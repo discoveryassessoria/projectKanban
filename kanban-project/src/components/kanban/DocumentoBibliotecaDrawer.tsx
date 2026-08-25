@@ -37,7 +37,7 @@ const CELL_DOT: Record<CellStatus, string> = {
   validada: "bg-[#4ade80]",
   recebida: "bg-[#7dd3fc]",
   pendente: "bg-[#d2a948]/15",
-  nao_aplica: "bg-white/20",
+  nao_aplica: "bg-[var(--surface-secondary)]",
 }
 
 export interface DocumentoBibliotecaContext {
@@ -87,7 +87,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
       {/* Painel claro */}
       <div className="fixed top-0 right-0 h-full w-[560px] max-w-[94vw] bg-[var(--surface-popover)] text-white/95 z-50 shadow-2xl flex flex-col">
         {/* ---- Cabeçalho ---- */}
-        <div className="px-6 pt-5 pb-4 border-b border-white/10">
+        <div className="px-6 pt-5 pb-4 border-b border-[var(--border-default)]">
           <div className="flex items-start gap-3">
             <div className="w-11 h-11 rounded-xl bg-[#252c35] grid place-items-center text-white/55 flex-none">
               <FileText className="w-[22px] h-[22px]" strokeWidth={1.7} />
@@ -114,18 +114,18 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
             <button
               disabled
               title="Arquivo ainda não disponível"
-              className="inline-flex items-center gap-2 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <ExternalLink className="w-[15px] h-[15px]" /> Abrir arquivo principal
             </button>
             <button
               disabled
               title="Arquivo ainda não disponível"
-              className="inline-flex items-center gap-2 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Download className="w-[15px] h-[15px]" /> Baixar todos os arquivos
             </button>
-            <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-white/20">
+            <button className="inline-flex items-center gap-1.5 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-[var(--border-strong)]">
               Mais ações <ChevronDown className="w-[15px] h-[15px]" />
             </button>
           </div>
@@ -238,13 +238,13 @@ function Overview({
                   n.tone === "ok"
                     ? "border-[#4ade80]/30"
                     : n.tone === "na"
-                    ? "border-white/15"
+                    ? "border-[var(--border-default)]"
                     : "border-[#d2a948]/30"
                 }`}
               >
                 <span
                   className={`w-2 h-2 rounded-full ${
-                    n.tone === "ok" ? "bg-[#4ade80]" : n.tone === "na" ? "bg-white/20" : "bg-[#d2a948]/15"
+                    n.tone === "ok" ? "bg-[#4ade80]" : n.tone === "na" ? "bg-[var(--surface-secondary)]" : "bg-[#d2a948]/15"
                   }`}
                 />
               </span>
@@ -257,7 +257,7 @@ function Overview({
 
       {/* Informações principais + Arquivos disponíveis */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="border border-white/10 rounded-xl p-4">
+        <div className="border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-[12px] font-bold text-white/95 mb-2.5">Informações principais</div>
           <div className="flex flex-col gap-2">
             {info.map(([k, v]) => (
@@ -269,7 +269,7 @@ function Overview({
           </div>
         </div>
 
-        <div className="border border-white/10 rounded-xl p-4">
+        <div className="border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-[12px] font-bold text-white/95 mb-2.5">Arquivos disponíveis</div>
           <div className="flex flex-col gap-2.5">
             <FileLine
@@ -335,7 +335,7 @@ function FileTab({ title, status, emptyMsg }: { title: string; status: CellStatu
         <span className="font-semibold text-white/95">{title}</span>
         <span className="text-white/55">— {CELL_LABEL[status]}</span>
       </div>
-      <div className="border border-dashed border-white/10 rounded-xl p-8 text-center text-[12px] text-white/40">
+      <div className="border border-dashed border-[var(--border-default)] rounded-xl p-8 text-center text-[12px] text-white/40">
         {available
           ? "Arquivo recebido. (visualização / download ainda não conectados ao backend)"
           : "Arquivo ainda não disponível."}

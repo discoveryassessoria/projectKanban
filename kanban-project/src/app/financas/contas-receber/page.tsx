@@ -119,25 +119,25 @@ export default function ContasReceberPage() {
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Total</p>
             <p className="text-xl font-bold text-white">{formatCurrency(totais.total)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Pendente</p>
             <p className="text-xl font-bold text-yellow-400">{formatCurrency(totais.pendente)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Vencido</p>
             <p className="text-xl font-bold text-red-400">{formatCurrency(totais.vencido)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Recebido</p>
             <p className="text-xl font-bold text-green-400">{formatCurrency(totais.pago)}</p>
@@ -153,11 +153,11 @@ export default function ContasReceberPage() {
             placeholder="Buscar por descrição ou processo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px] bg-white/10 border-white/20 text-white">
+          <SelectTrigger className="w-[180px] bg-[var(--surface-primary)] border-[var(--border-strong)] text-white">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -169,14 +169,14 @@ export default function ContasReceberPage() {
             <SelectItem value="CANCELADO">Cancelado</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+        <Button variant="outline" className="border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">
           <Download className="h-4 w-4 mr-2" />
           Exportar
         </Button>
       </div>
 
       {/* Tabela */}
-      <Card className="bg-white/10 border-white/20">
+      <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center h-48">
@@ -190,7 +190,7 @@ export default function ContasReceberPage() {
           ) : (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-white/10">
+                <tr className="border-b border-[var(--border-default)]">
                   <th className="text-left p-4 text-sm font-medium text-white/70">Descrição</th>
                   <th className="text-left p-4 text-sm font-medium text-white/70">Processo</th>
                   <th className="text-left p-4 text-sm font-medium text-white/70">Valor</th>
@@ -204,7 +204,7 @@ export default function ContasReceberPage() {
                   const StatusIcon = statusConfig[fatura.status].icon
                   
                   return (
-                    <tr key={fatura.id} className="border-b border-white/5 hover:bg-white/5">
+                    <tr key={fatura.id} className="border-b border-[var(--border-subtle)] hover:bg-[var(--surface-hover)]">
                       <td className="p-4">
                         <p className="text-white font-medium">{fatura.descricao}</p>
                         <p className="text-xs text-white/50">Emitido em {formatDate(fatura.dataEmissao)}</p>

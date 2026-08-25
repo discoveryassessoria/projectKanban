@@ -124,7 +124,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
   const protocoloCor = protocolo.apto ? 'text-[#4ade80]' : 'text-[#fbbf24]'
 
   // Discovery Design System — dark glass (skin only; layout preservado)
-  const cardCls = "bg-[var(--surface-popover)] border border-white/10 rounded-xl px-4 py-3.5"
+  const cardCls = "bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-4 py-3.5"
   const labelCls = "text-[10px] font-bold text-white/40 uppercase tracking-[0.08em] mb-1.5"
   const valueCls = "text-[22px] font-bold text-white/95 leading-tight tracking-tight"
   const subCls = "text-[11px] text-white/40 mt-1.5 leading-relaxed"
@@ -202,7 +202,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
       </div>
 
       {/* ============== ALERTAS EXECUTIVOS ============== */}
-      <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl px-4 py-3.5 mb-4">
+      <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-4 py-3.5 mb-4">
         <div className="text-[11px] font-bold text-white/68 uppercase tracking-[0.08em] mb-2.5">
           Alertas executivos
         </div>
@@ -234,11 +234,11 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
       )}
 
       {/* ============== ATALHOS DE NAVEGAÇÃO ============== */}
-      <div className="flex gap-2 pt-3.5 border-t border-white/10">
+      <div className="flex gap-2 pt-3.5 border-t border-[var(--border-default)]">
         <Button
           variant="outline"
           size="sm"
-          className="border-white/15 bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
           onClick={() => onNavigate?.('arvore')}
         >
           → Árvore Genealógica
@@ -248,14 +248,14 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           size="sm"
           disabled
           title="Aba ainda não implementada"
-          className="border-white/15 bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
         >
           → Central Operacional
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="border-white/15 bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
           onClick={() => onNavigate?.('documentos')}
         >
           → Documentos

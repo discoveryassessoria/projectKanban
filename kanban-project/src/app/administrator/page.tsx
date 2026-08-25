@@ -289,7 +289,7 @@ function CarregandoTela() {
 // fallback de segurança (não deve aparecer — todas as telas estão registradas)
 function EmBreve({ titulo }: { titulo: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-md p-10 text-center">
+    <div className="rounded-2xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md p-10 text-center">
       <Settings2 className="mx-auto mb-3 h-10 w-10 text-white/40" />
       <div className="font-semibold text-white/90">{titulo}</div>
       <div className="mt-1 text-sm text-white/50">Esta área será portada em breve.</div>
@@ -560,7 +560,7 @@ export default function GerenciamentoPage() {
   const secaoTela = itemAtivo?.section
 
   // classes de superfície — contraste real (fundo semissólido, blur discreto)
-  const PANEL = "rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-md"
+  const PANEL = "rounded-2xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">
@@ -597,13 +597,13 @@ export default function GerenciamentoPage() {
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Buscar configuração, módulo ou tela…"
                   aria-label="Buscar configuração, módulo ou tela"
-                  className="w-full rounded-xl border border-white/12 bg-white/[0.05] backdrop-blur-md py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-white/45 focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="w-full rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-white/45 focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 />
                 {busca ? (
                   <button
                     onClick={() => setBusca("")}
                     aria-label="Limpar busca"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/50 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/50 hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -646,9 +646,9 @@ export default function GerenciamentoPage() {
                     <button
                       key={g.key}
                       onClick={() => irParaModulo(g.key)}
-                      className="group flex min-h-[188px] flex-col rounded-2xl border border-white/10 bg-white/[0.05] p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                      className="group flex min-h-[188px] flex-col rounded-2xl border border-[var(--border-default)] bg-white/[0.05] p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                     >
-                      <div className="mb-3.5 flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85 transition-colors group-hover:bg-white/[0.12]">
+                      <div className="mb-3.5 flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[var(--border-default)] bg-white/[0.07] text-white/85 transition-colors group-hover:bg-white/[0.12]">
                         {Icon ? <Icon className="h-6 w-6" /> : <Settings2 className="h-6 w-6" />}
                       </div>
                       <h2 className="text-[19px] font-semibold leading-tight text-white">{g.fullLabel || g.label}</h2>
@@ -675,7 +675,7 @@ export default function GerenciamentoPage() {
             <button
               onClick={() => setMobileNav(true)}
               aria-label="Abrir navegação do Gerenciamento"
-              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.08] px-3 py-2 text-[13px] md:hidden"
+              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-white/[0.08] px-3 py-2 text-[13px] md:hidden"
             >
               <Menu className="h-4 w-4" /> {moduloAtivo.fullLabel || moduloAtivo.label}
             </button>
@@ -688,7 +688,7 @@ export default function GerenciamentoPage() {
               {/* ÁRVORE LATERAL — TODOS os módulos; accordion (1 módulo aberto por vez) */}
               <aside
                 aria-label="Navegação do Gerenciamento"
-                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-white/10 bg-white/[0.05] backdrop-blur-md p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-white/[0.05] md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
+                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-white/[0.05] md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
               >
                 {navCollapsed ? (
                   // modo recolhido (rail com ícones de TODOS os módulos)
@@ -697,7 +697,7 @@ export default function GerenciamentoPage() {
                       onClick={() => setNavCollapsed(false)}
                       aria-label="Expandir navegação"
                       title="Expandir navegação"
-                      className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-white/70 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                      className="mb-1 flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-default)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                     >
                       <PanelLeftOpen className="h-5 w-5" />
                     </button>
@@ -712,7 +712,7 @@ export default function GerenciamentoPage() {
                           aria-label={g.fullLabel || g.label}
                           aria-current={ativo ? "true" : undefined}
                           className={`flex h-10 w-10 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                            ativo ? "bg-white/[0.14] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                            ativo ? "bg-white/[0.14] text-white" : "text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                           }`}
                         >
                           {Icon ? <Icon className="h-5 w-5" /> : <Settings2 className="h-5 w-5" />}
@@ -735,14 +735,14 @@ export default function GerenciamentoPage() {
                         onClick={() => setNavCollapsed(true)}
                         aria-label="Recolher navegação"
                         title="Recolher navegação"
-                        className="hidden flex-none rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 md:block"
+                        className="hidden flex-none rounded-md p-1 text-white/45 hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 md:block"
                       >
                         <PanelLeftClose className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setMobileNav(false)}
                         aria-label="Fechar navegação"
-                        className="flex-none rounded-md p-1 text-white/45 hover:bg-white/10 hover:text-white md:hidden"
+                        className="flex-none rounded-md p-1 text-white/45 hover:bg-[var(--surface-hover)] hover:text-white md:hidden"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -830,7 +830,7 @@ export default function GerenciamentoPage() {
                                 className={`grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none ${moduloAberto ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
                               >
                                 <div className="min-h-0 overflow-hidden">
-                                  <div className={`ml-[13px] space-y-0.5 border-l border-white/10 pb-1 pl-2 pt-1 transition-opacity duration-200 motion-reduce:transition-none ${moduloAberto ? "opacity-100" : "opacity-0"}`}>
+                                  <div className={`ml-[13px] space-y-0.5 border-l border-[var(--border-default)] pb-1 pl-2 pt-1 transition-opacity duration-200 motion-reduce:transition-none ${moduloAberto ? "opacity-100" : "opacity-0"}`}>
                                     {blocos.map((b, i) =>
                                       b.tipo === "item" ? (
                                         <div key={`i-${b.item.key}-${i}`}>{renderItem(b.item)}</div>

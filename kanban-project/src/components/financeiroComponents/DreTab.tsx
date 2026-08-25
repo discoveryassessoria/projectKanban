@@ -66,10 +66,10 @@ export default function DreTab() {
       </div>
 
       {/* TABELA DRE */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-x-auto">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl overflow-x-auto">
         <div className="min-w-[640px]">
           {/* cabeçalho */}
-          <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2.5 border-b border-white/10 text-[11px] font-bold uppercase tracking-wide text-white/40">
+          <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2.5 border-b border-[var(--border-default)] text-[11px] font-bold uppercase tracking-wide text-white/40">
             <div>Conta</div>
             <div className="text-right capitalize">{d.periodoAtual.split(" ")[0]}</div>
             <div className="text-right capitalize">{d.periodoAnterior.split(" ")[0]}</div>
@@ -92,7 +92,7 @@ export default function DreTab() {
       </div>
 
       {/* nota de prévia */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg p-3">
+      <div className="flex items-start gap-2 text-xs text-white/50 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Receita bruta e custos são dados reais do mês. A quebra detalhada de impostos e despesas operacionais é uma <strong className="text-white/70">prévia</strong> estimada — será ligada a um plano de contas estruturado numa próxima etapa.</span>
       </div>
@@ -103,11 +103,11 @@ export default function DreTab() {
     label: string; l: Linha; grupo?: boolean; deduct?: boolean; margem?: boolean; total?: boolean; indent?: boolean
   }) {
     const ahVal = ah(l.valor, l.prev)
-    const bg = total ? "bg-white/10" : margem ? "bg-white/[0.07]" : grupo ? "bg-white/[0.03]" : ""
+    const bg = total ? "bg-[var(--surface-primary)]" : margem ? "bg-white/[0.07]" : grupo ? "bg-white/[0.03]" : ""
     const weight = total || margem || grupo ? "font-bold" : "font-normal"
     const valColor = total ? (l.valor >= 0 ? "text-green-400" : "text-red-400") : deduct ? "text-red-300/80" : "text-white"
     return (
-      <div className={`grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2 border-b border-white/5 text-sm ${bg}`}>
+      <div className={`grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2 border-b border-[var(--border-subtle)] text-sm ${bg}`}>
         <div className={`${weight} text-white/90 ${indent ? "pl-4" : ""} flex items-center gap-1.5`}>
           {label}{!l.real && <span className="text-[9px] text-white/30 font-normal">prévia</span>}
         </div>
@@ -121,7 +121,7 @@ export default function DreTab() {
 
   function DreSub({ label, valor, av }: { label: string; valor: number; av: number }) {
     return (
-      <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-1.5 border-b border-white/5 text-xs">
+      <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-1.5 border-b border-[var(--border-subtle)] text-xs">
         <div className="pl-8 text-white/50 flex items-center gap-1.5">{label}<span className="text-[9px] text-white/25">prévia</span></div>
         <div className="text-right tabular-nums text-white/60">{fmtBRL(valor)}</div>
         <div className="text-right text-white/30">—</div>
@@ -136,13 +136,13 @@ export default function DreTab() {
 // SUBCOMPONENTES
 // ============================================================
 function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-white/30 text-white hover:bg-white/10">{icon}{children}</button>
+  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">{icon}{children}</button>
 }
 function Kpi({ label, value, sub, valueColor = "text-white" }: {
   label: string; value: string; sub?: React.ReactNode; valueColor?: string
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-4">
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4">
       <div className="text-white/50 text-xs font-medium">{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
       {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}

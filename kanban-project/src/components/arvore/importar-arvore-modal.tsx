@@ -155,13 +155,13 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
 
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-popover)] text-white/95 shadow-2xl">
-        <header className="flex flex-shrink-0 items-center justify-between border-b border-white/10 px-6 py-4">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 shadow-2xl">
+        <header className="flex flex-shrink-0 items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold">Importar Árvore</h2>
             <p className="text-sm text-white/70">Envie o print de uma árvore já montada — os cards são transcritos automaticamente.</p>
           </div>
-          <button onClick={fechar} disabled={ocupado} className="rounded p-1 text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-40" aria-label="Fechar">
+          <button onClick={fechar} disabled={ocupado} className="rounded p-1 text-white/60 transition hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-40" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </header>
@@ -186,7 +186,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
             <div className="space-y-5">
               <div>
                 <label className="mb-2 block text-sm font-medium">Print da árvore <span className="text-red-400">*</span></label>
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-[var(--surface-popover)] px-6 py-10 text-center transition hover:border-white/35">
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-popover)] px-6 py-10 text-center transition hover:border-[var(--border-strong)]">
                   {previewUrl ? (
                     // <img> e não next/image: a origem é um blob: URL local do
                     // arquivo escolhido, que o otimizador do Next não processa.
@@ -211,7 +211,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                 <textarea value={textoComplementar} onChange={(e) => setTextoComplementar(e.target.value)}
                   disabled={ocupado} rows={4}
                   placeholder="Lista ou resumo escrito para desambiguar o que ficar cortado ou pouco legível na imagem."
-                  className="w-full rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-sm placeholder:text-white/35 focus:border-white/30 focus:outline-none" />
+                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm placeholder:text-white/35 focus:border-white/30 focus:outline-none" />
               </div>
             </div>
           )}
@@ -232,7 +232,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                 </div>
               )}
 
-              <div className="divide-y divide-white/10 overflow-hidden rounded-lg border border-white/10">
+              <div className="divide-y divide-white/10 overflow-hidden rounded-lg border border-[var(--border-default)]">
                 {extracao.pessoas.map((p) => {
                   const fora = removidas.has(p.ref)
                   const pai = extracao.pessoas.find((x) => x.ref === p.paiRef)
@@ -242,7 +242,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                       <div className="min-w-0">
                         <p className="font-medium">
                           {p.nome} {p.sobrenome ?? ""}
-                          {p.numeroLinhagem != null && <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">linhagem {p.numeroLinhagem}</span>}
+                          {p.numeroLinhagem != null && <span className="ml-2 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">linhagem {p.numeroLinhagem}</span>}
                         </p>
                         <p className="mt-0.5 text-xs text-white/60">
                           {[p.sexo, p.data_nasc && `nasc. ${p.data_nasc}`, [p.local_nasc, p.pais_nasc].filter(Boolean).join(", "),
@@ -256,7 +256,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                       </div>
                       <button
                         onClick={() => setRemovidas((s) => { const n = new Set(s); n.has(p.ref) ? n.delete(p.ref) : n.add(p.ref); return n })}
-                        className="flex-shrink-0 rounded border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10">
+                        className="flex-shrink-0 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)]">
                         {fora ? "Incluir" : "Remover"}
                       </button>
                     </div>
@@ -267,25 +267,25 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
           )}
         </div>
 
-        <footer className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-white/10 px-6 py-4">
+        <footer className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-4">
           <p className="text-xs text-white/50">
             {naPrevia ? "Nada foi gravado ainda — confira antes de confirmar." : "A imagem é lida no servidor; nada é gravado nesta etapa."}
           </p>
           <div className="flex items-center gap-2">
             {naPrevia && (
-              <button onClick={() => setEtapa("upload")} disabled={ocupado} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10">Voltar</button>
+              <button onClick={() => setEtapa("upload")} disabled={ocupado} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 transition hover:bg-[var(--surface-hover)]">Voltar</button>
             )}
             <button onClick={fechar} disabled={ocupado}
-              className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-40">Cancelar</button>
+              className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 transition hover:bg-[var(--surface-hover)] disabled:opacity-40">Cancelar</button>
             {!naPrevia ? (
               <button onClick={analisar} disabled={!arquivo || ocupado}
-                className="flex items-center gap-2 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
+                className="flex items-center gap-2 rounded-lg bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
                 {etapa === "analisando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {etapa === "analisando" ? "Lendo a imagem…" : "Analisar"}
               </button>
             ) : (
               <button onClick={confirmar} disabled={ocupado || restantes.length === 0}
-                className="flex items-center gap-2 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
+                className="flex items-center gap-2 rounded-lg bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
                 {etapa === "gravando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {etapa === "gravando" ? "Gravando…" : `Confirmar e criar ${restantes.length}`}
               </button>

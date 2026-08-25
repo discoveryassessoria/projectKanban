@@ -360,7 +360,7 @@ export default function TipoProcessoTab() {
 
   const paisDoModMods = useMemo(() => paises.find((p) => p.countryKey === modCountryKey) || null, [paises, modCountryKey])
 
-  const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
+  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
 
   return (
     <div className="space-y-5">
@@ -370,10 +370,10 @@ export default function TipoProcessoTab() {
           <p className="text-sm text-white/50">Tipos de processo configuráveis — país, modalidade, código e nome.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={abrirPaises} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white">
+          <button onClick={abrirPaises} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-[var(--surface-hover)] hover:text-white">
             Gerenciar países
           </button>
-          <button onClick={abrirMods} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white">
+          <button onClick={abrirMods} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-[var(--surface-hover)] hover:text-white">
             Gerenciar modalidades
           </button>
           <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
@@ -392,7 +392,7 @@ export default function TipoProcessoTab() {
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         placeholder="Buscar processo..."
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
+        className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
@@ -404,29 +404,29 @@ export default function TipoProcessoTab() {
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && paises.length > 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
           {busca ? 'Nenhum processo encontrado.' : 'Nenhum tipo de processo ainda. Crie o primeiro.'}
         </div>
       )}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="bg-white/5">
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Processo</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">País</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Modalidade</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+              <tr className="bg-[var(--surface-primary)]">
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Processo</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">País</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Modalidade</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((t) => {
                 const flag = paises.find((p) => p.countryKey === t.countryKey)?.flag || ''
                 return (
-                  <tr key={t.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                  <tr key={t.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                     <td className="px-4 py-2.5 font-mono text-[12px] text-white/80">{t.code}</td>
                     <td className="px-4 py-2.5 font-medium text-white">{t.name}</td>
                     <td className="px-4 py-2.5 text-white/70">{flag} {t.countryLabel}</td>
@@ -434,11 +434,11 @@ export default function TipoProcessoTab() {
                     <td className="px-4 py-2.5">
                       {t.ativo
                         ? <span className="rounded-md bg-green-500/15 px-2 py-0.5 text-[11px] font-medium text-green-300">ativo</span>
-                        : <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">inativo</span>}
+                        : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-white/50">inativo</span>}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => abrirEditar(t)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
+                        <button onClick={() => abrirEditar(t)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
                         <button onClick={() => excluir(t)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
                       </div>
                     </td>
@@ -453,8 +453,8 @@ export default function TipoProcessoTab() {
       {/* MODAL: Novo/Editar processo */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar processo' : 'Novo processo de nacionalidade'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
@@ -497,7 +497,7 @@ export default function TipoProcessoTab() {
               {erroModal && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
@@ -510,8 +510,8 @@ export default function TipoProcessoTab() {
       {/* MODAL: Gerenciar países (lista + criar/editar) */}
       {paisesModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
                 {visao === 'lista' ? 'Países' : editandoPais ? `Editar país — ${editandoPais.countryLabel}` : 'Novo país'}
               </h3>
@@ -533,32 +533,32 @@ export default function TipoProcessoTab() {
                 )}
 
                 {!carregandoPaises && paisesAdmin.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
                     <table className="w-full text-[13px]">
                       <thead>
-                        <tr className="bg-white/5">
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">País</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nacionalidade</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipos</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                        <tr className="bg-[var(--surface-primary)]">
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">País</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nacionalidade</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipos</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {paisesAdmin.map((p) => (
-                          <tr key={p.countryKey} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                          <tr key={p.countryKey} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                             <td className="px-3 py-2 font-medium text-white">{p.flag ? p.flag + ' ' : ''}{p.countryLabel}</td>
                             <td className="px-3 py-2 text-white/70">{p.nationalityLabel}</td>
                             <td className="px-3 py-2 text-white/70">{p.tiposCount ?? 0}</td>
                             <td className="px-3 py-2">
                               {p.ativo
                                 ? <span className="rounded-md bg-green-500/15 px-2 py-0.5 text-[11px] font-medium text-green-300">ativo</span>
-                                : <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">inativo</span>}
+                                : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-white/50">inativo</span>}
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center justify-end gap-1.5">
-                                <button onClick={() => abrirEditarPais(p)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
-                                <button onClick={() => toggleAtivoPais(p)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
+                                <button onClick={() => abrirEditarPais(p)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
+                                <button onClick={() => toggleAtivoPais(p)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">
                                   {p.ativo ? 'Inativar' : 'Ativar'}
                                 </button>
                                 <button onClick={() => excluirPais(p)} className="rounded-md border border-red-500/20 px-2 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
@@ -616,7 +616,7 @@ export default function TipoProcessoTab() {
                   {!editandoPais && (
                     <div>
                       <label className="mb-1 block text-xs text-white/60">Modalidades</label>
-                      <div className="space-y-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                      <div className="space-y-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                         <label className="flex items-center gap-2 text-sm text-white/80">
                           <input type="checkbox" checked={pJud} onChange={(e) => setPJud(e.target.checked)} className="h-4 w-4 accent-blue-500" />
                           Judicial
@@ -633,7 +633,7 @@ export default function TipoProcessoTab() {
                   {erroPais && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroPais}</div>}
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-white/10 px-6 py-4">
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-6 py-4">
                   <button onClick={() => { setVisao('lista'); setErroPais(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
                   <button onClick={salvarPais} disabled={salvandoPais} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                     {salvandoPais ? 'Salvando...' : editandoPais ? 'Salvar alterações' : 'Criar país'}
@@ -648,8 +648,8 @@ export default function TipoProcessoTab() {
       {/* MODAL: Gerenciar modalidades (seletor de país + lista + criar/editar) */}
       {modsModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
                 {visaoMod === 'lista'
                   ? 'Modalidades'
@@ -681,32 +681,32 @@ export default function TipoProcessoTab() {
                 )}
 
                 {!carregandoMods && modsAdmin.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-white/10">
+                  <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
                     <table className="w-full text-[13px]">
                       <thead>
-                        <tr className="bg-white/5">
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Modalidade</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Sufixo</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipos</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                          <th className="border-b border-white/10 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                        <tr className="bg-[var(--surface-primary)]">
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Modalidade</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Sufixo</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipos</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                          <th className="border-b border-[var(--border-default)] px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
                         </tr>
                       </thead>
                       <tbody>
                         {modsAdmin.map((m) => (
-                          <tr key={m.modalityKey} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                          <tr key={m.modalityKey} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                             <td className="px-3 py-2 font-medium text-white">{m.modalityLabel}</td>
                             <td className="px-3 py-2 font-mono text-[12px] text-white/70">{m.codeSuffix || '—'}</td>
                             <td className="px-3 py-2 text-white/70">{m.tiposCount ?? 0}</td>
                             <td className="px-3 py-2">
                               {(m.ativo ?? true)
                                 ? <span className="rounded-md bg-green-500/15 px-2 py-0.5 text-[11px] font-medium text-green-300">ativa</span>
-                                : <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11px] font-medium text-white/50">inativa</span>}
+                                : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-white/50">inativa</span>}
                             </td>
                             <td className="px-3 py-2">
                               <div className="flex items-center justify-end gap-1.5">
-                                <button onClick={() => abrirEditarMod(m)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
-                                <button onClick={() => toggleAtivoMod(m)} className="rounded-md border border-white/10 px-2 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">
+                                <button onClick={() => abrirEditarMod(m)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
+                                <button onClick={() => toggleAtivoMod(m)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">
                                   {(m.ativo ?? true) ? 'Inativar' : 'Ativar'}
                                 </button>
                                 <button onClick={() => excluirMod(m)} className="rounded-md border border-red-500/20 px-2 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
@@ -747,7 +747,7 @@ export default function TipoProcessoTab() {
                   {erroMod && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroMod}</div>}
                 </div>
 
-                <div className="flex items-center justify-between gap-2 border-t border-white/10 px-6 py-4">
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-6 py-4">
                   <button onClick={() => { setVisaoMod('lista'); setErroMod(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
                   <button onClick={salvarMod} disabled={salvandoMod} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                     {salvandoMod ? 'Salvando...' : editandoMod ? 'Salvar alterações' : 'Criar modalidade'}

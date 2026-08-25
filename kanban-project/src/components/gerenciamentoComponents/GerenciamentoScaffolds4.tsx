@@ -12,7 +12,7 @@
 import { useState } from 'react'
 import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
-const CARD = 'rounded-xl border border-white/10 bg-white/5 backdrop-blur'
+const CARD = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur'
 const BTN_PRIMARY =
   'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500'
 
@@ -30,11 +30,11 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
     <div className={`overflow-hidden ${CARD}`}>
       <table className="w-full text-[12.5px]">
         <thead>
-          <tr className="bg-white/5">
+          <tr className="bg-[var(--surface-primary)]">
             {headers.map((h, i) => (
               <th
                 key={i}
-                className={`whitespace-nowrap border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                className={`whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
                   i === headers.length - 1 ? 'text-right' : 'text-left'
                 }`}
               >
@@ -77,7 +77,7 @@ export function FinCatalogTab() {
             className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition ${
               filtro === f
                 ? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
-                : 'border-white/10 text-white/60 hover:bg-white/5'
+                : 'border-[var(--border-default)] text-white/60 hover:bg-[var(--surface-hover)]'
             }`}
           >
             {f}
@@ -134,7 +134,7 @@ function PhaseCard({ nome }: { nome: string }) {
     <div className={`${CARD} p-3.5`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-sm font-bold text-white">{nome}</div>
-        <span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/50">sem regras</span>
+        <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] font-semibold text-white/50">sem regras</span>
       </div>
       <div className="mb-2.5 grid grid-cols-3 gap-1.5 text-center">
         <div><div className="text-lg font-extrabold text-blue-300">0</div><div className="text-[9px] text-white/50">Disparos</div></div>
@@ -147,7 +147,7 @@ function PhaseCard({ nome }: { nome: string }) {
       <div className="text-[11px] text-white/40">— nenhuma —</div>
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <button className="rounded-lg bg-blue-600 px-2 py-1 text-[10px] font-semibold text-[#fff] transition hover:bg-blue-500">+ Disparo financeiro</button>
-        <button className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-white/70 transition hover:bg-white/10">Simular fase</button>
+        <button className="rounded-lg border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/70 transition hover:bg-[var(--surface-hover)]">Simular fase</button>
       </div>
     </div>
   )

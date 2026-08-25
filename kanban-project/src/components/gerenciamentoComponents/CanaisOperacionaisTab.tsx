@@ -26,7 +26,7 @@ interface Canal {
   observacaoObrigatoria: boolean
 }
 
-const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
 
 function headers(): HeadersInit {
@@ -96,10 +96,10 @@ export default function CanaisOperacionaisTab() {
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-white/10">
+      <div className="flex gap-1 border-b border-[var(--border-default)]">
         {(["tipos", "organizacoes"] as const).map((v) => (
           <button key={v} onClick={() => setVisao(v)}
-            className={`rounded-t-lg px-3 py-2 text-xs ${visao === v ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+            className={`rounded-t-lg px-3 py-2 text-xs ${visao === v ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
             {v === "tipos" ? "Tipos de canal" : "Por organização"}
           </button>
         ))}
@@ -113,12 +113,12 @@ export default function CanaisOperacionaisTab() {
 
       <div className="space-y-1.5">
         {canais.length === 0 && (
-          <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/40">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-white/40">
             Nenhum canal cadastrado ainda.
           </div>
         )}
         {canais.map((c) => (
-          <div key={c.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          <div key={c.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
             {editando?.id === c.id ? (
               <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -138,7 +138,7 @@ export default function CanaisOperacionaisTab() {
                   <label className="flex items-center gap-2"><input type="checkbox" checked={editando.ativo} onChange={(e) => setEditando({ ...editando, ativo: e.target.checked })} /> Ativo</label>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <button onClick={() => setEditando(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
+                  <button onClick={() => setEditando(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
                   <button onClick={() => salvar(editando)} disabled={salvando} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-50">Salvar</button>
                 </div>
               </div>
@@ -148,16 +148,16 @@ export default function CanaisOperacionaisTab() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-white">{c.label}</span>
                     <code className="text-[10px] text-white/35">{c.key}</code>
-                    {!c.ativo && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">inativo</span>}
+                    {!c.ativo && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">inativo</span>}
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
                     {c.protocoloObrigatorio && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">protocolo no ato</span>}
-                    {c.anexoObrigatorioLabel && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{c.anexoObrigatorioLabel}</span>}
+                    {c.anexoObrigatorioLabel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{c.anexoObrigatorioLabel}</span>}
                     {c.rastreioObrigatorio && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">rastreio</span>}
-                    {c.observacaoObrigatoria && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">observação</span>}
+                    {c.observacaoObrigatoria && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">observação</span>}
                   </div>
                 </div>
-                <button onClick={() => setEditando(c)} className="flex-none rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70 hover:bg-white/10">Editar</button>
+                <button onClick={() => setEditando(c)} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Editar</button>
               </div>
             )}
           </div>
@@ -182,7 +182,7 @@ export default function CanaisOperacionaisTab() {
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.observacaoObrigatoria} onChange={(e) => setForm({ ...form, observacaoObrigatoria: e.target.checked })} /> Exige observação</label>
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
+            <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
             <button onClick={criar} disabled={salvando || !form.label.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-50">Cadastrar canal</button>
           </div>
         </div>

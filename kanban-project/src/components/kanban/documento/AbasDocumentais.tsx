@@ -155,8 +155,8 @@ function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
       rel="noopener noreferrer"
       className={`flex items-center gap-2.5 rounded-md border px-2.5 py-2 transition-colors ${
         a.vigente
-          ? "border-white/10 bg-[var(--app-background)] hover:bg-[var(--surface-popover)]"
-          : "border-white/5 bg-[#0f1216] hover:bg-[var(--surface-overlay)] opacity-60"
+          ? "border-[var(--border-default)] bg-[var(--app-background)] hover:bg-[var(--surface-popover)]"
+          : "border-[var(--border-subtle)] bg-[#0f1216] hover:bg-[var(--surface-overlay)] opacity-60"
       }`}
     >
       <Paperclip className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
@@ -164,7 +164,7 @@ function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[12px] text-white/90 truncate">{a.nome}</span>
           {!a.vigente && (
-            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-white/55 flex-shrink-0">
+            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--surface-primary)] text-white/55 flex-shrink-0">
               substituído
             </span>
           )}
@@ -297,7 +297,7 @@ export function AbaAnexosDocumentais({
           <button
             onClick={() => inputRef.current?.click()}
             disabled={enviando}
-            className="w-full px-3 py-2.5 bg-[var(--surface-overlay)] border border-dashed border-white/15 rounded-md text-left hover:bg-[#20262e] transition-colors disabled:opacity-50"
+            className="w-full px-3 py-2.5 bg-[var(--surface-overlay)] border border-dashed border-[var(--border-default)] rounded-md text-left hover:bg-[#20262e] transition-colors disabled:opacity-50"
           >
             <div className="flex items-center gap-2.5">
               {enviando ? <Loader2 className="w-4 h-4 animate-spin text-white/60" /> : <Upload className="w-4 h-4 text-white/60" />}
@@ -380,7 +380,7 @@ export function AbaObservacoesDocumentais({
       ) : (
         <div className="space-y-1.5">
           {observacoes.map((o) => (
-            <div key={o.id} className="rounded-md border border-white/10 bg-[var(--surface-overlay)] p-2.5">
+            <div key={o.id} className="rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] p-2.5">
               <div className="text-[10px] text-white/45 mb-0.5 flex items-center gap-1.5">
                 <StickyNote className="w-3 h-3" />
                 {o.criadoPor?.nome ?? "—"} · {fmtDataHora(o.createdAt)}
@@ -398,7 +398,7 @@ export function AbaObservacoesDocumentais({
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Anote algo relevante sobre este documento…"
-            className="w-full px-3 py-2 bg-[var(--surface-overlay)] border border-white/10 rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 resize-none"
+            className="w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 resize-none"
           />
           <div className="flex justify-end mt-1.5">
             <button

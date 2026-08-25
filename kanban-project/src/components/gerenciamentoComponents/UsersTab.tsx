@@ -235,11 +235,11 @@ export default function UsersTab() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
         <Input placeholder="Buscar por nome ou email..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-          className="pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/50" />
+          className="pl-10 bg-[var(--surface-primary)] border-[var(--border-default)] text-white placeholder:text-white/50" />
       </div>
 
       {/* Tabela glass */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 overflow-x-auto">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         {isLoading ? (
           <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
         ) : usuarios.length === 0 ? (
@@ -247,7 +247,7 @@ export default function UsersTab() {
         ) : (
           <table className="w-full text-sm min-w-[640px]">
             <thead>
-              <tr className="text-white/40 text-xs border-b border-white/10">
+              <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
                 <th className="text-left font-medium py-2">Código</th>
                 <th className="text-left font-medium py-2">Nome</th>
                 <th className="text-left font-medium py-2">E-mail</th>
@@ -257,7 +257,7 @@ export default function UsersTab() {
             </thead>
             <tbody>
               {usuarios.map(u => (
-                <tr key={u.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                <tr key={u.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                   <td className="py-2.5 font-mono text-[12px] font-bold text-white/80">{u.publicCode ?? '—'}</td>
                   <td className="py-2.5 text-white">{u.nome}{getPerfilBadge(u)}</td>
                   <td className="py-2.5 text-white/70">{u.email}</td>
@@ -273,7 +273,7 @@ export default function UsersTab() {
                   <td className="py-2.5">
                     <div className="flex justify-end gap-1">
                       {pode("usuarios.editar") && (
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(u)} title="Editar" className="text-white/70 hover:text-white hover:bg-white/10"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(u)} title="Editar" className="text-white/70 hover:text-white hover:bg-[var(--surface-hover)]"><Pencil className="h-4 w-4" /></Button>
                       )}
                       {pode("usuarios.excluir") && u.tipo !== UserType.ADMIN && (
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(u)} title="Deletar" className="text-red-400 hover:text-red-300 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></Button>

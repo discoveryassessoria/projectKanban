@@ -20,7 +20,7 @@ import {
 // TOKENS DA REFERÊNCIA
 // ============================================================
 export const OURO = "#D2A948"
-const CARD = "rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md"
+const CARD = "rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
 
 // ============================================================
 // FORMATO
@@ -174,7 +174,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" style={{ color: OURO }} /> Entradas vs Saídas · Últimos 6 meses</div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] text-white/60 bg-white/5 border border-white/10 px-2 py-1 rounded-md">6 meses <span className="text-white/40">▾</span></span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-white/60 bg-[var(--surface-primary)] border border-[var(--border-default)] px-2 py-1 rounded-md">6 meses <span className="text-white/40">▾</span></span>
               <button type="button" aria-label="Opções do gráfico" className="text-white/40 hover:text-white/80 transition-colors">
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -193,7 +193,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
               <AlertTriangle className="h-4 w-4" style={{ color: OURO }} /> Alertas e Aprovações
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                 m.alertas.length === 0
-                  ? "bg-white/5 text-white/50 border-white/10"
+                  ? "bg-[var(--surface-primary)] text-white/50 border-[var(--border-default)]"
                   : "bg-red-500/20 text-red-300 border-red-500/30"
               }`}>{m.alertas.length}</span>
             </div>
@@ -233,15 +233,15 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             due: fmtDate(p.vencimento), dueHint: dueText(p.vencimento), critical: p.atrasado,
           }))} />
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Exposição Cambial <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded">prévia</span></div>
-          <div className="rounded-lg border border-white/10 bg-white/5 p-3 mb-2">
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Exposição Cambial <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 mb-2">
             <div className="flex items-center justify-between text-[11px] text-white/50 font-semibold uppercase tracking-wide">
               <span>🇪🇺 EUR</span><span>@ R$ {dash.fx.EUR.toFixed(2)}</span>
             </div>
             <div className="text-xl font-bold text-white mt-1">{fmtEUR(m.exposicaoEUR)}</div>
             <div className="text-xs text-white/50">≈ {fmtBRL(m.exposicaoEUR * dash.fx.EUR)}</div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
             <div className="flex items-center justify-between text-[11px] text-white/50 font-semibold uppercase tracking-wide">
               <span>🇺🇸 USD</span><span>@ R$ {dash.fx.USD.toFixed(2)}</span>
             </div>
@@ -258,7 +258,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             {dash.atividade.length === 0 ? (
               <p className="text-sm text-white/40 py-6 text-center">Sem registros de auditoria.</p>
             ) : dash.atividade.map(a => (
-              <div key={a.id} className="text-xs border-l-2 border-white/20 pl-3 py-1">
+              <div key={a.id} className="text-xs border-l-2 border-[var(--border-strong)] pl-3 py-1">
                 <div className="text-white/40">{fmtDate(a.data)}</div>
                 <div className="text-white/80"><span className="font-medium">{a.usuario}</span> · {a.acao}</div>
                 <div className="text-white/40">{a.entidade}</div>
@@ -271,7 +271,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
       {/* LINHA 2: Receita por País · Contas Bancárias */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded">prévia</span></div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
           <ReceitaPaisBars data={m.receitaPorPais} />
         </div>
 
@@ -282,7 +282,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {dash.contas.map(c => (
-                <div key={c.id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div key={c.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-white/50">{c.banco || "Conta"}</span>
                     <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor || "#64748b" }} />
@@ -353,7 +353,7 @@ function FluxoChart({ serie }: { serie: DashboardData["mock"]["serie6meses"] }) 
 // ============================================================
 function GlassBtn({ icon, children, onClick, disabled, title }: { icon: React.ReactNode; children: React.ReactNode; onClick?: () => void; disabled?: boolean; title?: string }) {
   return (
-    <button onClick={onClick} disabled={disabled} title={title} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-white/5 border border-white/20 text-white/90 hover:bg-white/10 hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/5">
+    <button onClick={onClick} disabled={disabled} title={title} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-[var(--surface-primary)] border border-[var(--border-strong)] text-white/90 hover:bg-[var(--surface-hover)] hover:text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-[var(--surface-hover)]">
       {icon}{children}
     </button>
   )
@@ -368,11 +368,11 @@ function StripCard({ topColor, icon, label, value, valueColor = "text-white", su
   void topColor
   return (
     <div className={`${CARD} p-4 relative`}>
-      {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>}
+      {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>}
       <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium">{icon}{label}</div>
       <div className={`text-[22px] font-bold mt-1 ${valueColor}`}>{value}</div>
       <div className="text-[11px] text-white/40 mt-1">{sub}</div>
-      <button onClick={action.onClick} className="mt-2 text-[11px] px-2.5 py-1 rounded-md border border-white/20 text-white/80 hover:bg-white/10 transition-colors">{action.label}</button>
+      <button onClick={action.onClick} className="mt-2 text-[11px] px-2.5 py-1 rounded-md border border-[var(--border-strong)] text-white/80 hover:bg-[var(--surface-hover)] transition-colors">{action.label}</button>
     </div>
   )
 }
@@ -385,7 +385,7 @@ function Kpi({ icon, label, value, sub, mock, accent }: {
 }) {
   return (
     <div className={`${CARD} relative overflow-hidden`}>
-      {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>}
+      {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>}
       <div className="p-3.5">
         <div className="flex items-center gap-2">
           <span
@@ -405,7 +405,7 @@ function Kpi({ icon, label, value, sub, mock, accent }: {
 
 function Mini({ label, value, hint, mock, last }: { label: string; value: string; hint: string; mock?: boolean; last?: boolean }) {
   return (
-    <div className={`px-3 ${last ? "" : "xl:border-r border-white/10"}`}>
+    <div className={`px-3 ${last ? "" : "xl:border-r border-[var(--border-default)]"}`}>
       <div className="text-[10px] text-white/40 font-semibold uppercase tracking-wide flex items-center gap-1 xl:whitespace-nowrap">
         {label}{mock && <span className="text-white/20">·prévia</span>}
       </div>
@@ -423,7 +423,7 @@ function AlertCard({ tipo, titulo, texto, meta }: { tipo: string; titulo: string
   }
   const s = styles[tipo] || styles.info
   return (
-    <div className={`flex gap-2 items-start bg-white/5 border border-white/10 border-l-2 ${s.border} rounded-lg p-2.5`}>
+    <div className={`flex gap-2 items-start bg-[var(--surface-primary)] border border-[var(--border-default)] border-l-2 ${s.border} rounded-lg p-2.5`}>
       <div className="mt-0.5">{s.icon}</div>
       <div className="min-w-0">
         <div className="text-sm font-semibold text-white">{titulo}</div>
@@ -445,7 +445,7 @@ function ReceitaPaisBars({ data }: { data: Record<string, number> }) {
             <span className="text-white/80 inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cores[pais] || "#64748b" }} />{pais}</span>
             <strong className="text-white">{fmtBRL(val)}</strong>
           </div>
-          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
             <div className="h-full rounded-full" style={{ width: `${(val / total) * 100}%`, background: cores[pais] || "#64748b" }} />
           </div>
         </div>
@@ -466,13 +466,13 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
       </div>
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-8">
-          <div className="h-11 w-11 rounded-full grid place-items-center bg-white/5 border border-white/10 mb-2 opacity-40">{icon}</div>
+          <div className="h-11 w-11 rounded-full grid place-items-center bg-[var(--surface-primary)] border border-[var(--border-default)] mb-2 opacity-40">{icon}</div>
           <p className="text-sm text-white/40">{empty}</p>
         </div>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-white/10">
+            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">{colLeft}</th>
               <th className="text-left font-medium py-1.5">{colMid}</th>
               <th className="text-right font-medium py-1.5">Valor</th>
@@ -482,8 +482,8 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
           <tbody>
             {rows.map(r => (
               <tr key={r.id} onClick={r.onClick}
-                className={`border-b border-white/5 last:border-0 ${r.onClick ? "cursor-pointer hover:bg-white/5" : ""}`}>
-                <td className="py-2 text-white/90"><span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${r.critical ? "bg-red-400" : "bg-white/20"}`} />{r.left}</td>
+                className={`border-b border-[var(--border-subtle)] last:border-0 ${r.onClick ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`}>
+                <td className="py-2 text-white/90"><span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${r.critical ? "bg-red-400" : "bg-[var(--surface-secondary)]"}`} />{r.left}</td>
                 <td className="py-2 text-white/50">{r.mid}</td>
                 <td className="py-2 text-right text-white font-medium tabular-nums">{r.val}</td>
                 <td className="py-2 text-right tabular-nums">

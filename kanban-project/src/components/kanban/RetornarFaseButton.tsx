@@ -79,14 +79,14 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
               value={justificativa}
               onChange={(e) => setJustificativa(e.target.value)}
               rows={3}
-              className="w-full text-[13px] rounded-lg border border-white/10 px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
+              className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
               placeholder="Por que o processo precisa voltar a esta fase?"
             />
             <label className="block text-[12px] font-semibold text-white/68 mb-1">Código de motivo</label>
             <input
               value={motivoCodigo}
               onChange={(e) => setMotivoCodigo(e.target.value)}
-              className="w-full text-[13px] rounded-lg border border-white/10 px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
+              className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
               placeholder="Ex.: DOC_NAO_LOCALIZADO"
             />
 

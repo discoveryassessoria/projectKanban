@@ -17,11 +17,11 @@ export function CodigoPublicoField({
     <div className={className}>
       <label className="mb-1 block text-xs text-white/60">Código</label>
       {codigo ? (
-        <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-mono text-sm font-bold text-white/80">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 font-mono text-sm font-bold text-white/80">
           {codigo}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-white/10 bg-white/[0.03] px-3 py-2 text-sm italic text-white/40">
+        <div className="rounded-lg border border-dashed border-[var(--border-default)] bg-white/[0.03] px-3 py-2 text-sm italic text-white/40">
           Será gerado automaticamente ao salvar.
         </div>
       )}

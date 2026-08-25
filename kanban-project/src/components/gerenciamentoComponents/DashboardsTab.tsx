@@ -20,7 +20,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 
 export default function DashboardsTab() {
 
@@ -95,14 +95,14 @@ export default function DashboardsTab() {
           <a
             key={p.chave}
             href={p.href}
-            className="group flex flex-col rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="group flex flex-col rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
-            <div className="mb-3 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85">
+            <div className="mb-3 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-[var(--border-default)] bg-white/[0.07] text-white/85">
               <p.Icon className="h-5 w-5" />
             </div>
             <h3 className="text-base font-semibold text-white">{p.nome}</h3>
             <p className="mt-1 flex-1 text-[13px] leading-snug text-white/55">{p.descricao}</p>
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-white/10 pt-3">
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-[var(--border-default)] pt-3">
               {p.metricas.filter((m) => !("oculto" in m && m.oculto)).map((m) => (
                 <div key={m.label}>
                   <div className="text-lg font-bold text-white">{m.valor}</div>

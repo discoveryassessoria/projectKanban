@@ -117,7 +117,7 @@ export default function CondicoesPagamentoTab() {
 
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar condição…" className="w-full rounded-lg border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar condição…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
       </div>
 
       {loading ? (
@@ -134,13 +134,13 @@ export default function CondicoesPagamentoTab() {
           {filtrados.map((x: any) => {
             const usoReal = (x._count?.receitas || 0) + (x._count?.custos || 0) + (x._count?.configuracoes || 0)
             return (
-              <div key={x.id} className={`${GLASS} flex items-center gap-4 p-4 transition hover:border-white/20`}>
+              <div key={x.id} className={`${GLASS} flex items-center gap-4 p-4 transition hover:border-[var(--border-strong)]`}>
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${OURO}18`, color: OURO }}><CalendarClock className="h-5 w-5" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium text-white">{x.name}</span>
-                    {x.codigo && <span className="shrink-0 rounded-md border border-white/15 px-2 py-0.5 text-[11px] text-white/60">v{x.versao} · {x.codigo}</span>}
-                    {!x.ativo && <span className="shrink-0 rounded-md border border-white/15 px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
+                    {x.codigo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/60">v{x.versao} · {x.codigo}</span>}
+                    {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
                     <span>{APLICA_A_LABEL[x.aplicaA] || x.aplicaA}</span>
@@ -150,7 +150,7 @@ export default function CondicoesPagamentoTab() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => { setEditando(x); setAberto(true) }} className="inline-flex items-center gap-1 rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"><Pencil className="h-3 w-3" /> {usoReal > 0 ? 'Nova versão' : 'Editar'}</button>
+                  <button onClick={() => { setEditando(x); setAberto(true) }} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"><Pencil className="h-3 w-3" /> {usoReal > 0 ? 'Nova versão' : 'Editar'}</button>
                   <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10"><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
@@ -340,7 +340,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                 <Toggle label="Permite quantidade personalizada" on={f.permiteParcelasPersonalizadas} onChange={(v) => set('permiteParcelasPersonalizadas', v)} />
                 <Toggle label="Permite edição manual das parcelas" on={f.permiteEdicaoManual} onChange={(v) => set('permiteEdicaoManual', v)} />
               </div>}
-              <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div className="mt-4 rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
                 <Toggle label="Possui entrada" on={f.temEntrada} onChange={(v) => set('temEntrada', v)} />
                 {f.temEntrada && (
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">

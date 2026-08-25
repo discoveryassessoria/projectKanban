@@ -22,7 +22,7 @@ export default function RuntimeWorkflowDiagnostics() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Diagnóstico do Runtime</h2>
         <p className="mt-1 text-sm text-white/60">
           Área técnica do Motor: runtime atual, gate global, readiness/pré-requisitos, versões macro/interna
@@ -35,7 +35,7 @@ export default function RuntimeWorkflowDiagnostics() {
             onKeyDown={(e) => e.key === "Enter" && carregar()}
             placeholder="ID do processo"
             inputMode="numeric"
-            className="w-40 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+            className="w-40 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
           />
           <button onClick={carregar} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">
             Carregar diagnóstico
@@ -50,7 +50,7 @@ export default function RuntimeWorkflowDiagnostics() {
           <WorkflowV2Panel processoId={processoId} />
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-sm text-white/40">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/40">
           Informe o ID de um processo para ver o diagnóstico técnico do Runtime.
         </div>
       )}

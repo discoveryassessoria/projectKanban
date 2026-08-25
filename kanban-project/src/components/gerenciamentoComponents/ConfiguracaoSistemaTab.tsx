@@ -28,9 +28,9 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 
 const SEM_VALORES: Record<string, string> = {}
 const SEM_CHAVES: ChaveSpec[] = []
@@ -152,7 +152,7 @@ function FormularioConfig({
                     type="color"
                     value={/^#[0-9a-fA-F]{6}$/.test(valores[c.chave] ?? "") ? valores[c.chave] : (c.padrao ?? "#38bdf8")}
                     onChange={(e) => setValores({ ...valores, [c.chave]: e.target.value })}
-                    className="h-9 w-12 flex-none cursor-pointer rounded border border-white/10 bg-transparent"
+                    className="h-9 w-12 flex-none cursor-pointer rounded border border-[var(--border-default)] bg-transparent"
                   />
                   <input value={valores[c.chave] ?? ""} onChange={(e) => setValores({ ...valores, [c.chave]: e.target.value })} className={inputCls} placeholder={c.padrao} />
                 </div>

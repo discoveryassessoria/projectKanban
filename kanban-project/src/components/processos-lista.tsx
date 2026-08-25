@@ -110,14 +110,14 @@ export function ProcessosLista({
             placeholder="Buscar processo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
           />
         </div>
         <select
           value={filtroSla}
           onChange={(e) => setFiltroSla(e.target.value as StatusSla | "todos")}
           aria-label="Filtrar por status de SLA"
-          className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm text-[#fff] outline-none focus:border-white/40 [&>option]:bg-[var(--surface-popover)]"
+          className="rounded-md border border-[var(--border-strong)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-[#fff] outline-none focus:border-white/40 [&>option]:bg-[var(--surface-popover)]"
         >
           {FILTROS_SLA.map((f) => (
             <option key={f.valor} value={f.valor}>{f.rotulo}</option>
@@ -132,7 +132,7 @@ export function ProcessosLista({
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-white/10">
+            <tr className="border-b border-[var(--border-default)]">
               <th className="text-left py-3 px-4 text-white/60 font-medium text-sm">Processo</th>
               <th className="text-left py-3 px-4 text-white/60 font-medium text-sm">Fase</th>
               <th className="text-left py-3 px-4 text-white/60 font-medium text-sm">Status SLA</th>
@@ -154,7 +154,7 @@ export function ProcessosLista({
               return (
                 <tr 
                   key={processo.id} 
-                  className="border-b border-white/10 hover:bg-white/5 transition-colors cursor-pointer"
+                  className="border-b border-[var(--border-default)] hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
                   onClick={() => handleEdit(processo)}
                 >
                   <td className="py-3 px-4">
@@ -235,7 +235,7 @@ export function ProcessosLista({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-white/10"
+                            className="h-8 w-8 p-0 text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
                           >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
@@ -279,7 +279,7 @@ export function ProcessosLista({
 
       {/* Paginação */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4 border-t border-white/10">
+        <div className="flex items-center justify-between pt-4 border-t border-[var(--border-default)]">
           <span className="text-sm text-white/60">
             Mostrando {startIndex + 1} a {Math.min(startIndex + itemsPerPage, filteredProcessos.length)} de {filteredProcessos.length}
           </span>
@@ -289,7 +289,7 @@ export function ProcessosLista({
               variant="ghost"
               onClick={() => setCurrentPage(Math.max(1, paginaAtual - 1))}
               disabled={paginaAtual === 1}
-              className="text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+              className="text-white/60 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -301,7 +301,7 @@ export function ProcessosLista({
               variant="ghost"
               onClick={() => setCurrentPage(Math.min(totalPages, paginaAtual + 1))}
               disabled={paginaAtual === totalPages}
-              className="text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30"
+              className="text-white/60 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

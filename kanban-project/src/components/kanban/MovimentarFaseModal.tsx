@@ -210,13 +210,13 @@ export function MovimentarFaseModal({
   const corpo = (
     <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={enviando ? undefined : onCancelar}>
       <div
-        className="w-full max-w-[560px] max-h-[88vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--surface-popover)] shadow-2xl"
+        className="w-full max-w-[560px] max-h-[88vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label="Confirmar movimentação manual"
       >
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/10">
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-[var(--border-default)]">
           <div>
             <h2 className="text-[16px] font-extrabold text-white/95">
               {plano?.ehRetrocesso ? "Retroceder processo" : "Confirmar movimentação manual"}
@@ -228,7 +228,7 @@ export function MovimentarFaseModal({
           <button
             onClick={onCancelar}
             disabled={enviando}
-            className="w-8 h-8 rounded-lg grid place-items-center text-white/55 hover:text-white hover:bg-white/10 disabled:opacity-40"
+            className="w-8 h-8 rounded-lg grid place-items-center text-white/55 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-40"
             aria-label="Cancelar"
           >
             <X className="w-4 h-4" />
@@ -243,7 +243,7 @@ export function MovimentarFaseModal({
           ) : (
             <>
               {/* ORIGEM → DESTINO */}
-              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[var(--surface-popover)] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">De</div>
                   <div className="text-[13px] font-bold text-white/95 truncate">{ctx?.faseAtualLabel ?? "—"}</div>
@@ -262,7 +262,7 @@ export function MovimentarFaseModal({
                   value={faseAlvo}
                   onChange={(e) => setFaseAlvo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
                 >
                   <option value="">Selecione…</option>
                   {(ctx?.fases ?? []).filter((f) => !f.atual).map((f) => (
@@ -302,7 +302,7 @@ export function MovimentarFaseModal({
                   value={motivoCodigo}
                   onChange={(e) => setMotivoCodigo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
                 >
                   <option value="">Selecione o motivo…</option>
                   {(ctx?.motivos ?? []).map((m) => (
@@ -327,7 +327,7 @@ export function MovimentarFaseModal({
                   disabled={enviando}
                   rows={3}
                   placeholder="Explique por que este processo está sendo reposicionado."
-                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-[#7dd3fc]/50"
                 />
               </label>
 
@@ -336,7 +336,7 @@ export function MovimentarFaseModal({
                   "e o trabalho que já foi feito?" existe. Retroceder sem marcar nada é
                   o caminho normal — reposiciona a fase e mais nada. */}
               {carregandoPlano && (
-                <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2.5 text-[12px] text-white/50">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5 text-[12px] text-white/50">
                   Carregando o que existe na fase de destino…
                 </div>
               )}
@@ -370,11 +370,11 @@ export function MovimentarFaseModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-white/10">
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-[var(--border-default)]">
           <button
             onClick={onCancelar}
             disabled={enviando}
-            className="text-[12.5px] font-semibold px-4 py-2 rounded-lg border border-white/10 text-white/80 hover:bg-white/5 disabled:opacity-40"
+            className="text-[12.5px] font-semibold px-4 py-2 rounded-lg border border-[var(--border-default)] text-white/80 hover:bg-[var(--surface-hover)] disabled:opacity-40"
           >
             Cancelar
           </button>

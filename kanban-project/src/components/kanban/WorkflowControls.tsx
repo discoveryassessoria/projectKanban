@@ -125,8 +125,8 @@ export function WorkflowControls({
   // ============================================================
 
   return (
-    <div className="px-6 py-3 border-b border-white/10" style={{ background: "#11151b" }}>
-      <div className="bg-[var(--surface-overlay)] border border-white/10 rounded-xl px-4 py-3.5">
+    <div className="px-6 py-3 border-b border-[var(--border-default)]" style={{ background: "#11151b" }}>
+      <div className="bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl px-4 py-3.5">
 
         {/* Barra de progresso */}
         <div className="flex items-center justify-between mb-2">
@@ -184,7 +184,7 @@ export function WorkflowControls({
             <button
               onClick={() => setConfirmAction("cancelar")}
               disabled={!!actionLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-white/12 text-white/80 bg-[#20262e] hover:bg-[#252c35]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-white/80 bg-[#20262e] hover:bg-[#252c35]"
             >
               <X className="w-3 h-3" />
               Cancelar operação

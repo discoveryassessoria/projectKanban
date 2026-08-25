@@ -438,7 +438,7 @@ export function ProcessoProtocolos({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-default)] flex-shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-orange-600" />
           <h3 className="font-semibold text-white/95">Protocolos</h3>
@@ -469,7 +469,7 @@ export function ProcessoProtocolos({
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
-          <div className="max-w-2xl mx-auto bg-[var(--surface-popover)] border border-white/10 rounded-lg p-6">
+          <div className="max-w-2xl mx-auto bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-lg p-6">
             <div className="flex items-center justify-between mb-1">
               <h4 className="font-semibold text-white/95">
                 {editando ? "Editar protocolização" : "Registrar protocolização"}
@@ -638,11 +638,11 @@ export function ProcessoProtocolos({
                   Documentos enviados
                 </label>
                 {(opcoes?.documentos ?? []).length === 0 ? (
-                  <p className="text-xs text-gray-400 border border-dashed border-white/10 rounded-md p-3">
+                  <p className="text-xs text-gray-400 border border-dashed border-[var(--border-default)] rounded-md p-3">
                     Nenhum documento disponível neste processo.
                   </p>
                 ) : (
-                  <div className="max-h-44 overflow-y-auto border border-white/10 rounded-md divide-y divide-gray-100">
+                  <div className="max-h-44 overflow-y-auto border border-[var(--border-default)] rounded-md divide-y divide-gray-100">
                     {(opcoes?.documentos ?? []).map((d) => (
                       <label key={d.id} className="flex items-start gap-2 px-3 py-2 text-sm text-white/95 hover:bg-[#252c35] cursor-pointer">
                         <input
@@ -734,7 +734,7 @@ export function ProcessoProtocolos({
               return (
                 <div
                   key={protocolo.id}
-                  className="bg-[var(--surface-popover)] border border-white/10 rounded-lg overflow-hidden"
+                  className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-lg overflow-hidden"
                 >
                   {/* Card principal */}
                   <div className="p-4">
@@ -865,7 +865,7 @@ export function ProcessoProtocolos({
                             return (
                               <div
                                 key={anexo.id}
-                                className="group relative bg-[var(--surface-popover)] rounded-lg border border-white/10 overflow-hidden hover:shadow-md transition-shadow"
+                                className="group relative bg-[var(--surface-popover)] rounded-lg border border-[var(--border-default)] overflow-hidden hover:shadow-md transition-shadow"
                               >
                                 {/* Preview */}
                                 <a
@@ -899,7 +899,7 @@ export function ProcessoProtocolos({
                                 </a>
 
                                 {/* Info */}
-                                <div className="p-2 border-t border-white/10">
+                                <div className="p-2 border-t border-[var(--border-default)]">
                                   <p className="text-xs text-white/95 truncate" title={anexo.nome}>
                                     {anexo.nome}
                                   </p>

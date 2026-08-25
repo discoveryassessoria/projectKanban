@@ -15,7 +15,7 @@ import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
 import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const OURO = '#D2A948'
-const GLASS = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
+const GLASS = 'rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md'
 const dt = (s: any) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 
 async function jf(url: string, opts: RequestInit = {}) {
@@ -94,9 +94,9 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <div className="flex items-center gap-2">
               <ReceiptText className="h-4 w-4" style={{ color: OURO }} />
@@ -143,7 +143,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
           ) : (
             <div className="space-y-3">
               {cobrancas.map((c: any) => <CobrancaCard key={c.id} cobranca={c} moeda={moeda} onPago={() => { carregar(); onChanged?.() }} />)}
-              <button onClick={() => setWizard(true)} className="w-full rounded-lg border border-white/15 py-2 text-sm text-white/80 transition hover:bg-white/10">+ Nova cobrança para esta receita</button>
+              <button onClick={() => setWizard(true)} className="w-full rounded-lg border border-[var(--border-default)] py-2 text-sm text-white/80 transition hover:bg-[var(--surface-hover)]">+ Nova cobrança para esta receita</button>
             </div>
           )}
         </div>
@@ -158,7 +158,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
 function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: string; onPago: () => void }) {
   const [pagando, setPagando] = React.useState<number | null>(null)
   const parcelas = (cobranca.parcelas || []).slice().sort((a: any, b: any) => a.numero - b.numero)
-  const statusCls: Record<string, string> = { ABERTA: 'bg-sky-500/15 text-sky-300 border-sky-500/25', PARCIAL: 'bg-amber-500/15 text-amber-300 border-amber-500/25', QUITADA: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25', CANCELADA: 'bg-white/10 text-white/50 border-white/15' }
+  const statusCls: Record<string, string> = { ABERTA: 'bg-sky-500/15 text-sky-300 border-sky-500/25', PARCIAL: 'bg-amber-500/15 text-amber-300 border-amber-500/25', QUITADA: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25', CANCELADA: 'bg-[var(--surface-primary)] text-white/50 border-[var(--border-default)]' }
   async function pagar(parcelaId: number, valor: number) {
     setPagando(parcelaId)
     try { await jf(`/api/financeiro/cobrancas/${cobranca.id}/pagamentos`, { method: 'POST', body: JSON.stringify({ parcelaId, valor }) }); onPago() }
@@ -168,24 +168,24 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
     <div className={`${GLASS} p-4`}>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="h-4 w-4" style={{ color: OURO }} /> Cobrança #{cobranca.id} · {parcelas.length}x</div>
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${statusCls[cobranca.status] || 'border-white/15 text-white/60'}`}>{cobranca.status}</span>
+        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${statusCls[cobranca.status] || 'border-[var(--border-default)] text-white/60'}`}>{cobranca.status}</span>
       </div>
-      <div className="overflow-hidden rounded-lg border border-white/10">
+      <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
         <table className="w-full text-[13px]">
-          <thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45">
+          <thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-white/45">
             {['#', 'Vencimento', 'Valor', 'Status', ''].map((h, i) => <th key={i} className="px-3 py-2 font-semibold">{h}</th>)}
           </tr></thead>
           <tbody>
             {parcelas.map((p: any) => {
               const quit = p.status === 'RECEBIDA' || p.status === 'PAGA'
               return (
-                <tr key={p.id} className="border-t border-white/5">
+                <tr key={p.id} className="border-t border-[var(--border-subtle)]">
                   <td className="px-3 py-2 tabular-nums text-white/70">{p.numero}</td>
                   <td className="px-3 py-2 text-white/70">{dt(p.vencimento)}</td>
                   <td className="px-3 py-2 tabular-nums">{brl(p.valor, moeda)}</td>
                   <td className="px-3 py-2">{quit ? <span className="text-emerald-400">recebida</span> : <span className="text-white/50">pendente</span>}</td>
                   <td className="px-3 py-2 text-right">
-                    {!quit && <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico único)." className="rounded-md border border-white/20 px-2.5 py-1 text-xs text-white/80 cursor-not-allowed opacity-40">Registrar pagamento</button>}
+                    {!quit && <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico único)." className="rounded-md border border-[var(--border-strong)] px-2.5 py-1 text-xs text-white/80 cursor-not-allowed opacity-40">Registrar pagamento</button>}
                   </td>
                 </tr>
               )
@@ -300,7 +300,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
   }
 
-  const sel = 'w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:border-white/30'
+  const sel = 'w-full rounded-lg bg-[var(--surface-primary)] border border-[var(--border-default)] px-3 py-2 text-sm text-white outline-none focus:border-white/30'
   const linha = (l: string, v: any) => (<div className="flex justify-between gap-3 py-0.5"><span className="text-white/45">{l}</span><span className="truncate text-right tabular-nums text-white/85">{v ?? '—'}</span></div>)
   const POL_LABEL: Record<string, string> = { IGNORAR: 'Ignorar', REPASSAR: 'Repassar ao cliente', ABSORVER: 'Absorver' }
 
@@ -341,7 +341,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           {precisaEscolha && (
             <div className="mt-2 flex flex-wrap gap-2">
               {['IGNORAR', 'REPASSAR', 'ABSORVER'].map((p) => (
-                <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[#1b1508]' : 'border-white/20 text-white/80 hover:bg-white/10'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
+                <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[#1b1508]' : 'border-[var(--border-strong)] text-white/80 hover:bg-[var(--surface-hover)]'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
               ))}
             </div>
           )}
@@ -364,15 +364,15 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         )}
         <div>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">Cronograma de parcelas</p>
-          <div className="overflow-x-auto rounded-lg border border-white/10">
-            <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
-              {(sim.parcelas ?? []).map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
+          <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
+            <table className="w-full text-[13px]"><thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
+              {(sim.parcelas ?? []).map((p: any) => <tr key={p.numero} className="border-t border-[var(--border-subtle)]"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
             </tbody></table>
           </div>
         </div>
         {Array.isArray(sim.memoria) && (
           <details className="text-[11px] text-white/50"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
-            <div className="mt-1 space-y-0.5 rounded-lg border border-white/10 bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
+            <div className="mt-1 space-y-0.5 rounded-lg border border-[var(--border-default)] bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
           </details>
         )}
       </>)}
@@ -384,7 +384,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     const cob = sucesso.cobranca
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-6 backdrop-blur-sm" onClick={() => onCriada()}>
-        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO }}><Check className="h-7 w-7" /></div>
           <h3 className="text-lg font-semibold">Cobrança criada com sucesso</h3>
           <p className="mt-1 text-sm text-white/55">A cobrança foi gerada e vinculada à receita.</p>
@@ -397,7 +397,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           </div>
           <div className="mt-4 flex justify-center gap-2">
             <button onClick={() => onCriada()} className="rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508]" style={{ background: OURO }}>Ver cobrança</button>
-            <button onClick={onClose} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Voltar para receita</button>
+            <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Voltar para receita</button>
           </div>
         </div>
       </div>
@@ -406,9 +406,9 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-3 backdrop-blur-sm sm:p-6" onClick={onClose}>
-      <div className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h3 className="text-lg font-semibold">Cadastrar Cobrança</h3>
             <p className="text-xs text-white/50">Crie uma nova cobrança vinculada à receita selecionada.</p>
@@ -416,9 +416,9 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         {/* Barra de etapas */}
-        <div className="flex flex-wrap gap-2 border-b border-white/10 px-6 py-3">
+        <div className="flex flex-wrap gap-2 border-b border-[var(--border-default)] px-6 py-3">
           {PASSOS.map((p) => (
-            <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-white/25 bg-white/[0.04]' : 'border-transparent'}`}>
+            <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-[var(--border-strong)] bg-white/[0.04]' : 'border-transparent'}`}>
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: '#6ee7b7' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
               <div className="min-w-0">
                 <p className={`truncate text-[13px] font-medium ${step === p.n ? 'text-white' : 'text-white/60'}`}>{p.label}</p>
@@ -531,7 +531,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           </div>{/* fim conteúdo esquerdo */}
 
           {/* Resumo lateral persistente */}
-          <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-white/10 bg-black/20 px-5 py-5 lg:w-80 lg:border-l lg:border-t-0">
+          <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-[var(--border-default)] bg-black/20 px-5 py-5 lg:w-80 lg:border-l lg:border-t-0">
             <div className={`${GLASS} p-4`}>
               <div className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4" style={{ color: OURO }} /> Receita selecionada</div>
               <p className="mt-1 text-xs text-white/50">{receita?.codigo ?? `#${receitaId}`}{receita?.descricao ? ` · ${receita.descricao}` : ''}</p>
@@ -570,7 +570,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         </div>{/* fim corpo */}
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/10 px-6 py-3">
+        <div className="flex items-center justify-between border-t border-[var(--border-default)] px-6 py-3">
           <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           <div className="flex items-center gap-3">
             <span className="text-xs text-white/40">Etapa {step} de 4</span>

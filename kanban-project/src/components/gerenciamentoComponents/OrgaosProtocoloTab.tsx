@@ -69,7 +69,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 const opt = "bg-zinc-900"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
@@ -232,7 +232,7 @@ export default function OrgaosProtocoloTab() {
     <div className="space-y-5">
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Órgãos e Organizações</h2>
@@ -254,9 +254,9 @@ export default function OrgaosProtocoloTab() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-white/10 text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
             <tr>
               <th className="px-4 py-3 font-medium">Código</th>
               <th className="px-4 py-3 font-medium">Nome oficial</th>
@@ -273,7 +273,7 @@ export default function OrgaosProtocoloTab() {
             {visiveis.length === 0 ? (
               <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma organização encontrada.</td></tr>
             ) : visiveis.map(d => (
-              <tr key={d.id} className="border-b border-white/5 last:border-0">
+              <tr key={d.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">
                   {d.name}
@@ -289,19 +289,19 @@ export default function OrgaosProtocoloTab() {
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {(d.categorias ?? []).length === 0
-                      ? <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">{typeLabel(d.type)}</span>
+                      ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">{typeLabel(d.type)}</span>
                       : (d.categorias ?? []).map(c => (
-                        <span key={c.categoriaId} className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{c.categoria?.nome}</span>
+                        <span key={c.categoriaId} className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{c.categoria?.nome}</span>
                       ))}
                   </div>
                 </td>
                 <td className="px-4 py-2.5 text-white/70">{d.country || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.city || "—"}</td>
                 <td className="px-4 py-2.5 text-white/60">{d.provincia || "—"}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-white/50">
-                    <button title="Editar" aria-label="Editar" onClick={() => abrirForm(daLinha(d))} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                    <button title="Editar" aria-label="Editar" onClick={() => abrirForm(daLinha(d))} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
                     <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                   </div>
                 </td>
@@ -313,8 +313,8 @@ export default function OrgaosProtocoloTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => abrirForm(null)}>
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} organização</h3></div>
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} organização</h3></div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
               <div className="col-span-2"><CodigoPublicoField codigo={form.publicCode} /></div>
 
@@ -344,7 +344,7 @@ export default function OrgaosProtocoloTab() {
 
               <div className="col-span-2">
                 <label className={labelCls}>Funções — a mesma organização pode exercer várias</label>
-                <div className="flex flex-wrap gap-3 rounded-md border border-white/10 px-3 py-2">
+                <div className="flex flex-wrap gap-3 rounded-md border border-[var(--border-default)] px-3 py-2">
                   {FUNCOES.map(([v, l]) => (
                     <label key={v} className="flex items-center gap-1.5 text-sm text-white/80">
                       <input
@@ -372,11 +372,11 @@ export default function OrgaosProtocoloTab() {
               <div className="col-span-2">
                 <label className={labelCls}>Categorias</label>
                 {categorias.length === 0 ? (
-                  <p className="rounded-md border border-dashed border-white/10 p-3 text-xs text-white/40">Nenhuma categoria cadastrada.</p>
+                  <p className="rounded-md border border-dashed border-[var(--border-default)] p-3 text-xs text-white/40">Nenhuma categoria cadastrada.</p>
                 ) : (
-                  <div className="max-h-40 overflow-y-auto rounded-md border border-white/10">
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--border-default)]">
                     {categorias.map(c => (
-                      <label key={c.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/80 hover:bg-white/5">
+                      <label key={c.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/80 hover:bg-[var(--surface-hover)]">
                         <input type="checkbox" checked={form.categoriaIds.includes(c.id)} onChange={() => alternarCategoria(c.id)} />
                         {c.nome}
                       </label>
@@ -437,7 +437,7 @@ export default function OrgaosProtocoloTab() {
               {/* FINANCEIRO — só aparece para quem é FORNECEDOR: sem função, sem campo morto. */}
               {form.funcoes.includes("FORNECEDOR") && (
                 <>
-                  <div className="col-span-2 mt-1 border-t border-white/10 pt-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">Dados financeiros do fornecedor</div>
+                  <div className="col-span-2 mt-1 border-t border-[var(--border-default)] pt-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">Dados financeiros do fornecedor</div>
                   <div><label className={labelCls}>Forma de pagamento</label><input value={form.formaPagamento} onChange={e => setForm(f => f && { ...f, formaPagamento: e.target.value })} className={inputCls} placeholder="PIX, transferência, boleto…" /></div>
                   <div><label className={labelCls}>Prazo de pagamento (dias)</label><input type="number" min={0} value={form.prazoPagamentoDias} onChange={e => setForm(f => f && { ...f, prazoPagamentoDias: e.target.value })} className={inputCls} /></div>
                   <div><label className={labelCls}>Chave PIX</label><input value={form.chavePix} onChange={e => setForm(f => f && { ...f, chavePix: e.target.value })} className={inputCls} /></div>
@@ -472,8 +472,8 @@ export default function OrgaosProtocoloTab() {
 
               <label className="col-span-2 flex items-center gap-2 text-sm text-white/70"><input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} />Ativo</label>
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => abrirForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => abrirForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>

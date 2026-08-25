@@ -129,7 +129,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !enviando && onClose()}>
       <div className="max-w-lg w-full rounded-2xl bg-[var(--surface-popover)] shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-white/10">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border-default)]">
           <h3 className="text-[15px] font-extrabold text-white/95 flex items-center gap-2"><ArrowLeftRight className="w-4 h-4 text-white/55" /> Nova operação antecipada</h3>
           <button onClick={onClose} className="text-white/40 hover:text-white/80"><X className="w-4.5 h-4.5" /></button>
         </div>
@@ -140,7 +140,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           ) : !necessidadeId ? (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Necessidade a atender</span>
-              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
+              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
                 <option value="">Selecionar…</option>
                 {necessidades.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
               </select>
@@ -149,14 +149,14 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Tipo de operação</span>
-              <select value={operationType} onChange={(e) => setOperationType(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
+              <select value={operationType} onChange={(e) => setOperationType(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
                 <option value="">Selecionar…</option>
                 {catalogo.map((c) => <option key={c.operationType} value={c.operationType}>{c.label}</option>)}
               </select>
             </label>
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Fase de referência</span>
-              <select value={targetPhaseCode} onChange={(e) => setTargetPhaseCode(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
+              <select value={targetPhaseCode} onChange={(e) => setTargetPhaseCode(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
                 <option value="">—</option>
                 {fases.map((f) => <option key={f.faseCode} value={f.faseCode}>{f.faseLabel}</option>)}
               </select>
@@ -166,7 +166,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           {campoDoc && (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">{campoDoc.label}{campoDoc.required ? " *" : ""}</span>
-              <select value={tipoDocumentoId} onChange={(e) => setTipoDocumentoId(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
+              <select value={tipoDocumentoId} onChange={(e) => setTipoDocumentoId(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
                 <option value="">Selecionar…</option>
                 {tipos.map((t) => <option key={t.id} value={t.id}>{t.publicCode ? t.publicCode + " — " : ""}{t.name}{t.countryCode ? ` (${t.countryCode})` : ""}</option>)}
               </select>
@@ -177,16 +177,16 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           )}
           <label className="block">
             <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Objetivo</span>
-            <textarea value={objetivo} onChange={(e) => setObjetivo(e.target.value)} rows={2} placeholder="Ex.: obter os dados do registro de nascimento pela certidão de casamento" className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 focus:outline-none focus:border-blue-400" />
+            <textarea value={objetivo} onChange={(e) => setObjetivo(e.target.value)} rows={2} placeholder="Ex.: obter os dados do registro de nascimento pela certidão de casamento" className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 focus:outline-none focus:border-blue-400" />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Resultado esperado</span>
-              <input value={resultadoEsperado} onChange={(e) => setResultadoEsperado(e.target.value)} placeholder="O que se espera obter" className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 focus:outline-none focus:border-blue-400" />
+              <input value={resultadoEsperado} onChange={(e) => setResultadoEsperado(e.target.value)} placeholder="O que se espera obter" className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 focus:outline-none focus:border-blue-400" />
             </label>
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Responsável</span>
-              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
+              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-blue-400">
                 <option value="">—</option>
                 {(usuarios ?? []).map((u) => <option key={u.id} value={u.id}>{nomePessoa(u)}</option>)}
               </select>
@@ -194,7 +194,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           </div>
           {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-[12.5px] text-[#f87171]">{erro}</div>}
         </div>
-        <div className="flex justify-end gap-2 px-5 py-3 border-t border-white/10">
+        <div className="flex justify-end gap-2 px-5 py-3 border-t border-[var(--border-default)]">
           <button disabled={enviando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[#252c35] hover:bg-[#252c35] text-white/95 disabled:opacity-50">Cancelar</button>
           <button disabled={enviando || !necIdFinal || !operationType || faltaDoc} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[#20262e] disabled:opacity-50">
             {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeftRight className="w-3.5 h-3.5" />} Criar operação antecipada

@@ -170,7 +170,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       )}
 
       {analise && (
-        <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
           <div className="flex items-start">
             {etapas.map((e, i) => (
               <div key={e.label} className={`flex items-start ${i < etapas.length - 1 ? "flex-1" : ""}`}>
@@ -198,7 +198,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         </div>
       )}
 
-      <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
+      <div className="rounded-xl border border-[var(--border-default)] bg-[#20262e] p-4 flex items-start gap-3">
         <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0"><Sparkles className="w-5 h-5" /></div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-white/95">Assistente de Divergências</div>
@@ -213,12 +213,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       {resultado && <div className="bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-4 py-3 text-sm text-[#4ade80] flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
       {!analise ? (
-        <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-sm text-white/55">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
+        <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/55">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
       ) : divs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-sm text-white/55">Nenhuma divergência encontrada — o processo pode seguir sem retificação.</div>
+        <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/55">Nenhuma divergência encontrada — o processo pode seguir sem retificação.</div>
       ) : (
-        <div className="rounded-xl border border-white/10 overflow-hidden">
-          <div className="px-4 py-2.5 border-b border-white/10 flex items-center gap-2">
+        <div className="rounded-xl border border-[var(--border-default)] overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-[var(--border-default)] flex items-center gap-2">
             <span className="text-sm font-semibold text-white/95">Divergências encontradas</span>
             <span className="text-xs font-semibold text-white/55 bg-[#252c35] rounded-full px-2 py-0.5">{divs.length}</span>
           </div>
@@ -245,10 +245,10 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5 text-white/80 whitespace-nowrap">{d.campoLabel}</td>
                     <td className="px-3 py-2.5 text-white/95">{d.valorArvore || "—"}</td>
                     <td className="px-3 py-2.5 text-white/95">{d.valorDocumento || "—"}</td>
-                    <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[#252c35] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-white/25"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
+                    <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[#252c35] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
-                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-white/10 text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
+                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     </td>
@@ -264,7 +264,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       )}
 
       {analise && analise.status !== "concluida" && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-4">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-default)] p-4">
           <div className="text-xs text-white/68">
             {pend > 0
               ? <span className="inline-flex items-center gap-1.5 text-[#d2a948]"><AlertTriangle className="w-4 h-4" />Faltam {pend} decisão(ões) antes de concluir.</span>
@@ -294,7 +294,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
 
 function Stat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2">
       <div className={`text-xl font-bold ${danger ? "text-[#f87171]" : "text-white/95"}`}>{value}</div>
       <div className="text-[11px] text-white/55">{label}</div>
     </div>
@@ -320,7 +320,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
       <div className="relative w-full max-w-md bg-[var(--surface-popover)] h-full shadow-xl overflow-y-auto flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div>
             <div className="text-sm font-bold text-white/95">Detalhe da divergência</div>
             <div className="text-xs text-white/55">{div.documentoTitulo}</div>
@@ -337,13 +337,13 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/10 divide-y divide-white/10 text-sm">
+          <div className="rounded-lg border border-[var(--border-default)] divide-y divide-white/10 text-sm">
             <div className="flex justify-between px-3 py-2"><span className="text-white/55">Campo</span><span className="font-medium text-white/95">{div.campoLabel}</span></div>
             <div className="flex justify-between px-3 py-2"><span className="text-white/55">Valor na árvore</span><span className="font-medium text-white/95">{div.valorArvore || "—"}</span></div>
             <div className="flex justify-between px-3 py-2"><span className="text-white/55">Valor no documento</span><span className="font-medium text-white/95">{div.valorDocumento || "—"}</span></div>
             <div className="flex justify-between px-3 py-2 items-center"><span className="text-white/55">Gravidade</span>
               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[div.severidade] || "bg-[#252c35] text-white/80"}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[div.severidade] || "bg-white/25"}`} />{SEV_LABEL[div.severidade] || div.severidade}
+                <span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[div.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[div.severidade] || div.severidade}
               </span>
             </div>
           </div>
@@ -360,7 +360,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
           <div>
             <label className="text-xs font-semibold text-white/80">Decisão</label>
             <select value={decisao} onChange={(e) => setDecisao(e.target.value)} disabled={readOnly}
-              className="mt-1 w-full text-sm border border-white/10 rounded-md px-2 py-2 bg-[var(--surface-popover)] disabled:bg-[#20262e] disabled:text-white/55">
+              className="mt-1 w-full text-sm border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] disabled:bg-[#20262e] disabled:text-white/55">
               {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -369,12 +369,12 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
             <label className="text-xs font-semibold text-white/80">Notas</label>
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} disabled={readOnly} rows={4}
               placeholder="Registre o motivo da decisão."
-              className="mt-1 w-full text-sm border border-white/10 rounded-md px-3 py-2 disabled:bg-[#20262e]" />
+              className="mt-1 w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 disabled:bg-[#20262e]" />
           </div>
         </div>
 
         {!readOnly && (
-          <div className="bg-[var(--surface-popover)] border-t border-white/10 px-5 py-3 flex justify-end gap-2">
+          <div className="bg-[var(--surface-popover)] border-t border-[var(--border-default)] px-5 py-3 flex justify-end gap-2">
             <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
             <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
               {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar decisão

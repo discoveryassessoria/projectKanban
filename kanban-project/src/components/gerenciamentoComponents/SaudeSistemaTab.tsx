@@ -98,14 +98,14 @@ const CORES_PRONTIDAO: Record<EstadoProntidao, string> = {
   DIAGNOSTICO_INCOMPLETO: "bg-violet-500/15 text-violet-300 border-violet-400/30",
 }
 
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const CORES_ESTADO: Record<Estado, { fundo: string; texto: string; ponto: string }> = {
   SAUDAVEL: { fundo: "bg-green-500/10 border-green-400/30", texto: "text-green-300", ponto: "bg-green-400" },
   ATENCAO: { fundo: "bg-amber-500/10 border-amber-400/30", texto: "text-amber-300", ponto: "bg-amber-400" },
   DEGRADADO: { fundo: "bg-orange-500/10 border-orange-400/30", texto: "text-orange-300", ponto: "bg-orange-400" },
   CRITICO: { fundo: "bg-red-500/10 border-red-400/30", texto: "text-red-300", ponto: "bg-red-400" },
   DIAGNOSTICO_INCOMPLETO: { fundo: "bg-violet-500/10 border-violet-400/30", texto: "text-violet-300", ponto: "bg-violet-400" },
-  INDISPONIVEL: { fundo: "bg-white/5 border-white/20", texto: "text-white/70", ponto: "bg-white/40" },
+  INDISPONIVEL: { fundo: "bg-[var(--surface-primary)] border-[var(--border-strong)]", texto: "text-white/70", ponto: "bg-[var(--surface-elevated)]" },
 }
 const CORES_SEV: Record<Severidade, string> = {
   CRITICO: "bg-red-500/15 text-red-300 border-red-400/30",
@@ -217,7 +217,7 @@ export function SaudeSistemaTab() {
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${cor.ponto}`} />
               <h2 className={`text-xl font-semibold ${cor.texto}`}>{rot.estados[estado] ?? estado}</h2>
-              <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">catálogo v{dados.versaoCatalogo}</span>
+              <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">catálogo v{dados.versaoCatalogo}</span>
             </div>
             <p className="mt-1 max-w-3xl text-sm text-white/70">{dados.motivoEstado}</p>
             <p className="mt-1 text-xs text-white/45">
@@ -228,7 +228,7 @@ export function SaudeSistemaTab() {
           </div>
           <div className="flex flex-wrap gap-2">
             <button disabled={executando} onClick={() => executar("RAPIDO")}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/85 hover:bg-white/10 disabled:opacity-50">
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs font-medium text-white/85 hover:bg-[var(--surface-hover)] disabled:opacity-50">
               Diagnóstico rápido
             </button>
             <button disabled={executando} onClick={() => executar("COMPLETO")}
@@ -236,12 +236,12 @@ export function SaudeSistemaTab() {
               Executar diagnóstico completo
             </button>
             <button disabled={executando} onClick={() => executar("PROFUNDO")}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/85 hover:bg-white/10 disabled:opacity-50">
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs font-medium text-white/85 hover:bg-[var(--surface-hover)] disabled:opacity-50">
               Profundo
             </button>
           </div>
         </div>
-        {mensagem && <div className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70">{mensagem}</div>}
+        {mensagem && <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/20 px-3 py-2 text-xs text-white/70">{mensagem}</div>}
       </div>
 
       {/* ── CARDS ────────────────────────────────────────────────────────── */}
@@ -259,7 +259,7 @@ export function SaudeSistemaTab() {
       </div>
 
       {/* ── ABAS ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-1 border-b border-white/10 text-sm">
+      <div className="flex flex-wrap gap-1 border-b border-[var(--border-default)] text-sm">
         {([
           ["visao", "Visão geral"],
           ["prontidao", `Prontidão (${dados.capacidades.filter(c => c.estado === "PRONTO").length}/${dados.capacidades.length})`],
@@ -410,7 +410,7 @@ export function SaudeSistemaTab() {
           {dados.plano.map((r) => (
             <div key={r.codigo} className={`${CARD} px-4 py-3`}>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{r.ordem}º</span>
+                <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{r.ordem}º</span>
                 <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[r.severidade]}`}>{rot.severidades[r.severidade]}</span>
                 <span className="font-medium text-white">{r.titulo}</span>
                 <span className="text-xs text-white/35">{rot.dependencias[r.tipo] ?? r.tipo} · esforço {r.esforco.toLowerCase()}</span>
@@ -423,7 +423,7 @@ export function SaudeSistemaTab() {
                 {r.destrava.length > 0 && <div className="text-white/50">Destrava: {r.destrava.join(", ")}</div>}
               </div>
               {r.rota && (
-                <a href={r.rota} className="mt-2 inline-block rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/80 hover:bg-white/10">
+                <a href={r.rota} className="mt-2 inline-block rounded-lg border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
                   Abrir cadastro
                 </a>
               )}
@@ -438,7 +438,7 @@ export function SaudeSistemaTab() {
       {aba === "capacidades" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
               <tr>
                 <th className="px-4 py-3">Capacidade</th><th className="px-4 py-3">Módulo</th>
                 <th className="px-4 py-3">Dependências</th><th className="px-4 py-3">Faltando</th><th className="px-4 py-3">Estado</th>
@@ -446,7 +446,7 @@ export function SaudeSistemaTab() {
             </thead>
             <tbody>
               {dados.capacidades.map((c) => (
-                <tr key={c.codigo} className="border-b border-white/5 last:border-0">
+                <tr key={c.codigo} className="border-b border-[var(--border-subtle)] last:border-0">
                   <td className="px-4 py-2.5 text-white">{c.nome}<div className="text-[10px] text-white/35">{c.codigo}</div></td>
                   <td className="px-4 py-2.5 text-white/70">{c.modulo}</td>
                   <td className="px-4 py-2.5 text-white/70">{c.dependencias.length}</td>
@@ -465,14 +465,14 @@ export function SaudeSistemaTab() {
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <select value={filtroSev} onChange={(ev) => setFiltroSev(ev.target.value as "" | Severidade)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white">
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white">
               <option value="" className="bg-zinc-900">Todas as severidades</option>
               {(["CRITICO", "ERRO", "ALERTA", "INFORMATIVO"] as Severidade[]).map((s) => (
                 <option key={s} value={s} className="bg-zinc-900">{rot.severidades[s]}</option>
               ))}
             </select>
             <select value={filtroDominio} onChange={(ev) => setFiltroDominio(ev.target.value)}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white">
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white">
               <option value="" className="bg-zinc-900">Todos os domínios</option>
               {[...new Set(dados.achados.map((a) => a.dominio))].map((d) => (
                 <option key={d} value={d} className="bg-zinc-900">{rot.dominios[d] ?? d}</option>
@@ -490,7 +490,7 @@ export function SaudeSistemaTab() {
       {aba === "dominios" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
               <tr><th className="px-4 py-3">Domínio</th><th className="px-4 py-3">Problemas</th><th className="px-4 py-3">Pior severidade</th></tr>
             </thead>
             <tbody>
@@ -498,7 +498,7 @@ export function SaudeSistemaTab() {
                 const doDominio = dados.achados.filter((a) => a.dominio === d)
                 const pior = (["CRITICO", "ERRO", "ALERTA", "INFORMATIVO"] as Severidade[]).find((s) => doDominio.some((a) => a.severidade === s))!
                 return (
-                  <tr key={d} className="border-b border-white/5 last:border-0">
+                  <tr key={d} className="border-b border-[var(--border-subtle)] last:border-0">
                     <td className="px-4 py-2.5 text-white">{rot.dominios[d] ?? d}</td>
                     <td className="px-4 py-2.5 text-white/70">{doDominio.length}</td>
                     <td className="px-4 py-2.5"><span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[pior]}`}>{rot.severidades[pior]}</span></td>
@@ -514,14 +514,14 @@ export function SaudeSistemaTab() {
       {aba === "cobertura" && (
         <div className="space-y-3">
         <div className={`${CARD} overflow-hidden`}>
-          <div className="border-b border-white/10 px-4 py-2.5 text-xs uppercase tracking-wide text-white/40">Matriz por módulo</div>
+          <div className="border-b border-[var(--border-default)] px-4 py-2.5 text-xs uppercase tracking-wide text-white/40">Matriz por módulo</div>
           <table className="w-full text-sm">
-            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
               <tr><th className="px-4 py-3">Módulo</th><th className="px-4 py-3">Capacidades prontas</th><th className="px-4 py-3">Verificações</th><th className="px-4 py-3">Situação</th></tr>
             </thead>
             <tbody>
               {dados.matriz.map((m) => (
-                <tr key={m.modulo} className="border-b border-white/5 last:border-0">
+                <tr key={m.modulo} className="border-b border-[var(--border-subtle)] last:border-0">
                   <td className="px-4 py-2.5 text-white">{m.modulo}</td>
                   <td className="px-4 py-2.5 text-white/70">{m.capacidades ? `${m.capacidadesProntas}/${m.capacidades}` : "—"}</td>
                   <td className="px-4 py-2.5 text-white/70">{m.verificacoes}</td>
@@ -539,12 +539,12 @@ export function SaudeSistemaTab() {
         </div>
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
               <tr><th className="px-4 py-3">Domínio obrigatório</th><th className="px-4 py-3">Verificações</th><th className="px-4 py-3">Obrigatórias</th><th className="px-4 py-3">Situação</th></tr>
             </thead>
             <tbody>
               {dados.cobertura.map((c) => (
-                <tr key={c.dominio} className="border-b border-white/5 last:border-0">
+                <tr key={c.dominio} className="border-b border-[var(--border-subtle)] last:border-0">
                   <td className="px-4 py-2.5 text-white">{rot.dominios[c.dominio] ?? c.dominio}</td>
                   <td className="px-4 py-2.5 text-white/70">{c.ativas}</td>
                   <td className="px-4 py-2.5 text-white/70">{c.obrigatorias}</td>
@@ -579,16 +579,16 @@ export function SaudeSistemaTab() {
                 </div>
 
                 <div className={`${CARD} overflow-hidden`}>
-                  <div className="border-b border-white/10 px-4 py-3 text-xs uppercase tracking-wide text-white/45">Execuções (mais recente por último)</div>
+                  <div className="border-b border-[var(--border-default)] px-4 py-3 text-xs uppercase tracking-wide text-white/45">Execuções (mais recente por último)</div>
                   <table className="w-full text-sm">
-                    <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                    <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                       <tr><th className="px-4 py-3">Quando</th><th className="px-4 py-3">Modo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Cobertura</th><th className="px-4 py-3">Achados</th><th className="px-4 py-3">Duração</th></tr>
                     </thead>
                     <tbody>
                       {h.execucoes.map((x) => {
                         const c = CORES_ESTADO[x.estado] ?? CORES_ESTADO.INDISPONIVEL
                         return (
-                          <tr key={x.id} className="border-b border-white/5 last:border-0">
+                          <tr key={x.id} className="border-b border-[var(--border-subtle)] last:border-0">
                             <td className="px-4 py-2.5 text-white/70">{fmtData(x.criadoEm)}</td>
                             <td className="px-4 py-2.5 text-white/60">{x.modo.toLowerCase()}</td>
                             <td className="px-4 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] ${c.texto}`}>{rot.estados[x.estado] ?? x.estado}</span></td>
@@ -603,14 +603,14 @@ export function SaudeSistemaTab() {
                 </div>
 
                 <div className={`${CARD} overflow-hidden`}>
-                  <div className="border-b border-white/10 px-4 py-3 text-xs uppercase tracking-wide text-white/45">Domínios que mais falham</div>
+                  <div className="border-b border-[var(--border-default)] px-4 py-3 text-xs uppercase tracking-wide text-white/45">Domínios que mais falham</div>
                   <table className="w-full text-sm">
-                    <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                    <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                       <tr><th className="px-4 py-3">Domínio</th><th className="px-4 py-3">Abertos</th><th className="px-4 py-3">Total histórico</th><th className="px-4 py-3">Críticos</th></tr>
                     </thead>
                     <tbody>
                       {h.porDominio.slice(0, 15).map((d) => (
-                        <tr key={d.dominio} className="border-b border-white/5 last:border-0">
+                        <tr key={d.dominio} className="border-b border-[var(--border-subtle)] last:border-0">
                           <td className="px-4 py-2.5 text-white">{rot.dominios[d.dominio] ?? d.dominio}</td>
                           <td className="px-4 py-2.5 text-white/70">{d.abertos}</td>
                           <td className="px-4 py-2.5 text-white/50">{d.total}</td>
@@ -629,7 +629,7 @@ export function SaudeSistemaTab() {
       {aba === "execucao" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
               <tr><th className="px-4 py-3">Verificação</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Duração</th><th className="px-4 py-3">Resultado</th></tr>
             </thead>
             <tbody>
@@ -640,7 +640,7 @@ export function SaudeSistemaTab() {
                   : x.status === "NAO_EXECUTADA" ? "bg-violet-500/15 text-violet-300"
                   : "bg-red-500/15 text-red-300"
                 return (
-                  <tr key={x.codigo} className="border-b border-white/5 last:border-0 align-top">
+                  <tr key={x.codigo} className="border-b border-[var(--border-subtle)] last:border-0 align-top">
                     <td className="px-4 py-2.5">
                       <div className="font-mono text-[11px] text-white/50">{x.codigo}</div>
                       <div className="text-white">{meta?.nome ?? "—"}</div>
@@ -669,7 +669,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
   const [aberto, setAberto] = useState(false)
   return (
     <div className={`${CARD} overflow-hidden`}>
-      <button onClick={() => setAberto((v) => !v)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-white/5">
+      <button onClick={() => setAberto((v) => !v)} className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-[var(--surface-hover)]">
         <span className={`mt-0.5 flex-none rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[a.severidade]}`}>{rot.severidades[a.severidade]}</span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-white">{a.titulo}</span>
@@ -685,7 +685,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
         </span>
       </button>
       {(aberto || detalhado) && (
-        <div className="border-t border-white/10 px-4 py-3 text-xs text-white/70">
+        <div className="border-t border-[var(--border-default)] px-4 py-3 text-xs text-white/70">
           {a.explicacao && <p className="mb-2"><b className="text-white/85">Por que:</b> {a.explicacao}</p>}
           {a.impacto && <p className="mb-2"><b className="text-white/85">Impacto:</b> {a.impacto}</p>}
           {a.recomendacao && <p className="mb-2"><b className="text-white/85">Como corrigir:</b> {a.recomendacao}</p>}
@@ -700,13 +700,13 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
               </button>
             )}
             {a.link && (
-              <a href={a.link} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-white/85 hover:bg-white/10">
+              <a href={a.link} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-white/85 hover:bg-[var(--surface-hover)]">
                 Ir para o registro →
               </a>
             )}
           </div>
           {a.evidencia != null && (
-            <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-white/10 bg-black/30 p-2 text-[11px] text-white/60">
+            <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[var(--border-default)] bg-black/30 p-2 text-[11px] text-white/60">
               {JSON.stringify(a.evidencia, null, 2)}
             </pre>
           )}

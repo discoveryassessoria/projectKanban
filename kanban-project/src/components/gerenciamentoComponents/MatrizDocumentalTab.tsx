@@ -32,7 +32,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 const opt = "bg-zinc-900"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
@@ -137,7 +137,7 @@ export default function MatrizDocumentalTab() {
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
 
       {/* cabeçalho + seletor */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Matriz Documental</h2>
         <p className="mt-1 text-sm text-white/60">Quais documentos são exigidos por processo, fase, alvo e regra de geração. Define se cria tarefa/custo/receita e se bloqueia a conclusão da fase. <span className="text-white/40">A execução real vem na Fase 4.</span></p>
         <div className="mt-4 max-w-md">
@@ -150,11 +150,11 @@ export default function MatrizDocumentalTab() {
       </div>
 
       {proc && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Nova regra documental</button>
             {arquivadasCount > 0 && (
-              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-400/40 bg-blue-500/10 text-blue-200" : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"}`}>
+              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-400/40 bg-blue-500/10 text-blue-200" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
                 {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arquivadasCount})`}
               </button>
             )}
@@ -162,20 +162,20 @@ export default function MatrizDocumentalTab() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                 <tr><th className="px-3 py-2 font-medium">Fase</th><th className="px-3 py-2 font-medium">Documento</th><th className="px-3 py-2 font-medium">Alvo</th><th className="px-3 py-2 font-medium">Regra de geração</th><th className="px-3 py-2 font-medium">Exigência</th><th className="px-3 py-2 font-medium">Gera</th><th className="px-3 py-2 text-right font-medium">Ações</th></tr>
               </thead>
               <tbody>
                 {regrasDoProc.length === 0 ? (
                   <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-white/40">Nenhuma regra documental para este processo.</td></tr>
                 ) : regrasDoProc.map(m => (
-                  <tr key={m.id} className={`border-b border-white/5 last:border-0 ${m.arquivado ? "opacity-60" : ""}`}>
+                  <tr key={m.id} className={`border-b border-[var(--border-subtle)] last:border-0 ${m.arquivado ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2 text-xs text-white/70">{phaseName(m.phaseKey)}</td>
-                    <td className="px-3 py-2 font-medium text-white">{docName(m.documentTypeCode)}{m.arquivado && <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] text-white/50">arquivada</span>}</td>
+                    <td className="px-3 py-2 font-medium text-white">{docName(m.documentTypeCode)}{m.arquivado && <span className="ml-1.5 rounded-full bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] text-white/50">arquivada</span>}</td>
                     <td className="px-3 py-2 text-xs text-white/70">{TARGETS[m.target] || m.target}</td>
                     <td className="px-3 py-2 text-[11px] text-white/50">{GENRULES[m.generationRule] || m.generationRule}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-amber-500/15 text-amber-300" : "bg-white/10 text-white/50"}`}>{m.required ? "obrigatório" : "opcional"}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-amber-500/15 text-amber-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{m.required ? "obrigatório" : "opcional"}</span>
                       {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">bloqueia fase</span>}
                     </td>
                     <td className="px-3 py-2 text-[10px] text-white/50">{[m.createsTask && "tarefa", m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
@@ -183,14 +183,14 @@ export default function MatrizDocumentalTab() {
                       <div className="flex items-center justify-end gap-0.5 text-white/50">
                         {m.arquivado ? (
                           <>
-                            <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-300/80 hover:bg-white/10 hover:text-green-300"><IUnarch /></button>
+                            <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-300/80 hover:bg-[var(--surface-hover)] hover:text-green-300"><IUnarch /></button>
                             {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>}
                           </>
                         ) : (
                           <>
-                            <button title="Editar" aria-label="Editar" onClick={() => openEdit(m)} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
-                            <button title="Duplicar" aria-label="Duplicar" onClick={() => dup(m)} className="rounded p-1 hover:bg-white/10 hover:text-white"><ICopy /></button>
-                            <button title="Arquivar" aria-label="Arquivar" onClick={() => setArquivado(m, true)} className="rounded p-1 hover:bg-white/10 hover:text-white"><IArch /></button>
+                            <button title="Editar" aria-label="Editar" onClick={() => openEdit(m)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
+                            <button title="Duplicar" aria-label="Duplicar" onClick={() => dup(m)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><ICopy /></button>
+                            <button title="Arquivar" aria-label="Arquivar" onClick={() => setArquivado(m, true)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IArch /></button>
                             {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>}
                           </>
                         )}
@@ -207,8 +207,8 @@ export default function MatrizDocumentalTab() {
       {/* MODAL */}
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} regra documental</h3></div>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} regra documental</h3></div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
               <div>
                 <label className={labelCls}>Fase</label>
@@ -252,8 +252,8 @@ export default function MatrizDocumentalTab() {
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.blocksPhaseCompletion} onChange={e => setForm(f => f && { ...f, blocksPhaseCompletion: e.target.checked })} />Bloqueia conclusão da fase</label>
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>

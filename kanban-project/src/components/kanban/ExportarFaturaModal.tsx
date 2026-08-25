@@ -311,7 +311,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-500 to-blue-600">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/20 rounded-lg">
+            <div className="p-2 bg-[var(--surface-secondary)] rounded-lg">
               <FileDown className="h-5 w-5 text-white" />
             </div>
             <div>
@@ -321,7 +321,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
           </div>
           <button 
             onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+            className="p-2 hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
           >
             <X className="h-5 w-5 text-white" />
           </button>
@@ -408,7 +408,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                 {/* Indicador de scroll */}
                 {showScrollIndicator && (
                   <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none flex items-end justify-center pb-1">
-                    <div className="flex items-center gap-1 text-xs text-gray-400 bg-white/80 px-2 py-1 rounded-full">
+                    <div className="flex items-center gap-1 text-xs text-gray-400 bg-[var(--surface-elevated)] px-2 py-1 rounded-full">
                       <ChevronDown className="h-3 w-3" />
                       Role para ver mais
                     </div>
@@ -542,7 +542,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
               className="bg-blue-600 hover:bg-blue-700 gap-2"
             >
               {gerando ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
               ) : (
                 <FileDown className="h-4 w-4" />
               )}

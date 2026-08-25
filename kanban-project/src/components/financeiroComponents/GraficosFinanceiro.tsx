@@ -515,7 +515,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
 
 function ChartCard({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="relative bg-white/5 border border-white/10 rounded-xl p-5">
+    <div className="relative bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-xl p-5">
       <div className="mb-3">
         <h3 className="text-white font-semibold text-sm">{title}</h3>
         {subtitle && <p className="text-white/40 text-xs">{subtitle}</p>}

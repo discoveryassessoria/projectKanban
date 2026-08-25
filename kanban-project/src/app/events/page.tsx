@@ -398,7 +398,7 @@ const handleSubmit = async () => {
             <div className="flex flex-wrap items-center gap-2">
             {/* Toggle Lista/Calendário */}
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "lista" | "calendario")}>
-              <TabsList className="bg-transparent border border-white/15">
+              <TabsList className="bg-transparent border border-[var(--border-default)]">
                 <TabsTrigger value="lista" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Lista</TabsTrigger>
                 <TabsTrigger value="calendario" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Calendário</TabsTrigger>
               </TabsList>
@@ -426,7 +426,7 @@ const handleSubmit = async () => {
 {/* Formulário de Novo Evento */}
           {showForm && (
             <section>
-              <Card className="bg-white/10 backdrop-blur-sm border border-white/20">
+              <Card className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)]">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-white">
@@ -434,7 +434,7 @@ const handleSubmit = async () => {
                     </h3>
                     <button
                       onClick={resetForm}
-                      className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                      className="p-2 hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
                     >
                       <X className="h-5 w-5 text-white/60" />
                     </button>
@@ -448,7 +448,7 @@ const handleSubmit = async () => {
                         value={titulo}
                         onChange={(e) => setTitulo(e.target.value)}
                         placeholder="Ex: Reunião no Consulado"
-                        className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
                       />
                     </div>
 
@@ -464,8 +464,8 @@ const handleSubmit = async () => {
                               onClick={() => setTipo(t.value)}
                               className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
                                 tipo === t.value
-                                  ? "border-[var(--border-default)] bg-white/20 text-white"
-                                  : "border-white/20 hover:border-white/40 text-white/60"
+                                  ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white"
+                                  : "border-[var(--border-strong)] hover:border-[var(--border-strong)] text-white/60"
                               }`}
                             >
                               <Icon className="h-4 w-4" style={{ color: t.cor }} />
@@ -483,7 +483,7 @@ const handleSubmit = async () => {
                           type="checkbox"
                           checked={diaInteiro}
                           onChange={(e) => setDiaInteiro(e.target.checked)}
-                          className="rounded border-white/30"
+                          className="rounded border-[var(--border-strong)]"
                         />
                         Dia inteiro
                       </label>
@@ -496,7 +496,7 @@ const handleSubmit = async () => {
   value={dataInicio}
   onChange={(value) => setDataInicio(value)}
   placeholder="dd/mm/aaaa"
-  className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
 />
                     </div>
 
@@ -508,7 +508,7 @@ const handleSubmit = async () => {
   type="time"
   value={horaInicio}
   onChange={(e) => setHoraInicio(e.target.value)}
-  className="bg-white/10 border-white/20 [color-scheme:dark] time-white"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] [color-scheme:dark] time-white"
 />
                       </div>
                     )}
@@ -522,7 +522,7 @@ const handleSubmit = async () => {
   value={dataFim}
   onChange={(value) => setDataFim(value)}
   placeholder="dd/mm/aaaa"
-  className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
 />
     </div>
     {dataFim && (
@@ -532,7 +532,7 @@ const handleSubmit = async () => {
   type="time"
   value={horaFim}
   onChange={(e) => setHoraFim(e.target.value)}
-  className="bg-white/10 border-white/20 [color-scheme:dark] time-white"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] [color-scheme:dark] time-white"
 />
       </div>
     )}
@@ -546,7 +546,7 @@ const handleSubmit = async () => {
                         value={local}
                         onChange={(e) => setLocal(e.target.value)}
                         placeholder="Ex: Consulado de São Paulo"
-                        className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
                       />
                     </div>
 
@@ -559,7 +559,7 @@ const handleSubmit = async () => {
   onChange={(e) => setLembreteDias(e.target.value)}
   placeholder="Ex: 3"
   min="0"
-  className="bg-white/10 border-white/20 text-white placeholder:text-white/40 [color-scheme:dark]"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40 [color-scheme:dark]"
 />
                     </div>
 
@@ -571,7 +571,7 @@ const handleSubmit = async () => {
                         onChange={(e) => setDescricao(e.target.value)}
                         placeholder="Detalhes do evento..."
                         rows={3}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                        className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
                       />
                     </div>
                   </div>
@@ -589,7 +589,7 @@ const handleSubmit = async () => {
                     <Button
                       variant="ghost"
                       onClick={resetForm}
-                      className="text-white/70 hover:text-white hover:bg-white/10"
+                      className="text-white/70 hover:text-white hover:bg-[var(--surface-hover)]"
                     >
                       Cancelar
                     </Button>
@@ -688,7 +688,7 @@ const handleSubmit = async () => {
           ) : (
             /* ========== VISUALIZAÇÃO EM CALENDÁRIO ========== */
             <section>
-              <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
+              <Card className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)]">
                 <CardContent className="p-6">
                   {/* Header do calendário */}
                   <div className="flex items-center justify-between mb-6">
@@ -698,19 +698,19 @@ const handleSubmit = async () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => navegarMes(-1)}
-                        className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                        className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-white/60 hover:text-white transition-colors"
                       >
                         <ChevronLeft className="h-5 w-5" />
                       </button>
                       <button
                         onClick={() => setMesAtual(new Date())}
-                        className="px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+                        className="px-3 py-1.5 text-sm font-medium rounded-lg hover:bg-[var(--surface-hover)] text-white/70 hover:text-white transition-colors"
                       >
                         Hoje
                       </button>
                       <button
                         onClick={() => navegarMes(1)}
-                        className="p-2 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                        className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-white/60 hover:text-white transition-colors"
                       >
                         <ChevronRight className="h-5 w-5" />
                       </button>
@@ -745,7 +745,7 @@ const handleSubmit = async () => {
                           className={`h-24 p-1 rounded-lg border transition-colors ${
                             ehHoje
                               ? "bg-emerald-500/10 border-emerald-500/30"
-                              : "border-white/10 hover:bg-white/5"
+                              : "border-[var(--border-default)] hover:bg-[var(--surface-hover)]"
                           }`}
                         >
                           <div

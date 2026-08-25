@@ -20,9 +20,9 @@ export interface Efeito {
   permitidoNestaFase: boolean; camposObrigatorios: string[]
 }
 
-const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
-const card = "rounded-lg border border-white/10 bg-white/5 p-3"
+const card = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
 
 export interface PecasDoPasso {
   acoes: AcaoCfg[]
@@ -59,7 +59,7 @@ export default function EditorDePecasDoPasso({
     <>
       <p className="text-xs text-white/50">O que o operador preenche aqui.</p>
       {pecas.campos.length === 0 && (
-        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
           Nenhum campo configurado.
         </p>
       )}
@@ -78,7 +78,7 @@ export default function EditorDePecasDoPasso({
                 {tiposDeCampo.map((t) => <option key={t} value={t}>{nomeDoTipoDeCampo(t)}</option>)}
               </select>
             </div>
-            <button onClick={() => delLista("campos", i)} className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+            <button onClick={() => delLista("campos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-xs text-white/60">
@@ -87,7 +87,7 @@ export default function EditorDePecasDoPasso({
             <code className="text-[11px] text-white/35" title="Chave gravada nas execuções — não muda.">{c.key ?? chaveDe(c.label)}</code>
           </div>
           {c.tipo === TIPO_REFERENCIA && (
-            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/20 p-3">
               <label className={lbl}>Qual cadastro</label>
               {/* NÃO se escrevem opções aqui: a lista É o cadastro, e ela muda quando
                   o cadastro muda. O que se escolhe é para ONDE o campo aponta. */}
@@ -120,12 +120,12 @@ export default function EditorDePecasDoPasso({
             </div>
           )}
           {TIPOS_COM_OPCOES.includes(c.tipo) && (
-            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/20 p-3">
               <div className="flex items-center justify-between">
                 <label className={`${lbl} mb-0`}>Opções</label>
                 <button
                   onClick={() => setLista("campos", i, { opcoesCadastradas: [...(c.opcoesCadastradas ?? []), { label: "Nova opção", ativo: true }] })}
-                  className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10">+ Opção</button>
+                  className="rounded-lg border border-[var(--border-default)] px-2 py-1 text-[11px] text-white/70 hover:bg-[var(--surface-hover)]">+ Opção</button>
               </div>
               <p className="mt-1 text-[11px] text-white/35">
                 Cada opção tem chave própria. Renomear o rótulo não desliga a escolha já registrada; para tirar
@@ -164,7 +164,7 @@ export default function EditorDePecasDoPasso({
         <b> só</b> os que esta fase tem competência para executar e que o executor sabe disparar.
       </p>
       {pecas.acoes.length === 0 && (
-        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
           Nenhum resultado disponível. Sem um resultado cadastrado o operador vê a etapa e não tem como fechá-la.
         </p>
       )}
@@ -180,7 +180,7 @@ export default function EditorDePecasDoPasso({
                 <label className={lbl}>Rótulo</label>
                 <input className={inp} value={a.label} onChange={(e) => setLista("acoes", i, { label: e.target.value })} />
               </div>
-              <button onClick={() => delLista("acoes", i)} className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+              <button onClick={() => delLista("acoes", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
             </div>
             <div className="mt-2">
               <label className={lbl}>O que acontece</label>
@@ -235,7 +235,7 @@ export default function EditorDePecasDoPasso({
       <p className="text-xs text-white/50">Itens de conferência.</p>
       {avisoDoExecutor && <p className="text-[11px] text-amber-300/70">{avisoDoExecutor}</p>}
       {pecas.checkItens.length === 0 && (
-        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
           Nenhum item de conferência.
         </p>
       )}
@@ -246,7 +246,7 @@ export default function EditorDePecasDoPasso({
               <label className={lbl}>Item</label>
               <input className={inp} value={k.label} onChange={(e) => setLista("checkItens", i, { label: e.target.value })} />
             </div>
-            <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+            <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
           </div>
           <input className={`${inp} mt-2`} placeholder="Explicação (opcional)" value={k.descricao ?? ""} onChange={(e) => setLista("checkItens", i, { descricao: e.target.value })} />
           <label className="mt-2 flex items-center gap-2 text-xs text-white/60">
@@ -277,7 +277,7 @@ export default function EditorDePecasDoPasso({
           : "O que precisa estar cumprido para concluir. O motor recusa a conclusão citando o requisito pelo nome que está aqui. As evidências ficam logo abaixo — mesma lista, agrupada à parte."}
       </p>
       {visiveis.length === 0 && (
-        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
           {soEvidencia ? "Nenhuma evidência obrigatória." : "Nenhum requisito configurado."}
         </p>
       )}
@@ -295,7 +295,7 @@ export default function EditorDePecasDoPasso({
                 <label className={lbl}>O que o operador lê quando falta</label>
                 <input className={inp} value={r.label} onChange={(e) => setLista("requisitos", i, { label: e.target.value })} />
               </div>
-              <button onClick={() => delLista("requisitos", i)} className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+              <button onClick={() => delLista("requisitos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
             </div>
             {!soEvidencia && (
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -354,7 +354,7 @@ export default function EditorDePecasDoPasso({
               </label>
               <div className="flex items-center gap-2 text-xs text-white/60">
                 <span>Só na ação:</span>
-                <select className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                <select className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white"
                   value={r.acaoKey ?? ""} onChange={(e) => setLista("requisitos", i, { acaoKey: e.target.value || null })}>
                   <option value="">(na conclusão)</option>
                   {pecas.acoes.map((a) => <option key={a.key ?? a.label} value={a.key ?? chaveDe(a.label)}>{a.label}</option>)}

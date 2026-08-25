@@ -30,7 +30,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 const opt = "bg-zinc-900"
 
@@ -94,7 +94,7 @@ export default function SimulacaoFaseTab() {
   return (
     <div className="space-y-5">
       {/* cabeçalho + seletores */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Simulação de Fase</h2>
         <p className="mt-1 text-sm text-white/60">Mostra <b>o que o motor faria</b> quando um processo deste tipo dispara o evento da fase — tarefas, lançamentos, alertas. <span className="text-green-300/80">É só uma prévia: nada é criado.</span></p>
 
@@ -158,7 +158,7 @@ export default function SimulacaoFaseTab() {
             <Secao titulo="Operacional" count={report.operacional.length} tone="sky">
               {report.operacional.map((a, i) => (
                 <Linha key={i}>
-                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{KIND_LABELS[a.kind] || a.kind}</span>
+                  <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">{KIND_LABELS[a.kind] || a.kind}</span>
                   <span className="text-white">{a.name}</span>
                   {a.acao && <span className="text-white/40">· {a.acao}</span>}{a.condicional && <CondBadge nota={a.condicaoNota} />}
                 </Linha>
@@ -191,13 +191,13 @@ export default function SimulacaoFaseTab() {
 // Blocos visuais
 // ============================================================
 function Secao({ titulo, count, tone, children }: { titulo: string; count: number; tone: string; children: React.ReactNode }) {
-  const dot: Record<string, string> = { green: "bg-green-400", amber: "bg-amber-400", sky: "bg-sky-400", red: "bg-red-400", neutral: "bg-white/30" }
+  const dot: Record<string, string> = { green: "bg-green-400", amber: "bg-amber-400", sky: "bg-sky-400", red: "bg-red-400", neutral: "bg-[var(--surface-secondary)]" }
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
       <div className="mb-2 flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${dot[tone] || dot.neutral}`} />
         <span className="text-xs font-bold uppercase tracking-wider text-white/50">{titulo}</span>
-        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-white/60">{count}</span>
+        <span className="rounded-full bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] text-white/60">{count}</span>
       </div>
       <div className="space-y-1">{count === 0 ? <div className="text-xs text-white/30">—</div> : children}</div>
     </div>

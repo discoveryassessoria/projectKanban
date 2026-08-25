@@ -399,7 +399,7 @@ export default function TabelaValoresTab() {
     catch (e: any) { alert(e.message || 'Não foi possível excluir.') }
   }
 
-  const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
+  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
   // Naturezas só existem depois de um item vinculado — e é o ITEM que diz quais admite.
   const itemVinculado = !!form.itemCatalogoId
   const podeCusto = !!itemSelecionado?.possuiCusto
@@ -415,21 +415,21 @@ export default function TabelaValoresTab() {
         <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">+ Novo valor</button>
       </div>
 
-      <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por cadastro mestre, papel ou contexto..." className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20" />
+      <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por cadastro mestre, papel ou contexto..." className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20" />
 
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
       {!loading && erroLista && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
-      {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
+      {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
-            <thead><tr className="bg-white/5">
+            <thead><tr className="bg-[var(--surface-primary)]">
               {/* UMA LINHA POR CADASTRO MESTRE. "Papel" era coluna porque a tela
                   renderizava REGISTRO de preço; agora Custo e Venda são colunas
                   próprias do mesmo item, e "Preço" genérico deixou de existir. */}
               {['Código', 'Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''].map((h, idx) => (
-                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 3 || idx === 4 || idx === 6 ? 'text-right' : 'text-left'}`}>{h}</th>
+                <th key={idx} className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 3 || idx === 4 || idx === 6 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -437,13 +437,13 @@ export default function TabelaValoresTab() {
                 const om = origemMestre(linha.referencia.configuracaoFinanceiraItem)
                 const ativo = !linha.referencia.arquivado
                 return (
-                  <tr key={linha.configId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                  <tr key={linha.configId} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                     <td className="px-3 py-2.5 font-mono text-[12px] text-white/70">{om.codigo ?? '—'}</td>
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />
                     <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
-                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
+                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
                     <td className="px-3 py-2.5 text-right text-[11px] text-white/40">
                       {/* VARIAÇÃO ≠ SEM PAPEL. O preço de um fornecedor específico
                           convivendo com o genérico é cadastro correto — é a régua
@@ -471,8 +471,8 @@ export default function TabelaValoresTab() {
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar preço' : 'Novo valor'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
@@ -701,7 +701,7 @@ export default function TabelaValoresTab() {
 
               {erroModal && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>}
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               {/* Sem item oficial vinculado não há o que salvar — o botão diz
                   isso antes do clique, em vez de deixar o operador descobrir no erro.

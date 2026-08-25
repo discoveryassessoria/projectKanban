@@ -68,7 +68,7 @@ export default function OverviewTab() {
       {strip.length > 0 && (
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
         {strip.map((k, i) => (
-          <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-2.5 text-center">
+          <div key={i} className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-lg p-2.5 text-center">
             <div className={`font-bold text-white ${k.isText ? "text-[13px]" : "text-lg"}`}>{k.value}</div>
             <div className="text-[10px] text-white/50 mt-0.5 leading-tight">{k.label}</div>
           </div>
@@ -79,8 +79,8 @@ export default function OverviewTab() {
       {/* CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c, i) => (
-          <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white/70">{c.icon}</div>
+          <div key={i} className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-[var(--surface-primary)] flex items-center justify-center text-white/70">{c.icon}</div>
             <div>
               <div className="text-2xl font-bold text-white leading-none">{c.value}</div>
               <div className="text-[11px] text-white/50 mt-1">{c.label}</div>
@@ -90,7 +90,7 @@ export default function OverviewTab() {
       </div>
 
       {/* ALERTAS */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 border-l-2 border-l-amber-400">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 border-l-2 border-l-amber-400">
         <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2 flex items-center gap-1.5">
           <AlertTriangle className="h-3.5 w-3.5" /> Alertas de configuração
         </div>
@@ -99,7 +99,7 @@ export default function OverviewTab() {
         ) : (
           <div className="space-y-1">
             {d.alertas.map((a, i) => (
-              <div key={i} className="text-[12.5px] text-white/80 py-1 border-t border-white/5 first:border-0">⚠ {a}</div>
+              <div key={i} className="text-[12.5px] text-white/80 py-1 border-t border-[var(--border-subtle)] first:border-0">⚠ {a}</div>
             ))}
           </div>
         )}
@@ -107,7 +107,7 @@ export default function OverviewTab() {
 
       {/* ÚLTIMA ALTERAÇÃO (não conta acesso/login) */}
       {ultima && (
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+        <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 mb-2">Última alteração</div>
           <div className="text-sm text-white/80">
             <strong className="text-white">{ultima.acao}</strong> · {ultima.entidade}

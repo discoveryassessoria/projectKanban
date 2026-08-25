@@ -13,7 +13,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const opt = "bg-zinc-900"
 
 function fmt(iso: string) {
@@ -77,7 +77,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">{cfg?.titulo ?? "Logs / Auditoria"}</h2>
@@ -85,7 +85,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
               {cfg?.descricao ?? "Registro das ações no sistema."} Mostrando {logsEscopo.length} de {logs.length} registros recentes.
             </p>
           </div>
-          <button onClick={() => void load()} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">Atualizar</button>
+          <button onClick={() => void load()} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/80 hover:bg-[var(--surface-hover)]">Atualizar</button>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <select value={fEntidade} onChange={e => setFEntidade(e.target.value)} className={inputCls}>
@@ -100,9 +100,9 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-white/10 text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
             <tr><th className="px-4 py-3 font-medium">Data/hora</th><th className="px-4 py-3 font-medium">Ação</th><th className="px-4 py-3 font-medium">Entidade</th><th className="px-4 py-3 font-medium">Descrição</th><th className="px-4 py-3 font-medium">Usuário</th></tr>
           </thead>
           <tbody>
@@ -110,7 +110,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
               <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Nenhum log encontrado.</td></tr>
             ) : filtered.map(l => (
               <Fragment key={l.id}>
-                <tr className={`border-b border-white/5 last:border-0 ${l.detalhes ? "cursor-pointer hover:bg-white/5" : ""}`} onClick={() => l.detalhes && setAberto(aberto === l.id ? null : l.id)}>
+                <tr className={`border-b border-[var(--border-subtle)] last:border-0 ${l.detalhes ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`} onClick={() => l.detalhes && setAberto(aberto === l.id ? null : l.id)}>
                   <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(l.criadoEm)}</td>
                   <td className="px-4 py-2.5"><span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">{l.acao}</span></td>
                   <td className="px-4 py-2.5 text-white/70">{l.entidade}{l.entidadeId != null && <span className="text-white/40"> #{l.entidadeId}</span>}</td>
@@ -118,7 +118,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
                   <td className="px-4 py-2.5 text-white/70">{l.usuarioNome || (l.usuarioId != null ? `#${l.usuarioId}` : "sistema")}</td>
                 </tr>
                 {aberto === l.id && l.detalhes != null && (
-                  <tr className="border-b border-white/5 bg-black/20">
+                  <tr className="border-b border-[var(--border-subtle)] bg-black/20">
                     <td colSpan={5} className="px-4 py-3">
                       <pre className="max-h-64 overflow-auto rounded-lg bg-black/40 p-3 text-[11px] text-white/70">{JSON.stringify(l.detalhes, null, 2)}</pre>
                     </td>

@@ -90,7 +90,7 @@ function authHeaders(json = true): HeadersInit {
 }
 
 const inputCls =
-  "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+  "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 
 const SEM_ITENS: never[] = Object.freeze([]) as never[]
@@ -98,7 +98,7 @@ const SEM_ITENS: never[] = Object.freeze([]) as never[]
 const CORES_STATUS: Record<StatusVersao, string> = {
   RASCUNHO: "bg-amber-500/15 text-amber-300",
   PUBLICADA: "bg-green-500/15 text-green-300",
-  REVOGADA: "bg-white/10 text-white/50",
+  REVOGADA: "bg-[var(--surface-primary)] text-white/50",
 }
 
 export default function ModelosDocumentaisTab() {
@@ -148,7 +148,7 @@ export default function ModelosDocumentaisTab() {
         <div className="rounded-xl border border-blue-400/30 bg-blue-500/15 px-4 py-3 text-sm text-blue-100">{flash}</div>
       )}
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Modelos</h2>
@@ -175,9 +175,9 @@ export default function ModelosDocumentaisTab() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-white/10 text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
             <tr>
               <th className="px-4 py-3 font-medium">Código</th>
               <th className="px-4 py-3 font-medium">Nome</th>
@@ -195,14 +195,14 @@ export default function ModelosDocumentaisTab() {
             ) : modelos.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-white/40">Nenhum modelo cadastrado.</td></tr>
             ) : modelos.map((m) => (
-              <tr key={m.id} className="border-b border-white/5 last:border-0">
+              <tr key={m.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 font-mono text-xs text-white/70">{m.codigo}</td>
                 <td className="px-4 py-2.5 text-white">{m.nome}</td>
                 <td className="px-4 py-2.5 text-white/70">{ROTULO_CATEGORIA[m.categoria] ?? m.categoria}</td>
                 <td className="px-4 py-2.5 text-white/70">
                   {m.documentType.name}
                   {m.documentType.publicCode && (
-                    <span className="ml-1.5 rounded bg-white/10 px-1.5 py-0.5 text-[9px] text-white/50">{m.documentType.publicCode}</span>
+                    <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] text-white/50">{m.documentType.publicCode}</span>
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-white/70">
@@ -210,7 +210,7 @@ export default function ModelosDocumentaisTab() {
                   <span className="ml-1 text-white/30">de {m.totalVersoes}</span>
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>
                     {m.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </td>
@@ -219,8 +219,8 @@ export default function ModelosDocumentaisTab() {
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-1 text-xs text-white/50">
-                    <button onClick={() => setAbertoId(m.id)} className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white">Versões</button>
-                    <button onClick={() => setForm(m)} className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white">Editar</button>
+                    <button onClick={() => setAbertoId(m.id)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-white">Versões</button>
+                    <button onClick={() => setForm(m)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
                   </div>
                 </td>
               </tr>
@@ -230,14 +230,14 @@ export default function ModelosDocumentaisTab() {
       </div>
 
       {variaveis.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
           <h3 className="text-sm font-semibold text-white">Variáveis reconhecidas</h3>
           <p className="mt-1 text-xs text-white/50">
             Use estas chaves entre chaves duplas dentro do DOCX. Qualquer outra reprova a publicação.
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {variaveis.map((v) => (
-              <div key={v.chave} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+              <div key={v.chave} className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-2">
                 <code className="text-[11px] text-blue-200">{`{{${v.chave}}}`}</code>
                 <div className="mt-0.5 text-xs text-white/70">{v.rotulo}</div>
                 <div className="text-[10px] text-white/40">
@@ -281,8 +281,8 @@ function FormularioModelo({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-      <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-white/10 px-6 py-4">
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[var(--border-default)] px-6 py-4">
           <h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} modelo</h3>
         </div>
         <div className="space-y-3 px-6 py-4">
@@ -329,8 +329,8 @@ function FormularioModelo({
             Ativo
           </label>
         </div>
-        <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-          <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+        <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+          <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
           <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
         </div>
       </div>
@@ -402,8 +402,8 @@ function PainelVersoes({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={fechar}>
-      <div className="my-8 w-full max-w-5xl rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between border-b border-white/10 px-6 py-4">
+      <div className="my-8 w-full max-w-5xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h3 className="font-semibold text-white">{modelo?.nome ?? "Modelo"}</h3>
             <p className="text-xs text-white/50">
@@ -411,10 +411,10 @@ function PainelVersoes({
               {modelo?.documentType.name}
             </p>
           </div>
-          <button onClick={fechar} className="rounded px-2 py-1 text-white/50 hover:bg-white/10 hover:text-white">Fechar</button>
+          <button onClick={fechar} className="rounded px-2 py-1 text-white/50 hover:bg-[var(--surface-hover)] hover:text-white">Fechar</button>
         </div>
 
-        <div className="border-b border-white/10 px-6 py-4">
+        <div className="border-b border-[var(--border-default)] px-6 py-4">
           <label className={labelCls}>Nova versão (DOCX)</label>
           <input
             type="file"
@@ -436,20 +436,20 @@ function PainelVersoes({
           ) : (
             <div className="space-y-3">
               {modelo.versoes.map((v) => (
-                <div key={v.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <div key={v.id} className="rounded-xl border border-[var(--border-default)] bg-white/[0.03] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-white">Versão {v.numero}</span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] ${CORES_STATUS[v.status]}`}>{v.status}</span>
                       {(v._count?.geracoes ?? 0) > 0 && (
-                        <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">
+                        <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">
                           {v._count!.geracoes} documento(s) gerado(s)
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1 text-xs text-white/50">
-                      <button onClick={() => void baixar(v.id)} className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white">Baixar</button>
-                      <button disabled={busy} onClick={() => void agir(v.id, "validar")} className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white disabled:opacity-40">Validar</button>
+                      <button onClick={() => void baixar(v.id)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-white">Baixar</button>
+                      <button disabled={busy} onClick={() => void agir(v.id, "validar")} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-40">Validar</button>
                       {v.status === "RASCUNHO" && (
                         <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-green-600/80 px-2 py-0.5 text-[#fff] hover:bg-green-600 disabled:opacity-40">Publicar</button>
                       )}
@@ -475,7 +475,7 @@ function PainelVersoes({
                       <span
                         key={p}
                         className={`rounded px-1.5 py-0.5 text-[10px] ${
-                          (v.obrigatorios ?? []).includes(p) ? "bg-blue-500/15 text-blue-200" : "bg-white/10 text-white/50"
+                          (v.obrigatorios ?? []).includes(p) ? "bg-blue-500/15 text-blue-200" : "bg-[var(--surface-primary)] text-white/50"
                         }`}
                       >
                         {p}
@@ -484,7 +484,7 @@ function PainelVersoes({
                   </div>
 
                   {validacao?.versaoId === v.id && (
-                    <div className="mt-3 rounded-lg border border-white/10 bg-black/30 p-3">
+                    <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/30 p-3">
                       <div className={`text-xs font-medium ${validacao.resultado.ok ? "text-green-300" : "text-red-300"}`}>
                         {validacao.resultado.ok ? "Validação aprovada — pode publicar." : "Validação reprovada."}
                       </div>
@@ -529,7 +529,7 @@ function PainelVersoes({
                           <button
                             disabled={busy}
                             onClick={() => void agir(v.id, "validar")}
-                            className="mt-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-[11px] text-white/80 hover:bg-white/10 disabled:opacity-40"
+                            className="mt-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1 text-[11px] text-white/80 hover:bg-[var(--surface-hover)] disabled:opacity-40"
                           >
                             Revalidar com as declarações
                           </button>

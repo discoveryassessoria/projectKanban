@@ -130,7 +130,7 @@ interface Props {
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
-const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
+const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
 const ini = (nome: string) => {
   const p = (nome || "").trim().split(/\s+/)
   return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase() || "—"
@@ -209,7 +209,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
   }
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-white/40" /></div>
-  if (!data) return <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-sm text-white/55">Este processo não está na fase de Emissão documental retificada.</div>
+  if (!data) return <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/55">Este processo não está na fase de Emissão documental retificada.</div>
 
   const docs = data.documentos
   const k = data.kpis
@@ -250,7 +250,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
         <div className="space-y-4 min-w-0">
           {/* Barra das 6 etapas do documento em foco */}
           {foco && (
-            <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
               <div className="text-[11px] text-white/55 mb-2">Workflow de <b className="text-white/80">{foco.documentoTitulo}</b> · {foco.pessoaNome}</div>
               <div className="flex items-start">
                 {foco.workflow.map((s, i) => {
@@ -272,7 +272,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           )}
 
           {/* Contexto */}
-          <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[#20262e] p-4 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0"><FileText className="w-5 h-5" /></div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold text-white/95">Documentos pós-retificação</div>
@@ -283,7 +283,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           {/* 8 KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {kpiList.map(([ic, val, lbl], i) => (
-              <div key={i} className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2.5">
+              <div key={i} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5">
                 <div className="text-base leading-none">{ic}</div>
                 <div className="text-xl font-bold text-white/95 mt-1">{val}</div>
                 <div className="text-[11px] text-white/55">{lbl}</div>
@@ -292,8 +292,8 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           </div>
 
           {/* Tabela de documentos */}
-          <div className="rounded-xl border border-white/10 overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-white/10 flex items-center gap-2">
+          <div className="rounded-xl border border-[var(--border-default)] overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-[var(--border-default)] flex items-center gap-2">
               <span className="text-sm font-semibold text-white/95">Documentos para emissão retificada</span>
               <span className="text-xs font-semibold text-white/55 bg-[#252c35] rounded-full px-2 py-0.5">{docs.length}</span>
             </div>
@@ -324,7 +324,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                         <td className="px-3 py-2.5"><RePill status={d.status} /></td>
                         <td className="px-3 py-2.5 text-white/68">{d.nextAction}</td>
                         <td className="px-3 py-2.5 text-right">
-                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[#4ade80]/30 text-[#4ade80]" : "border-white/10 bg-[#20262e] text-white hover:bg-[#252c35]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[#4ade80]/30 text-[#4ade80]" : "border-[var(--border-default)] bg-[#20262e] text-white hover:bg-[#252c35]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
                         </td>
                       </tr>
                     ))}
@@ -337,7 +337,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
 
         {/* Coluna direita */}
         <aside className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
             <div className="space-y-2">
               <QBtn icon={<FileText className="w-4 h-4 text-white/40" />} onClick={() => setAviso("Modelo de ofício de averbação — em breve.")}>Modelo de ofício de averbação</QBtn>
@@ -345,7 +345,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
             <div className="space-y-2 text-xs">
               {k.bloq > 0 && <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 border border-[#d2a948]/25 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
@@ -390,10 +390,10 @@ function calcProgress(docs: ReDoc[]): number {
 // ============================================================
 
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
-  return <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-white/55 whitespace-nowrap">{label}</div></div>
+  return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-white/55 whitespace-nowrap">{label}</div></div>
 }
 function QBtn({ icon, onClick, children }: { icon: ReactNode; onClick: () => void; children: ReactNode }) {
-  return <button onClick={onClick} className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 inline-flex items-center gap-2">{icon} {children}</button>
+  return <button onClick={onClick} className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">{icon} {children}</button>
 }
 function RePill({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -435,7 +435,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-[var(--surface-popover)] h-full shadow-xl overflow-y-auto flex flex-col">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-white/10">
+        <div className="px-5 py-4 border-b border-[var(--border-default)]">
           <button onClick={onClose} className="text-white/40 hover:text-white/80 float-right p-1"><X className="w-5 h-5" /></button>
           <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7dd3fc]">Emissão documental retificada · {pk.pessoaNome}</div>
           <h3 className="text-base font-bold text-white/95 mt-0.5">{pk.documentoTitulo} retificada</h3>
@@ -450,7 +450,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-white/10 px-3 flex gap-1 overflow-x-auto">
+        <div className="border-b border-[var(--border-default)] px-3 flex gap-1 overflow-x-auto">
           {DRAWER_TABS.map((t) => (
             <button key={t} onClick={() => onTab(t)} className={`px-2.5 py-2.5 text-xs font-semibold whitespace-nowrap border-b-2 ${t === tab ? "border-[#2563eb] text-white" : "border-transparent text-white/55 hover:text-white/80"}`}>{t}</button>
           ))}
@@ -466,7 +466,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 <p className="text-xs text-white/68">Workflow concluído (100%). Documento corrigido e validado.</p>
               </div>
             ) : cur ? (
-              <div className="rounded-lg border border-white/10 p-4 text-center">
+              <div className="rounded-lg border border-[var(--border-default)] p-4 text-center">
                 <div className="w-9 h-9 mx-auto rounded-full bg-[#20262e] text-white/80 flex items-center justify-center mb-2"><FileText className="w-5 h-5" /></div>
                 <h4 className="text-sm font-bold text-white/95">{cur.title}</h4>
                 <p className="text-xs text-white/68 mb-3">Etapa atual do workflow retificado. Abra para registrar e concluir.</p>
@@ -483,10 +483,10 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 const active = s.status === "em_andamento" || s.status === "pendente"
                 const meta = isDone ? `concluída${s.doneAt ? " em " + s.doneAt : ""}` : active ? "etapa atual" : "bloqueada · conclua a anterior"
                 return (
-                  <div key={s.id} className="flex items-center gap-3 border border-white/10 rounded-lg px-3 py-2.5">
+                  <div key={s.id} className="flex items-center gap-3 border border-[var(--border-default)] rounded-lg px-3 py-2.5">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[#4ade80]/15 text-[#4ade80]" : active ? "bg-[#2563eb] text-white" : "bg-[#252c35] text-white/40"}`}>{isDone ? "✓" : i + 1}</span>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium text-white/95">{i + 1}. {s.title}</div><div className="text-[11px] text-white/55">{meta}</div></div>
-                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[#fff] bg-[#20262e] border border-white/10 hover:bg-[#252c35] rounded-md px-2.5 py-1.5">Central da etapa</button>}
+                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[#fff] bg-[#20262e] border border-[var(--border-default)] hover:bg-[#252c35] rounded-md px-2.5 py-1.5">Central da etapa</button>}
                   </div>
                 )
               })}
@@ -495,7 +495,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
 
           {tab === "Averbação" && (
             Object.keys(pk.averbacao).length ? (
-              <div className="rounded-lg border border-white/10 divide-y divide-white/10 text-sm">
+              <div className="rounded-lg border border-[var(--border-default)] divide-y divide-white/10 text-sm">
                 <FieldRow k="Cartório" v={pk.averbacao.cartorio} />
                 <FieldRow k="Canal" v={pk.averbacao.canal} />
                 <FieldRow k="Protocolo" v={pk.averbacao.protocolo} />
@@ -506,7 +506,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
 
           {tab === "Solicitação" && (
             Object.keys(pk.solicitation).length ? (
-              <div className="rounded-lg border border-white/10 divide-y divide-white/10 text-sm">
+              <div className="rounded-lg border border-[var(--border-default)] divide-y divide-white/10 text-sm">
                 <FieldRow k="Canal" v={pk.solicitation.canal} />
                 <FieldRow k="Protocolo" v={pk.solicitation.protocolo} />
                 <FieldRow k="Prazo" v={pk.solicitation.prazo} />
@@ -517,7 +517,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
 
           {tab === "Conferência" && (
             <>
-              <div className="rounded-lg border border-white/10 bg-[#20262e] p-3 text-sm">
+              <div className="rounded-lg border border-[var(--border-default)] bg-[#20262e] p-3 text-sm">
                 <div className="text-[11px] font-semibold uppercase text-white/55 mb-1.5">Correção esperada</div>
                 <div className="flex justify-between py-0.5"><span className="text-white/55">Campo</span><b className="text-white/95">{pk.correcao.campo}</b></div>
                 <div className="flex justify-between py-0.5"><span className="text-white/55">Valor antigo</span><b className="text-[#f87171]">{pk.correcao.old}</b></div>
@@ -541,7 +541,7 @@ function FieldRow({ k, v }: { k: string; v?: string }) {
   return <div className="flex justify-between px-3 py-2"><span className="text-white/55">{k}</span><span className="font-medium text-white/95 text-right">{v || "—"}</span></div>
 }
 function Meta({ children }: { children: ReactNode }) {
-  return <div className="rounded-lg bg-[#20262e] border border-white/10 px-3 py-2.5 text-xs text-white/68">{children}</div>
+  return <div className="rounded-lg bg-[#20262e] border border-[var(--border-default)] px-3 py-2.5 text-xs text-white/68">{children}</div>
 }
 
 // ============================================================
@@ -669,7 +669,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
         {/* 3) Aguardar retorno */}
         {stepId === "aguardar_retorno_cartorio_retificado" && (
           <>
-            <div className="rounded-lg border border-white/10 bg-[#20262e] p-3">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[#20262e] p-3">
               <div className="text-xs font-semibold text-white/80 mb-2">✈️ Resumo da solicitação</div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <Cell k="Canal" v={doc.solicitation.canal || "—"} />
@@ -694,8 +694,8 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <Sec>2. Tipo de mídia</Sec>
             <div className="space-y-2">
               {MIDIAS.map(([v, l]) => (
-                <button key={v} type="button" onClick={() => setReMidia(v)} className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${reMidia === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>
-                  <span className={`w-3.5 h-3.5 rounded-full border ${reMidia === v ? "border-[#2563eb] bg-[#2563eb]" : "border-white/15"}`} />{l}
+                <button key={v} type="button" onClick={() => setReMidia(v)} className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${reMidia === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-[var(--border-default)] text-white/80"}`}>
+                  <span className={`w-3.5 h-3.5 rounded-full border ${reMidia === v ? "border-[#2563eb] bg-[#2563eb]" : "border-[var(--border-default)]"}`} />{l}
                 </button>
               ))}
             </div>
@@ -708,7 +708,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
         {/* 5) Conferir certidão retificada */}
         {stepId === "conferir_certidao_retificada" && (
           <>
-            <div className="rounded-lg border border-white/10 bg-[#20262e] p-3 text-sm">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[#20262e] p-3 text-sm">
               <div className="text-[11px] font-semibold uppercase text-white/55 mb-1.5">Correção esperada</div>
               <div className="flex justify-between py-0.5"><span className="text-white/55">Campo</span><b className="text-white/95">{cor.campo}</b></div>
               <div className="flex justify-between py-0.5"><span className="text-white/55">Valor antigo</span><b className="text-[#f87171]">{cor.old}</b></div>
@@ -718,8 +718,8 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <Sec>Checklist de conferência</Sec>
             <div className="flex flex-wrap gap-1.5">
               {CONF_CHK.map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
-                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
+                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/68"}`}>
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[#4ade80] text-white" : "border border-[var(--border-default)]"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
                 </button>
               ))}
             </div>
@@ -727,7 +727,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <div className="grid grid-cols-3 gap-2">
               {CONF_RES.map(([v, l, hint, tone]) => {
                 const sel = cfRes === v
-                const cls = !sel ? "border-white/10 text-white/80" : tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : tone === "warn" ? "border-[#f87171]/25 bg-[#f87171]/12 text-[#f87171]" : "border-white/20 bg-[#20262e] text-white/80"
+                const cls = !sel ? "border-[var(--border-default)] text-white/80" : tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : tone === "warn" ? "border-[#f87171]/25 bg-[#f87171]/12 text-[#f87171]" : "border-[var(--border-strong)] bg-[#20262e] text-white/80"
                 return <button key={v} type="button" onClick={() => setCfRes(v)} className={`border rounded-lg px-2 py-2 text-center ${cls}`}><div className="text-xs font-semibold">{l}</div><div className="text-[10px] text-white/55">{hint}</div></button>
               })}
             </div>
@@ -738,14 +738,14 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
         {/* 6) Validar certidão retificada */}
         {stepId === "validar_certidao_retificada" && (
           <>
-            <div className="rounded-lg border border-white/10 bg-[#20262e] p-3 text-sm">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[#20262e] p-3 text-sm">
               <div className="text-[11px] font-semibold uppercase text-white/55 mb-1.5">Correção aplicada</div>
               <div className="flex justify-between py-0.5"><span className="text-white/55">{cor.campo}</span><b><s className="text-[#f87171]">{cor.old}</s> → <span className="text-[#4ade80]">{cor.novo}</span></b></div>
             </div>
             <Sec>Decisão final</Sec>
             <div className="space-y-2">
               {VAL_DECS.map(([v, l, sub, tone]) => (
-                <button key={v} type="button" onClick={() => setVlDec(v)} className={`w-full text-left border rounded-lg px-3 py-2.5 ${vlDec === v ? (tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12" : "border-[#2563eb] bg-[#20262e]") : "border-white/10"}`}>
+                <button key={v} type="button" onClick={() => setVlDec(v)} className={`w-full text-left border rounded-lg px-3 py-2.5 ${vlDec === v ? (tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12" : "border-[#2563eb] bg-[#20262e]") : "border-[var(--border-default)]"}`}>
                   <div className="text-sm font-semibold text-white/95">{l}</div><div className="text-[11px] text-white/55">{sub}</div>
                 </button>
               ))}
@@ -757,7 +757,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
         {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-sm text-[#f87171]">{erro}</div>}
       </div>
 
-      <div className="border-t border-white/10 px-5 py-3 -mx-5 -mb-5 mt-4 flex justify-end gap-2">
+      <div className="border-t border-[var(--border-default)] px-5 py-3 -mx-5 -mb-5 mt-4 flex justify-end gap-2">
         <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
         <button onClick={submit} disabled={!podeSalvar || posting} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -785,7 +785,7 @@ function ModalShell({ children, onClose, title, sub, eyebrow, danger, maxW = "ma
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
       <div className={`relative w-full ${maxW} bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col`}>
-        <div className={`flex items-start justify-between px-5 py-4 border-b ${danger ? "border-white/10" : "border-white/10"}`}>
+        <div className={`flex items-start justify-between px-5 py-4 border-b ${danger ? "border-[var(--border-default)]" : "border-[var(--border-default)]"}`}>
           <div>
             {eyebrow && <div className={`text-[11px] font-semibold uppercase tracking-wider ${danger ? "text-[#f87171]" : "text-[#7dd3fc]"}`}>{eyebrow}</div>}
             <h3 className="text-base font-bold text-white/95 mt-0.5">{title}</h3>
@@ -817,14 +817,14 @@ function Chips({ opts, value, onChange }: { opts: Array<[string, string]>; value
   return (
     <div className="flex flex-wrap gap-2">
       {opts.map(([v, l]) => (
-        <button key={v} type="button" onClick={() => onChange(v)} className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${value === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>{l}</button>
+        <button key={v} type="button" onClick={() => onChange(v)} className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${value === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-[var(--border-default)] text-white/80"}`}>{l}</button>
       ))}
     </div>
   )
 }
 function FakeFile({ ok, onClick, label, okLabel }: { ok: boolean; onClick: () => void; label: string; okLabel: string }) {
   return (
-    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
+    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/80"}`}>
       {ok ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}{ok ? okLabel : label}
     </button>
   )

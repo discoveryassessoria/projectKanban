@@ -106,7 +106,7 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
   return (
     <Link
       href={fila.href}
-      className="group flex items-center gap-3 rounded-xl border border-transparent bg-white/[0.04] px-3 py-3 transition hover:border-white/10 hover:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4"
+      className="group flex items-center gap-3 rounded-xl border border-transparent bg-white/[0.04] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4"
     >
       <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border ${st.chip}`}>
         <Icone className="h-4 w-4" />
@@ -175,7 +175,7 @@ function CardSla({ fila }: { fila: FilaOperacional }) {
   return (
     <Link
       href={fila.href}
-      className="group flex flex-col gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 transition hover:border-white/20 hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20 md:px-4"
+      className="group flex flex-col gap-1 rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20 md:px-4"
     >
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 shrink-0 rounded-full ${st.ponto}`} />
@@ -294,7 +294,7 @@ function AgendaBloco({ data }: { data: HomeData }) {
 function LinhaQuieta({ children }: { children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-2.5 px-0.5 py-1.5 text-sm text-white/40">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/20" />
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--surface-secondary)]" />
       {children}
     </p>
   )
@@ -320,7 +320,7 @@ function Alertas({ data }: { data: HomeData }) {
             <li key={a.key}>
               <Link
                 href={a.href}
-                className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2.5 transition hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                className="flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-black/20 px-3 py-2.5 transition hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-white/20"
               >
                 <Icone className={`h-4 w-4 shrink-0 ${st.texto}`} />
                 <div className="min-w-0 flex-1">
@@ -387,7 +387,7 @@ function ResumoDoDia({ data }: { data: HomeData }) {
     return (
       <BlocoCard className="flex flex-wrap items-center gap-x-5 gap-y-2 !py-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-white/90">Operação de hoje</h2>
-        <span className="hidden h-3.5 w-px bg-white/10 sm:block" />
+        <span className="hidden h-3.5 w-px bg-[var(--surface-primary)] sm:block" />
         {itens.map((i) => (
           <span key={i.rotulo} className="text-xs text-white/40">
             <b className="font-semibold tabular-nums text-white/60">0</b> {i.curto}

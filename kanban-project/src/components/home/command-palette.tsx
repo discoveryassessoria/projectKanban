@@ -52,11 +52,11 @@ export function CommandPalette() {
         onClick={() => setAberto(true)}
         aria-haspopup="dialog"
         aria-expanded={aberto}
-        className="flex h-9 items-center gap-2 rounded-full border border-white/15 bg-black/30 px-3 text-sm text-white/45 backdrop-blur-md transition hover:border-white/30 hover:text-white/70 focus:outline-none focus:ring-2 focus:ring-white/20"
+        className="flex h-9 items-center gap-2 rounded-full border border-[var(--border-default)] bg-black/30 px-3 text-sm text-white/45 backdrop-blur-md transition hover:border-[var(--border-strong)] hover:text-white/70 focus:outline-none focus:ring-2 focus:ring-white/20"
       >
         <Search className="h-3.5 w-3.5" />
         <span>Buscar</span>
-        <kbd className="rounded border border-white/10 bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/60">
+        <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white/60">
           ⌘K
         </kbd>
       </button>
@@ -74,7 +74,7 @@ export function CommandPalette() {
             className="fixed inset-0 flex items-start justify-center bg-[var(--overlay-modal)] px-4 pt-[14vh] backdrop-blur-sm"
             style={{ zIndex: LAYER.aboveProcess }}
           >
-            <div className="w-full max-w-xl rounded-2xl border border-white/20 bg-[var(--surface-popover)] p-3 shadow-2xl">
+            <div className="w-full max-w-xl rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-popover)] p-3 shadow-2xl">
               <GlobalSearch autoFocusRef={inputRef} />
               <p className="px-1 pt-2 text-[11px] text-white/35">
                 Família, requerente, processo ou cliente · <kbd className="text-white/50">Esc</kbd> para fechar

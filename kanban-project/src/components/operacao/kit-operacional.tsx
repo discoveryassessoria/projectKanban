@@ -111,7 +111,7 @@ export function rotularFase(k: string | null): string | null {
 
 export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "acento"; children: React.ReactNode }) {
   const cores = {
-    neutro: "bg-white/[0.06] text-white/60 border-white/10",
+    neutro: "bg-white/[0.06] text-white/60 border-[var(--border-default)]",
     alerta: "bg-amber-400/10 text-amber-200/90 border-amber-300/25",
     critico: "bg-red-500/10 text-red-200/90 border-red-400/25",
     acento: "bg-sky-400/10 text-sky-200/90 border-sky-300/25",
@@ -126,12 +126,12 @@ export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critic
 export function Estado({ tipo, mensagem, aoTentar }: { tipo: "carregando" | "vazio" | "erro"; mensagem: string; aoTentar?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
-      {tipo === "carregando" && <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-transparent" />}
+      {tipo === "carregando" && <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-transparent" />}
       <p className="text-[12px] text-white/45">{mensagem}</p>
       {tipo === "erro" && aoTentar && (
         <button
           onClick={aoTentar}
-          className="rounded border border-white/15 px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:bg-white/[0.06]"
+          className="rounded border border-[var(--border-default)] px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:bg-white/[0.06]"
         >
           Tentar novamente
         </button>
@@ -189,7 +189,7 @@ export function SeletorResponsavel({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="w-full max-w-sm overflow-hidden rounded-lg border border-white/10 bg-[var(--surface-overlay)] shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">

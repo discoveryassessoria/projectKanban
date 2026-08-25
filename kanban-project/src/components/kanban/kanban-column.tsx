@@ -48,14 +48,14 @@ export function KanbanColumn({
       ref={setNodeRef}
       className={`
         flex flex-col h-full w-full
-        ${!isLast ? 'border-r-2 border-dashed border-white/20' : ''}
+        ${!isLast ? 'border-r-2 border-dashed border-[var(--border-strong)]' : ''}
         ${isOver ? 'bg-blue-500/10' : 'bg-transparent'}
         transition-colors duration-200
       `}
     >
       {/* Header compacto - altura fixa */}
       <div
-        className="px-2 py-2 border-b border-white/10 h-10 flex items-center"
+        className="px-2 py-2 border-b border-[var(--border-default)] h-10 flex items-center"
         style={{ backgroundColor: `${headerColor}40` }}
       >
         <div className="flex items-center gap-1.5 min-w-0 w-full">

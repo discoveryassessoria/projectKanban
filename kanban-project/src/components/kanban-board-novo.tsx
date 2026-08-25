@@ -365,7 +365,7 @@ export function KanbanBoard({
         >
           <div className="relative w-full max-w-full">
             <div
-              className="rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm pb-3 scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-white/10"
               style={{
                 overflowX: 'auto',
                 overflowY: 'hidden',
@@ -412,8 +412,8 @@ export function KanbanBoard({
       {/* MODAL: Novo processo — em portal pro body (senão fica preso no painel com blur) */}
       {criarModal && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="w-full max-w-md overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">Novo processo</h3>
               <button onClick={() => setCriarModal(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
@@ -426,7 +426,7 @@ export function KanbanBoard({
                   value={criarNome}
                   onChange={(e) => setCriarNome(e.target.value)}
                   placeholder="Nome do processo"
-                  className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
                   onKeyDown={(e) => { if (e.key === 'Enter') confirmarCriarProcesso() }}
                 />
               </div>
@@ -441,7 +441,7 @@ export function KanbanBoard({
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setCriarModal(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button
                 onClick={confirmarCriarProcesso}
@@ -491,7 +491,7 @@ export function KanbanBoard({
 
       {aviso && (
         <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={() => setAviso(null)}>
-          <div className="max-w-sm rounded-xl border border-white/10 bg-[var(--surface-popover)] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-sm rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-[13px] text-white/90 leading-relaxed">{aviso}</div>
             <div className="flex justify-end mt-4">
               <button

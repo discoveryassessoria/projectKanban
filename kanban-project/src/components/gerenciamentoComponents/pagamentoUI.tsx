@@ -9,8 +9,8 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, X } from 'lucide-react'
 
 export const OURO = '#D2A948'
-export const GLASS = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
-export const INPUT = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30'
+export const GLASS = 'rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md'
+export const INPUT = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30'
 
 export async function jf(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
@@ -47,7 +47,7 @@ export function Select({ value, onChange, options }: { value: string; onChange: 
 export function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button type="button" onClick={() => onChange(!on)} className="flex items-center gap-2 text-left text-sm text-white/80">
-      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${on ? '' : 'bg-white/15'}`} style={on ? { background: OURO } : undefined}>
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${on ? '' : 'bg-[var(--surface-secondary)]'}`} style={on ? { background: OURO } : undefined}>
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--surface-primary)] transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
       </span>
       {label}
@@ -61,7 +61,7 @@ export function ChipsMulti({ items, selecionados, onToggle }: { items: { id: str
       {items.map((it) => {
         const on = selecionados.includes(it.id)
         return (
-          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-white/15 text-white/60 hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
+          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-white/60 hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
             {on && <Check className="h-3 w-3" />}{it.label}
           </button>
         )
@@ -246,20 +246,20 @@ export function MultiSelect({
       ref={menuRef}
       // z acima do modal (z-50/z-[60]); sem backdrop — nada cobre a página.
       style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxH, zIndex: 120 }}
-      className="flex flex-col overflow-hidden rounded-lg border border-white/15 bg-zinc-900 shadow-2xl"
+      className="flex flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-zinc-900 shadow-2xl"
       onKeyDown={teclado}
     >
       {busca && (
-        <div className="shrink-0 border-b border-white/10 p-1.5">
+        <div className="shrink-0 border-b border-[var(--border-default)] p-1.5">
           <input
             ref={buscaRef} value={filtro} onChange={(e) => { setFiltro(e.target.value); setFoco(0) }}
             placeholder={buscaPlaceholder} autoFocus
-            className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/25"
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/25"
           />
         </div>
       )}
       {acoes && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-white/10 px-2 py-1.5 text-[11px]">
+        <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-2 py-1.5 text-[11px]">
           <button type="button" onClick={() => onChange(Array.from(new Set([...selecionados, ...visiveis.map((o) => o.id)])))} className="text-white/60 transition hover:text-white">Selecionar todas</button>
           <span className="text-white/20">·</span>
           <button type="button" onClick={() => onChange([])} className="text-white/60 transition hover:text-white">Limpar seleção</button>
@@ -268,10 +268,10 @@ export function MultiSelect({
       {especial && (
         // FIXADA no topo: não some com o filtro da busca, porque não é um
         // registro do cadastro — é o modo de aplicação do item.
-        <div className="shrink-0 border-b border-white/10 p-1">
+        <div className="shrink-0 border-b border-[var(--border-default)] p-1">
           <button
             type="button" role="option" aria-selected={especial.ativa} onClick={especial.onToggle}
-            className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-white/10 ${especial.ativa ? 'text-white' : 'text-white/70'}`}
+            className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-[var(--surface-hover)] ${especial.ativa ? 'text-white' : 'text-white/70'}`}
           >
             <span className="grid h-4 w-4 shrink-0 place-items-center rounded border" style={especial.ativa ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
               {especial.ativa && <Check className="h-3 w-3 text-[#1b1508]" />}
@@ -294,7 +294,7 @@ export function MultiSelect({
               // Com a opção especial ligada, as individuais ficam apagadas — mas
               // continuam CLICÁVEIS: clicar em uma é justamente como se sai do
               // modo especial (quem trata isso é o `onChange` do formulário).
-              className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition ${foco === i ? 'bg-white/10' : ''} ${on ? 'text-white' : 'text-white/70'} ${especial?.ativa ? 'opacity-45' : ''}`}
+              className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition ${foco === i ? 'bg-[var(--surface-primary)]' : ''} ${on ? 'text-white' : 'text-white/70'} ${especial?.ativa ? 'opacity-45' : ''}`}
             >
               <span className="grid h-4 w-4 shrink-0 place-items-center rounded border" style={on ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
                 {on && <Check className="h-3 w-3 text-[#1b1508]" />}
@@ -372,12 +372,12 @@ export function ModalWizard({ onClose, largura = 'max-w-2xl', header, footer, ch
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => { fecharTodosMultiSelects(); onClose() }}>
       <div
-        className={`flex max-h-[90vh] w-full ${largura} flex-col rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl`}
+        className={`flex max-h-[90vh] w-full ${largura} flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="shrink-0 rounded-t-2xl border-b border-white/10 bg-zinc-900/95 px-6 py-4">{header}</div>
+        <div className="shrink-0 rounded-t-2xl border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">{header}</div>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">{children}</div>
-        <div className="shrink-0 rounded-b-2xl border-t border-white/10 bg-zinc-900/95 px-6 py-4">{footer}</div>
+        <div className="shrink-0 rounded-b-2xl border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">{footer}</div>
       </div>
     </div>
   )
@@ -391,7 +391,7 @@ export function Stepper({ passos, atual }: { passos: string[]; atual: number }) 
         const n = i + 1
         return (
           <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-emerald-400' : 'text-white/35'}`}>
-            <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-white/40' : atual > n ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-white/15'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
+            <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-[var(--border-strong)]' : atual > n ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-[var(--border-default)]'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
             {label}
           </div>
         )

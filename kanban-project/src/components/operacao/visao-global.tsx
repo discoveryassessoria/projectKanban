@@ -139,7 +139,7 @@ function Responsavel({ nome }: { nome: string | null }) {
   if (!nome) return <span className="text-[11px] text-white/30">Sem responsável</span>
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10 text-[9px] font-medium text-white/70">
+      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--surface-primary)] text-[9px] font-medium text-white/70">
         {iniciais(nome)}
       </span>
       <span className="truncate text-[11px] text-white/70">{nome}</span>
@@ -321,7 +321,7 @@ export function VisaoGlobal() {
                 ativo ? { semResponsavel: false, atrasadas: false, venceHoje: false } : { ...SEM_FILTRO, ...ind.filtro, busca: filtros.busca },
               )}
               className={`rounded border px-2.5 py-1.5 text-left transition-colors ${
-                ativo ? "border-white/25 bg-white/[0.08]" : "border-white/10 hover:bg-white/[0.04]"
+                ativo ? "border-[var(--border-strong)] bg-white/[0.08]" : "border-[var(--border-default)] hover:bg-white/[0.04]"
               } ${clicavel ? "cursor-pointer" : "cursor-default"}`}
             >
               <div className={`text-[15px] font-medium tabular-nums leading-5 ${ind.tom}`}>
@@ -331,13 +331,13 @@ export function VisaoGlobal() {
             </button>
           )
         })}
-        <div className="ml-auto flex items-center gap-1 rounded border border-white/10 p-0.5">
+        <div className="ml-auto flex items-center gap-1 rounded border border-[var(--border-default)] p-0.5">
           {(["lista", "kanban"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setModo(m)}
               className={`rounded px-2.5 py-1 text-[11px] transition-colors ${
-                modo === m ? "bg-white/10 text-white/90" : "text-white/45 hover:text-white/75"
+                modo === m ? "bg-[var(--surface-primary)] text-white/90" : "text-white/45 hover:text-white/75"
               }`}
             >
               {m === "lista" ? "Lista" : "Kanban"}
@@ -352,7 +352,7 @@ export function VisaoGlobal() {
           value={buscaDigitada}
           onChange={(e) => setBuscaDigitada(e.target.value)}
           placeholder="Buscar tarefa, pessoa ou processo…"
-          className="w-64 rounded border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+          className="w-64 rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
         />
         <select
           value={filtros.semResponsavel ? "sem" : filtros.responsavel ?? ""}
@@ -360,7 +360,7 @@ export function VisaoGlobal() {
             const v = e.target.value
             aplicar({ semResponsavel: v === "sem", responsavel: v && v !== "sem" ? Number(v) : null })
           }}
-          className="rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+          className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
         >
           <option value="">Todos os responsáveis</option>
           <option value="sem">Sem responsável</option>
@@ -373,7 +373,7 @@ export function VisaoGlobal() {
         <select
           value={filtros.fase ?? ""}
           onChange={(e) => aplicar({ fase: e.target.value || null })}
-          className="rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+          className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
         >
           <option value="">Todas as fases</option>
           {dados?.facetas.fases.map((f) => (
@@ -385,7 +385,7 @@ export function VisaoGlobal() {
         <select
           value={filtros.prioridade ?? ""}
           onChange={(e) => aplicar({ prioridade: e.target.value || null })}
-          className="rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+          className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
         >
           <option value="">Toda prioridade</option>
           {["URGENTE", "ALTA", "MEDIA", "BAIXA"].map((p) => (
@@ -397,7 +397,7 @@ export function VisaoGlobal() {
             key={k}
             onClick={() => aplicar({ [k]: !filtros[k] } as Partial<Filtros>)}
             className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-              filtros[k] ? "border-white/25 bg-white/[0.08] text-white/85" : "border-white/10 text-white/50 hover:text-white/80"
+              filtros[k] ? "border-[var(--border-strong)] bg-white/[0.08] text-white/85" : "border-[var(--border-default)] text-white/50 hover:text-white/80"
             }`}
           >
             {r}
@@ -604,7 +604,7 @@ function Lista({
                 )}
                 <button
                   onClick={() => aoDistribuir(l)}
-                  className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+                  className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
                 >
                   {l.responsavelId == null ? "Atribuir" : "Transferir"}
                 </button>
@@ -716,7 +716,7 @@ function Quadro({
 
       {pedindo && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setPedindo(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-white/10 bg-[var(--surface-overlay)] p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-[13px] font-medium text-white/90">{pedindo.rotulo}</h2>
             <p className="mt-1 text-[11px] text-white/45">{pedindo.l.titulo}</p>
             <textarea
@@ -724,7 +724,7 @@ function Quadro({
               onChange={(e) => setMotivo(e.target.value)}
               rows={3}
               placeholder="Por quê? Quem ler depois precisa entender sem perguntar."
-              className="mt-3 w-full rounded border border-white/10 bg-white/[0.03] px-2.5 py-2 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+              className="mt-3 w-full rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-2 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
             />
             <div className="mt-3 flex justify-end gap-2">
               <button onClick={() => setPedindo(null)} className="rounded px-3 py-1.5 text-[11px] text-white/50 hover:text-white/80">
@@ -736,7 +736,7 @@ function Quadro({
                   const ok = await aoComandar(pedindo.l.taskId, { acao: pedindo.acao, motivo: motivo.trim() }, `${pedindo.rotulo}: feito.`)
                   if (ok) setPedindo(null)
                 }}
-                className="rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+                className="rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Confirmar
               </button>
@@ -763,7 +763,7 @@ function Card({
       draggable
       onDragStart={() => aoArrastar(true)}
       onDragEnd={() => aoArrastar(false)}
-      className={`cursor-grab rounded border border-white/[0.08] bg-white/[0.03] p-2.5 transition-colors hover:border-white/20 active:cursor-grabbing ${
+      className={`cursor-grab rounded border border-white/[0.08] bg-white/[0.03] p-2.5 transition-colors hover:border-[var(--border-strong)] active:cursor-grabbing ${
         l.atrasada ? "border-l-2 border-l-red-400/60" : l.venceHoje ? "border-l-2 border-l-amber-300/60" : ""
       }`}
     >
@@ -805,7 +805,7 @@ function Card({
           )}
           <button
             onClick={aoDistribuir}
-            className="rounded border border-white/12 px-1.5 py-0.5 text-[10px] text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+            className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white/90"
           >
             {l.responsavelId == null ? "Atribuir" : "Transferir"}
           </button>
@@ -841,7 +841,7 @@ function PainelSugestao({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-white/10 bg-[var(--surface-overlay)] shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
@@ -989,7 +989,7 @@ function PainelSugestao({
             {/* Confirmar abre o MESMO seletor de sempre — a porta que escreve é uma só. */}
             <button
               onClick={() => aoAtribuir(l)}
-              className="rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1]"
+              className="rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1]"
             >
               Atribuir…
             </button>

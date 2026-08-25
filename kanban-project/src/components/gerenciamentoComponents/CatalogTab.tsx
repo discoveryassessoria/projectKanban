@@ -28,10 +28,10 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
 
   if (!cfg) {
     return (
-      <div className="rounded-xl border border-white/10 bg-white/5 p-10 text-center backdrop-blur">
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-10 text-center backdrop-blur">
         <div className="text-sm font-semibold text-white/80">Cadastro ainda não configurado</div>
         <div className="mt-1 text-xs text-white/40">
-          O item <code className="rounded bg-white/10 px-1">{catalogKey}</code> existe no menu mas não tem
+          O item <code className="rounded bg-[var(--surface-primary)] px-1">{catalogKey}</code> existe no menu mas não tem
           configuração de catálogo. Será definido numa próxima etapa.
         </div>
       </div>
@@ -74,14 +74,14 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
       </div>
 
       {/* tabela */}
-      <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
+      <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
         <table className="w-full text-[12.5px]">
           <thead>
-            <tr className="bg-white/5">
+            <tr className="bg-[var(--surface-primary)]">
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                  className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
                     i === headers.length - 1 ? 'text-right' : 'text-left'
                   }`}
                 >
@@ -99,18 +99,18 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
               </tr>
             ) : (
               rows.map((ent, ri) => (
-                <tr key={ri} className="transition hover:bg-white/5">
+                <tr key={ri} className="transition hover:bg-[var(--surface-hover)]">
                   {cfg.cols.map((c, ci) => (
-                    <td key={ci} className="border-b border-white/10 px-3 py-2.5 text-white/80">
+                    <td key={ci} className="border-b border-[var(--border-default)] px-3 py-2.5 text-white/80">
                       {String(ent[c[0]] ?? '')}
                     </td>
                   ))}
-                  <td className="border-b border-white/10 px-3 py-2.5">
+                  <td className="border-b border-[var(--border-default)] px-3 py-2.5">
                     <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-green-300">
                       ativo
                     </span>
                   </td>
-                  <td className="whitespace-nowrap border-b border-white/10 px-3 py-2.5 text-right">
+                  <td className="whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-right">
                     <RowBtn>Editar</RowBtn>
                     <RowBtn>Duplicar</RowBtn>
                     <RowBtn>Desativar</RowBtn>
@@ -126,8 +126,8 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
       {/* modal criar/editar */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-3.5">
               <h3 className="text-base font-semibold text-white">
                 {editId ? 'Editar' : 'Novo'} · {cfg.title}
               </h3>
@@ -142,7 +142,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
               ))}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-3.5">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-3.5">
               <button
                 onClick={() => setModalOpen(false)}
                 className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white"
@@ -168,7 +168,7 @@ function RowBtn({ children, danger }: { children: React.ReactNode; danger?: bool
     <button
       disabled
       title={TITULO_RASCUNHO}
-      className={`ml-1 cursor-not-allowed rounded border border-white/10 px-1.5 py-0.5 text-[10px] ${
+      className={`ml-1 cursor-not-allowed rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] ${
         danger ? 'text-red-300/40' : 'text-white/35'
       }`}
     >
@@ -187,7 +187,7 @@ function Field({
   onChange: (v: any) => void
 }) {
   const base =
-    'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-white outline-none focus:border-white/20'
+    'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-white outline-none focus:border-white/20'
 
   let input: React.ReactNode
   if (field.type === 'select') {

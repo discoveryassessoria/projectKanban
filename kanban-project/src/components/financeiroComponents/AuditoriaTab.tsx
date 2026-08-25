@@ -91,21 +91,21 @@ export default function AuditoriaTab() {
           const active = chip === c.key
           return (
             <button key={c.key} onClick={() => setChip(c.key)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-white/15 border-white/30 text-white" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}>
-              {c.label}<span className="text-[10px] bg-white/10 px-1.5 rounded-full">{count}</span>
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-[var(--surface-secondary)] border-[var(--border-strong)] text-white" : "bg-[var(--surface-primary)] border-[var(--border-default)] text-white/60 hover:text-white"}`}>
+              {c.label}<span className="text-[10px] bg-[var(--surface-primary)] px-1.5 rounded-full">{count}</span>
             </button>
           )
         })}
       </div>
 
       {/* TABELA */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 overflow-x-auto">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         {filtrados.length === 0 ? (
           <p className="text-sm text-white/40 py-10 text-center">Nenhum evento de auditoria registrado ainda.</p>
         ) : (
           <table className="w-full text-sm min-w-[720px]">
             <thead>
-              <tr className="text-white/40 text-xs border-b border-white/10">
+              <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
                 <th className="text-left font-medium py-1.5">Data / Hora</th>
                 <th className="text-left font-medium py-1.5">Usuário</th>
                 <th className="text-left font-medium py-1.5">Ação</th>
@@ -116,14 +116,14 @@ export default function AuditoriaTab() {
             </thead>
             <tbody>
               {filtrados.map(l => (
-                <tr key={l.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+                <tr key={l.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                   <td className="py-2 tabular-nums">
                     <div className="text-white/80 font-medium">{fmtDateTime(l.criadoEm)}</div>
                     <div className="text-[10px] text-white/40">{fmtTime(l.criadoEm)}</div>
                   </td>
                   <td className="py-2">
                     {l.usuario === "Sistema" ? (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/20">Sistema</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Sistema</span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
                         <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-200 text-[9px] font-bold flex items-center justify-center">{iniciais(l.usuario)}</span>
@@ -147,11 +147,11 @@ export default function AuditoriaTab() {
 
 // SUBCOMPONENTES
 function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-white/30 text-white hover:bg-white/10">{icon}{children}</button>
+  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">{icon}{children}</button>
 }
 function Kpi({ icon, label, value, sub, valueColor = "text-white" }: { icon?: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-4">
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4">
       <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium">{icon && <span className="text-white/60">{icon}</span>}{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
       {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}

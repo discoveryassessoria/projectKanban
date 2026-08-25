@@ -150,17 +150,34 @@
 :root {
   /* Fundo e camadas do shell — IVORY QUENTE, nunca branco chapado. A temperatura
      é o que separa este produto de um painel administrativo genérico. */
-  --app-background: #f6f3ed;
+  --app-background: #f7f4ee;
   --app-overlay: rgba(246, 243, 237, 0.86);
   --sidebar-background: rgba(248, 246, 241, 0.92);
   --header-background: rgba(252, 251, 248, 0.88);
 
-  /* Superfícies (cards, painéis, linhas) — branco quente sobre ivory. A elevação
-     vem da diferença sutil entre fundo e superfície, não de sombra pesada. */
-  --surface-primary: rgba(255, 255, 255, 0.86);
-  --surface-secondary: rgba(243, 240, 233, 0.70);
-  --surface-hover: rgba(23, 25, 28, 0.045);
-  --surface-active: rgba(210, 169, 72, 0.12);
+  /* ── SUPERFÍCIE DE LEITURA É SÓLIDA. SEM EXCEÇÃO. ────────────────────────
+     Esta é a regra que separa ambiente de conteúdo, e a falta dela foi o defeito
+     central da primeira rodada.
+
+     No tema escuro, `bg-white/5` desenhava um card: 5% de branco sobre preto
+     produz uma superfície visível. Convertido para graphite a 5% sobre ivory, o
+     mesmo card praticamente sumiu — e a paisagem passou a atravessar tabela,
+     formulário e lista. O contraste caiu e o produto virou uma colagem de
+     superfícies com opacidades diferentes.
+
+     Agora toda superfície que o operador LÊ é opaca. A paisagem existe ao redor
+     e por baixo; nunca através. Translucidez fica só onde é decoração: hover,
+     realce, cortina de modal. */
+  --surface-primary: #fffefb;    /* card, painel, linha de tabela */
+  --surface-secondary: #f3efe7;  /* cabeçalho de tabela, agrupamento, filtro */
+  --surface-tertiary: #eee9df;   /* faixa, seção aninhada */
+  --surface-elevated: #ffffff;   /* o que flutua acima de tudo */
+
+  /* Estados — translúcidos DE PROPÓSITO: pintam SOBRE a superfície sólida. */
+  --surface-hover: rgba(23, 25, 28, 0.04);
+  --surface-selected: rgba(185, 133, 36, 0.10);
+  --surface-active: rgba(185, 133, 36, 0.14);
+  --surface-disabled: #f4f1ea;
 
   /* Superfícies OPACAS (overlays) — as superfícies translúcidas acima não servem
      a modal/dialog/drawer/sheet/popover/menu/tooltip, que precisam OCULTAR o
@@ -181,24 +198,50 @@
 
      Suave de propósito: a tela de origem precisa continuar sendo percebida. Uma
      cortina quase opaca faz o sistema parecer que apagou. */
+  /* ── A HIERARQUIA DE AÇÃO ─────────────────────────────────────────────────
+     Dez cores diferentes disputavam o papel de "botão primário" no produto —
+     azul, âmbar, verde, dourado, turquesa, roxo. Sem regra, cada tela escolhia,
+     e o operador perdia o sinal: se tudo é destaque, nada é.
+
+     Agora há uma: PRIMÁRIO é graphite. As semânticas continuam intactas e
+     continuam significando o que sempre significaram — verde é sucesso, âmbar é
+     atenção, vermelho é bloqueio, azul é andamento. O champagne é identidade, e
+     por isso aparece em seleção e detalhe, não como fundo de qualquer ação. */
+  --action-primary: #1d232a;
+  --action-primary-hover: #12171c;
+  --action-primary-ink: #ffffff;
+
   --overlay-modal: rgba(20, 24, 28, 0.26);
   --overlay-drawer: rgba(20, 24, 28, 0.22);
 
-  /* Bordas — quentes, para não esfriar o ivory. */
-  --border-default: #e6e1d8;
-  --border-strong: #ded9d0;
+  /* Bordas — quentes e SÓLIDAS: borda translúcida sobre superfície translúcida
+     era o que fazia o contorno dos cards desaparecer. */
+  --border-subtle: #ece7de;
+  --border-default: #d8d1c6;
+  --border-strong: #c8bfaf;
 
-  /* Texto — graphite, com a mesma escala de ênfase de antes. */
-  --text-primary: #17191c;
-  --text-secondary: #62666d;
-  --text-muted: #8a8d94;
+  /* ── TEXTO: A ESCALA INTEIRA PASSA EM AA ─────────────────────────────────
+     Medido sobre `--surface-primary` (#fffefb):
+       primary   17.29  ·  secondary 5.91  ·  muted 4.75  ·  disabled 3.11
+     O muted anterior (#8a8d94) dava 3.24 e sumia em metadado, rótulo de coluna e
+     texto de apoio — que é exatamente onde ele mais aparece. */
+  --text-primary: #171a1f;
+  --text-secondary: #5f646b;
+  --text-muted: #6e7378;
+  --text-disabled: #a7aaae;
+  --text-inverse: #ffffff;
 
   /* Acento institucional (dourado) — ação/navegação ativa apenas */
   /* Champagne — escurecido para ter contraste sobre superfície clara. O tom
      anterior (#d2a948) foi calibrado contra fundo preto e some sobre ivory. */
-  --accent-primary: #b98524;
+  --accent-primary: #b98524;   /* fundo, borda, ícone, indicador */
   --accent-hover: #a3731c;
-  --accent-ink: #ffffff; /* texto sobre champagne */
+  --accent-soft: #f6efdf;      /* realce de seleção */
+  --accent-ink: #ffffff;       /* texto SOBRE champagne */
+  /* CHAMPAGNE COMO TEXTO precisa ser mais escuro: #b98524 sobre branco dá 3.23 e
+     não passa AA. Este dá 4.59, e é o que deve ser usado quando o dourado é a
+     TINTA — link, valor em destaque, rótulo institucional. */
+  --accent-text: #9a6c19;
 
   /* Semânticas — usar SÓ quando houver significado real. Escurecidas para manter
      legibilidade sobre claro; o SIGNIFICADO de cada cor não muda. */
@@ -220,18 +263,24 @@
      com a mesma string de seis paradas em rgba(8,9,11) — o preto que fazia a
      paisagem virar textura sob o tema escuro.
 
-     Agora é um token, e a regra da Fase 6 fica visível nele: a foto continua
-     atrás de tudo, aparece um pouco mais no alto (onde há respiro) e some sob o
-     conteúdo denso (onde competiria com a leitura). Nunca `opacity` no contêiner
-     — isso apagaria o conteúdo junto; é uma camada própria, entre foto e shell. */
+     Agora é um token, e a regra mora nele: a foto é MAIS COBERTA EM CIMA e menos
+     embaixo — porque é em cima que ficam tabela, formulário e lista, e embaixo que
+     sobra espaço vazio. Cerca de 3% de presença na faixa de leitura, 12% na faixa
+     ambiental do rodapé.
+
+     Isso resolve sozinho metade do problema; a outra metade são as superfícies
+     opacas acima, que impedem a foto de atravessar o conteúdo mesmo onde ela
+     aparece. Ambiente e leitura passam a ser camadas separadas.
+
+     Nunca `opacity` no contêiner — isso apagaria o conteúdo junto; é uma camada
+     própria, entre foto e shell. */
   --landscape-veil: linear-gradient(
     180deg,
-    rgba(246, 243, 237, 0.90) 0%,
-    rgba(246, 243, 237, 0.93) 46%,
-    rgba(247, 244, 239, 0.95) 60%,
-    rgba(248, 246, 241, 0.96) 72%,
-    rgba(250, 248, 244, 0.97) 86%,
-    rgba(246, 243, 237, 0.96) 100%
+    rgba(247, 244, 238, 0.965) 0%,
+    rgba(247, 244, 238, 0.955) 40%,
+    rgba(247, 244, 238, 0.93) 65%,
+    rgba(247, 244, 238, 0.90) 82%,
+    rgba(247, 244, 238, 0.88) 100%
   );
 
   /* Espaçamento (escala 4px) */

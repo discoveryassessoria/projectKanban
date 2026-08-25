@@ -10,11 +10,11 @@
 import { useState } from 'react'
 import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
-const CARD = 'rounded-xl border border-white/10 bg-white/5 backdrop-blur'
+const CARD = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur'
 const BTN_PRIMARY =
   'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500'
 const SELECT =
-  'rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white outline-none focus:border-white/20'
+  'rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white outline-none focus:border-white/20'
 
 function Section({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -30,11 +30,11 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
     <div className={`overflow-hidden ${CARD}`}>
       <table className="w-full text-[12.5px]">
         <thead>
-          <tr className="bg-white/5">
+          <tr className="bg-[var(--surface-primary)]">
             {headers.map((h, i) => (
               <th
                 key={i}
-                className={`whitespace-nowrap border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                className={`whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
                   i === headers.length - 1 ? 'text-right' : 'text-left'
                 }`}
               >

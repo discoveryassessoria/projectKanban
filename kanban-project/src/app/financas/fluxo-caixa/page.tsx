@@ -164,18 +164,18 @@ export default function FluxoCaixaPage() {
             variant="outline" 
             size="icon"
             onClick={() => navegarMes(-1)}
-            className="border-white/20 text-white hover:bg-white/10"
+            className="border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="px-4 py-2 bg-white/10 rounded-lg border border-white/20 min-w-[180px] text-center">
+          <div className="px-4 py-2 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-strong)] min-w-[180px] text-center">
             <span className="text-white capitalize">{formatMesAno(mesAtual)}</span>
           </div>
           <Button 
             variant="outline" 
             size="icon"
             onClick={() => navegarMes(1)}
-            className="border-white/20 text-white hover:bg-white/10"
+            className="border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -184,7 +184,7 @@ export default function FluxoCaixaPage() {
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/70">Saldo Anterior</p>
@@ -194,7 +194,7 @@ export default function FluxoCaixaPage() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/70">Entradas</p>
@@ -204,7 +204,7 @@ export default function FluxoCaixaPage() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/70">Saídas</p>
@@ -214,7 +214,7 @@ export default function FluxoCaixaPage() {
           </CardContent>
         </Card>
         
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/70">Saldo Atual</p>
@@ -234,7 +234,7 @@ export default function FluxoCaixaPage() {
       {/* Filtros */}
       <div className="flex gap-4">
         <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-          <SelectTrigger className="w-[180px] bg-white/10 border-white/20 text-white">
+          <SelectTrigger className="w-[180px] bg-[var(--surface-primary)] border-[var(--border-strong)] text-white">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -244,7 +244,7 @@ export default function FluxoCaixaPage() {
           </SelectContent>
         </Select>
         
-        <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 ml-auto">
+        <Button variant="outline" className="border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)] ml-auto">
           <Download className="h-4 w-4 mr-2" />
           Exportar
         </Button>
@@ -257,7 +257,7 @@ export default function FluxoCaixaPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--border-default)]"></div>
           </div>
         ) : datasOrdenadas.length === 0 ? (
-          <Card className="bg-white/10 border-white/20">
+          <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
             <CardContent className="flex flex-col items-center justify-center h-48 text-white/50">
               <DollarSign className="h-12 w-12 mb-4" />
               <p>Nenhuma transação no período</p>
@@ -270,7 +270,7 @@ export default function FluxoCaixaPage() {
             const totalSaidas = transacoesDoDia.filter(t => t.tipo === 'SAIDA').reduce((acc, t) => acc + t.valor, 0)
             
             return (
-              <Card key={data} className="bg-white/10 border-white/20">
+              <Card key={data} className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-white text-sm font-medium flex items-center gap-2">
@@ -292,7 +292,7 @@ export default function FluxoCaixaPage() {
                     {transacoesDoDia.map((transacao) => (
                       <div 
                         key={transacao.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                        className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] transition-colors"
                       >
                         <div className="flex items-center gap-3">
                           {transacao.tipo === 'ENTRADA' ? (
@@ -308,7 +308,7 @@ export default function FluxoCaixaPage() {
                             <p className="text-sm font-medium text-white">{transacao.descricao}</p>
                             <div className="flex items-center gap-2 text-xs text-white/50">
                               {transacao.categoria && (
-                                <Badge variant="outline" className="text-xs border-white/20 text-white/70">
+                                <Badge variant="outline" className="text-xs border-[var(--border-strong)] text-white/70">
                                   {transacao.categoria.nome}
                                 </Badge>
                               )}

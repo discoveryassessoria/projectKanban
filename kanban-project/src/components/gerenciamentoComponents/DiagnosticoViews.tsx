@@ -39,7 +39,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const TH = "px-4 py-3 font-medium"
 const SEV: Record<string, string> = {
   ok: "bg-green-500/15 text-green-300",
@@ -78,7 +78,7 @@ function Casca({
             <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
             {dados && <p className="mt-1 text-[11px] text-white/40">Apurado em {fmt(dados.geradoEm)}</p>}
           </div>
-          <button onClick={() => void load()} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+          <button onClick={() => void load()} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
             Reexecutar
           </button>
         </div>
@@ -123,12 +123,12 @@ export function DiagnosticoSistemaTab() {
           </div>
           <div className={`overflow-hidden ${CARD}`}>
             <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                 <tr><th className={TH}>Cadastro</th><th className={TH}>Registros</th></tr>
               </thead>
               <tbody>
                 {ROTULO_CONTAGEM.map(([k, label]) => (
-                  <tr key={k} className="border-b border-white/5 last:border-0">
+                  <tr key={k} className="border-b border-[var(--border-subtle)] last:border-0">
                     <td className="px-4 py-2.5 text-white">{label}</td>
                     <td className="px-4 py-2.5 text-white/70">{d.sistema.contagens[k] ?? 0}</td>
                   </tr>
@@ -163,7 +163,7 @@ export function DiagnosticoExecutivoTab() {
             </div>
             <div className={`overflow-x-auto ${CARD}`}>
               <table className="w-full text-sm">
-                <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                   <tr>
                     <th className={TH}>Processo</th><th className={TH}>País</th><th className={TH}>Fluxo</th>
                     <th className={TH}>Fases</th><th className={TH}>Kanban</th><th className={TH}>Interno</th>
@@ -174,7 +174,7 @@ export function DiagnosticoExecutivoTab() {
                   {t.length === 0 ? (
                     <tr><td colSpan={9} className="px-4 py-10 text-center text-xs text-white/40">Nenhum tipo de processo cadastrado.</td></tr>
                   ) : t.map((x) => (
-                    <tr key={x.id} className="border-b border-white/5 last:border-0">
+                    <tr key={x.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-white">{x.nome}</td>
                       <td className="px-4 py-2.5 text-white/60">{x.pais}</td>
                       <td className="px-4 py-2.5">{x.temWorkflow ? <span className="text-white/70">sim</span> : <span className="text-red-300/80">não</span>}</td>
@@ -219,12 +219,12 @@ export function SaudeSistemaTab() {
             </div>
             <div className={`overflow-hidden ${CARD}`}>
               <table className="w-full text-sm">
-                <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                   <tr><th className={TH}>Verificação</th><th className={TH}>Situação</th><th className={TH}>Ocorrências</th><th className={TH}>O que significa</th></tr>
                 </thead>
                 <tbody>
                   {a.map((x) => (
-                    <tr key={x.chave} className="border-b border-white/5 last:border-0">
+                    <tr key={x.chave} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-white">{x.nome}</td>
                       <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${SEV[x.sev] ?? SEV.ok}`}>{SEV_LABEL[x.sev] ?? x.sev}</span></td>
                       <td className="px-4 py-2.5 text-white/70">{x.valor}</td>
@@ -251,16 +251,16 @@ export function HistoricoExecucoesTab() {
       {(d) => (
         <div className="space-y-4">
           <div className={`overflow-x-auto ${CARD}`}>
-            <div className="border-b border-white/10 px-4 py-3 text-[11px] uppercase tracking-wide text-white/45">Avanços de fase (60 mais recentes)</div>
+            <div className="border-b border-[var(--border-default)] px-4 py-3 text-[11px] uppercase tracking-wide text-white/45">Avanços de fase (60 mais recentes)</div>
             <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                 <tr><th className={TH}>Quando</th><th className={TH}>Processo</th><th className={TH}>De</th><th className={TH}>Para</th><th className={TH}>Resultado</th><th className={TH}>Motivo</th></tr>
               </thead>
               <tbody>
                 {d.execucoes.advanceLogs.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-white/40">Nenhum avanço registrado.</td></tr>
                 ) : d.execucoes.advanceLogs.map((l) => (
-                  <tr key={l.id} className="border-b border-white/5 last:border-0">
+                  <tr key={l.id} className="border-b border-[var(--border-subtle)] last:border-0">
                     <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(l.criadoEm)}</td>
                     <td className="px-4 py-2.5 text-white/70">#{l.processoId}</td>
                     <td className="px-4 py-2.5 text-white/70">{l.faseAtual}</td>
@@ -277,23 +277,23 @@ export function HistoricoExecucoesTab() {
           </div>
 
           <div className={`overflow-x-auto ${CARD}`}>
-            <div className="border-b border-white/10 px-4 py-3 text-[11px] uppercase tracking-wide text-white/45">Artefatos gerados pelas automações (60 mais recentes)</div>
+            <div className="border-b border-[var(--border-default)] px-4 py-3 text-[11px] uppercase tracking-wide text-white/45">Artefatos gerados pelas automações (60 mais recentes)</div>
             <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                 <tr><th className={TH}>Quando</th><th className={TH}>Processo</th><th className={TH}>Fase</th><th className={TH}>Evento</th><th className={TH}>Tipo</th><th className={TH}>Alvo</th><th className={TH}>Status</th></tr>
               </thead>
               <tbody>
                 {d.execucoes.artefatos.length === 0 ? (
                   <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-white/40">Nenhum artefato gerado.</td></tr>
                 ) : d.execucoes.artefatos.map((a) => (
-                  <tr key={a.id} className="border-b border-white/5 last:border-0">
+                  <tr key={a.id} className="border-b border-[var(--border-subtle)] last:border-0">
                     <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(a.criadoEm)}</td>
                     <td className="px-4 py-2.5 text-white/70">#{a.processoId}</td>
                     <td className="px-4 py-2.5 text-white/70">{a.phaseKey}</td>
                     <td className="px-4 py-2.5 text-white/60">{a.event}</td>
                     <td className="px-4 py-2.5 text-white">{a.ruleKind}</td>
                     <td className="px-4 py-2.5 text-white/60">{a.targetTable}</td>
-                    <td className="px-4 py-2.5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{a.status}</span></td>
+                    <td className="px-4 py-2.5"><span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{a.status}</span></td>
                   </tr>
                 ))}
               </tbody>

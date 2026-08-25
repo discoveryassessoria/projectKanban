@@ -78,7 +78,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
                   <li key={item.id}>
                     <Link
                       href={item.href}
-                      className="group flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 transition hover:border-white/20 hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20"
+                      className="group flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-2.5 transition hover:border-[var(--border-strong)] hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20"
                     >
                       <span className="w-6 shrink-0 text-center text-base">
                         {item.pais ? (BANDEIRA[item.pais] ?? "🏳️") : "•"}

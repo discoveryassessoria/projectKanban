@@ -22,7 +22,7 @@ export function OrigemBadge({ origem }: { origem: string | null | undefined }) {
   const proc = origem === "PROCESSO"
   const desconhecida = origem === "ORIGEM_DESCONHECIDA"
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-500/15 text-blue-300 border-blue-500/25" : desconhecida ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-white/8 text-white/60 border-white/15"}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-500/15 text-blue-300 border-blue-500/25" : desconhecida ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-default)]"}`}>
       {proc ? <Workflow className="h-2.5 w-2.5" /> : <Building2 className="h-2.5 w-2.5" />}
       {proc ? "Processo" : desconhecida ? "Origem?" : "Corporativo"}
     </span>
@@ -124,7 +124,7 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
   return (
     <Overlay onClose={onClose} title={estorno ? "Estornar lançamento" : "Cancelar lançamento"}>
       <div className="space-y-3 text-sm">
-        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
           <div className="text-white/80">{resumo.item}</div>
           <div className="text-white/50 text-xs">{resumo.processo ?? "—"} · <b className="text-white/80">{resumo.valor}</b></div>
         </div>
@@ -136,11 +136,11 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
         <div>
           <label className="block text-xs text-white/60 mb-1">Motivo *</label>
           <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2}
-            className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:border-white/30" placeholder="Descreva o motivo…" />
+            className="w-full rounded-lg bg-[var(--surface-primary)] border border-[var(--border-default)] px-3 py-2 text-sm text-white outline-none focus:border-white/30" placeholder="Descreva o motivo…" />
         </div>
         {erro && <p className="text-xs text-red-300">{erro}</p>}
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-lg border border-white/15 text-white/70 hover:bg-white/10">Voltar</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-default)] text-white/70 hover:bg-[var(--surface-hover)]">Voltar</button>
           <button onClick={confirmar} disabled={saving}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-white ${estorno ? "bg-purple-600 hover:bg-purple-700" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : estorno ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
@@ -156,8 +156,8 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
 function Overlay({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-3">
           <h3 className="text-base font-semibold text-white">{title}</h3>
           <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
         </div>

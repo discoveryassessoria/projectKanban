@@ -44,7 +44,7 @@ const CHIPS = [
 
 function statusBadge(status: string) {
   if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Paga</span>
-  if (status === "prevista") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/20">Prevista</span>
+  if (status === "prevista") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Prevista</span>
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">A pagar</span>
 }
 
@@ -77,7 +77,7 @@ export default function ComissoesTab() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Briefcase className="h-5 w-5" /> Comissões <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Briefcase className="h-5 w-5" /> Comissões <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
           <div className="text-xs text-white/60 mt-1">{d.contagem.todos} comissões · {d.regras.length} regras ativas</div>
         </div>
         <div className="flex items-center gap-2">
@@ -95,14 +95,14 @@ export default function ComissoesTab() {
       </div>
 
       {/* REGRAS */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 overflow-x-auto">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-white flex items-center gap-2"><FileText className="h-4 w-4" /> Regras de Comissão Ativas</div>
-          <button className="text-xs px-2.5 py-1 rounded border border-white/20 text-white/70 hover:bg-white/10">+ Nova regra</button>
+          <button className="text-xs px-2.5 py-1 rounded border border-[var(--border-strong)] text-white/70 hover:bg-[var(--surface-hover)]">+ Nova regra</button>
         </div>
         <table className="w-full text-sm min-w-[640px]">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-white/10">
+            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">Beneficiário</th>
               <th className="text-left font-medium py-1.5">Tipo</th>
               <th className="text-left font-medium py-1.5">Base de cálculo</th>
@@ -113,15 +113,15 @@ export default function ComissoesTab() {
           </thead>
           <tbody>
             {d.regras.map(r => (
-              <tr key={r.id} className="border-b border-white/5 last:border-0">
+              <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="py-2 text-white/90 font-medium">{r.nome}</td>
                 <td className="py-2">
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.tipo === "Vendedor" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" : r.tipo === "Parceiro" ? "bg-sky-500/20 text-sky-300 border-sky-500/30" : "bg-white/10 text-white/60 border-white/20"}`}>{r.tipo}</span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.tipo === "Vendedor" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" : r.tipo === "Parceiro" ? "bg-sky-500/20 text-sky-300 border-sky-500/30" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-strong)]"}`}>{r.tipo}</span>
                 </td>
                 <td className="py-2 text-white/70">{r.base}</td>
                 <td className="py-2 text-right text-white font-medium">{r.valor}</td>
                 <td className="py-2 text-white/50">{r.aplicacao}</td>
-                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/50">Inativa</span>}</td>
+                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/50">Inativa</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -135,18 +135,18 @@ export default function ComissoesTab() {
           const active = chip === c.key
           return (
             <button key={c.key} onClick={() => setChip(c.key)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-white/15 border-white/30 text-white" : "bg-white/5 border-white/10 text-white/60 hover:text-white"}`}>
-              {c.label}<span className="text-[10px] bg-white/10 px-1.5 rounded-full">{count}</span>
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-[var(--surface-secondary)] border-[var(--border-strong)] text-white" : "bg-[var(--surface-primary)] border-[var(--border-default)] text-white/60 hover:text-white"}`}>
+              {c.label}<span className="text-[10px] bg-[var(--surface-primary)] px-1.5 rounded-full">{count}</span>
             </button>
           )
         })}
       </div>
 
       {/* TABELA DE COMISSÕES */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 overflow-x-auto">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-white/10">
+            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">Beneficiário</th>
               <th className="text-left font-medium py-1.5">Processo</th>
               <th className="text-right font-medium py-1.5">Base</th>
@@ -158,7 +158,7 @@ export default function ComissoesTab() {
           </thead>
           <tbody>
             {filtradas.map(c => (
-              <tr key={c.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+              <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                 <td className="py-2">
                   <div className="text-white/90 font-medium">{c.beneficiario}</div>
                   <div className="text-[11px] text-white/40">{c.papel}</div>
@@ -190,7 +190,7 @@ export default function ComissoesTab() {
       </div>
 
       {/* nota de prévia */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg p-3">
+      <div className="flex items-start gap-2 text-xs text-white/50 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
         <BarChart3 className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Esta aba é uma <strong className="text-white/70">prévia</strong> com dados de exemplo. O módulo de comissões (regras + cálculo automático sobre parcelas pagas) será ligado a uma estrutura própria numa próxima etapa.</span>
       </div>
@@ -202,14 +202,14 @@ export default function ComissoesTab() {
 // SUBCOMPONENTES
 // ============================================================
 function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-white/30 text-white hover:bg-white/10">{icon}{children}</button>
+  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">{icon}{children}</button>
 }
 function Kpi({ label, value, sub, valueColor = "text-white", valueSize = "text-xl" }: {
   label: string; value: string; sub?: string; valueColor?: string; valueSize?: string
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 relative">
-      <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4 relative">
+      <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>
       <div className="text-white/50 text-xs font-medium">{label}</div>
       <div className={`font-bold mt-1.5 ${valueSize} ${valueColor} truncate`}>{value}</div>
       {sub && <div className="text-[11px] text-white/40 mt-1 truncate">{sub}</div>}

@@ -117,7 +117,7 @@ export default function BancosTab() {
     }
   }
 
-  const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
+  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
 
   return (
     <div className="space-y-5">
@@ -135,7 +135,7 @@ export default function BancosTab() {
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         placeholder="Buscar banco..."
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
+        className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
@@ -148,25 +148,25 @@ export default function BancosTab() {
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
           {busca ? 'Nenhum banco encontrado.' : 'Nenhum banco ainda. Crie o primeiro.'}
         </div>
       )}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="bg-white/5">
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Banco</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">País</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+              <tr className="bg-[var(--surface-primary)]">
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Banco</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">País</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((b) => (
-                <tr key={b.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                <tr key={b.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{b.nome}</div>
                     {(b.codigo || b.sigla) && (
@@ -177,13 +177,13 @@ export default function BancosTab() {
                   </td>
                   <td className="px-4 py-2.5 text-white/70">{b.pais || '—'}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${b.ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${b.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
                       {b.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => abrirEditar(b)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
+                      <button onClick={() => abrirEditar(b)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
                       <button onClick={() => excluir(b)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
                     </div>
                   </td>
@@ -196,8 +196,8 @@ export default function BancosTab() {
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar banco' : 'Novo banco'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
@@ -240,7 +240,7 @@ export default function BancosTab() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}

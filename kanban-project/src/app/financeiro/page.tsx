@@ -191,7 +191,7 @@ export default function FinanceiroPage() {
                 </button>
               ))}
             </div>
-            <div className="h-px bg-white/10 w-full" />
+            <div className="h-px bg-[var(--surface-primary)] w-full" />
           </div>
 
           {tab === "central" ? (
@@ -241,7 +241,7 @@ export default function FinanceiroPage() {
 function EmConstrucao({ tab }: { tab: TabKey }) {
   const label = TABS.find(t => t.key === tab)?.label ?? tab
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md p-16 text-center">
+    <div className="rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md p-16 text-center">
       <FileText className="h-10 w-10 text-white/30 mx-auto mb-3" />
       <h3 className="text-white font-semibold">{label}</h3>
       <p className="text-white/50 text-sm mt-1">Esta aba entra na próxima fatia da entrega.</p>

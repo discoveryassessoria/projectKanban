@@ -286,7 +286,7 @@ export function KanbanContent() {
 
         <main className="relative px-6 py-6 overflow-hidden">
           {/* TABS PRINCIPAIS */}
-          <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
+          <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               {/* Tabs Processos / Clientes */}
               <div className="flex items-center gap-2">
@@ -296,7 +296,7 @@ export function KanbanContent() {
                     px-4 py-2 rounded-lg font-medium transition-all duration-200
                     ${tabPrincipal === "processos"
                       ? "bg-indigo-600 text-white shadow-lg"
-                      : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                      : "bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                     }
                   `}
                 >
@@ -309,7 +309,7 @@ export function KanbanContent() {
                     px-4 py-2 rounded-lg font-medium transition-all duration-200
                     ${tabPrincipal === "contratantes"
                       ? "bg-indigo-600 text-white shadow-lg"
-                      : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                      : "bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                     }
                   `}
                 >
@@ -320,14 +320,14 @@ export function KanbanContent() {
 
               {/* Sub-tabs Kanban / Lista (só aparece em Processos) */}
               {tabPrincipal === "processos" && pode('processos.ver') && (
-                <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1">
+                <div className="flex items-center gap-1 bg-[var(--surface-primary)] rounded-lg p-1">
                   <button
                     onClick={() => setSubTab("kanban")}
                     className={`
                       px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                       ${subTab === "kanban"
-                        ? "bg-white/20 text-white"
-                        : "text-white/60 hover:text-white hover:bg-white/10"
+                        ? "bg-[var(--surface-secondary)] text-white"
+                        : "text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
                       }
                     `}
                   >
@@ -338,8 +338,8 @@ export function KanbanContent() {
                     className={`
                       px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                       ${subTab === "lista"
-                        ? "bg-white/20 text-white"
-                        : "text-white/60 hover:text-white hover:bg-white/10"
+                        ? "bg-[var(--surface-secondary)] text-white"
+                        : "text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
                       }
                     `}
                   >
@@ -351,7 +351,7 @@ export function KanbanContent() {
               {/* Contador + Países (só em Processos) */}
               {tabPrincipal === "processos" && pode('processos.ver') && (
                 <div className="flex items-center gap-4">
-                  <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
+                  <div className="flex flex-col items-center px-4 py-2 bg-[var(--surface-primary)] rounded-lg">
                     <span className="text-2xl font-bold text-white">
                       {processos.length}
                     </span>
@@ -367,7 +367,7 @@ export function KanbanContent() {
 
               {/* Contador Clientes */}
               {tabPrincipal === "contratantes" && (
-                <div className="flex flex-col items-center px-4 py-2 bg-white/10 rounded-lg">
+                <div className="flex flex-col items-center px-4 py-2 bg-[var(--surface-primary)] rounded-lg">
                   <span className="text-2xl font-bold text-white">
                     {contratantes.length + requerentes.length}
                   </span>
@@ -378,7 +378,7 @@ export function KanbanContent() {
 
             {/* ✅ Seletor de TIPO do país (só quando tem mais de um) */}
             {tabPrincipal === "processos" && pode('processos.ver') && tiposDoPais.length > 1 && (
-              <div className="mt-3 flex items-center gap-1 border-t border-white/10 pt-3">
+              <div className="mt-3 flex items-center gap-1 border-t border-[var(--border-default)] pt-3">
                 {tiposDoPais.map((t) => (
                   <button
                     key={t.id}
@@ -386,8 +386,8 @@ export function KanbanContent() {
                     className={`
                       px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                       ${tipoSelecionado?.id === t.id
-                        ? "bg-white/20 text-white"
-                        : "text-white/60 hover:text-white hover:bg-white/10"
+                        ? "bg-[var(--surface-secondary)] text-white"
+                        : "text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
                       }
                     `}
                   >
@@ -399,7 +399,7 @@ export function KanbanContent() {
           </div>
 
           {/* CONTEÚDO - overflow-hidden para conter o kanban */}
-          <div className="bg-white/5 border border-white/15 rounded-2xl p-4 backdrop-blur-xl shadow-lg overflow-hidden" style={{ maxWidth: '100%' }}>
+          <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-2xl p-4 backdrop-blur-xl shadow-lg overflow-hidden" style={{ maxWidth: '100%' }}>
             {/* Processos - Kanban */}
             {tabPrincipal === "processos" && subTab === "kanban" && (
               pode('processos.ver') ? (

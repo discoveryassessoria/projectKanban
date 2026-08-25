@@ -66,7 +66,7 @@ export default function FluxoTab() {
       </div>
 
       {/* GRÁFICO */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" /> Fluxo Previsto vs Realizado</div>
           <div className="flex gap-3 text-xs text-white/60">
@@ -85,7 +85,7 @@ export default function FluxoTab() {
       {/* CALENDÁRIO + TIMELINE */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* calendário */}
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+        <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3 capitalize"><Calendar className="h-4 w-4" /> Calendário · {d.mesLabel}</div>
           <div className="grid grid-cols-7 gap-1 text-center">
             {["D", "S", "T", "Q", "Q", "S", "S"].map((dd, i) => <div key={i} className="text-[10px] text-white/40 font-bold py-1">{dd}</div>)}
@@ -120,7 +120,7 @@ export default function FluxoTab() {
         </div>
 
         {/* timeline */}
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+        <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><FileText className="h-4 w-4" /> Agenda Financeira</div>
           {d.timeline.length === 0 ? (
             <p className="text-sm text-white/40 py-8 text-center">Sem eventos na janela.</p>
@@ -190,7 +190,7 @@ function FluxoChart({ serie }: { serie: FluxoData["serie"] }) {
 // SUBCOMPONENTES
 // ============================================================
 function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-white/30 text-white hover:bg-white/10">{icon}{children}</button>
+  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">{icon}{children}</button>
 }
 function Kpi({ icon, label, value, sub, valueColor = "text-white" }: {
   icon: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string

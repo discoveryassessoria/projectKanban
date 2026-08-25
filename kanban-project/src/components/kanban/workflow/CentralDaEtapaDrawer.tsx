@@ -164,13 +164,13 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 }
 
 const STATUS_PILL_CLS: Record<StatusStep, string> = {
-  nao_iniciada: "bg-[#20262e]0/20 text-white/40 border-white/10",
+  nao_iniciada: "bg-[#20262e]0/20 text-white/40 border-[var(--border-default)]",
   bloqueada: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/50",
   em_andamento: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/50",
   aguardando_terceiro: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/50",
   atrasada: "bg-[#fbbf24]/20 text-[#fbbf24] border-[#fbbf24]/50",
   concluida: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/50",
-  cancelada: "bg-[#20262e]0/20 text-white/40 border-white/10",
+  cancelada: "bg-[#20262e]0/20 text-white/40 border-[var(--border-default)]",
 }
 
 const fmtDateTime = (iso: string | null): string => {
@@ -461,7 +461,7 @@ function ConteudoDrawer({
           <>
             {/* ============== HEADER ============== */}
             <div
-              className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-white/10"
+              className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-[var(--border-default)]"
               style={{ background: "linear-gradient(180deg,#1c222b 0%,#161b22 100%)" }}
             >
               <div className="flex items-center justify-between mb-3">
@@ -495,13 +495,13 @@ function ConteudoDrawer({
                   {STATUS_LABEL[step.status]}
                 </span>
 
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-popover)]/5 border border-white/10 text-[11px] text-white/80">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-popover)]/5 border border-[var(--border-default)] text-[11px] text-white/80">
                   <UserIcon className="w-3 h-3" />
                   {step.assignee?.nome || ownerName(step.ownerKey)}
                 </span>
 
                 {step.dueAt && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-popover)]/5 border border-white/10 text-[11px] text-white/80 font-mono">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-popover)]/5 border border-[var(--border-default)] text-[11px] text-white/80 font-mono">
                     <Clock className="w-3 h-3" />
                     {fmtDateTime(step.dueAt)}
                   </span>
@@ -514,7 +514,7 @@ function ConteudoDrawer({
                   <button
                     onClick={() => setEditorAberto(true)}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-white/15"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-[var(--border-default)]"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Ver campos preenchidos
@@ -523,7 +523,7 @@ function ConteudoDrawer({
                     <button
                       onClick={() => setReabrindoModal(true)}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-white/15"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-[var(--border-default)]"
                     >
                       ↻ Reabrir etapa
                     </button>
@@ -648,7 +648,7 @@ function ConteudoDrawer({
                     value={blockReason}
                     onChange={(e) => setBlockReason(e.target.value)}
                     placeholder="ex: aguardando cliente confirmar dados"
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#f87171]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#f87171]/50"
                     autoFocus
                   />
                   <div className="flex gap-2 mt-2">
@@ -683,7 +683,7 @@ function ConteudoDrawer({
                     onChange={(e) =>
                       setTransferUserId(e.target.value ? Number(e.target.value) : null)
                     }
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] focus:outline-none focus:border-[#7dd3fc]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] focus:outline-none focus:border-[#7dd3fc]/50"
                   >
                     <option value="" className="bg-[#20262e]">
                       — Selecione quem executa —
@@ -730,7 +730,7 @@ function ConteudoDrawer({
                     value={forceMotivo}
                     onChange={(e) => setForceMotivo(e.target.value)}
                     placeholder="ex: etapa executada fora do sistema"
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50"
                     autoFocus
                   />
                   <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#d2a948]/80 mb-1.5 mt-2">
@@ -741,7 +741,7 @@ function ConteudoDrawer({
                     value={forceJustificativa}
                     onChange={(e) => setForceJustificativa(e.target.value)}
                     placeholder="Explique por que a etapa está sendo concluída assim."
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50 resize-none"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50 resize-none"
                   />
                   <div className="flex gap-2 mt-2">
                     <button
@@ -782,7 +782,7 @@ function ConteudoDrawer({
 
             {/* ============== TABS ============== */}
             <div
-              className="flex-shrink-0 flex flex-wrap px-6 border-b border-white/10"
+              className="flex-shrink-0 flex flex-wrap px-6 border-b border-[var(--border-default)]"
               style={{ background: "#11151b" }}
             >
               {(
@@ -936,7 +936,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
         {eventos.map((e, i) => (
           <div
             key={i}
-            className="flex items-start gap-3 p-3 rounded-md bg-[var(--surface-popover)]/5 border border-white/10"
+            className="flex items-start gap-3 p-3 rounded-md bg-[var(--surface-popover)]/5 border border-[var(--border-default)]"
           >
             <div className="w-2 h-2 rounded-full bg-[#7dd3fc]/15 mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">

@@ -15,7 +15,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const TH = "px-4 py-3 font-medium"
 const dinheiro = (v: number, moeda = "BRL") =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda }).format(Number(v) || 0)
@@ -50,7 +50,7 @@ function Cabecalho({ titulo, descricao, onReload }: { titulo: string; descricao:
           <h2 className="text-lg font-semibold text-white">{titulo}</h2>
           <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
         </div>
-        <button onClick={onReload} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+        <button onClick={onReload} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
           Atualizar
         </button>
       </div>
@@ -96,7 +96,7 @@ export function CreditoTab() {
           </div>
           <div className={`overflow-x-auto ${CARD}`}>
             <table className="w-full text-sm">
-              <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                 <tr>
                   <th className={TH}>Criado</th><th className={TH}>Pessoa</th><th className={TH}>Destino</th>
                   <th className={TH}>Gerado</th><th className={TH}>Disponível</th><th className={TH}>Utilizado</th>
@@ -107,7 +107,7 @@ export function CreditoTab() {
                 {dados.creditos.length === 0 ? (
                   <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhum crédito registrado.</td></tr>
                 ) : dados.creditos.map((c) => (
-                  <tr key={c.id} className="border-b border-white/5 last:border-0">
+                  <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0">
                     <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(c.criadoEm)}</td>
                     <td className="px-4 py-2.5 text-white">{c.pessoa ?? "—"}</td>
                     <td className="px-4 py-2.5 text-white/60">{c.destino}</td>
@@ -115,7 +115,7 @@ export function CreditoTab() {
                     <td className="px-4 py-2.5 text-white">{dinheiro(c.disponivel, c.moeda)}</td>
                     <td className="px-4 py-2.5 text-white/70">{dinheiro(c.utilizado, c.moeda)}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{c.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{c.status}</span>
                     </td>
                   </tr>
                 ))}
@@ -169,7 +169,7 @@ export function DocumentosFinanceirosTab() {
               <div className="mb-3 text-[11px] uppercase tracking-wide text-white/45">Faturas por situação</div>
               <div className="flex flex-wrap gap-2">
                 {dados.porStatus.map((s) => (
-                  <span key={s.status} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/75">
+                  <span key={s.status} className="rounded-lg border border-[var(--border-default)] bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/75">
                     {s.status}: <span className="text-white">{s.quantidade}</span> · {dinheiro(s.valor)}
                   </span>
                 ))}
@@ -177,10 +177,10 @@ export function DocumentosFinanceirosTab() {
             </div>
           )}
 
-          <div className="flex flex-wrap gap-1 border-b border-white/10">
+          <div className="flex flex-wrap gap-1 border-b border-[var(--border-default)]">
             {(["recibos", "faturas"] as const).map((a) => (
               <button key={a} onClick={() => setAba(a)}
-                className={`rounded-t-lg px-3 py-2 text-sm transition ${aba === a ? "bg-white/10 font-medium text-white" : "text-white/50 hover:text-white/80"}`}>
+                className={`rounded-t-lg px-3 py-2 text-sm transition ${aba === a ? "bg-[var(--surface-primary)] font-medium text-white" : "text-white/50 hover:text-white/80"}`}>
                 {a === "recibos" ? "Recibos" : "Faturas"}
               </button>
             ))}
@@ -189,14 +189,14 @@ export function DocumentosFinanceirosTab() {
           <div className={`overflow-x-auto ${CARD}`}>
             {aba === "recibos" ? (
               <table className="w-full text-sm">
-                <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                   <tr><th className={TH}>Número</th><th className={TH}>Data</th><th className={TH}>Pagador</th><th className={TH}>Descrição</th><th className={TH}>Valor</th><th className={TH}>Processo</th><th className={TH}>PDF</th></tr>
                 </thead>
                 <tbody>
                   {dados.recibos.length === 0 ? (
                     <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhum recibo emitido.</td></tr>
                   ) : dados.recibos.map((r) => (
-                    <tr key={r.id} className="border-b border-white/5 last:border-0">
+                    <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-white">{r.numero}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(r.data)}</td>
                       <td className="px-4 py-2.5 text-white/70">{r.pagadorNome ?? "—"}</td>
@@ -214,20 +214,20 @@ export function DocumentosFinanceirosTab() {
               </table>
             ) : (
               <table className="w-full text-sm">
-                <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
                   <tr><th className={TH}>Emissão</th><th className={TH}>Descrição</th><th className={TH}>Valor</th><th className={TH}>Parcelas</th><th className={TH}>Vencimento</th><th className={TH}>Situação</th><th className={TH}>Processo</th></tr>
                 </thead>
                 <tbody>
                   {dados.faturas.length === 0 ? (
                     <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhuma fatura emitida.</td></tr>
                   ) : dados.faturas.map((f) => (
-                    <tr key={f.id} className="border-b border-white/5 last:border-0">
+                    <tr key={f.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(f.dataEmissao)}</td>
                       <td className="px-4 py-2.5 text-white">{f.descricao}</td>
                       <td className="px-4 py-2.5 text-white/80">{dinheiro(f.valor, f.moeda)}</td>
                       <td className="px-4 py-2.5 text-white/60">{f.parcelas}</td>
                       <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{f.dataVencimento ? data(f.dataVencimento) : "—"}</td>
-                      <td className="px-4 py-2.5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{f.status}</span></td>
+                      <td className="px-4 py-2.5"><span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{f.status}</span></td>
                       <td className="px-4 py-2.5 text-white/60">#{f.processoId}</td>
                     </tr>
                   ))}

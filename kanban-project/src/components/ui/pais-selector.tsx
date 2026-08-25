@@ -25,7 +25,7 @@ export function PaisTabs({ paises, paisSelecionado, onSelect }: PaisTabsProps) {
             onClick={() => onSelect(p.countryKey)}
             className={`
               flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${ativo ? "bg-[var(--surface-primary)] text-gray-900 shadow" : "text-white/70 hover:text-white hover:bg-white/10"}
+              ${ativo ? "bg-[var(--surface-primary)] text-gray-900 shadow" : "text-white/70 hover:text-white hover:bg-[var(--surface-hover)]"}
             `}
           >
             {p.flag && <span>{p.flag}</span>}
@@ -50,7 +50,7 @@ export function PaisSelector({ paises, paisSelecionado, onSelect, className = ""
     <select
       value={paisSelecionado ?? ""}
       onChange={(e) => e.target.value && onSelect(e.target.value)}
-      className={`rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20 ${className}`}
+      className={`rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none focus:border-white/20 ${className}`}
     >
       <option value="" className="bg-zinc-900">— selecione o país —</option>
       {paises.map((p) => (

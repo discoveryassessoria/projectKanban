@@ -108,8 +108,8 @@ export default function PublicarWorkflowModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onFechar}>
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-white/10 px-6 py-4">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[var(--border-default)] px-6 py-4">
           <h3 className="font-semibold text-white">Publicar {preview ? `“${preview.nome}”` : "workflow"}</h3>
           {preview && (
             <p className="mt-0.5 text-xs text-white/50">
@@ -138,14 +138,14 @@ export default function PublicarWorkflowModal({
           )}
 
           {preview && areasComMudanca.map((area) => (
-            <div key={area} className="rounded-lg border border-white/10 bg-white/5 p-3">
+            <div key={area} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
               <div className="text-xs font-medium text-white/80">
                 {area} <span className="text-white/35">· {porArea.get(area)!.length} alteração(ões)</span>
               </div>
               <ul className="mt-1.5 space-y-1">
                 {porArea.get(area)!.map((m, i) => (
                   <li key={i} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-xs">
-                    <span className={`mt-0.5 flex-none rounded px-1.5 py-0.5 text-[10px] ${COR_DO_TIPO[m.tipo] ?? "bg-white/10 text-white/60"}`}>
+                    <span className={`mt-0.5 flex-none rounded px-1.5 py-0.5 text-[10px] ${COR_DO_TIPO[m.tipo] ?? "bg-[var(--surface-primary)] text-white/60"}`}>
                       {m.tipo.toLowerCase()}
                     </span>
                     <span className="text-white/80">{m.alvo}</span>
@@ -158,12 +158,12 @@ export default function PublicarWorkflowModal({
           ))}
 
           {preview && (
-            <p className="rounded-lg border border-white/10 bg-black/20 p-3 text-[11px] leading-relaxed text-white/45">{preview.aviso}</p>
+            <p className="rounded-lg border border-[var(--border-default)] bg-black/20 p-3 text-[11px] leading-relaxed text-white/45">{preview.aviso}</p>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-          <button onClick={onFechar} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Fechar</button>
+        <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+          <button onClick={onFechar} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Fechar</button>
           <button onClick={publicar} disabled={!preview || !preview.podePublicar || publicando}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-emerald-500 disabled:opacity-40">
             {publicando ? "Publicando…" : `Publicar versão ${preview?.versaoNova ?? ""}`}

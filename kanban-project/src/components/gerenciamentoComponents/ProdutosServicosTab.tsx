@@ -219,7 +219,7 @@ export default function ProdutosServicosTab() {
     }
   }
 
-  const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
+  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
   const urlExclusao = (l: ItemUnificado) =>
     `${l.origem === 'servico' ? URL_SERVICOS : URL_MESTRE}/${l.id}/exclusao-definitiva`
 
@@ -240,13 +240,13 @@ export default function ProdutosServicosTab() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1">
+        <div className="flex items-center gap-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-1">
           {ESCOPOS.map((e) => (
             <button
               key={e.valor}
               onClick={() => setEscopo(e.valor)}
               title={e.ajuda}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${escopo === e.valor ? 'bg-white/10 text-white' : 'text-white/50 hover:text-white/80'}`}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${escopo === e.valor ? 'bg-[var(--surface-primary)] text-white' : 'text-white/50 hover:text-white/80'}`}
             >
               {e.label}
               <span className="ml-1.5 text-[10px] text-white/40">{contagem[e.valor]}</span>
@@ -257,13 +257,13 @@ export default function ProdutosServicosTab() {
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar por código (SRV-n), nome ou descrição..."
-          className="min-w-[240px] flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
+          className="min-w-[240px] flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
         />
         {/* Filtros por REFERÊNCIA: categoria e país entram por id, nunca por texto. */}
         <select
           value={filtroCategoria == null ? '' : String(filtroCategoria)}
           onChange={(e) => setFiltroCategoria(e.target.value === '' ? null : Number(e.target.value))}
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur focus:border-white/20"
+          className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none backdrop-blur focus:border-white/20"
           title="Filtrar por categoria"
         >
           <option value="" className="bg-zinc-900">Todas as categorias</option>
@@ -275,7 +275,7 @@ export default function ProdutosServicosTab() {
         <select
           value={filtroPais === null ? '' : String(filtroPais)}
           onChange={(e) => setFiltroPais(e.target.value === '' ? null : e.target.value === 'global' ? 'global' : Number(e.target.value))}
-          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur focus:border-white/20"
+          className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none backdrop-blur focus:border-white/20"
           title="Filtrar por aplicação territorial"
         >
           <option value="" className="bg-zinc-900">Todos os territórios</option>
@@ -296,7 +296,7 @@ export default function ProdutosServicosTab() {
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
           {busca || filtroPais !== null
             ? 'Nenhum item encontrado.'
             : escopo === 'relacionados'
@@ -308,19 +308,19 @@ export default function ProdutosServicosTab() {
       )}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="bg-white/5">
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipo</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Aplicação</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Unidade</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Vínculos</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+              <tr className="bg-[var(--surface-primary)]">
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipo</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Aplicação</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Unidade</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Vínculos</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -330,14 +330,14 @@ export default function ProdutosServicosTab() {
                       documento como serviço quando as duas famílias convivem. */}
                   {s.grupo && (
                     <tr>
-                      <td colSpan={9} className="border-b border-white/10 bg-white/[0.07] px-4 py-2">
+                      <td colSpan={9} className="border-b border-[var(--border-default)] bg-white/[0.07] px-4 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{s.titulo}</div>
                         <div className="text-[11px] text-white/40">{s.ajuda}</div>
                       </td>
                     </tr>
                   )}
                   {s.linhas.map((l) => (
-                <tr key={l.chave} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                <tr key={l.chave} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{l.codigo ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{l.nome}</div>
@@ -352,7 +352,7 @@ export default function ProdutosServicosTab() {
                     )}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.grupo === 'servico_pacote' ? 'bg-blue-500/15 text-blue-200' : 'bg-white/10 text-white/70'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.grupo === 'servico_pacote' ? 'bg-blue-500/15 text-blue-200' : 'bg-[var(--surface-primary)] text-white/70'}`}>
                       {l.tipo}
                     </span>
                   </td>
@@ -365,13 +365,13 @@ export default function ProdutosServicosTab() {
                       : <span className="text-white/30">—</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
                       {l.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => abrirEditar(l)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
+                      <button onClick={() => abrirEditar(l)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
                       <button onClick={() => excluir(l)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
                     </div>
                   </td>
@@ -386,8 +386,8 @@ export default function ProdutosServicosTab() {
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? `Editar ${rotuloTipo(editando.natureza).toLowerCase()}` : 'Novo item do catálogo'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
@@ -481,7 +481,7 @@ export default function ProdutosServicosTab() {
               </label>
 
               {editando && editando.vinculos > 0 && (
-                <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/60">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-xs text-white/60">
                   Este item tem <b className="text-white/80">{editando.vinculos}</b> vínculo(s) em uso (configuração financeira, preço ou tipo de documento).
                   Editar o nome preserva os vínculos; para tirá-lo de circulação, desmarque <b className="text-white/80">Ativo</b> em vez de excluir.
                 </div>
@@ -492,7 +492,7 @@ export default function ProdutosServicosTab() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}

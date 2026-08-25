@@ -282,7 +282,7 @@ function CartaoDaFila({
             <button
               disabled={ocupado}
               onClick={aoExecutar}
-              className="rounded border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1] disabled:opacity-40"
+              className="rounded border border-[var(--border-default)] bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1] disabled:opacity-40"
             >
               {ocupado && acao.comando === "iniciar" ? "Iniciando…" : acao.rotulo}
             </button>
@@ -508,8 +508,8 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 onClick={() => setFiltro(f.id)}
                 className={`rounded border px-2 py-1 text-[11px] transition-colors ${
                   filtro === f.id
-                    ? "border-white/25 bg-white/[0.08] text-white/85"
-                    : "border-white/10 text-white/45 hover:text-white/75"
+                    ? "border-[var(--border-strong)] bg-white/[0.08] text-white/85"
+                    : "border-[var(--border-default)] text-white/45 hover:text-white/75"
                 }`}
               >
                 {f.rotulo} <span className="tabular-nums text-white/35">{n}</span>
@@ -594,7 +594,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => { setErroComando(null); setAlvo(l) }}
-                    className="rounded border border-white/15 px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-white/30 hover:bg-white/[0.06]"
+                    className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
                   >
                     {l.responsavelId == null ? "Atribuir" : "Transferir"}
                   </button>

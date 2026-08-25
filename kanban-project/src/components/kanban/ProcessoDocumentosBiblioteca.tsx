@@ -141,7 +141,7 @@ export function ProcessoDocumentosBiblioteca({
           {/* 8 KPIs */}
           <div className="grid gap-2.5 mb-[18px]" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
             {kpiCards.map(([label, val, ic, tone], i) => (
-              <div key={i} className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[13px]">
+              <div key={i} className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[13px]">
                 <span className="text-[10.5px] text-white/55 block leading-tight min-h-[28px]">{label}</span>
                 <div className="flex items-center justify-between mt-1.5">
                   <b className="text-[23px] font-extrabold text-white/95">{val}</b>
@@ -154,7 +154,7 @@ export function ProcessoDocumentosBiblioteca({
           {/* Toolbar: filtros + busca */}
           <div className="flex items-center justify-between gap-3.5 mb-5 flex-wrap">
             <div className="flex items-center gap-[7px] flex-wrap">
-              <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-white/55">
+              <button className="inline-flex items-center gap-1.5 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-white/55">
                 <Filter className="w-3.5 h-3.5" /> Filtros
               </button>
               {FILTERS.map((f) => (
@@ -164,14 +164,14 @@ export function ProcessoDocumentosBiblioteca({
                   className={`border rounded-lg px-[13px] py-2 text-[12.5px] font-semibold cursor-pointer transition-colors ${
                     f === filtro
                       ? "bg-[#7dd3fc]/12 border-[#7dd3fc] text-[#7dd3fc]"
-                      : "border-white/10 bg-[var(--surface-popover)] text-white/55 hover:border-white/20"
+                      : "border-[var(--border-default)] bg-[var(--surface-popover)] text-white/55 hover:border-[var(--border-strong)]"
                   }`}
                 >
                   {f}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
+            <div className="flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
               <Search className="w-[15px] h-[15px] text-white/40" />
               <input
                 value={busca}
@@ -199,7 +199,7 @@ export function ProcessoDocumentosBiblioteca({
 
           {/* Seção FORA DA LINHAGEM */}
           <div className="mb-6">
-            <div className="border-l-[3px] border-white/20 pl-3 mb-3.5">
+            <div className="border-l-[3px] border-[var(--border-strong)] pl-3 mb-3.5">
               <b className="text-[13px] font-extrabold text-white/95 tracking-wide">FORA DA LINHAGEM · CÔNJUGES / APOIO</b>
               <span className="block text-[12px] text-white/55 mt-0.5">Pessoas fora da linha reta ou documentos de apoio</span>
             </div>
@@ -216,19 +216,19 @@ export function ProcessoDocumentosBiblioteca({
         {/* ============== COLUNA LATERAL ============== */}
         <div className="flex flex-col gap-3.5">
           {/* Resumo da biblioteca (donut) */}
-          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[15px]">
+          <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo da biblioteca</h3>
             <Donut kpis={kpis} />
           </div>
 
           {/* Legenda */}
-          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[15px]">
+          <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Legenda de status</h3>
             <Legenda />
           </div>
 
           {/* Informações */}
-          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[15px]">
+          <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">⚠ Informações</h3>
             <p className="text-[11.5px] text-white/55 leading-relaxed mb-2">
               A biblioteca mostra apenas certidões, certidões retificadas, traduções juramentadas e apostilas de Haia.
@@ -264,7 +264,7 @@ function PersonGroup({
   const genTxt = g.lineage === "Linha reta" ? `Geração ${g.generation}` : "Fora da linha"
 
   return (
-    <div className="bg-[var(--surface-popover)] border border-white/10 rounded-2xl mb-3 overflow-hidden">
+    <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-2xl mb-3 overflow-hidden">
       {/* Cabeçalho da pessoa */}
       <div
         className="flex items-center gap-3.5 px-[18px] py-4 cursor-pointer"
@@ -281,7 +281,7 @@ function PersonGroup({
           <span className="block text-[12px] text-white/55 mt-px">{genTxt} · {g.lineage} · {g.role}</span>
         </div>
         <div className="flex gap-2.5">
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/55 bg-[#20262e] border border-white/10 rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/55 bg-[#20262e] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} documentos
           </span>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#4ade80] bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-[11px] py-1.5">
@@ -296,7 +296,7 @@ function PersonGroup({
 
       {/* Corpo (tabela) */}
       {aberto && (
-        <div className="border-t border-white/10">
+        <div className="border-t border-[var(--border-default)]">
           {/* Cabeçalho de colunas */}
           <div
             className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[#20262e] text-white/40 text-[10px] font-bold tracking-wider"
@@ -327,7 +327,7 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
 
   return (
     <div
-      className="grid gap-2.5 items-center px-[18px] py-[13px] border-t border-white/10 text-[12.5px]"
+      className="grid gap-2.5 items-center px-[18px] py-[13px] border-t border-[var(--border-default)] text-[12.5px]"
       style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
     >
       {/* Documento */}
@@ -357,7 +357,7 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
       <span>
         <button
           onClick={() => onAbrirDetalhes(it.id)}
-          className="border border-white/10 bg-[var(--surface-popover)] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-[#7dd3fc] hover:text-[#7dd3fc] transition-colors"
+          className="border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-[#7dd3fc] hover:text-[#7dd3fc] transition-colors"
         >
           Abrir detalhes
         </button>
@@ -456,7 +456,7 @@ function Legenda() {
     ["bg-[#4ade80]", "Validada", "Documento validado e aprovado"],
     ["bg-[#7dd3fc]", "Recebida", "Documento recebido, aguardando validação"],
     ["bg-[#d2a948]/120", "Pendente", "Documento ainda não recebido"],
-    ["bg-white/20", "Não se aplica", "Não aplicável para este documento"],
+    ["bg-[var(--surface-secondary)]", "Não se aplica", "Não aplicável para este documento"],
     ["bg-[#4ade80]", "Pronto para protocolo", "Certidão + Tradução + Apostila concluídas"],
     ["bg-[#d2a948]/120", "Aguardando", "Etapa pendente para conclusão"],
   ]

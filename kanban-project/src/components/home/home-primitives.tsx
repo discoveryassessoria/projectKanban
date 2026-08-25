@@ -18,7 +18,7 @@ import type { NivelPrioridade } from "@/src/types/home"
 /** Acento dourado — mesmo token do Financeiro. */
 export const OURO = "#D2A948"
 /** Card glass — mesma composição do Financeiro. */
-export const CARD = "rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md"
+export const CARD = "rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
 /**
  * Card FOCAL — a tela tem um assunto principal, e ele não pode ter o mesmo peso
  * dos apoios. Superfície OPACA do DS (`--surface-overlay`, o mesmo token dos
@@ -26,7 +26,7 @@ export const CARD = "rounded-xl border border-white/10 bg-white/[0.05] backdrop-
  * uma camada translúcida sobre a foto.
  */
 export const CARD_FOCAL =
-  "relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-md shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
+  "relative overflow-hidden rounded-2xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
 
 // ---- Estilos por nível -----------------------------------------------------
 export interface NivelStyle {
@@ -60,8 +60,8 @@ export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelSt
       }
     default:
       return {
-        chip: "bg-white/10 text-white/70 border-white/15",
-        ponto: "bg-white/40",
+        chip: "bg-[var(--surface-primary)] text-white/70 border-[var(--border-default)]",
+        ponto: "bg-[var(--surface-elevated)]",
         texto: "text-white/70",
         aro: "ring-white/10",
       }
@@ -121,7 +121,7 @@ export function ErrorState({ onRetry, mensagem }: { onRetry?: () => void; mensag
       {onRetry && (
         <button
           onClick={onRetry}
-          className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
+          className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-[var(--surface-hover)]"
         >
           Tentar novamente
         </button>

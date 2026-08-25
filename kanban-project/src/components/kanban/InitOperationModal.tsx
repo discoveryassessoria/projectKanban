@@ -227,7 +227,7 @@ function ConteudoModal({
           onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
-          <div className="px-6 pt-5 pb-4 border-b border-white/10">
+          <div className="px-6 pt-5 pb-4 border-b border-[var(--border-default)]">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white/95">Iniciar operação</h2>
               <button
@@ -266,7 +266,7 @@ function ConteudoModal({
                         className={`w-full flex items-start gap-3 px-3 py-3 rounded-lg border-2 transition-all text-left ${
                           selected
                             ? "border-blue-500 bg-[#7dd3fc]/12"
-                            : "border-white/10 bg-[var(--surface-popover)] hover:border-white/15 hover:bg-[#20262e]"
+                            : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:border-[var(--border-strong)] hover:bg-[#20262e]"
                         }`}
                       >
                         <div
@@ -301,7 +301,7 @@ function ConteudoModal({
                         <select
                           value={responsavelId}
                           onChange={(e) => setResponsavelId(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
+                          className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
                         >
                           <option value="auto">Auto (responsável padrão da etapa)</option>
                           {usuarios.map((u) => (
@@ -319,7 +319,7 @@ function ConteudoModal({
                           type="date"
                           value={dataPrazoInicial}
                           onChange={(e) => setDataPrazoInicial(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
+                          className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
                         />
                       </div>
                     </div>
@@ -333,9 +333,9 @@ function ConteudoModal({
                     <div className="grid grid-cols-3 gap-2 mb-6">
                       {(
                         [
-                          { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-white/10" },
-                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-white/10" },
-                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-white/10" },
+                          { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
                         const selected = prioridade === p.key
@@ -370,18 +370,18 @@ function ConteudoModal({
                       ? "Por que este documento não é mais necessário?"
                       : "Contexto, instruções para quem vai iniciar, particularidades do caso…"
                   }
-                  className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none"
+                  className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none"
                 />
               </>
             ) : null}
           </div>
 
           {/* FOOTER */}
-          <div className="px-6 py-4 border-t border-white/10 flex items-center justify-end gap-2">
+          <div className="px-6 py-4 border-t border-[var(--border-default)] flex items-center justify-end gap-2">
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[var(--surface-popover)] hover:bg-[#20262e] border border-white/10 rounded-md disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[var(--surface-popover)] hover:bg-[#20262e] border border-[var(--border-default)] rounded-md disabled:opacity-50"
             >
               Cancelar
             </button>

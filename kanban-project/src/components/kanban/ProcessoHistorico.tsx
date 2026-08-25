@@ -78,7 +78,7 @@ function diaLabel(s: string): string {
   return fmt
 }
 
-const CARD = "rounded-xl border border-white/10 bg-[var(--surface-popover)]"
+const CARD = "rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)]"
 
 const SEM_LOGS: LogItem[] = []
 
@@ -147,16 +147,16 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
               <p className="text-sm text-white/45">Linha do tempo completa de tudo que aconteceu neste processo</p>
             </div>
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" /></button>
-              <button className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-3.5 w-3.5" /></button>
+              <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" /></button>
+              <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-3.5 w-3.5" /></button>
             </div>
           </div>
 
           {/* filtros */}
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[240px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar no histórico..." className="w-full rounded-lg border border-white/10 bg-[var(--app-background)] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-            <div className="flex items-center justify-between gap-6 rounded-lg border border-white/10 bg-[var(--app-background)] px-3 py-2 text-sm"><span className="inline-flex items-center gap-1.5 text-white/70"><CalendarDays className="h-3.5 w-3.5 text-white/40" /> Período: Todo o período</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
-            <button onClick={() => { setBusca(""); setTipo("todos") }} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-[var(--app-background)] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
+            <div className="relative min-w-[240px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar no histórico..." className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
+            <div className="flex items-center justify-between gap-6 rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] px-3 py-2 text-sm"><span className="inline-flex items-center gap-1.5 text-white/70"><CalendarDays className="h-3.5 w-3.5 text-white/40" /> Período: Todo o período</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
+            <button onClick={() => { setBusca(""); setTipo("todos") }} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
           </div>
 
           {/* chips por tipo */}
@@ -179,7 +179,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                       return (
                         <div key={l.id} className="flex gap-3">
                           <div className="flex w-14 shrink-0 flex-col items-end pt-2 text-right"><span className="text-[12px] tabular-nums text-white/60">{horaBR(l.criadoEm)}</span></div>
-                          <div className="flex flex-col items-center pt-2.5"><span className="h-2.5 w-2.5 rounded-full ring-4 ring-[#1b2027]" style={{ background: t.cor }} />{i < g.itens.length - 1 && <span className="mt-1 w-px flex-1 bg-white/10" />}</div>
+                          <div className="flex flex-col items-center pt-2.5"><span className="h-2.5 w-2.5 rounded-full ring-4 ring-[#1b2027]" style={{ background: t.cor }} />{i < g.itens.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--surface-primary)]" />}</div>
                           <div className="min-w-0 flex-1 pb-4">
                             <div className={`${CARD} flex items-start gap-3 p-3.5`}>
                               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: `${t.cor}22`, color: t.cor }}><t.icon className="h-4.5 w-4.5" /></span>
@@ -201,7 +201,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                 </div>
               ))}
             {!loading && filtrados.length > visiveis.length && (
-              <div className="pt-2 text-center"><button onClick={() => setLimite((n) => n + 20)} className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-[var(--surface-popover)] px-4 py-2 text-sm text-white/80 hover:bg-[#252c35]"><ChevronDown className="h-4 w-4" /> Carregar mais eventos</button></div>
+              <div className="pt-2 text-center"><button onClick={() => setLimite((n) => n + 20)} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-4 py-2 text-sm text-white/80 hover:bg-[#252c35]"><ChevronDown className="h-4 w-4" /> Carregar mais eventos</button></div>
             )}
           </div>
         </div>
@@ -257,7 +257,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
 
 function ChipTipo({ ativo, onClick, icon: Ic, cor, label, n }: { ativo: boolean; onClick: () => void; icon: any; cor: string; label: string; n: number }) {
   return (
-    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${ativo ? "border-[#d2a948]/50 bg-[#d2a948]/12" : "border-white/10 bg-[var(--surface-popover)] hover:bg-[#252c35]"}`}>
+    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${ativo ? "border-[#d2a948]/50 bg-[#d2a948]/12" : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[#252c35]"}`}>
       <Ic className="h-4 w-4" style={{ color: cor }} />
       <span className={ativo ? "text-white/90" : "text-white/70"}>{label}</span>
       <span className="text-[11px] font-semibold" style={{ color: ativo ? "#d2a948" : "rgba(255,255,255,0.5)" }}>{n}</span>

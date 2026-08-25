@@ -289,7 +289,7 @@ export default function BlogAdminPage() {
               { label: 'Rascunhos', value: rascunhos, cor: 'bg-yellow-500' },
               { label: 'Em Destaque', value: destaques, cor: 'bg-purple-500' },
             ].map((metric, idx) => (
-              <Card key={idx} className="bg-white/10 backdrop-blur-sm border border-white/20 text-white">
+              <Card key={idx} className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)] text-white">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
                     <div>
@@ -306,7 +306,7 @@ export default function BlogAdminPage() {
           </div>
 
           {/* Filtros */}
-          <Card className="bg-white/10 backdrop-blur-sm border border-white/20">
+          <Card className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)]">
             <CardContent className="p-4">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
@@ -316,7 +316,7 @@ export default function BlogAdminPage() {
                       placeholder="Buscar posts..."
                       value={busca}
                       onChange={(e) => setBusca(e.target.value)}
-                      className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                      className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
                     />
                   </div>
                 </div>
@@ -325,7 +325,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'todos' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('todos')}
-                    className={filtroStatus === 'todos' ? 'bg-amber-500 text-black' : 'border-white/30 text-white/70 bg-transparent hover:bg-white/10'}
+                    className={filtroStatus === 'todos' ? 'bg-amber-500 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Todos
                   </Button>
@@ -333,7 +333,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'PUBLICADO' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('PUBLICADO')}
-                    className={filtroStatus === 'PUBLICADO' ? 'bg-green-500 text-white' : 'border-white/30 text-white/70 bg-transparent hover:bg-white/10'}
+                    className={filtroStatus === 'PUBLICADO' ? 'bg-green-500 text-white' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Publicados
                   </Button>
@@ -341,7 +341,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'RASCUNHO' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('RASCUNHO')}
-                    className={filtroStatus === 'RASCUNHO' ? 'bg-yellow-500 text-black' : 'border-white/30 text-white/70 bg-transparent hover:bg-white/10'}
+                    className={filtroStatus === 'RASCUNHO' ? 'bg-yellow-500 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Rascunhos
                   </Button>
@@ -352,7 +352,7 @@ export default function BlogAdminPage() {
 
           {/* Lista de Posts */}
           {filteredPosts.length === 0 ? (
-            <Card className="bg-white/10 backdrop-blur-sm border border-white/20">
+            <Card className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)]">
               <CardContent className="p-12 text-center">
                 <FileText className="w-16 h-16 text-white/30 mx-auto mb-4" />
                 <p className="text-white/70 text-lg">Nenhum post encontrado</p>
@@ -362,11 +362,11 @@ export default function BlogAdminPage() {
           ) : (
             <div className="grid gap-4">
               {filteredPosts.map((post) => (
-                <Card key={post.id} className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/15 transition-colors">
+                <Card key={post.id} className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)] hover:bg-[var(--surface-hover)] transition-colors">
                   <CardContent className="p-4">
                     <div className="flex gap-4">
                       {/* Imagem */}
-                      <div className="w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-white/10">
+                      <div className="w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-[var(--surface-primary)]">
                         {post.imagemUrl ? (
                           <img 
                             src={post.imagemUrl} 
@@ -428,7 +428,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => togglePublish(post)}
-                            className="text-white/60 hover:text-white hover:bg-white/10"
+                            className="text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
                           >
                             {post.status === 'PUBLICADO' ? (
                               <><EyeOff className="w-4 h-4 mr-1" /> Despublicar</>
@@ -440,7 +440,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleDestaque(post)}
-                            className="text-white/60 hover:text-amber-400 hover:bg-white/10"
+                            className="text-white/60 hover:text-amber-400 hover:bg-[var(--surface-hover)]"
                           >
                             {post.destaque ? (
                               <><StarOff className="w-4 h-4 mr-1" /> Remover Destaque</>
@@ -452,7 +452,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => editPost(post)}
-                            className="text-white/60 hover:text-blue-400 hover:bg-white/10"
+                            className="text-white/60 hover:text-blue-400 hover:bg-[var(--surface-hover)]"
                           >
                             <Pencil className="w-4 h-4 mr-1" /> Editar
                           </Button>
@@ -460,7 +460,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(post.id)}
-                            className="text-white/60 hover:text-red-400 hover:bg-white/10"
+                            className="text-white/60 hover:text-red-400 hover:bg-[var(--surface-hover)]"
                           >
                             <Trash2 className="w-4 h-4 mr-1" /> Excluir
                           </Button>
@@ -479,7 +479,7 @@ export default function BlogAdminPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-[var(--overlay-modal)] backdrop-blur-sm" onClick={resetForm} />
-          <Card className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 border-white/20">
+          <Card className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 border-[var(--border-strong)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white">
@@ -497,7 +497,7 @@ export default function BlogAdminPage() {
                     value={formData.titulo}
                     onChange={(e) => setFormData({...formData, titulo: e.target.value})}
                     placeholder="Digite o título do post"
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
                     required
                   />
                 </div>
@@ -508,7 +508,7 @@ export default function BlogAdminPage() {
                     value={formData.resumo}
                     onChange={(e) => setFormData({...formData, resumo: e.target.value})}
                     placeholder="Digite um resumo do post (aparece no card)"
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-white/50 resize-none h-20"
+                    className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-white/50 resize-none h-20"
                     required
                   />
                 </div>
@@ -519,7 +519,7 @@ export default function BlogAdminPage() {
                     value={formData.conteudo}
                     onChange={(e) => setFormData({...formData, conteudo: e.target.value})}
                     placeholder="Conteúdo completo do post (opcional)"
-                    className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white placeholder:text-white/50 resize-none h-32"
+                    className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-white/50 resize-none h-32"
                   />
                 </div>
 
@@ -530,7 +530,7 @@ export default function BlogAdminPage() {
                       value={formData.imagemUrl}
                       onChange={(e) => setFormData({...formData, imagemUrl: e.target.value})}
                       placeholder="https://..."
-                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
                     />
                   </div>
                   <div>
@@ -539,7 +539,7 @@ export default function BlogAdminPage() {
                       value={formData.imagemAlt}
                       onChange={(e) => setFormData({...formData, imagemAlt: e.target.value})}
                       placeholder="Descrição da imagem"
-                      className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
                     />
                   </div>
                 </div>
@@ -550,7 +550,7 @@ export default function BlogAdminPage() {
                     <select
                       value={formData.categoria}
                       onChange={(e) => setFormData({...formData, categoria: e.target.value})}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
+                      className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white"
                       required
                     >
                       {categorias.map(cat => (
@@ -565,7 +565,7 @@ export default function BlogAdminPage() {
                       value={formData.tempoLeitura}
                       onChange={(e) => setFormData({...formData, tempoLeitura: parseInt(e.target.value) || 5})}
                       min={1}
-                      className="bg-white/10 border-white/20 text-white"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                     />
                   </div>
                 </div>
@@ -576,7 +576,7 @@ export default function BlogAdminPage() {
                     <select
                       value={formData.status}
                       onChange={(e) => setFormData({...formData, status: e.target.value})}
-                      className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white"
+                      className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white"
                     >
                       <option value="RASCUNHO" className="bg-gray-900">Rascunho</option>
                       <option value="PUBLICADO" className="bg-gray-900">Publicado</option>
@@ -589,7 +589,7 @@ export default function BlogAdminPage() {
                       type="date"
                       value={formData.dataPublicacao}
                       onChange={(e) => setFormData({...formData, dataPublicacao: e.target.value})}
-                      className="bg-white/10 border-white/20 text-white"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                     />
                   </div>
                 </div>
@@ -600,7 +600,7 @@ export default function BlogAdminPage() {
                     id="destaque"
                     checked={formData.destaque}
                     onChange={(e) => setFormData({...formData, destaque: e.target.checked})}
-                    className="rounded border-white/30"
+                    className="rounded border-[var(--border-strong)]"
                   />
                   <label htmlFor="destaque" className="text-sm text-white/70">
                     Marcar como destaque (aparece primeiro)
@@ -612,7 +612,7 @@ export default function BlogAdminPage() {
                     type="button"
                     variant="outline"
                     onClick={resetForm}
-                    className="flex-1 border-white/30 text-white/70 bg-transparent hover:bg-white/10"
+                    className="flex-1 border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]"
                   >
                     Cancelar
                   </Button>

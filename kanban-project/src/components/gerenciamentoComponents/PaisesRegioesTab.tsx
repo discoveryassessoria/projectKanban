@@ -34,7 +34,7 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
@@ -145,7 +145,7 @@ export default function PaisesRegioesTab() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Países e Regiões</h2>
@@ -160,9 +160,9 @@ export default function PaisesRegioesTab() {
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-white/10 text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
             <tr>
               <th className="px-4 py-3 font-medium">País</th>
               <th className="px-4 py-3 font-medium">Nacionalidade</th>
@@ -178,10 +178,10 @@ export default function PaisesRegioesTab() {
             {rows.length === 0 ? (
               <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-white/40">Nenhum país cadastrado. Comece em “+ Novo país”.</td></tr>
             ) : rows.map(p => (
-              <tr key={p.countryKey} className="border-b border-white/5 last:border-0">
+              <tr key={p.countryKey} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 text-white">{p.flag ? `${p.flag} ` : ""}{p.countryLabel}</td>
                 <td className="px-4 py-2.5 text-white/70">{p.nationalityLabel}</td>
-                <td className="px-4 py-2.5"><code className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{p.countryKey}</code></td>
+                <td className="px-4 py-2.5"><code className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">{p.countryKey}</code></td>
                 <td className="px-4 py-2.5 text-white/70">{p.codePrefix || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{p.defaultCurrency || "—"}</td>
                 <td className="px-4 py-2.5 text-white/60">{p.tiposCount ?? 0}</td>
@@ -189,7 +189,7 @@ export default function PaisesRegioesTab() {
                   <button
                     onClick={() => toggleAtivo(p)}
                     title={(p.ativo ?? true) ? "Inativar (some dos seletores, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${(p.ativo ?? true) ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${(p.ativo ?? true) ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}
                   >
                     {(p.ativo ?? true) ? "Ativo" : "Inativo"}
                   </button>
@@ -203,7 +203,7 @@ export default function PaisesRegioesTab() {
                         flag: p.flag || "", codePrefix: p.codePrefix || "", defaultCurrency: p.defaultCurrency || "EUR",
                         judicial: false, administrativa: false,
                       })}
-                      className="rounded p-1 hover:bg-white/10 hover:text-white"
+                      className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"
                     ><IEdit /></button>
                     <button
                       title={(p.tiposCount ?? 0) > 0 ? `Em uso por ${p.tiposCount} tipo(s) — inative em vez de excluir` : "Excluir"}
@@ -222,8 +222,8 @@ export default function PaisesRegioesTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4">
+          <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">{form.editando ? "Editar país" : "Novo país"}</h3>
             </div>
             <div className="space-y-3 px-6 py-4">
@@ -254,7 +254,7 @@ export default function PaisesRegioesTab() {
                 </div>
               </div>
               {!form.editando && (
-                <div className="border-t border-white/10 pt-3">
+                <div className="border-t border-[var(--border-default)] pt-3">
                   <div className={labelCls}>Modalidades iniciais</div>
                   <label className="flex items-center gap-2 py-0.5 text-sm text-white/70">
                     <input type="checkbox" checked={form.judicial} onChange={e => setForm(f => f && { ...f, judicial: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
@@ -268,8 +268,8 @@ export default function PaisesRegioesTab() {
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>

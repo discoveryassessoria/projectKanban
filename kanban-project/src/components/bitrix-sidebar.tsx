@@ -151,7 +151,7 @@ export function BitrixSidebar() {
       className={`
         ${isExpanded ? "w-64" : "w-16"} 
         bg-black/40 backdrop-blur-md text-white 
-        border-r border-white/10 shadow-xl
+        border-r border-[var(--border-default)] shadow-xl
         transition-[width] duration-300 ease-in-out
         flex flex-col h-screen fixed left-0 top-0 z-50
         overflow-hidden
@@ -168,7 +168,7 @@ export function BitrixSidebar() {
             setIsCollapsed(!isCollapsed)
             setIsHovered(false)
           }}
-          className="hover:bg-white/10 rounded-lg p-2 transition-colors flex items-center justify-center flex-shrink-0"
+          className="hover:bg-[var(--surface-hover)] rounded-lg p-2 transition-colors flex items-center justify-center flex-shrink-0"
           aria-label="Toggle sidebar"
         >
           <Menu className="h-6 w-6 text-white" />
@@ -183,7 +183,7 @@ export function BitrixSidebar() {
 
       {/* Linha divisória */}
       <div className="px-4">
-        <div className="border-b border-white/20" />
+        <div className="border-b border-[var(--border-strong)]" />
       </div>
 
       {/* Menu de Navegação */}
@@ -205,8 +205,8 @@ export function BitrixSidebar() {
                   href={item.url}
                   className={`
                     flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
-                    hover:bg-white/10 relative
-                    ${isActive ? "bg-white/15 text-white" : "text-white/90"}
+                    hover:bg-[var(--surface-hover)] relative
+                    ${isActive ? "bg-[var(--surface-secondary)] text-white" : "text-white/90"}
                     ${!isExpanded ? "justify-center" : ""}
                   `}
                   title={!isExpanded ? item.title : undefined}
@@ -242,8 +242,8 @@ export function BitrixSidebar() {
                     href={item.url}
                     className={`
                       flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
-                      hover:bg-white/10
-                      ${isActive ? "bg-white/15 text-white" : "text-white/90"}
+                      hover:bg-[var(--surface-hover)]
+                      ${isActive ? "bg-[var(--surface-secondary)] text-white" : "text-white/90"}
                       ${!isExpanded ? "justify-center" : ""}
                     `}
                     title={!isExpanded ? item.title : undefined}

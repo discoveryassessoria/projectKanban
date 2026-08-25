@@ -49,19 +49,19 @@ export const LABEL_RESULTADO: Record<ResultadoContato, string> = {
 }
 
 const PILL_RESULTADO: Record<ResultadoContato, string> = {
-  SEM_RESPOSTA: "bg-[#20262e] text-white/70 border-white/15",
+  SEM_RESPOSTA: "bg-[#20262e] text-white/70 border-[var(--border-default)]",
   EM_ANALISE: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30",
   PRAZO_INFORMADO: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/30",
   EXIGENCIA: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/30",
   PRONTO_PARA_RETIRADA: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30",
   RETORNO_RECEBIDO: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30",
-  OUTRO: "bg-[#20262e] text-white/70 border-white/15",
+  OUTRO: "bg-[#20262e] text-white/70 border-[var(--border-default)]",
 }
 
 // Mesmos tokens visuais dos editores existentes — o painel entra no modal aprovado
 // sem alterar largura, altura, densidade ou paleta.
 export const campoCls =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
 
 export function Rotulo({ children }: { children: React.ReactNode }) {
   return (
@@ -309,13 +309,13 @@ export function BlocoContatos({
       </div>
 
       {emOrdem.length === 0 ? (
-        <div className="px-3 py-4 rounded-md bg-[var(--surface-overlay)] border border-dashed border-white/15 text-center">
+        <div className="px-3 py-4 rounded-md bg-[var(--surface-overlay)] border border-dashed border-[var(--border-default)] text-center">
           <div className="text-[11.5px] text-white/55 italic">Nenhum contato registrado ainda.</div>
         </div>
       ) : (
         <div className="space-y-2">
           {emOrdem.map((c) => (
-            <div key={c.chave} className="rounded-md border border-white/10 bg-[var(--surface-overlay)] p-2.5">
+            <div key={c.chave} className="rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] p-2.5">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded border bg-[#7dd3fc]/15 text-[#7dd3fc] border-[#7dd3fc]/25">
                   {LABEL_CANAL[c.canal]}
@@ -356,7 +356,7 @@ export function BlocoContatos({
       )}
 
       {podeRegistrar && aberto && (
-        <div className="mt-2.5 rounded-lg border border-white/10 bg-[var(--surface-overlay)] p-3.5">
+        <div className="mt-2.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3.5">
           <div className="grid grid-cols-2 gap-3 mb-2.5">
             <div>
               <Rotulo>Quando</Rotulo>

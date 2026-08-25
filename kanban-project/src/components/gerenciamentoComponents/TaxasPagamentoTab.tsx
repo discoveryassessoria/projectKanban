@@ -70,7 +70,7 @@ export default function TaxasPagamentoTab() {
 
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar forma…" className="w-full rounded-lg border border-white/10 bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar forma…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
       </div>
 
       {loading ? (
@@ -87,12 +87,12 @@ export default function TaxasPagamentoTab() {
           {filtrados.map((x) => {
             const Ic = iconForma(x.type)
             return (
-              <div key={x.formaPagamentoId} className={`${GLASS} flex items-center gap-4 p-4 transition hover:border-white/20`}>
+              <div key={x.formaPagamentoId} className={`${GLASS} flex items-center gap-4 p-4 transition hover:border-[var(--border-strong)]`}>
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${OURO}18`, color: OURO }}><Ic className="h-5 w-5" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-medium text-white">{x.nome}</span>
-                    {!x.status && <span className="shrink-0 rounded-md border border-white/15 px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
+                    {!x.status && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
                     {x.adquirentesNomes.length > 0 && <span>Adquirente: {x.adquirentesNomes.join(', ')}</span>}
@@ -230,12 +230,12 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
     finally { setSalvando(false) }
   }
 
-  const nInput = 'w-16 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-center text-[13px] text-white outline-none focus:border-white/30 placeholder:text-white/20'
+  const nInput = 'w-16 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1 text-center text-[13px] text-white outline-none focus:border-white/30 placeholder:text-white/20'
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-zinc-900/95 px-6 py-4">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="text-white/50 hover:text-white"><ArrowLeft className="h-4 w-4" /></button>
             <h3 className="text-base font-semibold">Configurar taxas · {det?.forma.name ?? '…'}</h3>
@@ -273,17 +273,17 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
               {/* adquirente */}
               <div className="flex flex-wrap items-center gap-3">
                 <label className="text-xs text-white/60">Adquirente</label>
-                <select value={adqSel ?? ''} onChange={(e) => setAdqSel(Number(e.target.value) || null)} className="rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-sm text-white outline-none focus:border-white/25">
+                <select value={adqSel ?? ''} onChange={(e) => setAdqSel(Number(e.target.value) || null)} className="rounded-lg border border-[var(--border-default)] bg-black/30 px-3 py-1.5 text-sm text-white outline-none focus:border-white/25">
                   {det.adquirentes.map((a) => <option key={a.id} value={a.id} className="bg-zinc-900">{a.nome}</option>)}
                 </select>
                 <span className="text-[11px] text-white/40">A estrutura aceita múltiplas adquirentes; a grade abaixo é da selecionada.</span>
               </div>
 
               {/* grade bandeiras × parcelas (crédito) OU × taxa única (débito) */}
-              <div className="overflow-x-auto rounded-lg border border-white/10">
+              <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
                 <table className="w-full text-[13px]">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/[0.03] text-[11px] uppercase tracking-wide text-white/40">
+                    <tr className="border-b border-[var(--border-default)] bg-white/[0.03] text-[11px] uppercase tracking-wide text-white/40">
                       <th className="px-3 py-2 text-left font-medium">Bandeira</th>
                       {det.perfil.mostraGrade
                         ? PARCELAS.map((p) => <th key={p} className="px-1 py-2 text-center font-medium">{p}x</th>)
@@ -292,7 +292,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
                   </thead>
                   <tbody>
                     {det.bandeiras.map((band) => (
-                      <tr key={band.id} className="border-b border-white/5 last:border-0">
+                      <tr key={band.id} className="border-b border-[var(--border-subtle)] last:border-0">
                         <td className="whitespace-nowrap px-3 py-1.5 font-medium text-white/80">{band.nome}</td>
                         {det.perfil.mostraGrade
                           ? PARCELAS.map((p) => (
@@ -318,8 +318,8 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
           )}
         </div>
 
-        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-white/10 bg-zinc-900/95 px-6 py-3">
-          <button onClick={onClose} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+        <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-3">
+          <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
           <button onClick={salvar} disabled={salvando || !det} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>
             {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar configuração'}
           </button>

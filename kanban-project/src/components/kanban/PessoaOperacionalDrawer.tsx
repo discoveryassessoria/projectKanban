@@ -59,7 +59,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_PILL_CLS: Record<string, string> = {
-  PENDENTE: "bg-white/25/20 text-white/40",
+  PENDENTE: "bg-[var(--surface-secondary)]/20 text-white/40",
   SOLICITAR: "bg-[#a78bfa]/20 text-violet-300",
   SOLICITADO: "bg-[#a78bfa]/20 text-violet-300",
   EM_BUSCA: "bg-[#d2a948]/20 text-amber-300",
@@ -300,7 +300,7 @@ function ConteudoDrawer({
           <>
             {/* ============== HEADER ============== */}
             <div
-              className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-white/10"
+              className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-[var(--border-default)]"
               style={{ background: "linear-gradient(180deg,#181d24 0%,#11151b 100%)" }}
             >
               <div className="flex items-center justify-between mb-3">
@@ -393,7 +393,7 @@ function ConteudoDrawer({
 
             {/* ============== TABS ============== */}
             <div
-              className="flex-shrink-0 flex overflow-x-auto px-6 border-b border-white/10"
+              className="flex-shrink-0 flex overflow-x-auto px-6 border-b border-[var(--border-default)]"
               style={{ background: "#11151b" }}
             >
               {tabs.map((t) => (
@@ -487,7 +487,7 @@ function StatCard({
       : "text-white"
 
   return (
-    <div className="bg-[var(--surface-popover)]/5 border border-white/10 rounded-lg px-3 py-2.5">
+    <div className="bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded-lg px-3 py-2.5">
       <div className={`text-[22px] font-bold leading-none mb-1 tabular-nums ${valueCls}`}>
         {value}
       </div>
@@ -569,7 +569,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left p-3.5 rounded-lg bg-[var(--surface-popover)]/5 border border-white/10 hover:bg-[var(--surface-popover)]/[0.08] hover:border-white/20 transition-colors"
+      className="group w-full text-left p-3.5 rounded-lg bg-[var(--surface-popover)]/5 border border-[var(--border-default)] hover:bg-[var(--surface-popover)]/[0.08] hover:border-[var(--border-strong)] transition-colors"
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex-1 min-w-0">

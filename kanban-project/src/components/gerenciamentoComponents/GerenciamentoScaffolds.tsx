@@ -13,13 +13,13 @@ import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 /* ----------------------------- helpers de UI ----------------------------- */
 
-const CARD = 'rounded-xl border border-white/10 bg-white/5 backdrop-blur'
+const CARD = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur'
 const BTN_PRIMARY =
   'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500'
 const BTN_GHOST =
-  'rounded-lg border border-white/10 px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white'
+  'rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white'
 const INPUT =
-  'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-white outline-none focus:border-white/20'
+  'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-white outline-none focus:border-white/20'
 
 function Section({
   title,
@@ -46,11 +46,11 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
     <div className={`overflow-hidden ${CARD}`}>
       <table className="w-full text-[12.5px]">
         <thead>
-          <tr className="bg-white/5">
+          <tr className="bg-[var(--surface-primary)]">
             {headers.map((h, i) => (
               <th
                 key={i}
-                className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
                   i === headers.length - 1 ? 'text-right' : 'text-left'
                 }`}
               >
@@ -63,7 +63,7 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
           <tr>
             <td colSpan={headers.length} className="px-4 py-10">
               <div className="mx-auto flex max-w-sm flex-col items-center text-center">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05]">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-default)] bg-white/[0.05]">
                   <Inbox className="h-5 w-5 text-white/45" />
                 </div>
                 <div className="text-sm font-semibold text-white/85">Nenhum item cadastrado</div>
@@ -285,7 +285,7 @@ export function SettingsTab() {
           <label className="mb-1 block text-[11px] text-white/60">Fuso</label>
           <input className={INPUT} value={cfg.tz} onChange={(e) => set('tz', e.target.value)} />
         </div>
-        <div className="border-t border-white/10 pt-3 sm:col-span-2">
+        <div className="border-t border-[var(--border-default)] pt-3 sm:col-span-2">
           {TOGGLES.map(([k, label]) => (
             <label key={k} className="flex cursor-pointer items-center gap-2 py-1.5 text-[12.5px] text-white/80">
               <input type="checkbox" checked={!!cfg[k]} onChange={(e) => set(k, e.target.checked)} className="h-3.5 w-3.5 accent-blue-500" />

@@ -83,7 +83,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
     const excluido = sucesso === "excluido"
     return (
       <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => onDone()}>
-        <div className="max-w-md w-full rounded-2xl bg-[var(--surface-overlay)] border border-white/10 shadow-xl text-white/90 p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="max-w-md w-full rounded-2xl bg-[var(--surface-overlay)] border border-[var(--border-default)] shadow-xl text-white/90 p-5" onClick={(e) => e.stopPropagation()}>
           <div className={`text-[15px] font-extrabold ${excluido ? "text-red-300" : "text-amber-300"}`}>
             {excluido ? `${entidadeLabel} excluído definitivamente` : `${entidadeLabel} inativado`}
           </div>
@@ -93,7 +93,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
               : "O histórico foi preservado integralmente. O registro continua existindo, apenas inativo."}
           </p>
           <div className="flex justify-end mt-4">
-            <button onClick={() => onDone()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-white/10 hover:bg-white/20">Fechar</button>
+            <button onClick={() => onDone()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)]">Fechar</button>
           </div>
         </div>
       </div>
@@ -102,8 +102,8 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !executando && onClose()}>
-      <div className="max-w-lg w-full rounded-2xl bg-[var(--surface-overlay)] border border-white/10 shadow-xl text-white/90" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 pt-4 pb-3 border-b border-white/10">
+      <div className="max-w-lg w-full rounded-2xl bg-[var(--surface-overlay)] border border-[var(--border-default)] shadow-xl text-white/90" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 pt-4 pb-3 border-b border-[var(--border-default)]">
           <h3 className="text-[15px] font-extrabold">{titulo}</h3>
           <p className="text-[12px] text-white/50 mt-0.5">
             Configuração some junto; fato histórico nunca é apagado. Exclusão definitiva é restrita a administradores.
@@ -116,7 +116,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
             <>
               {/* CONFIGURAÇÃO — o que cai em cascata. Com histórico NADA cai: o rótulo não pode
                   prometer exclusão que não vai acontecer. */}
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <div className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
                 <div className="text-[11px] uppercase font-bold tracking-wide text-white/40 mb-1.5">
                   {analise.deletionAllowed ? "Serão excluídos" : "Seriam excluídos, se não houvesse histórico"}
                 </div>
@@ -134,7 +134,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
 
               {/* COMPARTILHADO — preservado, só perde o vínculo */}
               {desvinculadas.length > 0 && (
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <div className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
                   <div className="text-[11px] uppercase font-bold tracking-wide text-white/40 mb-1.5">Serão apenas desvinculados (preservados)</div>
                   <ul className="text-[12.5px] space-y-0.5">
                     {desvinculadas.map((d) => (
@@ -148,7 +148,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
               )}
 
               {/* FATOS HISTÓRICOS — a única coisa que bloqueia */}
-              <div className={`rounded-lg border p-3 ${fatos.length ? "border-red-500/30 bg-red-500/10" : "border-white/10 bg-white/[0.03]"}`}>
+              <div className={`rounded-lg border p-3 ${fatos.length ? "border-red-500/30 bg-red-500/10" : "border-[var(--border-default)] bg-white/[0.03]"}`}>
                 <div className={`text-[11px] uppercase font-bold tracking-wide mb-1.5 ${fatos.length ? "text-red-300" : "text-white/40"}`}>Fatos históricos</div>
                 {fatos.length === 0 ? (
                   <div className="text-[12.5px] text-white/50">Nenhum.</div>
@@ -171,8 +171,8 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
                 <div className="rounded-lg border border-red-500/30 bg-red-500/[0.06] p-3 space-y-2">
                   <div className="text-[12.5px] text-white/70">Esta ação é <b>irreversível</b>. Para confirmar, digite exatamente:</div>
                   <div className="text-[12.5px] font-mono font-bold text-red-300">{analise.fraseConfirmacao}</div>
-                  <input value={frase} onChange={(e) => setFrase(e.target.value)} placeholder={analise.fraseConfirmacao} className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-red-400/40" />
-                  <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo (auditoria) — opcional" className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/20" />
+                  <input value={frase} onChange={(e) => setFrase(e.target.value)} placeholder={analise.fraseConfirmacao} className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm outline-none focus:border-red-400/40" />
+                  <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo (auditoria) — opcional" className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm outline-none focus:border-white/20" />
                 </div>
               )}
               {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-200">{erro}</div>}
@@ -181,14 +181,14 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
           {!analise && erro && !carregando && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12.5px] text-red-200">{erro}</div>}
         </div>
 
-        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-white/10">
-          <button disabled={executando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-50">Cancelar</button>
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-[var(--border-default)]">
+          <button disabled={executando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50">Cancelar</button>
           <div className="flex items-center gap-2">
             {onInativar && analise?.deactivationRequired && (
               <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-amber-500/90 text-black hover:bg-amber-400 disabled:opacity-50">Inativar e preservar histórico</button>
             )}
             {onInativar && analise?.deletionAllowed && (
-              <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50">Só inativar</button>
+              <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50">Só inativar</button>
             )}
             {analise?.deletionAllowed && (
               <button disabled={executando || !fraseOk} onClick={() => void excluirDefinitivo()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-red-600 text-[#fff] hover:bg-red-500 disabled:opacity-40">Excluir definitivamente</button>

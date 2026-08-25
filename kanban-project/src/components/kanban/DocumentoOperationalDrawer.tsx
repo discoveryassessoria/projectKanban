@@ -62,7 +62,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 // Mapeamento de cor da pílula por status (mockup): Solicitado = amber,
 // Recebido/Entregue = verde, Inválido/Não encontrado = vermelho, restante neutro.
-const STATUS_NEUTRAL_PILL = "bg-white/10 text-white/50"
+const STATUS_NEUTRAL_PILL = "bg-[var(--surface-primary)] text-white/50"
 const STATUS_PILL_CLS: Record<string, string> = {
   SOLICITADO: "bg-[#d2a948]/15 text-[#d2a948]",
   SOLICITAR: "bg-[#d2a948]/15 text-[#d2a948]",
@@ -532,7 +532,7 @@ function ConteudoDrawer({
           <>
             {/* HEADER */}
             <div
-              className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-white/10"
+              className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-[var(--border-default)]"
               style={{ background: "linear-gradient(180deg,#181d24 0%,#11151b 100%)" }}
             >
               {/* Breadcrumb + fechar */}
@@ -561,7 +561,7 @@ function ConteudoDrawer({
 
               {/* Identidade do documento: tile de ícone + título + pessoa */}
               <div className="flex items-center gap-3.5 mb-4">
-                <div className="w-11 h-11 rounded-lg bg-[#20262e] border border-white/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-11 h-11 rounded-lg bg-[#20262e] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
                   <FileText className="w-5 h-5 text-white/60" />
                 </div>
                 <div className="min-w-0">
@@ -582,7 +582,7 @@ function ConteudoDrawer({
               )}
 
               {/* STATUS BAR — card sólido único, 4 colunas */}
-              <div className="bg-[var(--surface-overlay)] border border-white/10 rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
+              <div className="bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
                 {/* STATUS */}
                 <div className="flex flex-col gap-1.5 min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
@@ -623,7 +623,7 @@ function ConteudoDrawer({
                         setDelegandoResp(false)
                       }}
                       onBlur={() => setDelegandoResp(false)}
-                      className="self-start rounded-md border border-white/10 bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
+                      className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
                     >
                       <option value="" className="bg-[#20262e]">— selecione —</option>
                       {usuarios.map((u) => (
@@ -695,7 +695,7 @@ function ConteudoDrawer({
                     <strong className="font-semibold">Bloqueado:</strong> {doc.motivoBloqueio}
                   </div>
                 ) : (
-                  <div className="mt-3 p-2.5 rounded-md border border-white/10 bg-white/[0.03] text-[11.5px] text-white/45">
+                  <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-white/[0.03] text-[11.5px] text-white/45">
                     <strong className="font-semibold text-white/60">Registro anterior:</strong> {doc.motivoBloqueio}
                     <span className="block text-[10.5px] text-white/30 mt-0.5">
                       Refere-se a uma operação encerrada — não impede o trabalho atual.
@@ -714,7 +714,7 @@ function ConteudoDrawer({
 
             {/* TABS */}
             <div
-              className="flex-shrink-0 flex flex-wrap px-6 border-b border-white/10"
+              className="flex-shrink-0 flex flex-wrap px-6 border-b border-[var(--border-default)]"
               style={{ background: "#11151b" }}
             >
               {tabs.map((t) => (
@@ -747,7 +747,7 @@ function ConteudoDrawer({
                   o corpo do painel, porque é o que há para fazer — e some
                   sozinho assim que a operação passa a existir. */}
               {opState === "NOT_MATERIALIZED" && (
-                <div className="mb-4 bg-[var(--surface-overlay)] border border-white/10 rounded-xl p-6 text-center">
+                <div className="mb-4 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl p-6 text-center">
                   <h4 className="text-sm font-bold text-white mb-1">
                     {projection?.permissions.canStart ? "Operação não iniciada" : "Sem operação nesta fase"}
                   </h4>
@@ -911,7 +911,7 @@ function TabHistory({ doc }: { doc: Documento }) {
       <Section title="Timeline do documento">
         <div className="space-y-2.5">
           {eventos.map((e, i) => (
-            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[var(--surface-overlay)] border border-white/5">
+            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[var(--surface-overlay)] border border-[var(--border-subtle)]">
               <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white">{e.label}</div>

@@ -136,7 +136,7 @@ export function WorkflowMacroTrilha({
   })()
 
   return (
-    <div className="bg-[var(--surface-popover)] border border-white/10 rounded-2xl px-5 py-4">
+    <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-2xl px-5 py-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-3.5">
         <div>
@@ -146,7 +146,7 @@ export function WorkflowMacroTrilha({
           </h3>
           <div className="text-xs text-white/55 mt-0.5">Visão geral do caminho do processo entre fases.</div>
         </div>
-        <div className="text-xs text-white/55 bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 whitespace-nowrap">
+        <div className="text-xs text-white/55 bg-[#20262e] border border-[var(--border-default)] rounded-lg px-3 py-2 whitespace-nowrap">
           Decisão da Análise Documental:
           <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ml-1.5 ${decLabel.cls}`}>{decLabel.txt}</span>
         </div>
@@ -161,11 +161,11 @@ export function WorkflowMacroTrilha({
 
           const dotCls =
             st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40"
-            : st === "atual" ? "bg-[#252c35] text-white/95 border border-white/10"
+            : st === "atual" ? "bg-[#252c35] text-white/95 border border-[var(--border-default)]"
             : st === "pulada" ? "bg-[#252c35] text-white/40"
             : st === "condicional" ? "bg-[#a78bfa]/15 text-[#a78bfa]"
             : st === "bloqueada" ? "bg-[#d2a948]/15 text-[#d2a948]"
-            : "border-2 border-white/10 bg-[var(--surface-popover)] text-white/40"
+            : "border-2 border-[var(--border-default)] bg-[var(--surface-popover)] text-white/40"
 
           const badgeCls =
             st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80]"
@@ -256,10 +256,10 @@ export function WorkflowMacroTrilha({
       </div>
 
       {/* Legenda */}
-      <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-white/10 text-[11px] text-white/55">
+      <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-[var(--border-default)] text-[11px] text-white/55">
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#7dd3fc]" />Atual (fase real)</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-white/10 bg-[var(--surface-popover)]" />Futura</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-popover)]" />Futura</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#a78bfa]/15 text-[#a78bfa] grid place-items-center text-[8px]">?</span>Condicional</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#252c35] text-white/40 grid place-items-center text-[8px]">⤳</span>Pulada</span>
       </div>
@@ -303,14 +303,14 @@ export function ResumoDoProcesso({
   ).length
 
   return (
-    <div className="bg-[var(--surface-popover)] border border-white/10 rounded-2xl p-4 h-full flex flex-col">
+    <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-2xl p-4 h-full flex flex-col">
       <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo do processo</h3>
       <StatRow label="Caminho ativo" value={`${path.length} fases`} />
       <StatRow label="Fases concluídas" value={String(concluidas)} />
       <StatRow label="Fase atual" value={currentPhase} />
       <StatRow label="Fases futuras" value={String(futuras)} />
       <StatRow label="Fases puladas" value={String(puladas)} />
-      <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-white/10">
+      <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-[var(--border-default)]">
         <span className="text-white/55">Progresso geral</span>
         <b className="text-[#7dd3fc] text-[15px]">{overall}%</b>
       </div>
@@ -356,21 +356,21 @@ export function MacroSidebar({
   return (
     <div className="w-[290px] flex-shrink-0 space-y-3.5">
       {/* Resumo do processo */}
-      <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-4">
+      <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-4">
         <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo do processo</h3>
         <StatRow label="Caminho ativo" value={`${path.length} fases`} />
         <StatRow label="Fases concluídas" value={String(concluidas)} />
         <StatRow label="Fase atual" value={currentPhase} />
         <StatRow label="Fases futuras" value={String(futuras)} />
         <StatRow label="Fases puladas" value={String(puladas)} />
-        <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-1 border-t-2 border-white/10">
+        <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-1 border-t-2 border-[var(--border-default)]">
           <span className="text-white/55">Progresso geral</span>
           <b className="text-[#7dd3fc] text-[15px]">{overall}%</b>
         </div>
       </div>
 
       {/* Resumo por fase */}
-      <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-4">
+      <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-4">
         <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo por fase</h3>
         <div className="flex flex-col gap-0.5">
           {PROCESS_PHASES.map((title, i) => {
@@ -380,7 +380,7 @@ export function MacroSidebar({
               st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40"
               : st === "atual" ? "bg-[#7dd3fc]"
               : st === "pulada" ? "bg-[#252c35] text-white/40"
-              : "border-[1.5px] border-white/10 bg-[var(--surface-popover)]"
+              : "border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)]"
             const pctCls =
               st === "concluida" ? "text-[#4ade80]"
               : st === "atual" ? "text-[#7dd3fc]"
@@ -416,7 +416,7 @@ export function MacroSidebar({
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-center text-[12.5px] py-1.5 border-b border-white/10">
+    <div className="flex justify-between items-center text-[12.5px] py-1.5 border-b border-[var(--border-default)]">
       <span className="text-white/55">{label}</span>
       <b className="text-white/95">{value}</b>
     </div>

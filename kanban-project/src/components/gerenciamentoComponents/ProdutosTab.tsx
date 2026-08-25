@@ -131,7 +131,7 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 
 function Secao({ titulo, children, primeira }: { titulo: string; children: React.ReactNode; primeira?: boolean }) {
   return (
-    <div className={primeira ? '' : 'border-t border-white/10 pt-4'}>
+    <div className={primeira ? '' : 'border-t border-[var(--border-default)] pt-4'}>
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">{titulo}</div>
       <div className="space-y-3">{children}</div>
     </div>
@@ -301,7 +301,7 @@ export default function ProdutosTab() {
     }
   }
 
-  const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
+  const inputCls = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
 
   return (
     <div className="space-y-5">
@@ -320,7 +320,7 @@ export default function ProdutosTab() {
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           placeholder="Buscar (código CFG-n, cadastro mestre, chave ou origem)..."
-          className="min-w-[220px] flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
+          className="min-w-[220px] flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
         />
         <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-white/60 select-none">
           <input
@@ -343,38 +343,38 @@ export default function ProdutosTab() {
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
           {busca ? 'Nenhuma configuração encontrada.' : 'Nenhuma configuração ainda. Crie a primeira.'}
         </div>
       )}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
+        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
-              <tr className="bg-white/5">
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Origem</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-white/10 px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+              <tr className="bg-[var(--surface-primary)]">
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Origem</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((p) => (
-                <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                <tr key={p.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5">
                     {/* Só o nome legível. Código (SRV-n) e chave estrutural são do
                         cadastro de ORIGEM — vivem no Catálogo de Serviços. */}
                     <div className="font-medium text-white">{nomeExibidoDoMestre(mestreDaConfiguracao(p))}</div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-500/15 text-sky-300' : p.mestre?.origem === 'documento' ? 'bg-indigo-500/15 text-indigo-300' : 'bg-white/10 text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-500/15 text-sky-300' : p.mestre?.origem === 'documento' ? 'bg-indigo-500/15 text-indigo-300' : 'bg-[var(--surface-primary)] text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-white/80">{lbl(NATUREZA_FIN, natFinDe(p.possuiCusto, p.possuiReceita))}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>
+                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
                         {p.ativo ? 'Ativo' : 'Inativo'}
                       </span>
                       {p.cobravelDoCliente && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-300">Cobrável</span>}
@@ -384,7 +384,7 @@ export default function ProdutosTab() {
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => abrirEditar(p)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
+                      <button onClick={() => abrirEditar(p)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
                       <button onClick={() => excluir(p)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
                     </div>
                   </td>
@@ -397,8 +397,8 @@ export default function ProdutosTab() {
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar Configuração Financeira' : 'Nova Configuração Financeira'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
@@ -415,7 +415,7 @@ export default function ProdutosTab() {
                 <div>
                   <label className="mb-1 block text-xs text-white/60">{lbl(ORIGENS, form.origem)} (mestre existente)</label>
                   {masterSelecionado ? (
-                    <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
+                    <div className="flex items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm">
                       <span className="text-white">{nomeExibidoDoMestre(masterSelecionado)}</span>
                       {!editando && <button onClick={() => setForm((f) => ({ ...f, masterId: '', codigo: '', nome: '' }))} className="text-xs text-white/50 hover:text-white">trocar</button>}
                     </div>
@@ -423,10 +423,10 @@ export default function ProdutosTab() {
                     <>
                       <input value={masterBusca} onChange={(e) => setMasterBusca(e.target.value)} autoFocus placeholder={`Buscar ${lbl(ORIGENS, form.origem).toLowerCase()} pelo nome/código...`} className={inputCls} />
                       {masterBusca && (
-                        <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-white/10 bg-zinc-900">
+                        <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-zinc-900">
                           {masterFiltrado.length === 0 && <div className="px-3 py-2 text-xs text-white/40">Nenhum cadastro encontrado.</div>}
                           {masterFiltrado.map((m) => (
-                            <button key={m.sourceId} onClick={() => selecionarMaster(m)} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">
+                            <button key={m.sourceId} onClick={() => selecionarMaster(m)} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-[var(--surface-hover)]">
                               {nomeExibidoDoMestre(m)}
                             </button>
                           ))}
@@ -505,7 +505,7 @@ export default function ProdutosTab() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}

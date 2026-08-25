@@ -131,7 +131,7 @@ export default function CapacidadeOperacionalTab() {
   if (!dados) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/25 border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-transparent" />
       </div>
     )
   }
@@ -158,7 +158,7 @@ export default function CapacidadeOperacionalTab() {
         </span>
         <a
           href="/administrator?screen=teams"
-          className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white/95"
+          className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white/95"
         >
           Abrir Equipes
         </a>
@@ -168,7 +168,7 @@ export default function CapacidadeOperacionalTab() {
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         placeholder="Buscar pessoa ou equipe…"
-        className="w-72 rounded border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+        className="w-72 rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
       />
 
       <div className="overflow-hidden rounded border border-white/[0.08]">
@@ -223,7 +223,7 @@ export default function CapacidadeOperacionalTab() {
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => setAberta(l.usuarioId)}
-                    className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
                   >
                     Configurar
                   </button>
@@ -268,7 +268,7 @@ function PainelConfiguracao({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-white/10 bg-[var(--surface-overlay)] shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
@@ -328,7 +328,7 @@ function PainelConfiguracao({
             <button
               disabled={ocupado || unidades.length === 0}
               onClick={() => aoSalvar({ acao: "aptidoes", usuarioId: linha.usuarioId, perfilOperacionalIds: [...marcadas] })}
-              className="mt-2 rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+              className="mt-2 rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
             >
               Salvar aptidões
             </button>
@@ -348,13 +348,13 @@ function PainelConfiguracao({
                 value={limite}
                 onChange={(e) => setLimite(e.target.value)}
                 placeholder="sem teto"
-                className="w-28 rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:outline-none"
+                className="w-28 rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:outline-none"
               />
               <span className="text-[11px] text-white/40">executáveis · hoje carrega {linha.carga.executaveis}</span>
               <button
                 disabled={ocupado}
                 onClick={() => aoSalvar({ acao: "capacidade", usuarioId: linha.usuarioId, limiteExecutaveis: limite === "" ? null : Number(limite) })}
-                className="ml-auto rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+                className="ml-auto rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Salvar
               </button>
@@ -388,7 +388,7 @@ function PainelConfiguracao({
                         <button
                           disabled={ocupado}
                           onClick={() => aoSalvar({ acao: "encerrar_indisponibilidade", usuarioId: linha.usuarioId, indisponibilidadeId: i.id })}
-                          className="ml-auto rounded border border-white/12 px-2 py-0.5 text-[10px] text-white/60 hover:text-white/90 disabled:opacity-40"
+                          className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-[10px] text-white/60 hover:text-white/90 disabled:opacity-40"
                         >
                           Encerrar agora
                         </button>
@@ -401,15 +401,15 @@ function PainelConfiguracao({
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <select value={tipo} onChange={(e) => setTipo(e.target.value)}
-                className="rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none">
+                className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none">
                 {tipos.map((t) => <option key={t} value={t}>{ROTULO_TIPO[t] ?? t}</option>)}
               </select>
               <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
-                className="rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
+                className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
               <input type="date" value={fim} onChange={(e) => setFim(e.target.value)} placeholder="fim"
-                className="rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
+                className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
               <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="motivo (opcional)"
-                className="min-w-[140px] flex-1 rounded border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 focus:outline-none" />
+                className="min-w-[140px] flex-1 rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 focus:outline-none" />
               <button
                 disabled={ocupado}
                 onClick={() => aoSalvar({
@@ -418,7 +418,7 @@ function PainelConfiguracao({
                   fim: fim ? new Date(`${fim}T12:00:00`).toISOString() : null,
                   motivo: motivo || null,
                 })}
-                className="rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+                className="rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Registrar
               </button>

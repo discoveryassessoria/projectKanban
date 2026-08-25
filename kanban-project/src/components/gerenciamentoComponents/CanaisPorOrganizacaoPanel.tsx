@@ -36,7 +36,7 @@ interface Organizacao {
   canais: Array<{ canal: { key: string; label: string } }>
 }
 
-const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
 
 function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
@@ -131,12 +131,12 @@ export default function CanaisPorOrganizacaoPanel() {
 
       <div className="space-y-1.5">
         {(organizacoes ?? []).map((o) => (
-          <div key={o.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+          <div key={o.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
             <div className="min-w-0">
               <div className="truncate text-sm text-white">{o.nomeFantasia || o.name}</div>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                {o.type && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{o.type}</span>}
-                {o.city && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{o.city}</span>}
+                {o.type && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{o.type}</span>}
+                {o.city && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{o.city}</span>}
                 {o.canais.length === 0
                   ? <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
                   : o.canais.map((c) => (
@@ -145,7 +145,7 @@ export default function CanaisPorOrganizacaoPanel() {
               </div>
             </div>
             <button onClick={() => abrir(o)}
-              className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+              className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">
               Configurar canais
             </button>
           </div>
@@ -154,8 +154,8 @@ export default function CanaisPorOrganizacaoPanel() {
 
       {aberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setAberta(null)}>
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">Canais de {aberta.nomeFantasia || aberta.name}</h3>
               <p className="mt-0.5 text-xs text-white/50">
                 Marque por onde esta organização atende. As exigências abaixo SOMAM às do tipo de canal —
@@ -172,7 +172,7 @@ export default function CanaisPorOrganizacaoPanel() {
                   t.observacaoObrigatoria ? "observação" : null,
                 ].filter(Boolean)
                 return (
-                  <div key={t.key} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div key={t.key} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                     <label className="flex items-center gap-2 text-sm text-white/80">
                       <input type="checkbox" checked={temCanal(t.key)} onChange={(e) => alternar(t, e.target.checked)} />
                       {t.label} <code className="text-[11px] text-white/35">{t.key}</code>
@@ -206,8 +206,8 @@ export default function CanaisPorOrganizacaoPanel() {
                 )
               })}
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => setAberta(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => setAberta(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button onClick={salvar} disabled={salvando}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? "Salvando…" : "Salvar canais"}

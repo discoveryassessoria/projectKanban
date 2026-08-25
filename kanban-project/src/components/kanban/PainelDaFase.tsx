@@ -166,14 +166,14 @@ export function PainelDaFase({
   return (
     <div>
       {/* ============== CABEÇALHO DA FASE ============== */}
-      <div className="bg-[var(--surface-popover)] border border-white/10 border-b-0 rounded-t-2xl px-5 pt-4">
+      <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] border-b-0 rounded-t-2xl px-5 pt-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-[19px] font-extrabold text-white/95">{faseNome}</h2>
           </div>
           <button
             onClick={onAbrirPainelCompleto}
-            className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-white/20 hover:text-[#fff] transition-colors"
+            className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-[var(--border-strong)] hover:text-[#fff] transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir painel da fase
@@ -181,7 +181,7 @@ export function PainelDaFase({
         </div>
         <div className="text-[13px] text-white/55 mt-1.5">{faseSub}</div>
 
-        <div className="flex gap-1 overflow-x-auto mt-3.5 border-b border-white/10">
+        <div className="flex gap-1 overflow-x-auto mt-3.5 border-b border-[var(--border-default)]">
           {faseTabs.map((t) => (
             <button
               key={t}
@@ -199,7 +199,7 @@ export function PainelDaFase({
       </div>
 
       {/* ============== CORPO DA FASE ============== */}
-      <div className="bg-[var(--surface-popover)] border border-white/10 border-t-0 rounded-b-2xl px-5 py-5">
+      <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] border-t-0 rounded-b-2xl px-5 py-5">
 
         {modoReestruturacao ? (
           <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-xl px-5 py-4 mb-5">
@@ -230,8 +230,8 @@ export function PainelDaFase({
               const alvo = recorteDoKpi(k.label)
               const ativo = alvo != null && recorte.rapido === alvo
               const classe = `bg-[var(--surface-popover)] border rounded-[10px] px-4 py-3 text-left transition-colors ${
-                ativo ? "border-[#7dd3fc]/60 ring-1 ring-inset ring-[#7dd3fc]/25" : "border-white/10"
-              } ${alvo != null ? "hover:border-white/25 cursor-pointer" : ""}`
+                ativo ? "border-[#7dd3fc]/60 ring-1 ring-inset ring-[#7dd3fc]/25" : "border-[var(--border-default)]"
+              } ${alvo != null ? "hover:border-[var(--border-strong)] cursor-pointer" : ""}`
               const conteudo = (
                 <>
                   <b className={`text-[22px] font-extrabold block leading-none ${cor}`}>{k.value}</b>
@@ -255,7 +255,7 @@ export function PainelDaFase({
           </div>
 
           {/* --- PROGRESSO DA FASE (projeção operacional canônica) --- */}
-          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl px-5 py-4 mb-5">
+          <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-5 py-4 mb-5">
             <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
               <div>
                 {/* O QUE ESTE NÚMERO CONTA — dito no rótulo.
@@ -610,7 +610,7 @@ function IndiceView({
   const totalPessoas =
     indice.linhaPrincipal.length + indice.foraDaLinha.length + indice.pendenteClassificacao.length
 
-  const campo = "bg-[var(--surface-popover)] border border-white/10 rounded-lg text-[11.5px] text-white/80 px-2.5 py-1.5 focus:border-white/25 focus:outline-none"
+  const campo = "bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-lg text-[11.5px] text-white/80 px-2.5 py-1.5 focus:border-white/25 focus:outline-none"
 
   // ── A BARRA DE RECORTE ────────────────────────────────────────────────────
   //
@@ -708,7 +708,7 @@ function IndiceView({
     return (
       <div>
         {barraDeRecorte}
-      <div className="border border-white/10 rounded-xl px-5 py-8 text-center">
+      <div className="border border-[var(--border-default)] rounded-xl px-5 py-8 text-center">
         <div className="text-[13px] text-white/68">Nenhum documento neste recorte.</div>
         <div className="text-[11.5px] text-white/40 mt-1">
           A fase tem {indiceBruto.resumo.documentos} documento(s).
@@ -727,7 +727,7 @@ function IndiceView({
 
   if (totalPessoas === 0 && indice.semDono.length === 0) {
     return (
-      <div className="border border-white/10 rounded-xl px-5 py-8 text-center">
+      <div className="border border-[var(--border-default)] rounded-xl px-5 py-8 text-center">
         <div className="text-[13px] text-white/68">Esta fase não tem trabalho materializado.</div>
         <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
           Publique os passos da fase em Gerenciamento › Workflows das Fases. Enquanto
@@ -752,7 +752,7 @@ function IndiceView({
             {icone}
           </span>
           <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">{titulo}</b>
-          <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-white/10 rounded-full px-2.5 py-0.5">
+          <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
             {pessoas.length} pessoa(s)
           </span>
         </div>
@@ -781,7 +781,7 @@ function IndiceView({
         <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">Documentos por pessoa</b>
         {/* O TOPO FALA DA FASE; ISTO FALA DO RECORTE. Dois números com o mesmo
             nome e escopos diferentes seria a confusão que esta tela evita. */}
-        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-white/10 rounded-full px-2.5 py-0.5">
+        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
           {recortando
             ? `${visiveis} de ${indiceBruto.resumo.documentos} documento(s)`
             : `${indiceBruto.resumo.documentos} documento(s)`}
@@ -840,11 +840,11 @@ function PessoaCard({
     p.classificacao === "LINHA_PRINCIPAL"
       ? { cor: "text-[#4ade80]", dot: "bg-[#4ade80]", label: "Na linha de transmissão" }
       : p.classificacao === "FORA_DA_LINHAGEM"
-        ? { cor: "text-white/40", dot: "bg-white/25", label: "Fora da linha" }
+        ? { cor: "text-white/40", dot: "bg-[var(--surface-secondary)]", label: "Fora da linha" }
         : { cor: "text-[#f87171]", dot: "bg-[#f87171]", label: "Classificação pendente" }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] overflow-hidden">
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] overflow-hidden">
       <button
         type="button"
         onClick={() => podeAbrir && alternar()}
@@ -859,7 +859,7 @@ function PessoaCard({
           <b className="text-[14.5px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
           <span className="text-[11.5px] text-white/40 font-semibold flex items-center gap-1.5 mt-0.5 flex-wrap">
             {p.geracao != null && (
-              <span className="text-[10px] font-extrabold bg-[#252c35] border border-white/10 rounded px-1.5 py-px">
+              <span className="text-[10px] font-extrabold bg-[#252c35] border border-[var(--border-default)] rounded px-1.5 py-px">
                 G{p.geracao + 1}
               </span>
             )}
@@ -895,7 +895,7 @@ function PessoaCard({
       </button>
 
       {aberto && podeAbrir && (
-        <div className="border-t border-white/10">
+        <div className="border-t border-[var(--border-default)]">
           <TabelaDocumentos
             docs={linha.documentos}
             onAbrirDetalhes={onAbrirDetalhes}
@@ -968,7 +968,7 @@ function TabelaDocumentos({
     <div className="overflow-x-auto">
       <div className="min-w-[900px]">
         <div
-          className="grid items-end gap-3 px-4 py-2 bg-[#20262e] border-b border-white/10 text-[10px] font-bold uppercase tracking-wider text-white/40"
+          className="grid items-end gap-3 px-4 py-2 bg-[#20262e] border-b border-[var(--border-default)] text-[10px] font-bold uppercase tracking-wider text-white/40"
           style={{ gridTemplateColumns: COLUNAS }}
         >
           <div>Documento</div>
@@ -1169,7 +1169,7 @@ function CelulaResponsavel({
             else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
           }}
           onBlur={() => setEditando(false)}
-          className="w-full rounded border border-white/15 bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
+          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
         >
           <option value="" className="bg-[#20262e]">
             {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
@@ -1229,7 +1229,7 @@ function LinhaDocumento({
       style={{ gridTemplateColumns: COLUNAS }}
     >
       <div className="flex items-center gap-2.5 min-w-0">
-        <span className="w-7 h-7 rounded-lg grid place-items-center border border-white/10 bg-[#252c35] text-white/55 flex-none">
+        <span className="w-7 h-7 rounded-lg grid place-items-center border border-[var(--border-default)] bg-[#252c35] text-white/55 flex-none">
           <FileText className="w-3.5 h-3.5" />
         </span>
         <div className="min-w-0">
@@ -1301,7 +1301,7 @@ function LinhaDocumento({
           <button
             type="button"
             onClick={() => onAbrirDetalhes!(doc)}
-            className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-white/10 text-[12px] font-bold px-3 py-1.5 rounded-lg hover:bg-[#2d353f] transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-[var(--border-default)] text-[12px] font-bold px-3 py-1.5 rounded-lg hover:bg-[#2d353f] transition-colors whitespace-nowrap"
           >
             {rotuloDaAcao(doc.naFase)} <ChevronRight className="w-3 h-3" />
           </button>

@@ -249,7 +249,7 @@ function ProcessosTooltip({
 
   if (count === 0) {
     return (
-      <span className="px-2 py-1 bg-white/10 rounded text-xs text-white/40">
+      <span className="px-2 py-1 bg-[var(--surface-primary)] rounded text-xs text-white/40">
         0
       </span>
     )
@@ -2280,7 +2280,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               setSearchTerm(e.target.value)
               setCurrentPage(1)
             }}
-            className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            className="pl-9 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
           />
         </div>
         
@@ -2298,9 +2298,9 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         </div>
       </div>
 
-      <div className="rounded-lg border border-white/20 overflow-hidden">
+      <div className="rounded-lg border border-[var(--border-strong)] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-white/10">
+          <thead className="bg-[var(--surface-primary)]">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Tipo</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Código</th>
@@ -2324,7 +2324,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               paginatedContratantes.map((contratante) => (
                 <tr 
                   key={`${contratante.tipo}-${contratante.id}`} 
-                  className="hover:bg-white/5 transition-colors cursor-pointer"
+                  className="hover:bg-[var(--surface-hover)] transition-colors cursor-pointer"
                   onClick={() => handleView(contratante)}
                 >
                   <td className="px-4 py-3">
@@ -2386,7 +2386,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10">
+                        <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-[var(--surface-hover)]">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -2437,7 +2437,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               size="sm"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="bg-transparent text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              className="bg-transparent text-white/60 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -2449,7 +2449,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               size="sm"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="bg-transparent text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              className="bg-transparent text-white/60 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

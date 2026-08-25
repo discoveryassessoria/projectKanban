@@ -932,7 +932,7 @@ export function ArvoreGenealogicaView({
       <div className={`absolute inset-0 bg-[var(--surface-primary)] z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`} />
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-popover)] border-b border-white/10 text-white/70">
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] text-white/70">
         <div className="flex items-center gap-2">
           {/* Botão Paisagem */}
           <button

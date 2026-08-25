@@ -91,7 +91,7 @@ interface Dados {
   execucoesAnteriores: Tentativa[]
 }
 
-const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
 
 function headers(): HeadersInit {
@@ -215,7 +215,7 @@ export default function PainelDeclarativoDaEtapa({
 
   if (!d.configuracao) {
     return (
-      <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 text-sm text-white/60">
         Esta etapa é anterior ao versionamento da configuração e não tem campos nem resultados cadastrados.
         Use o painel operacional da etapa.
       </div>
@@ -250,18 +250,18 @@ export default function PainelDeclarativoDaEtapa({
             const marc = marcadosDaSub[st.key] ?? {}
             const podeAgir = st.disponivel || (st.concluida && st.podeRepetir)
             return (
-              <div key={st.key} className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div key={st.key} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 flex-none rounded-full ${
                         st.concluida ? "bg-emerald-400"
-                        : st.status === "BLOQUEADO" || st.status === "PENDENTE" ? "bg-white/25"
+                        : st.status === "BLOQUEADO" || st.status === "PENDENTE" ? "bg-[var(--surface-secondary)]"
                         : st.status === "AGUARDANDO_EXTERNO" ? "bg-sky-400"
                         : "bg-amber-400"}`} />
                       <span className={`text-sm ${st.concluida ? "text-white/50 line-through" : "text-white"}`}>{st.label}</span>
                       {st.obrigatoria && !st.concluida && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">obrigatória</span>}
-                      {st.ocorrencias > 1 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">{st.ocorrencias}ª vez</span>}
+                      {st.ocorrencias > 1 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">{st.ocorrencias}ª vez</span>}
                     </div>
                     {st.descricao && <p className="mt-0.5 text-[11px] text-white/40">{st.descricao}</p>}
                     {/* O MOTIVO VEM DO SERVIDOR. A tela não deduz por que está bloqueada. */}
@@ -277,14 +277,14 @@ export default function PainelDeclarativoDaEtapa({
                   </div>
                   {podeAgir && (
                     <button onClick={() => setSubAberta(aberta ? null : st.key)}
-                      className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">
                       {aberta ? "Fechar" : st.concluida ? "Fazer de novo" : "Abrir"}
                     </button>
                   )}
                 </div>
 
                 {aberta && (
-                  <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                  <div className="mt-3 space-y-3 border-t border-[var(--border-default)] pt-3">
                     {/* OS CANAIS vêm do fornecedor concreto — não do catálogo inteiro. */}
                     {st.canais.length > 0 && (
                       <div>
@@ -380,7 +380,7 @@ export default function PainelDeclarativoDaEtapa({
       {(d.contexto?.blocos.length ?? 0) > 0 && (
         <div className="space-y-2">
           {d.contexto!.blocos.map((bloco) => (
-            <div key={bloco.chave} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div key={bloco.chave} className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
               <p className="text-[11px] uppercase tracking-wide text-white/40">{bloco.titulo}</p>
               <dl className="mt-2 space-y-1.5">
                 {bloco.itens.map((item, i) => (
@@ -415,7 +415,7 @@ export default function PainelDeclarativoDaEtapa({
               ) : c.tipo === "radio" ? (
                 <div className="space-y-1">
                   {c.opcoes.map((o) => (
-                    <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80">
+                    <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white/80">
                       <input type="radio" name={c.key} checked={valores[c.key] === o.value} onChange={() => setValores({ ...valores, [c.key]: o.value })} />
                       {o.label}
                     </label>
@@ -445,7 +445,7 @@ export default function PainelDeclarativoDaEtapa({
           <div className={lbl}>Conferência</div>
           <div className="space-y-1">
             {cfg.checklist.map((i) => (
-              <label key={i.key} className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              <label key={i.key} className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
                 <input type="checkbox" className="mt-1" checked={!!marcados[i.key]} onChange={(e) => setMarcados({ ...marcados, [i.key]: e.target.checked })} />
                 <span>
                   <span className="text-sm text-white/85">{i.label}</span>
@@ -471,7 +471,7 @@ export default function PainelDeclarativoDaEtapa({
         <div className="space-y-1.5">
           {cfg.acoes.map((a) => (
             <button key={a.key} onClick={() => void executar(a)} disabled={enviando != null}
-              className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left hover:bg-white/10 disabled:opacity-50">
+              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5 text-left hover:bg-[var(--surface-hover)] disabled:opacity-50">
               <div className="text-sm font-medium text-white">{enviando === `-|${a.key}` ? "Executando…" : a.label}</div>
               {(a.descricao || a.efeito) && (
                 <div className="mt-0.5 text-[11px] text-white/45">{a.descricao ?? a.efeito?.descricao}</div>
@@ -486,10 +486,10 @@ export default function PainelDeclarativoDaEtapa({
           para isso. As três listas dizem o que muda, o que é aproveitado e o que
           fica onde está — antes de qualquer escrita. */}
       {(d.passo.status === "CONCLUIDO" || d.passo.status === "EXECUTADO") && (
-        <div className="border-t border-white/10 pt-3">
+        <div className="border-t border-[var(--border-default)] pt-3">
           {!preview ? (
             <button onClick={() => void abrirPreview()}
-              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">
               Reexecutar esta etapa
             </button>
           ) : (
@@ -508,7 +508,7 @@ export default function PainelDeclarativoDaEtapa({
                   placeholder="ex.: certidão recebida ilegível; refazer a conferência" />
               </div>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setPreview(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
+                <button onClick={() => setPreview(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
                 <button onClick={() => void confirmarReexecucao()} disabled={enviando != null || justificativa.trim().length < 5}
                   className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-40">
                   {enviando === "__reexecutar" ? "Reexecutando…" : "Confirmar reexecução"}
@@ -520,11 +520,11 @@ export default function PainelDeclarativoDaEtapa({
       )}
 
       {d.execucoesAnteriores.length > 0 && (
-        <div className="border-t border-white/10 pt-3">
+        <div className="border-t border-[var(--border-default)] pt-3">
           <div className={lbl}>Execuções anteriores</div>
           <div className="space-y-1">
             {d.execucoesAnteriores.map((t) => (
-              <div key={t.id} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/55">
+              <div key={t.id} className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-2 text-xs text-white/55">
                 <span className="text-white/75">Execução {t.sequencia}</span> · {t.status.toLowerCase()}
                 {t.resultado && ` · ${t.resultado}`}
                 {t.completedAt && ` · concluída em ${new Date(t.completedAt).toLocaleDateString("pt-BR")}`}

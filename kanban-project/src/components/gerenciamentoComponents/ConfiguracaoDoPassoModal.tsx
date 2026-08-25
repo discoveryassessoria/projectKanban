@@ -80,9 +80,9 @@ interface Catalogo {
 // organizada como processo de trabalho: o que é, o que se faz, o que precisa estar
 // cumprido, o que pode acontecer, e as regras especiais.
 
-const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
-const card = "rounded-lg border border-white/10 bg-white/5 p-3"
+const card = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
 
 export default function ConfiguracaoDoPassoModal({
   passo, irmaos, phaseKey, faseLabel, onFechar, onSalvar, problemas,
@@ -210,13 +210,13 @@ export default function ConfiguracaoDoPassoModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={tentarFechar}>
       <div
         role="dialog" aria-modal="true" aria-label={`Configurar ${f.label}`}
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); tentarFechar() } }}
       >
         {/* CABEÇALHO FIXO — a configuração é longa e Salvar/Cancelar não podem sumir
             no scroll. O corpo rola; cabeçalho e rodapé ficam. */}
-        <div className="flex-none border-b border-white/10 px-6 py-4">
+        <div className="flex-none border-b border-[var(--border-default)] px-6 py-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="font-semibold text-white">Configurar “{f.label}”</h3>
@@ -245,13 +245,13 @@ export default function ConfiguracaoDoPassoModal({
         </div>
 
         {/* AS CINCO ÁREAS */}
-        <div className="flex-none border-b border-white/10 px-4 pt-3" role="tablist" aria-label="Áreas do passo">
+        <div className="flex-none border-b border-[var(--border-default)] px-4 pt-3" role="tablist" aria-label="Áreas do passo">
           <div className="flex flex-wrap gap-1">
             {AREAS.map((a) => (
               <button key={a.key} role="tab" aria-selected={area === a.key} type="button"
                 onClick={() => setArea(a.key)}
                 title={a.ajuda}
-                className={`rounded-t-lg px-3 py-2 text-xs ${area === a.key ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                className={`rounded-t-lg px-3 py-2 text-xs ${area === a.key ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
                 {a.label}
               </button>
             ))}
@@ -351,7 +351,7 @@ export default function ConfiguracaoDoPassoModal({
               {/* A CONDIÇÃO DE CONCLUSÃO MORA EM "Conclusão", e só lá. Ela estava
                   aqui também — dois seletores para o mesmo atributo, que é a
                   duplicidade que esta reorganização existe para desfazer. */}
-              <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] text-white/45">
+              <p className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-[11px] text-white/45">
                 Este passo termina: <b>{REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.label}</b>.
                 {" "}Para mudar, vá em <b>Conclusão</b>.
               </p>
@@ -361,12 +361,12 @@ export default function ConfiguracaoDoPassoModal({
           {/* ─────────────────────────── EXECUÇÃO ─────────────────────────── */}
           {area === "execucao" && (
             <>
-              <div className="flex gap-1 border-b border-white/10 pb-2" role="tablist" aria-label="Seções de execução">
+              <div className="flex gap-1 border-b border-[var(--border-default)] pb-2" role="tablist" aria-label="Seções de execução">
                 {([["subtarefas", `Subtarefas (${subs.length})`],
                    ["campos", `Campos (${f.campos?.length ?? 0})`],
                    ["checklist", `Checklist (${f.checkItens?.length ?? 0})`]] as const).map(([k, rotulo]) => (
                   <button key={k} type="button" role="tab" aria-selected={secaoExec === k} onClick={() => setSecaoExec(k)}
-                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoExec === k ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoExec === k ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
                     {rotulo}
                   </button>
                 ))}
@@ -405,28 +405,28 @@ export default function ConfiguracaoDoPassoModal({
                         onChange={(e) => setSub(i, { label: e.target.value, key: st.key ?? chaveDe(e.target.value) })} />
                     </div>
                     <button onClick={() => setSubAberta(subAberta === i ? null : i)}
-                      className="rounded-lg border border-white/10 px-3 py-2 text-xs text-blue-300 hover:bg-blue-500/10">
+                      className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-blue-300 hover:bg-blue-500/10">
                       {subAberta === i ? "Fechar" : "Configurar"}
                     </button>
                     <button onClick={() => setF((x) => ({ ...x, subtarefas: (x.subtarefas ?? []).filter((_, j) => j !== i) }))}
-                      className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+                      className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                     <code className="text-white/35">{st.key ?? chaveDe(st.label)}</code>
                     {st.obrigatoria !== false && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatória</span>}
-                    {st.repetivel && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
-                    {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
+                    {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
+                    {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
                     {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">canais do fornecedor</span>}
                     {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.acoes!.length} ações</span>}
                     {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.campos!.length} campos</span>}
                   </div>
 
                   {subAberta === i && (
-                    <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
-                      <div className="flex flex-wrap gap-1 border-b border-white/10 pb-2">
+                    <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/20 p-3">
+                      <div className="flex flex-wrap gap-1 border-b border-[var(--border-default)] pb-2">
                         {(["geral", "campos", "acoes", "checklist", "requisitos", "evidencias"] as const).map((v) => (
                           <button key={v} onClick={() => setAbaDaSub(v)}
-                            className={`rounded-t-lg px-2.5 py-1 text-[11px] ${abaDaSub === v ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                            className={`rounded-t-lg px-2.5 py-1 text-[11px] ${abaDaSub === v ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
                             {v === "geral" ? "Geral" : v === "acoes" ? "Ações" : v === "evidencias" ? "Evidências" : v[0].toUpperCase() + v.slice(1)}
                           </button>
                         ))}
@@ -465,7 +465,7 @@ export default function ConfiguracaoDoPassoModal({
                               {st.repetivel && (
                                 <label className="flex items-center gap-2 text-xs text-white/60">
                                   no máximo
-                                  <input className="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white"
+                                  <input className="w-16 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white"
                                     type="number" min={1} value={st.maxOcorrencias ?? ""}
                                     onChange={(e) => setSub(i, { maxOcorrencias: Number(e.target.value) || null })} />
                                   vezes
@@ -487,7 +487,7 @@ export default function ConfiguracaoDoPassoModal({
                                   const chave = outra.key ?? chaveDe(outra.label)
                                   const marcada = (st.dependeDe ?? []).includes(chave)
                                   return (
-                                    <label key={chave} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
+                                    <label key={chave} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white/70">
                                       <input type="checkbox" checked={marcada}
                                         onChange={(e) => setSub(i, {
                                           dependeDe: e.target.checked
@@ -517,7 +517,7 @@ export default function ConfiguracaoDoPassoModal({
                                   {(cat?.canais ?? []).map((c) => {
                                     const marcado = (st.tiposDeCanal ?? []).includes(c.key)
                                     return (
-                                      <label key={c.key} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
+                                      <label key={c.key} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white/70">
                                         <input type="checkbox" checked={marcado}
                                           onChange={(e) => setSub(i, {
                                             tiposDeCanal: e.target.checked
@@ -635,11 +635,11 @@ export default function ConfiguracaoDoPassoModal({
               {/* REQUISITO E EVIDÊNCIA SÃO A MESMA LISTA, vista por dois recortes. Dois
                   CRUDs concorrentes sobre o mesmo registro é o que a UX anterior fazia:
                   duas abas de primeiro nível editando `StepRequirement`. */}
-              <div className="flex gap-1 border-b border-white/10 pb-2" role="tablist" aria-label="Seções de conclusão">
+              <div className="flex gap-1 border-b border-[var(--border-default)] pb-2" role="tablist" aria-label="Seções de conclusão">
                 {([["requisitos", `Requisitos (${requisitosSimples.length})`],
                    ["evidencias", `Evidências obrigatórias (${evidencias.length})`]] as const).map(([k, rotulo]) => (
                   <button key={k} type="button" role="tab" aria-selected={secaoConcl === k} onClick={() => setSecaoConcl(k)}
-                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoConcl === k ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoConcl === k ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
                     {rotulo}
                   </button>
                 ))}
@@ -686,7 +686,7 @@ export default function ConfiguracaoDoPassoModal({
                 {irmaos.filter((s) => s.key !== f.key).map((s) => {
                   const marcada = (f.dependeDe ?? []).includes(s.key)
                   return (
-                    <label key={s.key} className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
+                    <label key={s.key} className="flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white/70">
                       <input type="checkbox" checked={marcada}
                         onChange={(e) => set("dependeDe", e.target.checked
                           ? [...(f.dependeDe ?? []), s.key]
@@ -720,7 +720,7 @@ export default function ConfiguracaoDoPassoModal({
                       ["suportaCanais", "canais"], ["suportaEvidencia", "evidência"],
                       ["suportaEsperaExterna", "espera externa"], ["suportaCondicoes", "condições"],
                     ] as Array<[keyof Executor, string]>).map(([k, rotulo]) => (
-                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-emerald-500/15 text-emerald-300" : "bg-white/10 text-white/40"}`}>
+                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--surface-primary)] text-white/40"}`}>
                         {exec[k] ? "✓" : "✕"} {rotulo}
                       </span>
                     ))}
@@ -779,7 +779,7 @@ export default function ConfiguracaoDoPassoModal({
 
         {/* RODAPÉ FIXO — Salvar e Cancelar não podem sumir no scroll de uma
             configuração longa. */}
-        <div className="flex flex-none items-center justify-between gap-3 border-t border-white/10 px-6 py-4">
+        <div className="flex flex-none items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-4">
           <div className="min-w-0 text-[11px]">
             {erroAoSalvar
               ? <span className="text-red-300">{erroAoSalvar}</span>
@@ -789,7 +789,7 @@ export default function ConfiguracaoDoPassoModal({
           </div>
           <div className="flex flex-none gap-2">
             <button type="button" onClick={tentarFechar}
-              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
+              className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
             <button type="button" onClick={salvar} disabled={salvando}
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
               {salvando ? "Salvando…" : "Salvar rascunho"}
@@ -802,12 +802,12 @@ export default function ConfiguracaoDoPassoModal({
           administrador não tem como saber que perdeu. */}
       {confirmandoSaida && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border-default)] bg-zinc-900 p-6 shadow-2xl">
             <h4 className="text-sm font-semibold text-white">Você tem alterações não salvas</h4>
             <p className="mt-1 text-xs text-white/50">Se sair agora, o que você configurou nesta sessão será descartado.</p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirmandoSaida(false)}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">Continuar editando</button>
+                className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Continuar editando</button>
               <button type="button" onClick={() => { setConfirmandoSaida(false); onFechar() }}
                 className="rounded-lg bg-red-600/80 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-red-600">Descartar</button>
             </div>

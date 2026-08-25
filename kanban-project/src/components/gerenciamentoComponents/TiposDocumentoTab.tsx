@@ -43,7 +43,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
@@ -148,7 +148,7 @@ export default function TiposDocumentoTab() {
     <div className="space-y-5">
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
 
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Tipos de Documento</h2>
@@ -157,32 +157,32 @@ export default function TiposDocumentoTab() {
           <button onClick={() => setForm(formVazio())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Novo tipo de documento</button>
         </div>
         {/* Filtro rápido — consolidação de "Tipos de Certidão" */}
-        <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-white/10 text-xs">
-          <button onClick={() => setFiltro("todos")} aria-pressed={filtro === "todos"} className={`px-3 py-1.5 ${filtro === "todos" ? "bg-white/15 font-medium text-white" : "text-white/60 hover:bg-white/5"}`}>Todos ({rows.length})</button>
-          <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-white/15 font-medium text-white" : "text-white/60 hover:bg-white/5"}`}>Certidões ({totalCertidoes})</button>
+        <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-[var(--border-default)] text-xs">
+          <button onClick={() => setFiltro("todos")} aria-pressed={filtro === "todos"} className={`px-3 py-1.5 ${filtro === "todos" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-white/60 hover:bg-[var(--surface-hover)]"}`}>Todos ({rows.length})</button>
+          <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-white/60 hover:bg-[var(--surface-hover)]"}`}>Certidões ({totalCertidoes})</button>
         </div>
         {filtro === "certidoes" && (
           <p className="mt-2 text-[11px] text-white/40">Cobertura: {certPorNature} por natureza estruturada · {certPorTexto} por fallback textual{certPorTexto > 0 ? " (migrar `nature` para eliminar)" : ""}.</p>
         )}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-white/10 text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
             <tr><th className="px-4 py-3 font-medium">Código</th><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
               <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">{filtro === "certidoes" ? "Nenhuma certidão encontrada." : "Nenhum tipo de documento cadastrado."}</td></tr>
             ) : visiveis.map(d => (
-              <tr key={d.id} className="border-b border-white/5 last:border-0">
+              <tr key={d.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.categoriaDocumental?.name ?? (d.category || "—")}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-white/50">
-                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, publicCode: d.publicCode ?? null, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo, familiaDocumentalId: d.familiaDocumentalId ?? null, naturezaOperacionalId: d.naturezaOperacionalId ?? null, perfilOperacionalId: d.perfilOperacionalId ?? null })} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, publicCode: d.publicCode ?? null, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo, familiaDocumentalId: d.familiaDocumentalId ?? null, naturezaOperacionalId: d.naturezaOperacionalId ?? null, perfilOperacionalId: d.perfilOperacionalId ?? null })} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
                     <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                   </div>
                 </td>
@@ -194,8 +194,8 @@ export default function TiposDocumentoTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
             <div className="space-y-3 px-6 py-4">
               <CodigoPublicoField codigo={form.publicCode} />
               <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} autoFocus className={inputCls} /></div>
@@ -213,7 +213,7 @@ export default function TiposDocumentoTab() {
               {/* ── CONTRATO OPERACIONAL ────────────────────────────────
                   Categoria diz ONDE o documento se arquiva. Estes três dizem
                   COMO ele opera. Todos gravam ID; nenhum aceita texto. */}
-              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 space-y-3">
+              <div className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3 space-y-3">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Contrato operacional</div>
 
                 <div>
@@ -275,8 +275,8 @@ export default function TiposDocumentoTab() {
 
               <label className="flex items-center gap-2 text-sm text-white/70"><input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} />Ativo</label>
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>

@@ -1260,7 +1260,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 className="flex-1 bg-green-600 hover:bg-green-700 gap-2"
               >
                 {salvandoParcela && (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
                 )}
                 {!salvandoParcela && <Check className="h-4 w-4" />}
                 Confirmar
@@ -1277,7 +1277,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
             
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-500 to-green-600">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
+                <div className="p-2 bg-[var(--surface-secondary)] rounded-lg">
                   <Check className="h-5 w-5 text-white" />
                 </div>
                 <div>
@@ -1287,7 +1287,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               </div>
               <button 
                 onClick={() => setShowPagar(null)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
               >
                 <X className="h-5 w-5 text-white" />
               </button>
@@ -1495,7 +1495,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 className="bg-green-600 hover:bg-green-700 min-w-[200px] gap-2"
               >
                 {salvando && (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
                 )}
                 {!salvando && <Check className="h-4 w-4" />}
                 Confirmar Pagamento
@@ -1512,7 +1512,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
             
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-500 to-green-600">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-lg">
+                <div className="p-2 bg-[var(--surface-secondary)] rounded-lg">
                   {editandoPagamento ? <Pencil className="h-5 w-5 text-white" /> : <Eye className="h-5 w-5 text-white" />}
                 </div>
                 <div>
@@ -1527,7 +1527,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   setPagamentoSelecionado(null)
                   setEditandoPagamento(false)
                 }}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-2 hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
               >
                 <X className="h-5 w-5 text-white" />
               </button>
@@ -1776,7 +1776,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     className="bg-green-600 hover:bg-green-700 min-w-[200px] gap-2"
                   >
                     {salvandoEdicao && (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
                     )}
                     {!salvandoEdicao && <Check className="h-4 w-4" />}
                     Salvar Alterações

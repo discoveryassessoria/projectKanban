@@ -170,7 +170,7 @@ export default function FornecedoresPage() {
               Novo Fornecedor
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#0a1628] border-white/20 text-[#fff] max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-[#0a1628] border-[var(--border-strong)] text-[#fff] max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo Fornecedor</DialogTitle>
               <DialogDescription className="text-white/60">
@@ -180,7 +180,7 @@ export default function FornecedoresPage() {
             
             <form onSubmit={handleSubmit}>
               <Tabs defaultValue="dados" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-white/10">
+                <TabsList className="grid w-full grid-cols-3 bg-[var(--surface-primary)]">
                   <TabsTrigger value="dados">Dados Básicos</TabsTrigger>
                   <TabsTrigger value="endereco">Endereço</TabsTrigger>
                   <TabsTrigger value="bancario">Dados Bancários</TabsTrigger>
@@ -194,7 +194,7 @@ export default function FornecedoresPage() {
                         value={formData.tipo} 
                         onValueChange={(v) => setFormData(prev => ({ ...prev, tipo: v as 'PF' | 'PJ' }))}
                       >
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectTrigger className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -210,7 +210,7 @@ export default function FornecedoresPage() {
                         value={formData.cpfCnpj}
                         onChange={(e) => setFormData(prev => ({ ...prev, cpfCnpj: e.target.value }))}
                         placeholder={formData.tipo === 'PJ' ? '00.000.000/0000-00' : '000.000.000-00'}
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   </div>
@@ -221,7 +221,7 @@ export default function FornecedoresPage() {
                       value={formData.nome}
                       onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
                       placeholder={formData.tipo === 'PJ' ? 'Razão Social da Empresa' : 'Nome Completo'}
-                      className="bg-white/10 border-white/20 text-white"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       required
                     />
                   </div>
@@ -233,7 +233,7 @@ export default function FornecedoresPage() {
                         value={formData.nomeFantasia}
                         onChange={(e) => setFormData(prev => ({ ...prev, nomeFantasia: e.target.value }))}
                         placeholder="Nome Fantasia"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   )}
@@ -245,7 +245,7 @@ export default function FornecedoresPage() {
                         value={formData.telefone}
                         onChange={(e) => setFormData(prev => ({ ...prev, telefone: e.target.value }))}
                         placeholder="(00) 0000-0000"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="space-y-2">
@@ -254,7 +254,7 @@ export default function FornecedoresPage() {
                         value={formData.celular}
                         onChange={(e) => setFormData(prev => ({ ...prev, celular: e.target.value }))}
                         placeholder="(00) 00000-0000"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   </div>
@@ -266,7 +266,7 @@ export default function FornecedoresPage() {
                       value={formData.email}
                       onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="email@exemplo.com"
-                      className="bg-white/10 border-white/20 text-white"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                     />
                   </div>
                 </TabsContent>
@@ -279,7 +279,7 @@ export default function FornecedoresPage() {
                         value={formData.cep}
                         onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
                         placeholder="00000-000"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="col-span-2 space-y-2">
@@ -288,7 +288,7 @@ export default function FornecedoresPage() {
                         value={formData.endereco}
                         onChange={(e) => setFormData(prev => ({ ...prev, endereco: e.target.value }))}
                         placeholder="Rua, Avenida..."
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   </div>
@@ -300,7 +300,7 @@ export default function FornecedoresPage() {
                         value={formData.numero}
                         onChange={(e) => setFormData(prev => ({ ...prev, numero: e.target.value }))}
                         placeholder="123"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="col-span-2 space-y-2">
@@ -309,7 +309,7 @@ export default function FornecedoresPage() {
                         value={formData.complemento}
                         onChange={(e) => setFormData(prev => ({ ...prev, complemento: e.target.value }))}
                         placeholder="Sala 101"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export default function FornecedoresPage() {
                       <Input
                         value={formData.bairro}
                         onChange={(e) => setFormData(prev => ({ ...prev, bairro: e.target.value }))}
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="space-y-2">
@@ -328,7 +328,7 @@ export default function FornecedoresPage() {
                       <Input
                         value={formData.cidade}
                         onChange={(e) => setFormData(prev => ({ ...prev, cidade: e.target.value }))}
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="space-y-2">
@@ -338,7 +338,7 @@ export default function FornecedoresPage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, estado: e.target.value }))}
                         placeholder="SP"
                         maxLength={2}
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   </div>
@@ -352,7 +352,7 @@ export default function FornecedoresPage() {
                         value={formData.banco}
                         onChange={(e) => setFormData(prev => ({ ...prev, banco: e.target.value }))}
                         placeholder="Nome do Banco"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="space-y-2">
@@ -361,7 +361,7 @@ export default function FornecedoresPage() {
                         value={formData.tipoConta} 
                         onValueChange={(v) => setFormData(prev => ({ ...prev, tipoConta: v }))}
                       >
-                        <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                        <SelectTrigger className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white">
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
                         <SelectContent>
@@ -379,7 +379,7 @@ export default function FornecedoresPage() {
                         value={formData.agencia}
                         onChange={(e) => setFormData(prev => ({ ...prev, agencia: e.target.value }))}
                         placeholder="0000"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                     <div className="space-y-2">
@@ -388,7 +388,7 @@ export default function FornecedoresPage() {
                         value={formData.conta}
                         onChange={(e) => setFormData(prev => ({ ...prev, conta: e.target.value }))}
                         placeholder="00000-0"
-                        className="bg-white/10 border-white/20 text-white"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       />
                     </div>
                   </div>
@@ -399,7 +399,7 @@ export default function FornecedoresPage() {
                       value={formData.chavePix}
                       onChange={(e) => setFormData(prev => ({ ...prev, chavePix: e.target.value }))}
                       placeholder="CPF, CNPJ, E-mail, Telefone ou Chave Aleatória"
-                      className="bg-white/10 border-white/20 text-white"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                     />
                   </div>
                   
@@ -409,7 +409,7 @@ export default function FornecedoresPage() {
                       value={formData.observacoes}
                       onChange={(e) => setFormData(prev => ({ ...prev, observacoes: e.target.value }))}
                       placeholder="Informações adicionais..."
-                      className="bg-white/10 border-white/20 text-white"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
                       rows={3}
                     />
                   </div>
@@ -437,7 +437,7 @@ export default function FornecedoresPage() {
             placeholder="Buscar por nome, fantasia ou documento..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
           />
         </div>
       </div>
@@ -448,7 +448,7 @@ export default function FornecedoresPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--border-default)]"></div>
         </div>
       ) : filteredFornecedores.length === 0 ? (
-        <Card className="bg-white/10 border-white/20">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="flex flex-col items-center justify-center h-48 text-white/50">
             <Users className="h-12 w-12 mb-4" />
             <p>Nenhum fornecedor encontrado</p>
@@ -457,7 +457,7 @@ export default function FornecedoresPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredFornecedores.map((fornecedor) => (
-            <Card key={fornecedor.id} className="bg-white/10 border-white/20 hover:bg-white/15 transition-colors">
+            <Card key={fornecedor.id} className="bg-[var(--surface-primary)] border-[var(--border-strong)] hover:bg-[var(--surface-hover)] transition-colors">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -526,7 +526,7 @@ export default function FornecedoresPage() {
                   )}
                 </div>
                 
-                <div className="mt-4 pt-4 border-t border-white/10 flex justify-between text-sm">
+                <div className="mt-4 pt-4 border-t border-[var(--border-default)] flex justify-between text-sm">
                   <span className="text-white/50">{fornecedor.totalContas} contas</span>
                   <span className="text-white font-medium">{formatCurrency(fornecedor.totalPago)} pago</span>
                 </div>

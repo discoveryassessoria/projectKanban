@@ -193,7 +193,7 @@ export function PainelDiagnostico({
           {/* Honestidade sobre cobertura: verde sem exigência materializada não
               é aprovação, é ausência de coisa para conferir. */}
           {diagnostico.semExigenciaMaterializada && (
-            <p className="mt-2 rounded-md bg-white/70 px-2 py-1.5 text-[11px] leading-snug text-gray-700">
+            <p className="mt-2 rounded-md bg-[var(--surface-elevated)] px-2 py-1.5 text-[11px] leading-snug text-gray-700">
               Nenhuma exigência documental foi materializada para este escopo. O verde significa
               “nada a apontar ainda”, não “conferido e aprovado”.
             </p>

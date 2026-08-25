@@ -190,7 +190,7 @@ function ConteudoModal({
       >
         {/* ============== HEAD ============== */}
         <div
-          className="px-[22px] pt-[18px] pb-[14px] border-b border-white/10 flex items-start justify-between gap-3"
+          className="px-[22px] pt-[18px] pb-[14px] border-b border-[var(--border-default)] flex items-start justify-between gap-3"
           style={{ background: "linear-gradient(135deg,#7c1d1d 0%,#3f1010 100%)" }}
         >
           <div className="flex-1 min-w-0">
@@ -293,7 +293,7 @@ function ConteudoModal({
 
         {/* ============== FOOT ============== */}
         <div
-          className="px-[22px] py-[13px] border-t border-white/10 flex justify-end gap-2"
+          className="px-[22px] py-[13px] border-t border-[var(--border-default)] flex justify-end gap-2"
           style={{ background: "rgba(0,0,0,0.3)" }}
         >
           <button

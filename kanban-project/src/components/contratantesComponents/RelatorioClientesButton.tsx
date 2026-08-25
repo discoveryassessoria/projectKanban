@@ -194,7 +194,7 @@ export default function RelatorioClientesButton() {
           variant="outline"
           size="sm"
           disabled={isGenerating}
-          className="bg-transparent border-white/30 text-white hover:bg-white/10 hover:text-white"
+          className="bg-transparent border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)] hover:text-white"
         >
           {isGenerating ? (
             <Loader2 className="mr-1 h-4 w-4 animate-spin" />

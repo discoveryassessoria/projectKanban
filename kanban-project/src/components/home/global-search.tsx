@@ -131,7 +131,7 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
           onFocus={() => resultadosVisiveis.length && setAberto(true)}
           onKeyDown={onKeyDown}
           placeholder="Buscar família, requerente, processo ou cliente…"
-          className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.06] pl-9 pr-9 text-sm text-white backdrop-blur-md placeholder:text-white/40 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/15"
+          className="h-10 w-full rounded-lg border border-[var(--border-default)] bg-white/[0.06] pl-9 pr-9 text-sm text-white backdrop-blur-md placeholder:text-white/40 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/15"
         />
         {carregandoVisivel && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
       </div>
@@ -140,7 +140,7 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
         <ul
           id="busca-global-lista"
           role="listbox"
-          className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-white/15 bg-[#0b1020]/95 py-1 shadow-2xl backdrop-blur-xl"
+          className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-[var(--border-default)] bg-[#0b1020]/95 py-1 shadow-2xl backdrop-blur-xl"
         >
           {resultadosVisiveis.length === 0 && !carregandoVisivel && (
             <li className="px-3 py-3 text-sm text-white/50">Nenhum resultado para “{q}”.</li>
@@ -157,14 +157,14 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
                   e.preventDefault()
                   irPara(r)
                 }}
-                className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 ${i === ativo ? "bg-white/10" : ""}`}
+                className={`flex cursor-pointer items-center gap-2.5 px-3 py-2 ${i === ativo ? "bg-[var(--surface-primary)]" : ""}`}
               >
                 <Icon className="h-4 w-4 shrink-0 text-white/40" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">{r.label}</p>
                   {r.sub && <p className="truncate text-xs text-white/50">{r.sub}</p>}
                 </div>
-                <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/60">
+                <span className="shrink-0 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/60">
                   {ROTULO[r.tipo]}
                 </span>
               </li>

@@ -248,7 +248,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
         {/* Formulário */}
         {showForm && (
-          <div className="mb-6 p-4 bg-[var(--surface-popover)] rounded-xl border border-white/10">
+          <div className="mb-6 p-4 bg-[var(--surface-popover)] rounded-xl border border-[var(--border-default)]">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium text-white/95">
                 {editingId ? "Editar Evento" : "Novo Evento"}
@@ -285,7 +285,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                         className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
                           tipo === t.value
                             ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-white/10 hover:border-gray-300 text-white/70"
+                            : "border-[var(--border-default)] hover:border-gray-300 text-white/70"
                         }`}
                       >
                         <Icon className="h-4 w-4" style={{ color: t.cor }} />
@@ -427,7 +427,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
               return (
                 <div
                   key={evento.id}
-                  className="p-4 bg-[var(--surface-popover)] rounded-xl border border-white/10 hover:border-gray-300 transition-colors"
+                  className="p-4 bg-[var(--surface-popover)] rounded-xl border border-[var(--border-default)] hover:border-gray-300 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">

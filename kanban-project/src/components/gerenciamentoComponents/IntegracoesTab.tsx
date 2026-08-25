@@ -26,7 +26,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 
 // estados vindos do backend → cor e rótulo em português
 const ESTADO: Record<string, { cls: string; label: string }> = {
@@ -40,9 +40,9 @@ const ESTADO: Record<string, { cls: string; label: string }> = {
   SEGREDO_PENDENTE: { cls: "bg-amber-500/15 text-amber-300", label: "Segredo pendente" },
   CONFIGURACAO_PENDENTE: { cls: "bg-red-500/15 text-red-300", label: "Configuração pendente" },
   INDISPONIVEL: { cls: "bg-red-500/15 text-red-300", label: "Indisponível" },
-  SEM_DADOS: { cls: "bg-white/10 text-white/50", label: "Sem dados" },
+  SEM_DADOS: { cls: "bg-[var(--surface-primary)] text-white/50", label: "Sem dados" },
 }
-const estadoDe = (e: string) => ESTADO[e] ?? { cls: "bg-white/10 text-white/60", label: e }
+const estadoDe = (e: string) => ESTADO[e] ?? { cls: "bg-[var(--surface-primary)] text-white/60", label: e }
 
 // rótulos amigáveis das chaves de detalhe (o resto cai no fallback legível)
 const ROTULO: Record<string, string> = {
@@ -108,11 +108,11 @@ export default function IntegracoesTab() {
           </div>
           <div className="flex flex-none items-center gap-2">
             {ambiente && (
-              <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/50">
+              <span className="rounded-lg border border-[var(--border-default)] bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/50">
                 ambiente: {ambiente}
               </span>
             )}
-            <button onClick={() => void load()} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+            <button onClick={() => void load()} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
               Atualizar
             </button>
           </div>
@@ -135,7 +135,7 @@ export default function IntegracoesTab() {
               </div>
 
               {detalhes.length > 0 && (
-                <dl className="mt-4 grid gap-x-4 gap-y-2 border-t border-white/10 pt-3 sm:grid-cols-2">
+                <dl className="mt-4 grid gap-x-4 gap-y-2 border-t border-[var(--border-default)] pt-3 sm:grid-cols-2">
                   {detalhes.map(([k, v]) => (
                     <div key={k} className="min-w-0">
                       <dt className="text-[11px] uppercase tracking-wide text-white/45">{rotulo(k)}</dt>
@@ -146,12 +146,12 @@ export default function IntegracoesTab() {
               )}
 
               {jobs.length > 0 && (
-                <div className="mt-4 border-t border-white/10 pt-3">
+                <div className="mt-4 border-t border-[var(--border-default)] pt-3">
                   <div className="mb-1.5 text-[11px] uppercase tracking-wide text-white/45">Rotinas</div>
                   <ul className="space-y-1 text-sm text-white/75">
                     {jobs.map((j) => (
                       <li key={j.path} className="flex flex-wrap items-baseline gap-x-2">
-                        <code className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] text-white/70">{j.path}</code>
+                        <code className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">{j.path}</code>
                         <span className="text-white/50">{j.schedule}</span>
                         <span className="text-white/60">· {j.descricao}</span>
                       </li>
@@ -160,7 +160,7 @@ export default function IntegracoesTab() {
                 </div>
               )}
 
-              <div className="mt-4 border-t border-white/10 pt-3 text-[12px] text-white/45">
+              <div className="mt-4 border-t border-[var(--border-default)] pt-3 text-[12px] text-white/45">
                 Configurado em: <span className="text-white/65">{i.ondeConfigurar}</span>
                 {i.telaRelacionada && <> · Tela relacionada: <span className="text-white/65">{i.telaRelacionada}</span></>}
               </div>

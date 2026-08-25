@@ -198,7 +198,7 @@ export function HeaderBar({
   const totalResults = searchResults.processos.length
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-black/40 backdrop-blur-md shadow-lg">
+    <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-lg">
       <div className="px-6 py-4 flex items-center justify-between">
         {/* Lado esquerdo - Título e Subtítulo */}
         <div>
@@ -222,11 +222,11 @@ export function HeaderBar({
           </div>
 
           {/* Divisor */}
-          <div className="hidden lg:block h-8 w-px bg-white/20" />
+          <div className="hidden lg:block h-8 w-px bg-[var(--surface-secondary)]" />
 
           {/* Campo de busca */}
           {!ocultarBusca && pode('processos.ver') && <div className="relative hidden md:block">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-white/30">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-[var(--border-strong)]">
               <Search className="h-4 w-4 text-white/70" />
               <input
                 className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
@@ -281,7 +281,7 @@ export function HeaderBar({
           {/* Notificações */}
           {pode('tarefas.ver') && <div className="relative hidden md:block" ref={notificacoesRef}>
             <button 
-              className="relative inline-flex items-center justify-center rounded-full p-2 border border-white/30 hover:bg-white/10 transition"
+              className="relative inline-flex items-center justify-center rounded-full p-2 border border-[var(--border-strong)] hover:bg-[var(--surface-hover)] transition"
               onClick={() => setShowNotifications(!showNotifications)}
             >
               <Bell className="h-4 w-4 text-white" />
@@ -399,7 +399,7 @@ export function HeaderBar({
 
           {/* Usuário */}
           <div className="flex items-center gap-2">
-            <Avatar className="h-9 w-9 border border-white/30">
+            <Avatar className="h-9 w-9 border border-[var(--border-strong)]">
               <AvatarFallback className="bg-transparent text-xs font-medium text-white">
                 {getInitials(userName)}
               </AvatarFallback>
@@ -419,7 +419,7 @@ export function HeaderBar({
             variant="outline"
             size="sm"
             onClick={onLogout}
-            className="border-white/30 text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-[#fff] hover:text-red-400 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-[#fff] hover:text-red-400 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

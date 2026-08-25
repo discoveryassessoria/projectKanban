@@ -320,7 +320,7 @@ function EditorShell({
         >
           {/* Header */}
           <div
-            className="flex-shrink-0 px-6 py-4 border-b border-white/10"
+            className="flex-shrink-0 px-6 py-4 border-b border-[var(--border-default)]"
             style={{ background: headerGradient }}
           >
             <div className="flex items-start justify-between gap-4">
@@ -344,7 +344,7 @@ function EditorShell({
           <div className="flex-1 overflow-y-auto px-6 py-5 text-white/70">{children}</div>
 
           {/* Footer */}
-          <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 bg-[var(--surface-overlay)]">
+          <div className="flex-shrink-0 px-6 py-4 border-t border-[var(--border-default)] bg-[var(--surface-overlay)]">
             {footer}
           </div>
         </div>
@@ -376,7 +376,7 @@ function Label({
 }
 
 const inputCls =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
 
 const inputClsInvalid =
   "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[#d2a948]/40 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#d2a948]/60 focus:ring-1 focus:ring-[#d2a948]/30"
@@ -384,7 +384,7 @@ const inputClsInvalid =
 function ReadOnlyBanner({ stepStatus }: { stepStatus: string }) {
   if (stepStatus !== "concluida") return null
   return (
-    <div className="mb-5 p-3 rounded-lg border border-white/10 bg-[var(--surface-overlay)]">
+    <div className="mb-5 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)]">
       <div className="text-[12px] font-semibold text-[#7dd3fc] mb-0.5 flex items-center gap-1.5">
         <AlertCircle className="w-3.5 h-3.5" />
         Etapa já concluída
@@ -992,8 +992,8 @@ function FormSolicitarCertidao({
           {/* ========================================================== */}
           {/* RESUMO DO PEDIDO                                            */}
           {/* ========================================================== */}
-          <div className="mb-5 rounded-xl border border-white/10 bg-[var(--surface-overlay)] overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-white/10 bg-[var(--surface-popover)] flex items-center gap-2">
+          <div className="mb-5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-[var(--border-default)] bg-[var(--surface-popover)] flex items-center gap-2">
               <span className="text-[16px]">📋</span>
               <span className="text-[12px] uppercase font-bold tracking-wider text-white/60">
                 Resumo do pedido
@@ -1068,7 +1068,7 @@ function FormSolicitarCertidao({
             {/* Recomendação */}
             {recomendacao && (
               <div className="px-4 pb-4">
-                <div className="rounded-lg border border-white/10 bg-[var(--surface-overlay)] p-3 flex items-start gap-3">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 flex items-start gap-3">
                   <span className="text-[18px] mt-0.5">💡</span>
                   <div className="flex-1 min-w-0">
                     <div className="text-[12px] font-semibold text-white mb-0.5">
@@ -1116,7 +1116,7 @@ function FormSolicitarCertidao({
                   className={`px-3 py-2.5 rounded-md border text-left transition-all disabled:cursor-not-allowed ${
                     isSelected
                       ? "border-[#7dd3fc]/60 bg-[#7dd3fc]/15 ring-1 ring-[#7dd3fc]/40"
-                      : "border-white/10 bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                      : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
@@ -1171,7 +1171,7 @@ function FormSolicitarCertidao({
                     {/* Já anexado numa execução anterior desta MESMA etapa: o
                         operador vê o que existe em vez de reenviar às cegas. */}
                     {anexoJaRegistrado && (
-                      <div className="rounded-md border border-white/10 bg-[var(--app-background)] px-2.5 py-2 flex items-center gap-2">
+                      <div className="rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-2.5 py-2 flex items-center gap-2">
                         <Paperclip className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <a
@@ -1360,7 +1360,7 @@ function FormSolicitarCertidao({
                   escopada por stepInstanceId. O requerimento aparece aqui por
                   REFERÊNCIA ao mesmo registro — nenhuma cópia, nenhum upload
                   paralelo. Só leitura: quem anexa nesta etapa é o campo acima. */}
-              <div className="mt-5 pt-4 border-t border-white/10">
+              <div className="mt-5 pt-4 border-t border-[var(--border-default)]">
                 <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
                   4. Anexos desta etapa
                 </div>
@@ -1387,7 +1387,7 @@ function ResumoCard({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--surface-overlay)] p-3">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3">
       <div className="text-[9.5px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
         {label}
       </div>
@@ -1656,8 +1656,8 @@ function FormAguardarRetorno({
           )}
 
           {/* 1. SITUAÇÃO DA ESPERA */}
-          <div className="rounded-lg border border-white/10 bg-[var(--surface-overlay)] overflow-hidden">
-            <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-white/10 flex items-center gap-2">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
+            <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-[#7dd3fc]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
                 Situação da espera
@@ -1701,8 +1701,8 @@ function FormAguardarRetorno({
           </div>
 
           {/* 2. PROTOCOLO DA SOLICITAÇÃO (somente leitura — não duplica nada) */}
-          <div className="rounded-lg border border-white/10 bg-[var(--surface-overlay)] overflow-hidden">
-            <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-white/10 flex items-center gap-2">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
+            <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
               <Send className="w-3.5 h-3.5 text-[#7dd3fc]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
                 Protocolo da solicitação
@@ -1961,7 +1961,7 @@ function InformarProtocoloInline({
   }
 
   return (
-    <div className="px-3.5 py-2.5 border-t border-white/10">
+    <div className="px-3.5 py-2.5 border-t border-[var(--border-default)]">
       {!aberto ? (
         <button
           onClick={() => setAberto(true)}
@@ -1977,7 +1977,7 @@ function InformarProtocoloInline({
             onChange={(e) => setNumero(e.target.value)}
             placeholder="Número devolvido pelo cartório"
             autoFocus
-            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 font-mono"
+            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 font-mono"
           />
           <button
             onClick={registrar}
@@ -2331,7 +2331,7 @@ function FormReceberCertidao({
                     className={`text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
                         ? "border-[#4ade80]/60 bg-[#4ade80]/10 ring-1 ring-[#4ade80]/30"
-                        : "border-white/10 bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -2339,7 +2339,7 @@ function FormReceberCertidao({
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           ativo
                             ? "border-[#4ade80]/30 bg-[#4ade80]/15"
-                            : "border-white/30 bg-transparent"
+                            : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
                         {ativo && (
@@ -2370,7 +2370,7 @@ function FormReceberCertidao({
               3. LOCALIZAÇÃO FÍSICA (condicional)
              ═══════════════════════════════════════════════════════ */}
           {showPhysicalLocation && (
-            <div className="p-3 rounded-lg border border-white/10 bg-[var(--surface-overlay)]">
+            <div className="p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)]">
               <Label>📍 Localização física do papel</Label>
               <input
                 type="text"
@@ -2747,7 +2747,7 @@ function FormConferirCertidao({
         <div className="space-y-5">
           {/* Anexo da certidão (link) */}
           {arquivoUrl && (
-            <div className="px-3 py-2 rounded-md border border-white/10 bg-[var(--surface-overlay)] flex items-center gap-2">
+            <div className="px-3 py-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] flex items-center gap-2">
               <FileCheck className="w-3.5 h-3.5 text-[#7dd3fc] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] text-white/70">Anexo recebido</div>
@@ -2885,7 +2885,7 @@ function FormConferirCertidao({
                     className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       isChecked
                         ? "border-[#4ade80]/40 bg-[#4ade80]/10"
-                        : "border-white/10 bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -2893,7 +2893,7 @@ function FormConferirCertidao({
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           isChecked
                             ? "border-[#4ade80]/30 bg-[#4ade80]/15"
-                            : "border-white/30 bg-transparent"
+                            : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
                         {isChecked && (
@@ -3027,7 +3027,7 @@ function ResultadoBtn({
     <button
       onClick={onClick}
       className={`px-3 py-3 rounded-md border text-center transition-all ${
-        ativo ? cls.ativo + " ring-1 ring-current/40" : "border-white/10 bg-[var(--surface-overlay)] hover:bg-[#20262e] text-white/80"
+        ativo ? cls.ativo + " ring-1 ring-current/40" : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e] text-white/80"
       }`}
     >
       <div className={`flex justify-center mb-1.5 ${ativo ? cls.icon : "text-white/60"}`}>{icon}</div>
@@ -3374,8 +3374,8 @@ function FormValidarCertidao({
           {/* ═══════════════════════════════════════════════════════
               1. CONTEXTO DA DECISÃO (read-only)
              ═══════════════════════════════════════════════════════ */}
-          <div className="rounded-lg border border-white/10 bg-[var(--surface-overlay)] overflow-hidden">
-            <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-white/10 flex items-center gap-2">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
+            <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
               <Scale className="w-3.5 h-3.5 text-[#d2a948]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">
                 Contexto da decisão
@@ -3472,7 +3472,7 @@ function FormValidarCertidao({
                     className={`w-full text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
                         ? colorMap[opt.cor]
-                        : "border-white/10 bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -3480,7 +3480,7 @@ function FormValidarCertidao({
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           ativo
                             ? `border-${opt.cor}-400 bg-${opt.cor}-500`
-                            : "border-white/30 bg-transparent"
+                            : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
                         {ativo && <div className="w-2 h-2 rounded-full bg-[var(--surface-popover)]" />}
@@ -3769,7 +3769,7 @@ function FileUploadField({
           onClick={openPicker}
           disabled={disabled}
           className={`w-full px-3 py-3.5 bg-[var(--surface-overlay)] border border-dashed rounded-md text-left hover:bg-[#20262e] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            invalid ? "border-[#d2a948]/40" : "border-white/15"
+            invalid ? "border-[#d2a948]/40" : "border-[var(--border-default)]"
           }`}
         >
           <div className="flex items-center gap-2.5">
@@ -3965,8 +3965,8 @@ function SituacaoDaEtapa({
     null
   const prazoDias = numeroOuNulo(etapa?.slaDays)
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--surface-overlay)] overflow-hidden">
-      <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-white/10 flex items-center gap-2">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
+      <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
         <Clock className="w-3.5 h-3.5 text-[#7dd3fc]" />
         <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">Situação atual</span>
       </div>

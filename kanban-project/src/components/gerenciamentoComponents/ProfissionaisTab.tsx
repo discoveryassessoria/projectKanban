@@ -49,7 +49,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 
 /** O conselho é um VALOR; a lista só poupa digitação. */
@@ -180,7 +180,7 @@ export function ProfissionaisTab() {
         </label>
         <button
           onClick={() => { setErroForm(null); setForm({ ...vazio() }) }}
-          className="ml-auto rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/10"
+          className="ml-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white hover:bg-[var(--surface-hover)]"
         >+ Novo profissional</button>
       </div>
 
@@ -189,13 +189,13 @@ export function ProfissionaisTab() {
       {carregando ? (
         <p className="py-10 text-center text-sm text-white/40">Carregando…</p>
       ) : lista.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-white/15 p-8 text-center text-sm text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/40">
           {busca ? "Nenhum profissional encontrado para essa busca." : "Nenhum profissional cadastrado ainda."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-white/10">
+        <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
           <table className="w-full text-sm">
-            <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-white/40">
+            <thead className="bg-[var(--surface-primary)] text-left text-xs uppercase tracking-wide text-white/40">
               <tr>
                 <th className="px-4 py-2.5">Nome</th>
                 <th className="px-4 py-2.5">Categoria</th>
@@ -207,7 +207,7 @@ export function ProfissionaisTab() {
             </thead>
             <tbody>
               {lista.map((p) => (
-                <tr key={p.id} className={`border-t border-white/5 ${p.ativo ? "" : "opacity-50"}`}>
+                <tr key={p.id} className={`border-t border-[var(--border-subtle)] ${p.ativo ? "" : "opacity-50"}`}>
                   <td className="px-4 py-2.5 text-white/90">{p.nome}</td>
                   <td className="px-4 py-2.5 text-white/60">{p.categoria?.nome ?? "—"}</td>
                   <td className="px-4 py-2.5 text-white/60">
@@ -226,16 +226,16 @@ export function ProfissionaisTab() {
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <button onClick={() => { setErroForm(null); setForm({ ...p }) }}
-                      className="rounded border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/10">Editar</button>
+                      className="rounded border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Editar</button>
                     <button onClick={() => void alternarAtivo(p)}
-                      className="ml-2 rounded border border-white/10 px-2 py-1 text-xs text-white/70 hover:bg-white/10">
+                      className="ml-2 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 hover:bg-[var(--surface-hover)]">
                       {p.ativo ? "Tirar de circulação" : "Reativar"}
                     </button>
                     {/* EXCLUIR só aparece para quem nunca foi usado — quem já conduziu
                         um pedido é histórico, e o botão diria uma coisa que não pode fazer. */}
                     {p._count.retificacoes === 0 && (
                       <button onClick={() => void excluir(p)}
-                        className="ml-2 rounded border border-white/10 px-2 py-1 text-xs text-red-300/80 hover:bg-red-500/10">Excluir</button>
+                        className="ml-2 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-red-300/80 hover:bg-red-500/10">Excluir</button>
                     )}
                   </td>
                 </tr>
@@ -247,7 +247,7 @@ export function ProfissionaisTab() {
 
       {form && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setForm(null)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-white/10 bg-[#0f1115] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[#0f1115] p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-medium text-white">
               {form.id ? "Editar profissional" : "Novo profissional"}
             </h3>
@@ -297,12 +297,12 @@ export function ProfissionaisTab() {
               </label>
             </div>
 
-            <div className="mt-5 rounded-lg border border-white/10 bg-black/20 p-3">
+            <div className="mt-5 rounded-lg border border-[var(--border-default)] bg-black/20 p-3">
               <div className="flex items-center justify-between">
                 <label className={`${labelCls} mb-0`}>Registros de classe</label>
                 <button
                   onClick={() => setForm((f) => f ? { ...f, registros: [...f.registros, { tipo: "OAB", numero: "", jurisdicao: null, orgaoDeClasseId: null, ativo: true }] } : f)}
-                  className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10">+ Registro</button>
+                  className="rounded-lg border border-[var(--border-default)] px-2 py-1 text-[11px] text-white/70 hover:bg-[var(--surface-hover)]">+ Registro</button>
               </div>
               <p className="mt-1 text-[11px] text-white/35">
                 O tipo é um valor, não uma estrutura: OAB, CRC, JUCESP. A mesma inscrição não se repete no sistema —
@@ -320,7 +320,7 @@ export function ProfissionaisTab() {
                   <input className={inputCls} placeholder="UF" value={r.jurisdicao ?? ""}
                     onChange={(e) => setRegistro(i, { jurisdicao: e.target.value.toUpperCase() || null })} />
                   <button onClick={() => setForm((f) => f ? { ...f, registros: f.registros.filter((_, k) => k !== i) } : f)}
-                    className="rounded border border-white/10 px-2 py-2 text-xs text-red-300/80 hover:bg-red-500/10">Remover</button>
+                    className="rounded border border-[var(--border-default)] px-2 py-2 text-xs text-red-300/80 hover:bg-red-500/10">Remover</button>
                 </div>
               ))}
               <datalist id="tipos-registro">
@@ -329,9 +329,9 @@ export function ProfissionaisTab() {
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
+              <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button onClick={() => void salvar()} disabled={salvando || !form.nome.trim() || !form.categoriaId}
-                className="rounded-lg border border-white/10 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-40">
+                className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--surface-hover)] disabled:opacity-40">
                 {salvando ? "Salvando…" : "Salvar"}
               </button>
             </div>

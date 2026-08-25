@@ -32,7 +32,7 @@ interface ImpostosData {
 
 function statusBadge(status: string) {
   if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Pago</span>
-  if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-white/60 border border-white/20">Previsto</span>
+  if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Previsto</span>
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">A pagar</span>
 }
 
@@ -56,7 +56,7 @@ export default function ImpostosTab() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Receipt className="h-5 w-5" /> Impostos e Tributos <span className="text-[10px] text-white/40 bg-white/5 px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Receipt className="h-5 w-5" /> Impostos e Tributos <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
           <div className="text-xs text-white/60 mt-1">Provisão automática · {k.qtdPendentes} guias em aberto · regime Simples Nacional</div>
         </div>
         <div className="flex items-center gap-2">
@@ -76,7 +76,7 @@ export default function ImpostosTab() {
       {/* CALENDÁRIO + CARGA */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {/* calendário de vencimentos */}
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+        <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2"><Calendar className="h-4 w-4" /> Calendário de Vencimentos</div>
             <span className="text-[11px] text-white/40">{d.calendario.length} vencimentos</span>
@@ -99,7 +99,7 @@ export default function ImpostosTab() {
         </div>
 
         {/* carga tributária */}
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+        <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><BarChart3 className="h-4 w-4" /> Carga Tributária · Histórico</div>
           <div className="space-y-3">
             {d.cargaTributaria.map((c, i) => (
@@ -108,7 +108,7 @@ export default function ImpostosTab() {
                   <span className="text-white/60">{c.mes}</span>
                   <strong className="text-white">{fmtPct(c.pct)}</strong>
                 </div>
-                <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
                   <div className="h-full bg-red-500/70 rounded-full" style={{ width: `${(c.pct / 20) * 100}%` }} />
                 </div>
               </div>
@@ -122,10 +122,10 @@ export default function ImpostosTab() {
       </div>
 
       {/* TABELA */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 overflow-x-auto">
+      <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         <table className="w-full text-sm min-w-[680px]">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-white/10">
+            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">Tributo</th>
               <th className="text-left font-medium py-1.5">Competência</th>
               <th className="text-right font-medium py-1.5">Base</th>
@@ -137,7 +137,7 @@ export default function ImpostosTab() {
           </thead>
           <tbody>
             {d.tributos.map(t => (
-              <tr key={t.id} className="border-b border-white/5 last:border-0 hover:bg-white/5">
+              <tr key={t.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                 <td className="py-2 text-white/90 font-medium">{t.tipo}</td>
                 <td className="py-2 text-white/60 capitalize">{fmtMonth(t.competencia)}</td>
                 <td className="py-2 text-right text-white/70 tabular-nums">{fmtBRL(t.base)}</td>
@@ -155,7 +155,7 @@ export default function ImpostosTab() {
       </div>
 
       {/* nota */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-white/5 border border-white/10 rounded-lg p-3">
+      <div className="flex items-start gap-2 text-xs text-white/50 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Esta aba é uma <strong className="text-white/70">prévia</strong> com dados de exemplo. A provisão automática de tributos (calculada sobre a receita real) será ligada a uma estrutura própria numa próxima etapa.</span>
       </div>
@@ -165,12 +165,12 @@ export default function ImpostosTab() {
 
 // SUBCOMPONENTES
 function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-white/30 text-white hover:bg-white/10">{icon}{children}</button>
+  return <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-transparent border border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">{icon}{children}</button>
 }
 function Kpi({ label, value, sub, valueColor = "text-white" }: { label: string; value: string; sub?: string; valueColor?: string }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm p-4 relative">
-      <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-white/5 px-1.5 py-0.5 rounded">prévia</span>
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4 relative">
+      <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>
       <div className="text-white/50 text-xs font-medium">{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
       {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}

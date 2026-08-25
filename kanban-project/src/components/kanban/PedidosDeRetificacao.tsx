@@ -117,7 +117,7 @@ export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: numb
           onClick={() => { setErro(null); setAbrindo(true) }}
           disabled={disponiveis.length === 0}
           title={disponiveis.length === 0 ? "Não há divergência marcada para retificação e ainda sem pedido." : undefined}
-          className="whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white hover:bg-white/10 disabled:opacity-40"
+          className="whitespace-nowrap rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white hover:bg-[var(--surface-hover)] disabled:opacity-40"
         >+ Abrir pedido</button>
       </div>
 
@@ -126,14 +126,14 @@ export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: numb
       {carregando ? (
         <p className="py-6 text-center text-xs text-white/40">Carregando…</p>
       ) : pedidos.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-white/15 p-6 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-6 text-center text-xs text-white/40">
           Nenhum pedido aberto. A fase só cria etapas depois que existir um — abra o pedido com as
           divergências que vão no mesmo procedimento.
         </p>
       ) : (
         <div className="space-y-2">
           {pedidos.map((p) => (
-            <div key={p.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div key={p.id} className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
               <div className="flex flex-wrap items-baseline gap-x-3">
                 <span className="text-sm text-white/90">{p.num}</span>
                 <span className="text-xs text-white/50">{p.tipo ?? "modo a definir"}</span>
@@ -155,7 +155,7 @@ export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: numb
 
       {abrindo && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setAbrindo(false)}>
-          <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-xl border border-white/10 bg-[#0f1115] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[#0f1115] p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-medium text-white">Abrir pedido de retificação</h3>
             <p className="mt-1 text-xs text-white/45">
               Marque as divergências que vão no MESMO procedimento. As que ficarem de fora podem ir num
@@ -167,7 +167,7 @@ export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: numb
                 <p className="text-xs text-white/40">Nenhuma divergência disponível para agrupar.</p>
               )}
               {disponiveis.map((d) => (
-                <label key={d.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <label key={d.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
                   <input type="checkbox" className="mt-0.5" checked={selecionadas.has(d.id)} onChange={() => alternar(d.id)} />
                   <span className="text-xs text-white/70">
                     <b className="text-white/90">{d.campoLabel}</b> — {d.valorDocumento ?? "—"} → {d.valorArvore ?? "—"}
@@ -180,13 +180,13 @@ export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: numb
             <div className="mt-3">
               <label className="mb-1 block text-[11px] uppercase tracking-wide text-white/40">Motivo (opcional)</label>
               <textarea rows={2} value={motivo} onChange={(e) => setMotivo(e.target.value)}
-                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20" />
+                className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none focus:border-white/20" />
             </div>
 
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setAbrindo(false)} className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
+              <button onClick={() => setAbrindo(false)} className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button onClick={() => void abrirPedido()} disabled={salvando || selecionadas.size === 0}
-                className="rounded-lg border border-white/10 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-40">
+                className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--surface-hover)] disabled:opacity-40">
                 {salvando ? "Abrindo…" : `Abrir com ${selecionadas.size} divergência(s)`}
               </button>
             </div>

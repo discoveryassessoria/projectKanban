@@ -220,7 +220,7 @@ export default function RolesTab() {
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         placeholder="Buscar perfil..."
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
+        className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
       {/* Estados */}
@@ -238,7 +238,7 @@ export default function RolesTab() {
       )}
 
       {!loading && !erroLista && perfisFiltrados.length === 0 && (
-        <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
           {busca ? 'Nenhum perfil encontrado.' : 'Nenhum perfil cadastrado ainda. Crie o primeiro.'}
         </div>
       )}
@@ -253,7 +253,7 @@ export default function RolesTab() {
             return (
               <div
                 key={p.id}
-                className="flex flex-col rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-white/20"
+                className="flex flex-col rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur transition hover:border-[var(--border-strong)]"
               >
                 <div className="mb-2 flex items-start gap-3">
                   <span
@@ -268,7 +268,7 @@ export default function RolesTab() {
                           Protegido
                         </span>
                       ) : p.sistema ? (
-                        <span className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/60">
+                        <span className="shrink-0 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white/60">
                           Padrão
                         </span>
                       ) : null}
@@ -291,13 +291,13 @@ export default function RolesTab() {
                 <div className="mt-auto flex items-center gap-2 text-xs">
                   <button
                     onClick={() => abrirEditar(p)}
-                    className="rounded-md border border-white/10 px-2.5 py-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+                    className="rounded-md border border-[var(--border-default)] px-2.5 py-1.5 text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"
                   >
                     {bloqueado ? 'Ver' : 'Editar'}
                   </button>
                   <button
                     onClick={() => abrirDuplicar(p)}
-                    className="rounded-md border border-white/10 px-2.5 py-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+                    className="rounded-md border border-[var(--border-default)] px-2.5 py-1.5 text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"
                   >
                     Duplicar
                   </button>
@@ -319,9 +319,9 @@ export default function RolesTab() {
       {/* Modal */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             {/* topo do modal */}
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
                 {editando ? (somenteLeitura ? 'Perfil Administrador' : 'Editar perfil') : 'Novo perfil'}
               </h3>
@@ -348,7 +348,7 @@ export default function RolesTab() {
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                     disabled={somenteLeitura}
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20 disabled:opacity-60"
+                    className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none focus:border-white/20 disabled:opacity-60"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -358,7 +358,7 @@ export default function RolesTab() {
                     onChange={(e) => setDescricao(e.target.value)}
                     disabled={somenteLeitura}
                     placeholder="Para que serve este perfil"
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20 disabled:opacity-60"
+                    className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20 disabled:opacity-60"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -415,7 +415,7 @@ export default function RolesTab() {
                     return (
                       <div
                         key={mod.modulo}
-                        className="rounded-lg border border-white/10 bg-white/[0.03] p-3"
+                        className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3"
                       >
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-sm font-medium text-white/90">
@@ -438,7 +438,7 @@ export default function RolesTab() {
                               <label
                                 key={k}
                                 className={`flex items-center gap-2 rounded px-2 py-1 text-xs ${
-                                  somenteLeitura ? 'cursor-default' : 'cursor-pointer hover:bg-white/5'
+                                  somenteLeitura ? 'cursor-default' : 'cursor-pointer hover:bg-[var(--surface-hover)]'
                                 }`}
                               >
                                 <input
@@ -467,7 +467,7 @@ export default function RolesTab() {
             </div>
 
             {/* rodapé */}
-            <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
+            <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button
                 onClick={() => setModalAberto(false)}
                 className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white"

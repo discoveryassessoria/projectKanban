@@ -44,9 +44,9 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
@@ -259,7 +259,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
           </button>
         </div>
         {rows.length > 6 && (
-          <div className="mt-4 border-t border-white/10 pt-4">
+          <div className="mt-4 border-t border-[var(--border-default)] pt-4">
             <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar…" className={`${inputCls} max-w-sm`} />
           </div>
         )}
@@ -267,7 +267,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
       <div className={`overflow-x-auto ${CARD}`}>
         <table className="w-full text-sm">
-          <thead className="border-b border-white/10 text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
             <tr>
               {spec.ordenavel && <th className="w-10 px-2 py-3 font-medium" aria-label="Ordem" />}
               {spec.colunas.map((c) => <th key={c.key} className="px-4 py-3 font-medium">{c.label}</th>)}
@@ -285,7 +285,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
             ) : filtradas.map((r, idx) => (
               <tr
                 key={String(r.id)}
-                className={`border-b border-white/5 last:border-0 ${arrastando === Number(r.id) ? "opacity-40" : ""}`}
+                className={`border-b border-[var(--border-subtle)] last:border-0 ${arrastando === Number(r.id) ? "opacity-40" : ""}`}
                 draggable={!!spec.ordenavel && !busca}
                 onDragStart={() => setArrastando(Number(r.id))}
                 onDragEnd={() => setArrastando(null)}
@@ -335,14 +335,14 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                   <button
                     onClick={() => alternarAtivo(r)}
                     title={r.ativo ? "Inativar (some dos seletores, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}
                   >
                     {r.ativo ? "Ativo" : "Inativo"}
                   </button>
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-white/50">
-                    <button title="Editar" aria-label="Editar" onClick={() => editar(r)} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                    <button title="Editar" aria-label="Editar" onClick={() => editar(r)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
                     <button title="Excluir" aria-label="Excluir" onClick={() => excluir(r)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                   </div>
                 </td>
@@ -354,8 +354,8 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => fecharModal()}>
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">
                 {spec.singular
                   ? `${form.id ? "Editar" : "Nova"} ${spec.singular}`
@@ -395,7 +395,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                           {opcoesDe(c).map((o) => <option key={o.valor} value={o.valor} className="bg-zinc-900">{o.label}</option>)}
                         </select>
                       ) : c.tipo === "multiselect" ? (
-                        <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-white/10 bg-white/5 p-2">
+                        <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-2">
                           {opcoesDe(c).length === 0 && <div className="px-1 py-2 text-xs text-white/40">Nenhuma opção disponível.</div>}
                           {opcoesDe(c).map((o) => {
                             const sel = Array.isArray(v) && (v as unknown[]).map(String).includes(o.valor)
@@ -431,8 +431,8 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                 })}
               </div>
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => fecharModal()} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => fecharModal()} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
                 {busy ? "Salvando…" : "Salvar"}
               </button>

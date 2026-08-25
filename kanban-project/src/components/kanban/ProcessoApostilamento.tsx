@@ -78,12 +78,12 @@ const PILL_DOT: Record<string, string> = {
   validado: "bg-[#4ade80]",
   bloqueado: "bg-[#f87171]",
   correcao_solicitada: "bg-[#f87171]",
-  pendente: "bg-white/25",
+  pendente: "bg-[var(--surface-secondary)]",
 }
 const pillCls = (s: string) => PILL[s] || "bg-[#d2a948]/12 text-[#d2a948]"
 const pillDot = (s: string) => PILL_DOT[s] || "bg-amber-400"
 
-const EC = "w-full text-sm border border-white/10 rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
+const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
@@ -163,7 +163,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
 
   if (!pasta) {
     return (
-      <div className="rounded-xl border border-dashed border-white/15 p-8 text-center text-sm text-white/55">
+      <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/55">
         Este processo ainda não está na fase de Apostilamento.
       </div>
     )
@@ -218,7 +218,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-4">
         <div className="space-y-4">
           {/* Barra das 6 etapas */}
-          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <div className="flex items-start">
               {pasta.workflow.map((s, i) => {
                 const done = s.status === "concluida"
@@ -252,7 +252,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
             </div>
 
             {!concluida && activeStep && (
-              <div className="mt-3 pt-3 border-t border-white/10 flex justify-end">
+              <div className="mt-3 pt-3 border-t border-[var(--border-default)] flex justify-end">
                 <button
                   onClick={() => setModalStep(activeStep.id)}
                   className="px-3 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2"
@@ -264,7 +264,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           </div>
 
           {/* Card de contexto */}
-          <div className="rounded-xl border border-white/10 bg-[#20262e] p-4 flex items-start gap-3">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[#20262e] p-4 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0">
               <FolderOpen className="w-5 h-5" />
             </div>
@@ -287,7 +287,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           {/* 8 KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {kpis.map(([ic, val, lbl]) => (
-              <div key={lbl} className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2.5">
+              <div key={lbl} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5">
                 <div className="text-base leading-none">{ic}</div>
                 <div className="text-xl font-bold text-white/95 mt-1">{val}</div>
                 <div className="text-[11px] text-white/55">{lbl}</div>
@@ -296,8 +296,8 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           </div>
 
           {/* Tabela */}
-          <div className="rounded-xl border border-white/10 overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-white/10 flex items-center gap-2">
+          <div className="rounded-xl border border-[var(--border-default)] overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-[var(--border-default)] flex items-center gap-2">
               <span className="text-sm font-semibold text-white/95">Documentos da pasta de apostilamento</span>
               <span className="text-xs font-semibold text-white/55 bg-[#252c35] rounded-full px-2 py-0.5">{docs.length}</span>
             </div>
@@ -347,23 +347,23 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
 
         {/* Coluna direita */}
         <aside className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
             <div className="space-y-2">
               <button
                 onClick={() => activeStep ? setModalStep(activeStep.id) : setAviso("A fase já está concluída.")}
-                className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 inline-flex items-center gap-2">
+                className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">
                 <FolderOpen className="w-4 h-4 text-white/40" /> Abrir etapa atual
               </button>
               <button
                 onClick={() => setAviso("Cartórios / autoridades de apostilamento — em breve.")}
-                className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 inline-flex items-center gap-2">
+                className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">
                 <Users className="w-4 h-4 text-white/40" /> Cartórios / autoridades
               </button>
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 rounded-lg px-3 py-2">
@@ -380,7 +380,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Últimas movimentações</h3>
             <div className="text-xs text-white/40">Sem movimentações.</div>
           </div>
@@ -407,7 +407,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
 
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-center">
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center">
       <div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div>
       <div className="text-[11px] text-white/55 whitespace-nowrap">{label}</div>
     </div>
@@ -527,7 +527,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
-        <div className="flex items-start justify-between px-5 py-4 border-b border-white/10">
+        <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7dd3fc]">Etapa {num} de 6 · Workflow do Apostilamento</div>
             <h3 className="text-base font-bold text-white/95 mt-0.5">{title}</h3>
@@ -542,7 +542,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <Sec>Documentos incluídos ({docs.length})</Sec>
               <div className="space-y-2">
                 {docs.map((d) => (
-                  <div key={d.id} className="flex items-center gap-3 border border-white/10 rounded-lg px-3 py-2">
+                  <div key={d.id} className="flex items-center gap-3 border border-[var(--border-default)] rounded-lg px-3 py-2">
                     <span className="text-base">📄</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-white/95">{d.documentoTitulo}</div>
@@ -559,7 +559,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                   <div className="flex gap-2">
                     {TIPO_APOSTILA.map(([v, l]) => (
                       <button key={v} type="button" onClick={() => setTipo(v)}
-                        className={`flex-1 px-3 py-2 text-xs font-semibold rounded-md border ${tipo === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>{l}</button>
+                        className={`flex-1 px-3 py-2 text-xs font-semibold rounded-md border ${tipo === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-[var(--border-default)] text-white/80"}`}>{l}</button>
                     ))}
                   </div>
                 </Field>
@@ -571,8 +571,8 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <div className="space-y-2">
                 {MONTAR_CHK.map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setMontarChk((p) => ({ ...p, [key]: !p[key] }))}
-                    className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
-                    <span className={`w-4 h-4 rounded flex items-center justify-center ${montarChk[key] ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>
+                    className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/80"}`}>
+                    <span className={`w-4 h-4 rounded flex items-center justify-center ${montarChk[key] ? "bg-[#4ade80] text-white" : "border border-[var(--border-default)]"}`}>
                       {montarChk[key] && <Check className="w-3 h-3" />}
                     </span>
                     {label}
@@ -596,7 +596,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                 <div className="flex flex-wrap gap-2">
                   {CANAIS.map(([v, l]) => (
                     <button key={v} type="button" onClick={() => setCanal(v)}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${canal === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-white/10 text-white/80"}`}>{l}</button>
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md border ${canal === v ? "border-[#2563eb] bg-[#20262e] text-white" : "border-[var(--border-default)] text-white/80"}`}>{l}</button>
                   ))}
                 </div>
               </Field>
@@ -615,7 +615,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
           {/* 3) Aguardar */}
           {stepId === "aguardar_retorno_apostilamento" && (
             <>
-              <div className="rounded-lg border border-white/10 bg-[#20262e] p-3">
+              <div className="rounded-lg border border-[var(--border-default)] bg-[#20262e] p-3">
                 <div className="text-xs font-semibold text-white/80 mb-2">🏛️ Resumo do envio</div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <Cell k="Autoridade" v={pasta.authorityName || "—"} />
@@ -634,16 +634,16 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <Sec>Documentos apostilados ({docs.length})</Sec>
               <div className="space-y-2">
                 {docs.map((d) => (
-                  <div key={d.id} className="border border-white/10 rounded-lg px-3 py-2 space-y-2">
+                  <div key={d.id} className="border border-[var(--border-default)] rounded-lg px-3 py-2 space-y-2">
                     <div className="text-sm font-medium text-white/95">{d.documentoTitulo}</div>
                     <div className="text-[11px] text-white/55">{d.pessoaNome}</div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <input className="text-xs border border-white/10 rounded-md px-2 py-1.5 w-32" placeholder="Nº da apostila"
+                      <input className="text-xs border border-[var(--border-default)] rounded-md px-2 py-1.5 w-32" placeholder="Nº da apostila"
                         value={nums[d.documentoId] || ""} onChange={(e) => setNums((p) => ({ ...p, [d.documentoId]: e.target.value }))} />
-                      <input className="text-xs border border-white/10 rounded-md px-2 py-1.5 w-28" placeholder="Data"
+                      <input className="text-xs border border-[var(--border-default)] rounded-md px-2 py-1.5 w-28" placeholder="Data"
                         value={dates[d.documentoId] || ""} onChange={(e) => setDates((p) => ({ ...p, [d.documentoId]: e.target.value }))} />
                       <button type="button" onClick={() => setFiles((p) => ({ ...p, [d.documentoId]: `apostilado_${d.documentoId}.pdf` }))}
-                        className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-md border px-3 py-1.5 ${files[d.documentoId] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/80"}`}>
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-md border px-3 py-1.5 ${files[d.documentoId] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/80"}`}>
                         {files[d.documentoId] ? <Check className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                         {files[d.documentoId] ? "Anexado" : "Anexar"}
                       </button>
@@ -663,7 +663,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
           {stepId === "conferir_apostilas" && (
             <div className="space-y-3">
               {docs.map((d) => (
-                <div key={d.id} className="border border-white/10 rounded-lg p-3">
+                <div key={d.id} className="border border-[var(--border-default)] rounded-lg p-3">
                   <div className="flex items-baseline gap-2 mb-2">
                     <b className="text-sm text-white/95">{d.documentoTitulo}</b>
                     <small className="text-[11px] text-white/55">{d.pessoaNome}{d.apostilleNumber ? ` · Apostila ${d.apostilleNumber}` : ""}</small>
@@ -674,8 +674,8 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       const on = confChk[key]
                       return (
                         <button key={ci} type="button" onClick={() => setConfChk((p) => ({ ...p, [key]: !p[key] }))}
-                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-white/10 text-white/68"}`}>
-                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${on ? "bg-[#4ade80] text-white" : "border border-white/15"}`}>{on && <Check className="w-2.5 h-2.5" />}</span>
+                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/68"}`}>
+                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${on ? "bg-[#4ade80] text-white" : "border border-[var(--border-default)]"}`}>{on && <Check className="w-2.5 h-2.5" />}</span>
                           {c}
                         </button>
                       )
@@ -684,7 +684,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                   <div className="flex flex-wrap gap-2">
                     {CONF_RES.map(([v, l, tone]) => {
                       const sel = confRes[d.documentoId] === v
-                      const selCls = !sel ? "border-white/10 text-white/80"
+                      const selCls = !sel ? "border-[var(--border-default)] text-white/80"
                         : tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]"
                           : tone === "warn" ? "border-[#d2a948]/25 bg-[#d2a948]/12 text-[#d2a948]"
                             : tone === "crit" ? "border-[#f87171]/25 bg-[#f87171]/12 text-[#f87171]"
@@ -715,7 +715,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <div className="space-y-2">
                 {VALIDAR_DECS.map(([v, l, sub]) => (
                   <button key={v} type="button" onClick={() => setDecision(v)}
-                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? "border-[#2563eb] bg-[#20262e]" : "border-white/10"}`}>
+                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? "border-[#2563eb] bg-[#20262e]" : "border-[var(--border-default)]"}`}>
                     <div className="text-sm font-semibold text-white/95">{l}</div>
                     <div className="text-[11px] text-white/55">{sub}</div>
                   </button>
@@ -728,7 +728,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
           {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-sm text-[#f87171]">{erro}</div>}
         </div>
 
-        <div className="border-t border-white/10 px-5 py-3 flex justify-end gap-2">
+        <div className="border-t border-[var(--border-default)] px-5 py-3 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
           <button onClick={submit} disabled={!podeSalvar || posting}
             className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -758,5 +758,5 @@ function Cell({ k, v }: { k: string; v: string }) {
   return <div><div className="text-[10px] uppercase text-white/40">{k}</div><div className="font-semibold text-white/95">{v}</div></div>
 }
 function Resumo({ n, l }: { n: number; l: string }) {
-  return <div className="rounded-lg border border-white/10 py-2"><div className="text-lg font-bold text-white/95">{n}</div><div className="text-[10px] text-white/55">{l}</div></div>
+  return <div className="rounded-lg border border-[var(--border-default)] py-2"><div className="text-lg font-bold text-white/95">{n}</div><div className="text-[10px] text-white/55">{l}</div></div>
 }

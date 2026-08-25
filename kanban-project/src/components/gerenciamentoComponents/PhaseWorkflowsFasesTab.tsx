@@ -119,7 +119,7 @@ function authHeaders(): HeadersInit {
            : { "Content-Type": "application/json" }
 }
 
-const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
+const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 
 // ícones compactos
@@ -329,7 +329,7 @@ export default function PhaseWorkflowsFasesTab() {
       )}
 
       {/* cabeçalho */}
-      <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+      <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Workflows Internos das Fases</h2>
         <p className="mt-1 text-sm text-white/60">
           Os workflows internos definem os passos <strong>dentro</strong> de cada fase. Escolha o Processo para ver os workflows aplicados por fase. Para criar ou editar modelos reutilizáveis, use a biblioteca <span className="text-blue-300">“Modelos de Workflow Interno”</span>.
@@ -349,7 +349,7 @@ export default function PhaseWorkflowsFasesTab() {
         {proc && fasesOrdenadas.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <button onClick={() => setPhaseFilter([])}
-              className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${phaseFilter.length === 0 ? "bg-blue-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}>
+              className={`rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${phaseFilter.length === 0 ? "bg-blue-600 text-white" : "bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
               Todas as fases
             </button>
             <span className="text-white/20">|</span>
@@ -357,7 +357,7 @@ export default function PhaseWorkflowsFasesTab() {
               const on = phaseFilter.includes(p.phaseKey)
               return (
                 <button key={p.phaseKey} onClick={() => togglePhase(p.phaseKey)}
-                  className={`rounded-full px-3 py-1 text-[11px] transition-colors ${on ? "bg-blue-600 text-white" : "bg-white/5 text-white/60 hover:bg-white/10"}`}>
+                  className={`rounded-full px-3 py-1 text-[11px] transition-colors ${on ? "bg-blue-600 text-white" : "bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
                   {on ? "✓ " : ""}{p.label}
                 </button>
               )
@@ -368,12 +368,12 @@ export default function PhaseWorkflowsFasesTab() {
 
       {/* corpo */}
       {!proc && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-sm text-white/50">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/50">
           Escolha um Processo de Nacionalidade para ver os workflows internos de cada fase.
         </div>
       )}
       {proc && fasesOrdenadas.length === 0 && (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-sm text-white/50">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/50">
           Este processo ainda não possui fases no Workflow Macro.
         </div>
       )}
@@ -381,14 +381,14 @@ export default function PhaseWorkflowsFasesTab() {
       {proc && fasesVisiveis.map(p => {
         const wf = workflowForPhase(p.phaseKey)
         return (
-          <div key={p.phaseKey} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
+          <div key={p.phaseKey} className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
             {/* header do card */}
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-white">[{p.order}] {p.label}</span>
                   {wf && (
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${wf.tipoProcessoId === null ? "bg-white/10 text-white/60" : "bg-sky-500/15 text-sky-300"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${wf.tipoProcessoId === null ? "bg-[var(--surface-primary)] text-white/60" : "bg-sky-500/15 text-sky-300"}`}>
                       {wf.tipoProcessoId === null ? "global (compartilhado)" : "deste processo"}
                     </span>
                   )}
@@ -422,14 +422,14 @@ export default function PhaseWorkflowsFasesTab() {
                       <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">perfil: {wf.perfis[0].name}</span>
                     )}
                     {wf.familiaDocumental && (
-                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/70">família: {wf.familiaDocumental.name}</span>
+                      <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">família: {wf.familiaDocumental.name}</span>
                     )}
-                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/70">
+                    <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">
                       {CARDINALIDADE_LABEL[wf.escopoExecucao] ?? wf.escopoExecucao}
                     </span>
                     {wf.exigeDocumento && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">exige documento</span>}
                     {wf.exigePessoa && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">exige pessoa</span>}
-                    {wf.versao != null && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50">v{wf.versao}</span>}
+                    {wf.versao != null && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/50">v{wf.versao}</span>}
                     {wf.rascunhoAlteradoEm && (
                       <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300" title="Há alterações salvas que ainda não valem para os processos.">
                         rascunho não publicado
@@ -444,10 +444,10 @@ export default function PhaseWorkflowsFasesTab() {
                   {/* PUBLICAR É UM ATO SEPARADO DE SALVAR. Enquanto não se clica aqui,
                       o que os processos leem continua sendo a versão anterior. */}
                   <button onClick={() => setPublicarWf(wf)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-medium ${wf.rascunhoAlteradoEm ? "bg-emerald-600 text-white hover:bg-emerald-500" : "border border-white/10 bg-white/5 text-white/60 hover:bg-white/10"}`}>
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium ${wf.rascunhoAlteradoEm ? "bg-emerald-600 text-white hover:bg-emerald-500" : "border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
                     Publicar…
                   </button>
-                  <button onClick={() => excluirWorkflow(wf)} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">Excluir</button>
+                  <button onClick={() => excluirWorkflow(wf)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">Excluir</button>
                 </div>
               )}
             </div>
@@ -462,7 +462,7 @@ export default function PhaseWorkflowsFasesTab() {
             ) : (
               <div className="mt-3 space-y-1.5">
                 {wf.passos.slice().sort((a, b) => a.ordem - b.ordem).map((st, idx, arr) => (
-                  <div key={st.key} className="flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                  <div key={st.key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
                     <div className="min-w-0">
                       <div className="truncate text-sm text-white">{idx + 1}. {st.label}</div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -476,11 +476,11 @@ export default function PhaseWorkflowsFasesTab() {
                             eram nove selos misturando as duas coisas. */}
                         {st.required
                           ? <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatório</span>
-                          : <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50">opcional</span>}
+                          : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/50">opcional</span>}
                         <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{CARDINALIDADE_LABEL[st.cardinalidade || ""] ?? st.cardinalidade}</span>
-                        {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">prazo {st.slaDays}d</span>}
-                        {st.owner && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{st.owner}</span>}
-                        {!st.createsTask && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50" title="Não entra no roteiro de trabalho do operador.">sem trabalho operacional</span>}
+                        {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">prazo {st.slaDays}d</span>}
+                        {st.owner && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{st.owner}</span>}
+                        {!st.createsTask && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/50" title="Não entra no roteiro de trabalho do operador.">sem trabalho operacional</span>}
                         {(() => {
                           const partes = [
                             (st.subtarefas?.length ?? 0) > 0 ? `${st.subtarefas!.length} subtarefa${st.subtarefas!.length > 1 ? "s" : ""}` : null,
@@ -491,7 +491,7 @@ export default function PhaseWorkflowsFasesTab() {
                           ].filter(Boolean)
                           return partes.length > 0
                             ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{partes.join(" · ")}</span>
-                            : <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/35">sem configuração ainda</span>
+                            : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/35">sem configuração ainda</span>
                         })()}
                         {problemas.some((pr) => pr.stepKey === st.key) && <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-red-300">publicação recusada</span>}
                       </div>
@@ -505,9 +505,9 @@ export default function PhaseWorkflowsFasesTab() {
                           alcançar o resto do passo. Deixá-lo abrindo o configurador
                           seria a mesma duplicidade sem o segundo modal: dois botões
                           vizinhos para a mesma coisa. "Configurar" é a porta única. */}
-                      <button title="Duplicar" aria-label="Duplicar" onClick={() => dupStep(wf, st)} className="rounded p-1 hover:bg-white/10 hover:text-white"><ICopy /></button>
-                      <button title="Subir" aria-label="Subir" disabled={idx === 0} onClick={() => moveStep(wf, st, -1)} className="rounded p-1 hover:bg-white/10 hover:text-white disabled:opacity-30"><IUp /></button>
-                      <button title="Descer" aria-label="Descer" disabled={idx === arr.length - 1} onClick={() => moveStep(wf, st, 1)} className="rounded p-1 hover:bg-white/10 hover:text-white disabled:opacity-30"><IDown /></button>
+                      <button title="Duplicar" aria-label="Duplicar" onClick={() => dupStep(wf, st)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><ICopy /></button>
+                      <button title="Subir" aria-label="Subir" disabled={idx === 0} onClick={() => moveStep(wf, st, -1)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-30"><IUp /></button>
+                      <button title="Descer" aria-label="Descer" disabled={idx === arr.length - 1} onClick={() => moveStep(wf, st, 1)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-30"><IDown /></button>
                       <button title="Remover" aria-label="Remover" onClick={() => removeStep(wf, st)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                     </div>
                   </div>
@@ -553,8 +553,8 @@ export default function PhaseWorkflowsFasesTab() {
       {/* MODAL — aplicar modelo */}
       {applyFor && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setApplyFor(null)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">Aplicar modelo de workflow</h3>
               <p className="mt-0.5 text-xs text-white/50">Fase: {applyFor.label} · os passos do modelo serão copiados para esta fase.</p>
             </div>
@@ -563,7 +563,7 @@ export default function PhaseWorkflowsFasesTab() {
               {modelosOrdenados.map(m => {
                 const rec = (m.recommendedPhases || []).includes(applyFor.phaseKey)
                 return (
-                  <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 ${applySel === m.id ? "border-blue-400/50 bg-blue-500/10" : "border-white/10 bg-white/5 hover:bg-white/10"}`}>
+                  <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 ${applySel === m.id ? "border-blue-400/50 bg-blue-500/10" : "border-[var(--border-default)] bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)]"}`}>
                     <input type="radio" name="modelo" checked={applySel === m.id} onChange={() => setApplySel(m.id)} className="mt-1" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -576,8 +576,8 @@ export default function PhaseWorkflowsFasesTab() {
                 )
               })}
             </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => setApplyFor(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+              <button onClick={() => setApplyFor(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={!applySel || busy} onClick={() => applySel && aplicar(applySel, applyFor.phaseKey, applyFor.label)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Aplicar</button>
             </div>
           </div>
@@ -587,11 +587,11 @@ export default function PhaseWorkflowsFasesTab() {
       {/* MODAL — confirmar substituição */}
       {replaceAsk && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setReplaceAsk(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-white">Substituir os passos?</h3>
             <p className="mt-2 text-sm text-white/60">A fase <strong>{replaceAsk.label}</strong> já tem um workflow interno neste processo. Aplicar o modelo vai <strong>substituir os passos atuais</strong> pelos do modelo.</p>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setReplaceAsk(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
+              <button onClick={() => setReplaceAsk(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button disabled={busy} onClick={() => aplicar(replaceAsk.templateId, replaceAsk.phaseKey, replaceAsk.label, "replace")} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Substituir passos</button>
             </div>
           </div>

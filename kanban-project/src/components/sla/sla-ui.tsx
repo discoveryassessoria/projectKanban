@@ -48,8 +48,8 @@ export const CORES_SLA = {
     aro: "ring-emerald-400/25",
   },
   neutro: {
-    chip: "bg-white/10 text-white/70 border-white/15",
-    ponto: "bg-white/40",
+    chip: "bg-[var(--surface-primary)] text-white/70 border-[var(--border-default)]",
+    ponto: "bg-[var(--surface-elevated)]",
     texto: "text-white/70",
     aro: "ring-white/10",
   },

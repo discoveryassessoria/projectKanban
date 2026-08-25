@@ -57,7 +57,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
           </p>
           <button
             onClick={() => recarregar()}
-            className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/10"
+            className="rounded-lg border border-[var(--border-strong)] px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-[var(--surface-hover)]"
           >
             Tentar novamente
           </button>
@@ -96,7 +96,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 border-t border-white/10 pt-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 border-t border-[var(--border-default)] pt-3 sm:grid-cols-3">
           <Campo
             rotulo="Fase atual"
             valor={
@@ -133,7 +133,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
   })()
 
   return (
-    <section className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+    <section className="rounded-xl border border-[var(--border-default)] bg-white/[0.04] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
           <CalendarClock className="h-4 w-4" /> SLA

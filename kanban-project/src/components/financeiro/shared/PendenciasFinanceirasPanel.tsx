@@ -26,7 +26,7 @@ export default function PendenciasFinanceirasPanel({ processoId, compact = false
   const abertas = itens.filter((i) => !i.resolvida)
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4">
+    <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
       <div className="text-[11px] text-white/50 font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5">
         <AlertTriangle className="h-3.5 w-3.5" /> Pendências financeiras
         {abertas.length > 0 && <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 rounded-full">{abertas.length}</span>}

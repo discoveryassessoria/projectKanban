@@ -94,7 +94,7 @@ export function PhaseProgressHeader({
     ? "text-white tabular-nums"
     : "text-gray-900 tabular-nums"
   const countsCls = isDark ? "text-white/50" : "text-gray-500"
-  const trackCls = isDark ? "bg-white/10" : "bg-gray-200"
+  const trackCls = isDark ? "bg-[var(--surface-primary)]" : "bg-gray-200"
 
   // FONTE ÚNICA: projeção oficial (percentual, label e métricas). Sem recálculo local.
   const proj = data.projection ?? null

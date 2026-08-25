@@ -273,14 +273,14 @@ function DecisaoSobreCausa({
             rows={2}
             maxLength={300}
             placeholder="Por quê? (obrigatório — fica no histórico)"
-            className="mt-3 w-full resize-none rounded-md border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 placeholder:text-white/30 focus:border-white/30 focus:outline-none"
+            className="mt-3 w-full resize-none rounded-md border border-[var(--border-default)] bg-black/30 px-3 py-2 text-xs text-white/85 placeholder:text-white/30 focus:border-white/30 focus:outline-none"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => decidir("MANTER")}
               disabled={enviando !== null}
-              className="rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/15 disabled:opacity-50"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-[var(--surface-hover)] disabled:opacity-50"
             >
               {enviando === "MANTER" ? "Registrando…" : "Manter o trabalho"}
             </button>
@@ -824,14 +824,14 @@ export function ProcessoCentralOperacional({
   if (!data) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-white/60">
           <div className="text-white/80">Nenhuma operação materializada para este processo.</div>
           <div className="mt-1 text-xs text-white/45">
             A Central aparece quando o processo tem fase e workflow ativos.
           </div>
           <button
             onClick={() => carregar()}
-            className="mt-3 rounded-md border border-white/15 px-3 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+            className="mt-3 rounded-md border border-[var(--border-default)] px-3 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"
           >
             Tentar novamente
           </button>
@@ -987,7 +987,7 @@ export function ProcessoCentralOperacional({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedPhaseKey(null)}
-                className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-white/20 hover:text-[#fff] transition-colors"
+                className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-[var(--border-strong)] hover:text-[#fff] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Voltar à fase ativa
               </button>

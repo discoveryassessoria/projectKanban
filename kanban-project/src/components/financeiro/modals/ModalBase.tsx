@@ -45,12 +45,12 @@ export function ModalBase({
     <div className="fixed inset-0 flex items-center justify-center p-4 bg-[var(--overlay-modal)]" style={{ zIndex: LAYER.aboveProcess }}>
       <div className={`bg-[var(--surface-primary)] rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}>
         <div className={`${colorClasses[color]} text-white p-4 flex items-center gap-3`}>
-          <div className="bg-white/20 rounded-lg h-10 w-10 flex items-center justify-center text-xl">{icon}</div>
+          <div className="bg-[var(--surface-secondary)] rounded-lg h-10 w-10 flex items-center justify-center text-xl">{icon}</div>
           <div className="flex-1">
             <div className="font-bold text-lg">{title}</div>
             {subtitle && <div className="text-sm opacity-90">{subtitle}</div>}
           </div>
-          <button onClick={onClose} className="hover:bg-white/20 p-1 rounded">
+          <button onClick={onClose} className="hover:bg-[var(--surface-hover)] p-1 rounded">
             <X className="h-5 w-5" />
           </button>
         </div>

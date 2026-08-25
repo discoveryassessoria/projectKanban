@@ -94,7 +94,7 @@ export default function FinancasDashboard() {
           <p className="text-white/70">Visão geral das finanças da empresa</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+          <Button variant="outline" className="border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">
             <Calendar className="h-4 w-4 mr-2" />
             Janeiro 2026
           </Button>
@@ -104,7 +104,7 @@ export default function FinancasDashboard() {
       {/* Cards principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Saldo em Contas */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Saldo em Contas</CardTitle>
             <PiggyBank className="h-4 w-4 text-white/50" />
@@ -116,7 +116,7 @@ export default function FinancasDashboard() {
         </Card>
 
         {/* A Receber */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">A Receber</CardTitle>
             <Receipt className="h-4 w-4 text-green-400" />
@@ -133,7 +133,7 @@ export default function FinancasDashboard() {
         </Card>
 
         {/* A Pagar */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">A Pagar</CardTitle>
             <CreditCard className="h-4 w-4 text-red-400" />
@@ -150,7 +150,7 @@ export default function FinancasDashboard() {
         </Card>
 
         {/* Saldo do Mês */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Saldo do Mês</CardTitle>
             {resumo.saldoMes >= 0 ? (
@@ -180,7 +180,7 @@ export default function FinancasDashboard() {
       {/* Seção inferior */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Contas Vencendo */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-400" />
@@ -195,7 +195,7 @@ export default function FinancasDashboard() {
               {contasVencendo.map((conta) => (
                 <div 
                   key={conta.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     {conta.tipo === 'receber' ? (
@@ -228,7 +228,7 @@ export default function FinancasDashboard() {
         </Card>
 
         {/* Ações Rápidas */}
-        <Card className="bg-white/10 border-white/20 backdrop-blur-sm">
+        <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white">Ações Rápidas</CardTitle>
             <CardDescription className="text-white/50">

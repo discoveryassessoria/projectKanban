@@ -49,7 +49,7 @@ function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
-const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
+const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 
 /** Converte lista de objetos em CSV (separador ";", padrão pt-BR do Excel). */
 function paraCSV(linhas: Record<string, unknown>[]): string {
@@ -113,10 +113,10 @@ export default function ExportacoesTab() {
               cadastro usa — nada é recalculado nem duplicado aqui.
             </p>
           </div>
-          <div className="flex flex-none items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] p-1">
+          <div className="flex flex-none items-center gap-1 rounded-lg border border-[var(--border-default)] bg-white/[0.04] p-1">
             {(["csv", "json"] as const).map((f) => (
               <button key={f} onClick={() => setFormato(f)}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition ${formato === f ? "bg-white/15 text-white" : "text-white/55 hover:text-white"}`}>
+                className={`rounded px-3 py-1.5 text-xs font-medium transition ${formato === f ? "bg-[var(--surface-secondary)] text-white" : "text-white/55 hover:text-white"}`}>
                 {f.toUpperCase()}
               </button>
             ))}
@@ -126,7 +126,7 @@ export default function ExportacoesTab() {
 
       {modulos.map((m) => (
         <div key={m} className={`overflow-hidden ${CARD}`}>
-          <div className="border-b border-white/10 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-white/45">{m}</div>
+          <div className="border-b border-[var(--border-default)] px-4 py-3 text-[11px] font-bold uppercase tracking-[0.12em] text-white/45">{m}</div>
           <ul className="divide-y divide-white/5">
             {FONTES.filter((f) => f.modulo === m).map((f) => (
               <li key={f.chave} className="flex items-center justify-between gap-3 px-4 py-3">
@@ -137,7 +137,7 @@ export default function ExportacoesTab() {
                 <button
                   onClick={() => exportar(f)}
                   disabled={ocupada === f.chave}
-                  className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 disabled:opacity-40"
+                  className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/80 hover:bg-[var(--surface-hover)] disabled:opacity-40"
                 >
                   {ocupada === f.chave ? "Exportando…" : `Exportar ${formato.toUpperCase()}`}
                 </button>
