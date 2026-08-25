@@ -34,12 +34,27 @@ VALUES ('advogado', 'Advogado', 1),
        ('correspondente', 'Correspondente', 5)
 ON CONFLICT ("code") DO NOTHING;
 
--- A COLUNA TEXTUAL SAI. Ela existiu por um dia e nunca recebeu linha; preservá-la
--- seria guardar histórico que não houve.
+-- A TROCA DA COLUNA, no padrão que funciona com a tabela cheia ou vazia.
+--
+-- A primeira tentativa usou `DEFAULT (SELECT ...)` e o Postgres recusou — subquery
+-- não entra em DEFAULT. Era desnecessário de duas formas: a tabela tem zero linhas, e
+-- mesmo cheia o caminho certo é nascer anulável, preencher e só então exigir.
+ALTER TABLE "Profissional" ADD COLUMN IF NOT EXISTS "categoriaId" INTEGER;
+
+-- BACKFILL pelo texto que estava lá, quando houver. `code` sai do nome normalizado,
+-- que é como o cadastro genérico o gera; o que não casar cai em 'advogado', que era
+-- o único valor que a tela oferecia por padrão.
+UPDATE "Profissional" p
+   SET "categoriaId" = COALESCE(
+         (SELECT c."id" FROM "CategoriaProfissional" c
+           WHERE c."code" = lower(replace(trim(p."categoria"), ' ', '_'))),
+         (SELECT c."id" FROM "CategoriaProfissional" c WHERE c."code" = 'advogado'))
+ WHERE p."categoriaId" IS NULL;
+
+ALTER TABLE "Profissional" ALTER COLUMN "categoriaId" SET NOT NULL;
+
+-- A COLUNA TEXTUAL SAI depois de o dado dela estar guardado no vínculo.
 ALTER TABLE "Profissional" DROP COLUMN IF EXISTS "categoria";
-ALTER TABLE "Profissional" ADD COLUMN IF NOT EXISTS "categoriaId" INTEGER NOT NULL
-  DEFAULT (SELECT "id" FROM "CategoriaProfissional" WHERE "code" = 'advogado');
-ALTER TABLE "Profissional" ALTER COLUMN "categoriaId" DROP DEFAULT;
 
 DO $$ BEGIN
   ALTER TABLE "Profissional" ADD CONSTRAINT "Profissional_categoriaId_fkey"
