@@ -518,12 +518,14 @@ function ConteudoModal({
           finDark ? 'bg-[var(--surface-popover)] border-[var(--border-default)]' : 'bg-[var(--surface-primary)]'
         }`}>
           <div className="flex items-center gap-4">
-            <button 
-              onClick={handleClose}
-              className="w-10 h-10 bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-lg flex items-center justify-center transition-colors"
+            {/* Avatar do processo — no mockup este quadrado é a IDENTIDADE, não um
+                botão. O fechar mora à direita, junto das demais ações. */}
+            <span
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[var(--action-primary)] text-[13px] font-semibold text-[var(--action-primary-ink)]"
+              aria-hidden
             >
-              <X className="h-5 w-5 text-white" />
-            </button>
+              {processo.nome.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("")}
+            </span>
             
             <div>
               <h1 className={`text-xl font-semibold ${finDark ? 'text-white' : 'text-gray-900'}`}>{processo.nome}</h1>
@@ -576,6 +578,16 @@ function ConteudoModal({
                 <Trash2 className="h-5 w-5" />
               </Button>
             )}
+            {/* Fechar — no fim da fila de ações, como no mockup. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              aria-label="Fechar processo"
+              className="text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <X className="h-5 w-5" />
+            </Button>
           </div>
         </div>
 
