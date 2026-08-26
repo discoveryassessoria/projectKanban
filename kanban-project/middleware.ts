@@ -243,7 +243,8 @@ export async function middleware(request: NextRequest) {
   // ===== 2) Gate de páginas protegidas (redirect) =====
   if (
     pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/administrator")
+    pathname.startsWith("/administrator") ||
+    pathname.startsWith("/processos")
   ) {
     if (!token) {
       return NextResponse.redirect(new URL("/login", request.url))
@@ -272,5 +273,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/administrator/:path*", "/api/:path*"],
+  matcher: ["/dashboard/:path*", "/administrator/:path*", "/processos/:path*", "/api/:path*"],
 }

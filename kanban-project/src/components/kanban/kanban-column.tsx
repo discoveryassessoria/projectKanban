@@ -25,8 +25,10 @@ interface KanbanColumnProps {
   podeArrastar?: boolean
   /** Ícone da fase, vindo do cadastro. Sem ícone a coluna não inventa um. */
   Icone?: React.ComponentType<{ className?: string }>
-  /** Criar processo já nesta fase. Ausente = o rodapé não aparece. */
+  /** Abre a criação de processo. Ausente = o rodapé não aparece. */
   onAdicionar?: () => void
+  /** Nome da 1ª fase do fluxo — o motor só cria processo lá. */
+  faseInicial?: string
   /** Rótulo da nacionalidade, repassado a cada card. */
   nacionalidade?: string
 }
@@ -41,6 +43,7 @@ export function KanbanColumn({
   onProcessoClick,
   Icone,
   onAdicionar,
+  faseInicial,
   nacionalidade,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -120,6 +123,14 @@ export function KanbanColumn({
         <button
           type="button"
           onClick={onAdicionar}
+          // O motor cria processo SEMPRE na primeira fase — CriarProcessoInput
+          // não aceita fase. O botão aparece em toda coluna, como no mockup, mas
+          // não finge criar aqui: diz onde o processo vai nascer.
+          title={
+            faseInicial && faseInicial !== title
+              ? `Novo processo — começa em "${faseInicial}"`
+              : "Novo processo"
+          }
           className="flex shrink-0 items-center justify-center gap-1.5 border-t border-[var(--border-subtle)] px-3 py-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
           style={{ color: headerColor }}
         >

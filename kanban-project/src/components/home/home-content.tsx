@@ -44,6 +44,7 @@ import {
   saudacao,
   CARD,
 } from "@/src/components/home/home-primitives"
+import { ProcessosEmAndamento } from "@/src/components/home/processos-andamento"
 import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
 import { faixaDaFilaSla } from "@/src/lib/home/home-logic"
 
@@ -552,7 +553,8 @@ export function HomeContent({ data }: { data: HomeData }) {
       ) : (
         <>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+            <div className="space-y-5 lg:col-span-2">
+              <ProcessosEmAndamento />
               <CentralOperacional data={data} />
             </div>
             <div className="space-y-5">

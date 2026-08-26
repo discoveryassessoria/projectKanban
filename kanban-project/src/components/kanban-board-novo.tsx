@@ -408,6 +408,8 @@ export function KanbanBoard({
                       processos={processosByFase.get(fase.phaseKey) || []}
                       headerColor={corDaColuna(index)}
                       Icone={iconeDaColuna(index)}
+                      onAdicionar={podeArrastar ? abrirCriar : undefined}
+                      faseInicial={fases[0]?.label}
                       nacionalidade={tipo?.name ?? undefined}
                       isLast={index === fases.length - 1}
                       onProcessoClick={handleProcessoClick}
