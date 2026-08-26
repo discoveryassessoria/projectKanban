@@ -18,6 +18,7 @@
 import * as React from "react"
 import Link from "next/link"
 import {
+  AlertCircle,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
@@ -27,6 +28,7 @@ import {
   DollarSign,
   FileText,
   Layers,
+  ListChecks,
   ShieldAlert,
 } from "lucide-react"
 import type { AgendaItem, FilaOperacional, HomeData, ModuloFila } from "@/src/types/home"
@@ -40,6 +42,7 @@ import {
   formatarHorario,
   nivelStyle,
   saudacao,
+  CARD,
 } from "@/src/components/home/home-primitives"
 import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
 import { faixaDaFilaSla } from "@/src/lib/home/home-logic"
@@ -416,6 +419,120 @@ function ResumoDoDia({ data }: { data: HomeData }) {
 // ===========================================================================
 // COMPOSIÇÃO
 // ===========================================================================
+
+// ===========================================================================
+// FAIXA DE INDICADORES — os quatro cartões do topo do mockup.
+//
+// Cada número vem de uma fonte que JÁ EXISTE no HomeData; nenhum deles é
+// inventado nem recalculado aqui. O ladrilho colorido é o mesmo par
+// (pastel + glifo saturado) usado nos KPI da fase.
+// ===========================================================================
+const CARTOES_TOPO = [
+  { chave: "criticos",   rotulo: "Itens críticos",       sub: "Exigem atenção imediata", tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertCircle },
+  { chave: "noPrazo",    rotulo: "Processos no prazo",   sub: "Dentro do SLA contratado", tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock },
+  { chave: "abertas",    rotulo: "Ações abertas",        sub: "Pendências operacionais",  tile: "var(--pessoa-tile)",  ink: "var(--pessoa)",  Icone: ListChecks },
+  { chave: "concluidas", rotulo: "Ações concluídas hoje", sub: "Parabéns, ótimo trabalho!", tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2 },
+] as const
+
+function FaixaIndicadores({ data }: { data: HomeData }) {
+  const valores: Record<string, number> = {
+    // Alerta crítico é o que o motor já classificou como crítico — não é uma
+    // releitura das filas com outro critério.
+    criticos: data.alertas.filter((a) => a.nivel === "critico").length,
+    noPrazo: data.sla?.resumo.noPrazo ?? 0,
+    abertas: data.filas.reduce((s, f) => s + f.quantidade, 0),
+    concluidas: data.resumoDia.tarefasConcluidas,
+  }
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {CARTOES_TOPO.map((c) => (
+        <div key={c.chave} className={`${CARD} overflow-hidden p-5`}>
+          <div className="flex items-start gap-3.5">
+            <span
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
+              style={{ background: c.tile, color: c.ink }}
+              aria-hidden
+            >
+              <c.Icone className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <div className="text-[28px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">
+                {valores[c.chave]}
+              </div>
+              <div className="mt-1.5 text-[13px] font-medium text-[var(--text-primary)]">{c.rotulo}</div>
+              <div className="text-[12px] text-[var(--text-muted)]">{c.sub}</div>
+            </div>
+          </div>
+          {/* Filete da cor do indicador, como no mockup. */}
+          <div className="mt-4 h-[3px] w-10 rounded-full" style={{ background: c.ink }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ===========================================================================
+// ROSCA DE SLA — as quatro faixas que o ResumoSla já entrega.
+// SVG puro: um gráfico destes não justifica biblioteca.
+// ===========================================================================
+function RoscaSla({ data }: { data: HomeData }) {
+  const r = data.sla?.resumo
+  if (!r) return null
+  const faixas = [
+    { rotulo: "No prazo",       valor: r.noPrazo,    cor: "var(--success)" },
+    { rotulo: "Próximos 7 dias", valor: r.proximos7,  cor: "var(--accent-primary)" },
+    { rotulo: "Vencem hoje",    valor: r.vencemHoje, cor: "var(--warning)" },
+    { rotulo: "Atrasados",      valor: r.atrasados,  cor: "var(--danger)" },
+  ]
+  const total = faixas.reduce((s, f) => s + f.valor, 0)
+  const RAIO = 52, ESPESSURA = 12
+  const circ = 2 * Math.PI * RAIO
+  let percorrido = 0
+
+  return (
+    <BlocoCard>
+      <BlocoHeader titulo="SLA dos processos" descricao={`${total} processo${total === 1 ? "" : "s"} avaliado${total === 1 ? "" : "s"}`} />
+      <div className="mt-4 flex items-center gap-5">
+        <div className="relative shrink-0">
+          <svg width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Distribuição de SLA">
+            <circle cx="64" cy="64" r={RAIO} fill="none" stroke="var(--surface-tertiary)" strokeWidth={ESPESSURA} />
+            {total > 0 && faixas.map((f) => {
+              if (f.valor === 0) return null
+              const traco = (f.valor / total) * circ
+              const el = (
+                <circle
+                  key={f.rotulo} cx="64" cy="64" r={RAIO} fill="none"
+                  stroke={f.cor} strokeWidth={ESPESSURA} strokeLinecap="butt"
+                  strokeDasharray={`${traco} ${circ - traco}`}
+                  strokeDashoffset={-percorrido}
+                  transform="rotate(-90 64 64)"
+                />
+              )
+              percorrido += traco
+              return el
+            })}
+          </svg>
+          <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
+            <div>
+              <div className="text-[26px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">{r.noPrazo}</div>
+              <div className="text-[11px] text-[var(--text-muted)]">No prazo</div>
+            </div>
+          </div>
+        </div>
+        <ul className="min-w-0 flex-1 space-y-2">
+          {faixas.map((f) => (
+            <li key={f.rotulo} className="flex items-center gap-2.5 text-[13px]">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: f.cor }} aria-hidden />
+              <span className="w-7 shrink-0 text-right font-semibold tabular-nums text-[var(--text-primary)]">{f.valor}</span>
+              <span className="truncate text-[var(--text-secondary)]">{f.rotulo}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </BlocoCard>
+  )
+}
+
 export function HomeContent({ data }: { data: HomeData }) {
   const semAcesso =
     !data.permissions.verProcessos && !data.permissions.verTarefas && !data.permissions.verEventos
@@ -423,6 +540,8 @@ export function HomeContent({ data }: { data: HomeData }) {
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5 px-4 py-5 md:px-6">
       <Cabecalho data={data} />
+
+      {!semAcesso && <FaixaIndicadores data={data} />}
 
       {semAcesso ? (
         <BlocoCard>
@@ -439,6 +558,7 @@ export function HomeContent({ data }: { data: HomeData }) {
             <div className="space-y-5">
               <Alertas data={data} />
               <AgendaBloco data={data} />
+              <RoscaSla data={data} />
             </div>
           </div>
 
