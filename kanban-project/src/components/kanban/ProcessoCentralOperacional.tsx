@@ -366,11 +366,16 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   // ============================================================
   const kpis: FaseKpi[] = resumo
     ? [
-        { label: "Pessoas", value: resumo.pessoasComTrabalho },
-        { label: "Documentos", value: resumo.documentos },
-        { label: "Prontos", value: resumo.prontos, tone: "ok" },
-        { label: "Pendentes", value: resumo.pendentes, tone: "busca" },
-        { label: "Divergentes", value: resumo.divergentes, tone: "late" },
+        // O sub-rótulo descreve o próprio número — não é dado novo, é a mesma
+        // contagem dita por extenso, como no mockup aprovado.
+        { label: "Pessoas", value: resumo.pessoasComTrabalho,
+          sub: resumo.pessoasComTrabalho === 1 ? "1 vinculada" : `${resumo.pessoasComTrabalho} vinculadas` },
+        { label: "Documentos", value: resumo.documentos,
+          sub: resumo.documentos === 1 ? "1 solicitado" : `${resumo.documentos} solicitados` },
+        { label: "Prontos", value: resumo.prontos, tone: "ok",
+          sub: `${resumo.prontos} concluído${resumo.prontos === 1 ? "" : "s"}` },
+        { label: "Pendentes", value: resumo.pendentes, tone: "busca", sub: "Aguardando" },
+        { label: "Divergentes", value: resumo.divergentes, tone: "late", sub: "Requer atenção" },
       ]
     : // Janela de deploy (back sem `estrutura`): números da matriz oficial, sem
       // inventar um agregado paralelo.

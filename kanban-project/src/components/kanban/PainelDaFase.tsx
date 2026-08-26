@@ -40,17 +40,8 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from "react"
-import {
-  ExternalLink,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  Star,
-  Users,
-  AlertTriangle,
-  Layers,
-  Search,
-} from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink, FileText, Layers, Search, Star, Users } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import type {
   DocumentoDoIndice,
   EstadoOperacionalDaLinha,
@@ -69,6 +60,20 @@ export interface FaseKpi {
   label: string
   value: number
   tone?: "" | "ok" | "busca" | "late"
+  /** Sub-rótulo do cartão ("1 vinculada", "Requer atenção"). Descritivo. */
+  sub?: string
+}
+
+/**
+ * Ladrilho do KPI — cor e ícone por PAPEL, amostrados dos mockups aprovados.
+ * O ladrilho é pastel e o glifo é saturado; a mesma dupla aparece na Home.
+ */
+const LADRILHO_KPI: Record<string, { tile: string; ink: string; Icone: LucideIcon }> = {
+  Pessoas:     { tile: "var(--pessoa-tile)",  ink: "var(--pessoa)",  Icone: Users },
+  Documentos:  { tile: "var(--info-tile)",    ink: "var(--info)",    Icone: FileText },
+  Prontos:     { tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2 },
+  Pendentes:   { tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock },
+  Divergentes: { tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertTriangle },
 }
 
 export interface PainelDaFaseProps {
@@ -219,23 +224,37 @@ export function PainelDaFase({
               contar elementos renderizados. auto-fit para o número nunca ser espremido. */}
           <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))" }}>
             {kpis.map((k, i) => {
-              const cor =
-                k.tone === "ok" ? "text-green-800"
-                : k.tone === "busca" ? "text-[var(--accent-text)]"
-                : k.tone === "late" ? "text-red-700"
-                : "text-white/95"
+              // O cartão do mockup: ladrilho de ícone à esquerda, número grande,
+              // rótulo e sub-rótulo empilhados à direita. O número é sempre a
+              // tinta primária — quem carrega o significado é o ladrilho.
+              const lad = LADRILHO_KPI[k.label]
+              const cor = "text-[var(--text-primary)]"
               // UM CONTADOR QUE VIRA FILTRO. "Pendentes: 137" e depois procurar
               // os 137 na mão é um número que informa e não ajuda; clicar nele é
               // o gesto óbvio, e ele passou a existir.
               const alvo = recorteDoKpi(k.label)
               const ativo = alvo != null && recorte.rapido === alvo
-              const classe = `bg-[var(--surface-popover)] border rounded-[10px] px-4 py-3 text-left transition-colors ${
-                ativo ? "border-[var(--border-default)] ring-1 ring-inset border-[var(--border-default)]" : "border-[var(--border-default)]"
+              const classe = `bg-[var(--surface-primary)] border rounded-xl px-4 py-3.5 text-left transition-colors flex items-center gap-3 ${
+                ativo ? "border-[var(--border-strong)] ring-1 ring-inset ring-[var(--border-strong)]" : "border-[var(--border-default)]"
               } ${alvo != null ? "hover:border-[var(--border-strong)] cursor-pointer" : ""}`
               const conteudo = (
                 <>
-                  <b className={`text-[22px] font-extrabold block leading-none ${cor}`}>{k.value}</b>
-                  <span className="text-[11px] text-[var(--text-muted)] font-semibold block mt-1.5">{k.label}</span>
+                  {lad && (
+                    <span
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px]"
+                      style={{ background: lad.tile, color: lad.ink }}
+                      aria-hidden
+                    >
+                      <lad.Icone className="h-[18px] w-[18px]" />
+                    </span>
+                  )}
+                  <span className="min-w-0">
+                    <b className={`text-[22px] font-semibold block leading-none ${cor}`}>{k.value}</b>
+                    <span className="text-[12px] text-[var(--text-primary)] font-medium block mt-1 truncate">{k.label}</span>
+                    {k.sub && (
+                      <span className="text-[11px] text-[var(--text-muted)] block truncate">{k.sub}</span>
+                    )}
+                  </span>
                 </>
               )
               return alvo == null ? (
