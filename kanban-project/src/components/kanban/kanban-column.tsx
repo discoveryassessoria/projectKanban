@@ -11,6 +11,7 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
 import { useMemo } from "react"
 import { KanbanCard } from "./kanban-card"
+import { Inbox, Plus } from "lucide-react"
 import type { Processo } from "@/src/types/kanban"
 
 interface KanbanColumnProps {
@@ -22,6 +23,12 @@ interface KanbanColumnProps {
   onProcessoClick?: (processo: Processo) => void
   /** Repassado a cada card: o usuário pode arrastar processos? */
   podeArrastar?: boolean
+  /** Ícone da fase, vindo do cadastro. Sem ícone a coluna não inventa um. */
+  Icone?: React.ComponentType<{ className?: string }>
+  /** Criar processo já nesta fase. Ausente = o rodapé não aparece. */
+  onAdicionar?: () => void
+  /** Rótulo da nacionalidade, repassado a cada card. */
+  nacionalidade?: string
 }
 
 export function KanbanColumn({
@@ -32,6 +39,9 @@ export function KanbanColumn({
   isLast,
   podeArrastar = true,
   onProcessoClick,
+  Icone,
+  onAdicionar,
+  nacionalidade,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${faseKey}`,
@@ -46,39 +56,77 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`
-        flex flex-col h-full w-full
-        ${!isLast ? 'border-r-2 border-dashed border-[var(--border-strong)]' : ''}
-        ${isOver ? 'bg-[var(--surface-secondary)]' : 'bg-transparent'}
-        transition-colors duration-200
-      `}
+      className={`flex h-full w-full flex-col overflow-hidden rounded-xl border transition-colors duration-200 ${
+        isOver
+          ? "border-[var(--border-strong)] bg-[var(--surface-secondary)]"
+          : "border-[var(--border-default)] bg-[var(--surface-primary)]"
+      }`}
     >
-      {/* Header compacto - altura fixa */}
-      <div
-        className="px-2 py-2 border-b border-[var(--border-default)] h-10 flex items-center"
-        style={{ backgroundColor: `${headerColor}40` }}
-      >
-        <div className="flex items-center gap-1.5 min-w-0 w-full">
-          <h3 className="font-medium text-xs text-white truncate">{title}</h3>
-          <span className="text-xs text-white/70 flex-shrink-0">
-            ({processos.length})
+      {/* Filete da cor da fase no topo — identifica a coluna sem tingir o fundo,
+          que é onde os cards precisam de superfície neutra para se destacarem. */}
+      <div className="h-[3px] w-full shrink-0" style={{ backgroundColor: headerColor }} />
+
+      {/* Cabeçalho: ladrilho do ícone, nome da fase e contagem. */}
+      <div className="flex shrink-0 items-center gap-2 px-3 py-3">
+        {Icone && (
+          <span
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-md"
+            style={{ backgroundColor: `${headerColor}22`, color: headerColor }}
+            aria-hidden
+          >
+            <Icone className="h-3.5 w-3.5" />
           </span>
-        </div>
+        )}
+        <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+          {title}
+        </h3>
+        <span
+          className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
+          style={{ backgroundColor: `${headerColor}1f`, color: headerColor }}
+        >
+          {processos.length}
+        </span>
       </div>
 
-      {/* Área de cards com scroll interno */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-        <SortableContext items={processosIds} strategy={verticalListSortingStrategy}>
-          {processos.map((processo) => (
-            <KanbanCard
-              podeArrastar={podeArrastar}
-              key={processo.id}
-              processo={processo}
-              onClick={() => onProcessoClick?.(processo)}
-            />
-          ))}
-        </SortableContext>
+      {/* Cards */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 pb-2">
+        {processos.length === 0 ? (
+          // Coluna vazia não é buraco: diz o que significa, em vez de só faltar.
+          <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 px-3 text-center">
+            <Inbox className="h-8 w-8" style={{ color: `${headerColor}59` }} aria-hidden />
+            <p className="text-[12px] leading-snug text-[var(--text-muted)]">
+              Nenhum processo
+              <br />
+              nesta fase
+            </p>
+          </div>
+        ) : (
+          <SortableContext items={processosIds} strategy={verticalListSortingStrategy}>
+            {processos.map((processo) => (
+              <KanbanCard
+                podeArrastar={podeArrastar}
+                key={processo.id}
+                processo={processo}
+                corDaFase={headerColor}
+                nacionalidade={nacionalidade}
+                onClick={() => onProcessoClick?.(processo)}
+              />
+            ))}
+          </SortableContext>
+        )}
       </div>
+
+      {onAdicionar && (
+        <button
+          type="button"
+          onClick={onAdicionar}
+          className="flex shrink-0 items-center justify-center gap-1.5 border-t border-[var(--border-subtle)] px-3 py-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
+          style={{ color: headerColor }}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Adicionar processo
+        </button>
+      )}
     </div>
   )
 }

@@ -24,7 +24,7 @@ import {
 } from "@dnd-kit/core"
 import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { FileText, FileX, PenLine, Plus, ShieldCheck, Stamp, Users } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
@@ -42,6 +42,30 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 // Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
 // cada render, e qualquer useMemo que dependesse dele recomputava sempre —
 // era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
+
+/**
+ * Cor da COLUNA por posição no fluxo.
+ *
+ * A fase não guarda cor no cadastro — e inventar um campo de cor no motor para
+ * resolver um problema de tela seria dado de negócio nascido de decoração. A
+ * sequência é determinística pela ORDEM do workflow, então a mesma fase recebe
+ * sempre a mesma cor, e a leitura da esquerda para a direita fica estável.
+ * Tons amostrados dos mockups aprovados.
+ */
+const COR_DA_COLUNA = [
+  "#6d51a8", // roxo
+  "#2680df", // azul
+  "#319639", // verde
+  "#c2691a", // âmbar
+  "#d20001", // vermelho
+  "#a17938", // dourado
+] as const
+const corDaColuna = (i: number) => COR_DA_COLUNA[i % COR_DA_COLUNA.length]
+
+/** Ícone da coluna, pela mesma posição — idem: apresentação, não cadastro. */
+const ICONE_DA_COLUNA = [Users, FileText, ShieldCheck, PenLine, FileX, Stamp] as const
+const iconeDaColuna = (i: number) => ICONE_DA_COLUNA[i % ICONE_DA_COLUNA.length]
+
 const SEM_FASES: any[] = Object.freeze([]) as unknown as any[]
 
 interface KanbanBoardProps {
@@ -382,7 +406,9 @@ export function KanbanBoard({
                       faseKey={fase.phaseKey}
                       title={fase.label}
                       processos={processosByFase.get(fase.phaseKey) || []}
-                      headerColor={corPais}
+                      headerColor={corDaColuna(index)}
+                      Icone={iconeDaColuna(index)}
+                      nacionalidade={tipo?.name ?? undefined}
                       isLast={index === fases.length - 1}
                       onProcessoClick={handleProcessoClick}
                       podeArrastar={podeArrastar}

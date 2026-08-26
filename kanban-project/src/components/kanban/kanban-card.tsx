@@ -10,11 +10,15 @@ import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import type React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Phone, Mail, MessageCircle, Users } from "lucide-react"
+import { AlertCircle, MoreVertical } from "lucide-react"
 import type { Processo } from "@/src/types/kanban"
 
 interface KanbanCardProps {
   processo: Processo
+  /** Cor da fase (coluna) — tinge a barra de progresso e o realce do card. */
+  corDaFase?: string
+  /** Rótulo da nacionalidade ("Cidadania Alemã"), resolvido pelo board. */
+  nacionalidade?: string
   onClick?: () => void
   isDragging?: boolean // Prop para quando está no DragOverlay
   /**
@@ -26,14 +30,19 @@ interface KanbanCardProps {
   podeArrastar?: boolean
 }
 
-export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, podeArrastar = true }: KanbanCardProps) {
+export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDragging: isDraggingProp, podeArrastar = true }: KanbanCardProps) {
   const {
     id,
     nome,
     contratantes = [], // Array de contratantes
     requerentes = [],
     projection,
+    sla,
   } = processo
+
+  /** Iniciais para o avatar: duas letras, sem inventar quando o nome é curto. */
+  const iniciais = (v: string) =>
+    v.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("")
 
   // Pegar o primeiro contratante para exibir dados de contato
   const contratante = contratantes[0] || null
@@ -122,77 +131,83 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
         `}
         onClick={handleCardClick}
       >
-        {/* Conteúdo principal */}
-        <div className="p-3">
-          {/* Header: Nome */}
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="font-medium text-sm text-gray-900 leading-tight flex-1">
+        {/* Conteúdo principal — desenho do mockup aprovado: nome + avatar,
+            nacionalidade, código, chips de requerente, barra da fase, alerta. */}
+        <div className="p-3.5">
+          {/* Nome do processo e avatar com as iniciais */}
+          <div className="mb-2.5 flex items-start justify-between gap-2">
+            <h3 className="min-w-0 flex-1 text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
               {nome}
             </h3>
+            <span
+              className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-semibold"
+              style={{ backgroundColor: `${corDaFase ?? "#6b7280"}1f`, color: corDaFase ?? "var(--text-secondary)" }}
+              aria-hidden
+            >
+              {iniciais(nome)}
+            </span>
           </div>
 
-          {/* Contratante */}
-          {contratante && (
-            <p className="text-xs text-gray-500 mb-2 truncate">
-              {nomePessoa(contratante)}
-            </p>
+          {/* Nacionalidade e código — duas linhas secundárias, como no mockup.
+              Só aparecem quando existem: card não inventa rótulo. */}
+          {nacionalidade && (
+            <p className="truncate text-[12px] leading-snug text-[var(--text-muted)]">{nacionalidade}</p>
+          )}
+          {processo.codigo && (
+            <p className="truncate text-[12px] leading-snug text-[var(--text-muted)]">Proc. {processo.codigo}</p>
           )}
 
-          {/* Badge: Requerentes (identidade — não é contador operacional) */}
+          {/* Requerentes como chips. É o MESMO dado que antes era um contador com
+              ícone — só apresentado como o mockup apresenta. */}
           {requerentesCount > 0 && (
-            <div className="flex items-center gap-2 mb-2">
-              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-[var(--surface-secondary)] text-[var(--text-secondary)] text-xs font-medium rounded">
-                <Users className="h-3 w-3" />
-                {requerentesCount}
+            <div className="mt-2.5 flex items-center gap-1">
+              {requerentes!.slice(0, 2).map((r, i) => (
+                <span
+                  key={i}
+                  className="grid h-6 w-6 place-items-center rounded-full bg-[var(--surface-secondary)] text-[9.5px] font-semibold text-[var(--text-secondary)]"
+                  title={nomePessoa(r)}
+                >
+                  {iniciais(nomePessoa(r))}
+                </span>
+              ))}
+              {requerentesCount > 2 && (
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--surface-secondary)] text-[9.5px] font-semibold text-[var(--text-muted)]">
+                  +{requerentesCount - 2}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Barra da fase — percentual OFICIAL da projeção, na cor da coluna. */}
+          {activePhase && (
+            <div className="mt-2.5 flex items-center gap-2">
+              <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--surface-tertiary)]">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${pct}%`, background: corDaFase ?? barColor }}
+                />
+              </div>
+              <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">
+                {pct}%
               </span>
             </div>
           )}
 
-          {/* Progresso da fase — barra + percentual OFICIAL (projeção). Sem contadores. */}
-          {activePhase && (
-            <div className="mb-2">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <span className="text-[11px] text-gray-500 truncate" title={activePhase.name}>
-                  {activePhase.name}
-                </span>
-                <span className="text-[11px] font-semibold text-gray-700 tabular-nums flex-shrink-0">
-                  {pct}%
-                </span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{ width: `${pct}%`, background: barColor }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Ícones de ação */}
-          <div className="flex items-center justify-end gap-1">
+          {/* Rodapé: alerta de SLA (só quando há) e o menu do card. */}
+          <div className="mt-2.5 flex items-center justify-between">
+            {sla && sla.status === "atrasado" ? (
+              <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--danger-text)]">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {sla.diasAtraso}
+              </span>
+            ) : <span />}
             <button
-              onClick={handlePhoneClick}
-              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-[var(--text-secondary)]' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
-              disabled={!telefone}
-              title={telefone || 'Sem telefone'}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onClick?.() }}
+              className="rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"
+              title="Abrir processo"
             >
-              <Phone className="h-4 w-4" />
-            </button>
-            <button
-              onClick={handleEmailClick}
-              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${email ? 'text-gray-500 hover:text-[var(--text-secondary)]' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
-              disabled={!email}
-              title={email || 'Sem email'}
-            >
-              <Mail className="h-4 w-4" />
-            </button>
-            <button
-              onClick={handleChatClick}
-              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-green-600' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
-              disabled={!telefone}
-              title={telefone ? 'WhatsApp' : 'Sem telefone'}
-            >
-              <MessageCircle className="h-4 w-4" />
+              <MoreVertical className="h-4 w-4" />
             </button>
           </div>
         </div>

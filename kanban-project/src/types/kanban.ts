@@ -196,6 +196,8 @@ export interface OperationalProjection {
 export interface Processo {
   id: number
   nome: string
+  /** Código público do processo ("R2026-0556"). Vem do GET /api/processos. */
+  codigo?: string | null
   descricao?: string | null
   observacoes?: string | null
   pais: string                        // countryKey ("italia")
