@@ -177,7 +177,8 @@
      Agora toda superfície que o operador LÊ é opaca. A paisagem existe ao redor
      e por baixo; nunca através. Translucidez fica só onde é decoração: hover,
      realce, cortina de modal. */
-  --surface-primary: #fffefb;    /* card, painel, linha de tabela */
+  --surface-sidebar: #faf7f5;  /* amostrado do mockup */
+  --surface-primary: #ffffff;    /* card, painel, linha de tabela */
   --surface-secondary: #f3efe7;  /* cabeçalho de tabela, agrupamento, filtro */
   --surface-tertiary: #eee9df;   /* faixa, seção aninhada */
   --surface-elevated: #ffffff;   /* o que flutua acima de tudo */
@@ -241,25 +242,40 @@
   --text-inverse: #ffffff;
 
   /* Acento institucional (dourado) — ação/navegação ativa apenas */
-  /* Champagne — escurecido para ter contraste sobre superfície clara. O tom
-     anterior (#d2a948) foi calibrado contra fundo preto e some sobre ivory. */
-  --accent-primary: #1d232a;  /* fundo, borda, ícone, indicador — graphite */
-  --accent-hover: #12171c;
-  --accent-soft: #f3efe7;      /* realce de seleção, neutro */
+  /* ── ACENTO DA MARCA ────────────────────────────────────────────────────
+     Dourado bronze, amostrado dos mockups aprovados (#a17938): botão de ação
+     principal, barra de progresso do cabeçalho, marcador do item ativo da
+     sidebar. Substitui o graphite da rodada anterior — o alvo mudou. */
+  --accent-primary: #a17938;
+  --accent-hover: #8d6930;
+  --accent-soft: #f8e9d2;      /* realce de seleção / superfície dourada suave */
   --accent-ink: #ffffff;
   /* Vermelho SÓLIDO: só ação destrutiva confirmada. Tinta branca real. */
   --danger-solid: #b91c1c;
   --danger-solid-ink: #ffffff;
-  /* O champagne saiu do produto: destaque se faz por PESO e CONTRASTE, não por
-     cor de marca. A tinta de acento é a mesma tinta primária. */
-  --accent-text: #171a1f;
 
   /* Semânticas — usar SÓ quando houver significado real. Escurecidas para manter
      legibilidade sobre claro; o SIGNIFICADO de cada cor não muda. */
-  --success: #166534;
-  --warning: #92400e;
-  --danger: #b91c1c;
-  --info: #585d64;      /* informativo = neutro; azul saiu do contrato */
+  --success: #319639;
+  --success-tile: #b7e1bb;
+  --warning: #c2691a;
+  --warning-tile: #fae4cc;
+  --danger: #d20001;
+  --danger-tile: #fdd5d1;
+  --info: #2680df;
+  --info-tile: #d5e3fa;
+
+  /* Degrau de TINTA: mesmo matiz do mockup, escurecido até passar AA sobre branco
+     E sobre o próprio ladrilho. As cores acima são de ÍCONE (glifo grande); como
+     texto pequeno elas ficam entre 2,6 e 4,0 de contraste. */
+  --success-text: #236b28;
+  --warning-text: #8f4a0c;
+  --info-text: #1a5b9f;
+  --pessoa-text: #5c4490;
+  --accent-text: #775722;
+  --danger-text: #b30001;
+  --pessoa: #6d51a8;
+  --pessoa-tile: #d1bfea;
 
   /* Raio */
   --radius-sm: 8px;
