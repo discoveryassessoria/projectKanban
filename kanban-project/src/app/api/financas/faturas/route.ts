@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Decimal } from "@prisma/client/runtime/library"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 function toNumber(value: Decimal | number | string | null | undefined): number {
   if (value === null || value === undefined) return 0
@@ -33,9 +34,10 @@ export async function GET(request: NextRequest) {
 
     const where: any = {}
 
-    // Filtro por país do processo
+    // Filtro por país do processo — POR IDENTIDADE. `{ pais }` casava texto com
+    // texto e só funcionava enquanto as duas pontas usassem a mesma grafia.
     if (pais && pais !== "all") {
-      where.processo = { pais }
+      where.processo = ondePaisEh(pais)
     }
 
     // Filtro por moeda

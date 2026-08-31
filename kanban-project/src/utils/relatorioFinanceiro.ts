@@ -67,12 +67,16 @@ interface FiltrosFinanceiro {
   dataFim?: string
 }
 
-const PAIS_LABELS: Record<string, string> = {
-  PORTUGAL: 'Portugal',
-  ESPANHA: 'Espanha',
-  ALEMANHA: 'Alemanha',
-  ITALIA: 'Itália'
-}
+/**
+ * RÓTULO DE PAÍS — sem lista local.
+ *
+ * Havia aqui um mapa fixo com quatro países em MAIÚSCULAS, comparado contra o
+ * valor que o banco grava em minúsculas: o rótulo nunca era encontrado e o país
+ * novo nunca apareceria. A lista de países é do Cadastro Mestre; este arquivo
+ * gera PDF e não consulta banco, então ele apenas APRESENTA a chave recebida.
+ */
+const rotuloDePais = (chave: string): string =>
+  chave ? chave.charAt(0).toUpperCase() + chave.slice(1).toLowerCase() : chave
 
 const STATUS_LABELS: Record<string, string> = {
   PENDENTE: 'Pendente',
@@ -177,7 +181,7 @@ export function gerarRelatorioFinanceiroPDF(dados: DadosFinanceiro, filtrosAtivo
 
   // ---- FILTROS ----
   const filtrosTexto: string[] = []
-  if (filtrosAtivos?.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${PAIS_LABELS[filtrosAtivos.pais] || filtrosAtivos.pais}`)
+  if (filtrosAtivos?.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${rotuloDePais(filtrosAtivos.pais)}`)
   if (filtrosAtivos?.status && filtrosAtivos.status !== 'all') filtrosTexto.push(`Status: ${STATUS_LABELS[filtrosAtivos.status] || filtrosAtivos.status}`)
   if (filtrosAtivos?.moeda && filtrosAtivos.moeda !== 'all') filtrosTexto.push(`Moeda: ${filtrosAtivos.moeda}`)
   if (filtrosAtivos?.dataInicio) filtrosTexto.push(`De: ${formatDate(filtrosAtivos.dataInicio)}`)
@@ -195,7 +199,7 @@ export function gerarRelatorioFinanceiroPDF(dados: DadosFinanceiro, filtrosAtivo
   const headers = ['Família/Processo', 'País', 'Descrição', 'Moeda', 'Valor', 'Pago', 'Restante', 'Vencimento', 'Status', 'Destinatários']
   const body = dados.faturas.map(f => [
     f.processo?.nome || '-',
-    PAIS_LABELS[f.processo?.pais || ''] || '-',
+    rotuloDePais(f.processo?.pais || '') || '-',
     f.descricao,
     f.moeda,
     formatCurrency(f.valor, f.moeda),
@@ -373,7 +377,7 @@ function criarAbaFaturas(wb: ExcelJS.Workbook, nomeAba: string, faturas: FaturaR
   faturas.forEach((f, idx) => {
     const row = ws.addRow([
       f.processo?.nome || '-',
-      PAIS_LABELS[f.processo?.pais || ''] || '-',
+      rotuloDePais(f.processo?.pais || '') || '-',
       f.descricao,
       f.moeda,
       f.valor,
@@ -473,7 +477,7 @@ export async function gerarRelatorioFinanceiroExcel(dados: DadosFinanceiro, filt
   // Filtros
   if (filtrosAtivos) {
     const filtrosTexto: string[] = []
-    if (filtrosAtivos.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${PAIS_LABELS[filtrosAtivos.pais] || filtrosAtivos.pais}`)
+    if (filtrosAtivos.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${rotuloDePais(filtrosAtivos.pais)}`)
     if (filtrosAtivos.status && filtrosAtivos.status !== 'all') filtrosTexto.push(`Status: ${STATUS_LABELS[filtrosAtivos.status] || filtrosAtivos.status}`)
     if (filtrosAtivos.moeda && filtrosAtivos.moeda !== 'all') filtrosTexto.push(`Moeda: ${filtrosAtivos.moeda}`)
     if (filtrosTexto.length > 0) {
@@ -555,7 +559,7 @@ export async function gerarRelatorioFinanceiroExcel(dados: DadosFinanceiro, filt
     processos.forEach((p, idx) => {
       const isAlt = idx % 2 === 0
       const cells = [
-        `${p.nome} (${PAIS_LABELS[p.pais] || p.pais})`,
+        `${p.nome} (${rotuloDePais(p.pais)})`,
         formatCurrencyBRL(p.totalBRL),
         formatCurrencyBRL(p.pagoBRL),
         formatCurrencyBRL(p.pendenteBRL)

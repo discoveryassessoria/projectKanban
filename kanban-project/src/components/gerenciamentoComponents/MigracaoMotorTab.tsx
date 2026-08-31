@@ -6,7 +6,11 @@ import { enviar, useApi, useConsulta } from "@/src/lib/dados"
 interface Tipo { id: number; name: string; countryLabel: string }
 interface PaisStat { pais: string; total: number; conectados: number }
 
-const PAIS_LABEL: Record<string, string> = { PORTUGAL: "Portugal", ESPANHA: "Espanha", ALEMANHA: "Alemanha", ITALIA: "Itália" }
+// Sem lista local de países: esta tela é da MIGRAÇÃO DO MOTOR (rota técnica e
+// legada) e as chaves que ela envia são as do próprio motor legado. O rótulo é
+// derivado da chave; a lista de países do produto vive no Cadastro Mestre.
+const rotuloDePais = (k: string) => (k ? k.charAt(0).toUpperCase() + k.slice(1).toLowerCase() : k)
+const PAISES_DO_MOTOR_LEGADO = ["PORTUGAL", "ESPANHA", "ALEMANHA", "ITALIA"] as const
 
 function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -85,7 +89,7 @@ export default function MigracaoMotorTab() {
 
   if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
-  const paisNome = pais === "all" ? "todos os países" : (PAIS_LABEL[pais] || pais)
+  const paisNome = pais === "all" ? "todos os países" : rotuloDePais(pais)
 
   return (
     <div className="space-y-5">
@@ -115,7 +119,7 @@ export default function MigracaoMotorTab() {
         <div className="mt-3 space-y-1">
           {porPais.filter(p => p.total > 0).map(p => (
             <div key={p.pais} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-1.5 text-sm">
-              <span className="text-white/80">{PAIS_LABEL[p.pais] || p.pais}</span>
+              <span className="text-white/80">{rotuloDePais(p.pais)}</span>
               <span className="text-[var(--text-secondary)]">{p.conectados} de {p.total} conectados</span>
             </div>
           ))}
@@ -129,7 +133,7 @@ export default function MigracaoMotorTab() {
             <label className={labelCls}>País</label>
             <select value={pais} onChange={e => { setPais(e.target.value); setConfirmando(false); setConfirmandoDesc(false) }} className={inputCls}>
               <option value="all" className={opt}>Todos os países</option>
-              {Object.entries(PAIS_LABEL).map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
+              {PAISES_DO_MOTOR_LEGADO.map((v) => <option key={v} value={v} className={opt}>{rotuloDePais(v)}</option>)}
             </select>
           </div>
           <div>

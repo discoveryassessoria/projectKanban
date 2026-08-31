@@ -103,6 +103,42 @@ async function main() {
   okGuard(filtrosPorTexto.length === 0,
     `nenhuma comparação de país por nome${filtrosPorTexto.length ? ` (${filtrosPorTexto.join(", ")})` : ""}`)
 
+  // NENHUMA LISTA LOCAL DE PAÍSES. Três mapas fixos existiam — todos em
+  // MAIÚSCULAS, comparados contra o valor que o banco grava em minúsculas: não
+  // falhavam, devolviam vazio. País novo cadastrado nunca apareceria.
+  // O QUE ESTE GUARD PROÍBE, E O QUE ELE NÃO PROÍBE.
+  //
+  // Proíbe ENUMERAR o universo de países em código — array de chaves ou mapa
+  // percorrido com Object.keys/entries. É isso que faz um país cadastrado novo
+  // nunca aparecer, e foi assim que a quebra por país do Receber ficou zerada.
+  //
+  // NÃO proíbe dicionário de APRESENTAÇÃO ou de PARSING consultado por chave:
+  // o adjetivo pátrio ("português") e o dicionário de variantes textuais que a
+  // genealogia usa para ler certidão ("REGNO D ITALIA") são linguagem, não
+  // cadastro. Transformar isso em tabela seria criar cadastro inútil.
+  const EXCECOES_DE_LINGUAGEM = ["identidade/canonica", "migracao-motor", "MigracaoMotorTab",
+    "genealogia/motor/regras/linhagem", "arvore/tree-onboarding"]
+  const listasLocais = fontes.filter((f) => {
+    if (EXCECOES_DE_LINGUAGEM.some((e) => f.includes(e))) return false
+    const src = semComentario(readFileSync(join(RAIZ, f), "utf8"))
+    const enumeraEmArray = /\[\s*["'](ITALIA|ESPANHA|PORTUGAL|ALEMANHA)["']\s*,/i.test(src)
+    const mapaDePais = /\b(PORTUGAL|ESPANHA|ALEMANHA|ITALIA)\s*:\s*["']/.test(src)
+    const percorreMapa = /Object\.(keys|entries|values)\s*\(\s*PAIS/.test(src)
+    return enumeraEmArray || (mapaDePais && percorreMapa)
+  })
+  okGuard(listasLocais.length === 0,
+    `nenhuma lista local de países${listasLocais.length ? ` (${listasLocais.join(", ")})` : ""}`)
+
+  // FILTRO DE PROCESSO POR PAÍS usa o resolvedor de identidade, não `{ pais }`.
+  const filtroCru = fontes.filter((f) => {
+    if (f.includes("identidade/canonica")) return false
+    const src = semComentario(readFileSync(join(RAIZ, f), "utf8"))
+    return /where[^\n]*\.processo\s*=\s*\{\s*pais\s*\}/.test(src)
+      || /processo:\s*\{\s*pais\s*\}/.test(src)
+  })
+  okGuard(filtroCru.length === 0,
+    `nenhum filtro de processo por texto de país${filtroCru.length ? ` (${filtroCru.join(", ")})` : ""}`)
+
   console.log(falhas === 0
     ? "\n✅ Cobertura total. A identidade canônica resolve todas as linhas."
     : `\n❌ ${falhas} verificação(ões) falharam — NÃO tornar o vínculo obrigatório.`)

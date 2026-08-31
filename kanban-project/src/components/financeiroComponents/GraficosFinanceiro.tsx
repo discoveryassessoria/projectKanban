@@ -65,9 +65,9 @@ interface GraficosFinanceiroProps {
 // CONSTANTES
 // ============================================
 
-const PAIS_LABELS: Record<string, string> = {
-  PORTUGAL: 'Portugal', ESPANHA: 'Espanha', ALEMANHA: 'Alemanha', ITALIA: 'Itália'
-}
+// Rótulo derivado da chave: a lista de países é do Cadastro Mestre, não daqui.
+const rotuloDePais = (k?: string | null) =>
+  k ? k.charAt(0).toUpperCase() + k.slice(1).toLowerCase() : ""
 
 const STATUS_COLORS: Record<string, string> = {
   PAGO: '#22C55E',
@@ -189,7 +189,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
     })
     return Object.entries(paisCount)
       .map(([pais, valor]) => ({
-        name: PAIS_LABELS[pais] || pais,
+        name: rotuloDePais(pais) || pais,
         value: valor,
         fill: PAIS_COLORS[pais] || '#4e6879',
       }))

@@ -123,8 +123,21 @@ export async function GET(_req: NextRequest) {
       d90: { total: soma(b90), qtd: b90.length },
     }
 
-    const paises = ["ITALIA", "ESPANHA", "ALEMANHA", "PORTUGAL"]
-    const porPais = paises.map((pais) => ({ pais, total: soma(emAberto.filter((i) => i.pais === pais)) }))
+    // A LISTA VEM DO CADASTRO. Era `["ITALIA","ESPANHA","ALEMANHA","PORTUGAL"]`
+    // em MAIÚSCULAS, comparada com o valor do banco em minúsculas: a quebra por
+    // país sempre devolveu zero em todas as linhas, e ninguém percebeu porque
+    // zero é um número plausível. País novo também nunca apareceria.
+    const paisesCadastrados = await prisma.catalogoPais.findMany({
+      where: { ativo: true },
+      select: { countryKey: true, countryLabel: true, flag: true },
+      orderBy: { countryLabel: "asc" },
+    })
+    const porPais = paisesCadastrados.map((c) => ({
+      pais: c.countryLabel,
+      chave: c.countryKey,
+      flag: c.flag ?? null,
+      total: soma(emAberto.filter((i) => (i.pais ?? "").toLowerCase() === c.countryKey.toLowerCase())),
+    }))
 
     const mapaDevedor = new Map<number, { nome: string; pais: string | null; total: number }>()
     for (const i of emAberto) {

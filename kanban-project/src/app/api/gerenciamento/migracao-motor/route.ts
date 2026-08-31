@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { ondePaisEh } from '@/src/lib/identidade/canonica'
 
 // ============================================================
 // FASE 5 — Parte 1: conectar processos ao motor EM LOTE.
@@ -15,7 +16,9 @@ const isPais = (s: string): boolean => PAISES.includes(s)
 
 // monta o filtro por país (ou todos)
 function wherePais(pais: string) {
-  return pais && pais !== 'all' && isPais(pais) ? { pais } : {}
+  // Identidade, não texto: casa pela FK do cadastro e só cai no espelho para
+  // linha que ainda não tem `paisId`.
+  return pais && pais !== 'all' && isPais(pais) ? ondePaisEh(pais) : {}
 }
 
 // ---- GET: números atuais (total, conectados, por país) + tipos ----

@@ -35,8 +35,13 @@ function dueText(d: string | Date | null): string {
   if (dias === 1) return "amanhã"
   return `em ${dias}d`
 }
-const PAIS_FLAG: Record<string, string> = { PORTUGAL: "🇵🇹", ESPANHA: "🇪🇸", ALEMANHA: "🇩🇪", ITALIA: "🇮🇹" }
-const PAIS_LABEL: Record<string, string> = { PORTUGAL: "Portugal", ESPANHA: "Espanha", ALEMANHA: "Alemanha", ITALIA: "Itália" }
+// SEM LISTA LOCAL DE PAÍSES. Havia dois mapas fixos, em MAIÚSCULAS, consultados
+// com o valor que o banco grava em minúsculas — a bandeira e o rótulo nunca
+// apareciam, e país novo jamais apareceria. O rótulo e a bandeira agora vêm do
+// Cadastro Mestre pela própria API; o que sobra aqui é o fallback de
+// apresentação, derivado da chave, sem enumerar país nenhum.
+const rotuloDePais = (k?: string | null) =>
+  k ? k.charAt(0).toUpperCase() + k.slice(1).toLowerCase() : ""
 
 interface Parcela {
   id: number; numero: number; totalParcelas: number; cliente: string; processoId: number | null
@@ -50,7 +55,7 @@ interface Parcela {
 interface ReceberData {
   kpis: { aReceber: number; vencido: number; aVencer7: number; aVencer30: number; inadimplencia: number; ticketMedio: number; qtdAberto: number; qtdAtrasadas: number; qtdAVencer7: number; processosAtivos: number }
   aging: { noPrazo: { total: number; qtd: number }; d30: { total: number; qtd: number }; d60: { total: number; qtd: number }; d90: { total: number; qtd: number } }
-  porPais: { pais: string; total: number }[]
+  porPais: { pais: string; chave?: string; flag?: string | null; total: number }[]
   topDevedores: { processoId: number; nome: string; pais: string | null; total: number }[]
   resumo: { totalPrevisto: number; recebido: number; emAberto: number; atrasado: number; previstoFuturo: number }
   parcelas: Parcela[]
@@ -187,9 +192,9 @@ export default function ReceberTab() {
                     <Tr key={p.id}>
                       <td className="py-2.5 px-2"><input type="checkbox" className="accent-[var(--accent-primary)]" aria-label="Selecionar" /></td>
                       <td className="py-2.5 px-2">
-                        <div className="font-medium flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>{p.pais ? PAIS_FLAG[p.pais] + " " : ""}{p.cliente}<OrigemBadge origem={p.origem} /></div>
+                        <div className="font-medium flex items-center gap-1.5" style={{ color: "var(--text-primary)" }}>{p.cliente}<OrigemBadge origem={p.origem} /></div>
                         <div className="text-[11px] flex items-center gap-2" style={{ color: "var(--text-muted)" }}>
-                          {p.pais ? PAIS_LABEL[p.pais] : "— sem vínculo —"}
+                          {p.pais ? rotuloDePais(p.pais) : "— sem vínculo —"}
                           {p.lancamentoOrigemId != null && <VerOrigemLink tipo="receita" id={p.lancamentoOrigemId} onOpen={(t, id) => setDetalhe({ tipo: t, id })} />}
                         </div>
                       </td>
@@ -245,14 +250,14 @@ export default function ReceberTab() {
           </SidePanel>
           <SidePanel title="Por País">
             {d.porPais.map(p => (
-              <MetricRow key={p.pais} label={`${PAIS_FLAG[p.pais]} ${PAIS_LABEL[p.pais]}`} value={fmtBRL(p.total)} />
+              <MetricRow key={p.pais} label={`${p.flag ?? ""} ${p.pais}`.trim()} value={fmtBRL(p.total)} />
             ))}
           </SidePanel>
           <SidePanel title="Top Devedores">
             {d.topDevedores.length === 0 ? (
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>Sem devedores em aberto.</p>
             ) : d.topDevedores.map(t => (
-              <MetricRow key={t.processoId} label={`${t.pais ? PAIS_FLAG[t.pais] + " " : ""}${t.nome}`} value={fmtBRLshort(t.total)} />
+              <MetricRow key={t.processoId} label={t.nome} value={fmtBRLshort(t.total)} />
             ))}
           </SidePanel>
           <PendenciasFinanceirasPanel compact />

@@ -30,12 +30,16 @@ interface ReportFilters {
   dataFim?: string
 }
 
-const PAIS_LABELS: Record<string, string> = {
-  PORTUGAL: 'Portugal',
-  ESPANHA: 'Espanha',
-  ALEMANHA: 'Alemanha',
-  ITALIA: 'Itália'
-}
+/**
+ * RÓTULO DE PAÍS — sem lista local.
+ *
+ * Havia aqui um mapa fixo com quatro países em MAIÚSCULAS, comparado contra o
+ * valor que o banco grava em minúsculas: o rótulo nunca era encontrado e o país
+ * novo nunca apareceria. A lista de países é do Cadastro Mestre; este arquivo
+ * gera PDF e não consulta banco, então ele apenas APRESENTA a chave recebida.
+ */
+const rotuloDePais = (chave: string): string =>
+  chave ? chave.charAt(0).toUpperCase() + chave.slice(1).toLowerCase() : chave
 
 // ============================================
 // CLASSIFICAÇÃO DE TAREFAS
@@ -101,7 +105,7 @@ function prepararDados(atividades: Atividade[]) {
     prazoFinal: formatDate(a.data_termino),
     status: getStatusLabel(a),
     responsavel: getResponsavel(a),
-    pais: PAIS_LABELS[a.pais || ''] || a.pais || '-',
+    pais: rotuloDePais(a.pais || '') || '-',
   }))
 
   return {
@@ -163,7 +167,7 @@ export function gerarRelatorioPDF(atividades: Atividade[], filtrosAtivos?: Repor
 
   let filtroY = resumoY + boxHeight + 6
   const filtrosTexto: string[] = []
-  if (filtrosAtivos?.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${PAIS_LABELS[filtrosAtivos.pais] || filtrosAtivos.pais}`)
+  if (filtrosAtivos?.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${rotuloDePais(filtrosAtivos.pais)}`)
   if (filtrosAtivos?.status && filtrosAtivos.status !== 'all') filtrosTexto.push(`Status: ${filtrosAtivos.status}`)
   if (filtrosAtivos?.responsavel && filtrosAtivos.responsavel !== 'all') filtrosTexto.push(`Responsável: ${filtrosAtivos.responsavel}`)
   if (filtrosAtivos?.dataInicio) filtrosTexto.push(`De: ${formatDate(filtrosAtivos.dataInicio)}`)
@@ -392,7 +396,7 @@ export async function gerarRelatorioExcel(atividades: Atividade[], filtrosAtivos
 
   if (filtrosAtivos) {
     const filtrosTexto: string[] = []
-    if (filtrosAtivos.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${PAIS_LABELS[filtrosAtivos.pais] || filtrosAtivos.pais}`)
+    if (filtrosAtivos.pais && filtrosAtivos.pais !== 'all') filtrosTexto.push(`País: ${rotuloDePais(filtrosAtivos.pais)}`)
     if (filtrosAtivos.status && filtrosAtivos.status !== 'all') filtrosTexto.push(`Status: ${filtrosAtivos.status}`)
     if (filtrosAtivos.responsavel && filtrosAtivos.responsavel !== 'all') filtrosTexto.push(`Responsável: ${filtrosAtivos.responsavel}`)
     
