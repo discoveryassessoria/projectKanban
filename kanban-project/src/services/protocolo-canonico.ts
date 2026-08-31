@@ -84,7 +84,7 @@ export type Cardinalidade = (typeof CARDINALIDADES)[keyof typeof CARDINALIDADES]
 
 export interface DadosDoProtocolo {
   processoId: number
-  numeroProtocolo: string
+  numeroProtocolo?: string | null
   dataProtocolo: Date
   origem: OrigemDeProtocolo
   orgaoId?: number | null
@@ -127,8 +127,11 @@ export interface ProtocoloRegistrado {
 export async function registrarProtocoloTx(
   tx: Prisma.TransactionClient, dados: DadosDoProtocolo,
 ): Promise<ProtocoloRegistrado> {
-  const numero = dados.numeroProtocolo.trim()
-  if (numero === "") throw new Error("PROTOCOLO_SEM_NUMERO")
+  // O NÚMERO DEIXOU DE SER OBRIGATÓRIO. Nem todo balcão devolve um: o consulado
+  // marca a entrega e o número do expediente vem depois, às vezes semanas depois.
+  // Exigir o número era exigir que o operador inventasse um para poder registrar
+  // um fato que aconteceu.
+  const numero = (dados.numeroProtocolo ?? "").trim() || null
 
   const finalidade = dados.finalidade ?? FINALIDADES_DE_PROTOCOLO.REQUERIMENTO
   const escopo = [...new Set((dados.requerenteIds ?? []).filter((n) => Number.isInteger(n)))]
@@ -138,11 +141,25 @@ export async function registrarProtocoloTx(
   // A CHAVE DA IDEMPOTÊNCIA. Inclui a origem porque o mesmo número pode chegar por
   // dois caminhos legítimos — o dossiê protocolado e a certidão solicitada — e são
   // fatos diferentes.
+  //
+  // SEM NÚMERO a chave não pode ser o número: cairia em "todo protocolo sem
+  // número é o mesmo protocolo", e o segundo ato do dia sumiria dentro do
+  // primeiro. Nesse caso a identidade é o conjunto que descreve o ato — mesmo
+  // processo, mesmo órgão, mesma data, mesma finalidade —, que é o que um duplo
+  // clique repete e dois atos reais não repetem.
   const existente = await tx.protocolo.findFirst({
-    where: {
-      processoId: dados.processoId, numeroProtocolo: numero, origem: dados.origem,
-      ...(dados.solicitacaoId != null ? { solicitacaoId: dados.solicitacaoId } : {}),
-    },
+    where: numero
+      ? {
+          processoId: dados.processoId, numeroProtocolo: numero, origem: dados.origem,
+          ...(dados.solicitacaoId != null ? { solicitacaoId: dados.solicitacaoId } : {}),
+        }
+      : {
+          processoId: dados.processoId, origem: dados.origem, numeroProtocolo: null,
+          orgaoId: dados.orgaoId ?? null,
+          dataProtocolo: dados.dataProtocolo,
+          finalidade,
+          ...(dados.solicitacaoId != null ? { solicitacaoId: dados.solicitacaoId } : {}),
+        },
     select: { id: true },
   })
 

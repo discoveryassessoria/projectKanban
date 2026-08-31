@@ -124,10 +124,7 @@ export async function PUT(
       if (!dataProtocolo) return NextResponse.json({ error: "Data e hora do protocolo são obrigatórias" }, { status: 400 })
       updateData.dataProtocolo = new Date(dataProtocolo)
     }
-    if (numeroProtocolo !== undefined) {
-      if (!numeroProtocolo) return NextResponse.json({ error: "Número do protocolo é obrigatório" }, { status: 400 })
-      updateData.numeroProtocolo = numeroProtocolo
-    }
+    if (numeroProtocolo !== undefined) updateData.numeroProtocolo = numeroProtocolo || null
     if (tipoProtocoloId !== undefined) {
       if (!tipoProtocoloId) return NextResponse.json({ error: "Selecione um tipo de protocolo do cadastro." }, { status: 400 })
       const tipo = await prisma.tipoProtocoloCadastro.findUnique({
@@ -137,10 +134,7 @@ export async function PUT(
       updateData.tipoProtocoloId = tipo.id
     }
     if (formaEnvio !== undefined) updateData.formaEnvio = formaEnvio || null
-    if (responsavelId !== undefined) {
-      if (!responsavelId) return NextResponse.json({ error: "Responsável é obrigatório" }, { status: 400 })
-      updateData.responsavelId = Number(responsavelId)
-    }
+    if (responsavelId !== undefined) updateData.responsavelId = responsavelId ? Number(responsavelId) : null
     if (observacoes !== undefined) updateData.observacoes = observacoes || null
     if (numeroProcesso !== undefined) updateData.numeroProcesso = numeroProcesso?.trim() || null
     if (finalidade !== undefined) {

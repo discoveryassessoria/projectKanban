@@ -168,10 +168,7 @@ const SEM_PROTOCOLOS: Protocolo[] = []
 const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)]"
 
 const FORM_VAZIO = {
-  tipoPessoa: "contratante" as "contratante" | "requerente",
-  pessoaId: "",
   orgaoId: "",
-  setor: "",
   dataProtocolo: "",
   numeroProtocolo: "",
   numeroProcesso: "",
@@ -179,8 +176,6 @@ const FORM_VAZIO = {
   finalidade: "REQUERIMENTO",
   situacao: "PROTOCOLADO",
   requerenteIds: [] as number[],
-  formaEnvio: "",
-  responsavelId: "",
   observacoes: "",
   documentoIds: [] as number[],
 }
@@ -328,10 +323,7 @@ export function ProcessoProtocolos({
     setEditando(protocolo)
     setErroForm(null)
     setForm({
-      tipoPessoa: protocolo.contratanteId ? "contratante" : "requerente",
-      pessoaId: (protocolo.contratanteId || "").toString(),
       orgaoId: protocolo.orgaoId ? String(protocolo.orgaoId) : "",
-      setor: protocolo.setor || "",
       dataProtocolo: paraDatetimeLocal(protocolo.dataProtocolo),
       numeroProtocolo: protocolo.numeroProtocolo || "",
       numeroProcesso: protocolo.numeroProcesso || "",
@@ -339,8 +331,6 @@ export function ProcessoProtocolos({
       finalidade: protocolo.finalidade || "REQUERIMENTO",
       situacao: protocolo.situacao || "PROTOCOLADO",
       requerenteIds: (protocolo.requerentesCobertos ?? []).map((r) => r.requerente.id),
-      formaEnvio: protocolo.formaEnvio || "",
-      responsavelId: protocolo.responsavelId ? String(protocolo.responsavelId) : "",
       observacoes: protocolo.observacoes || "",
       documentoIds: (protocolo.documentos ?? []).map((d) => d.documentoId),
     })
@@ -361,7 +351,6 @@ export function ProcessoProtocolos({
     // campos mínimos do ato — sem eles a protocolização não é rastreável
     if (!form.orgaoId) return setErroForm("Selecione o órgão que recebeu o protocolo.")
     if (!form.dataProtocolo) return setErroForm("Informe a data e a hora da protocolização.")
-    if (!form.numeroProtocolo.trim()) return setErroForm("Informe o número do protocolo.")
     if (!form.tipoProtocoloId) return setErroForm("Selecione o tipo de protocolo.")
     // A MESMA regra do servidor, dita ANTES de o operador perder o formulário.
     // Ela não substitui a do servidor — o banco continua sendo quem recusa.
@@ -373,26 +362,20 @@ export function ProcessoProtocolos({
         return setErroForm("Nesta rota o requerimento é individual: um requerente por protocolo.")
       }
     }
-    if (!form.formaEnvio) return setErroForm("Selecione a forma de envio.")
-    if (!form.responsavelId) return setErroForm("Selecione o responsável pela protocolização.")
 
     setErroForm(null)
     setSalvando(true)
     try {
       const payload = {
         processoId,
-        contratanteId: form.pessoaId && form.tipoPessoa === "contratante" ? parseInt(form.pessoaId) : null,
         requerenteIds: form.requerenteIds,
         orgaoId: parseInt(form.orgaoId),
-        setor: form.setor.trim() || null,
         dataProtocolo: new Date(form.dataProtocolo).toISOString(),
         numeroProtocolo: form.numeroProtocolo.trim(),
         numeroProcesso: form.numeroProcesso.trim() || null,
         tipoProtocoloId: form.tipoProtocoloId ? parseInt(form.tipoProtocoloId) : null,
         finalidade: form.finalidade,
         situacao: form.situacao,
-        formaEnvio: form.formaEnvio,
-        responsavelId: parseInt(form.responsavelId),
         observacoes: form.observacoes.trim() || null,
         documentoIds: form.documentoIds,
       }
@@ -624,8 +607,10 @@ export function ProcessoProtocolos({
             </p>
 
             <div className="space-y-4">
-              {/* Órgão + Setor */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Órgão — o setor/guichê saiu: é detalhe de balcão que ninguém
+                  consulta depois, e cada campo a mais é uma chance a mais de o
+                  registro não ser feito na hora em que aconteceu. */}
+              <div>
                 <div>
                   <label className="block text-sm font-medium text-white/95 mb-1">
                     <Building2 className="h-4 w-4 inline mr-1" />
@@ -644,14 +629,6 @@ export function ProcessoProtocolos({
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-white/95 mb-1">Setor</label>
-                  <Input
-                    value={form.setor}
-                    onChange={(e) => setForm({ ...form, setor: e.target.value })}
-                    placeholder="Opcional — guichê, seção, mesa…"
-                  />
-                </div>
               </div>
 
               {/* Data/hora + Número */}
@@ -659,10 +636,10 @@ export function ProcessoProtocolos({
                 <div>
                   <label className="block text-sm font-medium text-white/95 mb-1">
                     <Calendar className="h-4 w-4 inline mr-1" />
-                    Data e hora *
+                    Data do protocolo *
                   </label>
                   <input
-                    type="datetime-local"
+                    type="date"
                     value={form.dataProtocolo}
                     onChange={(e) => setForm({ ...form, dataProtocolo: e.target.value })}
                     className={INPUT}
@@ -671,13 +648,16 @@ export function ProcessoProtocolos({
                 <div>
                   <label className="block text-sm font-medium text-white/95 mb-1">
                     <Hash className="h-4 w-4 inline mr-1" />
-                    Número do protocolo *
+                    Número do protocolo
                   </label>
                   <Input
                     value={form.numeroProtocolo}
                     onChange={(e) => setForm({ ...form, numeroProtocolo: e.target.value })}
-                    placeholder="Ex: M8371/2"
+                    placeholder="Opcional — Ex: M8371/2"
                   />
+                  <p className="text-xs text-white/60 mt-1">
+                    Nem todo balcão devolve número na hora. Registre o ato agora e complete depois.
+                  </p>
                 </div>
               </div>
 
@@ -732,8 +712,9 @@ export function ProcessoProtocolos({
                 </select>
               </div>
 
-              {/* Tipo + Forma de envio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Tipo do ato. A forma de envio saiu: presencial/correio/e-mail
+                  descreve o meio, não o fato — e o fato é que foi protocolado. */}
+              <div>
                 <div>
                   <label className="block text-sm font-medium text-white/95 mb-1">Tipo de protocolo *</label>
                   <select
@@ -752,56 +733,14 @@ export function ProcessoProtocolos({
                     </p>
                   )}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-white/95 mb-1">
-                    <Send className="h-4 w-4 inline mr-1" />
-                    Forma de envio *
-                  </label>
-                  <select
-                    value={form.formaEnvio}
-                    onChange={(e) => setForm({ ...form, formaEnvio: e.target.value })}
-                    className={INPUT}
-                  >
-                    <option value="">Selecione a forma</option>
-                    {(opcoes?.formasEnvio ?? []).map((f) => (
-                      <option key={f.valor} value={f.valor}>{f.label}</option>
-                    ))}
-                  </select>
-                </div>
               </div>
 
-              {/* Responsável + Pessoa vinculada */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-white/95 mb-1">
-                    <User className="h-4 w-4 inline mr-1" />
-                    Responsável *
-                  </label>
-                  <select
-                    value={form.responsavelId}
-                    onChange={(e) => setForm({ ...form, responsavelId: e.target.value })}
-                    className={INPUT}
-                  >
-                    <option value="">Quem protocolou</option>
-                    {(opcoes?.responsaveis ?? []).map((u) => (
-                      <option key={u.id} value={u.id}>{u.nome}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-white/95 mb-1">Contratante vinculado</label>
-                  <select
-                    value={form.tipoPessoa === "contratante" && form.pessoaId ? form.pessoaId : ""}
-                    onChange={(e) => setForm({ ...form, tipoPessoa: "contratante", pessoaId: e.target.value })}
-                    className={INPUT}
-                  >
-                    <option value="">Opcional — quem contratou</option>
-                    {contratantes.map(c => (
-                      <option key={`c-${c.id}`} value={String(c.id)}>{nomePessoa(c)}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              {/* RESPONSÁVEL e CONTRATANTE saíram do formulário.
+                  Responsável é quem está registrando — perguntar é pedir que a
+                  pessoa se identifique duas vezes, e a resposta errada só
+                  apareceria num relatório meses depois; o servidor grava o
+                  usuário da sessão. Contratante é vínculo do PROCESSO, não do
+                  ato: quem contratou não muda a cada protocolo. */}
 
               {/* ── ESCOPO: QUEM ESTE PROTOCOLO COBRE ──────────────────────────
                   O mesmo formulário serve Espanha e Itália. O que muda é quantos

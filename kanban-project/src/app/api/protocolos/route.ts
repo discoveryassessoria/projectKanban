@@ -79,9 +79,6 @@ export async function POST(request: Request) {
     if (!dataProtocolo) {
       return NextResponse.json({ error: "Data e hora do protocolo são obrigatórias" }, { status: 400 })
     }
-    if (!numeroProtocolo) {
-      return NextResponse.json({ error: "Número do protocolo é obrigatório" }, { status: 400 })
-    }
     // TIPO — agora vem do cadastro. O enum continua sendo gravado enquanto a
     // coluna existir, e só quando o `code` do cadastro corresponde a um valor
     // dele: tipo novo criado pela operação simplesmente não tem enum, e isso é
@@ -96,11 +93,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Selecione um tipo de protocolo do cadastro." }, { status: 400 })
     }
 
-    if (!formaEnvio || !Object.values(FormaEnvioProtocolo).includes(formaEnvio)) {
+    if (formaEnvio && !Object.values(FormaEnvioProtocolo).includes(formaEnvio)) {
       return NextResponse.json({ error: "Forma de envio inválida" }, { status: 400 })
-    }
-    if (!responsavelId) {
-      return NextResponse.json({ error: "Responsável é obrigatório" }, { status: 400 })
     }
     // Catálogos fechados: a rota não aceita classificação que o banco vai recusar.
     if (finalidade && !Object.values(FINALIDADES_DE_PROTOCOLO).includes(finalidade)) {
@@ -144,14 +138,17 @@ export async function POST(request: Request) {
         orgaoId: Number(orgaoId),
         setor: setor || null,
         dataProtocolo: quando,
-        numeroProtocolo,
+        numeroProtocolo: numeroProtocolo || null,
         numeroProcesso: numeroProcesso || null,
         tipoProtocoloId: tipo.id,
         ...(finalidade ? { finalidade } : {}),
         ...(situacao ? { situacao } : {}),
         formaEnvio,
         origem: ORIGENS_DE_PROTOCOLO.PROCESSO,
-        responsavelId: Number(responsavelId),
+        // QUEM PROTOCOLOU É QUEM REGISTRA. O campo saiu da tela porque perguntar
+        // isso a quem está preenchendo o formulário é pedir que ele se identifique
+        // duas vezes — e a resposta errada só apareceria num relatório, meses depois.
+        responsavelId: responsavelId ? Number(responsavelId) : (usuario?.userId ?? null),
         observacoes: observacoes || null,
         documentoIds: ids,
       })
