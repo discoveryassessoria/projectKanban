@@ -12,6 +12,36 @@ import {
   descreverProtocolizacao,
   registrarNaTimelineTx,
 } from "@/src/services/protocolizacao"
+import {
+  FINALIDADES_DE_PROTOCOLO,
+  SITUACOES_DE_PROTOCOLO,
+  cardinalidadeDoProcesso,
+  CARDINALIDADES,
+} from "@/src/services/protocolo-canonico"
+
+/**
+ * A MESMA regra de escopo da criação, aplicada na edição.
+ *
+ * Vive aqui em vez de no serviço canônico porque o serviço registra (cria ou
+ * reaproveita) e a edição REESCREVE — mas as duas perguntas são idênticas, e as
+ * duas respostas saem do cadastro: o requerente pertence ao processo, e a
+ * contagem cabe na cardinalidade da rota.
+ */
+async function validarEscopoNaEdicao(processoId: number, escopo: number[], finalidade: string): Promise<void> {
+  const doProcesso = await prisma.processoRequerente.findMany({
+    where: { processoId, requerenteId: { in: escopo } },
+    select: { requerenteId: true },
+  })
+  const conhecidos = new Set(doProcesso.map((r) => r.requerenteId))
+  const intrusos = escopo.filter((rid) => !conhecidos.has(rid))
+  if (intrusos.length > 0) throw new Error(`REQUERENTE_FORA_DO_PROCESSO: ${intrusos.join(", ")}`)
+
+  if (finalidade !== FINALIDADES_DE_PROTOCOLO.REQUERIMENTO) return
+  const cardinalidade = await cardinalidadeDoProcesso(prisma, processoId)
+  if (cardinalidade === CARDINALIDADES.INDIVIDUAL && escopo.length !== 1) {
+    throw new Error(`REQUERIMENTO_INDIVIDUAL_ACEITA_UM_REQUERENTE: recebidos ${escopo.length}`)
+  }
+}
 
 // GET - buscar protocolização por ID
 export async function GET(
@@ -61,7 +91,11 @@ export async function PUT(
       orgaoId,
       setor,
       dataProtocolo,
+      requerenteIds,
       numeroProtocolo,
+      numeroProcesso,
+      finalidade,
+      situacao,
       tipoProtocolo,
       formaEnvio,
       responsavelId,
@@ -111,6 +145,32 @@ export async function PUT(
       updateData.responsavelId = Number(responsavelId)
     }
     if (observacoes !== undefined) updateData.observacoes = observacoes || null
+    if (numeroProcesso !== undefined) updateData.numeroProcesso = numeroProcesso?.trim() || null
+    if (finalidade !== undefined) {
+      if (!Object.values(FINALIDADES_DE_PROTOCOLO).includes(finalidade)) {
+        return NextResponse.json({ error: "Finalidade inválida" }, { status: 400 })
+      }
+      updateData.finalidade = finalidade
+    }
+    if (situacao !== undefined) {
+      if (!Object.values(SITUACOES_DE_PROTOCOLO).includes(situacao)) {
+        return NextResponse.json({ error: "Situação inválida" }, { status: 400 })
+      }
+      // A data da situação acompanha a mudança: sem ela, "deferido" não tem quando.
+      if (situacao !== existente.situacao) updateData.situacaoEm = new Date()
+      updateData.situacao = situacao
+    }
+
+    // ESCOPO — a lista recebida é a verdade. Reescrever o vínculo aqui é o que
+    // permite corrigir um requerimento coletivo que nasceu com um requerente a
+    // menos, sem criar um segundo protocolo para o mesmo ato.
+    const escopo: number[] | null = Array.isArray(requerenteIds)
+      ? Array.from(new Set(requerenteIds.map(Number).filter((n: number) => Number.isInteger(n))))
+      : null
+    if (escopo) {
+      await validarEscopoNaEdicao(existente.processoId, escopo, (finalidade ?? existente.finalidade) as string)
+      updateData.requerenteId = escopo.length === 1 ? escopo[0] : null
+    }
 
     const ids: number[] | null = Array.isArray(documentoIds)
       ? Array.from(new Set(documentoIds.map(Number).filter((n: number) => Number.isFinite(n))))
@@ -122,6 +182,18 @@ export async function PUT(
         data: updateData,
         include: INCLUDE_PROTOCOLO,
       })
+
+      if (escopo) {
+        await tx.protocoloRequerente.deleteMany({
+          where: { protocoloId: id, requerenteId: { notIn: escopo.length ? escopo : [-1] } },
+        })
+        if (escopo.length) {
+          await tx.protocoloRequerente.createMany({
+            data: escopo.map((requerenteId) => ({ protocoloId: id, requerenteId })),
+            skipDuplicates: true,
+          })
+        }
+      }
 
       // documentos enviados: a lista recebida é a verdade (substitui a anterior)
       if (ids) {
@@ -159,6 +231,16 @@ export async function PUT(
 
     return NextResponse.json({ protocolo })
   } catch (error) {
+    const msg = error instanceof Error ? error.message : ""
+    if (msg.startsWith("REQUERENTE_FORA_DO_PROCESSO")) {
+      return NextResponse.json({ error: "Há requerente selecionado que não pertence a este processo." }, { status: 400 })
+    }
+    if (msg.startsWith("REQUERIMENTO_INDIVIDUAL_ACEITA_UM_REQUERENTE")) {
+      return NextResponse.json({ error: "Nesta rota o requerimento é individual: um requerente por protocolo." }, { status: 400 })
+    }
+    if (msg.includes("REQUERENTE_JA_TEM_REQUERIMENTO")) {
+      return NextResponse.json({ error: "Este requerente já está coberto por um requerimento neste processo." }, { status: 409 })
+    }
     console.error("Erro ao atualizar protocolo:", error)
     return NextResponse.json({ error: "Erro ao atualizar protocolo" }, { status: 500 })
   }

@@ -77,6 +77,11 @@ interface Protocolo {
   setor?: string | null
   dataProtocolo?: string | null
   numeroProtocolo?: string | null
+  numeroProcesso?: string | null
+  finalidade?: string | null
+  situacao?: string | null
+  requerentesCobertos?: { requerente: PessoaBase }[]
+  exigencias?: { id: number; descricao: string; prazo?: string | null; cumpridaEm?: string | null }[]
   tipoProtocolo?: string | null
   formaEnvio?: string | null
   responsavelId?: number | null
@@ -92,6 +97,10 @@ interface Protocolo {
 
 interface OpcoesProtocolo {
   orgaos: { id: number; name: string; type?: string | null; city?: string | null }[]
+  /** INDIVIDUAL | COLETIVO — vem da Modalidade Legal do processo, não do país. */
+  cardinalidade?: "INDIVIDUAL" | "COLETIVO"
+  finalidades?: string[]
+  situacoes?: string[]
   responsaveis: { id: number; nome: string }[]
   documentos: { id: number; publicCode: string | null; tipo: string | null; descricao: string | null; pessoa: string }[]
   tipos: { valor: string; label: string }[]
@@ -135,6 +144,31 @@ const rotuloDocumento = (d: { publicCode?: string | null; tipo?: string | null; 
   return `${codigo}${nome}${d.pessoa ? ` (${d.pessoa})` : ""}`
 }
 
+/** Rótulos das dimensões fechadas. O valor é do banco; o texto é da tela. */
+const ROTULO_FINALIDADE: Record<string, string> = {
+  REQUERIMENTO: "Requerimento (o pedido)",
+  RETIFICACAO: "Retificação de registro",
+  CERTIDAO: "Solicitação de certidão",
+  COMPLEMENTACAO: "Resposta a exigência",
+  RECURSO: "Recurso",
+  OUTRO: "Outro",
+}
+const ROTULO_SITUACAO: Record<string, string> = {
+  PROTOCOLADO: "Protocolado",
+  EM_ANALISE: "Em análise",
+  EXIGENCIA: "Em exigência",
+  DEFERIDO: "Deferido",
+  INDEFERIDO: "Indeferido",
+  ARQUIVADO: "Arquivado",
+}
+
+/** A situação usa as três famílias semânticas do contrato da paleta — nada além. */
+const CorDaSituacao = (v: string): string =>
+  v === "DEFERIDO" ? "var(--success-text)"
+  : v === "INDEFERIDO" ? "var(--danger-text)"
+  : v === "EXIGENCIA" ? "var(--warning-text)"
+  : "var(--info-text)"
+
 const SEM_PROTOCOLOS: Protocolo[] = []
 const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)]"
 
@@ -145,6 +179,10 @@ const FORM_VAZIO = {
   setor: "",
   dataProtocolo: "",
   numeroProtocolo: "",
+  numeroProcesso: "",
+  finalidade: "REQUERIMENTO",
+  situacao: "PROTOCOLADO",
+  requerenteIds: [] as number[],
   tipoProtocolo: "",
   formaEnvio: "",
   responsavelId: "",
@@ -180,6 +218,17 @@ export function ProcessoProtocolos({
   // fechadas (tipo/forma de envio). Fonte única, resolvida no servidor.
   const opcoesReq = useApi<OpcoesProtocolo>(processoId ? `/api/protocolos/opcoes?processoId=${processoId}` : null)
   const opcoes = opcoesReq.dados
+  /**
+   * A CARDINALIDADE DA ROTA — quantos requerentes cabem num requerimento.
+   *
+   * Vem do cadastro (Modalidade Legal → `cardinalidadeRequerimento`), NUNCA do
+   * país. Espanha/LMD é consular e individual: um expediente por pessoa, no
+   * consulado do domicílio dela. Itália é judicial e coletiva: um ricorso, um
+   * R.G., a família inteira. Enquanto o cadastro não responde, a tela assume a
+   * regra mais restritiva — um requerimento coletivo criado por engano espalha o
+   * erro por N pessoas de uma vez.
+   */
+  const cardinalidade = opcoes?.cardinalidade ?? "INDIVIDUAL"
 
   // Buscar protocolos
   // Leitura COMPOSTA: a lista de protocolos e, para cada um, os seus anexos. Em tela
@@ -226,6 +275,10 @@ export function ProcessoProtocolos({
       setor: protocolo.setor || "",
       dataProtocolo: paraDatetimeLocal(protocolo.dataProtocolo),
       numeroProtocolo: protocolo.numeroProtocolo || "",
+      numeroProcesso: protocolo.numeroProcesso || "",
+      finalidade: protocolo.finalidade || "REQUERIMENTO",
+      situacao: protocolo.situacao || "PROTOCOLADO",
+      requerenteIds: (protocolo.requerentesCobertos ?? []).map((r) => r.requerente.id),
       tipoProtocolo: protocolo.tipoProtocolo || "",
       formaEnvio: protocolo.formaEnvio || "",
       responsavelId: protocolo.responsavelId ? String(protocolo.responsavelId) : "",
@@ -250,6 +303,16 @@ export function ProcessoProtocolos({
     if (!form.orgaoId) return setErroForm("Selecione o órgão que recebeu o protocolo.")
     if (!form.dataProtocolo) return setErroForm("Informe a data e a hora da protocolização.")
     if (!form.numeroProtocolo.trim()) return setErroForm("Informe o número do protocolo.")
+    // A MESMA regra do servidor, dita ANTES de o operador perder o formulário.
+    // Ela não substitui a do servidor — o banco continua sendo quem recusa.
+    if (form.finalidade === "REQUERIMENTO") {
+      if (form.requerenteIds.length === 0) {
+        return setErroForm("Selecione quem este requerimento cobre.")
+      }
+      if (cardinalidade === "INDIVIDUAL" && form.requerenteIds.length > 1) {
+        return setErroForm("Nesta rota o requerimento é individual: um requerente por protocolo.")
+      }
+    }
     if (!form.tipoProtocolo) return setErroForm("Selecione o tipo de protocolo.")
     if (!form.formaEnvio) return setErroForm("Selecione a forma de envio.")
     if (!form.responsavelId) return setErroForm("Selecione o responsável pela protocolização.")
@@ -260,11 +323,14 @@ export function ProcessoProtocolos({
       const payload = {
         processoId,
         contratanteId: form.pessoaId && form.tipoPessoa === "contratante" ? parseInt(form.pessoaId) : null,
-        requerenteId: form.pessoaId && form.tipoPessoa === "requerente" ? parseInt(form.pessoaId) : null,
+        requerenteIds: form.requerenteIds,
         orgaoId: parseInt(form.orgaoId),
         setor: form.setor.trim() || null,
         dataProtocolo: new Date(form.dataProtocolo).toISOString(),
         numeroProtocolo: form.numeroProtocolo.trim(),
+        numeroProcesso: form.numeroProcesso.trim() || null,
+        finalidade: form.finalidade,
+        situacao: form.situacao,
         tipoProtocolo: form.tipoProtocolo,
         formaEnvio: form.formaEnvio,
         responsavelId: parseInt(form.responsavelId),
@@ -543,6 +609,57 @@ export function ProcessoProtocolos({
                 </div>
               </div>
 
+              {/* ── FINALIDADE + NÚMERO DO PROCESSO ────────────────────────────
+                  São dois números diferentes e confundi-los custa caro: o
+                  PROTOCOLO prova a entrega (o comprovante do guichê); o NÚMERO DO
+                  PROCESSO é o que o órgão dá ao dossiê e o acompanha pelo resto da
+                  vida — o *ruolo generale* do tribunal, o expediente do consulado.
+                  É por ele que se consulta o andamento. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white/95 mb-1">Finalidade *</label>
+                  <select
+                    value={form.finalidade}
+                    onChange={(e) => setForm({ ...form, finalidade: e.target.value })}
+                    className={INPUT}
+                  >
+                    {(opcoes?.finalidades ?? ["REQUERIMENTO"]).map((f) => (
+                      <option key={f} value={f}>{ROTULO_FINALIDADE[f] ?? f}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-white/70 mt-1">
+                    O requerimento é o pedido em si. Retificação, certidão e complementação são atos do mesmo processo.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/95 mb-1">
+                    <Hash className="h-4 w-4 inline mr-1" />
+                    Número do processo no órgão
+                  </label>
+                  <Input
+                    value={form.numeroProcesso}
+                    onChange={(e) => setForm({ ...form, numeroProcesso: e.target.value })}
+                    placeholder="Ruolo generale / nº de expediente"
+                  />
+                </div>
+              </div>
+
+              {/* SITUAÇÃO — o que o ÓRGÃO respondeu. Não é a fase do nosso
+                  workflow: o motor sabe em que etapa nós estamos, só o órgão sabe
+                  se deferiu, exigiu ou arquivou. */}
+              <div>
+                <label className="block text-sm font-medium text-white/95 mb-1">Situação no órgão</label>
+                <select
+                  value={form.situacao}
+                  onChange={(e) => setForm({ ...form, situacao: e.target.value })}
+                  className={INPUT}
+                >
+                  {(opcoes?.situacoes ?? ["PROTOCOLADO"]).map((v) => (
+                    <option key={v} value={v}>{ROTULO_SITUACAO[v] ?? v}</option>
+                  ))}
+                </select>
+              </div>
+
               {/* Tipo + Forma de envio */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -595,40 +712,74 @@ export function ProcessoProtocolos({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/95 mb-1">Pessoa vinculada</label>
+                  <label className="block text-sm font-medium text-white/95 mb-1">Contratante vinculado</label>
                   <select
-                    value={form.pessoaId ? `${form.tipoPessoa}-${form.pessoaId}` : ""}
-                    onChange={(e) => {
-                      const [tipo, id] = e.target.value.split("-")
-                      setForm({
-                        ...form,
-                        tipoPessoa: (tipo as "contratante" | "requerente") || "contratante",
-                        pessoaId: id || "",
-                      })
-                    }}
+                    value={form.tipoPessoa === "contratante" && form.pessoaId ? form.pessoaId : ""}
+                    onChange={(e) => setForm({ ...form, tipoPessoa: "contratante", pessoaId: e.target.value })}
                     className={INPUT}
                   >
-                    <option value="">Opcional — todo o processo</option>
-                    {contratantes.length > 0 && (
-                      <optgroup label="Contratantes">
-                        {contratantes.map(c => (
-                          <option key={`c-${c.id}`} value={`contratante-${c.id}`}>
-                            {nomePessoa(c)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {requerentes.length > 0 && (
-                      <optgroup label="Requerentes">
-                        {requerentes.map(r => (
-                          <option key={`r-${r.id}`} value={`requerente-${r.id}`}>
-                            {nomePessoa(r)}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
+                    <option value="">Opcional — quem contratou</option>
+                    {contratantes.map(c => (
+                      <option key={`c-${c.id}`} value={String(c.id)}>{nomePessoa(c)}</option>
+                    ))}
                   </select>
                 </div>
+              </div>
+
+              {/* ── ESCOPO: QUEM ESTE PROTOCOLO COBRE ──────────────────────────
+                  O mesmo formulário serve Espanha e Itália. O que muda é quantos
+                  cabem, e isso vem do cadastro — a tela não pergunta o país. */}
+              <div>
+                <label className="block text-sm font-medium text-white/95 mb-1">
+                  Requerentes cobertos {form.finalidade === "REQUERIMENTO" && <span className="text-[var(--danger)]">*</span>}
+                </label>
+                <p className="text-xs text-white/70 mb-2">
+                  {cardinalidade === "COLETIVO"
+                    ? "Esta rota é coletiva: um requerimento cobre os requerentes selecionados, sob um único número de processo."
+                    : "Esta rota é individual: um requerimento por requerente, com número de processo próprio."}
+                </p>
+                {requerentes.length === 0 ? (
+                  <p className="text-sm text-white/70 border border-[var(--border-subtle)] rounded-md px-3 py-2">
+                    Nenhum requerente vinculado a este processo.
+                  </p>
+                ) : (
+                  <div className="border border-[var(--border-subtle)] rounded-md max-h-44 overflow-y-auto divide-y divide-[var(--border-subtle)]">
+                    {requerentes.map((r) => {
+                      const marcado = form.requerenteIds.includes(r.id)
+                      return (
+                        <label
+                          key={`req-${r.id}`}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-white/95 hover:bg-[var(--surface-tertiary)] cursor-pointer"
+                        >
+                          <input
+                            type={cardinalidade === "COLETIVO" ? "checkbox" : "radio"}
+                            name="requerentes-cobertos"
+                            checked={marcado}
+                            onChange={() => setForm({
+                              ...form,
+                              requerenteIds: cardinalidade === "COLETIVO"
+                                ? (marcado ? form.requerenteIds.filter((id) => id !== r.id) : [...form.requerenteIds, r.id])
+                                : [r.id],
+                            })}
+                          />
+                          <span>{nomePessoa(r)}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                )}
+                {cardinalidade === "COLETIVO" && requerentes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => setForm({
+                      ...form,
+                      requerenteIds: form.requerenteIds.length === requerentes.length ? [] : requerentes.map((r) => r.id),
+                    })}
+                    className="mt-1 text-xs text-[var(--accent-text)] hover:underline"
+                  >
+                    {form.requerenteIds.length === requerentes.length ? "Limpar seleção" : "Selecionar todos os requerentes"}
+                  </button>
+                )}
               </div>
 
               {/* Documentos enviados */}
@@ -756,6 +907,22 @@ export function ProcessoProtocolos({
                               {rotuloTipo(protocolo.tipoProtocolo)}
                             </span>
                           )}
+                          {protocolo.finalidade && protocolo.finalidade !== "REQUERIMENTO" && (
+                            <span className="text-xs px-2 py-0.5 bg-[var(--surface-secondary)] text-white/80 rounded">
+                              {ROTULO_FINALIDADE[protocolo.finalidade] ?? protocolo.finalidade}
+                            </span>
+                          )}
+                          {protocolo.situacao && protocolo.situacao !== "PROTOCOLADO" && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded font-medium"
+                              style={{
+                                backgroundColor: `${CorDaSituacao(protocolo.situacao)}22`,
+                                color: CorDaSituacao(protocolo.situacao),
+                              }}
+                            >
+                              {ROTULO_SITUACAO[protocolo.situacao] ?? protocolo.situacao}
+                            </span>
+                          )}
                         </div>
 
                         {/* Info do protocolo */}
@@ -769,6 +936,15 @@ export function ProcessoProtocolos({
                             <div className="flex items-center gap-2 text-white/70">
                               <Hash className="h-4 w-4 text-[var(--text-muted)]" />
                               <span className="font-mono">{protocolo.numeroProtocolo}</span>
+                            </div>
+                          )}
+
+                          {protocolo.numeroProcesso && (
+                            <div className="flex items-center gap-2 text-white/70">
+                              <FileText className="h-4 w-4 text-[var(--text-muted)]" />
+                              <span className="font-mono" title="Número do processo no órgão">
+                                {protocolo.numeroProcesso}
+                              </span>
                             </div>
                           )}
 
@@ -786,6 +962,24 @@ export function ProcessoProtocolos({
                             </div>
                           )}
                         </div>
+
+                        {/* ESCOPO — quem este protocolo cobre. Na Espanha é um
+                            nome; na Itália é a família inteira. A mesma linha
+                            serve aos dois porque a fonte é a mesma tabela. */}
+                        {(protocolo.requerentesCobertos ?? []).length > 0 && (
+                          <p className="text-xs text-white/70 mt-2 ml-5">
+                            <span className="text-white/60">
+                              {protocolo.requerentesCobertos!.length === 1 ? "Requerente: " : `Requerentes (${protocolo.requerentesCobertos!.length}): `}
+                            </span>
+                            {protocolo.requerentesCobertos!.map((r) => nomePessoa(r.requerente)).join(" · ")}
+                          </p>
+                        )}
+
+                        {(protocolo.exigencias ?? []).some((e) => e.cumpridaEm == null) && (
+                          <p className="text-xs mt-1 ml-5" style={{ color: "var(--warning-text)" }}>
+                            {protocolo.exigencias!.filter((e) => e.cumpridaEm == null).length} exigência(s) em aberto
+                          </p>
+                        )}
 
                         {pessoa && (
                           <p className="text-xs text-white/70 mt-2 ml-5">{pessoa}</p>

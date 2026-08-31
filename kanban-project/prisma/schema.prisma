@@ -639,10 +639,10 @@ model Tarefa {
   // tem saída: manter o trabalho zeraria `causaRemovidaEm`, e o reconciliador
   // — que só olha o workflow encerrado — marcaria tudo de novo na passada
   // seguinte. A decisão precisa ficar registrada para ser respeitada.
-  causaDecididaEm       DateTime?
-  causaDecisao          String?   @db.VarChar(20) // MANTER | ENCERRAR
-  causaDecisaoAutorId   Int?
-  causaDecisaoMotivo    String?   @db.VarChar(300)
+  causaDecididaEm     DateTime?
+  causaDecisao        String?   @db.VarChar(20) // MANTER | ENCERRAR
+  causaDecisaoAutorId Int?
+  causaDecisaoMotivo  String?   @db.VarChar(300)
 
   dependeDe TarefaDependencia[] @relation("TarefaDependente")
   bloqueia  TarefaDependencia[] @relation("TarefaPreRequisito")
@@ -784,6 +784,8 @@ model Requerente {
   pagamentosRecebidos  PagamentoDestinatario[]
   processos            ProcessoRequerente[]
   protocolos           Protocolo[]
+  /// Protocolos que COBREM este requerente (escopo — ver ProtocoloRequerente).
+  protocolosCobertos   ProtocoloRequerente[]
   receitaParticipacoes ReceitaRequerente[]     @relation("ReceitaRequerentes")
   recibosPagos         Recibo[]                @relation("ReciboRequerente")
 
@@ -802,49 +804,78 @@ model Requerente {
 /// NÃO é cadastro: cada registro é um ato concreto (entregar/enviar algo a um
 /// órgão), que gera Evento na Timeline e entra no Histórico do Processo.
 model Protocolo {
-  publicCode      String?               @unique @db.VarChar(20)
-  id              Int                   @id @default(autoincrement())
-  processoId      Int
-  contratanteId   Int?
-  requerenteId    Int?
+  publicCode           String?               @unique @db.VarChar(20)
+  id                   Int                   @id @default(autoincrement())
+  processoId           Int
+  contratanteId        Int?
+  requerenteId         Int?
   /// LEGADO (Espanha): substituído por `orgaoId` — Órgãos e Organizações.
-  consulado       Consulado?
-  consuladoOutro  String?               @db.VarChar(200)
+  consulado            Consulado?
+  consuladoOutro       String?               @db.VarChar(200)
   /// Órgão que RECEBEU o protocolo (fonte única: Órgãos e Organizações).
-  orgaoId         Int?
+  orgaoId              Int?
   /// Setor/guichê dentro do órgão (opcional).
-  setor           String?               @db.VarChar(120)
+  setor                String?               @db.VarChar(120)
   /// Data e hora da protocolização.
-  dataProtocolo   DateTime?
-  numeroProtocolo String?               @db.VarChar(100)
-  tipoProtocolo   TipoProtocolo?
-  formaEnvio      FormaEnvioProtocolo?
+  dataProtocolo        DateTime?
+  /// NÚMERO DO COMPROVANTE DA ENTREGA — o que o guichê devolve na hora.
+  numeroProtocolo      String?               @db.VarChar(100)
+  /// NÚMERO DO PROCESSO NO ÓRGÃO — o *ruolo generale* do tribunal italiano, o
+  /// número de expediente do consulado espanhol. É OUTRO fato: o protocolo prova
+  /// a entrega, este identifica o dossiê dentro do órgão pelo resto da vida dele.
+  /// Vivia em `InformacaoItalia.numeroRuoloGenerale`, tabela que só a Itália
+  /// tinha; aqui serve aos dois países e entra nos relatórios por órgão.
+  numeroProcesso       String?               @db.VarChar(100)
+  /// PARA QUE serve este ato. `tipoProtocolo` diz ONDE (consular, judicial,
+  /// comune); `origem` diz QUEM o criou (tela, solicitação, etapa). Faltava o
+  /// para quê — sem ele não dá para separar, num relatório, O requerimento de
+  /// cidadania de um protocolo de retificação no mesmo tribunal.
+  /// Catálogo fechado em `FINALIDADES_DE_PROTOCOLO` (protocolo-canonico.ts).
+  finalidade           String                @default("REQUERIMENTO") @db.VarChar(30)
+  /// SITUAÇÃO DADA PELO ÓRGÃO — não é fase do nosso workflow. O motor sabe em que
+  /// etapa nós estamos; só o órgão sabe se deferiu, exigiu ou arquivou.
+  /// Catálogo fechado em `SITUACOES_DE_PROTOCOLO`.
+  situacao             String                @default("PROTOCOLADO") @db.VarChar(30)
+  /// Quando a situação acima passou a valer (data do ato do órgão).
+  situacaoEm           DateTime?
+  tipoProtocolo        TipoProtocolo?
+  formaEnvio           FormaEnvioProtocolo?
   /// Quem da equipe protocolou.
-  responsavelId   Int?
-  observacoes     String?
+  responsavelId        Int?
+  observacoes          String?
   /// ORIGEM do ato. "PROCESSO" = protocolizacao do dossie no orgao (telas do processo).
   /// "SOLICITACAO_DOCUMENTO" = numero devolvido ao solicitar uma certidao. E o MESMO
   /// cadastro de protocolo (nao existe um segundo); a origem so diz de onde ele nasceu.
-  origem          String                @default("PROCESSO") @db.VarChar(30)
+  origem               String                @default("PROCESSO") @db.VarChar(30)
   /// Solicitacao de certidao que originou este protocolo (null = protocolo do processo).
-  solicitacaoId   Int?
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
-  anexos          AnexoProtocolo[]
-  documentos      ProtocoloDocumento[]
+  solicitacaoId        Int?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  anexos               AnexoProtocolo[]
+  documentos           ProtocoloDocumento[]
+  /// QUEM este protocolo cobre. FONTE ÚNICA do escopo.
+  ///
+  /// A cardinalidade NÃO está aqui: está na Modalidade Legal do processo.
+  /// Espanha/LMD é consular e INDIVIDUAL — um requerimento por requerente, um
+  /// número por pessoa. Itália é judicial e COLETIVA — um ricorso cobre a
+  /// família inteira sob um único R.G. A mesma tabela serve aos dois; o que
+  /// muda é um dado de cadastro, nunca um `if (pais)`.
+  requerentesCobertos  ProtocoloRequerente[]
+  /// Exigências que o órgão levantou sobre ESTE protocolo.
+  exigencias           ProtocoloExigencia[]
   /// Arquivos da operacao documental ligados a ESTE protocolo (o requerimento
   /// enviado, os comprovantes). E REFERENCIA ao mesmo DocumentoArquivo que a etapa
   /// e o documento leem - nao existe copia do binario nem segunda linha.
-  arquivos        DocumentoArquivo[]    @relation("ArquivoProtocolo")
-  tentativas           StepExecution[]    @relation("ProtocoloDaTentativa")
-  retificacoes         RetificacaoPacote[] @relation("ProtocoloDaRetificacao")
-  execucoesDeSubtarefa SubtaskExecution[] @relation("ProtocoloDaSubtarefa")
-  contratante     Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-  processo        Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  requerente      Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-  orgao           OrgaoProtocolo?       @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
-  responsavel     Usuario?              @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
-  solicitacao     SolicitacaoDocumento? @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  arquivos             DocumentoArquivo[]    @relation("ArquivoProtocolo")
+  tentativas           StepExecution[]       @relation("ProtocoloDaTentativa")
+  retificacoes         RetificacaoPacote[]   @relation("ProtocoloDaRetificacao")
+  execucoesDeSubtarefa SubtaskExecution[]    @relation("ProtocoloDaSubtarefa")
+  contratante          Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  processo             Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerente           Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  orgao                OrgaoProtocolo?       @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+  responsavel          Usuario?              @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  solicitacao          SolicitacaoDocumento? @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
 
   @@index([processoId])
   @@index([contratanteId])
@@ -852,6 +883,53 @@ model Protocolo {
   @@index([orgaoId])
   @@index([responsavelId])
   @@index([solicitacaoId])
+  /// RELATÓRIO POR CONSULADO/TRIBUNAL E POR DATA — o filtro que a operação pede
+  /// ("tudo que foi protocolado no Consulado de São Paulo em agosto") varre estas
+  /// duas colunas juntas, para os dois países, numa consulta só.
+  @@index([orgaoId, dataProtocolo])
+  @@index([finalidade, situacao])
+}
+
+/// ESCOPO DO PROTOCOLO — quais requerentes aquele ato cobre.
+///
+/// Existe porque `Protocolo.requerenteId` cabia UM só: o caso italiano (um
+/// ricorso para a família inteira) era irrepresentável, e o espanhol só
+/// funcionava por acidente. Com a tabela, os dois casos são o MESMO modelo com
+/// contagem diferente — e o relatório por família não precisa saber de país.
+model ProtocoloRequerente {
+  protocoloId  Int
+  requerenteId Int
+  criadoEm     DateTime   @default(now())
+  protocolo    Protocolo  @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+  requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+
+  @@id([protocoloId, requerenteId])
+  @@index([requerenteId])
+}
+
+/// EXIGÊNCIA DO ÓRGÃO — o que ele pediu, e até quando.
+///
+/// É entidade própria, e não dois campos no protocolo, porque o órgão exige mais
+/// de uma vez ao longo do mesmo expediente e cada exigência tem prazo, resposta e
+/// data de cumprimento próprios. Dois campos guardariam só a última e apagariam o
+/// histórico — que é exatamente o que a operação precisa provar depois.
+model ProtocoloExigencia {
+  id           Int       @id @default(autoincrement())
+  protocoloId  Int
+  /// O que o órgão pediu, no texto dele.
+  descricao    String    @db.Text
+  /// Data-limite dada pelo órgão. É ela que alimenta o relatório do que vence.
+  prazo        DateTime?
+  /// Quando NÓS cumprimos. Nulo = em aberto.
+  cumpridaEm   DateTime?
+  observacoes  String?   @db.Text
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  protocolo    Protocolo @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+
+  @@index([protocoloId])
+  @@index([prazo])
+  @@index([cumpridaEm])
 }
 
 /// Documentos ENVIADOS numa protocolização (o que foi entregue ao órgão).
@@ -2030,18 +2108,18 @@ model FaseFinal {
 }
 
 model RetificacaoPacote {
-  id             Int      @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   processoId     Int
-  processo       Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  processo       Processo      @relation(fields: [processoId], references: [id], onDelete: Cascade)
   num            String // PR-001
   /// MODO do procedimento. ANULAVEL: o pedido pode ser aberto (agrupando as
   /// divergencias que vao juntas) antes de alguem decidir se o caminho e judicial ou
   /// administrativo — que e exatamente o que o passo "Definir modo" resolve.
   tipo           String? // judicial | administrativa
-  status         String   @default("em_preparacao") // em_preparacao|protocolado|em_exigencia|decisao_recebida|validado|bloqueado
-  currentStep    String   @default("definir_estrategia")
+  status         String        @default("em_preparacao") // em_preparacao|protocolado|em_exigencia|decisao_recebida|validado|bloqueado
+  currentStep    String        @default("definir_estrategia")
   motivo         String?
-  prioridade     String?  @default("MÃ©dia")
+  prioridade     String?       @default("MÃ©dia")
   proxAcao       String?
   /// PROFISSIONAL RESPONSAVEL pelo procedimento, quando houver. Referencia, nunca
   /// nome copiado: renomear o cadastro aparece aqui sem regravar execucao nenhuma.
@@ -2054,7 +2132,7 @@ model RetificacaoPacote {
   /// no sistema, e criar uma vazia para guardar uma string seria estrutura sem dono.
   /// Nao e protocolo: protocolo e o comprovante de entrada, este e a identidade da
   /// acao no tribunal, e eles nem sempre coincidem.
-  processoNum    String?
+  processoNum   String?
   /// ─── LEGADO TEXTUAL — PRESERVADO, NAO ESCRITO ──────────────────────────
   /// Os campos abaixo sao da tela anterior. Continuam existindo porque apagar coluna
   /// e apagar o que ja foi digitado; nenhum caminho canonico escreve neles, e cada um
@@ -2071,37 +2149,37 @@ model RetificacaoPacote {
   ///   protocolo,
   ///   dataProtocolo      → `protocoloId` → `Protocolo`.
   ///   prazo              → prazo da etapa, herdado da fase.
-  tribunal       String?
-  vara           String?
-  comarca        String?
-  advogado       String?
-  oab            String?
-  statusProc     String?
+  tribunal      String?
+  vara          String?
+  comarca       String?
+  advogado      String?
+  oab           String?
+  statusProc    String?
   // Administrativa
-  cartorio       String?
-  canal          String?
-  protocolo      String?
-  dataProtocolo  String?
-  atendente      String?
-  prazo          String?
-  statusAdm      String?
+  cartorio      String?
+  canal         String?
+  protocolo     String?
+  dataProtocolo String?
+  atendente     String?
+  prazo         String?
+  statusAdm     String?
   /// ORGAO que recebe o pedido. FONTE UNICA: Orgaos e Organizacoes. Substitui o
   /// campo `cartorio` (texto), que ficava congelado no dia em que a organizacao
   /// mudasse de nome. `cartorio` segue existindo para nao apagar historico.
-  orgaoId        Int?
-  orgao          OrgaoProtocolo? @relation("OrgaoDaRetificacao", fields: [orgaoId], references: [id], onDelete: SetNull)
+  orgaoId       Int?
+  orgao         OrgaoProtocolo? @relation("OrgaoDaRetificacao", fields: [orgaoId], references: [id], onDelete: SetNull)
   /// PROTOCOLO canonico do pedido. Substitui os campos `protocolo`/`dataProtocolo`
   /// (texto), pela mesma razao: o protocolo tem dono.
-  protocoloId    Int?
-  protocoloRef   Protocolo?      @relation("ProtocoloDaRetificacao", fields: [protocoloId], references: [id], onDelete: SetNull)
+  protocoloId   Int?
+  protocoloRef  Protocolo?      @relation("ProtocoloDaRetificacao", fields: [protocoloId], references: [id], onDelete: SetNull)
 
   /// AS DIVERGENCIAS DESTE PACOTE, por vinculo real. O campo `divergenceIds` (Json)
   /// era um snapshot: nao havia como perguntar ao banco quais pacotes tratam uma
   /// divergencia, nem impedir que a mesma entrasse em dois pedidos.
-  divergencias   RetificacaoPacoteDivergencia[]
+  divergencias RetificacaoPacoteDivergencia[]
   /// As instancias de passo ancoradas NESTE pacote. E o que da isolamento: reabrir
   /// um pacote nao toca no outro porque sao instancias diferentes.
-  passos         PhaseWorkflowStepInstance[]    @relation("PassosDaRetificacao")
+  passos       PhaseWorkflowStepInstance[]    @relation("PassosDaRetificacao")
 
   // VariÃ¡veis (Json)
   workflow       Json? // 6 passos RET_STEPS
@@ -2151,25 +2229,25 @@ model RetificacaoPacoteDivergencia {
 /// disponibilidade nem carteira de clientes — o sistema nao precisa disso hoje, e
 /// modelo grande vazio e pior que modelo pequeno.
 model Profissional {
-  id             Int      @id @default(autoincrement())
-  nome           String   @db.VarChar(200)
+  id            Int                   @id @default(autoincrement())
+  nome          String                @db.VarChar(200)
   /// A PROFISSAO, pelo cadastro. Acrescentar uma nao pede deploy: pede um registro
   /// em Profissionais > Categorias.
-  categoriaId    Int
-  categoria      CategoriaProfissional @relation(fields: [categoriaId], references: [id])
-  email          String?  @db.VarChar(200)
-  telefone       String?  @db.VarChar(60)
+  categoriaId   Int
+  categoria     CategoriaProfissional @relation(fields: [categoriaId], references: [id])
+  email         String?               @db.VarChar(200)
+  telefone      String?               @db.VarChar(60)
   /// ESCRITORIO/EMPRESA onde atua, quando houver. Opcional: profissional autonomo
   /// existe, e exigir organizacao obrigaria a inventar uma para ele.
-  organizacaoId  Int?
-  organizacao    OrgaoProtocolo? @relation("ProfissionaisDaOrganizacao", fields: [organizacaoId], references: [id], onDelete: SetNull)
-  observacoes    String?  @db.Text
-  ativo          Boolean  @default(true)
-  criadoEm       DateTime @default(now())
-  atualizadoEm   DateTime @updatedAt
+  organizacaoId Int?
+  organizacao   OrgaoProtocolo?       @relation("ProfissionaisDaOrganizacao", fields: [organizacaoId], references: [id], onDelete: SetNull)
+  observacoes   String?               @db.Text
+  ativo         Boolean               @default(true)
+  criadoEm      DateTime              @default(now())
+  atualizadoEm  DateTime              @updatedAt
 
-  registros      RegistroProfissional[]
-  retificacoes   RetificacaoPacote[]    @relation("ProfissionalDaRetificacao")
+  registros    RegistroProfissional[]
+  retificacoes RetificacaoPacote[]    @relation("ProfissionalDaRetificacao")
 
   @@index([categoriaId])
   @@index([organizacaoId])
@@ -2186,26 +2264,25 @@ model Profissional {
 ///
 /// `tipo` e vocabulario ABERTO. "OAB" nao e estrutura: e um valor.
 model RegistroProfissional {
-  id             Int      @id @default(autoincrement())
-  profissionalId Int
-  profissional   Profissional @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+  id              Int             @id @default(autoincrement())
+  profissionalId  Int
+  profissional    Profissional    @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
   /// OAB | CRC | CREA | JUCESP | ... — o conselho, como valor.
-  tipo           String   @db.VarChar(20)
-  numero         String   @db.VarChar(40)
+  tipo            String          @db.VarChar(20)
+  numero          String          @db.VarChar(40)
   /// UF, pais ou circunscricao em que o registro vale.
-  jurisdicao     String?  @db.VarChar(40)
+  jurisdicao      String?         @db.VarChar(40)
   /// Orgao de classe, quando ele estiver cadastrado em Orgaos e Organizacoes.
   orgaoDeClasseId Int?
   orgaoDeClasse   OrgaoProtocolo? @relation("RegistrosDoOrgaoDeClasse", fields: [orgaoDeClasseId], references: [id], onDelete: SetNull)
-  ativo          Boolean  @default(true)
-  criadoEm       DateTime @default(now())
-  atualizadoEm   DateTime @updatedAt
+  ativo           Boolean         @default(true)
+  criadoEm        DateTime        @default(now())
+  atualizadoEm    DateTime        @updatedAt
 
   /// A MESMA INSCRICAO NAO SE REPETE. "OAB 123456 SP" identifica uma pessoa so.
   @@unique([tipo, numero, jurisdicao])
   @@index([profissionalId])
 }
-
 
 model EmissaoRetificada {
   id                Int      @id @default(autoincrement())
@@ -3147,11 +3224,11 @@ model FaseNaturezaPermitida {
 }
 
 model CatalogoFase {
-  id                Int      @id @default(autoincrement())
-  phaseKey          String   @unique @db.VarChar(60)
-  label             String   @db.VarChar(120)
+  id                Int             @id @default(autoincrement())
+  phaseKey          String          @unique @db.VarChar(60)
+  label             String          @db.VarChar(120)
   /// O QUE A FASE É, em texto do operador. Não participa de nenhuma decisão.
-  descricao         String?  @db.Text
+  descricao         String?         @db.Text
   /// SOBRE O QUE A FASE OPERA — processo, pessoa, necessidade ou documento.
   ///
   /// É o que a materialização usa para decidir sobre quantas entidades os passos se
@@ -3163,11 +3240,11 @@ model CatalogoFase {
   /// ORDEM PADRÃO — só o valor sugerido ao semear um macrofluxo novo. A ordem REAL de
   /// uma fase pertence ao workflow que a usa (`FaseMacro.ordem`): a mesma fase pode
   /// ser a terceira num fluxo e a quarta noutro.
-  ordemPadrao       Int      @default(0)
-  requiredPadrao    Boolean  @default(true)
-  conditionalPadrao Boolean  @default(false)
-  slaDiasPadrao     Int      @default(30)
-  ativo             Boolean  @default(true)
+  ordemPadrao       Int             @default(0)
+  requiredPadrao    Boolean         @default(true)
+  conditionalPadrao Boolean         @default(false)
+  slaDiasPadrao     Int             @default(30)
+  ativo             Boolean         @default(true)
   /// COMPETÊNCIA DA FASE — quais efeitos os passos desta fase podem executar.
   ///
   /// Emissão Documental mandava o processo para Retificação a partir de um resultado
@@ -3175,8 +3252,8 @@ model CatalogoFase {
   /// para a fase anterior sem que nada no cadastro dissesse que podia. Lista de
   /// `effectKey`; `null` = sem restrição declarada (compatibilidade com o existente).
   efeitosPermitidos Json?
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
+  criadoEm          DateTime        @default(now())
+  atualizadoEm      DateTime        @updatedAt
 
   naturezasPermitidas FaseNaturezaPermitida[]
 
@@ -3251,7 +3328,7 @@ model PhaseInternalWorkflow {
   criadoEm       DateTime @default(now())
   atualizadoEm   DateTime @updatedAt
 
-  passos PhaseInternalWorkflowStep[]
+  passos  PhaseInternalWorkflowStep[]
   /// Versões congeladas desta definição (ver PhaseInternalWorkflowVersao).
   versoes PhaseInternalWorkflowVersao[]
 
@@ -3277,10 +3354,6 @@ model PhaseInternalWorkflow {
   /// Mesma pergunta para bloqueio — e a resposta não é necessariamente a mesma.
   pausarSlaEmBloqueio      Boolean                      @default(false)
 
-  @@index([phaseKey])
-  @@index([tipoProcessoId])
-  @@index([familiaDocumentalId])
-
   /// ALTERADO DESDE A ÚLTIMA PUBLICAÇÃO?
   ///
   /// A definição viva SEMPRE foi o rascunho e a versão congelada SEMPRE foi o
@@ -3289,6 +3362,10 @@ model PhaseInternalWorkflow {
   /// de "publiquei", sem inventar uma segunda árvore de definição.
   rascunhoAlteradoEm  DateTime?
   rascunhoAlteradoPor Int?
+
+  @@index([phaseKey])
+  @@index([tipoProcessoId])
+  @@index([familiaDocumentalId])
 }
 
 /// VERSÃO PUBLICADA DE UM WORKFLOW INTERNO — imutável, e a razão de existir.
@@ -3331,10 +3408,10 @@ model PhaseInternalWorkflowVersao {
   /// padrão, prioridade, SLA, cardinalidade, condição de conclusão e checklist.
   passos                   Json
 
-  congeladoEm     DateTime @default(now())
-  congeladoPorId  Int?
+  congeladoEm    DateTime @default(now())
+  congeladoPorId Int?
   /// Por que esta versão nasceu: PUBLICACAO (edição), CRIACAO, BACKFILL.
-  origem          String   @db.VarChar(20)
+  origem         String   @db.VarChar(20)
 
   @@unique([workflowId, versao])
   @@index([workflowId])
@@ -3376,11 +3453,11 @@ model PhaseInternalWorkflowStep {
   /// mesma coisa, e não havia como declarar que B e C dependem de A mas não um do
   /// outro. `null` = não declarado, e aí o modo de execução continua respondendo
   /// (compatibilidade com o que já está publicado).
-  dependeDe      Json?
+  dependeDe   Json?
   /// EXECUTOR declarado do passo. `null` = o registro resolve pela chave, como sempre
   /// fez. Um passo criado pelo administrador declara aqui qual interface o executa —
   /// é o que permite um passo novo nascer executável sem código.
-  executorKey    String?               @db.VarChar(40)
+  executorKey String? @db.VarChar(40)
 
   /// PODE SER REEXECUTADO? — política de reabertura, cadastrada, não presumida.
   ///
@@ -3388,14 +3465,14 @@ model PhaseInternalWorkflowStep {
   /// declarada: quem podia, com que justificativa e o que acontecia com os dependentes
   /// eram respostas do código. Aqui viram cadastro — e ficam congeladas na versão,
   /// como todo o resto da configuração.
-  reaberturaPermitida Boolean @default(true)
+  reaberturaPermitida          Boolean @default(true)
   /// SOMENTE_ESTA | ESTA_E_DEPENDENTES | ESCOLHA_MANUAL — o que a tela propõe por
   /// padrão quando alguém reabre. `ESCOLHA_MANUAL` não propõe: pergunta.
-  reaberturaEstrategia String @default("ESCOLHA_MANUAL") @db.VarChar(24)
+  reaberturaEstrategia         String  @default("ESCOLHA_MANUAL") @db.VarChar(24)
   /// Reabrir sem dizer por quê deixa o histórico com um buraco no lugar do motivo.
   reaberturaExigeJustificativa Boolean @default(true)
   /// Permissão exigida para reabrir esta etapa. `null` = a permissão geral de reabrir.
-  reaberturaPermissao String? @db.VarChar(60)
+  reaberturaPermissao          String? @db.VarChar(60)
 
   /// REGRA DE CONCLUSÃO do passo, em vocabulário fechado.
   ///
@@ -3451,9 +3528,9 @@ model StepSubtaskDefinition {
   ativo     Boolean @default(true)
 
   /// Obrigatória para o passo concluir (quando a regra de conclusão olha subtarefas).
-  obrigatoria Boolean @default(true)
+  obrigatoria    Boolean @default(true)
   /// Pode acontecer mais de uma vez (ex.: "registrar protocolo" a cada tentativa).
-  repetivel   Boolean @default(false)
+  repetivel      Boolean @default(false)
   /// Teto de ocorrências quando repetível. `null` = sem teto.
   maxOcorrencias Int?
 
@@ -3461,7 +3538,7 @@ model StepSubtaskDefinition {
   modoExecucao String @default("MANUAL") @db.VarChar(20)
 
   /// HERDA | ESPECIFICO | REGRA — de onde sai o responsável desta subtarefa.
-  responsavelRegra String  @default("HERDA") @db.VarChar(20)
+  responsavelRegra String @default("HERDA") @db.VarChar(20)
   /// Quando ESPECIFICO. Referência solta a Usuario (o motor projeta, não cascateia).
   responsavelId    Int?
   /// SLA próprio em dias úteis. `null` = herda o do passo.
@@ -3489,14 +3566,14 @@ model StepSubtaskDefinition {
   ///   FORNECEDOR_RELACIONADO — os canais que o fornecedor CONCRETO daquele documento
   ///                            oferece. O workflow não copia o cadastro dele;
   ///   TIPOS_PERMITIDOS       — restringe aos tipos listados em `tiposDeCanal`.
-  fonteDeCanais String  @default("NENHUMA") @db.VarChar(30)
+  fonteDeCanais String @default("NENHUMA") @db.VarChar(30)
   /// Restrição por tipo de canal (chaves de `CanalOperacional`), quando aplicável.
   tiposDeCanal  Json?
 
   /// POLÍTICA DE REABERTURA própria. `null` nos booleanos = herda a do passo.
   reaberturaPermitida          Boolean?
   reaberturaExigeJustificativa Boolean?
-  reaberturaPermissao          String? @db.VarChar(60)
+  reaberturaPermissao          String?  @db.VarChar(60)
 
   metadata Json?
 
@@ -3523,24 +3600,24 @@ model StepSubtaskDefinition {
 /// IDENTIDADE É A `key`, não o rótulo: renomear não quebra o histórico, porque o que
 /// ficou gravado na execução foi a chave.
 model StepAction {
-  id           Int      @id @default(autoincrement())
+  id           Int                       @id @default(autoincrement())
   stepId       Int
   step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  key          String   @db.VarChar(60)
-  label        String   @db.VarChar(160)
-  descricao    String?  @db.Text
-  ordem        Int      @default(0)
+  key          String                    @db.VarChar(60)
+  label        String                    @db.VarChar(160)
+  descricao    String?                   @db.Text
+  ordem        Int                       @default(0)
   /// Chave do CATÁLOGO DE EFEITOS (código). A publicação recusa efeito inexistente.
-  effectKey    String   @db.VarChar(60)
+  effectKey    String                    @db.VarChar(60)
   /// Campos (`StepField.key`) que esta ação exige preenchidos.
   requerCampos Json?
   /// Permissão exigida para executar. `null` = a permissão do passo.
-  permissao    String?  @db.VarChar(60)
+  permissao    String?                   @db.VarChar(60)
   condicao     Json?
   metadata     Json?
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  ativo        Boolean                   @default(true)
+  criadoEm     DateTime                  @default(now())
+  atualizadoEm DateTime                  @updatedAt
 
   /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
   ///
@@ -3568,25 +3645,25 @@ model StepAction {
 
 /// CAMPO CADASTRADO DE UM PASSO — o que o operador preenche.
 model StepField {
-  id           Int      @id @default(autoincrement())
+  id           Int                       @id @default(autoincrement())
   stepId       Int
   step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  key          String   @db.VarChar(60)
-  label        String   @db.VarChar(160)
+  key          String                    @db.VarChar(60)
+  label        String                    @db.VarChar(160)
   /// texto | textarea | numero | moeda | data | select | multiselect | checkbox | radio | upload | booleano
-  tipo         String   @db.VarChar(20)
-  obrigatorio  Boolean  @default(false)
+  tipo         String                    @db.VarChar(20)
+  obrigatorio  Boolean                   @default(false)
   /// Opções de select/multiselect/radio: [{ value, label }]. Também aceita a chave de
   /// um catálogo global (`{ catalogo: "canais" }`) — é assim que o campo "canal"
   /// oferece os canais cadastrados sem repetir a lista dentro do passo.
   opcoes       Json?
   /// Condição de visibilidade declarativa: { campo, op, valor }.
   condicao     Json?
-  ajuda        String?  @db.Text
-  ordem        Int      @default(0)
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  ajuda        String?                   @db.Text
+  ordem        Int                       @default(0)
+  ativo        Boolean                   @default(true)
+  criadoEm     DateTime                  @default(now())
+  atualizadoEm DateTime                  @updatedAt
 
   opcoesCadastradas StepFieldOption[]
 
@@ -3647,24 +3724,24 @@ model StepFieldOption {
 /// ativos" — e o que um canal exige NESTE passo (protocolo, comprovante, destinatário)
 /// não tinha onde ser configurado sem virar regra no código.
 model StepChannel {
-  id           Int                       @id @default(autoincrement())
-  stepId       Int
-  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  canalId      Int
-  canal        CanalOperacional          @relation(fields: [canalId], references: [id], onDelete: Cascade)
-  ordem        Int                       @default(0)
-  ativo        Boolean                   @default(true)
+  id                 Int                       @id @default(autoincrement())
+  stepId             Int
+  step               PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  canalId            Int
+  canal              CanalOperacional          @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  ordem              Int                       @default(0)
+  ativo              Boolean                   @default(true)
   /// Sobrescreve o requisito do catálogo NESTE passo. `null` = herda do canal.
-  exigeProtocolo   Boolean?
-  exigeAnexo       Boolean?
-  exigeRastreio    Boolean?
-  exigeObservacao  Boolean?
+  exigeProtocolo     Boolean?
+  exigeAnexo         Boolean?
+  exigeRastreio      Boolean?
+  exigeObservacao    Boolean?
   /// Campos (`StepField.key`) que este canal torna obrigatórios.
   camposObrigatorios Json?
   /// Condição declarativa para o canal aparecer.
-  condicao     Json?
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  condicao           Json?
+  criadoEm           DateTime                  @default(now())
+  atualizadoEm       DateTime                  @updatedAt
 
   @@unique([stepId, canalId])
   @@index([stepId])
@@ -3678,39 +3755,39 @@ model StepChannel {
 /// Sem esta separação, "exige comprovante" só existia dentro do executor, e mudá-lo
 /// era deploy.
 model StepRequirement {
-  id           Int                       @id @default(autoincrement())
-  stepId       Int
-  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  key          String                    @db.VarChar(60)
-  label        String                    @db.VarChar(200)
-  descricao    String?                   @db.Text
+  id              Int                       @id @default(autoincrement())
+  stepId          Int
+  step            PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  key             String                    @db.VarChar(60)
+  label           String                    @db.VarChar(200)
+  descricao       String?                   @db.Text
   /// CAMPO_PREENCHIDO | CHECKLIST_COMPLETO | EVIDENCIA_ANEXADA | ACAO_EXECUTADA
-  tipo         String                    @db.VarChar(30)
+  tipo            String                    @db.VarChar(30)
   /// A que ele se refere: a `key` do campo, do item de checklist ou da ação.
-  alvoKey      String?                   @db.VarChar(60)
+  alvoKey         String?                   @db.VarChar(60)
   /// Quantidade mínima, quando o tipo admite (ex.: evidências).
-  minimo       Int                       @default(1)
-  obrigatorio  Boolean                   @default(true)
+  minimo          Int                       @default(1)
+  obrigatorio     Boolean                   @default(true)
   /// Só vale quando a condição for verdadeira. `null` = sempre.
-  condicao     Json?
+  condicao        Json?
   /// Aplica-se a esta ação; `null` = à conclusão do passo.
-  acaoKey      String?                   @db.VarChar(60)
+  acaoKey         String?                   @db.VarChar(60)
   /// EVIDÊNCIA — só faz sentido em `tipo = EVIDENCIA_ANEXADA`.
   ///
   /// Qual DOCUMENTO MESTRE o arquivo precisa ser (por ID, nunca por nome de arquivo),
   /// que formatos são aceitos e em que momento a exigência vale. Isto está aqui, e não
   /// numa tabela própria, porque "precisa haver comprovante anexado" É um requisito —
   /// separá-lo criaria duas respostas para "o que falta para concluir".
-  evidenciaTipoId  Int?
-  evidenciaTipo    TipoDocumentoCadastro? @relation("RequisitoEvidenciaMestre", fields: [evidenciaTipoId], references: [id], onDelete: SetNull)
+  evidenciaTipoId Int?
+  evidenciaTipo   TipoDocumentoCadastro?    @relation("RequisitoEvidenciaMestre", fields: [evidenciaTipoId], references: [id], onDelete: SetNull)
   /// Formatos aceitos (ex.: ["application/pdf","image/jpeg"]). `null` = qualquer um.
-  mimesPermitidos  Json?
+  mimesPermitidos Json?
   /// AO_CONCLUIR | AO_EXECUTAR_ACAO | SEMPRE — quando a exigência é cobrada.
-  momento          String @default("AO_CONCLUIR") @db.VarChar(24)
-  ordem        Int                       @default(0)
-  ativo        Boolean                   @default(true)
-  criadoEm     DateTime                  @default(now())
-  atualizadoEm DateTime                  @updatedAt
+  momento         String                    @default("AO_CONCLUIR") @db.VarChar(24)
+  ordem           Int                       @default(0)
+  ativo           Boolean                   @default(true)
+  criadoEm        DateTime                  @default(now())
+  atualizadoEm    DateTime                  @updatedAt
 
   /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
   ///
@@ -3738,17 +3815,17 @@ model StepRequirement {
 
 /// ITEM DE CHECKLIST CADASTRADO DE UM PASSO.
 model StepChecklistItem {
-  id           Int      @id @default(autoincrement())
+  id           Int                       @id @default(autoincrement())
   stepId       Int
   step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  key          String   @db.VarChar(60)
-  label        String   @db.VarChar(200)
-  descricao    String?  @db.Text
-  obrigatorio  Boolean  @default(true)
-  ordem        Int      @default(0)
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  key          String                    @db.VarChar(60)
+  label        String                    @db.VarChar(200)
+  descricao    String?                   @db.Text
+  obrigatorio  Boolean                   @default(true)
+  ordem        Int                       @default(0)
+  ativo        Boolean                   @default(true)
+  criadoEm     DateTime                  @default(now())
+  atualizadoEm DateTime                  @updatedAt
 
   /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
   ///
@@ -3787,11 +3864,11 @@ model StepChecklistItem {
 /// fornecedor relacionado", e o runtime resolve pelo fornecedor concreto daquele
 /// documento. Nenhum cadastro é duplicado.
 model OrganizacaoCanal {
-  id             Int              @id @default(autoincrement())
-  organizacaoId  Int
-  organizacao    OrgaoProtocolo   @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
-  canalId        Int
-  canal          CanalOperacional @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  id            Int              @id @default(autoincrement())
+  organizacaoId Int
+  organizacao   OrgaoProtocolo   @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  canalId       Int
+  canal         CanalOperacional @relation(fields: [canalId], references: [id], onDelete: Cascade)
 
   ativo Boolean @default(true)
   ordem Int     @default(0)
@@ -3805,9 +3882,9 @@ model OrganizacaoCanal {
 
   /// Endereço/identificador da organização NESTE canal (e-mail, URL do portal,
   /// telefone do WhatsApp, guichê). É dado de contato, não de workflow.
-  endereco String? @db.VarChar(300)
+  endereco   String? @db.VarChar(300)
   /// Prazo típico de retorno por este canal, em dias.
-  prazoDias Int?
+  prazoDias  Int?
   observacao String? @db.Text
 
   criadoEm     DateTime @default(now())
@@ -3843,7 +3920,7 @@ model CanalOperacional {
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
 
-  passos StepChannel[]
+  passos       StepChannel[]
   organizacoes OrganizacaoCanal[]
 }
 
@@ -3979,7 +4056,10 @@ model OrgaoProtocolo {
   canais                OrganizacaoCanal[]
   execucoesDeSubtarefa  SubtaskExecution[]
   /// Documentos que ESTA organização emite. Ver `Documento.orgaoId`.
-  documentosEmitidos    Documento[]        @relation("DocumentoOrgaoEmissor")
+  documentosEmitidos    Documento[]            @relation("DocumentoOrgaoEmissor")
+  retificacoes          RetificacaoPacote[]    @relation("OrgaoDaRetificacao")
+  profissionais         Profissional[]         @relation("ProfissionaisDaOrganizacao")
+  registrosDeClasse     RegistroProfissional[] @relation("RegistrosDoOrgaoDeClasse")
 
   /// Anti-duplicidade do cadastro mestre: mesma entidade não entra duas vezes.
   @@unique([name, country])
@@ -3988,9 +4068,6 @@ model OrgaoProtocolo {
   @@index([ativo])
   @@index([provincia])
   @@index([funcoes])
-  retificacoes RetificacaoPacote[] @relation("OrgaoDaRetificacao")
-  profissionais       Profissional[]         @relation("ProfissionaisDaOrganizacao")
-  registrosDeClasse   RegistroProfissional[] @relation("RegistrosDoOrgaoDeClasse")
 }
 
 /// Funções que uma organização exerce. Uma organização = UM registro, N funções.
@@ -4762,7 +4839,7 @@ model StepExecution {
   status    StepInstanceStatus
 
   /// POR QUE esta tentativa nasceu. Sem isto, "tentativa 2" não se explica.
-  motivo    String @db.VarChar(30)
+  motivo String @db.VarChar(30)
 
   startedAt      DateTime?
   completedAt    DateTime?
@@ -4783,10 +4860,10 @@ model StepExecution {
   /// Quando esta tentativa deixou de ser a vigente, e por qual. `null` = é a atual.
   supersededAt      DateTime?
   supersededPorId   Int?
-  correlationId     String?  @db.VarChar(60)
+  correlationId     String?   @db.VarChar(60)
   /// Retry de HTTP não pode virar tentativa nova.
-  chaveIdempotencia String   @unique @db.VarChar(200)
-  criadoEm          DateTime @default(now())
+  chaveIdempotencia String    @unique @db.VarChar(200)
+  criadoEm          DateTime  @default(now())
 
   @@unique([stepInstanceId, sequencia])
   @@index([stepInstanceId])
@@ -4814,7 +4891,7 @@ model SubtaskExecution {
   stepInstance   PhaseWorkflowStepInstance @relation(fields: [stepInstanceId], references: [id], onDelete: Cascade)
 
   /// A CHAVE da subtarefa, não o id da definição: é ela que sobrevive à republicação.
-  subtaskKey String @db.VarChar(60)
+  subtaskKey          String @db.VarChar(60)
   /// A definição que valia quando esta execução nasceu (solta — a versão congelada é
   /// quem resolve o conteúdo histórico).
   subtaskDefinitionId Int?
@@ -4860,10 +4937,10 @@ model SubtaskExecution {
 
   supersededAt      DateTime?
   supersededPorId   Int?
-  correlationId     String?  @db.VarChar(60)
+  correlationId     String?   @db.VarChar(60)
   /// Retry de HTTP não pode virar execução nova.
-  chaveIdempotencia String   @unique @db.VarChar(200)
-  criadoEm          DateTime @default(now())
+  chaveIdempotencia String    @unique @db.VarChar(200)
+  criadoEm          DateTime  @default(now())
 
   @@unique([stepInstanceId, subtaskKey, sequencia])
   @@index([stepInstanceId])
@@ -4892,18 +4969,18 @@ model PhaseWorkflowStepInstance {
 
   // Entidade do ESCOPO do passo. No maximo UMA fica preenchida: pessoaId (escopo
   // PESSOA), necessidadeId/documentoId (escopo DOCUMENTO). Nenhuma = escopo GLOBAL.
-  pessoaId      Int?
-  pessoa        Pessoa?                @relation(fields: [pessoaId], references: [id], onDelete: SetNull)
-  necessidadeId Int?
-  necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
-  documentoId   Int?
-  documento     Documento?             @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  pessoaId            Int?
+  pessoa              Pessoa?                @relation(fields: [pessoaId], references: [id], onDelete: SetNull)
+  necessidadeId       Int?
+  necessidade         NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
+  documentoId         Int?
+  documento           Documento?             @relation(fields: [documentoId], references: [id], onDelete: SetNull)
   /// PACOTE DE RETIFICACAO ao qual esta unidade de trabalho pertence (cardinalidade
   /// RETIFICACAO). E a quarta ancora possivel, e a razao dela e a mesma das outras
   /// tres: sem ela, dois pedidos de retificacao no mesmo processo compartilhariam
   /// uma unica cadeia de passos — reabrir um reabriria o outro.
   retificacaoPacoteId Int?
-  retificacaoPacote   RetificacaoPacote? @relation("PassosDaRetificacao", fields: [retificacaoPacoteId], references: [id], onDelete: SetNull)
+  retificacaoPacote   RetificacaoPacote?     @relation("PassosDaRetificacao", fields: [retificacaoPacoteId], references: [id], onDelete: SetNull)
 
   ciclo         Int                @default(1)
   status        StepInstanceStatus @default(PENDENTE)
@@ -4943,6 +5020,10 @@ model PhaseWorkflowStepInstance {
 
   tarefas Tarefa[]
 
+  /// Tentativas de execução deste passo (append-only). Ver StepExecution.
+  execucoes            StepExecution[]
+  execucoesDeSubtarefa SubtaskExecution[]
+
   @@index([workflowInstanceId, ordem])
   @@index([processoId, faseMacroKey, status])
   @@index([necessidadeId])
@@ -4950,10 +5031,6 @@ model PhaseWorkflowStepInstance {
   @@index([retificacaoPacoteId])
   @@index([stepKey])
   @@index([chaveIdempotencia])
-
-  /// Tentativas de execução deste passo (append-only). Ver StepExecution.
-  execucoes StepExecution[]
-  execucoesDeSubtarefa SubtaskExecution[]
 }
 
 // Eventos append-only (sem rota de update/delete â garantido por contrato).
@@ -5912,17 +5989,25 @@ model SaldoSnapshot {
 /// (administrativa/consular/judicial), que é outra dimensão, nem com o tipo de
 /// processo, que é país + produto.
 model ModalidadeLegal {
-  id           Int          @id @default(autoincrement())
+  id                        Int          @id @default(autoincrement())
   /// Identidade IMUTÁVEL. Vínculo é sempre por id — o code só identifica o registro.
-  code         String       @unique @db.VarChar(60)
-  nome         String       @db.VarChar(200)
-  descricao    String?      @db.Text
-  paisId       Int
-  pais         CatalogoPais @relation(fields: [paisId], references: [id], onDelete: Restrict)
-  ordem        Int          @default(0)
-  ativo        Boolean      @default(true)
-  criadoEm     DateTime     @default(now())
-  atualizadoEm DateTime     @updatedAt
+  code                      String       @unique @db.VarChar(60)
+  nome                      String       @db.VarChar(200)
+  descricao                 String?      @db.Text
+  paisId                    Int
+  pais                      CatalogoPais @relation(fields: [paisId], references: [id], onDelete: Restrict)
+  /// INDIVIDUAL | COLETIVO — quantos requerentes cabem em UM requerimento.
+  ///
+  /// É a base jurídica que decide isso, não o país e não o produto: a cidadania
+  /// espanhola por LMD é pedida por pessoa, no consulado do domicílio dela; a
+  /// italiana judicial é pedida uma vez, no tribunal, pela família toda. Sendo
+  /// dado de cadastro, uma rota nova (Portugal, Alemanha) declara a sua regra
+  /// sem tocar em código — e a tela não precisa perguntar o país.
+  cardinalidadeRequerimento String       @default("INDIVIDUAL") @db.VarChar(20)
+  ordem                     Int          @default(0)
+  ativo                     Boolean      @default(true)
+  criadoEm                  DateTime     @default(now())
+  atualizadoEm              DateTime     @updatedAt
 
   enquadramentos EnquadramentoLegal[]
 
@@ -5992,14 +6077,14 @@ model CategoriaOrganizacao {
 /// Sem cadastro, "advogado" e "Advogado" viravam duas profissoes, e ninguem conseguia
 /// perguntar quais existem.
 model CategoriaProfissional {
-  id            Int      @id @default(autoincrement())
-  code          String   @unique @db.VarChar(60)
-  nome          String   @db.VarChar(200)
-  descricao     String?  @db.Text
-  ordem         Int      @default(0)
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
+  id            Int            @id @default(autoincrement())
+  code          String         @unique @db.VarChar(60)
+  nome          String         @db.VarChar(200)
+  descricao     String?        @db.Text
+  ordem         Int            @default(0)
+  ativo         Boolean        @default(true)
+  criadoEm      DateTime       @default(now())
+  atualizadoEm  DateTime       @updatedAt
   profissionais Profissional[]
 }
 

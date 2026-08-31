@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-25
+-- Gerado em : 2026-08-31
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -666,6 +666,10 @@ CREATE TABLE "Protocolo" (
     "setor" VARCHAR(120),
     "dataProtocolo" TIMESTAMP(3),
     "numeroProtocolo" VARCHAR(100),
+    "numeroProcesso" VARCHAR(100),
+    "finalidade" VARCHAR(30) NOT NULL DEFAULT 'REQUERIMENTO',
+    "situacao" VARCHAR(30) NOT NULL DEFAULT 'PROTOCOLADO',
+    "situacaoEm" TIMESTAMP(3),
     "tipoProtocolo" "TipoProtocolo",
     "formaEnvio" "FormaEnvioProtocolo",
     "responsavelId" INTEGER,
@@ -676,6 +680,29 @@ CREATE TABLE "Protocolo" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Protocolo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProtocoloRequerente" (
+    "protocoloId" INTEGER NOT NULL,
+    "requerenteId" INTEGER NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ProtocoloRequerente_pkey" PRIMARY KEY ("protocoloId","requerenteId")
+);
+
+-- CreateTable
+CREATE TABLE "ProtocoloExigencia" (
+    "id" SERIAL NOT NULL,
+    "protocoloId" INTEGER NOT NULL,
+    "descricao" TEXT NOT NULL,
+    "prazo" TIMESTAMP(3),
+    "cumpridaEm" TIMESTAMP(3),
+    "observacoes" TEXT,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ProtocoloExigencia_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -3689,6 +3716,7 @@ CREATE TABLE "ModalidadeLegal" (
     "nome" VARCHAR(200) NOT NULL,
     "descricao" TEXT,
     "paisId" INTEGER NOT NULL,
+    "cardinalidadeRequerimento" VARCHAR(20) NOT NULL DEFAULT 'INDIVIDUAL',
     "ordem" INTEGER NOT NULL DEFAULT 0,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -4765,6 +4793,24 @@ CREATE INDEX "Protocolo_responsavelId_idx" ON "Protocolo"("responsavelId");
 
 -- CreateIndex
 CREATE INDEX "Protocolo_solicitacaoId_idx" ON "Protocolo"("solicitacaoId");
+
+-- CreateIndex
+CREATE INDEX "Protocolo_orgaoId_dataProtocolo_idx" ON "Protocolo"("orgaoId", "dataProtocolo");
+
+-- CreateIndex
+CREATE INDEX "Protocolo_finalidade_situacao_idx" ON "Protocolo"("finalidade", "situacao");
+
+-- CreateIndex
+CREATE INDEX "ProtocoloRequerente_requerenteId_idx" ON "ProtocoloRequerente"("requerenteId");
+
+-- CreateIndex
+CREATE INDEX "ProtocoloExigencia_protocoloId_idx" ON "ProtocoloExigencia"("protocoloId");
+
+-- CreateIndex
+CREATE INDEX "ProtocoloExigencia_prazo_idx" ON "ProtocoloExigencia"("prazo");
+
+-- CreateIndex
+CREATE INDEX "ProtocoloExigencia_cumpridaEm_idx" ON "ProtocoloExigencia"("cumpridaEm");
 
 -- CreateIndex
 CREATE INDEX "ProtocoloDocumento_documentoId_idx" ON "ProtocoloDocumento"("documentoId");
@@ -6529,6 +6575,15 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_responsavelId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_solicitacaoId_fkey" FOREIGN KEY ("solicitacaoId") REFERENCES "SolicitacaoDocumento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProtocoloRequerente" ADD CONSTRAINT "ProtocoloRequerente_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProtocoloRequerente" ADD CONSTRAINT "ProtocoloRequerente_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProtocoloExigencia" ADD CONSTRAINT "ProtocoloExigencia_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloDocumento" ADD CONSTRAINT "ProtocoloDocumento_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;

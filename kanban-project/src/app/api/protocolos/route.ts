@@ -5,7 +5,12 @@
 // cronológica única).
 
 import { NextResponse } from "next/server"
-import { registrarProtocoloTx, ORIGENS_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
+import {
+  registrarProtocoloTx,
+  ORIGENS_DE_PROTOCOLO,
+  FINALIDADES_DE_PROTOCOLO,
+  SITUACOES_DE_PROTOCOLO,
+} from "@/src/services/protocolo-canonico"
 import { prisma } from "@/lib/prisma"
 import { TipoProtocolo, FormaEnvioProtocolo } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
@@ -50,10 +55,14 @@ export async function POST(request: Request) {
       processoId,
       contratanteId,
       requerenteId,
+      requerenteIds,
       orgaoId,
       setor,
       dataProtocolo,
       numeroProtocolo,
+      numeroProcesso,
+      finalidade,
+      situacao,
       tipoProtocolo,
       formaEnvio,
       responsavelId,
@@ -83,6 +92,21 @@ export async function POST(request: Request) {
     if (!responsavelId) {
       return NextResponse.json({ error: "Responsável é obrigatório" }, { status: 400 })
     }
+    // Catálogos fechados: a rota não aceita classificação que o banco vai recusar.
+    if (finalidade && !Object.values(FINALIDADES_DE_PROTOCOLO).includes(finalidade)) {
+      return NextResponse.json({ error: "Finalidade inválida" }, { status: 400 })
+    }
+    if (situacao && !Object.values(SITUACOES_DE_PROTOCOLO).includes(situacao)) {
+      return NextResponse.json({ error: "Situação inválida" }, { status: 400 })
+    }
+
+    // ESCOPO — aceita a lista (Itália, a família inteira) ou o id avulso, e
+    // normaliza para lista antes de descer. Quem valida contagem e pertinência é
+    // o serviço canônico, com a cardinalidade lida do cadastro.
+    const escopo: number[] = Array.from(new Set(
+      (Array.isArray(requerenteIds) ? requerenteIds : requerenteId != null ? [requerenteId] : [])
+        .map(Number).filter((n: number) => Number.isInteger(n)),
+    ))
 
     const processo = await prisma.processo.findUnique({ where: { id: processoId }, select: { id: true } })
     if (!processo) {
@@ -106,11 +130,14 @@ export async function POST(request: Request) {
       const { protocoloId } = await registrarProtocoloTx(tx, {
         processoId,
         contratanteId: contratanteId || null,
-        requerenteId: requerenteId || null,
+        requerenteIds: escopo,
         orgaoId: Number(orgaoId),
         setor: setor || null,
         dataProtocolo: quando,
         numeroProtocolo,
+        numeroProcesso: numeroProcesso || null,
+        ...(finalidade ? { finalidade } : {}),
+        ...(situacao ? { situacao } : {}),
         tipoProtocolo,
         formaEnvio,
         origem: ORIGENS_DE_PROTOCOLO.PROCESSO,
@@ -140,6 +167,9 @@ export async function POST(request: Request) {
           orgao: orgao.name,
           setor: criado.setor,
           numero: criado.numeroProtocolo,
+          numeroProcesso: criado.numeroProcesso,
+          finalidade: criado.finalidade,
+          requerentesCobertos: escopo.length,
           tipo: criado.tipoProtocolo,
           formaEnvio: criado.formaEnvio,
           documentosEnviados: ids.length,
@@ -151,6 +181,22 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ protocolo }, { status: 201 })
   } catch (error) {
+    // As recusas de ESCOPO são erro do operador, não falha do sistema: voltam com
+    // o que fazer, e não como 500 genérico.
+    const msg = error instanceof Error ? error.message : ""
+    if (msg.startsWith("REQUERENTE_FORA_DO_PROCESSO")) {
+      return NextResponse.json({ error: "Há requerente selecionado que não pertence a este processo." }, { status: 400 })
+    }
+    if (msg.startsWith("REQUERIMENTO_INDIVIDUAL_ACEITA_UM_REQUERENTE")) {
+      return NextResponse.json({
+        error: "Nesta rota o requerimento é individual: um requerente por protocolo.",
+      }, { status: 400 })
+    }
+    if (msg.includes("REQUERENTE_JA_TEM_REQUERIMENTO")) {
+      return NextResponse.json({
+        error: "Este requerente já está coberto por um requerimento neste processo.",
+      }, { status: 409 })
+    }
     console.error("Erro ao criar protocolo:", error)
     return NextResponse.json({ error: "Erro ao criar protocolo" }, { status: 500 })
   }

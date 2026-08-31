@@ -12,6 +12,12 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { TIPOS_PROTOCOLO, FORMAS_ENVIO } from "@/src/services/protocolizacao"
+import {
+  cardinalidadeDoProcesso,
+  FINALIDADES_DE_PROTOCOLO,
+  SITUACOES_DE_PROTOCOLO,
+  CARDINALIDADES,
+} from "@/src/services/protocolo-canonico"
 
 export async function GET(request: Request) {
   try {
@@ -58,12 +64,22 @@ export async function GET(request: Request) {
       }
     }
 
+    // A TELA NÃO PERGUNTA O PAÍS. Ela pergunta ao cadastro quantos requerentes
+    // cabem num requerimento desta rota, e desenha um seletor de um ou de vários.
+    // É o mesmo formulário para Espanha e Itália; o que muda é este dado.
+    const cardinalidade = isNaN(processoId)
+      ? CARDINALIDADES.INDIVIDUAL
+      : await cardinalidadeDoProcesso(prisma, processoId)
+
     return NextResponse.json({
       orgaos,
       responsaveis,
       documentos,
       tipos: TIPOS_PROTOCOLO,
       formasEnvio: FORMAS_ENVIO,
+      cardinalidade,
+      finalidades: Object.values(FINALIDADES_DE_PROTOCOLO),
+      situacoes: Object.values(SITUACOES_DE_PROTOCOLO),
     })
   } catch (error) {
     console.error("Erro ao carregar opções de protocolo:", error)
