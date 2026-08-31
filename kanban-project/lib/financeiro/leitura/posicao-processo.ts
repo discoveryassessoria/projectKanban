@@ -12,7 +12,7 @@ const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
 export interface PosicaoProcesso {
   processoId: number
-  processo: { codigo: string | null; nome: string; pais: string } | null
+  processo: { codigo: string | null; nome: string; pais: string | null } | null
   totais: { contratado: number; saldo: number; recebido: number; obrigacoes: number }
   responsaveis: { id: number; nome: string; cpf: string | null }[]
   nomesPessoas: Record<number, string> // pessoaId → nome (requerentes/pagadores)
@@ -21,7 +21,7 @@ export interface PosicaoProcesso {
 
 /** Carrega a posição financeira consolidada de um processo (tudo do Ledger). */
 export async function carregarPosicaoProcesso(processoId: number): Promise<PosicaoProcesso> {
-  const processo = await prisma.processo.findUnique({ where: { id: processoId }, select: { codigo: true, nome: true, pais: true } })
+  const processo = await prisma.processo.findUnique({ where: { id: processoId }, select: { codigo: true, nome: true, paisCanonico: { select: { countryKey: true } } } })
   const obrs = await prisma.obrigacaoEconomica.findMany({ where: { processoId }, select: { id: true }, orderBy: { id: 'asc' } })
 
   const posicoes: PosicaoFinanceira[] = []
@@ -57,5 +57,10 @@ export async function carregarPosicaoProcesso(processoId: number): Promise<Posic
     obrigacoes: posicoes.length,
   }
 
-  return { processoId, processo, totais, responsaveis: contratantes, nomesPessoas, obrigacoes: posicoes }
+  // O DTO expõe `pais` como APRESENTAÇÃO, derivado da identidade — o consumidor
+  // não precisa saber que houve migração, e a coluna legada não é lida.
+  const processoDto = processo
+    ? { codigo: processo.codigo, nome: processo.nome, pais: processo.paisCanonico?.countryKey ?? null }
+    : null
+  return { processoId, processo: processoDto, totais, responsaveis: contratantes, nomesPessoas, obrigacoes: posicoes }
 }

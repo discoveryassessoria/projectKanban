@@ -31,7 +31,7 @@ export async function POST(
 
     const body = await request.json().catch(() => ({}))
 
-    const processo = await prisma.processo.findUnique({ where: { id }, select: { id: true, pais: true } })
+    const processo = await prisma.processo.findUnique({ where: { id }, select: { id: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
     const row = await prisma.retificacaoPacote.findFirst({ where: { id: pid, processoId: id } })
