@@ -16,8 +16,7 @@
 
 import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 import { prisma } from "@/lib/prisma"
-import { PrioridadeTarefa } from "@prisma/client"
-import type { Pais } from "@prisma/client"
+import {PrioridadeTarefa} from '@prisma/client'
 import { logTarefa } from "@/lib/auditoria"
 
 export interface TarefaSpec {
@@ -34,7 +33,7 @@ export interface TarefaSpec {
   /** Alternativa ao dataPrazo: calcula prazo = hoje + slaDays. */
   slaDays?: number | null
   statusId?: number | null
-  pais?: Pais | null
+  pais?: string | null
   /** Dependência = encaixa como subtarefa desta tarefa pai (usa a régua de
    *  ordem existente: só a próxima não-iniciada fica acionável). */
   /** Se ausente, calcula a próxima ordem na sequência (igual à rota). */

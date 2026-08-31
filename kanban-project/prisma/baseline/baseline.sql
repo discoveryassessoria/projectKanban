@@ -109,9 +109,6 @@ CREATE TYPE "NaturezaItem" AS ENUM ('DOCUMENTO', 'PRODUTO', 'SERVICO', 'HONORARI
 CREATE TYPE "UnidadeItem" AS ENUM ('UNIDADE', 'DOCUMENTO', 'PESSOA', 'REQUERENTE', 'PAGINA', 'PACOTE', 'PROCESSO', 'FASE', 'HORA', 'DIA', 'MES', 'PERCENTUAL', 'CUSTOM');
 
 -- CreateEnum
-CREATE TYPE "Pais" AS ENUM ('PORTUGAL', 'ESPANHA', 'ALEMANHA', 'ITALIA');
-
--- CreateEnum
 CREATE TYPE "StatusTarefa" AS ENUM ('NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_CLIENTE', 'AGUARDANDO_TERCEIRO', 'CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'BLOQUEADA', 'SUPERSEDIDA', 'CANCELADA');
 
 -- CreateEnum
@@ -2890,9 +2887,6 @@ CREATE TABLE "MatrizDocumental" (
     "vigenciaFim" TIMESTAMP(3),
     "aplicaTodosProcessos" BOOLEAN NOT NULL DEFAULT false,
     "tipoProcessoIds" JSONB,
-    "modalidadeId" INTEGER,
-    "paisCode" VARCHAR(8),
-    "regiaoCode" VARCHAR(16),
     "tipoProcessoVersao" INTEGER,
     "requisitoNome" VARCHAR(200),
     "documentosAceitos" JSONB,

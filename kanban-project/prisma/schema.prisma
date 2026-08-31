@@ -4391,9 +4391,6 @@ model MatrizDocumental {
   // saÃ­ram do ESCOPO (viram condiÃ§Ã£o da regra quando necessÃ¡rio).
   aplicaTodosProcessos                 Boolean                 @default(false)
   tipoProcessoIds                      Json? // [Int] â coleÃ§Ã£o; legado: [tipoProcessoId]
-  modalidadeId                         Int? // LEGADO (nÃ£o usado no escopo; modalidade vira condiÃ§Ã£o)
-  paisCode                             String?                 @db.VarChar(8) // LEGADO
-  regiaoCode                           String?                 @db.VarChar(16) // LEGADO
   tipoProcessoVersao                   Int?
   // REQUISITO + DOCUMENTOS ACEITOS (o requisito pode ser atendido por 1+ documentos)
   requisitoNome                        String?                 @db.VarChar(200)
@@ -5259,13 +5256,6 @@ enum UnidadeItem {
   MES
   PERCENTUAL
   CUSTOM
-}
-
-enum Pais {
-  PORTUGAL
-  ESPANHA
-  ALEMANHA
-  ITALIA
 }
 
 enum StatusTarefa {

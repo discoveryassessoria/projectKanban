@@ -46,8 +46,6 @@ export async function POST(request: NextRequest) {
     const ctx: ContextoAvaliacao = {
       tipoProcessoId,
       modalidadeId: b?.modalidadeId != null ? Number(b.modalidadeId) : null,
-      paisCode: b?.paisCode ?? null,
-      regiaoCode: b?.regiaoCode ?? null,
       faseKey: b?.faseKey ?? null,
       sujeito,
       dataReferencia: b?.dataReferencia ? String(b.dataReferencia) : new Date().toISOString(),

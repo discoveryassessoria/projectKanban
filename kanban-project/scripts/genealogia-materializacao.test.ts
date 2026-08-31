@@ -17,7 +17,7 @@ function ok(c: boolean, n: string) { if (c) { passed++; console.log(`  ✅ ${n}`
 
 const baseR: Omit<RegraDocumental, "id" | "nome" | "codigo" | "documentTypeCode" | "documentosAceitos" | "requisitoNome" | "faseExigencia" | "faseBloqueio" | "publicosAlvo" | "publicoAlvo" | "condicoes"> = {
   descricao: null, status: "PUBLICADA", versao: 1, prioridade: 100, vigenciaInicio: null, vigenciaFim: null,
-  aplicaTodosProcessos: true, tipoProcessoIds: [], tipoProcessoId: 0, modalidadeId: null, paisCode: null, regiaoCode: null, tipoProcessoVersao: null,
+  aplicaTodosProcessos: true, tipoProcessoIds: [], tipoProcessoId: 0, tipoProcessoVersao: null,
   modoSatisfacao: "QUALQUER_UM_ATENDE", categoriaCode: null, obrigatoriedade: "OBRIGATORIA",
   bloqueiaConclusaoFase: true, continuaObrigatorioNasFasesSeguintes: true, faseFinalExigencia: null, obrigatorioAteFinalProcesso: false,
   possuiValidade: false, validadeDias: null, exigeDataEmissao: false, renovarQuandoExpirado: false, antecedenciaRenovacaoDias: null,

@@ -1,13 +1,15 @@
 // ESTE ARQUIVO VAI EM: prisma/seed.ts
 // Versão atualizada com etapas específicas por país
 
-import { PrismaClient, Pais } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import { hash } from 'bcrypt'
 
 const prisma = new PrismaClient()
 
 // Etapas específicas por país
-const etapasPorPais: Record<Pais, string[]> = {
+// CHAVE DO CADASTRO, não enum: o enum `Pais` foi removido: era peso morto —
+// nenhuma coluna o usava e a fonte real sempre foi CatalogoPais.
+const etapasPorPais: Record<string, string[]> = {
   ITALIA: [
     'Genealogia',
     'Busca Documental',
@@ -60,7 +62,7 @@ const etapasPorPais: Record<Pais, string[]> = {
   ],
 }
 
-const paises: Pais[] = [Pais.ALEMANHA, Pais.ESPANHA, Pais.ITALIA, Pais.PORTUGAL]
+const paises: string[] = ['ALEMANHA', 'ESPANHA', 'ITALIA', 'PORTUGAL']
 
 async function main() {
   console.log('🌱 Iniciando seed do banco de dados...')

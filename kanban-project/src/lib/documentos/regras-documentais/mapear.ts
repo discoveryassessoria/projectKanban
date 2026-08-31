@@ -67,9 +67,6 @@ export function matrizParaRegra(row: MatrizDocumental): RegraDocumental {
     aplicaTodosProcessos: !!row.aplicaTodosProcessos,
     tipoProcessoIds: parseIntArray(row.tipoProcessoIds) ?? [row.tipoProcessoId],
     tipoProcessoId: row.tipoProcessoId,
-    modalidadeId: row.modalidadeId ?? null,
-    paisCode: row.paisCode ?? null,
-    regiaoCode: row.regiaoCode ?? null,
     tipoProcessoVersao: row.tipoProcessoVersao ?? null,
     requisitoNome: row.requisitoNome ?? row.nome ?? null,
     documentosAceitos: parseStrArray(row.documentosAceitos) ?? [row.documentTypeCode],
@@ -104,9 +101,6 @@ export interface RegraInput {
   aplicaTodosProcessos?: boolean
   tipoProcessoIds?: number[]
   tipoProcessoId?: number
-  modalidadeId?: number | null
-  paisCode?: string | null
-  regiaoCode?: string | null
   tipoProcessoVersao?: number | null
   requisitoNome?: string | null
   documentosAceitos?: string[]
@@ -140,9 +134,6 @@ export function regraInputParaData(input: RegraInput): Record<string, unknown> {
   set("nome", input.nome)
   set("descricao", input.descricao)
   set("aplicaTodosProcessos", input.aplicaTodosProcessos)
-  set("modalidadeId", input.modalidadeId)
-  set("paisCode", input.paisCode)
-  set("regiaoCode", input.regiaoCode)
   set("tipoProcessoVersao", input.tipoProcessoVersao)
   set("requisitoNome", input.requisitoNome)
   set("modoSatisfacao", input.modoSatisfacao)

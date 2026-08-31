@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import type { Pais } from '@prisma/client'
 
 // ============================================================
 // FASE 5 — Parte 1: conectar processos ao motor EM LOTE.
@@ -9,8 +8,10 @@ import type { Pais } from '@prisma/client'
 // Nada é apagado. Reversível (desconectar).
 // ============================================================
 
-const PAISES: Pais[] = ['PORTUGAL', 'ESPANHA', 'ALEMANHA', 'ITALIA']
-const isPais = (s: string): s is Pais => (PAISES as string[]).includes(s)
+// Lista técnica da rota de migração legada. O enum `Pais` foi removido do
+// schema (nenhuma coluna o usava); a fonte de país é CatalogoPais.
+const PAISES: string[] = ['PORTUGAL', 'ESPANHA', 'ALEMANHA', 'ITALIA']
+const isPais = (s: string): boolean => PAISES.includes(s)
 
 // monta o filtro por país (ou todos)
 function wherePais(pais: string) {

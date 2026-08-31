@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { PrioridadeTarefa, Pais } from "@prisma/client"
+import {PrioridadeTarefa} from '@prisma/client'
 import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
 import { extrairUsuarioKanban } from "@/lib/kanban-auth"
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const responsavelId = searchParams.get("responsavelId")
     const concluida = searchParams.get("concluida")
     const prioridade = searchParams.get("prioridade") as PrioridadeTarefa | null
-    const pais = searchParams.get("pais") as Pais | null
+    const pais = searchParams.get("pais") as string | null
     const statusId = searchParams.get("statusId")
     const responsavelEmail = searchParams.get("responsavel")
     const dataInicio = searchParams.get("dataInicio")
@@ -96,7 +96,11 @@ export async function GET(request: Request) {
       where.prioridade = prioridade
     }
 
-    if (pais && Object.values(Pais).includes(pais)) {
+    // País válido é o CADASTRADO — a lista deixou de ser constante do schema.
+    const paisCadastrado = pais
+      ? await prisma.catalogoPais.findFirst({ where: { countryKey: String(pais).toLowerCase() }, select: { id: true } })
+      : null
+    if (pais && paisCadastrado) {
       const paisCondition = {
         OR: [
           { pais: pais },
@@ -238,7 +242,12 @@ export async function POST(request: Request) {
       ? prioridade
       : PrioridadeTarefa.MEDIA
 
-    const paisValido = pais && Object.values(Pais).includes(pais) ? pais : null
+    // Validado contra o CADASTRO, não contra uma lista do schema.
+    const paisValido = pais
+      ? (await prisma.catalogoPais.findFirst({
+          where: { countryKey: String(pais).toLowerCase() }, select: { countryKey: true },
+        }))?.countryKey ?? null
+      : null
 
     let ordemFinal = ordem
     if (ordemFinal === undefined || ordemFinal === null) {

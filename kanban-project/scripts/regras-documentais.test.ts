@@ -18,8 +18,7 @@ function ok(cond: boolean, nome: string) { if (cond) { passed++; console.log(`  
 const HOJE = "2026-07-16T12:00:00.000Z"
 const base: Omit<RegraDocumental, "id" | "documentTypeCode" | "publicoAlvo" | "documentosAceitos" | "publicosAlvo" | "tipoProcessoIds"> = {
   codigo: null, nome: null, descricao: null, status: "PUBLICADA", versao: 1, prioridade: 0,
-  vigenciaInicio: null, vigenciaFim: null, aplicaTodosProcessos: false, tipoProcessoId: 1,
-  modalidadeId: null, paisCode: null, regiaoCode: null, tipoProcessoVersao: null,
+  vigenciaInicio: null, vigenciaFim: null, aplicaTodosProcessos: false, tipoProcessoId: 1, tipoProcessoVersao: null,
   requisitoNome: null, modoSatisfacao: "QUALQUER_UM_ATENDE", categoriaCode: null, obrigatoriedade: "OBRIGATORIA", condicoes: null,
   faseExigencia: null, faseBloqueio: null, bloqueiaConclusaoFase: false, continuaObrigatorioNasFasesSeguintes: false,
   faseFinalExigencia: null, obrigatorioAteFinalProcesso: false,

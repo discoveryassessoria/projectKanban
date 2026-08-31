@@ -31,9 +31,11 @@ function serializaCondicoes(r: RegraDocumental): string {
   return `${r.condicoes.combinador}:${regras.join(",")}`
 }
 
-// escopo de comparação: mesmo processo + documento + público-alvo (+ modalidade)
+// Escopo de comparação: mesmo processo + documento + público-alvo. A modalidade
+// saiu — era o campo LEGADO `modalidadeId`, que ninguém preenchia; a base
+// jurídica virou condição da regra.
 function escopo(r: RegraDocumental): string {
-  return [r.tipoProcessoId, r.modalidadeId ?? "*", r.documentTypeCode, r.publicoAlvo].join("::")
+  return [r.tipoProcessoId, r.documentTypeCode, r.publicoAlvo].join("|")
 }
 
 export function detectarConflitos(

@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { Pais } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Buscar status (filtrado por país)
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const pais = searchParams.get("pais") as Pais | null
+    const pais = searchParams.get("pais")
 
     const where = pais ? { pais } : {}
 
@@ -48,7 +47,11 @@ export async function POST(request: Request) {
     }
 
     // Validar se o país é válido
-    if (!Object.values(Pais).includes(pais)) {
+    // O país válido é o que está CADASTRADO, não uma constante do schema.
+    const cadastrado = await prisma.catalogoPais.findFirst({
+      where: { countryKey: pais.toLowerCase() }, select: { id: true },
+    })
+    if (!cadastrado) {
       return NextResponse.json(
         { error: "País inválido" },
         { status: 400 }

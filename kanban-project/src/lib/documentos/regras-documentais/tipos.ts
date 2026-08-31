@@ -143,9 +143,6 @@ export interface RegraDocumental {
   aplicaTodosProcessos: boolean
   tipoProcessoIds: number[]
   tipoProcessoId: number // primário (1º item) — dual-read
-  modalidadeId: number | null // legado
-  paisCode: string | null // legado
-  regiaoCode: string | null // legado
   tipoProcessoVersao: number | null
   // REQUISITO + DOCUMENTOS ACEITOS
   requisitoNome: string | null
