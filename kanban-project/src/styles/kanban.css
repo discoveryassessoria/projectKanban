@@ -3,7 +3,7 @@
 /* Scroll horizontal suave para o kanban */
 .kanban-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgb(203 213 225) transparent;
+  scrollbar-color: var(--border-default, #a7c9de) transparent;
 }
 
 .kanban-scroll::-webkit-scrollbar {
@@ -15,12 +15,12 @@
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb {
-  background-color: rgb(203 213 225);
+  background-color: var(--border-default, #a7c9de);
   border-radius: 4px;
 }
 
 .kanban-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(148 163 184);
+  background-color: var(--border-strong, #7faecc);
 }
 
 /* Cards com hover suave */
@@ -30,44 +30,45 @@
 
 .activity-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px -8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--elev-2, 0 8px 25px -8px rgba(16, 39, 58, 0.14));
 }
 
 /* Estilos de Drag and Drop */
 .activity-card.dragging {
   opacity: 0.5;
-  transform: rotate(3deg) scale(1.05);
+  transform: rotate(1.5deg) scale(1.04);
   z-index: 1000;
 }
 
 .activity-card.drag-preview {
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.3);
-  border: 1px solid rgb(148 163 184);
+  box-shadow: 0 18px 36px -10px rgba(16, 39, 58, 0.28), 0 0 0 4px rgba(79, 145, 197, 0.18);
+  border: 1px solid var(--brand, #4f91c5);
+  background: var(--surface-elevated, #f2f9fd);
   cursor: grabbing;
 }
 
 /* Colunas como drop targets */
 .kanban-column.drop-target {
-  background: rgba(59, 130, 246, 0.05);
-  border: 2px dashed rgb(59 130 246);
+  background: rgba(40, 117, 183, 0.06);
+  border: 2px dashed var(--brand, #4f91c5);
   border-radius: 8px;
   transition: all 0.2s ease-in-out;
 }
 
 /* Feedback visual para área de drop ativa */
 .drop-zone-active {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 197, 253, 0.1));
-  border: 2px solid rgb(59 130 246);
+  background: linear-gradient(135deg, rgba(40, 117, 183, 0.12), rgba(185, 221, 244, 0.18));
+  border: 2px solid var(--brand-active, #2875b7);
   border-radius: 12px;
   animation: dropZonePulse 1.5s ease-in-out infinite;
 }
 
 @keyframes dropZonePulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 0 0 rgba(40, 117, 183, 0.35);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.1);
+    box-shadow: 0 0 0 8px rgba(40, 117, 183, 0.10);
   }
 }
 
@@ -119,9 +120,9 @@
 }
 
 .status-semana {
-  background-color: rgb(219 234 254);
-  color: rgb(30 58 138);
-  border-color: rgb(147 197 253);
+  background-color: var(--info-tile, #d8ecf8);
+  color: var(--info-text, #174d76);
+  border-color: var(--border-strong, #7faecc);
 }
 
 .status-futuro {
@@ -131,15 +132,15 @@
 }
 
 .status-sem-prazo {
-  background-color: rgb(249 250 251);
-  color: rgb(55 65 81);
-  border-color: rgb(209 213 219);
+  background-color: var(--surface-secondary, #d8ecf8);
+  color: var(--text-secondary, #456175);
+  border-color: var(--border-default, #a7c9de);
 }
 
 /* Animação de carregamento para skeleton */
 .skeleton-loading {
   animation: skeleton-loading 1.5s ease-in-out infinite;
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #e4f1fb 25%, #cde6f6 50%, #e4f1fb 75%);
   background-size: 200% 100%;
 }
 
@@ -182,9 +183,9 @@
 
 /* Estilo para filtros ativos */
 .filter-active {
-  background-color: rgba(59, 130, 246, 0.1);
-  border-color: rgba(59, 130, 246, 0.2);
-  color: rgb(59, 130, 246);
+  background-color: rgba(40, 117, 183, 0.10);
+  border-color: rgba(40, 117, 183, 0.22);
+  color: var(--info-text, #174d76);
 }
 
 /* Loading states */

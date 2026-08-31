@@ -73,9 +73,9 @@ interface PessoaSidebarProps {
 // HELPERS
 // ========================================
 const colors = {
-  male: '#2563EB',
+  male: '#2875b7',
   female: '#DB2777',
-  neutral: '#6B7280',
+  neutral: '#4e6879',
 }
 
 // Função corrigida para evitar problemas de timezone
@@ -138,11 +138,11 @@ const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  PENDENTE: { label: 'Pendente', color: '#6B7280', bg: '#F3F4F6', icon: Clock },            // Cinza
+  PENDENTE: { label: 'Pendente', color: '#4e6879', bg: '#d8ecf8', icon: Clock },            // Cinza
   EM_BUSCA: { label: 'Em Busca', color: '#DC2626', bg: '#FEE2E2', icon: AlertCircle },      // 🔴 !
   SOLICITAR: { label: 'Solicitar', color: '#D97706', bg: '#FEF3C7', icon: AlertCircle },     // 🟡 !
   SOLICITADO: { label: 'Solicitado', color: '#059669', bg: '#D1FAE5', icon: Clock },         // 🟢 relógio
-  RECEBIDO: { label: 'Recebido', color: '#2563EB', bg: '#DBEAFE', icon: CheckCircle2 },     // 🔵 ✓
+  RECEBIDO: { label: 'Recebido', color: '#2875b7', bg: '#DBEAFE', icon: CheckCircle2 },     // 🔵 ✓
   EM_TRADUCAO: { label: 'Em Tradução', color: '#7C3AED', bg: '#EDE9FE', icon: Clock },
   TRADUZIDO: { label: 'Traduzido', color: '#0891B2', bg: '#CFFAFE', icon: CheckCircle2 },
   APOSTILADO: { label: 'Apostilado', color: '#059669', bg: '#D1FAE5', icon: CheckCircle2 },

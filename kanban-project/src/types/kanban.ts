@@ -25,8 +25,8 @@ export const PRIORIDADE_CONFIG: Record<PrioridadeTarefa, {
   cor: string
   corBg: string
 }> = {
-  [PrioridadeTarefa.BAIXA]: { label: 'Baixa', cor: '#6b7280', corBg: '#6b728020' },
-  [PrioridadeTarefa.MEDIA]: { label: 'Média', cor: '#3b82f6', corBg: '#3b82f620' },
+  [PrioridadeTarefa.BAIXA]: { label: 'Baixa', cor: '#4e6879', corBg: '#4e687920' },
+  [PrioridadeTarefa.MEDIA]: { label: 'Média', cor: '#4f91c5', corBg: '#4f91c520' },
   [PrioridadeTarefa.ALTA]: { label: 'Alta', cor: '#f59e0b', corBg: '#f59e0b20' },
   [PrioridadeTarefa.URGENTE]: { label: 'Urgente', cor: '#ef4444', corBg: '#ef444420' },
 }

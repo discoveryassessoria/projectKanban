@@ -173,7 +173,7 @@ export function PhaseMapTab() {
 
 /* ----------------------- Diagnóstico do Sistema (diagnostics) --------------- */
 function DiagBlock({ title, tone }: { title: string; tone: 'danger' | 'warn' | 'info' }) {
-  const border = tone === 'danger' ? '#ef4444' : tone === 'warn' ? '#f59e0b' : '#2563eb'
+  const border = tone === 'danger' ? '#ef4444' : tone === 'warn' ? '#f59e0b' : '#2875b7'
   return (
     <div className={`mb-2.5 ${CARD} p-3.5`} style={{ borderLeft: `3px solid ${border}` }}>
       <div className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-secondary)]">{title} (0)</div>

@@ -8,8 +8,8 @@ const colors = {
   maleBg: '#E8F4FC',
   female: '#BF3D79',
   femaleBg: '#FCE8F2',
-  neutral: '#6B7280',
-  neutralBg: '#F3F4F6',
+  neutral: '#4e6879',
+  neutralBg: '#d8ecf8',
   green: '#87B940',
 }
 

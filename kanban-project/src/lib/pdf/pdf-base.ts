@@ -13,7 +13,7 @@ export const PDF_CORES = {
   green: [34, 197, 94] as RGB,
   red: [239, 68, 68] as RGB,
   orange: [245, 158, 11] as RGB,
-  blue: [59, 130, 246] as RGB,
+  blue: [40, 117, 183] as RGB,
   dark: [31, 41, 55] as RGB,
   gray: [107, 114, 128] as RGB,
   lightGray: [243, 244, 246] as RGB,

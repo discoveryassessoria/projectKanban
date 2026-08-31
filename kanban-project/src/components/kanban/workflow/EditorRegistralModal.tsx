@@ -431,7 +431,7 @@ function ConteudoModal({
               {/* ============== HEADER ============== */}
               <div
                 className="flex-shrink-0 px-6 py-4 border-b border-[var(--border-default)]"
-                style={{ background: "linear-gradient(135deg,#1e293b 0%,#0f172a 100%)" }}
+                style={{ background: "linear-gradient(135deg,#2875b7 0%,#174d76 100%)" }}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">

@@ -68,7 +68,7 @@ const fsColors = {
   male: '#3073B5',
   female: '#BF3D79',
   green: '#87B940',
-  line: '#9CA3AF'
+  line: '#8fa6b5'
 }
 
 /** Resposta da árvore como a API a devolve. */
@@ -315,7 +315,7 @@ export function ArvoreGenealogicaView({
       })
 
       const imgData = await toPng(reactFlowContainer, {
-        backgroundColor: '#f9fafb',
+        backgroundColor: '#eaf5fc',
         pixelRatio: 2,
         skipFonts: true,
       })
@@ -1001,7 +1001,7 @@ export function ArvoreGenealogicaView({
             <div className="flex flex-col items-center gap-8 max-w-sm text-center px-4">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="1.5">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8fa6b5" strokeWidth="1.5">
                     <circle cx="12" cy="7" r="4" />
                     <path d="M5.5 21a7.5 7.5 0 0113 0" />
                   </svg>

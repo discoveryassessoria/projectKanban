@@ -123,11 +123,11 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
 
       {/* STRIP TOPO: Fechamento / Conciliação / A Vencer */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <StripCard topColor="#64748b" icon={<Lock className="h-3.5 w-3.5" />} label="Fechamento Mensal"
+        <StripCard topColor="#4e6879" icon={<Lock className="h-3.5 w-3.5" />} label="Fechamento Mensal"
           value={m.fechamentoLabel}
           sub={<>Status: <strong className="text-white/80">{m.fechamentoStatus}</strong></>}
           action={{ label: "Ir para DRE", onClick: () => onGoTab("dre") }} />
-        <StripCard topColor="#64748b" icon={<Scale className="h-3.5 w-3.5" />} label="Conciliação Bancária"
+        <StripCard topColor="#4e6879" icon={<Scale className="h-3.5 w-3.5" />} label="Conciliação Bancária"
           value={fmtBRLshort(Math.abs(m.conciliacaoDiff))}
           sub={<>Diferença · {m.conciliacaoPendencias} pendência(s)</>}
           action={{ label: "Conciliar", onClick: () => onGoTab("tesouraria") }} />
@@ -139,7 +139,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
 
       {/* KPIs — 8 indicadores em UMA linha (layout oficial) */}
       <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
-        <Kpi accent="#cbd5e1" icon={<Wallet className="h-4 w-4" />} label="Caixa Consolidado"
+        <Kpi accent="#7faecc" icon={<Wallet className="h-4 w-4" />} label="Caixa Consolidado"
           value={fmtBRL(k.caixaBRL)} sub="Saldo das contas bancárias" />
         <Kpi accent="#22c55e" icon={<ArrowDownRight className="h-4 w-4" />} label="Recebido no Mês"
           value={fmtBRL(k.recebidoMesBRL)} sub={`A receber: ${fmtBRL(k.aReceberMesBRL)}`} />
@@ -151,9 +151,9 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           value={fmtBRL(k.lucroMesBRL)} sub={`Realizado · ${hoje.getDate()}/31 dias`} />
         <Kpi accent={OURO} icon={<Target className="h-4 w-4" />} label="Margem Líquida"
           value={fmtPct(k.margemPct)} sub="Meta 35%" />
-        <Kpi accent="#38bdf8" icon={<Activity className="h-4 w-4" />} label="Forecast 30 dias"
+        <Kpi accent="#4f91c5" icon={<Activity className="h-4 w-4" />} label="Forecast 30 dias"
           value={fmtBRL(m.forecast30BRL)} sub="Entrada líquida prevista" mock />
-        <Kpi accent="#38bdf8" icon={<Globe className="h-4 w-4" />} label="Exposição Cambial"
+        <Kpi accent="#4f91c5" icon={<Globe className="h-4 w-4" />} label="Exposição Cambial"
           value={fmtBRL(m.exposicaoBRL)} sub={`${fmtEUR(m.exposicaoEUR)} + ${fmtUSD(m.exposicaoUSD)}`} mock />
       </div>
 
@@ -286,7 +286,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
                 <div key={c.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-[var(--text-secondary)]">{c.banco || "Conta"}</span>
-                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor || "#64748b" }} />
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor || "#4e6879" }} />
                   </div>
                   <div className="text-white font-semibold mt-1">{c.nome}</div>
                   <div className="text-lg font-bold text-white mt-1">{fmtBRL(c.saldoBRL)}</div>
@@ -436,18 +436,18 @@ function AlertCard({ tipo, titulo, texto, meta }: { tipo: string; titulo: string
 }
 
 function ReceitaPaisBars({ data }: { data: Record<string, number> }) {
-  const cores: Record<string, string> = { "Itália": "#ef4444", "Espanha": "#f59e0b", "Alemanha": "#94a3b8", "Portugal": "#16a34a" }
+  const cores: Record<string, string> = { "Itália": "#ef4444", "Espanha": "#f59e0b", "Alemanha": "#7faecc", "Portugal": "#16a34a" }
   const total = Object.values(data).reduce((a, b) => a + b, 0) || 1
   return (
     <div className="space-y-2.5">
       {Object.entries(data).map(([pais, val]) => (
         <div key={pais}>
           <div className="flex justify-between text-xs mb-1">
-            <span className="text-white/80 inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cores[pais] || "#64748b" }} />{pais}</span>
+            <span className="text-white/80 inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: cores[pais] || "#4e6879" }} />{pais}</span>
             <strong className="text-white">{fmtBRL(val)}</strong>
           </div>
           <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${(val / total) * 100}%`, background: cores[pais] || "#64748b" }} />
+            <div className="h-full rounded-full" style={{ width: `${(val / total) * 100}%`, background: cores[pais] || "#4e6879" }} />
           </div>
         </div>
       ))}

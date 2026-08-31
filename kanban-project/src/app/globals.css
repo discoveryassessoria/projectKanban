@@ -31,13 +31,13 @@
 @theme {
   /* A TINTA CLARA do vidro — era branco translúcido sobre escuro, vira graphite
      translúcido sobre ivory. `text-white/60`, `bg-white/5`, `border-white/10`. */
-  --color-white: #17191c;
+  --color-white: #10273a;
 
   /* A TINTA ESCURA — `bg-black/40` (sidebar, header, overlays) era preto sobre
      escuro para AFUNDAR a superfície. Sobre ivory ela precisa fazer o mesmo
      trabalho e o pigmento é o oposto: branco quente, que ERGUE a superfície.
      São 137 ocorrências, quase todas em sidebar, header, modal e overlay. */
-  --color-black: #fdfcfa;
+  --color-black: #f2f9fd;
 
   /* Branco de verdade, para tinta sobre superfície colorida. */
   --color-pure: #ffffff;
@@ -50,14 +50,14 @@
      `gray` e `slate` são o oposto: 251 usos como TINTA e poucos como fundo. Não
      entram aqui — texto escuro sobre claro é o que o tema quer, e clareá-los
      apagaria a leitura. */
-  --color-zinc-950: #f4f1ea;
-  --color-zinc-900: #f7f5f0;
-  --color-zinc-800: #efece4;
-  --color-zinc-700: #e6e1d8;
-  --color-neutral-950: #f4f1ea;
-  --color-neutral-900: #f7f5f0;
-  --color-neutral-800: #efece4;
-  --color-neutral-700: #e6e1d8;
+  --color-zinc-950: #e4f1fb;
+  --color-zinc-900: #eaf5fc;
+  --color-zinc-800: #dcedf9;
+  --color-zinc-700: #cfe7f6;
+  --color-neutral-950: #e4f1fb;
+  --color-neutral-900: #eaf5fc;
+  --color-neutral-800: #dcedf9;
+  --color-neutral-700: #cfe7f6;
 }
 
 @theme inline {
@@ -103,24 +103,24 @@
 :root {
   --radius: 0.625rem;
   /* Ivory, não branco: `--background` alimenta `body` via @apply bg-background. */
-  --background: oklch(0.966 0.006 84);
-  --foreground: oklch(0.185 0.004 260);
-  --card: oklch(0.995 0.003 84);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --background: #ddeffc;
+  --foreground: #10273a;
+  --card: #eaf5fc;
+  --card-foreground: #10273a;
+  --popover: #f2f9fd;
+  --popover-foreground: #10273a;
+  --primary: #2875b7;
+  --primary-foreground: #ffffff;
+  --secondary: #d8ecf8;
+  --secondary-foreground: #174d76;
+  --muted: #d8ecf8;
+  --muted-foreground: #4e6879;
+  --accent: #cde6f6;
+  --accent-foreground: #174d76;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #bfd8e8;
+  --input: #a7c9de;
+  --ring: #4f91c5;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -129,14 +129,14 @@
   
   /* SIDEBAR — ivory/champagne muito suave. O item ATIVO é graphite profundo com
      texto claro: sem ele o menu inteiro vira bege e perde a hierarquia. */
-  --sidebar: oklch(0.972 0.007 84);
-  --sidebar-foreground: oklch(0.24 0.004 260);
-  --sidebar-primary: oklch(0.245 0.008 260);
-  --sidebar-primary-foreground: oklch(0.98 0.004 84);
-  --sidebar-accent: oklch(0.93 0.018 84);
-  --sidebar-accent-foreground: oklch(0.24 0.004 260);
-  --sidebar-border: oklch(0.90 0.008 84);
-  --sidebar-ring: oklch(0.62 0.09 76);
+  --sidebar: #e4f1fb;
+  --sidebar-foreground: #10273a;
+  --sidebar-primary: #2875b7;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #cde6f6;
+  --sidebar-accent-foreground: #174d76;
+  --sidebar-border: #bfd8e8;
+  --sidebar-ring: #4f91c5;
 }
 
 /* ============================================================
@@ -155,14 +155,15 @@
      Uma escala só. Sombra em tema claro não é preto a 75% — é a própria tinta
      do texto, muito diluída, em duas camadas: um contorno de 1px que separa da
      superfície e uma difusa que dá altura. Três degraus, nada além. */
-  --elev-1: 0 1px 2px rgba(23, 25, 28, 0.05);
-  --elev-2: 0 1px 2px rgba(23, 25, 28, 0.04), 0 8px 20px -10px rgba(23, 25, 28, 0.10);
-  --elev-3: 0 1px 3px rgba(23, 25, 28, 0.05), 0 16px 36px -18px rgba(23, 25, 28, 0.14);
+  --elev-1: 0 1px 2px rgba(16, 39, 58, 0.06);
+  --elev-2: 0 1px 2px rgba(16, 39, 58, 0.05), 0 8px 20px -10px rgba(16, 39, 58, 0.12);
+  --elev-3: 0 1px 3px rgba(16, 39, 58, 0.06), 0 16px 36px -18px rgba(16, 39, 58, 0.16);
 
-  --app-background: #f7f4ee;
-  --app-overlay: rgba(246, 243, 237, 0.86);
-  --sidebar-background: rgba(248, 246, 241, 0.92);
-  --header-background: rgba(252, 251, 248, 0.88);
+  --app-background: #ddeffc;
+  --app-background-accent: #cde6f6;
+  --app-overlay: rgba(221, 239, 252, 0.86);
+  --sidebar-background: rgba(228, 241, 251, 0.92);
+  --header-background: rgba(242, 249, 253, 0.88);
 
   /* ── SUPERFÍCIE DE LEITURA É SÓLIDA. SEM EXCEÇÃO. ────────────────────────
      Esta é a regra que separa ambiente de conteúdo, e a falta dela foi o defeito
@@ -177,17 +178,18 @@
      Agora toda superfície que o operador LÊ é opaca. A paisagem existe ao redor
      e por baixo; nunca através. Translucidez fica só onde é decoração: hover,
      realce, cortina de modal. */
-  --surface-sidebar: #faf7f5;  /* amostrado do mockup */
-  --surface-primary: #ffffff;    /* card, painel, linha de tabela */
-  --surface-secondary: #f3efe7;  /* cabeçalho de tabela, agrupamento, filtro */
-  --surface-tertiary: #eee9df;   /* faixa, seção aninhada */
-  --surface-elevated: #ffffff;   /* o que flutua acima de tudo */
+  --surface-page: #ddeffc;       /* fundo ambiental da página */
+  --surface-sidebar: #e4f1fb;
+  --surface-primary: #eaf5fc;    /* card, painel, linha de tabela */
+  --surface-secondary: #d8ecf8;  /* cabeçalho de tabela, agrupamento, filtro */
+  --surface-tertiary: #cde6f6;   /* faixa, seção aninhada */
+  --surface-elevated: #f2f9fd;   /* o que flutua acima de tudo */
 
   /* Estados — translúcidos DE PROPÓSITO: pintam SOBRE a superfície sólida. */
-  --surface-hover: rgba(23, 25, 28, 0.04);
-  --surface-selected: rgba(23, 25, 28, 0.06);
-  --surface-active: rgba(23, 25, 28, 0.09);
-  --surface-disabled: #f4f1ea;
+  --surface-hover: rgba(16, 39, 58, 0.05);
+  --surface-selected: rgba(40, 117, 183, 0.12);
+  --surface-active: rgba(40, 117, 183, 0.18);
+  --surface-disabled: #dceef9;
 
   /* Superfícies OPACAS (overlays) — as superfícies translúcidas acima não servem
      a modal/dialog/drawer/sheet/popover/menu/tooltip, que precisam OCULTAR o
@@ -195,9 +197,9 @@
      só existem em claro). Token global do DS: nenhuma tela cria o seu próprio.
      As superfícies translúcidas (--surface-primary…) podem ser empilhadas SOBRE
      estas para dar elevação de painéis aninhados dentro do overlay. */
-  --surface-overlay: #fcfbf8;        /* painel de modal/dialog/drawer/sheet */
-  --surface-popover: #ffffff;        /* popover/dropdown/menu/tooltip */
-  --surface-input: #ffffff;          /* fundo de campo de formulário */
+  --surface-overlay: #eaf5fc;        /* painel de modal/dialog/drawer/sheet */
+  --surface-popover: #f2f9fd;        /* popover/dropdown/menu/tooltip */
+  --surface-input: #f2f9fd;          /* fundo de campo de formulário */
 
   /* ── A CORTINA DO MODAL ───────────────────────────────────────────────────
      `bg-black/60` fazia dois trabalhos opostos no produto: escurecer a tela por
@@ -217,28 +219,32 @@
      continuam significando o que sempre significaram — verde é sucesso, âmbar é
      atenção, vermelho é bloqueio, azul é andamento. O champagne é identidade, e
      por isso aparece em seleção e detalhe, não como fundo de qualquer ação. */
-  --action-primary: #1d232a;
-  --action-primary-hover: #12171c;
+  --action-primary: #2875b7;
+  --action-primary-hover: #174d76;
   --action-primary-ink: #ffffff;
+  --action-secondary: #d8ecf8;
+  --action-secondary-ink: #174d76;
 
-  --overlay-modal: rgba(20, 24, 28, 0.26);
-  --overlay-drawer: rgba(20, 24, 28, 0.22);
+  /* Cortina azulada leve: a tela de origem continua reconhecível (§17). */
+  --overlay-modal: rgba(20, 50, 70, 0.18);
+  --overlay-drawer: rgba(20, 50, 70, 0.16);
 
   /* Bordas — quentes e SÓLIDAS: borda translúcida sobre superfície translúcida
      era o que fazia o contorno dos cards desaparecer. */
-  --border-subtle: #ece7de;
-  --border-default: #d8d1c6;
-  --border-strong: #c8bfaf;
+  --border-subtle: #bfd8e8;
+  --border-default: #a7c9de;
+  --border-strong: #7faecc;
+  --border-focus: #4f91c5;
 
   /* ── TEXTO: A ESCALA INTEIRA PASSA EM AA ─────────────────────────────────
      Medido sobre `--surface-primary` (#fffefb):
        primary   17.29  ·  secondary 5.91  ·  muted 4.75  ·  disabled 3.11
      O muted anterior (#8a8d94) dava 3.24 e sumia em metadado, rótulo de coluna e
      texto de apoio — que é exatamente onde ele mais aparece. */
-  --text-primary: #171a1f;
-  --text-secondary: #585d64;
-  --text-muted: #61656b;
-  --text-disabled: #a7aaae;
+  --text-primary: #10273a;
+  --text-secondary: #456175;
+  --text-muted: #4e6879;
+  --text-disabled: #8fa6b5;
   --text-inverse: #ffffff;
 
   /* Acento institucional (dourado) — ação/navegação ativa apenas */
@@ -246,9 +252,14 @@
      Dourado bronze, amostrado dos mockups aprovados (#a17938): botão de ação
      principal, barra de progresso do cabeçalho, marcador do item ativo da
      sidebar. Substitui o graphite da rodada anterior — o alvo mudou. */
-  --accent-primary: #a17938;
-  --accent-hover: #8d6930;
-  --accent-soft: #f8e9d2;      /* realce de seleção / superfície dourada suave */
+  --brand-light: #b9ddf4;
+  --brand: #4f91c5;
+  --brand-hover: #2875b7;
+  --brand-active: #2875b7;
+  --brand-dark: #174d76;
+  --accent-primary: #2875b7;
+  --accent-hover: #174d76;
+  --accent-soft: #cde6f6;      /* realce de seleção / superfície azul suave */
   --accent-ink: #ffffff;
   /* Vermelho SÓLIDO: só ação destrutiva confirmada. Tinta branca real. */
   --danger-solid: #b91c1c;
@@ -262,17 +273,17 @@
   --warning-tile: #fae4cc;
   --danger: #d20001;
   --danger-tile: #fdd5d1;
-  --info: #2680df;
-  --info-tile: #d5e3fa;
+  --info: #2875b7;
+  --info-tile: #d8ecf8;
 
   /* Degrau de TINTA: mesmo matiz do mockup, escurecido até passar AA sobre branco
      E sobre o próprio ladrilho. As cores acima são de ÍCONE (glifo grande); como
      texto pequeno elas ficam entre 2,6 e 4,0 de contraste. */
   --success-text: #236b28;
   --warning-text: #8f4a0c;
-  --info-text: #1a5b9f;
+  --info-text: #174d76;
   --pessoa-text: #5c4490;
-  --accent-text: #775722;
+  --accent-text: #174d76;
   --danger-text: #b30001;
   --pessoa: #6d51a8;
   --pessoa-tile: #d1bfea;
@@ -283,7 +294,7 @@
   --radius-lg: 16px;
 
   /* Sombra de superfície */
-  --shadow-surface: 0 1px 2px rgba(23, 25, 28, 0.05), 0 1px 3px rgba(23, 25, 28, 0.04);
+  --shadow-surface: 0 1px 2px rgba(16, 39, 58, 0.06), 0 1px 3px rgba(16, 39, 58, 0.05);
 
   /* ── O VÉU DA PAISAGEM ────────────────────────────────────────────────────
      Doze páginas carregavam este gradiente COPIADO no próprio arquivo, cada uma
@@ -303,11 +314,11 @@
      própria, entre foto e shell. */
   --landscape-veil: linear-gradient(
     180deg,
-    rgba(247, 244, 238, 0.90) 0%,
-    rgba(247, 244, 238, 0.945) 18%,
-    rgba(247, 244, 238, 0.965) 38%,
-    rgba(247, 244, 238, 0.975) 62%,
-    rgba(247, 244, 238, 0.98) 100%
+    rgba(221, 239, 252, 0.975) 0%,
+    rgba(221, 239, 252, 0.968) 22%,
+    rgba(221, 239, 252, 0.955) 48%,
+    rgba(221, 239, 252, 0.94) 74%,
+    rgba(221, 239, 252, 0.925) 100%
   );
 
   /* Espaçamento (escala 4px) */
@@ -336,7 +347,7 @@
 
 /* Enhanced genealogical tree styles with exact color specifications */
 .genealogy-tree {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: linear-gradient(135deg, #eaf5fc 0%, #ddeffc 100%);
 }
 
 .tree-node {
@@ -348,11 +359,11 @@
 .tree-node:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(18, 60, 115, 0.15);
-  border-color: #d4a853;
+  border-color: #2875b7;
 }
 
 .tree-connection {
-  stroke: #3b82f6;
+  stroke: #7faecc;
   stroke-width: 2;
   fill: none;
 }
@@ -361,8 +372,8 @@
   transition: all 0.2s ease;
   opacity: 0;
   transform: scale(0.8);
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: #f2f9fd;
+  border: 1px solid #bfd8e8;
 }
 
 .tree-node:hover .tree-action-button {
@@ -371,9 +382,9 @@
 }
 
 .tree-action-button:hover {
-  background-color: #d4a853;
+  background-color: #2875b7;
   color: white;
-  border-color: #d4a853;
+  border-color: #2875b7;
 }
 
 .tree-action-button.delete:hover {
@@ -383,11 +394,11 @@
 
 /* Added specific styles for genealogical tree text colors */
 .tree-person-name {
-  color: #1e3a5f;
+  color: #10273a;
 }
 
 .tree-person-dates {
-  color: #6b7280;
+  color: #4e6879;
 }
 
 .tree-success {
@@ -404,7 +415,7 @@
 
 /* Padrão de grade sutil para background */
 .bg-grid-pattern {
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(16, 39, 58, 0.06) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
@@ -415,18 +426,18 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #18181b;
+  background: #d8ecf8;
   border-radius: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #a7c9de;
   border-radius: 4px;
   transition: 0.2s;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: #7faecc;
 }
 
 /* Apply custom scrollbar to all scrollable areas in Kanban */
@@ -434,7 +445,7 @@
 .overflow-y-auto,
 .overflow-x-auto {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 #18181b;
+  scrollbar-color: #a7c9de #d8ecf8;
 }
 
 .overflow-auto::-webkit-scrollbar,
@@ -447,21 +458,21 @@
 .overflow-auto::-webkit-scrollbar-track,
 .overflow-y-auto::-webkit-scrollbar-track,
 .overflow-x-auto::-webkit-scrollbar-track {
-  background: #18181b;
+  background: #d8ecf8;
   border-radius: 4px;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb,
 .overflow-y-auto::-webkit-scrollbar-thumb,
 .overflow-x-auto::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: #a7c9de;
   border-radius: 4px;
 }
 
 .overflow-auto::-webkit-scrollbar-thumb:hover,
 .overflow-y-auto::-webkit-scrollbar-thumb:hover,
 .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: #7faecc;
 }
 
 /* Estilos customizados para o React Calendar */
@@ -579,7 +590,7 @@
 .react-calendar-custom .react-calendar__tile.has-deadline:hover,
 .react-calendar-custom .react-calendar__tile.has-both:hover {
   transform: scale(1.02);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 8px rgba(16, 39, 58, 0.12);
 }
 
 html, body {
@@ -642,8 +653,8 @@ header[style*="margin"] {
 input[type="date"],
 input[type="datetime-local"],
 input[type="time"] {
-  color: #111827 !important;
-  -webkit-text-fill-color: #111827 !important;
+  color: #10273a !important;
+  -webkit-text-fill-color: #10273a !important;
 }
 
 input[type="date"]::-webkit-datetime-edit,
@@ -652,8 +663,8 @@ input[type="date"]::-webkit-datetime-edit-text,
 input[type="date"]::-webkit-datetime-edit-month-field,
 input[type="date"]::-webkit-datetime-edit-day-field,
 input[type="date"]::-webkit-datetime-edit-year-field {
-  color: #111827 !important;
-  -webkit-text-fill-color: #111827 !important;
+  color: #10273a !important;
+  -webkit-text-fill-color: #10273a !important;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
@@ -684,15 +695,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .react-datepicker {
     font-family: inherit;
-    border: 1px solid #e5e7eb;
+    border: 1px solid #bfd8e8;
     border-radius: 0.75rem;
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    background: white;
+    box-shadow: 0 10px 15px -3px rgb(16 39 58 / 0.12), 0 4px 6px -4px rgb(16 39 58 / 0.12);
+    background: #f2f9fd;
   }
 
   .react-datepicker__header {
-    background: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
+    background: #d8ecf8;
+    border-bottom: 1px solid #bfd8e8;
     border-top-left-radius: 0.75rem;
     border-top-right-radius: 0.75rem;
     padding-top: 0.75rem;
@@ -701,7 +712,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .react-datepicker__current-month {
     font-weight: 600;
     font-size: 0.95rem;
-    color: #111827;
+    color: #10273a;
     margin-bottom: 0.5rem;
   }
 
@@ -712,7 +723,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .react-datepicker__day-name {
-    color: #6b7280;
+    color: #4e6879;
     font-weight: 500;
     font-size: 0.75rem;
     width: 2.25rem;
@@ -734,19 +745,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     line-height: 2.25rem;
     margin: 0.125rem;
     border-radius: 0.5rem;
-    color: #374151;
+    color: #456175;
     font-size: 0.875rem;
     transition: all 0.15s;
   }
 
   .react-datepicker__day:hover {
-    background: #e0e7ff;
-    color: #4338ca;
+    background: #cde6f6;
+    color: #174d76;
   }
 
   .react-datepicker__day--selected,
   .react-datepicker__day--keyboard-selected {
-    background: #4f46e5 !important;
+    background: #2875b7 !important;
     color: white !important;
     font-weight: 600;
   }
@@ -758,22 +769,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .react-datepicker__day--today.react-datepicker__day--selected {
-    background: #4f46e5 !important;
+    background: #2875b7 !important;
     color: white !important;
   }
 
   .react-datepicker__day--outside-month {
-    color: #d1d5db;
+    color: #8fa6b5;
   }
 
   .react-datepicker__day--disabled {
-    color: #e5e7eb;
+    color: #bfd8e8;
     cursor: not-allowed;
   }
 
   .react-datepicker__day--disabled:hover {
     background: transparent;
-    color: #e5e7eb;
+    color: #bfd8e8;
   }
 
   .react-datepicker__navigation {
@@ -789,14 +800,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .react-datepicker__navigation-icon::before {
-    border-color: #6b7280;
+    border-color: #4e6879;
     border-width: 2px 2px 0 0;
     height: 8px;
     width: 8px;
   }
 
   .react-datepicker__navigation:hover *::before {
-    border-color: #111827;
+    border-color: #10273a;
   }
 
   /* Dropdowns de mês e ano */
@@ -808,10 +819,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .react-datepicker__month-select,
   .react-datepicker__year-select {
     padding: 0.25rem 0.5rem;
-    border: 1px solid #d1d5db;
+    border: 1px solid #a7c9de;
     border-radius: 0.375rem;
-    background: white;
-    color: #374151;
+    background: #f2f9fd;
+    color: #456175;
     font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
@@ -820,13 +831,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .react-datepicker__month-select:focus,
   .react-datepicker__year-select:focus {
-    border-color: #4f46e5;
-    ring: 2px solid #4f46e5;
+    border-color: #2875b7;
+    ring: 2px solid #2875b7;
   }
 
   .react-datepicker__month-select:hover,
   .react-datepicker__year-select:hover {
-    border-color: #9ca3af;
+    border-color: #7faecc;
   }
 
   /* Triangle/Arrow */

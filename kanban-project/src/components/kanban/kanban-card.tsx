@@ -91,7 +91,7 @@ export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDrag
   const barColor =
     opState === "BLOQUEADA" ? "#f59e0b"
     : pct >= 100 ? "#10b981"
-    : "#3b82f6"
+    : "#4f91c5"
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (!isDragging && onClick) {
@@ -141,7 +141,7 @@ export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDrag
             </h3>
             <span
               className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[10px] font-semibold"
-              style={{ backgroundColor: `${corDaFase ?? "#6b7280"}1f`, color: corDaFase ?? "var(--text-secondary)" }}
+              style={{ backgroundColor: `${corDaFase ?? "#4e6879"}1f`, color: corDaFase ?? "var(--text-secondary)" }}
               aria-hidden
             >
               {iniciais(nome)}

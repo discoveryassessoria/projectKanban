@@ -119,8 +119,8 @@ const CORES: Record<Severidade, { texto: string; fundo: string; borda: string }>
   critico: { texto: "#b42318", fundo: "#fef3f2", borda: "#fecdca" },
   alto: { texto: "#b54708", fundo: "#fffaeb", borda: "#fedf89" },
   medio: { texto: "#175cd3", fundo: "#eff8ff", borda: "#b2ddff" },
-  baixo: { texto: "#475467", fundo: "#f9fafb", borda: "#eaecf0" },
-  info: { texto: "#475467", fundo: "#f9fafb", borda: "#eaecf0" },
+  baixo: { texto: "#475467", fundo: "#eaf5fc", borda: "#eaecf0" },
+  info: { texto: "#475467", fundo: "#eaf5fc", borda: "#eaecf0" },
 }
 
 function IconeSeveridade({ s }: { s: Severidade }) {

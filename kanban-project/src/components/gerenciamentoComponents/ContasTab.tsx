@@ -33,7 +33,7 @@ type Conta = {
   _count?: { contasPagar: number; transacoes: number }
 }
 
-const CORES = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#EC4899', '#14B8A6', '#6366F1']
+const CORES = ['#EF4444', '#F59E0B', '#4f91c5', '#8B5CF6', '#10B981', '#EC4899', '#14B8A6', '#6366F1']
 const TIPOS_CONTA: [string, string][] = [
   ['checking', 'Conta corrente'],
   ['savings', 'Poupança'],
@@ -235,7 +235,7 @@ export default function ContasTab() {
                 <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.cor || '#64748b' }} />
+                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.cor || '#4e6879' }} />
                       <div>
                         <div className="font-medium text-white">{c.nome}</div>
                         <div className="text-[11px] text-[var(--text-muted)]">

@@ -112,11 +112,11 @@ const ownerName = (key: string | null): string => {
 }
 
 const ownerColor = (key: string | null): string => {
-  if (!key) return "#64748b"
+  if (!key) return "#4e6879"
   if (key.includes("daniela")) return "#ec4899"
-  if (key.includes("marco")) return "#3b82f6"
+  if (key.includes("marco")) return "#4f91c5"
   if (key.includes("equipe")) return "#10b981"
-  return "#64748b"
+  return "#4e6879"
 }
 
 const fmtDateTime = (iso: string | null): string => {

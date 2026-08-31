@@ -150,7 +150,7 @@ function FormularioConfig({
                 <div className="flex items-center gap-2">
                   <input
                     type="color"
-                    value={/^#[0-9a-fA-F]{6}$/.test(valores[c.chave] ?? "") ? valores[c.chave] : (c.padrao ?? "#38bdf8")}
+                    value={/^#[0-9a-fA-F]{6}$/.test(valores[c.chave] ?? "") ? valores[c.chave] : (c.padrao ?? "#4f91c5")}
                     onChange={(e) => setValores({ ...valores, [c.chave]: e.target.value })}
                     className="h-9 w-12 flex-none cursor-pointer rounded border border-[var(--border-default)] bg-transparent"
                   />
@@ -192,7 +192,7 @@ export function IdentidadeVisualTab() {
           <div className="flex flex-wrap items-center gap-4">
             <div
               className="flex h-16 min-w-[220px] items-center gap-3 rounded-xl px-4"
-              style={{ backgroundColor: valores["identidade.corDestaque"] || "#38bdf8", color: valores["identidade.corTexto"] || "#0b1220" }}
+              style={{ backgroundColor: valores["identidade.corDestaque"] || "#4f91c5", color: valores["identidade.corTexto"] || "#0b1220" }}
             >
               {valores["identidade.logoUrl"] ? (
                 <img src={valores["identidade.logoUrl"]} alt="" className="h-9 w-9 rounded object-contain" />

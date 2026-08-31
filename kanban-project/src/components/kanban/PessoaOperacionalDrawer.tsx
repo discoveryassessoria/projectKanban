@@ -352,7 +352,7 @@ function ConteudoDrawer({
                           ? "#10b981"
                           : progresso >= 50
                           ? "#f59e0b"
-                          : "#3b82f6",
+                          : "#4f91c5",
                     }}
                   />
                 </div>
@@ -603,7 +603,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
               style={{
                 width: `${progress}%`,
                 background:
-                  progress === 100 ? "#10b981" : progress >= 50 ? "#f59e0b" : "#3b82f6",
+                  progress === 100 ? "#10b981" : progress >= 50 ? "#f59e0b" : "#4f91c5",
               }}
             />
           </div>

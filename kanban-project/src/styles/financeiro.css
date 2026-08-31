@@ -22,26 +22,27 @@
   --fin-green-50: #f0fdf4;
   --fin-red: #ef4444;
   --fin-red-50: #fef2f2;
-  --fin-blue: #3b82f6;
-  --fin-blue-50: #eff6ff;
+  --fin-blue: #4f91c5;
+  --fin-blue-50: #e4f1fb;
   --fin-yellow: #f59e0b;
   --fin-yellow-50: #fffbeb;
   --fin-pink: #ec4899;
   --fin-cyan: #06b6d4;
 
   /* Neutros */
-  --fin-ink: #0f172a;
-  --fin-ink-2: #334155;
-  --fin-ink-3: #64748b;
-  --fin-line: #e2e8f0;
-  --fin-line-2: #f1f5f9;
-  --fin-bg: #ffffff;
-  --fin-bg-soft: #f8fafc;
+  --fin-ink: var(--text-primary, #10273a);
+  --fin-ink-2: var(--text-secondary, #456175);
+  --fin-ink-3: var(--text-muted, #4e6879);
+  --fin-line: var(--border-subtle, #bfd8e8);
+  --fin-line-2: var(--surface-secondary, #d8ecf8);
+  --fin-bg: var(--surface-primary, #eaf5fc);
+  --fin-bg-soft: var(--surface-secondary, #d8ecf8);
+  --fin-bg-elevated: var(--surface-elevated, #f2f9fd);
 
   /* Sombras */
-  --fin-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --fin-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
-  --fin-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --fin-shadow-sm: var(--elev-1, 0 1px 2px rgba(16, 39, 58, 0.06));
+  --fin-shadow: var(--elev-2, 0 1px 2px rgba(16, 39, 58, 0.05), 0 8px 20px -10px rgba(16, 39, 58, 0.12));
+  --fin-shadow-lg: var(--elev-3, 0 1px 3px rgba(16, 39, 58, 0.06), 0 16px 36px -18px rgba(16, 39, 58, 0.16));
 
   /* Raio */
   --fin-radius: 12px;

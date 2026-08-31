@@ -249,7 +249,7 @@ export function SaudeSistemaTab() {
         <Kpi valor={e?.criticos ?? "—"} label="Críticos" cor={(e?.criticos ?? 0) > 0 ? "#f87171" : "#4ade80"} destaque={(e?.criticos ?? 0) > 0} />
         <Kpi valor={e?.erros ?? "—"} label="Erros" cor={(e?.erros ?? 0) > 0 ? "#fb923c" : "#4ade80"} />
         <Kpi valor={e?.alertas ?? "—"} label="Alertas" cor={(e?.alertas ?? 0) > 0 ? "#fbbf24" : "#4ade80"} />
-        <Kpi valor={e?.informativos ?? "—"} label="Informativos" cor="#0369a1" />
+        <Kpi valor={e?.informativos ?? "—"} label="Informativos" cor="#174d76" />
         <Kpi valor={`${e?.coberturaPercentual ?? 0}%`} label="Cobertura" cor={(e?.coberturaPercentual ?? 0) === 100 ? "#4ade80" : "#fbbf24"} />
         <Kpi valor={e?.naoExecutadas ?? "—"} label="Não executadas" cor={(e?.naoExecutadas ?? 0) > 0 ? "#c4b5fd" : "#4ade80"} />
         <Kpi valor={e?.falhasTecnicas ?? "—"} label="Falha técnica" cor={(e?.falhasTecnicas ?? 0) > 0 ? "#f87171" : "#4ade80"} />

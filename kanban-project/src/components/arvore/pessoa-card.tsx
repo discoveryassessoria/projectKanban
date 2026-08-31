@@ -26,8 +26,8 @@ const colors = {
   female: '#BF3D79',
   femaleBg: '#FCE8F2',
   femaleBorder: '#E8B8D0',
-  neutral: '#6B7280',
-  neutralBg: '#F3F4F6',
+  neutral: '#4e6879',
+  neutralBg: '#d8ecf8',
   green: '#87B940',
   greenDark: '#5B8A20',
 }
@@ -191,7 +191,7 @@ function DocumentoIndicador({ doc }: { doc: DocumentoArvore }) {
     'EM_BUSCA':    { color: '#EF4444', label: 'Em busca' },
     'SOLICITAR':   { color: '#F59E0B', label: 'Solicitar' },
     'SOLICITADO':  { color: '#22C55E', label: 'Solicitado' },
-    'RECEBIDO':    { color: '#3B82F6', label: 'Recebido' },
+    'RECEBIDO':    { color: '#4f91c5', label: 'Recebido' },
   }
 
   const config = statusConfig[doc.status]

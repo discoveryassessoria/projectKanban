@@ -323,14 +323,14 @@ export function CustosPorTipoCards({
 
         /* Variantes de cor */
         .ctc-card--blue {
-          background: #eff6ff;
+          background: #e4f1fb;
           border-color: var(--text-secondary);
         }
         .ctc-card--blue .ctc-card__valor {
           color: #1d4ed8;
         }
         .ctc-card--blue .ctc-card__label {
-          color: #1e40af;
+          color: #174d76;
         }
 
         .ctc-card--purple {

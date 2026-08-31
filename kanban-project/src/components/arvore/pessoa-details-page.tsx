@@ -29,9 +29,9 @@ interface PessoaDetailsPageProps {
 
 // Cores por gênero
 const colors = {
-  male: '#2563EB',
+  male: '#2875b7',
   female: '#DB2777',
-  neutral: '#6B7280',
+  neutral: '#4e6879',
 }
 
 function getGenderColor(sexo: string | null | undefined): string {

@@ -35,7 +35,7 @@ export const CHAVES: ChaveSpec[] = [
   // ── Identidade Visual ───────────────────────────────────────────────────
   { chave: 'identidade.marca', grupo: 'identidade', label: 'Nome exibido da marca', tipo: 'text' },
   { chave: 'identidade.logoUrl', grupo: 'identidade', label: 'URL do logotipo', tipo: 'text', ajuda: 'Endereço público da imagem.' },
-  { chave: 'identidade.corDestaque', grupo: 'identidade', label: 'Cor de destaque', tipo: 'cor', padrao: '#38bdf8' },
+  { chave: 'identidade.corDestaque', grupo: 'identidade', label: 'Cor de destaque', tipo: 'cor', padrao: '#4f91c5' },
   { chave: 'identidade.corTexto', grupo: 'identidade', label: 'Cor de texto sobre o destaque', tipo: 'cor', padrao: '#0b1220' },
   { chave: 'identidade.assinaturaEmail', grupo: 'identidade', label: 'Assinatura padrão de e-mail', tipo: 'textarea' },
 ]

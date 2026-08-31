@@ -115,7 +115,7 @@ export function gerarExtratoReceitasPDF(d: DadosRelatorio) {
       if (data.column.index === 5 && data.section === "body") {
         const st = data.cell.text[0]
         if (st === "PAGO") { data.cell.styles.textColor = [34, 197, 94]; data.cell.styles.fontStyle = "bold" }
-        else if (st === "PARCIAL") { data.cell.styles.textColor = [59, 130, 246]; data.cell.styles.fontStyle = "bold" }
+        else if (st === "PARCIAL") { data.cell.styles.textColor = [40, 117, 183]; data.cell.styles.fontStyle = "bold" }
         else if (st === "VENCIDO") { data.cell.styles.textColor = [239, 68, 68]; data.cell.styles.fontStyle = "bold" }
       }
     }
@@ -281,8 +281,8 @@ export function gerarDREPDF(d: DadosRelatorio) {
       [{ content: "(=) TOTAL CUSTOS", styles: { fontStyle: "bold" } }, { content: "-" + fmtBRL(d.resumo.custo), styles: { fontStyle: "bold", halign: "right" } }],
       [""],
       [
-        { content: "(=) LUCRO BRUTO", styles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold" } },
-        { content: fmtBRL(d.resumo.lucro), styles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: "bold", halign: "right" } }
+        { content: "(=) LUCRO BRUTO", styles: { fillColor: [40, 117, 183], textColor: 255, fontStyle: "bold" } },
+        { content: fmtBRL(d.resumo.lucro), styles: { fillColor: [40, 117, 183], textColor: 255, fontStyle: "bold", halign: "right" } }
       ],
       [
         { content: "MARGEM BRUTA", styles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: "bold" } },

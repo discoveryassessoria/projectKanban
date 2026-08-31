@@ -72,7 +72,7 @@ const PAIS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   PAGO: '#22C55E',
   PARCIAL: '#F59E0B',
-  PENDENTE: '#3B82F6',
+  PENDENTE: '#4f91c5',
   VENCIDO: '#EF4444',
 }
 
@@ -84,7 +84,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const PAIS_COLORS: Record<string, string> = {
-  PORTUGAL: '#3B82F6',
+  PORTUGAL: '#4f91c5',
   ESPANHA: '#F59E0B',
   ALEMANHA: '#EF4444',
   ITALIA: '#22C55E',
@@ -92,7 +92,7 @@ const PAIS_COLORS: Record<string, string> = {
 
 const MOEDA_COLORS: Record<string, string> = {
   BRL: '#22C55E',
-  EUR: '#3B82F6',
+  EUR: '#4f91c5',
   USD: '#F59E0B',
 }
 
@@ -174,7 +174,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
       .map(([status, valor]) => ({
         name: STATUS_LABELS[status] || status,
         value: valor,
-        fill: STATUS_COLORS[status] || '#6B7280',
+        fill: STATUS_COLORS[status] || '#4e6879',
       }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value)
@@ -191,7 +191,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
       .map(([pais, valor]) => ({
         name: PAIS_LABELS[pais] || pais,
         value: valor,
-        fill: PAIS_COLORS[pais] || '#6B7280',
+        fill: PAIS_COLORS[pais] || '#4e6879',
       }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value)
@@ -254,7 +254,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
       .map(([status, qtd]) => ({
         name: STATUS_LABELS[status] || status,
         value: qtd,
-        fill: STATUS_COLORS[status] || '#6B7280',
+        fill: STATUS_COLORS[status] || '#4e6879',
       }))
       .sort((a, b) => b.value - a.value)
   }, [faturas])
@@ -410,7 +410,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
                   wrapperStyle={{ paddingBottom: 10 }}
                   formatter={(value: string) => <span className="text-white/70 text-xs ml-1">{value}</span>}
                 />
-                <Bar dataKey="Emitido" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Emitido" fill="#4f91c5" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="Recebido" fill="#22C55E" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

@@ -142,7 +142,7 @@ export function gerarRelatorioPDF(atividades: Atividade[], filtrosAtivos?: Repor
   const startX = (pageWidth - (4 * boxWidth + 3 * gap)) / 2
 
   const resumoBoxes = [
-    { label: 'Total', valor: dados.total, cor: [59, 130, 246] },
+    { label: 'Total', valor: dados.total, cor: [40, 117, 183] },
     { label: 'Atrasadas', valor: dados.atrasadas, cor: [239, 68, 68] },
     { label: 'Pendentes', valor: dados.pendentes, cor: [245, 158, 11] },
     { label: 'Concluídas', valor: dados.concluidas, cor: [34, 197, 94] },

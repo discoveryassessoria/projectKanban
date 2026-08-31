@@ -398,7 +398,7 @@ function Donut({ kpis }: { kpis: BibKpis }) {
   const total = kpis.obrig || 1
   const segs: Array<[string, number, string]> = [
     ["Prontos para protocolo", kpis.pronto, "#16a34a"],
-    ["Com tradução", kpis.trad, "#2563eb"],
+    ["Com tradução", kpis.trad, "#2875b7"],
     ["Com apostila", kpis.apost, "#7c3aed"],
     ["Pendentes", kpis.pend, "#f59e0b"],
   ]

@@ -132,8 +132,11 @@ export function BitrixSidebar() {
   }
 
   const getIconClasses = (isActive: boolean) => {
+    // Regra global do item ativo (§11): superfície azul sólida, tinta e glifo
+    // BRANCOS de verdade — `text-white` é o pigmento do vidro (tinta escura),
+    // não o branco real, que mora em --text-inverse.
     if (isActive) {
-      return "h-5 w-5 flex-shrink-0 fill-white text-white"
+      return "h-5 w-5 flex-shrink-0 fill-[var(--text-inverse)] text-[var(--text-inverse)]"
     }
     return "h-5 w-5 flex-shrink-0 text-white"
   }
@@ -141,7 +144,7 @@ export function BitrixSidebar() {
   // Função para renderizar o ícone corretamente
   const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof BoardIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
   // Todos os ícones são customizados agora, passa a prop filled
-    return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
+    return <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? "text-[var(--text-inverse)]" : "text-white"} ${iconOffset}`} filled={isActive} />
   }
 
   return (
@@ -150,7 +153,7 @@ export function BitrixSidebar() {
       onMouseLeave={handleMouseLeave}
       className={`
         ${isExpanded ? "w-64" : "w-16"} 
-        bg-black/40 backdrop-blur-md text-white 
+        bg-[var(--surface-sidebar)] text-white 
         border-r border-[var(--border-default)] shadow-[var(--elev-3)]
         transition-[width] duration-300 ease-in-out
         flex flex-col h-screen fixed left-0 top-0 z-50
@@ -206,7 +209,7 @@ export function BitrixSidebar() {
                   className={`
                     flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
                     hover:bg-[var(--surface-hover)] relative
-                    ${isActive ? "bg-[var(--surface-secondary)] text-white" : "text-white/90"}
+                    ${isActive ? "bg-[var(--action-primary)] text-[var(--text-inverse)]" : "text-white/90"}
                     ${!isExpanded ? "justify-center" : ""}
                   `}
                   title={!isExpanded ? item.title : undefined}
@@ -243,7 +246,7 @@ export function BitrixSidebar() {
                     className={`
                       flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
                       hover:bg-[var(--surface-hover)]
-                      ${isActive ? "bg-[var(--surface-secondary)] text-white" : "text-white/90"}
+                      ${isActive ? "bg-[var(--action-primary)] text-[var(--text-inverse)]" : "text-white/90"}
                       ${!isExpanded ? "justify-center" : ""}
                     `}
                     title={!isExpanded ? item.title : undefined}

@@ -2,8 +2,8 @@
 //
 // Coluna do kanban = FASE do Workflow Macro (motor).
 // Colunas são definidas no GERENCIAMENTO → sem editar/excluir/adicionar aqui.
-// O "+" de criar processo saiu da coluna: processo novo nasce na 1ª fase,
-// pelo botão "+ Novo processo" do board.
+// O "+" de criar processo NÃO existe na coluna — nem no topo, nem no rodapé.
+// Processo novo nasce na 1ª fase, e só pelo botão "+ Novo processo" do board.
 
 "use client"
 
@@ -11,7 +11,7 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
 import { useMemo } from "react"
 import { KanbanCard } from "./kanban-card"
-import { Inbox, Plus } from "lucide-react"
+import { Inbox } from "lucide-react"
 import type { Processo } from "@/src/types/kanban"
 
 interface KanbanColumnProps {
@@ -25,10 +25,6 @@ interface KanbanColumnProps {
   podeArrastar?: boolean
   /** Ícone da fase, vindo do cadastro. Sem ícone a coluna não inventa um. */
   Icone?: React.ComponentType<{ className?: string }>
-  /** Abre a criação de processo. Ausente = o rodapé não aparece. */
-  onAdicionar?: () => void
-  /** Nome da 1ª fase do fluxo — o motor só cria processo lá. */
-  faseInicial?: string
   /** Rótulo da nacionalidade, repassado a cada card. */
   nacionalidade?: string
 }
@@ -42,8 +38,6 @@ export function KanbanColumn({
   podeArrastar = true,
   onProcessoClick,
   Icone,
-  onAdicionar,
-  faseInicial,
   nacionalidade,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -119,25 +113,6 @@ export function KanbanColumn({
         )}
       </div>
 
-      {onAdicionar && (
-        <button
-          type="button"
-          onClick={onAdicionar}
-          // O motor cria processo SEMPRE na primeira fase — CriarProcessoInput
-          // não aceita fase. O botão aparece em toda coluna, como no mockup, mas
-          // não finge criar aqui: diz onde o processo vai nascer.
-          title={
-            faseInicial && faseInicial !== title
-              ? `Novo processo — começa em "${faseInicial}"`
-              : "Novo processo"
-          }
-          className="flex shrink-0 items-center justify-center gap-1.5 border-t border-[var(--border-subtle)] px-3 py-2.5 text-[12px] font-medium transition-colors hover:bg-[var(--surface-hover)]"
-          style={{ color: headerColor }}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Adicionar processo
-        </button>
-      )}
     </div>
   )
 }

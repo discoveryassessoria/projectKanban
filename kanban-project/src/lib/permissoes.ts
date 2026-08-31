@@ -371,7 +371,7 @@ export const PERFIS_PADRAO = [
   {
     nome: 'Assistente',
     descricao: 'Operações do dia a dia, sem excluir ou gerenciar financeiro',
-    cor: '#3B82F6',
+    cor: '#4f91c5',
     sistema: true,
     permissoes: {
       ...TODAS_PERMISSOES,

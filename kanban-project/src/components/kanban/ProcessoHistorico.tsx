@@ -31,14 +31,14 @@ interface ProcessoHistoricoProps { processoId: number; onUpdate?: () => void }
 // ── Tipos do diário (chips + ícone/cor) ─────────────────────────────────────
 type TipoKey = "workflow" | "documentos" | "tarefas" | "pessoas" | "comunicacao" | "eventos" | "alteracoes" | "arquivos"
 const TIPOS: { key: TipoKey; label: string; icon: any; cor: string }[] = [
-  { key: "workflow", label: "Workflow", icon: GitBranch, cor: "#0369a1" },
+  { key: "workflow", label: "Workflow", icon: GitBranch, cor: "#174d76" },
   { key: "documentos", label: "Documentos", icon: FileText, cor: "#15803d" },
-  { key: "tarefas", label: "Tarefas", icon: CheckSquare, cor: "#334155" },
+  { key: "tarefas", label: "Tarefas", icon: CheckSquare, cor: "#10273a" },
   { key: "pessoas", label: "Pessoas", icon: Users, cor: "#2dd4bf" },
   { key: "comunicacao", label: "Comunicação", icon: Mail, cor: "#fb923c" },
   { key: "eventos", label: "Eventos", icon: CalendarDays, cor: "#b45309" },
   { key: "alteracoes", label: "Alterações", icon: Edit3, cor: "var(--accent-text)" },
-  { key: "arquivos", label: "Arquivos", icon: Paperclip, cor: "#94a3b8" },
+  { key: "arquivos", label: "Arquivos", icon: Paperclip, cor: "#7faecc" },
 ]
 const TIPO_POR_KEY = Object.fromEntries(TIPOS.map((t) => [t.key, t]))
 
@@ -224,10 +224,10 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
             <div className="mb-3 text-sm font-semibold text-white">Filtros rápidos</div>
             <div className="space-y-1">
               <FiltroRapido icon={FileText} cor="#15803d" label="Apenas documentos" n={contagem.documentos ?? 0} onClick={() => setTipo("documentos")} />
-              <FiltroRapido icon={CheckSquare} cor="#334155" label="Apenas tarefas" n={contagem.tarefas ?? 0} onClick={() => setTipo("tarefas")} />
+              <FiltroRapido icon={CheckSquare} cor="#10273a" label="Apenas tarefas" n={contagem.tarefas ?? 0} onClick={() => setTipo("tarefas")} />
               <FiltroRapido icon={Edit3} cor="var(--accent-text)" label="Só alterações" n={contagem.alteracoes ?? 0} onClick={() => setTipo("alteracoes")} />
               <FiltroRapido icon={Mail} cor="#fb923c" label="Apenas comunicação" n={contagem.comunicacao ?? 0} onClick={() => setTipo("comunicacao")} />
-              <FiltroRapido icon={GitBranch} cor="#0369a1" label="Apenas workflow" n={contagem.workflow ?? 0} onClick={() => setTipo("workflow")} />
+              <FiltroRapido icon={GitBranch} cor="#174d76" label="Apenas workflow" n={contagem.workflow ?? 0} onClick={() => setTipo("workflow")} />
             </div>
           </div>
 

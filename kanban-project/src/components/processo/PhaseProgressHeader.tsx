@@ -110,8 +110,8 @@ export function PhaseProgressHeader({
     : pct >= 100
     ? "#10b981"
     : isDark
-    ? "#3b82f6"
-    : "#1e293b"
+    ? "#4f91c5"
+    : "#10273a"
 
   return (
     <div className="flex flex-col gap-1 min-w-[220px] max-w-[400px]">

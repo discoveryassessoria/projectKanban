@@ -50,15 +50,19 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
  * resolver um problema de tela seria dado de negócio nascido de decoração. A
  * sequência é determinística pela ORDEM do workflow, então a mesma fase recebe
  * sempre a mesma cor, e a leitura da esquerda para a direita fica estável.
- * Tons amostrados dos mockups aprovados.
+ *
+ * A rampa é MONOCROMÁTICA em azul: o degrau significa POSIÇÃO NO FLUXO, não
+ * categoria. Seis matizes diferentes (roxo/verde/âmbar/vermelho) faziam a fase
+ * parecer um estado semântico que ela não é — e vermelho numa coluna competia
+ * com vermelho de atraso, que significa de verdade.
  */
 const COR_DA_COLUNA = [
-  "#6d51a8", // roxo
-  "#2680df", // azul
-  "#319639", // verde
-  "#c2691a", // âmbar
-  "#d20001", // vermelho
-  "#a17938", // dourado
+  "#174d76", // azul profundo
+  "#1f6aaa",
+  "#2875b7", // azul active
+  "#3d84bd",
+  "#4f91c5", // azul médio
+  "#6ba6d1",
 ] as const
 const corDaColuna = (i: number) => COR_DA_COLUNA[i % COR_DA_COLUNA.length]
 
@@ -408,8 +412,6 @@ export function KanbanBoard({
                       processos={processosByFase.get(fase.phaseKey) || []}
                       headerColor={corDaColuna(index)}
                       Icone={iconeDaColuna(index)}
-                      onAdicionar={podeArrastar ? abrirCriar : undefined}
-                      faseInicial={fases[0]?.label}
                       nacionalidade={tipo?.name ?? undefined}
                       isLast={index === fases.length - 1}
                       onProcessoClick={handleProcessoClick}

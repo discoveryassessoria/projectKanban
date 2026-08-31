@@ -211,7 +211,7 @@ export default function UsersTab() {
   const getPerfilBadge = (u: Usuario) => {
     if (u.tipo === "admin" || !u.perfilNome) return null
     const perfil = perfis.find(p => p.nome === u.perfilNome)
-    return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-2" style={{ backgroundColor: `${perfil?.cor || "#6B7280"}20`, color: perfil?.cor || "#6B7280" }}>{u.perfilNome}</span>
+    return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-2" style={{ backgroundColor: `${perfil?.cor || "#4e6879"}20`, color: perfil?.cor || "#4e6879" }}>{u.perfilNome}</span>
   }
   const totalOverrides = Object.keys(permissoesCustom).length
 

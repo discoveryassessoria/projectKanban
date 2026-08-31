@@ -185,8 +185,8 @@ export function WorkflowMacroTrilha({
 
           const barColor =
             st === "concluida" ? "#16a34a"
-            : st === "atual" ? "#2563eb"
-            : st === "pulada" ? "#cbd5e1"
+            : st === "atual" ? "#2875b7"
+            : st === "pulada" ? "#a7c9de"
             : "#d1d5db"
           const pctColor =
             st === "concluida" ? "text-green-800"
@@ -224,7 +224,7 @@ export function WorkflowMacroTrilha({
                   {i < PROCESS_PHASES.length - 1 && (
                     <div
                       className="absolute left-1/2 w-full h-0.5 top-1/2 -translate-y-1/2 z-20"
-                      style={{ background: nextDone ? "#16a34a" : "#e5e7eb" }}
+                      style={{ background: nextDone ? "#16a34a" : "#bfd8e8" }}
                     />
                   )}
                 </div>

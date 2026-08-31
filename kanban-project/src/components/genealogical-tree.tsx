@@ -652,8 +652,8 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
             source: pessoa.paiId.toString(),
             target: pessoa.id.toString(),
             type: "smoothstep",
-            style: { stroke: "#1e40af", strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: "#1e40af" },
+            style: { stroke: "#174d76", strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: "#174d76" },
           })
         }
         if (pessoa.maeId && nodeMap.has(pessoa.maeId)) {
@@ -946,7 +946,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
               const relationshipType = node.data?.relationshipType
               switch (relationshipType) {
                 case "pai":
-                  return "#3b82f6"
+                  return "#4f91c5"
                 case "mae":
                   return "#ec4899"
                 case "filho":
@@ -956,12 +956,12 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
                 case "irmao":
                   return "#f59e0b"
                 default:
-                  return "#6b7280"
+                  return "#4e6879"
               }
             }}
             maskColor="rgba(0, 0, 0, 0.1)"
           />
-          <Background variant={BackgroundVariant.Dots} gap={25} size={1} color="#e2e8f0" />
+          <Background variant={BackgroundVariant.Dots} gap={25} size={1} color="#bfd8e8" />
         </ReactFlow>
       </ReactFlowProvider>
 

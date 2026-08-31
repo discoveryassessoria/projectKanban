@@ -431,7 +431,7 @@ function ResumoDoDia({ data }: { data: HomeData }) {
 const CARTOES_TOPO = [
   { chave: "criticos",   rotulo: "Itens críticos",       sub: "Exigem atenção imediata", tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertCircle },
   { chave: "noPrazo",    rotulo: "Processos no prazo",   sub: "Dentro do SLA contratado", tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock },
-  { chave: "abertas",    rotulo: "Ações abertas",        sub: "Pendências operacionais",  tile: "var(--pessoa-tile)",  ink: "var(--pessoa)",  Icone: ListChecks },
+  { chave: "abertas",    rotulo: "Ações abertas",        sub: "Pendências operacionais",  tile: "var(--info-tile)",    ink: "var(--info)",    Icone: ListChecks },
   { chave: "concluidas", rotulo: "Ações concluídas hoje", sub: "Parabéns, ótimo trabalho!", tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2 },
 ] as const
 

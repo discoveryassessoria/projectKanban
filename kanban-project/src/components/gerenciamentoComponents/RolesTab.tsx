@@ -28,7 +28,7 @@ const TOTAL_PERMISSOES = TODAS_CHAVES.length
 const ehAdministrador = (nome: string) => (nome || '').trim().toLowerCase() === 'administrador'
 
 const CORES = [
-  '#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6',
+  '#EF4444', '#F59E0B', '#4f91c5', '#8B5CF6',
   '#10B981', '#EC4899', '#14B8A6', '#6366F1',
 ]
 
@@ -258,7 +258,7 @@ export default function RolesTab() {
                 <div className="mb-2 flex items-start gap-3">
                   <span
                     className="mt-1 h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: p.cor || '#64748b' }}
+                    style={{ backgroundColor: p.cor || '#4e6879' }}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

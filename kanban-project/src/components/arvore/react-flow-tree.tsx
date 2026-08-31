@@ -31,10 +31,10 @@ const colors = {
   maleBg: '#E8F4FC',
   female: '#BF3D79',
   femaleBg: '#FCE8F2',
-  neutral: '#6B7280',
-  neutralBg: '#F3F4F6',
+  neutral: '#4e6879',
+  neutralBg: '#d8ecf8',
   green: '#87B940',
-  line: '#9CA3AF',
+  line: '#8fa6b5',
   marriage: '#9333EA' // Roxo para linha de casamento
 }
 
@@ -65,7 +65,7 @@ function DocumentoIndicador({ tipo, label, status, mode }: DocumentoIndicadorPro
     'em_busca': '#EF4444',   // Vermelho
     'solicitar': '#F59E0B',  // Amarelo
     'solicitado': '#22C55E', // Verde
-    'recebido': '#3B82F6',   // Azul
+    'recebido': '#4f91c5',   // Azul
   }
   const labelMap: Record<string, string> = {
     'em_busca': 'Em busca',

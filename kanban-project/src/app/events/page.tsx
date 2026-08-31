@@ -78,7 +78,7 @@ function statusEventoBadge(status?: string): { label: string; tone: Tone } {
 }
 
 const TIPOS_EVENTO = [
-  { value: "CONSULADO", label: "Consulado", icon: Building2, cor: "#3b82f6" },
+  { value: "CONSULADO", label: "Consulado", icon: Building2, cor: "#4f91c5" },
   { value: "CARTORIO", label: "Cartório", icon: FileText, cor: "#8b5cf6" },
   { value: "REUNIAO", label: "Reunião", icon: Users, cor: "#10b981" },
   { value: "PRAZO", label: "Prazo", icon: AlertCircle, cor: "#ef4444" },

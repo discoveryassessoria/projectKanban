@@ -74,24 +74,30 @@ function run() {
   console.log("\nIdentidade visual (idêntica ao Financeiro):")
   const fundoFinanceiro = /bg-\[url\('\/espanha\.jpg'\)\]/
   ok(fundoFinanceiro.test(financeiro) && fundoFinanceiro.test(shell), "mesma imagem europeia de fundo")
-  // Overlay do ambiente — MUDOU DE INTENTO em 02/08/2026 (aprovado pelo usuário).
-  // Antes: véu chapado igual ao do Financeiro (bg-black/60 sobre a foto borrada).
-  // Isso baixava o contraste da tela inteira sem dar profundidade a lugar nenhum.
-  // Agora: a foto é HORIZONTE — véu em GRADIENTE, quase opaco na faixa onde vive
-  // o conteúdo e abrindo só na base. A guarda deixa de exigir igualdade com o
-  // Financeiro e passa a exigir as duas propriedades que sustentam a decisão:
-  // (a) o véu é gradiente vertical, não cor chapada; (b) começa praticamente
-  // opaco no topo (>= .95), que é o que garante a legibilidade do texto.
-  const veu = (shell.match(/linear-gradient\(180deg,[^)]*rgba\(8,9,11,\.(\d+)\)/) || [])[1] || null
-  ok(!!veu, "ambiente com véu em gradiente (foto vira horizonte, não textura sob o texto)")
-  ok(!!veu && Number(`0.${veu}`) >= 0.95, `véu opaco onde há conteúdo (topo = 0.${veu ?? "—"})`)
+  // Overlay do ambiente — INTENTO ATUAL (aprovado em 28/08/2026, identidade AZUL).
+  // 1ª rodada: véu chapado (bg-black/60) igual ao Financeiro.
+  // 2ª rodada (02/08): véu em GRADIENTE, escrito à mão em cada página.
+  // Agora: o gradiente é TOKEN — `--landscape-veil` em globals.css, uma fonte só.
+  // A guarda deixa de ler a string na página e passa a exigir (a) que a página
+  // consuma o token e (b) que o token seja gradiente vertical quase opaco no
+  // topo, que é a faixa onde vive o conteúdo (§9/§10 da spec azul).
+  const globais = ler("src/app/globals.css")
+  ok(/var\(--landscape-veil\)/.test(shell), "ambiente consome o véu canônico (--landscape-veil)")
+  const veuToken = (globais.match(/--landscape-veil:\s*linear-gradient\(\s*180deg,\s*rgba\([^)]*,\s*(0?\.\d+)\)/) || [])[1] || null
+  ok(!!veuToken, "véu é gradiente vertical (foto vira horizonte, não textura sob o texto)")
+  ok(!!veuToken && Number(veuToken) >= 0.95, `véu opaco onde há conteúdo (topo = ${veuToken ?? "—"})`)
   ok(!/blur-\[\d+px\]/.test(shell), "sem borrão uniforme na foto de ambiente")
   ok(/backdrop-blur/.test(primitivas), "glassmorphism nos cards")
   ok(shell.includes("<HeaderBar"), "mesma barra superior (HeaderBar)")
-  const cardFinanceiro = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
-  ok(financeiroDash.includes(cardFinanceiro) && primitivas.includes(cardFinanceiro), "mesmo token de card do Financeiro")
-  ok(/#D2A948/.test(primitivas) && /#D2A948/.test(financeiroDash), "mesmo acento dourado")
-  // bg-white/[0.05] é o vidro do Financeiro; o que não pode é superfície sólida clara.
+  // O card deixou de ser uma string de vidro escuro e virou token do DS: a
+  // guarda continua exigindo que Home e Financeiro usem O MESMO card.
+  const cardCompartilhado = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
+  ok(financeiroDash.includes(cardCompartilhado) && primitivas.includes(cardCompartilhado), "mesmo token de card do Financeiro")
+  // O acento também é token. Era dourado (#D2A948, depois #a17938); na identidade
+  // azul é o azul de ação. A guarda trava o TOKEN COMPARTILHADO, não o hex, e
+  // confere que o hex do token é azul — dourado aqui é regressão.
+  ok(/var\(--accent-primary\)/.test(primitivas) && /var\(--accent-primary\)/.test(financeiroDash), "mesmo acento da marca (token)")
+  ok(/--accent-primary:\s*#2875b7/i.test(globais), "acento da marca é o azul de ação (#2875b7)")
   ok(!/bg-slate-50|bg-white(?!\/)/.test(uiHome), "sem superfície clara (a Home é parte do mesmo sistema)")
 
   // ---- 3. Blocos obrigatórios ----
