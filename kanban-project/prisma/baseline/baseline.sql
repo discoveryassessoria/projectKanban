@@ -666,7 +666,6 @@ CREATE TABLE "Protocolo" (
     "solicitacaoId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
-    "requerenteId" INTEGER,
 
     CONSTRAINT "Protocolo_pkey" PRIMARY KEY ("id")
 );
@@ -6545,9 +6544,6 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_solicitacaoId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_tipoProtocoloId_fkey" FOREIGN KEY ("tipoProtocoloId") REFERENCES "TipoProtocoloCadastro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloRequerente" ADD CONSTRAINT "ProtocoloRequerente_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;

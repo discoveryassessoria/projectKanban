@@ -275,7 +275,7 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // produção, então a coluna nasce NOT NULL sem backfill nem default mentiroso.
 //
 //   anterior : 7c67e2f5035c1efade5380b3cadeed1a4a43bdb02934c5924cb6ec15c72a9b0c
-const CHECKSUM_LEDGER = '892e1749344197972ce8acde29d041e9304439e4826c7291a479638b4518bbd4'
+const CHECKSUM_LEDGER = '90bebd1187c816afb96623cc2f64c9dca0817d9736dbfec9ef3ba86644b05215'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova

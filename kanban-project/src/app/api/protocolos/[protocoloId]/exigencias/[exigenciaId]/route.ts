@@ -67,7 +67,7 @@ export async function PUT(request: Request, { params }: Ctx) {
         })
       }
       return atualizada
-    })
+    }, { timeout: 20000, maxWait: 10000 })
 
     return NextResponse.json({ exigencia })
   } catch (error) {

@@ -86,7 +86,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
       })
 
       return criada
-    })
+    }, { timeout: 20000, maxWait: 10000 })
 
     return NextResponse.json({ exigencia }, { status: 201 })
   } catch (error) {

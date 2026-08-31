@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     const tipo = tipoProtocoloId
       ? await prisma.tipoProtocoloCadastro.findUnique({
           where: { id: Number(tipoProtocoloId) },
-          select: { id: true, code: true, ativo: true },
+          select: { id: true, code: true, nome: true, ativo: true },
         })
       : null
     if (!tipo || !tipo.ativo) {
@@ -127,7 +127,11 @@ export async function POST(request: Request) {
       ? Array.from(new Set(documentoIds.map(Number).filter((n: number) => Number.isFinite(n))))
       : []
 
-    const protocolo = await prisma.$transaction(async (tx) => {
+    // A TRANSAÇÃO GUARDA SÓ A ESCRITA. A leitura de volta (com todos os
+    // includes que a tela consome) saiu de dentro dela: era o passo mais caro e
+    // não fazia parte do ato. Com o banco remoto, o conjunto estourava os 5s
+    // padrão do Prisma e o protocolo falhava depois de já ter sido gravado.
+    const { protocoloId, orgaoNome } = await prisma.$transaction(async (tx) => {
       // QUEM ESCREVE `Protocolo` É UM SÓ. Esta rota continua sendo a tela de
       // protocolização do dossiê; o que ela deixou de fazer é criar a linha por conta
       // própria, que a tornava o segundo writer do mesmo fato.
@@ -152,39 +156,38 @@ export async function POST(request: Request) {
         observacoes: observacoes || null,
         documentoIds: ids,
       })
-      const criado = await tx.protocolo.findUniqueOrThrow({ where: { id: protocoloId }, include: INCLUDE_PROTOCOLO })
-
       const titulo = descreverProtocolizacao({
-        numeroProtocolo: criado.numeroProtocolo,
-        tipoNome: criado.tipo?.nome ?? null,
+        numeroProtocolo: numeroProtocolo || null,
+        tipoNome: tipo.nome,
         orgaoNome: orgao.name,
       })
 
       await registrarNaTimelineTx(tx, {
         acao: "PROTOCOLO_REGISTRADO",
         processoId,
-        protocoloId: criado.id,
+        protocoloId,
         titulo,
         quando,
         usuarioId: usuario?.userId ?? null,
-        responsavelId: criado.responsavelId,
+        responsavelId: responsavelId ? Number(responsavelId) : (usuario?.userId ?? null),
         criarEvento: true,
         detalhes: {
-          protocoloId: criado.id,
+          protocoloId,
           orgao: orgao.name,
-          setor: criado.setor,
-          numero: criado.numeroProtocolo,
-          numeroProcesso: criado.numeroProcesso,
-          finalidade: criado.finalidade,
+          numero: numeroProtocolo || null,
+          numeroProcesso: numeroProcesso || null,
+          finalidade,
           requerentesCobertos: escopo.length,
-          tipo: criado.tipo?.nome ?? null,
-          formaEnvio: criado.formaEnvio,
+          tipo: tipo.nome,
           documentosEnviados: ids.length,
         },
       })
 
-      return criado
-    })
+      return { protocoloId, orgaoNome: orgao.name }
+    }, { timeout: 20000, maxWait: 10000 })
+
+    void orgaoNome
+    const protocolo = await prisma.protocolo.findUnique({ where: { id: protocoloId }, include: INCLUDE_PROTOCOLO })
 
     return NextResponse.json({ protocolo }, { status: 201 })
   } catch (error) {

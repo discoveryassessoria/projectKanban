@@ -217,7 +217,7 @@ export async function PUT(
       return ids
         ? await tx.protocolo.findUnique({ where: { id }, include: INCLUDE_PROTOCOLO })
         : atualizado
-    })
+    }, { timeout: 20000, maxWait: 10000 })
 
     return NextResponse.json({ protocolo })
   } catch (error) {

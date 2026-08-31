@@ -782,7 +782,6 @@ model Requerente {
   faturas              FaturaDestinatario[]
   pagamentosRecebidos  PagamentoDestinatario[]
   processos            ProcessoRequerente[]
-  protocolos           Protocolo[]
   /// Protocolos que COBREM este requerente (escopo — ver ProtocoloRequerente).
   protocolosCobertos   ProtocoloRequerente[]
   receitaParticipacoes ReceitaRequerente[]     @relation("ReceitaRequerentes")
@@ -874,8 +873,6 @@ model Protocolo {
   solicitacao          SolicitacaoDocumento?  @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
   /// TIPO DO ATO, pelo cadastro. Ver `tipoProtocoloId`.
   tipo                 TipoProtocoloCadastro? @relation(fields: [tipoProtocoloId], references: [id], onDelete: SetNull)
-  requerente           Requerente?            @relation(fields: [requerenteId], references: [id])
-  requerenteId         Int?
 
   @@index([processoId])
   @@index([contratanteId])
