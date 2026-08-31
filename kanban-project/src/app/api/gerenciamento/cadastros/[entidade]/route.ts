@@ -38,7 +38,11 @@ export function dadosDaSpec(cfg: CadastroSpec, body: Record<string, unknown>, cr
     const v = body[campo.key]
     if (campo.tipo === 'number') data[campo.key] = v === '' || v == null ? null : Number(v)
     else if (campo.tipo === 'bool') data[campo.key] = !!v
-    else if (campo.tipo === 'select' && campo.fonte === 'tiposProcesso') data[campo.key] = v === '' || v == null ? null : Number(v)
+    // FK numérica: a fonte declara `valorNumerico`. Antes só `tiposProcesso`
+    // convertia, por nome — a segunda fonte numérica gravaria String num Int.
+    else if (campo.tipo === 'select' && campo.fonte && FONTES[campo.fonte]?.valorNumerico) {
+      data[campo.key] = v === '' || v == null ? null : Number(v)
+    }
     else if (cfg.identidade && campo.key === cfg.identidade) data[campo.key] = normalizarNome(String(v ?? ''))
     else data[campo.key] = v === '' || v == null ? null : String(v)
   }

@@ -119,7 +119,14 @@ for (const [k, esperado] of Object.entries(ARVORE_OFICIAL)) {
 // conteúdo dos agrupamentos que reaproveitam telas existentes
 const itensDaSecao = (gk: string, secao: string) =>
   (gDe(gk)?.children ?? []).filter((c) => c.section === secao && c.status !== "hidden").map((c) => c.key)
-ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify(["proctypes", "modalidades", "countrycatalog"]), "Processos › Cadastros = Tipos de Processo, Modalidades, Países e Regiões")
+// A BASE JURÍDICA entrou em 31/08/2026: "Modalidades" (via de tramitação) e
+// "Modalidades Legais" (fundamento jurídico) são coisas diferentes e convivem.
+// A legal é a que declara se o requerimento é individual ou coletivo, e precisava
+// ser editável pela operação — a tela do processo manda "declare em Gerenciamento".
+ok(
+  JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify(["proctypes", "modalidades", "legalmodes", "legalframes", "countrycatalog"]),
+  "Processos › Cadastros = Tipos de Processo, Modalidades, Modalidades Legais, Enquadramentos Legais, Países e Regiões",
+)
 // "Variações da Fase" (PhaseInternalMode) foi ELIMINADA em 06/08: não era conceito
 // de domínio — o comportamento já é determinado por Fase, Workflow Interno, Matriz
 // e Regras. Nenhum runtime a consumia; era cadastro sem consumidor.

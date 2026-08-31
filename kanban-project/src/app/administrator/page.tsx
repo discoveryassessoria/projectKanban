@@ -211,6 +211,8 @@ const TELAS: Record<string, React.ComponentType> = {
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
   prottypes: cad("tipos-protocolo"),
+  legalmodes: cad("modalidades-legais"),
+  legalframes: cad("enquadramentos-legais"),
   profcats: cad("categorias-profissional"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
   // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro

@@ -1,4 +1,4 @@
-// scripts/seed-modalidade-italia-judicial.ts
+// scripts/seed-modalidades-italia.ts (era seed-modalidade-italia-judicial.ts)
 //
 // A BASE JURÍDICA DA ROTA ITALIANA JUDICIAL entra no cadastro.
 //
@@ -45,6 +45,29 @@ async function main() {
     process.exit(0)
   }
 
+  // ── ITÁLIA · ADMINISTRATIVA ──────────────────────────────────────────────
+  // O usuário declarou que a rota italiana tem DUAS modalidades: judicial e
+  // administrativa. O nome segue a simetria da que ele nomeou.
+  //
+  // A CARDINALIDADE aqui é INFERIDA, não declarada: a via administrativa
+  // tramita no consulado/comune, onde o fascicolo é por pessoa — mesmo padrão da
+  // rota espanhola. Fica INDIVIDUAL, que é também a regra restritiva. Se estiver
+  // errado, agora se corrige na TELA (Gerenciamento › Processos › Modalidades
+  // Legais), sem deploy — foi para isso que o cadastro virou tela.
+  const administrativa = await prisma.modalidadeLegal.upsert({
+    where: { code: "IT_ADMINISTRATIVO" },
+    update: {},
+    create: {
+      code: "IT_ADMINISTRATIVO",
+      nome: "Processo Administrativo",
+      paisId: italia.id,
+      cardinalidadeRequerimento: "INDIVIDUAL",
+      ordem: 1,
+      ativo: true,
+    },
+    select: { id: true, code: true, nome: true, cardinalidadeRequerimento: true },
+  })
+
   const modalidade = await prisma.modalidadeLegal.upsert({
     where: { code: "IT_JUDICIAL" },
     update: { cardinalidadeRequerimento: "COLETIVO" },
@@ -76,6 +99,15 @@ async function main() {
     select: { id: true, code: true, nome: true },
   })
   console.log(`✅ Enquadramento ${enquadramento.code} — ${enquadramento.nome}`)
+
+  const enqAdm = await prisma.enquadramentoLegal.upsert({
+    where: { code: "IT_ADMINISTRATIVO" },
+    update: {},
+    create: { code: "IT_ADMINISTRATIVO", nome: "Processo Administrativo", modalidadeLegalId: administrativa.id, ordem: 1, ativo: true },
+    select: { code: true, nome: true },
+  })
+  console.log(`✅ Modalidade ${administrativa.code} — ${administrativa.nome} · ${administrativa.cardinalidadeRequerimento} (cardinalidade INFERIDA da via consular; editável na tela)`)
+  console.log(`✅ Enquadramento ${enqAdm.code} — ${enqAdm.nome}`)
 
   const es = await prisma.modalidadeLegal.updateMany({
     where: { code: "ES_LMD" },
