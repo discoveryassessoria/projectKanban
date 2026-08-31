@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 nome: true,
-                pais: true,
+                pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
               },
               take: 1, // Pegar apenas o primeiro processo (geralmente só tem um)
             },

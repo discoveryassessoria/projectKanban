@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 nome: true,
-                pais: true,
+                pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
             },
             },
         },
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 nome: true,
-                pais: true,
+                pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
             },
             },
         },
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
           processos: c.processos.map((pc) => ({
           id: pc.processo.id,
           nome: pc.processo.nome,
-          pais: pc.processo.pais,
+          pais: (pc.processo?.paisCanonico?.countryKey ?? null),
           })),
         }
       }),
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
           processos: r.processos.map((pr) => ({
           id: pr.processo.id,
           nome: pr.processo.nome,
-          pais: pr.processo.pais,
+          pais: (pr.processo?.paisCanonico?.countryKey ?? null),
           })),
         }
       }),

@@ -76,7 +76,7 @@ export async function GET(_req: NextRequest) {
           receita: {
             select: {
               descricao: true, moeda: true,
-              processo: { select: { id: true, nome: true, pais: true } },
+              processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
             },
           },
         },
@@ -150,7 +150,7 @@ export async function GET(_req: NextRequest) {
     const proximosRecebimentos = parcelasAbertas.slice(0, 5).map((p) => ({
       id: p.id,
       cliente: p.receita?.processo?.nome ?? "Avulso",
-      pais: p.receita?.processo?.pais ?? null,
+      pais: p.receita?.processo?.paisCanonico?.countryKey ?? null,
       processoId: p.receita?.processo?.id ?? null,
       descricao: p.receita?.descricao ?? `Parcela ${p.numero}`,
       valorBRL: p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), p.receita?.moeda ?? "BRL"),

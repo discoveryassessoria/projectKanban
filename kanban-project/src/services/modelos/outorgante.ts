@@ -74,7 +74,7 @@ const SELECAO = {
   cidade: true,
   estado: true,
   cep: true,
-  pais: true,
+  pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
   personId: true,
   pessoa: { select: { id: true, profissao: true, sexo: true } },
 } as const

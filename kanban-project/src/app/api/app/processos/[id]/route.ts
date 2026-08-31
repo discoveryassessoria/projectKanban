@@ -79,6 +79,7 @@ export async function GET(
     const processo = await prisma.processo.findUnique({
       where: { id: processoId },
       include: {
+        paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
         contratantes: {
           include: { contratante: { select: { id: true, publicCode: true, nome: true } } },
         },
@@ -191,7 +192,7 @@ export async function GET(
     return NextResponse.json({
       id: processo.id,
       nome: processo.nome,
-      pais: processo.pais,
+      pais: (processo.paisCanonico?.countryKey ?? null),
       etapaAtual: faseAtual ? faseAtual.label : null,
       etapaAtualOrdem: ordemAtual,
       dataInicio: processo.dataInicio,

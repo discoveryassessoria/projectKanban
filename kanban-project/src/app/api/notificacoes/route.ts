@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         processoId: true,
         pais: true,
-        processo: { select: { id: true, nome: true, pais: true } }
+        processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } }
       },
       orderBy: { dataPrazo: 'asc' }
     })
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
         dataPrazo: t.dataPrazo,
         processoId: t.processo?.id ?? t.processoId,
         processoNome: t.processo?.nome ?? 'Sem processo',
-        pais: t.pais ?? t.processo?.pais ?? null
+        pais: t.pais ?? (t.processo?.paisCanonico?.countryKey ?? null) ?? null
       }
 
       if (t.dataPrazo) {

@@ -97,7 +97,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           documento: { select: { id: true, tipo: true } },
           processo: {
             select: {
-              id: true, codigo: true, nome: true, pais: true, arvoreId: true,
+              id: true, codigo: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true,
               tipoProcessoMotor: { select: { id: true, name: true } },
             },
           },
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
               id: receita.processo.id,
               codigo: receita.processo.codigo,
               nome: receita.processo.nome,
-              pais: receita.processo.pais,
+              pais: (receita.processo?.paisCanonico?.countryKey ?? null),
               tipo: receita.processo.tipoProcessoMotor?.name ?? null,
             }
           : null,

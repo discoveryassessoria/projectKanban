@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   // Processos operacionais: os que ainda não concluíram.
   const processos = await prisma.processo.findMany({
     where: { dataConclusao: null },
-    select: { id: true, nome: true, codigo: true, pais: true, faseAtualKey: true },
+    select: { id: true, nome: true, codigo: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true },
     orderBy: { updatedAt: "desc" },
     take: limite,
   })

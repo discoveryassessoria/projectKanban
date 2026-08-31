@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest) {
               // §1/§3/§4 — campos CANÔNICOS do lançamento de origem
               origemLancamento: true, naturezaLancamento: true, estornoDeId: true, canceladoEm: true, estornadoEm: true,
               phaseKey: true, configFinanceiraId: true, valorUnitario: true, dataCompetencia: true,
-              processo: { select: { id: true, nome: true, pais: true } },
+              processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
             },
           },
         },
@@ -70,7 +70,7 @@ export async function GET(_req: NextRequest) {
         totalParcelas: p.receita?.nParcelas ?? 1,
         cliente: p.receita?.processo?.nome ?? "Avulso",
         processoId: p.receita?.processo?.id ?? null,
-        pais: p.receita?.processo?.pais ?? null,
+        pais: p.receita?.processo?.paisCanonico?.countryKey ?? null,
         descricao: p.receita?.descricao ?? `Parcela ${p.numero}`,
         categoria: CAT_LABEL[p.receita?.categoria ?? "OUTROS"] ?? "Outros",
         valorBRL,

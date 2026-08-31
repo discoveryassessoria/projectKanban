@@ -42,7 +42,7 @@ export async function GET(
     // 1) Carrega o processo (precisa do arvoreId e pais)
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true, pais: true, paisId: true, paisCanonico: { select: { countryKey: true } } },
+      select: { id: true, arvoreId: true, pais: true, paisId: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
     })
 
     if (!processo) {
@@ -104,7 +104,7 @@ export async function GET(
     // É o caso exemplar de por que relacionamento por texto não pode existir.
     if (processo.paisId != null
       ? processo.paisCanonico?.countryKey === "espanha"
-      : (processo.pais ?? "").toLowerCase() === "espanha") {
+      : ((processo.paisCanonico?.countryKey ?? null) ?? "").toLowerCase() === "espanha") {
       protocoloImpeditivos = await prisma.protocolo.count({
         where: { processoId: id, dataProtocolo: null },
       })

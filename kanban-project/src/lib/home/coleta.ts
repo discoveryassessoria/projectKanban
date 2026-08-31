@@ -126,7 +126,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
   const [processosRaw, passosRaw, tarefasRaw, pendenciasRaw, instanciasRaw] = await Promise.all([
     p.verProcessos
       ? prisma.processo.findMany({
-          select: { id: true, codigo: true, nome: true, pais: true, faseAtualKey: true, updatedAt: true },
+          select: { id: true, codigo: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true, updatedAt: true },
         })
       : Promise.resolve([] as ProcessoBase[]),
     p.verProcessos
@@ -589,7 +589,7 @@ export async function montarAgenda(ctx: ContextoHome): Promise<Agenda> {
       processoNome: e.processo?.nome ?? null,
       local: e.local ?? null,
       href: e.processo?.id
-        ? `/kanban?pais=${encodeURIComponent((e.processo.pais ?? "").toLowerCase())}&processoId=${e.processo.id}`
+        ? `/kanban?pais=${encodeURIComponent(((e.processo?.paisCanonico?.countryKey ?? null) ?? "").toLowerCase())}&processoId=${e.processo.id}`
         : "/events",
     }
     vazia[grupo].push(item)

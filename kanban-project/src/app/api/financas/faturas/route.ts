@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             nome: true,
-            pais: true,
+            pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
           }
         },
         pagamentos: {
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
         processo: fatura.processo ? {
           id: fatura.processo.id,
           nome: fatura.processo.nome,
-          pais: fatura.processo.pais,
+          pais: (fatura.processo?.paisCanonico?.countryKey ?? null),
         } : null,
         destinatarios: fatura.destinatarios.map(d => d.requerente),
         pagamentos: fatura.pagamentos.map(p => ({
@@ -205,7 +205,7 @@ export async function GET(request: NextRequest) {
     }), { total: 0, pago: 0, pendente: 0, vencido: 0 })
 
     // Resumo por processo
-    const porProcesso: Record<number, { nome: string; pais: string; totalBRL: number; pagoBRL: number; pendenteBRL: number; vencidoBRL: number; qtdFaturas: number }> = {}
+    const porProcesso: Record<number, { nome: string; pais: string | null; totalBRL: number; pagoBRL: number; pendenteBRL: number; vencidoBRL: number; qtdFaturas: number }> = {}
     faturasFinais.forEach(f => {
       if (!f.processo) return
       const pid = f.processo.id

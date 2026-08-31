@@ -44,13 +44,13 @@ export async function GET(request: NextRequest) {
       prisma.processo.findMany({
         // busca por NOME ou por CÓDIGO PÚBLICO (ex.: "DE-7", "IT-125").
         where: { OR: [{ nome: contains }, { codigo: contains }] },
-        select: { id: true, nome: true, pais: true, codigo: true, familia: { select: { nome: true } } },
+        select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, codigo: true, familia: { select: { nome: true } } },
         take: LIMITE,
         orderBy: { updatedAt: "desc" },
       }),
       prisma.familia.findMany({
         where: { nome: contains },
-        select: { id: true, nome: true, processos: { select: { id: true, nome: true, pais: true }, take: 3 } },
+        select: { id: true, nome: true, processos: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: 3 } },
         take: LIMITE,
       }),
       prisma.requerente.findMany({
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { select: { processo: { select: { id: true, nome: true, pais: true } } }, take: 3 },
+          processos: { select: { processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
         },
         take: LIMITE,
       }),
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { select: { processo: { select: { id: true, nome: true, pais: true } } }, take: 3 },
+          processos: { select: { processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
         },
         take: LIMITE,
       }),
@@ -95,13 +95,13 @@ export async function GET(request: NextRequest) {
     for (const r of requerentes) {
       for (const v of r.processos) {
         if (!v.processo) continue
-        add({ tipo: "requerente", id: r.id, label: r.publicCode ? `${r.publicCode} — ${r.nome}` : r.nome, sub: `Requerente · ${v.processo.nome}`, processoId: v.processo.id, pais: v.processo.pais, href: href(v.processo.id, v.processo.pais) })
+        add({ tipo: "requerente", id: r.id, label: r.publicCode ? `${r.publicCode} — ${r.nome}` : r.nome, sub: `Requerente · ${v.processo.nome}`, processoId: v.processo.id, pais: (v.processo?.paisCanonico?.countryKey ?? null), href: href(v.processo.id, (v.processo?.paisCanonico?.countryKey ?? null)) })
       }
     }
     for (const c of contratantes) {
       for (const v of c.processos) {
         if (!v.processo) continue
-        add({ tipo: "cliente", id: c.id, label: c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome, sub: `Cliente · ${v.processo.nome}`, processoId: v.processo.id, pais: v.processo.pais, href: href(v.processo.id, v.processo.pais) })
+        add({ tipo: "cliente", id: c.id, label: c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome, sub: `Cliente · ${v.processo.nome}`, processoId: v.processo.id, pais: (v.processo?.paisCanonico?.countryKey ?? null), href: href(v.processo.id, (v.processo?.paisCanonico?.countryKey ?? null)) })
       }
     }
 

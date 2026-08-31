@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nome: true,
-        pais: true,
+        pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
         faseAtualKey: true,
         dataInicio: true,
       },
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       return {
         id: processo.id,
         nome: processo.nome,
-        pais: processo.pais,
+        pais: (processo.paisCanonico?.countryKey ?? null),
         etapaAtual: etapaAtualLabel,
         progresso,
         // Contagem da FASE atual (não de tarefas): quanto falta nesta etapa.
