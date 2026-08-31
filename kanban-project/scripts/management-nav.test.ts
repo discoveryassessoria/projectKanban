@@ -92,7 +92,7 @@ const ARVORE_OFICIAL: Record<string, string[]> = {
   grp_processos: ["Cadastros", "Estrutura", "Configurações"],
   grp_workflow: ["Fluxos", "Transições", "Configurações"],
   grp_automacoes: ["Financeiras", "Eventos", "Configurações"],
-  grp_documentos: ["Documentos", "Regras"],
+  grp_documentos: ["Documentos", "Protocolos", "Regras"],
   grp_servicos: ["Catálogo de Serviços", "Categorias"],
   grp_financeiro: [
     "Configurações Financeiras", "Tabela de Valores", "Tesouraria",
@@ -234,17 +234,25 @@ const ALIAS_MAP_PROTO = Object.fromEntries(
   Array.from(blocoAlias.matchAll(/"?([\w-]+)"?:\s*"(\w+)"/g)).map((m) => [m[1], m[2]]),
 )
 ok(!/\bmarcos\b/i.test(registrySrc), 'motor genérico de cadastros não conhece "marcos"')
-// Protocolos: cadastro ELIMINADO (02/08/2026). Protocolo é OCORRÊNCIA operacional
-// registrada dentro do Processo (aba Protocolos → Timeline/Histórico), nunca um
-// cadastro mestre do Gerenciamento.
-ok(!itemDe("prottypes") && !itemDe("protocols"), 'cadastro "Tipos de Protocolo" não existe mais na navegação')
+// PROTOCOLO: a regra que continua valendo é que o ATO não é cadastro — ele é uma
+// OCORRÊNCIA registrada dentro do Processo (aba Protocolos → Timeline/Histórico).
+// Nunca existiu e não pode existir um cadastro mestre de "protocolos".
+//
+// MUDOU EM 31/08/2026, a pedido do usuário: a CLASSIFICAÇÃO do ato virou cadastro
+// ("Tipos de Protocolo"). Era um enum de 7 valores fixos no schema — registrar um
+// tipo novo exigia deploy, e o valor não tinha descrição, ordem nem inativação.
+// Classificar o ato não é criar um segundo lugar onde o protocolo mora, e é essa
+// distinção que as guardas abaixo travam.
+ok(!itemDe("protocols"), 'não existe cadastro mestre de "protocolos" na navegação')
+ok(!TELAS_KEYS.has("protocols"), "nenhuma tela de cadastro do ATO de protocolo registrada")
+ok(ALIAS_MAP_PROTO["protocols"] === "overview", "URL antiga do cadastro de protocolo cai no painel do Gerenciamento (sem tela morta)")
+ok(!!itemDe("prottypes"), 'cadastro "Tipos de Protocolo" existe na navegação')
+ok(TELAS_KEYS.has("prottypes"), 'tela de "Tipos de Protocolo" registrada')
+ok(/tipos-protocolo/.test(registrySrc), 'motor genérico de cadastros conhece "tipos-protocolo"')
 ok(
-  !todosItens.filter((i) => i.status !== "hidden").some((i) => /protocolo/i.test(i.label)),
-  'nenhum ITEM de menu de protocolo (só o nome do módulo "Documentos e Protocolos" permanece)',
+  /protegerExclusao[\s\S]{0,400}tipoProtocoloId/.test(registrySrc),
+  "tipo em uso não pode ser excluído (protocolo registrado ficaria sem classificação)",
 )
-ok(!TELAS_KEYS.has("prottypes") && !TELAS_KEYS.has("protocols"), "nenhuma tela de cadastro de protocolo registrada")
-ok(ALIAS_MAP_PROTO["prottypes"] === "overview" && ALIAS_MAP_PROTO["protocols"] === "overview", "URLs antigas de protocolo caem no painel do Gerenciamento (sem tela morta)")
-ok(!/tipos-protocolo|tipoProtocoloCadastro/i.test(registrySrc), 'motor genérico de cadastros não conhece "tipos-protocolo"')
 // Classificação financeira ELIMINADA: nem menu, nem tela, nem cadastro intermediário.
 ok(!itemDe("categories") && !itemDe("coa") && !itemDe("costcenters"), "Categorias Financeiras, Plano de Contas e Centros de Custo não existem na navegação")
 ok(!TELAS_KEYS.has("categories") && !TELAS_KEYS.has("coa") && !TELAS_KEYS.has("costcenters"), "nenhuma tela de classificação financeira registrada")
@@ -252,7 +260,10 @@ ok(
   ALIAS_MAP_PROTO["categories"] === "catalog" && ALIAS_MAP_PROTO["coa"] === "catalog" && ALIAS_MAP_PROTO["costcenters"] === "catalog",
   "URLs antigas de classificação caem em Configurações Financeiras",
 )
-ok((gDe("grp_documentos")?.children ?? []).every((c) => c.section !== "Protocolos"), 'módulo Documentos e Protocolos não tem mais a seção "Protocolos"')
+ok(
+  (gDe("grp_documentos")?.children ?? []).filter((c) => c.section === "Protocolos").every((c) => c.key === "prottypes"),
+  'a seção "Protocolos" tem apenas a CLASSIFICAÇÃO do ato, nunca o ato',
+)
 ok(moduloDe("audit") === "grp_sistema" && itemDe("audit")?.status === "active", "Auditoria e Logs tem casa oficial (Sistema)")
 
 // ═══════════════ 5) SEM DUPLICAÇÃO E SEM NOMENCLATURA ANTIGA ═══════════════════

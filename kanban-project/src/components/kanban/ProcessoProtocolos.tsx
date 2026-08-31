@@ -81,6 +81,8 @@ interface Protocolo {
   finalidade?: string | null
   situacao?: string | null
   requerentesCobertos?: { requerente: PessoaBase }[]
+  tipoProtocoloId?: number | null
+  tipo?: { id: number; code: string; nome: string } | null
   exigencias?: { id: number; descricao: string; prazo?: string | null; cumpridaEm?: string | null }[]
   tipoProtocolo?: string | null
   formaEnvio?: string | null
@@ -99,11 +101,14 @@ interface OpcoesProtocolo {
   orgaos: { id: number; name: string; type?: string | null; city?: string | null }[]
   /** INDIVIDUAL | COLETIVO — vem da Modalidade Legal do processo, não do país. */
   cardinalidade?: "INDIVIDUAL" | "COLETIVO"
+  /** false = a rota do processo não declara a regra; o valor acima é fallback. */
+  cardinalidadeDeclarada?: boolean
+  rota?: { enquadramento: string; modalidade: string | null } | null
+  tiposCadastro?: { id: number; code: string; nome: string; descricao?: string | null }[]
   finalidades?: string[]
   situacoes?: string[]
   responsaveis: { id: number; nome: string }[]
   documentos: { id: number; publicCode: string | null; tipo: string | null; descricao: string | null; pessoa: string }[]
-  tipos: { valor: string; label: string }[]
   formasEnvio: { valor: string; label: string }[]
 }
 
@@ -180,6 +185,7 @@ const FORM_VAZIO = {
   dataProtocolo: "",
   numeroProtocolo: "",
   numeroProcesso: "",
+  tipoProtocoloId: "",
   finalidade: "REQUERIMENTO",
   situacao: "PROTOCOLADO",
   requerenteIds: [] as number[],
@@ -276,6 +282,7 @@ export function ProcessoProtocolos({
       dataProtocolo: paraDatetimeLocal(protocolo.dataProtocolo),
       numeroProtocolo: protocolo.numeroProtocolo || "",
       numeroProcesso: protocolo.numeroProcesso || "",
+      tipoProtocoloId: protocolo.tipoProtocoloId ? String(protocolo.tipoProtocoloId) : "",
       finalidade: protocolo.finalidade || "REQUERIMENTO",
       situacao: protocolo.situacao || "PROTOCOLADO",
       requerenteIds: (protocolo.requerentesCobertos ?? []).map((r) => r.requerente.id),
@@ -303,6 +310,7 @@ export function ProcessoProtocolos({
     if (!form.orgaoId) return setErroForm("Selecione o órgão que recebeu o protocolo.")
     if (!form.dataProtocolo) return setErroForm("Informe a data e a hora da protocolização.")
     if (!form.numeroProtocolo.trim()) return setErroForm("Informe o número do protocolo.")
+    if (!form.tipoProtocoloId) return setErroForm("Selecione o tipo de protocolo.")
     // A MESMA regra do servidor, dita ANTES de o operador perder o formulário.
     // Ela não substitui a do servidor — o banco continua sendo quem recusa.
     if (form.finalidade === "REQUERIMENTO") {
@@ -329,6 +337,7 @@ export function ProcessoProtocolos({
         dataProtocolo: new Date(form.dataProtocolo).toISOString(),
         numeroProtocolo: form.numeroProtocolo.trim(),
         numeroProcesso: form.numeroProcesso.trim() || null,
+        tipoProtocoloId: form.tipoProtocoloId ? parseInt(form.tipoProtocoloId) : null,
         finalidade: form.finalidade,
         situacao: form.situacao,
         tipoProtocolo: form.tipoProtocolo,
@@ -496,8 +505,10 @@ export function ProcessoProtocolos({
     return "Órgão não informado"
   }
 
+  // Rótulo do ENUM legado, só para protocolos gravados antes do cadastro de
+  // Tipos de Protocolo. Registro novo traz `protocolo.tipo` do cadastro.
   const rotuloTipo = (valor?: string | null) =>
-    opcoes?.tipos.find((t) => t.valor === valor)?.label ?? null
+    (valor ? (opcoes?.tiposCadastro ?? []).find((t) => t.code === valor)?.nome : null) ?? null
   const rotuloForma = (valor?: string | null) =>
     opcoes?.formasEnvio.find((f) => f.valor === valor)?.label ?? null
 
@@ -665,15 +676,20 @@ export function ProcessoProtocolos({
                 <div>
                   <label className="block text-sm font-medium text-white/95 mb-1">Tipo de protocolo *</label>
                   <select
-                    value={form.tipoProtocolo}
-                    onChange={(e) => setForm({ ...form, tipoProtocolo: e.target.value })}
+                    value={form.tipoProtocoloId}
+                    onChange={(e) => setForm({ ...form, tipoProtocoloId: e.target.value })}
                     className={INPUT}
                   >
                     <option value="">Selecione o tipo</option>
-                    {(opcoes?.tipos ?? []).map((t) => (
-                      <option key={t.valor} value={t.valor}>{t.label}</option>
+                    {(opcoes?.tiposCadastro ?? []).map((t) => (
+                      <option key={t.id} value={String(t.id)}>{t.nome}</option>
                     ))}
                   </select>
+                  {(opcoes?.tiposCadastro ?? []).length === 0 && (
+                    <p className="text-xs mt-1" style={{ color: "var(--warning-text)" }}>
+                      Nenhum tipo cadastrado. Cadastre em Gerenciamento → Documentos e Protocolos → Tipos de Protocolo.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/95 mb-1">
@@ -733,6 +749,16 @@ export function ProcessoProtocolos({
                 <label className="block text-sm font-medium text-white/95 mb-1">
                   Requerentes cobertos {form.finalidade === "REQUERIMENTO" && <span className="text-[var(--danger)]">*</span>}
                 </label>
+                {opcoes && opcoes.cardinalidadeDeclarada === false && (
+                  <p
+                    className="text-xs mb-2 rounded-md px-3 py-2"
+                    style={{ backgroundColor: "var(--warning-tile)", color: "var(--warning-text)" }}
+                  >
+                    Este processo ainda não tem <strong>modalidade legal</strong> declarada, então o sistema não sabe
+                    se o requerimento desta rota é individual ou coletivo — está aplicando a regra mais restritiva
+                    (um requerente). Declare em Gerenciamento para que a tela pare de adivinhar.
+                  </p>
+                )}
                 <p className="text-xs text-white/70 mb-2">
                   {cardinalidade === "COLETIVO"
                     ? "Esta rota é coletiva: um requerimento cobre os requerentes selecionados, sob um único número de processo."
@@ -902,9 +928,9 @@ export function ProcessoProtocolos({
                               {protocolo.setor}
                             </span>
                           )}
-                          {rotuloTipo(protocolo.tipoProtocolo) && (
+                          {(protocolo.tipo?.nome || rotuloTipo(protocolo.tipoProtocolo)) && (
                             <span className="text-xs px-2 py-0.5 bg-[var(--surface-secondary)] text-amber-800 rounded">
-                              {rotuloTipo(protocolo.tipoProtocolo)}
+                              {protocolo.tipo?.nome || rotuloTipo(protocolo.tipoProtocolo)}
                             </span>
                           )}
                           {protocolo.finalidade && protocolo.finalidade !== "REQUERIMENTO" && (

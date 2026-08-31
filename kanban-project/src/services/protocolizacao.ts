@@ -116,6 +116,7 @@ export const INCLUDE_PROTOCOLO = {
   contratante: { select: { id: true, publicCode: true, nome: true, email: true, telefone: true } },
   requerente: { select: { id: true, publicCode: true, nome: true, email: true, telefone: true } },
   orgao: { select: { id: true, name: true, type: true, city: true } },
+  tipo: { select: { id: true, code: true, nome: true } },
   responsavel: { select: { id: true, nome: true } },
   /// ESCOPO — quem o protocolo cobre. Fonte única; `requerente` acima é a coluna
   /// antiga de um só, mantida até a migration de remoção.

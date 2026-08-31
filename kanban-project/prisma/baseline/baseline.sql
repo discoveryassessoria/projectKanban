@@ -663,6 +663,7 @@ CREATE TABLE "Protocolo" (
     "consulado" "Consulado",
     "consuladoOutro" VARCHAR(200),
     "orgaoId" INTEGER,
+    "tipoProtocoloId" INTEGER,
     "setor" VARCHAR(120),
     "dataProtocolo" TIMESTAMP(3),
     "numeroProtocolo" VARCHAR(100),
@@ -680,6 +681,20 @@ CREATE TABLE "Protocolo" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Protocolo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TipoProtocoloCadastro" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(60) NOT NULL,
+    "nome" VARCHAR(120) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TipoProtocoloCadastro_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -4795,10 +4810,19 @@ CREATE INDEX "Protocolo_responsavelId_idx" ON "Protocolo"("responsavelId");
 CREATE INDEX "Protocolo_solicitacaoId_idx" ON "Protocolo"("solicitacaoId");
 
 -- CreateIndex
+CREATE INDEX "Protocolo_tipoProtocoloId_idx" ON "Protocolo"("tipoProtocoloId");
+
+-- CreateIndex
 CREATE INDEX "Protocolo_orgaoId_dataProtocolo_idx" ON "Protocolo"("orgaoId", "dataProtocolo");
 
 -- CreateIndex
 CREATE INDEX "Protocolo_finalidade_situacao_idx" ON "Protocolo"("finalidade", "situacao");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TipoProtocoloCadastro_code_key" ON "TipoProtocoloCadastro"("code");
+
+-- CreateIndex
+CREATE INDEX "TipoProtocoloCadastro_ativo_idx" ON "TipoProtocoloCadastro"("ativo");
 
 -- CreateIndex
 CREATE INDEX "ProtocoloRequerente_requerenteId_idx" ON "ProtocoloRequerente"("requerenteId");
@@ -6575,6 +6599,9 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_responsavelId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_solicitacaoId_fkey" FOREIGN KEY ("solicitacaoId") REFERENCES "SolicitacaoDocumento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_tipoProtocoloId_fkey" FOREIGN KEY ("tipoProtocoloId") REFERENCES "TipoProtocoloCadastro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloRequerente" ADD CONSTRAINT "ProtocoloRequerente_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;

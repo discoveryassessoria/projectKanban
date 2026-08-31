@@ -97,6 +97,7 @@ export async function PUT(
       finalidade,
       situacao,
       tipoProtocolo,
+      tipoProtocoloId,
       formaEnvio,
       responsavelId,
       observacoes,
@@ -139,6 +140,15 @@ export async function PUT(
       updateData.numeroProtocolo = numeroProtocolo
     }
     if (tipoProtocolo !== undefined) updateData.tipoProtocolo = tipoProtocolo || null
+    if (tipoProtocoloId !== undefined) {
+      if (!tipoProtocoloId) return NextResponse.json({ error: "Selecione um tipo de protocolo do cadastro." }, { status: 400 })
+      const tipo = await prisma.tipoProtocoloCadastro.findUnique({
+        where: { id: Number(tipoProtocoloId) }, select: { id: true, code: true, ativo: true },
+      })
+      if (!tipo || !tipo.ativo) return NextResponse.json({ error: "Tipo de protocolo não encontrado ou inativo." }, { status: 400 })
+      updateData.tipoProtocoloId = tipo.id
+      updateData.tipoProtocolo = (Object.values(TipoProtocolo) as string[]).includes(tipo.code) ? tipo.code : null
+    }
     if (formaEnvio !== undefined) updateData.formaEnvio = formaEnvio || null
     if (responsavelId !== undefined) {
       if (!responsavelId) return NextResponse.json({ error: "Responsável é obrigatório" }, { status: 400 })

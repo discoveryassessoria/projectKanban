@@ -7,6 +7,10 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { CodigoPublicoField } from "./CodigoPublicoField"
+import {
+  useSelecaoEmMassa, executarEmMassa, CaixaDeSelecao, CaixaDeSelecaoTodos,
+  BarraDeSelecao, ResumoEmMassa, type ResultadoEmMassa,
+} from "@/src/components/ui/selecao-em-massa"
 
 interface CategoriaRef { id: number; code: string; nome: string; ativo: boolean }
 type Funcao = 'ORGAO' | 'FORNECEDOR' | 'PARCEIRO' | 'CORRESPONDENTE' | 'CLIENTE_CORPORATIVO'
@@ -223,6 +227,44 @@ export default function OrgaosProtocoloTab() {
     else { showFlash(j.error || "Erro ao excluir."); load() }
   }
 
+  // ─── SELEÇÃO MÚLTIPLA ──────────────────────────────────────────────────
+  // Item a item pela MESMA porta do `del` acima — inclusive a regra que INATIVA
+  // em vez de apagar quando a organização já recebeu protocolo. Por isso o
+  // resumo distingue excluída de inativada: o histórico é intocável.
+  const idsVisiveis = useMemo(() => visiveis.map((d) => d.id), [visiveis])
+  const selecao = useSelecaoEmMassa(idsVisiveis, `orgaos:${busca}:${filtroPais}:${filtroFuncao}`)
+  const [excluindoEmMassa, setExcluindoEmMassa] = useState(false)
+  const [resultadoEmMassa, setResultadoEmMassa] = useState<ResultadoEmMassa | null>(null)
+  const nomePorId = useMemo(() => {
+    const mapa = new Map<number, string>()
+    for (const d of rows) mapa.set(d.id, d.name)
+    return mapa
+  }, [rows])
+
+  async function excluirSelecionadas() {
+    const ids = [...selecao.selecionados]
+    if (ids.length === 0) return
+    if (!confirm(
+      `Excluir ${ids.length} organização(ões)?\n\n` +
+      "As que já receberam protocolo são INATIVADAS para preservar o histórico, não apagadas.",
+    )) return
+    setExcluindoEmMassa(true)
+    setResultadoEmMassa(null)
+    const resultado = await executarEmMassa(ids, async (id) => {
+      const res = await fetch(`/api/gerenciamento/orgaos-protocolo/${id}`, { method: "DELETE", headers: authHeaders() })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) return { ok: false, motivo: j.error || `Erro ${res.status}.` }
+      // Inativar NÃO é excluir: dizer "excluída" aqui seria mentir sobre o que
+      // aconteceu com um registro que continua no cadastro.
+      if (j.inativado) return { ok: false, motivo: `inativada — ${j.protocolos} protocolo(s) no histórico` }
+      return { ok: true }
+    })
+    setExcluindoEmMassa(false)
+    setResultadoEmMassa(resultado)
+    selecao.limpar()
+    load()
+  }
+
   const alternarCategoria = (id: number) =>
     setForm(f => f && ({ ...f, categoriaIds: f.categoriaIds.includes(id) ? f.categoriaIds.filter(x => x !== id) : [...f.categoriaIds, id] }))
 
@@ -254,10 +296,33 @@ export default function OrgaosProtocoloTab() {
         </div>
       </div>
 
+      <ResumoEmMassa
+        resultado={resultadoEmMassa}
+        substantivo={["organização", "organizações"]}
+        genero="f"
+        rotuloDoItem={(id) => nomePorId.get(Number(id)) ?? `#${id}`}
+        onFechar={() => setResultadoEmMassa(null)}
+      />
+      <BarraDeSelecao
+        quantidade={selecao.quantidade}
+        substantivo={["organização", "organizações"]}
+        genero="f"
+        onLimpar={selecao.limpar}
+        onExcluir={() => void excluirSelecionadas()}
+        excluindo={excluindoEmMassa}
+      />
+
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr>
+              <th className="w-10 px-4 py-3 font-medium">
+                <CaixaDeSelecaoTodos
+                  todosMarcados={selecao.todosMarcados}
+                  algumMarcado={selecao.algumMarcado}
+                  onAlternar={selecao.alternarTodos}
+                />
+              </th>
               <th className="px-4 py-3 font-medium">Código</th>
               <th className="px-4 py-3 font-medium">Nome oficial</th>
               <th className="px-4 py-3 font-medium">Funções</th>
@@ -271,9 +336,16 @@ export default function OrgaosProtocoloTab() {
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma organização encontrada.</td></tr>
+              <tr><td colSpan={10} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma organização encontrada.</td></tr>
             ) : visiveis.map(d => (
               <tr key={d.id} className="border-b border-[var(--border-subtle)] last:border-0">
+                <td className="px-4 py-2.5 align-middle">
+                  <CaixaDeSelecao
+                    marcada={selecao.selecionados.has(d.id)}
+                    onAlternar={() => selecao.alternar(d.id)}
+                    rotulo={`Selecionar ${d.name}`}
+                  />
+                </td>
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">
                   {d.name}

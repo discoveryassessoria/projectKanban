@@ -91,7 +91,9 @@ export interface DadosDoProtocolo {
   responsavelId?: number | null
   observacoes?: string | null
   solicitacaoId?: number | null
-  /** Classificação do ato, quando o caminho de origem a conhece. */
+  /** Classificação do ato pelo CADASTRO (Tipos de Protocolo). */
+  tipoProtocoloId?: number | null
+  /** @deprecated Enum legado; sai na migration de remoção. */
   tipoProtocolo?: unknown
   formaEnvio?: unknown
   contratanteId?: number | null
@@ -161,6 +163,7 @@ export async function registrarProtocoloTx(
       observacoes: dados.observacoes ?? null,
       solicitacaoId: dados.solicitacaoId ?? null,
       ...(dados.tipoProtocolo != null ? { tipoProtocolo: dados.tipoProtocolo as never } : {}),
+      ...(dados.tipoProtocoloId != null ? { tipoProtocoloId: dados.tipoProtocoloId } : {}),
       ...(dados.formaEnvio != null ? { formaEnvio: dados.formaEnvio as never } : {}),
       contratanteId: dados.contratanteId ?? null,
       requerenteId: escopo.length === 1 ? escopo[0] : null,

@@ -804,38 +804,41 @@ model Requerente {
 /// NÃO é cadastro: cada registro é um ato concreto (entregar/enviar algo a um
 /// órgão), que gera Evento na Timeline e entra no Histórico do Processo.
 model Protocolo {
-  publicCode           String?               @unique @db.VarChar(20)
-  id                   Int                   @id @default(autoincrement())
+  publicCode           String?                @unique @db.VarChar(20)
+  id                   Int                    @id @default(autoincrement())
   processoId           Int
   contratanteId        Int?
   requerenteId         Int?
   /// LEGADO (Espanha): substituído por `orgaoId` — Órgãos e Organizações.
   consulado            Consulado?
-  consuladoOutro       String?               @db.VarChar(200)
+  consuladoOutro       String?                @db.VarChar(200)
   /// Órgão que RECEBEU o protocolo (fonte única: Órgãos e Organizações).
   orgaoId              Int?
+  /// TIPO DO ATO, pelo cadastro (Gerenciamento → Documentos e Protocolos).
+  /// Substitui o enum `tipoProtocolo`, que sai na migration de remoção.
+  tipoProtocoloId      Int?
   /// Setor/guichê dentro do órgão (opcional).
-  setor                String?               @db.VarChar(120)
+  setor                String?                @db.VarChar(120)
   /// Data e hora da protocolização.
   dataProtocolo        DateTime?
   /// NÚMERO DO COMPROVANTE DA ENTREGA — o que o guichê devolve na hora.
-  numeroProtocolo      String?               @db.VarChar(100)
+  numeroProtocolo      String?                @db.VarChar(100)
   /// NÚMERO DO PROCESSO NO ÓRGÃO — o *ruolo generale* do tribunal italiano, o
   /// número de expediente do consulado espanhol. É OUTRO fato: o protocolo prova
   /// a entrega, este identifica o dossiê dentro do órgão pelo resto da vida dele.
   /// Vivia em `InformacaoItalia.numeroRuoloGenerale`, tabela que só a Itália
   /// tinha; aqui serve aos dois países e entra nos relatórios por órgão.
-  numeroProcesso       String?               @db.VarChar(100)
+  numeroProcesso       String?                @db.VarChar(100)
   /// PARA QUE serve este ato. `tipoProtocolo` diz ONDE (consular, judicial,
   /// comune); `origem` diz QUEM o criou (tela, solicitação, etapa). Faltava o
   /// para quê — sem ele não dá para separar, num relatório, O requerimento de
   /// cidadania de um protocolo de retificação no mesmo tribunal.
   /// Catálogo fechado em `FINALIDADES_DE_PROTOCOLO` (protocolo-canonico.ts).
-  finalidade           String                @default("REQUERIMENTO") @db.VarChar(30)
+  finalidade           String                 @default("REQUERIMENTO") @db.VarChar(30)
   /// SITUAÇÃO DADA PELO ÓRGÃO — não é fase do nosso workflow. O motor sabe em que
   /// etapa nós estamos; só o órgão sabe se deferiu, exigiu ou arquivou.
   /// Catálogo fechado em `SITUACOES_DE_PROTOCOLO`.
-  situacao             String                @default("PROTOCOLADO") @db.VarChar(30)
+  situacao             String                 @default("PROTOCOLADO") @db.VarChar(30)
   /// Quando a situação acima passou a valer (data do ato do órgão).
   situacaoEm           DateTime?
   tipoProtocolo        TipoProtocolo?
@@ -846,11 +849,11 @@ model Protocolo {
   /// ORIGEM do ato. "PROCESSO" = protocolizacao do dossie no orgao (telas do processo).
   /// "SOLICITACAO_DOCUMENTO" = numero devolvido ao solicitar uma certidao. E o MESMO
   /// cadastro de protocolo (nao existe um segundo); a origem so diz de onde ele nasceu.
-  origem               String                @default("PROCESSO") @db.VarChar(30)
+  origem               String                 @default("PROCESSO") @db.VarChar(30)
   /// Solicitacao de certidao que originou este protocolo (null = protocolo do processo).
   solicitacaoId        Int?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
   anexos               AnexoProtocolo[]
   documentos           ProtocoloDocumento[]
   /// QUEM este protocolo cobre. FONTE ÚNICA do escopo.
@@ -866,16 +869,18 @@ model Protocolo {
   /// Arquivos da operacao documental ligados a ESTE protocolo (o requerimento
   /// enviado, os comprovantes). E REFERENCIA ao mesmo DocumentoArquivo que a etapa
   /// e o documento leem - nao existe copia do binario nem segunda linha.
-  arquivos             DocumentoArquivo[]    @relation("ArquivoProtocolo")
-  tentativas           StepExecution[]       @relation("ProtocoloDaTentativa")
-  retificacoes         RetificacaoPacote[]   @relation("ProtocoloDaRetificacao")
-  execucoesDeSubtarefa SubtaskExecution[]    @relation("ProtocoloDaSubtarefa")
-  contratante          Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-  processo             Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  requerente           Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-  orgao                OrgaoProtocolo?       @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
-  responsavel          Usuario?              @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
-  solicitacao          SolicitacaoDocumento? @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  arquivos             DocumentoArquivo[]     @relation("ArquivoProtocolo")
+  tentativas           StepExecution[]        @relation("ProtocoloDaTentativa")
+  retificacoes         RetificacaoPacote[]    @relation("ProtocoloDaRetificacao")
+  execucoesDeSubtarefa SubtaskExecution[]     @relation("ProtocoloDaSubtarefa")
+  contratante          Contratante?           @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  processo             Processo               @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerente           Requerente?            @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  orgao                OrgaoProtocolo?        @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+  responsavel          Usuario?               @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  solicitacao          SolicitacaoDocumento?  @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  /// TIPO DO ATO, pelo cadastro. Ver `tipoProtocoloId`.
+  tipo                 TipoProtocoloCadastro? @relation(fields: [tipoProtocoloId], references: [id], onDelete: SetNull)
 
   @@index([processoId])
   @@index([contratanteId])
@@ -886,8 +891,32 @@ model Protocolo {
   /// RELATÓRIO POR CONSULADO/TRIBUNAL E POR DATA — o filtro que a operação pede
   /// ("tudo que foi protocolado no Consulado de São Paulo em agosto") varre estas
   /// duas colunas juntas, para os dois países, numa consulta só.
+  @@index([tipoProtocoloId])
   @@index([orgaoId, dataProtocolo])
   @@index([finalidade, situacao])
+}
+
+/// TIPO DE PROTOCOLO — cadastro, no Gerenciamento.
+///
+/// O enum `TipoProtocolo` (7 valores fixos no schema) obrigava um deploy para a
+/// operação classificar um ato novo, e não tinha descrição, ordem nem inativação.
+/// A regra "protocolo NÃO é cadastro" continua de pé — o ATO segue sendo uma
+/// ocorrência dentro do processo. O que virou cadastro é a CLASSIFICAÇÃO dele,
+/// que é outra coisa: uma lista que a operação mantém.
+model TipoProtocoloCadastro {
+  id           Int      @id @default(autoincrement())
+  /// Identidade IMUTÁVEL, gerada do nome na criação.
+  code         String   @unique @db.VarChar(60)
+  nome         String   @db.VarChar(120)
+  descricao    String?  @db.Text
+  ordem        Int      @default(0)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  protocolos Protocolo[]
+
+  @@index([ativo])
 }
 
 /// ESCOPO DO PROTOCOLO — quais requerentes aquele ato cobre.

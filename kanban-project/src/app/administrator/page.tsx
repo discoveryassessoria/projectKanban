@@ -210,6 +210,7 @@ const TELAS: Record<string, React.ComponentType> = {
   opcapacity: CapacidadeOperacionalTab,
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
+  prottypes: cad("tipos-protocolo"),
   profcats: cad("categorias-profissional"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
   // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro
@@ -344,7 +345,9 @@ export default function GerenciamentoPage() {
     categories: "catalog",
     coa: "catalog",
     costcenters: "catalog",
-    prottypes: "overview",
+    // `prottypes` deixou de ser alias em 31/08/2026: virou tela de verdade
+    // (Tipos de Protocolo). `protocols` continua caindo no painel — o ATO de
+    // protocolar nunca foi e não é cadastro.
     protocols: "overview",
   }
   const resolverTela = useCallback((k: string | null): string => {

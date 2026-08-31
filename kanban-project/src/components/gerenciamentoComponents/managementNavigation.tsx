@@ -214,15 +214,22 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   },
 
   // ══════════════════ 5. DOCUMENTOS E PROTOCOLOS ══════════════════════════════
-  // REGRA: só Documentos e Regras. PROTOCOLO NÃO É CADASTRO — é uma OCORRÊNCIA
-  // operacional registrada dentro do Processo (aba Protocolos), que alimenta a
-  // Timeline/Histórico. Não existe cadastro mestre de protocolo no Gerenciamento.
+  // REGRA: o PROTOCOLO não é cadastro — é uma OCORRÊNCIA registrada dentro do
+  // Processo (aba Protocolos), que alimenta a Timeline/Histórico. Continua sendo
+  // assim, e não existe cadastro mestre de protocolo aqui.
+  //
+  // O que existe é a CLASSIFICAÇÃO do ato: "Tipos de Protocolo" (31/08/2026).
+  // Era um enum de 7 valores fixos no schema — a operação precisava de um deploy
+  // para registrar um tipo novo, e o valor não tinha descrição nem inativação.
+  // Classificar não é criar um segundo lugar onde o protocolo mora.
   {
     key: "grp_documentos", label: "Documentos", fullLabel: "Documentos e Protocolos", icon: FileText, order: 50, status: "active",
     description: "Cadastros documentais e políticas documentais.",
     children: [
       a(10, "doctypes", "Tipos de Documento", ["documento", "certidao", "certidão", "tipo", "nascimento", "casamento", "obito"], "Documentos"),
       a(20, "doccats", "Categorias Documentais", ["categoria", "categorias", "documental", "classificacao", "classificação"], "Documentos"),
+
+      a(30, "prottypes", "Tipos de Protocolo", ["protocolo", "tipo", "consular", "judicial", "comune", "cartorio", "cartório", "tribunal"], "Protocolos"),
 
       a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental", "matriz", "obrigatorio", "obrigatório"], "Regras"),
 

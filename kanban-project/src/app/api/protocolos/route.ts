@@ -64,6 +64,7 @@ export async function POST(request: Request) {
       finalidade,
       situacao,
       tipoProtocolo,
+      tipoProtocoloId,
       formaEnvio,
       responsavelId,
       observacoes,
@@ -83,9 +84,22 @@ export async function POST(request: Request) {
     if (!numeroProtocolo) {
       return NextResponse.json({ error: "Número do protocolo é obrigatório" }, { status: 400 })
     }
-    if (!tipoProtocolo || !Object.values(TipoProtocolo).includes(tipoProtocolo)) {
-      return NextResponse.json({ error: "Tipo de protocolo inválido" }, { status: 400 })
+    // TIPO — agora vem do cadastro. O enum continua sendo gravado enquanto a
+    // coluna existir, e só quando o `code` do cadastro corresponde a um valor
+    // dele: tipo novo criado pela operação simplesmente não tem enum, e isso é
+    // correto — o enum é o legado, não a fonte.
+    const tipo = tipoProtocoloId
+      ? await prisma.tipoProtocoloCadastro.findUnique({
+          where: { id: Number(tipoProtocoloId) },
+          select: { id: true, code: true, ativo: true },
+        })
+      : null
+    if (!tipo || !tipo.ativo) {
+      return NextResponse.json({ error: "Selecione um tipo de protocolo do cadastro." }, { status: 400 })
     }
+    const enumEquivalente = (Object.values(TipoProtocolo) as string[]).includes(tipo.code)
+      ? (tipo.code as TipoProtocolo)
+      : null
     if (!formaEnvio || !Object.values(FormaEnvioProtocolo).includes(formaEnvio)) {
       return NextResponse.json({ error: "Forma de envio inválida" }, { status: 400 })
     }
@@ -136,9 +150,10 @@ export async function POST(request: Request) {
         dataProtocolo: quando,
         numeroProtocolo,
         numeroProcesso: numeroProcesso || null,
+        tipoProtocoloId: tipo.id,
         ...(finalidade ? { finalidade } : {}),
         ...(situacao ? { situacao } : {}),
-        tipoProtocolo,
+        tipoProtocolo: enumEquivalente,
         formaEnvio,
         origem: ORIGENS_DE_PROTOCOLO.PROCESSO,
         responsavelId: Number(responsavelId),

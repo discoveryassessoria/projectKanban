@@ -171,6 +171,44 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     ],
   },
 
+  // ── Documentos e Protocolos › Tipos de Protocolo ──────────────────────────
+  // A regra "protocolo NÃO é cadastro" continua de pé: o ATO é uma ocorrência
+  // dentro do processo. O que é cadastro aqui é a CLASSIFICAÇÃO do ato — antes
+  // um enum de 7 valores fixos, que obrigava deploy para a operação registrar um
+  // tipo novo e não tinha descrição, ordem nem inativação.
+  "tipos-protocolo": {
+    entidade: "tipos-protocolo",
+    model: "tipoProtocoloCadastro",
+    titulo: "Tipos de Protocolo",
+    singular: "tipo de protocolo",
+    descricao:
+      "Classificam o ato de protocolar (consular, judicial, comune, cartório…). O protocolo em si continua sendo registrado dentro do processo, na aba Protocolos — aqui vive apenas a lista de tipos que aquela tela oferece.",
+    novoLabel: "+ Novo tipo",
+    codeDe: "nome",
+    identidade: "nome",
+    ordenavel: true,
+    auditoria: "TipoProtocoloCadastro",
+    // Tipo em uso não some do histórico: protocolo já registrado ficaria sem
+    // classificação, e o relatório por tipo passaria a mentir.
+    protegerExclusao: [
+      { model: "protocolo", campo: "tipoProtocoloId", rotulo: "protocolos registrados" },
+    ],
+    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
+    colunas: [
+      { key: "nome", label: "Tipo" },
+      { key: "code", label: "Código" },
+      { key: "descricao", label: "Descrição" },
+    ],
+    campos: [
+      { key: "nome", label: "Nome do tipo", tipo: "text", obrigatorio: true, largura: "cheia" },
+      {
+        key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia",
+        ajuda: "Quando a operação deve escolher este tipo ao registrar um protocolo.",
+      },
+      ...CAMPOS_BASE,
+    ],
+  },
+
   // ── Órgãos e Organizações › Profissionais › Categorias ────────────────────
   "categorias-profissional": {
     entidade: "categorias-profissional",

@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { TIPOS_PROTOCOLO, FORMAS_ENVIO } from "@/src/services/protocolizacao"
+import { FORMAS_ENVIO } from "@/src/services/protocolizacao"
 import {
   cardinalidadeDoProcesso,
   FINALIDADES_DE_PROTOCOLO,
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 
     const processoId = parseInt(new URL(request.url).searchParams.get("processoId") || "")
 
-    const [orgaos, responsaveis] = await Promise.all([
+    const [orgaos, responsaveis, tiposCadastro] = await Promise.all([
       prisma.orgaoProtocolo.findMany({
         where: { ativo: true },
         select: { id: true, name: true, type: true, city: true },
@@ -35,6 +35,14 @@ export async function GET(request: Request) {
       prisma.usuario.findMany({
         select: { id: true, nome: true },
         orderBy: { nome: "asc" },
+      }),
+      // TIPO DO ATO vem do CADASTRO (Gerenciamento → Documentos e Protocolos →
+      // Tipos de Protocolo). Era um enum de 7 valores no schema: registrar um
+      // tipo novo exigia deploy.
+      prisma.tipoProtocoloCadastro.findMany({
+        where: { ativo: true },
+        select: { id: true, code: true, nome: true, descricao: true },
+        orderBy: [{ ordem: "asc" }, { nome: "asc" }],
       }),
     ])
 
@@ -71,13 +79,34 @@ export async function GET(request: Request) {
       ? CARDINALIDADES.INDIVIDUAL
       : await cardinalidadeDoProcesso(prisma, processoId)
 
+    // LACUNA DE CADASTRO TEM QUE APARECER. Sem enquadramento legal declarado, a
+    // regra acima é um FALLBACK restritivo, não uma resposta — e a tela precisa
+    // dizer isso em vez de restringir em silêncio. Cair calado na regra mais
+    // apertada faz o operador achar que o sistema sabe algo que ele não sabe.
+    const rota = isNaN(processoId) ? null : await prisma.processo.findUnique({
+      where: { id: processoId },
+      select: {
+        enquadramentoLegal: {
+          select: { id: true, nome: true, modalidadeLegal: { select: { id: true, nome: true, cardinalidadeRequerimento: true } } },
+        },
+      },
+    })
+    const cardinalidadeDeclarada = !!rota?.enquadramentoLegal?.modalidadeLegal
+
     return NextResponse.json({
       orgaos,
       responsaveis,
       documentos,
-      tipos: TIPOS_PROTOCOLO,
       formasEnvio: FORMAS_ENVIO,
       cardinalidade,
+      cardinalidadeDeclarada,
+      rota: rota?.enquadramentoLegal
+        ? {
+            enquadramento: rota.enquadramentoLegal.nome,
+            modalidade: rota.enquadramentoLegal.modalidadeLegal?.nome ?? null,
+          }
+        : null,
+      tiposCadastro,
       finalidades: Object.values(FINALIDADES_DE_PROTOCOLO),
       situacoes: Object.values(SITUACOES_DE_PROTOCOLO),
     })

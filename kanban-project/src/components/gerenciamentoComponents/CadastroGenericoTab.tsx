@@ -10,6 +10,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { moverUmaPosicao, moverPara } from "@/lib/gerenciamento/cadastro-identidade"
 import { useApi } from "@/src/lib/dados"
+import {
+  useSelecaoEmMassa, executarEmMassa, CaixaDeSelecao, CaixaDeSelecaoTodos,
+  BarraDeSelecao, ResumoEmMassa, type ResultadoEmMassa,
+} from "@/src/components/ui/selecao-em-massa"
 
 type Registro = Record<string, unknown>
 interface CampoSpec {
@@ -181,6 +185,12 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
     else setErro(j.error || "Erro ao excluir.")
   }
 
+  // ─── SELEÇÃO MÚLTIPLA ──────────────────────────────────────────────────
+  // A exclusão em massa chama a MESMA porta de uma linha, item a item: a guarda
+  // "não excluo o que está em uso" continua valendo e o resultado volta honesto.
+  const [excluindoEmMassa, setExcluindoEmMassa] = useState(false)
+  const [resultadoEmMassa, setResultadoEmMassa] = useState<ResultadoEmMassa | null>(null)
+
   // ORDEM administrada pelo sistema: a listagem é a interface de reordenação.
   // `ordemLocal` reflete o arrasto em curso; o servidor recebe a lista final.
   const idsOrdenados = useMemo(
@@ -216,6 +226,32 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
     if (!q) return base
     return base.filter((r) => Object.values(r).some((v) => String(v ?? "").toLowerCase().includes(q)))
   }, [rows, ordenadas, spec, busca])
+
+  const idsVisiveis = useMemo(() => filtradas.map((r) => Number(r.id)), [filtradas])
+  const selecao = useSelecaoEmMassa(idsVisiveis, `${entidade}:${busca}`)
+  const nomePorId = useMemo(() => {
+    const mapa = new Map<number, string>()
+    for (const r of rows) mapa.set(Number(r.id), String(r.nome ?? r.id))
+    return mapa
+  }, [rows])
+
+  async function excluirSelecionados() {
+    const ids = [...selecao.selecionados]
+    if (ids.length === 0) return
+    if (!confirm(`Excluir ${ids.length} registro(s)? O que estiver em uso será recusado e continuará existindo.`)) return
+    setExcluindoEmMassa(true)
+    setResultadoEmMassa(null)
+    const resultado = await executarEmMassa(ids, async (id) => {
+      const res = await fetch(`/api/gerenciamento/cadastros/${entidade}/${id}`, { method: "DELETE", headers: authHeaders() })
+      if (res.ok) return { ok: true }
+      const j = await res.json().catch(() => ({}))
+      return { ok: false, motivo: j.error || `Erro ${res.status}.` }
+    })
+    setExcluindoEmMassa(false)
+    setResultadoEmMassa(resultado)
+    selecao.limpar()
+    await load()
+  }
 
   function celula(r: Registro, col: { key: string; label: string }) {
     if (col.key === "_membros") return String((r[spec?.relacao?.campoForm ?? "membros"] as unknown[] | undefined)?.length ?? 0)
@@ -265,10 +301,31 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
         )}
       </div>
 
+      <ResumoEmMassa
+        resultado={resultadoEmMassa}
+        substantivo={["registro", "registros"]}
+        rotuloDoItem={(id) => nomePorId.get(Number(id)) ?? `#${id}`}
+        onFechar={() => setResultadoEmMassa(null)}
+      />
+      <BarraDeSelecao
+        quantidade={selecao.quantidade}
+        substantivo={["registro", "registros"]}
+        onLimpar={selecao.limpar}
+        onExcluir={() => void excluirSelecionados()}
+        excluindo={excluindoEmMassa}
+      />
+
       <div className={`overflow-x-auto ${CARD}`}>
         <table className="w-full text-sm">
           <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr>
+              <th className="w-10 px-4 py-3 font-medium">
+                <CaixaDeSelecaoTodos
+                  todosMarcados={selecao.todosMarcados}
+                  algumMarcado={selecao.algumMarcado}
+                  onAlternar={selecao.alternarTodos}
+                />
+              </th>
               {spec.ordenavel && <th className="w-10 px-2 py-3 font-medium" aria-label="Ordem" />}
               {spec.colunas.map((c) => <th key={c.key} className="px-4 py-3 font-medium">{c.label}</th>)}
               <th className="px-4 py-3 font-medium">Status</th>
@@ -278,7 +335,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
           <tbody>
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={spec.colunas.length + (spec.ordenavel ? 3 : 2)} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">
+                <td colSpan={spec.colunas.length + (spec.ordenavel ? 4 : 3)} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">
                   {rows.length === 0 ? `Nenhum registro. Comece em “${spec.novoLabel}”.` : "Nada encontrado para esta busca."}
                 </td>
               </tr>
@@ -299,6 +356,13 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                   if (novos !== idsOrdenados) void salvarOrdem(novos)
                 }}
               >
+                <td className="px-4 py-2.5 align-middle">
+                  <CaixaDeSelecao
+                    marcada={selecao.selecionados.has(Number(r.id))}
+                    onAlternar={() => selecao.alternar(Number(r.id))}
+                    rotulo={`Selecionar ${String(r.nome ?? r.id)}`}
+                  />
+                </td>
                 {spec.ordenavel && (
                   <td className="px-2 py-2.5 align-middle">
                     <div className="flex items-center gap-0.5">
