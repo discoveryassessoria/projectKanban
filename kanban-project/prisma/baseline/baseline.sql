@@ -461,6 +461,7 @@ CREATE TABLE "Processo" (
     "descricao" VARCHAR(500),
     "observacoes" TEXT,
     "pais" TEXT NOT NULL,
+    "paisId" INTEGER,
     "arvoreId" INTEGER,
     "familiaId" INTEGER,
     "dataInicio" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2864,6 +2865,8 @@ CREATE TABLE "MatrizDocumental" (
     "tipoProcessoId" INTEGER NOT NULL,
     "phaseKey" VARCHAR(60),
     "documentTypeCode" VARCHAR(40) NOT NULL,
+    "documentoTipoId" INTEGER,
+    "tipoProcessoRefId" INTEGER,
     "target" VARCHAR(40) NOT NULL DEFAULT 'direct_line_person',
     "generationRule" VARCHAR(40) NOT NULL DEFAULT 'all_direct_line',
     "required" BOOLEAN NOT NULL DEFAULT true,
@@ -4311,6 +4314,7 @@ CREATE TABLE "SolicitacaoDocumento" (
     "stepInstanceId" INTEGER,
     "tarefaId" INTEGER,
     "canal" "CanalSolicitacaoDocumento" NOT NULL,
+    "canalOperacionalId" INTEGER,
     "orgaoId" INTEGER,
     "destinatarioNome" VARCHAR(200),
     "atendente" VARCHAR(200),
@@ -6504,6 +6508,9 @@ ALTER TABLE "Documento" ADD CONSTRAINT "Documento_necessidadeId_fkey" FOREIGN KE
 ALTER TABLE "Documento" ADD CONSTRAINT "Documento_derivadoDeId_fkey" FOREIGN KEY ("derivadoDeId") REFERENCES "Documento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Processo" ADD CONSTRAINT "Processo_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Processo" ADD CONSTRAINT "Processo_arvoreId_fkey" FOREIGN KEY ("arvoreId") REFERENCES "Arvore"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -7038,6 +7045,12 @@ ALTER TABLE "PerfilOperacionalDocumento" ADD CONSTRAINT "PerfilOperacionalDocume
 ALTER TABLE "PerfilOperacionalDocumento" ADD CONSTRAINT "PerfilOperacionalDocumento_familiaDocumentalId_fkey" FOREIGN KEY ("familiaDocumentalId") REFERENCES "FamiliaDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "MatrizDocumental" ADD CONSTRAINT "MatrizDocumental_documentoTipoId_fkey" FOREIGN KEY ("documentoTipoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MatrizDocumental" ADD CONSTRAINT "MatrizDocumental_tipoProcessoRefId_fkey" FOREIGN KEY ("tipoProcessoRefId") REFERENCES "TipoProcessoNacionalidade"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "MotorArtefato" ADD CONSTRAINT "MotorArtefato_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -7330,6 +7343,9 @@ ALTER TABLE "SaudeAchado" ADD CONSTRAINT "SaudeAchado_execucaoId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_canalOperacionalId_fkey" FOREIGN KEY ("canalOperacionalId") REFERENCES "CanalOperacional"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_orgaoId_fkey" FOREIGN KEY ("orgaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;

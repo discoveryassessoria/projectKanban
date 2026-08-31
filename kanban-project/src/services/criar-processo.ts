@@ -156,7 +156,11 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
           nome: input.nome.trim(),
           descricao: input.descricao?.trim() || null,
           observacoes: input.observacoes?.trim() || null,
-          pais: input.pais,
+          // IDENTIDADE + ESPELHO, juntos. O cadastro já era consultado acima
+          // para VALIDAR; agora o vínculo também é gravado, e `pais` (texto)
+          // passa a ser derivado dele em vez de ser a verdade.
+          pais: paisCat.countryKey,
+          paisId: paisCat.id,
           faseAtualKey: primeiraFase, // estado inicial do agregado (não é transição)
           arvoreId: input.arvoreId || null,
           previsaoTermino: input.previsaoTermino ? new Date(input.previsaoTermino) : null,

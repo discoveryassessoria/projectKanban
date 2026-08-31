@@ -58,7 +58,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const usuarioId = await usuarioIdDe(request)
     const data = regraInputParaData(input)
-    const row = await prisma.matrizDocumental.update({ where: { id: atual.id }, data: { ...(data as object), atualizadoPor: usuarioId ?? undefined } })
+
+    // A IDENTIDADE SEGUE O CODE. Se a edição trocou o documento aceito, a FK
+    // precisa acompanhar — senão a regra passaria a exibir um tipo e apontar
+    // para outro, que é a divergência silenciosa que esta migração existe para
+    // impedir. Resolvido do valor que ESTA edição está gravando.
+    const codeAlvo = String((data as Record<string, unknown>).documentTypeCode ?? atual.documentTypeCode ?? "")
+    const procAlvo = Number((data as Record<string, unknown>).tipoProcessoId ?? atual.tipoProcessoId ?? 0)
+    const [tipoDocCanonico, tipoProcCanonico] = await Promise.all([
+      codeAlvo ? prisma.tipoDocumentoCadastro.findFirst({ where: { code: codeAlvo }, select: { id: true } }) : null,
+      procAlvo ? prisma.tipoProcessoNacionalidade.findUnique({ where: { id: procAlvo }, select: { id: true } }) : null,
+    ])
+
+    const row = await prisma.matrizDocumental.update({
+      where: { id: atual.id },
+      data: {
+        ...(data as object),
+        documentoTipoId: tipoDocCanonico?.id ?? null,
+        tipoProcessoRefId: tipoProcCanonico?.id ?? null,
+        atualizadoPor: usuarioId ?? undefined,
+      },
+    })
     await auditar(prisma, { acao: "REGRA_EDITADA", entidadeId: row.id, descricao: `Regra editada no lugar: ${row.nome ?? row.documentTypeCode} (v${row.versao}, ${row.status})`, detalhes: { antes: matrizParaRegra(atual), depois: matrizParaRegra(row) }, usuarioId })
     return NextResponse.json({ regra: row })
   } catch (e) {

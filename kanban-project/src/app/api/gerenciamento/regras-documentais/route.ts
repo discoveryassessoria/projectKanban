@@ -45,11 +45,24 @@ export async function POST(request: NextRequest) {
     const primeiroDoc = input.documentosAceitos?.[0] ?? input.documentTypeCode ?? ""
     const codigo = novoCodigoRegra(primeiroProc, primeiroDoc)
 
+    // IDENTIDADE CANÔNICA. `documentTypeCode` e `tipoProcessoId` eram texto e
+    // Int SOLTOS — o schema admitia isso em comentário. A regra passa a apontar
+    // para a linha do cadastro; as colunas antigas continuam gravadas como
+    // espelho enquanto ainda tiverem leitores.
+    const tipoDocCanonico = primeiroDoc
+      ? await prisma.tipoDocumentoCadastro.findFirst({ where: { code: primeiroDoc }, select: { id: true } })
+      : null
+    const tipoProcCanonico = primeiroProc
+      ? await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: primeiroProc }, select: { id: true } })
+      : null
+
     const row = await prisma.matrizDocumental.create({
       data: {
         ...(data as object),
         tipoProcessoId: primeiroProc,
+        tipoProcessoRefId: tipoProcCanonico?.id ?? null,
         documentTypeCode: primeiroDoc,
+        documentoTipoId: tipoDocCanonico?.id ?? null,
         codigo,
         versao: 1,
         status: "RASCUNHO",

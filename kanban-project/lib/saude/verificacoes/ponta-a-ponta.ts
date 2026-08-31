@@ -106,11 +106,18 @@ registrar({
     let detalheCriacao = 'não testada'
     if (tipo) {
       try {
+        const paisDiagnostico = await prisma.catalogoPais.findFirst({
+          where: { countryKey: 'italia' }, select: { id: true, countryKey: true },
+        })
         await prisma.$transaction(async (tx) => {
           const p = await tx.processo.create({
             data: {
               nome: '[diagnóstico] simulação — rollback automático',
-              pais: 'ITALIA',
+              // Identidade + espelho. O valor era 'ITALIA' em maiúsculas, que
+              // não corresponde a nenhuma chave do cadastro — o diagnóstico
+              // criava um processo de um país que não existe.
+              pais: paisDiagnostico?.countryKey ?? 'italia',
+              paisId: paisDiagnostico?.id ?? null,
               tipoProcessoMotorId: tipo.id,
               faseAtualKey: ordenadas[0]?.phaseKey ?? null,
             },

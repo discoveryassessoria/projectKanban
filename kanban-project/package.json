@@ -357,7 +357,8 @@
     "test:fase-vazia": "tsx scripts/fase-vazia-explica.test.ts",
     "test:atributo-cadastral": "tsx scripts/guard-atributo-cadastral.test.ts",
     "test:status-documental": "tsx scripts/guard-status-documental-nao-operacional.test.ts",
-    "test:relatorios": "tsx scripts/relatorios-canonico.test.ts"
+    "test:relatorios": "tsx scripts/relatorios-canonico.test.ts",
+    "test:identidade-canonica": "tsx scripts/identidade-canonica-cobertura.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

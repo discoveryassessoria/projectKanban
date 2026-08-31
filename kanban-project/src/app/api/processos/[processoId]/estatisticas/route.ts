@@ -42,7 +42,7 @@ export async function GET(
     // 1) Carrega o processo (precisa do arvoreId e pais)
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true, pais: true },
+      select: { id: true, arvoreId: true, pais: true, paisId: true, paisCanonico: { select: { countryKey: true } } },
     })
 
     if (!processo) {
@@ -98,7 +98,13 @@ export async function GET(
     // 5) Protocolo — para Espanha, conta os protocolos cadastrados.
     //    "Apto" ainda não tem regra formal no schema → false por enquanto.
     let protocoloImpeditivos = 0
-    if (processo.pais === "ESPANHA") {
+    // IDENTIDADE, NÃO NOME. Este `if` comparava com "ESPANHA" em maiúsculas
+    // enquanto o banco grava a chave do cadastro em minúsculas ('espanha') —
+    // ele NUNCA era verdadeiro, e o contador ficava zerado sem ninguém notar.
+    // É o caso exemplar de por que relacionamento por texto não pode existir.
+    if (processo.paisId != null
+      ? processo.paisCanonico?.countryKey === "espanha"
+      : (processo.pais ?? "").toLowerCase() === "espanha") {
       protocoloImpeditivos = await prisma.protocolo.count({
         where: { processoId: id, dataProtocolo: null },
       })

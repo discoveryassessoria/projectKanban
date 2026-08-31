@@ -21,6 +21,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { completudeDoProcesso, type RequisitoAvaliado } from "@/src/lib/requisitos/completude"
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 /** Teto de processos avaliados por chamada. Acima disso, refine os filtros. */
 const TETO = 300
@@ -46,7 +47,8 @@ export async function GET(request: Request) {
       where: {
         ...(processoId != null ? { id: processoId } : {}),
         ...(familiaId != null ? { familiaId } : {}),
-        ...(paisKey ? { pais: paisKey } : {}),
+        // Identidade, não texto: mesma resolução do relatório de protocolos.
+        ...ondePaisEh(paisKey),
       },
       select: { id: true, codigo: true, nome: true, pais: true, familia: { select: { id: true, nome: true } } },
       orderBy: { id: "desc" },

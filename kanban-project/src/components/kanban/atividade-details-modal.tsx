@@ -89,9 +89,17 @@ interface ProcessoDetailsModalProps {
   initialTaskId?: number
 }
 
-/** País do processo — usado tanto no valor inicial da aba quanto no corpo do modal. */
+/**
+ * País do processo, por IDENTIDADE.
+ *
+ * Comparava com "ITALIA" em maiúsculas enquanto o banco grava a chave do
+ * cadastro em minúsculas ('italia') — nunca era verdadeiro. Comparação de
+ * negócio por texto tem exatamente esse defeito: ela não falha, ela mente.
+ */
 function ehItalia(processo: ProcessoWithStatus | Processo | null): boolean {
-  return processo?.pais === "ITALIA"
+  const p = processo as { paisCanonico?: { countryKey?: string } | null; pais?: string | null } | null
+  const chave = p?.paisCanonico?.countryKey ?? p?.pais ?? ""
+  return chave.toLowerCase() === "italia"
 }
 
 /** Abas válidas do modal. */

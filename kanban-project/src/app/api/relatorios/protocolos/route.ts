@@ -20,6 +20,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { Prisma } from "@prisma/client"
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 /** Fim do dia, para `ate` inclusivo — filtro de data que exclui o próprio dia é bug clássico. */
 function fimDoDia(iso: string): Date {
@@ -60,8 +61,12 @@ export async function GET(request: Request) {
       ...(orgaoTipo || orgaoPais
         ? { orgao: { ...(orgaoTipo ? { type: orgaoTipo } : {}), ...(orgaoPais ? { country: orgaoPais } : {}) } }
         : {}),
+      // NACIONALIDADE POR IDENTIDADE. Comparar `Processo.pais` com o texto do
+      // filtro funcionava por coincidência: os dois usavam a mesma grafia. A
+      // cláusula agora sai de `ondePaisEh`, que casa pela FK do cadastro e só
+      // cai no texto para linha que ainda não tem identidade.
       ...(familiaId != null || paisProcesso
-        ? { processo: { ...(familiaId != null ? { familiaId } : {}), ...(paisProcesso ? { pais: paisProcesso } : {}) } }
+        ? { processo: { ...(familiaId != null ? { familiaId } : {}), ...ondePaisEh(paisProcesso) } }
         : {}),
       // O filtro por requerente atravessa o ESCOPO — é assim que a mesma pergunta
       // serve à Espanha (uma pessoa, um protocolo) e à Itália (uma pessoa dentro

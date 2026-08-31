@@ -241,6 +241,10 @@ model Documento {
   publicCode            String?         @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
   id                    Int             @id @default(autoincrement())
   pessoaId              Int
+  /// LEGADO EM TRANSIÇÃO: enum de 15 valores. A identidade canônica do tipo já
+  /// existia — é `documentTypeId`, mais abaixo, que aponta para o Cadastro
+  /// Mestre documental. Este enum é ESPELHO dele, e a ponte é
+  /// `TipoDocumentoCadastro.legacyEnumKey`.
   tipo                  TipoDocumento?
   status                StatusDocumento @default(PENDENTE)
   descricao             String?         @db.VarChar(200)
@@ -441,7 +445,14 @@ model Processo {
   nome                        String                 @db.VarChar(100)
   descricao                   String?                @db.VarChar(500)
   observacoes                 String?
+  /// LEGADO EM TRANSIÇÃO: texto livre ('espanha', 'italia'). Continua gravado
+  /// porque 136 leitores ainda o consomem, mas NÃO é mais fonte de verdade — ele
+  /// é ESPELHO derivado de `paisId`, escrito só pela porta canônica. Guard
+  /// impede novo writer (npm run test:identidade-canonica).
   pais                        String
+  /// IDENTIDADE CANÔNICA da nacionalidade. Fonte: Países e Regiões.
+  paisId                      Int?
+  paisCanonico                CatalogoPais?          @relation("ProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
   arvoreId                    Int?
   familiaId                   Int?
   dataInicio                  DateTime               @default(now())
@@ -3211,6 +3222,8 @@ model TipoProcessoNacionalidade {
   processosVinculados Processo[]          @relation("ProcessoTipoMotor")
   configFinanceiras   ProdutoFinanceiro[] @relation("ConfigFinTipoProcesso")
 
+  regrasDocumentaisRef MatrizDocumental[] @relation("MatrizTipoProcessoCanonico")
+
   @@index([countryKey])
   @@index([modalityKey])
 }
@@ -3234,6 +3247,8 @@ model CatalogoPais {
   taxasPagamento       TaxaPagamentoPais[]
   servicos             ServicoProdutoPais[]
   modalidadesLegais    ModalidadeLegal[]
+
+  processos Processo[] @relation("ProcessoPais")
 }
 
 model ModalidadePais {
@@ -3975,6 +3990,8 @@ model CanalOperacional {
 
   passos       StepChannel[]
   organizacoes OrganizacaoCanal[]
+
+  solicitacoesCanonicas SolicitacaoDocumento[] @relation("SolicitacaoCanalCanonico")
 }
 
 model PhaseAutomationRule {
@@ -4185,6 +4202,7 @@ model TipoDocumentoCadastro {
   // REPOSITÓRIO DE MODELOS — o tipo mestre é o QUE o modelo produz (por ID).
   modelosDocumentais ModeloDocumental[] @relation("ModeloTipoDocumento")
   documentosGerados  DocumentoGerado[]  @relation("DocumentoGeradoTipo")
+  regrasDocumentais  MatrizDocumental[] @relation("MatrizTipoCanonico")
 
   @@index([itemCatalogoId])
   @@index([categoriaDocumentalId])
@@ -4325,26 +4343,35 @@ model CategoriaDocumental {
 // Matriz Documental (documentRequirementMatrix) â quais documentos sÃ£o
 // exigidos por processo, fase, alvo e regra de geraÃ§Ã£o. Por processo.
 model MatrizDocumental {
-  id                    Int      @id @default(autoincrement())
+  id                    Int                        @id @default(autoincrement())
   tipoProcessoId        Int // â TipoProcessoNacionalidade (solto)
-  phaseKey              String?  @db.VarChar(60) // null = qualquer fase (LEGADO; ver faseExigencia)
-  documentTypeCode      String   @db.VarChar(40) // â TipoDocumentoCadastro.code (solto)
-  target                String   @default("direct_line_person") @db.VarChar(40)
-  generationRule        String   @default("all_direct_line") @db.VarChar(40)
-  required              Boolean  @default(true)
-  conditional           Boolean  @default(false)
-  condition             String?  @db.Text
-  createsTask           Boolean  @default(true)
-  createsCost           Boolean  @default(false)
-  createsRevenue        Boolean  @default(false)
-  blocksPhaseCompletion Boolean  @default(false)
-  usedByCount           Int      @default(0)
-  arquivado             Boolean  @default(false)
+  phaseKey              String?                    @db.VarChar(60) // null = qualquer fase (LEGADO; ver faseExigencia)
+  /// LEGADO EM TRANSIÇÃO: code em texto, "solto" por definição. Espelho de
+  /// `documentoTipoId`.
+  documentTypeCode      String                     @db.VarChar(40)
+  /// IDENTIDADE CANÔNICA do tipo documental exigido pela regra.
+  documentoTipoId       Int?
+  documentoTipo         TipoDocumentoCadastro?     @relation("MatrizTipoCanonico", fields: [documentoTipoId], references: [id], onDelete: Restrict)
+  /// IDENTIDADE CANÔNICA do tipo de processo. `tipoProcessoId` era Int solto,
+  /// sem FK — nada impedia apontar para um tipo inexistente.
+  tipoProcessoRefId     Int?
+  tipoProcessoRef       TipoProcessoNacionalidade? @relation("MatrizTipoProcessoCanonico", fields: [tipoProcessoRefId], references: [id], onDelete: Restrict) // â TipoDocumentoCadastro.code (solto)
+  target                String                     @default("direct_line_person") @db.VarChar(40)
+  generationRule        String                     @default("all_direct_line") @db.VarChar(40)
+  required              Boolean                    @default(true)
+  conditional           Boolean                    @default(false)
+  condition             String?                    @db.Text
+  createsTask           Boolean                    @default(true)
+  createsCost           Boolean                    @default(false)
+  createsRevenue        Boolean                    @default(false)
+  blocksPhaseCompletion Boolean                    @default(false)
+  usedByCount           Int                        @default(0)
+  arquivado             Boolean                    @default(false)
   // CP-3 â versÃ£o da regra (snapshot imutÃ¡vel por versÃ£o; mudanÃ§a futura
   // incrementa a versÃ£o e NÃO reescreve necessidades jÃ¡ produzidas).
-  versao                Int      @default(1)
-  criadoEm              DateTime @default(now())
-  atualizadoEm          DateTime @updatedAt
+  versao                Int                        @default(1)
+  criadoEm              DateTime                   @default(now())
+  atualizadoEm          DateTime                   @updatedAt
 
   // ============================================================
   // REGRAS DOCUMENTAIS (estrutura canÃ´nica ampliada) â base dos workflows
@@ -7172,14 +7199,19 @@ model SolicitacaoDocumento {
   stepInstanceId     Int?
   tarefaId           Int?
 
-  canal            CanalSolicitacaoDocumento
+  /// LEGADO EM TRANSIÇÃO: enum. Espelho derivado de `canalOperacionalId`, cuja
+  /// ponte é `CanalOperacional.key` (mesmas 8 chaves).
+  canal              CanalSolicitacaoDocumento
+  /// IDENTIDADE CANÔNICA do canal. Fonte: Canais de atendimento.
+  canalOperacionalId Int?
+  canalOperacional   CanalOperacional?         @relation("SolicitacaoCanalCanonico", fields: [canalOperacionalId], references: [id], onDelete: Restrict)
   /// Orgao/cartorio quando ha cadastro (Orgaos e Organizacoes).
-  orgaoId          Int?
-  orgao            OrgaoProtocolo?           @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+  orgaoId            Int?
+  orgao              OrgaoProtocolo?           @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
   /// Nome do destinatario quando nao ha cadastro correspondente. Nunca substitui orgaoId.
-  destinatarioNome String?                   @db.VarChar(200)
+  destinatarioNome   String?                   @db.VarChar(200)
   /// Pessoa que atendeu (balcao, telefone, e-mail).
-  atendente        String?                   @db.VarChar(200)
+  atendente          String?                   @db.VarChar(200)
 
   dataEnvio          DateTime
   prazoEsperadoDias  Int?
