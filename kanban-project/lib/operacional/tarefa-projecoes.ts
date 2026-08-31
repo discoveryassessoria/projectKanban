@@ -445,7 +445,7 @@ export async function dossieDaTarefa(tarefaId: number) {
   const protocolos = t.documentoId != null
     ? await prisma.protocolo.findMany({
         where: { numeroProtocolo: { not: null }, documentos: { some: { documentoId: t.documentoId } } },
-        select: { id: true, numeroProtocolo: true, tipoProtocolo: true, createdAt: true, solicitacaoId: true },
+        select: { id: true, numeroProtocolo: true, tipo: { select: { nome: true } }, createdAt: true, solicitacaoId: true },
         orderBy: { createdAt: 'desc' },
       })
     : []
@@ -596,7 +596,7 @@ export async function dossieDaTarefa(tarefaId: number) {
     protocolos: protocolos.map((p) => ({
       id: p.id,
       numero: p.numeroProtocolo,
-      tipo: p.tipoProtocolo,
+      tipo: p.tipo?.nome ?? null,
       em: p.createdAt.toISOString(),
       solicitacaoId: p.solicitacaoId,
     })),

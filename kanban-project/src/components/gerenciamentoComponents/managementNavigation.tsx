@@ -411,6 +411,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "diagnostics", "Diagnóstico do Sistema", ["diagnostico", "diagnóstico", "relatorio", "relatório"], "Relatórios"),
       a(20, "cfgdiagnosis", "Diagnóstico de Configuração", ["diagnostico", "diagnóstico", "config", "relatorio"], "Relatórios"),
+      // PROTOCOLOS — a pergunta que a operação faz toda semana: o que foi
+      // protocolado, em qual consulado ou tribunal, de qual família, quando.
+      a(25, "protreport", "Protocolos", ["protocolo", "consulado", "tribunal", "familia", "família", "requerimento", "exigencia", "exigência", "relatorio"], "Relatórios"),
 
       a(30, "mgmthealth", "Diagnóstico Executivo", ["indicador", "kpi", "saude", "saúde", "executivo", "score"], "Indicadores"),
       a(40, "syshealth", "Saúde do Sistema", ["saude", "saúde", "indicador", "score", "auditoria"], "Indicadores"),

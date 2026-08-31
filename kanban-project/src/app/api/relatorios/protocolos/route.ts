@@ -84,7 +84,7 @@ export async function GET(request: Request) {
         finalidade: true,
         situacao: true,
         situacaoEm: true,
-        tipoProtocolo: true,
+        tipo: { select: { id: true, code: true, nome: true } },
         formaEnvio: true,
         setor: true,
         orgao: { select: { id: true, publicCode: true, name: true, type: true, city: true, country: true } },

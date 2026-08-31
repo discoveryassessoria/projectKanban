@@ -9,6 +9,10 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { CodigoPublicoField } from './CodigoPublicoField'
 import { useApi } from "@/src/lib/dados"
+import {
+  useSelecaoEmMassa, executarEmMassa, CaixaDeSelecao, CaixaDeSelecaoTodos,
+  BarraDeSelecao, ResumoEmMassa, type ResultadoEmMassa,
+} from "@/src/components/ui/selecao-em-massa"
 
 type Fornecedor = {
   id: number
@@ -167,6 +171,33 @@ export default function FornecedoresTab() {
     }
   }
 
+  // ─── SELEÇÃO MÚLTIPLA ──────────────────────────────────────────────────
+  const idsVisiveis = useMemo(() => filtrados.map((f) => f.id), [filtrados])
+  const selecao = useSelecaoEmMassa(idsVisiveis, `fornecedores:${busca}`)
+  const [excluindoEmMassa, setExcluindoEmMassa] = useState(false)
+  const [resultadoEmMassa, setResultadoEmMassa] = useState<ResultadoEmMassa | null>(null)
+  const nomePorId = useMemo(() => new Map(fornecedores.map((f) => [f.id, f.nome])), [fornecedores])
+
+  async function excluirSelecionados() {
+    const ids = [...selecao.selecionados]
+    if (ids.length === 0) return
+    if (!confirm(`Excluir ${ids.length} fornecedor(es)? Quem estiver em uso será recusado e continuará existindo.`)) return
+    setExcluindoEmMassa(true)
+    setResultadoEmMassa(null)
+    const resultado = await executarEmMassa(ids, async (id) => {
+      try {
+        await jsonFetch(`/api/gerenciamento/fornecedores/${id}`, { method: 'DELETE' })
+        return { ok: true }
+      } catch (e: any) {
+        return { ok: false, motivo: e?.message || 'Não foi possível excluir.' }
+      }
+    })
+    setExcluindoEmMassa(false)
+    setResultadoEmMassa(resultado)
+    selecao.limpar()
+    await carregar()
+  }
+
   async function excluir(f: Fornecedor) {
     if (!confirm(`Excluir o fornecedor "${f.nome}"? Esta ação não pode ser desfeita.`)) return
     try {
@@ -218,10 +249,31 @@ export default function FornecedoresTab() {
 
       {/* Tabela */}
       {!loading && !erroLista && filtrados.length > 0 && (
+        <>
+        <ResumoEmMassa
+          resultado={resultadoEmMassa}
+          substantivo={["fornecedor", "fornecedores"]}
+          rotuloDoItem={(id) => nomePorId.get(Number(id)) ?? `#${id}`}
+          onFechar={() => setResultadoEmMassa(null)}
+        />
+        <BarraDeSelecao
+          quantidade={selecao.quantidade}
+          substantivo={["fornecedor", "fornecedores"]}
+          onLimpar={selecao.limpar}
+          onExcluir={() => void excluirSelecionados()}
+          excluindo={excluindoEmMassa}
+        />
         <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
+                <th className="w-10 border-b border-[var(--border-default)] px-4 py-2.5 text-left">
+                  <CaixaDeSelecaoTodos
+                    todosMarcados={selecao.todosMarcados}
+                    algumMarcado={selecao.algumMarcado}
+                    onAlternar={selecao.alternarTodos}
+                  />
+                </th>
                 <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Código</th>
                 <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Fornecedor</th>
                 <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Categoria</th>
@@ -233,6 +285,13 @@ export default function FornecedoresTab() {
             <tbody>
               {filtrados.map((f) => (
                 <tr key={f.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
+                  <td className="px-4 py-2.5 align-middle">
+                    <CaixaDeSelecao
+                      marcada={selecao.selecionados.has(f.id)}
+                      onAlternar={() => selecao.alternar(f.id)}
+                      rotulo={`Selecionar ${f.nome}`}
+                    />
+                  </td>
                   <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{f.publicCode ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{f.nome}</div>
@@ -260,6 +319,7 @@ export default function FornecedoresTab() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Modal */}

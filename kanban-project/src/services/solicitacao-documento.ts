@@ -668,7 +668,7 @@ export async function carregarResumoProtocoloDocumento(
       criadoPor: USUARIO_RESUMO,
       protocolos: {
         orderBy: { createdAt: "desc" },
-        include: { responsavel: USUARIO_RESUMO },
+        include: { responsavel: USUARIO_RESUMO, tipo: { select: { nome: true } } },
       },
       arquivos: {
         orderBy: { createdAt: "asc" },
@@ -709,7 +709,7 @@ export async function carregarResumoProtocoloDocumento(
       protocolos: s.protocolos.map((p, i) => ({
         id: p.id,
         numero: p.numeroProtocolo,
-        tipo: p.tipoProtocolo,
+        tipo: p.tipo?.nome ?? null,
         formaEnvio: p.formaEnvio,
         dataProtocolo: p.dataProtocolo ? p.dataProtocolo.toISOString() : null,
         informadoEm: p.createdAt.toISOString(),

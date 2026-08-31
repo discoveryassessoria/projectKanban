@@ -109,6 +109,7 @@ const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerencia
 // exclusivamente dentro do DOCX versionado do repositório.
 const ModelosDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RuntimeWorkflowDiagnostics = dynamic(() => import("@/src/components/gerenciamentoComponents/RuntimeWorkflowDiagnostics"), { ssr: false, loading: () => <CarregandoTela /> })
+const RelatorioProtocolosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RelatorioProtocolosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AssistenteParametrizacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AssistenteParametrizacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -213,6 +214,7 @@ const TELAS: Record<string, React.ComponentType> = {
   prottypes: cad("tipos-protocolo"),
   legalmodes: cad("modalidades-legais"),
   legalframes: cad("enquadramentos-legais"),
+  protreport: RelatorioProtocolosTab,
   profcats: cad("categorias-profissional"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
   // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro

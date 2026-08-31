@@ -104,8 +104,6 @@ export interface DadosDoProtocolo {
    * lê a cardinalidade da Modalidade Legal do processo e recusa o que não bate.
    */
   requerenteIds?: number[]
-  /** @deprecated Escopo mora em `requerenteIds`. Mantido só até a migration de remoção. */
-  requerenteId?: number | null
   /** Número que o ÓRGÃO deu ao dossiê (ruolo generale / expediente). */
   numeroProcesso?: string | null
   finalidade?: FinalidadeDeProtocolo
@@ -133,11 +131,7 @@ export async function registrarProtocoloTx(
   if (numero === "") throw new Error("PROTOCOLO_SEM_NUMERO")
 
   const finalidade = dados.finalidade ?? FINALIDADES_DE_PROTOCOLO.REQUERIMENTO
-  // O escopo aceita a forma antiga (um id) enquanto a coluna existir, mas a
-  // VERDADE gravada é sempre a lista — uma fonte só, desde já.
-  const escopo = [...new Set(
-    (dados.requerenteIds ?? (dados.requerenteId != null ? [dados.requerenteId] : [])).filter((n) => Number.isInteger(n)),
-  )]
+  const escopo = [...new Set((dados.requerenteIds ?? []).filter((n) => Number.isInteger(n)))]
 
   if (escopo.length > 0) await validarEscopo(tx, dados.processoId, escopo, finalidade)
 
@@ -166,7 +160,6 @@ export async function registrarProtocoloTx(
       ...(dados.tipoProtocoloId != null ? { tipoProtocoloId: dados.tipoProtocoloId } : {}),
       ...(dados.formaEnvio != null ? { formaEnvio: dados.formaEnvio as never } : {}),
       contratanteId: dados.contratanteId ?? null,
-      requerenteId: escopo.length === 1 ? escopo[0] : null,
       numeroProcesso: dados.numeroProcesso?.trim() || null,
       finalidade,
       ...(dados.situacao != null ? { situacao: dados.situacao } : {}),

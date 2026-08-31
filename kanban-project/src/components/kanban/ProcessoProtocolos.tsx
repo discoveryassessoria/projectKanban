@@ -14,22 +14,7 @@ import { buscar, useApi, useConsulta } from "@/src/lib/dados"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { uploadFiles } from "@/src/lib/storage"
-import {
-  Plus,
-  FileText,
-  Calendar,
-  Hash,
-  User,
-  Trash2,
-  Loader2,
-  Edit2,
-  X,
-  Building2,
-  Paperclip,
-  Eye,
-  Send,
-  Layers,
-} from "lucide-react"
+import { AlertTriangle, Building2, Calendar, Edit2, Eye, FileText, Hash, Layers, Loader2, Paperclip, Plus, Send, Trash2, Upload, User, X } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Tipos compatíveis com os do modal
@@ -69,9 +54,7 @@ interface Protocolo {
   id: number
   processoId: number
   contratanteId?: number | null
-  requerenteId?: number | null
   contratante?: PessoaBase | null
-  requerente?: PessoaBase | null
   orgaoId?: number | null
   orgao?: { id: number; name: string; type?: string | null; city?: string | null } | null
   setor?: string | null
@@ -84,7 +67,6 @@ interface Protocolo {
   tipoProtocoloId?: number | null
   tipo?: { id: number; code: string; nome: string } | null
   exigencias?: { id: number; descricao: string; prazo?: string | null; cumpridaEm?: string | null }[]
-  tipoProtocolo?: string | null
   formaEnvio?: string | null
   responsavelId?: number | null
   responsavel?: { id: number; nome: string } | null
@@ -93,8 +75,6 @@ interface Protocolo {
   documentos?: DocumentoEnviado[]
   createdAt: string
   // legado (Espanha) — exibido quando o registro antigo não tem órgão
-  consulado?: string | null
-  consuladoOutro?: string | null
 }
 
 interface OpcoesProtocolo {
@@ -174,6 +154,16 @@ const CorDaSituacao = (v: string): string =>
   : v === "EXIGENCIA" ? "var(--warning-text)"
   : "var(--info-text)"
 
+/**
+ * Chave dos arquivos escolhidos ANTES de o protocolo existir.
+ *
+ * O anexo pertence a um protocolo, e o protocolo só tem id depois do POST — mas
+ * obrigar o operador a registrar primeiro e anexar depois é pedir que ele lembre
+ * de voltar. Ele escolhe junto; a subida acontece assim que o id existe, na
+ * mesma ação. Negativo de propósito: nenhum id real colide.
+ */
+const PROTOCOLO_NOVO = -1
+
 const SEM_PROTOCOLOS: Protocolo[] = []
 const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)]"
 
@@ -189,7 +179,6 @@ const FORM_VAZIO = {
   finalidade: "REQUERIMENTO",
   situacao: "PROTOCOLADO",
   requerenteIds: [] as number[],
-  tipoProtocolo: "",
   formaEnvio: "",
   responsavelId: "",
   observacoes: "",
@@ -236,6 +225,65 @@ export function ProcessoProtocolos({
    */
   const cardinalidade = opcoes?.cardinalidade ?? "INDIVIDUAL"
 
+  // ─── EXIGÊNCIAS ────────────────────────────────────────────────────────
+  // O que o órgão pediu, e até quando. É o que trava o processo de verdade: sem
+  // um lugar para registrar e dar baixa, o prazo do órgão vive na cabeça de
+  // alguém — e o contador de "exigências em aberto" nunca sairia de zero.
+  const [formExigencia, setFormExigencia] = useState<{ protocoloId: number; descricao: string; prazo: string } | null>(null)
+  const [salvandoExigencia, setSalvandoExigencia] = useState(false)
+
+  async function salvarExigencia() {
+    if (!formExigencia) return
+    if (!formExigencia.descricao.trim()) return setErroForm("Descreva o que o órgão exigiu.")
+    setSalvandoExigencia(true)
+    try {
+      const res = await fetch(`/api/protocolos/${formExigencia.protocoloId}/exigencias`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+        body: JSON.stringify({ descricao: formExigencia.descricao.trim(), prazo: formExigencia.prazo || null }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) { setErroForm(j.error || "Erro ao registrar a exigência."); return }
+      setFormExigencia(null)
+      await fetchProtocolos()
+    } finally { setSalvandoExigencia(false) }
+  }
+
+  async function alternarExigencia(protocoloId: number, exigenciaId: number, cumprida: boolean) {
+    const res = await fetch(`/api/protocolos/${protocoloId}/exigencias/${exigenciaId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+      body: JSON.stringify({ cumprida }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      setErroForm(j.error || "Erro ao atualizar a exigência.")
+      return
+    }
+    await fetchProtocolos()
+  }
+
+  async function excluirExigencia(protocoloId: number, exigenciaId: number) {
+    if (!confirm("Excluir esta exigência? O registro sai do histórico do protocolo.")) return
+    const res = await fetch(`/api/protocolos/${protocoloId}/exigencias/${exigenciaId}`, {
+      method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("authToken")}` },
+    })
+    if (!res.ok) { setErroForm("Erro ao excluir a exigência."); return }
+    await fetchProtocolos()
+  }
+
+  /** Vencida, vence hoje, ou no prazo — a mesma régua semântica do resto do produto. */
+  const situacaoDoPrazo = (prazo?: string | null, cumpridaEm?: string | null) => {
+    if (cumpridaEm) return { cor: "var(--success-text)", texto: `cumprida em ${formatarDataHora(cumpridaEm)}` }
+    if (!prazo) return { cor: "var(--text-muted)", texto: "sem prazo definido" }
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+    const d = new Date(prazo); d.setHours(0, 0, 0, 0)
+    const dias = Math.round((d.getTime() - hoje.getTime()) / 86400000)
+    if (dias < 0) return { cor: "var(--danger-text)", texto: `vencida há ${Math.abs(dias)} dia(s)` }
+    if (dias === 0) return { cor: "var(--warning-text)", texto: "vence hoje" }
+    return { cor: "var(--text-secondary)", texto: `vence em ${dias} dia(s)` }
+  }
+
   // Buscar protocolos
   // Leitura COMPOSTA: a lista de protocolos e, para cada um, os seus anexos. Em tela
   // isso é um resultado único, então é uma consulta única — `useConsulta` existe na
@@ -264,6 +312,11 @@ export function ProcessoProtocolos({
 
   // Resetar form
   const resetForm = () => {
+    setArquivosPendentes((prev) => {
+      const proximo = { ...prev }
+      delete proximo[PROTOCOLO_NOVO]
+      return proximo
+    })
     setForm(FORM_VAZIO)
     setErroForm(null)
     setEditando(null)
@@ -276,7 +329,7 @@ export function ProcessoProtocolos({
     setErroForm(null)
     setForm({
       tipoPessoa: protocolo.contratanteId ? "contratante" : "requerente",
-      pessoaId: (protocolo.contratanteId || protocolo.requerenteId || "").toString(),
+      pessoaId: (protocolo.contratanteId || "").toString(),
       orgaoId: protocolo.orgaoId ? String(protocolo.orgaoId) : "",
       setor: protocolo.setor || "",
       dataProtocolo: paraDatetimeLocal(protocolo.dataProtocolo),
@@ -286,7 +339,6 @@ export function ProcessoProtocolos({
       finalidade: protocolo.finalidade || "REQUERIMENTO",
       situacao: protocolo.situacao || "PROTOCOLADO",
       requerenteIds: (protocolo.requerentesCobertos ?? []).map((r) => r.requerente.id),
-      tipoProtocolo: protocolo.tipoProtocolo || "",
       formaEnvio: protocolo.formaEnvio || "",
       responsavelId: protocolo.responsavelId ? String(protocolo.responsavelId) : "",
       observacoes: protocolo.observacoes || "",
@@ -321,7 +373,6 @@ export function ProcessoProtocolos({
         return setErroForm("Nesta rota o requerimento é individual: um requerente por protocolo.")
       }
     }
-    if (!form.tipoProtocolo) return setErroForm("Selecione o tipo de protocolo.")
     if (!form.formaEnvio) return setErroForm("Selecione a forma de envio.")
     if (!form.responsavelId) return setErroForm("Selecione o responsável pela protocolização.")
 
@@ -340,7 +391,6 @@ export function ProcessoProtocolos({
         tipoProtocoloId: form.tipoProtocoloId ? parseInt(form.tipoProtocoloId) : null,
         finalidade: form.finalidade,
         situacao: form.situacao,
-        tipoProtocolo: form.tipoProtocolo,
         formaEnvio: form.formaEnvio,
         responsavelId: parseInt(form.responsavelId),
         observacoes: form.observacoes.trim() || null,
@@ -363,7 +413,25 @@ export function ProcessoProtocolos({
       })
 
       if (response.ok) {
+        // OS ANEXOS ESCOLHIDOS NO FORMULÁRIO SOBEM AGORA, com o id recém-criado.
+        // Se a subida falhar, o protocolo continua registrado e os arquivos
+        // continuam pendentes no cartão — o operador reenvia de lá, sem perder o
+        // ato. Anexo que falha não pode desfazer uma protocolização que aconteceu.
+        const pendentesDoForm = arquivosPendentes[PROTOCOLO_NOVO] ?? []
+        let novoId: number | null = null
+        if (!editando && pendentesDoForm.length > 0) {
+          const data = await response.json().catch(() => ({}))
+          novoId = data?.protocolo?.id ?? null
+          if (novoId) {
+            setArquivosPendentes((prev) => {
+              const proximo = { ...prev, [novoId as number]: pendentesDoForm }
+              delete proximo[PROTOCOLO_NOVO]
+              return proximo
+            })
+          }
+        }
         resetForm()
+        if (novoId) await handleUpload(novoId)
         fetchProtocolos()
         onUpdate?.()
       } else {
@@ -489,26 +557,19 @@ export function ProcessoProtocolos({
     }
   }
 
-  // Pessoa vinculada (opcional) — o vínculo obrigatório é com o PROCESSO
+  // CONTRATANTE vinculado (opcional). Os REQUERENTES não vêm daqui: eles são o
+  // escopo do ato e saem de `requerentesCobertos`, que cabe um ou a família toda.
   const getNomePessoa = (protocolo: Protocolo) => {
-    const c = protocolo.contratante ?? protocolo.requerente
-    if (!c) return null
-    const rotulo = nomePessoa(c)
-    return `${rotulo}${protocolo.contratanteId ? " (Contratante)" : " (Requerente)"}`
+    if (!protocolo.contratante) return null
+    return `${nomePessoa(protocolo.contratante)} (Contratante)`
   }
 
   const rotuloOrgao = (protocolo: Protocolo) => {
     if (protocolo.orgao) return protocolo.orgao.city ? `${protocolo.orgao.name} — ${protocolo.orgao.city}` : protocolo.orgao.name
     // registro legado (Espanha), anterior ao órgão como fonte única
-    if (protocolo.consulado === "OUTROS" && protocolo.consuladoOutro) return protocolo.consuladoOutro
-    if (protocolo.consulado) return `Consulado ${protocolo.consulado.replace(/_/g, " ").toLowerCase()}`
     return "Órgão não informado"
   }
 
-  // Rótulo do ENUM legado, só para protocolos gravados antes do cadastro de
-  // Tipos de Protocolo. Registro novo traz `protocolo.tipo` do cadastro.
-  const rotuloTipo = (valor?: string | null) =>
-    (valor ? (opcoes?.tiposCadastro ?? []).find((t) => t.code === valor)?.nome : null) ?? null
   const rotuloForma = (valor?: string | null) =>
     opcoes?.formasEnvio.find((f) => f.valor === valor)?.label ?? null
 
@@ -849,9 +910,52 @@ export function ProcessoProtocolos({
                 />
               </div>
 
-              <p className="text-xs text-white/70">
-                O comprovante/anexo é enviado no cartão do protocolo, logo após o registro.
-              </p>
+              {/* ── COMPROVANTES ────────────────────────────────────────────
+                  Anexar junto com o registro, não depois: o comprovante do
+                  guichê está na mão do operador NESTE momento. */}
+              <div>
+                <label className="block text-sm font-medium text-white/95 mb-1">
+                  <Paperclip className="h-4 w-4 inline mr-1" />
+                  Comprovantes e anexos
+                </label>
+                <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-[var(--border-default)] px-4 py-4 text-sm text-white/70 hover:border-[var(--border-strong)] hover:bg-[var(--surface-hover)]">
+                  <Upload className="h-4 w-4" />
+                  Escolher arquivos (comprovante, recibo, protocolo assinado…)
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const arquivos = Array.from(e.target.files ?? [])
+                      if (arquivos.length === 0) return
+                      setArquivosPendentes((prev) => ({
+                        ...prev,
+                        [PROTOCOLO_NOVO]: [...(prev[PROTOCOLO_NOVO] ?? []), ...arquivos],
+                      }))
+                      e.target.value = ""
+                    }}
+                  />
+                </label>
+                {(arquivosPendentes[PROTOCOLO_NOVO] ?? []).length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {(arquivosPendentes[PROTOCOLO_NOVO] ?? []).map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between rounded-md bg-[var(--surface-secondary)] px-3 py-1.5 text-xs text-white/90">
+                        <span className="truncate">{f.name} · {formatFileSize(f.size)}</span>
+                        <button
+                          type="button"
+                          onClick={() => removerArquivoPendente(PROTOCOLO_NOVO, i)}
+                          className="ml-3 shrink-0 text-[var(--danger-text)] hover:underline"
+                        >
+                          remover
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-xs text-white/60 mt-1">
+                  Sobem assim que o protocolo for registrado. Também dá para anexar depois, no cartão do protocolo.
+                </p>
+              </div>
 
               {erroForm && (
                 <p className="text-sm text-red-600 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md px-3 py-2">{erroForm}</p>
@@ -928,9 +1032,9 @@ export function ProcessoProtocolos({
                               {protocolo.setor}
                             </span>
                           )}
-                          {(protocolo.tipo?.nome || rotuloTipo(protocolo.tipoProtocolo)) && (
+                          {protocolo.tipo?.nome && (
                             <span className="text-xs px-2 py-0.5 bg-[var(--surface-secondary)] text-amber-800 rounded">
-                              {protocolo.tipo?.nome || rotuloTipo(protocolo.tipoProtocolo)}
+                              {protocolo.tipo.nome}
                             </span>
                           )}
                           {protocolo.finalidade && protocolo.finalidade !== "REQUERIMENTO" && (
@@ -1059,6 +1163,114 @@ export function ProcessoProtocolos({
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── EXIGÊNCIAS DO ÓRGÃO ────────────────────────────────
+                        O que trava o processo de verdade. Fica no cartão do
+                        protocolo porque é o órgão daquele protocolo que exigiu —
+                        e a baixa aqui move a situação sozinha: com exigência
+                        aberta o protocolo está EM EXIGÊNCIA, sem nenhuma volta a
+                        EM ANÁLISE. Ninguém precisa lembrar de trocar à mão. */}
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-white/95 flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          Exigências do órgão
+                          {(protocolo.exigencias ?? []).filter((e) => !e.cumpridaEm).length > 0 && (
+                            <span
+                              className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                              style={{ backgroundColor: "var(--warning-tile)", color: "var(--warning-text)" }}
+                            >
+                              {(protocolo.exigencias ?? []).filter((e) => !e.cumpridaEm).length} em aberto
+                            </span>
+                          )}
+                        </h4>
+                        {podeEditar && formExigencia?.protocoloId !== protocolo.id && (
+                          <button
+                            type="button"
+                            onClick={() => setFormExigencia({ protocoloId: protocolo.id, descricao: "", prazo: "" })}
+                            className="text-xs font-medium text-[var(--accent-text)] hover:underline"
+                          >
+                            + Registrar exigência
+                          </button>
+                        )}
+                      </div>
+
+                      {(protocolo.exigencias ?? []).length === 0 && formExigencia?.protocoloId !== protocolo.id && (
+                        <p className="text-xs text-white/60">Nenhuma exigência registrada neste protocolo.</p>
+                      )}
+
+                      {(protocolo.exigencias ?? []).length > 0 && (
+                        <ul className="space-y-1.5">
+                          {(protocolo.exigencias ?? []).map((ex) => {
+                            const prazo = situacaoDoPrazo(ex.prazo, ex.cumpridaEm)
+                            return (
+                              <li
+                                key={ex.id}
+                                className="flex items-start gap-2 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-2"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!!ex.cumpridaEm}
+                                  disabled={!podeEditar}
+                                  onChange={() => void alternarExigencia(protocolo.id, ex.id, !ex.cumpridaEm)}
+                                  aria-label={ex.cumpridaEm ? "Reabrir exigência" : "Marcar exigência como cumprida"}
+                                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-[var(--action-primary)]"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <p className={`text-sm ${ex.cumpridaEm ? "text-white/50 line-through" : "text-white/90"}`}>
+                                    {ex.descricao}
+                                  </p>
+                                  <p className="text-[11px]" style={{ color: prazo.cor }}>
+                                    {ex.prazo ? `prazo ${formatarDataHora(ex.prazo)} · ` : ""}{prazo.texto}
+                                  </p>
+                                </div>
+                                {podeEditar && (
+                                  <button
+                                    type="button"
+                                    onClick={() => void excluirExigencia(protocolo.id, ex.id)}
+                                    title="Excluir exigência"
+                                    className="shrink-0 rounded p-1 text-[var(--danger-text)] hover:bg-[var(--surface-hover)]"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+
+                      {formExigencia?.protocoloId === protocolo.id && (
+                        <div className="mt-2 space-y-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
+                          <textarea
+                            value={formExigencia.descricao}
+                            onChange={(e) => setFormExigencia({ ...formExigencia, descricao: e.target.value })}
+                            placeholder="O que o órgão exigiu, no texto dele."
+                            rows={2}
+                            className={INPUT}
+                          />
+                          <div className="flex flex-wrap items-end gap-2">
+                            <div>
+                              <label className="block text-[11px] text-white/70 mb-1">Prazo dado pelo órgão</label>
+                              <input
+                                type="date"
+                                value={formExigencia.prazo}
+                                onChange={(e) => setFormExigencia({ ...formExigencia, prazo: e.target.value })}
+                                className={INPUT}
+                              />
+                            </div>
+                            <div className="ml-auto flex gap-2">
+                              <Button variant="outline" onClick={() => setFormExigencia(null)} disabled={salvandoExigencia}>
+                                Cancelar
+                              </Button>
+                              <Button onClick={() => void salvarExigencia()} disabled={salvandoExigencia}>
+                                {salvandoExigencia ? "Registrando…" : "Registrar exigência"}
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>

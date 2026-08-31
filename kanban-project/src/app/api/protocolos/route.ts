@@ -12,7 +12,7 @@ import {
   SITUACOES_DE_PROTOCOLO,
 } from "@/src/services/protocolo-canonico"
 import { prisma } from "@/lib/prisma"
-import { TipoProtocolo, FormaEnvioProtocolo } from "@prisma/client"
+import { FormaEnvioProtocolo } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import {
   INCLUDE_PROTOCOLO,
@@ -54,7 +54,6 @@ export async function POST(request: Request) {
     const {
       processoId,
       contratanteId,
-      requerenteId,
       requerenteIds,
       orgaoId,
       setor,
@@ -63,7 +62,6 @@ export async function POST(request: Request) {
       numeroProcesso,
       finalidade,
       situacao,
-      tipoProtocolo,
       tipoProtocoloId,
       formaEnvio,
       responsavelId,
@@ -97,9 +95,7 @@ export async function POST(request: Request) {
     if (!tipo || !tipo.ativo) {
       return NextResponse.json({ error: "Selecione um tipo de protocolo do cadastro." }, { status: 400 })
     }
-    const enumEquivalente = (Object.values(TipoProtocolo) as string[]).includes(tipo.code)
-      ? (tipo.code as TipoProtocolo)
-      : null
+
     if (!formaEnvio || !Object.values(FormaEnvioProtocolo).includes(formaEnvio)) {
       return NextResponse.json({ error: "Forma de envio inválida" }, { status: 400 })
     }
@@ -118,7 +114,7 @@ export async function POST(request: Request) {
     // normaliza para lista antes de descer. Quem valida contagem e pertinência é
     // o serviço canônico, com a cardinalidade lida do cadastro.
     const escopo: number[] = Array.from(new Set(
-      (Array.isArray(requerenteIds) ? requerenteIds : requerenteId != null ? [requerenteId] : [])
+      (Array.isArray(requerenteIds) ? requerenteIds : [])
         .map(Number).filter((n: number) => Number.isInteger(n)),
     ))
 
@@ -153,7 +149,6 @@ export async function POST(request: Request) {
         tipoProtocoloId: tipo.id,
         ...(finalidade ? { finalidade } : {}),
         ...(situacao ? { situacao } : {}),
-        tipoProtocolo: enumEquivalente,
         formaEnvio,
         origem: ORIGENS_DE_PROTOCOLO.PROCESSO,
         responsavelId: Number(responsavelId),
@@ -164,7 +159,7 @@ export async function POST(request: Request) {
 
       const titulo = descreverProtocolizacao({
         numeroProtocolo: criado.numeroProtocolo,
-        tipoProtocolo: criado.tipoProtocolo,
+        tipoNome: criado.tipo?.nome ?? null,
         orgaoNome: orgao.name,
       })
 
@@ -185,7 +180,7 @@ export async function POST(request: Request) {
           numeroProcesso: criado.numeroProcesso,
           finalidade: criado.finalidade,
           requerentesCobertos: escopo.length,
-          tipo: criado.tipoProtocolo,
+          tipo: criado.tipo?.nome ?? null,
           formaEnvio: criado.formaEnvio,
           documentosEnviados: ids.length,
         },

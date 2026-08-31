@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { TipoProtocolo, FormaEnvioProtocolo } from "@prisma/client"
+import { FormaEnvioProtocolo } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import {
   INCLUDE_PROTOCOLO,
@@ -96,7 +96,6 @@ export async function PUT(
       numeroProcesso,
       finalidade,
       situacao,
-      tipoProtocolo,
       tipoProtocoloId,
       formaEnvio,
       responsavelId,
@@ -107,23 +106,13 @@ export async function PUT(
     const existente = await prisma.protocolo.findUnique({ where: { id } })
     if (!existente) return NextResponse.json({ error: "Protocolo não encontrado" }, { status: 404 })
 
-    if (tipoProtocolo !== undefined && tipoProtocolo !== null && !Object.values(TipoProtocolo).includes(tipoProtocolo)) {
-      return NextResponse.json({ error: "Tipo de protocolo inválido" }, { status: 400 })
-    }
     if (formaEnvio !== undefined && formaEnvio !== null && !Object.values(FormaEnvioProtocolo).includes(formaEnvio)) {
       return NextResponse.json({ error: "Forma de envio inválida" }, { status: 400 })
     }
 
     const updateData: Record<string, unknown> = {}
 
-    if (contratanteId !== undefined) {
-      updateData.contratanteId = contratanteId || null
-      if (contratanteId) updateData.requerenteId = null
-    }
-    if (requerenteId !== undefined) {
-      updateData.requerenteId = requerenteId || null
-      if (requerenteId) updateData.contratanteId = null
-    }
+    if (contratanteId !== undefined) updateData.contratanteId = contratanteId || null
     if (orgaoId !== undefined) {
       if (!orgaoId) return NextResponse.json({ error: "Órgão é obrigatório" }, { status: 400 })
       const orgao = await prisma.orgaoProtocolo.findUnique({ where: { id: Number(orgaoId) }, select: { id: true } })
@@ -139,7 +128,6 @@ export async function PUT(
       if (!numeroProtocolo) return NextResponse.json({ error: "Número do protocolo é obrigatório" }, { status: 400 })
       updateData.numeroProtocolo = numeroProtocolo
     }
-    if (tipoProtocolo !== undefined) updateData.tipoProtocolo = tipoProtocolo || null
     if (tipoProtocoloId !== undefined) {
       if (!tipoProtocoloId) return NextResponse.json({ error: "Selecione um tipo de protocolo do cadastro." }, { status: 400 })
       const tipo = await prisma.tipoProtocoloCadastro.findUnique({
@@ -147,7 +135,6 @@ export async function PUT(
       })
       if (!tipo || !tipo.ativo) return NextResponse.json({ error: "Tipo de protocolo não encontrado ou inativo." }, { status: 400 })
       updateData.tipoProtocoloId = tipo.id
-      updateData.tipoProtocolo = (Object.values(TipoProtocolo) as string[]).includes(tipo.code) ? tipo.code : null
     }
     if (formaEnvio !== undefined) updateData.formaEnvio = formaEnvio || null
     if (responsavelId !== undefined) {
@@ -179,7 +166,6 @@ export async function PUT(
       : null
     if (escopo) {
       await validarEscopoNaEdicao(existente.processoId, escopo, (finalidade ?? existente.finalidade) as string)
-      updateData.requerenteId = escopo.length === 1 ? escopo[0] : null
     }
 
     const ids: number[] | null = Array.isArray(documentoIds)
@@ -219,7 +205,7 @@ export async function PUT(
 
       const titulo = descreverProtocolizacao({
         numeroProtocolo: atualizado.numeroProtocolo,
-        tipoProtocolo: atualizado.tipoProtocolo,
+        tipoNome: atualizado.tipo?.nome ?? null,
         orgaoNome: atualizado.orgao?.name ?? null,
       })
 
@@ -272,7 +258,7 @@ export async function DELETE(
 
     const protocolo = await prisma.protocolo.findUnique({
       where: { id },
-      include: { orgao: { select: { name: true } } },
+      include: { orgao: { select: { name: true } }, tipo: { select: { nome: true } } },
     })
     if (!protocolo) return NextResponse.json({ error: "Protocolo não encontrado" }, { status: 404 })
 
@@ -281,7 +267,7 @@ export async function DELETE(
 
       const titulo = descreverProtocolizacao({
         numeroProtocolo: protocolo.numeroProtocolo,
-        tipoProtocolo: protocolo.tipoProtocolo,
+        tipoNome: protocolo.tipo?.nome ?? null,
         orgaoNome: protocolo.orgao?.name ?? null,
       })
 

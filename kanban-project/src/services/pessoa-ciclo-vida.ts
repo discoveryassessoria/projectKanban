@@ -338,8 +338,11 @@ async function levantarFatosProtegidos(ctx: ContextoPessoa, db: DB): Promise<Fat
     })
     registrar("RECIBO_EMITIDO", recibos.map((r) => r.id), (n) => `${n} recibo(s) emitido(s)`)
 
+    // O escopo do protocolo é a tabela de vínculo — a coluna `requerenteId`
+    // cabia UM e saiu. Um protocolo italiano cobre a família inteira, então a
+    // pessoa aparece aqui mesmo quando não é a única do ato.
     const protocolos = await db.protocolo.findMany({
-      where: { requerenteId: ctx.requerenteId },
+      where: { requerentesCobertos: { some: { requerenteId: ctx.requerenteId } } },
       select: { id: true },
     })
     registrar("PROTOCOLO_ENVIADO", protocolos.map((p) => p.id), (n) => `${n} protocolo(s) oficial(is) entregue(s) a órgão`)

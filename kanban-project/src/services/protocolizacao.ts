@@ -11,20 +11,13 @@
 //
 // Tudo dentro da MESMA transação do registro: ou o protocolo e sua marca
 // cronológica existem juntos, ou nenhum dos dois existe.
-import type { Prisma, PrismaClient, TipoProtocolo, FormaEnvioProtocolo } from "@prisma/client"
+import type { Prisma, PrismaClient, FormaEnvioProtocolo } from "@prisma/client"
 
 type Tx = Prisma.TransactionClient | PrismaClient
 
-/** Rótulos oficiais — fonte única para a UI, a Timeline e o Histórico. */
-export const TIPO_PROTOCOLO_LABEL: Record<TipoProtocolo, string> = {
-  CONSULAR: "Consular",
-  JUDICIAL: "Judicial",
-  ADMINISTRATIVO: "Administrativo",
-  COMUNE: "Comune",
-  CARTORIO: "Cartório",
-  TRIBUNAL: "Tribunal",
-  OUTRO: "Outro",
-}
+// O TIPO DO PROTOCOLO deixou de morar aqui. Era um enum de 7 valores com os
+// rótulos escritos em código; virou cadastro (TipoProtocoloCadastro), e quem
+// precisa do nome lê a linha do cadastro pelo `tipoProtocoloId`.
 
 export const FORMA_ENVIO_LABEL: Record<FormaEnvioProtocolo, string> = {
   PRESENCIAL: "Presencial",
@@ -34,7 +27,6 @@ export const FORMA_ENVIO_LABEL: Record<FormaEnvioProtocolo, string> = {
   TERCEIRO: "Terceiro / despachante",
 }
 
-export const TIPOS_PROTOCOLO = Object.entries(TIPO_PROTOCOLO_LABEL).map(([valor, label]) => ({ valor, label }))
 export const FORMAS_ENVIO = Object.entries(FORMA_ENVIO_LABEL).map(([valor, label]) => ({ valor, label }))
 
 /** Dados de uma protocolização, do jeito que a tela do processo envia. */
@@ -43,7 +35,7 @@ export interface DadosProtocolizacao {
   setor?: string | null
   dataProtocolo?: Date | null
   numeroProtocolo?: string | null
-  tipoProtocolo?: TipoProtocolo | null
+  tipoProtocoloId?: number | null
   formaEnvio?: FormaEnvioProtocolo | null
   responsavelId?: number | null
   observacoes?: string | null
@@ -53,10 +45,11 @@ export interface DadosProtocolizacao {
 /** Título humano do ato — usado no Evento e no Histórico. */
 export function descreverProtocolizacao(p: {
   numeroProtocolo?: string | null
-  tipoProtocolo?: TipoProtocolo | null
+  /** Nome do tipo, vindo do cadastro — não mais um valor de enum. */
+  tipoNome?: string | null
   orgaoNome?: string | null
 }): string {
-  const tipo = p.tipoProtocolo ? TIPO_PROTOCOLO_LABEL[p.tipoProtocolo] : null
+  const tipo = p.tipoNome ?? null
   const partes = [
     `Protocolo${tipo ? ` ${tipo.toLowerCase()}` : ""}`,
     p.numeroProtocolo ? `nº ${p.numeroProtocolo}` : null,
@@ -72,7 +65,15 @@ export function descreverProtocolizacao(p: {
 export async function registrarNaTimelineTx(
   tx: Tx,
   args: {
-    acao: "PROTOCOLO_REGISTRADO" | "PROTOCOLO_ATUALIZADO" | "PROTOCOLO_EXCLUIDO"
+    acao:
+      | "PROTOCOLO_REGISTRADO"
+      | "PROTOCOLO_ATUALIZADO"
+      | "PROTOCOLO_EXCLUIDO"
+      // A resposta do ÓRGÃO também é ato do protocolo e pertence à mesma linha
+      // do tempo: exigência é o que trava o processo, e o operador precisa
+      // encontrá-la no Histórico junto com a protocolização que a originou.
+      | "PROTOCOLO_EXIGENCIA_REGISTRADA"
+      | "PROTOCOLO_EXIGENCIA_CUMPRIDA"
     processoId: number
     protocoloId: number
     titulo: string
@@ -114,7 +115,6 @@ export async function registrarNaTimelineTx(
 /** include padrão de leitura — a tela do processo consome esta forma. */
 export const INCLUDE_PROTOCOLO = {
   contratante: { select: { id: true, publicCode: true, nome: true, email: true, telefone: true } },
-  requerente: { select: { id: true, publicCode: true, nome: true, email: true, telefone: true } },
   orgao: { select: { id: true, name: true, type: true, city: true } },
   tipo: { select: { id: true, code: true, nome: true } },
   responsavel: { select: { id: true, nome: true } },

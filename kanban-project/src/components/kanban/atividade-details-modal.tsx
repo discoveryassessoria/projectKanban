@@ -20,7 +20,6 @@ import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcuracaoDoProcesso } from "./ProcuracaoDoProcesso"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
-import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 // SLA operacional do processo (engine única — src/lib/motor/sla-core.ts)
 import { ProcessoSlaCard } from "./ProcessoSlaCard"
@@ -96,7 +95,7 @@ function ehItalia(processo: ProcessoWithStatus | Processo | null): boolean {
 }
 
 /** Abas válidas do modal. */
-type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos"
+type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "eventos"
 
 /**
  * Aba inicial a partir do deep-link. Puro: mesma entrada, mesma saída — era isto que a
@@ -108,7 +107,6 @@ function abaInicial(initialTab: string | undefined, isItalia: boolean): AbaProce
   if (initialTab && (permitidas as string[]).includes(initialTab)) return initialTab as AbaProcesso
   // Protocolo é ocorrência de QUALQUER processo — não é mais exclusivo da Espanha.
   if (initialTab === "protocolos") return "protocolos"
-  if (initialTab === "informacoes" && isItalia) return "informacoes"
   return "geral"
 }
 
@@ -204,8 +202,12 @@ function ConteudoModal({
   // o campo branco no branco.
   const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
 
-  // ✅ Verificar se o processo é da Itália (aba Informações)
-  const isItalia = ehItalia(processo)
+  // A ABA "INFORMAÇÕES" SAIU (31/08/2026). Ela era exclusiva da Itália e
+  // guardava tribunal + ruolo generale + datas de protocolo — os MESMOS fatos que
+  // a aba Protocolos passou a registrar, para os dois países, com o órgão vindo
+  // do cadastro em vez de um enum. Duas telas afirmando o mesmo fato é o que esta
+  // rodada existiu para acabar; o tribunal agora é uma organização como outra
+  // qualquer, e o número do processo mora no protocolo que o originou.
 
   // ✅ NOVO: Função para abrir o modal de detalhes do cliente
   const abrirDetalhesCliente = (cliente: Contratante | Requerente, tipo: "contratante" | "requerente") => {
@@ -478,7 +480,6 @@ function ConteudoModal({
     { id: "geral", label: "Geral" },
     { id: "central", label: "Central Operacional" },
     ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
-    ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
     ...(pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
     ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Financeiro" }] : []),
     { id: "documentos", label: "Documentos" },           // ← NOVO
@@ -1016,14 +1017,6 @@ function ConteudoModal({
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
               nomeFamilia={processo.nome}
-            />
-          )}
-
-          {/* ✅ Aba Informações (apenas para Itália) */}
-          {activeTab === "informacoes" && isItalia && (
-            <ProcessoInformacoes
-              processoId={processo.id}
-              onUpdate={onSave}
             />
           )}
 

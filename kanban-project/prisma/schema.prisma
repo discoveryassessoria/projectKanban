@@ -456,7 +456,6 @@ model Processo {
   custosPessoa                CustoPessoa[]
   eventos                     Evento[]
   faturas                     Fatura[]
-  informacaoItalia            InformacaoItalia?
   mensagens                   Mensagem[]
   outrosCustos                OutroCusto[]
   arvore                      Arvore?                @relation(fields: [arvoreId], references: [id])
@@ -477,7 +476,6 @@ model Processo {
   motivoCadastroEmAndamento   String?                @db.Text
   contratantes                ProcessoContratante[]
   requerentes                 ProcessoRequerente[]
-  protocolos                  Protocolo[]
   receitas                    Receita[]
   recibos                     Recibo[]
   tarefas                     Tarefa[]
@@ -520,6 +518,7 @@ model Processo {
   // MODELOS DOCUMENTAIS — documentos gerados vinculados a este processo.
   documentosGerados DocumentoGerado[]        @relation("DocumentoGeradoProcesso")
   planilhaOverrides PlanilhaCelulaOverride[]
+  protocolos        Protocolo[]
 
   @@index([pais])
   @@index([arvoreId])
@@ -808,10 +807,6 @@ model Protocolo {
   id                   Int                    @id @default(autoincrement())
   processoId           Int
   contratanteId        Int?
-  requerenteId         Int?
-  /// LEGADO (Espanha): substituído por `orgaoId` — Órgãos e Organizações.
-  consulado            Consulado?
-  consuladoOutro       String?                @db.VarChar(200)
   /// Órgão que RECEBEU o protocolo (fonte única: Órgãos e Organizações).
   orgaoId              Int?
   /// TIPO DO ATO, pelo cadastro (Gerenciamento → Documentos e Protocolos).
@@ -841,7 +836,6 @@ model Protocolo {
   situacao             String                 @default("PROTOCOLADO") @db.VarChar(30)
   /// Quando a situação acima passou a valer (data do ato do órgão).
   situacaoEm           DateTime?
-  tipoProtocolo        TipoProtocolo?
   formaEnvio           FormaEnvioProtocolo?
   /// Quem da equipe protocolou.
   responsavelId        Int?
@@ -875,16 +869,16 @@ model Protocolo {
   execucoesDeSubtarefa SubtaskExecution[]     @relation("ProtocoloDaSubtarefa")
   contratante          Contratante?           @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
   processo             Processo               @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  requerente           Requerente?            @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
   orgao                OrgaoProtocolo?        @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
   responsavel          Usuario?               @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
   solicitacao          SolicitacaoDocumento?  @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
   /// TIPO DO ATO, pelo cadastro. Ver `tipoProtocoloId`.
   tipo                 TipoProtocoloCadastro? @relation(fields: [tipoProtocoloId], references: [id], onDelete: SetNull)
+  requerente           Requerente?            @relation(fields: [requerenteId], references: [id])
+  requerenteId         Int?
 
   @@index([processoId])
   @@index([contratanteId])
-  @@index([requerenteId])
   @@index([orgaoId])
   @@index([responsavelId])
   @@index([solicitacaoId])
@@ -974,18 +968,6 @@ model ProtocoloDocumento {
   @@index([documentoId])
 }
 
-/// Natureza do ato de protocolo. Dimensão FECHADA de domínio — não é cadastro
-/// mestre (o cadastro "Tipos de Protocolo" foi eliminado em 02/08/2026).
-enum TipoProtocolo {
-  CONSULAR
-  JUDICIAL
-  ADMINISTRATIVO
-  COMUNE
-  CARTORIO
-  TRIBUNAL
-  OUTRO
-}
-
 /// Como o protocolo chegou ao órgão.
 enum FormaEnvioProtocolo {
   PRESENCIAL
@@ -993,37 +975,6 @@ enum FormaEnvioProtocolo {
   EMAIL
   PORTAL_ONLINE
   TERCEIRO
-}
-
-model InformacaoItalia {
-  id                  Int                     @id @default(autoincrement())
-  processoId          Int                     @unique
-  tribunal            Tribunal
-  dataProtocolo       DateTime?
-  dataDistribuicao    DateTime?
-  numeroRuoloGenerale String?                 @db.VarChar(100)
-  observacoes         String?
-  createdAt           DateTime                @default(now())
-  updatedAt           DateTime                @updatedAt
-  anexos              AnexoInformacaoItalia[]
-  processo            Processo                @relation(fields: [processoId], references: [id], onDelete: Cascade)
-
-  @@index([processoId])
-}
-
-model AnexoInformacaoItalia {
-  id                 Int              @id @default(autoincrement())
-  nome               String           @db.VarChar(200)
-  tipo               String?          @db.VarChar(50)
-  nomeArquivo        String           @db.VarChar(300)
-  urlArquivo         String
-  tamanho            Int?
-  mimeType           String?          @db.VarChar(100)
-  informacaoItaliaId Int
-  createdAt          DateTime         @default(now())
-  informacaoItalia   InformacaoItalia @relation(fields: [informacaoItaliaId], references: [id], onDelete: Cascade)
-
-  @@index([informacaoItaliaId])
 }
 
 model AnexoProcesso {
@@ -1455,9 +1406,9 @@ model ClienteAuth {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   contratante      Contratante?      @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-  requerente       Requerente?       @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
   mensagens        Mensagem[]
   dispositivosPush DispositivoPush[]
+  requerente       Requerente?       @relation(fields: [requerenteId], references: [id])
 
   @@index([contratanteId])
   @@index([requerenteId])
@@ -5233,44 +5184,6 @@ enum PrioridadeTarefa {
   URGENTE
 }
 
-enum Consulado {
-  SAO_PAULO
-  PORTO_ALEGRE
-  RIO_DE_JANEIRO
-  SALVADOR
-  BRASILIA
-  OUTROS
-}
-
-enum Tribunal {
-  ANCONA
-  BARI
-  BOLOGNA
-  BRESCIA
-  CAGLIARI
-  CALTANISSETTA
-  CAMPOBASSO
-  CATANIA
-  CATANZARO
-  FIRENZE
-  GENOVA
-  L_AQUILA
-  LECCE
-  MESSINA
-  MILANO
-  NAPOLI
-  PALERMO
-  PERUGIA
-  POTENZA
-  REGGIO_CALABRIA
-  ROMA
-  SALERNO
-  TORINO
-  TRENTO
-  TRIESTE
-  VENEZIA
-}
-
 enum TipoDocumento {
   CERTIDAO_NASCIMENTO
   CERTIDAO_NASCIMENTO_INTEIRO_TEOR
@@ -7534,7 +7447,6 @@ model DocumentoGerado {
   contratanteId Int?
   contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Restrict)
   requerenteId  Int?
-  requerente    Requerente?  @relation(fields: [requerenteId], references: [id], onDelete: Restrict)
 
   /// Identidade humana única (CP-1), quando o papel já está vinculado a ela.
   pessoaId Int?
@@ -7566,7 +7478,8 @@ model DocumentoGerado {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  versoes DocumentoGeradoVersao[]
+  versoes    DocumentoGeradoVersao[]
+  requerente Requerente?             @relation(fields: [requerenteId], references: [id])
 
   @@index([contratanteId])
   @@index([requerenteId])

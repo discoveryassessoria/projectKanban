@@ -12,7 +12,7 @@ import { PESSOA_ATIVA, requerentesAtivosDaArvore } from '@/src/lib/genealogia/vi
 import {
   Prisma, PrioridadeTarefa,
   CategoriaReceita, CategoriaCusto, TipoCusto, Moeda, FxRule, ReceitaStatus, CustoStatus,
-  TipoEvento, Consulado,
+  TipoEvento,
 } from '@prisma/client'
 import type { FaseCode } from '@prisma/client'
 import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'

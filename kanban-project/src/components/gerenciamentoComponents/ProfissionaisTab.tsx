@@ -15,7 +15,11 @@
 //
 // Backend: /api/gerenciamento/profissionais (GET/POST) + /[id] (GET/PATCH/DELETE)
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
+import {
+  useSelecaoEmMassa, executarEmMassa, CaixaDeSelecao, CaixaDeSelecaoTodos,
+  BarraDeSelecao, ResumoEmMassa, type ResultadoEmMassa,
+} from "@/src/components/ui/selecao-em-massa"
 
 interface Registro {
   id?: number
@@ -147,6 +151,33 @@ export function ProfissionaisTab() {
     carregar()
   }
 
+  // ─── SELEÇÃO MÚLTIPLA ──────────────────────────────────────────────────
+  // Mesma porta de uma linha, item a item: quem está em uso continua sendo
+  // recusado pelo servidor, e o resumo diz quem e por quê.
+  const idsVisiveis = useMemo(() => lista.map((p) => p.id), [lista])
+  const selecao = useSelecaoEmMassa(idsVisiveis, `profissionais:${busca}:${mostrarInativos}`)
+  const [excluindoEmMassa, setExcluindoEmMassa] = useState(false)
+  const [resultadoEmMassa, setResultadoEmMassa] = useState<ResultadoEmMassa | null>(null)
+  const nomePorId = useMemo(() => new Map(lista.map((p) => [p.id, p.nome])), [lista])
+
+  async function excluirSelecionados() {
+    const ids = [...selecao.selecionados]
+    if (ids.length === 0) return
+    if (!confirm(`Excluir ${ids.length} profissional(is)? Quem estiver em uso será recusado e continuará existindo.`)) return
+    setExcluindoEmMassa(true)
+    setResultadoEmMassa(null)
+    const resultado = await executarEmMassa(ids, async (id) => {
+      const r = await fetch(`/api/gerenciamento/profissionais/${id}`, { method: "DELETE", headers: authHeaders() })
+      if (r.ok) return { ok: true }
+      const j = await r.json().catch(() => ({}))
+      return { ok: false, motivo: j.mensagem || j.error || `Erro ${r.status}.` }
+    })
+    setExcluindoEmMassa(false)
+    setResultadoEmMassa(resultado)
+    selecao.limpar()
+    carregar()
+  }
+
   async function excluir(p: Profissional) {
     const r = await fetch(`/api/gerenciamento/profissionais/${p.id}`, { method: "DELETE", headers: authHeaders() })
     const j = await r.json().catch(() => ({}))
@@ -193,10 +224,31 @@ export function ProfissionaisTab() {
           {busca ? "Nenhum profissional encontrado para essa busca." : "Nenhum profissional cadastrado ainda."}
         </p>
       ) : (
+        <>
+        <ResumoEmMassa
+          resultado={resultadoEmMassa}
+          substantivo={["profissional", "profissionais"]}
+          rotuloDoItem={(id) => nomePorId.get(Number(id)) ?? `#${id}`}
+          onFechar={() => setResultadoEmMassa(null)}
+        />
+        <BarraDeSelecao
+          quantidade={selecao.quantidade}
+          substantivo={["profissional", "profissionais"]}
+          onLimpar={selecao.limpar}
+          onExcluir={() => void excluirSelecionados()}
+          excluindo={excluindoEmMassa}
+        />
         <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-primary)] text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
               <tr>
+                <th className="w-10 px-4 py-2.5">
+                  <CaixaDeSelecaoTodos
+                    todosMarcados={selecao.todosMarcados}
+                    algumMarcado={selecao.algumMarcado}
+                    onAlternar={selecao.alternarTodos}
+                  />
+                </th>
                 <th className="px-4 py-2.5">Nome</th>
                 <th className="px-4 py-2.5">Categoria</th>
                 <th className="px-4 py-2.5">Registro</th>
@@ -208,6 +260,13 @@ export function ProfissionaisTab() {
             <tbody>
               {lista.map((p) => (
                 <tr key={p.id} className={`border-t border-[var(--border-subtle)] ${p.ativo ? "" : "opacity-50"}`}>
+                  <td className="px-4 py-2.5 align-middle">
+                    <CaixaDeSelecao
+                      marcada={selecao.selecionados.has(p.id)}
+                      onAlternar={() => selecao.alternar(p.id)}
+                      rotulo={`Selecionar ${p.nome}`}
+                    />
+                  </td>
                   <td className="px-4 py-2.5 text-white/90">{p.nome}</td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]">{p.categoria?.nome ?? "—"}</td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]">
@@ -243,6 +302,7 @@ export function ProfissionaisTab() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {form && (

@@ -34,9 +34,6 @@
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum
-CREATE TYPE "TipoProtocolo" AS ENUM ('CONSULAR', 'JUDICIAL', 'ADMINISTRATIVO', 'COMUNE', 'CARTORIO', 'TRIBUNAL', 'OUTRO');
-
--- CreateEnum
 CREATE TYPE "FormaEnvioProtocolo" AS ENUM ('PRESENCIAL', 'CORREIO', 'EMAIL', 'PORTAL_ONLINE', 'TERCEIRO');
 
 -- CreateEnum
@@ -119,12 +116,6 @@ CREATE TYPE "StatusTarefa" AS ENUM ('NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_
 
 -- CreateEnum
 CREATE TYPE "PrioridadeTarefa" AS ENUM ('BAIXA', 'MEDIA', 'ALTA', 'URGENTE');
-
--- CreateEnum
-CREATE TYPE "Consulado" AS ENUM ('SAO_PAULO', 'PORTO_ALEGRE', 'RIO_DE_JANEIRO', 'SALVADOR', 'BRASILIA', 'OUTROS');
-
--- CreateEnum
-CREATE TYPE "Tribunal" AS ENUM ('ANCONA', 'BARI', 'BOLOGNA', 'BRESCIA', 'CAGLIARI', 'CALTANISSETTA', 'CAMPOBASSO', 'CATANIA', 'CATANZARO', 'FIRENZE', 'GENOVA', 'L_AQUILA', 'LECCE', 'MESSINA', 'MILANO', 'NAPOLI', 'PALERMO', 'PERUGIA', 'POTENZA', 'REGGIO_CALABRIA', 'ROMA', 'SALERNO', 'TORINO', 'TRENTO', 'TRIESTE', 'VENEZIA');
 
 -- CreateEnum
 CREATE TYPE "TipoDocumento" AS ENUM ('CERTIDAO_NASCIMENTO', 'CERTIDAO_NASCIMENTO_INTEIRO_TEOR', 'CERTIDAO_CASAMENTO', 'CERTIDAO_CASAMENTO_INTEIRO_TEOR', 'CERTIDAO_OBITO', 'CERTIDAO_OBITO_INTEIRO_TEOR', 'CERTIDAO_BATISMO', 'CNN', 'CARTA_NATURALIZACAO', 'RG', 'CPF', 'CNH', 'PASSAPORTE_BRASILEIRO', 'TITULO_ELEITOR', 'RESERVISTA', 'PASSAPORTE_ESTRANGEIRO', 'CERTIDAO_CIDADANIA_ESTRANGEIRA', 'COMPROVANTE_RESIDENCIA', 'TRADUCAO_JURAMENTADA', 'APOSTILA_HAIA', 'FOTO_3X4', 'PROCURACAO', 'ARVORE_GENEALOGICA_DOC', 'OUTRO');
@@ -659,9 +650,6 @@ CREATE TABLE "Protocolo" (
     "id" SERIAL NOT NULL,
     "processoId" INTEGER NOT NULL,
     "contratanteId" INTEGER,
-    "requerenteId" INTEGER,
-    "consulado" "Consulado",
-    "consuladoOutro" VARCHAR(200),
     "orgaoId" INTEGER,
     "tipoProtocoloId" INTEGER,
     "setor" VARCHAR(120),
@@ -671,7 +659,6 @@ CREATE TABLE "Protocolo" (
     "finalidade" VARCHAR(30) NOT NULL DEFAULT 'REQUERIMENTO',
     "situacao" VARCHAR(30) NOT NULL DEFAULT 'PROTOCOLADO',
     "situacaoEm" TIMESTAMP(3),
-    "tipoProtocolo" "TipoProtocolo",
     "formaEnvio" "FormaEnvioProtocolo",
     "responsavelId" INTEGER,
     "observacoes" TEXT,
@@ -679,6 +666,7 @@ CREATE TABLE "Protocolo" (
     "solicitacaoId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "requerenteId" INTEGER,
 
     CONSTRAINT "Protocolo_pkey" PRIMARY KEY ("id")
 );
@@ -728,36 +716,6 @@ CREATE TABLE "ProtocoloDocumento" (
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ProtocoloDocumento_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "InformacaoItalia" (
-    "id" SERIAL NOT NULL,
-    "processoId" INTEGER NOT NULL,
-    "tribunal" "Tribunal" NOT NULL,
-    "dataProtocolo" TIMESTAMP(3),
-    "dataDistribuicao" TIMESTAMP(3),
-    "numeroRuoloGenerale" VARCHAR(100),
-    "observacoes" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "InformacaoItalia_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "AnexoInformacaoItalia" (
-    "id" SERIAL NOT NULL,
-    "nome" VARCHAR(200) NOT NULL,
-    "tipo" VARCHAR(50),
-    "nomeArquivo" VARCHAR(300) NOT NULL,
-    "urlArquivo" TEXT NOT NULL,
-    "tamanho" INTEGER,
-    "mimeType" VARCHAR(100),
-    "informacaoItaliaId" INTEGER NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "AnexoInformacaoItalia_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -4798,9 +4756,6 @@ CREATE INDEX "Protocolo_processoId_idx" ON "Protocolo"("processoId");
 CREATE INDEX "Protocolo_contratanteId_idx" ON "Protocolo"("contratanteId");
 
 -- CreateIndex
-CREATE INDEX "Protocolo_requerenteId_idx" ON "Protocolo"("requerenteId");
-
--- CreateIndex
 CREATE INDEX "Protocolo_orgaoId_idx" ON "Protocolo"("orgaoId");
 
 -- CreateIndex
@@ -4841,15 +4796,6 @@ CREATE INDEX "ProtocoloDocumento_documentoId_idx" ON "ProtocoloDocumento"("docum
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ProtocoloDocumento_protocoloId_documentoId_key" ON "ProtocoloDocumento"("protocoloId", "documentoId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "InformacaoItalia_processoId_key" ON "InformacaoItalia"("processoId");
-
--- CreateIndex
-CREATE INDEX "InformacaoItalia_processoId_idx" ON "InformacaoItalia"("processoId");
-
--- CreateIndex
-CREATE INDEX "AnexoInformacaoItalia_informacaoItaliaId_idx" ON "AnexoInformacaoItalia"("informacaoItaliaId");
 
 -- CreateIndex
 CREATE INDEX "AnexoProcesso_processoId_idx" ON "AnexoProcesso"("processoId");
@@ -6589,9 +6535,6 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_contratanteId_fkey" FOREIGN KE
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_orgaoId_fkey" FOREIGN KEY ("orgaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -6602,6 +6545,9 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_solicitacaoId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_tipoProtocoloId_fkey" FOREIGN KEY ("tipoProtocoloId") REFERENCES "TipoProtocoloCadastro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloRequerente" ADD CONSTRAINT "ProtocoloRequerente_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6617,12 +6563,6 @@ ALTER TABLE "ProtocoloDocumento" ADD CONSTRAINT "ProtocoloDocumento_protocoloId_
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloDocumento" ADD CONSTRAINT "ProtocoloDocumento_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "InformacaoItalia" ADD CONSTRAINT "InformacaoItalia_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "AnexoInformacaoItalia" ADD CONSTRAINT "AnexoInformacaoItalia_informacaoItaliaId_fkey" FOREIGN KEY ("informacaoItaliaId") REFERENCES "InformacaoItalia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "AnexoProcesso" ADD CONSTRAINT "AnexoProcesso_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6703,7 +6643,7 @@ ALTER TABLE "Parcela" ADD CONSTRAINT "Parcela_faturaId_fkey" FOREIGN KEY ("fatur
 ALTER TABLE "ClienteAuth" ADD CONSTRAINT "ClienteAuth_contratanteId_fkey" FOREIGN KEY ("contratanteId") REFERENCES "Contratante"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ClienteAuth" ADD CONSTRAINT "ClienteAuth_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "ClienteAuth" ADD CONSTRAINT "ClienteAuth_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DispositivoPush" ADD CONSTRAINT "DispositivoPush_clienteAuthId_fkey" FOREIGN KEY ("clienteAuthId") REFERENCES "ClienteAuth"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -7411,9 +7351,6 @@ ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_documentTypeId_fke
 ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_contratanteId_fkey" FOREIGN KEY ("contratanteId") REFERENCES "Contratante"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -7427,6 +7364,9 @@ ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_documentoId_fkey" 
 
 -- AddForeignKey
 ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoGerado" ADD CONSTRAINT "DocumentoGerado_requerenteId_fkey" FOREIGN KEY ("requerenteId") REFERENCES "Requerente"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_documentoGeradoId_fkey" FOREIGN KEY ("documentoGeradoId") REFERENCES "DocumentoGerado"("id") ON DELETE CASCADE ON UPDATE CASCADE;
