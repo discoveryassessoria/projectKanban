@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
 
     const porPais = await Promise.all(PAISES.map(async (p) => {
       const [t, c] = await Promise.all([
-        prisma.processo.count({ where: { pais: p } }),
-        prisma.processo.count({ where: { pais: p, tipoProcessoMotorId: { not: null } } }),
+        prisma.processo.count({ where: ondePaisEh(p) }),
+        prisma.processo.count({ where: { ...ondePaisEh(p), tipoProcessoMotorId: { not: null } } }),
       ])
       return { pais: p, total: t, conectados: c }
     }))

@@ -230,8 +230,11 @@ function ProcessosTooltip({
       onOpenProcesso(processo.id, processo.pais)
     } else {
       // Fallback: navegar para o Kanban
-      const paisNormalizado = processo.pais?.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      router.push(`/kanban?processoId=${processo.id}&pais=${paisNormalizado}`)
+      // A CHAVE CANÔNICA vai na URL como está no cadastro. Normalizar acento e
+      // caixa para "identificar" o país é o que produzia comparações que nunca
+      // batiam — chave é chave, não texto para maquiar.
+      const chave = processo.pais ?? ""
+      router.push(`/kanban?processoId=${processo.id}&pais=${encodeURIComponent(chave)}`)
     }
   }
 

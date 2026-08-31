@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 export async function PUT(request: Request, { params }: { params: Promise<{ countryKey: string }> }) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -62,7 +63,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     // Bloqueia se estiver em uso
     const [tipos, processos] = await Promise.all([
       prisma.tipoProcessoNacionalidade.count({ where: { countryKey } }),
-      prisma.processo.count({ where: { pais: countryKey } }),
+      prisma.processo.count({ where: ondePaisEh(countryKey) }),
     ])
     if (tipos > 0 || processos > 0) {
       return NextResponse.json(

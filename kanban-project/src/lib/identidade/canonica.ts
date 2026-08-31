@@ -112,3 +112,65 @@ export async function idDoPais(paisKey: string): Promise<number | null> {
   })
   return p?.id ?? null
 }
+
+
+// ─── HELPERS DE LEITURA ─────────────────────────────────────────────────────
+
+/**
+ * Fragmento de select do país para QUALQUER consulta de Processo.
+ *
+ * Existe para que migrar um leitor seja trocar uma linha, e para que ninguém
+ * precise lembrar quais colunas trazer. Traz a identidade e o rótulo juntos —
+ * assim a tela nunca precisa de uma segunda consulta só para exibir o nome,
+ * que seria N+1 disfarçado de boa intenção.
+ */
+export const SELECT_PAIS = {
+  select: { id: true, countryKey: true, countryLabel: true, flag: true },
+} as const
+
+/** O que qualquer leitor precisa saber sobre o país de um processo. */
+export interface PaisDoProcesso {
+  id: number | null
+  chave: string | null
+  rotulo: string | null
+  bandeira: string | null
+}
+
+type ProcessoComPais = {
+  paisId?: number | null
+  paisCanonico?: { id: number; countryKey: string; countryLabel: string; flag?: string | null } | null
+  pais?: string | null
+}
+
+/**
+ * Lê o país de um processo já carregado.
+ *
+ * A identidade manda. O texto legado só entra quando a linha ainda não tem
+ * `paisId` — e some junto com a coluna. Nenhum leitor precisa saber disso.
+ */
+export function paisDoProcesso(p: ProcessoComPais | null | undefined): PaisDoProcesso {
+  if (!p) return { id: null, chave: null, rotulo: null, bandeira: null }
+  if (p.paisCanonico) {
+    return {
+      id: p.paisCanonico.id,
+      chave: p.paisCanonico.countryKey,
+      rotulo: p.paisCanonico.countryLabel,
+      bandeira: p.paisCanonico.flag ?? null,
+    }
+  }
+  const t = (p.pais ?? "").trim()
+  return { id: p.paisId ?? null, chave: t || null, rotulo: t || null, bandeira: null }
+}
+
+/**
+ * "Este processo é da rota X?" — por IDENTIDADE.
+ *
+ * Recebe a CHAVE canônica do cadastro, nunca um rótulo. Existe porque a
+ * pergunta é legítima (o produto tem regras por nacionalidade) e o jeito errado
+ * de fazê-la — normalizar acento, comparar maiúsculas, procurar substring — foi
+ * responsável por três bugs silenciosos neste sistema.
+ */
+export function ehPais(p: ProcessoComPais | null | undefined, chaveCanonica: string): boolean {
+  const atual = paisDoProcesso(p).chave
+  return atual != null && atual.toLowerCase() === chaveCanonica.toLowerCase()
+}

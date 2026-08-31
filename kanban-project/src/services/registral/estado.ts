@@ -51,6 +51,7 @@ export async function carregarContexto(db: DB, processoId: number): Promise<Cont
       id: true,
       arvoreId: true,
       pais: true,
+      paisCanonico: { select: { countryKey: true } },
       arvore: { select: { id: true, pessoaPrincipalId: true } },
       requerentes: { where: VINCULO_PROCESSO_ATIVO, select: { requerente: { select: { personId: true } } } },
     },
@@ -72,7 +73,10 @@ export async function carregarContexto(db: DB, processoId: number): Promise<Cont
   return {
     processoId: proc.id,
     arvoreId: proc.arvoreId ?? null,
-    paisAlvo: MAPA_PAIS[String(proc.pais || "").toUpperCase()] ?? null,
+    // POR IDENTIDADE: a chave canônica do cadastro resolve direto o alvo. O
+    // mapa continua existindo só para as siglas (IT/PT/ES/DE) e para linha sem
+    // `paisId` — e some com a coluna espelho.
+    paisAlvo: MAPA_PAIS[(proc.paisCanonico?.countryKey ?? String(proc.pais || "")).toUpperCase()] ?? null,
     requerenteIds: [...new Set([...dosPapeis, ...marcados.map((m) => m.id)])].sort((a, b) => a - b),
     raizId: proc.arvore?.pessoaPrincipalId ?? null,
   }

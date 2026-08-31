@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma"
 import { criarProcessoV2 } from "@/src/services/criar-processo"
 import { garantirFamiliaParaProcesso } from "@/src/services/familia"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 export const maxDuration = 300
 export const dynamic = "force-dynamic"
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
 
   // 4) existentes no país (dedupe forte por nome normalizado)
   const existentes = await prisma.processo.findMany({
-    where: { pais: pais.countryKey },
+    where: ondePaisEh(pais.countryKey),
     select: { id: true, codigo: true, nome: true },
   })
   const mapaExistente = new Map(existentes.map((p) => [norm(p.nome), p]))

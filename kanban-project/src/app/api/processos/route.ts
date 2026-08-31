@@ -15,6 +15,7 @@ import { criarProcessoV2 } from '@/src/services/criar-processo'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
 import { resolveOperationalProjectionBatch } from '@/src/lib/process-stage/operational-projection'
 import { resolveSlaProjectionBatch } from '@/src/lib/process-stage/sla-projection'
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -28,8 +29,10 @@ export async function GET(request: Request) {
     // Construir filtro dinâmico
     const where: any = {}
 
+    // POR IDENTIDADE. `where.pais = pais` casava texto com texto e dependia de
+    // as duas pontas usarem a mesma grafia.
     if (pais) {
-      where.pais = pais
+      Object.assign(where, ondePaisEh(pais))
     }
 
     // ✅ Filtro por requerente

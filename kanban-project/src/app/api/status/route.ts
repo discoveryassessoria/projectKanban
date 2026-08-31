@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 // GET - Buscar status (filtrado por país)
 export async function GET(request: Request) {
@@ -8,7 +9,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const pais = searchParams.get("pais")
 
-    const where = pais ? { pais } : {}
+    const where = pais ? ondePaisEh(pais) : {}
 
     const status = await prisma.status.findMany({
       where,
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
 
     // Buscar a maior ordem para este país
     const maxOrdem = await prisma.status.aggregate({
-      where: { pais },
+      where: ondePaisEh(pais),
       _max: { ordem: true }
     })
 
