@@ -275,7 +275,7 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // produção, então a coluna nasce NOT NULL sem backfill nem default mentiroso.
 //
 //   anterior : 7c67e2f5035c1efade5380b3cadeed1a4a43bdb02934c5924cb6ec15c72a9b0c
-const CHECKSUM_LEDGER = '90bebd1187c816afb96623cc2f64c9dca0817d9736dbfec9ef3ba86644b05215'
+const CHECKSUM_LEDGER = '2cd054d7832395ab094067fd08a3cf69307231d9ba5060c022737699618fc1f8'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -325,6 +325,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260831120000_requerimento_escopo_e_cardinalidade',
   '20260831140000_tipo_protocolo_cadastro',
   '20260831160000_remove_legado_protocolo',
+  '20260831180000_requisito_cadastral',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

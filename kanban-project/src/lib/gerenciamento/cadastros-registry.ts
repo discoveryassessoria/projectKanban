@@ -1,3 +1,4 @@
+import { OPCOES_DE_CAMPO } from "@/src/lib/requisitos/campos-canonicos"
 // src/lib/gerenciamento/cadastros-registry.ts
 //
 // REGISTRO ÚNICO dos cadastros simples do Gerenciamento (26/07/2026).
@@ -101,6 +102,7 @@ export const FONTES: Record<string, {
   tiposProcesso: { model: "tipoProcessoNacionalidade", valor: "id", label: ["name"], where: { arquivado: false }, valorNumerico: true },
   paises: { model: "catalogoPais", valor: "id", label: ["countryLabel"], where: { ativo: true }, valorNumerico: true },
   modalidadesLegais: { model: "modalidadeLegal", valor: "id", label: ["nome"], where: { ativo: true }, valorNumerico: true },
+  itensCatalogo: { model: "itemCatalogo", valor: "id", label: ["name"], where: { ativo: true }, valorNumerico: true },
   fases: { model: "catalogoFase", valor: "phaseKey", label: ["label"], where: { ativo: true } },
   // NOME + E-MAIL: dois funcionários homônimos ficavam indistinguíveis no
   // seletor, e escolher a pessoa errada para uma equipe é um erro silencioso —
@@ -263,6 +265,72 @@ export const CADASTROS: Record<string, CadastroSpec> = {
         obrigatorio: true, largura: "cheia",
         ajuda: "A base jurídica a que este recorte pertence. É dela que vem a regra do requerimento.",
       },
+      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
+      ...CAMPOS_BASE,
+    ],
+  },
+
+  // ── Documentos e Protocolos › Requisitos Cadastrais ───────────────────────
+  // A obrigatoriedade de DADO. Irmã da Regra Documental, que cuida do DOCUMENTO.
+  // Aqui não se cadastra o campo — os campos são as colunas que o schema já tem,
+  // e a lista vem de `campos-canonicos.ts`. O que se cadastra é a EXIGÊNCIA.
+  "requisitos-cadastrais": {
+    entidade: "requisitos-cadastrais",
+    model: "requisitoCadastral",
+    titulo: "Requisitos Cadastrais",
+    singular: "requisito cadastral",
+    descricao:
+      "Quando um DADO passa a ser exigido — e-mail, endereço, CPF, data de nascimento. Não confundir com Regra Documental, que exige DOCUMENTO: 'comprovante de endereço' é documento, 'endereço' é dado. Deixe um escopo em branco para valer em qualquer caso.",
+    novoLabel: "+ Novo requisito",
+    codeDe: "nome",
+    identidade: "nome",
+    ordenavel: true,
+    auditoria: "RequisitoCadastral",
+    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
+    colunas: [
+      { key: "nome", label: "Requisito" },
+      { key: "campoKey", label: "Campo exigido" },
+      { key: "obrigatoriedade", label: "Obrigatoriedade" },
+    ],
+    campos: [
+      { key: "nome", label: "Nome do requisito", tipo: "text", obrigatorio: true, largura: "cheia" },
+      {
+        key: "campoKey", label: "Campo exigido", tipo: "select", opcoes: OPCOES_DE_CAMPO,
+        obrigatorio: true, largura: "cheia",
+        ajuda: "O dado que precisa estar preenchido. A lista vem das colunas que o sistema realmente tem — não é possível exigir um campo inexistente.",
+      },
+      {
+        key: "obrigatoriedade", label: "Obrigatoriedade", tipo: "select", largura: "meia",
+        opcoes: [
+          { valor: "OBRIGATORIA", label: "Obrigatória" },
+          { valor: "OPCIONAL", label: "Opcional" },
+        ],
+      },
+      {
+        key: "bloqueante", label: "Bloqueia o avanço", tipo: "bool", largura: "meia",
+        ajuda: "Nem toda pendência trava o processo. Marque só o que realmente impede continuar.",
+      },
+      {
+        key: "publicoAlvo", label: "A quem se aplica", tipo: "select", largura: "cheia",
+        opcoes: [
+          { valor: "REQUERENTE", label: "Requerente" },
+          { valor: "CONTRATANTE", label: "Contratante" },
+          { valor: "PESSOA_DA_LINHA_RETA", label: "Pessoa da linha reta" },
+          { valor: "PESSOA_DA_ARVORE_COM_DOCUMENTACAO", label: "Pessoa da árvore com documentação" },
+          { valor: "PESSOA_FORA_DA_LINHA_RETA", label: "Pessoa fora da linha reta" },
+          { valor: "TODAS_AS_PESSOAS_DA_ARVORE", label: "Todas as pessoas da árvore" },
+        ],
+      },
+      { key: "paisId", label: "Somente no país", tipo: "select", fonte: "paises", largura: "meia",
+        ajuda: "Em branco = vale para todas as nacionalidades." },
+      { key: "modalidadeLegalId", label: "Somente na modalidade legal", tipo: "select", fonte: "modalidadesLegais", largura: "meia",
+        ajuda: "Em branco = vale para qualquer base jurídica." },
+      { key: "itemCatalogoId", label: "Somente no serviço/item", tipo: "select", fonte: "itensCatalogo", largura: "cheia",
+        ajuda: "Em branco = vale para qualquer serviço." },
+      { key: "idadeMinima", label: "Idade mínima (anos)", tipo: "number", largura: "meia",
+        ajuda: "A idade é calculada na leitura, a partir da data de nascimento — nunca armazenada." },
+      { key: "idadeMaxima", label: "Idade máxima (anos)", tipo: "number", largura: "meia" },
+      // Sem vigência: cadastro vale até ser inativado. Data é para fato.
       { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
       ...CAMPOS_BASE,
     ],

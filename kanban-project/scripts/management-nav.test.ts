@@ -254,6 +254,15 @@ ok(!itemDe("protocols"), 'não existe cadastro mestre de "protocolos" na navega�
 ok(!TELAS_KEYS.has("protocols"), "nenhuma tela de cadastro do ATO de protocolo registrada")
 ok(ALIAS_MAP_PROTO["protocols"] === "overview", "URL antiga do cadastro de protocolo cai no painel do Gerenciamento (sem tela morta)")
 ok(!!itemDe("prottypes"), 'cadastro "Tipos de Protocolo" existe na navegação')
+// RELATÓRIO NÃO MORA NO GERENCIAMENTO. Ele é leitura da operação e vive no
+// destino próprio "Relatórios", organizado por fluxo — quem tira o relatório de
+// protocolo pode não ter `usuarios.gerenciar`. A URL antiga redireciona.
+ok(!itemDe("protreport"), "relatório de protocolos não é item do Gerenciamento")
+ok(!TELAS_KEYS.has("protreport"), "relatório de protocolos não é tela do Gerenciamento")
+ok(
+  /MUDOU_DE_ENDERECO[\s\S]{0,200}protreport:\s*"\/relatorios\?r=protocolos"/.test(pageSrc),
+  "URL antiga ?screen=protreport redireciona para /relatorios (bookmark não morre)",
+)
 ok(TELAS_KEYS.has("prottypes"), 'tela de "Tipos de Protocolo" registrada')
 ok(/tipos-protocolo/.test(registrySrc), 'motor genérico de cadastros conhece "tipos-protocolo"')
 ok(

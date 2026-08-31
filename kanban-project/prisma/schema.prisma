@@ -887,6 +887,81 @@ model Protocolo {
   @@index([finalidade, situacao])
 }
 
+/// REQUISITO CADASTRAL — "para esta rota, este DADO é exigido".
+///
+/// ─── A LACUNA QUE ISTO FECHA ────────────────────────────────────────────────
+/// O Discovery já sabia dizer que um DOCUMENTO era obrigatório: MatrizDocumental
+/// é a regra, NecessidadeDocumental é a obrigação materializada, e o Documento é
+/// a evidência. Não havia nada equivalente para DADO: "e-mail é obrigatório para
+/// a rota espanhola" não existia em lugar nenhum — o mais próximo era um
+/// `camposObrigatorios: string[]` dentro de um JSON de configuração de passo,
+/// sem cadastro, sem aplicabilidade e sem versão.
+///
+/// Documento e dado são naturezas diferentes e o produto precisa distinguir:
+/// "comprovante de endereço" é documento; "endereço" é dado. "RG" pode ser as
+/// duas coisas — o documento anexado e o número no cadastro — e são requisitos
+/// separados.
+///
+/// ─── O QUE ESTA TABELA NÃO GUARDA ──────────────────────────────────────────
+/// O VALOR. O e-mail continua em `Requerente.email`. Aqui mora só a REGRA de
+/// obrigatoriedade; `campoKey` aponta para o catálogo de campos canônicos
+/// (src/lib/requisitos/campos-canonicos.ts), que é o espelho do schema. Sem isso
+/// seria possível cadastrar requisito para um campo que não existe — obrigação
+/// impossível de satisfazer.
+///
+/// ─── APLICABILIDADE ────────────────────────────────────────────────────────
+/// Campos de escopo NULOS significam "vale para qualquer": um requisito sem país
+/// vale para todas as nacionalidades. Isso evita a explosão de duplicar o mesmo
+/// requisito por combinação — a regra é uma, o escopo é que a estreita.
+model RequisitoCadastral {
+  id        Int     @id @default(autoincrement())
+  /// Identidade IMUTÁVEL, gerada do nome na criação.
+  code      String  @unique @db.VarChar(60)
+  nome      String  @db.VarChar(160)
+  descricao String? @db.Text
+
+  /// Campo canônico exigido (`requerente.email`, `requerente.endereco`…).
+  /// Aponta para o catálogo em código, que espelha as colunas reais.
+  campoKey String @db.VarChar(80)
+
+  /// Mesma escala da regra documental — uma semântica só para obrigatoriedade.
+  obrigatoriedade ObrigatoriedadeRegra @default(OBRIGATORIA)
+  /// Impede o processo de avançar enquanto não satisfeito? Nem toda pendência
+  /// bloqueia, e tratar todas como bloqueio faria a operação parar por nada.
+  bloqueante      Boolean              @default(false)
+  /// A quem o requisito se dirige. Mesma escala da regra documental.
+  publicoAlvo     PublicoAlvoRegra     @default(REQUERENTE)
+
+  // ── ESCOPO (null = qualquer) ─────────────────────────────────────────────
+  paisId            Int?
+  pais              CatalogoPais?    @relation(fields: [paisId], references: [id], onDelete: Restrict)
+  modalidadeLegalId Int?
+  modalidadeLegal   ModalidadeLegal? @relation(fields: [modalidadeLegalId], references: [id], onDelete: Restrict)
+  itemCatalogoId    Int?
+  itemCatalogo      ItemCatalogo?    @relation("RequisitoCadastralItem", fields: [itemCatalogoId], references: [id], onDelete: Restrict)
+  /// Faixa etária em anos completos, calculada na LEITURA a partir da data de
+  /// nascimento. Idade não é persistida: ela muda sozinha todo ano.
+  idadeMinima       Int?
+  idadeMaxima       Int?
+
+  // ── SEM VIGÊNCIA, DE PROPÓSITO ───────────────────────────────────────────
+  /// Cadastro vale até ser INATIVADO; data é para FATO — é a regra do produto, e
+  /// há guard que a protege. A pergunta "esta pendência existia em março?" não se
+  /// responde datando o cadastro: responde-se pela obrigação materializada, que
+  /// guarda o snapshot da regra que a gerou (ver NecessidadeDocumental).
+  versao Int @default(1)
+
+  ordem        Int      @default(0)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([ativo])
+  @@index([campoKey])
+  @@index([paisId])
+  @@index([modalidadeLegalId])
+}
+
 /// TIPO DE PROTOCOLO — cadastro, no Gerenciamento.
 ///
 /// O enum `TipoProtocolo` (7 valores fixos no schema) obrigava um deploy para a
@@ -3154,10 +3229,11 @@ model CatalogoPais {
   criadoEm         DateTime @default(now())
   atualizadoEm     DateTime @updatedAt
 
-  condicoesPagamento CondicaoPagamentoPais[]
-  taxasPagamento     TaxaPagamentoPais[]
-  servicos           ServicoProdutoPais[]
-  modalidadesLegais  ModalidadeLegal[]
+  requisitosCadastrais RequisitoCadastral[]
+  condicoesPagamento   CondicaoPagamentoPais[]
+  taxasPagamento       TaxaPagamentoPais[]
+  servicos             ServicoProdutoPais[]
+  modalidadesLegais    ModalidadeLegal[]
 }
 
 model ModalidadePais {
@@ -4493,6 +4569,9 @@ model ItemCatalogo {
 
   // MRG - evidencias que citam este Documento Mestre
   evidenciasRegistrais EvidenciaRegistral[]
+
+  /// Requisitos CADASTRAIS que este item de catálogo exige (ver RequisitoCadastral).
+  requisitosCadastrais RequisitoCadastral[] @relation("RequisitoCadastralItem")
 
   @@index([natureza])
   @@index([ativo])
@@ -5948,7 +6027,8 @@ model ModalidadeLegal {
   criadoEm                  DateTime     @default(now())
   atualizadoEm              DateTime     @updatedAt
 
-  enquadramentos EnquadramentoLegal[]
+  enquadramentos       EnquadramentoLegal[]
+  requisitosCadastrais RequisitoCadastral[]
 
   @@index([paisId])
 }

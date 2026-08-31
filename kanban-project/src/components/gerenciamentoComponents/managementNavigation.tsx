@@ -237,6 +237,11 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       a(30, "prottypes", "Tipos de Protocolo", ["protocolo", "tipo", "consular", "judicial", "comune", "cartorio", "cartório", "tribunal"], "Protocolos"),
 
+      // REQUISITO CADASTRAL é irmão da Regra Documental: uma exige DOCUMENTO, a
+      // outra exige DADO. Ficam lado a lado porque a pergunta operacional é a
+      // mesma — "o que ainda falta para esta pessoa?".
+      a(45, "regreqs", "Requisitos Cadastrais", ["requisito", "campo", "email", "e-mail", "endereco", "endereço", "telefone", "cpf", "obrigatorio", "obrigatório", "pendencia", "pendência", "completude"], "Regras"),
+
       a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental", "matriz", "obrigatorio", "obrigatório"], "Regras"),
 
       // OCULTOS (telas existentes, acessíveis por ?screen=) — sem cadastro paralelo no menu.
@@ -411,9 +416,11 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "diagnostics", "Diagnóstico do Sistema", ["diagnostico", "diagnóstico", "relatorio", "relatório"], "Relatórios"),
       a(20, "cfgdiagnosis", "Diagnóstico de Configuração", ["diagnostico", "diagnóstico", "config", "relatorio"], "Relatórios"),
-      // PROTOCOLOS — a pergunta que a operação faz toda semana: o que foi
-      // protocolado, em qual consulado ou tribunal, de qual família, quando.
-      a(25, "protreport", "Protocolos", ["protocolo", "consulado", "tribunal", "familia", "família", "requerimento", "exigencia", "exigência", "relatorio"], "Relatórios"),
+      // RELATÓRIO DE PROTOCOLOS SAIU DAQUI (31/08/2026). Relatório é leitura da
+      // OPERAÇÃO, não configuração: quem tira o relatório de protocolo é quem
+      // protocola, e essa pessoa pode não ter `usuarios.gerenciar`. Mudou para o
+      // destino próprio "Relatórios", organizado por fluxo. A URL antiga
+      // (?screen=protreport) redireciona para lá — bookmark não morre.
 
       a(30, "mgmthealth", "Diagnóstico Executivo", ["indicador", "kpi", "saude", "saúde", "executivo", "score"], "Indicadores"),
       a(40, "syshealth", "Saúde do Sistema", ["saude", "saúde", "indicador", "score", "auditoria"], "Indicadores"),

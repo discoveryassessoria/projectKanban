@@ -109,7 +109,6 @@ const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerencia
 // exclusivamente dentro do DOCX versionado do repositório.
 const ModelosDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RuntimeWorkflowDiagnostics = dynamic(() => import("@/src/components/gerenciamentoComponents/RuntimeWorkflowDiagnostics"), { ssr: false, loading: () => <CarregandoTela /> })
-const RelatorioProtocolosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RelatorioProtocolosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AssistenteParametrizacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AssistenteParametrizacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -212,9 +211,9 @@ const TELAS: Record<string, React.ComponentType> = {
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
   prottypes: cad("tipos-protocolo"),
+  regreqs: cad("requisitos-cadastrais"),
   legalmodes: cad("modalidades-legais"),
   legalframes: cad("enquadramentos-legais"),
-  protreport: RelatorioProtocolosTab,
   profcats: cad("categorias-profissional"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
   // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro
@@ -354,6 +353,16 @@ export default function GerenciamentoPage() {
     // protocolar nunca foi e não é cadastro.
     protocols: "overview",
   }
+  /**
+   * Telas que MUDARAM DE ENDEREÇO — saíram do Gerenciamento para um destino
+   * próprio. Alias comum troca uma key por outra dentro desta página; estas
+   * precisam sair dela, então viram redirecionamento de verdade. Bookmark
+   * antigo continua chegando onde a tela mora agora.
+   */
+  const MUDOU_DE_ENDERECO: Record<string, string> = {
+    protreport: "/relatorios?r=protocolos",
+  }
+
   const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k
@@ -403,6 +412,10 @@ export default function GerenciamentoPage() {
     const params = new URLSearchParams(window.location.search)
     const screen = params.get("screen")
     const moduleKey = params.get("module")
+    if (screen && MUDOU_DE_ENDERECO[screen]) {
+      router.replace(MUDOU_DE_ENDERECO[screen])
+      return
+    }
     if (screen) {
       const key = resolverTela(screen)
       const g = grupoDaKey(key)

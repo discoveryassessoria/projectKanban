@@ -61,7 +61,7 @@ const INPUT = "w-full rounded-md border border-[var(--border-default)] bg-[var(-
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)]"
 const dataBR = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—")
 
-export default function RelatorioProtocolosTab() {
+export default function RelatorioProtocolosTab({ paisKey = null }: { paisKey?: string | null } = {}) {
   const [orgaos, setOrgaos] = useState<{ id: number; name: string; type: string | null; country: string | null }[]>([])
   const [familias, setFamilias] = useState<{ id: number; nome: string }[]>([])
   const [dados, setDados] = useState<Resposta | null>(null)
@@ -96,6 +96,9 @@ export default function RelatorioProtocolosTab() {
       if (f.de) q.set("de", f.de)
       if (f.ate) q.set("ate", f.ate)
       if (f.exigenciaAberta) q.set("exigenciaAberta", "1")
+      // NACIONALIDADE É CONTEXTO: ela chega de fora (da navegação) e entra como
+      // filtro do MESMO relatório. Não existe relatório de protocolos por país.
+      if (paisKey) q.set("pais", paisKey)
       const res = await fetch(`/api/relatorios/protocolos?${q}`, { headers: auth() })
       const j = await res.json()
       if (!res.ok) { setErro(j.error || "Erro ao gerar o relatório."); setDados(null); return }
@@ -105,7 +108,7 @@ export default function RelatorioProtocolosTab() {
     } finally { setCarregando(false) }
   }
 
-  useEffect(() => { void consultar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void consultar() }, [paisKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const tiposDeOrgao = useMemo(
     () => Array.from(new Set(orgaos.map((o) => o.type).filter((t): t is string => !!t))).sort(),

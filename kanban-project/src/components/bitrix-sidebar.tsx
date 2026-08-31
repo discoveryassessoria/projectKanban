@@ -19,6 +19,7 @@ import { DollarIcon } from "@/src/components/icons/dollar-icon"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ManagementIcon } from "@/src/components/icons/management-icon"
 import { ScrollIcon } from "@/src/components/icons/scroll-icon"
+import { ReportIcon } from "@/src/components/icons/report-icon"
 
 const menuItems = [
   {
@@ -83,6 +84,18 @@ const menuItems = [
     textOffset: "",
     iconOffset: "",
     permissao: "registral.ver_evidencias",
+  },
+  {
+    // RELATÓRIO É LEITURA DA OPERAÇÃO, não configuração. Nasceu dentro do
+    // Gerenciamento e estava no lugar errado: quem tira um relatório de
+    // protocolo é quem protocola, e essa pessoa pode não ter (nem precisar de)
+    // `usuarios.gerenciar`. Aqui o conteúdo é organizado por FLUXO.
+    title: "Relatórios",
+    url: "/relatorios",
+    icon: ReportIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "processos.ver_paginas",
   },
 ]
 

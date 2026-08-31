@@ -671,6 +671,30 @@ CREATE TABLE "Protocolo" (
 );
 
 -- CreateTable
+CREATE TABLE "RequisitoCadastral" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(60) NOT NULL,
+    "nome" VARCHAR(160) NOT NULL,
+    "descricao" TEXT,
+    "campoKey" VARCHAR(80) NOT NULL,
+    "obrigatoriedade" "ObrigatoriedadeRegra" NOT NULL DEFAULT 'OBRIGATORIA',
+    "bloqueante" BOOLEAN NOT NULL DEFAULT false,
+    "publicoAlvo" "PublicoAlvoRegra" NOT NULL DEFAULT 'REQUERENTE',
+    "paisId" INTEGER,
+    "modalidadeLegalId" INTEGER,
+    "itemCatalogoId" INTEGER,
+    "idadeMinima" INTEGER,
+    "idadeMaxima" INTEGER,
+    "versao" INTEGER NOT NULL DEFAULT 1,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RequisitoCadastral_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "TipoProtocoloCadastro" (
     "id" SERIAL NOT NULL,
     "code" VARCHAR(60) NOT NULL,
@@ -4773,6 +4797,21 @@ CREATE INDEX "Protocolo_orgaoId_dataProtocolo_idx" ON "Protocolo"("orgaoId", "da
 CREATE INDEX "Protocolo_finalidade_situacao_idx" ON "Protocolo"("finalidade", "situacao");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "RequisitoCadastral_code_key" ON "RequisitoCadastral"("code");
+
+-- CreateIndex
+CREATE INDEX "RequisitoCadastral_ativo_idx" ON "RequisitoCadastral"("ativo");
+
+-- CreateIndex
+CREATE INDEX "RequisitoCadastral_campoKey_idx" ON "RequisitoCadastral"("campoKey");
+
+-- CreateIndex
+CREATE INDEX "RequisitoCadastral_paisId_idx" ON "RequisitoCadastral"("paisId");
+
+-- CreateIndex
+CREATE INDEX "RequisitoCadastral_modalidadeLegalId_idx" ON "RequisitoCadastral"("modalidadeLegalId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "TipoProtocoloCadastro_code_key" ON "TipoProtocoloCadastro"("code");
 
 -- CreateIndex
@@ -6544,6 +6583,15 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_solicitacaoId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_tipoProtocoloId_fkey" FOREIGN KEY ("tipoProtocoloId") REFERENCES "TipoProtocoloCadastro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequisitoCadastral" ADD CONSTRAINT "RequisitoCadastral_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequisitoCadastral" ADD CONSTRAINT "RequisitoCadastral_modalidadeLegalId_fkey" FOREIGN KEY ("modalidadeLegalId") REFERENCES "ModalidadeLegal"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RequisitoCadastral" ADD CONSTRAINT "RequisitoCadastral_itemCatalogoId_fkey" FOREIGN KEY ("itemCatalogoId") REFERENCES "ItemCatalogo"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloRequerente" ADD CONSTRAINT "ProtocoloRequerente_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
