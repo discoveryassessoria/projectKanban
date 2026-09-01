@@ -2723,7 +2723,6 @@ CREATE TABLE "OrgaoProtocolo" (
     "name" VARCHAR(200) NOT NULL,
     "nomeFantasia" VARCHAR(200),
     "type" VARCHAR(30),
-    "country" VARCHAR(60),
     "paisId" INTEGER,
     "state" VARCHAR(60),
     "provincia" VARCHAR(80),
@@ -5597,7 +5596,7 @@ CREATE UNIQUE INDEX "OrgaoProtocolo_identificacaoFiscal_key" ON "OrgaoProtocolo"
 CREATE INDEX "OrgaoProtocolo_type_idx" ON "OrgaoProtocolo"("type");
 
 -- CreateIndex
-CREATE INDEX "OrgaoProtocolo_country_idx" ON "OrgaoProtocolo"("country");
+CREATE INDEX "OrgaoProtocolo_paisId_idx" ON "OrgaoProtocolo"("paisId");
 
 -- CreateIndex
 CREATE INDEX "OrgaoProtocolo_ativo_idx" ON "OrgaoProtocolo"("ativo");
@@ -5609,7 +5608,7 @@ CREATE INDEX "OrgaoProtocolo_provincia_idx" ON "OrgaoProtocolo"("provincia");
 CREATE INDEX "OrgaoProtocolo_funcoes_idx" ON "OrgaoProtocolo"("funcoes");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "OrgaoProtocolo_name_country_key" ON "OrgaoProtocolo"("name", "country");
+CREATE UNIQUE INDEX "OrgaoProtocolo_name_paisId_key" ON "OrgaoProtocolo"("name", "paisId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "TipoDocumentoCadastro_publicCode_key" ON "TipoDocumentoCadastro"("publicCode");
