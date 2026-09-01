@@ -10,6 +10,7 @@ import type { FuncaoOrganizacao } from '@prisma/client'
 
 const INCLUDE_CATEGORIAS = {
   categorias: { select: { categoriaId: true, categoria: { select: { id: true, code: true, nome: true, ativo: true } } } },
+  pais: { select: { id: true, countryKey: true, countryLabel: true, flag: true } },
 } as const
 
 const txt = (v: unknown, max?: number) => {
@@ -71,7 +72,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const campo = <T,>(chave: string, atualValor: T, transformar: (v: unknown) => T): T =>
       b[chave] !== undefined ? transformar(b[chave]) : atualValor
 
-    const orgao = await prisma.$transaction(async (tx) => {
+    // Escrita atômica; releitura fora — mesma razão do POST (P2028 em banco remoto).
+    await prisma.$transaction(async (tx) => {
       await tx.orgaoProtocolo.update({
         where: { id },
         data: {
@@ -130,8 +132,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
       }
 
-      return tx.orgaoProtocolo.findUnique({ where: { id }, include: INCLUDE_CATEGORIAS })
-    })
+    }, { timeout: 20000, maxWait: 10000 })
+    const orgao = await prisma.orgaoProtocolo.findUnique({ where: { id }, include: INCLUDE_CATEGORIAS })
 
     return NextResponse.json({ orgao })
   } catch (e) {

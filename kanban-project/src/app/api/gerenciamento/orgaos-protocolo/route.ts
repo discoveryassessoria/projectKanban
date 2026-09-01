@@ -19,6 +19,9 @@ import type { FuncaoOrganizacao } from '@prisma/client'
 
 const INCLUDE_CATEGORIAS = {
   categorias: { select: { categoriaId: true, categoria: { select: { id: true, code: true, nome: true, ativo: true } } } },
+  // O país volta pela relação em TODA resposta — criar, acrescentar e listar
+  // devolvem o mesmo formato, e a tela nunca precisa de uma segunda ida.
+  pais: { select: { id: true, countryKey: true, countryLabel: true, flag: true } },
 } as const
 
 const s = (v: unknown, max?: number) => {
@@ -83,7 +86,7 @@ export async function GET(request: NextRequest) {
   try {
     const orgaos = await prisma.orgaoProtocolo.findMany({
       orderBy: [{ pais: { countryLabel: 'asc' } }, { name: 'asc' }],
-      include: { ...INCLUDE_CATEGORIAS, pais: { select: { id: true, countryKey: true, countryLabel: true, flag: true } } },
+      include: INCLUDE_CATEGORIAS,
     })
     return NextResponse.json({ orgaos })
   } catch (e) {
@@ -131,7 +134,7 @@ export async function POST(request: NextRequest) {
         }, { status: 409 })
       }
       const atual = await prisma.orgaoProtocolo.findUniqueOrThrow({ where: { id: resolucao.id }, select: { funcoes: true } })
-      const orgao = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         await tx.orgaoProtocolo.update({
           where: { id: resolucao.id! },
           data: { funcoes: unirFuncoes(atual.funcoes, funcoes) },
@@ -142,8 +145,8 @@ export async function POST(request: NextRequest) {
             skipDuplicates: true,
           })
         }
-        return tx.orgaoProtocolo.findUnique({ where: { id: resolucao.id! }, include: INCLUDE_CATEGORIAS })
-      })
+      }, { timeout: 20000, maxWait: 10000 })
+      const orgao = await prisma.orgaoProtocolo.findUnique({ where: { id: resolucao.id! }, include: INCLUDE_CATEGORIAS })
       return NextResponse.json({ orgao, acrescentado: true, resolvidoPor: resolucao.como })
     }
 
@@ -159,9 +162,13 @@ export async function POST(request: NextRequest) {
       }, { status: 409 })
     }
 
-    const orgao = await prisma.$transaction(async (tx) => {
+    // A ESCRITA é atômica; a releitura com include NÃO entra na transação.
+    // Dentro dela, a leitura só consumia o orçamento de tempo — e num banco
+    // remoto isso estourava o limite e derrubava a criação inteira (P2028).
+    const criadoId = await prisma.$transaction(async (tx) => {
       const criado = await tx.orgaoProtocolo.create({
         data: { name, ...ficha, paisId, funcoes: funcoes.length ? funcoes : ['ORGAO'], ativo: b.ativo !== false },
+        select: { id: true },
       })
       if (categoriaIds.length) {
         await tx.organizacaoCategoria.createMany({
@@ -169,8 +176,9 @@ export async function POST(request: NextRequest) {
           skipDuplicates: true,
         })
       }
-      return tx.orgaoProtocolo.findUnique({ where: { id: criado.id }, include: INCLUDE_CATEGORIAS })
-    })
+      return criado.id
+    }, { timeout: 20000, maxWait: 10000 })
+    const orgao = await prisma.orgaoProtocolo.findUnique({ where: { id: criadoId }, include: INCLUDE_CATEGORIAS })
 
     return NextResponse.json({ orgao }, { status: 201 })
   } catch (e) {
