@@ -267,7 +267,6 @@ export async function POST(request: Request) {
         prioridade: prioridadeValida,
         dataPrazo: toUTCNoon(dataPrazo),
         statusId: statusId || null,
-        pais: paisValido,
         ordem: ordemFinal
       },
       include: {

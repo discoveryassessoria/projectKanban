@@ -70,7 +70,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           equals: nome.trim(),
           mode: 'insensitive'
         },
-        pais: existingStatus.pais,
+        paisId: existingStatus.paisId,
         id: {
           not: parsedStatusId
         }

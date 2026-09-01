@@ -8,11 +8,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const pais = searchParams.get("pais")
 
-    // ATENÇÃO: `Status.pais` é coluna DA PRÓPRIA entidade Status, não é
-    // `Processo.pais`. Eu apliquei aqui, por engano, o resolvedor de identidade
-    // do processo — e a rota passou a devolver 500. Status tem a sua própria
-    // string de país, que é outro problema e outro escopo.
-    const where = pais ? { pais } : {}
+    // O parâmetro chega como CHAVE (texto, contrato externo) e é resolvido na
+    // borda para a identidade do cadastro. Internamente, só ID.
+    const paisFiltro = pais
+      ? await prisma.catalogoPais.findFirst({ where: { countryKey: pais.toLowerCase() }, select: { id: true } })
+      : null
+    const where = paisFiltro ? { paisId: paisFiltro.id } : {}
 
     const status = await prisma.status.findMany({
       where,
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
 
     // Buscar a maior ordem para este país
     const maxOrdem = await prisma.status.aggregate({
-      where: { pais },
+      where: { paisId: cadastrado.id },
       _max: { ordem: true }
     })
 
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     const status = await prisma.status.create({
       data: {
         nome,
-        pais,
+        paisId: cadastrado.id,
         ordem: novaOrdem
       }
     })

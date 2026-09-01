@@ -415,15 +415,26 @@ model Documento {
 // Status = coluna/estado de TAREFA (domÃ­nio de Tarefa). NÃO representa fase de
 // Processo â a fase do processo Ã© Processo.faseAtualKey (Workflow Macro/Interno).
 // O legado Processo.statusId foi removido definitivamente.
+/// STATUS — coluna do Kanban legado. Ver nota de escopo abaixo.
+///
+/// `Status.pais` era a SEGUNDA fonte textual de país do sistema: um status
+/// pertence a exatamente UM país (o @@unique([nome, pais]) já dizia isso), e a
+/// coluna guardava o nome em texto. Virou FK para o Cadastro Mestre.
+///
+/// A cardinalidade é 1:N e não N:N — foi verificada no domínio, não presumida:
+/// o unique composto e a rota de criação (que numera a ordem POR PAÍS) só fazem
+/// sentido com um país por status.
 model Status {
-  id      Int      @id @default(autoincrement())
-  nome    String   @db.VarChar(50)
-  ordem   Int      @default(0)
-  pais    String
+  id      Int          @id @default(autoincrement())
+  nome    String       @db.VarChar(50)
+  ordem   Int          @default(0)
+  /// IDENTIDADE do país a que este status se aplica.
+  paisId  Int
+  pais    CatalogoPais @relation("StatusPais", fields: [paisId], references: [id], onDelete: Restrict)
   tarefas Tarefa[]
 
-  @@unique([nome, pais])
-  @@index([pais])
+  @@unique([nome, paisId])
+  @@index([paisId])
 }
 
 // ââ CodeGeneratorService â sequÃªncias de cÃ³digo pÃºblico (contador atÃ´mico, sem reuso) ââ
@@ -548,7 +559,6 @@ model Tarefa {
   descricao           String?
   processoId          Int?
   statusId            Int?
-  pais                String?
   responsavelId       Int?
   concluida           Boolean           @default(false)
   prioridade          PrioridadeTarefa  @default(MEDIA)
@@ -675,7 +685,6 @@ model Tarefa {
   @@index([concluida])
   @@index([statusTarefa])
   @@index([statusId])
-  @@index([pais])
   @@index([dataPrazo])
   @@index([workflowStepInstanceId])
   @@index([workflowInstanceId])
@@ -3242,7 +3251,8 @@ model CatalogoPais {
   servicos             ServicoProdutoPais[]
   modalidadesLegais    ModalidadeLegal[]
 
-  processos Processo[] @relation("ProcessoPais")
+  processos    Processo[] @relation("ProcessoPais")
+  statusKanban Status[]   @relation("StatusPais")
 }
 
 model ModalidadePais {

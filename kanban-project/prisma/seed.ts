@@ -105,21 +105,21 @@ async function main() {
     for (let i = 0; i < etapas.length; i++) {
       const nomeEtapa = etapas[i]
 
+      // IDENTIDADE, NÃO TEXTO: o status pertence a uma linha do Cadastro
+      // Mestre. Sem o país cadastrado, não há status a semear — e inventar o
+      // país aqui seria criar dado de negócio que ninguém pediu.
+      const paisCanonico = await prisma.catalogoPais.findFirst({
+        where: { countryKey: pais.toLowerCase() },
+        select: { id: true },
+      })
+      if (!paisCanonico) {
+        console.log(`      (país ${pais} não está no Cadastro Mestre — status não semeado)`)
+        continue
+      }
       await prisma.status.upsert({
-        where: {
-          nome_pais: {
-            nome: nomeEtapa,
-            pais: pais,
-          },
-        },
-        update: {
-          ordem: i,
-        },
-        create: {
-          nome: nomeEtapa,
-          pais: pais,
-          ordem: i,
-        },
+        where: { nome_paisId: { nome: nomeEtapa, paisId: paisCanonico.id } },
+        update: { ordem: i },
+        create: { nome: nomeEtapa, paisId: paisCanonico.id, ordem: i },
       })
 
       console.log(`      ${i + 1}. ${nomeEtapa}`)

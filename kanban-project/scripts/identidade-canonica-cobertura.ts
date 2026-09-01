@@ -55,6 +55,16 @@ async function main() {
   // "compatibilidade") volta a falhar aqui.
   await div("coluna legada Processo.pais não existe",
     `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'Processo' AND column_name = 'pais'`)
+  // AS OUTRAS IDENTIDADES TEXTUAIS DE PAÍS TAMBÉM NÃO PODEM VOLTAR.
+  // `Status.pais` era a segunda fonte, `Tarefa.pais` a terceira — nenhuma das
+  // duas era um conceito diferente: guardavam a nacionalidade do trabalho em
+  // texto, ao lado do Cadastro Mestre.
+  await div("coluna legada Status.pais não existe",
+    `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'Status' AND column_name = 'pais'`)
+  await div("coluna legada Tarefa.pais não existe",
+    `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'Tarefa' AND column_name = 'pais'`)
+  await div("Status aponta para o cadastro (FK)",
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Status' AND column_name='paisId') THEN 0 ELSE 1 END n`)
   await div("trigger do espelho não existe",
     `SELECT COUNT(*)::int n FROM pg_trigger WHERE tgrelid = '"Processo"'::regclass AND NOT tgisinternal AND tgname ILIKE '%pais%'`)
   await div("Documento.tipo × legacyEnumKey",

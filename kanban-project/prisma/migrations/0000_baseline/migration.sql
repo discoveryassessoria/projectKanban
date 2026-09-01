@@ -435,7 +435,7 @@ CREATE TABLE "Status" (
     "id" SERIAL NOT NULL,
     "nome" VARCHAR(50) NOT NULL,
     "ordem" INTEGER NOT NULL DEFAULT 0,
-    "pais" TEXT NOT NULL,
+    "paisId" INTEGER NOT NULL,
 
     CONSTRAINT "Status_pkey" PRIMARY KEY ("id")
 );
@@ -497,7 +497,6 @@ CREATE TABLE "Tarefa" (
     "descricao" TEXT,
     "processoId" INTEGER,
     "statusId" INTEGER,
-    "pais" TEXT,
     "responsavelId" INTEGER,
     "concluida" BOOLEAN NOT NULL DEFAULT false,
     "prioridade" "PrioridadeTarefa" NOT NULL DEFAULT 'MEDIA',
@@ -4671,10 +4670,10 @@ CREATE INDEX "Documento_origem_idx" ON "Documento"("origem");
 CREATE INDEX "Documento_ruleCode_idx" ON "Documento"("ruleCode");
 
 -- CreateIndex
-CREATE INDEX "Status_pais_idx" ON "Status"("pais");
+CREATE INDEX "Status_paisId_idx" ON "Status"("paisId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Status_nome_pais_key" ON "Status"("nome", "pais");
+CREATE UNIQUE INDEX "Status_nome_paisId_key" ON "Status"("nome", "paisId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CodeSequence_scope_key" ON "CodeSequence"("scope");
@@ -4723,9 +4722,6 @@ CREATE INDEX "Tarefa_statusTarefa_idx" ON "Tarefa"("statusTarefa");
 
 -- CreateIndex
 CREATE INDEX "Tarefa_statusId_idx" ON "Tarefa"("statusId");
-
--- CreateIndex
-CREATE INDEX "Tarefa_pais_idx" ON "Tarefa"("pais");
 
 -- CreateIndex
 CREATE INDEX "Tarefa_dataPrazo_idx" ON "Tarefa"("dataPrazo");
@@ -6496,6 +6492,9 @@ ALTER TABLE "Documento" ADD CONSTRAINT "Documento_necessidadeId_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "Documento" ADD CONSTRAINT "Documento_derivadoDeId_fkey" FOREIGN KEY ("derivadoDeId") REFERENCES "Documento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Status" ADD CONSTRAINT "Status_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Processo" ADD CONSTRAINT "Processo_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

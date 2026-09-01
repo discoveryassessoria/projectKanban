@@ -48,7 +48,6 @@ export async function GET(request: NextRequest) {
         dataPrazo: true,
         createdAt: true,
         processoId: true,
-        pais: true,
         processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } }
       },
       orderBy: { dataPrazo: 'asc' }
@@ -66,7 +65,9 @@ export async function GET(request: NextRequest) {
         dataPrazo: t.dataPrazo,
         processoId: t.processo?.id ?? t.processoId,
         processoNome: t.processo?.nome ?? 'Sem processo',
-        pais: t.pais ?? (t.processo?.paisCanonico?.countryKey ?? null) ?? null
+        // `Tarefa.pais` era identidade textual duplicada e saiu. O país de uma
+        // tarefa é o do PROCESSO — uma fonte, não duas que podiam divergir.
+        pais: t.processo?.paisCanonico?.countryKey ?? null
       }
 
       if (t.dataPrazo) {

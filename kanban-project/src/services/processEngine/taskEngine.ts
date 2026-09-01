@@ -85,7 +85,6 @@ export async function criarTarefaDeSpec(spec: TarefaSpec) {
       prioridade,
       dataPrazo,
       statusId: spec.statusId ?? null,
-      pais: spec.pais ?? null,
       ordem,
       observacoes: spec.observacoes ?? null,
       ...(spec.followUp?.prazoCobranca != null
