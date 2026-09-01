@@ -145,7 +145,7 @@ async function montarCenario(sufixo: string): Promise<Cenario> {
   })
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore ${sufixo}` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo ${sufixo}`, pais: "espanha", arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} processo ${sufixo}`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
     select: { id: true },
   })
   return { processoId: processo.id, arvoreId: arvore.id, tipoProcessoId: tipo.id, configId: config.id, ruleId: regra.id }

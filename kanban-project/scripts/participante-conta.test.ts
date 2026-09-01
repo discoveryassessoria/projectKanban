@@ -58,7 +58,7 @@ async function main() {
   console.log('participante-conta — read-models de conta individual + timeline separada\n')
   await limpar()
   // Processo 16 existe (upsert mínimo).
-  await prisma.processo.upsert({ where: { id: PROC_ID }, update: {}, create: { id: PROC_ID, nome: 'TESTE-PARTICIPANTE-CONTA', pais: 'Alemanha' } }).catch(() => {})
+  await prisma.processo.upsert({ where: { id: PROC_ID }, update: {}, create: { id: PROC_ID, nome: 'TESTE-PARTICIPANTE-CONTA',} }).catch(() => {})
 
   // ── Seed: Receita RECEITA (1 participante) no processo 16, BRL 5.000 ──
   const rec = await prisma.receita.create({ data: {

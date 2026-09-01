@@ -81,7 +81,7 @@ async function montarCenario() {
   criado.documentoId = doc.id
 
   const processo = await prisma.processo.create({
-    data: { nome: `Processo ${TAG}`, pais: "Italia", arvoreId: arvore.id, tipoProcessoMotorId: TIPO_PROCESSO, faseAtualKey: FASE },
+    data: { nome: `Processo ${TAG}`, arvoreId: arvore.id, tipoProcessoMotorId: TIPO_PROCESSO, faseAtualKey: FASE },
   })
   criado.processoId = processo.id
 

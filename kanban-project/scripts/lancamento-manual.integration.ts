@@ -41,7 +41,7 @@ async function limpar() {
 }
 
 async function seed() {
-  const proc = await prisma.processo.create({ data: { nome: 'Processo Teste', pais: 'IT' } })
+  const proc = await prisma.processo.create({ data: { nome: 'Processo Teste',} })
   const forn = await prisma.fornecedor.create({ data: { nome: 'Cartório XYZ', tipo: 'PJ' } })
 
   // 3 pessoas + requerentes vinculados

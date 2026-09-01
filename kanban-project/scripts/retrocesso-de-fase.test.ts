@@ -246,7 +246,7 @@ async function montar(marca: string): Promise<Palco> {
   const pessoa = await prisma.pessoa.create({ data: { nome: "Titular", sobrenome: marca, arvoreId: arv.id }, select: { id: true } })
   const proc = await prisma.processo.create({
     data: {
-      nome: `${M} ${marca}`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2",
+      nome: `${M} ${marca}`, arvoreId: arv.id, workflowRuntime: "v2",
       faseAtualKey: fAnalise.phaseKey, tipoProcessoMotorId: tipo.id,
     },
     select: { id: true },

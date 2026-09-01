@@ -65,7 +65,7 @@ async function main() {
 
   async function processoNaAnalise(nome: string, requerRetificacao: boolean) {
     const p = await prisma.processo.create({
-      data: { nome, codigo: `T-${nome}`, pais: "Alemanha", faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+      data: { nome, codigo: `T-${nome}`, faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
     })
     await materializarExecucaoDaFase({ processoId: p.id, fonte: "CADASTRO_EM_ANDAMENTO" })
     await prisma.analiseDocumental.create({ data: { processoId: p.id, requerRetificacao } })

@@ -144,7 +144,7 @@ async function criarProcesso(tipoId: number, phaseKey: string, codigo: string) {
   const pai = await prisma.pessoa.create({ data: { nome: "Joao", sobrenome: "Silva", arvoreId: arvore.id, linhaReta: true, requerente: "nao" } })
   await prisma.pessoa.create({ data: { nome: "Marco", sobrenome: "Rovatti", arvoreId: arvore.id, linhaReta: true, requerente: "maior", paiId: pai.id } })
   return prisma.processo.create({
-    data: { nome: `Teste ${codigo}`, codigo, pais: "Alemanha", arvoreId: arvore.id, faseAtualKey: phaseKey, tipoProcessoMotorId: tipoId, workflowRuntime: "v2" },
+    data: { nome: `Teste ${codigo}`, codigo, arvoreId: arvore.id, faseAtualKey: phaseKey, tipoProcessoMotorId: tipoId, workflowRuntime: "v2" },
   })
 }
 

@@ -64,7 +64,7 @@ async function main() {
   const requerente = await prisma.pessoa.create({ data: { nome: "Requerente", sobrenome: "Sai", arvoreId: arv.id }, select: { id: true } })
   const outra = await prisma.pessoa.create({ data: { nome: "Outra", sobrenome: "Fica", arvoreId: arv.id }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${M} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
+    data: { nome: `${M} processo`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
     select: { id: true },
   })
   const item = await prisma.itemCatalogo.create({ data: { code: `${M}_ITEM`, name: "Certidão prova", natureza: "SERVICO" }, select: { id: true } })
@@ -178,7 +178,7 @@ async function main() {
   await congelarVersaoVigente(wf.id, "CRIACAO")
 
   const proc2 = await prisma.processo.create({
-    data: { nome: `${M} processo 2`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: fase.phaseKey },
+    data: { nome: `${M} processo 2`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: fase.phaseKey },
     select: { id: true },
   })
   const inst2 = await prisma.phaseWorkflowInstance.create({
@@ -243,7 +243,7 @@ async function main() {
     await congelarVersaoVigente(wf.id, "PUBLICACAO", tx)
   })
   const proc3 = await prisma.processo.create({
-    data: { nome: `${M} processo 3`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: fase.phaseKey },
+    data: { nome: `${M} processo 3`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: fase.phaseKey },
     select: { id: true },
   })
   const wfAtual = await prisma.phaseInternalWorkflow.findUnique({ where: { id: wf.id }, select: { versao: true } })

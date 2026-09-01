@@ -19,7 +19,7 @@ export async function GET(
           select: {
             id: true,
             nome: true,
-            pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+            paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
           },
         },
       },
@@ -87,7 +87,7 @@ export async function PUT(
           select: {
             id: true,
             nome: true,
-            pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+            paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
           },
         },
       },

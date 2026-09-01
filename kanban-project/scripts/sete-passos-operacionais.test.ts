@@ -244,7 +244,7 @@ async function main() {
   // Um processo real percorrendo a fase.
   const arv = await prisma.arvore.create({ data: { nome: `${M} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${M} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: phaseKey },
+    data: { nome: `${M} processo`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: phaseKey },
     select: { id: true },
   })
   // A UNIDADE É O PEDIDO. Este palco nasceu quando a fase materializava por PROCESSO;

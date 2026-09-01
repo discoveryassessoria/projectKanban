@@ -80,7 +80,7 @@ async function main() {
 
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} Família`, pais: 'espanha', arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: 'emissao_documental' },
+    data: { nome: `${MARCA} Família`, arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: 'emissao_documental' },
     select: { id: true },
   })
   const criar = async (titulo: string) => {

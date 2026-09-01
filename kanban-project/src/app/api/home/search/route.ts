@@ -44,13 +44,13 @@ export async function GET(request: NextRequest) {
       prisma.processo.findMany({
         // busca por NOME ou por CÓDIGO PÚBLICO (ex.: "DE-7", "IT-125").
         where: { OR: [{ nome: contains }, { codigo: contains }] },
-        select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, codigo: true, familia: { select: { nome: true } } },
+        select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, codigo: true, familia: { select: { nome: true } } },
         take: LIMITE,
         orderBy: { updatedAt: "desc" },
       }),
       prisma.familia.findMany({
         where: { nome: contains },
-        select: { id: true, nome: true, processos: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: 3 } },
+        select: { id: true, nome: true, processos: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: 3 } },
         take: LIMITE,
       }),
       prisma.requerente.findMany({
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { select: { processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
+          processos: { select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
         },
         take: LIMITE,
       }),
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { select: { processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
+          processos: { select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
         },
         take: LIMITE,
       }),
@@ -85,11 +85,11 @@ export async function GET(request: NextRequest) {
     }
 
     for (const p of processos) {
-      add({ tipo: "processo", id: p.id, label: p.nome, sub: p.familia?.nome ?? null, processoId: p.id, pais: p.pais, href: href(p.id, p.pais) })
+      add({ tipo: "processo", id: p.id, label: p.nome, sub: p.familia?.nome ?? null, processoId: p.id, pais: (p.paisCanonico?.countryKey ?? null), href: href(p.id, (p.paisCanonico?.countryKey ?? null)) })
     }
     for (const f of familias) {
       for (const p of f.processos) {
-        add({ tipo: "familia", id: f.id, label: f.nome, sub: `Processo: ${p.nome}`, processoId: p.id, pais: p.pais, href: href(p.id, p.pais) })
+        add({ tipo: "familia", id: f.id, label: f.nome, sub: `Processo: ${p.nome}`, processoId: p.id, pais: (p.paisCanonico?.countryKey ?? null), href: href(p.id, (p.paisCanonico?.countryKey ?? null)) })
       }
     }
     for (const r of requerentes) {

@@ -351,7 +351,7 @@ async function main() {
   console.log("\n(B1) O processo nasce SEM árvore — a fase fica sem alvo, e diz por quê")
   // ------------------------------------------------------------
   const processo = await prisma.processo.create({
-    data: { nome: "Processo Materialização", codigo: "T-MAT", pais: "Alemanha", faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo Materialização", codigo: "T-MAT", faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
   })
   const semArvore = await materializarExecucaoDaFase({ processoId: processo.id, fonte: "PROCESSO_CRIADO" })
   check("fase publicada + processo sem árvore ⇒ SEM_ALVO_APLICAVEL", semArvore.estado === "SEM_ALVO_APLICAVEL", semArvore.estado)
@@ -552,7 +552,7 @@ async function main() {
   console.log("\n(B7) Reparo do ciclo vazio — completa, não recria")
   // ------------------------------------------------------------
   const p2 = await prisma.processo.create({
-    data: { nome: "Processo Vazio", codigo: "T-VAZIO", pais: "Alemanha", faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo Vazio", codigo: "T-VAZIO", faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
   })
   await materializarExecucaoDaFase({ processoId: p2.id, fonte: "PROCESSO_CRIADO" }) // sem árvore ⇒ vazio
   const instVazia = await prisma.phaseWorkflowInstance.findFirst({ where: { processoId: p2.id, faseMacroKey: "genealogia" } })

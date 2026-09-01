@@ -54,7 +54,7 @@ async function main() {
   console.log('int-geral-acoes-db — persistência real\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-GERAL-ACOES' } }).catch(() => {})
-  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-GERAL-ACOES', pais: 'Alemanha' } })).id
+  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-GERAL-ACOES',} })).id
 
   // ── GERAL com ajustes RATEADOS: Marco 1000 / Matheus 2000; forma 2700 + desconto 300 ──
   const marco = await seed('Marco', 1000, 0)

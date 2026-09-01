@@ -47,7 +47,7 @@ async function main() {
   await limparCatalogo('HOM-ALEMA-TST'); await limparCatalogo('CUSTO-TST'); await limparCatalogo('INATIVO-TST')
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-MANUAL' } }).catch(() => {})
   await prisma.requerente.deleteMany({ where: { cpf: 'MAN' } }).catch(() => {})
-  const proc = await prisma.processo.create({ data: { nome: 'TESTE-MANUAL', pais: 'Alemanha' } })
+  const proc = await prisma.processo.create({ data: { nome: 'TESTE-MANUAL',} })
   await limparReceitasProc(proc.id)
   const reqA = await prisma.requerente.create({ data: { nome: 'Marco Kruger', cpf: 'MAN' } })
   const reqB = await prisma.requerente.create({ data: { nome: 'Matheus Kruger', cpf: 'MAN' } })

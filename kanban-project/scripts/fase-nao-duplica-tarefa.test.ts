@@ -119,7 +119,7 @@ async function main() {
   })
   const processo = await prisma.processo.create({
     data: {
-      nome: `${MARCA} Família`, pais: 'espanha', arvoreId: arvore.id, workflowRuntime: 'v2',
+      nome: `${MARCA} Família`, arvoreId: arvore.id, workflowRuntime: 'v2',
       faseAtualKey: 'genealogia', tipoProcessoMotorId: tipo.id,
     },
     select: { id: true },

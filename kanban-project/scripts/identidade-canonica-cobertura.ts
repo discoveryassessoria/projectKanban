@@ -23,7 +23,7 @@ async function main() {
   }
 
   console.log("COBERTURA DA IDENTIDADE CANÔNICA\n")
-  await linha("Processo.pais → CatalogoPais",
+  await linha("Processo → CatalogoPais (identidade única)",
     `SELECT COUNT(*)::int n FROM "Processo"`,
     `SELECT COUNT(*)::int n FROM "Processo" WHERE "paisId" IS NULL`)
   // A identidade do tipo documental JÁ EXISTIA como `documentTypeId` (dual-write
@@ -50,8 +50,13 @@ async function main() {
     if (d > 0) falhas++
     console.log(`  ${d === 0 ? "✅" : "❌"} ${nome} — divergentes: ${d}`)
   }
-  await div("Processo.pais × CatalogoPais.countryKey",
-    `SELECT COUNT(*)::int n FROM "Processo" p JOIN "CatalogoPais" c ON c.id = p."paisId" WHERE lower(p.pais) <> lower(c."countryKey")`)
+  // A COLUNA ESPELHO NÃO EXISTE MAIS — e este guard prova isso contra o banco,
+  // não contra o schema: recriá-la (por migration manual, por engano ou por
+  // "compatibilidade") volta a falhar aqui.
+  await div("coluna legada Processo.pais não existe",
+    `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'Processo' AND column_name = 'pais'`)
+  await div("trigger do espelho não existe",
+    `SELECT COUNT(*)::int n FROM pg_trigger WHERE tgrelid = '"Processo"'::regclass AND NOT tgisinternal AND tgname ILIKE '%pais%'`)
   await div("Documento.tipo × legacyEnumKey",
     `SELECT COUNT(*)::int n FROM "Documento" d JOIN "TipoDocumentoCadastro" t ON t.id = d."documentTypeId" WHERE d.tipo IS NOT NULL AND t."legacyEnumKey" IS DISTINCT FROM d.tipo::text`)
   await div("Solicitacao.canal × CanalOperacional.key",

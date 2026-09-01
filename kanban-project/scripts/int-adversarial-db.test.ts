@@ -58,7 +58,7 @@ async function main() {
   console.log('int-adversarial-db — tentando QUEBRAR\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-ADV' } }).catch(() => {})
-  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-ADV', pais: 'Alemanha' } })).id
+  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-ADV',} })).id
 
   // 1) DESCONTO MAIOR QUE O SALDO — não pode deixar o a receber NEGATIVO
   await cenario('adv1', async () => {

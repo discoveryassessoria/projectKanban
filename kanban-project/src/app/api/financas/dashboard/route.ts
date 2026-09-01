@@ -76,7 +76,7 @@ export async function GET(_req: NextRequest) {
           receita: {
             select: {
               descricao: true, moeda: true,
-              processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
+              processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
             },
           },
         },

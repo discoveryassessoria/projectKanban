@@ -90,7 +90,7 @@ async function censo(c: Cenario): Promise<Censo> {
 async function montarCenario(sufixo: string): Promise<Cenario> {
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} ${sufixo}` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} ${sufixo}`, pais: "Brasil", arvoreId: arvore.id }, select: { id: true },
+    data: { nome: `${MARCA} ${sufixo}`, arvoreId: arvore.id }, select: { id: true },
   })
   const requerente = await prisma.requerente.create({
     data: { nome: `${MARCA} ${sufixo}`, cpf: `000.000.000-0${sufixo === "A" ? 1 : 2}` }, select: { id: true },

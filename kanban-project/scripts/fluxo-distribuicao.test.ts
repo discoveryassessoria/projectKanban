@@ -60,7 +60,7 @@ async function palco(sufixo: string, prioridade?: "URGENTE" | "ALTA" | "MEDIA" |
   const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_${sufixo}`, name: "Certidão de Nascimento", natureza: "DOCUMENTO" }, select: { id: true } })
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} ${sufixo}` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} Família ${sufixo}`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
+    data: { nome: `${MARCA} Família ${sufixo}`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
     select: { id: true },
   })
   const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: "João", sobrenome: "da Silva" }, select: { id: true } })

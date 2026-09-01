@@ -24,7 +24,7 @@ async function main() {
   console.log(`✅ usuário de teste pronto: #${u?.id} ${u?.email}`)
 
   if (!(await prisma.processo.findUnique({ where: { id: 16 } }))) {
-    await prisma.processo.create({ data: { id: 16, nome: 'Processo de Teste — Financeiro', pais: 'Itália' } })
+    await prisma.processo.create({ data: { id: 16, nome: 'Processo de Teste — Financeiro',} })
     await prisma.$executeRawUnsafe(
       `SELECT setval(pg_get_serial_sequence('"Processo"', 'id'), GREATEST((SELECT MAX(id) FROM "Processo"), 16))`,
     )

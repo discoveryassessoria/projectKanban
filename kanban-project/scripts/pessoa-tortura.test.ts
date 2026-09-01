@@ -153,7 +153,7 @@ async function main() {
   // ── Cenário: um processo, uma árvore, um requerente ──────────────────────
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, pais: "Brasil", arvoreId: arvore.id },
+    data: { nome: `${MARCA} processo`, arvoreId: arvore.id },
     select: { id: true },
   })
   const requerente = await prisma.requerente.create({

@@ -128,7 +128,7 @@ async function montarPalco(): Promise<Palco> {
   })
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, pais: "espanha", arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
     select: { id: true },
   })
   const requerentes: Record<string, number> = {}

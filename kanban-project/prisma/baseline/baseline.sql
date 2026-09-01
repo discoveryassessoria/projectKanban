@@ -457,7 +457,6 @@ CREATE TABLE "Processo" (
     "nome" VARCHAR(100) NOT NULL,
     "descricao" VARCHAR(500),
     "observacoes" TEXT,
-    "pais" TEXT NOT NULL DEFAULT '',
     "paisId" INTEGER,
     "arvoreId" INTEGER,
     "familiaId" INTEGER,
@@ -4685,9 +4684,6 @@ CREATE UNIQUE INDEX "Processo_codigo_key" ON "Processo"("codigo");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Processo_chaveIdempotenciaCriacao_key" ON "Processo"("chaveIdempotenciaCriacao");
-
--- CreateIndex
-CREATE INDEX "Processo_pais_idx" ON "Processo"("pais");
 
 -- CreateIndex
 CREATE INDEX "Processo_arvoreId_idx" ON "Processo"("arvoreId");

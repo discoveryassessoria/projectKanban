@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
                   select: {
                     id: true,
                     nome: true,
-                    pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+                    paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
                   },
                   take: 1,
                 },
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       // NOVO: Dados do processo vinculado
       processoId: d.pessoa?.arvore?.processos?.[0]?.id || null,
       processoNome: d.pessoa?.arvore?.processos?.[0]?.nome || null,
-      processoPais: d.pessoa?.arvore?.processos?.[0]?.pais || null,
+      processoPais: d.pessoa?.arvore?.processos?.[0]?.paisCanonico?.countryKey || null,
     }))
 
     return NextResponse.json(resultado)

@@ -104,7 +104,7 @@ export async function completudeDoProcesso(
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
     select: {
-      id: true, pais: true, paisId: true,
+      id: true, paisId: true,
       paisCanonico: { select: { id: true, countryKey: true, countryLabel: true } },
       tiposServico: { select: { id: true } },
       enquadramentoLegal: { select: { modalidadeLegalId: true, modalidadeLegal: { select: { id: true, nome: true } } } },
@@ -123,16 +123,9 @@ export async function completudeDoProcesso(
   })
   if (!processo) return null
 
-  // IDENTIDADE PRIMEIRO. Se o processo tem `paisId`, é ele que manda — o texto
-  // `Processo.pais` é espelho. A resolução pelo texto só existe para as linhas
-  // que ainda não foram alcançadas pelo backfill, e some com a coluna.
+  // IDENTIDADE, E SÓ. A resolução pelo texto legado deixou de existir junto com
+  // a coluna: o país do processo é a relação, carregada no mesmo select.
   const paisCanonico = processo.paisCanonico
-    ?? (processo.pais
-      ? await prisma.catalogoPais.findFirst({
-          where: { countryKey: processo.pais.toLowerCase() },
-          select: { id: true, countryKey: true, countryLabel: true },
-        })
-      : null)
 
   const modalidadeId = processo.enquadramentoLegal?.modalidadeLegalId ?? null
 
@@ -261,7 +254,7 @@ export async function completudeDoProcesso(
 
   return {
     processoId,
-    pais: paisCanonico?.countryLabel ?? processo.pais,
+    pais: paisCanonico?.countryLabel ?? null,
     modalidadeLegal: processo.enquadramentoLegal?.modalidadeLegal?.nome ?? null,
     pessoas,
     totais: {

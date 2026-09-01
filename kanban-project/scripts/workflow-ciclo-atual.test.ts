@@ -148,7 +148,7 @@ async function montarPalco(nome: string, quantosDocumentos = 1) {
     create: { nome: "Executor", email: "ciclo@teste.local", senha: "x", tipo: "admin" }, select: { id: true },
   })
   const proc = await prisma.processo.create({
-    data: { nome: `${nome} processo`, pais: "alemanha", tipoProcessoMotorId: tipo.id, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
+    data: { nome: `${nome} processo`, tipoProcessoMotorId: tipo.id, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
     select: { id: true },
   })
   const docs: Array<{ documentoId: number; necessidadeId: number; pessoaId: number }> = []

@@ -59,7 +59,7 @@ async function main() {
   // defeito de desempenho aparece primeiro.
   const candidatos = await prisma.processo.findMany({
     where: { arvoreId: { not: null } },
-    select: { id: true, nome: true, pais: true, arvoreId: true },
+    select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true },
     take: 200,
     orderBy: { id: "desc" },
   })
@@ -142,7 +142,7 @@ async function main() {
   const t1 = Date.now()
   const grafo = construirGrafo(pessoasDb, unioes)
   const analise = analisarArvore(pessoasDb, unioes, {
-    paisAlvo: paisAlvoDe(alvo.pais),
+    paisAlvo: paisAlvoDe(alvo.paisCanonico?.countryKey),
     raizId: pessoasDb[0]?.id ?? null,
   })
   const msAnalise = Date.now() - t1

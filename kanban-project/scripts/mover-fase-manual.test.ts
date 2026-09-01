@@ -223,7 +223,7 @@ async function main() {
     create: { nome: "Master", email: "master@teste.local", senha: "x", tipo: "admin" },
   })
   const processo = await prisma.processo.create({
-    data: { nome: "Processo Mover", codigo: "T-MOV", pais: "Alemanha", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo Mover", codigo: "T-MOV", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
   })
   await reconciliarFaseAtiva(processo.id)
 

@@ -132,7 +132,7 @@ async function main() {
   await congelarVersaoVigente(wf.id, "CRIACAO")
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "analise_documental" },
+    data: { nome: `${MARCA} processo`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "analise_documental" },
     select: { id: true },
   })
   const inst = await prisma.phaseWorkflowInstance.create({

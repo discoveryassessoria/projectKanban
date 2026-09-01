@@ -61,7 +61,7 @@ async function limpar() {
 async function palco(sufixo: string, documentos: string[]) {
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} ${sufixo}` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} ${sufixo}`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "emissao_documental" },
+    data: { nome: `${MARCA} ${sufixo}`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "emissao_documental" },
     select: { id: true },
   })
   const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: "Teste", sobrenome: "Operacional" }, select: { id: true } })

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
             processos: {
               select: {
                 processo: {
-                  select: { id: true, nome: true, pais: true },
+                  select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
                 },
               },
             },
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
             processos: {
               select: {
                 processo: {
-                  select: { id: true, nome: true, pais: true },
+                  select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
                 },
               },
             },
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
           processos: {
             select: {
               processo: {
-                select: { id: true, nome: true, pais: true },
+                select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
               },
             },
           },
@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
           processos: {
             select: {
               processo: {
-                select: { id: true, nome: true, pais: true },
+                select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
               },
             },
           },

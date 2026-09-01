@@ -142,7 +142,7 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true }, select: { id: true, countryKey: true } })
   const arv = await prisma.arvore.create({ data: { nome: "TESTE-VERSAO árvore" }, select: { id: true } })
   const p1 = await prisma.processo.create({
-    data: { nome: "TESTE-VERSAO P1", pais: tipo?.countryKey ?? "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo?.id ?? null },
+    data: { nome: "TESTE-VERSAO P1", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo?.id ?? null },
     select: { id: true },
   })
   const instP1 = await prisma.phaseWorkflowInstance.create({
@@ -194,7 +194,7 @@ async function main() {
   const vigente = await prisma.phaseInternalWorkflow.findUnique({ where: { id: wf.id }, select: { versao: true } })
   check("a definição viva está na V2", vigente?.versao === 2)
   const p2 = await prisma.processo.create({
-    data: { nome: "TESTE-VERSAO P2", pais: tipo?.countryKey ?? "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo?.id ?? null },
+    data: { nome: "TESTE-VERSAO P2", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo?.id ?? null },
     select: { id: true },
   })
   const instP2 = await prisma.phaseWorkflowInstance.create({

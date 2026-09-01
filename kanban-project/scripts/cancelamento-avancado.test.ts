@@ -66,7 +66,7 @@ async function main() {
   console.log('cancelamento-avancado — persistência real\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-CANCEL-AVANCADO' } }).catch(() => {})
-  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-CANCEL-AVANCADO', pais: 'Alemanha' } })).id
+  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-CANCEL-AVANCADO',} })).id
 
   // ── 1 · PARCIAL_VALOR: previsão BATE com execução; reduz saldo, não toca pagamento ──
   sec('PARCIAL_VALOR')

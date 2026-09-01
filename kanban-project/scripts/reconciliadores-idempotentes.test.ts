@@ -179,7 +179,7 @@ async function main() {
   const arv = await prisma.arvore.create({ data: { nome: `${M} árvore` }, select: { id: true } })
   const pessoa = await prisma.pessoa.create({ data: { nome: "Requerente", sobrenome: "Recon", arvoreId: arv.id }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${M} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
+    data: { nome: `${M} processo`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
     select: { id: true },
   })
   // A NECESSIDADE e o DOCUMENTO que a atende — é sobre esse par que a nova via age.

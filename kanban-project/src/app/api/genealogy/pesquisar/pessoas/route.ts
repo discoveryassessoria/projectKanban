@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 nome: true,
-                pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+                paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
               },
               take: 1, // Pegar apenas o primeiro processo (geralmente só tem um)
             },
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       // NOVO: Dados do processo vinculado
       processoId: p.arvore?.processos?.[0]?.id || null,
       processoNome: p.arvore?.processos?.[0]?.nome || null,
-      processoPais: p.arvore?.processos?.[0]?.pais || null,
+      processoPais: p.arvore?.processos?.[0]?.paisCanonico?.countryKey || null,
       _count: p._count,
     }))
 

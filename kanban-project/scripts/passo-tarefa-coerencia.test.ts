@@ -189,7 +189,7 @@ async function main() {
   const arvore = await prisma.arvore.create({ data: { nome: "Árvore SYNC" } })
   const ana = await prisma.pessoa.create({ data: { nome: "Ana", sobrenome: "Souza", arvoreId: arvore.id, linhaReta: true, requerente: "maior" }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: "Processo SYNC", codigo: "T-SYNC", pais: "Alemanha", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo SYNC", codigo: "T-SYNC", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
   })
   // A OBRIGAÇÃO REAL. O passo `localizar_registro` opera por NECESSIDADE: sem
   // uma certidão a localizar, o motor recusa materializar e explica por quê

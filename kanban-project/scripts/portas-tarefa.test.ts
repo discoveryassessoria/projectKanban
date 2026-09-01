@@ -71,7 +71,7 @@ async function limpar() {
 async function palco(sufixo: string, etapas = 2) {
   const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_${sufixo}`, name: `Trabalho ${sufixo}`, natureza: "DOCUMENTO" }, select: { id: true } })
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} ${sufixo}` }, select: { id: true } })
-  const proc = await prisma.processo.create({ data: { nome: `${MARCA} ${sufixo}`, pais: "espanha", arvoreId: arv.id }, select: { id: true } })
+  const proc = await prisma.processo.create({ data: { nome: `${MARCA} ${sufixo}`, arvoreId: arv.id }, select: { id: true } })
   const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: "Ademir", sobrenome: sufixo }, select: { id: true } })
   const nec = await prisma.necessidadeDocumental.create({
     data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-${sufixo}-${proc.id}` }, select: { id: true },

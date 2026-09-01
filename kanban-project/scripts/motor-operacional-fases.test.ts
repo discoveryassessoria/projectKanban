@@ -54,7 +54,7 @@ interface Ctx { processoId: number; arvoreId: number; pessoaId: number }
 async function processo(): Promise<Ctx> {
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, pais: "espanha", arvoreId: arv.id, faseAtualKey: "genealogia" }, select: { id: true },
+    data: { nome: `${MARCA} processo`, arvoreId: arv.id, faseAtualKey: "genealogia" }, select: { id: true },
   })
   const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: "Ademir", sobrenome: "Matheus" }, select: { id: true } })
   return { processoId: proc.id, arvoreId: arv.id, pessoaId: pes.id }

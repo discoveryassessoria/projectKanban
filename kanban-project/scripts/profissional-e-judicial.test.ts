@@ -218,7 +218,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   const arv = await prisma.arvore.create({ data: { nome: `${M} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${M} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE },
+    data: { nome: `${M} processo`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE },
     select: { id: true },
   })
   const analise = await prisma.analiseDocumental.create({ data: { processoId: proc.id }, select: { id: true } })

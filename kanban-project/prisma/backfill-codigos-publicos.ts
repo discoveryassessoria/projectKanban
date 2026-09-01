@@ -15,19 +15,19 @@ const EXECUTE = process.argv.includes('--execute')
 async function main() {
   const semCodigo = await prisma.processo.findMany({
     where: { codigo: null },
-    select: { id: true, pais: true },
+    select: { id: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
     orderBy: { id: 'asc' },
   })
   console.log(`Processos sem código: ${semCodigo.length}`)
 
   let n = 0
   for (const p of semCodigo) {
-    if (!EXECUTE) { console.log(`  [dry] #${p.id} (${p.pais})`); continue }
+    if (!EXECUTE) { console.log(`  [dry] #${p.id} (${p.paisCanonico?.countryKey})`); continue }
     // gera dentro de uma transação curta (código + update atômicos por registro)
     await prisma.$transaction(async (tx) => {
-      const codigo = await gerarCodigoPublico(tx, 'PROCESS', { pais: p.pais })
+      const codigo = await gerarCodigoPublico(tx, 'PROCESS', { pais: p.paisCanonico?.countryKey })
       await tx.processo.update({ where: { id: p.id }, data: { codigo } })
-      console.log(`  #${p.id} (${p.pais}) → ${codigo}`)
+      console.log(`  #${p.id} (${p.paisCanonico?.countryKey}) → ${codigo}`)
     })
     n++
   }

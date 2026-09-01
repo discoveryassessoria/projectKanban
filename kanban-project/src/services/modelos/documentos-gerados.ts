@@ -29,7 +29,7 @@ const INCLUSAO = {
   documentType: { select: { id: true, name: true, publicCode: true } },
   contratante: { select: { id: true, nome: true, publicCode: true } },
   requerente: { select: { id: true, nome: true, publicCode: true } },
-  processo: { select: { id: true, codigo: true, nome: true, pais: true } },
+  processo: { select: { id: true, codigo: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
   servico: { select: { id: true, name: true } },
   criadoPor: { select: { id: true, nome: true } },
   versoes: {

@@ -43,7 +43,7 @@ async function palco() {
     data: { code: `${MARCA}_C`, name: "Certidão de Nascimento - Inteiro Teor", natureza: "DOCUMENTO" }, select: { id: true },
   })
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
-  const proc = await prisma.processo.create({ data: { nome: `${MARCA} processo`, pais: "espanha", arvoreId: arv.id }, select: { id: true } })
+  const proc = await prisma.processo.create({ data: { nome: `${MARCA} processo`, arvoreId: arv.id }, select: { id: true } })
   const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: "Ademir", sobrenome: "Matheus" }, select: { id: true } })
   const nec = await prisma.necessidadeDocumental.create({
     data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-nec-${proc.id}` },

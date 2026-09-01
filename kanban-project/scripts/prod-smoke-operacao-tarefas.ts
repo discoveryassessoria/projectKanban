@@ -108,14 +108,14 @@ async function main() {
     // exatamente isso que fazia o link cair numa tela vazia.
     const proc = await prisma.processo.findUnique({
       where: { id: alvo.processoId! },
-      select: { pais: true, tipoProcessoMotorId: true },
+      select: { paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, tipoProcessoMotorId: true },
     })
-    chk(typeof proc?.pais === "string" && proc.pais.length > 0,
-      "o processo alvo tem país", String(proc?.pais))
+    chk(typeof proc?.paisCanonico?.countryKey === "string" && proc.paisCanonico?.countryKey.length > 0,
+      "o processo alvo tem país", String(proc?.paisCanonico?.countryKey))
     chk(proc?.tipoProcessoMotorId != null,
       "e tipo de processo — sem ele o Kanban não o lista", String(proc?.tipoProcessoMotorId))
     const pais = await prisma.catalogoPais.findFirst({
-      where: { countryKey: proc!.pais!, ativo: true }, select: { countryKey: true },
+      where: { countryKey: proc!.paisCanonico?.countryKey!, ativo: true }, select: { countryKey: true },
     })
     chk(pais != null, "e o país está ativo no catálogo", String(pais?.countryKey))
   }

@@ -57,7 +57,7 @@ export async function GET(
       where: { id },
       include: {
         ...INCLUDE_PROTOCOLO,
-        processo: { select: { id: true, nome: true, pais: true } },
+        processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
       },
     })
 

@@ -200,7 +200,7 @@ async function main() {
 
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} Juarez`, pais: "espanha", arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} Juarez`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
     select: { id: true },
   })
 

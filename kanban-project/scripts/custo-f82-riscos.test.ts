@@ -40,7 +40,7 @@ async function main() {
   chk(gruposDuplicados([item({ obrigacaoId: 1, criadoEm: new Date(Date.now() - 60 * DIA).toISOString() }), item({ obrigacaoId: 2, criadoEm: new Date(Date.now() - 60 * DIA).toISOString() })]).length === 0, 'fora da janela não vira duplicidade')
 
   // ───────── fixtures no banco: processo isolado ─────────
-  const proc = await prisma.processo.create({ data: { nome: `Proc riscos F82 ${TS}`, pais: 'Itália' }, select: { id: true } })
+  const proc = await prisma.processo.create({ data: { nome: `Proc riscos F82 ${TS}`,}, select: { id: true } })
   const forn = await criarFornecedor({ nome: `Fornecedor F82 ${TS}`, tipo: 'PJ', cpfCnpj: `3${String(TS).slice(-13)}`.slice(0, 14) })
   const novo = (extra: Record<string, unknown>) => criarObrigacaoEconomicaComLedger({
     natureza: 'CUSTO', moedaContratual: 'BRL', processoId: proc.id, criadoPorId: 1, ...extra,
@@ -86,7 +86,7 @@ async function main() {
   chk(r3.riscos.find((x) => x.codigo === 'PAGO_SEM_CONCILIAR')?.obrigacaoIds.includes(dupA) === true, 'detecta pago sem conciliar')
 
   // processo sem nada → sem riscos (não inventa alerta)
-  const procVazio = await prisma.processo.create({ data: { nome: `Proc vazio F82 ${TS}`, pais: 'Itália' }, select: { id: true } })
+  const procVazio = await prisma.processo.create({ data: { nome: `Proc vazio F82 ${TS}`,}, select: { id: true } })
   const rVazio = await riscosContasAPagar({ processoId: procVazio.id })
   chk(rVazio.riscos.length === 0 && rVazio.analisados === 0, 'processo sem custos não gera risco algum')
 

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 nome: true,
-                pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+                paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
             },
             },
         },
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
             select: {
                 id: true,
                 nome: true,
-                pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+                paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
             },
             },
         },

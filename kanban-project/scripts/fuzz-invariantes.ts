@@ -170,7 +170,7 @@ async function rodada(semente: number): Promise<{ violacoes: Violacao[]; sequenc
 
   const arv = await prisma.arvore.create({ data: { nome: `${M} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${M} processo`, pais: 'espanha', arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: 'fz_fase' },
+    data: { nome: `${M} processo`, arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: 'fz_fase' },
     select: { id: true },
   })
   const inst = await prisma.phaseWorkflowInstance.create({

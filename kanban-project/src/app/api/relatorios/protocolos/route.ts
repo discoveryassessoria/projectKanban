@@ -96,7 +96,7 @@ export async function GET(request: Request) {
         responsavel: { select: { id: true, nome: true } },
         processo: {
           select: {
-            id: true, codigo: true, nome: true, pais: true,
+            id: true, codigo: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
             familia: { select: { id: true, nome: true } },
             enquadramentoLegal: {
               select: {

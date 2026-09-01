@@ -59,7 +59,7 @@ async function main() {
   console.log('int-financeiro-db — persistência real (banco de teste)\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-INT-FINANCEIRO' } }).catch(() => {})
-  const proc = await prisma.processo.create({ data: { nome: 'TESTE-INT-FINANCEIRO', pais: 'Alemanha' } })
+  const proc = await prisma.processo.create({ data: { nome: 'TESTE-INT-FINANCEIRO',} })
   GRUPO.processoId = proc.id
   await prisma.requerente.deleteMany({ where: { nome: { in: ['Marco Kruger', 'Matheus Kruger'] }, cpf: 'TST' } }).catch(() => {})
   const reqMarco = await prisma.requerente.create({ data: { nome: 'Marco Kruger', cpf: 'TST' } })

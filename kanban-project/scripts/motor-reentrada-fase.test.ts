@@ -202,7 +202,7 @@ async function montarPalco(nome: string) {
     create: { nome: "Master", email: "motor@teste.local", senha: "x", tipo: "admin" },
   })
   const processo = await prisma.processo.create({
-    data: { nome: `Processo ${nome}`, codigo: `T-${nome}`, pais: "Alemanha", arvoreId: arvore.id, faseAtualKey: A, tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: `Processo ${nome}`, codigo: `T-${nome}`, arvoreId: arvore.id, faseAtualKey: A, tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
   })
   await reconciliarFaseAtiva(processo.id)
   return { processo, usuario, tipo }

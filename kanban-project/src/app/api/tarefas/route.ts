@@ -127,7 +127,7 @@ export async function GET(request: Request) {
           select: {
             id: true,
             nome: true,
-            pais: true
+            paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }
           }
         },
         responsavel: {
@@ -275,7 +275,7 @@ export async function POST(request: Request) {
           select: {
             id: true,
             nome: true,
-            pais: true
+            paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }
           }
         },
         responsavel: {

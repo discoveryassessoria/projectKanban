@@ -91,7 +91,7 @@ interface Cenario {
 async function semear(quantos: number): Promise<Cenario> {
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} arvore` } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, pais: "ITALIA" },
+    data: { nome: `${MARCA} processo`, arvoreId: arvore.id,},
   })
   const requerenteIds: number[] = []
   for (let i = 0; i < quantos; i++) {

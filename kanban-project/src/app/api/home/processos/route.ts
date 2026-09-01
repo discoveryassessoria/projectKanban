@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   // Processos operacionais: os que ainda não concluíram.
   const processos = await prisma.processo.findMany({
     where: { dataConclusao: null },
-    select: { id: true, nome: true, codigo: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true },
+    select: { id: true, nome: true, codigo: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true },
     orderBy: { updatedAt: "desc" },
     take: limite,
   })
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
         id: p.id,
         nome: p.nome,
         codigo: p.codigo,
-        pais: p.pais,
+        pais: p.paisCanonico?.countryKey,
         faseAtualKey: p.faseAtualKey,
         // Vêm dos motores canônicos, intactos.
         progresso: projPorProc.get(p.id)?.progress.percentage ?? 0,

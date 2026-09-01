@@ -88,7 +88,7 @@ async function main() {
   for (const [i, c] of CENAS.entries()) {
     const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_${i}`, name: c.item, natureza: "DOCUMENTO" }, select: { id: true } })
     const arv = await prisma.arvore.create({ data: { nome: `${MARCA} ${i}` }, select: { id: true } })
-    const proc = await prisma.processo.create({ data: { nome: `${MARCA} ${c.nome}`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "emissao_documental" }, select: { id: true } })
+    const proc = await prisma.processo.create({ data: { nome: `${MARCA} ${c.nome}`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "emissao_documental" }, select: { id: true } })
     const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: c.pessoa[0], sobrenome: c.pessoa[1] }, select: { id: true } })
     const doc = await prisma.documento.create({ data: { pessoaId: pes.id, descricao: c.item, status: "SOLICITAR" }, select: { id: true } })
     const nec = await prisma.necessidadeDocumental.create({ data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-${i}` }, select: { id: true } })

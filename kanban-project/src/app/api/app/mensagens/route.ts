@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         nome: true,
-        pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+        paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
         mensagens: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
       return {
         processoId: p.id,
         processoNome: p.nome,
-        pais: p.pais,
+        pais: p.paisCanonico?.countryKey,
         naoLidas: p._count.mensagens,
         ultimaMensagem: ultimaMensagem
           ? {

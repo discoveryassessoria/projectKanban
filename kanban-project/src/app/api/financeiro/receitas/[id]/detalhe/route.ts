@@ -97,7 +97,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
           documento: { select: { id: true, tipo: true } },
           processo: {
             select: {
-              id: true, codigo: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true,
+              id: true, codigo: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true,
               tipoProcessoMotor: { select: { id: true, name: true } },
             },
           },

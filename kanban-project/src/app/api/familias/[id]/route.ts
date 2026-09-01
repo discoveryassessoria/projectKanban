@@ -19,7 +19,7 @@ export async function GET(
     const familia = await prisma.familia.findUnique({
       where: { id },
       include: {
-        processos: { select: { id: true, nome: true, pais: true } },
+        processos: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
         arvores: { select: { id: true, nome: true } },
       },
     })

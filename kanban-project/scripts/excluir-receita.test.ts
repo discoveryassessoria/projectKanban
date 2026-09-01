@@ -58,7 +58,7 @@ async function main() {
   console.log('excluir-receita — persistência real\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-EXCLUIR-RECEITA' } }).catch(() => {})
-  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-EXCLUIR-RECEITA', pais: 'Alemanha' } })).id
+  PROC = (await prisma.processo.create({ data: { nome: 'TESTE-EXCLUIR-RECEITA',} })).id
 
   // ── 1 · bloqueia quando há pagamento (motivo explícito) ──
   sec('Bloqueio por pagamento')

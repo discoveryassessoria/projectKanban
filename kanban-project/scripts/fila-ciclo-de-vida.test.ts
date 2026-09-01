@@ -97,7 +97,7 @@ async function palco(quantas: number, nomes: string[]) {
   const S = `${MARCA}-${++palcoSeq}`
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, pais: 'espanha', arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: FASE },
+    data: { nome: `${MARCA} processo`, arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: FASE },
     select: { id: true },
   })
   const inst = await prisma.phaseWorkflowInstance.create({

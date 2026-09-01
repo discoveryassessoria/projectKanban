@@ -108,7 +108,7 @@ async function main() {
   await prisma.uniao.create({ data: { pessoa1Id: tereza.id, pessoa2Id: joao.id } })
 
   const processo = await prisma.processo.create({
-    data: { nome: "Processo Teste", codigo: "T-EST", pais: "Alemanha", arvoreId: arvore.id, faseAtualKey: "emissao_documental", tipoProcessoMotorId: tipoId, workflowRuntime: "v2" },
+    data: { nome: "Processo Teste", codigo: "T-EST", arvoreId: arvore.id, faseAtualKey: "emissao_documental", tipoProcessoMotorId: tipoId, workflowRuntime: "v2" },
   })
 
   // 4 CERTIDÕES EXIGIDAS + os documentos que as atendem, exatamente como em produção:

@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest) {
               // §1/§3/§4 — campos CANÔNICOS do lançamento de origem
               origemLancamento: true, naturezaLancamento: true, estornoDeId: true, canceladoEm: true, estornadoEm: true,
               phaseKey: true, configFinanceiraId: true, valorUnitario: true, dataCompetencia: true,
-              processo: { select: { id: true, nome: true, pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
+              processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
             },
           },
         },

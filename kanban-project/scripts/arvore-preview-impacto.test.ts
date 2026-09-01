@@ -163,7 +163,7 @@ async function semearCadastroDocumental() {
 async function semear(): Promise<Cenario> {
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} arvore` } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, pais: "ITALIA" },
+    data: { nome: `${MARCA} processo`, arvoreId: arvore.id,},
   })
   const pai = await prisma.pessoa.create({
     data: {

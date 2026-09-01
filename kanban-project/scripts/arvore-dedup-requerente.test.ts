@@ -84,7 +84,7 @@ async function main() {
     ctx.requerenteIds.push(requerente.id)
 
     const processo = await prisma.processo.create({
-      data: { nome: MARK, pais: "alemanha", arvoreId: arvore.id },
+      data: { nome: MARK, arvoreId: arvore.id },
     })
     ctx.processoIds.push(processo.id)
     await prisma.processoRequerente.create({

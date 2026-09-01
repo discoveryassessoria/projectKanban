@@ -445,15 +445,6 @@ model Processo {
   nome                        String                 @db.VarChar(100)
   descricao                   String?                @db.VarChar(500)
   observacoes                 String?
-  /// LEGADO EM TRANSIÇÃO: texto livre ('espanha', 'italia'). Continua gravado
-  /// porque 136 leitores ainda o consomem, mas NÃO é mais fonte de verdade — ele
-  /// é ESPELHO derivado de `paisId`, escrito só pela porta canônica. Guard
-  /// impede novo writer (npm run test:identidade-canonica).
-  /// ESPELHO DERIVADO — NÃO ESCREVER. O trigger o preenche a partir de `paisId`
-  /// em toda escrita. Ganhou default vazio justamente para que NENHUM writer
-  /// precise (ou consiga) informá-lo: quem grava informa a identidade, e o banco
-  /// deriva o texto. A coluna sai quando o último leitor sair.
-  pais                        String                 @default("")
   /// IDENTIDADE CANÔNICA da nacionalidade. Fonte: Países e Regiões.
   paisId                      Int?
   paisCanonico                CatalogoPais?          @relation("ProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
@@ -535,7 +526,6 @@ model Processo {
   planilhaOverrides PlanilhaCelulaOverride[]
   protocolos        Protocolo[]
 
-  @@index([pais])
   @@index([arvoreId])
   @@index([familiaId])
   @@index([tipoProcessoMotorId])
