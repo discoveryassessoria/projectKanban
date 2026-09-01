@@ -2298,6 +2298,7 @@ CREATE TABLE "TipoProcessoNacionalidade" (
     "countryLabel" VARCHAR(80) NOT NULL,
     "nationalityKey" VARCHAR(40) NOT NULL,
     "nationalityLabel" VARCHAR(80) NOT NULL,
+    "paisId" INTEGER,
     "modalityKey" VARCHAR(40) NOT NULL,
     "modalityLabel" VARCHAR(80) NOT NULL,
     "processFamily" VARCHAR(40) NOT NULL DEFAULT 'cidadania',
@@ -6945,6 +6946,9 @@ ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_taxaId_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TipoProcessoNacionalidade" ADD CONSTRAINT "TipoProcessoNacionalidade_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "FaseNaturezaPermitida" ADD CONSTRAINT "FaseNaturezaPermitida_catalogoFaseId_fkey" FOREIGN KEY ("catalogoFaseId") REFERENCES "CatalogoFase"("id") ON DELETE CASCADE ON UPDATE CASCADE;

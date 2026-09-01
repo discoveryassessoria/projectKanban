@@ -3209,10 +3209,15 @@ model TipoProcessoNacionalidade {
   id                  Int                 @id @default(autoincrement())
   code                String              @unique @db.VarChar(40)
   name                String              @db.VarChar(200)
+  /// LEGADO EM TRANSIÇÃO — duplicavam `CatalogoPais`. Espelhos de `paisId`.
   countryKey          String              @db.VarChar(40)
   countryLabel        String              @db.VarChar(80)
   nationalityKey      String              @db.VarChar(40)
   nationalityLabel    String              @db.VarChar(80)
+  /// IDENTIDADE do país desta oferta. É a EXISTÊNCIA de um tipo ativo aqui que
+  /// torna a nacionalidade ofertada — não a existência do país no cadastro.
+  paisId              Int?
+  pais                CatalogoPais?       @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
   modalityKey         String              @db.VarChar(40)
   modalityLabel       String              @db.VarChar(80)
   processFamily       String              @default("cidadania") @db.VarChar(40)
@@ -3251,8 +3256,9 @@ model CatalogoPais {
   servicos             ServicoProdutoPais[]
   modalidadesLegais    ModalidadeLegal[]
 
-  processos    Processo[] @relation("ProcessoPais")
-  statusKanban Status[]   @relation("StatusPais")
+  processos       Processo[]                  @relation("ProcessoPais")
+  statusKanban    Status[]                    @relation("StatusPais")
+  tiposDeProcesso TipoProcessoNacionalidade[] @relation("TipoProcessoPais")
 }
 
 model ModalidadePais {

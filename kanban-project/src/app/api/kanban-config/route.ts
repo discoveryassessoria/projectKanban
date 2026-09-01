@@ -1,7 +1,7 @@
 // ESTE ARQUIVO VAI EM: src/app/api/kanban-config/route.ts
 //
 // Configuração do kanban vinda do GERENCIAMENTO (motor):
-// - paises = CatalogoPais ATIVOS (variável — cria/inativa no Gerenciamento)
+// - paises = as NACIONALIDADES OFERTADAS, não os países existentes.
 // - tipos  = TipoProcessoNacionalidade ativos, cada um com as FASES do
 //            Workflow Macro (só showInKanban, em ordem) = as COLUNAS do board
 //
@@ -18,8 +18,19 @@ export async function GET(request: Request) {
 
   try {
     const [paises, tipos, workflows] = await Promise.all([
+      // EXISTIR NÃO É SER OFERTADO.
+      //
+      // Esta lista devolvia todo `CatalogoPais` ativo — então cadastrar um país
+      // para outra finalidade (o país de um consulado, por exemplo) faria surgir
+      // uma aba de cidadania que a empresa não vende. País é identidade
+      // geográfica; oferta é CONFIGURAÇÃO sobre ela, e a configuração que já
+      // existe é o Tipo de Processo por nacionalidade: sem um tipo ativo, não há
+      // o que abrir naquele país.
       prisma.catalogoPais.findMany({
-        where: { ativo: true },
+        where: {
+          ativo: true,
+          tiposDeProcesso: { some: { ativo: true, arquivado: false } },
+        },
         orderBy: { countryLabel: "asc" },
         select: { countryKey: true, countryLabel: true, flag: true },
       }),

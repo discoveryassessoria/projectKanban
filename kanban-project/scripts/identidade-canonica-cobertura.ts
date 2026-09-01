@@ -163,6 +163,35 @@ async function main() {
   okGuard(filtroCru.length === 0,
     `nenhum filtro de processo por texto de país${filtroCru.length ? ` (${filtroCru.join(", ")})` : ""}`)
 
+  // ── EXISTIR ≠ SER OFERTADO ────────────────────────────────────────────
+  // O erro conceitual mais caro desta arquitetura seria tratar "o país está no
+  // cadastro" como "vendemos cidadania desse país". Este guard usa um país REAL
+  // que a empresa não atende para provar que a separação continua de pé.
+  console.log("\nPaís geográfico não habilita nacionalidade ofertada:")
+  const naoOfertado = await q(`
+    SELECT c."countryKey" k FROM "CatalogoPais" c
+    WHERE c.ativo AND NOT EXISTS (
+      SELECT 1 FROM "TipoProcessoNacionalidade" t
+      WHERE t."paisId" = c.id AND t.ativo AND NOT t.arquivado)`)
+  const ofertados = await q(`
+    SELECT c."countryKey" k FROM "CatalogoPais" c
+    WHERE c.ativo AND EXISTS (
+      SELECT 1 FROM "TipoProcessoNacionalidade" t
+      WHERE t."paisId" = c.id AND t.ativo AND NOT t.arquivado)`)
+  const semOferta = naoOfertado.map((r: any) => r.k)
+  const comOferta = ofertados.map((r: any) => r.k)
+  const cruzamento = semOferta.filter((k: string) => comOferta.includes(k))
+  if (cruzamento.length > 0) falhas++
+  console.log(`  ${cruzamento.length === 0 ? "✅" : "❌"} país sem tipo ativo não é ofertado` +
+    ` — ofertados: ${comOferta.join(", ") || "nenhum"} · só geográficos: ${semOferta.join(", ") || "nenhum"}`)
+
+  // A oferta é resolvida por IDENTIDADE, não por texto: o tipo de processo tem
+  // de apontar para a linha do cadastro.
+  const tiposSemIdentidade = await n(
+    `SELECT COUNT(*)::int n FROM "TipoProcessoNacionalidade" WHERE "paisId" IS NULL AND ativo`)
+  if (tiposSemIdentidade > 0) falhas++
+  console.log(`  ${tiposSemIdentidade === 0 ? "✅" : "❌"} todo tipo de processo ativo aponta para o país (paisId) — sem identidade: ${tiposSemIdentidade}`)
+
   console.log(falhas === 0
     ? "\n✅ Cobertura total. A identidade canônica resolve todas as linhas."
     : `\n❌ ${falhas} verificação(ões) falharam — NÃO tornar o vínculo obrigatório.`)
