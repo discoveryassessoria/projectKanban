@@ -90,7 +90,10 @@ const TELA: Partial<Record<EtapaKey, string>> = {
 }
 
 export async function estadoParametrizacao(escopo: EscopoParametrizacao): Promise<EstadoParametrizacao> {
-  const tipo = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: escopo.tipoProcessoId } })
+  const tipo = await prisma.tipoProcessoNacionalidade.findUnique({
+    where: { id: escopo.tipoProcessoId },
+    include: { pais: { select: { countryLabel: true } } },
+  })
   if (!tipo) throw new Error(`Tipo de processo ${escopo.tipoProcessoId} não existe.`)
 
   const macro = await prisma.macroWorkflow.findUnique({
@@ -226,7 +229,7 @@ export async function estadoParametrizacao(escopo: EscopoParametrizacao): Promis
 
   return {
     escopo: {
-      tipoProcessoId: tipo.id, tipoProcessoNome: tipo.name, pais: tipo.countryLabel,
+      tipoProcessoId: tipo.id, tipoProcessoNome: tipo.name, pais: tipo.pais.countryLabel,
       fases, phaseKey: escopo.phaseKey ?? null,
     },
     etapas,

@@ -13,7 +13,10 @@ export async function GET(request: NextRequest) {
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         orderBy: { name: 'asc' },
-        select: { id: true, code: true, name: true, countryKey: true, countryLabel: true, modalityLabel: true, ativo: true },
+        select: {
+          id: true, code: true, name: true, modalityLabel: true, ativo: true,
+          pais: { select: { countryKey: true, countryLabel: true } },
+        },
       }),
       prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: 'asc' } }),
       prisma.catalogoPais.findMany({ select: { countryKey: true, flag: true } }),
@@ -22,7 +25,13 @@ export async function GET(request: NextRequest) {
     // marca quais tipos já têm workflow
     const comWf = await prisma.macroWorkflow.findMany({ select: { tipoProcessoId: true } })
     const setWf = new Set(comWf.map((m) => m.tipoProcessoId))
-    const tiposOut = tipos.map((t) => ({ ...t, temWorkflow: setWf.has(t.id) }))
+    // País do tipo é APRESENTAÇÃO derivada da relação canônica.
+    const tiposOut = tipos.map(({ pais, ...t }) => ({
+      ...t,
+      countryKey: pais.countryKey,
+      countryLabel: pais.countryLabel,
+      temWorkflow: setWf.has(t.id),
+    }))
 
     return NextResponse.json({ tipos: tiposOut, catalogoFases, paises })
   } catch (error) {

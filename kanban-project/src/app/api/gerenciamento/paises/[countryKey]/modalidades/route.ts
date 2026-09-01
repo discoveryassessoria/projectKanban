@@ -29,7 +29,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ coun
 
     const [mods, tipos] = await Promise.all([
       prisma.modalidadePais.findMany({ where: { countryKey }, orderBy: { ordem: 'asc' } }),
-      prisma.tipoProcessoNacionalidade.findMany({ where: { countryKey }, select: { modalityKey: true } }),
+      // Quem usa a modalidade é uma OFERTA daquele país — recorte por identidade.
+      prisma.tipoProcessoNacionalidade.findMany({ where: { paisId: pais.id }, select: { modalityKey: true } }),
     ])
 
     const contagem = new Map<string, number>()

@@ -25,8 +25,12 @@ export async function GET(request: NextRequest) {
   try {
     const [tipos, internos, automacoes, matriz, configsFin, catalogoFases] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
-        orderBy: [{ countryLabel: 'asc' }, { name: 'asc' }],
-        include: { macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
+        // Ordena pelo rótulo DO PAÍS canônico, atravessando a relação.
+        orderBy: [{ pais: { countryLabel: 'asc' } }, { name: 'asc' }],
+        include: {
+          macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } },
+          pais: { select: { countryKey: true, countryLabel: true, nationalityLabel: true } },
+        },
       }),
       prisma.phaseInternalWorkflow.findMany({
         where: { arquivado: false },
@@ -105,9 +109,10 @@ export async function GET(request: NextRequest) {
         id: t.id,
         code: t.code,
         name: t.name,
-        countryKey: t.countryKey,
-        countryLabel: t.countryLabel,
-        nationalityLabel: t.nationalityLabel,
+        // Apresentação derivada da relação canônica.
+        countryKey: t.pais.countryKey,
+        countryLabel: t.pais.countryLabel,
+        nationalityLabel: t.pais.nationalityLabel,
         modalityKey: t.modalityKey,
         modalityLabel: t.modalityLabel,
         processFamily: t.processFamily,

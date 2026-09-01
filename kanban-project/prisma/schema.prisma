@@ -3208,15 +3208,11 @@ model TipoProcessoNacionalidade {
   id                  Int                 @id @default(autoincrement())
   code                String              @unique @db.VarChar(40)
   name                String              @db.VarChar(200)
-  /// LEGADO EM TRANSIÇÃO — duplicavam `CatalogoPais`. Espelhos de `paisId`.
-  countryKey          String              @db.VarChar(40)
-  countryLabel        String              @db.VarChar(80)
-  nationalityKey      String              @db.VarChar(40)
-  nationalityLabel    String              @db.VarChar(80)
-  /// IDENTIDADE do país desta oferta. É a EXISTÊNCIA de um tipo ativo aqui que
-  /// torna a nacionalidade ofertada — não a existência do país no cadastro.
-  paisId              Int?
-  pais                CatalogoPais?       @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
+  /// IDENTIDADE do país desta oferta, OBRIGATÓRIA. É a EXISTÊNCIA de um tipo
+  /// ativo aqui que torna a nacionalidade ofertada — não a existência do país
+  /// no cadastro. Sem país não existe oferta: por isso não admite nulo.
+  paisId              Int
+  pais                CatalogoPais        @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
   modalityKey         String              @db.VarChar(40)
   modalityLabel       String              @db.VarChar(80)
   processFamily       String              @default("cidadania") @db.VarChar(40)
@@ -3231,7 +3227,7 @@ model TipoProcessoNacionalidade {
 
   regrasDocumentaisRef MatrizDocumental[] @relation("MatrizTipoProcessoCanonico")
 
-  @@index([countryKey])
+  @@index([paisId])
   @@index([modalityKey])
 }
 

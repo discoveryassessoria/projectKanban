@@ -37,7 +37,7 @@ export interface ParamsEventoRequerente {
 export async function enfileirarEventoRequerente(tx: Prisma.TransactionClient, params: ParamsEventoRequerente): Promise<number> {
   const arvore = await tx.arvore.findUnique({
     where: { id: params.arvoreId },
-    select: { processos: { select: { id: true, tipoProcessoMotorId: true, faseAtualKey: true, tipoProcessoMotor: { select: { nationalityLabel: true } } } } },
+    select: { processos: { select: { id: true, tipoProcessoMotorId: true, faseAtualKey: true, tipoProcessoMotor: { select: { pais: { select: { nationalityLabel: true } } } } } } },
   })
   const processos = arvore?.processos ?? []
   if (processos.length === 0) return 0
@@ -58,7 +58,7 @@ export async function enfileirarEventoRequerente(tx: Prisma.TransactionClient, p
           processoId: p.id, pessoaId: params.pessoaId, requerenteId: billing?.id ?? null,
           servicoId: p.tipoProcessoMotorId ?? null, tipoProcessoId: p.tipoProcessoMotorId ?? null,
           faseId: p.faseAtualKey ?? null, phaseKey: p.faseAtualKey ?? null,
-          nacionalidade: p.tipoProcessoMotor?.nationalityLabel ?? null,
+          nacionalidade: p.tipoProcessoMotor?.pais?.nationalityLabel ?? null,
           actorId: params.actorId ?? null, occurredAt: new Date().toISOString(),
         } as Prisma.InputJsonValue,
       },

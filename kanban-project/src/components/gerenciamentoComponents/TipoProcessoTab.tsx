@@ -171,7 +171,10 @@ export default function TipoProcessoTab() {
     if (!name.trim()) { setErroModal('Informe o nome.'); return }
     setSalvando(true); setErroModal(null)
     try {
-      const body = JSON.stringify({ code: code.trim(), name: name.trim(), countryKey, modalityKey, ativo })
+      // Manda a IDENTIDADE do país (paisId). `countryKey` segue junto só porque
+      // a modalidade ainda é endereçada por (país, modalidade) — o servidor não
+      // usa esse texto como identidade.
+      const body = JSON.stringify({ code: code.trim(), name: name.trim(), paisId: paisSel?.id, countryKey, modalityKey, ativo })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/tipos-processo/${editando.id}`, { method: 'PUT', body })
       } else {

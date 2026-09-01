@@ -24,13 +24,21 @@ export async function GET(request: Request) {
         id: true,
         code: true,
         name: true,
-        countryKey: true,
-        countryLabel: true,
         modalityKey: true,
         modalityLabel: true,
+        // País pela relação canônica: uma junção, sem N+1.
+        pais: { select: { countryKey: true, countryLabel: true } },
       },
     })
-    return NextResponse.json({ tipos })
+    // O seletor continua recebendo `countryKey`/`countryLabel` — só que agora
+    // eles são DERIVADOS da relação, e não colunas copiadas no tipo.
+    return NextResponse.json({
+      tipos: tipos.map(({ pais, ...t }) => ({
+        ...t,
+        countryKey: pais.countryKey,
+        countryLabel: pais.countryLabel,
+      })),
+    })
   } catch (error) {
     console.error("Erro ao listar tipos de processo:", error)
     return NextResponse.json({ error: "Erro ao listar tipos de processo" }, { status: 500 })

@@ -2,6 +2,9 @@
 //
 // PUT    - edita a modalidade (nome, sufixo, ordem, ativo).
 //          Propaga modalityLabel pros tipos existentes (guardam cópia).
+//          NOTA: `modalityLabel` ainda é cópia em TipoProcessoNacionalidade —
+//          é outra dívida, de MODALIDADE, e não entra nesta canonicalização de
+//          país. Enquanto a cópia existir, ela precisa ser mantida coerente.
 // DELETE - exclui a modalidade (só se NENHUM tipo usar; senão 409 →
 //          a UI sugere inativar).
 
@@ -32,10 +35,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ coun
       },
     })
 
-    // Propaga o label pros tipos existentes (eles guardam cópia)
     if (b.modalityLabel !== undefined) {
       await prisma.tipoProcessoNacionalidade.updateMany({
-        where: { countryKey, modalityKey },
+        where: { pais: { countryKey }, modalityKey },
         data: { modalityLabel: modalidade.modalityLabel },
       })
     }
@@ -58,7 +60,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     })
     if (!atual) return NextResponse.json({ error: 'Modalidade não encontrada.' }, { status: 404 })
 
-    const tipos = await prisma.tipoProcessoNacionalidade.count({ where: { countryKey, modalityKey } })
+    const tipos = await prisma.tipoProcessoNacionalidade.count({
+      where: { pais: { countryKey }, modalityKey },
+    })
     if (tipos > 0) {
       return NextResponse.json(
         { error: `Esta modalidade é usada por ${tipos} tipo(s) de processo. Inative-a em vez de excluir.` },

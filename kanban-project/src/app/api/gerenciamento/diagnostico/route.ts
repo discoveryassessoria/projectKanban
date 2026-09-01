@@ -58,10 +58,11 @@ export async function GET(request: NextRequest) {
     const tipos = await prisma.tipoProcessoNacionalidade.findMany({
       where: { arquivado: false },
       select: {
-        id: true, name: true, ativo: true, countryLabel: true,
+        id: true, name: true, ativo: true,
+        pais: { select: { countryLabel: true } },
         macroWorkflow: { select: { id: true, versao: true, fases: { select: { phaseKey: true, showInKanban: true } } } },
       },
-      orderBy: [{ countryLabel: 'asc' }, { name: 'asc' }],
+      orderBy: [{ pais: { countryLabel: 'asc' } }, { name: 'asc' }],
     })
     const autoPorTipo = await prisma.phaseAutomationRule.groupBy({
       by: ['tipoProcessoId'], where: { arquivado: false, active: true }, _count: { _all: true },
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
       ]
       const score = Math.round((itens.filter(Boolean).length / itens.length) * 100)
       return {
-        id: t.id, nome: t.name, pais: t.countryLabel, ativo: t.ativo,
+        id: t.id, nome: t.name, pais: t.pais.countryLabel, ativo: t.ativo,
         temWorkflow: !!t.macroWorkflow, fases: fases.length, fasesNoKanban: fases.filter((f) => f.showInKanban).length,
         fasesComInterno: comInterno, automacoes: autoMap.get(t.id) ?? 0, regrasDocumentais: matrizMap.get(t.id) ?? 0,
         score, bloqueante: !t.macroWorkflow || fases.length === 0,

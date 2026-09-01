@@ -726,7 +726,7 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
   const proc = await prisma.processo.findUnique({
     where: { id: processoId },
     select: { paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true, tipoProcessoMotorId: true,
-      tipoProcessoMotor: { select: { nationalityLabel: true, name: true } } },
+      tipoProcessoMotor: { select: { name: true, pais: { select: { nationalityLabel: true } } } } },
   })
   if (!proc) return { aplicavel: false, motivo: 'processo não encontrado' }
 
@@ -831,7 +831,7 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
     return { aplicavel: true, n, total, moeda, acao: 'pendencia', motivo: `sem câmbio ${moeda}→BRL (pendência registrada)` }
   }
 
-  const nacionalidade = proc.tipoProcessoMotor?.nationalityLabel || proc.tipoProcessoMotor?.name || null
+  const nacionalidade = proc.tipoProcessoMotor?.pais?.nationalityLabel || proc.tipoProcessoMotor?.name || null
   const desc = nacionalidade ? `Honorários Contratuais — ${nacionalidade}` : 'Honorários Contratuais por Requerente'
   const contexto = { fonte: 'honorario_por_requerente', requerentes: n, incluidoNaBase: 1, adicionais: n - 1, valorBase: base, valorAdicional: adic, tabelaValorId: preco.id, evento: 'REQUERENTES_DO_PROCESSO_DEFINIDOS' } as Prisma.InputJsonValue
   const fz: FreezeExec = { tabelaValorId: preco.id, configId: config?.id ?? null, regraId: null, naturezaPreco: 'VENDA', phaseKey: 'genealogia', chaveIdempotencia: akey, contexto }
@@ -932,7 +932,7 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
   const proc = await prisma.processo.findUnique({
     where: { id: evt.processoId },
     select: { id: true, arvoreId: true, faseAtualKey: true, tipoProcessoMotorId: true,
-      tipoProcessoMotor: { select: { nationalityLabel: true, name: true } } },
+      tipoProcessoMotor: { select: { name: true, pais: { select: { nationalityLabel: true } } } } },
   })
   if (!proc || !proc.tipoProcessoMotorId) { res.ignorados.push('processo/tipo não encontrado'); return res }
   const tipoProcessoId = proc.tipoProcessoMotorId
@@ -970,7 +970,7 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
   if (!cls) { res.ignorados.push('pessoa não está entre os requerentes do processo'); return res }
 
   const nomeCompleto = `${pessoa.nome}${pessoa.sobrenome ? ' ' + pessoa.sobrenome : ''}`.trim()
-  const nac = proc.tipoProcessoMotor?.nationalityLabel || proc.tipoProcessoMotor?.name || null
+  const nac = proc.tipoProcessoMotor?.pais?.nationalityLabel || proc.tipoProcessoMotor?.name || null
   const billingReqId = pessoa.requerentesVinculados[0]?.id ?? evt.requerenteId ?? null
   const fxCache = new Map<string, number>()
 

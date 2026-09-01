@@ -15,18 +15,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const b = await request.json()
 
-    // Se mudou país/modalidade, re-resolve os labels denormalizados
-    let paisFields = {}
-    if (b.countryKey !== undefined && b.modalityKey !== undefined) {
-      const pais = await prisma.catalogoPais.findUnique({ where: { countryKey: String(b.countryKey) } })
-      const modalidade = await prisma.modalidadePais.findUnique({
-        where: { countryKey_modalityKey: { countryKey: String(b.countryKey), modalityKey: String(b.modalityKey) } },
-      })
+    // Se mudou país/modalidade, RESOLVE A IDENTIDADE na borda: a chave textual
+    // que chega do formulário vira o vínculo canônico. Nenhum rótulo de país é
+    // gravado no tipo — só a modalidade, que é outra dívida, ainda copia label.
+    let paisFields: Record<string, unknown> = {}
+    if ((b.paisId !== undefined || b.countryKey !== undefined) && b.modalityKey !== undefined) {
+      const pais = b.paisId
+        ? await prisma.catalogoPais.findUnique({ where: { id: Number(b.paisId) } })
+        : await prisma.catalogoPais.findUnique({ where: { countryKey: String(b.countryKey) } })
       if (!pais) return NextResponse.json({ error: 'País não encontrado no catálogo.' }, { status: 400 })
+      const modalidade = await prisma.modalidadePais.findUnique({
+        where: { countryKey_modalityKey: { countryKey: pais.countryKey, modalityKey: String(b.modalityKey) } },
+      })
       if (!modalidade) return NextResponse.json({ error: 'Modalidade não encontrada para este país.' }, { status: 400 })
       paisFields = {
-        countryKey: pais.countryKey, countryLabel: pais.countryLabel,
-        nationalityKey: pais.nationalityKey, nationalityLabel: pais.nationalityLabel,
+        pais: { connect: { id: pais.id } },
         modalityKey: modalidade.modalityKey, modalityLabel: modalidade.modalityLabel,
       }
     }

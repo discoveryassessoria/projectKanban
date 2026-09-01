@@ -28,13 +28,15 @@ export async function GET(request: Request) {
   try {
     const [paises, tipos] = await Promise.all([
       prisma.catalogoPais.findMany({ orderBy: { countryLabel: 'asc' } }),
-      prisma.tipoProcessoNacionalidade.findMany({ select: { countryKey: true } }),
+      // A contagem é feita pela IDENTIDADE (`paisId`), não pelo nome do país:
+      // é o vínculo que diz quantas ofertas existem, e ele não pode divergir.
+      prisma.tipoProcessoNacionalidade.findMany({ select: { paisId: true } }),
     ])
 
-    const contagem = new Map<string, number>()
-    for (const t of tipos) contagem.set(t.countryKey, (contagem.get(t.countryKey) || 0) + 1)
+    const contagem = new Map<number, number>()
+    for (const t of tipos) if (t.paisId != null) contagem.set(t.paisId, (contagem.get(t.paisId) || 0) + 1)
 
-    const out = paises.map((p) => ({ ...p, tiposCount: contagem.get(p.countryKey) || 0 }))
+    const out = paises.map((p) => ({ ...p, tiposCount: contagem.get(p.id) || 0 }))
     return NextResponse.json({ paises: out })
   } catch (error) {
     console.error('Erro ao listar países:', error)

@@ -33,13 +33,13 @@ export async function POST(request: Request) {
   if (!nomes.length) return NextResponse.json({ error: "nomes vazio" }, { status: 400 })
 
   // 1) país Espanha (catálogo oficial)
-  const paises = await prisma.catalogoPais.findMany({ select: { countryKey: true, countryLabel: true, ativo: true } })
+  const paises = await prisma.catalogoPais.findMany({ select: { id: true, countryKey: true, countryLabel: true, ativo: true } })
   const pais = paises.find((p) => p.ativo && (norm(p.countryLabel).includes("espanh") || norm(p.countryKey) === "es" || norm(p.countryKey).includes("espanh")))
   if (!pais) return NextResponse.json({ error: "país Espanha não encontrado", paises }, { status: 422 })
 
   // 2) tipo de processo do país (motor)
   const tipos = await prisma.tipoProcessoNacionalidade.findMany({
-    where: { countryKey: pais.countryKey },
+    where: { paisId: pais.id },
     select: { id: true, name: true, code: true, ativo: true, arquivado: true },
   })
   const tiposAtivos = tipos.filter((t) => t.ativo && !t.arquivado)

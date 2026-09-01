@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       prisma.processo.count({ where: { tipoProcessoMotorId: { not: null } } }),
       prisma.tipoProcessoNacionalidade.findMany({
         where: { ativo: true, arquivado: false },
-        select: { id: true, name: true, countryLabel: true },
+        select: { id: true, name: true, pais: { select: { countryLabel: true } } },
         orderBy: { name: 'asc' },
       }),
     ])

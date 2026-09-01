@@ -36,7 +36,8 @@ export async function dadosDeApoio() {
     prisma.tipoProcessoNacionalidade.findMany({
       where: { ativo: true, arquivado: false },
       select: {
-        id: true, name: true, countryKey: true, modalityKey: true,
+        id: true, name: true, modalityKey: true,
+        pais: { select: { countryKey: true } },
         macroWorkflow: { select: { versao: true, fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: "asc" } } } },
       },
       orderBy: { name: "asc" },
@@ -46,7 +47,7 @@ export async function dadosDeApoio() {
     prisma.modalidadePais.findMany({ where: { ativo: true }, select: { id: true, countryKey: true, modalityKey: true, modalityLabel: true }, orderBy: { ordem: "asc" } }),
   ])
   const tiposProcesso = tipos.map((t) => ({
-    id: t.id, name: t.name, countryKey: t.countryKey, modalityKey: t.modalityKey,
+    id: t.id, name: t.name, countryKey: t.pais.countryKey, modalityKey: t.modalityKey,
     versao: t.macroWorkflow?.versao ?? null,
     fases: t.macroWorkflow?.fases ?? [],
   }))

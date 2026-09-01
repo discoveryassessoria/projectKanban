@@ -1,7 +1,8 @@
 // ESTE ARQUIVO VAI EM: src/app/api/gerenciamento/paises/[countryKey]/route.ts
 //
 // PUT    - edita o país (nome, bandeira, nacionalidade, prefixo, moeda, ativo).
-//          Propaga countryLabel/nationalityLabel pros tipos existentes.
+//          NÃO propaga nada: o rótulo vive só aqui, e quem exibe resolve pela
+//          relação. Propagar era o sintoma de que existiam cópias.
 // DELETE - exclui o país (só se NÃO tiver tipos nem processos; senão 409 →
 //          a UI sugere inativar). Apaga as modalidades junto.
 
@@ -33,17 +34,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ coun
       },
     })
 
-    // Propaga os labels pros tipos existentes (eles guardam cópia)
-    if (b.countryLabel !== undefined || b.nationalityLabel !== undefined) {
-      await prisma.tipoProcessoNacionalidade.updateMany({
-        where: { countryKey },
-        data: {
-          ...(b.countryLabel !== undefined ? { countryLabel: pais.countryLabel } : {}),
-          ...(b.nationalityLabel !== undefined ? { nationalityLabel: pais.nationalityLabel } : {}),
-        },
-      })
-    }
-
     return NextResponse.json({ pais })
   } catch (error) {
     console.error('Erro ao editar país:', error)
@@ -62,7 +52,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
 
     // Bloqueia se estiver em uso
     const [tipos, processos] = await Promise.all([
-      prisma.tipoProcessoNacionalidade.count({ where: { countryKey } }),
+      prisma.tipoProcessoNacionalidade.count({ where: { paisId: atual.id } }),
       prisma.processo.count({ where: ondePaisEh(countryKey) }),
     ])
     if (tipos > 0 || processos > 0) {
@@ -73,7 +63,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     }
 
     await prisma.$transaction(async (tx) => {
-      await tx.modalidadePais.deleteMany({ where: { countryKey } })
+      await tx.modalidadePais.deleteMany({ where: { paisId: atual.id } })
       await tx.catalogoPais.delete({ where: { countryKey } })
     })
 

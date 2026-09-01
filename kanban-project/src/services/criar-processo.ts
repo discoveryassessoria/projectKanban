@@ -104,7 +104,9 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
   if (!paisCat) return err("PAIS_INVALIDO")
 
   const tipoMotor = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: input.tipoProcessoMotorId } })
-  if (!tipoMotor || tipoMotor.countryKey !== input.pais) return err("TIPO_INVALIDO")
+  // O tipo pertence ao país pela IDENTIDADE. Comparar chaves textuais era o que
+  // permitia um tipo apontar para um país e o processo nascer com outro.
+  if (!tipoMotor || tipoMotor.paisId !== paisCat.id) return err("TIPO_INVALIDO")
 
   // Kill switch global: sem v2 habilitado não há como nascer v2.
   const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
