@@ -100,7 +100,8 @@ ok(!/publicCode/.test(dataDoUpdate), 'PUT nunca reescreve o código público')
 
 // ═══════════ 6) ANTI-DUPLICIDADE E ESTADO INICIAL ═══════════
 console.log('\n6) Sem duplicidade, tudo ativo, só cadastro mestre')
-ok(/@@unique\(\[name, country\]\)/.test(ler('prisma/schema.prisma')), 'banco garante nome oficial + país únicos')
+ok(/@@unique\(\[name, paisId\]\)/.test(ler('prisma/schema.prisma')), 'banco garante nome oficial + país únicos, pela IDENTIDADE do país')
+ok(!/^\s*country\s+String/m.test(ler('prisma/schema.prisma')), 'OrgaoProtocolo não tem mais coluna textual de país')
 ok(/Esta organização já existe/.test(rotaOrg), 'POST avisa que a organização já existe (e acrescenta função)')
 ok(/Já existe uma organização com este nome neste país/.test(rotaOrgId), 'PUT recusa colisão ao renomear')
 const seed = ler('prisma/seed-orgaos-organizacoes.ts')

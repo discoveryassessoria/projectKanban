@@ -81,8 +81,16 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   console.log("\nA — REFERÊNCIA A ENTIDADE CANÔNICA")
   // ══════════════════════════════════════════════════════════════════════════
+  // O país do órgão é IDENTIDADE: o teste conecta ao Cadastro Mestre em vez de
+  // escrever "Brasil" numa coluna de texto.
+  const brasil = await prisma.catalogoPais.upsert({
+    where: { countryKey: "brasil" },
+    update: {},
+    create: { countryKey: "brasil", countryLabel: "Brasil", nationalityKey: "brasileira", nationalityLabel: "Brasileira" },
+    select: { id: true },
+  })
   const orgA = await prisma.orgaoProtocolo.create({
-    data: { name: `${M} Cartório do Centro`, type: "cartorio", city: "São Paulo", country: "Brasil", ativo: true },
+    data: { name: `${M} Cartório do Centro`, type: "cartorio", city: "São Paulo", paisId: brasil.id, ativo: true },
     select: { id: true, name: true },
   })
   const orgInativa = await prisma.orgaoProtocolo.create({

@@ -2,7 +2,8 @@
 // Cadastro mestre de Órgãos e Organizações (Gerenciamento › Órgãos e Organizações).
 // O código público (ORG1, ORG2…) é gerado pelo CodeGeneratorService no create e
 // NUNCA aceito do cliente. Categorias são N:N (uma entidade pode ser cartório E
-// tradutor). Anti-duplicidade por nome oficial + país.
+// tradutor). Anti-duplicidade por nome oficial + país — o país entra por
+// IDENTIDADE (`paisId` → CatalogoPais), nunca pela grafia do nome.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -32,6 +33,13 @@ const listaTags = (v: unknown): string[] =>
 const listaFuncoes = (v: unknown): FuncaoOrganizacao[] =>
   Array.isArray(v) ? FUNCOES.filter((f) => v.includes(f)) : []
 
+/** O país chega como IDENTIDADE. Aceita só número; ausência é país não informado. */
+function paisIdDoCorpo(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
 /** Campos livres da ficha — mesmos no POST e no PUT. */
 function camposDaFicha(b: Record<string, unknown>) {
   return {
@@ -52,7 +60,6 @@ function camposDaFicha(b: Record<string, unknown>) {
     observacoesFinanceiras: s(b.observacoesFinanceiras),
     statusFinanceiro: s(b.statusFinanceiro, 20),
     type: s(b.type, 30),
-    country: s(b.country, 60),
     state: s(b.state, 60),
     city: s(b.city, 100),
     endereco: s(b.endereco, 300),
@@ -75,8 +82,8 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
   try {
     const orgaos = await prisma.orgaoProtocolo.findMany({
-      orderBy: [{ country: 'asc' }, { name: 'asc' }],
-      include: INCLUDE_CATEGORIAS,
+      orderBy: [{ pais: { countryLabel: 'asc' } }, { name: 'asc' }],
+      include: { ...INCLUDE_CATEGORIAS, pais: { select: { id: true, countryKey: true, countryLabel: true, flag: true } } },
     })
     return NextResponse.json({ orgaos })
   } catch (e) {
@@ -94,6 +101,13 @@ export async function POST(request: NextRequest) {
     if (!name) return NextResponse.json({ error: 'Informe o nome oficial.' }, { status: 400 })
 
     const ficha = camposDaFicha(b)
+    const paisId = paisIdDoCorpo(b.paisId)
+    // País informado tem de EXISTIR no Cadastro Mestre. Antes qualquer texto
+    // passava — inclusive um país que não existe, escrito errado.
+    if (paisId != null) {
+      const existe = await prisma.catalogoPais.findUnique({ where: { id: paisId }, select: { id: true } })
+      if (!existe) return NextResponse.json({ error: 'País não encontrado no Cadastro Mestre.' }, { status: 400 })
+    }
     const funcoes = listaFuncoes(b.funcoes)
     const categoriaIds: number[] = Array.isArray(b.categoriaIds)
       ? Array.from(new Set(b.categoriaIds.map(Number).filter((n: number) => Number.isInteger(n))))
@@ -104,7 +118,7 @@ export async function POST(request: NextRequest) {
     // oficial + país → nome fantasia + país). Se já existe, NÃO se cria outra:
     // acrescentam-se funções e categorias ao registro que já é a organização.
     const resolucao = await resolverOrganizacao(prisma, {
-      name, nomeFantasia: ficha.nomeFantasia, country: ficha.country,
+      name, nomeFantasia: ficha.nomeFantasia, paisId,
       identificacaoFiscal: ficha.identificacaoFiscal,
     })
     if (resolucao.id) {
@@ -135,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     // Nada casou por identidade exata. Antes de criar, AVISA sobre parecidas —
     // detectar não é fundir: quem decide é quem cadastra.
-    const suspeitas = await detectarDuplicidade(prisma, { name, nomeFantasia: ficha.nomeFantasia, country: ficha.country })
+    const suspeitas = await detectarDuplicidade(prisma, { name, nomeFantasia: ficha.nomeFantasia, paisId })
     if (suspeitas.length && b.confirmarNova !== true) {
       return NextResponse.json({
         error: 'Encontramos organizações muito parecidas. Confirme que esta é uma entidade diferente.',
@@ -147,7 +161,7 @@ export async function POST(request: NextRequest) {
 
     const orgao = await prisma.$transaction(async (tx) => {
       const criado = await tx.orgaoProtocolo.create({
-        data: { name, ...ficha, funcoes: funcoes.length ? funcoes : ['ORGAO'], ativo: b.ativo !== false },
+        data: { name, ...ficha, paisId, funcoes: funcoes.length ? funcoes : ['ORGAO'], ativo: b.ativo !== false },
       })
       if (categoriaIds.length) {
         await tx.organizacaoCategoria.createMany({

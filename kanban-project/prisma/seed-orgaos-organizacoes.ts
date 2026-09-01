@@ -24,12 +24,27 @@ import { CATEGORIAS, BASE_COMPLETA, funcoesDe, validarBase, type OrganizacaoSeed
 const DRY = process.argv.includes('--dry-run')
 const log = (m: string) => console.log(`[seed-orgaos]${DRY ? ' (dry)' : ''} ${m}`)
 
+/**
+ * O país do dado-fonte é um RÓTULO; aqui ele vira IDENTIDADE. Se o país não
+ * existir no Cadastro Mestre, o seed PARA — cadastrar órgão apontando para país
+ * que não existe é como o texto livre deixava o cadastro sujo.
+ */
+async function mapaDePaises(): Promise<Map<string, number>> {
+  const paises = await prisma.catalogoPais.findMany({ select: { id: true, countryLabel: true } })
+  return new Map(paises.map((p) => [p.countryLabel.trim().toLowerCase(), p.id]))
+}
+function paisIdDe(mapa: Map<string, number>, rotulo: string): number {
+  const id = mapa.get(rotulo.trim().toLowerCase())
+  if (id == null) throw new Error(`[seed-orgaos] país "${rotulo}" não existe no Cadastro Mestre — cadastre-o antes de semear órgãos.`)
+  return id
+}
+
 /** Campos da ficha que o seed sabe preencher. */
-function fichaDe(o: OrganizacaoSeed) {
+function fichaDe(o: OrganizacaoSeed, paises: Map<string, number>) {
   return {
     nomeFantasia: o.nomeFantasia ?? null,
     type: o.type ?? null,
-    country: o.country,
+    paisId: paisIdDe(paises, o.country),
     state: o.state ?? null,
     provincia: o.provincia ?? null,
     city: o.city ?? null,
@@ -49,6 +64,10 @@ async function main() {
     process.exit(1)
   }
   log(`base válida: ${CATEGORIAS.length} categorias · ${BASE_COMPLETA.length} organizações`)
+
+  // O país vira identidade ANTES de qualquer escrita: se faltar um, para aqui.
+  const paises = await mapaDePaises()
+  for (const o of BASE_COMPLETA) paisIdDe(paises, o.country)
 
   // ── 1) categorias ──────────────────────────────────────────────────────────
   const existentesCat = new Map(
@@ -75,14 +94,14 @@ async function main() {
 
   let funcoesAcrescentadas = 0
   for (const o of BASE_COMPLETA) {
-    const ficha = fichaDe(o)
+    const ficha = fichaDe(o, paises)
     const funcoes = funcoesDe(o)
 
     // ORGANIZAÇÃO ÚNICA: a entidade é procurada na ordem obrigatória
     // (id → identificação fiscal → nome oficial + país → nome fantasia + país).
     // Só é criada quando NADA casou.
     const resolucao = await resolverOrganizacao(prisma, {
-      name: o.name, nomeFantasia: o.nomeFantasia, country: o.country,
+      name: o.name, nomeFantasia: o.nomeFantasia, paisId: paisIdDe(paises, o.country),
     })
     const atual = resolucao.id
       ? await prisma.orgaoProtocolo.findUnique({
@@ -115,7 +134,7 @@ async function main() {
           if ((atual.tags?.length ?? 0) === 0 && (valor as string[]).length) patch.tags = valor
           continue
         }
-        if (chave === 'country') continue
+        if (chave === 'paisId') continue
         const atualValor = (atual as unknown as Record<string, unknown>)[chave]
         if ((atualValor === null || atualValor === undefined || atualValor === '') && valor != null) patch[chave] = valor
       }
@@ -157,7 +176,7 @@ async function main() {
     prisma.orgaoProtocolo.count({ where: { ativo: true } }),
     prisma.orgaoProtocolo.count({ where: { publicCode: null } }),
     prisma.$queryRawUnsafe<{ n: number }[]>(
-      `SELECT COUNT(*)::int AS n FROM (SELECT "name", "country" FROM "OrgaoProtocolo" GROUP BY "name", "country" HAVING COUNT(*) > 1) x`,
+      `SELECT COUNT(*)::int AS n FROM (SELECT "name", "paisId" FROM "OrgaoProtocolo" GROUP BY "name", "paisId" HAVING COUNT(*) > 1) x`,
     ),
   ])
   const nDup = duplicados?.[0]?.n ?? 0

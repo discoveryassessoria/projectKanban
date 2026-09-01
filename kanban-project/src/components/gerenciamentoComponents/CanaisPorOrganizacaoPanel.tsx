@@ -32,7 +32,8 @@ interface Vinculo {
 }
 interface Organizacao {
   id: number; name: string; nomeFantasia: string | null
-  type: string | null; city: string | null; country: string | null
+  type: string | null; city: string | null
+  paisId: number | null; pais: { id: number; countryKey: string; countryLabel: string } | null
   canais: Array<{ canal: { key: string; label: string } }>
 }
 

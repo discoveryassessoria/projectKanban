@@ -113,14 +113,19 @@ registrar({
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
     const todas = await prisma.orgaoProtocolo.findMany({
-      select: { id: true, publicCode: true, name: true, nomeFantasia: true, country: true, identificacaoFiscal: true },
+      select: {
+        id: true, publicCode: true, name: true, nomeFantasia: true, identificacaoFiscal: true,
+        paisId: true, pais: { select: { countryLabel: true } },
+      },
     })
     const achados: Achado[] = []
 
     // 1) nome oficial normalizado + país (pega acento, caixa, pontuação)
     const porChave = new Map<string, typeof todas>()
     for (const o of todas) {
-      const k = `${chaveDeNome(o.name)}::${o.country ?? ''}`
+      // Agrupa pela IDENTIDADE do país. Antes, duas grafias do mesmo país
+      // ("Italia" e "Itália") escondiam a duplicata em vez de mostrá-la.
+      const k = `${chaveDeNome(o.name)}::${o.paisId ?? ''}`
       const l = porChave.get(k) ?? []
       l.push(o)
       porChave.set(k, l)
@@ -140,7 +145,7 @@ registrar({
         quantidade: grupo.length,
         link: ROTA,
         recomendacao: 'Consolide manualmente: mantenha um registro, transfira funções/categorias e inative o outro. Nunca exclua registro com vínculo.',
-        evidencia: { registros: grupo.map((g) => ({ id: g.id, codigo: g.publicCode, nome: g.name, pais: g.country })) },
+        evidencia: { registros: grupo.map((g) => ({ id: g.id, codigo: g.publicCode, nome: g.name, pais: g.pais?.countryLabel ?? null })) },
       })
     }
 

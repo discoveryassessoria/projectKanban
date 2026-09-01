@@ -14,7 +14,7 @@
 // NULOS — quem tem esse dado é o operador, e contato fabricado é pior que campo
 // vazio.
 //
-// Idempotente: a chave é (name, country), que já é @@unique no modelo.
+// Idempotente: a chave é (name, paisId), que já é @@unique no modelo.
 import { prisma } from "../src/lib/prisma"
 
 /** Os 26 tribunais do enum legado, com a região a que pertencem. */
@@ -47,22 +47,26 @@ const TRIBUNAIS: { cidade: string; regiao: string }[] = [
   { cidade: "Venezia",         regiao: "Veneto" },
 ]
 
-const PAIS = "Itália"
+const PAIS_KEY = "italia"
 const nomeOficial = (cidade: string) => `Tribunale Ordinario di ${cidade}`
 
 async function main() {
   const aplicar = process.argv.includes("--aplicar")
+  // O país é resolvido UMA vez, pela identidade do Cadastro Mestre.
+  const pais = await prisma.catalogoPais.findUnique({ where: { countryKey: PAIS_KEY }, select: { id: true, countryLabel: true } })
+  if (!pais) { console.error(`país "${PAIS_KEY}" não existe no Cadastro Mestre`); process.exit(1) }
+  const paisId = pais.id
   let criados = 0, existentes = 0
   for (const t of TRIBUNAIS) {
     const name = nomeOficial(t.cidade)
-    const ja = await prisma.orgaoProtocolo.findUnique({ where: { name_country: { name, country: PAIS } }, select: { id: true, publicCode: true } })
+    const ja = await prisma.orgaoProtocolo.findUnique({ where: { name_paisId: { name, paisId } }, select: { id: true, publicCode: true } })
     if (ja) { existentes++; continue }
     if (!aplicar) { console.log(`  + ${name} · ${t.cidade} · ${t.regiao}`); criados++; continue }
     const criado = await prisma.orgaoProtocolo.create({
       data: {
         name,
         type: "tribunal",
-        country: PAIS,
+        paisId,
         state: t.regiao,
         city: t.cidade,
         idioma: "it",

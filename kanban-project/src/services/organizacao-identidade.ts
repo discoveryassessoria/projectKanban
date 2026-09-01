@@ -73,7 +73,8 @@ export interface EntradaIdentidade {
   id?: number | null
   name?: string | null
   nomeFantasia?: string | null
-  country?: string | null
+  /** IDENTIDADE geográfica. O país entra por vínculo, nunca por texto. */
+  paisId?: number | null
   identificacaoFiscal?: string | null
 }
 
@@ -82,10 +83,21 @@ export type ComoResolveu = 'id' | 'identificacao-fiscal' | 'nome-oficial-pais' |
 export interface ResolucaoOrganizacao {
   id: number | null
   como: ComoResolveu
-  registro: { id: number; publicCode: string | null; name: string; country: string | null } | null
+  /** `pais` é o RÓTULO para a mensagem de erro — derivado, nunca persistido. */
+  registro: { id: number; publicCode: string | null; name: string; paisId: number | null; pais: string | null } | null
 }
 
-const SELECT_MIN = { id: true, publicCode: true, name: true, country: true } as const
+const SELECT_MIN = {
+  id: true, publicCode: true, name: true, paisId: true,
+  pais: { select: { countryLabel: true } },
+} as const
+
+type LinhaMin = { id: number; publicCode: string | null; name: string; paisId: number | null; pais: { countryLabel: string } | null }
+
+/** Achata a relação num rótulo. A apresentação deriva; a identidade é `paisId`. */
+const comRotulo = (r: LinhaMin) => ({
+  id: r.id, publicCode: r.publicCode, name: r.name, paisId: r.paisId, pais: r.pais?.countryLabel ?? null,
+})
 
 /**
  * Encontra a organização que a entrada JÁ é, na ordem obrigatória. Devolve
@@ -95,31 +107,33 @@ export async function resolverOrganizacao(db: DB, e: EntradaIdentidade): Promise
   // 1) id
   if (e.id != null) {
     const porId = await db.orgaoProtocolo.findUnique({ where: { id: e.id }, select: SELECT_MIN })
-    if (porId) return { id: porId.id, como: 'id', registro: porId }
+    if (porId) return { id: porId.id, como: 'id', registro: comRotulo(porId) }
   }
 
   // 2) identificação fiscal — a chave forte: mesma inscrição = mesma pessoa jurídica
   const fiscal = normalizarIdentificacaoFiscal(e.identificacaoFiscal)
   if (fiscal) {
     const porFiscal = await db.orgaoProtocolo.findUnique({ where: { identificacaoFiscal: fiscal }, select: SELECT_MIN })
-    if (porFiscal) return { id: porFiscal.id, como: 'identificacao-fiscal', registro: porFiscal }
+    if (porFiscal) return { id: porFiscal.id, como: 'identificacao-fiscal', registro: comRotulo(porFiscal) }
   }
 
-  const pais = e.country?.trim() || null
+  // A REGRA NÃO MUDOU: "mesmo nome no mesmo país é a mesma entidade". O que
+  // mudou é como o país é endereçado — por vínculo, não pela grafia do rótulo.
+  const paisId = e.paisId ?? null
 
   // 3) nome oficial + país
   if (e.name?.trim()) {
-    const porNome = await db.orgaoProtocolo.findFirst({ where: { name: e.name.trim(), country: pais }, select: SELECT_MIN })
-    if (porNome) return { id: porNome.id, como: 'nome-oficial-pais', registro: porNome }
+    const porNome = await db.orgaoProtocolo.findFirst({ where: { name: e.name.trim(), paisId }, select: SELECT_MIN })
+    if (porNome) return { id: porNome.id, como: 'nome-oficial-pais', registro: comRotulo(porNome) }
   }
 
   // 4) nome fantasia + país
   if (e.nomeFantasia?.trim()) {
     const porFantasia = await db.orgaoProtocolo.findFirst({
-      where: { nomeFantasia: e.nomeFantasia.trim(), country: pais },
+      where: { nomeFantasia: e.nomeFantasia.trim(), paisId },
       select: SELECT_MIN,
     })
-    if (porFantasia) return { id: porFantasia.id, como: 'nome-fantasia-pais', registro: porFantasia }
+    if (porFantasia) return { id: porFantasia.id, como: 'nome-fantasia-pais', registro: comRotulo(porFantasia) }
   }
 
   return { id: null, como: 'nova', registro: null }
@@ -129,7 +143,9 @@ export interface SuspeitaDuplicidade {
   id: number
   publicCode: string | null
   name: string
-  country: string | null
+  paisId: number | null
+  /** Rótulo do país, para a tela mostrar. Derivado da relação. */
+  pais: string | null
   similaridade: number
   motivo: string
 }
@@ -149,7 +165,7 @@ export async function detectarDuplicidade(
 
   const candidatas = await db.orgaoProtocolo.findMany({
     where: {
-      ...(e.country?.trim() ? { country: e.country.trim() } : {}),
+      ...(e.paisId != null ? { paisId: e.paisId } : {}),
       ...(opts.ignorarId ? { id: { not: opts.ignorarId } } : {}),
     },
     select: { ...SELECT_MIN, nomeFantasia: true },
@@ -163,7 +179,8 @@ export async function detectarDuplicidade(
     const s = Math.max(sNome, sFantasia)
     if (s >= limiar) {
       achados.push({
-        id: c.id, publicCode: c.publicCode, name: c.name, country: c.country,
+        id: c.id, publicCode: c.publicCode, name: c.name,
+        paisId: c.paisId, pais: c.pais?.countryLabel ?? null,
         similaridade: Number(s.toFixed(2)),
         motivo: s === 1 ? 'nome equivalente (só difere em acento/pontuação)' : 'nome muito parecido',
       })

@@ -24,7 +24,11 @@ type Linha = {
   dataProtocolo: string | null
   finalidade: string
   situacao: string
-  orgao: { id: number; publicCode: string | null; name: string; type: string | null; city: string | null; country: string | null } | null
+  orgao: {
+    id: number; publicCode: string | null; name: string; type: string | null; city: string | null
+    // País do ÓRGÃO — dimensão geográfica, distinta da nacionalidade do processo.
+    paisId: number | null; pais: { id: number; countryKey: string; countryLabel: string } | null
+  } | null
   responsavel: { id: number; nome: string } | null
   processo: {
     id: number; codigo: string | null; nome: string; pais: string
@@ -62,7 +66,7 @@ const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surfac
 const dataBR = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—")
 
 export default function RelatorioProtocolosTab({ paisKey = null }: { paisKey?: string | null } = {}) {
-  const [orgaos, setOrgaos] = useState<{ id: number; name: string; type: string | null; country: string | null }[]>([])
+  const [orgaos, setOrgaos] = useState<{ id: number; name: string; type: string | null; pais: { countryLabel: string } | null }[]>([])
   const [familias, setFamilias] = useState<{ id: number; nome: string }[]>([])
   const [dados, setDados] = useState<Resposta | null>(null)
   const [carregando, setCarregando] = useState(false)
@@ -125,7 +129,7 @@ export default function RelatorioProtocolosTab({ paisKey = null }: { paisKey?: s
     const cab = ["Data", "Protocolo", "Nº do processo", "Órgão", "Cidade", "País do órgão", "Processo", "Família", "Requerentes", "Finalidade", "Situação", "Exigências abertas"]
     const linhas = dados.protocolos.map((p) => [
       dataBR(p.dataProtocolo), p.numeroProtocolo ?? "", p.numeroProcesso ?? "",
-      p.orgao?.name ?? "", p.orgao?.city ?? "", p.orgao?.country ?? "",
+      p.orgao?.name ?? "", p.orgao?.city ?? "", p.orgao?.pais?.countryLabel ?? "",
       p.processo ? `${p.processo.codigo ?? p.processo.id} — ${p.processo.nome}` : "",
       p.processo?.familia?.nome ?? "", p.requerentes.map((r) => r.nome).join(" | "),
       ROTULO_FINALIDADE[p.finalidade] ?? p.finalidade, ROTULO_SITUACAO[p.situacao] ?? p.situacao,
@@ -158,7 +162,7 @@ export default function RelatorioProtocolosTab({ paisKey = null }: { paisKey?: s
             <select value={f.orgaoId} onChange={(e) => setF({ ...f, orgaoId: e.target.value })} className={INPUT}>
               <option value="">Todos os órgãos</option>
               {orgaos.map((o) => (
-                <option key={o.id} value={String(o.id)}>{o.name}{o.country ? ` · ${o.country}` : ""}</option>
+                <option key={o.id} value={String(o.id)}>{o.name}{o.pais ? ` · ${o.pais.countryLabel}` : ""}</option>
               ))}
             </select>
           </div>

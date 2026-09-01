@@ -107,14 +107,14 @@ function projetarProfissional(p: {
 
 const SELECT_ORG = {
   id: true, name: true, nomeFantasia: true, type: true,
-  city: true, country: true, ativo: true,
+  city: true, pais: { select: { countryLabel: true } }, ativo: true,
 } as const
 
 function projetarOrganizacao(o: {
   id: number; name: string; nomeFantasia: string | null
-  type: string | null; city: string | null; country: string | null; ativo: boolean
+  type: string | null; city: string | null; pais: { countryLabel: string } | null; ativo: boolean
 }): EntidadeReferenciada {
-  const onde = [o.city, o.country].filter(Boolean).join(" · ")
+  const onde = [o.city, o.pais?.countryLabel].filter(Boolean).join(" · ")
   return {
     id: o.id,
     // O nomeFantasia é como a organização é chamada no dia a dia; o `name` é o

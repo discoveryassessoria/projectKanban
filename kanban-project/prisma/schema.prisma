@@ -4065,8 +4065,6 @@ model OrgaoProtocolo {
   /// Nome fantasia/usual (sigla ou como o operador chama no dia a dia).
   nomeFantasia String?       @db.VarChar(200)
   type         String?       @db.VarChar(30) // consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro
-  /// LEGADO EM TRANSIÇÃO — nome do país em texto. Espelho de `paisId`.
-  country      String?       @db.VarChar(60)
   /// IDENTIDADE GEOGRÁFICA do órgão. NÃO é nacionalidade ofertada: o Consolato
   /// d'Italia em Miami fica nos Estados Unidos e atende cidadania italiana —
   /// são duas relações diferentes e as duas legítimas.
@@ -4149,9 +4147,12 @@ model OrgaoProtocolo {
   registrosDeClasse     RegistroProfissional[] @relation("RegistrosDoOrgaoDeClasse")
 
   /// Anti-duplicidade do cadastro mestre: mesma entidade não entra duas vezes.
-  @@unique([name, country])
+  /// Ancorada na IDENTIDADE do país. Continua opcional como antes: órgão sem
+  /// país cadastrado não colide (NULL não colide em índice único no Postgres),
+  /// exatamente como acontecia com a coluna textual.
+  @@unique([name, paisId])
   @@index([type])
-  @@index([country])
+  @@index([paisId])
   @@index([ativo])
   @@index([provincia])
   @@index([funcoes])

@@ -1,4 +1,4 @@
-// GET /api/gerenciamento/orgaos-protocolo/verificar?name=&nomeFantasia=&country=&identificacaoFiscal=&ignorarId=
+// GET /api/gerenciamento/orgaos-protocolo/verificar?name=&nomeFantasia=&paisId=&identificacaoFiscal=&ignorarId=
 //
 // DETECÇÃO DE DUPLICIDADE em tempo de digitação. A tela chama enquanto o
 // operador preenche o nome: se a organização já existe, ele acrescenta função
@@ -17,7 +17,8 @@ export async function GET(request: NextRequest) {
     const entrada = {
       name: p.get('name'),
       nomeFantasia: p.get('nomeFantasia'),
-      country: p.get('country'),
+      // O país chega como IDENTIDADE — a tela manda o id do Cadastro Mestre.
+      paisId: Number(p.get('paisId')) || null,
       identificacaoFiscal: p.get('identificacaoFiscal'),
     }
     const ignorarId = Number(p.get('ignorarId')) || null

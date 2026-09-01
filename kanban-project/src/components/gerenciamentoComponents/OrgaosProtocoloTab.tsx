@@ -11,6 +11,7 @@ import {
   useSelecaoEmMassa, executarEmMassa, CaixaDeSelecao, CaixaDeSelecaoTodos,
   BarraDeSelecao, ResumoEmMassa, type ResultadoEmMassa,
 } from "@/src/components/ui/selecao-em-massa"
+import { SelectPaisCanonico, type PaisCanonico } from "@/src/components/ui/select-pais-canonico"
 
 interface CategoriaRef { id: number; code: string; nome: string; ativo: boolean }
 type Funcao = 'ORGAO' | 'FORNECEDOR' | 'PARCEIRO' | 'CORRESPONDENTE' | 'CLIENTE_CORPORATIVO'
@@ -19,14 +20,16 @@ const FUNCOES: [Funcao, string][] = [
   ['CORRESPONDENTE', 'Correspondente'], ['CLIENTE_CORPORATIVO', 'Cliente Corporativo'],
 ]
 const funcaoLabel = (f: Funcao) => FUNCOES.find(([v]) => v === f)?.[1] ?? f
-interface Suspeita { id: number; publicCode: string | null; name: string; country: string | null; similaridade: number; motivo: string }
+interface Suspeita { id: number; publicCode: string | null; name: string; paisId: number | null; pais: string | null; similaridade: number; motivo: string }
 interface Orgao {
   id: number
   publicCode: string | null
   name: string
   nomeFantasia: string | null
   type: string | null
-  country: string | null
+  /// IDENTIDADE do país. O rótulo vem da relação, não de coluna copiada.
+  paisId: number | null
+  pais: { id: number; countryKey: string; countryLabel: string; flag?: string | null } | null
   state: string | null
   provincia: string | null
   city: string | null
@@ -82,7 +85,7 @@ const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" s
 type Form = {
   id?: number; publicCode?: string | null
   name: string; nomeFantasia: string; type: string
-  country: string; state: string; provincia: string; city: string; endereco: string; cep: string
+  paisId: number | null; state: string; provincia: string; city: string; endereco: string; cep: string
   site: string; email: string; telefone: string
   idioma: string; moeda: string; horario: string; responsavel: string
   observacoes: string; tags: string; queueRule: string
@@ -95,7 +98,7 @@ type Form = {
   ativo: boolean
 }
 const blank = (): Form => ({
-  name: "", nomeFantasia: "", type: "", country: "", state: "", provincia: "", city: "", endereco: "", cep: "",
+  name: "", nomeFantasia: "", type: "", paisId: null, state: "", provincia: "", city: "", endereco: "", cep: "",
   site: "", email: "", telefone: "", idioma: "", moeda: "", horario: "", responsavel: "",
   observacoes: "", tags: "", queueRule: "", categoriaIds: [], funcoes: ["ORGAO"],
   identificacaoFiscal: "", tipoIdentificacaoFiscal: "", formaPagamento: "", chavePix: "", tipoChavePix: "",
@@ -104,7 +107,7 @@ const blank = (): Form => ({
 })
 const daLinha = (d: Orgao): Form => ({
   id: d.id, publicCode: d.publicCode, name: d.name, nomeFantasia: d.nomeFantasia || "", type: d.type || "",
-  country: d.country || "", state: d.state || "", provincia: d.provincia || "", city: d.city || "", endereco: d.endereco || "", cep: d.cep || "",
+  paisId: d.paisId ?? null, state: d.state || "", provincia: d.provincia || "", city: d.city || "", endereco: d.endereco || "", cep: d.cep || "",
   site: d.site || "", email: d.email || "", telefone: d.telefone || "", idioma: d.idioma || "", moeda: d.moeda || "",
   horario: d.horario || "", responsavel: d.responsavel || "", observacoes: d.observacoes || "",
   tags: (d.tags ?? []).join(", "), queueRule: d.queueRule || "",
@@ -120,12 +123,19 @@ const daLinha = (d: Orgao): Form => ({
 export default function OrgaosProtocoloTab() {
   const [rows, setRows] = useState<Orgao[]>([])
   const [categorias, setCategorias] = useState<CategoriaRef[]>([])
+  // PAÍSES GEOGRÁFICOS do Cadastro Mestre — não é a lista de nacionalidades
+  // ofertadas: o órgão pode estar em qualquer país do mundo cadastrado.
+  const [paisesCadastro, setPaisesCadastro] = useState<PaisCanonico[]>([])
+  const [paisesCarregando, setPaisesCarregando] = useState(true)
+  const [paisesErro, setPaisesErro] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
   const [form, setForm] = useState<Form | null>(null)
   const [busca, setBusca] = useState("")
-  const [filtroPais, setFiltroPais] = useState("")
+  // O filtro guarda o ID do país, não o texto: filtrar por grafia era o mesmo
+  // defeito da coluna, só que na tela.
+  const [filtroPais, setFiltroPais] = useState<number | "">("")
   const [filtroFuncao, setFiltroFuncao] = useState<"" | Funcao>("")
   const [suspeitas, setSuspeitas] = useState<Suspeita[]>([])
   const [existente, setExistente] = useState<{ id: number; publicCode: string | null; name: string } | null>(null)
@@ -143,21 +153,39 @@ export default function OrgaosProtocoloTab() {
       }
     } finally { setLoading(false) }
   }, [])
+
+  const carregarPaises = useCallback(async () => {
+    setPaisesCarregando(true)
+    setPaisesErro(null)
+    try {
+      const res = await fetch("/api/gerenciamento/paises", { headers: authHeaders() })
+      if (!res.ok) throw new Error(String(res.status))
+      setPaisesCadastro(((await res.json()).paises ?? []) as PaisCanonico[])
+    } catch {
+      setPaisesErro("falha ao carregar")
+    } finally { setPaisesCarregando(false) }
+  }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { carregarPaises() }, [carregarPaises])
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 2600) }
 
-  const paises = useMemo(
-    () => Array.from(new Set(rows.map(r => r.country).filter((v): v is string => !!v))).sort(),
-    [rows],
-  )
+  // Só os países que REALMENTE têm órgão entram no filtro — a lista completa do
+  // cadastro encheria o seletor de opções que não filtram nada.
+  const paises = useMemo(() => {
+    const vistos = new Map<number, string>()
+    for (const r of rows) if (r.paisId != null && r.pais) vistos.set(r.paisId, r.pais.countryLabel)
+    return [...vistos.entries()]
+      .map(([id, label]) => ({ id, label }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"))
+  }, [rows])
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase()
     return rows.filter(r => {
-      if (filtroPais && r.country !== filtroPais) return false
+      if (filtroPais !== "" && r.paisId !== filtroPais) return false
       if (filtroFuncao && !(r.funcoes ?? []).includes(filtroFuncao)) return false
       if (!q) return true
-      const alvo = [r.publicCode, r.name, r.nomeFantasia, r.city, r.country, ...(r.tags ?? []),
+      const alvo = [r.publicCode, r.name, r.nomeFantasia, r.city, r.pais?.countryLabel, ...(r.tags ?? []),
         ...(r.categorias ?? []).map(c => c.categoria?.nome)].filter(Boolean).join(" ").toLowerCase()
       return alvo.includes(q)
     })
@@ -171,7 +199,7 @@ export default function OrgaosProtocoloTab() {
     if (nome.length < 4) { setSuspeitas([]); setExistente(null); return }
     const p = new URLSearchParams({ name: nome })
     if (f.nomeFantasia.trim()) p.set("nomeFantasia", f.nomeFantasia.trim())
-    if (f.country.trim()) p.set("country", f.country.trim())
+    if (f.paisId != null) p.set("paisId", String(f.paisId))
     if (f.identificacaoFiscal.trim()) p.set("identificacaoFiscal", f.identificacaoFiscal.trim())
     if (f.id) p.set("ignorarId", String(f.id))
     try {
@@ -284,9 +312,13 @@ export default function OrgaosProtocoloTab() {
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, código, cidade, categoria ou tag…" className={inputCls + " max-w-md"} />
-          <select value={filtroPais} onChange={e => setFiltroPais(e.target.value)} className={inputCls + " max-w-[14rem]"}>
+          <select
+            value={filtroPais === "" ? "" : String(filtroPais)}
+            onChange={e => setFiltroPais(e.target.value === "" ? "" : Number(e.target.value))}
+            className={inputCls + " max-w-[14rem]"}
+          >
             <option value="" className={opt}>Todos os países ({rows.length})</option>
-            {paises.map(p => <option key={p} value={p} className={opt}>{p}</option>)}
+            {paises.map(p => <option key={p.id} value={String(p.id)} className={opt}>{p.label}</option>)}
           </select>
           <select value={filtroFuncao} onChange={e => setFiltroFuncao(e.target.value as "" | Funcao)} className={inputCls + " max-w-[12rem]"}>
             <option value="" className={opt}>Todas as funções</option>
@@ -367,7 +399,7 @@ export default function OrgaosProtocoloTab() {
                       ))}
                   </div>
                 </td>
-                <td className="px-4 py-2.5 text-white/70">{d.country || "—"}</td>
+                <td className="px-4 py-2.5 text-white/70">{d.pais?.countryLabel || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.city || "—"}</td>
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">{d.provincia || "—"}</td>
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
@@ -405,7 +437,7 @@ export default function OrgaosProtocoloTab() {
                     {suspeitas.map(su => (
                       <li key={su.id}>
                         <span className="font-mono">{su.publicCode ?? `#${su.id}`}</span> — {su.name}
-                        {su.country ? ` (${su.country})` : ""} · {su.motivo}
+                        {su.pais ? ` (${su.pais})` : ""} · {su.motivo}
                       </li>
                     ))}
                   </ul>
@@ -457,7 +489,18 @@ export default function OrgaosProtocoloTab() {
                 )}
               </div>
 
-              <div><label className={labelCls}>País</label><input value={form.country} onChange={e => setForm(f => { if (!f) return f; const novo = { ...f, country: e.target.value }; agendarVerificacao(novo); return novo })} className={inputCls} /></div>
+              <div>
+                <label className={labelCls}>País</label>
+                <SelectPaisCanonico
+                  valor={form.paisId}
+                  paises={paisesCadastro}
+                  carregando={paisesCarregando}
+                  erro={paisesErro}
+                  onRecarregar={carregarPaises}
+                  className={inputCls}
+                  onChange={paisId => setForm(f => { if (!f) return f; const novo = { ...f, paisId }; agendarVerificacao(novo); return novo })}
+                />
+              </div>
               <div><label className={labelCls}>Estado / Região</label><input value={form.state} onChange={e => setForm(f => f && { ...f, state: e.target.value })} className={inputCls} placeholder="Veneto, SP, Cataluña…" /></div>
               <div><label className={labelCls}>Província / Distrito</label><input value={form.provincia} onChange={e => setForm(f => f && { ...f, provincia: e.target.value })} className={inputCls} placeholder="Vicenza (VI), Porto…" /></div>
               <div><label className={labelCls}>Cidade</label><input value={form.city} onChange={e => setForm(f => f && { ...f, city: e.target.value })} className={inputCls} /></div>

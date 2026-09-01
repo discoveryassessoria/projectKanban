@@ -43,20 +43,10 @@ export const MG_CATALOG: Record<string, CatalogConfig> = {
   },
 
   // ---------- PROTOCOLO E ÓRGÃOS ----------
-  op_organs: {
-    path: 'operational.organs',
-    title: 'Órgãos',
-    desc: 'Consulados, comunes, tribunais, conservatórias, cartórios.',
-    cols: [['name', 'Nome'], ['type', 'Tipo'], ['nationality', 'Nac.'], ['city', 'Cidade']],
-    fields: [
-      { key: 'name', label: 'Nome', type: 'text', required: true },
-      { key: 'type', label: 'Tipo', type: 'select', options: ['consulado', 'comune', 'tribunal', 'conservatoria', 'cartorio', 'ministerio', 'prefeitura', 'tradutor', 'apostilamento', 'outro'] },
-      { key: 'country', label: 'País', type: 'text' },
-      { key: 'state', label: 'Estado', type: 'text' },
-      { key: 'city', label: 'Cidade', type: 'text' },
-      { key: 'queueRule', label: 'Regra de fila', type: 'text' },
-    ],
-  },
+  // 'op_organs' foi ELIMINADO: o menu aponta `organs` para OrgaosProtocoloTab,
+  // a tela real e ligada ao banco. O scaffold nunca era renderizado e declarava
+  // País como texto livre — exatamente a fonte de identidade que saiu do modelo.
+  // Não reintroduzir: país de órgão é `paisId` → CatalogoPais.
 
   // LOTE A — 'op_certtypes' (scaffold de "Tipos de Certidão" com salvar no-op, origem
   // do bug de duplicidade) foi APOSENTADO e é inalcançável: certidões são Tipos de

@@ -45,7 +45,9 @@ export async function GET(request: Request) {
     const processoId = num("processoId")
     const requerenteId = num("requerenteId")
     const orgaoTipo = q.get("orgaoTipo")          // consulado | tribunal | comune…
-    const orgaoPais = q.get("orgaoPais")          // país do ÓRGÃO
+    // PAÍS DO ÓRGÃO — por identidade. É dimensão SEPARADA da nacionalidade do
+    // processo: o Consolato d'Italia em Miami fica nos Estados Unidos.
+    const orgaoPaisId = Number(q.get("orgaoPaisId")) || null
     const paisProcesso = q.get("pais")            // país do PROCESSO
     const finalidade = q.get("finalidade")
     const situacao = q.get("situacao")
@@ -58,8 +60,8 @@ export async function GET(request: Request) {
       ...(processoId != null ? { processoId } : {}),
       ...(finalidade ? { finalidade } : {}),
       ...(situacao ? { situacao } : {}),
-      ...(orgaoTipo || orgaoPais
-        ? { orgao: { ...(orgaoTipo ? { type: orgaoTipo } : {}), ...(orgaoPais ? { country: orgaoPais } : {}) } }
+      ...(orgaoTipo || orgaoPaisId != null
+        ? { orgao: { ...(orgaoTipo ? { type: orgaoTipo } : {}), ...(orgaoPaisId != null ? { paisId: orgaoPaisId } : {}) } }
         : {}),
       // NACIONALIDADE POR IDENTIDADE. Comparar `Processo.pais` com o texto do
       // filtro funcionava por coincidência: os dois usavam a mesma grafia. A
@@ -92,7 +94,12 @@ export async function GET(request: Request) {
         tipo: { select: { id: true, code: true, nome: true } },
         formaEnvio: true,
         setor: true,
-        orgao: { select: { id: true, publicCode: true, name: true, type: true, city: true, country: true } },
+        orgao: {
+          select: {
+            id: true, publicCode: true, name: true, type: true, city: true,
+            paisId: true, pais: { select: { id: true, countryKey: true, countryLabel: true } },
+          },
+        },
         responsavel: { select: { id: true, nome: true } },
         processo: {
           select: {
@@ -137,7 +144,8 @@ export async function GET(request: Request) {
         orgaoId: p.orgao?.id ?? null,
         nome: p.orgao?.name ?? "— sem órgão —",
         tipo: p.orgao?.type ?? null,
-        pais: p.orgao?.country ?? null,
+        paisId: p.orgao?.paisId ?? null,
+        pais: p.orgao?.pais?.countryLabel ?? null,
         total: 0,
         requerentes: 0,
       }

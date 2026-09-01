@@ -142,7 +142,7 @@ export async function contratoOrganizacao(): Promise<ResultadoContrato> {
   const orgs = await prisma.orgaoProtocolo.findMany({
     where: { ativo: true },
     select: {
-      id: true, name: true, publicCode: true, country: true, funcoes: true,
+      id: true, name: true, publicCode: true, paisId: true, funcoes: true,
       categorias: { select: { categoriaId: true } },
     },
   })
@@ -150,7 +150,9 @@ export async function contratoOrganizacao(): Promise<ResultadoContrato> {
   for (const o of orgs) {
     const faltando: string[] = []
     if (!o.publicCode) faltando.push('código público')
-    if (!o.country?.trim()) faltando.push('país')
+    // "Tem país" virou "tem VÍNCULO com o país" — texto preenchido com uma
+    // grafia qualquer deixava o cadastro passar por completo sem estar.
+    if (o.paisId == null) faltando.push('país')
     if (!o.funcoes.length) faltando.push('função')
     if (!o.categorias.length) faltando.push('categoria')
     if (faltando.length) incompletos.push({ id: o.id, rotulo: o.name, faltando })
@@ -169,13 +171,13 @@ export async function contratoOrganizacao(): Promise<ResultadoContrato> {
 export async function contratoFornecedor(): Promise<ResultadoContrato> {
   const forns = await prisma.orgaoProtocolo.findMany({
     where: { ativo: true, funcoes: { has: 'FORNECEDOR' } },
-    select: { id: true, name: true, publicCode: true, moeda: true, identificacaoFiscal: true, country: true },
+    select: { id: true, name: true, publicCode: true, moeda: true, identificacaoFiscal: true, paisId: true },
   })
   const incompletos: ItemIncompleto[] = []
   for (const f of forns) {
     const faltando: string[] = []
     if (!f.publicCode) faltando.push('código público')
-    if (!f.country?.trim()) faltando.push('país')
+    if (f.paisId == null) faltando.push('país')
     // Moeda e identificação fiscal só são exigidas de quem é efetivamente pago —
     // o que não dá para inferir daqui. Ficam como recomendação, não bloqueio.
     if (faltando.length) incompletos.push({ id: f.id, rotulo: f.name, faltando })

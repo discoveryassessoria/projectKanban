@@ -73,7 +73,6 @@ const EXCECOES_SCHEMA: Excecao[] = [
   { alvo: 'Requerente.pais', motivo: 'DÍVIDA: idem Contratante.pais.' },
   { alvo: 'Fornecedor.pais', motivo: 'DÍVIDA: idem Contratante.pais.' },
   { alvo: 'Banco.pais', motivo: 'DÍVIDA: país do banco. Destino: paisId → CatalogoPais.' },
-  { alvo: 'OrgaoProtocolo.country', motivo: 'DÍVIDA: país do órgão. Destino: paisId → CatalogoPais.' },
 
   // ── Cadastros de pagamento — texto no lugar de FK ─────────────────────────
   { alvo: 'FormaPagamentoCadastro.moeda', motivo: 'DÍVIDA: moeda em texto. Destino: moedaId → MoedaCadastro (o vínculo N:N já existe em CondicaoPagamentoMoeda).' },

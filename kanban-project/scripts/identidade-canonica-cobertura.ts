@@ -238,9 +238,18 @@ async function main() {
   // cadastro" como "vendemos cidadania desse país". Este guard usa um país REAL
   // que a empresa não atende para provar que a separação continua de pé.
   console.log("\nÓrgãos, modalidades e taxas apontam para a identidade:")
-  await linha("OrgaoProtocolo.country → CatalogoPais",
-    `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE country IS NOT NULL`,
-    `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE country IS NOT NULL AND "paisId" IS NULL`)
+  await linha("OrgaoProtocolo → CatalogoPais (identidade única)",
+    `SELECT COUNT(*)::int n FROM "OrgaoProtocolo"`,
+    `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE "paisId" IS NULL`)
+  await div("espelho OrgaoProtocolo.country não existe",
+    `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'OrgaoProtocolo' AND column_name = 'country'`)
+  // A ANTI-DUPLICIDADE DO CADASTRO MESTRE ancorada na identidade. Enquanto era
+  // (name, country), "Itália" e "Italia" eram dois países e a mesma entidade
+  // entrava duas vezes sem o banco reclamar.
+  await div("unicidade do órgão é (name, paisId)",
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='OrgaoProtocolo' AND indexdef LIKE '%(name, "paisId")%') THEN 0 ELSE 1 END n`)
+  await div("nenhum órgão duplicado por (name, paisId)",
+    `SELECT COUNT(*)::int n FROM (SELECT name, "paisId" FROM "OrgaoProtocolo" GROUP BY 1,2 HAVING COUNT(*)>1) x`)
   await linha("ModalidadePais → CatalogoPais (identidade única)",
     `SELECT COUNT(*)::int n FROM "ModalidadePais"`,
     `SELECT COUNT(*)::int n FROM "ModalidadePais" WHERE "paisId" IS NULL`)

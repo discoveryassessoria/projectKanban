@@ -30,10 +30,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!atual) return NextResponse.json({ error: 'Órgão não encontrado.' }, { status: 404 })
 
     const nomeFinal = b.name !== undefined ? (txt(b.name, 200) ?? atual.name) : atual.name
-    const paisFinal = b.country !== undefined ? txt(b.country, 60) : atual.country
-    if (nomeFinal !== atual.name || paisFinal !== atual.country) {
+    // IDENTIDADE do país. `paisId` ausente no corpo = não mexeu; explícito nulo
+    // = tirou o país. A regra de colisão é a mesma, sobre o vínculo.
+    let paisFinal = atual.paisId
+    if (b.paisId !== undefined) {
+      const n = b.paisId === null || b.paisId === '' ? null : Number(b.paisId)
+      paisFinal = Number.isInteger(n) && (n as number) > 0 ? (n as number) : null
+      if (paisFinal != null) {
+        const existe = await prisma.catalogoPais.findUnique({ where: { id: paisFinal }, select: { id: true } })
+        if (!existe) return NextResponse.json({ error: 'País não encontrado no Cadastro Mestre.' }, { status: 400 })
+      }
+    }
+    if (nomeFinal !== atual.name || paisFinal !== atual.paisId) {
       const colide = await prisma.orgaoProtocolo.findFirst({
-        where: { name: nomeFinal, country: paisFinal, id: { not: id } },
+        where: { name: nomeFinal, paisId: paisFinal, id: { not: id } },
         select: { id: true, publicCode: true },
       })
       if (colide) {
@@ -47,7 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Editar também não pode gerar duplicidade: renomear para algo muito parecido
     // com outra organização é avisado antes de gravar.
     if (b.name !== undefined && b.confirmarNova !== true) {
-      const suspeitas = await detectarDuplicidade(prisma, { name: nomeFinal, country: paisFinal }, { ignorarId: id })
+      const suspeitas = await detectarDuplicidade(prisma, { name: nomeFinal, paisId: paisFinal }, { ignorarId: id })
       if (suspeitas.length) {
         return NextResponse.json({
           error: 'O novo nome ficou muito parecido com outra organização já cadastrada.',
@@ -68,7 +78,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           name: nomeFinal,
           nomeFantasia: campo('nomeFantasia', atual.nomeFantasia, (v) => txt(v, 200)),
           type: campo('type', atual.type, (v) => txt(v, 30)),
-          country: paisFinal,
+          paisId: paisFinal,
           state: campo('state', atual.state, (v) => txt(v, 60)),
           provincia: campo('provincia', atual.provincia, (v) => txt(v, 80)),
           // FUNÇÕES: a organização é uma só e acumula papéis. A edição substitui

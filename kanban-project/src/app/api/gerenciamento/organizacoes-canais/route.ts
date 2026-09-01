@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
     const org = await prisma.orgaoProtocolo.findUnique({
       where: { id: orgId },
       select: {
-        id: true, name: true, nomeFantasia: true, type: true, city: true, country: true,
+        id: true, name: true, nomeFantasia: true, type: true, city: true,
+        paisId: true, pais: { select: { id: true, countryKey: true, countryLabel: true } },
         canais: { include: { canal: true }, orderBy: [{ ordem: 'asc' }, { id: 'asc' }] },
       },
     })
@@ -49,7 +50,8 @@ export async function GET(request: NextRequest) {
     orderBy: [{ name: 'asc' }],
     take: 200,
     select: {
-      id: true, name: true, nomeFantasia: true, type: true, city: true, country: true,
+      id: true, name: true, nomeFantasia: true, type: true, city: true,
+      paisId: true, pais: { select: { id: true, countryKey: true, countryLabel: true } },
       canais: { where: { ativo: true }, select: { canal: { select: { key: true, label: true } } } },
     },
   })
