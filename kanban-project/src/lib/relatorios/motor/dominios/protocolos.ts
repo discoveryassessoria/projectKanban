@@ -63,8 +63,31 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
   rotulo: "Protocolos",
   descricao: "O que foi protocolado, em qual órgão, de qual família e quando — com o que está em exigência.",
   grain: "1 linha = 1 protocolo",
+
+  // A UNIDADE REAL depende da cardinalidade do requerimento daquela
+  // nacionalidade — que é CADASTRO (ModalidadeLegal), não país escrito no if.
+  // Itália é judicial e COLETIVA: um ricorso, a família inteira, uma linha.
+  // Espanha é consular e INDIVIDUAL: cinco requerentes protocolados são cinco
+  // protocolos, e por isso cinco linhas. A consulta é a mesma nos dois casos;
+  // o que muda é o dado, porque o protocolo espanhol JÁ nasce por pessoa.
+  grainNoContexto: async (countryKey) => {
+    if (!countryKey) return "1 linha = 1 protocolo"
+    const modalidades = await prisma.modalidadeLegal.findMany({
+      where: { ativo: true, pais: { countryKey } },
+      select: { cardinalidadeRequerimento: true },
+    })
+    const cards = new Set(modalidades.map((m) => m.cardinalidadeRequerimento))
+    if (cards.size === 0) return "1 linha = 1 protocolo"
+    if (cards.has("INDIVIDUAL") && !cards.has("COLETIVO")) {
+      return "1 linha = 1 protocolo individual — um por requerente"
+    }
+    if (cards.has("COLETIVO") && !cards.has("INDIVIDUAL")) {
+      return "1 linha = 1 protocolo do processo — cobre os requerentes, sem multiplicá-los"
+    }
+    return "1 linha = 1 protocolo — a modalidade decide se é do processo ou por requerente"
+  },
   permissao: "processos.ver_paginas",
-  ordem: 7,
+  ordem: 8,
   aceitaNacionalidade: true,
 
   // A nacionalidade recorta pelo PROCESSO, e por identidade: `paisCanonico` é a

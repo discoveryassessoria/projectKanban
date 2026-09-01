@@ -55,8 +55,14 @@ export interface FiltroDef {
    */
   descricao?: string
   opcoes?: FonteDeOpcoes
-  /** Traduz o valor escolhido para o `where` do Prisma. */
-  paraWhere: (valor: ValorDeFiltro) => Record<string, unknown> | null
+  /**
+   * Traduz o valor escolhido para o `where` do Prisma.
+   *
+   * Pode ser assíncrono pela mesma razão do recorte de nacionalidade: onde não
+   * existe relação declarada, o filtro resolve os ids antes numa consulta e
+   * devolve um `in` — em vez de fingir uma relação que o schema não tem.
+   */
+  paraWhere: (valor: ValorDeFiltro) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>
 }
 
 export type ValorDeFiltro =
@@ -124,6 +130,19 @@ export interface DominioDef {
   descricao: string
   /** 1 linha = ? — declarado, e verificado pelo teste de consistência. */
   grain: Grain
+  /**
+   * A NACIONALIDADE PODE MUDAR A UNIDADE REAL.
+   *
+   * Itália protocola o processo inteiro (um ricorso cobre a família); Espanha
+   * protocola por pessoa (um expediente por requerente). É a MESMA tabela e a
+   * mesma consulta — o que muda é o que cada linha significa, e o operador
+   * precisa ler isso na tela.
+   *
+   * A diferença NÃO sai de `if (pais)`: sai de
+   * `ModalidadeLegal.cardinalidadeRequerimento`, que é cadastro. Nacionalidade
+   * nova entra com a cardinalidade dela e o texto se ajusta sozinho.
+   */
+  grainNoContexto?: (countryKey: string | null) => Promise<string>
   /** Tipada pelo catálogo de permissões: chave inventada não compila. */
   permissao: PermissaoChave
   /** Ordem na home. */
@@ -137,8 +156,15 @@ export interface DominioDef {
   /** Com que colunas a exploração começa. O usuário troca à vontade. */
   colunasIniciais: string[]
   ordenacaoPadrao: { key: string; direcao: "asc" | "desc" }
-  /** Recorte da nacionalidade escolhida, na linguagem deste domínio. */
-  ondeNacionalidade: (countryKey: string) => Record<string, unknown>
+  /**
+   * Recorte da nacionalidade escolhida, na linguagem deste domínio.
+   *
+   * É ASSÍNCRONO porque nem toda tabela tem relação declarada para Processo —
+   * `ObrigacaoEconomica`, por exemplo, guarda só o `processoId` escalar. Esses
+   * domínios resolvem os ids numa consulta e devolvem um `in`, em vez de
+   * inventar uma relação que o schema não tem.
+   */
+  ondeNacionalidade: (countryKey: string) => Record<string, unknown> | Promise<Record<string, unknown>>
   /** Conta e carrega. O motor cuida de where/paginação; o domínio, do include. */
   contar: (where: any) => Promise<number>
   carregar: (where: any, orderBy: any, pular: number, levar: number) => Promise<any[]>

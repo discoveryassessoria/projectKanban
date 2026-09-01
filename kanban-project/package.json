@@ -359,7 +359,8 @@
     "test:status-documental": "tsx scripts/guard-status-documental-nao-operacional.test.ts",
     "test:relatorios": "tsx scripts/relatorios-canonico.test.ts",
     "test:identidade-canonica": "tsx scripts/identidade-canonica-cobertura.ts",
-    "test:relatorios-motor": "tsx scripts/relatorios-motor.test.ts"
+    "test:relatorios-motor": "tsx scripts/relatorios-motor.test.ts",
+    "test:ui:relatorios": "playwright test tests/ui/relatorios.spec.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

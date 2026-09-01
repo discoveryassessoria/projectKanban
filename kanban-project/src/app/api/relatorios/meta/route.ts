@@ -36,8 +36,14 @@ export async function GET(request: Request) {
     const d = dominioPorChave(chave)
     if (!d) return NextResponse.json({ error: "Domínio não encontrado." }, { status: 404 })
 
+    // O grain é resolvido NO CONTEXTO: a mesma tela diz "1 protocolo do
+    // processo" na Itália e "1 protocolo individual" na Espanha, porque a
+    // cardinalidade vem do cadastro da modalidade legal.
+    const nac = new URL(request.url).searchParams.get("nacionalidade")
+    const grain = d.grainNoContexto ? await d.grainNoContexto(nac) : d.grain
+
     return NextResponse.json({
-      dominio: resumo(d),
+      dominio: { ...resumo(d), grain },
       nacionalidades,
       filtros: d.filtros.map((f) => ({
         key: f.key, rotulo: f.rotulo, tipo: f.tipo, descricao: f.descricao ?? null,

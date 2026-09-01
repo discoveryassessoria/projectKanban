@@ -125,6 +125,64 @@ export async function opcoesDoCadastro(chave: string, busca?: string | null): Pr
       return r.map((u) => ({ valor: String(u.id), rotulo: u.nome, detalhe: u.tipo }))
     }
 
+    case "tipos_de_processo": {
+      const r = await prisma.tipoProcessoNacionalidade.findMany({
+        where: { ativo: true, arquivado: false },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, pais: { select: { countryLabel: true } } },
+      })
+      return r.map((t) => ({ valor: String(t.id), rotulo: t.name, detalhe: t.pais.countryLabel }))
+    }
+
+    case "fases": {
+      // As fases vêm do CATÁLOGO DE FASES — o cadastro canônico. Uma lista fixa
+      // aqui deixaria de fora a fase que alguém cadastrar amanhã.
+      const r = await prisma.catalogoFase.findMany({
+        where: { ativo: true }, orderBy: { ordemPadrao: "asc" }, select: { phaseKey: true, label: true },
+      })
+      return r.map((f) => ({ valor: f.phaseKey, rotulo: f.label }))
+    }
+
+    case "itens_documentais": {
+      const r = await prisma.itemCatalogo.findMany({
+        where: { ativo: true, natureza: "DOCUMENTO", ...(contem ? { name: contem } : {}) },
+        orderBy: { name: "asc" }, take: 100,
+        select: { id: true, name: true, code: true },
+      })
+      return r.map((i) => ({ valor: String(i.id), rotulo: i.name, detalhe: i.code }))
+    }
+
+    case "categorias_documentais": {
+      const r = await prisma.categoriaDocumental.findMany({
+        where: { ativo: true }, orderBy: { ordem: "asc" }, select: { code: true, name: true },
+      })
+      return r.map((c) => ({ valor: c.code, rotulo: c.name }))
+    }
+
+    case "canais": {
+      const r = await prisma.canalOperacional.findMany({
+        where: { ativo: true }, orderBy: { key: "asc" }, select: { key: true, label: true },
+      })
+      return r.map((c) => ({ valor: c.key, rotulo: c.label }))
+    }
+
+    case "servicos": {
+      const r = await prisma.servicoProduto.findMany({
+        where: { ativo: true, ...(contem ? { name: contem } : {}) },
+        orderBy: { name: "asc" }, take: 100, select: { id: true, name: true, code: true },
+      })
+      return r.map((x) => ({ valor: String(x.id), rotulo: x.name, detalhe: x.code }))
+    }
+
+    case "fornecedores": {
+      const r = await prisma.orgaoProtocolo.findMany({
+        where: { ativo: true, funcoes: { has: "FORNECEDOR" }, ...(contem ? { name: contem } : {}) },
+        orderBy: { name: "asc" }, take: 100,
+        select: { id: true, name: true, pais: { select: { countryLabel: true } } },
+      })
+      return r.map((f) => ({ valor: String(f.id), rotulo: f.name, detalhe: f.pais?.countryLabel }))
+    }
+
     default:
       return []
   }

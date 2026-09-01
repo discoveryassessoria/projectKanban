@@ -70,14 +70,14 @@ export async function executar(dominio: DominioDef, spec: QuerySpec): Promise<Re
 
   // CONTEXTO DE NACIONALIDADE — dimensão global, aplicada antes de tudo.
   if (spec.nacionalidade && dominio.aceitaNacionalidade) {
-    clausulas.push(dominio.ondeNacionalidade(spec.nacionalidade))
+    clausulas.push(await dominio.ondeNacionalidade(spec.nacionalidade))
     aplicados.push({ key: "__nacionalidade", rotulo: "Nacionalidade", descricao: spec.nacionalidade })
   }
 
   for (const f of spec.filtros ?? []) {
     const def = dominio.filtros.find((x) => x.key === f.key)
     if (!def) { ignorados.push(f.key); continue }
-    const clausula = def.paraWhere(f.valor)
+    const clausula = await def.paraWhere(f.valor)
     // Filtro sem valor útil não vira cláusula vazia: sumiria o AND e passaria a
     // trazer tudo, que é o pior resultado possível — parece funcionar.
     if (!clausula) { ignorados.push(f.key); continue }

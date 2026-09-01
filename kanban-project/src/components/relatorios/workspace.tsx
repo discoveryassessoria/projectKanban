@@ -41,9 +41,9 @@ const BOTAO =
   "rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] hover:border-[var(--action-primary)]"
 const PAINEL = "rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-primary)]"
 
-export function Workspace({ dominioKey }: { dominioKey: string }) {
+export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: string; nacionalidade?: string | null }) {
   const [meta, setMeta] = useState<Meta | null>(null)
-  const [spec, setSpec] = useState<QuerySpec>({ dominio: dominioKey, filtros: [], pagina: 1, porPagina: 50 })
+  const [spec, setSpec] = useState<QuerySpec>({ dominio: dominioKey, nacionalidade, filtros: [], pagina: 1, porPagina: 50 })
   const [res, setRes] = useState<Resultado | null>(null)
   const [aba, setAba] = useState<"explorar" | "visoes" | "favoritos">("explorar")
   const [visoes, setVisoes] = useState<Visao[]>([])
@@ -52,14 +52,22 @@ export function Workspace({ dominioKey }: { dominioKey: string }) {
   const [mostrarColunas, setMostrarColunas] = useState(false)
   const [novoFiltro, setNovoFiltro] = useState("")
 
-  useEffect(() => { setSpec({ dominio: dominioKey, filtros: [], pagina: 1, porPagina: 50 }); setRes(null) }, [dominioKey])
+  // A nacionalidade vem da navegação e recomeça a consulta — ela é contexto de
+  // toda a tela, não mais um filtro perdido dentro do painel.
+  useEffect(() => {
+    setSpec({ dominio: dominioKey, nacionalidade, filtros: [], pagina: 1, porPagina: 50 })
+    setRes(null)
+  }, [dominioKey, nacionalidade])
 
   useEffect(() => {
     void (async () => {
-      const r = await fetch(`/api/relatorios/meta?dominio=${dominioKey}`, { headers: auth() }).catch(() => null)
+      // O grain é pedido NO CONTEXTO: a mesma tela diz "1 protocolo do processo"
+      // na Itália e "1 protocolo individual" na Espanha.
+      const q = nacionalidade ? `&nacionalidade=${encodeURIComponent(nacionalidade)}` : ""
+      const r = await fetch(`/api/relatorios/meta?dominio=${dominioKey}${q}`, { headers: auth() }).catch(() => null)
       if (r?.ok) setMeta(await r.json())
     })()
-  }, [dominioKey])
+  }, [dominioKey, nacionalidade])
 
   const carregarVisoes = useCallback(async () => {
     const r = await fetch(`/api/relatorios/visoes?dominio=${dominioKey}`, { headers: auth() }).catch(() => null)
@@ -151,18 +159,10 @@ export function Workspace({ dominioKey }: { dominioKey: string }) {
     <div className="space-y-3">
       {/* CONTEXTO + ABAS */}
       <div className="flex flex-wrap items-center gap-2">
-        {meta.dominio.aceitaNacionalidade && (
-          <select
-            value={spec.nacionalidade ?? ""}
-            onChange={(e) => mudar({ nacionalidade: e.target.value || null })}
-            className={BOTAO}
-            title="Só nacionalidades ofertadas — país geográfico não entra aqui"
-          >
-            <option value="">Todas as nacionalidades</option>
-            {meta.nacionalidades.map((n) => (
-              <option key={n.valor} value={n.valor}>{n.detalhe ? `${n.detalhe} ` : ""}{n.rotulo}</option>
-            ))}
-          </select>
+        {!meta.dominio.aceitaNacionalidade && spec.nacionalidade && (
+          <span className="rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] text-[var(--text-secondary)]">
+            Este domínio é do sistema inteiro — a nacionalidade não o recorta.
+          </span>
         )}
         <div className="flex items-center gap-1 rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-0.5">
           {(["explorar", "visoes", "favoritos"] as const).map((a) => (
@@ -217,8 +217,9 @@ export function Workspace({ dominioKey }: { dominioKey: string }) {
         </div>
       ) : (
         <>
-          {/* FILTROS — faixa compacta, não um painel gigante. */}
-          <div className={`${PAINEL} p-3`}>
+          {/* FILTROS — faixa compacta. Sem filtro escolhido, ela não ocupa a
+              altura de um painel: vira uma linha só, e a tabela sobe. */}
+          <div className={`${PAINEL} ${spec.filtros.length || res?.aplicados.length ? "p-3" : "px-3 py-2"}`}>
             <div className="flex flex-wrap items-start gap-4">
               {spec.filtros.map((f) => {
                 const m = meta.filtros.find((x) => x.key === f.key)
@@ -226,8 +227,10 @@ export function Workspace({ dominioKey }: { dominioKey: string }) {
                 return <FiltroControle key={f.key} meta={m} valor={f.valor}
                   onChange={(v) => setFiltro(f.key, v)} onRemover={() => setFiltro(f.key, null)} />
               })}
-              <div className="min-w-[190px]">
-                <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">Adicionar filtro</label>
+              <div className={spec.filtros.length ? "min-w-[190px]" : "min-w-[190px] self-center"}>
+                {spec.filtros.length > 0 && (
+                  <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">Adicionar filtro</label>
+                )}
                 <select value={novoFiltro} className={`${BOTAO} w-full`}
                   onChange={(e) => {
                     const k = e.target.value
@@ -250,7 +253,10 @@ export function Workspace({ dominioKey }: { dominioKey: string }) {
                 <span className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Consulta atual</span>
                 {res.aplicados.map((a) => (
                   <span key={a.key} className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--surface-secondary)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]">
-                    {a.rotulo}: {a.descricao}
+                    {a.rotulo}: {a.key === "__nacionalidade"
+                      // A chave do cadastro é identidade; quem lê a tela lê o nome.
+                      ? meta.nacionalidades.find((n) => n.valor === a.descricao)?.rotulo ?? a.descricao
+                      : a.descricao}
                     <button type="button" className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                       onClick={() => a.key === "__nacionalidade" ? mudar({ nacionalidade: null }) : setFiltro(a.key, null)}>×</button>
                   </span>
