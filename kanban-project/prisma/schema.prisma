@@ -3089,7 +3089,6 @@ model TaxaPagamento {
   prioridade Int @default(0)
 
   // regras de aplicaÃ§Ã£o (tudo opcional)
-  paises           String[] @default([])
   moedasAplicaveis String[] @default([])
   servicos         Int[]    @default([])
   modalidades      String[] @default([])
@@ -3256,14 +3255,21 @@ model CatalogoPais {
   servicos             ServicoProdutoPais[]
   modalidadesLegais    ModalidadeLegal[]
 
-  processos       Processo[]                  @relation("ProcessoPais")
-  statusKanban    Status[]                    @relation("StatusPais")
-  tiposDeProcesso TipoProcessoNacionalidade[] @relation("TipoProcessoPais")
+  processos              Processo[]                  @relation("ProcessoPais")
+  statusKanban           Status[]                    @relation("StatusPais")
+  tiposDeProcesso        TipoProcessoNacionalidade[] @relation("TipoProcessoPais")
+  modalidadePaisCanonico ModalidadePais[]            @relation("ModalidadePaisCanonico")
+  orgaoPaisCanonico      OrgaoProtocolo[]            @relation("OrgaoPaisCanonico")
 }
 
 model ModalidadePais {
   id            Int           @id @default(autoincrement())
+  /// LEGADO EM TRANSIÇÃO — espelho de `paisId`.
   countryKey    String        @db.VarChar(40)
+  /// IDENTIDADE do país. A junction continua N:N (uma modalidade vale para N
+  /// países, um país tem N modalidades) — o que mudou é a chave, não a natureza.
+  paisId        Int?
+  pais          CatalogoPais? @relation("ModalidadePaisCanonico", fields: [paisId], references: [id], onDelete: Restrict)
   modalityKey   String        @db.VarChar(40)
   modalityLabel String        @db.VarChar(80)
   codeSuffix    String?       @db.VarChar(20)
@@ -4057,26 +4063,32 @@ model Departamento {
 // ÃrgÃ£os de Protocolo (op_organs) â consulados, comunes, tribunais, cartÃ³rios...
 model OrgaoProtocolo {
   /// ORG1, ORG2… — código público gerado pelo CodeGeneratorService (imutável).
-  publicCode   String?  @unique @db.VarChar(20)
-  id           Int      @id @default(autoincrement())
+  publicCode   String?       @unique @db.VarChar(20)
+  id           Int           @id @default(autoincrement())
   /// NOME OFICIAL — na língua e na grafia oficiais da entidade.
-  name         String   @db.VarChar(200)
+  name         String        @db.VarChar(200)
   /// Nome fantasia/usual (sigla ou como o operador chama no dia a dia).
-  nomeFantasia String?  @db.VarChar(200)
-  type         String?  @db.VarChar(30) // consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro
-  country      String?  @db.VarChar(60)
+  nomeFantasia String?       @db.VarChar(200)
+  type         String?       @db.VarChar(30) // consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro
+  /// LEGADO EM TRANSIÇÃO — nome do país em texto. Espelho de `paisId`.
+  country      String?       @db.VarChar(60)
+  /// IDENTIDADE GEOGRÁFICA do órgão. NÃO é nacionalidade ofertada: o Consolato
+  /// d'Italia em Miami fica nos Estados Unidos e atende cidadania italiana —
+  /// são duas relações diferentes e as duas legítimas.
+  paisId       Int?
+  pais         CatalogoPais? @relation("OrgaoPaisCanonico", fields: [paisId], references: [id], onDelete: Restrict)
   /// Região / estado / província de 1º nível (ex.: Veneto, SP, Cataluña).
-  state        String?  @db.VarChar(60)
+  state        String?       @db.VarChar(60)
   /// Província / distrito de 2º nível (ex.: Vicenza, Barletta-Andria-Trani).
-  provincia    String?  @db.VarChar(80)
-  city         String?  @db.VarChar(100)
-  endereco     String?  @db.VarChar(300)
-  cep          String?  @db.VarChar(20)
-  site         String?  @db.VarChar(300)
-  email        String?  @db.VarChar(200)
-  telefone     String?  @db.VarChar(60)
+  provincia    String?       @db.VarChar(80)
+  city         String?       @db.VarChar(100)
+  endereco     String?       @db.VarChar(300)
+  cep          String?       @db.VarChar(20)
+  site         String?       @db.VarChar(300)
+  email        String?       @db.VarChar(200)
+  telefone     String?       @db.VarChar(60)
   /// Idioma de atendimento (ISO 639-1: pt, es, it, en, fr, de…).
-  idioma       String?  @db.VarChar(10)
+  idioma       String?       @db.VarChar(10)
   /// Moeda praticada pela entidade (ISO 4217: BRL, EUR, USD…).
   ///
   /// FICHA CADASTRAL, ao lado de `idioma` e `horario`: "este cartorio cobra em euro"
@@ -4085,14 +4097,14 @@ model OrgaoProtocolo {
   /// vem da Tabela de Precos e o custo de `Fornecedor.moedaPadrao`; o motor financeiro
   /// nunca pergunta a moeda ao orgao. Apontar para o cadastro limitaria a ficha aos
   /// codigos do financeiro e perderia ARS e PYG, que 6 organizacoes usam.
-  moeda        String?  @db.VarChar(10)
-  horario      String?  @db.VarChar(200)
+  moeda        String?       @db.VarChar(10)
+  horario      String?       @db.VarChar(200)
   /// Responsável/contato na entidade (texto — não é usuário do sistema).
-  responsavel  String?  @db.VarChar(200)
-  observacoes  String?  @db.Text
+  responsavel  String?       @db.VarChar(200)
+  observacoes  String?       @db.Text
   /// Etiquetas livres de operação (ex.: "apostila", "cidadania", "urgente").
-  tags         String[] @default([])
-  queueRule    String?  @db.VarChar(200) // regra de fila
+  tags         String[]      @default([])
+  queueRule    String?       @db.VarChar(200) // regra de fila
 
   // ── FUNÇÕES ────────────────────────────────────────────────────────────────
   // A MESMA organização exerce várias funções ao mesmo tempo — e continua sendo

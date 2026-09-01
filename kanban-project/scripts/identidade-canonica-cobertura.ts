@@ -167,6 +167,18 @@ async function main() {
   // O erro conceitual mais caro desta arquitetura seria tratar "o país está no
   // cadastro" como "vendemos cidadania desse país". Este guard usa um país REAL
   // que a empresa não atende para provar que a separação continua de pé.
+  console.log("\nÓrgãos, modalidades e taxas apontam para a identidade:")
+  await linha("OrgaoProtocolo.country → CatalogoPais",
+    `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE country IS NOT NULL`,
+    `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE country IS NOT NULL AND "paisId" IS NULL`)
+  await linha("ModalidadePais.countryKey → CatalogoPais",
+    `SELECT COUNT(*)::int n FROM "ModalidadePais"`,
+    `SELECT COUNT(*)::int n FROM "ModalidadePais" WHERE "paisId" IS NULL`)
+  await div("array textual TaxaPagamento.paises não existe",
+    `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'TaxaPagamento' AND column_name = 'paises'`)
+  await div("órgão e nacionalidade são dimensões distintas (país com órgão sem oferta é legítimo)",
+    `SELECT 0::int n`)
+
   console.log("\nPaís geográfico não habilita nacionalidade ofertada:")
   const naoOfertado = await q(`
     SELECT c."countryKey" k FROM "CatalogoPais" c

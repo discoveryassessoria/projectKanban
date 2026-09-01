@@ -2207,7 +2207,6 @@ CREATE TABLE "TaxaPagamento" (
     "anticipationMinDays" INTEGER,
     "absorcaoPercentEmpresa" DECIMAL(5,2),
     "prioridade" INTEGER NOT NULL DEFAULT 0,
-    "paises" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "moedasAplicaveis" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "servicos" INTEGER[] DEFAULT ARRAY[]::INTEGER[],
     "modalidades" TEXT[] DEFAULT ARRAY[]::TEXT[],
@@ -2333,6 +2332,7 @@ CREATE TABLE "CatalogoPais" (
 CREATE TABLE "ModalidadePais" (
     "id" SERIAL NOT NULL,
     "countryKey" VARCHAR(40) NOT NULL,
+    "paisId" INTEGER,
     "modalityKey" VARCHAR(40) NOT NULL,
     "modalityLabel" VARCHAR(80) NOT NULL,
     "codeSuffix" VARCHAR(20),
@@ -2729,6 +2729,7 @@ CREATE TABLE "OrgaoProtocolo" (
     "nomeFantasia" VARCHAR(200),
     "type" VARCHAR(30),
     "country" VARCHAR(60),
+    "paisId" INTEGER,
     "state" VARCHAR(60),
     "provincia" VARCHAR(80),
     "city" VARCHAR(100),
@@ -6951,6 +6952,9 @@ ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_paisId_fkey" F
 ALTER TABLE "TipoProcessoNacionalidade" ADD CONSTRAINT "TipoProcessoNacionalidade_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ModalidadePais" ADD CONSTRAINT "ModalidadePais_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "FaseNaturezaPermitida" ADD CONSTRAINT "FaseNaturezaPermitida_catalogoFaseId_fkey" FOREIGN KEY ("catalogoFaseId") REFERENCES "CatalogoFase"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -7015,6 +7019,9 @@ ALTER TABLE "OrganizacaoCanal" ADD CONSTRAINT "OrganizacaoCanal_organizacaoId_fk
 
 -- AddForeignKey
 ALTER TABLE "OrganizacaoCanal" ADD CONSTRAINT "OrganizacaoCanal_canalId_fkey" FOREIGN KEY ("canalId") REFERENCES "CanalOperacional"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrgaoProtocolo" ADD CONSTRAINT "OrgaoProtocolo_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_itemCatalogoId_fkey" FOREIGN KEY ("itemCatalogoId") REFERENCES "ItemCatalogo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
