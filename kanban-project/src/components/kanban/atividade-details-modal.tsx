@@ -50,8 +50,6 @@ import {
   FileText
 } from "lucide-react"
 import {
-  Pais,
-  PAISES_CONFIG,
   type ProcessoWithStatus,
   type Processo,
   type Contratante,
@@ -479,7 +477,10 @@ function ConteudoModal({
 
   if (!isOpen || !processo) return null
 
-  const paisConfig = PAISES_CONFIG[processo.pais as keyof typeof PAISES_CONFIG] || { label: processo.pais, bandeira: "🏳" }
+  // Rótulo e bandeira vêm do Cadastro Mestre, carregados junto com o processo.
+  // Antes saíam de um mapa fixo de quatro países escrito no código.
+  const paisRel = (processo as { paisCanonico?: { countryLabel?: string; flag?: string | null } | null }).paisCanonico
+  const paisConfig = { label: paisRel?.countryLabel ?? "—", bandeira: paisRel?.flag ?? "🏳" }
 
   const dataCriacao = processo.createdAt
   const dataFormatada = dataCriacao ? new Date(dataCriacao).toLocaleDateString('pt-BR') : ""

@@ -12,12 +12,8 @@ import { CambioMini } from "@/src/components/cambio/cambio-mini"
 import useSWR from 'swr'
 
 // Mapeamento de bandeiras por país
-const BANDEIRAS_PAIS: Record<string, string> = {
-  ALEMANHA: "🇩🇪",
-  ESPANHA: "🇪🇸",
-  ITALIA: "🇮🇹",
-  PORTUGAL: "🇵🇹",
-}
+// Sem mapa fixo de bandeiras: a bandeira é atributo do Cadastro Mestre e chega
+// junto do processo. País novo cadastrado aparece sem tocar em código.
 
 interface HeaderBarProps {
   title: string
@@ -259,7 +255,7 @@ export function HeaderBar({
                         onClick={() => handleProcessoClick(processo)}
                       >
                         <span className="text-lg flex-shrink-0">
-                          {BANDEIRAS_PAIS[processo.pais] || "🏳️"}
+                          {(processo as { paisFlag?: string | null }).paisFlag ?? "🏳️"}
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800 truncate font-medium">{processo.nome}</p>

@@ -293,29 +293,12 @@ export interface AtualizarTarefa {
 // (código antigo fora do kanban pode importar; NÃO usar em código novo)
 // =====================================================
 
-/** @deprecated País agora é dinâmico (CatalogoPais/countryKey). */
-export enum Pais {
-  PORTUGAL = 'PORTUGAL',
-  ESPANHA = 'ESPANHA',
-  ALEMANHA = 'ALEMANHA',
-  ITALIA = 'ITALIA'
-}
+// O enum local de países SAIU. Ele era a última lista de países escrita em
+// código: quatro valores fixos que nenhum cadastro governava, e que faziam um
+// país novo em Países e Regiões simplesmente não existir para a aplicação.
+// Identidade de país é `CatalogoPais`; rótulo e bandeira são atributos DELE.
 
-/** @deprecated Use corDoPais(countryKey) + dados do CatalogoPais. */
-export const PAISES_CONFIG: Record<Pais, {
-  label: string
-  bandeira: string
-  cor: string
-  corClara: string
-}> = {
-  [Pais.PORTUGAL]: { label: 'Portugal', bandeira: '🇵🇹', cor: '#006600', corClara: '#00660020' },
-  [Pais.ESPANHA]: { label: 'Espanha', bandeira: '🇪🇸', cor: '#c60b1e', corClara: '#c60b1e20' },
-  [Pais.ALEMANHA]: { label: 'Alemanha', bandeira: '🇩🇪', cor: '#000000', corClara: '#00000020' },
-  [Pais.ITALIA]: { label: 'Itália', bandeira: '🇮🇹', cor: '#009246', corClara: '#00924620' },
-}
 
-/** @deprecated Use a lista de países do /api/kanban-config. */
-export const PAISES_LISTA = Object.values(Pais)
 
 /** @deprecated Use Processo ao invés de Atividade */
 export interface Atividade {

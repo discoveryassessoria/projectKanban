@@ -2,10 +2,11 @@
 
 "use client"
 
-import { Pais } from "@/src/types/kanban"
-
+// A prop é a CHAVE do Cadastro Mestre (string), não um enum: o componente
+// desenha a bandeira que conhece e cai no genérico para país novo — o que é
+// correto para um componente de desenho, e não o torna fonte de identidade.
 interface BandeiraPaisProps {
-  pais: Pais
+  pais: string
   size?: "sm" | "md" | "lg" | "xl"
   className?: string
 }
@@ -51,16 +52,19 @@ const BandeiraPortugal = ({ width, height }: { width: number; height: number }) 
   </svg>
 )
 
-const BANDEIRAS_MAP: Record<Pais, React.FC<{ width: number; height: number }>> = {
-  [Pais.ALEMANHA]: BandeiraAlemanha,
-  [Pais.ESPANHA]: BandeiraEspanha,
-  [Pais.ITALIA]: BandeiraItalia,
-  [Pais.PORTUGAL]: BandeiraPortugal,
+// Mapa de DESENHOS, indexado pela chave do cadastro em maiúsculas. Não é lista
+// de países do produto: é o conjunto de bandeiras que este componente sabe
+// desenhar. País sem SVG cai no genérico — e continua existindo no sistema.
+const BANDEIRAS_MAP: Record<string, React.FC<{ width: number; height: number }>> = {
+  ALEMANHA: BandeiraAlemanha,
+  ESPANHA: BandeiraEspanha,
+  ITALIA: BandeiraItalia,
+  PORTUGAL: BandeiraPortugal,
 }
 
 export function BandeiraPais({ pais, size = "md", className = "" }: BandeiraPaisProps) {
   const { width, height } = TAMANHOS[size]
-  const BandeiraComponent = BANDEIRAS_MAP[pais]
+  const BandeiraComponent = BANDEIRAS_MAP[(pais ?? "").toUpperCase()]
 
   if (!BandeiraComponent) {
     return <span className={className}>🏳️</span>
