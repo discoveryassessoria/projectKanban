@@ -101,7 +101,11 @@ export async function resolverCanal(db: Db, valor: string | null | undefined): P
 export function ondePaisEh(paisKey: string | null | undefined) {
   const k = (paisKey ?? "").trim().toLowerCase()
   if (!k) return {}
-  return { OR: [{ paisCanonico: { countryKey: k } }, { paisId: null as number | null, pais: k }] }
+  // SÓ IDENTIDADE. Havia aqui um segundo termo para as linhas que ainda não
+  // tinham `paisId`, casando pelo texto — ele existia durante a transição e
+  // morreu com a coluna. Mantê-lo faria a consulta referenciar um campo que não
+  // existe mais, que foi exatamente o 500 que apareceu no smoke.
+  return { paisCanonico: { countryKey: k } }
 }
 
 /** Consulta o cadastro por chave — para quem precisa do ID antes de gravar. */

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 // GET - Buscar status (filtrado por país)
 export async function GET(request: Request) {
@@ -9,7 +8,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const pais = searchParams.get("pais")
 
-    const where = pais ? ondePaisEh(pais) : {}
+    // ATENÇÃO: `Status.pais` é coluna DA PRÓPRIA entidade Status, não é
+    // `Processo.pais`. Eu apliquei aqui, por engano, o resolvedor de identidade
+    // do processo — e a rota passou a devolver 500. Status tem a sua própria
+    // string de país, que é outro problema e outro escopo.
+    const where = pais ? { pais } : {}
 
     const status = await prisma.status.findMany({
       where,
@@ -61,7 +64,7 @@ export async function POST(request: Request) {
 
     // Buscar a maior ordem para este país
     const maxOrdem = await prisma.status.aggregate({
-      where: ondePaisEh(pais),
+      where: { pais },
       _max: { ordem: true }
     })
 
