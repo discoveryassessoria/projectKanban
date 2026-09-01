@@ -77,6 +77,7 @@ const EXCECOES_SCHEMA: Excecao[] = [
   // ── Cadastros de pagamento — texto no lugar de FK ─────────────────────────
   { alvo: 'FormaPagamentoCadastro.moeda', motivo: 'DÍVIDA: moeda em texto. Destino: moedaId → MoedaCadastro (o vínculo N:N já existe em CondicaoPagamentoMoeda).' },
   { alvo: 'TaxaPagamento.moeda', motivo: 'DÍVIDA: idem FormaPagamentoCadastro.moeda.' },
+  { alvo: 'CondicaoPagamento.paises', motivo: 'DÍVIDA: array textual — projeção legada do motor, VAZIA em 27/27 linhas. A seleção real já é CondicaoPagamentoPais; falta desligar a projeção.' },
   { alvo: 'CondicaoPagamento.modalidades', motivo: 'DÍVIDA: array textual — projeção legada do motor. A seleção real já é CondicaoPagamentoModalidade; falta desligar a projeção.' },
   { alvo: 'TaxaPagamento.modalidades', motivo: 'DÍVIDA: idem CondicaoPagamento.modalidades.' },
   { alvo: 'CondicaoPagamento.perfil', motivo: 'DÍVIDA: perfil em texto. Destino: perfilId → Perfil.' },
