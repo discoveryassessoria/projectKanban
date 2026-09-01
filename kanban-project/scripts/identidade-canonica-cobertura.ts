@@ -195,6 +195,34 @@ async function main() {
   okGuard(escritoresDaCopia.length === 0,
     `nenhum writer copia país para dentro da oferta${escritoresDaCopia.length ? ` (${escritoresDaCopia.join(", ")})` : ""}`)
 
+  // SELECT ESCONDIDO. Um `include` declarado `as const` num arquivo
+  // compartilhado não é validado pelo compilador no ponto de uso: o erro só
+  // aparece em runtime, como 500. Foi assim que `INCLUDE_APLICABILIDADE`
+  // continuou pedindo `countryKey` da modalidade depois do drop, e o smoke
+  // pegou. Este guard lê o TEXTO: qualquer seleção de modalidade ou de tipo de
+  // processo que nomeie um dos campos mortos falha aqui.
+  const selectsFantasma: string[] = []
+  for (const f of fontes) {
+    const src = semComentario(readFileSync(join(RAIZ, f), "utf8"))
+    for (const m of src.matchAll(/\b(modalidade|modalidadePais|tipoProcesso|tipoProcessoMotor|tipoProcessoNacionalidade)\s*:\s*\{/g)) {
+      // recorta o objeto da seleção (balanceado) e olha só o primeiro nível
+      let prof = 0, fim = m.index ?? 0
+      for (let j = (m.index ?? 0) + m[0].length - 1; j < src.length; j++) {
+        if (src[j] === "{") prof++
+        else if (src[j] === "}") { prof--; if (prof === 0) { fim = j; break } }
+      }
+      const bloco = src.slice(m.index ?? 0, fim + 1)
+      // `pais: { ... countryKey ... }` é a relação canônica, e é o certo
+      const semRelacao = bloco.replace(/pais(Canonico)?:\s*\{[\s\S]*?\}/g, "")
+      if (/\b(countryKey|countryLabel|nationalityKey|nationalityLabel)\s*:\s*true/.test(semRelacao)) {
+        selectsFantasma.push(f)
+        break
+      }
+    }
+  }
+  okGuard(selectsFantasma.length === 0,
+    `nenhuma seleção pede país dentro da modalidade ou do tipo${selectsFantasma.length ? ` (${[...new Set(selectsFantasma)].join(", ")})` : ""}`)
+
   // FILTRO DE PROCESSO POR PAÍS usa o resolvedor de identidade, não `{ pais }`.
   const filtroCru = fontes.filter((f) => {
     if (f.includes("identidade/canonica")) return false

@@ -232,6 +232,8 @@ export async function regravarVinculos(
 export const INCLUDE_APLICABILIDADE = {
   moedasVinculadas: { select: { moedaId: true, moeda: { select: { id: true, code: true, name: true } } } },
   paisesPermitidos: { select: { paisId: true, pais: { select: { id: true, countryKey: true, countryLabel: true, flag: true } } } },
-  modalidadesPermitidas: { select: { modalidadeId: true, modalidade: { select: { id: true, modalityKey: true, modalityLabel: true, countryKey: true } } } },
+  // O país da modalidade vem da relação canônica — a modalidade não guarda
+  // mais cópia da chave do país.
+  modalidadesPermitidas: { select: { modalidadeId: true, modalidade: { select: { id: true, modalityKey: true, modalityLabel: true, pais: { select: { countryKey: true } } } } } },
   servicosPermitidos: { select: { servicoId: true, servico: { select: { id: true, name: true, code: true } } } },
 } as const
