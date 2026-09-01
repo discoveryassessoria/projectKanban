@@ -3213,8 +3213,11 @@ model TipoProcessoNacionalidade {
   /// no cadastro. Sem país não existe oferta: por isso não admite nulo.
   paisId              Int
   pais                CatalogoPais        @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
-  modalityKey         String              @db.VarChar(40)
-  modalityLabel       String              @db.VarChar(80)
+  /// IDENTIDADE da modalidade desta oferta, OBRIGATÓRIA. `ModalidadePais` é a
+  /// modalidade DE UM PAÍS: apontar para a linha resolve, de uma vez, a chave e
+  /// o rótulo. Não existe oferta sem modalidade.
+  modalidadeId        Int
+  modalidade          ModalidadePais      @relation("TipoProcessoModalidade", fields: [modalidadeId], references: [id], onDelete: Restrict)
   processFamily       String              @default("cidadania") @db.VarChar(40)
   serviceNature       String              @default("main_process") @db.VarChar(40)
   ativo               Boolean             @default(true)
@@ -3228,7 +3231,6 @@ model TipoProcessoNacionalidade {
   regrasDocumentaisRef MatrizDocumental[] @relation("MatrizTipoProcessoCanonico")
 
   @@index([paisId])
-  @@index([modalityKey])
 }
 
 model CatalogoPais {
@@ -3275,6 +3277,7 @@ model ModalidadePais {
   precos        TabelaValor[]
 
   condicoesPagamento CondicaoPagamentoModalidade[]
+  tiposDeProcesso    TipoProcessoNacionalidade[]   @relation("TipoProcessoModalidade")
 
   @@unique([paisId, modalityKey])
   @@index([paisId])

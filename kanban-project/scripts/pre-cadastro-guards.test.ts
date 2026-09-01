@@ -14,6 +14,7 @@ import { resolverElegibilidadeDocumental } from "@/src/lib/motor/elegibilidade-d
 import { pendenciasDoComponente, podePublicarRegraDocumental, MARCA_PLACEHOLDER } from "@/src/services/financeiro/pendencias-parametrizacao"
 
 import { exigirBancoDeTeste } from "./_banco-de-teste"
+import { garantirOferta } from "./_fixture-oferta"
 
 // TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
 exigirBancoDeTeste()
@@ -27,9 +28,10 @@ const FASE = `fase_guard_${TS}`.slice(0, 60)
 const criado: { tipoProcessoId?: number; itemId?: number; cfgId?: number; econId?: number; matrizId?: number; tabelaIds: number[]; macroId?: number; faseId?: number } = { tabelaIds: [] }
 
 async function montar() {
+  const oferta = await garantirOferta(prisma, { countryKey: 'x', countryLabel: 'X', nationalityKey: 'x', nationalityLabel: 'X', modalityKey: 'x', modalityLabel: 'X' })
   const tp = await prisma.tipoProcessoNacionalidade.create({
-    data: { code: `TPG-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, pais: { connectOrCreate: { where: { countryKey: 'x' }, create: { countryKey: 'x', countryLabel: 'X', nationalityKey: 'x', nationalityLabel: 'X' } } },
-      modalityKey: 'x', modalityLabel: 'X' },
+    data: { code: `TPG-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
   })
   criado.tipoProcessoId = tp.id
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tp.id, name: `Macro ${TAG}` } })

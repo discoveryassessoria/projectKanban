@@ -38,13 +38,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ coun
       },
     })
 
-    if (b.modalityLabel !== undefined) {
-      await prisma.tipoProcessoNacionalidade.updateMany({
-        where: { paisId: pais.id, modalityKey },
-        data: { modalityLabel: modalidade.modalityLabel },
-      })
-    }
-
+    // NADA A PROPAGAR: o tipo de processo aponta para esta linha, e lê o rótulo
+    // dela. Editar o nome da modalidade não reescreve cópia nenhuma.
     return NextResponse.json({ modalidade })
   } catch (error) {
     console.error('Erro ao editar modalidade:', error)
@@ -65,9 +60,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     })
     if (!atual) return NextResponse.json({ error: 'Modalidade não encontrada.' }, { status: 404 })
 
-    const tipos = await prisma.tipoProcessoNacionalidade.count({
-      where: { paisId: pais.id, modalityKey },
-    })
+    const tipos = await prisma.tipoProcessoNacionalidade.count({ where: { modalidadeId: atual.id } })
     if (tipos > 0) {
       return NextResponse.json(
         { error: `Esta modalidade é usada por ${tipos} tipo(s) de processo. Inative-a em vez de excluir.` },

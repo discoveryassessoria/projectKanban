@@ -24,19 +24,20 @@ export async function GET(request: Request) {
         id: true,
         code: true,
         name: true,
-        modalityKey: true,
-        modalityLabel: true,
-        // País pela relação canônica: uma junção, sem N+1.
+        // País e modalidade pelas relações canônicas: junções, sem N+1.
         pais: { select: { countryKey: true, countryLabel: true } },
+        modalidade: { select: { modalityKey: true, modalityLabel: true } },
       },
     })
     // O seletor continua recebendo `countryKey`/`countryLabel` — só que agora
     // eles são DERIVADOS da relação, e não colunas copiadas no tipo.
     return NextResponse.json({
-      tipos: tipos.map(({ pais, ...t }) => ({
+      tipos: tipos.map(({ pais, modalidade, ...t }) => ({
         ...t,
         countryKey: pais.countryKey,
         countryLabel: pais.countryLabel,
+        modalityKey: modalidade.modalityKey,
+        modalityLabel: modalidade.modalityLabel,
       })),
     })
   } catch (error) {

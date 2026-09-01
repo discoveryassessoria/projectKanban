@@ -21,6 +21,7 @@ import {
   type ObrigacaoFotografada,
 } from "../src/lib/motor/invariantes-obrigacoes"
 import { montarPendenciasTransversais } from "../src/lib/process-stage/pendencias-transversais-core"
+import { garantirOferta } from "./_fixture-oferta"
 
 const ROOT = join(__dirname, "..")
 const read = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
@@ -269,12 +270,12 @@ async function main() {
   )
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
 
+  const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "MAT-TEST" }, update: {},
     create: {
-      code: "MAT-TEST", name: "Materialização", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
-      modalityKey: "administrativa",
-      modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
+      code: "MAT-TEST", name: "Materialização", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
 

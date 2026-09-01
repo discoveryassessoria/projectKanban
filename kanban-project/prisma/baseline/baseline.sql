@@ -2294,8 +2294,7 @@ CREATE TABLE "TipoProcessoNacionalidade" (
     "code" VARCHAR(40) NOT NULL,
     "name" VARCHAR(200) NOT NULL,
     "paisId" INTEGER NOT NULL,
-    "modalityKey" VARCHAR(40) NOT NULL,
-    "modalityLabel" VARCHAR(80) NOT NULL,
+    "modalidadeId" INTEGER NOT NULL,
     "processFamily" VARCHAR(40) NOT NULL DEFAULT 'cidadania',
     "serviceNature" VARCHAR(40) NOT NULL DEFAULT 'main_process',
     "ativo" BOOLEAN NOT NULL DEFAULT true,
@@ -5476,9 +5475,6 @@ CREATE UNIQUE INDEX "TipoProcessoNacionalidade_code_key" ON "TipoProcessoNaciona
 CREATE INDEX "TipoProcessoNacionalidade_paisId_idx" ON "TipoProcessoNacionalidade"("paisId");
 
 -- CreateIndex
-CREATE INDEX "TipoProcessoNacionalidade_modalityKey_idx" ON "TipoProcessoNacionalidade"("modalityKey");
-
--- CreateIndex
 CREATE UNIQUE INDEX "CatalogoPais_countryKey_key" ON "CatalogoPais"("countryKey");
 
 -- CreateIndex
@@ -6944,6 +6940,9 @@ ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_paisId_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "TipoProcessoNacionalidade" ADD CONSTRAINT "TipoProcessoNacionalidade_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TipoProcessoNacionalidade" ADD CONSTRAINT "TipoProcessoNacionalidade_modalidadeId_fkey" FOREIGN KEY ("modalidadeId") REFERENCES "ModalidadePais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ModalidadePais" ADD CONSTRAINT "ModalidadePais_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -14,8 +14,9 @@ export async function GET(request: NextRequest) {
         where: { arquivado: false },
         orderBy: { name: 'asc' },
         select: {
-          id: true, code: true, name: true, modalityLabel: true, ativo: true,
+          id: true, code: true, name: true, ativo: true,
           pais: { select: { countryKey: true, countryLabel: true } },
+          modalidade: { select: { modalityLabel: true } },
         },
       }),
       prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: 'asc' } }),
@@ -26,10 +27,11 @@ export async function GET(request: NextRequest) {
     const comWf = await prisma.macroWorkflow.findMany({ select: { tipoProcessoId: true } })
     const setWf = new Set(comWf.map((m) => m.tipoProcessoId))
     // País do tipo é APRESENTAÇÃO derivada da relação canônica.
-    const tiposOut = tipos.map(({ pais, ...t }) => ({
+    const tiposOut = tipos.map(({ pais, modalidade, ...t }) => ({
       ...t,
       countryKey: pais.countryKey,
       countryLabel: pais.countryLabel,
+      modalityLabel: modalidade.modalityLabel,
       temWorkflow: setWf.has(t.id),
     }))
 

@@ -30,13 +30,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ coun
     const [mods, tipos] = await Promise.all([
       prisma.modalidadePais.findMany({ where: { paisId: pais.id }, orderBy: { ordem: 'asc' } }),
       // Quem usa a modalidade é uma OFERTA daquele país — recorte por identidade.
-      prisma.tipoProcessoNacionalidade.findMany({ where: { paisId: pais.id }, select: { modalityKey: true } }),
+      prisma.tipoProcessoNacionalidade.findMany({ where: { paisId: pais.id }, select: { modalidadeId: true } }),
     ])
 
-    const contagem = new Map<string, number>()
-    for (const t of tipos) contagem.set(t.modalityKey, (contagem.get(t.modalityKey) || 0) + 1)
+    // Contagem pela IDENTIDADE da modalidade, não pela chave copiada.
+    const contagem = new Map<number, number>()
+    for (const t of tipos) contagem.set(t.modalidadeId, (contagem.get(t.modalidadeId) || 0) + 1)
 
-    const out = mods.map((m) => ({ ...m, tiposCount: contagem.get(m.modalityKey) || 0 }))
+    const out = mods.map((m) => ({ ...m, tiposCount: contagem.get(m.id) || 0 }))
     return NextResponse.json({ modalidades: out })
   } catch (error) {
     console.error('Erro ao listar modalidades:', error)

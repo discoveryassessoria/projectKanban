@@ -9,6 +9,7 @@
 // workflow publicado dela e não deixa fase ativa vazia. Só roda no banco de teste.
 
 import { PrismaClient } from "@prisma/client"
+import { garantirOferta } from "./_fixture-oferta"
 
 let ok = 0
 const falhas: string[] = []
@@ -41,12 +42,12 @@ async function main() {
     'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro","AnaliseDocumental","PhaseAdvanceLog","LogAuditoria" RESTART IDENTITY CASCADE',
   )
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
+  const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM-TEST" }, update: {},
     create: {
-      code: "ALE-ADM-TEST", name: "Alemã (teste de caminhos)", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
-      modalityKey: "administrativa",
-      modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
+      code: "ALE-ADM-TEST", name: "Alemã (teste de caminhos)", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro ALE canônico", versao: 1 } })
@@ -118,10 +119,11 @@ async function main() {
   check("o CatalogoFase tem as canônicas", ["traducao_juramentada", "retificacao_registros"].every((k) => catFinal.some((c) => c.phaseKey === k)))
 
   // Macro novo montado como o endpoint monta (a partir do catálogo ativo).
+  const oferta2 = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipoNovo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "NOVO-SEED" }, update: {},
-    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", pais: { connectOrCreate: { where: { countryKey: "italia" }, create: { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana" } } },
-      modalityKey: "administrativa", modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", paisId: oferta2.paisId, modalidadeId: oferta2.modalidadeId,
+      processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
   })
   const catAtivo = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: "asc" } })
   const macroNovo = await prisma.macroWorkflow.create({

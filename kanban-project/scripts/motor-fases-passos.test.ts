@@ -14,6 +14,7 @@ import { PrismaClient } from "@prisma/client"
 import { reconciliarFaseAtiva } from "../src/services/reconciliar-fase"
 import { planejarMaterializacao } from "../src/services/phase-workflow-escopo"
 import type { DefStep } from "../src/services/phase-workflow-helpers"
+import { garantirOferta } from "./_fixture-oferta"
 
 const url = process.env.PRISMA_DATABASE_URL ?? ""
 if (!/discovery_test/.test(url)) {
@@ -50,12 +51,12 @@ async function limpar() {
 
 async function semear() {
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
+  const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
-      modalityKey: "administrativa",
-      modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
 

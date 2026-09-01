@@ -18,6 +18,7 @@ import { publicarParametrizacao } from "@/src/services/parametrizacao/publicacao
 import { concluirParametrizacao } from "@/src/services/parametrizacao/concluir-parametrizacao"
 
 import { exigirBancoDeTeste } from "./_banco-de-teste"
+import { garantirOferta } from "./_fixture-oferta"
 
 // TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
 exigirBancoDeTeste()
@@ -33,9 +34,10 @@ const FASE = `fase_wiz_${TS}`.slice(0, 60)
 const c: { tipoId?: number; macroId?: number; faseId?: number; itemId?: number; cfgId?: number; econId?: number; matrizId?: number; precoId?: number; progressoId?: number } = {}
 
 async function montar() {
+  const oferta = await garantirOferta(prisma, { countryKey: 'x', countryLabel: 'País X', nationalityKey: 'x', nationalityLabel: 'X', modalityKey: 'x', modalityLabel: 'X' })
   const tp = await prisma.tipoProcessoNacionalidade.create({
-    data: { code: `TPW-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, pais: { connectOrCreate: { where: { countryKey: 'x' }, create: { countryKey: 'x', countryLabel: 'País X', nationalityKey: 'x', nationalityLabel: 'X' } } },
-      modalityKey: 'x', modalityLabel: 'X' },
+    data: { code: `TPW-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
   })
   c.tipoId = tp.id
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tp.id, name: `Macro ${TAG}` } })

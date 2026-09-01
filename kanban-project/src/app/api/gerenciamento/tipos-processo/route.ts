@@ -12,7 +12,10 @@ export async function GET(request: NextRequest) {
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         orderBy: { name: 'asc' },
-        include: { pais: { select: { countryKey: true, countryLabel: true, nationalityKey: true, nationalityLabel: true } } },
+        include: {
+          pais: { select: { countryKey: true, countryLabel: true, nationalityKey: true, nationalityLabel: true } },
+          modalidade: { select: { modalityKey: true, modalityLabel: true } },
+        },
       }),
       prisma.catalogoPais.findMany({ where: { ativo: true }, orderBy: { countryLabel: 'asc' } }),
       prisma.modalidadePais.findMany({
@@ -24,8 +27,10 @@ export async function GET(request: NextRequest) {
 
     // A tela continua lendo country/nationality no tipo — como APRESENTAÇÃO
     // derivada do país canônico, não como cópia persistida.
-    const tiposOut = tipos.map(({ pais, ...t }) => ({
+    const tiposOut = tipos.map(({ pais, modalidade, ...t }) => ({
       ...t,
+      modalityKey: modalidade.modalityKey,
+      modalityLabel: modalidade.modalityLabel,
       countryKey: pais.countryKey,
       countryLabel: pais.countryLabel,
       nationalityKey: pais.nationalityKey,
@@ -73,8 +78,8 @@ export async function POST(request: NextRequest) {
         name: String(b.name).trim(),
         // IDENTIDADE. Nada de país é copiado para dentro do tipo.
         pais: { connect: { id: pais.id } },
-        modalityKey: modalidade.modalityKey,
-        modalityLabel: modalidade.modalityLabel,
+        // IDENTIDADE também da modalidade: nem a chave nem o rótulo são copiados.
+        modalidade: { connect: { id: modalidade.id } },
         processFamily: 'cidadania',
         serviceNature: 'main_process',
         ativo: b.ativo !== false,

@@ -30,6 +30,7 @@ import { removerPessoaDaArvore } from "../src/services/pessoa-ciclo-vida"
 import { reconciliarAutomacaoPorRequerente } from "../src/lib/motor/reconciliar-requerente-economico"
 import { listarReceitas } from "../lib/financeiro/leitura/receitas-lista"
 import { pessoaCausadoraDaReceita, pessoaDaChaveIdempotencia } from "../lib/financeiro/causa-requerente"
+import { garantirOferta } from "./_fixture-oferta"
 
 const URL_DB = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ""
 if (!/127\.0\.0\.1|localhost/.test(URL_DB) || !/test/i.test(URL_DB)) {
@@ -115,12 +116,12 @@ async function limpar() {
 }
 
 async function montarCenario(sufixo: string): Promise<Cenario> {
+  const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${MARCA}-${sufixo}`, name: `${MARCA} tipo ${sufixo}`,
-      pais: { connectOrCreate: { where: { countryKey: "espanha" }, create: { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola" } } },
-      modalityKey: "descendencia", modalityLabel: "Descendência",
-    },
+      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
     select: { id: true },
   })
   const config = await prisma.produtoFinanceiro.create({

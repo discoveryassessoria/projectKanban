@@ -40,8 +40,9 @@ export async function GET(request: Request) {
         // A oferta aponta para a IDENTIDADE do país; a chave que o board usa
         // para agrupar é lida da relação, não de uma cópia no tipo.
         select: {
-          id: true, code: true, name: true, modalityLabel: true,
+          id: true, code: true, name: true,
           pais: { select: { countryKey: true } },
+          modalidade: { select: { modalityKey: true, modalityLabel: true } },
         },
       }),
       prisma.macroWorkflow.findMany({
@@ -60,10 +61,11 @@ export async function GET(request: Request) {
     const fasesPorTipo = new Map<number, { phaseKey: string; label: string; ordem: number }[]>()
     for (const wf of workflows) fasesPorTipo.set(wf.tipoProcessoId, wf.fases)
 
-    const tiposOut = tipos.map(({ pais, ...t }) => ({
+    const tiposOut = tipos.map(({ pais, modalidade, ...t }) => ({
       ...t,
-      // APRESENTAÇÃO derivada da relação — nunca de coluna espelhada.
+      // APRESENTAÇÃO derivada das relações — nunca de coluna espelhada.
       countryKey: pais.countryKey,
+      modalityLabel: modalidade.modalityLabel,
       fases: fasesPorTipo.get(t.id) || [],
     }))
 

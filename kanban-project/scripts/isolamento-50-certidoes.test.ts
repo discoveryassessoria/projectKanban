@@ -20,6 +20,7 @@ import { executarRetrocesso } from "../src/services/retrocesso-de-fase"
 import { planejarReabertura, executarReabertura } from "../src/services/reabertura-de-execucao"
 import { garantirTentativa, tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { congelarVersaoVigente } from "../src/services/versao-publicada"
+import { garantirOferta } from "./_fixture-oferta"
 
 const prisma = new PrismaClient()
 const M = "ESCALA50"
@@ -91,12 +92,12 @@ async function main() {
   console.log(`\nISOLAMENTO EM ESCALA — ${PESSOAS} pessoas · ${PESSOAS * DOCS_POR_PESSOA} certidões · ${ETAPAS.length} etapas\n`)
 
   // ── PALCO ────────────────────────────────────────────────────────────────
+  const oferta = await garantirOferta(prisma, { countryKey: "esc", countryLabel: "Esc", nationalityKey: "esc", nationalityLabel: "Esc", modalityKey: "esc", modalityLabel: "Esc" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_TIPO`, name: `${M} tipo`, ativo: true,
-      pais: { connectOrCreate: { where: { countryKey: "esc" }, create: { countryKey: "esc", countryLabel: "Esc", nationalityKey: "esc", nationalityLabel: "Esc" } } },
-      modalityKey: "esc", modalityLabel: "Esc",
-    },
+      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
     select: { id: true },
   })
   const fEmissao = await prisma.catalogoFase.create({

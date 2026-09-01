@@ -19,6 +19,7 @@ import { reconciliarDocumentalFinanceiro } from "@/src/services/financeiro/recon
 import { ORIGEM_AUTOMATICA, ORIGEM_MANUAL, ehAutomatico } from "@/lib/financeiro/dominio/origem-lancamento"
 
 import { exigirBancoDeTeste } from "./_banco-de-teste"
+import { garantirOferta } from "./_fixture-oferta"
 
 // TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
 exigirBancoDeTeste()
@@ -44,12 +45,12 @@ interface Criado {
 const criado: Criado = { matrizIds: [], econIds: [], configIds: [], tabelaIds: [], tipoDocExtraIds: [], documentoExtraIds: [] }
 
 async function montarCenario() {
+  const oferta = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "teste", modalityLabel: "Teste" })
   const tipoProc = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `TP-${TS}`.slice(0, 40), name: `Tipo ${TAG}`,
-      pais: { connectOrCreate: { where: { countryKey: "italia" }, create: { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana" } } },
-      modalityKey: "teste", modalityLabel: "Teste",
-    },
+      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
   })
   TIPO_PROCESSO = tipoProc.id
   criado.tipoProcessoId = tipoProc.id

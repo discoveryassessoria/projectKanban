@@ -23,6 +23,7 @@ import { exigirBancoDeTeste } from './_banco-de-teste'
 import { reconciliarTarefas } from '@/lib/operacional/reconciliar-tarefas'
 import { atribuirTarefa, iniciarTarefa } from '@/lib/operacional/tarefa-comandos'
 import { aguardarTerceiro, bloquearTarefa } from '@/lib/operacional/tarefa-ciclo'
+import { garantirOferta } from "./_fixture-oferta"
 
 const MARCA = 'GERENCIAL'
 
@@ -154,13 +155,13 @@ async function main() {
   // O TIPO DE PROCESSO — o Kanban filtra por país E por tipo, e só mostra
   // processo com `tipoProcessoMotorId`. Sem isto o quadro fica vazio e o
   // deep-link chega a lugar nenhum, exatamente como em produção.
+  const oferta = await garantirOferta(prisma, { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola', modalityKey: 'administrativa', modalityLabel: 'Administrativa' })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: `${MARCA}_ESP_ADM` },
     create: {
       code: `${MARCA}_ESP_ADM`, name: 'Espanha — Administrativa (palco)',
-      pais: { connectOrCreate: { where: { countryKey: 'espanha' }, create: { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola' } } },
-      modalityKey: 'administrativa', modalityLabel: 'Administrativa',
-    },
+      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
     update: { ativo: true, arquivado: false }, select: { id: true },
   })
 

@@ -33,6 +33,7 @@ import {
 import { criarObrigacaoEconomicaComLedger } from "../lib/financeiro/ledger/ledger-service"
 import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
 import { removerPessoaDaArvore } from "../src/services/pessoa-ciclo-vida"
+import { garantirOferta } from "./_fixture-oferta"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -122,11 +123,11 @@ async function config(sufixo: string, valor: number | null): Promise<number> {
 }
 
 async function montarPalco(): Promise<Palco> {
+  const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: MARCA, name: `${MARCA} tipo`, pais: { connectOrCreate: { where: { countryKey: "espanha" }, create: { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola" } } },
-      modalityKey: "descendencia", modalityLabel: "Descendência",
-    }, select: { id: true },
+      code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      }, select: { id: true },
   })
   const tipoDoc = await prisma.tipoDocumentoCadastro.create({
     data: { code: `${MARCA}-NASC`, name: `${MARCA} Certidão de Nascimento`, participaPlanilha: true, ativo: true },

@@ -19,6 +19,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import {
   adicionarColuna, adicionarColunaDeEtapa, listarColunasConfiguradas, removerColuna,
 } from "@/lib/financeiro/leitura/planilha-colunas"
+import { garantirOferta } from "./_fixture-oferta"
 
 const MARCA = "GM"
 const FASE = "gm_fase"
@@ -113,11 +114,11 @@ async function main() {
     return
   }
 
+  const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: MARCA, name: `${MARCA} espanhola`, pais: { connectOrCreate: { where: { countryKey: "espanha" }, create: { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola" } } },
-      modalityKey: "descendencia", modalityLabel: "Descendência",
-    },
+      code: MARCA, name: `${MARCA} espanhola`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
     select: { id: true },
   })
 

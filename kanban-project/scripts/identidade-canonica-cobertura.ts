@@ -84,6 +84,20 @@ async function main() {
   await div("TipoProcessoNacionalidade.paisId é NOT NULL",
     `SELECT CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TipoProcessoNacionalidade' AND column_name='paisId' AND is_nullable='NO') THEN 0 ELSE 1 END n`)
 
+  // MODALIDADE — a mesma duplicação, uma tabela adiante. `modalityKey` e
+  // `modalityLabel` eram cópias de `ModalidadePais`; a identidade é
+  // `modalidadeId`, e recriar qualquer um dos dois falha aqui.
+  for (const campo of ["modalityKey", "modalityLabel"]) {
+    await div(`espelho TipoProcessoNacionalidade.${campo} não existe`,
+      `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'TipoProcessoNacionalidade' AND column_name = '${campo}'`)
+  }
+  await div("TipoProcessoNacionalidade.modalidadeId é NOT NULL",
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TipoProcessoNacionalidade' AND column_name='modalidadeId' AND is_nullable='NO') THEN 0 ELSE 1 END n`)
+  // A modalidade da oferta tem de ser do PAÍS da oferta — o vínculo sozinho não
+  // impede apontar para a modalidade de outro país.
+  await div("a modalidade da oferta pertence ao país da oferta",
+    `SELECT COUNT(*)::int n FROM "TipoProcessoNacionalidade" t JOIN "ModalidadePais" m ON m.id = t."modalidadeId" WHERE m."paisId" <> t."paisId"`)
+
   await div("MatrizDocumental.documentTypeCode × code",
     `SELECT COUNT(*)::int n FROM "MatrizDocumental" m JOIN "TipoDocumentoCadastro" t ON t.id = m."documentoTipoId" WHERE t.code <> m."documentTypeCode"`)
 
@@ -188,12 +202,12 @@ async function main() {
       const dados = corpoDeData(src.slice(m.index ?? 0, (m.index ?? 0) + 1600))
       // dentro de `connectOrCreate` os campos são do PAÍS, não do tipo
       const semConnect = dados.replace(/connectOrCreate:\s*\{[\s\S]*\}/g, "")
-      if (/\b(countryKey|countryLabel|nationalityKey|nationalityLabel)\s*:/.test(semConnect)) return true
+      if (/\b(countryKey|countryLabel|nationalityKey|nationalityLabel|modalityKey|modalityLabel)\s*:/.test(semConnect)) return true
     }
     return false
   })
   okGuard(escritoresDaCopia.length === 0,
-    `nenhum writer copia país para dentro da oferta${escritoresDaCopia.length ? ` (${escritoresDaCopia.join(", ")})` : ""}`)
+    `nenhum writer copia país ou modalidade para dentro da oferta${escritoresDaCopia.length ? ` (${escritoresDaCopia.join(", ")})` : ""}`)
 
   // SELECT ESCONDIDO. Um `include` declarado `as const` num arquivo
   // compartilhado não é validado pelo compilador no ponto de uso: o erro só
@@ -213,15 +227,17 @@ async function main() {
       }
       const bloco = src.slice(m.index ?? 0, fim + 1)
       // `pais: { ... countryKey ... }` é a relação canônica, e é o certo
-      const semRelacao = bloco.replace(/pais(Canonico)?:\s*\{[\s\S]*?\}/g, "")
-      if (/\b(countryKey|countryLabel|nationalityKey|nationalityLabel)\s*:\s*true/.test(semRelacao)) {
+      const semRelacao = bloco
+        .replace(/pais(Canonico)?:\s*\{[\s\S]*?\}/g, "")
+        .replace(/modalidade:\s*\{[\s\S]*?\}/g, "")
+      if (/\b(countryKey|countryLabel|nationalityKey|nationalityLabel|modalityKey|modalityLabel)\s*:\s*true/.test(semRelacao)) {
         selectsFantasma.push(f)
         break
       }
     }
   }
   okGuard(selectsFantasma.length === 0,
-    `nenhuma seleção pede país dentro da modalidade ou do tipo${selectsFantasma.length ? ` (${[...new Set(selectsFantasma)].join(", ")})` : ""}`)
+    `nenhuma seleção pede país ou modalidade em texto dentro do tipo${selectsFantasma.length ? ` (${[...new Set(selectsFantasma)].join(", ")})` : ""}`)
 
   // FILTRO DE PROCESSO POR PAÍS usa o resolvedor de identidade, não `{ pais }`.
   const filtroCru = fontes.filter((f) => {

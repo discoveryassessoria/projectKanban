@@ -27,6 +27,7 @@ import { resultadoDaOperacao, exigeJustificativa } from "../src/lib/motor/phase-
 import { movePhaseManual } from "../src/lib/motor/phase-advance"
 import { MOTIVOS_MOVIMENTACAO, motivoValido, normalizarJustificativa, JUSTIFICATIVA_MIN, JUSTIFICATIVA_MAX } from "../src/lib/motor/motivos-movimentacao"
 import { reconciliarFaseAtiva } from "../src/services/reconciliar-fase"
+import { garantirOferta } from "./_fixture-oferta"
 
 const ROOT = join(__dirname, "..")
 const read = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
@@ -187,12 +188,12 @@ async function main() {
     'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro","MatrizDocumental","TipoDocumentoCadastro","ItemCatalogo","PhaseAdvanceLog" RESTART IDENTITY CASCADE',
   )
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
+  const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
-      modalityKey: "administrativa",
-      modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
 

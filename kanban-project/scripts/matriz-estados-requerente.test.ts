@@ -38,6 +38,7 @@ import {
   classificarEstado, EFEITOS_POR_ESTADO, TRANSICOES, transicaoPermitida, explicarEfeitos,
   type EstadoRequerente,
 } from "../lib/genealogia/estados-requerente"
+import { garantirOferta } from "./_fixture-oferta"
 
 if (process.env.FINANCEIRO_DUAL_WRITE !== "1") {
   console.error("\n❌ Rode com FINANCEIRO_DUAL_WRITE=1 — sem o espelho V3 o Financeiro não é comparável.\n")
@@ -101,11 +102,11 @@ async function limpar() {
 
 /** Um processo com automação financeira armada e CINCO requerentes cadastrados. */
 async function montarPalco(): Promise<Palco> {
+  const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: MARCA, name: `${MARCA} tipo`, pais: { connectOrCreate: { where: { countryKey: "espanha" }, create: { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola" } } },
-      modalityKey: "descendencia", modalityLabel: "Descendência",
-    }, select: { id: true },
+      code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      }, select: { id: true },
   })
   const config = await prisma.produtoFinanceiro.create({
     data: { codigo: MARCA.slice(0, 30), nome: `${MARCA} honorários`, moedaPadrao: "BRL", possuiReceita: true },

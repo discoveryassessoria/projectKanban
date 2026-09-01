@@ -6,6 +6,7 @@ import { reconciliarFinanceiroDaFase } from '@/src/lib/motor/executor'
 import { listarObrigacoes } from '@/lib/financeiro/leitura/consultas'
 
 import { exigirBancoDeTeste } from "./_banco-de-teste"
+import { garantirOferta } from "./_fixture-oferta"
 
 // TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
 exigirBancoDeTeste()
@@ -18,8 +19,9 @@ async function main() {
   const PROC = 16
   const procAntes = await prisma.processo.findUnique({ where: { id: PROC }, select: { tipoProcessoMotorId: true } })
   const restoreTipo = procAntes?.tipoProcessoMotorId ?? null
-  const tpn = await prisma.tipoProcessoNacionalidade.create({ data: { code: `E2E-TP-${TS % 100000}`, name: 'TP E2E', pais: { connectOrCreate: { where: { countryKey: 'xx' }, create: { countryKey: 'xx', countryLabel: 'XX', nationalityKey: 'xx', nationalityLabel: 'XX' } } },
-      modalityKey: 'xx', modalityLabel: 'XX' } as any })
+  const oferta = await garantirOferta(prisma, { countryKey: 'xx', countryLabel: 'XX', nationalityKey: 'xx', nationalityLabel: 'XX', modalityKey: 'xx', modalityLabel: 'XX' })
+  const tpn = await prisma.tipoProcessoNacionalidade.create({ data: { code: `E2E-TP-${TS % 100000}`, name: 'TP E2E', paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      } as any })
   const TP = tpn.id
   await prisma.processo.update({ where: { id: PROC }, data: { tipoProcessoMotorId: TP } })
 

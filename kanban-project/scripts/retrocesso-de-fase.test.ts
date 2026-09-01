@@ -26,6 +26,7 @@ import { planejarReabertura, executarReabertura } from "../src/services/reabertu
 import { tentativasDoPasso, garantirTentativa, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { congelarVersaoVigente } from "../src/services/versao-publicada"
 import { gravarOperacao, historicoDaOperacao, historicoDaOperacaoDaUnidade } from "../src/services/operacao-da-etapa"
+import { garantirOferta } from "./_fixture-oferta"
 
 const ROOT = join(__dirname, "..")
 const ler = (r: string) => (existsSync(join(ROOT, r)) ? readFileSync(join(ROOT, r), "utf8") : "")
@@ -187,12 +188,12 @@ interface Palco {
  * que ordem visual não é dependência.
  */
 async function montar(marca: string): Promise<Palco> {
+  const oferta = await garantirOferta(prisma, { countryKey: "retro", countryLabel: "Retro", nationalityKey: "retro", nationalityLabel: "Retro", modalityKey: "retro", modalityLabel: "Retro" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_${marca}`.toUpperCase().slice(0, 40), name: `${M} ${marca}`, ativo: true,
-      pais: { connectOrCreate: { where: { countryKey: "retro" }, create: { countryKey: "retro", countryLabel: "Retro", nationalityKey: "retro", nationalityLabel: "Retro" } } },
-      modalityKey: "retro", modalityLabel: "Retro",
-    },
+      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
     select: { id: true },
   })
   const fEmissao = await prisma.catalogoFase.upsert({

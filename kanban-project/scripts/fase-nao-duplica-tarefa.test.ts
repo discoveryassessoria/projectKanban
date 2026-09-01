@@ -25,6 +25,7 @@ import { exigirBancoDeTeste } from './_banco-de-teste'
 import { materializarExecucaoDaFase } from '../src/services/materializar-fase'
 import { movePhaseManual } from '../src/lib/motor/phase-advance'
 import { chaveDaUnidade, tarefaVivaDaUnidade } from '../lib/operacional/identidade-da-tarefa'
+import { garantirOferta } from "./_fixture-oferta"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -76,11 +77,11 @@ async function main() {
     data: { nome: 'Admin FaseDup', email: 'admin@fasedup.test', senha: 'x', tipo: 'admin' },
     select: { id: true },
   })
+  const oferta = await garantirOferta(prisma, { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola', modalityKey: 'administrativa', modalityLabel: 'Administrativa' })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: `${MARCA}_ESP`, name: `${MARCA} Espanha`, pais: { connectOrCreate: { where: { countryKey: 'espanha' }, create: { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola' } } },
-      modalityKey: 'administrativa', modalityLabel: 'Administrativa',
-    },
+      code: `${MARCA}_ESP`, name: `${MARCA} Espanha`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      },
     select: { id: true },
   })
   const macro = await prisma.macroWorkflow.create({

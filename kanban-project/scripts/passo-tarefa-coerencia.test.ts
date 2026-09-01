@@ -83,6 +83,7 @@ const AUTORIZADOS = new Set([
   "src/services/passo-tarefa-projecao.ts",
 ])
 import { readdirSync, statSync } from "fs"
+import { garantirOferta } from "./_fixture-oferta"
 function varrer(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(join(ROOT, dir))) {
     const rel = `${dir}/${nome}`
@@ -152,12 +153,12 @@ async function main() {
     'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro","MatrizDocumental","TipoDocumentoCadastro","ItemCatalogo","PhaseAdvanceLog","LogAuditoria" RESTART IDENTITY CASCADE',
   )
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
+  const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "SYNC-TEST" }, update: {},
     create: {
-      code: "SYNC-TEST", name: "Sincronismo", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
-      modalityKey: "administrativa",
-      modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
+      code: "SYNC-TEST", name: "Sincronismo", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro SYNC", versao: 1 } })

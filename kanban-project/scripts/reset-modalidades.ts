@@ -61,22 +61,27 @@ async function main() {
   // remapeia tipos existentes (se REMAP preenchido)
   for (const [code, novaKey] of Object.entries(REMAP)) {
     const nova = PADRAO.find((m) => m.modalityKey === novaKey)!
-    const r = await prisma.tipoProcessoNacionalidade.updateMany({
-      where: { code },
-      data: { modalityKey: nova.modalityKey, modalityLabel: nova.modalityLabel },
+    // Remapear é REAPONTAR o vínculo — antes era reescrever a cópia do rótulo.
+    const alvo = await prisma.tipoProcessoNacionalidade.findUnique({ where: { code }, select: { id: true, paisId: true } })
+    if (!alvo) { console.log(`⚠ Tipo ${code} não encontrado (REMAP ignorado)`); continue }
+    const modalidade = await prisma.modalidadePais.findUnique({
+      where: { paisId_modalityKey: { paisId: alvo.paisId, modalityKey: nova.modalityKey } },
+      select: { id: true, modalityLabel: true },
     })
-    console.log(r.count > 0 ? `✔ Tipo ${code} → ${nova.modalityLabel}` : `⚠ Tipo ${code} não encontrado (REMAP ignorado)`)
+    if (!modalidade) { console.log(`⚠ Tipo ${code}: país não tem a modalidade "${nova.modalityKey}"`); continue }
+    await prisma.tipoProcessoNacionalidade.update({ where: { id: alvo.id }, data: { modalidadeId: modalidade.id } })
+    console.log(`✔ Tipo ${code} → ${modalidade.modalityLabel}`)
   }
 
   // avisa tipos órfãos
   const orfaos = await prisma.tipoProcessoNacionalidade.findMany({
-    where: { modalityKey: { notIn: ['judicial', 'administrativa'] } },
-    select: { code: true, name: true, modalityLabel: true },
+    where: { modalidade: { modalityKey: { notIn: ['judicial', 'administrativa'] } } },
+    select: { code: true, name: true, modalidade: { select: { modalityLabel: true } } },
   })
   if (orfaos.length > 0) {
-    console.log('\n⚠ Tipos ainda com modalidade antiga (nada quebra — o label é cópia).')
+    console.log('\n⚠ Tipos ainda apontando para modalidade antiga.')
     console.log('  Edite pelo sistema ou preencha o REMAP e rode de novo:')
-    for (const t of orfaos) console.log(`  - ${t.code} · ${t.name} (${t.modalityLabel})`)
+    for (const t of orfaos) console.log(`  - ${t.code} · ${t.name} (${t.modalidade.modalityLabel})`)
   } else {
     console.log('\n✔ Nenhum tipo com modalidade antiga.')
   }

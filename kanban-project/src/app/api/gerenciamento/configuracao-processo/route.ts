@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
         include: {
           macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } },
           pais: { select: { countryKey: true, countryLabel: true, nationalityLabel: true } },
+          modalidade: { select: { modalityKey: true, modalityLabel: true } },
         },
       }),
       prisma.phaseInternalWorkflow.findMany({
@@ -113,8 +114,8 @@ export async function GET(request: NextRequest) {
         countryKey: t.pais.countryKey,
         countryLabel: t.pais.countryLabel,
         nationalityLabel: t.pais.nationalityLabel,
-        modalityKey: t.modalityKey,
-        modalityLabel: t.modalityLabel,
+        modalityKey: t.modalidade.modalityKey,
+        modalityLabel: t.modalidade.modalityLabel,
         processFamily: t.processFamily,
         serviceNature: t.serviceNature,
         ativo: t.ativo,
