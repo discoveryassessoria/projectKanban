@@ -70,12 +70,16 @@ export async function GET(request: NextRequest) {
       }),
       prisma.modalidadePais.findMany({
         where: { ativo: true },
-        select: { id: true, countryKey: true, modalityKey: true, modalityLabel: true },
-        orderBy: [{ countryKey: 'asc' }, { ordem: 'asc' }, { modalityLabel: 'asc' }],
+        select: { id: true, modalityKey: true, modalityLabel: true, pais: { select: { countryKey: true } } },
+        orderBy: [{ pais: { countryKey: 'asc' } }, { ordem: 'asc' }, { modalityLabel: 'asc' }],
       }),
     ])
 
-    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas, servicos, moedas, paises, modalidades })
+    // `countryKey` da modalidade é DERIVADO do país canônico (a tela agrupa por
+    // país); a modalidade não guarda mais cópia da chave.
+    const modalidadesOut = modalidades.map(({ pais, ...m }) => ({ ...m, countryKey: pais.countryKey }))
+
+    return NextResponse.json({ condicoes, carteiras, formasPagamento, taxas, servicos, moedas, paises, modalidades: modalidadesOut })
   } catch (error) {
     console.error('Erro ao listar condições de pagamento:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })

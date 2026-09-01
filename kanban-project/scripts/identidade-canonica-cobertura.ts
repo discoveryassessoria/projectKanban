@@ -213,9 +213,14 @@ async function main() {
   await linha("OrgaoProtocolo.country → CatalogoPais",
     `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE country IS NOT NULL`,
     `SELECT COUNT(*)::int n FROM "OrgaoProtocolo" WHERE country IS NOT NULL AND "paisId" IS NULL`)
-  await linha("ModalidadePais.countryKey → CatalogoPais",
+  await linha("ModalidadePais → CatalogoPais (identidade única)",
     `SELECT COUNT(*)::int n FROM "ModalidadePais"`,
     `SELECT COUNT(*)::int n FROM "ModalidadePais" WHERE "paisId" IS NULL`)
+  await div("espelho ModalidadePais.countryKey não existe",
+    `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'ModalidadePais' AND column_name = 'countryKey'`)
+  // A unicidade da modalidade é sobre a IDENTIDADE do país, não sobre texto.
+  await div("unicidade da modalidade é (paisId, modalityKey)",
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE tablename='ModalidadePais' AND indexname='ModalidadePais_paisId_modalityKey_key') THEN 0 ELSE 1 END n`)
   await div("array textual TaxaPagamento.paises não existe",
     `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'TaxaPagamento' AND column_name = 'paises'`)
   await div("órgão e nacionalidade são dimensões distintas (país com órgão sem oferta é legítimo)",

@@ -2327,8 +2327,7 @@ CREATE TABLE "CatalogoPais" (
 -- CreateTable
 CREATE TABLE "ModalidadePais" (
     "id" SERIAL NOT NULL,
-    "countryKey" VARCHAR(40) NOT NULL,
-    "paisId" INTEGER,
+    "paisId" INTEGER NOT NULL,
     "modalityKey" VARCHAR(40) NOT NULL,
     "modalityLabel" VARCHAR(80) NOT NULL,
     "codeSuffix" VARCHAR(20),
@@ -5484,10 +5483,10 @@ CREATE INDEX "TipoProcessoNacionalidade_modalityKey_idx" ON "TipoProcessoNaciona
 CREATE UNIQUE INDEX "CatalogoPais_countryKey_key" ON "CatalogoPais"("countryKey");
 
 -- CreateIndex
-CREATE INDEX "ModalidadePais_countryKey_idx" ON "ModalidadePais"("countryKey");
+CREATE INDEX "ModalidadePais_paisId_idx" ON "ModalidadePais"("paisId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ModalidadePais_countryKey_modalityKey_key" ON "ModalidadePais"("countryKey", "modalityKey");
+CREATE UNIQUE INDEX "ModalidadePais_paisId_modalityKey_key" ON "ModalidadePais"("paisId", "modalityKey");
 
 -- CreateIndex
 CREATE INDEX "FaseNaturezaPermitida_catalogoFaseId_idx" ON "FaseNaturezaPermitida"("catalogoFaseId");

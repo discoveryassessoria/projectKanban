@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
         include: { pais: { select: { countryKey: true, countryLabel: true, nationalityKey: true, nationalityLabel: true } } },
       }),
       prisma.catalogoPais.findMany({ where: { ativo: true }, orderBy: { countryLabel: 'asc' } }),
-      prisma.modalidadePais.findMany({ where: { ativo: true }, orderBy: [{ countryKey: 'asc' }, { ordem: 'asc' }] }),
+      prisma.modalidadePais.findMany({
+        where: { ativo: true },
+        orderBy: [{ pais: { countryKey: 'asc' } }, { ordem: 'asc' }],
+        include: { pais: { select: { countryKey: true } } },
+      }),
     ])
 
     // A tela continua lendo country/nationality no tipo — como APRESENTAÇÃO
@@ -28,7 +32,11 @@ export async function GET(request: NextRequest) {
       nationalityLabel: pais.nationalityLabel,
     }))
 
-    return NextResponse.json({ tipos: tiposOut, paises, modalidades })
+    // A cascata país → modalidade continua endereçada por chave na tela; a
+    // chave é DERIVADA do país canônico, não coluna própria da modalidade.
+    const modalidadesOut = modalidades.map(({ pais, ...m }) => ({ ...m, countryKey: pais.countryKey }))
+
+    return NextResponse.json({ tipos: tiposOut, paises, modalidades: modalidadesOut })
   } catch (error) {
     console.error('Erro ao listar tipos de processo:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -54,7 +62,7 @@ export async function POST(request: NextRequest) {
       ? await prisma.catalogoPais.findUnique({ where: { id: Number(b.paisId) } })
       : await prisma.catalogoPais.findUnique({ where: { countryKey: String(b.countryKey) } })
     const modalidade = await prisma.modalidadePais.findUnique({
-      where: { countryKey_modalityKey: { countryKey: pais?.countryKey ?? '', modalityKey: String(b.modalityKey) } },
+      where: { paisId_modalityKey: { paisId: pais?.id ?? 0, modalityKey: String(b.modalityKey) } },
     })
     if (!pais) return NextResponse.json({ error: 'País não encontrado no catálogo.' }, { status: 400 })
     if (!modalidade) return NextResponse.json({ error: 'Modalidade não encontrada para este país.' }, { status: 400 })

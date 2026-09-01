@@ -3260,12 +3260,11 @@ model CatalogoPais {
 
 model ModalidadePais {
   id            Int           @id @default(autoincrement())
-  /// LEGADO EM TRANSIÇÃO — espelho de `paisId`.
-  countryKey    String        @db.VarChar(40)
   /// IDENTIDADE do país. A junction continua N:N (uma modalidade vale para N
   /// países, um país tem N modalidades) — o que mudou é a chave, não a natureza.
-  paisId        Int?
-  pais          CatalogoPais? @relation("ModalidadePaisCanonico", fields: [paisId], references: [id], onDelete: Restrict)
+  /// Obrigatória: modalidade sem país não é modalidade de país nenhum.
+  paisId        Int
+  pais          CatalogoPais  @relation("ModalidadePaisCanonico", fields: [paisId], references: [id], onDelete: Restrict)
   modalityKey   String        @db.VarChar(40)
   modalityLabel String        @db.VarChar(80)
   codeSuffix    String?       @db.VarChar(20)
@@ -3277,8 +3276,8 @@ model ModalidadePais {
 
   condicoesPagamento CondicaoPagamentoModalidade[]
 
-  @@unique([countryKey, modalityKey])
-  @@index([countryKey])
+  @@unique([paisId, modalityKey])
+  @@index([paisId])
 }
 
 // CatÃ¡logo das fases (building blocks do workflow)

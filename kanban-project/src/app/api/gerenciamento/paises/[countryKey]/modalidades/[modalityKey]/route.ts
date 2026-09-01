@@ -18,15 +18,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ coun
 
   try {
     const { countryKey, modalityKey } = await params
+    // A chave da URL endereça o PAÍS; a modalidade é encontrada pela identidade.
+    const pais = await prisma.catalogoPais.findUnique({ where: { countryKey }, select: { id: true } })
+    if (!pais) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
     const atual = await prisma.modalidadePais.findUnique({
-      where: { countryKey_modalityKey: { countryKey, modalityKey } },
+      where: { paisId_modalityKey: { paisId: pais.id, modalityKey } },
     })
     if (!atual) return NextResponse.json({ error: 'Modalidade não encontrada.' }, { status: 404 })
 
     const b = await request.json().catch(() => ({}))
 
     const modalidade = await prisma.modalidadePais.update({
-      where: { countryKey_modalityKey: { countryKey, modalityKey } },
+      where: { paisId_modalityKey: { paisId: pais.id, modalityKey } },
       data: {
         modalityLabel: b.modalityLabel !== undefined ? String(b.modalityLabel).trim() : atual.modalityLabel,
         codeSuffix: b.codeSuffix !== undefined ? (b.codeSuffix ? String(b.codeSuffix).trim() : null) : atual.codeSuffix,
@@ -37,7 +40,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ coun
 
     if (b.modalityLabel !== undefined) {
       await prisma.tipoProcessoNacionalidade.updateMany({
-        where: { pais: { countryKey }, modalityKey },
+        where: { paisId: pais.id, modalityKey },
         data: { modalityLabel: modalidade.modalityLabel },
       })
     }
@@ -55,13 +58,15 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
 
   try {
     const { countryKey, modalityKey } = await params
+    const pais = await prisma.catalogoPais.findUnique({ where: { countryKey }, select: { id: true } })
+    if (!pais) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
     const atual = await prisma.modalidadePais.findUnique({
-      where: { countryKey_modalityKey: { countryKey, modalityKey } },
+      where: { paisId_modalityKey: { paisId: pais.id, modalityKey } },
     })
     if (!atual) return NextResponse.json({ error: 'Modalidade não encontrada.' }, { status: 404 })
 
     const tipos = await prisma.tipoProcessoNacionalidade.count({
-      where: { pais: { countryKey }, modalityKey },
+      where: { paisId: pais.id, modalityKey },
     })
     if (tipos > 0) {
       return NextResponse.json(
@@ -71,7 +76,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     }
 
     await prisma.modalidadePais.delete({
-      where: { countryKey_modalityKey: { countryKey, modalityKey } },
+      where: { paisId_modalityKey: { paisId: pais.id, modalityKey } },
     })
 
     return NextResponse.json({ ok: true })

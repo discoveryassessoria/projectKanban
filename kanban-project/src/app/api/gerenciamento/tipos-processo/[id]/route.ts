@@ -25,7 +25,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         : await prisma.catalogoPais.findUnique({ where: { countryKey: String(b.countryKey) } })
       if (!pais) return NextResponse.json({ error: 'País não encontrado no catálogo.' }, { status: 400 })
       const modalidade = await prisma.modalidadePais.findUnique({
-        where: { countryKey_modalityKey: { countryKey: pais.countryKey, modalityKey: String(b.modalityKey) } },
+        where: { paisId_modalityKey: { paisId: pais.id, modalityKey: String(b.modalityKey) } },
       })
       if (!modalidade) return NextResponse.json({ error: 'Modalidade não encontrada para este país.' }, { status: 400 })
       paisFields = {

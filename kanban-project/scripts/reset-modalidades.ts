@@ -46,13 +46,13 @@ async function main() {
 
   for (const p of paises) {
     const removidas = await prisma.modalidadePais.deleteMany({
-      where: { countryKey: p.countryKey, modalityKey: { notIn: ['judicial', 'administrativa'] } },
+      where: { paisId: p.id, modalityKey: { notIn: ['judicial', 'administrativa'] } },
     })
     for (const m of PADRAO) {
       await prisma.modalidadePais.upsert({
-        where: { countryKey_modalityKey: { countryKey: p.countryKey, modalityKey: m.modalityKey } },
+        where: { paisId_modalityKey: { paisId: p.id, modalityKey: m.modalityKey } },
         update: { modalityLabel: m.modalityLabel, codeSuffix: m.codeSuffix, ordem: m.ordem, ativo: true },
-        create: { countryKey: p.countryKey, ...m, ativo: true },
+        create: { paisId: p.id, ...m, ativo: true },
       })
     }
     console.log(`✔ ${p.countryLabel}: ${removidas.count} modalidade(s) antiga(s) removida(s); Judicial + Administrativa garantidas.`)

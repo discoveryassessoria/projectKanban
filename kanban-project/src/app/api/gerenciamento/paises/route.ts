@@ -102,7 +102,7 @@ export async function POST(request: Request) {
       })
       await tx.modalidadePais.createMany({
         data: modalidades.map((m) => ({
-          countryKey,
+          paisId: p.id,
           modalityKey: m.modalityKey,
           modalityLabel: m.modalityLabel,
           codeSuffix: m.codeSuffix ?? undefined, // createMany usa undefined (não null)

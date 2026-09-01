@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ coun
     if (!pais) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
 
     const [mods, tipos] = await Promise.all([
-      prisma.modalidadePais.findMany({ where: { countryKey }, orderBy: { ordem: 'asc' } }),
+      prisma.modalidadePais.findMany({ where: { paisId: pais.id }, orderBy: { ordem: 'asc' } }),
       // Quem usa a modalidade é uma OFERTA daquele país — recorte por identidade.
       prisma.tipoProcessoNacionalidade.findMany({ where: { paisId: pais.id }, select: { modalityKey: true } }),
     ])
@@ -61,15 +61,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
     if (!modalityKey) return NextResponse.json({ error: 'Não foi possível gerar a chave da modalidade.' }, { status: 400 })
 
     const existe = await prisma.modalidadePais.findUnique({
-      where: { countryKey_modalityKey: { countryKey, modalityKey } },
+      where: { paisId_modalityKey: { paisId: pais.id, modalityKey } },
     })
     if (existe) return NextResponse.json({ error: `Este país já tem a modalidade "${modalityKey}".` }, { status: 409 })
 
-    const total = await prisma.modalidadePais.count({ where: { countryKey } })
+    const total = await prisma.modalidadePais.count({ where: { paisId: pais.id } })
 
     const modalidade = await prisma.modalidadePais.create({
       data: {
-        countryKey,
+        paisId: pais.id,
         modalityKey,
         modalityLabel,
         codeSuffix: body?.codeSuffix ? String(body.codeSuffix).trim() : null,

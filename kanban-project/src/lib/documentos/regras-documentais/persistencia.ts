@@ -44,7 +44,7 @@ export async function dadosDeApoio() {
     }),
     prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true, category: true, categoriaDocumental: { select: { code: true, name: true } } }, orderBy: { name: "asc" } }),
     prisma.categoriaDocumental.findMany({ where: { ativo: true }, select: { code: true, name: true }, orderBy: { ordem: "asc" } }),
-    prisma.modalidadePais.findMany({ where: { ativo: true }, select: { id: true, countryKey: true, modalityKey: true, modalityLabel: true }, orderBy: { ordem: "asc" } }),
+    prisma.modalidadePais.findMany({ where: { ativo: true }, select: { id: true, modalityKey: true, modalityLabel: true, pais: { select: { countryKey: true } } }, orderBy: { ordem: "asc" } }),
   ])
   const tiposProcesso = tipos.map((t) => ({
     id: t.id, name: t.name, countryKey: t.pais.countryKey, modalityKey: t.modalityKey,
@@ -53,7 +53,9 @@ export async function dadosDeApoio() {
   }))
   // catálogo canônico de fases (para faseExigencia/faseBloqueio quando o processo não tem macro)
   const fasesCatalogo = Object.values(FASES).map((f) => ({ phaseKey: f.phaseKey, label: f.label, ordem: f.ordem }))
-  return { tiposProcesso, docTypes, categorias, modalidades, fasesCatalogo }
+  // A tela filtra modalidade por país: a chave vem da relação, derivada.
+  const modalidadesOut = modalidades.map(({ pais, ...m }) => ({ ...m, countryKey: pais.countryKey }))
+  return { tiposProcesso, docTypes, categorias, modalidades: modalidadesOut, fasesCatalogo }
 }
 
 // mapa phaseKey → ordem (catálogo global) para detecção de conflito de fase

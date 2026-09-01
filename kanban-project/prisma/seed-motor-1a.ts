@@ -35,10 +35,14 @@ async function main() {
     await prisma.catalogoPais.upsert({ where: { countryKey: p.countryKey }, update: p, create: p })
   }
   for (const m of MODALIDADES) {
+    // A modalidade pertence ao país pela IDENTIDADE — a chave textual do seed
+    // é resolvida aqui, e não é gravada na modalidade.
+    const { countryKey, ...dados } = m
+    const pais = await prisma.catalogoPais.findUniqueOrThrow({ where: { countryKey }, select: { id: true } })
     await prisma.modalidadePais.upsert({
-      where: { countryKey_modalityKey: { countryKey: m.countryKey, modalityKey: m.modalityKey } },
-      update: m,
-      create: m,
+      where: { paisId_modalityKey: { paisId: pais.id, modalityKey: m.modalityKey } },
+      update: dados,
+      create: { ...dados, paisId: pais.id },
     })
   }
   console.log(`Seed motor 1A OK — ${PAISES.length} países, ${MODALIDADES.length} modalidades.`)
