@@ -118,8 +118,7 @@ async function montarCenario(sufixo: string): Promise<Cenario> {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${MARCA}-${sufixo}`, name: `${MARCA} tipo ${sufixo}`,
-      countryKey: "espanha", countryLabel: "Espanha",
-      nationalityKey: "espanhola", nationalityLabel: "Espanhola",
+      pais: { connectOrCreate: { where: { countryKey: "espanha" }, create: { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola" } } },
       modalityKey: "descendencia", modalityLabel: "Descendência",
     },
     select: { id: true },

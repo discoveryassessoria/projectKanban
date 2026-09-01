@@ -158,8 +158,7 @@ async function main() {
     where: { code: `${MARCA}_ESP_ADM` },
     create: {
       code: `${MARCA}_ESP_ADM`, name: 'Espanha — Administrativa (palco)',
-      countryKey: 'espanha', countryLabel: 'Espanha',
-      nationalityKey: 'espanhola', nationalityLabel: 'Espanhola',
+      pais: { connectOrCreate: { where: { countryKey: 'espanha' }, create: { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola' } } },
       modalityKey: 'administrativa', modalityLabel: 'Administrativa',
     },
     update: { ativo: true, arquivado: false }, select: { id: true },

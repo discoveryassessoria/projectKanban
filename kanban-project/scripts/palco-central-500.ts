@@ -60,7 +60,7 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({
     where: { ativo: true, arquivado: false },
     orderBy: { id: 'asc' },
-    select: { id: true, countryKey: true },
+    select: { id: true, pais: { select: { countryKey: true } } },
   })
   if (!tipo) {
     console.error('❌ o banco de teste não tem TipoProcessoNacionalidade ativo — o quadro não teria coluna para o palco.')
@@ -171,7 +171,7 @@ async function main() {
   }
 
 
-  console.log(JSON.stringify({ processoId: processo.id, pais: tipo.countryKey, documentos: TOTAL, pessoas: PESSOAS }))
+  console.log(JSON.stringify({ processoId: processo.id, pais: tipo.pais.countryKey, documentos: TOTAL, pessoas: PESSOAS }))
 }
 
 void main().finally(() => prisma.$disconnect())

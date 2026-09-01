@@ -190,7 +190,7 @@ async function montar(marca: string): Promise<Palco> {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_${marca}`.toUpperCase().slice(0, 40), name: `${M} ${marca}`, ativo: true,
-      countryKey: "retro", countryLabel: "Retro", nationalityKey: "retro", nationalityLabel: "Retro",
+      pais: { connectOrCreate: { where: { countryKey: "retro" }, create: { countryKey: "retro", countryLabel: "Retro", nationalityKey: "retro", nationalityLabel: "Retro" } } },
       modalityKey: "retro", modalityLabel: "Retro",
     },
     select: { id: true },

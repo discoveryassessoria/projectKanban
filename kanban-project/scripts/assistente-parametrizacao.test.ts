@@ -34,7 +34,8 @@ const c: { tipoId?: number; macroId?: number; faseId?: number; itemId?: number; 
 
 async function montar() {
   const tp = await prisma.tipoProcessoNacionalidade.create({
-    data: { code: `TPW-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, countryKey: 'x', countryLabel: 'País X', nationalityKey: 'x', nationalityLabel: 'X', modalityKey: 'x', modalityLabel: 'X' },
+    data: { code: `TPW-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, pais: { connectOrCreate: { where: { countryKey: 'x' }, create: { countryKey: 'x', countryLabel: 'País X', nationalityKey: 'x', nationalityLabel: 'X' } } },
+      modalityKey: 'x', modalityLabel: 'X' },
   })
   c.tipoId = tp.id
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tp.id, name: `Macro ${TAG}` } })

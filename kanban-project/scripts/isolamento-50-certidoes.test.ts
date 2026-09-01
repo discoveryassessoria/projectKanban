@@ -94,7 +94,7 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_TIPO`, name: `${M} tipo`, ativo: true,
-      countryKey: "esc", countryLabel: "Esc", nationalityKey: "esc", nationalityLabel: "Esc",
+      pais: { connectOrCreate: { where: { countryKey: "esc" }, create: { countryKey: "esc", countryLabel: "Esc", nationalityKey: "esc", nationalityLabel: "Esc" } } },
       modalityKey: "esc", modalityLabel: "Esc",
     },
     select: { id: true },

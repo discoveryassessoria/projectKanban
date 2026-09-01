@@ -2293,11 +2293,7 @@ CREATE TABLE "TipoProcessoNacionalidade" (
     "id" SERIAL NOT NULL,
     "code" VARCHAR(40) NOT NULL,
     "name" VARCHAR(200) NOT NULL,
-    "countryKey" VARCHAR(40) NOT NULL,
-    "countryLabel" VARCHAR(80) NOT NULL,
-    "nationalityKey" VARCHAR(40) NOT NULL,
-    "nationalityLabel" VARCHAR(80) NOT NULL,
-    "paisId" INTEGER,
+    "paisId" INTEGER NOT NULL,
     "modalityKey" VARCHAR(40) NOT NULL,
     "modalityLabel" VARCHAR(80) NOT NULL,
     "processFamily" VARCHAR(40) NOT NULL DEFAULT 'cidadania',
@@ -5479,7 +5475,7 @@ CREATE INDEX "Bandeira_ativo_idx" ON "Bandeira"("ativo");
 CREATE UNIQUE INDEX "TipoProcessoNacionalidade_code_key" ON "TipoProcessoNacionalidade"("code");
 
 -- CreateIndex
-CREATE INDEX "TipoProcessoNacionalidade_countryKey_idx" ON "TipoProcessoNacionalidade"("countryKey");
+CREATE INDEX "TipoProcessoNacionalidade_paisId_idx" ON "TipoProcessoNacionalidade"("paisId");
 
 -- CreateIndex
 CREATE INDEX "TipoProcessoNacionalidade_modalityKey_idx" ON "TipoProcessoNacionalidade"("modalityKey");

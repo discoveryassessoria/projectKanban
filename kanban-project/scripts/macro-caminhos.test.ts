@@ -44,8 +44,8 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM-TEST" }, update: {},
     create: {
-      code: "ALE-ADM-TEST", name: "Alemã (teste de caminhos)", countryKey: "alemanha", countryLabel: "Alemanha",
-      nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa",
+      code: "ALE-ADM-TEST", name: "Alemã (teste de caminhos)", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
+      modalityKey: "administrativa",
       modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
@@ -120,7 +120,8 @@ async function main() {
   // Macro novo montado como o endpoint monta (a partir do catálogo ativo).
   const tipoNovo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "NOVO-SEED" }, update: {},
-    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "administrativa", modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", pais: { connectOrCreate: { where: { countryKey: "italia" }, create: { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana" } } },
+      modalityKey: "administrativa", modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
   })
   const catAtivo = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: "asc" } })
   const macroNovo = await prisma.macroWorkflow.create({

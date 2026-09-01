@@ -47,7 +47,7 @@ async function montarCenario() {
   const tipoProc = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `TP-${TS}`.slice(0, 40), name: `Tipo ${TAG}`,
-      countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana",
+      pais: { connectOrCreate: { where: { countryKey: "italia" }, create: { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana" } } },
       modalityKey: "teste", modalityLabel: "Teste",
     },
   })

@@ -170,7 +170,7 @@ async function main() {
     select: { id: true },
   })
 
-  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true, arquivado: false }, orderBy: { id: 'asc' }, select: { id: true, countryKey: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true, arquivado: false }, orderBy: { id: 'asc' }, select: { id: true, pais: { select: { countryKey: true } } } })
   if (!tipo) { console.error('❌ banco de teste sem TipoProcessoNacionalidade ativo'); process.exit(1) }
 
   // O MACRO define a matriz de fases — o motor lê dele, não de lista no código.

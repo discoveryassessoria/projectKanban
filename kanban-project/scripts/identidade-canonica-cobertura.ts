@@ -71,6 +71,19 @@ async function main() {
     `SELECT COUNT(*)::int n FROM "Documento" d JOIN "TipoDocumentoCadastro" t ON t.id = d."documentTypeId" WHERE d.tipo IS NOT NULL AND t."legacyEnumKey" IS DISTINCT FROM d.tipo::text`)
   await div("Solicitacao.canal × CanalOperacional.key",
     `SELECT COUNT(*)::int n FROM "SolicitacaoDocumento" s JOIN "CanalOperacional" c ON c.id = s."canalOperacionalId" WHERE c.key <> s.canal::text`)
+  // OS QUATRO ESPELHOS DA OFERTA. `TipoProcessoNacionalidade` copiava o país
+  // inteiro — chave e rótulo, do país e da nacionalidade. Recriar qualquer um
+  // deles como coluna é recriar a segunda fonte, e o guard falha aqui mesmo que
+  // o schema do Prisma diga outra coisa.
+  for (const campo of ["countryKey", "countryLabel", "nationalityKey", "nationalityLabel"]) {
+    await div(`espelho TipoProcessoNacionalidade.${campo} não existe`,
+      `SELECT COUNT(*)::int n FROM information_schema.columns WHERE table_name = 'TipoProcessoNacionalidade' AND column_name = '${campo}'`)
+  }
+  // Sem país não existe oferta: a identidade é obrigatória NO BANCO, não só no
+  // schema. Uma linha com paisId nulo seria uma oferta de nacionalidade nenhuma.
+  await div("TipoProcessoNacionalidade.paisId é NOT NULL",
+    `SELECT CASE WHEN EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='TipoProcessoNacionalidade' AND column_name='paisId' AND is_nullable='NO') THEN 0 ELSE 1 END n`)
+
   await div("MatrizDocumental.documentTypeCode × code",
     `SELECT COUNT(*)::int n FROM "MatrizDocumental" m JOIN "TipoDocumentoCadastro" t ON t.id = m."documentoTipoId" WHERE t.code <> m."documentTypeCode"`)
 
@@ -152,6 +165,35 @@ async function main() {
 
   okGuard(listasLocais.length === 0,
     `nenhuma lista local de países${listasLocais.length ? ` (${listasLocais.join(", ")})` : ""}`)
+
+  // NINGUÉM VOLTA A ESCREVER O PAÍS DENTRO DA OFERTA. Um create/update de
+  // `tipoProcessoNacionalidade` que atribua countryKey/countryLabel/
+  // nationalityKey/nationalityLabel está recriando a cópia — mesmo que o
+  // compilador ainda não reclame porque alguém "reabriu" a coluna no schema.
+  const corpoDeData = (janela: string): string => {
+    // Recorta só o objeto `data:` — `where: { pais: { countryKey } }` é FILTRO
+    // pela relação canônica, não cópia, e não pode acusar.
+    const i = janela.indexOf("data:")
+    if (i < 0) return ""
+    let prof = 0, ini = -1
+    for (let j = i; j < janela.length; j++) {
+      if (janela[j] === "{") { if (prof === 0) ini = j; prof++ }
+      else if (janela[j] === "}") { prof--; if (prof === 0) return janela.slice(ini, j + 1) }
+    }
+    return janela.slice(ini < 0 ? i : ini)
+  }
+  const escritoresDaCopia = fontes.filter((f) => {
+    const src = semComentario(readFileSync(join(RAIZ, f), "utf8"))
+    for (const m of src.matchAll(/tipoProcessoNacionalidade\.(create|update|upsert|updateMany|createMany)/g)) {
+      const dados = corpoDeData(src.slice(m.index ?? 0, (m.index ?? 0) + 1600))
+      // dentro de `connectOrCreate` os campos são do PAÍS, não do tipo
+      const semConnect = dados.replace(/connectOrCreate:\s*\{[\s\S]*\}/g, "")
+      if (/\b(countryKey|countryLabel|nationalityKey|nationalityLabel)\s*:/.test(semConnect)) return true
+    }
+    return false
+  })
+  okGuard(escritoresDaCopia.length === 0,
+    `nenhum writer copia país para dentro da oferta${escritoresDaCopia.length ? ` (${escritoresDaCopia.join(", ")})` : ""}`)
 
   // FILTRO DE PROCESSO POR PAÍS usa o resolvedor de identidade, não `{ pais }`.
   const filtroCru = fontes.filter((f) => {

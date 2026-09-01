@@ -78,8 +78,7 @@ async function main() {
   })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: `${MARCA}_ESP`, name: `${MARCA} Espanha`, countryKey: 'espanha', countryLabel: 'Espanha',
-      nationalityKey: 'espanhola', nationalityLabel: 'Espanhola',
+      code: `${MARCA}_ESP`, name: `${MARCA} Espanha`, pais: { connectOrCreate: { where: { countryKey: 'espanha' }, create: { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola' } } },
       modalityKey: 'administrativa', modalityLabel: 'Administrativa',
     },
     select: { id: true },

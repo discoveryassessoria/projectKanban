@@ -104,7 +104,7 @@ async function main() {
   // O QUADRO PRECISA TER COLUNA PARA ESTE PROCESSO — mesma razão do palco de 500.
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({
     where: { ativo: true, arquivado: false }, orderBy: { id: 'asc' },
-    select: { id: true, countryKey: true },
+    select: { id: true, pais: { select: { countryKey: true } } },
   })
   if (!tipo) {
     console.error('❌ o banco de teste não tem TipoProcessoNacionalidade ativo.')

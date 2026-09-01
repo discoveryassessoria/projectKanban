@@ -272,8 +272,8 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "MAT-TEST" }, update: {},
     create: {
-      code: "MAT-TEST", name: "Materialização", countryKey: "alemanha", countryLabel: "Alemanha",
-      nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa",
+      code: "MAT-TEST", name: "Materialização", pais: { connectOrCreate: { where: { countryKey: "alemanha" }, create: { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã" } } },
+      modalityKey: "administrativa",
       modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })

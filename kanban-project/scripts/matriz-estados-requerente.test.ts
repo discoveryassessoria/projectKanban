@@ -103,8 +103,7 @@ async function limpar() {
 async function montarPalco(): Promise<Palco> {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: MARCA, name: `${MARCA} tipo`, countryKey: "espanha", countryLabel: "Espanha",
-      nationalityKey: "espanhola", nationalityLabel: "Espanhola",
+      code: MARCA, name: `${MARCA} tipo`, pais: { connectOrCreate: { where: { countryKey: "espanha" }, create: { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola" } } },
       modalityKey: "descendencia", modalityLabel: "Descendência",
     }, select: { id: true },
   })
