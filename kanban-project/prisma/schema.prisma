@@ -70,6 +70,7 @@ model Usuario {
   indisponibilidadesRegistradas IndisponibilidadeOperacional[] @relation("IndisponibilidadeAutor")
   capacidadeOperacional         CapacidadeOperacional?
   capacidadesDefinidas          CapacidadeOperacional[]        @relation("CapacidadeAutor")
+  visoesDeRelatorio             RelatorioVisao[]               @relation("VisoesDeRelatorio")
 
   @@index([perfilId])
 }
@@ -7967,4 +7968,32 @@ model CapacidadeOperacional {
   atualizadoPorId   Int?
   usuario           Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   atualizadoPor     Usuario? @relation("CapacidadeAutor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+}
+
+/// VISÃO SALVA DE RELATÓRIO — a PERGUNTA, nunca a resposta.
+///
+/// Guarda só a QuerySpec: domínio, contexto de nacionalidade, filtros,
+/// agrupamento, colunas e ordenação. Reabrir uma visão refaz a consulta e traz
+/// dado fresco. Se ela guardasse o resultado, viraria uma fotografia velha se
+/// passando por relatório — e uma segunda fonte de verdade.
+model RelatorioVisao {
+  id           Int       @id @default(autoincrement())
+  /// Chave do domínio no motor (ex.: "protocolos").
+  dominio      String    @db.VarChar(40)
+  nome         String    @db.VarChar(120)
+  /// A QuerySpec inteira, como o motor a recebe.
+  spec         Json
+  /// Dono da visão. Visão é do operador que a criou.
+  usuarioId    Int
+  usuario      Usuario   @relation("VisoesDeRelatorio", fields: [usuarioId], references: [id], onDelete: Cascade)
+  favorita     Boolean   @default(false)
+  /// Última vez que foi aberta — alimenta "Recentes" sem log paralelo.
+  usadaEm      DateTime?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  @@unique([usuarioId, dominio, nome])
+  @@index([usuarioId, dominio])
+  @@index([usuarioId, favorita])
+  @@index([usuarioId, usadaEm])
 }

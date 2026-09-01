@@ -4571,6 +4571,21 @@ CREATE TABLE "CapacidadeOperacional" (
 );
 
 -- CreateTable
+CREATE TABLE "RelatorioVisao" (
+    "id" SERIAL NOT NULL,
+    "dominio" VARCHAR(40) NOT NULL,
+    "nome" VARCHAR(120) NOT NULL,
+    "spec" JSONB NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "favorita" BOOLEAN NOT NULL DEFAULT false,
+    "usadaEm" TIMESTAMP(3),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RelatorioVisao_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -6438,6 +6453,18 @@ CREATE INDEX "IndisponibilidadeOperacional_fim_idx" ON "IndisponibilidadeOperaci
 CREATE UNIQUE INDEX "CapacidadeOperacional_usuarioId_key" ON "CapacidadeOperacional"("usuarioId");
 
 -- CreateIndex
+CREATE INDEX "RelatorioVisao_usuarioId_dominio_idx" ON "RelatorioVisao"("usuarioId", "dominio");
+
+-- CreateIndex
+CREATE INDEX "RelatorioVisao_usuarioId_favorita_idx" ON "RelatorioVisao"("usuarioId", "favorita");
+
+-- CreateIndex
+CREATE INDEX "RelatorioVisao_usuarioId_usadaEm_idx" ON "RelatorioVisao"("usuarioId", "usadaEm");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RelatorioVisao_usuarioId_dominio_nome_key" ON "RelatorioVisao"("usuarioId", "dominio", "nome");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -7489,6 +7516,9 @@ ALTER TABLE "CapacidadeOperacional" ADD CONSTRAINT "CapacidadeOperacional_usuari
 
 -- AddForeignKey
 ALTER TABLE "CapacidadeOperacional" ADD CONSTRAINT "CapacidadeOperacional_atualizadoPorId_fkey" FOREIGN KEY ("atualizadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RelatorioVisao" ADD CONSTRAINT "RelatorioVisao_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -40,7 +40,6 @@ const SUPERFICIE = [
   ...arquivos("src/components/relatorios"),
   ...arquivos("src/lib/relatorios"),
   ...arquivos("src/app/api/relatorios"),
-  join(ROOT, "src/components/gerenciamentoComponents/RelatorioProtocolosTab.tsx"),
 ]
 
 console.log("RELATÓRIOS — GUARD DE ARQUITETURA CANÔNICA\n")
@@ -78,16 +77,53 @@ const orgHard = conteudo.filter(({ src }) => {
 })
 ok(orgHard.length === 0, "nenhum órgão escrito em código")
 
-console.log("\nO catálogo referencia, não duplica:")
-const registry = readFileSync(join(ROOT, "src/lib/relatorios/registry.ts"), "utf8")
-ok(!/countryKey\s*:\s*["']/.test(registry), "catálogo de relatórios não declara nacionalidade")
-ok(/familia:/.test(registry), "todo relatório declara a FAMÍLIA (domínio proprietário)")
-ok(/granularidade:/.test(registry), "todo relatório declara a GRANULARIDADE (protege contra JOIN inflado)")
-ok(/permissao:/.test(registry), "todo relatório declara PERMISSÃO")
+console.log("\nNão existe catálogo de relatórios prontos:")
+// O catálogo antigo listava relatórios (Protocolos, Pendências por pessoa,
+// Pendências por requisito). Cada pergunta nova pedia uma entrada nova — foi o
+// que produziu a tela rejeitada. Domínio não é relatório: a pergunta vira filtro.
+import { existsSync } from "fs"
+ok(!existsSync(join(ROOT, "src/lib/relatorios/registry.ts")),
+  "o catálogo de relatórios prontos foi eliminado — perguntas viram filtros")
+const dominios = readFileSync(join(ROOT, "src/lib/relatorios/motor/dominios/protocolos.ts"), "utf8")
+ok(/grain:/.test(dominios), "o domínio declara o GRAIN (protege contra JOIN inflado)")
+ok(/permissao:/.test(dominios), "o domínio declara PERMISSÃO")
+ok(/visoesDoSistema/.test(dominios), "visões prontas são QuerySpecs, não relatórios separados")
 
-console.log("\nA nacionalidade vem do cadastro:")
-const pagina = readFileSync(join(ROOT, "src/app/relatorios/page.tsx"), "utf8")
-ok(/\/api\/gerenciamento\/paises/.test(pagina), "a tela busca as nacionalidades no cadastro (CatalogoPais)")
+console.log("\nNACIONALIDADE OFERTADA ≠ PAÍS GEOGRÁFICO:")
+// ESTA VERIFICAÇÃO CIMENTAVA O DEFEITO. Ela exigia que a tela buscasse
+// `/api/gerenciamento/paises` — o registro GEOGRÁFICO — e por isso Argentina,
+// Brasil, Estados Unidos, França, Paraguai e Reino Unido apareciam listados
+// como nacionalidades que a empresa vende. Guard que trava a arquitetura errada
+// é pior que guard nenhum.
+const superficie = [
+  ...arquivos("src/app/relatorios"),
+  ...arquivos("src/components/relatorios"),
+  ...arquivos("src/lib/relatorios"),
+].map((f) => ({ f, src: readFileSync(f, "utf8") }))
+const geograficoComoNacionalidade = superficie.filter(({ src }) =>
+  /\/api\/gerenciamento\/paises/.test(semComentarios(src)))
+ok(geograficoComoNacionalidade.length === 0,
+  `o módulo NÃO usa o cadastro geográfico como lista de nacionalidades${geograficoComoNacionalidade.length ? ` (${geograficoComoNacionalidade.map((x) => x.f.split("/").pop()).join(", ")})` : ""}`)
+
+const opcoes = readFileSync(join(ROOT, "src/lib/relatorios/motor/opcoes.ts"), "utf8")
+ok(/tiposDeProcesso:\s*\{\s*some:\s*\{\s*ativo:\s*true/.test(opcoes),
+  "nacionalidade ofertada = país COM tipo de processo ativo (a mesma regra do Kanban)")
+ok(/export async function paisesGeograficos/.test(opcoes),
+  "país geográfico tem função própria — serve ao país do órgão, não à nacionalidade")
+
+console.log("\nO motor não é uma porta de SQL:")
+const executar = readFileSync(join(ROOT, "src/lib/relatorios/motor/executar.ts"), "utf8")
+ok(/dominio\.filtros\.find/.test(executar), "filtro só é aplicado se o domínio o declarou")
+ok(/dominio\.contar\(where\)/.test(executar), "o total vem de um COUNT sobre o mesmo where — não de linhas.length")
+ok(/exportarCsv/.test(executar) && /executar\(dominio, \{ \.\.\.spec/.test(executar),
+  "o export reusa a MESMA consulta da tela")
+
+const registro = readFileSync(join(ROOT, "src/lib/relatorios/motor/registro.ts"), "utf8")
+ok(/DOMINIOS/.test(registro), "existe um registro de DOMÍNIOS (assuntos), não de relatórios")
+
+const tipos = readFileSync(join(ROOT, "src/lib/relatorios/motor/tipos.ts"), "utf8")
+ok(/grain:\s*Grain/.test(tipos), "todo domínio declara o GRAIN (o que é uma linha)")
+ok(/PermissaoChave/.test(tipos), "a permissão do domínio é tipada pelo catálogo de permissões")
 
 console.log("\nO motor de completude não decide obrigatoriedade:")
 const motor = readFileSync(join(ROOT, "src/lib/requisitos/completude.ts"), "utf8")
