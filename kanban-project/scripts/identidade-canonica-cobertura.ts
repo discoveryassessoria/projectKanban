@@ -141,6 +141,15 @@ async function main() {
     const percorreMapa = /Object\.(keys|entries|values)\s*\(\s*PAIS/.test(src)
     return enumeraEmArray || (mapaDePais && percorreMapa)
   })
+  // NENHUM ENUM LOCAL DE PAÍS. O `enum Pais` do schema e o de types/kanban
+  // foram removidos; recriar qualquer um volta a ser uma segunda fonte.
+  const enumsDePais = fontes.filter((f) => {
+    const src = semComentario(readFileSync(join(RAIZ, f), "utf8"))
+    return /enum\s+Pais\b/.test(src) || /enum\s+Country\b/.test(src)
+  })
+  okGuard(enumsDePais.length === 0,
+    `nenhum enum local de país${enumsDePais.length ? ` (${enumsDePais.join(", ")})` : ""}`)
+
   okGuard(listasLocais.length === 0,
     `nenhuma lista local de países${listasLocais.length ? ` (${listasLocais.join(", ")})` : ""}`)
 
