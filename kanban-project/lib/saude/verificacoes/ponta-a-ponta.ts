@@ -116,7 +116,6 @@ registrar({
               // Identidade + espelho. O valor era 'ITALIA' em maiúsculas, que
               // não corresponde a nenhuma chave do cadastro — o diagnóstico
               // criava um processo de um país que não existe.
-              pais: paisDiagnostico?.countryKey ?? 'italia',
               paisId: paisDiagnostico?.id ?? null,
               tipoProcessoMotorId: tipo.id,
               faseAtualKey: ordenadas[0]?.phaseKey ?? null,

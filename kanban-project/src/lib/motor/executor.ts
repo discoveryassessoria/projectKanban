@@ -725,7 +725,7 @@ export type ResultadoHonorario = {
 export async function aplicarHonorariosPorRequerente(processoId: number): Promise<ResultadoHonorario> {
   const proc = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true, tipoProcessoMotorId: true,
+    select: { paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true, tipoProcessoMotorId: true,
       tipoProcessoMotor: { select: { nationalityLabel: true, name: true } } },
   })
   if (!proc) return { aplicavel: false, motivo: 'processo não encontrado' }

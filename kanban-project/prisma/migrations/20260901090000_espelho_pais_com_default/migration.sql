@@ -1,0 +1,13 @@
+-- ============================================================================
+-- O ESPELHO GANHA DEFAULT — para que ninguém mais precise escrevê-lo
+-- ----------------------------------------------------------------------------
+-- `Processo.pais` é NOT NULL sem default, então todo writer era OBRIGADO a
+-- informá-lo — inclusive depois de a identidade (`paisId`) passar a ser a fonte.
+-- Enquanto isso valesse, "nenhum writer grava o espelho" seria impossível de
+-- cumprir: o tipo exigia o campo.
+--
+-- Com default vazio, quem grava informa apenas a IDENTIDADE e o trigger deriva o
+-- texto. É o passo que permite remover a escrita do espelho de todos os writers
+-- antes de a coluna sair.
+-- ============================================================================
+ALTER TABLE "Processo" ALTER COLUMN "pais" SET DEFAULT '';

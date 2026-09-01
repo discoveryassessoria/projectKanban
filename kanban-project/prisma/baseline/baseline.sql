@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-31
+-- Gerado em : 2026-09-01
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -457,7 +457,7 @@ CREATE TABLE "Processo" (
     "nome" VARCHAR(100) NOT NULL,
     "descricao" VARCHAR(500),
     "observacoes" TEXT,
-    "pais" TEXT NOT NULL,
+    "pais" TEXT NOT NULL DEFAULT '',
     "paisId" INTEGER,
     "arvoreId" INTEGER,
     "familiaId" INTEGER,

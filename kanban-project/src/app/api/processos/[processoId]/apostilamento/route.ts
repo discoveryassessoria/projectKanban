@@ -56,7 +56,7 @@ export async function GET(
 
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, pais: true, arvoreId: true, faseAtualKey: true },
+      select: { id: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, arvoreId: true, faseAtualKey: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 

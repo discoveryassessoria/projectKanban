@@ -42,7 +42,7 @@ export async function GET(
     // 1) Carrega o processo (precisa do arvoreId e pais)
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true, pais: true, paisId: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
+      select: { id: true, arvoreId: true, paisId: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
     })
 
     if (!processo) {
