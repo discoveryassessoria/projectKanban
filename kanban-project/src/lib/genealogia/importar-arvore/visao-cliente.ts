@@ -75,8 +75,14 @@ export function configVisao(): ConfigVisao {
     modelo: process.env.ARVORE_VISAO_MODELO?.trim() || MODELO_PADRAO,
     esforco: process.env.ARVORE_VISAO_ESFORCO?.trim() || "medium",
     maxTokens: num(process.env.ARVORE_VISAO_MAX_TOKENS, 16_000, 1_000, 32_000),
-    timeoutMs: num(process.env.ARVORE_VISAO_TIMEOUT_MS, 45_000, 5_000, 120_000),
-    prazoTotalMs: num(process.env.ARVORE_VISAO_PRAZO_MS, 52_000, 10_000, 300_000),
+    // 45s não cobria a leitura de uma árvore real. Uma prancha com quinze cards
+    // leva bem mais que isso, então a 1ª tentativa era abortada, e a 2ª herdava
+    // o resto do orçamento — o usuário via "A leitura passou de 6s", mensagem
+    // que escondia os 45s já gastos e fazia parecer defeito instantâneo.
+    timeoutMs: num(process.env.ARVORE_VISAO_TIMEOUT_MS, 110_000, 5_000, 120_000),
+    // O orçamento total precisa caber DUAS tentativas, senão a segunda nasce
+    // condenada e só serve para atrasar a mensagem de erro.
+    prazoTotalMs: num(process.env.ARVORE_VISAO_PRAZO_MS, 240_000, 10_000, 300_000),
     tentativas: num(process.env.ARVORE_VISAO_TENTATIVAS, 2, 1, 5),
     concorrencia: num(process.env.ARVORE_VISAO_CONCORRENCIA, 2, 1, 8),
     tetoUsd: num(process.env.ARVORE_VISAO_TETO_USD, 1, 0, 100),
@@ -402,8 +408,13 @@ export async function chamarVisao(pedido: PedidoVisao, cfg: ConfigVisao = config
         if (tentativa < cfg.tentativas) await esperar(Math.min(esperaDe(res, tentativa), Math.max(restante() - 5_000, 0)))
       } catch (e) {
         const abortado = e instanceof Error && e.name === "AbortError"
+        // A MENSAGEM CONTA O TEMPO TOTAL, NÃO O DA ÚLTIMA JANELA. Dizer "passou
+        // de 6s" quando a tentativa anterior já tinha queimado 45s faz o
+        // usuário procurar um defeito instantâneo que não existe.
+        const gastoS = Math.round((Date.now() - inicio) / 1000)
         ultimoMotivo = abortado
-          ? `A leitura passou de ${Math.round(janela / 1000)}s e foi interrompida.`
+          ? `A leitura foi interrompida após ${gastoS}s (tentativa ${tentativa} de ${cfg.tentativas}, janela de ${Math.round(janela / 1000)}s). ` +
+            `Imagem muito grande ou serviço lento — tente recortar o print ou reenviar.`
           : `Falha de rede ao chamar o serviço de leitura: ${e instanceof Error ? e.message : String(e)}`
         registrar("warn", "visao_falha_rede", { referencia: pedido.referencia ?? null, tentativa, abortado })
         if (tentativa < cfg.tentativas) {

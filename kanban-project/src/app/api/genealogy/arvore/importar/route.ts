@@ -23,7 +23,10 @@ import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/mater
 import { ExtracaoNaoImplementada, FalhaNaLeitura, obterExtrator } from "@/src/lib/genealogia/importar-arvore/extrair"
 import type { ExtracaoArvore, PessoaExtraida, UniaoExtraida } from "@/src/lib/genealogia/importar-arvore/tipos"
 
-export const maxDuration = 60
+// A leitura de uma árvore por visão leva muito mais que 60s quando a prancha
+// tem muitos cards. O teto da rota era o limite REAL da operação: o orçamento
+// interno podia ser generoso, que a função morria antes.
+export const maxDuration = 300
 
 /** Data ISO → Date. Valor ausente, vazio ou inválido vira null (nunca "hoje"). */
 function paraData(v: unknown): Date | null {

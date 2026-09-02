@@ -12,7 +12,7 @@
 // 501 com `codigo: EXTRACAO_NAO_IMPLEMENTADA` e a tela explica isso em vez de
 // mostrar erro genérico.
 // ============================================================================
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { X, Upload, Loader2, AlertTriangle, Users, Link2 } from "lucide-react"
 import type { ExtracaoArvore, PessoaExtraida } from "@/src/lib/genealogia/importar-arvore/tipos"
 
@@ -57,6 +57,14 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
   const [removidas, setRemovidas] = useState<Set<string>>(new Set())
   const [erro, setErro] = useState<string | null>(null)
   const [naoImplementado, setNaoImplementado] = useState(false)
+  /** Segundos decorridos na leitura. Sem isso, minutos de silêncio parecem travamento. */
+  const [segundos, setSegundos] = useState(0)
+
+  useEffect(() => {
+    if (etapa !== "analisando") { setSegundos(0); return }
+    const t = setInterval(() => setSegundos((s) => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [etapa])
 
   if (!aberto) return null
 
@@ -274,7 +282,9 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
             usa o token de ação, o mesmo de "Novo processo" e "Entrar". */}
         <footer className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-4">
           <p className="text-xs text-[var(--text-secondary)]">
-            {naPrevia ? "Nada foi gravado ainda — confira antes de confirmar." : "A imagem é lida no servidor; nada é gravado nesta etapa."}
+            {etapa === "analisando"
+              ? "Transcrevendo os cards — uma árvore cheia pode levar um a dois minutos. Não feche a janela."
+              : naPrevia ? "Nada foi gravado ainda — confira antes de confirmar." : "A imagem é lida no servidor; nada é gravado nesta etapa."}
           </p>
           <div className="flex items-center gap-2">
             {naPrevia && (
@@ -286,7 +296,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
               <button onClick={analisar} disabled={!arquivo || ocupado}
                 className="flex items-center gap-2 rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] shadow-[var(--elev-1)] transition hover:opacity-90 disabled:opacity-40">
                 {etapa === "analisando" && <Loader2 className="h-4 w-4 animate-spin" />}
-                {etapa === "analisando" ? "Lendo a imagem…" : "Analisar"}
+                {etapa === "analisando" ? `Lendo a imagem… ${segundos}s` : "Analisar"}
               </button>
             ) : (
               <button onClick={confirmar} disabled={ocupado || restantes.length === 0}
