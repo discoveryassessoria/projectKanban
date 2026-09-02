@@ -348,8 +348,17 @@ export function ArvoreGenealogicaView({
       // voltar vazia ou estourar, tenta de novo em 1× — que é a configuração
       // mais modesta possível. Desistir na primeira falha é o que produzia
       // "verifique o console".
+      // ─── FUNDO CINZA ───────────────────────────────────────────────────
+      // Era '#eaf5fc' — exatamente o valor de `--surface-primary`, a cor de
+      // preenchimento dos CARDS. Card da mesma cor do fundo desaparece: o PDF
+      // saía com os nomes e as barras coloridas flutuando no vazio, sem as
+      // caixas em volta. O cinza neutro devolve o contraste e é o que o
+      // desenho pede.
+      const FUNDO_EXPORTACAO = '#eef0f2'
+      const FUNDO_EXPORTACAO_RGB: [number, number, number] = [238, 240, 242]
+
       const capturar = (px: number) => toPng(reactFlowContainer, {
-        backgroundColor: '#eaf5fc',
+        backgroundColor: FUNDO_EXPORTACAO,
         pixelRatio: px,
         skipFonts: true,
       })
@@ -436,6 +445,12 @@ export function ArvoreGenealogicaView({
       })
 
       const actualPageWidth = pdf.internal.pageSize.getWidth()
+      const actualPageHeight = pdf.internal.pageSize.getHeight()
+
+      // A FOLHA INTEIRA, não só o bloco da imagem. Sem isto sobra uma moldura
+      // branca em volta do cinza, e o resultado parece defeito de recorte.
+      pdf.setFillColor(...FUNDO_EXPORTACAO_RGB)
+      pdf.rect(0, 0, actualPageWidth, actualPageHeight, 'F')
 
       // ✅ ATUALIZADO: Título em italiano com nome da família
       pdf.setFontSize(14)
