@@ -302,22 +302,58 @@ registrar({
           AND NOT EXISTS (SELECT 1 FROM "Tarefa" t WHERE t."processoId" = p.id AND t.concluida = false)
         LIMIT 100`,
     )
+    // O MOTIVO JÁ FOI ESCRITO — BASTA LER. O materializador nomeia por que não
+    // criou nada ("o passo opera por NECESSIDADE e o processo não tem certidão a
+    // localizar") e grava isso na auditoria. Dizer só "sem tarefa aberta" obriga
+    // quem lê o painel a abrir o banco para descobrir o que já está registrado.
+    // Leitura pura: a verificação NÃO chama o materializador, que escreveria.
+    const motivoPorProcesso = new Map<number, string>()
+    if (semProximaAcao.length) {
+      const logs = await prisma.logAuditoria.findMany({
+        where: { acao: 'FASE_MATERIALIZADA', entidade: 'PROCESSO', entidadeId: { in: semProximaAcao.map((p) => p.id) } },
+        select: { entidadeId: true, detalhes: true },
+        orderBy: { criadoEm: 'desc' },
+      })
+      // Quem separa motivo ACIONÁVEL de nota de bastidor é o próprio
+      // materializador. Repetir a lista aqui criaria uma segunda verdade que
+      // envelheceria calada — e o primeiro motivo da lista é justamente uma
+      // nota de bastidor ("Tipo inferido de createsTask=true"), inútil para
+      // quem lê o painel.
+      const { motivosAcionaveis } = await import('@/src/services/materializar-fase')
+      for (const log of logs) {
+        if (log.entidadeId == null || motivoPorProcesso.has(log.entidadeId)) continue
+        const d = log.detalhes as { estado?: string; motivos?: { code: string; message?: string }[] } | null
+        // O JSON da auditoria pode ter motivo sem mensagem; o filtro exige a
+        // mensagem presente, então normaliza antes de entregar.
+        const motivos = (d?.motivos ?? []).map((m) => ({ code: m.code, message: m.message ?? '' }))
+        const acionaveis = motivosAcionaveis(motivos)
+        const frase = acionaveis.find((m) => m.message)?.message ?? d?.motivos?.find((m) => m.message)?.message
+        if (frase) motivoPorProcesso.set(log.entidadeId, `${d?.estado ?? '?'} — ${frase}`)
+      }
+    }
+
+    const comMotivo = semProximaAcao.map((p) => ({
+      id: p.id, nome: p.nome,
+      motivo: motivoPorProcesso.get(p.id) ?? 'sem registro de materialização — a fase pode nunca ter sido materializada',
+    }))
+
     const achados: Achado[] = []
     if (semProximaAcao.length) {
+      const primeiro = comMotivo[0]
       achados.push({
         chave: 'processo-sem-proxima-acao',
         severidade: 'ALERTA',
         titulo: `${semProximaAcao.length} processo(s) sem próxima ação`,
-        descricao: `${semProximaAcao.length} processo(s) em andamento não têm nenhuma tarefa aberta.`,
-        explicacao: 'Sem tarefa aberta, ninguém tem o que fazer no processo — ele fica parado sem aparecer em nenhuma fila.',
+        descricao: `${primeiro.nome} (#${primeiro.id}): ${primeiro.motivo}`,
+        explicacao: 'Sem tarefa aberta, ninguém tem o que fazer no processo — ele fica parado sem aparecer em nenhuma fila. O motivo acima é o que o materializador registrou quando tentou criar as tarefas da fase.',
         impacto: 'Processo estagnado sem sinal visível para a operação.',
         entidade: 'Processo',
-        registroId: String(semProximaAcao[0].id),
-        registroNome: semProximaAcao[0].nome,
+        registroId: String(primeiro.id),
+        registroNome: primeiro.nome,
         quantidade: semProximaAcao.length,
-        link: `/kanban?processoId=${semProximaAcao[0].id}`,
-        recomendacao: 'Verifique se o workflow interno da fase gerou as tarefas; caso contrário, reprocesse a fase.',
-        evidencia: { total: semProximaAcao.length, amostra: semProximaAcao.slice(0, 10) },
+        link: `/kanban?processoId=${primeiro.id}`,
+        recomendacao: 'Leia o motivo: SEM_ALVO_APLICAVEL quase sempre significa que a fase só tem passos que operam sobre uma entidade que o processo ainda não tem — é cadastro do workflow da fase, não falha de execução.',
+        evidencia: { total: semProximaAcao.length, amostra: comMotivo.slice(0, 10) },
       })
     }
     return { achados, metricas: { semProximaAcao: semProximaAcao.length }, resumo: 'Todo processo em andamento tem próxima ação.' }
