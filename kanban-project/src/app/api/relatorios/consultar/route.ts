@@ -20,6 +20,15 @@ export async function POST(request: Request) {
     const d = dominioPorChave(spec?.dominio)
     if (!d) return NextResponse.json({ error: "Domínio não encontrado." }, { status: 404 })
 
+    // PORTÃO DO MÓDULO. Esconder o item do menu não autoriza nada: sem
+
+    // `relatorios.ver` a rota recusa, venha o pedido de onde vier.
+
+    const semModulo = await verificarPermissao(request, "relatorios.ver")
+
+    if (semModulo) return semModulo
+
+
     const erro = await verificarPermissao(request, d.permissao)
     if (erro) return erro
 

@@ -17,8 +17,10 @@ const FONTES_PERMITIDAS = new Set(
 )
 
 export async function GET(request: Request) {
-  const erro = await verificarPermissao(request, "processos.ver_paginas")
-  if (erro) return erro
+  // PORTÃO DO MÓDULO. Esconder o item do menu não autoriza nada: sem
+  // `relatorios.ver` a rota recusa, venha o pedido de onde vier.
+  const semModulo = await verificarPermissao(request, "relatorios.ver")
+  if (semModulo) return semModulo
   try {
     const q = new URL(request.url).searchParams
     const fonte = q.get("fonte") ?? ""

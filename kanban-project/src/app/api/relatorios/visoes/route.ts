@@ -20,7 +20,8 @@ async function dono(request: Request): Promise<number | null> {
 }
 
 export async function GET(request: Request) {
-  const erro = await verificarPermissao(request, "processos.ver_paginas")
+
+  const erro = await verificarPermissao(request, "relatorios.ver")
   if (erro) return erro
   try {
     const usuarioId = await dono(request)
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const erro = await verificarPermissao(request, "processos.ver_paginas")
+  const erro = await verificarPermissao(request, "relatorios.ver")
   if (erro) return erro
   try {
     const usuarioId = await dono(request)
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const erro = await verificarPermissao(request, "processos.ver_paginas")
+  const erro = await verificarPermissao(request, "relatorios.ver")
   if (erro) return erro
   try {
     const usuarioId = await dono(request)
@@ -106,7 +107,7 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const erro = await verificarPermissao(request, "processos.ver_paginas")
+  const erro = await verificarPermissao(request, "relatorios.ver")
   if (erro) return erro
   try {
     const usuarioId = await dono(request)

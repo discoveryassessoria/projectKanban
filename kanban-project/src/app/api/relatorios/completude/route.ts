@@ -28,8 +28,10 @@ const TETO = 300
 
 export async function GET(request: Request) {
   try {
-    const erro = await verificarPermissao(request, "processos.ver_paginas")
-    if (erro) return erro
+    // PORTÃO DO MÓDULO. Esconder o item do menu não autoriza nada: sem
+    // `relatorios.ver` a rota recusa, venha o pedido de onde vier.
+    const semModulo = await verificarPermissao(request, "relatorios.ver")
+    if (semModulo) return semModulo
 
     const q = new URL(request.url).searchParams
     const num = (k: string) => {

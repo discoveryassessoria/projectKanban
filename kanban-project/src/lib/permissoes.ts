@@ -35,6 +35,15 @@ export const PERMISSOES = {
   // concedida por perfil padrão nem por `tipo = 'admin'`. Funcionário não a recebe.
   'processos.moverFaseManual': 'Administrador Master: mover o processo manualmente para qualquer fase, sem as validações do fluxo',
 
+  // Relatórios
+  // MÓDULO PRÓPRIO. O menu de Relatórios estava pendurado em
+  // `processos.ver_paginas` — permissão de "ver Protocolos/Informações do
+  // processo" — então desligar o relatório de alguém desligava junto as páginas
+  // do processo. Permissão emprestada não se desliga sozinha. Esta abre o
+  // MÓDULO; o que a pessoa enxerga DENTRO dele continua decidido pela permissão
+  // de cada domínio (e pela de cada coluna, no caso do dinheiro).
+  'relatorios.ver': 'Ver o módulo de Relatórios',
+
   // Clientes/Cadastros
   'clientes.ver': 'Ver contratantes e requerentes',
   'clientes.criar': 'Cadastrar contratantes e requerentes',
@@ -182,6 +191,13 @@ export const MODULOS_PERMISSOES = [
       'processos.excluir_coluna',
       'processos.ver_paginas',
       'processos.editar_paginas',
+    ],
+  },
+  {
+    modulo: 'Relatórios',
+    icone: '📊',
+    permissoes: [
+      'relatorios.ver',
     ],
   },
   {
@@ -464,6 +480,7 @@ export const PERFIS_PADRAO = [
       'tarefas.iniciar_concluir': true,
       'processos.ver': true,
       'processos.ver_paginas': true,
+      'relatorios.ver': true,
       'clientes.ver': true,
       'eventos.ver': true,
       'arvore.ver': true,

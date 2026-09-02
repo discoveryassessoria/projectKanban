@@ -95,7 +95,9 @@ const menuItems = [
     icon: ReportIcon,
     textOffset: "",
     iconOffset: "",
-    permissao: "processos.ver_paginas",
+    // Permissão PRÓPRIA. Antes era `processos.ver_paginas`, emprestada: tirar o
+    // relatório de alguém tirava junto as páginas do processo.
+    permissao: "relatorios.ver",
   },
 ]
 

@@ -17,8 +17,10 @@ const resumo = (d: (typeof DOMINIOS)[number]) => ({
 })
 
 export async function GET(request: Request) {
-  const erro = await verificarPermissao(request, "processos.ver_paginas")
-  if (erro) return erro
+  // PORTÃO DO MÓDULO. Esconder o item do menu não autoriza nada: sem
+  // `relatorios.ver` a rota recusa, venha o pedido de onde vier.
+  const semModulo = await verificarPermissao(request, "relatorios.ver")
+  if (semModulo) return semModulo
   try {
     const chave = new URL(request.url).searchParams.get("dominio")
 
