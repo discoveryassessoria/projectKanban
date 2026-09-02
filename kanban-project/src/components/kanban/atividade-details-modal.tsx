@@ -1026,6 +1026,7 @@ function ConteudoModal({
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
               nomeFamilia={processo.nome}
+              idiomaDoPais={(processo as { paisCanonico?: { language?: string | null } | null }).paisCanonico?.language ?? null}
             />
           )}
 

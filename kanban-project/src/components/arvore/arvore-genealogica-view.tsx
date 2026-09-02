@@ -52,6 +52,26 @@ function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   })
 }
 
+/**
+ * TÍTULO DO PDF POR IDIOMA.
+ *
+ * O título era fixo em italiano — "Albero Genealogico" — para qualquer país, e
+ * uma árvore ESPANHOLA saía em italiano. O idioma não é adivinhado aqui: ele
+ * vem de `CatalogoPais.language`, que já é cadastro, e o operador pode trocar na
+ * hora da exportação, porque quem recebe o documento nem sempre fala a língua do
+ * país do processo.
+ */
+const TITULO_ARVORE: Record<string, { rotulo: string; titulo: (familia: string) => string }> = {
+  it: { rotulo: "Italiano",  titulo: (f) => `Albero Genealogico - Famiglia ${f}` },
+  es: { rotulo: "Espanhol",  titulo: (f) => `Árbol Genealógico - Familia ${f}` },
+  pt: { rotulo: "Português", titulo: (f) => `Árvore Genealógica - Família ${f}` },
+  de: { rotulo: "Alemão",    titulo: (f) => `Stammbaum - Familie ${f}` },
+  en: { rotulo: "Inglês",    titulo: (f) => `Family Tree - ${f} Family` },
+}
+
+/** País sem idioma cadastrado não trava a exportação: cai no português. */
+const IDIOMA_PADRAO = "pt"
+
 interface ArvoreGenealogicaViewProps {
   processoId: number
   arvoreId?: number | null
@@ -59,6 +79,8 @@ interface ArvoreGenealogicaViewProps {
   pessoaIdParaFocar?: number
   sidebarTabParaFocar?: string
   nomeFamilia?: string  // ✅ NOVA PROP
+  /** `CatalogoPais.language` do processo — só o PADRÃO do seletor, não uma trava. */
+  idiomaDoPais?: string | null
   paisProcesso?: "PORTUGAL" | "ESPANHA" | "ALEMANHA" | "ITALIA"
 }
 
@@ -87,6 +109,7 @@ export function ArvoreGenealogicaView({
   pessoaIdParaFocar,
   sidebarTabParaFocar,
   nomeFamilia,  // ✅ NOVA PROP
+  idiomaDoPais,
   paisProcesso
 }: ArvoreGenealogicaViewProps) {
   const { pode } = usePermissoes()
@@ -217,6 +240,9 @@ export function ArvoreGenealogicaView({
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
+  const [idiomaPdf, setIdiomaPdf] = useState<string>(
+    idiomaDoPais && TITULO_ARVORE[idiomaDoPais] ? idiomaDoPais : IDIOMA_PADRAO,
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const treeContainerRef = useRef<HTMLDivElement>(null)
   
@@ -427,22 +453,35 @@ export function ArvoreGenealogicaView({
       const imgWidth = img.width
       const imgHeight = img.height
 
-      const pxToMm = 0.264583 / 2
-      const imgWidthMM = imgWidth * pxToMm
-      const imgHeightMM = imgHeight * pxToMm
+      // ─── A ÁRVORE SE ENQUADRA NA PÁGINA ────────────────────────────────
+      // A página era esticada até caber a imagem no tamanho original: saía um
+      // PDF de folha gigante e fora de padrão, que ninguém imprime e que abre
+      // minúsculo. Agora a FOLHA é fixa — A4, na orientação que melhor acomoda o
+      // desenho — e a IMAGEM é reduzida até caber, mantendo a proporção.
+      const A4_MAIOR = 297
+      const A4_MENOR = 210
+      const paisagem = imgWidth >= imgHeight
+
+      const pageWidth = paisagem ? A4_MAIOR : A4_MENOR
+      const pageHeight = paisagem ? A4_MENOR : A4_MAIOR
 
       const marginX = 8
       const marginTop = 14
       const marginBottom = 8
 
-      const pageWidth = Math.max(imgWidthMM + marginX * 2, 297)
-      const pageHeight = Math.max(imgHeightMM + marginTop + marginBottom, 210)
-
       const pdf = new jsPDF({
-        orientation: pageWidth > pageHeight ? 'landscape' : 'portrait',
+        orientation: paisagem ? 'landscape' : 'portrait',
         unit: 'mm',
-        format: [pageWidth, pageHeight]
+        format: 'a4',
       })
+
+      // Escala de enquadramento: o menor entre o que cabe na largura e na
+      // altura. Nunca AMPLIA — árvore pequena não vira borrão esticado.
+      const larguraUtil = pageWidth - marginX * 2
+      const alturaUtil = pageHeight - marginTop - marginBottom
+      const fator = Math.min(larguraUtil / imgWidth, alturaUtil / imgHeight, 1)
+      const imgWidthMM = imgWidth * fator
+      const imgHeightMM = imgHeight * fator
 
       const actualPageWidth = pdf.internal.pageSize.getWidth()
       const actualPageHeight = pdf.internal.pageSize.getHeight()
@@ -456,14 +495,17 @@ export function ArvoreGenealogicaView({
       pdf.setFontSize(14)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(30, 30, 30)
-      const titulo = `Albero Genealogico - Famiglia ${nomeFamilia || pessoaPrincipal.sobrenome || pessoaPrincipal.nome}`
+      const familia = nomeFamilia || pessoaPrincipal.sobrenome || pessoaPrincipal.nome
+      const titulo = (TITULO_ARVORE[idiomaPdf] ?? TITULO_ARVORE[IDIOMA_PADRAO]).titulo(familia)
       pdf.text(titulo, actualPageWidth / 2, 10, { align: 'center' })
 
       // ✅ REMOVIDO: Data de geração
       // ✅ REMOVIDO: Quantidade de pessoas
 
       const imgX = (actualPageWidth - imgWidthMM) / 2
-      const imgY = marginTop
+      // Centraliza no espaço útil: com o enquadramento, sobra folga vertical, e
+      // colar no topo deixaria a árvore desequilibrada na folha.
+      const imgY = marginTop + Math.max((alturaUtil - imgHeightMM) / 2, 0)
 
       pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidthMM, imgHeightMM)
 
@@ -488,7 +530,7 @@ export function ArvoreGenealogicaView({
       
       setIsExporting(false)
     }
-  }, [pessoas, pessoaPrincipal, nomeFamilia])
+  }, [pessoas, pessoaPrincipal, nomeFamilia, idiomaPdf])
 
   const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
 
@@ -1049,6 +1091,20 @@ export function ArvoreGenealogicaView({
         </div>
 
         <div className="flex items-center gap-1">
+          {/* IDIOMA DO PDF — nasce no idioma do país do processo (cadastro), e
+              o operador troca quando o destinatário fala outra língua. */}
+          <select
+            value={idiomaPdf}
+            onChange={(e) => setIdiomaPdf(e.target.value)}
+            disabled={isExporting}
+            title="Idioma do PDF"
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-tertiary)] px-2 py-2 text-sm text-white/90 outline-none disabled:opacity-50"
+          >
+            {Object.entries(TITULO_ARVORE).map(([codigo, def]) => (
+              <option key={codigo} value={codigo} className="text-black">{def.rotulo}</option>
+            ))}
+          </select>
+
           {/* Botão Exportar PDF */}
           <button
             className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
