@@ -361,6 +361,72 @@ const motorGeracao = semComentarios(ler("src/services/modelos/gerar-documento.ts
 ok(!/toLocaleUpperCase|toUpperCase/.test(motorGeracao),
   "11.7 o snapshot guarda o valor do cadastro, não o desenhado")
 
+// ══════════════════════════════════════════════════════════════════════════
+// (12) O SELECT DO OUTORGANTE EXISTE NOS DOIS CADASTROS
+//
+// `carregarCadastroOutorgante` usa UM `SELECAO` para `requerente` e para
+// `contratante`. Uma varredura da canonicalização colou `paisCanonico` ao lado
+// de todo `pais: true` — e em Requerente e Contratante essa relação não existe.
+// O `select` inválido não vira erro de tipo (o cliente Prisma chega ali como
+// união e o `tsc` não confere), então passou no build e derrubou TODA geração
+// de procuração em produção, para todo cliente, com erro do Prisma no lugar de
+// uma mensagem de negócio.
+//
+// A suíte que pegaria isso (`test:modelos-e2e`) precisa de banco e não roda no
+// build. Esta verificação é estática: lê o schema e confere campo por campo.
+console.log("\n(12) Select do outorgante × schema:")
+
+const schemaPrisma = ler("prisma/schema.prisma")
+
+function camposDoModelo(nome: string): Set<string> {
+  const bloco = schemaPrisma.match(new RegExp("^model " + nome + " \\{([\\s\\S]*?)^\\}", "m"))
+  const campos = new Set<string>()
+  if (!bloco) return campos
+  for (const linha of bloco[1].split("\n")) {
+    const limpa = linha.replace(/\/\/.*$/, "").trim()
+    if (!limpa || limpa.startsWith("@@")) continue
+    const primeiro = limpa.split(/\s+/)[0]
+    if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(primeiro)) campos.add(primeiro)
+  }
+  return campos
+}
+
+const fonteOutorgante = ler("src/services/modelos/outorgante.ts")
+const blocoSelecao = fonteOutorgante.match(/const SELECAO = \{([\s\S]*?)\n\} as const/)
+ok(!!blocoSelecao, "12.1 o SELECAO do outorgante é legível no arquivo")
+
+if (blocoSelecao) {
+  // Só as chaves de PRIMEIRO nível — as aninhadas pertencem ao modelo relacionado.
+  const chaves: string[] = []
+  let profundidade = 0
+  for (const linha of blocoSelecao[1].split("\n")) {
+    let limpa = linha.replace(/\/\/.*$/, "")
+    // Um `pessoa: { select: { ... } }` cabe numa linha só: sem tirar os grupos
+    // aninhados antes de ler as chaves, `select` e `profissao` vazariam como se
+    // fossem campos do próprio cadastro.
+    let antes: string
+    do { antes = limpa; limpa = limpa.replace(/\{[^{}]*\}/g, "") } while (limpa !== antes)
+    if (profundidade === 0) {
+      for (const m of limpa.matchAll(/([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g)) chaves.push(m[1])
+    }
+    profundidade += (limpa.match(/\{/g) ?? []).length - (limpa.match(/\}/g) ?? []).length
+  }
+
+  const camposRequerente = camposDoModelo("Requerente")
+  const camposContratante = camposDoModelo("Contratante")
+  ok(camposRequerente.size > 10 && camposContratante.size > 10,
+    "12.2 os dois cadastros foram lidos do schema")
+
+  const faltamEmRequerente = chaves.filter((c) => !camposRequerente.has(c))
+  const faltamEmContratante = chaves.filter((c) => !camposContratante.has(c))
+  ok(faltamEmRequerente.length === 0,
+    "12.3 todo campo do SELECAO existe em Requerente" +
+      (faltamEmRequerente.length ? " — não existe: " + faltamEmRequerente.join(", ") : ""))
+  ok(faltamEmContratante.length === 0,
+    "12.4 todo campo do SELECAO existe em Contratante" +
+      (faltamEmContratante.length ? " — não existe: " + faltamEmContratante.join(", ") : ""))
+}
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) {
   console.log("FALHAS: " + falhas.join("; "))

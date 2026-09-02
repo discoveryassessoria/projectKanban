@@ -74,7 +74,12 @@ const SELECAO = {
   cidade: true,
   estado: true,
   cep: true,
-  pais: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
+  // `pais` aqui é o país do ENDEREÇO do outorgante, campo de texto do próprio
+  // cadastro — não é identidade de nacionalidade e não tem relação canônica.
+  // Uma varredura da canonicalização colou `paisCanonico` ao lado de todo
+  // `pais: true`; em Requerente/Contratante essa relação não existe, e o
+  // `select` inválido derrubava TODA geração de procuração com erro do Prisma.
+  pais: true,
   personId: true,
   pessoa: { select: { id: true, profissao: true, sexo: true } },
 } as const
