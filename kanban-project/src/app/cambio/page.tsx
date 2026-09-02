@@ -80,7 +80,7 @@ export default function CambioHistoricoPage() {
         </div>
 
         {/* Histórico completo */}
-        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] shadow-[var(--elev-1)]">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] shadow-[var(--elev-1)]">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-[var(--surface-secondary)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
               {['Par', 'Valor', 'Data fonte', 'Consulta', 'Origem', 'Modalidade', 'Vigente'].map((h) => <th key={h} className="border-b border-[var(--border-default)] px-3 py-2 font-semibold">{h}</th>)}

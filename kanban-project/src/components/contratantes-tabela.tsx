@@ -2301,7 +2301,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         </div>
       </div>
 
-      <div className="rounded-lg border border-[var(--border-strong)] overflow-hidden">
+      <div className="rounded-lg border border-[var(--border-strong)] overflow-x-auto">
         <table className="w-full">
           <thead className="bg-[var(--surface-primary)]">
             <tr>

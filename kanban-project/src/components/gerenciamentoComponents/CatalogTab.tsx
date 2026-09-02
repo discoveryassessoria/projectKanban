@@ -74,7 +74,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
       </div>
 
       {/* tabela */}
-      <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
         <table className="w-full text-[12.5px]">
           <thead>
             <tr className="bg-[var(--surface-primary)]">

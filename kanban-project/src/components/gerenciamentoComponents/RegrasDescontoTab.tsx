@@ -151,7 +151,7 @@ export default function RegrasDescontoTab() {
       )}
 
       {!loading && !erroLista && filtradas.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">

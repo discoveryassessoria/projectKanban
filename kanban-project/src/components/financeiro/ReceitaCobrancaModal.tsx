@@ -171,7 +171,7 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
         <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="h-4 w-4" style={{ color: OURO_TINTA }} /> Cobrança #{cobranca.id} · {parcelas.length}x</div>
         <span className={`rounded-full border px-2 py-0.5 text-[11px] ${statusCls[cobranca.status] || 'border-[var(--border-default)] text-[var(--text-secondary)]'}`}>{cobranca.status}</span>
       </div>
-      <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
+      <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
         <table className="w-full text-[13px]">
           <thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
             {['#', 'Vencimento', 'Valor', 'Status', ''].map((h, i) => <th key={i} className="px-3 py-2 font-semibold">{h}</th>)}

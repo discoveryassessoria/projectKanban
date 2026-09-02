@@ -223,7 +223,7 @@ export default function RegrasTarefaTransversalTab() {
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)]">
+      <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)]">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">

@@ -86,7 +86,7 @@ export default function AplicabilidadeEconomicaTab() {
       {loading ? <div className="py-10 text-center text-[var(--text-muted)]">Carregando…</div>
       : (d?.regras.length ?? 0) === 0 ? <div className="py-10 text-center text-[var(--text-muted)]">Nenhuma regra. Clique em "+ Nova regra".</div>
       : (
-        <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
+        <div className="overflow-x-auto rounded-xl ring-1 ring-white/10">
           <table className="w-full text-sm">
             <thead className="bg-[var(--surface-primary)] text-left text-[var(--text-secondary)]"><tr>
               <th className="px-3 py-2">Fase</th><th className="px-3 py-2">Componente</th><th className="px-3 py-2">Processo</th><th className="px-3 py-2">Doc</th><th className="px-3 py-2">Custo</th><th className="px-3 py-2">Receita</th><th className="px-3 py-2">Planilha</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ações</th>

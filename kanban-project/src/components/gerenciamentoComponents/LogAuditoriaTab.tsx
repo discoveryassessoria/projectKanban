@@ -100,7 +100,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
+      <div className="overflow-x-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr><th className="px-4 py-3 font-medium">Data/hora</th><th className="px-4 py-3 font-medium">Ação</th><th className="px-4 py-3 font-medium">Entidade</th><th className="px-4 py-3 font-medium">Descrição</th><th className="px-4 py-3 font-medium">Usuário</th></tr>

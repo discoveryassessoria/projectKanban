@@ -422,7 +422,7 @@ export default function TabelaValoresTab() {
       {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-[var(--surface-primary)]">
               {/* UMA LINHA POR CADASTRO MESTRE. "Papel" era coluna porque a tela

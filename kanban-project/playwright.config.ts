@@ -36,7 +36,13 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // O enquadramento roda TAMBÉM no motor do Safari: foi lá que ele quebrou, e
+    // `overflow-x: hidden` se comporta diferente nesse motor. Só esta suíte —
+    // duplicar a bateria inteira custaria caro sem provar mais nada.
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testMatch: /enquadramento\.spec\.ts/ },
+  ],
   webServer: process.env.UI_TEST_BASE_URL
     ? undefined
     : {

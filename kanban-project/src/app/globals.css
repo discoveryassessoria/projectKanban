@@ -598,6 +598,11 @@ html, body {
   overscroll-behavior-x: none;
   overscroll-behavior-y: none;
   overflow-x: hidden;
+  /* `overflow-x: hidden` sozinho não segura o Safari: ele continua deixando a
+     página rolar de lado quando algum descendente passa da largura, e aí a
+     barra lateral `fixed` sai da tela junto. O teto explícito em 100vw é o que
+     impede a página de ficar mais larga que a janela. */
+  max-width: 100vw;
 }
 
 /* ============================================

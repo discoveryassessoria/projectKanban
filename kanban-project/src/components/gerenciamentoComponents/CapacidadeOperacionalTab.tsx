@@ -172,7 +172,7 @@ export default function CapacidadeOperacionalTab() {
         className="w-72 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
       />
 
-      <div className="overflow-hidden rounded border border-white/[0.08]">
+      <div className="overflow-x-auto rounded border border-white/[0.08]">
         <table className="w-full border-collapse text-left">
           <thead className="bg-[var(--surface-primary)]">
             <tr className="border-b border-white/[0.08]">

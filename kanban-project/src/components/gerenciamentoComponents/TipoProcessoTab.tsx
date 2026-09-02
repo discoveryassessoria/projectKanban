@@ -413,7 +413,7 @@ export default function TipoProcessoTab() {
       )}
 
       {!loading && !erroLista && filtrados.length > 0 && (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
@@ -536,7 +536,7 @@ export default function TipoProcessoTab() {
                 )}
 
                 {!carregandoPaises && paisesAdmin.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
+                  <div className="overflow-x-auto rounded-xl border border-[var(--border-default)]">
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="bg-[var(--surface-primary)]">
@@ -684,7 +684,7 @@ export default function TipoProcessoTab() {
                 )}
 
                 {!carregandoMods && modsAdmin.length > 0 && (
-                  <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
+                  <div className="overflow-x-auto rounded-xl border border-[var(--border-default)]">
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="bg-[var(--surface-primary)]">
