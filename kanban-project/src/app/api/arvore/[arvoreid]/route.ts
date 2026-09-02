@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma"
 import { PESSOA_ATIVA } from "@/src/lib/genealogia/vinculo-ativo"
 import { analisarRemocaoPessoa, removerPessoaDaArvore } from "@/src/services/pessoa-ciclo-vida"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { removerFamiliaSeOrfa } from "@/src/services/familia"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   const semPermissao = await verificarPermissao(request, "arvore.ver")
@@ -119,6 +120,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     //
     // Se QUALQUER pessoa tiver fato histórico protegido, a árvore não é excluída:
     // apagá-la destruiria a evidência. O erro diz quem impede e por quê.
+    const arvoreAlvo = await prisma.arvore.findUnique({ where: { id }, select: { familiaId: true } })
     const pessoas = await prisma.pessoa.findMany({ where: { arvoreId: id }, select: { id: true } })
 
     const impedidas: { pessoaId: number; nome: string; fatos: string[] }[] = []
@@ -158,9 +160,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     await prisma.arvore.delete({ where: { id } })
 
+    // Mesma razão do processo: família sem árvore e sem processo é resíduo.
+    const familiaRemovida = await removerFamiliaSeOrfa(arvoreAlvo?.familiaId)
+
     return NextResponse.json({
       message: "Árvore e todos os seus dados foram excluídos com sucesso",
       pessoasRemovidas: pessoas.length,
+      familiaRemovida,
     })
   } catch (error) {
     console.error("Erro ao excluir árvore:", error)

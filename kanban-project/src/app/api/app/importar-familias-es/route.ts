@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { criarProcessoV2 } from "@/src/services/criar-processo"
-import { garantirFamiliaParaProcesso } from "@/src/services/familia"
+import { herdarFamiliaDaArvore } from "@/src/services/familia"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     })
     if (!r.success) { erros.push({ nome, code: r.code, message: r.message }); continue }
 
-    try { await garantirFamiliaParaProcesso(r.processId) } catch { /* best-effort (igual à API) */ }
+    try { await herdarFamiliaDaArvore(r.processId) } catch { /* best-effort (igual à API) */ }
 
     mapaExistente.set(chave, { id: r.processId, codigo: r.processCode, nome })
     if (r.created) criados.push({ nome, processId: r.processId, codigo: r.processCode, fase: r.currentPhaseKey, tarefas: r.tarefasIniciais })

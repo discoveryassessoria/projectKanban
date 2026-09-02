@@ -5,7 +5,6 @@
 // API aceitava a chamada. Permissão de tela não é permissão de sistema.
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { garantirFamiliaParaArvore } from "@/src/services/familia"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 
@@ -55,14 +54,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // CP-1 — forward-fill: toda nova árvore recebe sua Família (1 por árvore).
-    const familiaId = await garantirFamiliaParaArvore(novaArvore.id)
-
-    // Se foi passado processoId, vincular ao processo (árvore + família).
+    // A ÁRVORE NÃO CRIA FAMÍLIA. Ela criava — copiando o próprio nome, que a
+    // tela gera como "Árvore do Processo 458" — e cada tentativa deixava uma
+    // família fantasma no cadastro. Família é cadastro: nasce quando alguém a
+    // cadastra, não quando alguém clica em "criar árvore".
     if (processoId) {
       await prisma.processo.update({
         where: { id: processoId },
-        data: { arvoreId: novaArvore.id, familiaId }
+        data: { arvoreId: novaArvore.id }
       })
       // O processo nasce ANTES da árvore: quando a fase inicial foi materializada,
       // não havia árvore nenhuma e o plano de alvos saiu vazio. Agora que ela existe,
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ...novaArvore, familiaId }, { status: 201 })
+    return NextResponse.json({ ...novaArvore, familiaId: novaArvore.familiaId ?? null }, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar árvore:", error)
     if (error instanceof Error) {

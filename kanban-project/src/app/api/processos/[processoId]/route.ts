@@ -6,6 +6,7 @@ import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
+import { removerFamiliaSeOrfa } from "@/src/services/familia"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -244,7 +245,7 @@ export async function DELETE(
     // Buscar o processo para pegar nome e arvoreId ANTES de deletar
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { nome: true, arvoreId: true }
+      select: { nome: true, arvoreId: true, familiaId: true }
     })
 
     if (!processo) {
@@ -255,6 +256,7 @@ export async function DELETE(
     }
 
     const arvoreId = processo.arvoreId
+    const familiaId = processo.familiaId
     const nomeProcesso = processo.nome
 
     // Excluir o processo
@@ -280,11 +282,19 @@ export async function DELETE(
       }
     }
 
-    return NextResponse.json({ 
-      message: arvoreRemovida 
-        ? "Processo e árvore órfã excluídos com sucesso" 
-        : "Processo excluído com sucesso",
-      arvoreRemovida 
+    // A FAMÍLIA TAMBÉM NÃO PODE FICAR PARA TRÁS. Sem processo e sem árvore, ela
+    // não é mais alcançável por porta nenhuma — é resíduo. Se ainda houver
+    // outro processo ou outra árvore nela, ela continua sendo de alguém e fica.
+    const familiaRemovida = await removerFamiliaSeOrfa(familiaId)
+
+    return NextResponse.json({
+      message: [
+        "Processo excluído com sucesso",
+        arvoreRemovida ? "árvore órfã removida" : null,
+        familiaRemovida ? "família órfã removida" : null,
+      ].filter(Boolean).join(" · "),
+      arvoreRemovida,
+      familiaRemovida,
     })
   } catch (error) {
     console.error("Erro ao excluir processo:", error)

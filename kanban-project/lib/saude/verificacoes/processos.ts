@@ -235,3 +235,63 @@ registrar({
     }
   },
 })
+
+registrar({
+  id: 'saude.processos.familia-orfa',
+  codigo: 'PROC-900',
+  nome: 'Família sem processo e sem árvore',
+  descricao: 'Família que nenhuma porta do sistema alcança — ela só aparece somando no relatório.',
+  dominio: 'PROCESSOS',
+  modulo: 'Processos',
+  severidadePadrao: 'ERRO',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.0.0',
+  timeoutMs: 15_000,
+  orientacao:
+    'Confira a evidência e exclua as famílias listadas — nenhuma tem processo ou árvore, então nada se perde. ' +
+    'Se alguma for família real que você pretende usar, vincule-a a um processo.',
+  rotaCorrecao: '/relatorios?d=familias',
+  responsavel: 'Cadastros',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // Em 02/09/2026 existiam 61 destas em produção, com nomes como
+    // "Árvore do Processo 458" e "teste" repetido dezesseis vezes: criar uma
+    // árvore criava uma Família copiando o nome da árvore, e apagar o processo
+    // não levava a família junto. O relatório dizia "63 famílias" existindo duas.
+    //
+    // A porta foi fechada e a exclusão passou a limpar. Esta verificação existe
+    // para o caso de o resíduo voltar por um caminho que ninguém revisou.
+    const orfas = await prisma.familia.findMany({
+      where: { processos: { none: {} }, arvores: { none: {} } },
+      select: { id: true, nome: true, createdAt: true },
+      orderBy: { id: 'asc' },
+      take: 200,
+    })
+    if (!orfas.length) {
+      return { achados: [], metricas: { familiasOrfas: 0 }, resumo: 'Toda família tem processo ou árvore.' }
+    }
+    return {
+      achados: [{
+        chave: 'familia-orfa',
+        severidade: 'ERRO',
+        titulo: `${orfas.length} família(s) sem processo e sem árvore`,
+        descricao: `${orfas.length} família(s) não são alcançadas por nenhum processo nem por nenhuma árvore.`,
+        explicacao:
+          'Família é a unidade de atendimento: ela existe para agrupar processos. Sem processo e sem árvore, ' +
+          'ninguém chega até ela por tela nenhuma — mas ela continua contando no relatório de Famílias.',
+        impacto:
+          'O relatório informa um total que não corresponde à operação. Número certo sobre dado sujo é pior que ' +
+          'um erro: no erro a pessoa desconfia, neste não.',
+        entidade: 'Familia',
+        registroId: String(orfas[0].id),
+        registroNome: orfas[0].nome,
+        quantidade: orfas.length,
+        link: '/relatorios?d=familias',
+        recomendacao: 'Exclua as famílias órfãs, ou vincule a um processo aquelas que forem reais.',
+        evidencia: { total: orfas.length, amostra: orfas.slice(0, 10).map((f) => ({ id: f.id, nome: f.nome })) },
+      }],
+      metricas: { familiasOrfas: orfas.length },
+    }
+  },
+})

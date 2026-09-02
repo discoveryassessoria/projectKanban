@@ -360,7 +360,8 @@
     "test:relatorios": "tsx scripts/relatorios-canonico.test.ts",
     "test:identidade-canonica": "tsx scripts/identidade-canonica-cobertura.ts",
     "test:relatorios-motor": "tsx scripts/relatorios-motor.test.ts",
-    "test:ui:relatorios": "playwright test tests/ui/relatorios.spec.ts"
+    "test:ui:relatorios": "playwright test tests/ui/relatorios.spec.ts",
+    "test:cadastro-precede-operacao": "tsx scripts/cadastro-nao-nasce-da-operacao.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

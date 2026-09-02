@@ -10,7 +10,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { garantirFamiliaParaProcesso } from '@/src/services/familia'
+import { herdarFamiliaDaArvore } from '@/src/services/familia'
 import { criarProcessoV2 } from '@/src/services/criar-processo'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
 import { resolveOperationalProjectionBatch } from '@/src/lib/process-stage/operational-projection'
@@ -164,9 +164,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // CP-1 — forward-fill da Família (best-effort; nunca bloqueia a criação).
-    try { await garantirFamiliaParaProcesso(resultado.processId) }
-    catch (e) { console.error("CP-1 forward-fill de família falhou (criar processo):", e) }
+    // Se a árvore já tem família, o processo HERDA. Se não tem, ele nasce sem —
+    // e alguém escolhe uma depois. Inventar família aqui foi o que encheu o
+    // cadastro de "Árvore do Processo N".
+    try { await herdarFamiliaDaArvore(resultado.processId) }
+    catch (e) { console.error("herança de família falhou (criar processo):", e) }
 
     // Drena os efeitos do phase.entered inicial (idempotente; best-effort — as
     // tarefas já nasceram na transação; aqui só marca o evento como processado).
