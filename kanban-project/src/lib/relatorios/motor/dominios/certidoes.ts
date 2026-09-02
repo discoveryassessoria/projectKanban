@@ -74,8 +74,8 @@ export const DOMINIO_CERTIDOES: DominioDef = {
 
   filtros: [
     { key: "tipo", rotulo: "Tipo de certidão",
-      descricao: "Do Cadastro Mestre de documentos — nunca inferido pelo nome.",
-      tipo: "multi_selecao", opcoes: cadastro("itens_documentais"), paraWhere: emListaId("itemCatalogoId") },
+      descricao: "Só registro civil — a mesma categoria do Cadastro Mestre que define este domínio.",
+      tipo: "multi_selecao", opcoes: cadastro("itens_certidao"), paraWhere: emListaId("itemCatalogoId") },
     { key: "status", rotulo: "Situação", tipo: "multi_selecao",
       opcoes: { tipo: "catalogo", valores: STATUS.map((s) => ({ valor: s, rotulo: s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ") })) },
       paraWhere: emLista("status") },

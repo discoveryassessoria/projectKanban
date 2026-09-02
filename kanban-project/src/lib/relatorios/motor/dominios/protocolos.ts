@@ -74,17 +74,27 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
     if (!countryKey) return "1 linha = 1 protocolo"
     const modalidades = await prisma.modalidadeLegal.findMany({
       where: { ativo: true, pais: { countryKey } },
-      select: { cardinalidadeRequerimento: true },
+      select: { nome: true, cardinalidadeRequerimento: true },
+      orderBy: { ordem: "asc" },
     })
+    if (modalidades.length === 0) {
+      // Sem base jurídica cadastrada não dá para afirmar a unidade. Dizer
+      // "1 protocolo" seria um palpite com cara de fato.
+      return "1 linha = 1 protocolo — este país ainda não tem modalidade legal cadastrada"
+    }
     const cards = new Set(modalidades.map((m) => m.cardinalidadeRequerimento))
-    if (cards.size === 0) return "1 linha = 1 protocolo"
-    if (cards.has("INDIVIDUAL") && !cards.has("COLETIVO")) {
-      return "1 linha = 1 protocolo individual — um por requerente"
+    if (cards.size === 1) {
+      return cards.has("COLETIVO")
+        ? "1 linha = 1 protocolo do processo — cobre os requerentes, sem multiplicá-los"
+        : "1 linha = 1 protocolo individual — um por requerente"
     }
-    if (cards.has("COLETIVO") && !cards.has("INDIVIDUAL")) {
-      return "1 linha = 1 protocolo do processo — cobre os requerentes, sem multiplicá-los"
-    }
-    return "1 linha = 1 protocolo — a modalidade decide se é do processo ou por requerente"
+    // DUAS ROTAS NÃO É AMBIGUIDADE. A Itália tem ricorso judicial (coletivo, um
+    // R.G. para a família) E via administrativa consular (individual, um
+    // expediente por pessoa). As duas são legítimas e convivem: o que decide é a
+    // modalidade DAQUELE processo, e a linha continua sendo o protocolo.
+    const porCard = (c: string) => modalidades.filter((m) => m.cardinalidadeRequerimento === c).map((m) => m.nome)
+    return `1 linha = 1 protocolo · ${porCard("COLETIVO").join(", ")} cobre a família; ` +
+      `${porCard("INDIVIDUAL").join(", ")} é por requerente`
   },
   permissao: "processos.ver_paginas",
   ordem: 8,

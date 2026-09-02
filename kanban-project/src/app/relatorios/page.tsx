@@ -36,6 +36,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { Workspace } from "@/src/components/relatorios/workspace"
+import { CartoesDominio } from "@/src/components/relatorios/cartoes-dominio"
 
 const auth = () => ({
   Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") ?? "" : ""}`,
@@ -143,14 +144,10 @@ function Conteudo() {
     ? visiveis.filter((d) => `${d.rotulo} ${d.descricao} ${d.grupo}`.toLowerCase().includes(busca.trim().toLowerCase()))
     : visiveis
 
-  // Os grupos saem da DECLARAÇÃO dos domínios, na ordem em que aparecem — não
-  // existe lista de assuntos escrita nesta tela.
-  const grupos: [string, DominioResumo[]][] = []
-  for (const d of [...filtrados].sort((a, b) => a.ordem - b.ordem)) {
-    const atual = grupos.find(([g]) => g === d.grupo)
-    if (atual) atual[1].push(d)
-    else grupos.push([d.grupo, [d]])
-  }
+  // Uma ordem só, a DECLARADA no domínio. O número impresso no cartão é essa
+  // mesma `ordem` — não o índice do laço, que mudaria de significado toda vez
+  // que a busca filtrasse a lista.
+  const ordenados = [...filtrados].sort((a, b) => a.ordem - b.ordem)
 
   return (
     <>
@@ -223,36 +220,10 @@ function Conteudo() {
               className="w-full max-w-sm rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
             />
 
-            {/* AGRUPADO POR ASSUNTO, em lista.
-                Dezessete cartões iguais numa grade não davam hierarquia nenhuma:
-                tudo do mesmo tamanho, e quem chegava não sabia por onde começar.
-                Aqui o assunto vem primeiro e cada domínio é uma linha — mais
-                denso, e a ordem de leitura é óbvia. */}
             {filtrados.length === 0 ? (
               <p className="text-[13px] text-[var(--text-secondary)]">Nenhum domínio com esse nome.</p>
             ) : (
-              <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
-                {grupos.map(([grupo, itens]) => (
-                  <section key={grupo}>
-                    <h2 className="mb-1.5 border-b border-[var(--border-default)] pb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                      {grupo}
-                    </h2>
-                    <div className="divide-y divide-[var(--border-subtle)]">
-                      {itens.map((d) => (
-                        <button key={d.key} type="button" onClick={() => ir(pais, d.key)}
-                          className="group flex w-full items-baseline gap-3 py-2 text-left">
-                          <span className="w-[11.5rem] shrink-0 text-[14px] font-medium text-[var(--text-primary)] group-hover:text-[var(--action-primary)]">
-                            {d.rotulo}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--text-secondary)]" title={d.descricao}>
-                            {d.descricao}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
+              <CartoesDominio dominios={ordenados} aoAbrir={(k) => ir(pais, k)} />
             )}
 
             {visoes.length > 0 && (

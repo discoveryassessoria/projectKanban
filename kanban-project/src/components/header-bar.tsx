@@ -195,19 +195,22 @@ export function HeaderBar({
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-[var(--elev-2)]">
-      <div className="px-6 py-4 flex items-center justify-between">
+      {/* A faixa NÃO pode transbordar: quando ela transborda, o pai recorta e as
+          ações somem sem aviso (sino, avatar, Sair). Quem cede espaço é o
+          título — ele trunca; as ações nunca encolhem. */}
+      <div className="px-6 py-4 flex items-center justify-between gap-4">
         {/* Lado esquerdo - Título e Subtítulo */}
-        <div>
-          <h1 className="text-lg font-semibold leading-tight text-white">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-semibold leading-tight text-white">
             Grupo Discovery · {title}
           </h1>
-          <p className="text-xs text-white/70">
+          <p className="truncate text-xs text-white/70">
             {subtitle}
           </p>
         </div>
 
         {/* Lado direito - Ações */}
-        <div className="flex items-center gap-4">
+        <div className="flex shrink-0 items-center gap-3 xl:gap-4">
           {/* Câmbio discreto — presente em todas as telas do sistema */}
           <CambioMini />
 
@@ -225,7 +228,7 @@ export function HeaderBar({
             <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-[var(--border-strong)]">
               <Search className="h-4 w-4 text-white/70" />
               <input
-                className="bg-transparent text-xs outline-none placeholder:text-[var(--text-secondary)] w-40 text-white"
+                className="bg-transparent text-xs outline-none placeholder:text-[var(--text-secondary)] w-28 xl:w-40 text-white"
                 placeholder="Pesquisar processos..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}

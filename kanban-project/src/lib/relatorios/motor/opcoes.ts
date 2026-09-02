@@ -19,6 +19,7 @@
 // existem — uma fonte, não duas.
 
 import { prisma } from "@/lib/prisma"
+import { CATEGORIA_CERTIDAO } from "./dominios/certidoes"
 
 export interface Opcao {
   /** O que trafega. ID quando existe entidade; chave canônica quando é cadastro. */
@@ -141,6 +142,36 @@ export async function opcoesDoCadastro(chave: string, busca?: string | null): Pr
         where: { ativo: true }, orderBy: { ordemPadrao: "asc" }, select: { phaseKey: true, label: true },
       })
       return r.map((f) => ({ valor: f.phaseKey, rotulo: f.label }))
+    }
+
+    // CERTIDÃO × DOCUMENTO — a mesma fronteira que recorta as LINHAS precisa
+    // recortar as OPÇÕES. O filtro listava CNH e RG dentro de Certidões: tipos
+    // que a consulta nunca traria, porque as linhas já são só de registro civil.
+    // Oferecer o que não pode voltar é pior que não oferecer.
+    case "itens_certidao": {
+      const r = await prisma.itemCatalogo.findMany({
+        where: {
+          ativo: true,
+          tiposDocumento: { some: { categoriaDocumental: { code: CATEGORIA_CERTIDAO } } },
+          ...(contem ? { name: contem } : {}),
+        },
+        orderBy: { name: "asc" }, take: 100,
+        select: { id: true, name: true, code: true },
+      })
+      return r.map((i) => ({ valor: String(i.id), rotulo: i.name, detalhe: i.code }))
+    }
+
+    case "itens_nao_certidao": {
+      const r = await prisma.itemCatalogo.findMany({
+        where: {
+          ativo: true,
+          NOT: { tiposDocumento: { some: { categoriaDocumental: { code: CATEGORIA_CERTIDAO } } } },
+          ...(contem ? { name: contem } : {}),
+        },
+        orderBy: { name: "asc" }, take: 100,
+        select: { id: true, name: true, code: true },
+      })
+      return r.map((i) => ({ valor: String(i.id), rotulo: i.name, detalhe: i.code }))
     }
 
     case "itens_documentais": {

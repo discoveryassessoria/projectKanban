@@ -9,6 +9,7 @@
 // SOMENTE LEITURA — nenhum teste aqui escreve.
 import { prisma } from "@/lib/prisma"
 import { DOMINIO_PROTOCOLOS } from "@/src/lib/relatorios/motor/dominios/protocolos"
+import { DOMINIO_CERTIDOES } from "@/src/lib/relatorios/motor/dominios/certidoes"
 import { executar, exportarCsv } from "@/src/lib/relatorios/motor/executar"
 import { nacionalidadesOfertadas, paisesGeograficos } from "@/src/lib/relatorios/motor/opcoes"
 import { DOMINIOS, dominioPorChave } from "@/src/lib/relatorios/motor/registro"
@@ -58,6 +59,30 @@ async function main() {
     `${geograficos.length} geográficos × ${ofertadas.length} ofertadas`)
   const semOferta = geograficos.length - ofertadas.length
   t(semOferta > 0, "existe país geográfico sem oferta", `${semOferta}`)
+
+  // ── CERTIDÃO × DOCUMENTO: A FRONTEIRA VALE PARA AS OPÇÕES TAMBÉM ─────────
+  console.log("\nO filtro só oferece o que a consulta pode devolver:")
+  const { opcoesDoCadastro } = await import("@/src/lib/relatorios/motor/opcoes")
+  const opCert = await opcoesDoCadastro("itens_certidao")
+  const opDoc = await opcoesDoCadastro("itens_nao_certidao")
+  const nomesCert = opCert.map((o) => o.rotulo)
+  t(opCert.length > 0, "Certidões oferece tipos", nomesCert.join(", "))
+  // O filtro listava CNH e RG dentro de Certidões — tipos que a consulta nunca
+  // traria, porque as linhas já são só de registro civil.
+  t(!nomesCert.some((n) => /^(RG|CNH|Comprovante|Procuração)/i.test(n)),
+    "Certidões NÃO oferece RG, CNH, comprovante nem procuração")
+  const cruzam = opCert.filter((c) => opDoc.some((d) => d.valor === c.valor))
+  t(cruzam.length === 0, "nenhum item aparece nos dois domínios ao mesmo tempo",
+    cruzam.map((c) => c.rotulo).join(", "))
+
+  // Toda opção ofertada precisa ser alcançável: filtrar por ela não pode dar
+  // erro nem trazer linha de outro domínio.
+  for (const o of opCert.slice(0, 5)) {
+    const rc = await executar(DOMINIO_CERTIDOES, {
+      dominio: "certidoes", filtros: [{ key: "tipo", valor: { tipo: "multi_selecao", valores: [o.valor] } }], porPagina: 1,
+    })
+    t(rc.ignorados.length === 0, `filtrar Certidões por "${o.rotulo}" é aceito`)
+  }
 
   // ── AS PERGUNTAS A–L ──────────────────────────────────────────────────────
   console.log("\nA MESMA CONSULTA, PERGUNTAS DIFERENTES:")

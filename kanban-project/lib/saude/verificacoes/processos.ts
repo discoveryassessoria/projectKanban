@@ -295,3 +295,122 @@ registrar({
     }
   },
 })
+
+registrar({
+  id: 'saude.processos.oferta-sem-modalidade-legal',
+  codigo: 'PROC-901',
+  nome: 'Nacionalidade ofertada tem modalidade legal cadastrada',
+  descricao: 'Nacionalidade vendida sem base jurídica declarada — o sistema não sabe como o requerimento se organiza.',
+  dominio: 'PROCESSOS',
+  modulo: 'Processos',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.0.0',
+  timeoutMs: 15_000,
+  orientacao:
+    'Cadastre a modalidade legal do país e a cardinalidade do requerimento (INDIVIDUAL quando cada requerente ' +
+    'protocola o seu; COLETIVO quando um requerimento cobre a família).',
+  rotaCorrecao: '/administrator?screen=proctypes',
+  responsavel: 'Cadastros',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // A CARDINALIDADE DECIDE O QUE É UMA LINHA no relatório de Protocolos.
+    // Itália tem duas rotas legítimas — ricorso judicial COLETIVO (um R.G. para
+    // a família) e via administrativa INDIVIDUAL (um expediente por pessoa) — e
+    // é a modalidade do processo que resolve qual vale. Sem nenhuma cadastrada,
+    // o sistema não tem como responder, e um palpite com cara de fato é pior
+    // que a lacuna declarada.
+    const semModalidade = await prisma.catalogoPais.findMany({
+      where: {
+        ativo: true,
+        tiposDeProcesso: { some: { ativo: true, arquivado: false } },
+        modalidadesLegais: { none: { ativo: true } },
+      },
+      select: { id: true, countryKey: true, countryLabel: true },
+      orderBy: { countryLabel: 'asc' },
+    })
+    if (!semModalidade.length) {
+      return { achados: [], metricas: { semModalidadeLegal: 0 }, resumo: 'Toda nacionalidade ofertada tem modalidade legal.' }
+    }
+    return {
+      achados: [{
+        chave: 'oferta-sem-modalidade-legal',
+        severidade: 'ALERTA',
+        titulo: `${semModalidade.length} nacionalidade(s) ofertada(s) sem modalidade legal`,
+        descricao: `${semModalidade.map((p) => p.countryLabel).join(', ')} — vendidas sem base jurídica cadastrada.`,
+        explicacao:
+          'A modalidade legal declara a base jurídica e a CARDINALIDADE do requerimento: se cada requerente ' +
+          'protocola o seu (individual) ou se um requerimento cobre a família (coletivo).',
+        impacto:
+          'O processo nasce sem enquadramento legal, e o relatório de Protocolos não consegue afirmar o que é ' +
+          'uma linha para esse país.',
+        entidade: 'CatalogoPais',
+        registroId: String(semModalidade[0].id),
+        registroNome: semModalidade[0].countryLabel,
+        quantidade: semModalidade.length,
+        link: '/administrator?screen=proctypes',
+        recomendacao: 'Cadastre a modalidade legal de cada país listado, com a cardinalidade correta.',
+        evidencia: { total: semModalidade.length, paises: semModalidade.map((p) => p.countryLabel) },
+      }],
+      metricas: { semModalidadeLegal: semModalidade.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.processos.arvore-orfa',
+  codigo: 'PROC-902',
+  nome: 'Árvore genealógica pertence a algum processo',
+  descricao: 'Árvore sem nenhum processo — e as pessoas dentro dela — é resíduo que a Pesquisa Genealógica exibe como se fosse dado.',
+  dominio: 'PROCESSOS',
+  modulo: 'Processos',
+  severidadePadrao: 'ERRO',
+  obrigatoria: false,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.0.0',
+  timeoutMs: 15_000,
+  orientacao:
+    'Exclua a árvore órfã (as pessoas dentro dela vão junto, por cascata) ou vincule-a ao processo a que ela pertence.',
+  rotaCorrecao: '/genealogy',
+  responsavel: 'Operação',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // A ÁRVORE É ARTEFATO DO PROCESSO. Ela não é cadastro: ninguém a "cadastra"
+    // para reaproveitar depois — ela nasce quando um processo precisa dela e
+    // deixa de ter dono quando o último processo some. Órfã, ela continua
+    // aparecendo na Pesquisa Genealógica com as pessoas dentro, e quem lê conta
+    // pessoas que não pertencem a trabalho nenhum.
+    const orfas = await prisma.arvore.findMany({
+      where: { processos: { none: {} } },
+      select: { id: true, nome: true, _count: { select: { pessoas: true } } },
+      orderBy: { id: 'asc' },
+    })
+    if (!orfas.length) {
+      return { achados: [], metricas: { arvoresOrfas: 0, pessoasEmArvoreOrfa: 0 }, resumo: 'Toda árvore pertence a um processo.' }
+    }
+    const pessoas = orfas.reduce((s, a) => s + a._count.pessoas, 0)
+    return {
+      achados: [{
+        chave: 'arvore-orfa',
+        severidade: 'ERRO',
+        titulo: `${orfas.length} árvore(s) sem processo, com ${pessoas} pessoa(s) dentro`,
+        descricao: orfas.map((a) => `#${a.id} "${a.nome}" (${a._count.pessoas} pessoa(s))`).join(', '),
+        explicacao:
+          'A árvore existe para servir a um processo. Sem nenhum processo apontando para ela, não há porta ' +
+          'que a alcance — mas a Pesquisa Genealógica varre todas as árvores e a mostra assim mesmo.',
+        impacto:
+          'A contagem de pessoas e árvores fica maior que a realidade, e a busca devolve gente que não ' +
+          'pertence a trabalho nenhum.',
+        entidade: 'Arvore',
+        registroId: String(orfas[0].id),
+        registroNome: orfas[0].nome,
+        quantidade: orfas.length,
+        link: '/genealogy',
+        recomendacao: 'Exclua as árvores órfãs — as pessoas dentro delas saem por cascata — ou religue-as ao processo dono.',
+        evidencia: { total: orfas.length, pessoas, amostra: orfas.slice(0, 10).map((a) => ({ id: a.id, nome: a.nome, pessoas: a._count.pessoas })) },
+      }],
+      metricas: { arvoresOrfas: orfas.length, pessoasEmArvoreOrfa: pessoas },
+    }
+  },
+})

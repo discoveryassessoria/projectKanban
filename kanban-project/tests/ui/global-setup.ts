@@ -22,7 +22,9 @@ export default async function globalSetup() {
   const saida = execFileSync('npx', ['tsx', 'scripts/ui-token.ts'], {
     cwd: RAIZ, encoding: 'utf8', env: process.env, stdio: ['ignore', 'pipe', 'inherit'],
   })
-  const { token, nome, tipo } = JSON.parse(saida.trim()) as { token: string; nome: string; tipo: string }
+  const { token, nome, tipo, user } = JSON.parse(saida.trim()) as {
+    token: string; nome: string; tipo: string; user: Record<string, unknown>
+  }
 
   // A aplicação lê o token dos DOIS lugares: cookie (middleware/SSR) e
   // localStorage (chamadas do cliente). O estado precisa ter ambos.
@@ -32,7 +34,12 @@ export default async function globalSetup() {
       expires: Math.floor(Date.now() / 1000) + 8 * 60 * 60,
       httpOnly: false, secure: false, sameSite: 'Lax' as const,
     }],
-    origins: [{ origin: base, localStorage: [{ name: 'authToken', value: token }] }],
+    // DOIS itens, não um: telas como o Kanban leem `autenticado = token && user`.
+    // Com só o token elas redirecionavam para /login e o teste media a tela errada.
+    origins: [{ origin: base, localStorage: [
+      { name: 'authToken', value: token },
+      { name: 'user', value: JSON.stringify(user) },
+    ] }],
   }
 
   const destino = join(RAIZ, 'tests/ui/.auth')

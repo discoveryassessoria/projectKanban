@@ -66,7 +66,9 @@ export const DOMINIO_DOCUMENTOS: DominioDef = {
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 
   filtros: [
-    { key: "tipo", rotulo: "Tipo documental", tipo: "multi_selecao", opcoes: cadastro("itens_documentais"),
+    { key: "tipo", rotulo: "Tipo documental",
+      descricao: "Exclui registro civil: certidão vive no domínio Certidões.",
+      tipo: "multi_selecao", opcoes: cadastro("itens_nao_certidao"),
       paraWhere: emListaId("itemCatalogoId") },
     { key: "categoria", rotulo: "Categoria documental", tipo: "multi_selecao", opcoes: cadastro("categorias_documentais"),
       paraWhere: (v) => (v.tipo === "multi_selecao" && v.valores.length

@@ -16,7 +16,9 @@ interface PaisTabsProps {
 export function PaisTabs({ paises, paisSelecionado, onSelect }: PaisTabsProps) {
   if (!paises.length) return null
   return (
-    <div className="flex items-center gap-1 overflow-x-auto">
+    // Rola em vez de sumir: com muitos países cadastrados a faixa passa da
+    // largura e o recorte do pai comeria as últimas bandeiras.
+    <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
       {paises.map((p) => {
         const ativo = p.countryKey === paisSelecionado
         return (

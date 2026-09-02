@@ -27,7 +27,14 @@ async function main() {
   })
 
   // única saída do processo — o chamador lê e guarda em arquivo ignorado
-  process.stdout.write(JSON.stringify({ token, nome: admin.nome, tipo: admin.tipo }))
+  // A aplicação exige token E usuário: `autenticado = Boolean(token && user)`.
+  // Emitir só o token deixava a suíte cair no /login sem dizer por quê.
+  process.stdout.write(JSON.stringify({
+    token,
+    nome: admin.nome,
+    tipo: admin.tipo,
+    user: { id: admin.id, nome: admin.nome, email: admin.email, tipo: admin.tipo },
+  }))
   await prisma.$disconnect()
 }
 

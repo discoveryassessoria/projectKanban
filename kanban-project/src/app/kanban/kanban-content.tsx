@@ -350,8 +350,11 @@ export function KanbanContent() {
 
               {/* Contador + Países (só em Processos) */}
               {tabPrincipal === "processos" && pode('processos.ver') && (
-                <div className="flex items-center gap-4">
-                  <div className="flex flex-col items-center px-4 py-2 bg-[var(--surface-primary)] rounded-lg">
+                // `min-w-0` é o que faz o `overflow-x-auto` das abas de país
+                // funcionar: sem ele o item de flex nunca encolhe abaixo do
+                // conteúdo, a linha transborda e o pai recorta em silêncio.
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
+                  <div className="flex shrink-0 flex-col items-center px-4 py-2 bg-[var(--surface-primary)] rounded-lg">
                     <span className="text-2xl font-bold text-white">
                       {processos.length}
                     </span>
@@ -378,7 +381,7 @@ export function KanbanContent() {
 
             {/* ✅ Seletor de TIPO do país (só quando tem mais de um) */}
             {tabPrincipal === "processos" && pode('processos.ver') && tiposDoPais.length > 1 && (
-              <div className="mt-3 flex items-center gap-1 border-t border-[var(--border-default)] pt-3">
+              <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-[var(--border-default)] pt-3">
                 {tiposDoPais.map((t) => (
                   <button
                     key={t.id}

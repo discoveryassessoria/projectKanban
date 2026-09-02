@@ -464,15 +464,20 @@ export function ArvoreGenealogicaView({
   }
 
   const handleCreateArvore = async () => {
+    // SEM PROCESSO NÃO HÁ ÁRVORE. Esta tela montava o nome com o id na string —
+    // e quando o id não tinha chegado, mandava "Árvore do Processo undefined"
+    // para o servidor, que aceitava. O nome agora é problema do servidor, que
+    // o tira do processo; aqui só se manda a identidade.
+    if (!processoId) {
+      alert('Abra a árvore a partir de um processo — ela não existe fora dele.')
+      return
+    }
     setCreating(true)
     try {
       const response = await authFetch('/api/arvore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nome: `Árvore do Processo ${processoId}`,
-          processoId: processoId
-        })
+        body: JSON.stringify({ processoId })
       })
 
       if (response.ok) {
