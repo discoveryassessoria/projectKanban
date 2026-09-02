@@ -288,8 +288,22 @@ export function ArvoreGenealogicaView({
         (el as HTMLElement).style.setProperty('display', 'none', 'important')
       })
 
-      // ✅ Remover TODAS as sombras (removendo classes E estilos)
-      const shadowElements = reactFlowContainer.querySelectorAll('.shadow-[var(--elev-2)], .shadow-[var(--elev-2)], .shadow-[var(--elev-1)], .shadow, .shadow-[var(--elev-3)]');
+      // Remover TODAS as sombras antes de capturar.
+      //
+      // ESTA LINHA ERA A CAUSA DA FALHA DE EXPORTAÇÃO. O seletor era montado com
+      // os nomes das classes do Tailwind, e uma varredura de tokens trocou
+      // `shadow-lg` por `shadow-[var(--elev-2)]` DENTRO DA STRING também. Em CSS,
+      // `.shadow-[var(--elev-2)]` é sintaxe inválida (colchete e parêntese
+      // precisariam de escape), então `querySelectorAll` lançava e derrubava a
+      // exportação inteira — antes mesmo de desenhar qualquer coisa.
+      //
+      // A correção não é escapar os caracteres: é parar de depender do NOME da
+      // classe. Sombra é o que o navegador calcula como sombra. Assim o dia em
+      // que o token mudar de nome outra vez, isto continua funcionando.
+      const shadowElements = Array.from(reactFlowContainer.querySelectorAll<HTMLElement>('*')).filter((el) => {
+        const cs = getComputedStyle(el)
+        return (cs.boxShadow && cs.boxShadow !== 'none') || (cs.filter && cs.filter.includes('drop-shadow'))
+      });
       shadowElements.forEach((el) => {
         const htmlEl = el as HTMLElement;
         htmlEl.classList.add('!shadow-none');
