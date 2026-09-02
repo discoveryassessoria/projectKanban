@@ -11,7 +11,16 @@ import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 
-interface Elo { ordem: number; nome: string; ok: boolean; detalhe: string; rota?: string }
+interface Elo {
+  ordem: number; nome: string; ok: boolean; detalhe: string; rota?: string
+  /**
+   * O elo não pôde ser EXERCIDO porque não existe o insumo — não porque está
+   * quebrado. Sistema recém-limpo não tem histórico, e histórico ausente não
+   * prova defeito. Isso não vira crítico, mas também não vira verde: fica
+   * declarado como não exercido, porque "não testado nunca é saudável".
+   */
+  naoExercido?: boolean
+}
 
 registrar({
   id: 'saude.pontaaponta.cadeia-operacional',
@@ -148,11 +157,31 @@ registrar({
     })
 
     // 9) a timeline registra movimentação
+    //
+    // Este elo era o ÚNICO da corrente que media HISTÓRICO e não CAPACIDADE:
+    // contava `WorkflowEvento` acumulado. Num sistema sem nenhum processo — o
+    // estado legítimo de quem acabou de limpar a base — ele falhava sempre, e o
+    // painel anunciava "o Discovery não consegue executar o fluxo principal",
+    // o que era falso. A pergunta certa não é "já houve movimentação?", é
+    // "quando houve movimentação, ela foi registrada?".
     const eventosTimeline = await prisma.workflowEvento.count()
-    elos.push({
-      ordem: 9, nome: 'Timeline registra movimentação',
-      ok: eventosTimeline > 0, detalhe: `${eventosTimeline} evento(s) de workflow registrados`,
-    })
+    const processosComAvanco = await prisma.processo.count({ where: { faseAtualKey: { not: null } } })
+
+    if (processosComAvanco === 0) {
+      elos.push({
+        ordem: 9, nome: 'Timeline registra movimentação',
+        ok: false, naoExercido: true,
+        detalhe: 'nenhum processo em fase — não houve movimentação para registrar',
+      })
+    } else {
+      elos.push({
+        ordem: 9, nome: 'Timeline registra movimentação',
+        ok: eventosTimeline > 0,
+        detalhe: eventosTimeline > 0
+          ? `${eventosTimeline} evento(s) para ${processosComAvanco} processo(s) em fase`
+          : `${processosComAvanco} processo(s) em fase e NENHUM evento registrado`,
+      })
+    }
 
     // 10) o financeiro consegue emitir cobrança (existe conta e condição)
     const contas = await prisma.contaBancaria.count({ where: { ativo: true } })
@@ -162,7 +191,17 @@ registrar({
       rota: '/administrator?screen=accounts',
     })
 
-    const partidos = elos.filter((e) => !e.ok)
+    // PARTIDO ≠ NÃO EXERCIDO. Um elo que não pôde ser exercido por falta de
+    // insumo não interrompe corrente nenhuma, e chamá-lo de crítico faz o painel
+    // mentir. Ele aparece — porque silenciar seria pior — mas como alerta.
+    const partidos = elos.filter((e) => !e.ok && !e.naoExercido)
+    const naoExercidos = elos.filter((e) => e.naoExercido)
+
+    const cadeia = elos.map((x) => ({
+      ordem: x.ordem, nome: x.nome,
+      estado: x.naoExercido ? 'NAO_EXERCIDO' : x.ok ? 'OK' : 'PARTIDO',
+    }))
+
     const achados: Achado[] = partidos.map((e): Achado => ({
       chave: `e2e-elo-${e.ordem}`,
       // O primeiro elo partido é o que trava o fluxo; os seguintes são consequência.
@@ -175,13 +214,38 @@ registrar({
       quantidade: 1,
       link: e.rota ?? null,
       recomendacao: `Resolva "${e.nome}" antes dos demais — os elos seguintes costumam ser consequência.`,
-      evidencia: { elo: e.ordem, nome: e.nome, detalhe: e.detalhe, cadeia: elos.map((x) => ({ ordem: x.ordem, nome: x.nome, ok: x.ok })) },
+      evidencia: { elo: e.ordem, nome: e.nome, detalhe: e.detalhe, cadeia },
     }))
+
+    for (const e of naoExercidos) {
+      achados.push({
+        chave: `e2e-elo-${e.ordem}-nao-exercido`,
+        severidade: 'ALERTA',
+        titulo: `Elo ${e.ordem} não pôde ser exercido: ${e.nome}`,
+        descricao: `${e.nome} — ${e.detalhe}.`,
+        explicacao:
+          'Este elo só se prova em movimento. Sem o insumo, ele não foi exercido — o que não é o mesmo ' +
+          'que estar quebrado, e também não é o mesmo que estar provado.',
+        impacto: 'A corrente não pode ser declarada íntegra até que este elo rode com dado real.',
+        entidade: 'Operação',
+        quantidade: 1,
+        link: e.rota ?? null,
+        recomendacao: 'Crie um processo e avance uma fase — o elo se prova sozinho no primeiro movimento real.',
+        evidencia: { elo: e.ordem, nome: e.nome, detalhe: e.detalhe, cadeia },
+      })
+    }
 
     return {
       achados,
-      metricas: { elos: elos.length, elosOk: elos.filter((e) => e.ok).length, elosPartidos: partidos.length },
-      resumo: `Corrente operacional íntegra nos ${elos.length} elos verificados.`,
+      metricas: {
+        elos: elos.length,
+        elosOk: elos.filter((e) => e.ok).length,
+        elosPartidos: partidos.length,
+        elosNaoExercidos: naoExercidos.length,
+      },
+      resumo: naoExercidos.length
+        ? `${elos.length - naoExercidos.length} elo(s) íntegros; ${naoExercidos.length} não exercido(s) por falta de movimento real.`
+        : `Corrente operacional íntegra nos ${elos.length} elos verificados.`,
     }
   },
 })

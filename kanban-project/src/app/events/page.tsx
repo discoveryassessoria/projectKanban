@@ -341,7 +341,7 @@ const handleSubmit = async () => {
 
   if (isLoading) {
     return (
-      <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      <div className="relative min-h-screen text-white [overflow-x:clip] overscroll-none">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
         <div
           className="pointer-events-none fixed inset-0 -z-10"
@@ -363,7 +363,7 @@ const handleSubmit = async () => {
   if (!usuario) return null
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+    <div className="relative min-h-screen text-white [overflow-x:clip] overscroll-none">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div
         className="pointer-events-none fixed inset-0 -z-10"

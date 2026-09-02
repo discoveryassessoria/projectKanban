@@ -129,7 +129,7 @@ export default function FinanceiroPage() {
 
   if (!mounted || carregando || !pode("financeiro.ver")) {
     return (
-      <div className="relative min-h-screen text-white overflow-x-hidden">
+      <div className="relative min-h-screen text-white [overflow-x:clip]">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
         <div
           className="pointer-events-none fixed inset-0 -z-10"
@@ -149,7 +149,7 @@ export default function FinanceiroPage() {
   }
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+    <div className="relative min-h-screen text-white [overflow-x:clip] overscroll-none">
       {/* Fundo arquitetônico desfocado e escurecido (somente desta tela) */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div

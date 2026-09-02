@@ -34,7 +34,7 @@ export function HomeShell({
   function sair() { void encerrarSessao("manual") }
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden text-white">
+    <div className="relative min-h-screen [overflow-x:clip] text-white">
       {/* AMBIENTE — receita única do sistema: imagem fixa nítida + degradê escuro.
           O degradê é quase opaco onde o conteúdo vive e abre na base, então a
           cidade aparece nítida embaixo — decisão de composição, não sobra. */}

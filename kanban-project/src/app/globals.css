@@ -597,11 +597,16 @@ html, body {
   overscroll-behavior: none;
   overscroll-behavior-x: none;
   overscroll-behavior-y: none;
-  overflow-x: hidden;
-  /* `overflow-x: hidden` sozinho não segura o Safari: ele continua deixando a
-     página rolar de lado quando algum descendente passa da largura, e aí a
-     barra lateral `fixed` sai da tela junto. O teto explícito em 100vw é o que
-     impede a página de ficar mais larga que a janela. */
+  /* `clip`, não `hidden`. Duas razões, e as duas custaram caro:
+     — `hidden` num eixo faz o OUTRO eixo computar `auto`. Com isso o `body`
+       virava contêiner de rolagem e o cabeçalho `sticky` grudava NELE em vez de
+       na janela: rolava a página e o cabeçalho ia junto, sumindo.
+     — `hidden` ainda permite rolagem programática; `clip` não permite nenhuma.
+       No Safari, `overflow-x: hidden` deixava a página rolar de lado e a barra
+       lateral `fixed` saía da tela.
+     `clip` corta na horizontal, não cria rolador e não toca no eixo vertical. */
+  overflow-x: clip;
+  /* Teto explícito: a página não pode ficar mais larga que a janela. */
   max-width: 100vw;
 }
 

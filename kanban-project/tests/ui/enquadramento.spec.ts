@@ -54,3 +54,36 @@ test('nenhuma tela fica mais larga que a janela', async ({ page }) => {
     }
   }
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// O CABEÇALHO PRECISA GRUDAR NO TOPO.
+//
+// Ele é `sticky top-0`, e mesmo assim rolava para fora da tela. Causa: `body`
+// tinha `overflow-x: hidden`, e `hidden` num eixo faz o OUTRO computar `auto` —
+// o `body` virava contêiner de rolagem e o `sticky` passava a grudar NELE, não
+// na janela. Trocado por `overflow-x: clip`, que corta na horizontal sem virar
+// rolador e sem tocar no eixo vertical. Mesma armadilha nas raízes de página.
+
+const ROTAS_COM_CABECALHO = ['/relatorios', '/kanban', '/genealogy', '/events', '/registral']
+
+test('o cabeçalho gruda no topo ao rolar', async ({ page }) => {
+  for (const rota of ROTAS_COM_CABECALHO) {
+    await page.setViewportSize({ width: 1512, height: 700 })
+    await page.goto(rota)
+    await page.waitForSelector('header', { timeout: 30000 })
+    await page.waitForTimeout(900)
+    await page.evaluate(() => window.scrollTo(0, 400))
+    await page.waitForTimeout(400)
+
+    const medida = await page.evaluate(() => ({
+      topo: Math.round(document.querySelector('header')!.getBoundingClientRect().top),
+      rolagem: Math.round(window.scrollY),
+    }))
+
+    // Página curta demais para rolar não prova nada — e não pode reprovar.
+    if (medida.rolagem > 0) {
+      expect(Math.abs(medida.topo), `${rota}: o cabeçalho saiu do topo ao rolar ${medida.rolagem}px`)
+        .toBeLessThanOrEqual(1)
+    }
+  }
+})

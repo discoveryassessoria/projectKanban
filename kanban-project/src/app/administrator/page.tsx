@@ -583,7 +583,7 @@ export default function GerenciamentoPage() {
   const PANEL = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden text-white">
+    <div className="relative min-h-screen [overflow-x:clip] text-white">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div
         className="pointer-events-none fixed inset-0 -z-10"

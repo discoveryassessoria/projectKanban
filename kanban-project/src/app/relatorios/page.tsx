@@ -267,7 +267,7 @@ export default function RelatoriosPage() {
   return (
     // O fundo continua ambiental, mas a leitura vem primeiro: o véu garante que
     // filtro e tabela nunca fiquem boiando sobre a paisagem.
-    <div className="relative min-h-screen overflow-x-hidden overscroll-none">
+    <div className="relative min-h-screen [overflow-x:clip] overscroll-none">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: "var(--landscape-veil)" }} />
       <Suspense fallback={null}>

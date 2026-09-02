@@ -230,7 +230,7 @@ export default function BlogAdminPage() {
 
   if (loading) {
     return (
-      <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+      <div className="relative min-h-screen text-white [overflow-x:clip] overscroll-none">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
         <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
@@ -245,7 +245,7 @@ export default function BlogAdminPage() {
   if (!usuario) return null
 
   return (
-    <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
+    <div className="relative min-h-screen text-white [overflow-x:clip] overscroll-none">
       {/* Background com imagem */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
