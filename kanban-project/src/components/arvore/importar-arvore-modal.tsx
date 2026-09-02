@@ -155,13 +155,13 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
 
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 shadow-[var(--elev-3)]">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] text-[var(--text-primary)] shadow-[var(--elev-3)]">
         <header className="flex flex-shrink-0 items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold">Importar Árvore</h2>
-            <p className="text-sm text-white/70">Envie o print de uma árvore já montada — os cards são transcritos automaticamente.</p>
+            <p className="text-sm text-[var(--text-secondary)]">Envie o print de uma árvore já montada — os cards são transcritos automaticamente.</p>
           </div>
-          <button onClick={fechar} disabled={ocupado} className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-40" aria-label="Fechar">
+          <button onClick={fechar} disabled={ocupado} className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)] disabled:opacity-40" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </header>
@@ -194,7 +194,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                   ) : (
                     <>
                       <Upload className="h-8 w-8 text-[var(--text-muted)]" />
-                      <span className="text-sm text-white/70">Clique para escolher uma imagem</span>
+                      <span className="text-sm text-[var(--text-secondary)]">Clique para escolher uma imagem</span>
                       <span className="text-xs text-[var(--text-secondary)]">PNG, JPEG ou WebP · até {LIMITE_MB} MB</span>
                     </>
                   )}
@@ -242,7 +242,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                       <div className="min-w-0">
                         <p className="font-medium">
                           {p.nome} {p.sobrenome ?? ""}
-                          {p.numeroLinhagem != null && <span className="ml-2 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">linhagem {p.numeroLinhagem}</span>}
+                          {p.numeroLinhagem != null && <span className="ml-2 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]">linhagem {p.numeroLinhagem}</span>}
                         </p>
                         <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                           {[p.sexo, p.data_nasc && `nasc. ${p.data_nasc}`, [p.local_nasc, p.pais_nasc].filter(Boolean).join(", "),
@@ -256,7 +256,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                       </div>
                       <button
                         onClick={() => setRemovidas((s) => { const n = new Set(s); n.has(p.ref) ? n.delete(p.ref) : n.add(p.ref); return n })}
-                        className="flex-shrink-0 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)]">
+                        className="flex-shrink-0 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)]">
                         {fora ? "Incluir" : "Remover"}
                       </button>
                     </div>
@@ -267,25 +267,30 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
           )}
         </div>
 
+        {/* A AÇÃO PRIMÁRIA PRECISA PARECER A AÇÃO PRIMÁRIA. "Analisar" usava
+            `--surface-elevated` (#f2f9fd) como fundo: quase branco, sobre um
+            rodapé branco, sem borda. O botão estava lá e não parecia botão —
+            o usuário abria o modal, escolhia o print e via só "Cancelar". Agora
+            usa o token de ação, o mesmo de "Novo processo" e "Entrar". */}
         <footer className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-4">
           <p className="text-xs text-[var(--text-secondary)]">
             {naPrevia ? "Nada foi gravado ainda — confira antes de confirmar." : "A imagem é lida no servidor; nada é gravado nesta etapa."}
           </p>
           <div className="flex items-center gap-2">
             {naPrevia && (
-              <button onClick={() => setEtapa("upload")} disabled={ocupado} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 transition hover:bg-[var(--surface-hover)]">Voltar</button>
+              <button onClick={() => setEtapa("upload")} disabled={ocupado} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)]">Voltar</button>
             )}
             <button onClick={fechar} disabled={ocupado}
-              className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 transition hover:bg-[var(--surface-hover)] disabled:opacity-40">Cancelar</button>
+              className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-primary)] transition hover:bg-[var(--surface-hover)] disabled:opacity-40">Cancelar</button>
             {!naPrevia ? (
               <button onClick={analisar} disabled={!arquivo || ocupado}
-                className="flex items-center gap-2 rounded-lg bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
+                className="flex items-center gap-2 rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] shadow-[var(--elev-1)] transition hover:opacity-90 disabled:opacity-40">
                 {etapa === "analisando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {etapa === "analisando" ? "Lendo a imagem…" : "Analisar"}
               </button>
             ) : (
               <button onClick={confirmar} disabled={ocupado || restantes.length === 0}
-                className="flex items-center gap-2 rounded-lg bg-[var(--surface-elevated)] px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
+                className="flex items-center gap-2 rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] shadow-[var(--elev-1)] transition hover:opacity-90 disabled:opacity-40">
                 {etapa === "gravando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {etapa === "gravando" ? "Gravando…" : `Confirmar e criar ${restantes.length}`}
               </button>
