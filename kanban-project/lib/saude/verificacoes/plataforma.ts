@@ -565,8 +565,59 @@ registrar({
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
     const registro = await prisma.configuracaoSistema.findUnique({ where: { chave: 'backup.ultimo' } }).catch(() => null)
+
+    // EVIDÊNCIA É ESTRUTURA CONFERIDA, NÃO FRASE. Antes bastava haver qualquer
+    // texto na chave para a verificação ficar verde — o mesmo problema que ela
+    // existe para resolver, um nível acima. Agora o valor tem de ser o registro
+    // que `scripts/backup-registrar.ts` escreve depois de conferir o arquivo
+    // (assinatura de dump, tamanho e sha256). E backup velho não é backup: a
+    // idade entra na conta.
     if (registro?.valor) {
-      return { achados: [], metricas: { evidencia: 1 }, resumo: `Último backup registrado: ${registro.valor}.` }
+      let prova: { registradoEm?: string; arquivo?: string; sha256?: string; tamanhoBytes?: number; origem?: string } | null = null
+      try { prova = JSON.parse(registro.valor) } catch { prova = null }
+
+      if (!prova?.registradoEm || !prova.sha256) {
+        return {
+          achados: [{
+            chave: 'backup-evidencia-sem-prova',
+            severidade: 'ALERTA',
+            titulo: 'A evidência de backup não tem prova conferível',
+            descricao: `O valor de \`backup.ultimo\` não é um registro conferido: ${registro.valor.slice(0, 120)}`,
+            explicacao: 'Uma frase escrita à mão afirma o backup sem prová-lo — é o mesmo problema que esta verificação existe para impedir.',
+            impacto: 'Em caso de incidente, não se sabe a que ponto é possível voltar.',
+            entidade: 'ConfiguracaoSistema',
+            quantidade: 1,
+            recomendacao: 'Rode `npx tsx scripts/backup-registrar.ts <dump>` — ele confere o arquivo antes de registrar.',
+            evidencia: { chave: 'backup.ultimo', valor: registro.valor.slice(0, 200) },
+          }],
+          metricas: { evidencia: 0 },
+        }
+      }
+
+      const dias = Math.floor((Date.now() - new Date(prova.registradoEm).getTime()) / 86_400_000)
+      if (dias > 7) {
+        return {
+          achados: [{
+            chave: 'backup-vencido',
+            severidade: 'ALERTA',
+            titulo: `O último backup tem ${dias} dias`,
+            descricao: `${prova.arquivo ?? 'dump'} · ${prova.origem ?? 'origem não declarada'} · sha256 ${prova.sha256.slice(0, 16)}…`,
+            explicacao: 'O backup existe e foi conferido, mas envelheceu: o que se perde num incidente é tudo que entrou depois dele.',
+            impacto: `Em caso de incidente, perde-se até ${dias} dia(s) de operação.`,
+            entidade: 'ConfiguracaoSistema',
+            quantidade: dias,
+            recomendacao: 'Gere um dump novo e registre a evidência.',
+            evidencia: prova as unknown as Record<string, unknown>,
+          }],
+          metricas: { evidencia: 1, diasDesdeUltimoBackup: dias },
+        }
+      }
+
+      return {
+        achados: [],
+        metricas: { evidencia: 1, diasDesdeUltimoBackup: dias },
+        resumo: `Backup conferido há ${dias} dia(s): ${prova.arquivo ?? 'dump'} (${prova.origem ?? 'origem não declarada'}).`,
+      }
     }
     return {
       achados: [{
@@ -785,7 +836,11 @@ registrar({
   responsavel: 'Operação',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
-    const modelos = await prisma.modeloDocumento.count({ where: { ativo: true } })
+    // O REPOSITÓRIO OFICIAL. Contava `ModeloDocumento` — o mecanismo paralelo
+    // que a arquitetura removeu, com zero linhas e nenhuma porta que o crie. A
+    // verificação acusava eternamente uma falta que ninguém podia sanar, e a
+    // própria `rotaCorrecao` daqui já apontava para a tela do repositório novo.
+    const modelos = await prisma.modeloDocumental.count({ where: { ativo: true } })
     const regras = await prisma.regraNotificacao.count({ where: { ativo: true } })
     const achados: Achado[] = []
     if (regras > 0 && modelos === 0) {
@@ -810,7 +865,7 @@ registrar({
         descricao: 'Não há modelo de documento ativo.',
         explicacao: 'Modelos padronizam ofícios, cartas e mensagens ao cliente.',
         impacto: 'Não bloqueia: as comunicações seguem manuais.',
-        entidade: 'ModeloDocumento',
+        entidade: 'ModeloDocumental',
         quantidade: 0,
         link: '/administrator?screen=templates',
         recomendacao: 'Cadastre os modelos quando padronizar a comunicação.',

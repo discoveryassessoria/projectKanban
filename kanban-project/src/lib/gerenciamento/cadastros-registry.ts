@@ -111,7 +111,14 @@ export const FONTES: Record<string, {
   // MODELO DE MENSAGEM (e-mail/mensagem de notificação) — NÃO é modelo documental.
   // O repositório de modelos documentais (DOCX versionado) é outro domínio e vive
   // em ModeloDocumental. O nome distinto existe para que ninguém confunda os dois.
-  modelosMensagem: { model: "modeloDocumento", valor: "code", label: ["nome"], where: { ativo: true } },
+  // O REPOSITÓRIO OFICIAL, não o legado. Isto apontava para `ModeloDocumento` —
+  // o mecanismo paralelo de template que foi REMOVIDO do cadastro. A tabela tem
+  // zero linhas e nenhum código no sistema a cria, então o campo "Modelo de
+  // mensagem" da regra de notificação era um seletor eternamente vazio, sem
+  // porta nenhuma para preencher. Agora vem de `ModeloDocumental`, que é onde a
+  // tela `?screen=templates` de fato cadastra, com DOCX versionado e publicação
+  // auditada. `RegraNotificacao.modeloCode` guarda o `codigo` do modelo.
+  modelosMensagem: { model: "modeloDocumental", valor: "codigo", label: ["nome"], where: { ativo: true } },
 }
 
 const CAMPOS_BASE: CampoSpec[] = [

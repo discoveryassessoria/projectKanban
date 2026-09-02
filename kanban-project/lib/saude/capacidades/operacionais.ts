@@ -617,7 +617,8 @@ registrarCapacidade({
       acao: 'Cadastre os modelos em Sistema › Cadastros Auxiliares › Modelos.',
       rota: '/administrator?screen=templates',
       avaliar: async () => {
-        const n = await prisma.modeloDocumento.count({ where: { ativo: true } })
+        // Mesma correção de COM-001: o repositório oficial é `ModeloDocumental`.
+        const n = await prisma.modeloDocumental.count({ where: { ativo: true } })
         return { ok: n > 0, detalhe: `${n} modelo(s) ativo(s)`, quantidade: n }
       },
     },

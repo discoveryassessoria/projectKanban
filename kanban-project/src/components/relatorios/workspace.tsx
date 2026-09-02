@@ -51,6 +51,9 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [mostrarColunas, setMostrarColunas] = useState(false)
+  const [menuExport, setMenuExport] = useState(false)
+  const [exportando, setExportando] = useState<"csv" | "xlsx" | "pdf" | null>(null)
+  const [erroExport, setErroExport] = useState<string | null>(null)
   const [novoFiltro, setNovoFiltro] = useState("")
 
   // A nacionalidade vem da navegação e recomeça a consulta — ela é contexto de
@@ -124,13 +127,42 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
     if (r.ok) { await carregarVisoes(); setAba("visoes") }
   }
 
-  async function exportar() {
-    const r = await fetch("/api/relatorios/exportar", { method: "POST", headers: auth(), body: JSON.stringify(spec) })
-    if (!r.ok) return
-    const url = URL.createObjectURL(await r.blob())
-    const a = document.createElement("a")
-    a.href = url; a.download = `${dominioKey}-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
-    URL.revokeObjectURL(url)
+  // Exportar é ação demorada e pode falhar. Antes, `if (!r.ok) return` engolia
+  // o erro: o usuário clicava, nada acontecia e ele não sabia se o arquivo
+  // estava vindo ou se tinha quebrado.
+  async function exportar(formato: "csv" | "xlsx" | "pdf") {
+    setExportando(formato)
+    setErroExport(null)
+    try {
+      const r = await fetch("/api/relatorios/exportar", {
+        method: "POST", headers: auth(), body: JSON.stringify({ ...spec, formato }),
+      })
+      if (!r.ok) {
+        const j = await r.json().catch(() => null)
+        setErroExport(j?.error ?? `A exportação falhou (${r.status}).`)
+        return
+      }
+      // O corte não pode ficar só dentro do arquivo: quem exportou precisa
+      // saber, na hora, que a extração parou antes do fim.
+      if (r.headers.get("X-Relatorio-Truncado") === "1") {
+        setErroExport(
+          `O arquivo traz ${r.headers.get("X-Relatorio-Extraidas")} de ` +
+          `${r.headers.get("X-Relatorio-Total")} registros — o teto de exportação foi atingido. ` +
+          `Estreite os filtros para levar tudo.`,
+        )
+      }
+      const url = URL.createObjectURL(await r.blob())
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${dominioKey}-${new Date().toISOString().slice(0, 10)}.${formato}`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setErroExport("A exportação não completou. Tente de novo.")
+    } finally {
+      setExportando(null)
+      setMenuExport(false)
+    }
   }
 
   async function abrirVisao(v: Visao | { nome: string; spec: QuerySpec }, id?: number) {
@@ -316,8 +348,38 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
             </button>
             <button type="button" className={BOTAO} onClick={() => setMostrarColunas((v) => !v)}>Colunas</button>
             <button type="button" className={BOTAO} onClick={() => void salvarVisao()}>Salvar visão</button>
-            <button type="button" className={BOTAO} onClick={() => void exportar()}>Exportar CSV</button>
+            <div className="relative">
+              <button type="button" className={BOTAO} disabled={exportando !== null}
+                onClick={() => setMenuExport((v) => !v)}>
+                {exportando ? `Exportando ${exportando.toUpperCase()}…` : "Exportar ▾"}
+              </button>
+              {menuExport && (
+                <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]">
+                  {([
+                    ["xlsx", "Excel (.xlsx)", "abre no Excel com filtro e números somáveis"],
+                    ["csv", "CSV (.csv)", "texto puro, para importar em outro sistema"],
+                    ["pdf", "PDF (.pdf)", "para imprimir ou anexar, com os filtros no topo"],
+                  ] as const).map(([f, nome, ajuda]) => (
+                    <button key={f} type="button" onClick={() => void exportar(f)}
+                      className="block w-full px-3 py-2 text-left hover:bg-[var(--surface-hover)]">
+                      <span className="block text-[13px] text-[var(--text-primary)]">{nome}</span>
+                      <span className="block text-[11px] text-[var(--text-secondary)]">{ajuda}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+
+          {erroExport && (
+            <div className="mt-2 flex items-start justify-between gap-3 rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-elevated)] px-3 py-2">
+              <span className="text-[12.5px] text-[var(--text-primary)]">{erroExport}</span>
+              <button type="button" onClick={() => setErroExport(null)}
+                className="shrink-0 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                dispensar
+              </button>
+            </div>
+          )}
 
           {mostrarColunas && (
             <div className={`${PAINEL} flex flex-wrap gap-x-4 gap-y-1 p-3`}>

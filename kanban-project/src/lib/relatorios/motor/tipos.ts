@@ -87,6 +87,14 @@ export interface ColunaDef {
   alinhamento?: "esquerda" | "direita"
   /** Coluna numérica que faz sentido somar no rodapé de um grupo. */
   somavel?: boolean
+  /**
+   * PERMISSÃO ALÉM DA DO DOMÍNIO. Um domínio expõe UMA permissão, mas nem toda
+   * coluna dele pertence ao mesmo assunto: "Certidões" abre com `processos.ver`
+   * e trazia a coluna "Custo pago" junto — dinheiro liberado para quem só podia
+   * ver processo. Declarada aqui, a coluna é REMOVIDA do resultado de quem não
+   * tem a permissão, e com ela somem o filtro e a ordenação correspondentes.
+   */
+  permissao?: PermissaoChave
 }
 
 export interface AgrupamentoDef {

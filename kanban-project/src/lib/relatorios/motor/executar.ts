@@ -15,6 +15,7 @@
 // banco inteiro.
 
 import { rotuloDeData } from "./datas"
+import type { PermissaoChave } from "@/src/lib/permissoes"
 import type { DominioDef, QuerySpec, ValorDeFiltro } from "./tipos"
 
 export interface LinhaResultado {
@@ -63,10 +64,28 @@ function descrever(rotulo: string, v: ValorDeFiltro): string {
 
 const MAX_POR_PAGINA = 200
 
-export async function executar(dominio: DominioDef, spec: QuerySpec): Promise<Resultado> {
+/**
+ * `pode` é a permissão do USUÁRIO da requisição. Ausente = sem recorte por
+ * coluna (é o caso de script e de teste). A rota SEMPRE passa: a coluna
+ * restrita depende disso para sumir.
+ */
+export async function executar(
+  dominio: DominioDef, spec: QuerySpec, pode?: (chave: PermissaoChave) => boolean,
+): Promise<Resultado> {
   const clausulas: Record<string, unknown>[] = []
   const aplicados: Resultado["aplicados"] = []
   const ignorados: string[] = []
+
+  // COLUNA RESTRITA SOME INTEIRA — e leva junto o filtro e a ordenação que
+  // apontam para ela. Só esconder a célula não protege nada: quem pode ordenar
+  // por "Custo pago" lê o valor pela ordem das linhas, e quem pode filtrar por
+  // faixa descobre o número por tentativa. Esconder sem fechar a porta é pior
+  // que não esconder, porque parece seguro.
+  const colunaVisivel = (c: { permissao?: PermissaoChave }) =>
+    !c.permissao || !pode || pode(c.permissao)
+  const chavesProibidas = new Set(
+    dominio.colunas.filter((c) => !colunaVisivel(c)).map((c) => c.key),
+  )
 
   // CONTEXTO DE NACIONALIDADE — dimensão global, aplicada antes de tudo.
   if (spec.nacionalidade && dominio.aceitaNacionalidade) {
@@ -77,6 +96,7 @@ export async function executar(dominio: DominioDef, spec: QuerySpec): Promise<Re
   for (const f of spec.filtros ?? []) {
     const def = dominio.filtros.find((x) => x.key === f.key)
     if (!def) { ignorados.push(f.key); continue }
+    if (chavesProibidas.has(def.key)) { ignorados.push(f.key); continue }
     const clausula = await def.paraWhere(f.valor)
     // Filtro sem valor útil não vira cláusula vazia: sumiria o AND e passaria a
     // trazer tudo, que é o pior resultado possível — parece funcionar.
@@ -87,7 +107,9 @@ export async function executar(dominio: DominioDef, spec: QuerySpec): Promise<Re
 
   const where = clausulas.length ? { AND: clausulas } : {}
 
-  const ordDef = dominio.ordenacoes.find((o) => o.key === spec.ordenarPor)
+  const pedida = chavesProibidas.has(spec.ordenarPor ?? "") ? null : spec.ordenarPor
+  if (spec.ordenarPor && !pedida) ignorados.push(spec.ordenarPor)
+  const ordDef = dominio.ordenacoes.find((o) => o.key === pedida)
     ?? dominio.ordenacoes.find((o) => o.key === dominio.ordenacaoPadrao.key)
     ?? dominio.ordenacoes[0]
   const direcao = spec.direcao ?? dominio.ordenacaoPadrao.direcao
@@ -101,9 +123,12 @@ export async function executar(dominio: DominioDef, spec: QuerySpec): Promise<Re
 
   const chavesColunas = (spec.colunas?.length ? spec.colunas : dominio.colunasIniciais)
     .filter((k) => dominio.colunas.some((c) => c.key === k))
+    .filter((k) => !chavesProibidas.has(k))
   const colunas = chavesColunas.map((k) => dominio.colunas.find((c) => c.key === k)!)
 
-  const agrupamento = spec.agruparPor ? dominio.agrupamentos.find((a) => a.key === spec.agruparPor) ?? null : null
+  const agrupamento = spec.agruparPor && !chavesProibidas.has(spec.agruparPor)
+    ? dominio.agrupamentos.find((a) => a.key === spec.agruparPor) ?? null
+    : null
   if (spec.agruparPor && !agrupamento) ignorados.push(spec.agruparPor)
 
   const cruas = await dominio.carregar(where, orderBy, (pagina - 1) * porPagina, porPagina)
@@ -145,23 +170,11 @@ export async function executar(dominio: DominioDef, spec: QuerySpec): Promise<Re
 }
 
 /**
- * EXPORTAÇÃO — o MESMO caminho da tela, sem paginação. Se o export tivesse
- * consulta própria, ele acabaria trazendo linha que a tela não mostrou; é o
- * defeito clássico de relatório, e o motivo de ele reusar `executar`.
+ * EXPORTAÇÃO EM CSV — mantida para quem já chamava por aqui. A coleta e os três
+ * formatos vivem em `./exportar`; duplicar a paginação aqui criaria a segunda
+ * origem de linhas que a regra de consistência existe para impedir.
  */
 export async function exportarCsv(dominio: DominioDef, spec: QuerySpec, teto = 20000): Promise<string> {
-  const r = await executar(dominio, { ...spec, pagina: 1, porPagina: 1 })
-  const total = Math.min(r.total, teto)
-  const linhas: LinhaResultado[] = []
-  const lote = 200
-  for (let p = 1; (p - 1) * lote < total; p++) {
-    const parte = await executar(dominio, { ...spec, pagina: p, porPagina: lote })
-    linhas.push(...parte.linhas)
-    if (parte.linhas.length === 0) break
-  }
-  const cab = r.colunas.map((c) => c.rotulo)
-  const corpo = linhas.map((l) => l.celulas.map((c) => (c.valor ?? "")))
-  const escapar = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`
-  // BOM para o Excel abrir acentuação corretamente.
-  return "﻿" + [cab, ...corpo].map((l) => l.map(escapar).join(";")).join("\n")
+  const { coletar, paraCsv } = await import("./exportar")
+  return paraCsv(await coletar(dominio, spec, teto))
 }

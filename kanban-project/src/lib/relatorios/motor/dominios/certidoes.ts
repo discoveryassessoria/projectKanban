@@ -140,7 +140,11 @@ export const DOMINIO_CERTIDOES: DominioDef = {
       valor: (l) => { const s = sol(l); if (!s?.previsaoRetorno || s.status === "RESPONDIDA") return null
         const d = diasEntre(s.previsaoRetorno); return d != null && d > 0 ? d : null }, alinhamento: "direita" },
     { key: "situacao_solicitacao", rotulo: "Situação da solicitação", valor: (l) => sol(l)?.status ?? null },
-    { key: "custo", rotulo: "Custo pago", valor: (l) => (sol(l)?.custoPago != null ? Number(sol(l).custoPago) : null),
+    // Dinheiro é assunto do Financeiro, mesmo aparecendo num relatório de
+    // certidões: este domínio abre com `processos.ver`, e sem esta linha quem
+    // só pode ver processo lia custo por aqui.
+    { key: "custo", rotulo: "Custo pago", permissao: "financeiro.ver",
+      valor: (l) => (sol(l)?.custoPago != null ? Number(sol(l).custoPago) : null),
       alinhamento: "direita", somavel: true },
     { key: "responsavel", rotulo: "Solicitada por", valor: (l) => sol(l)?.criadoPor?.nome ?? null },
     { key: "emissao", rotulo: "Data de emissão", valor: (l) => dataBR(doc(l)?.data_emissao) },

@@ -87,7 +87,9 @@ export const DOMINIO_FORNECEDORES: DominioDef = {
     { key: "em_aberto", rotulo: "Em aberto", valor: (l) => emAberto(l).length, alinhamento: "direita", somavel: true },
     { key: "atrasadas", rotulo: "Com retorno vencido", valor: (l) => atrasadas(l).length, alinhamento: "direita", somavel: true },
     { key: "prazo_medio", rotulo: "Prazo médio (dias)", valor: prazoMedio, alinhamento: "direita" },
-    { key: "custo_total", rotulo: "Custo pago",
+    // Mesma razão de `certidoes.custo`: o domínio abre com `usuarios.gerenciar`,
+    // que é permissão de gente, não de dinheiro.
+    { key: "custo_total", rotulo: "Custo pago", permissao: "financeiro.ver",
       valor: (l) => { const t = sols(l).reduce((a: number, s: any) => a + (s.custoPago ? Number(s.custoPago) : 0), 0)
         return t || null }, alinhamento: "direita", somavel: true },
     { key: "protocolos", rotulo: "Protocolos", valor: (l) => l._count?.protocolos ?? 0, alinhamento: "direita", somavel: true },
