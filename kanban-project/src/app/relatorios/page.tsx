@@ -43,7 +43,7 @@ const auth = () => ({
 
 interface DominioResumo {
   key: string; rotulo: string; descricao: string; grain: string; ordem: number
-  permissao: string; aceitaNacionalidade: boolean
+  grupo: string; permissao: string; aceitaNacionalidade: boolean
 }
 interface Nacionalidade { valor: string; rotulo: string; detalhe?: string | null }
 interface VisaoResumo { id: number; dominio: string; nome: string; favorita: boolean; usadaEm: string | null }
@@ -140,8 +140,17 @@ function Conteudo() {
   const atual = visiveis.find((d) => d.key === dominioKey) ?? null
   const paisAtual = nacionalidades.find((n) => n.valor === pais) ?? null
   const filtrados = busca.trim()
-    ? visiveis.filter((d) => `${d.rotulo} ${d.descricao}`.toLowerCase().includes(busca.trim().toLowerCase()))
+    ? visiveis.filter((d) => `${d.rotulo} ${d.descricao} ${d.grupo}`.toLowerCase().includes(busca.trim().toLowerCase()))
     : visiveis
+
+  // Os grupos saem da DECLARAÇÃO dos domínios, na ordem em que aparecem — não
+  // existe lista de assuntos escrita nesta tela.
+  const grupos: [string, DominioResumo[]][] = []
+  for (const d of [...filtrados].sort((a, b) => a.ordem - b.ordem)) {
+    const atual = grupos.find(([g]) => g === d.grupo)
+    if (atual) atual[1].push(d)
+    else grupos.push([d.grupo, [d]])
+  }
 
   return (
     <>
@@ -211,22 +220,40 @@ function Conteudo() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar um domínio…"
-              className="w-full max-w-xl rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3.5 py-2.5 text-[14px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+              className="w-full max-w-sm rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
             />
 
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {filtrados.map((d) => (
-                <button key={d.key} type="button" onClick={() => ir(pais, d.key)}
-                  className={`${CARTAO} p-3.5 text-left transition-colors hover:border-[var(--action-primary)]`}>
-                  <p className="text-[14px] font-semibold text-[var(--text-primary)]">{d.rotulo}</p>
-                  <p className="mt-0.5 text-[12px] leading-snug text-[var(--text-secondary)]">{d.descricao}</p>
-                  <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">{d.grain}</p>
-                </button>
-              ))}
-              {filtrados.length === 0 && (
-                <p className="text-[13px] text-[var(--text-secondary)]">Nenhum domínio com esse nome.</p>
-              )}
-            </div>
+            {/* AGRUPADO POR ASSUNTO, em lista.
+                Dezessete cartões iguais numa grade não davam hierarquia nenhuma:
+                tudo do mesmo tamanho, e quem chegava não sabia por onde começar.
+                Aqui o assunto vem primeiro e cada domínio é uma linha — mais
+                denso, e a ordem de leitura é óbvia. */}
+            {filtrados.length === 0 ? (
+              <p className="text-[13px] text-[var(--text-secondary)]">Nenhum domínio com esse nome.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-2">
+                {grupos.map(([grupo, itens]) => (
+                  <section key={grupo}>
+                    <h2 className="mb-1.5 border-b border-[var(--border-default)] pb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                      {grupo}
+                    </h2>
+                    <div className="divide-y divide-[var(--border-subtle)]">
+                      {itens.map((d) => (
+                        <button key={d.key} type="button" onClick={() => ir(pais, d.key)}
+                          className="group flex w-full items-baseline gap-3 py-2 text-left">
+                          <span className="w-[11.5rem] shrink-0 text-[14px] font-medium text-[var(--text-primary)] group-hover:text-[var(--action-primary)]">
+                            {d.rotulo}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--text-secondary)]" title={d.descricao}>
+                            {d.descricao}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            )}
 
             {visoes.length > 0 && (
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

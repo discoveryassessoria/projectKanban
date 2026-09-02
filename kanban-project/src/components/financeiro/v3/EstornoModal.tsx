@@ -15,6 +15,7 @@ import { uploadFiles } from "@/src/lib/storage"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as money } from "@/src/lib/financeiro/formato"
 import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
@@ -129,7 +130,11 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
           )}
 
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Data do estorno</label><input type="date" value={data} onChange={(e) => setData(e.target.value)} className={`${inputCls} mt-1`} /></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Data do estorno</label><CampoData
+  value={data}
+  onChange={(v) => setData((v ?? ""))}
+  className={`${inputCls} mt-1`}
+/></div>
             <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Categoria do motivo *</label><select value={motivo} onChange={(e) => setMotivo(e.target.value)} className={`${inputCls} mt-1`}><option value="">Selecione…</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
           </div>
           {motivo === "Outro" && <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Justificativa detalhada * (categoria Outro)</label><input value={motivoOutro} onChange={(e) => setMotivoOutro(e.target.value)} placeholder="Descreva o motivo do estorno" className={`${inputCls} mt-1`} /></div>}

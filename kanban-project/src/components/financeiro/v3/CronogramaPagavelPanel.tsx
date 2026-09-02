@@ -5,6 +5,7 @@
 import { useState } from "react"
 import { CalendarClock, Plus, X } from "lucide-react"
 import { authHeaders } from "@/src/lib/financeiro/http"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 
 type Parcela = { id: number; numero: number; vencimento: string; valor: number; moeda: string; status: string }
@@ -78,7 +79,11 @@ export function CronogramaPagavelPanel({ obrigacaoId, parcelas, valorContratado,
             <p className="mt-1 text-xs text-[var(--text-muted)]">Total a distribuir: <b className="text-[var(--text-primary)]">{brl(valorContratado, moeda)}</b> (a última parcela ajusta o arredondamento).</p>
             <div className="mt-4 grid grid-cols-3 gap-3">
               <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Parcelas<input type="number" min={1} max={60} value={n} onChange={(e) => setN(Number(e.target.value))} className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-primary)]" /></label>
-              <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">1º vencimento<input type="date" value={primeiro} onChange={(e) => setPrimeiro(e.target.value)} className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-primary)]" /></label>
+              <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">1º vencimento<CampoData
+  value={primeiro}
+  onChange={(v) => setPrimeiro((v ?? ""))}
+  className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-primary)]"
+/></label>
               <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Intervalo (dias)<input type="number" min={1} value={intervalo} onChange={(e) => setIntervalo(Number(e.target.value))} className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-primary)]" /></label>
             </div>
             {erro && <div className="mt-3 rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] px-3 py-2 text-xs text-[var(--danger)]">{erro}</div>}

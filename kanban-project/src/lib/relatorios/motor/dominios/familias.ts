@@ -33,6 +33,7 @@ export const DOMINIO_FAMILIAS: DominioDef = {
   grain: "1 linha = 1 família",
   permissao: "processos.ver",
   ordem: 3,
+  grupo: "Operação",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ processos: { some: { paisCanonico: { countryKey } } } }),
 

@@ -25,6 +25,7 @@ import {
   type CanalContato,
   type ResultadoContato,
 } from "@/src/lib/process-stage/andamento-etapa"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 // ── Vocabulário de tela (rótulos), separado do vocabulário de domínio ────────
 
@@ -415,11 +416,9 @@ export function BlocoContatos({
           </div>
           <div className="mb-2.5 w-1/2">
             <Rotulo>Próximo acompanhamento</Rotulo>
-            <input
-              type="date"
+            <CampoData
               value={proximo}
-              min={hoje()}
-              onChange={(e) => setProximo(e.target.value)}
+              onChange={(v) => setProximo((v ?? ""))}
               className={campoCls}
             />
           </div>

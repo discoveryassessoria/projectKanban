@@ -22,6 +22,7 @@ import { parseTaxaCambio } from "@/lib/financeiro/dominio/cambio"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
 import { fmtMoeda as money } from "@/src/lib/financeiro/formato"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
@@ -337,7 +338,12 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                   </div>
                   <div>
                     <label className={labelCls}>Vencimento</label>
-                    <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} disabled={!seededOk} className={`${inputCls} disabled:opacity-50`} />
+                    <CampoData
+                      value={vencimento}
+                      onChange={(v) => setVencimento((v ?? ""))}
+                      className={`${inputCls} disabled:opacity-50`}
+                      disabled={!seededOk}
+                    />
                     <p className="mt-1 text-[11px] text-[var(--text-muted)]">Vencimento da obrigação. Não move saldo.</p>
                   </div>
                   {ehCusto && (
@@ -389,7 +395,12 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                     <>
                       <div>
                         <label className={labelCls}>Data de fixação</label>
-                        <input type="date" value={fxData} disabled={moeda === "BRL"} onChange={(e) => setFxData(e.target.value)} className={`${inputCls} disabled:opacity-40`} />
+                        <CampoData
+                          value={fxData}
+                          onChange={(v) => setFxData((v ?? ""))}
+                          className={`${inputCls} disabled:opacity-40`}
+                          disabled={moeda === "BRL"}
+                        />
                       </div>
                       <div>
                         <label className={labelCls}>Valor BRL travado (total)</label>

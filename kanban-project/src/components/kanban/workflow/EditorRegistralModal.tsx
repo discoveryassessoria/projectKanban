@@ -14,6 +14,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 // ============================================================
 // TIPOS
@@ -869,16 +870,30 @@ function Field({
           </span>
         )}
       </div>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
-          requiredEmpty || requiredAltEmpty
-            ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
-            : "border-[var(--border-default)] focus:border-[var(--border-default)] focus:border-[var(--border-default)]"
-        }`}
-      />
+      {/* Data de registro civil é do século passado: o seletor precisa deixar
+          escolher o ano direto, e não subir de mês em mês até 1912. */}
+      {type === "date" ? (
+        <CampoData
+          value={value}
+          onChange={(v) => onChange(v ?? "")}
+          className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 ${
+            requiredEmpty || requiredAltEmpty
+              ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
+              : "border-[var(--border-default)] focus:border-[var(--border-default)]"
+          }`}
+        />
+      ) : (
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
+            requiredEmpty || requiredAltEmpty
+              ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
+              : "border-[var(--border-default)] focus:border-[var(--border-default)] focus:border-[var(--border-default)]"
+          }`}
+        />
+      )}
     </div>
   )
 }

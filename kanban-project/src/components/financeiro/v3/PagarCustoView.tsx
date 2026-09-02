@@ -23,6 +23,7 @@ import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebiment
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const fmtTamanho = (b?: number | null) => { if (b == null) return ""; if (b < 1024) return `${b} B`; if (b < 1048576) return `${(b / 1024).toFixed(0)} KB`; return `${(b / 1048576).toFixed(1)} MB` }
@@ -275,7 +276,11 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
                       </div>
                       <div className="sm:col-span-2">
                         <div className={labelCls}>Data</div>
-                        <input type="date" value={l.dataPag} onChange={(e) => setLinha(l._id, { dataPag: e.target.value })} className={`${inputCls} mt-1`} />
+                        <CampoData
+                          value={l.dataPag}
+                          onChange={(v) => setLinha(l._id, { dataPag: (v ?? "") })}
+                          className={`${inputCls} mt-1`}
+                        />
                       </div>
                       <div className="flex items-end sm:col-span-1">
                         <button onClick={() => rmLinha(l._id)} disabled={linhas.length === 1} title={linhas.length === 1 ? "Ao menos uma forma" : "Remover"} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-2 text-[var(--text-muted)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>

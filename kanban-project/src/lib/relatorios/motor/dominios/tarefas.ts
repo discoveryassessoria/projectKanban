@@ -40,6 +40,7 @@ export const DOMINIO_TAREFAS: DominioDef = {
   grain: "1 linha = 1 tarefa canônica (passo de workflow NÃO é tarefa)",
   permissao: "tarefas.ver",
   ordem: 9,
+  grupo: "Andamento",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 

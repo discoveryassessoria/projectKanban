@@ -39,6 +39,7 @@ export const DOMINIO_FINANCEIRO: DominioDef = {
   grain: "1 linha = 1 obrigação econômica (agregável por processo, família ou período)",
   permissao: "financeiro.ver",
   ordem: 11,
+  grupo: "Financeiro",
   aceitaNacionalidade: true,
   // Sem relação declarada para Processo, o recorte não pode atravessar. Ele é
   // feito por subconsulta explícita — o Prisma resolve num IN, sem N+1.

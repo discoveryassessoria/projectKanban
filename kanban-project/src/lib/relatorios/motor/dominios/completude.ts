@@ -60,6 +60,7 @@ export const DOMINIO_COMPLETUDE: DominioDef = {
   grain: "1 linha = 1 requisito aplicável (dispensado sai do denominador)",
   permissao: "processos.ver",
   ordem: 7,
+  grupo: "Documentação",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 

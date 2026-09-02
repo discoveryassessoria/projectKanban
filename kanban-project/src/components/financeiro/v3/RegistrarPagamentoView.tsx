@@ -21,6 +21,7 @@ import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebiment
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 const brl = (v: number) => fmt(v || 0, "BRL")
 const eur = (v: number) => fmt(v || 0, "EUR")
@@ -375,8 +376,16 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                           </td>
                           <td className="px-2 py-1.5"><input inputMode="decimal" value={l.valor} onChange={(e) => setLinha(l._id, { valor: e.target.value })} placeholder="0,00" className={`${inputCls} w-28 text-right`} /></td>
                           <td className="px-2 py-1.5"><select value={l.contaKey} onChange={(e) => setLinha(l._id, { contaKey: e.target.value })} className={inputCls}><option value="">Selecione…</option>{contasOpts.map((c) => <option key={c.key} value={c.key}>{c.label}{c.sub ? ` — ${c.sub}` : ""}</option>)}</select></td>
-                          <td className="px-2 py-1.5"><input type="date" value={l.dataRec} onChange={(e) => setLinha(l._id, { dataRec: e.target.value })} className={`${inputCls} w-36`} /></td>
-                          <td className="px-2 py-1.5"><input type="date" value={l.dataComp} onChange={(e) => setLinha(l._id, { dataComp: e.target.value })} className={`${inputCls} w-36`} /></td>
+                          <td className="px-2 py-1.5"><CampoData
+  value={l.dataRec}
+  onChange={(v) => setLinha(l._id, { dataRec: (v ?? "") })}
+  className={`${inputCls} w-36`}
+/></td>
+                          <td className="px-2 py-1.5"><CampoData
+  value={l.dataComp}
+  onChange={(v) => setLinha(l._id, { dataComp: (v ?? "") })}
+  className={`${inputCls} w-36`}
+/></td>
                           <td className="px-2 py-1.5"><input value={l.referencia} onChange={(e) => setLinha(l._id, { referencia: e.target.value })} placeholder="—" className={inputCls} /></td>
                           <td className="px-2 py-1.5 text-center"><button onClick={() => rmLinha(l._id)} disabled={linhas.length === 1} className="text-[var(--text-muted)] hover:text-[var(--danger)] disabled:opacity-30"><Trash2 className="h-4 w-4" /></button></td>
                         </tr>

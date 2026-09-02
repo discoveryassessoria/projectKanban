@@ -26,6 +26,7 @@ export const DOMINIO_SERVICOS: DominioDef = {
   grain: "1 linha = 1 preço cadastrado (override de processo aparece como linha própria)",
   permissao: "financeiro.ver",
   ordem: 13,
+  grupo: "Financeiro",
   aceitaNacionalidade: true,
   // O preço é de uma MODALIDADE, e a modalidade é de um país. É por aí que o
   // recorte anda — não por um campo de país no preço, que não existe.

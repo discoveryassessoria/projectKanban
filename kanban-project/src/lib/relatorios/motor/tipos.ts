@@ -147,6 +147,15 @@ export interface DominioDef {
   permissao: PermissaoChave
   /** Ordem na home. */
   ordem: number
+  /**
+   * A QUE ASSUNTO ESTE DOMÍNIO PERTENCE.
+   *
+   * Dezessete cartões iguais numa grade não são uma navegação: são dezessete
+   * coisas do mesmo tamanho, e quem chega não sabe por onde começar. O grupo dá
+   * a hierarquia que faltava — "documentação" reúne Certidões, Documentos e
+   * Completude porque quem procura uma procura as três.
+   */
+  grupo: string
   /** O domínio aceita o contexto de nacionalidade? */
   aceitaNacionalidade: boolean
   filtros: FiltroDef[]

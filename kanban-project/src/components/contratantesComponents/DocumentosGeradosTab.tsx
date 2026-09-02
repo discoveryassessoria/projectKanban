@@ -13,6 +13,7 @@ import { useApi } from "@/src/lib/dados"
 import {
   FileText, Download, Eye, Loader2, AlertTriangle, CheckCircle2, XCircle, MinusCircle, Link2, Ban,
 } from "lucide-react"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 export interface ModeloDisponivel {
   id: number
@@ -349,12 +350,11 @@ export function DocumentosGeradosTab({
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Data da emissão *</label>
-                <input
-                  type="date"
+                <CampoData
                   value={dataEmissao}
-                  onChange={(e) => setDataEmissao(e.target.value)}
-                  disabled={!podeGerar}
+                  onChange={(v) => setDataEmissao((v ?? ""))}
                   className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] disabled:bg-gray-50"
+                  disabled={!podeGerar}
                 />
               </div>
             </div>

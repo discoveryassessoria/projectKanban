@@ -20,6 +20,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 interface Indisponibilidade {
   id: number
@@ -404,10 +405,17 @@ function PainelConfiguracao({
                 className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none">
                 {tipos.map((t) => <option key={t} value={t}>{ROTULO_TIPO[t] ?? t}</option>)}
               </select>
-              <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
-                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
-              <input type="date" value={fim} onChange={(e) => setFim(e.target.value)} placeholder="fim"
-                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
+              <CampoData
+                value={inicio}
+                onChange={(v) => setInicio((v ?? ""))}
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none"
+              />
+              <CampoData
+                value={fim}
+                onChange={(v) => setFim((v ?? ""))}
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none"
+                placeholder="fim"
+              />
               <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="motivo (opcional)"
                 className="min-w-[140px] flex-1 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 placeholder:text-[var(--text-muted)] focus:outline-none" />
               <button

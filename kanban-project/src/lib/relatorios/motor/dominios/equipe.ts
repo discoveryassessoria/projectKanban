@@ -51,6 +51,7 @@ export const DOMINIO_EQUIPE: DominioDef = {
   grain: "1 linha = 1 responsável",
   permissao: "usuarios.gerenciar",
   ordem: 15,
+  grupo: "Rede e equipe",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({
     tarefas: { some: { processo: { paisCanonico: { countryKey } } } },

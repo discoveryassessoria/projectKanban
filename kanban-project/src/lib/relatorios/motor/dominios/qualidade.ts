@@ -31,6 +31,7 @@ export const DOMINIO_QUALIDADE: DominioDef = {
   grain: "1 linha = 1 ocorrência de inconsistência detectada",
   permissao: "usuarios.gerenciar",
   ordem: 17,
+  grupo: "Integridade",
   // Achado é do SISTEMA, não de uma nacionalidade. Filtrar por nacionalidade
   // esconderia justamente o problema estrutural que não pertence a nenhuma.
   aceitaNacionalidade: false,

@@ -12,6 +12,7 @@ import { useMemo, useState } from "react"
 import { X, Plus, Trash2 } from "lucide-react"
 import { authToken } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 const OURO = 'var(--accent-primary)'
 const OURO_TINTA = 'var(--accent-text)'
@@ -173,7 +174,11 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
           </div>
           {!imediato ? (
             <label className={lbl}>Vencimento
-              <input type="date" value={vencimento} onChange={(e) => setVencimento(e.target.value)} className={`${inp} max-w-xs`} />
+              <CampoData
+                value={vencimento}
+                onChange={(v) => setVencimento((v ?? ""))}
+                className={`${inp} max-w-xs`}
+              />
             </label>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">

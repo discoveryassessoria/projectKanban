@@ -12,6 +12,7 @@ import { createPortal } from "react-dom"
 import { X, Loader2, CheckCircle2, AlertTriangle, ReceiptText, RefreshCcw, Ban, Archive, ThumbsDown } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
 import { authHeaders } from "@/src/lib/financeiro/http"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 
 export type AcaoReceita = "recibo" | "renegociar" | "cancelar" | "arquivar" | "reprovar"
@@ -84,7 +85,11 @@ export default function AcaoReceitaModal({ acao, receitaRef, natureza, onClose, 
         <div className="space-y-3 px-5 py-4">
           <p className="flex items-start gap-1.5 rounded-[var(--radius-sm)] border p-3 text-xs text-[var(--text-secondary)]" style={{ borderColor: `color-mix(in srgb, ${m.cor} 25%, transparent)`, background: `color-mix(in srgb, ${m.cor} 5%, transparent)` }}><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" style={{ color: m.cor }} /> {nota}</p>
           {acao === "renegociar" && (
-            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Nova data de vencimento (opcional)</label><input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--info)]" /></div>
+            <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Nova data de vencimento (opcional)</label><CampoData
+  value={novaData}
+  onChange={(v) => setNovaData((v ?? ""))}
+  className="mt-1 w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--info)]"
+/></div>
           )}
           {m.exigeMotivo && (
             <div><label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{acao === "cancelar" ? "Motivo do cancelamento *" : acao === "reprovar" ? "Motivo da reprovação *" : "Observação / motivo *"}</label><textarea value={motivo} onChange={(e) => setMotivo(e.target.value.slice(0, 300))} rows={3} className="mt-1 w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-strong)]" placeholder="Justificativa (auditoria)" /></div>

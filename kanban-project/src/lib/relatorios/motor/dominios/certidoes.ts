@@ -68,6 +68,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
   grain: "1 linha = 1 certidão necessária (a necessidade, não o pedido)",
   permissao: "processos.ver",
   ordem: 5,
+  grupo: "Documentação",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 

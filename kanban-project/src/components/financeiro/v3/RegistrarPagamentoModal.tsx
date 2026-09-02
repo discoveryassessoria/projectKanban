@@ -13,6 +13,7 @@ import { LAYER } from "@/src/lib/ui/layers"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 import { X, Loader2, CheckCircle2 } from "lucide-react"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 
 interface FormaPagamento { id: number; nome: string }
@@ -140,7 +141,11 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
             </div>
             <div>
               <label className={lbl}>Data *</label>
-              <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inp} />
+              <CampoData
+                value={data}
+                onChange={(v) => setData((v ?? ""))}
+                className={inp}
+              />
             </div>
 
             <div>

@@ -26,6 +26,7 @@ export const DOMINIO_ORGAOS: DominioDef = {
   grain: "1 linha = 1 organização",
   permissao: "usuarios.gerenciar",
   ordem: 14,
+  grupo: "Rede e equipe",
   aceitaNacionalidade: true,
   // Pela nacionalidade dos PROCESSOS que protocolaram aqui — não pelo país do
   // órgão. É o que permite ver o consulado italiano em Miami sob "Itália".

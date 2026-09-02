@@ -24,6 +24,7 @@ import {
   MULTA_TIPOS, JUROS_TIPOS, JUROS_PERIODOS, DESCONTO_TIPOS,
 } from '@/lib/financeiro/condicao-constants'
 import { useApi } from "@/src/lib/dados"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 type Ref = { id: number; name: string; code?: string | null; icone?: string | null }
 type CarteiraRef = { id: number; nome: string }
@@ -366,7 +367,11 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Início"><Select value={f.inicioCronograma} onChange={(v) => set('inicioCronograma', v)} options={INICIOS.map((i) => [i, INICIOS_LABEL[i]] as [string, string])} /></Campo>
                 {f.inicioCronograma === 'DIAS' && <Campo label="Após N dias"><input type="number" className={INPUT} value={f.primeiraParcelaDias ?? ''} onChange={(e) => set('primeiraParcelaDias', e.target.value === '' ? null : Number(e.target.value))} /></Campo>}
-                {f.inicioCronograma === 'DATA_ESPECIFICA' && <Campo label="Data"><input type="date" className={INPUT} value={f.primeiraParcelaData?.slice(0, 10) || ''} onChange={(e) => set('primeiraParcelaData', e.target.value)} /></Campo>}
+                {f.inicioCronograma === 'DATA_ESPECIFICA' && <Campo label="Data"><CampoData
+  value={f.primeiraParcelaData?.slice(0, 10) || ''}
+  onChange={(v) => set('primeiraParcelaData', (v ?? ""))}
+  className={INPUT}
+/></Campo>}
                 <Campo label="Periodicidade"><Select value={f.periodicidade} onChange={(v) => set('periodicidade', v)} options={PERIODICIDADES.map((p) => [p, PERIODICIDADES_LABEL[p]] as [string, string])} /></Campo>
                 {f.periodicidade === 'PERSONALIZADA' && <Campo label="Intervalo (dias)"><input type="number" className={INPUT} value={f.periodicidadeDias ?? ''} onChange={(e) => set('periodicidadeDias', e.target.value === '' ? null : Number(e.target.value))} /></Campo>}
                 <Campo label="Dia fixo (1–31)"><input type="number" min={1} max={31} className={INPUT} value={f.diaFixo ?? ''} onChange={(e) => set('diaFixo', e.target.value === '' ? null : Number(e.target.value))} /></Campo>

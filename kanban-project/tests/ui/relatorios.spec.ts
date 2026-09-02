@@ -53,19 +53,37 @@ test.describe('Relatórios', () => {
     // Os dois campos de data existem SEM nenhum clique prévio. Antes era preciso
     // abrir "+ Adicionar filtro" e escolher — a pergunta mais comum de um
     // relatório era a mais trabalhosa de fazer.
-    const datas = page.locator('input[type="date"]')
-    await expect(datas).toHaveCount(2)
-    await expect(datas.first()).toBeVisible()
     await expect(page.getByText('Período do protocolo')).toBeVisible()
+    // Os dois campos têm rótulo próprio — "De" e "Até".
+    await expect(page.getByLabel('De', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('Até', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('De', { exact: true })).toContainText('dd/mm/aaaa')
   })
 
-  test('filtrar por intervalo de datas muda o resultado e mostra o dia certo', async ({ page }) => {
+  test('o calendário deixa escolher mês e ano — não é stepper', async ({ page }) => {
     await page.goto('/relatorios?d=protocolos')
     await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
 
-    const datas = page.locator('input[type="date"]')
-    await datas.first().fill('2023-01-01')
-    await datas.nth(1).fill('2023-01-31')
+    await page.getByLabel('De', { exact: true }).click()
+    // O ponto do componente: ir de 2026 a 1890 são dois cliques, não oitenta.
+    await expect(page.getByLabel('Mês', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('Ano', { exact: true })).toBeVisible()
+    await expect(page.getByLabel('Ano', { exact: true }).locator('option[value="1890"]')).toHaveCount(1)
+  })
+
+  test('escolher dia, mês e ano filtra e mostra o dia certo', async ({ page }) => {
+    await page.goto('/relatorios?d=protocolos')
+    await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
+
+    await page.getByLabel('De', { exact: true }).click()
+    await page.getByLabel('Ano', { exact: true }).selectOption('2023')
+    await page.getByLabel('Mês', { exact: true }).selectOption('0')
+    await page.getByRole('button', { name: '1', exact: true }).click()
+
+    await page.getByLabel('Até', { exact: true }).click()
+    await page.getByLabel('Ano', { exact: true }).selectOption('2023')
+    await page.getByLabel('Mês', { exact: true }).selectOption('0')
+    await page.getByRole('button', { name: '31', exact: true }).click()
 
     // O resumo mostra o MESMO dia escolhido — a borda de fuso já exibiu
     // "31/12/2022" aqui, e isso é defeito.
@@ -78,9 +96,9 @@ test.describe('Relatórios', () => {
     await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
 
     await page.getByRole('button', { name: 'Este mês', exact: true }).click()
-    const datas = page.locator('input[type="date"]')
-    await expect(datas.first()).not.toHaveValue('')
-    await expect(datas.nth(1)).not.toHaveValue('')
+    // Nenhum dos dois campos continua vazio.
+    await expect(page.getByLabel('De', { exact: true })).not.toContainText('dd/mm/aaaa')
+    await expect(page.getByLabel('Até', { exact: true })).not.toContainText('dd/mm/aaaa')
     await expect(page.getByText('Consulta atual')).toBeVisible({ timeout: 30_000 })
   })
 

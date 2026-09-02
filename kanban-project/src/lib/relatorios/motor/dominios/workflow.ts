@@ -33,6 +33,7 @@ export const DOMINIO_WORKFLOW: DominioDef = {
   grain: "1 linha = 1 execução de fase (a mesma fase reaberta conta de novo)",
   permissao: "processos.ver",
   ordem: 10,
+  grupo: "Andamento",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 

@@ -33,6 +33,7 @@ export const DOMINIO_ARQUIVOS: DominioDef = {
   grain: "1 linha = 1 arquivo",
   permissao: "processos.ver",
   ordem: 16,
+  grupo: "Integridade",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({
     documento: { pessoa: { arvore: { processos: { some: { paisCanonico: { countryKey } } } } } },

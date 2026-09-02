@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Loader2,
 } from "lucide-react"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 // ============================================================
 // TIPOS
@@ -315,10 +316,9 @@ function ConteudoModal({
                         <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--text-secondary)] mb-1.5">
                           Prazo inicial
                         </label>
-                        <input
-                          type="date"
+                        <CampoData
                           value={dataPrazoInicial}
-                          onChange={(e) => setDataPrazoInicial(e.target.value)}
+                          onChange={(v) => setDataPrazoInicial((v ?? ""))}
                           className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:ring-[var(--border-strong)] bg-[var(--surface-popover)]"
                         />
                       </div>

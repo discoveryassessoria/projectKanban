@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { ValorDeFiltro } from "@/src/lib/relatorios/motor/tipos"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 export interface FiltroMeta {
   key: string
@@ -95,11 +96,19 @@ export function FiltroControle({
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
-              <input type="date" lang="pt-BR" value={v.de ?? ""} className={`${CAMPO} w-[9rem]`} aria-label="De"
-                onChange={(e) => onChange({ tipo: "intervalo_data", de: e.target.value || null, ate: v.ate })} />
+              <CampoData
+                value={v.de ?? ""}
+                onChange={(d) => onChange({ tipo: "intervalo_data", de: d || null, ate: v.ate })}
+                className={`${CAMPO} w-[9rem]`}
+                aria-label="De"
+              />
               <span className="text-[11px] text-[var(--text-muted)]">até</span>
-              <input type="date" lang="pt-BR" value={v.ate ?? ""} className={`${CAMPO} w-[9rem]`} aria-label="Até"
-                onChange={(e) => onChange({ tipo: "intervalo_data", de: v.de, ate: e.target.value || null })} />
+              <CampoData
+                value={v.ate ?? ""}
+                onChange={(d) => onChange({ tipo: "intervalo_data", de: v.de, ate: d || null })}
+                className={`${CAMPO} w-[9rem]`}
+                aria-label="Até"
+              />
               {(v.de || v.ate) && (
                 <button type="button" onClick={() => onChange(null)}
                   className="px-1 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"

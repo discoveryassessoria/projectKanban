@@ -41,6 +41,7 @@ export const DOMINIO_REQUERENTES: DominioDef = {
   grain: "1 linha = 1 requerente",
   permissao: "processos.ver",
   ordem: 2,
+  grupo: "Operação",
   aceitaNacionalidade: true,
   // Pela NACIONALIDADE DO PROCESSO em que a pessoa está — o requerente não tem
   // nacionalidade ofertada própria; ele participa de um processo que tem.

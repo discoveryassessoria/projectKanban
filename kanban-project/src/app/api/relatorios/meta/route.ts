@@ -13,7 +13,7 @@ import { nacionalidadesOfertadas } from "@/src/lib/relatorios/motor/opcoes"
 
 const resumo = (d: (typeof DOMINIOS)[number]) => ({
   key: d.key, rotulo: d.rotulo, descricao: d.descricao, grain: d.grain,
-  ordem: d.ordem, permissao: d.permissao, aceitaNacionalidade: d.aceitaNacionalidade,
+  ordem: d.ordem, grupo: d.grupo, permissao: d.permissao, aceitaNacionalidade: d.aceitaNacionalidade,
 })
 
 export async function GET(request: Request) {

@@ -38,6 +38,7 @@ export const DOMINIO_PROCESSOS: DominioDef = {
   grain: "1 linha = 1 processo",
   permissao: "processos.ver",
   ordem: 1,
+  grupo: "Operação",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ paisCanonico: { countryKey } }),
 

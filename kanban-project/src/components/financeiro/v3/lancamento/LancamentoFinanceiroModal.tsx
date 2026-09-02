@@ -33,6 +33,7 @@ import {
 } from "@/lib/financeiro/lancamento/calculo"
 import { SeletorItemCatalogo, type ItemCatalogoOpcao } from "./SeletorItemCatalogo"
 import { Campo, Origem, Secao, Selecao, ValorFixo, inputCls, type Opcao } from "./campos"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 type Natureza = "RECEITA" | "CUSTO"
 type Vinculo = "processo" | "requerentes"
@@ -439,8 +440,13 @@ export function LancamentoFinanceiroModal({
 
               <Campo label={custo && n > 1 ? "Vencimento da 1ª parcela" : "Vencimento"} opcional={n <= 1} problemas={doCampo("primeiroVencimento")}>
                 {({ id, descrevePor, invalido }) => (
-                  <input id={id} aria-describedby={descrevePor} type="date" value={primeiroVencimento} onChange={(e) => alterar(setPrimeiroVencimento)(e.target.value)}
-                    className={inputCls} style={{ borderColor: invalido ? "var(--danger)" : "var(--border-default)" }} />
+                  <CampoData
+                    value={primeiroVencimento}
+                    onChange={(v) => alterar(setPrimeiroVencimento)((v ?? ""))}
+                    className={inputCls}
+                    id={id}
+                    aria-describedby={descrevePor}
+                  />
                 )}
               </Campo>
 

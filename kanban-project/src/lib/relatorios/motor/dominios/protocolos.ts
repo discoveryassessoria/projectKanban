@@ -88,6 +88,7 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
   },
   permissao: "processos.ver_paginas",
   ordem: 8,
+  grupo: "Andamento",
   aceitaNacionalidade: true,
 
   // A nacionalidade recorta pelo PROCESSO, e por identidade: `paisCanonico` é a

@@ -27,6 +27,7 @@ import {
   Image as ImageIcon,
   Tag
 } from 'lucide-react'
+import { CampoData } from "@/src/components/ui/campo-data"
 
 interface Usuario {
   id: number
@@ -585,11 +586,10 @@ export default function BlogAdminPage() {
                   </div>
                   <div>
                     <label className="text-sm text-white/70 mb-1 block">Data de Publicação</label>
-                    <Input
-                      type="date"
+                    <CampoData
                       value={formData.dataPublicacao}
-                      onChange={(e) => setFormData({...formData, dataPublicacao: e.target.value})}
-                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white"
+                      onChange={(v) => setFormData({...formData, dataPublicacao: v ?? ""})}
+                      className="w-full rounded-md border border-[var(--border-strong)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white"
                     />
                   </div>
                 </div>

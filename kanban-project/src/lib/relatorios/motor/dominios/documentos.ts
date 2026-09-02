@@ -61,6 +61,7 @@ export const DOMINIO_DOCUMENTOS: DominioDef = {
   grain: "1 linha = 1 necessidade documental (excluídas as certidões)",
   permissao: "processos.ver",
   ordem: 6,
+  grupo: "Documentação",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({ processo: { paisCanonico: { countryKey } } }),
 

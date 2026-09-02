@@ -45,6 +45,7 @@ export const DOMINIO_FORNECEDORES: DominioDef = {
   grain: "1 linha = 1 fornecedor (a mesma organização de Órgãos, recortada pela função)",
   permissao: "usuarios.gerenciar",
   ordem: 12,
+  grupo: "Financeiro",
   aceitaNacionalidade: true,
   ondeNacionalidade: (countryKey) => ({
     solicitacaoDocumentos: { some: { documento: { pessoa: { arvore: { processos: { some: { paisCanonico: { countryKey } } } } } } } },

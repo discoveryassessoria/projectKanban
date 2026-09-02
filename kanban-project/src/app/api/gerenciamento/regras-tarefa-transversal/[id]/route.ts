@@ -28,7 +28,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
     const data: Prisma.RegraTarefaTransversalUpdateInput = {
       name: b.name !== undefined ? b.name : atual.name,
-      tipoProcessoId: b.tipoProcessoId !== undefined ? b.tipoProcessoId : atual.tipoProcessoId,
+      // A relação passou a ser declarada: o vínculo é `connect`/`disconnect`,
+      // não mais o id solto. Mesmo efeito, agora com o banco protegendo.
+      tipoProcesso: (() => {
+        const alvo = b.tipoProcessoId !== undefined ? b.tipoProcessoId : atual.tipoProcessoId
+        return alvo == null ? { disconnect: true } : { connect: { id: Number(alvo) } }
+      })(),
       originPhase: b.originPhase !== undefined ? b.originPhase : atual.originPhase,
       operationalPhase: b.operationalPhase !== undefined ? b.operationalPhase : atual.operationalPhase,
       templateId: b.templateId !== undefined ? b.templateId : atual.templateId,

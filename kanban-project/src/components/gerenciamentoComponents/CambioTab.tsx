@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useApi } from "@/src/lib/dados"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 type Cotacao = {
   id: number
@@ -223,7 +224,11 @@ export default function CambioTab() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">Data</label>
-                  <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inputCls} />
+                  <CampoData
+                    value={data}
+                    onChange={(v) => setData((v ?? ""))}
+                    className={inputCls}
+                  />
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">Fonte</label>

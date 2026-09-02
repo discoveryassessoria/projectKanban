@@ -36,6 +36,7 @@ async function main() {
     const inexistentes = d.filtrosPrincipais.filter((k) => !d.filtros.some((f) => f.key === k))
     t(inexistentes.length === 0, `${d.rotulo}: todo filtro principal existe`, inexistentes.join(", "))
     t(d.filtrosPrincipais.length > 0, `${d.rotulo}: declara filtros à mostra`)
+    t(!!d.grupo, `${d.rotulo}: declara o grupo a que pertence`)
   }
   t(D.ordenacoes.some((o) => o.key === D.ordenacaoPadrao.key), "a ordenação padrão existe")
 

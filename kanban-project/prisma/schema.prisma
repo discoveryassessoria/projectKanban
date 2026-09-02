@@ -72,6 +72,15 @@ model Usuario {
   capacidadesDefinidas          CapacidadeOperacional[]        @relation("CapacidadeAutor")
   visoesDeRelatorio             RelatorioVisao[]               @relation("VisoesDeRelatorio")
 
+  assistenteParametrizacaoProgresso_usuario AssistenteParametrizacaoProgresso[] @relation("AssistenteParametrizacaoProgresso_usuarioId")
+  creditoMovimento_usuario                  CreditoMovimento[]                  @relation("CreditoMovimento_usuarioId")
+  operacaoAntecipada_responsavel            OperacaoAntecipada[]                @relation("OperacaoAntecipada_responsavelId")
+  phaseWorkflowStepInstance_responsavel     PhaseWorkflowStepInstance[]         @relation("PhaseWorkflowStepInstance_responsavelId")
+  saudeAchado_responsavel                   SaudeAchado[]                       @relation("SaudeAchado_responsavelId")
+  snapshotCambial_usuario                   SnapshotCambial[]                   @relation("SnapshotCambial_usuarioId")
+  stepSubtaskDefinition_responsavel         StepSubtaskDefinition[]             @relation("StepSubtaskDefinition_responsavelId")
+  subtaskExecution_responsavel              SubtaskExecution[]                  @relation("SubtaskExecution_responsavelId")
+
   @@index([perfilId])
 }
 
@@ -159,6 +168,14 @@ model Pessoa {
   motivoRemocao     String?                  @db.VarChar(300)
   planilhaOverrides PlanilhaCelulaOverride[]
 
+  creditoFinanceiro_pessoa     CreditoFinanceiro[]     @relation("CreditoFinanceiro_pessoaId")
+  creditoMovimento_pessoa      CreditoMovimento[]      @relation("CreditoMovimento_pessoaId")
+  divergencia_pessoa           Divergencia[]           @relation("Divergencia_pessoaId")
+  pagador_pessoa               Pagador[]               @relation("Pagador_pessoaId")
+  participacaoEconomica_pessoa ParticipacaoEconomica[] @relation("ParticipacaoEconomica_pessoaId")
+  solicitacaoDocumento_pessoa  SolicitacaoDocumento[]  @relation("SolicitacaoDocumento_pessoaId")
+  tarefa_pessoa                Tarefa[]                @relation("Tarefa_pessoaId")
+
   @@index([arvoreId])
   @@index([removidaEm])
   @@index([pais_nasc])
@@ -221,6 +238,8 @@ model Arvore {
   propostasRegistrais PropostaReconciliacao[]
   conflitosRegistrais ConflitoRegistral[]
   versoesGenealogicas VersaoGenealogica[]
+
+  necessidadeDocumental_arvore NecessidadeDocumental[] @relation("NecessidadeDocumental_arvoreId")
 
   @@index([familiaId])
 }
@@ -399,6 +418,12 @@ model Documento {
 
   // MODELOS DOCUMENTAIS — geração que produziu este documento operacional.
   documentosGerados DocumentoGerado[] @relation("DocumentoGeradoOperacional")
+
+  divergencia_documento                 Divergencia[]                 @relation("Divergencia_documentoId")
+  emissaoRetificada_documento           EmissaoRetificada[]           @relation("EmissaoRetificada_documentoId")
+  obrigacaoEconomica_documento          ObrigacaoEconomica[]          @relation("ObrigacaoEconomica_documentoId")
+  pastaApostilamentoDocumento_documento PastaApostilamentoDocumento[] @relation("PastaApostilamentoDocumento_documentoId")
+  pastaTraducaoDocumento_documento      PastaTraducaoDocumento[]      @relation("PastaTraducaoDocumento_documentoId")
 
   @@index([documentTypeId])
   @@index([necessidadeId])
@@ -685,6 +710,8 @@ model Tarefa {
   faseOrigemCode           String?                  @db.VarChar(60) // fase ATIVA onde foi criada
   faseReferenciaCode       String?                  @db.VarChar(60) // fase Ã  qual a AÃÃO pertence
   workflowInstanceOrigemId Int? // instÃ¢ncia da fase de ORIGEM (ativa) no momento da criaÃ§Ã£o
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  pessoa                   Pessoa?                  @relation("Tarefa_pessoaId", fields: [pessoaId], references: [id], onDelete: SetNull)
   pessoaId                 Int? // pessoa correspondente (solto â Pessoa)
   tipoDocumentoId          Int? // tipo documental correspondente (solto â TipoDocumentoCadastro)
   acaoStepKey              String?                  @db.VarChar(80) // aÃ§Ã£o de catÃ¡logo antecipada (stepKey da fase de referÃªncia)
@@ -693,6 +720,9 @@ model Tarefa {
   resultadoObtido          String?                  @db.Text
   createdBy                Int?
   notificacoes             NotificacaoOperacional[]
+
+  solicitacaoDocumento_tarefa SolicitacaoDocumento[] @relation("SolicitacaoDocumento_tarefaId")
+  workflowEvento_tarefa       WorkflowEvento[]       @relation("WorkflowEvento_tarefaId")
 
   @@index([tipo])
   @@index([pessoaId])
@@ -2058,13 +2088,17 @@ model Divergencia {
   analise   AnaliseDocumental @relation(fields: [analiseId], references: [id], onDelete: Cascade)
 
   // Snapshots (auto-contido â nÃ£o quebra se a pessoa/doc mudar depois)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  pessoa          Pessoa?    @relation("Divergencia_pessoaId", fields: [pessoaId], references: [id], onDelete: SetNull)
   pessoaId        Int?
-  pessoaNome      String  @db.VarChar(200)
+  pessoaNome      String     @db.VarChar(200)
   geracao         Int?
-  linhaReta       Boolean @default(true)
+  linhaReta       Boolean    @default(true)
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  documento       Documento? @relation("Divergencia_documentoId", fields: [documentoId], references: [id], onDelete: Cascade)
   documentoId     Int?
-  documentoTitulo String  @db.VarChar(200)
-  dataDocumento   String? @db.VarChar(20)
+  documentoTitulo String     @db.VarChar(200)
+  dataDocumento   String?    @db.VarChar(20)
 
   // O que divergiu
   campo          String  @db.VarChar(60) // "pai", "sobrenome", "cidade_nascimento"...
@@ -2122,6 +2156,8 @@ model PastaTraducaoDocumento {
   id                 Int           @id @default(autoincrement())
   pastaTraducaoId    Int
   pastaTraducao      PastaTraducao @relation(fields: [pastaTraducaoId], references: [id], onDelete: Cascade)
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  documento          Documento     @relation("PastaTraducaoDocumento_documentoId", fields: [documentoId], references: [id], onDelete: Cascade)
   documentoId        Int // snapshot, sem FK
   pessoaNome         String        @default("")
   documentoTitulo    String        @default("")
@@ -2163,6 +2199,8 @@ model PastaApostilamentoDocumento {
   id                   Int                @id @default(autoincrement())
   pastaApostilamentoId Int
   pastaApostilamento   PastaApostilamento @relation(fields: [pastaApostilamentoId], references: [id], onDelete: Cascade)
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  documento            Documento          @relation("PastaApostilamentoDocumento_documentoId", fields: [documentoId], references: [id], onDelete: Cascade)
   documentoId          Int // snapshot, sem FK
   pessoaNome           String             @default("")
   documentoTitulo      String             @default("")
@@ -2373,9 +2411,11 @@ model RegistroProfissional {
 }
 
 model EmissaoRetificada {
-  id                Int      @id @default(autoincrement())
+  id                Int       @id @default(autoincrement())
   processoId        Int
-  processo          Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  processo          Processo  @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  documento         Documento @relation("EmissaoRetificada_documentoId", fields: [documentoId], references: [id], onDelete: Cascade)
   documentoId       Int // snapshot, sem FK forte (igual Divergencia)
   pessoaNome        String
   pessoaGen         String?
@@ -2384,12 +2424,12 @@ model EmissaoRetificada {
   correcaoCampo     String?
   correcaoOld       String?
   correcaoNovo      String?
-  status            String   @default("pendente_averbacao")
-  nextAction        String   @default("Enviar pedido de averbaÃ§Ã£o ao cartÃ³rio")
+  status            String    @default("pendente_averbacao")
+  nextAction        String    @default("Enviar pedido de averbaÃ§Ã£o ao cartÃ³rio")
   workflow          Json // 6 etapas RE_STEPS + blocos averbacao/solicitation/receipt/conference/validation
-  retifiedValidated Boolean  @default(false)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  retifiedValidated Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@unique([processoId, documentoId])
   @@index([processoId])
@@ -2611,27 +2651,29 @@ model TabelaValor {
 // mesma precedÃªncia). NUNCA cria lanÃ§amento com valor incorreto/zero: registra aqui
 // para revisÃ£o. Idempotente por chaveIdempotencia (mesma do MotorArtefato do lanÃ§amento).
 model PendenciaFinanceira {
-  id                 Int            @id @default(autoincrement())
+  id                 Int                        @id @default(autoincrement())
   processoId         Int
-  processo           Processo       @relation("ProcessoPendenciasFinanceiras", fields: [processoId], references: [id], onDelete: Cascade)
+  processo           Processo                   @relation("ProcessoPendenciasFinanceiras", fields: [processoId], references: [id], onDelete: Cascade)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  tipoProcesso       TipoProcessoNacionalidade? @relation("PendenciaFinanceira_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: SetNull)
   tipoProcessoId     Int?
-  phaseKey           String         @db.VarChar(60)
-  phaseCycle         Int            @default(1)
+  phaseKey           String                     @db.VarChar(60)
+  phaseCycle         Int                        @default(1)
   configFinanceiraId Int? // â ProdutoFinanceiro.id (ConfiguraÃ§Ã£o Financeira; solto/snapshot)
   regraFinanceiraId  Int? // â PhaseEconomicRule/PhaseTriggerRule.id (solto/snapshot)
   natureza           NaturezaPreco? // CUSTO | VENDA que faltou resolver
-  motivo             String         @db.VarChar(40) // SEM_PRECO | CONFLITO_PRECO | NENHUMA_LINHA | SEM_PRECO_VALIDO
-  detalhe            String         @db.VarChar(500)
+  motivo             String                     @db.VarChar(40) // SEM_PRECO | CONFLITO_PRECO | NENHUMA_LINHA | SEM_PRECO_VALIDO
+  detalhe            String                     @db.VarChar(500)
   contexto           Json? // dimensÃµes/alternativas descartadas (auditoria)
-  chaveIdempotencia  String         @unique @db.VarChar(220) // anti-duplicaÃ§Ã£o no banco
-  resolvida          Boolean        @default(false)
+  chaveIdempotencia  String                     @unique @db.VarChar(220) // anti-duplicaÃ§Ã£o no banco
+  resolvida          Boolean                    @default(false)
   resolvidaEm        DateTime?
-  resolucao          String?        @db.VarChar(300) // Â§13 â o que foi feito p/ resolver
-  criadoEm           DateTime       @default(now())
+  resolucao          String?                    @db.VarChar(300) // Â§13 â o que foi feito p/ resolver
+  criadoEm           DateTime                   @default(now())
   // Reprocessamento (P4): a pendÃªncia Ã© reprocessÃ¡vel quando o preÃ§o/config for cadastrado.
-  tentativas         Int            @default(0)
+  tentativas         Int                        @default(0)
   ultimaTentativaEm  DateTime?
-  ultimaFalha        String?        @db.VarChar(500)
+  ultimaFalha        String?                    @db.VarChar(500)
 
   @@index([processoId])
   @@index([phaseKey])
@@ -3254,6 +3296,16 @@ model TipoProcessoNacionalidade {
 
   regrasDocumentaisRef MatrizDocumental[] @relation("MatrizTipoProcessoCanonico")
 
+  assistenteParametrizacaoProgresso_tipoProcesso AssistenteParametrizacaoProgresso[] @relation("AssistenteParametrizacaoProgresso_tipoProcessoId")
+  matrizDocumental_tipoProcesso                  MatrizDocumental[]                  @relation("MatrizDocumental_tipoProcessoId")
+  motorArtefato_tipoProcesso                     MotorArtefato[]                     @relation("MotorArtefato_tipoProcessoId")
+  pendenciaFinanceira_tipoProcesso               PendenciaFinanceira[]               @relation("PendenciaFinanceira_tipoProcessoId")
+  phaseAutomationRule_tipoProcesso               PhaseAutomationRule[]               @relation("PhaseAutomationRule_tipoProcessoId")
+  phaseEconomicRule_tipoProcesso                 PhaseEconomicRule[]                 @relation("PhaseEconomicRule_tipoProcessoId")
+  phaseInternalWorkflow_tipoProcesso             PhaseInternalWorkflow[]             @relation("PhaseInternalWorkflow_tipoProcessoId")
+  phaseInternalWorkflowVersao_tipoProcesso       PhaseInternalWorkflowVersao[]       @relation("PhaseInternalWorkflowVersao_tipoProcessoId")
+  regraTarefaTransversal_tipoProcesso            RegraTarefaTransversal[]            @relation("RegraTarefaTransversal_tipoProcessoId")
+
   @@index([paisId])
 }
 
@@ -3416,23 +3468,25 @@ model FaseMacro {
 }
 
 model PhaseInternalWorkflow {
-  id             Int      @id @default(autoincrement())
+  id             Int                        @id @default(autoincrement())
   // {tipoProcessoId|'all'}::{phaseKey} para o workflow PRIMÃRIO de uma fase.
   // (Ã¢ncora de unicidade â 1 workflow por processo+fase; null = global/todos)
-  wfUid          String   @unique @db.VarChar(140)
+  wfUid          String                     @unique @db.VarChar(140)
   templateId     Int? // â ModeloWorkflowInterno (solto; null = ad-hoc/seed)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  tipoProcesso   TipoProcessoNacionalidade? @relation("PhaseInternalWorkflow_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: SetNull)
   tipoProcessoId Int? // â TipoProcessoNacionalidade (solto; null = TODOS os processos)
-  phaseKey       String   @db.VarChar(60)
-  name           String   @db.VarChar(200)
+  phaseKey       String                     @db.VarChar(60)
+  name           String                     @db.VarChar(200)
   // MODO DE EXECUCAO dos passos publicados (persistido; nunca inferido no codigo):
   //   SEQUENCIAL = so o primeiro passo nasce DISPONIVEL; concluir um libera o seguinte.
   //   PARALELO   = todos os passos nascem DISPONIVEL.
-  execucao       String   @default("SEQUENCIAL") @db.VarChar(20)
-  active         Boolean  @default(true)
-  arquivado      Boolean  @default(false)
-  versao         Int      @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
-  criadoEm       DateTime @default(now())
-  atualizadoEm   DateTime @updatedAt
+  execucao       String                     @default("SEQUENCIAL") @db.VarChar(20)
+  active         Boolean                    @default(true)
+  arquivado      Boolean                    @default(false)
+  versao         Int                        @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
+  criadoEm       DateTime                   @default(now())
+  atualizadoEm   DateTime                   @updatedAt
 
   passos  PhaseInternalWorkflowStep[]
   /// Versões congeladas desta definição (ver PhaseInternalWorkflowVersao).
@@ -3500,16 +3554,18 @@ model PhaseInternalWorkflowVersao {
   // Cópia fiel do que a definição dizia quando esta versão passou a valer. Os
   // campos escalares ficam em colunas (consultáveis) e os passos em JSON: eles são
   // lidos como um conjunto, sempre inteiro, e nunca por linha.
-  phaseKey                 String          @db.VarChar(60)
+  phaseKey                 String                     @db.VarChar(60)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  tipoProcesso             TipoProcessoNacionalidade? @relation("PhaseInternalWorkflowVersao_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: SetNull)
   tipoProcessoId           Int?
-  name                     String          @db.VarChar(200)
-  execucao                 String          @db.VarChar(20)
+  name                     String                     @db.VarChar(200)
+  execucao                 String                     @db.VarChar(20)
   escopoExecucao           EscopoExecucao?
   familiaDocumentalId      Int?
-  exigeDocumento           Boolean         @default(false)
-  exigePessoa              Boolean         @default(false)
-  pausarSlaEmEsperaExterna Boolean         @default(false)
-  pausarSlaEmBloqueio      Boolean         @default(false)
+  exigeDocumento           Boolean                    @default(false)
+  exigePessoa              Boolean                    @default(false)
+  pausarSlaEmEsperaExterna Boolean                    @default(false)
+  pausarSlaEmBloqueio      Boolean                    @default(false)
   /// Passos como estavam: key, label, ordem, obrigatório, gera tarefa, responsável
   /// padrão, prioridade, SLA, cardinalidade, condição de conclusão e checklist.
   passos                   Json
@@ -3644,8 +3700,10 @@ model StepSubtaskDefinition {
   modoExecucao String @default("MANUAL") @db.VarChar(20)
 
   /// HERDA | ESPECIFICO | REGRA — de onde sai o responsável desta subtarefa.
-  responsavelRegra String @default("HERDA") @db.VarChar(20)
+  responsavelRegra String   @default("HERDA") @db.VarChar(20)
   /// Quando ESPECIFICO. Referência solta a Usuario (o motor projeta, não cascateia).
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  responsavel      Usuario? @relation("StepSubtaskDefinition_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId    Int?
   /// SLA próprio em dias úteis. `null` = herda o do passo.
   slaDays          Int?
@@ -4033,31 +4091,33 @@ model CanalOperacional {
 }
 
 model PhaseAutomationRule {
-  publicCode          String? @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id                  Int     @id @default(autoincrement())
+  publicCode          String?                   @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
+  id                  Int                       @id @default(autoincrement())
   templateId          Int? // â ModeloAutomacao (solto; null = regra ad-hoc)
+  /// Protegido pelo banco: ON DELETE RESTRICT.
+  tipoProcesso        TipoProcessoNacionalidade @relation("PhaseAutomationRule_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: Restrict)
   tipoProcessoId      Int // â TipoProcessoNacionalidade (solto) â regra pertence a um processo
-  phaseKey            String  @db.VarChar(60)
+  phaseKey            String                    @db.VarChar(60)
   // LEGADO â texto livre. Regras financeiras NOVAS nÃ£o preenchem (identidade Ã© derivada
   // da estrutura: AplicaÃ§Ã£o + Config Financeira + gatilho + fase). Mantido nullable sÃ³ p/
   // leitura de regras antigas. NÃ£o usar para gerar tÃ­tulo/descriÃ§Ã£o/lanÃ§amento de regras novas.
-  name                String? @db.VarChar(200)
-  description         String? @db.Text
-  kind                String  @db.VarChar(30) // task | financial | document | event | protocol | phase_advance | alert
-  scope               String  @default("phase") @db.VarChar(40)
-  trigger             String  @default("phase_entered") @db.VarChar(60)
-  action              String? @db.VarChar(80)
+  name                String?                   @db.VarChar(200)
+  description         String?                   @db.Text
+  kind                String                    @db.VarChar(30) // task | financial | document | event | protocol | phase_advance | alert
+  scope               String                    @default("phase") @db.VarChar(40)
+  trigger             String                    @default("phase_entered") @db.VarChar(60)
+  action              String?                   @db.VarChar(80)
   conditions          Json? // [{ field, op, value }]
   params              Json? // blob especÃ­fico do tipo (owner/priority/slaDays/checklist, amount/currency, targetPhaseKey, ...)
-  financialType       String? @db.VarChar(20) // LEGADO (kind=financial): atalho de card/consulta do fluxo antigo
+  financialType       String?                   @db.VarChar(20) // LEGADO (kind=financial): atalho de card/consulta do fluxo antigo
   // FLUXO NOVO (kind=financial): vÃ­nculo ESTRUTURAL Ã  ConfiguraÃ§Ã£o Financeira + direÃ§Ã£o.
   // A automaÃ§Ã£o NÃO guarda preÃ§o/moeda/valor â o preÃ§o vem da Tabela de PreÃ§os na execuÃ§Ã£o.
   configItemId        Int? // â ProdutoFinanceiro.id (solto). ObrigatÃ³rio em regras financeiras NOVAS.
-  aplicacaoFinanceira String? @db.VarChar(10) // RECEITA | CUSTO | AMBOS (fluxo novo; null = legado)
-  idempotencyPattern  String  @default("processId+phaseKey") @db.VarChar(120)
-  idempotent          Boolean @default(true)
-  active              Boolean @default(true)
-  arquivado           Boolean @default(false)
+  aplicacaoFinanceira String?                   @db.VarChar(10) // RECEITA | CUSTO | AMBOS (fluxo novo; null = legado)
+  idempotencyPattern  String                    @default("processId+phaseKey") @db.VarChar(120)
+  idempotent          Boolean                   @default(true)
+  active              Boolean                   @default(true)
+  arquivado           Boolean                   @default(false)
 
   // --- execuÃ§Ã£o (Fase 4 â guardado, fica zerado por ora) ---
   runCount  Int       @default(0)
@@ -4389,6 +4449,8 @@ model CategoriaDocumental {
 // exigidos por processo, fase, alvo e regra de geraÃ§Ã£o. Por processo.
 model MatrizDocumental {
   id                    Int                        @id @default(autoincrement())
+  /// Protegido pelo banco: ON DELETE RESTRICT.
+  tipoProcesso          TipoProcessoNacionalidade  @relation("MatrizDocumental_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: Restrict)
   tipoProcessoId        Int // â TipoProcessoNacionalidade (solto)
   phaseKey              String?                    @db.VarChar(60) // null = qualquer fase (LEGADO; ver faseExigencia)
   /// LEGADO EM TRANSIÇÃO: code em texto, "solto" por definição. Espelho de
@@ -4504,22 +4566,24 @@ enum PublicoAlvoRegra {
 }
 
 model MotorArtefato {
-  id             Int       @id @default(autoincrement())
+  id             Int                       @id @default(autoincrement())
   processoId     Int
-  processo       Processo  @relation("ProcessoMotorArtefatos", fields: [processoId], references: [id], onDelete: Cascade)
+  processo       Processo                  @relation("ProcessoMotorArtefatos", fields: [processoId], references: [id], onDelete: Cascade)
+  /// Protegido pelo banco: ON DELETE RESTRICT.
+  tipoProcesso   TipoProcessoNacionalidade @relation("MotorArtefato_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: Restrict)
   tipoProcessoId Int // snapshot do tipo do motor usado
-  phaseKey       String    @db.VarChar(60)
-  event          String    @default("entered") @db.VarChar(20) // entered | completed | reopened | blocked
-  ruleKind       String    @db.VarChar(30) // task | financial | document | event | protocol | alert | phase_advance
-  ruleSource     String    @db.VarChar(20) // automation | trigger
+  phaseKey       String                    @db.VarChar(60)
+  event          String                    @default("entered") @db.VarChar(20) // entered | completed | reopened | blocked
+  ruleKind       String                    @db.VarChar(30) // task | financial | document | event | protocol | alert | phase_advance
+  ruleSource     String                    @db.VarChar(20) // automation | trigger
   ruleId         Int? // id da regra (solto, snapshot)
-  automaticKey   String    @unique @db.VarChar(200) // chave de idempotÃªncia
-  targetTable    String    @db.VarChar(40) // Tarefa | Custo | Receita | Evento | Protocolo
+  automaticKey   String                    @unique @db.VarChar(200) // chave de idempotÃªncia
+  targetTable    String                    @db.VarChar(40) // Tarefa | Custo | Receita | Evento | Protocolo
   targetId       Int? // id do registro criado (para desfazer)
-  status         String    @default("active") @db.VarChar(20) // active | undone
-  descricao      String    @db.VarChar(300)
+  status         String                    @default("active") @db.VarChar(20) // active | undone
+  descricao      String                    @db.VarChar(300)
   detalhes       Json?
-  criadoEm       DateTime  @default(now())
+  criadoEm       DateTime                  @default(now())
   undoneEm       DateTime?
 
   @@index([processoId])
@@ -4537,12 +4601,14 @@ model MotorConfig {
 }
 
 model RegraTarefaTransversal {
-  id               Int     @id @default(autoincrement())
-  ruleKey          String? @unique @db.VarChar(80) // cross_rule_* (seed); null p/ criadas na tela
-  name             String  @db.VarChar(200)
+  id               Int                        @id @default(autoincrement())
+  ruleKey          String?                    @unique @db.VarChar(80) // cross_rule_* (seed); null p/ criadas na tela
+  name             String                     @db.VarChar(200)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  tipoProcesso     TipoProcessoNacionalidade? @relation("RegraTarefaTransversal_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: SetNull)
   tipoProcessoId   Int? // â TipoProcessoNacionalidade (solto); null = todos
-  originPhase      String  @db.VarChar(60) // fase onde a regra dispara
-  operationalPhase String  @db.VarChar(60) // fase cujo fluxo Ã© usado
+  originPhase      String                     @db.VarChar(60) // fase onde a regra dispara
+  operationalPhase String                     @db.VarChar(60) // fase cujo fluxo Ã© usado
   templateId       Int? // â ModeloTarefaTransversal (solto)
 
   // config detalhada (as seÃ§Ãµes do modal)
@@ -4580,20 +4646,22 @@ model PerfilPermissaoMotor {
 }
 
 model PhaseEconomicRule {
-  id                 Int      @id @default(autoincrement())
+  id                 Int                        @id @default(autoincrement())
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  tipoProcesso       TipoProcessoNacionalidade? @relation("PhaseEconomicRule_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: SetNull)
   tipoProcessoId     Int? // null = vale p/ qualquer tipo de processo
-  phaseKey           String   @db.VarChar(60) // ex: "emissao_documental"
-  documentTypeCode   String?  @db.VarChar(40) // null = qualquer doc; senÃ£o sÃ³ p/ esse code (â TipoDocumentoCadastro.code)
-  appliesTo          String   @default("any") @db.VarChar(30) // any|certificate|translation|original|... (natureza do doc elegÃ­vel)
-  componentKey       String   @db.VarChar(40) // identidade do componente, ex: "CERTIDAO_INTEIRO_TEOR"
-  componentName      String   @db.VarChar(100) // nome exibido = COLUNA da planilha, ex: "CertidÃ£o Inteiro Teor"
-  custoProdutoCode   String?  @db.VarChar(30) // â ProdutoFinanceiro.codigo (CUSTO)   â separado
-  receitaProdutoCode String?  @db.VarChar(30) // â ProdutoFinanceiro.codigo (RECEITA) â separado
-  participaPlanilha  Boolean  @default(true) // componente aparece como coluna na Planilha Documental
-  ordem              Int      @default(0)
-  ativo              Boolean  @default(true)
-  criadoEm           DateTime @default(now())
-  atualizadoEm       DateTime @updatedAt
+  phaseKey           String                     @db.VarChar(60) // ex: "emissao_documental"
+  documentTypeCode   String?                    @db.VarChar(40) // null = qualquer doc; senÃ£o sÃ³ p/ esse code (â TipoDocumentoCadastro.code)
+  appliesTo          String                     @default("any") @db.VarChar(30) // any|certificate|translation|original|... (natureza do doc elegÃ­vel)
+  componentKey       String                     @db.VarChar(40) // identidade do componente, ex: "CERTIDAO_INTEIRO_TEOR"
+  componentName      String                     @db.VarChar(100) // nome exibido = COLUNA da planilha, ex: "CertidÃ£o Inteiro Teor"
+  custoProdutoCode   String?                    @db.VarChar(30) // â ProdutoFinanceiro.codigo (CUSTO)   â separado
+  receitaProdutoCode String?                    @db.VarChar(30) // â ProdutoFinanceiro.codigo (RECEITA) â separado
+  participaPlanilha  Boolean                    @default(true) // componente aparece como coluna na Planilha Documental
+  ordem              Int                        @default(0)
+  ativo              Boolean                    @default(true)
+  criadoEm           DateTime                   @default(now())
+  atualizadoEm       DateTime                   @updatedAt
 
   // F2 â vÃ­nculos por FK real (dual-read com os cÃ³digos-texto legados acima)
   tipoDocumentoId Int?
@@ -4641,6 +4709,8 @@ model ItemCatalogo {
 
   /// Requisitos CADASTRAIS que este item de catálogo exige (ver RequisitoCadastral).
   requisitosCadastrais RequisitoCadastral[] @relation("RequisitoCadastralItem")
+
+  obrigacaoEconomica_itemCatalogo ObrigacaoEconomica[] @relation("ObrigacaoEconomica_itemCatalogoId")
 
   @@index([natureza])
   @@index([ativo])
@@ -4709,6 +4779,8 @@ model NecessidadeDocumental {
   matrizSnapshot       Json?
   avaliadaEm           DateTime?
   motivoAplicabilidade String?   @db.Text
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  arvore               Arvore?   @relation("NecessidadeDocumental_arvoreId", fields: [arvoreId], references: [id], onDelete: Cascade)
   arvoreId             Int?
   ruleCode             String?   @db.VarChar(20)
 
@@ -4732,6 +4804,8 @@ model NecessidadeDocumental {
   // MRG - back-relations
   execucoesRegistrais  ExecucaoRegistral[]
   evidenciasRegistrais EvidenciaRegistral[]
+
+  operacaoAntecipada_necessidade OperacaoAntecipada[] @relation("OperacaoAntecipada_necessidadeId")
 
   @@index([processoId])
   @@index([itemCatalogoId])
@@ -5038,6 +5112,8 @@ model SubtaskExecution {
   startedAt      DateTime?
   completedAt    DateTime?
   executadoPorId Int?
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  responsavel    Usuario?  @relation("SubtaskExecution_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId  Int?
   prazo          DateTime?
 
@@ -5112,6 +5188,8 @@ model PhaseWorkflowStepInstance {
   ciclo         Int                @default(1)
   status        StepInstanceStatus @default(PENDENTE)
   prioridade    String?            @db.VarChar(20)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  responsavel   Usuario?           @relation("PhaseWorkflowStepInstance_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId Int? // ref. solta a Usuario (snapshot operacional)
   equipe        String?            @db.VarChar(120)
   papel         String?            @db.VarChar(80)
@@ -5171,6 +5249,8 @@ model WorkflowEvento {
   processoId         Int?
   workflowInstanceId Int?
   stepInstanceId     Int?
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  tarefa             Tarefa?            @relation("WorkflowEvento_tarefaId", fields: [tarefaId], references: [id], onDelete: Cascade)
   tarefaId           Int?
   correlationId      String?            @db.VarChar(60)
   causationId        String?            @db.VarChar(200) // CP-4B â causa imediata (chave do advance chega a ~74 chars)
@@ -5541,6 +5621,8 @@ model OperacaoAntecipada {
   originPhaseCode            String?                  @db.VarChar(60)
   originStepKey              String?                  @db.VarChar(80)
   // Necessidade de origem que a operaÃ§Ã£o pretende atender (loose ref).
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  necessidade                NecessidadeDocumental?   @relation("OperacaoAntecipada_necessidadeId", fields: [necessidadeId], references: [id], onDelete: Cascade)
   necessidadeId              Int?
   // Destino: fase e workflow oficiais a que a operaÃ§Ã£o pertence.
   targetPhaseCode            String?                  @db.VarChar(60)
@@ -5560,6 +5642,8 @@ model OperacaoAntecipada {
   // Resultado ESTRUTURADO interpretado (ex.: cartÃ³rio/livro/folha/termo do registro localizado).
   resultadoDados             Json?
   status                     StatusOperacaoAntecipada @default(CRIADA)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  responsavel                Usuario?                 @relation("OperacaoAntecipada_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId              Int?
   createdBy                  Int?
   avaliadoPor                Int?
@@ -5589,36 +5673,38 @@ model OperacaoAntecipada {
 
 /// Aggregate root do ciclo financeiro. Reusa o cÃ³digo operacional atual (REC-n).
 model ObrigacaoEconomica {
-  id                Int       @id @default(autoincrement())
-  codigoOperacional String?   @db.VarChar(40) // = cÃ³digo da Receita/Custo (ex.: REC-105)
-  natureza          String    @db.VarChar(30) // RECEITA|CUSTO|RECEITA_EXTRA|DESCONTO|CREDITO|REEMBOLSO|JUROS|MULTA|AJUSTE|ESTORNO|RENEGOCIACAO|OUTRO
-  direcao           String    @db.VarChar(12) // A_RECEBER|A_PAGAR
+  id                Int           @id @default(autoincrement())
+  codigoOperacional String?       @db.VarChar(40) // = cÃ³digo da Receita/Custo (ex.: REC-105)
+  natureza          String        @db.VarChar(30) // RECEITA|CUSTO|RECEITA_EXTRA|DESCONTO|CREDITO|REEMBOLSO|JUROS|MULTA|AJUSTE|ESTORNO|RENEGOCIACAO|OUTRO
+  direcao           String        @db.VarChar(12) // A_RECEBER|A_PAGAR
   /// O banco cascateia: apagar o processo apaga esta linha.
-  processo          Processo? @relation("obrigacoesEconomicas", fields: [processoId], references: [id], onDelete: Cascade)
+  processo          Processo?     @relation("obrigacoesEconomicas", fields: [processoId], references: [id], onDelete: Cascade)
   processoId        Int?
   faseId            Int?
   clienteId         Int?
   regraFinanceiraId Int?
-  moedaContratual   Moeda     @default(BRL)
-  moedaContabil     Moeda     @default(BRL)
-  valorContratado   Decimal   @db.Decimal(14, 2)
+  moedaContratual   Moeda         @default(BRL)
+  moedaContabil     Moeda         @default(BRL)
+  valorContratado   Decimal       @db.Decimal(14, 2)
   politicaCambialId Int?
-  politicaDivisao   String?   @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
+  politicaDivisao   String?       @db.VarChar(20) // SEM_DIVISAO|IGUAL|PERCENTUAL|VALOR|GRUPO|PERSONALIZADA
   fornecedorId      Int? // custo manual: fornecedor vinculado (aditivo; sem FK forte)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  itemCatalogo      ItemCatalogo? @relation("ObrigacaoEconomica_itemCatalogoId", fields: [itemCatalogoId], references: [id], onDelete: SetNull)
   itemCatalogoId    Int? // FONTE do lançamento manual: item do Cadastro Mestre (Gerenciamento). Aditivo, sem FK forte.
-  status            String    @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
-  estadoCusto       String?   @db.VarChar(24) // F4 — estado de NEGÓCIO do custo (ortogonal ao status do contrato): PREVISTO|APROVADO|CONTRATADO|EXECUTADO|PAGO|CONCILIADO|CANCELADO_PARCIAL|CANCELADO|ARQUIVADO. Null p/ receita. NÃO inferido por saldo.
+  status            String        @default("RASCUNHO") @db.VarChar(20) // RASCUNHO|ATIVO|SUSPENSO|LIQUIDADO|CANCELADO
+  estadoCusto       String?       @db.VarChar(24) // F4 — estado de NEGÓCIO do custo (ortogonal ao status do contrato): PREVISTO|APROVADO|CONTRATADO|EXECUTADO|PAGO|CONCILIADO|CANCELADO_PARCIAL|CANCELADO|ARQUIVADO. Null p/ receita. NÃO inferido por saldo.
   arquivadaEm       DateTime? // exclusão LÓGICA (soft-delete) — oculta das listas operacionais; Ledger preservado. Simétrico a Receita.arquivadaEm; usado p/ custo (sem Receita de origem).
   vencimento        DateTime? // Fase 2 — vencimento da obrigação (ex.: lançamento extra em cobrança futura)
-  versao            Int       @default(1)
+  versao            Int           @default(1)
   substituiId       Int?
-  origemTipo        String?   @db.VarChar(20) // Receita|Custo|nativo
+  origemTipo        String?       @db.VarChar(20) // Receita|Custo|nativo
   origemId          Int?
-  observacoes       String?   @db.Text
-  version           Int       @default(0) // optimistic locking (aggregate)
+  observacoes       String?       @db.Text
+  version           Int           @default(0) // optimistic locking (aggregate)
   criadoPorId       Int?
-  criadoEm          DateTime  @default(now())
-  atualizadoEm      DateTime  @updatedAt
+  criadoEm          DateTime      @default(now())
+  atualizadoEm      DateTime      @updatedAt
 
   // ── VÍNCULO DOCUMENTAL ────────────────────────────────────────────────────
   // O model Custo legado carregava personId/documentoId/tipoServicoId/phaseKey e
@@ -5630,9 +5716,11 @@ model ObrigacaoEconomica {
   // continua sendo a única verdade do movimento): dizem a que fato operacional a
   // obrigação pertence. Simétricas às que a Receita já possui.
   personId           Int?
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  documento          Documento? @relation("ObrigacaoEconomica_documentoId", fields: [documentoId], references: [id], onDelete: Cascade)
   documentoId        Int?
   tipoServicoId      Int?
-  phaseKey           String? @db.VarChar(60)
+  phaseKey           String?    @db.VarChar(60)
   phaseCycle         Int?
   /// ProdutoFinanceiro (Configuração Financeira) que originou o lançamento.
   configFinanceiraId Int?
@@ -5691,15 +5779,19 @@ model AssistenteParametrizacaoProgresso {
   id Int @id @default(autoincrement())
 
   /// ESCOPO — por tipo de processo (o país vem do próprio tipo).
+  /// Protegido pelo banco: ON DELETE RESTRICT.
+  tipoProcesso   TipoProcessoNacionalidade @relation("AssistenteParametrizacaoProgresso_tipoProcessoId", fields: [tipoProcessoId], references: [id], onDelete: Restrict)
   tipoProcessoId Int
   /// Fase específica, quando o administrador escolheu recortar; null = todas.
-  phaseKey       String? @db.VarChar(60)
+  phaseKey       String?                   @db.VarChar(60)
 
   /// Etapa em que parou (chave estrutural da etapa, não rótulo de tela).
   etapaAtual       String @db.VarChar(40)
   /// Etapas já percorridas — só chaves, nunca conteúdo de configuração.
   etapasConcluidas Json?
 
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  usuario      Usuario?  @relation("AssistenteParametrizacaoProgresso_usuarioId", fields: [usuarioId], references: [id], onDelete: SetNull)
   usuarioId    Int?
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
@@ -5923,6 +6015,8 @@ model ParticipacaoEconomica {
   id             Int                   @id @default(autoincrement())
   distribuicaoId Int
   distribuicao   DistribuicaoEconomica @relation(fields: [distribuicaoId], references: [id], onDelete: Cascade)
+  /// Protegido pelo banco: ON DELETE RESTRICT.
+  pessoa         Pessoa                @relation("ParticipacaoEconomica_pessoaId", fields: [pessoaId], references: [id], onDelete: Restrict)
   pessoaId       Int
   incluido       Boolean               @default(true)
   percentual     Decimal?              @db.Decimal(7, 4)
@@ -5938,6 +6032,8 @@ model ParticipacaoEconomica {
 model Pagador {
   id             Int      @id @default(autoincrement())
   tipo           String   @db.VarChar(12) // REQUERENTE|EMPRESA|TERCEIRO|EXTERNO
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  pessoa         Pessoa?  @relation("Pagador_pessoaId", fields: [pessoaId], references: [id], onDelete: SetNull)
   pessoaId       Int?
   parteExternaId Int?
   criadoEm       DateTime @default(now())
@@ -5978,6 +6074,8 @@ model SnapshotCambial {
   fonte               String?  @db.VarChar(60)
   tipo                String   @db.VarChar(12) // AUTOMATICA|MANUAL|ESTIMADA|MESMA
   data                DateTime
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  usuario             Usuario? @relation("SnapshotCambial_usuarioId", fields: [usuarioId], references: [id], onDelete: SetNull)
   usuarioId           Int?
   justificativa       String?  @db.VarChar(300)
   precisao            Int      @default(6)
@@ -5993,6 +6091,8 @@ model SnapshotCambial {
 model CreditoFinanceiro {
   id                    Int      @id @default(autoincrement())
   obrigacaoId           Int?
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  pessoa                Pessoa?  @relation("CreditoFinanceiro_pessoaId", fields: [pessoaId], references: [id], onDelete: SetNull)
   pessoaId              Int?
   origemOcorrenciaId    Int?
   valor                 Decimal  @db.Decimal(14, 2)
@@ -6024,11 +6124,15 @@ model CreditoMovimento {
   cobrancaDestinoId  Int?
   ocorrenciaId       Int?
   pagadorId          Int?
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  pessoa             Pessoa?   @relation("CreditoMovimento_pessoaId", fields: [pessoaId], references: [id], onDelete: SetNull)
   pessoaId           Int?
   /// O banco cascateia: apagar o processo apaga esta linha.
   processo           Processo? @relation("movimentosDeCredito", fields: [processoId], references: [id], onDelete: Cascade)
   processoId         Int?
   receitaId          Int?
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  usuario            Usuario?  @relation("CreditoMovimento_usuarioId", fields: [usuarioId], references: [id], onDelete: SetNull)
   usuarioId          Int?
   correlationId      String?   @db.VarChar(80)
   observacao         String?   @db.VarChar(300)
@@ -7164,6 +7268,8 @@ model SaudeAchado {
   ultimaDeteccao     DateTime       @default(now())
   resolvidoEm        DateTime?
   recorrencias       Int            @default(1)
+  /// Protegido pelo banco: ON DELETE SET NULL.
+  responsavel        Usuario?       @relation("SaudeAchado_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId      Int?
   /// justificativa obrigatória para IGNORADO — problema ignorado continua visível
   justificativa      String?        @db.Text
@@ -7242,12 +7348,16 @@ model SolicitacaoDocumento {
   /// O banco cascateia: apagar o processo apaga esta linha.
   processo    Processo? @relation("solicitacoesDocumento", fields: [processoId], references: [id], onDelete: Cascade)
   processoId  Int
+  /// Protegido pelo banco: ON DELETE RESTRICT.
+  pessoa      Pessoa    @relation("SolicitacaoDocumento_pessoaId", fields: [pessoaId], references: [id], onDelete: Restrict)
   pessoaId    Int
 
   // Vinculos com a execucao que originou a solicitacao (nunca por nome/titulo).
-  faseMacroKey       String @db.VarChar(60)
+  faseMacroKey       String  @db.VarChar(60)
   workflowInstanceId Int?
   stepInstanceId     Int?
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  tarefa             Tarefa? @relation("SolicitacaoDocumento_tarefaId", fields: [tarefaId], references: [id], onDelete: Cascade)
   tarefaId           Int?
 
   /// LEGADO EM TRANSIÇÃO: enum. Espelho derivado de `canalOperacionalId`, cuja
@@ -7286,6 +7396,8 @@ model SolicitacaoDocumento {
 
   protocolos Protocolo[]
   arquivos   DocumentoArquivo[]
+
+  documentoObservacao_solicitacao DocumentoObservacao[] @relation("DocumentoObservacao_solicitacaoId")
 
   @@index([documentoId, createdAt])
   @@index([processoId])
@@ -7424,6 +7536,8 @@ model DocumentoObservacao {
   documentoId Int
   documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
 
+  /// Protegido pelo banco: ON DELETE CASCADE.
+  solicitacao    SolicitacaoDocumento? @relation("DocumentoObservacao_solicitacaoId", fields: [solicitacaoId], references: [id], onDelete: Cascade)
   solicitacaoId  Int?
   stepInstanceId Int?
 

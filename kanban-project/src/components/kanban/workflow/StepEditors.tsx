@@ -72,6 +72,7 @@ import {
   CANAIS_SOLICITACAO,
 } from "@/src/lib/process-stage/canais-solicitacao"
 import type { CanalSolicitacaoDocumento } from "@prisma/client"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 /**
  * Erro do domínio → frase operacional. Códigos de campo faltando viram a lista
@@ -1813,19 +1814,17 @@ function FormAguardarRetorno({
                 </div>
                 <div>
                   <Label>Previsão de retorno</Label>
-                  <input
-                    type="date"
+                  <CampoData
                     value={previsao}
-                    onChange={(e) => setPrevisao(e.target.value)}
+                    onChange={(v) => setPrevisao((v ?? ""))}
                     className={inputCls}
                   />
                 </div>
                 <div>
                   <Label>Próximo acompanhamento</Label>
-                  <input
-                    type="date"
+                  <CampoData
                     value={proximo}
-                    onChange={(e) => setProximo(e.target.value)}
+                    onChange={(v) => setProximo((v ?? ""))}
                     className={inputCls}
                   />
                 </div>
@@ -2839,23 +2838,21 @@ function FormConferirCertidao({
 
               <div>
                 <Label>Data do evento (do documento)</Label>
-                <input
-                  type="date"
+                <CampoData
                   value={dataEventoDoc}
-                  onChange={(e) => setDataEventoDoc(e.target.value)}
-                  disabled={readOnly}
+                  onChange={(v) => setDataEventoDoc((v ?? ""))}
                   className={inputCls}
+                  disabled={readOnly}
                 />
               </div>
 
               <div>
                 <Label>Data do registro (do documento)</Label>
-                <input
-                  type="date"
+                <CampoData
                   value={dataRegistroDoc}
-                  onChange={(e) => setDataRegistroDoc(e.target.value)}
-                  disabled={readOnly}
+                  onChange={(v) => setDataRegistroDoc((v ?? ""))}
                   className={inputCls}
+                  disabled={readOnly}
                 />
               </div>
             </div>

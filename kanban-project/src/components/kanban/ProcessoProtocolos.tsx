@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { uploadFiles } from "@/src/lib/storage"
 import { AlertTriangle, Building2, Calendar, Edit2, Eye, FileText, Hash, Layers, Loader2, Paperclip, Plus, Send, Trash2, Upload, User, X } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 // Tipos compatíveis com os do modal
 interface PessoaBase {
@@ -638,10 +639,9 @@ export function ProcessoProtocolos({
                     <Calendar className="h-4 w-4 inline mr-1" />
                     Data do protocolo *
                   </label>
-                  <input
-                    type="date"
+                  <CampoData
                     value={form.dataProtocolo}
-                    onChange={(e) => setForm({ ...form, dataProtocolo: e.target.value })}
+                    onChange={(v) => setForm({ ...form, dataProtocolo: (v ?? "") })}
                     className={INPUT}
                   />
                 </div>
@@ -1194,10 +1194,9 @@ export function ProcessoProtocolos({
                           <div className="flex flex-wrap items-end gap-2">
                             <div>
                               <label className="block text-[11px] text-white/70 mb-1">Prazo dado pelo órgão</label>
-                              <input
-                                type="date"
+                              <CampoData
                                 value={formExigencia.prazo}
-                                onChange={(e) => setFormExigencia({ ...formExigencia, prazo: e.target.value })}
+                                onChange={(v) => setFormExigencia({ ...formExigencia, prazo: (v ?? "") })}
                                 className={INPUT}
                               />
                             </div>

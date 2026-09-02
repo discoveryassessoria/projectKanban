@@ -14,6 +14,7 @@ import {
 import { validarConjunto, justificativaDoConjunto } from "@/src/lib/documentos/regras-documentais/condicoes"
 import { resumoRegra } from "@/src/lib/documentos/regras-documentais/resumo"
 import type { Conflito } from "@/src/lib/documentos/regras-documentais/conflitos"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 // ---- tipos de apoio (espelho do GET) ----
 interface Fase { phaseKey: string; label: string; ordem: number }
@@ -533,7 +534,11 @@ function Simulador({ data, ptId, onClose }: { data: Data; ptId: number | null; o
         <div className="grid grid-cols-2 gap-3 px-6 py-4">
           <div><label className={label}>Tipo de processo</label><select className={input} value={tipoProcessoId} onChange={(e) => setTipo(Number(e.target.value))}>{data.tiposProcesso.map((t) => <option key={t.id} value={t.id} className={opt}>{t.name}</option>)}</select></div>
           <div><label className={label}>Fase</label><select className={input} value={faseKey} onChange={(e) => setFase(e.target.value)}><option value="" className={opt}>— qualquer —</option>{fases.map((f) => <option key={f.phaseKey} value={f.phaseKey} className={opt}>{f.label}</option>)}</select></div>
-          <div><label className={label}>Data de emissão (validade)</label><input type="date" className={input} value={dataEmissao} onChange={(e) => setDataEmissao(e.target.value)} /></div>
+          <div><label className={label}>Data de emissão (validade)</label><CampoData
+  value={dataEmissao}
+  onChange={(v) => setDataEmissao((v ?? ""))}
+  className={input}
+/></div>
           <div />
           <div className="col-span-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-white/70">
             {([["ehPessoaArvore", "Pessoa da árvore"], ["requerente", "Requerente"], ["contratante", "Contratante"], ["precisaDeDocumentacao", "Documentação"], ["linhaReta", "Linha reta"], ["casado", "Casado"], ["falecido", "Falecido"]] as [keyof typeof suj, string][]).map(([k, lbl]) => (

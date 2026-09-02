@@ -30,6 +30,7 @@ export const DOMINIO_GENEALOGIA: DominioDef = {
   grain: "1 linha = 1 pessoa da árvore",
   permissao: "arvore.ver",
   ordem: 4,
+  grupo: "Operação",
   aceitaNacionalidade: true,
   // A pessoa não tem nacionalidade ofertada; a ÁRVORE pertence a processos que
   // têm. O recorte atravessa a árvore, não um campo da pessoa.
