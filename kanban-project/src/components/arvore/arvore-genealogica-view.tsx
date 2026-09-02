@@ -330,6 +330,12 @@ export function ArvoreGenealogicaView({
         const cs = getComputedStyle(el)
         return (cs.boxShadow && cs.boxShadow !== 'none') || (cs.filter && cs.filter.includes('drop-shadow'))
       });
+      // A sombra é a ÚNICA borda que o card tem. Tirando-a para a captura, ele
+      // perde o contorno e passa a depender só do contraste com a folha — que é
+      // baixo, porque card claro sobre cinza claro. Em vez de escurecer a folha
+      // (o usuário quer o cinza) ou clarear o card, devolve-se o contorno.
+      // `outline` e não `border`: não ocupa espaço, então não desloca nada.
+      const CONTORNO_EXPORT = '1px solid rgba(16, 39, 58, 0.18)'
       shadowElements.forEach((el) => {
         const htmlEl = el as HTMLElement;
         htmlEl.classList.add('!shadow-none');
@@ -337,7 +343,8 @@ export function ArvoreGenealogicaView({
         htmlEl.style.setProperty('filter', 'none', 'important');
         htmlEl.style.setProperty('drop-shadow', 'none', 'important');
         htmlEl.style.setProperty('-webkit-box-shadow', 'none', 'important');
-        // REMOVIDO: htmlEl.style.setProperty('background-color', '#ffffff', 'important');
+        htmlEl.style.setProperty('outline', CONTORNO_EXPORT, 'important');
+        htmlEl.style.setProperty('outline-offset', '-1px', 'important');
       });
 
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -440,6 +447,8 @@ export function ArvoreGenealogicaView({
         htmlEl.style.removeProperty('filter');
         htmlEl.style.removeProperty('drop-shadow');
         htmlEl.style.removeProperty('-webkit-box-shadow');
+        htmlEl.style.removeProperty('outline');
+        htmlEl.style.removeProperty('outline-offset');
         // REMOVIDO: htmlEl.style.removeProperty('background-color');
       });
 
