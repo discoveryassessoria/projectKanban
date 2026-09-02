@@ -117,6 +117,7 @@ export const DOMINIO_FINANCEIRO: DominioDef = {
     { key: "valor", rotulo: "Valor", orderBy: (d) => [{ valorContratado: d }, { id: "desc" as const }] },
   ],
 
+  filtrosPrincipais: ["direcao", "periodo_vencimento", "processo"],
   colunasIniciais: ["codigo", "direcao", "natureza", "item", "valor", "moeda", "status", "processo", "vencimento"],
   ordenacaoPadrao: { key: "vencimento", direcao: "desc" },
 

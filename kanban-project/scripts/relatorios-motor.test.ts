@@ -32,6 +32,11 @@ async function main() {
   t(new Set(D.filtros.map((f) => f.key)).size === D.filtros.length, "nenhuma chave de filtro repetida")
   t(new Set(D.colunas.map((c) => c.key)).size === D.colunas.length, "nenhuma chave de coluna repetida")
   t(D.colunasIniciais.every((k) => D.colunas.some((c) => c.key === k)), "toda coluna padrão existe")
+  for (const d of DOMINIOS) {
+    const inexistentes = d.filtrosPrincipais.filter((k) => !d.filtros.some((f) => f.key === k))
+    t(inexistentes.length === 0, `${d.rotulo}: todo filtro principal existe`, inexistentes.join(", "))
+    t(d.filtrosPrincipais.length > 0, `${d.rotulo}: declara filtros à mostra`)
+  }
   t(D.ordenacoes.some((o) => o.key === D.ordenacaoPadrao.key), "a ordenação padrão existe")
 
   // ── A PROVA DA NACIONALIDADE ──────────────────────────────────────────────

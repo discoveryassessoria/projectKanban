@@ -116,6 +116,7 @@ export const DOMINIO_PROCESSOS: DominioDef = {
     { key: "nome", rotulo: "Nome", orderBy: (d) => [{ nome: d }] },
   ],
 
+  filtrosPrincipais: ["periodo_inicio", "fase", "concluido", "familia"],
   colunasIniciais: ["codigo", "nome", "nacionalidade", "fase", "situacao", "familia", "qtd_requerentes", "entrada", "parado_dias"],
   ordenacaoPadrao: { key: "entrada", direcao: "desc" },
 

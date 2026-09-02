@@ -154,6 +154,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     { key: "status", rotulo: "Situação", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
   ],
 
+  filtrosPrincipais: ["status", "tipo", "periodo_solicitacao", "orgao_emissor"],
   colunasIniciais: ["tipo", "status", "pessoa", "familia", "processo", "orgao", "solicitada_em", "atraso_dias"],
   ordenacaoPadrao: { key: "criacao", direcao: "desc" },
 

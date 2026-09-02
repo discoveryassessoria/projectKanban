@@ -96,6 +96,7 @@ export const DOMINIO_QUALIDADE: DominioDef = {
     { key: "severidade", rotulo: "Severidade", orderBy: (d) => [{ severidade: d }, { id: "desc" as const }] },
   ],
 
+  filtrosPrincipais: ["severidade", "status", "dominio"],
   colunasIniciais: ["severidade", "titulo", "dominio", "entidade", "registro", "quantidade", "status", "aberto_ha"],
   ordenacaoPadrao: { key: "deteccao", direcao: "desc" },
 

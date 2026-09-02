@@ -112,6 +112,7 @@ export const DOMINIO_GENEALOGIA: DominioDef = {
     { key: "nascimento", rotulo: "Nascimento", orderBy: (d) => [{ data_nasc: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "arvore", "sem_filiacao"],
   colunasIniciais: ["nome", "arvore", "familia", "pai", "mae", "filhos", "nascimento", "quebra"],
   ordenacaoPadrao: { key: "nome", direcao: "asc" },
 

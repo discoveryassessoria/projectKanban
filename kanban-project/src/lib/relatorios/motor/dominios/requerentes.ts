@@ -140,6 +140,7 @@ export const DOMINIO_REQUERENTES: DominioDef = {
     { key: "cadastro", rotulo: "Cadastro", orderBy: (d) => [{ createdAt: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "familia", "nascimento"],
   colunasIniciais: ["codigo", "nome", "cpf", "nascimento", "idade", "familia", "processo", "nacionalidade", "fase"],
   ordenacaoPadrao: { key: "nome", direcao: "asc" },
 

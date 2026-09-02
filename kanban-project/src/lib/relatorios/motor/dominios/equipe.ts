@@ -97,6 +97,7 @@ export const DOMINIO_EQUIPE: DominioDef = {
     { key: "nome", rotulo: "Nome", orderBy: (d) => [{ nome: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "com_atraso"],
   colunasIniciais: ["nome", "tipo", "total", "abertas", "atrasadas", "concluidas", "tempo_medio", "no_prazo"],
   ordenacaoPadrao: { key: "nome", direcao: "asc" },
 

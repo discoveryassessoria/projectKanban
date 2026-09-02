@@ -155,6 +155,17 @@ export interface DominioDef {
   ordenacoes: OrdenacaoDef[]
   /** Com que colunas a exploração começa. O usuário troca à vontade. */
   colunasIniciais: string[]
+  /**
+   * OS FILTROS QUE FICAM À MOSTRA.
+   *
+   * O resto vive atrás de "+ Adicionar filtro". Estes não: são os que a pessoa
+   * usa toda vez que abre a tela, e obrigá-la a caçar o período dentro de um
+   * dropdown para responder "o que foi protocolado em janeiro" é transformar a
+   * pergunta mais comum na mais trabalhosa.
+   *
+   * Ordem importa: é a ordem em que aparecem na barra.
+   */
+  filtrosPrincipais: string[]
   ordenacaoPadrao: { key: string; direcao: "asc" | "desc" }
   /**
    * Recorte da nacionalidade escolhida, na linguagem deste domínio.

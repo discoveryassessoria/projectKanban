@@ -95,6 +95,7 @@ export const DOMINIO_ARQUIVOS: DominioDef = {
     { key: "nome", rotulo: "Nome", orderBy: (d) => [{ nome: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "periodo", "tipo_documental"],
   colunasIniciais: ["nome", "tipo", "tipo_documental", "pessoa", "vinculo", "vigente", "enviado_por", "enviado_em"],
   ordenacaoPadrao: { key: "enviado", direcao: "desc" },
 

@@ -102,6 +102,7 @@ export const DOMINIO_WORKFLOW: DominioDef = {
     { key: "saida", rotulo: "Saída da fase", orderBy: (d) => [{ completedAt: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["fase", "periodo_entrada", "aberta"],
   colunasIniciais: ["fase", "processo", "nacionalidade", "status", "entrada", "permanencia", "parada_dias", "reentrada"],
   ordenacaoPadrao: { key: "entrada", direcao: "desc" },
 

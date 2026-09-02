@@ -56,6 +56,7 @@ export async function GET(request: Request) {
       colunas: d.colunas.map((c) => ({ key: c.key, rotulo: c.rotulo, alinhamento: c.alinhamento ?? null })),
       ordenacoes: d.ordenacoes.map((o) => ({ key: o.key, rotulo: o.rotulo })),
       colunasIniciais: d.colunasIniciais,
+      filtrosPrincipais: d.filtrosPrincipais,
       ordenacaoPadrao: d.ordenacaoPadrao,
       visoesDoSistema: d.visoesDoSistema.map((v) => ({ key: v.key, nome: v.nome, spec: { ...v.spec, dominio: d.key } })),
     })

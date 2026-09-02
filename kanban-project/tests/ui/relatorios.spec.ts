@@ -46,25 +46,54 @@ test.describe('Relatórios', () => {
     }
   })
 
-  test('Protocolos abre, filtra por período e mostra a consulta atual', async ({ page }) => {
+  test('o período fica À MOSTRA — sem caçar dentro de dropdown', async ({ page }) => {
     await page.goto('/relatorios?d=protocolos')
-    await expect(page.getByRole('button', { name: 'Explorar' })).toBeVisible()
-
-    // O total aparece — e é um número, não "carregando" eterno.
     await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
 
-    // Adiciona o período do protocolo pelo seletor de filtros.
-    await page.getByRole('combobox').filter({ hasText: '+ Adicionar filtro' })
-      .selectOption({ label: 'Período do protocolo' })
+    // Os dois campos de data existem SEM nenhum clique prévio. Antes era preciso
+    // abrir "+ Adicionar filtro" e escolher — a pergunta mais comum de um
+    // relatório era a mais trabalhosa de fazer.
     const datas = page.locator('input[type="date"]')
+    await expect(datas).toHaveCount(2)
     await expect(datas.first()).toBeVisible()
+    await expect(page.getByText('Período do protocolo')).toBeVisible()
+  })
+
+  test('filtrar por intervalo de datas muda o resultado e mostra o dia certo', async ({ page }) => {
+    await page.goto('/relatorios?d=protocolos')
+    await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
+
+    const datas = page.locator('input[type="date"]')
     await datas.first().fill('2023-01-01')
     await datas.nth(1).fill('2023-01-31')
 
-    // O resumo mostra o MESMO dia que foi escolhido — a borda de fuso já
-    // exibiu "31/12/2022" aqui, e isso é defeito.
+    // O resumo mostra o MESMO dia escolhido — a borda de fuso já exibiu
+    // "31/12/2022" aqui, e isso é defeito.
     await expect(page.getByText('Consulta atual')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText('01/01/2023 – 31/01/2023')).toBeVisible()
+  })
+
+  test('os atalhos de período preenchem as duas datas', async ({ page }) => {
+    await page.goto('/relatorios?d=protocolos')
+    await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
+
+    await page.getByRole('button', { name: 'Este mês', exact: true }).click()
+    const datas = page.locator('input[type="date"]')
+    await expect(datas.first()).not.toHaveValue('')
+    await expect(datas.nth(1)).not.toHaveValue('')
+    await expect(page.getByText('Consulta atual')).toBeVisible({ timeout: 30_000 })
+  })
+
+  test('todo domínio abre com os filtros principais visíveis', async ({ page }) => {
+    // A reclamação era geral, não só de Protocolos: o filtro precisa estar à
+    // mostra em TODAS as classes de relatório.
+    for (const d of ['processos', 'requerentes', 'tarefas', 'financeiro', 'certidoes']) {
+      await page.goto(`/relatorios?d=${d}`)
+      await expect(page.getByText(/\d+ resultados?/)).toBeVisible({ timeout: 30_000 })
+      // Pelo menos um controle de filtro à mostra, sem abrir dropdown nenhum.
+      const controles = page.locator('input[type="date"], input[placeholder="Buscar…"]')
+      await expect(controles.first(), `domínio ${d} sem filtro à mostra`).toBeVisible()
+    }
   })
 
   test('agrupar não abre outra tela: é a mesma consulta', async ({ page }) => {

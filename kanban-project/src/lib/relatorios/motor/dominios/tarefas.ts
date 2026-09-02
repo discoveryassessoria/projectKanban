@@ -125,6 +125,7 @@ export const DOMINIO_TAREFAS: DominioDef = {
     { key: "conclusao", rotulo: "Conclusão", orderBy: (d) => [{ dataConclusao: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["responsavel", "status", "periodo_prazo", "atrasada"],
   colunasIniciais: ["codigo", "titulo", "responsavel", "status", "processo", "fase", "prazo", "atraso_dias"],
   ordenacaoPadrao: { key: "prazo", direcao: "asc" },
 

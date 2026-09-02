@@ -304,6 +304,7 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
     { key: "ultima_movimentacao", rotulo: "Última movimentação", orderBy: (d) => [{ updatedAt: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["periodo_protocolo", "orgao", "situacao", "responsavel"],
   colunasIniciais: ["data", "processo", "familia", "requerentes", "nacionalidade", "orgao", "orgao_pais", "responsavel", "situacao"],
   ordenacaoPadrao: { key: "data", direcao: "desc" },
 

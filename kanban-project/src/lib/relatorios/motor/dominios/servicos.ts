@@ -97,6 +97,7 @@ export const DOMINIO_SERVICOS: DominioDef = {
     { key: "criado", rotulo: "Cadastro", orderBy: (d) => [{ criadoEm: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "item", "natureza"],
   colunasIniciais: ["nome", "item", "natureza", "valor", "moeda", "modo", "modalidade", "vigencia", "origem"],
   ordenacaoPadrao: { key: "nome", direcao: "asc" },
 

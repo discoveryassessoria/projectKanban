@@ -99,6 +99,7 @@ export const DOMINIO_ORGAOS: DominioDef = {
     { key: "criado", rotulo: "Cadastro", orderBy: (d) => [{ criadoEm: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "tipo", "pais"],
   colunasIniciais: ["codigo", "nome", "tipo", "funcoes", "pais", "cidade", "protocolos", "ativo"],
   ordenacaoPadrao: { key: "nome", direcao: "asc" },
 

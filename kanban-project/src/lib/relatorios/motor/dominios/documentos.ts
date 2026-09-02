@@ -146,6 +146,7 @@ export const DOMINIO_DOCUMENTOS: DominioDef = {
     { key: "status", rotulo: "Situação", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
   ],
 
+  filtrosPrincipais: ["status", "tipo", "vencido"],
   colunasIniciais: ["tipo", "categoria", "status", "pessoa", "processo", "entregue", "validade", "vencido"],
   ordenacaoPadrao: { key: "criacao", direcao: "desc" },
 

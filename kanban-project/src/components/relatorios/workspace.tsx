@@ -24,6 +24,7 @@ interface Meta {
   colunas: { key: string; rotulo: string; alinhamento: string | null }[]
   ordenacoes: { key: string; rotulo: string }[]
   colunasIniciais: string[]
+  filtrosPrincipais: string[]
   ordenacaoPadrao: { key: string; direcao: "asc" | "desc" }
   visoesDoSistema: { key: string; nome: string; spec: QuerySpec }[]
 }
@@ -93,7 +94,17 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
   }, [spec])
 
   const usados = useMemo(() => new Set(spec.filtros.map((f) => f.key)), [spec.filtros])
-  const disponiveis = useMemo(() => (meta?.filtros ?? []).filter((f) => !usados.has(f.key)), [meta, usados])
+  // Os principais não entram no "+ Mais filtros": eles já estão na barra.
+  const principais = useMemo(
+    () => (meta?.filtrosPrincipais ?? [])
+      .map((k) => meta?.filtros.find((f) => f.key === k))
+      .filter((f): f is FiltroMeta => !!f),
+    [meta],
+  )
+  const disponiveis = useMemo(
+    () => (meta?.filtros ?? []).filter((f) => !usados.has(f.key) && !(meta?.filtrosPrincipais ?? []).includes(f.key)),
+    [meta, usados],
+  )
   const colunasAtivas = spec.colunas ?? meta?.colunasIniciais ?? []
 
   const mudar = (patch: Partial<QuerySpec>) => setSpec((s) => ({ ...s, pagina: 1, ...patch }))
@@ -217,20 +228,40 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
         </div>
       ) : (
         <>
-          {/* FILTROS — faixa compacta. Sem filtro escolhido, ela não ocupa a
-              altura de um painel: vira uma linha só, e a tabela sobe. */}
-          <div className={`${PAINEL} ${spec.filtros.length || res?.aplicados.length ? "p-3" : "px-3 py-2"}`}>
-            <div className="flex flex-wrap items-start gap-4">
-              {spec.filtros.map((f) => {
-                const m = meta.filtros.find((x) => x.key === f.key)
-                if (!m) return null
-                return <FiltroControle key={f.key} meta={m} valor={f.valor}
-                  onChange={(v) => setFiltro(f.key, v)} onRemover={() => setFiltro(f.key, null)} />
-              })}
-              <div className={spec.filtros.length ? "min-w-[190px]" : "min-w-[190px] self-center"}>
-                {spec.filtros.length > 0 && (
-                  <label className="mb-1 block text-[11px] font-medium text-[var(--text-secondary)]">Adicionar filtro</label>
-                )}
+          {/* FILTROS.
+              Os PRINCIPAIS ficam à mostra o tempo todo — o período à frente,
+              porque "o que aconteceu entre tal e tal dia" é a pergunta que se
+              faz toda vez. Esconder isso atrás de um dropdown transformava a
+              consulta mais comum na mais trabalhosa. Os demais continuam
+              disponíveis em "+ Adicionar filtro". */}
+          <div className={`${PAINEL} p-3`}>
+            <div className="grid grid-cols-2 items-start gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {principais.map((m) => (
+                // Duas datas mais os atalhos não cabem numa célula: o período
+                // ocupa duas. Espremido, ele cortava o campo "até".
+                <div key={m.key} className={m.tipo === "intervalo_data" ? "col-span-2" : "min-w-0"}>
+                  <FiltroControle meta={m} fixo
+                    valor={spec.filtros.find((f) => f.key === m.key)?.valor ?? null}
+                    onChange={(v) => setFiltro(m.key, v)} onRemover={() => setFiltro(m.key, null)} />
+                </div>
+              ))}
+
+              {/* filtros extras que o usuário acrescentou */}
+              {spec.filtros
+                .filter((f) => !meta.filtrosPrincipais.includes(f.key))
+                .map((f) => {
+                  const m = meta.filtros.find((x) => x.key === f.key)
+                  if (!m) return null
+                  return (
+                    <div key={f.key} className={m.tipo === "intervalo_data" ? "col-span-2" : "min-w-0"}>
+                      <FiltroControle meta={m} valor={f.valor}
+                        onChange={(v) => setFiltro(f.key, v)} onRemover={() => setFiltro(f.key, null)} />
+                    </div>
+                  )
+                })}
+
+              <div className="self-start">
+                <label className="mb-1 block text-[11px] font-medium text-transparent select-none">.</label>
                 <select value={novoFiltro} className={`${BOTAO} w-full`}
                   onChange={(e) => {
                     const k = e.target.value
@@ -241,7 +272,7 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
                     // deixar passar tudo achando que filtrou.
                     setSpec((s) => ({ ...s, pagina: 1, filtros: [...s.filtros, { key: k, valor: { tipo: "texto", texto: "" } as ValorDeFiltro }] }))
                   }}>
-                  <option value="">+ Adicionar filtro</option>
+                  <option value="">+ Mais filtros</option>
                   {disponiveis.map((f) => <option key={f.key} value={f.key}>{f.rotulo}</option>)}
                 </select>
               </div>

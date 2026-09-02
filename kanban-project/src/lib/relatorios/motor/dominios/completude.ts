@@ -131,6 +131,7 @@ export const DOMINIO_COMPLETUDE: DominioDef = {
     { key: "estado", rotulo: "Estado", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
   ],
 
+  filtrosPrincipais: ["estado", "processo", "pendente"],
   colunasIniciais: ["requisito", "estado", "obrigatoriedade", "pessoa", "processo", "fase", "dono", "motivo"],
   ordenacaoPadrao: { key: "estado", direcao: "asc" },
 

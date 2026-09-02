@@ -90,6 +90,7 @@ export const DOMINIO_FAMILIAS: DominioDef = {
     { key: "criada", rotulo: "Criação", orderBy: (d) => [{ createdAt: d }, { id: d }] },
   ],
 
+  filtrosPrincipais: ["nome", "com_processo_aberto"],
   colunasIniciais: ["nome", "qtd_processos", "qtd_requerentes", "nacionalidades", "em_andamento", "fase", "arvore"],
   ordenacaoPadrao: { key: "nome", direcao: "asc" },
 
