@@ -314,11 +314,53 @@ export function ArvoreGenealogicaView({
         htmlEl.style.setProperty('text-overflow', 'unset', 'important')
       })
 
-      const imgData = await toPng(reactFlowContainer, {
+      // ESCALA CALCULADA, NÃO FIXA. `pixelRatio: 2` dobra as dimensões da
+      // captura, e o Safari recusa canvas acima de ~16,7 milhões de pixels de
+      // área (e ~4096px por lado no iOS): numa árvore larga a captura falhava
+      // inteira, e o usuário via só "verifique o console". Aqui a escala cai
+      // até caber — perde nitidez em árvore gigante, que é infinitamente melhor
+      // do que não exportar.
+      const larguraCss = reactFlowContainer.scrollWidth || reactFlowContainer.clientWidth
+      const alturaCss = reactFlowContainer.scrollHeight || reactFlowContainer.clientHeight
+      const AREA_MAX = 16_000_000
+      const LADO_MAX = 8_000
+      const escalaPorArea = Math.sqrt(AREA_MAX / Math.max(larguraCss * alturaCss, 1))
+      const escalaPorLado = LADO_MAX / Math.max(larguraCss, alturaCss, 1)
+      const escala = Math.max(1, Math.min(2, escalaPorArea, escalaPorLado))
+
+      // DUAS TENTATIVAS. Eu não consigo reproduzir o navegador de quem exporta,
+      // e a captura falha por mais de um motivo (área de canvas, fonte, filtro
+      // CSS). Em vez de apostar numa causa só, tenta na escala calculada e, se
+      // voltar vazia ou estourar, tenta de novo em 1× — que é a configuração
+      // mais modesta possível. Desistir na primeira falha é o que produzia
+      // "verifique o console".
+      const capturar = (px: number) => toPng(reactFlowContainer, {
         backgroundColor: '#eaf5fc',
-        pixelRatio: 2,
+        pixelRatio: px,
         skipFonts: true,
       })
+      const valida = (d: string | null | undefined) => !!d && d.length > 1000
+
+      let imgData = ''
+      let falhaPrimeira: unknown = null
+      try {
+        imgData = await capturar(escala)
+      } catch (e) { falhaPrimeira = e }
+
+      if (!valida(imgData)) {
+        console.warn(`[arvore] captura em ${escala.toFixed(2)}× falhou; tentando 1×`, falhaPrimeira)
+        try {
+          imgData = await capturar(1)
+        } catch (e) { falhaPrimeira = e }
+      }
+
+      if (!valida(imgData)) {
+        const detalhe = falhaPrimeira instanceof Error ? ` (${falhaPrimeira.message})` : ''
+        throw new Error(
+          `O navegador não conseguiu desenhar a árvore inteira de uma vez — ` +
+          `${larguraCss}×${alturaCss}px${detalhe}.`,
+        )
+      }
 
       // Restaurar estilos dos nomes
       nameElements.forEach((el) => {
@@ -402,8 +444,15 @@ export function ArvoreGenealogicaView({
       pdf.save(nomeArquivo)
 
     } catch (error) {
+      // "Verifique o console" não é mensagem: manda o usuário a um lugar que ele
+      // não abre, para ler algo que ele não interpreta. Aqui vai o motivo real.
       console.error('Erro ao exportar PDF:', error)
-      alert('Erro ao exportar PDF. Verifique o console para mais detalhes.')
+      const motivo = error instanceof Error ? error.message : String(error)
+      alert(
+        `Não foi possível exportar o PDF da árvore.\n\n${motivo}\n\n` +
+        `Se a árvore for muito grande, tente exportar a linhagem do requerente ` +
+        `em vez da árvore completa.`,
+      )
     } finally {
       // Restaurar zoom original
       document.body.style.zoom = currentZoom
