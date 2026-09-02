@@ -418,7 +418,21 @@ registrar({
   responsavel: 'Arquitetura',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
-    const eliminadas = ['MarcoProcesso', 'TipoProtocoloCadastro', 'CategoriaFinanceira', 'PlanoConta', 'CentroCusto']
+    // `TipoProtocoloCadastro` SAIU desta lista em 02/09/2026, e não por
+    // conveniência: o que foi eliminado em 02/08 era o cadastro de MARCOS de
+    // protocolo — a ideia de que protocolo é cadastro, com etapas configuráveis.
+    // Isso continua eliminado (`MarcoProcesso` segue aqui).
+    //
+    // O que existe hoje com esse nome é outra coisa, criada depois pela
+    // migration `20260831140000_tipo_protocolo_cadastro`: o TIPO DO ATO
+    // (administrativo, judicial), que é cadastro legítimo no Gerenciamento e
+    // que `Protocolo.tipoProtocoloId` referencia. São 7 tipos, com protocolo
+    // real apontando para eles.
+    //
+    // Manter o nome aqui fazia a verificação acusar como regressão uma decisão
+    // de arquitetura posterior — e um ERRO que não é erro treina a operação a
+    // ignorar a tela inteira.
+    const eliminadas = ['MarcoProcesso', 'CategoriaFinanceira', 'PlanoConta', 'CentroCusto']
     const r = await prisma.$queryRawUnsafe<{ table_name: string }[]>(
       `SELECT table_name FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = ANY($1)`,

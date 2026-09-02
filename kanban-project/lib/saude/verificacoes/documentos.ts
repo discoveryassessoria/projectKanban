@@ -255,6 +255,7 @@ registrar({
     const r = await prisma.$queryRawUnsafe<{ n: number }[]>(
       `SELECT COUNT(*)::int AS n FROM "Arvore" a
         WHERE a."pessoaPrincipalId" IS NOT NULL
+          AND a."pessoaPrincipalId" IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM "Pessoa" p WHERE p.id = a."pessoaPrincipalId")`,
     )
     const n = r?.[0]?.n ?? 0

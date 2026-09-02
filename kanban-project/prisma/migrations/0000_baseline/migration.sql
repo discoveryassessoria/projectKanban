@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-01
+-- Gerado em : 2026-09-02
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -6672,10 +6672,16 @@ ALTER TABLE "CustoPessoa" ADD CONSTRAINT "CustoPessoa_tipoServicoId_fkey" FOREIG
 ALTER TABLE "ContaBancaria" ADD CONSTRAINT "ContaBancaria_bankId_fkey" FOREIGN KEY ("bankId") REFERENCES "Banco"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "ContaPagar" ADD CONSTRAINT "ContaPagar_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ContaPagar" ADD CONSTRAINT "ContaPagar_contaBancariaId_fkey" FOREIGN KEY ("contaBancariaId") REFERENCES "ContaBancaria"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ContaPagar" ADD CONSTRAINT "ContaPagar_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "Fornecedor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Transacao" ADD CONSTRAINT "Transacao_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Transacao" ADD CONSTRAINT "Transacao_contaBancariaId_fkey" FOREIGN KEY ("contaBancariaId") REFERENCES "ContaBancaria"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -6775,6 +6781,9 @@ ALTER TABLE "Custo" ADD CONSTRAINT "Custo_condicaoPagamentoId_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "Cobranca" ADD CONSTRAINT "Cobranca_receitaId_fkey" FOREIGN KEY ("receitaId") REFERENCES "Receita"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Cobranca" ADD CONSTRAINT "Cobranca_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ParcelaFinanceira" ADD CONSTRAINT "ParcelaFinanceira_custoId_fkey" FOREIGN KEY ("custoId") REFERENCES "Custo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6889,6 +6898,9 @@ ALTER TABLE "TabelaValor" ADD CONSTRAINT "TabelaValor_fornecedorId_fkey" FOREIGN
 
 -- AddForeignKey
 ALTER TABLE "TabelaValor" ADD CONSTRAINT "TabelaValor_itemCatalogoId_fkey" FOREIGN KEY ("itemCatalogoId") REFERENCES "ItemCatalogo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TabelaValor" ADD CONSTRAINT "TabelaValor_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TabelaValor" ADD CONSTRAINT "TabelaValor_configuracaoFinanceiraItemId_fkey" FOREIGN KEY ("configuracaoFinanceiraItemId") REFERENCES "ProdutoFinanceiro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -7134,6 +7146,9 @@ ALTER TABLE "SubtaskExecution" ADD CONSTRAINT "SubtaskExecution_protocoloId_fkey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -7147,6 +7162,18 @@ ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstanc
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_previousStepInstanceId_fkey" FOREIGN KEY ("previousStepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WorkflowEvento" ADD CONSTRAINT "WorkflowEvento_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PhaseAdvanceLog" ADD CONSTRAINT "PhaseAdvanceLog_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OperacaoAntecipada" ADD CONSTRAINT "OperacaoAntecipada_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ObrigacaoEconomica" ADD CONSTRAINT "ObrigacaoEconomica_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ObrigacaoEconomica" ADD CONSTRAINT "ObrigacaoEconomica_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "Fornecedor"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -7177,6 +7204,12 @@ ALTER TABLE "DistribuicaoEconomica" ADD CONSTRAINT "DistribuicaoEconomica_obriga
 
 -- AddForeignKey
 ALTER TABLE "ParticipacaoEconomica" ADD CONSTRAINT "ParticipacaoEconomica_distribuicaoId_fkey" FOREIGN KEY ("distribuicaoId") REFERENCES "DistribuicaoEconomica"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ParteExterna" ADD CONSTRAINT "ParteExterna_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CreditoMovimento" ADD CONSTRAINT "CreditoMovimento_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SaldoProjecao" ADD CONSTRAINT "SaldoProjecao_obrigacaoId_fkey" FOREIGN KEY ("obrigacaoId") REFERENCES "ObrigacaoEconomica"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -7363,6 +7396,9 @@ ALTER TABLE "SaudeAchado" ADD CONSTRAINT "SaudeAchado_execucaoId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_canalOperacionalId_fkey" FOREIGN KEY ("canalOperacionalId") REFERENCES "CanalOperacional"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

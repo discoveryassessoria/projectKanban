@@ -538,6 +538,21 @@ model Processo {
   planilhaOverrides PlanilhaCelulaOverride[]
   protocolos        Protocolo[]
 
+  // Trilha e lançamentos do processo. Todos com ON DELETE CASCADE no banco:
+  // apagar o processo leva junto o que só existia por causa dele.
+  eventosWorkflow       WorkflowEvento[]            @relation("eventosWorkflow")
+  avancosDeFase         PhaseAdvanceLog[]           @relation("avancosDeFase")
+  passosDeWorkflow      PhaseWorkflowStepInstance[] @relation("passosDeWorkflow")
+  operacoesAntecipadas  OperacaoAntecipada[]        @relation("operacoesAntecipadas")
+  partesExternas        ParteExterna[]              @relation("partesExternas")
+  solicitacoesDocumento SolicitacaoDocumento[]      @relation("solicitacoesDocumento")
+  cobrancasDoProcesso   Cobranca[]                  @relation("cobrancasDoProcesso")
+  contasAPagar          ContaPagar[]                @relation("contasAPagar")
+  movimentosDeCredito   CreditoMovimento[]          @relation("movimentosDeCredito")
+  transacoes            Transacao[]                 @relation("transacoes")
+  precosDoProcesso      TabelaValor[]               @relation("precosDoProcesso")
+  obrigacoesEconomicas  ObrigacaoEconomica[]        @relation("obrigacoesEconomicas")
+
   @@index([arvoreId])
   @@index([familiaId])
   @@index([tipoProcessoMotorId])
@@ -1350,6 +1365,8 @@ model ContaPagar {
   contaPaiId      Int?
   numeroParcela   Int?
   totalParcelas   Int?
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo        Processo?        @relation("contasAPagar", fields: [processoId], references: [id], onDelete: Cascade)
   processoId      Int?
   // Â§7 â origem do lanÃ§amento corporativo. CORPORATIVA = lanÃ§ado direto no Financeiro
   // Geral (aluguel, salÃ¡riosâ¦). PROCESSO = espelha um Custo de processo (evitar!) â
@@ -1381,6 +1398,8 @@ model Transacao {
   contaBancariaId Int
   faturaId        Int?
   contaPagarId    Int?
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo        Processo?     @relation("transacoes", fields: [processoId], references: [id], onDelete: Cascade)
   processoId      Int?
   conciliado      Boolean       @default(false)
   dataConciliacao DateTime?
@@ -1839,6 +1858,8 @@ model Cobranca {
   id                  Int       @id @default(autoincrement())
   receitaId           Int
   receita             Receita   @relation("ReceitaCobrancas", fields: [receitaId], references: [id], onDelete: Cascade)
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo            Processo? @relation("cobrancasDoProcesso", fields: [processoId], references: [id], onDelete: Cascade)
   processoId          Int // snapshot p/ consulta rÃ¡pida
   // IDs do Gerenciamento â Financeiro (FONTE ÃNICA â sÃ³ referÃªncia, nunca cÃ³pia):
   formaPagamentoId    Int? // â FormaPagamentoCadastro
@@ -2560,6 +2581,8 @@ model TabelaValor {
   itemCatalogo                 ItemCatalogo?      @relation(fields: [itemCatalogoId], references: [id])
   natureza                     NaturezaPreco? // CUSTO ou RECEITA (independentes!). null = legado/ambÃ­guo
   regiao                       String?            @db.VarChar(60) // nÃ­vel paÃ­s/regiÃ£o da precedÃªncia
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo                     Processo?          @relation("precosDoProcesso", fields: [processoId], references: [id], onDelete: Cascade)
   processoId                   Int? // preÃ§o especÃ­fico de UM processo (nÃ­vel + especÃ­fico)
   // F4 â CHAVE PRINCIPAL canÃ´nica: o preÃ§o pertence a uma ConfiguraÃ§Ã£o Financeira
   // (papel financeiro de uma entidade mestre). itemCatalogoId/natureza ficam sÃ³ como legado.
@@ -5062,6 +5085,8 @@ model PhaseWorkflowStepInstance {
   snapshot              Json?
   snapshotSchemaVersion Int    @default(1) // CP-4B
 
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo     Processo? @relation("passosDeWorkflow", fields: [processoId], references: [id], onDelete: Cascade)
   processoId   Int
   faseMacroKey String    @db.VarChar(60)
   ordem        Int       @default(0)
@@ -5141,6 +5166,8 @@ model WorkflowEvento {
   tipo               WorkflowEventoTipo
   entityType         String             @db.VarChar(30) // workflow_instance|step_instance|tarefa|fase
   entityId           Int?
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo           Processo?          @relation("eventosWorkflow", fields: [processoId], references: [id], onDelete: Cascade)
   processoId         Int?
   workflowInstanceId Int?
   stepInstanceId     Int?
@@ -5174,6 +5201,8 @@ enum AdvanceResultado {
 
 model PhaseAdvanceLog {
   id                      Int              @id @default(autoincrement())
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo                Processo?        @relation("avancosDeFase", fields: [processoId], references: [id], onDelete: Cascade)
   processoId              Int
   faseAtual               String           @db.VarChar(60)
   fasePretendida          String?          @db.VarChar(60)
@@ -5504,6 +5533,8 @@ model OperacaoAntecipada {
   // CÃ³digo pÃºblico operacional (OPA-n) gerado pelo CodeGeneratorService central. Aditivo/Ãºnico;
   // nullable p/ backfill seguro. NÃ£o editÃ¡vel pelo usuÃ¡rio; identidade permanente (id/UUID Ã© a chave tÃ©cnica).
   publicCode                 String?                  @unique @db.VarChar(20)
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo                   Processo?                @relation("operacoesAntecipadas", fields: [processoId], references: [id], onDelete: Cascade)
   processoId                 Int
   // InstÃ¢ncia do Workflow Interno da fase de ORIGEM (a que solicitou a antecipaÃ§Ã£o).
   workflowInstanceId         Int?
@@ -5562,6 +5593,8 @@ model ObrigacaoEconomica {
   codigoOperacional String?   @db.VarChar(40) // = cÃ³digo da Receita/Custo (ex.: REC-105)
   natureza          String    @db.VarChar(30) // RECEITA|CUSTO|RECEITA_EXTRA|DESCONTO|CREDITO|REEMBOLSO|JUROS|MULTA|AJUSTE|ESTORNO|RENEGOCIACAO|OUTRO
   direcao           String    @db.VarChar(12) // A_RECEBER|A_PAGAR
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo          Processo? @relation("obrigacoesEconomicas", fields: [processoId], references: [id], onDelete: Cascade)
   processoId        Int?
   faseId            Int?
   clienteId         Int?
@@ -5912,14 +5945,16 @@ model Pagador {
 
 /// Parte externa (pagador/terceiro fora do cadastro de Pessoas).
 model ParteExterna {
-  id         Int      @id @default(autoincrement())
-  nome       String   @db.VarChar(160)
-  documento  String?  @db.VarChar(40)
-  tipo       String?  @db.VarChar(4) // PF|PJ
-  observacao String?  @db.Text
+  id         Int       @id @default(autoincrement())
+  nome       String    @db.VarChar(160)
+  documento  String?   @db.VarChar(40)
+  tipo       String?   @db.VarChar(4) // PF|PJ
+  observacao String?   @db.Text
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo   Processo? @relation("partesExternas", fields: [processoId], references: [id], onDelete: Cascade)
   processoId Int?
-  ativo      Boolean  @default(true)
-  criadoEm   DateTime @default(now())
+  ativo      Boolean   @default(true)
+  criadoEm   DateTime  @default(now())
 }
 
 /// PolÃ­tica cambial (diferenÃ§a configurÃ¡vel pela Regra Financeira).
@@ -5977,25 +6012,27 @@ model CreditoFinanceiro {
 /// pagador, ocorrência, usuário e correlation id. Aditivo; não substitui o Ledger
 /// double-entry das obrigações — é o sub-razão do crédito. Nunca é editado/apagado.
 model CreditoMovimento {
-  id                 Int      @id @default(autoincrement())
+  id                 Int       @id @default(autoincrement())
   creditoId          Int
-  tipo               String   @db.VarChar(16) // GERACAO|UTILIZACAO|DEVOLUCAO|ESTORNO
-  valor              Decimal  @db.Decimal(14, 2)
-  saldoAnterior      Decimal  @db.Decimal(14, 2)
-  saldoPosterior     Decimal  @db.Decimal(14, 2)
-  moeda              Moeda    @default(BRL)
+  tipo               String    @db.VarChar(16) // GERACAO|UTILIZACAO|DEVOLUCAO|ESTORNO
+  valor              Decimal   @db.Decimal(14, 2)
+  saldoAnterior      Decimal   @db.Decimal(14, 2)
+  saldoPosterior     Decimal   @db.Decimal(14, 2)
+  moeda              Moeda     @default(BRL)
   obrigacaoOrigemId  Int?
   obrigacaoDestinoId Int?
   cobrancaDestinoId  Int?
   ocorrenciaId       Int?
   pagadorId          Int?
   pessoaId           Int?
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo           Processo? @relation("movimentosDeCredito", fields: [processoId], references: [id], onDelete: Cascade)
   processoId         Int?
   receitaId          Int?
   usuarioId          Int?
-  correlationId      String?  @db.VarChar(80)
-  observacao         String?  @db.VarChar(300)
-  criadoEm           DateTime @default(now())
+  correlationId      String?   @db.VarChar(80)
+  observacao         String?   @db.VarChar(300)
+  criadoEm           DateTime  @default(now())
 
   @@index([creditoId])
   @@index([correlationId])
@@ -7202,6 +7239,8 @@ model SolicitacaoDocumento {
   documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
   /// Denormalizados por ESCOPO (nao por conveniencia): a consulta da aba Protocolo
   /// e por documento, e o isolamento entre processos precisa ser verificavel na linha.
+  /// O banco cascateia: apagar o processo apaga esta linha.
+  processo    Processo? @relation("solicitacoesDocumento", fields: [processoId], references: [id], onDelete: Cascade)
   processoId  Int
   pessoaId    Int
 

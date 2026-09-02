@@ -193,8 +193,13 @@ registrar({
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
     const orfaos = await prisma.$queryRawUnsafe<{ n: number }[]>(
+      // `processoId` é NULO por projeto: nem todo evento de workflow fala de um
+      // processo. Sem o `IS NOT NULL`, `p.id = NULL` nunca casa, o NOT EXISTS dá
+      // verdadeiro e TODO evento legítimo sem processo era contado como órfão.
+      // Um ERRO que não é erro ensina a operação a ignorar o painel inteiro.
       `SELECT COUNT(*)::int AS n FROM "WorkflowEvento" e
-        WHERE NOT EXISTS (SELECT 1 FROM "Processo" p WHERE p.id = e."processoId")`,
+        WHERE e."processoId" IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM "Processo" p WHERE p.id = e."processoId")`,
     )
     const n = orfaos?.[0]?.n ?? 0
     if (!n) return { achados: [], metricas: { orfaos: 0 }, resumo: 'Todo evento de workflow aponta para um processo existente.' }
