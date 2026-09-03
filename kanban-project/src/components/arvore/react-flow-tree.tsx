@@ -1369,6 +1369,33 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   // resultado é o pior tipo de defeito: a pessoa existe no banco, aparece na
   // busca, no diagnóstico e no painel, e não está na tela. Ver o bloco logo
   // abaixo, que fecha a lacuna.
+  // Desenha as arestas de pai/mãe/filho de UMA pessoa contra quem já está
+  // desenhado — usada tanto para quem o laço abaixo alcança na própria vez
+  // quanto para um cônjuge que vira nó como EFEITO COLATERAL de ser casado com
+  // quem o laço alcançou (ver o `forEach` de cônjuges logo abaixo: sem isto, o
+  // cônjuge era adicionado só com a aresta de casamento — e o casamento nem
+  // desenha linha quando o casal já tem filho em comum, `casalTemFilhos` acima
+  // — e `processedIds.has` já marcado fazia a PRÓPRIA vez dele no laço externo
+  // ser pulada silenciosamente. Era exatamente o defeito que este laço existe
+  // para fechar, só que por um caminho lateral: pai/mãe corretos no banco,
+  // sem nenhuma aresta, porque a vez dele nunca chegou a rodar.
+  const desenharVinculosDeParentesco = (p: PessoaArvore) => {
+    if (p.paiId && processedIds.has(p.paiId)) {
+      addEdge(`person-${p.id}`, `person-${p.paiId}`, `edge-filho-${p.id}-pai`, colors.neutral)
+    }
+    if (p.maeId && processedIds.has(p.maeId)) {
+      addEdge(`person-${p.id}`, `person-${p.maeId}`, `edge-filho-${p.id}-mae`, colors.neutral)
+    }
+    findFilhos(p).filter(f => processedIds.has(f.id)).forEach(filho => {
+      if (filho.paiId === p.id) {
+        addEdge(`person-${filho.id}`, `person-${p.id}`, `edge-filho-${filho.id}-pai`, colors.neutral)
+      }
+      if (filho.maeId === p.id) {
+        addEdge(`person-${filho.id}`, `person-${p.id}`, `edge-filho-${filho.id}-mae`, colors.neutral)
+      }
+    })
+  }
+
   let changed = true
   let iterations = 0
   const maxIterations = 100
@@ -1376,7 +1403,7 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
   while (changed && iterations < maxIterations) {
     changed = false
     iterations++
-    
+
     pessoas.forEach(pessoa => {
       if (processedIds.has(pessoa.id)) return
 
@@ -1394,26 +1421,14 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
       if (paiNaArvore || maeNaArvore || filhosNaArvore.length > 0) {
         addPersonNode(pessoa, false, false)
         changed = true
-
-        if (paiNaArvore && pessoa.paiId) {
-          addEdge(`person-${pessoa.id}`, `person-${pessoa.paiId}`, `edge-filho-${pessoa.id}-pai`, colors.neutral)
-        }
-        if (maeNaArvore && pessoa.maeId) {
-          addEdge(`person-${pessoa.id}`, `person-${pessoa.maeId}`, `edge-filho-${pessoa.id}-mae`, colors.neutral)
-        }
-        filhosNaArvore.forEach(filho => {
-          if (filho.paiId === pessoa.id) {
-            addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-pai`, colors.neutral)
-          }
-          if (filho.maeId === pessoa.id) {
-            addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-mae`, colors.neutral)
-          }
-        })
+        desenharVinculosDeParentesco(pessoa)
 
         const conjugesPessoa = findConjuges(pessoa)
         conjugesPessoa.forEach(conjuge => {
+          const conjugeJaEstavaDesenhado = processedIds.has(conjuge.id)
           addPersonNode(conjuge, false, false)
           addMarriageEdge(pessoa.id, conjuge.id)
+          if (!conjugeJaEstavaDesenhado) desenharVinculosDeParentesco(conjuge)
         })
       }
     })
