@@ -154,16 +154,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         data: dataToUpdate,
         include: { pai: true, mae: true, arvore: true, documentos: { orderBy: { createdAt: 'desc' } } },
       })
-      // Único PRINCIPAL por árvore: promover explicitamente a "maior" (principal)
-      // demove qualquer outro "maior" para "sim" — impede dois principais e permite
-      // a troca explícita do principal quando há mais de um requerente.
-      if (body.requerente === "maior" && p.arvoreId) {
-        await tx.pessoa.updateMany({
-          where: { arvoreId: p.arvoreId, requerente: "maior", id: { not: p.id } },
-          data: { requerente: "sim" },
-        })
-        await tx.arvore.update({ where: { id: p.arvoreId }, data: { pessoaPrincipalId: p.id } })
-      }
+      // "maior"/"menor" são classificação de MAIORIDADE de CADA requerente — fato
+      // independente por pessoa (idade, não liderança). Havia aqui um rebaixamento
+      // automático ("só um 'maior' por árvore") que emprestava esse campo pra
+      // simular "o principal da árvore" — conceito que já tem fonte própria
+      // (`Arvore.pessoaPrincipalId`, mantida à parte). O empréstimo derrubava a
+      // classificação de quem já estava correto: marcar um SEGUNDO requerente
+      // como maior de idade apagava o "maior" do primeiro, sem nenhuma regra de
+      // negócio (SLA, financeiro, documentos) depender dessa exclusividade — só
+      // essa rota fingia que dependia.
       // MESMA transação da atualização. Quem sabe o que "virar requerente"
       // significa é o serviço canônico — a rota só informa que a transição
       // ocorreu. Ela não conhece a DomainOutbox.
