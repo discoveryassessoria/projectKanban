@@ -53,7 +53,10 @@ export interface PhaseMeta {
   faseCode: FaseCode | null
   label: string
   ordem: number
-  state: "ACTIVE" | "COMPLETED" | "FUTURE"
+  /** OPEN = já materializada, mas sem concluir de fato (não é a atual). */
+  state: "ACTIVE" | "COMPLETED" | "OPEN" | "FUTURE"
+  /** Progresso REAL da fase (0-100) — mesma projeção do Kanban/Header, por fase. */
+  progress: number
   materialized: boolean
   workflowInstanceId: number | null
   ciclo: number | null
@@ -857,17 +860,23 @@ export function ProcessoCentralOperacional({
     phaseKeyToFaseCode((processo as { faseAtualKey?: string | null }).faseAtualKey) ??
     undefined
   const faseAtivaNome = (faseKeyAtiva ? FASES[faseKeyAtiva]?.label : undefined) ?? "Genealogia"
-  const idxAtual = PROCESS_PHASES.indexOf(faseAtivaNome as (typeof PROCESS_PHASES)[number])
-  const fasesConcluidas = idxAtual > 0 ? PROCESS_PHASES.slice(0, idxAtual) : []
-  // Percentual da fase ATIVA = projeção oficial (mesmo % do Kanban/Header). Fases
-  // concluídas = 100, futuras = 0. Nenhum recálculo local.
+  // Percentual da fase ATIVA = projeção oficial (mesmo % do Kanban/Header). Nenhum
+  // recálculo local.
   const pctFaseAtual = data.projection?.progress.percentage ?? data.matrix?.percentage ?? 0
+  // "Concluída" e o progresso de TODA fase (inclusive as anteriores) vêm de
+  // `GET .../phases` — a MESMA projeção oficial, calculada por fase. Antes disto,
+  // "toda fase anterior à atual" era pintada de 100% só pela posição: mover o
+  // processo manualmente preservando histórico (a pedido, para nenhuma tarefa
+  // sumir) deixava a fase de origem sem o trabalho real feito, e a tela mesmo
+  // assim dizia "Concluída". Sem `/phases` carregado ainda, cai em 0 (nunca 100
+  // por suposição) — a fase ativa usa `pctFaseAtual` acima, que chega antes.
   const progressoPorFase: Record<string, number> = {}
-  PROCESS_PHASES.forEach((ph, i) => {
-    if (i < idxAtual) progressoPorFase[ph] = 100
-    else if (i === idxAtual) progressoPorFase[ph] = pctFaseAtual
-    else progressoPorFase[ph] = 0
-  })
+  PROCESS_PHASES.forEach((ph) => { progressoPorFase[ph] = ph === faseAtivaNome ? pctFaseAtual : 0 })
+  for (const p of phases) {
+    if (p.label === faseAtivaNome) continue
+    progressoPorFase[p.label] = p.progress
+  }
+  const fasesConcluidas = phases.filter((p) => p.state === "COMPLETED").map((p) => p.label)
   const activePhaseKey = faseKeyAtiva ? faseCodeToPhaseKey(faseKeyAtiva) : null
 
   // FASE CONSULTADA (corpo) — `viewData` (passada) ou `data` (ativa). MESMO layout;
@@ -935,10 +944,13 @@ export function ProcessoCentralOperacional({
     (isView && selectedKey)
       ? (phases.find((p) => p.phaseKey === selectedKey) ?? {
           // Fallback quando a rota /phases ainda n\u00e3o respondeu: metadados m\u00ednimos.
+          // "OPEN" (nunca "COMPLETED") \u2014 sem a resposta real ainda n\u00e3o d\u00e1 pra
+          // afirmar que a fase terminou; supor conclus\u00e3o pela posi\u00e7\u00e3o foi exatamente
+          // o bug que este acerto corrige.
           phaseKey: selectedKey, faseCode: selectedFaseCode, label: selectedLabel ?? selectedKey,
           ordem: selectedFaseCode ? FASES[selectedFaseCode].ordem : 0,
-          state: (selectedFaseCode && faseKeyAtiva && FASES[selectedFaseCode].ordem < FASES[faseKeyAtiva].ordem
-            ? "COMPLETED" : "FUTURE") as PhaseMeta["state"],
+          state: "OPEN" as PhaseMeta["state"],
+          progress: 0,
           materialized: false, workflowInstanceId: null, ciclo: null, status: null,
         })
       : null
@@ -986,6 +998,7 @@ export function ProcessoCentralOperacional({
               </span>
               <span className="text-[13px] font-semibold text-white/80">
                 {selectedPhaseMeta?.state === "FUTURE" ? "Fase futura · ainda não iniciada"
+                  : selectedPhaseMeta?.state === "OPEN" ? `Fase não concluída · ${selectedPhaseMeta.progress}%${selectedPhaseMeta.ciclo ? ` · Ciclo ${selectedPhaseMeta.ciclo}` : ""}`
                   : `Fase concluída${selectedPhaseMeta?.ciclo ? ` · Ciclo ${selectedPhaseMeta.ciclo}` : ""}`}
               </span>
             </div>
