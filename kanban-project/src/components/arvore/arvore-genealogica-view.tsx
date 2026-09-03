@@ -951,6 +951,29 @@ export function ArvoreGenealogicaView({
     setShowAddPersonModal(true)
   }
 
+  // DESVINCULAR pai/mãe (não apaga a pessoa, só religa o ponteiro pra null) —
+  // corrige o mesmo tipo de erro de importação que o seletor do Editar Pessoa
+  // corrige, só que direto do card da sidebar, sem abrir o formulário inteiro.
+  const handleRemoveParent = async (pessoaId: number, tipo: 'pai' | 'mae') => {
+    const campo = tipo === 'pai' ? 'Pai' : 'Mãe'
+    if (!window.confirm(`Remover o vínculo de ${campo} desta pessoa? A pessoa não é apagada — só o vínculo.`)) return
+    try {
+      const res = await authFetch(`/api/pessoas/${pessoaId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tipo === 'pai' ? { paiId: null } : { maeId: null }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        alert(d.error || `Erro ao remover ${campo.toLowerCase()}`)
+        return
+      }
+      await fetchArvore()
+    } catch {
+      alert(`Erro ao remover ${campo.toLowerCase()}`)
+    }
+  }
+
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false)
     await fetchArvore()
@@ -1340,6 +1363,7 @@ export function ArvoreGenealogicaView({
         onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
         onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
         onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
+        onRemoveParent={pode('arvore.editar') ? handleRemoveParent : undefined}
         onAddDocumento={undefined}
         onEditDocumento={undefined}
         onSelectPerson={handleSelectPersonFromSidebar}
@@ -1914,6 +1938,12 @@ function EditPersonModal({
   const [dataCasamento, setDataCasamento] = useState(uniaoExistente?.data_inicio ? new Date(uniaoExistente.data_inicio).toISOString().split('T')[0] : '')
   const [localCasamento, setLocalCasamento] = useState(uniaoExistente?.local || '')
   const [conjugeId, setConjugeId] = useState<number | string>(conjugeExistenteId || '')
+  // Vínculo de PAI/MÃE editável — pra corrigir importação errada (ex.: pessoa
+  // entrou com os pais da esposa) sem apagar ninguém: troca pra outra pessoa já
+  // existente na árvore, ou "Nenhum" pra desvincular. Vai no MESMO PUT que já
+  // grava os outros campos — /api/pessoas/[id] já aceita paiId/maeId direto.
+  const [paiSelecionadoId, setPaiSelecionadoId] = useState<number | ''>((pessoa as any).paiId || '')
+  const [maeSelecionadaId, setMaeSelecionadaId] = useState<number | ''>((pessoa as any).maeId || '')
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
   const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
@@ -1927,6 +1957,10 @@ function EditPersonModal({
   const [requerentesDisponiveis, setRequerentesDisponiveis] = useState<
     Array<{ requerenteId: number; nome: string; availableForTree: boolean }>
   >([])
+  // Pergunta primeiro, revela depois: "é requerente?" (Não/Sim) antes de abrir a
+  // lista de quem escolher. Sem isso o seletor de vínculo aparecia direto, sem
+  // dar a chance de confirmar a intenção antes de ver as opções.
+  const [respostaEhRequerente, setRespostaEhRequerente] = useState<'nao' | 'sim'>('nao')
   const [requerenteEscolhidoId, setRequerenteEscolhidoId] = useState<number | ''>('')
   const [vinculandoRequerente, setVinculandoRequerente] = useState(false)
   const [erroVinculoRequerente, setErroVinculoRequerente] = useState<string | null>(null)
@@ -2080,7 +2114,9 @@ function EditPersonModal({
           requerente: requerente || 'nao',
           numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
           linhaReta: isLinhaReta,
-          documentacao: precisaDocumentacao
+          documentacao: precisaDocumentacao,
+          paiId: paiSelecionadoId || null,
+          maeId: maeSelecionadaId || null,
         })
       })
 
@@ -2209,6 +2245,38 @@ function EditPersonModal({
             </div>
           </section>
 
+          {/* ===== Pai e Mãe ===== */}
+          {/* Corrige vínculo errado (ex.: pessoa entrou com os pais do cônjuge
+              na importação) sem apagar ou recriar ninguém: troca pra outra
+              pessoa já existente na árvore, ou "Nenhum" pra desvincular.
+              A mesma rota (PUT /api/pessoas/[id]) já aceita paiId/maeId. */}
+          <section className="border-t border-gray-100 pt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Pai e Mãe</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Pai</label>
+                <select value={paiSelecionadoId} onChange={(e) => setPaiSelecionadoId(e.target.value ? Number(e.target.value) : '')} className={selectClass} style={selectStyle}>
+                  <option value="">Nenhum</option>
+                  {pessoasDisponiveis.map(p => (
+                    <option key={p.id} value={p.id}>{p.nome} {p.sobrenome || ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mãe</label>
+                <select value={maeSelecionadaId} onChange={(e) => setMaeSelecionadaId(e.target.value ? Number(e.target.value) : '')} className={selectClass} style={selectStyle}>
+                  <option value="">Nenhuma</option>
+                  {pessoasDisponiveis.map(p => (
+                    <option key={p.id} value={p.id}>{p.nome} {p.sobrenome || ''}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-[var(--text-muted)]">
+              Trocar ou remover aqui não apaga ninguém — só religa (ou desliga) o vínculo. Salva junto com o resto do formulário.
+            </p>
+          </section>
+
           {/* ===== Nascimento ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Nascimento</h3>
@@ -2304,31 +2372,44 @@ function EditPersonModal({
                   </select>
                 ) : requerentesDisponiveis.length > 0 ? (
                   <div className="space-y-1.5">
-                    <div className="flex gap-1.5">
-                      <select
-                        value={requerenteEscolhidoId}
-                        onChange={(e) => setRequerenteEscolhidoId(e.target.value ? Number(e.target.value) : '')}
-                        className={selectClass}
-                        style={selectStyle}
-                      >
-                        <option value="">É requerente de...</option>
-                        {requerentesDisponiveis.map((r) => (
-                          <option key={r.requerenteId} value={r.requerenteId}>{r.nome}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={vincularComoRequerente}
-                        disabled={!requerenteEscolhidoId || vinculandoRequerente}
-                        className="shrink-0 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {vinculandoRequerente ? 'Vinculando…' : 'Vincular'}
-                      </button>
-                    </div>
-                    <p className="text-[11px] text-[var(--text-muted)]">
-                      Esta pessoa já existe na árvore — só vincule se ela for de fato um dos requerentes cadastrados no processo.
-                    </p>
-                    {erroVinculoRequerente && <p className="text-xs text-red-600">{erroVinculoRequerente}</p>}
+                    <select
+                      value={respostaEhRequerente}
+                      onChange={(e) => setRespostaEhRequerente(e.target.value as 'nao' | 'sim')}
+                      className={selectClass}
+                      style={selectStyle}
+                    >
+                      <option value="nao">Não</option>
+                      <option value="sim">Sim</option>
+                    </select>
+                    {respostaEhRequerente === 'sim' && (
+                      <>
+                        <div className="flex gap-1.5">
+                          <select
+                            value={requerenteEscolhidoId}
+                            onChange={(e) => setRequerenteEscolhidoId(e.target.value ? Number(e.target.value) : '')}
+                            className={selectClass}
+                            style={selectStyle}
+                          >
+                            <option value="">É requerente de...</option>
+                            {requerentesDisponiveis.map((r) => (
+                              <option key={r.requerenteId} value={r.requerenteId}>{r.nome}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={vincularComoRequerente}
+                            disabled={!requerenteEscolhidoId || vinculandoRequerente}
+                            className="shrink-0 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {vinculandoRequerente ? 'Vinculando…' : 'Vincular'}
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-[var(--text-muted)]">
+                          Esta pessoa já existe na árvore — só vincule se ela for de fato um dos requerentes cadastrados no processo.
+                        </p>
+                        {erroVinculoRequerente && <p className="text-xs text-red-600">{erroVinculoRequerente}</p>}
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">

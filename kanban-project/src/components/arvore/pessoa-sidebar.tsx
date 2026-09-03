@@ -44,6 +44,8 @@ interface PessoaSidebarProps {
   onAddFilho?: (pessoaId: number) => void
   onAddPai?: (pessoaId: number) => void
   onAddMae?: (pessoaId: number) => void
+  /** Desvincula (não apaga) o pai ou a mãe desta pessoa. */
+  onRemoveParent?: (pessoaId: number, tipo: 'pai' | 'mae') => void
   onAddConjuge?: (pessoaId: number) => void
   onAddDocumento?: (pessoaId: number) => void
   onEditDocumento?: (documento: DocumentoArvore) => void
@@ -532,19 +534,22 @@ function DocumentoCard({
 // ========================================
 // NOVO: Card de familiar clicável
 // ========================================
-function FamiliarCard({ 
-  familiar, 
-  relacao, 
+function FamiliarCard({
+  familiar,
+  relacao,
   extra,
-  onClick 
-}: { 
+  onClick,
+  onRemove,
+}: {
   familiar: PessoaArvore
   relacao: string
   extra?: React.ReactNode
-  onClick?: () => void 
+  onClick?: () => void
+  /** Presente só quando o vínculo pode ser desfeito (ex.: pai/mãe errados na importação). */
+  onRemove?: () => void
 }) {
   return (
-    <div 
+    <div
       className="flex items-center gap-3 p-3 bg-[var(--surface-secondary)] rounded-lg hover:bg-[var(--surface-secondary)] hover:ring-1 hover:ring-[var(--border-strong)] transition-all cursor-pointer group"
       onClick={onClick}
     >
@@ -556,6 +561,16 @@ function FamiliarCard({
         <p className="text-xs text-[var(--text-secondary)]">{relacao}</p>
         {extra}
       </div>
+      {onRemove && (
+        <button
+          type="button"
+          title={`Remover vínculo de ${relacao.toLowerCase()} (não apaga a pessoa)`}
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="p-1.5 rounded-md text-[var(--text-muted)] hover:bg-red-50 hover:text-red-700 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
       <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-amber-500 transition-colors" />
     </div>
   )
@@ -586,6 +601,7 @@ function ConteudoSidebar({
   onAddFilho,
   onAddPai,
   onAddMae,
+  onRemoveParent,
   onAddConjuge,
   onAddDocumento,
   onEditDocumento,
@@ -877,17 +893,19 @@ function ConteudoSidebar({
               {(pessoa.pai || pessoa.mae) ? (
                 <div className="space-y-2">
                   {pessoa.pai && (
-                    <FamiliarCard 
+                    <FamiliarCard
                       familiar={pessoa.pai}
                       relacao="Pai"
                       onClick={() => handleSelectFamiliar(pessoa.pai!)}
+                      onRemove={onRemoveParent ? () => onRemoveParent(pessoa.id, 'pai') : undefined}
                     />
                   )}
                   {pessoa.mae && (
-                    <FamiliarCard 
+                    <FamiliarCard
                       familiar={pessoa.mae}
                       relacao="Mãe"
                       onClick={() => handleSelectFamiliar(pessoa.mae!)}
+                      onRemove={onRemoveParent ? () => onRemoveParent(pessoa.id, 'mae') : undefined}
                     />
                   )}
                   {/* Botão para adicionar pai se não tem */}
