@@ -27,6 +27,7 @@ import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/service
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/services/materializar-fase"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
+import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
 import {
   fotografarObrigacoes,
   compararObrigacoes,
@@ -669,6 +670,26 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
   const proxima = await proximaFaseComCondicional(processoId, c.fases, c.processo.faseAtual)
   if (!proxima) {
     return { success: false, resultado: "REJEITADO", code: "SEM_PROXIMA_FASE", message: "Não há próxima fase (última fase do macro)", faseAtual: c.processo.faseAtual, correlationId }
+  }
+
+  // FASE "processo" (checklist + avanço manual, por definição do catálogo —
+  // `kind: "processo"`, ver isProcessoFase) NÃO avança pela varredura de
+  // segurança do cron. O cron existe para o gap de EVENTO das fases "documento"
+  // (ex.: pendência caiu por um caminho sem gancho e o processo ficou parado com
+  // o gate satisfeito). Fase "processo" não tem esse gap — toda conclusão real
+  // já é um clique explícito — e um checklist vazio (fase alcançada por
+  // movimentação manual, sem nenhum pedido aberto) é "0 exigido = 100%" por
+  // definição do gate, não "pronto para avançar sozinho". Foi assim que o
+  // processo 573 saiu de Retificação para Apostilamento sem ninguém pedir.
+  if (ctx.origem === "cron-reconciliacao") {
+    const faseAtualCode = phaseKeyToFaseCode(c.processo.faseAtual)
+    if (faseAtualCode && isProcessoFase(faseAtualCode)) {
+      return {
+        success: false, resultado: "REJEITADO", code: "AVANCO_MANUAL_OBRIGATORIO",
+        message: `Fase "${c.processo.faseAtual}" avança só manualmente — a reconciliação automática não avança fases do tipo "processo".`,
+        faseAtual: c.processo.faseAtual, correlationId,
+      }
+    }
   }
 
   // GATE canônico: decide pelo `canAdvance` da FUNÇÃO-BASE ÚNICA (computeGate), a MESMA

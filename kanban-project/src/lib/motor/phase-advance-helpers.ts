@@ -41,6 +41,9 @@ export type AdvanceFailureCode =
   | "BLOQUEADO"
   | "CONFLITO"
   | "INSTANCIACAO_FALHOU"
+  // Fase "processo" (kind: "processo" no catálogo) alcançou o gate satisfeito, mas
+  // só avança por ação explícita — a reconciliação automática (cron) não avança.
+  | "AVANCO_MANUAL_OBRIGATORIO"
   // A transição alteraria obrigação de outra fase — trava de domínio, rollback integral.
   | "INVARIANTE_OBRIGACOES"
 
