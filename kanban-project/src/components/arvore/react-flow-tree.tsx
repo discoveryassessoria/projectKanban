@@ -1379,21 +1379,37 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     
     pessoas.forEach(pessoa => {
       if (processedIds.has(pessoa.id)) return
-      
+
       const paiNaArvore = pessoa.paiId && processedIds.has(pessoa.paiId)
       const maeNaArvore = pessoa.maeId && processedIds.has(pessoa.maeId)
-      
-      if (paiNaArvore || maeNaArvore) {
+      // ASCENSÃO — o espelho exato da adoção acima, na direção oposta: um FILHO
+      // já desenhado revela o pai/mãe que ainda não entrou. Sem isto, um pai/mãe
+      // só alcançado pela caminhada descendente (`addAllDescendants`) — quando o
+      // filho é visitado ANTES dele — nunca ganhava a aresta até o filho: entrava
+      // só pelo laço de segurança final (linha ~1417), que desenha o card mas não
+      // a ligação de parentesco. Resultado: pai/mãe reais, corretos no banco
+      // (`paiId`/`maeId` da FK), aparecendo soltos no canvas.
+      const filhosNaArvore = findFilhos(pessoa).filter(f => processedIds.has(f.id))
+
+      if (paiNaArvore || maeNaArvore || filhosNaArvore.length > 0) {
         addPersonNode(pessoa, false, false)
         changed = true
-        
+
         if (paiNaArvore && pessoa.paiId) {
           addEdge(`person-${pessoa.id}`, `person-${pessoa.paiId}`, `edge-filho-${pessoa.id}-pai`, colors.neutral)
         }
         if (maeNaArvore && pessoa.maeId) {
           addEdge(`person-${pessoa.id}`, `person-${pessoa.maeId}`, `edge-filho-${pessoa.id}-mae`, colors.neutral)
         }
-        
+        filhosNaArvore.forEach(filho => {
+          if (filho.paiId === pessoa.id) {
+            addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-pai`, colors.neutral)
+          }
+          if (filho.maeId === pessoa.id) {
+            addEdge(`person-${filho.id}`, `person-${pessoa.id}`, `edge-filho-${filho.id}-mae`, colors.neutral)
+          }
+        })
+
         const conjugesPessoa = findConjuges(pessoa)
         conjugesPessoa.forEach(conjuge => {
           addPersonNode(conjuge, false, false)
