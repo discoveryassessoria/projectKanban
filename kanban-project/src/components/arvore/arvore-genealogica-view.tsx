@@ -8,6 +8,7 @@ import { jsPDF } from "jspdf"
 import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
+import { ExclusaoArvoreModal, type PlanoExclusaoArvoreUI } from '@/src/components/arvore/exclusao-arvore-modal'
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
@@ -37,6 +38,7 @@ import {
   Search,
   Sparkles,
   ImagePlus,
+  Trash2,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -76,6 +78,7 @@ interface ArvoreGenealogicaViewProps {
   processoId: number
   arvoreId?: number | null
   onArvoreCreated?: (arvoreId: number) => void
+  onArvoreExcluida?: () => void
   pessoaIdParaFocar?: number
   sidebarTabParaFocar?: string
   nomeFamilia?: string  // ✅ NOVA PROP
@@ -103,9 +106,10 @@ interface RespostaArvore {
 const SEM_PESSOAS: PessoaArvore[] = []
 
 export function ArvoreGenealogicaView({ 
-  processoId, 
-  arvoreId: initialArvoreId, 
+  processoId,
+  arvoreId: initialArvoreId,
   onArvoreCreated,
+  onArvoreExcluida,
   pessoaIdParaFocar,
   sidebarTabParaFocar,
   nomeFamilia,  // ✅ NOVA PROP
@@ -558,6 +562,7 @@ export function ArvoreGenealogicaView({
   }, [pessoas, pessoaPrincipal, nomeFamilia, idiomaPdf])
 
   const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
+  const [mostrarExclusaoArvore, setMostrarExclusaoArvore] = useState(false)
 
   // FRONTEIRA (ADR — Árvore como camada de projeção): a exclusão de Documento
   // saiu daqui.
@@ -601,6 +606,35 @@ export function ArvoreGenealogicaView({
     setSelectedPerson(null)
     await fetchArvore()
   }, [pessoaParaRemover, fetchArvore, setSelectedPerson])
+
+  // Excluir a ÁRVORE INTEIRA — mesma disciplina da remoção de uma pessoa
+  // (plano antes, execução recalcula), só que a rota é `DELETE /api/arvore/[id]`
+  // e o resultado, quando dá certo, é a árvore deixando de existir: `arvoreId`
+  // volta a `null` e a tela cai sozinha no estado "Criar Árvore Genealógica".
+  const carregarPlanoExclusaoArvore = useCallback(async (id: number): Promise<PlanoExclusaoArvoreUI | null> => {
+    const r = await authFetch(`/api/arvore/${id}/plano-exclusao`)
+    if (!r.ok) return null
+    return (await r.json()) as PlanoExclusaoArvoreUI
+  }, [])
+
+  const executarExclusaoArvore = useCallback(async (id: number, confirmacao: string) => {
+    const r = await authFetch(`/api/arvore/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmacao }),
+    })
+    if (!r.ok) {
+      const erro = await r.json().catch(() => ({}))
+      throw new Error(erro.error || 'Não foi possível excluir a árvore.')
+    }
+  }, [])
+
+  const handleArvoreExcluida = useCallback(() => {
+    setMostrarExclusaoArvore(false)
+    setSelectedPerson(null)
+    setArvoreId(null)
+    onArvoreExcluida?.()
+  }, [setSelectedPerson, onArvoreExcluida])
 
   const handleAddConjuge = (pessoa: PessoaArvore) => {
     setAddPersonType('conjuge')
@@ -1178,6 +1212,19 @@ export function ArvoreGenealogicaView({
           >
             {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
+
+          {/* Excluir árvore inteira — ação rara e irreversível, por isso separada
+              do resto do grupo e sempre atrás de confirmação (ver ExclusaoArvoreModal).
+              Só aparece com permissão e com uma árvore de fato para excluir. */}
+          {pode('arvore.excluir') && arvoreId && (
+            <button
+              className="p-2 rounded transition-colors text-red-300 hover:bg-red-950/40 hover:text-red-200"
+              onClick={() => setMostrarExclusaoArvore(true)}
+              title="Excluir árvore inteira"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -1397,6 +1444,17 @@ export function ArvoreGenealogicaView({
           onFechar={() => setPessoaParaRemover(null)}
           onConfirmar={confirmarRemocao}
           carregarPlano={carregarPlanoRemocao}
+        />
+      )}
+
+      {mostrarExclusaoArvore && arvoreId != null && (
+        <ExclusaoArvoreModal
+          key={arvoreId}
+          arvoreId={arvoreId}
+          onFechar={() => setMostrarExclusaoArvore(false)}
+          onExcluida={handleArvoreExcluida}
+          carregarPlano={carregarPlanoExclusaoArvore}
+          executar={executarExclusaoArvore}
         />
       )}
 

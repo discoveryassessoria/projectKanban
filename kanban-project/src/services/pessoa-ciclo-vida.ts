@@ -447,6 +447,66 @@ export async function analisarRemocaoPessoa(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// PLANO DA ÁRVORE INTEIRA — soma o plano de cada pessoa. Nenhum cálculo novo:
+// é o MESMO `analisarRemocaoPessoa` que a remoção individual usa, pessoa a
+// pessoa. A prévia (GET) e a execução (DELETE /api/arvore/[id]) chamam esta
+// mesma função — não existe segunda contagem.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface PessoaImpedidaExclusaoArvore {
+  pessoaId: number
+  pessoaNome: string
+  fatosProtegidos: FatoProtegido[]
+}
+
+export interface PlanoExclusaoArvore {
+  arvoreId: number
+  arvoreNome: string
+  totalPessoas: number
+  removiveis: RemoviveisPessoa
+  /** Pessoas com fato histórico: nenhuma pode ser hard-deletada → a árvore inteira fica bloqueada. */
+  impedidas: PessoaImpedidaExclusaoArvore[]
+  podeExcluir: boolean
+}
+
+export async function analisarExclusaoArvore(
+  arvoreId: number,
+  db: DB = prisma,
+): Promise<PlanoExclusaoArvore | null> {
+  const arvore = await db.arvore.findUnique({ where: { id: arvoreId }, select: { id: true, nome: true } })
+  if (!arvore) return null
+
+  const pessoas = await db.pessoa.findMany({ where: { arvoreId }, select: { id: true } })
+
+  const removiveis: RemoviveisPessoa = {
+    vinculoArvore: 0, vinculoProcesso: 0, unioes: 0, necessidades: 0, documentos: 0,
+    passos: 0, tarefas: 0, participantesFinanceiros: 0, receitasPrevistas: 0,
+    custosPrevistos: 0, obrigacoesPrevistas: 0, distribuicoes: 0,
+  }
+  const impedidas: PessoaImpedidaExclusaoArvore[] = []
+
+  for (const p of pessoas) {
+    const plano = await analisarRemocaoPessoa(p.id, db)
+    if (!plano) continue
+    for (const chave of Object.keys(removiveis) as (keyof RemoviveisPessoa)[]) {
+      removiveis[chave] += plano.removiveis[chave]
+    }
+    if (!plano.podeHardDelete) {
+      impedidas.push({ pessoaId: p.id, pessoaNome: plano.pessoaNome, fatosProtegidos: plano.fatosProtegidos })
+    }
+  }
+
+  return {
+    arvoreId,
+    arvoreNome: arvore.nome,
+    totalPessoas: pessoas.length,
+    removiveis,
+    impedidas,
+    podeExcluir: impedidas.length === 0,
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // EXECUÇÃO — transacional. Não existe meia exclusão.
 // ═══════════════════════════════════════════════════════════════════════════
 

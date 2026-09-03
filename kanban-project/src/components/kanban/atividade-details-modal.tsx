@@ -1139,6 +1139,10 @@ function ConteudoModal({
                 setArvoreIdLocal(novoArvoreId)
                 onSave?.()
               }}
+              onArvoreExcluida={() => {
+                setArvoreIdLocal(null)
+                onSave?.()
+              }}
               pessoaIdParaFocar={pessoaIdParaFocar}
               sidebarTabParaFocar={sidebarTabParaFocar}
               nomeFamilia={processo.nome}

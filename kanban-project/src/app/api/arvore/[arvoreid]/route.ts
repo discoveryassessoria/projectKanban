@@ -6,9 +6,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { PESSOA_ATIVA } from "@/src/lib/genealogia/vinculo-ativo"
-import { analisarRemocaoPessoa, removerPessoaDaArvore } from "@/src/services/pessoa-ciclo-vida"
+import { analisarExclusaoArvore, removerPessoaDaArvore } from "@/src/services/pessoa-ciclo-vida"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { removerFamiliaSeOrfa } from "@/src/services/familia"
+import { FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   const semPermissao = await verificarPermissao(request, "arvore.ver")
@@ -112,6 +113,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
+    // Ação irreversível de alto raio: exige a MESMA frase de confirmação do
+    // padrão de exclusão definitiva do resto do sistema (§ exclusão definitiva
+    // ADMIN) — digitada no cliente, revalidada aqui, nunca só no frontend.
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    if (String((body as Record<string, unknown>)?.confirmacao ?? "").trim() !== FRASE_CONFIRMACAO) {
+      return NextResponse.json(
+        { error: `Confirmação inválida. Digite exatamente "${FRASE_CONFIRMACAO}".` },
+        { status: 400 },
+      )
+    }
+
     // Excluir a ÁRVORE é excluir cada pessoa dela — pelo mesmo serviço canônico,
     // uma a uma. A versão anterior fazia `pessoa.deleteMany({ arvoreId })` e
     // reproduzia o defeito da exclusão individual multiplicado por N: a cadeia
@@ -119,31 +131,29 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     // sobrevivia inteira, porque as FKs para Pessoa são `onDelete: SetNull`.
     //
     // Se QUALQUER pessoa tiver fato histórico protegido, a árvore não é excluída:
-    // apagá-la destruiria a evidência. O erro diz quem impede e por quê.
+    // apagá-la destruiria a evidência. `analisarExclusaoArvore` é o MESMO motor
+    // que a prévia (`GET .../plano-exclusao`) usa — sem segunda contagem.
     const arvoreAlvo = await prisma.arvore.findUnique({ where: { id }, select: { familiaId: true } })
-    const pessoas = await prisma.pessoa.findMany({ where: { arvoreId: id }, select: { id: true } })
-
-    const impedidas: { pessoaId: number; nome: string; fatos: string[] }[] = []
-    for (const p of pessoas) {
-      const plano = await analisarRemocaoPessoa(p.id)
-      if (plano && !plano.podeHardDelete) {
-        impedidas.push({
-          pessoaId: p.id,
-          nome: plano.pessoaNome,
-          fatos: plano.fatosProtegidos.map((f) => f.descricao),
-        })
-      }
+    const plano = await analisarExclusaoArvore(id)
+    if (!plano) {
+      return NextResponse.json({ error: "Árvore não encontrada" }, { status: 404 })
     }
-    if (impedidas.length > 0) {
+    if (plano.impedidas.length > 0) {
       return NextResponse.json(
         {
           error: "Esta árvore tem histórico protegido e não pode ser excluída.",
           code: "FATO_PROTEGIDO_IMPEDE_HARD_DELETE",
-          impedidas,
+          impedidas: plano.impedidas.map((p) => ({
+            pessoaId: p.pessoaId,
+            nome: p.pessoaNome,
+            fatos: p.fatosProtegidos.map((f) => f.descricao),
+          })),
         },
         { status: 409 },
       )
     }
+
+    const pessoas = await prisma.pessoa.findMany({ where: { arvoreId: id }, select: { id: true } })
 
     // Cada pessoa sai pelo serviço canônico — que já reconcilia depois de commitar.
     // Esta rota NÃO tem limpeza nem reconciliação própria: se tivesse, voltaria a
