@@ -81,6 +81,12 @@ function getPhaseStatus(
   path: PhaseName[],
   needsRectification: boolean | null | undefined
 ): PhaseStatus {
+  // A fase em que o processo REALMENTE está vence qualquer heurística de
+  // caminho. Sem isto, um processo já dentro de "Retificação de registros"
+  // sem a Decisão da Análise Documental registrada (ex.: chegou lá por
+  // movimentação manual) ficava com a fase atual marcada "Condicional" — o
+  // operador não conseguia nem ver em que fase o processo estava.
+  if (title === currentPhase) return "atual"
   if (!path.includes(title)) {
     // Fase fora do caminho ativo. Se é condicional E a Análise ainda NÃO
     // decidiu (null), ela é "condicional" (pode entrar). Só vira "pulada"
@@ -92,9 +98,11 @@ function getPhaseStatus(
     return "pulada"
   }
   if (completedPhases.includes(title)) return "concluida"
-  if (title === currentPhase) return "atual"
-  const ci = path.indexOf(currentPhase as PhaseName)
-  const pi = path.indexOf(title)
+  // Ordem GLOBAL (não a do `path`) — a fase atual pode estar fora do `path`
+  // pela mesma razão do bloco acima (condicional sem decisão registrada), e
+  // `path.indexOf` devolveria -1, jogando toda fase anterior para "futura".
+  const ci = phaseIndex(currentPhase)
+  const pi = phaseIndex(title)
   if (pi > ci) return "futura"
   return "bloqueada"
 }
@@ -210,8 +218,15 @@ export function WorkflowMacroTrilha({
                 onClick={() => onSelectPhase?.(title)}
                 disabled={!clicavel}
                 title={clicavel ? "Ver esta fase" : undefined}
-                className={`flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] transition-colors ${
-                  clicavel ? "cursor-pointer hover:bg-[var(--surface-secondary)]" : "cursor-default"
+                className={`flex flex-col items-center gap-1 w-full py-1.5 px-1 rounded-xl border transition-colors ${
+                  clicavel ? "cursor-pointer" : "cursor-default"
+                } ${
+                  // FASE REAL do processo: quadro próprio (borda + fundo + sombra), não
+                  // só o texto do badge — é o que dá pra achar "em qual fase está" num
+                  // relance, sem ler as 10 etiquetas.
+                  st === "atual"
+                    ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 shadow-[var(--elev-2)]"
+                    : `border-transparent bg-transparent ${clicavel ? "hover:bg-[var(--surface-secondary)]" : ""}`
                 } ${consultando ? "ring-2 border-[var(--border-default)] bg-[var(--surface-secondary)]" : ""}`}
               >
                 {/* dot + conector */}
