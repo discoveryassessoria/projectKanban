@@ -472,68 +472,6 @@ function FaixaIndicadores({ data }: { data: HomeData }) {
   )
 }
 
-// ===========================================================================
-// ROSCA DE SLA — as quatro faixas que o ResumoSla já entrega.
-// SVG puro: um gráfico destes não justifica biblioteca.
-// ===========================================================================
-function RoscaSla({ data }: { data: HomeData }) {
-  const r = data.sla?.resumo
-  if (!r) return null
-  const faixas = [
-    { rotulo: "No prazo",       valor: r.noPrazo,    cor: "var(--success)" },
-    { rotulo: "Próximos 7 dias", valor: r.proximos7,  cor: "var(--accent-primary)" },
-    { rotulo: "Vencem hoje",    valor: r.vencemHoje, cor: "var(--warning)" },
-    { rotulo: "Atrasados",      valor: r.atrasados,  cor: "var(--danger)" },
-  ]
-  const total = faixas.reduce((s, f) => s + f.valor, 0)
-  const RAIO = 52, ESPESSURA = 12
-  const circ = 2 * Math.PI * RAIO
-  let percorrido = 0
-
-  return (
-    <BlocoCard>
-      <BlocoHeader titulo="SLA dos processos" descricao={`${total} processo${total === 1 ? "" : "s"} avaliado${total === 1 ? "" : "s"}`} />
-      <div className="mt-4 flex items-center gap-5">
-        <div className="relative shrink-0">
-          <svg width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Distribuição de SLA">
-            <circle cx="64" cy="64" r={RAIO} fill="none" stroke="var(--surface-tertiary)" strokeWidth={ESPESSURA} />
-            {total > 0 && faixas.map((f) => {
-              if (f.valor === 0) return null
-              const traco = (f.valor / total) * circ
-              const el = (
-                <circle
-                  key={f.rotulo} cx="64" cy="64" r={RAIO} fill="none"
-                  stroke={f.cor} strokeWidth={ESPESSURA} strokeLinecap="butt"
-                  strokeDasharray={`${traco} ${circ - traco}`}
-                  strokeDashoffset={-percorrido}
-                  transform="rotate(-90 64 64)"
-                />
-              )
-              percorrido += traco
-              return el
-            })}
-          </svg>
-          <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-            <div>
-              <div className="text-[26px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">{r.noPrazo}</div>
-              <div className="text-[11px] text-[var(--text-muted)]">No prazo</div>
-            </div>
-          </div>
-        </div>
-        <ul className="min-w-0 flex-1 space-y-2">
-          {faixas.map((f) => (
-            <li key={f.rotulo} className="flex items-center gap-2.5 text-[13px]">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: f.cor }} aria-hidden />
-              <span className="w-7 shrink-0 text-right font-semibold tabular-nums text-[var(--text-primary)]">{f.valor}</span>
-              <span className="truncate text-[var(--text-secondary)]">{f.rotulo}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </BlocoCard>
-  )
-}
-
 export function HomeContent({ data }: { data: HomeData }) {
   const semAcesso =
     !data.permissions.verProcessos && !data.permissions.verTarefas && !data.permissions.verEventos
@@ -560,7 +498,6 @@ export function HomeContent({ data }: { data: HomeData }) {
             <div className="space-y-5">
               <Alertas data={data} />
               <AgendaBloco data={data} />
-              <RoscaSla data={data} />
             </div>
           </div>
 
