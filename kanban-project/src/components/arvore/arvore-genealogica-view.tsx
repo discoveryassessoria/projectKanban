@@ -2383,6 +2383,11 @@ function EditPersonModal({
                     principal (maior/menor); demais é somente leitura. */}
                 {jaEhRequerente ? (
                   <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
+                    {/* "sim" é o estado de quem foi vinculado como requerente sem ainda
+                        ter maioridade classificada (2º+ requerente vinculado na mesma
+                        árvore — só o 1º vira "maior" automaticamente). Fica listado pra
+                        o select não cair num valor sem option correspondente. */}
+                    {requerente === 'sim' && <option value="sim">Sim - a classificar</option>}
                     <option value="maior">Sim - Maior de idade</option>
                     <option value="menor">Sim - Menor de idade</option>
                   </select>

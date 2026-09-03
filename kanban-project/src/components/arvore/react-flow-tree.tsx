@@ -243,13 +243,22 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   const isFalecido = pessoa.vivo === false
 
   // Verificar se é requerente
+  //
+  // `requerente` também aceita "sim" — quando mais de uma pessoa é vinculada
+  // como requerente na mesma árvore, só a PRIMEIRA vira "maior" (auto-
+  // principal); as demais entram como "sim" até alguém classificar
+  // maior/menor no Editar Pessoa. Sem tratar "sim" aqui, essas pessoas
+  // ficavam com o vínculo gravado certo no banco mas SEM NENHUM selo na
+  // tela — pareciam não-requerentes mesmo estando marcadas.
   const requerente = (pessoa as any).requerente
-  const isRequerente = requerente === 'maior' || requerente === 'menor'
-  const requerenteLabel = requerente === 'maior' 
-    ? 'Requerente maior de idade' 
-    : requerente === 'menor' 
-      ? 'Requerente menor de idade' 
-      : null
+  const isRequerente = requerente === 'maior' || requerente === 'menor' || requerente === 'sim'
+  const requerenteLabel = requerente === 'maior'
+    ? 'Requerente maior de idade'
+    : requerente === 'menor'
+      ? 'Requerente menor de idade'
+      : requerente === 'sim'
+        ? 'Requerente'
+        : null
 
   // Verificar se tem cônjuge
   const temConjuge = unioes.length > 0
