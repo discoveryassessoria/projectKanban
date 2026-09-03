@@ -126,6 +126,32 @@ export interface VisitaDoDocumento {
 }
 
 export async function visitaAtualDoDocumento(documentoId: number): Promise<VisitaDoDocumento | null> {
+  // 1) O documento JÁ TEM passo materializado (em qualquer fase)? A visita é a
+  //    instância ONDE O TRABALHO REALMENTE ESTÁ — nunca a fase atual do processo.
+  //
+  //    Sem isto: um documento de Genealogia continua com passo `DISPONIVEL`
+  //    depois de o processo ser movido manualmente para Retificação (histórico
+  //    preservado, tarefa aberta, exatamente como pedido) — mas o escopo aqui
+  //    perguntava pela fase ATUAL, que não tem nada deste documento. A tela dizia
+  //    "sem Workflow Interno configurado" para uma tarefa real, pendente,
+  //    clicável em todo o resto do sistema. A tarefa sobrevivia; ficava
+  //    congelada — visível, mas impossível de operar. Incidente do processo 573.
+  const passoExistente = await prisma.phaseWorkflowStepInstance.findFirst({
+    where: { documentoId, status: { notIn: INATIVOS } },
+    orderBy: { id: "desc" },
+    select: { workflowInstanceId: true, faseMacroKey: true, ciclo: true, processoId: true },
+  })
+  if (passoExistente) {
+    return {
+      processoId: passoExistente.processoId,
+      faseMacroKey: passoExistente.faseMacroKey,
+      workflowInstanceId: passoExistente.workflowInstanceId,
+      ciclo: passoExistente.ciclo,
+    }
+  }
+
+  // 2) SEM passo nenhum ainda: aqui, e só aqui, "abrir pela primeira vez"
+  //    materializa — na fase ATUAL do processo, como sempre foi.
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
     select: { pessoa: { select: { arvore: { select: { processos: { select: { id: true, faseAtualKey: true } } } } } } },
