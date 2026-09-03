@@ -290,6 +290,22 @@ export function ArvoreGenealogicaView({
       document.body.style.zoom = '100%'
 
     try {
+      // ENQUADRAR A ÁRVORE INTEIRA ANTES DE CAPTURAR.
+      //
+      // A captura é um screenshot do DOM (`toPng` sobre `.react-flow`), não uma
+      // reconstrução a partir dos dados — ela reproduz fielmente o zoom/pan que
+      // o canvas estava na tela no momento do clique. Sem isto, o PDF saía
+      // enquadrado do jeito que o usuário deixou a tela, cortando quem estivesse
+      // fora da viewport visível.
+      //
+      // `enquadrar([])` já existe e já é usado com esse propósito exato (ver o
+      // "sair do modo linhagem", mais abaixo) — chamar sem ids ajusta pra TODOS
+      // os nós. `fitView` não devolve uma Promise que resolve ao fim da
+      // transição; a duração é fixa (500ms) na implementação do ref, então
+      // esperamos esse tempo antes de seguir para a captura.
+      reactFlowTreeRef.current?.enquadrar([])
+      await new Promise(resolve => setTimeout(resolve, 550))
+
       const { toPng } = await import('html-to-image')
 
       const reactFlowContainer = treeContainerRef.current.querySelector('.react-flow') as HTMLElement
