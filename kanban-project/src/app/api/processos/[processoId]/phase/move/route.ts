@@ -192,6 +192,10 @@ export async function POST(
       correlationId: typeof body?.correlationId === "string" ? body.correlationId : undefined,
       solicitadoPorId: usuario.userId,
       origem: typeof body?.origem === "string" && body.origem === "KANBAN_DRAG_DROP" ? "kanban-drag" : "move-route",
+      // Esta é a porta de movimentação manual (admin) — nunca a do Retrocesso. As
+      // fases anteriores devem continuar existindo, abertas e regularizáveis uma a
+      // uma; nada aqui pode concluir, cancelar ou anular o que ficou pra trás.
+      preservarHistorico: true,
     })
 
     if (r.success) {

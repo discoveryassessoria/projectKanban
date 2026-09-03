@@ -27,6 +27,8 @@ import { resultadoDaOperacao, exigeJustificativa } from "../src/lib/motor/phase-
 import { movePhaseManual } from "../src/lib/motor/phase-advance"
 import { MOTIVOS_MOVIMENTACAO, motivoValido, normalizarJustificativa, JUSTIFICATIVA_MIN, JUSTIFICATIVA_MAX } from "../src/lib/motor/motivos-movimentacao"
 import { reconciliarFaseAtiva } from "../src/services/reconciliar-fase"
+import { concluirTarefa } from "../src/services/task-step-sync"
+import { tentarAvancoAutomaticoSeFaseAtual } from "../src/lib/motor/auto-avanco"
 import { garantirOferta } from "./_fixture-oferta"
 
 const ROOT = join(__dirname, "..")
@@ -96,9 +98,16 @@ check("a rota não decide regra de negócio: delega ao motor", rota.includes("mo
 check("justificativa e motivo ausentes viram 422", /MISSING_JUSTIFICATION: 422/.test(rota) && /MISSING_REASON: 422/.test(rota))
 
 check("o motor expõe movePhaseManual", motor.includes("export async function movePhaseManual"))
-check("a fase de origem é SUPERSEDIDA, nunca concluída", /operacao: "MOVER"[\s\S]{0,600}encerramento: "SUPERSEDER"/.test(motor))
+// A fase de origem NUNCA é concluída ao mover (CONCLUIR nunca aparece nesta operação):
+// por padrão é SUPERSEDIDA; com `preservarHistorico` (a Movimentação Manual do admin,
+// para preservar tarefas de fases anteriores regularizáveis depois) fica intocada
+// (NENHUM) — a escolha é explícita, nunca um terceiro modo inventado.
+check(
+  "a fase de origem nunca é CONCLUÍDA ao mover — SUPERSEDIDA por padrão, preservada (NENHUM) com preservarHistorico",
+  /operacao: "MOVER"[\s\S]{0,800}encerramento: preservarHistorico \? "NENHUM" : "SUPERSEDER"/.test(semComentarios(motor)),
+)
 check("o evento de fase é próprio (FASE_MOVIDA)", motor.includes('eventoFaseTipo: "FASE_MOVIDA"'))
-check("`forcado` NÃO é usado para marcar a movimentação manual", /operacao: "MOVER"[\s\S]{0,900}forcado: false/.test(motor))
+check("`forcado` NÃO é usado para marcar a movimentação manual", /operacao: "MOVER"[\s\S]{0,800}forcado: false/.test(semComentarios(motor)))
 check("a movimentação não consulta o gate", !/movePhaseManual[\s\S]{0,3000}calcularPendencias\([\s\S]{0,200}blocking/.test(motor))
 check("mover para a fase atual é rejeitado (isso é reabertura)", motor.includes("Para reiniciar o ciclo da fase atual, use a reabertura."))
 check("fase-alvo tem de existir no macro DO PROCESSO", motor.includes("Fase-alvo inexistente no macro do processo"))
@@ -160,6 +169,101 @@ check("a ação do menu é gated pela mesma permissão", modalProcesso.includes(
 check("a ação do menu usa o MESMO modal e endpoint", modalProcesso.includes('origem="MENU_PROCESSO"'))
 check("tentativa negada é auditada", rota.includes("auditarTentativaNegada") && rota.includes("negado: true"))
 check("auditar a negativa não pode derrubar o 403", rota.includes("// Auditar a negativa não pode derrubar a negativa"))
+
+// ============================================================
+console.log("\n(C6) Preservação de histórico — fases anteriores existem, disponíveis, sem auto-avanço")
+// ============================================================
+//
+// Regra do administrador: mover manualmente o processo pra frente NUNCA pode
+// concluir, cancelar, anular, marcar como não aplicável, apagar, resetar ou
+// recriar tarefa de fase anterior — elas continuam existindo e disponíveis pra
+// serem regularizadas manualmente, uma a uma, sem mexer na fase atual do processo.
+
+const autoAvanco = read("src/lib/motor/auto-avanco.ts")
+const rotaConcluirTarefa = read("src/app/api/tarefas/[tarefaId]/concluir/route.ts")
+const retrocesso = read("src/services/retrocesso-de-fase.ts")
+const recalcularFase = read("src/lib/process-stage/recalcular-fase.ts")
+
+check("MoveInput ganhou o parâmetro opcional preservarHistorico", motor.includes("preservarHistorico?: boolean"))
+check("só a rota de movimentação manual liga preservarHistorico", rota.includes("preservarHistorico: true"))
+check(
+  "o Retrocesso (congelado) NÃO usa preservarHistorico — comportamento anterior intocado",
+  !retrocesso.includes("preservarHistorico"),
+)
+
+check(
+  "com preservarHistorico, fases intermediárias puladas são materializadas pelo materializador único",
+  /async function materializarFasesPuladas[\s\S]{0,2500}materializarExecucaoDaFase\(/.test(semComentarios(motor)) &&
+    motor.includes('materializarFasesPuladas(processoId, c.fases, faseOrigem, faseAlvo'),
+)
+check(
+  "a materialização das fases puladas é idempotente (pula fase já visitada, não duplica)",
+  /materializarFasesPuladas[\s\S]{0,1500}if \(jaExiste\) continue/.test(semComentarios(motor)),
+)
+check(
+  "só materializa fases puladas quando o destino é POSTERIOR à origem",
+  /ordemDestino <= ordemOrigem\) return/.test(semComentarios(motor)),
+)
+
+check(
+  "existe o gancho de auto-avanço escopado à fase ATUAL (não reage a conclusão de tarefa histórica)",
+  autoAvanco.includes("export async function tentarAvancoAutomaticoSeFaseAtual"),
+)
+check(
+  "o guard compara a fase da unidade concluída com Processo.faseAtualKey antes de tentar avançar",
+  /tentarAvancoAutomaticoSeFaseAtual[\s\S]{0,600}processo\.faseAtualKey !== faseMacroKeyDaUnidade/.test(semComentarios(autoAvanco)),
+)
+check(
+  "a rota de concluir tarefa usa o gancho escopado, não o incondicional",
+  rotaConcluirTarefa.includes("tentarAvancoAutomaticoSeFaseAtual(") && !rotaConcluirTarefa.includes("tentarAvancoAutomatico(tarefaAtual"),
+)
+check(
+  "recalcularFaseDoProcesso aceita a fase de origem e recusa avançar se não for a atual",
+  recalcularFase.includes("faseMacroKeyOrigem?: string | null") &&
+    recalcularFase.includes("faseMacroKeyOrigem !== processo.faseAtualKey"),
+)
+
+// A Central de Tarefas conclui pela porta `concluirEtapa` (lib/operacional/tarefa-etapa.ts),
+// NÃO por `concluirTarefa` — é uma porta diferente do gancho de auto-avanço, e por isso
+// precisou do MESMO guard aplicado separadamente aqui.
+const tarefaEtapa = read("lib/operacional/tarefa-etapa.ts")
+const rotaNecessidade = read("src/app/api/processos/[processoId]/necessidades/[necessidadeId]/route.ts")
+
+check(
+  "concluirEtapa (a porta que a Central de Tarefas realmente usa) também usa o gancho escopado",
+  tarefaEtapa.includes("tentarAvancoAutomaticoSeFaseAtual(processoAfetado, faseMacroKeyAfetada)") &&
+    !tarefaEtapa.includes("tentarAvancoAutomatico(processoAfetado)"),
+)
+check(
+  "a transição de necessidade documental usa o gancho escopado por necessidade",
+  rotaNecessidade.includes("tentarAvancoAutomaticoSeNecessidadeDaFaseAtual(isNaN(pid) ? null : pid, id)"),
+)
+
+// Varredura adicional: TODO chamador que conclui algo de uma fase/necessidade
+// específica e depois tenta avançar precisa do guard — não só os dois primeiros
+// achados. `concluirFaseBespokeEAvancar` (Análise/Apostilamento/Tradução/
+// Retificação/Emissão Retificada) e os dois serviços que atendem necessidade por
+// fora da rota HTTP (Operação Antecipada, Tarefa Transversal) tinham o mesmo bug.
+check(
+  "concluirFaseBespokeEAvancar (fases bespoke: Análise, Apostilamento, Tradução...) usa o gancho escopado por fase",
+  autoAvanco.includes("await tentarAvancoAutomaticoSeFaseAtual(processoId, faseMacroKey)"),
+)
+check(
+  "existe o gancho escopado por NECESSIDADE (Operação Antecipada / Tarefa Transversal não têm a fase à mão)",
+  autoAvanco.includes("export async function tentarAvancoAutomaticoSeNecessidadeDaFaseAtual"),
+)
+const operacaoAntecipada = read("src/services/operacao-antecipada.ts")
+const tarefaTransversal = read("src/services/tarefa-transversal.ts")
+check(
+  "Operação Antecipada usa o gancho escopado por necessidade (preserva o fallback sem necessidade)",
+  operacaoAntecipada.includes("tentarAvancoAutomaticoSeNecessidadeDaFaseAtual(op.processoId, op.necessidadeId)") &&
+    operacaoAntecipada.includes("tentarAvancoAutomatico(op.processoId)"),
+)
+check(
+  "Tarefa Transversal usa o gancho escopado por necessidade",
+  tarefaTransversal.includes("tentarAvancoAutomaticoSeNecessidadeDaFaseAtual(t.processoId, t.necessidadeId)") &&
+    !tarefaTransversal.includes("tentarAvancoAutomatico(t.processoId)"),
+)
 
 // ============================================================
 // (B) COMPORTAMENTO — banco real
@@ -319,6 +423,75 @@ async function main() {
   check("nenhuma recusa mexeu na fase do processo", faseFinal?.faseAtualKey === "analise_documental")
   const logsRecusa = await prisma.phaseAdvanceLog.count({ where: { processoId: processo.id, resultado: "MOVIDO" } })
   check("recusa NÃO gera registro de movimentação", logsRecusa === 3, String(logsRecusa))
+
+  console.log("\n(B6) preservarHistorico: origem intocada, MÚLTIPLAS intermediárias puladas materializadas, sem auto-avanço em histórico")
+  // Processo PRÓPRIO, do zero: nasce em "genealogia" e salta direto pra última fase,
+  // pulando emissao_documental, analise_documental E retificacao_registros — nenhuma
+  // delas visitada antes, pra provar a materialização FRESCA (não o atalho idempotente).
+  const processo2 = await prisma.processo.create({
+    data: { nome: "Processo Mover B6", codigo: "T-MOV-B6", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+  })
+  await reconciliarFaseAtiva(processo2.id)
+
+  const origemAntes = await prisma.phaseWorkflowInstance.findFirst({
+    where: { processoId: processo2.id, faseMacroKey: "genealogia" },
+    orderBy: { ciclo: "desc" }, select: { id: true, status: true },
+  })
+  check("(setup B6) fase de origem está ATIVA antes do salto", origemAntes?.status === "ATIVO", String(origemAntes?.status))
+
+  const tarefaOrigemAntes = await prisma.tarefa.findFirst({
+    where: { workflowInstanceId: origemAntes?.id ?? -1, concluida: false },
+    select: { id: true },
+  })
+  check("(setup B6) existe tarefa aberta na fase de origem", tarefaOrigemAntes != null)
+
+  const puladasAntes = ["emissao_documental", "analise_documental", "retificacao_registros"]
+  const semIntermediariasAntes = await prisma.phaseWorkflowInstance.count({
+    where: { processoId: processo2.id, faseMacroKey: { in: puladasAntes } },
+  })
+  check("(setup B6) as 3 fases que serão puladas ainda não existem pra este processo", semIntermediariasAntes === 0, String(semIntermediariasAntes))
+
+  const r4 = await movePhaseManual(processo2.id, {
+    faseAlvo: "emissao_documental_retificada",
+    justificativa: "Processo chegou pronto pra fase final; fases anteriores serão regularizadas depois.",
+    motivoCodigo: "CORRECAO_CADASTRO", solicitadoPorId: usuario.id, origem: "teste",
+    preservarHistorico: true,
+  })
+  check("movimentação com preservarHistorico é aceita", r4.success === true, JSON.stringify(r4))
+  const p4 = await prisma.processo.findUnique({ where: { id: processo2.id }, select: { faseAtualKey: true } })
+  check("a fase atual pulou direto pro destino (emissao_documental_retificada)", p4?.faseAtualKey === "emissao_documental_retificada", String(p4?.faseAtualKey))
+
+  const origemDepois = await prisma.phaseWorkflowInstance.findUnique({
+    where: { id: origemAntes?.id ?? -1 }, select: { status: true, supersededAt: true, completedAt: true },
+  })
+  check("a fase de origem NÃO foi supersedida (preservarHistorico)", origemDepois?.status === "ATIVO" && origemDepois?.supersededAt === null, JSON.stringify(origemDepois))
+
+  const passosOrigemSupersedidos = await prisma.phaseWorkflowStepInstance.count({
+    where: { workflowInstanceId: origemAntes?.id ?? -1, status: "SUPERSEDIDO" },
+  })
+  check("nenhum passo da fase de origem foi supersedido", passosOrigemSupersedidos === 0, String(passosOrigemSupersedidos))
+
+  for (const faseKey of puladasAntes) {
+    const intermediaria = await prisma.phaseWorkflowInstance.findFirst({
+      where: { processoId: processo2.id, faseMacroKey: faseKey }, select: { id: true, status: true },
+    })
+    check(`a fase pulada "${faseKey}" FOI materializada do zero`, intermediaria != null, JSON.stringify(intermediaria))
+    const passosIntermediaria = await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: intermediaria?.id ?? -1 } })
+    check(`"${faseKey}" tem passos reais`, passosIntermediaria > 0, String(passosIntermediaria))
+    const tarefasIntermediaria = await prisma.tarefa.count({ where: { workflowInstanceId: intermediaria?.id ?? -1 } })
+    check(`"${faseKey}" tem tarefas reais, disponíveis pra regularizar depois`, tarefasIntermediaria > 0, String(tarefasIntermediaria))
+  }
+
+  // Regra 3: concluir uma tarefa HISTÓRICA não pode mexer na fase atual do processo.
+  const rConclusao = tarefaOrigemAntes ? await concluirTarefa(tarefaOrigemAntes.id, { origem: "USER", usuarioId: usuario.id }) : null
+  check("a tarefa histórica pôde ser concluída (não travada por supersessão)", rConclusao?.success === true, JSON.stringify(rConclusao))
+  await tentarAvancoAutomaticoSeFaseAtual(processo2.id, "genealogia", "teste-b6")
+  const pDepoisDeConcluir = await prisma.processo.findUnique({ where: { id: processo2.id }, select: { faseAtualKey: true } })
+  check(
+    "concluir tarefa da fase histórica NÃO mudou a fase atual do processo",
+    pDepoisDeConcluir?.faseAtualKey === "emissao_documental_retificada",
+    String(pDepoisDeConcluir?.faseAtualKey),
+  )
 
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
   if (falhas.length > 0) {

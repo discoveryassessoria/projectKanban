@@ -10,7 +10,7 @@ import { Prisma, StatusOperacaoAntecipada } from "@prisma/client"
 import { getAdapter } from "@/src/lib/operacoes/catalogo"
 import type { ResultadoAvaliacao } from "@/src/lib/operacoes/tipos"
 import { atenderNecessidade } from "@/src/services/necessidade-documental"
-import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
+import { tentarAvancoAutomatico, tentarAvancoAutomaticoSeNecessidadeDaFaseAtual } from "@/src/lib/motor/auto-avanco"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 
 const INSTANCIA_ATIVA = ["ATIVO", "AGUARDANDO", "BLOQUEADO"] as const
@@ -196,7 +196,15 @@ export async function avaliarOperacaoAntecipada(
     await atenderNecessidade(op.necessidadeId)                 // idempotente (garante status ATENDIDA)
     await audit("NECESSIDADE_ATENDIDA", id, `Necessidade ${op.necessidadeId} atendida por operação antecipada${podeVincular ? " (doc oficial)" : " (documento de apoio)"}; passos oficiais concluídos: ${prop.concluidos}`, opts.usuarioId)
   }
-  await tentarAvancoAutomatico(op.processoId)                  // BlockingEngine (computeGate) → PhaseAdvance
+  // Escopado à fase ATUAL só quando há necessidade (é ela que diz de que fase é o
+  // trabalho): se a necessidade não tiver etapa viva na fase corrente do processo
+  // (ex.: antecipação sobre uma fase já reposicionada/histórica), não há avanço a
+  // reavaliar por aqui. Sem necessidade associada, o comportamento é o de sempre.
+  if (op.necessidadeId != null) {
+    await tentarAvancoAutomaticoSeNecessidadeDaFaseAtual(op.processoId, op.necessidadeId)
+  } else {
+    await tentarAvancoAutomatico(op.processoId)                // BlockingEngine (computeGate) → PhaseAdvance
+  }
   await audit("CONCLUIDA", id, `Objetivo atingido. ${opts.resultadoObtido ?? ""}`.trim(), opts.usuarioId)
   return { status: StatusOperacaoAntecipada.CONCLUIDA }
 }

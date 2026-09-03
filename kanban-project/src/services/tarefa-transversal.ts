@@ -14,7 +14,7 @@ import { prisma } from "@/lib/prisma"
 import { criarTarefaManual, concluirTarefaSemWorkflow, cancelarTarefa } from "@/lib/operacional/tarefa-ciclo"
 import { type FaseCode } from "@prisma/client"
 import { atenderNecessidade } from "@/src/services/necessidade-documental"
-import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
+import { tentarAvancoAutomaticoSeNecessidadeDaFaseAtual } from "@/src/lib/motor/auto-avanco"
 import { phaseKeyToFaseCode, FASES } from "@/src/lib/process-stage/fases-catalog"
 
 const INSTANCIA_ATIVA = ["ATIVO", "AGUARDANDO", "BLOQUEADO"] as const
@@ -147,7 +147,9 @@ export async function concluirTarefaTransversal(
   if (opts.resolveuNecessidade && t.necessidadeId != null) {
     await atenderNecessidade(t.necessidadeId) // motor oficial da necessidade
     await audit("NECESSIDADE_RESOLVIDA", tarefaId, `Necessidade ${t.necessidadeId} → ATENDIDA por transversal`, opts.usuarioId)
-    if (t.processoId) await tentarAvancoAutomatico(t.processoId) // BlockingEngine + PhaseAdvanceService (oficiais)
+    // Escopado à fase ATUAL: a transversal referencia uma necessidade de origem que
+    // pode não estar mais na fase corrente do processo (regularização histórica).
+    if (t.processoId) await tentarAvancoAutomaticoSeNecessidadeDaFaseAtual(t.processoId, t.necessidadeId) // BlockingEngine + PhaseAdvanceService (oficiais)
   }
   return t
 }

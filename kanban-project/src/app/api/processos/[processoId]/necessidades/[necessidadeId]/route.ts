@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { marcarNaoLocalizada, reabrir, retornoGenealogia, dispensarNecessidade, atenderNecessidade, iniciarAtendimentoNecessidade } from "@/src/services/necessidade-documental"
-import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
+import { tentarAvancoAutomaticoSeNecessidadeDaFaseAtual } from "@/src/lib/motor/auto-avanco"
 import { notificarNecessidadeTransicionada } from "@/src/services/registral/gancho-documental"
 
 // GET - detalhe da necessidade + histórico (eventos) + documentos que a atendem
@@ -54,7 +54,12 @@ export async function PATCH(
     // AUTO-AVANÇO: necessidade é ENTRADA do gate da fase. Quando uma transição
     // completa/dispensa uma necessidade obrigatória, o card deve ir sozinho — sem
     // arrastar. Dispara após a transição (gancho idempotente e gated).
-    const avancar = () => tentarAvancoAutomatico(isNaN(pid) ? null : pid)
+    //
+    // ESCOPADO À FASE ATUAL: uma necessidade também pode pertencer só a uma etapa de
+    // fase HISTÓRICA (regularização manual de fase anterior, processo já reposicionado
+    // adiante) — transicioná-la não pode reavaliar nem mover a fase corrente. Só
+    // dispara se existir etapa desta necessidade na fase ATUAL do processo.
+    const avancar = () => tentarAvancoAutomaticoSeNecessidadeDaFaseAtual(isNaN(pid) ? null : pid, id)
 
     // MRG — RECONCILIAÇÃO CONTÍNUA: transição de necessidade muda o que está
     // comprovado, e portanto a linhagem. Publica evento (best-effort, fora do

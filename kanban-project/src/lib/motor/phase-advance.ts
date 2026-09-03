@@ -79,6 +79,22 @@ export interface MoveInput extends AdvanceCtx {
   faseAlvo: string
   justificativa: string
   motivoCodigo: string
+  /**
+   * PRESERVA O HISTÓRICO em vez de supersedê-lo.
+   *
+   * A instância de origem NÃO é supersedida (fica exatamente como estava — passos e
+   * tarefas continuam abertos e concluíveis depois, um por um, na fase deles), e as
+   * fases INTERMEDIÁRIAS entre origem e destino — quando o destino é posterior —
+   * são materializadas pelo mesmo materializador único (`materializarExecucaoDaFase`),
+   * disponíveis para regularização manual. Sem isto, mover direto da Fase 1 pra Fase 7
+   * nunca cria nada nas fases 2-6: elas ficam impossíveis de regularizar depois porque
+   * nunca existiram.
+   *
+   * Usado pela Movimentação Manual (`processos.moverFaseManual`). O Retrocesso
+   * (`retrocesso-de-fase.ts`, CONGELADO) não passa isto e mantém o comportamento
+   * anterior — SUPERSEDER, sem materializar intermediárias — intocado.
+   */
+  preservarHistorico?: boolean
 }
 
 export interface AdvanceOk {
@@ -871,14 +887,20 @@ export async function movePhaseManual(processoId: number, input: MoveInput): Pro
   // movimentação manual não é gateada por elas. Sem isso, o registro não diria de
   // onde o processo saiu.
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
+  const preservarHistorico = input.preservarHistorico === true
+  const faseOrigem = c.processo.faseAtual
 
-  return executarPlano({
-    operacao: "MOVER", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
+  const resultado = await executarPlano({
+    operacao: "MOVER", processoId, faseAtual: faseOrigem, lockVersion: c.processo.lockVersion,
     faseDestino: faseAlvo, novaFaseAtualKey: faseAlvo, cicloAlvo,
+    origemInstancia: "MANUAL", fonteMaterializacao: "MOVIMENTACAO_MANUAL",
     // SUPERSEDER, nunca CONCLUIR: mover não conclui a fase de origem. Marcá-la como
     // concluída faria o histórico afirmar um trabalho que não aconteceu.
-    origemInstancia: "MANUAL", fonteMaterializacao: "MOVIMENTACAO_MANUAL",
-    encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_MOVIDA",
+    //
+    // Com `preservarHistorico`, nem SUPERSEDER: a instância de origem fica intocada
+    // (modo NENHUM, já suportado pelo motor) — as tarefas dela continuam abertas e
+    // concluíveis, em vez de encerradas num estado terminal sem volta.
+    encerramento: preservarHistorico ? "NENHUM" : "SUPERSEDER", eventoFaseTipo: "FASE_MOVIDA",
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     // `forcado` continua sendo especificamente "o gate barrou e foi sobreposto".
     // Aqui o gate nem foi consultado — o fato é outro, e quem o nomeia é `resultado`.
@@ -886,4 +908,68 @@ export async function movePhaseManual(processoId: number, input: MoveInput): Pro
     origemLog: input.origem ?? "mover-manual", regrasAvaliadas: snap.regrasAvaliadas,
     pendencias: snap.pendencias, warnings: snap.warnings,
   })
+
+  if (preservarHistorico && resultado.success) {
+    await materializarFasesPuladas(processoId, c.fases, faseOrigem, faseAlvo, {
+      correlationId, solicitadoPorId: input.solicitadoPorId,
+    })
+  }
+
+  return resultado
+}
+
+/**
+ * Materializa as fases MACRO puladas entre origem e destino — só quando o destino é
+ * POSTERIOR à origem — pelo mesmo materializador único usado para a fase de destino
+ * em qualquer outra transição (`materializarExecucaoDaFase`). Nenhum motor novo:
+ * reaproveita exatamente o que `executarPlano` já usa no passo 4b.
+ *
+ * Idempotente (pula fase que já tem instância — ex.: um retorno seguido de novo
+ * avanço não duplica) e best-effort, fora de transação: escala com o número de
+ * alvos de CADA fase pulada, pelo mesmo motivo que a materialização do destino
+ * já roda fora da transação principal (ver 4b em `executarPlano`).
+ */
+async function materializarFasesPuladas(
+  processoId: number,
+  fases: Contexto["fases"],
+  faseOrigem: string,
+  faseDestino: string,
+  ctx: { correlationId: string; solicitadoPorId?: number },
+): Promise<void> {
+  const ordemOrigem = fases.find((f) => f.phaseKey === faseOrigem)?.ordem
+  const ordemDestino = fases.find((f) => f.phaseKey === faseDestino)?.ordem
+  if (ordemOrigem == null || ordemDestino == null || ordemDestino <= ordemOrigem) return
+
+  const puladas = fases
+    .filter((f) => f.ordem > ordemOrigem && f.ordem < ordemDestino)
+    .sort((a, b) => a.ordem - b.ordem)
+
+  for (const fase of puladas) {
+    try {
+      const jaExiste = await prisma.phaseWorkflowInstance.findFirst({
+        where: { processoId, faseMacroKey: fase.phaseKey },
+        select: { id: true },
+      })
+      if (jaExiste) continue // já visitada antes — não duplica
+
+      const ciclo = await proximoCiclo(processoId, fase.phaseKey)
+      const inst = await instanciarWorkflowDaFase({
+        processoId, faseMacroKey: fase.phaseKey, ciclo,
+        origem: "MANUAL", correlationId: ctx.correlationId, solicitadoPorId: ctx.solicitadoPorId,
+      })
+      if (!inst.success) {
+        console.error(`[mover-manual] fase pulada "${fase.phaseKey}" não pôde ser instanciada (proc ${processoId}): ${inst.code}`)
+        continue
+      }
+      await materializarExecucaoDaFase({
+        processoId, phaseInstanceId: inst.workflowInstance.id,
+        fonte: "MOVIMENTACAO_MANUAL", solicitadoPorId: ctx.solicitadoPorId, correlationId: ctx.correlationId,
+      })
+    } catch (e) {
+      // Best-effort: uma fase pulada que falhou não desfaz a movimentação nem
+      // impede as demais — fica pendente de reparo, como qualquer materialização
+      // fora de transação neste motor.
+      console.error(`[mover-manual] materialização da fase pulada "${fase.phaseKey}" falhou (proc ${processoId}):`, e)
+    }
+  }
 }

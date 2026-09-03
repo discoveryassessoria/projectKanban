@@ -563,7 +563,7 @@ export async function atualizarPassoV2(
     // falha aqui não o desfaz — o evento `step.concluido` na fila reprocessa
     // (idempotente pela chave única da obrigação).
     await projetarCustosDocumentaisSeCouber(stepInstanceId)
-    await avancarFaseSeCouber(documentoId)
+    await avancarFaseSeCouber(documentoId, p.faseMacroKey)
   }
 
   return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
@@ -583,9 +583,9 @@ export async function projetarCustosDocumentaisSeCouber(stepInstanceId: number):
 }
 
 /** Dispara o recálculo/avanço de fase. Fora de transação, e tolerante a falha. */
-export async function avancarFaseSeCouber(documentoId: number): Promise<void> {
+export async function avancarFaseSeCouber(documentoId: number, faseMacroKeyOrigem?: string | null): Promise<void> {
   try {
-    const adv = await recalcularFaseDoProcesso(documentoId)
+    const adv = await recalcularFaseDoProcesso(documentoId, faseMacroKeyOrigem)
     if (adv.mudou) console.log(`[avanço de fase] doc ${documentoId}: ${adv.faseAnterior} → ${adv.faseNova}`)
   } catch (e) {
     console.error("[avanço de fase] erro ao recalcular:", e)

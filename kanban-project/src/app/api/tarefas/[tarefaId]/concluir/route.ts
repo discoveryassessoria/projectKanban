@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import { concluirTarefa } from "@/src/services/task-step-sync"
-import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
+import { tentarAvancoAutomaticoSeFaseAtual } from "@/src/lib/motor/auto-avanco"
 
 export async function POST(
   request: NextRequest,
@@ -37,7 +37,10 @@ export async function POST(
 
     const tarefaAtual = await prisma.tarefa.findUnique({
       where: { id },
-      select: { id: true, responsavelId: true, processoId: true, workflowStepInstanceId: true },
+      select: {
+        id: true, responsavelId: true, processoId: true, workflowStepInstanceId: true,
+        workflowInstance: { select: { faseMacroKey: true } },
+      },
     })
     if (!tarefaAtual) {
       return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
@@ -76,8 +79,13 @@ export async function POST(
     }
 
     const r = await concluirTarefa(id, { origem: "USER", usuarioId })
-    // AUTO-AVANÇO: concluída a tarefa, se a fase ficou sem pendências o card vai sozinho.
-    if (r.success) await tentarAvancoAutomatico(tarefaAtual.processoId)
+    // AUTO-AVANÇO: concluída a tarefa, se a fase ficou sem pendências o card vai sozinho —
+    // mas só quando a tarefa era da fase ATUAL do processo. Concluir uma tarefa
+    // histórica (fase anterior à atual, regularizada manualmente) não pode mexer na
+    // fase corrente.
+    if (r.success) {
+      await tentarAvancoAutomaticoSeFaseAtual(tarefaAtual.processoId, tarefaAtual.workflowInstance?.faseMacroKey ?? null)
+    }
     return NextResponse.json(r, { status: r.success ? 200 : 409 })
   } catch (error) {
     console.error("Erro ao concluir tarefa:", error)

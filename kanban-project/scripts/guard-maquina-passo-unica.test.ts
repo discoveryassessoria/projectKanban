@@ -273,8 +273,8 @@ ok("concluirPasso também libera a etapa seguinte",
   "concluir pela Central fechava a etapa e o roteiro travava com as seguintes PENDENTES")
 ok("a regra de 'qual é a próxima etapa' mora num lugar só",
   /export async function ativarProximoPassoTx\(/.test(syncCode))
-ok("concluirEtapa aciona o avanço automático de fase",
-  /tentarAvancoAutomatico\(/.test(etapa),
+ok("concluirEtapa aciona o avanço automático de fase — escopado à fase ATUAL",
+  /tentarAvancoAutomatico(SeFaseAtual)?\(/.test(etapa),
   "sem isto, concluir a última etapa pela porta de tarefa deixava a fase aberta")
 ok("concluirEtapa passa pela trava de coerência passo×tarefa",
   /assegurarCoerenciaPassoTarefa\(/.test(etapa))
@@ -314,8 +314,8 @@ const rotaConcluir = semComentarios(ler("src/app/api/tarefas/[tarefaId]/concluir
 ok("a rota concluir não tem mais o ramo legado sob flag de runtime",
   !/runtimeV2Habilitado/.test(rotaConcluir),
   "o mesmo botão produzia históricos diferentes conforme uma flag")
-ok("a rota concluir mantém o avanço automático de fase",
-  /tentarAvancoAutomatico\(/.test(rotaConcluir))
+ok("a rota concluir mantém o avanço automático de fase — escopado à fase ATUAL",
+  /tentarAvancoAutomatico(SeFaseAtual)?\(/.test(rotaConcluir))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("5) Fora da camada de tarefa: a dívida é NOMEADA e CONTADA")

@@ -25,7 +25,7 @@ import { STATUS_TERMINAIS, escopoDaUnidade, estadoDerivado, etapaCorrente } from
 import { transicionarPassoTx, ativarProximoPassoTx, aplicarTarefaTx } from '@/src/services/task-step-sync'
 import { assegurarCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
-import { tentarAvancoAutomatico } from '@/src/lib/motor/auto-avanco'
+import { tentarAvancoAutomaticoSeFaseAtual } from '@/src/lib/motor/auto-avanco'
 
 export type FalhaEtapa =
   | 'TAREFA_NAO_ENCONTRADA' | 'ETAPA_NAO_ENCONTRADA' | 'ETAPA_DE_OUTRA_TAREFA'
@@ -111,6 +111,8 @@ export async function concluirEtapa(args: {
   const correlationId = randomUUID()
   /** Preenchido dentro da transação; os efeitos pós-commit precisam dele. */
   let processoAfetado: number | null = null
+  /** A fase da etapa concluída — o auto-avanço só reage se for a fase ATUAL do processo. */
+  let faseMacroKeyAfetada: string | null = null
 
   const resultado = await prisma.$transaction(async (tx) => {
     const tarefa = await tx.tarefa.findUnique({
@@ -176,6 +178,7 @@ export async function concluirEtapa(args: {
       select: {
         id: true, status: true, obrigatorio: true, ordem: true, stepKey: true,
         documentoId: true, necessidadeId: true, processoId: true, dependeDeStepKeys: true, ciclo: true,
+        faseMacroKey: true,
       },
       orderBy: { ordem: 'asc' },
     })
@@ -355,6 +358,7 @@ export async function concluirEtapa(args: {
     await assegurarCoerenciaPassoTarefa(tx, [alvo.id, ...(proxima ? [proxima.id] : [])])
 
     processoAfetado = alvo.processoId
+    faseMacroKeyAfetada = alvo.faseMacroKey
 
     return {
       ok: true as const,
@@ -380,7 +384,11 @@ export async function concluirEtapa(args: {
     // uma fase é o que fecha a fase — e isso não pode depender de qual porta o
     // operador usou. Antes desta consolidação, concluir pela rota antiga
     // avançava a fase e concluir por esta porta não.
-    await tentarAvancoAutomatico(processoAfetado)
+    //
+    // ESCOPADO À FASE ATUAL: uma etapa de fase HISTÓRICA (regularização manual
+    // de uma fase anterior, processo já reposicionado adiante) não pode reavaliar
+    // nem mover a fase corrente — só a etapa de que ela é dona.
+    await tentarAvancoAutomaticoSeFaseAtual(processoAfetado, faseMacroKeyAfetada)
   }
 
   return resultado
