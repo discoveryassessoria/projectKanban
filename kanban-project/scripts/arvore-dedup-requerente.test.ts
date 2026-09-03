@@ -37,17 +37,10 @@ async function limpar(ctx: {
   arvoreIds: number[]
   processoIds: number[]
   requerenteIds: number[]
-  pessoaSoltaIds?: number[]
 }) {
   // Desamarra o principal para permitir excluir Pessoas sem violar FK.
   for (const id of ctx.arvoreIds) {
     await prisma.arvore.update({ where: { id }, data: { pessoaPrincipalId: null } }).catch(() => {})
-  }
-  // Pessoa "solta" (arvoreId null no início do cenário) pode ter sido adotada por
-  // uma árvore durante o teste — o filtro por arvoreId abaixo já cobre, mas apaga
-  // explícito por id também, pro caso de ela continuar solta se o teste falhar cedo.
-  if (ctx.pessoaSoltaIds?.length) {
-    await prisma.pessoa.deleteMany({ where: { id: { in: ctx.pessoaSoltaIds } } }).catch(() => {})
   }
   await prisma.processoRequerente
     .deleteMany({ where: { processoId: { in: ctx.processoIds.length ? ctx.processoIds : [-1] } } })
