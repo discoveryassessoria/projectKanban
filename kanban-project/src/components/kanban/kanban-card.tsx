@@ -125,7 +125,7 @@ export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDrag
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <div
         className={`
-          mb-3 bg-[var(--surface-primary)] rounded-lg shadow-[var(--elev-1)] border border-gray-200
+          mb-3 bg-[var(--surface-elevated)] rounded-lg shadow-[var(--elev-1)] border border-[var(--border-default)]
           hover:shadow-[var(--elev-2)] transition-all cursor-grab active:cursor-grabbing
           ${isDragging ? "shadow-[var(--elev-3)] ring-2 ring-[var(--border-strong)]" : ""}
         `}
