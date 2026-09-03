@@ -283,14 +283,44 @@ export async function efeitosDoVinculoPosCommit(
 }
 
 /**
+ * Agenda os efeitos SEM travar a resposta — para quem chama de dentro de uma
+ * rota HTTP (App Router), onde `after()` mantém a função viva até o efeito
+ * terminar, sem o cliente esperar. `dispararMaterializacaoPorArvore` percorre
+ * TODOS os processos e pessoas da árvore (não só o vínculo desta chamada) —
+ * é lento (pode passar de 1s numa árvore de 15-20 pessoas) e nunca precisou
+ * bloquear a resposta: o vínculo já está commitado, o efeito é reavaliação.
+ *
+ * `after()` exige contexto de requisição — por isso é OPCIONAL (`opts?.after`)
+ * e nunca o padrão: quem chama fora de rota (script, teste, seed) continua
+ * recebendo o comportamento de sempre — aguarda o efeito antes de retornar.
+ */
+function rodarEfeitosDoVinculo(arvoreId: number | null, opts?: DeferirEfeitosOpts): Promise<void> {
+  if (opts?.after) {
+    opts.after(() => {
+      efeitosDoVinculoPosCommit({ arvoreId }).catch((e) =>
+        console.error(`[vínculo de requerente → efeitos adiados] árvore ${arvoreId}:`, e),
+      )
+    })
+    return Promise.resolve()
+  }
+  return efeitosDoVinculoPosCommit({ arvoreId }).then(() => undefined)
+}
+
+/** `after` do `next/server` (App Router) — ou qualquer função com a mesma forma. */
+export interface DeferirEfeitosOpts {
+  after?: (fn: () => void | Promise<void>) => void
+}
+
+/**
  * A PORTA PÚBLICA. Transação própria + efeitos pós-commit. É o que a rota, o
  * script, o backfill e o teste devem chamar — todos terminam no mesmo estado.
  */
 export async function vincularRequerente(
-  input: VincularRequerenteInput
+  input: VincularRequerenteInput,
+  opts?: DeferirEfeitosOpts,
 ): Promise<VincularRequerenteResult> {
   const resultado = await prisma.$transaction((tx) => vincularRequerenteTx(tx, input))
-  if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
+  if (resultado.ok) await rodarEfeitosDoVinculo(input.arvoreId, opts)
   return resultado
 }
 
@@ -409,6 +439,7 @@ async function aplicarVinculoAPessoaExistenteTx(
  */
 export async function vincularPessoaExistenteAoRequerente(
   input: VincularPessoaExistenteInput,
+  opts?: DeferirEfeitosOpts,
 ): Promise<VincularPessoaExistenteResult> {
   const resultado = await prisma.$transaction(async (tx) => {
     const r = await aplicarVinculoAPessoaExistenteTx(tx, input)
@@ -421,6 +452,6 @@ export async function vincularPessoaExistenteAoRequerente(
     })
     return r
   })
-  if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
+  if (resultado.ok) await rodarEfeitosDoVinculo(input.arvoreId, opts)
   return resultado
 }

@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse, after } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
@@ -160,7 +160,15 @@ export async function POST(request: NextRequest) {
     //
     // Best-effort e idempotente, como nos demais gatilhos: falha do motor
     // documental não pode impedir o registro do casamento.
-    await dispararMaterializacaoPorArvore(novaUniao.pessoa1?.arvoreId ?? novaUniao.pessoa2?.arvoreId)
+    //
+    // via after(): a união já está gravada quando respondemos — reavaliar toda
+    // a árvore não precisa travar o "Salvar" do usuário.
+    const arvoreIdAfetada = novaUniao.pessoa1?.arvoreId ?? novaUniao.pessoa2?.arvoreId
+    after(() => {
+      dispararMaterializacaoPorArvore(arvoreIdAfetada).catch((e) =>
+        console.error(`[POST /api/unioes] materialização adiada falhou (árvore ${arvoreIdAfetada}):`, e),
+      )
+    })
 
     return NextResponse.json(novaUniao, { status: 201 })
   } catch (error) {

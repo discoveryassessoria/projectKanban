@@ -132,9 +132,18 @@ ok("`vincularRequerenteTx` enfileira o evento na MESMA transação recebida",
   /aplicarVinculoNaArvore\(tx,/.test(corpoTxFim) && /enfileirarEventoRequerente\(tx,/.test(corpoTxFim))
 ok("o enfileiramento vem DEPOIS do vínculo, e só quando ele deu certo",
   corpoTxFim.indexOf("if (!resultado.ok) return resultado") < corpoTxFim.indexOf("enfileirarEventoRequerente"))
-ok("`vincularRequerente` faz o ato inteiro: transação + pós-commit",
+// `rodarEfeitosDoVinculo` é o único desvio permitido do await direto: com
+// `opts.after` ela adia a chamada para depois da resposta via Next `after()`
+// (a função HTTP continua viva até terminar — não é fire-and-forget), sem
+// `opts.after` ela chama `efeitosDoVinculoPosCommit` e aguarda como sempre.
+// Em ambos os casos o efeito é SEMPRE disparado por dentro do serviço — nunca
+// pela rota, nunca esquecido.
+ok("`vincularRequerente` faz o ato inteiro: transação + pós-commit (direto ou adiado via after())",
   /prisma\.\$transaction\(\(tx\) => vincularRequerenteTx\(tx, input\)\)/.test(canonico) &&
-  /if \(resultado\.ok\) await efeitosDoVinculoPosCommit\(/.test(canonico))
+  /if \(resultado\.ok\) await rodarEfeitosDoVinculo\(/.test(canonico) &&
+  /function rodarEfeitosDoVinculo\(/.test(canonico) &&
+  /opts\.after\(/.test(canonico) &&
+  /return efeitosDoVinculoPosCommit\(/.test(canonico))
 ok("o pós-commit drena a fila E reavalia as Regras Documentais",
   /processarOutbox\(/.test(canonico) && /dispararMaterializacaoPorArvore\(/.test(canonico))
 

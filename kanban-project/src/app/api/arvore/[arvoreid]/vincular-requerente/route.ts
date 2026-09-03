@@ -11,7 +11,7 @@
 // para dentro de `vincularRequerente`, onde toda porta os herda.
 // ============================================================================
 
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse, after } from "next/server"
 import { vincularRequerente, vincularPessoaExistenteAoRequerente } from "@/lib/genealogia/vincular-requerente"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
@@ -57,8 +57,13 @@ export async function POST(
       return NextResponse.json({ error: "pessoaId inválido" }, { status: 400 })
     }
 
+    // `deferirEfeitos: after` — o vínculo em si (rápido, na transação) já está
+    // completo quando respondemos; a reavaliação de TODA a árvore (materializar
+    // genealogia + regras documentais) roda depois de responder, sem o cliente
+    // esperar. `after()` mantém a função viva até o efeito terminar — não é
+    // "atirar e esquecer": só não trava a resposta.
     const result = pessoaId != null
-      ? await vincularPessoaExistenteAoRequerente({ arvoreId, requerenteId, pessoaId, actorId })
+      ? await vincularPessoaExistenteAoRequerente({ arvoreId, requerenteId, pessoaId, actorId }, { after })
       : await vincularRequerente({
           arvoreId,
           requerenteId,
@@ -67,7 +72,7 @@ export async function POST(
           paiId: body?.paiId ?? undefined,
           maeId: body?.maeId ?? undefined,
           actorId,
-        })
+        }, { after })
 
     if (!result.ok) {
       const status = STATUS_POR_ERRO[result.code] ?? 400

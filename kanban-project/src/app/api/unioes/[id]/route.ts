@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse, after } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
@@ -98,9 +98,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Editar a união muda o fato que sustenta a exigência de casamento (trocar
     // cônjuge muda de QUEM é a certidão). Mesmo elo causal do POST — reusando o
     // materializador ÚNICO, nunca reimplementado aqui.
-    await dispararMaterializacaoPorArvore(
-      uniaoAtualizada.pessoa1?.arvoreId ?? uniaoAtualizada.pessoa2?.arvoreId,
-    )
+    //
+    // via after(): a resposta não espera a árvore inteira ser reavaliada.
+    const arvoreIdAfetadaPut = uniaoAtualizada.pessoa1?.arvoreId ?? uniaoAtualizada.pessoa2?.arvoreId
+    after(() => {
+      dispararMaterializacaoPorArvore(arvoreIdAfetadaPut).catch((e) =>
+        console.error(`[PUT /api/unioes/[id]] materialização adiada falhou (árvore ${arvoreIdAfetadaPut}):`, e),
+      )
+    })
 
     return NextResponse.json(uniaoAtualizada)
   } catch (error) {
@@ -142,7 +147,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     // Desfazer o casamento também é mudança de estado civil: a exigência da
     // certidão deixa de ser aplicável e o motor oficial precisa reconciliar.
-    await dispararMaterializacaoPorArvore(antes?.pessoa1?.arvoreId ?? antes?.pessoa2?.arvoreId)
+    //
+    // via after(): a resposta não espera a árvore inteira ser reavaliada.
+    const arvoreIdAfetadaDelete = antes?.pessoa1?.arvoreId ?? antes?.pessoa2?.arvoreId
+    after(() => {
+      dispararMaterializacaoPorArvore(arvoreIdAfetadaDelete).catch((e) =>
+        console.error(`[DELETE /api/unioes/[id]] materialização adiada falhou (árvore ${arvoreIdAfetadaDelete}):`, e),
+      )
+    })
 
     return NextResponse.json({ message: "União excluída com sucesso" })
   } catch (error) {

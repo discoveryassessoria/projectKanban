@@ -1,6 +1,6 @@
 // src/app/api/pessoas/[id]/route.ts
 
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse, after } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
@@ -183,7 +183,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // mesmo par que a porta de vínculo usa — drenar a fila e reavaliar as Regras.
     // Chamar sempre é de propósito: a materialização é necessária em qualquer
     // edição de atributo relevante, e drenar fila vazia não custa nada.
-    await efeitosDoVinculoPosCommit({ arvoreId: pessoaAtualizada.arvoreId })
+    //
+    // via after(): a pessoa já está salva quando respondemos — reavaliar TODA a
+    // árvore (materializar genealogia + regras documentais de novo para cada
+    // pessoa de cada processo) é caro e nunca precisou travar a resposta do
+    // Salvar. after() mantém a função viva até terminar; só não faz o cliente
+    // esperar por um recálculo que não afeta o que ele acabou de editar.
+    after(() => {
+      efeitosDoVinculoPosCommit({ arvoreId: pessoaAtualizada.arvoreId }).catch((e) =>
+        console.error(`[PUT /api/pessoas/${id}] efeitos pós-commit adiados falharam:`, e),
+      )
+    })
 
     return NextResponse.json(pessoaAtualizada)
   } catch (error) {
