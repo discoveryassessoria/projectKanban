@@ -47,7 +47,8 @@ import {
   User,
   MapPin,
   Trash2,
-  FileText
+  FileText,
+  Link2
 } from "lucide-react"
 import {
   type ProcessoWithStatus,
@@ -180,6 +181,66 @@ function ConteudoModal({
   
   // Árvore genealógica
   const [arvoreIdLocal, setArvoreIdLocal] = useState<number | null>(processo?.arvoreId || null)
+
+  // ── VINCULAR REQUERENTE A UMA PESSOA JÁ EXISTENTE NA ÁRVORE ─────────────────
+  // Um requerente sem `personId` pode já estar na árvore (ex.: veio de Importar
+  // Árvore) — sem isto, o único jeito de dar nó a ele era pela aba Árvore
+  // Genealógica, que sempre CRIA uma pessoa nova (duplicando quem já existe).
+  // Mesma porta de dedup do fluxo manual: POST /api/arvore/{id}/vincular-requerente.
+  const [vinculandoRequerenteId, setVinculandoRequerenteId] = useState<number | null>(null)
+  const [pessoasDaArvoreSemRequerente, setPessoasDaArvoreSemRequerente] = useState<Array<{ id: number; nome: string }>>([])
+  const [carregandoPessoasArvore, setCarregandoPessoasArvore] = useState(false)
+  const [pessoaEscolhidaId, setPessoaEscolhidaId] = useState<number | ''>('')
+  const [salvandoVinculoArvore, setSalvandoVinculoArvore] = useState(false)
+  const [erroVinculoArvore, setErroVinculoArvore] = useState<string | null>(null)
+
+  async function abrirVinculoComArvore(requerenteId: number) {
+    setVinculandoRequerenteId(requerenteId)
+    setPessoaEscolhidaId('')
+    setErroVinculoArvore(null)
+    if (!arvoreIdLocal) return
+    setCarregandoPessoasArvore(true)
+    try {
+      const res = await fetch(`/api/arvore/${arvoreIdLocal}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      })
+      const data = await res.json().catch(() => ({}))
+      const pessoas = (data?.pessoas ?? []) as Array<{ id: number; nome: string; sobrenome?: string | null; requerente?: string | null }>
+      setPessoasDaArvoreSemRequerente(
+        pessoas
+          .filter((p) => !["sim", "maior", "menor"].includes(String(p.requerente ?? "").toLowerCase()))
+          .map((p) => ({ id: p.id, nome: [p.nome, p.sobrenome].filter(Boolean).join(" ") }))
+      )
+    } catch {
+      setErroVinculoArvore("Não foi possível carregar as pessoas da árvore.")
+    } finally {
+      setCarregandoPessoasArvore(false)
+    }
+  }
+
+  async function confirmarVinculoComArvore() {
+    if (!vinculandoRequerenteId || !pessoaEscolhidaId || !arvoreIdLocal) return
+    setSalvandoVinculoArvore(true)
+    setErroVinculoArvore(null)
+    try {
+      const res = await fetch(`/api/arvore/${arvoreIdLocal}/vincular-requerente`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ requerenteId: vinculandoRequerenteId, pessoaId: pessoaEscolhidaId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Erro ao vincular requerente à árvore")
+      setVinculandoRequerenteId(null)
+      onSave?.()
+    } catch (e) {
+      setErroVinculoArvore(e instanceof Error ? e.message : "Erro ao vincular requerente à árvore")
+    } finally {
+      setSalvandoVinculoArvore(false)
+    }
+  }
   
   // Estado para pessoa selecionada na árvore
   // Vindos do deep-link: valor inicial desta abertura. Como o conteúdo desmonta ao
@@ -890,17 +951,72 @@ function ConteudoModal({
                       {requerentesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
-                            <div key={req.id} className="flex items-center justify-between p-2 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl">
-                              <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-[var(--text-secondary)]" />
-                                <span className="text-white/95 text-sm">{nomePessoa(req)}</span>
+                            <div key={req.id} className="p-2 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-4 w-4 text-[var(--text-secondary)]" />
+                                  <span className="text-white/95 text-sm">{nomePessoa(req)}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {/* Requerente sem nó na árvore: pode já existir lá (ex.: árvore
+                                      importada) — vincula em vez de criar duplicata. */}
+                                  {!req.personId && arvoreIdLocal && (
+                                    <button
+                                      onClick={() => abrirVinculoComArvore(req.id)}
+                                      title="Vincular a uma pessoa já existente na árvore"
+                                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-amber-800 hover:bg-amber-50"
+                                    >
+                                      <Link2 className="h-3.5 w-3.5" />
+                                      Vincular à árvore
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => removeRequerente(req.id)}
+                                    className="text-[var(--text-muted)] hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </div>
-                              <button
-                                onClick={() => removeRequerente(req.id)}
-                                className="text-[var(--text-muted)] hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+
+                              {vinculandoRequerenteId === req.id && (
+                                <div className="mt-2 pt-2 border-t border-[var(--border-default)] space-y-1.5">
+                                  {carregandoPessoasArvore ? (
+                                    <p className="text-xs text-[var(--text-muted)]">Carregando pessoas da árvore…</p>
+                                  ) : pessoasDaArvoreSemRequerente.length === 0 ? (
+                                    <p className="text-xs text-[var(--text-muted)]">
+                                      Nenhuma pessoa disponível na árvore (todas já são requerentes, ou a árvore está vazia).
+                                    </p>
+                                  ) : (
+                                    <div className="flex gap-1.5">
+                                      <select
+                                        value={pessoaEscolhidaId}
+                                        onChange={(e) => setPessoaEscolhidaId(e.target.value ? Number(e.target.value) : '')}
+                                        className="flex-1 h-8 text-xs rounded-md bg-[var(--surface-popover)] border border-[var(--border-default)] text-white/95 px-2"
+                                      >
+                                        <option value="">Esta pessoa é...</option>
+                                        {pessoasDaArvoreSemRequerente.map((p) => (
+                                          <option key={p.id} value={p.id}>{p.nome}</option>
+                                        ))}
+                                      </select>
+                                      <button
+                                        onClick={confirmarVinculoComArvore}
+                                        disabled={!pessoaEscolhidaId || salvandoVinculoArvore}
+                                        className="shrink-0 px-2.5 rounded-md border border-amber-300 bg-amber-50 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {salvandoVinculoArvore ? 'Vinculando…' : 'Confirmar'}
+                                      </button>
+                                    </div>
+                                  )}
+                                  {erroVinculoArvore && <p className="text-xs text-red-600">{erroVinculoArvore}</p>}
+                                  <button
+                                    onClick={() => setVinculandoRequerenteId(null)}
+                                    className="text-xs text-[var(--text-muted)] hover:text-white/80"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

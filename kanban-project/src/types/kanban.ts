@@ -134,6 +134,8 @@ export interface Requerente {
   id: number
   publicCode?: string | null   // CLI-n — código público do cliente
   nome: string
+  /** Pessoa da Árvore Genealógica vinculada a este requerente (dedup). Null = ainda sem nó na árvore. */
+  personId?: number | null
   cpf?: string | null
   rg?: string | null
   dataNascimento?: string | null

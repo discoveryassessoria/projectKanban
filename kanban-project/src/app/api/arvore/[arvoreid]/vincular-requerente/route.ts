@@ -12,7 +12,7 @@
 // ============================================================================
 
 import { type NextRequest, NextResponse } from "next/server"
-import { vincularRequerente } from "@/lib/genealogia/vincular-requerente"
+import { vincularRequerente, vincularPessoaExistenteAoRequerente } from "@/lib/genealogia/vincular-requerente"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 
@@ -20,6 +20,9 @@ const STATUS_POR_ERRO: Record<string, number> = {
   ARVORE_NAO_ENCONTRADA: 404,
   REQUERENTE_NAO_ENCONTRADO: 404,
   PESSOA_EM_OUTRA_ARVORE: 409,
+  PESSOA_NAO_ENCONTRADA: 404,
+  REQUERENTE_JA_VINCULADO: 409,
+  PESSOA_JA_E_REQUERENTE: 409,
 }
 
 export async function POST(
@@ -44,22 +47,34 @@ export async function POST(
 
     const actorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
 
-    const result = await vincularRequerente({
-      arvoreId,
-      requerenteId,
-      x: body?.x ?? undefined,
-      y: body?.y ?? undefined,
-      paiId: body?.paiId ?? undefined,
-      maeId: body?.maeId ?? undefined,
-      actorId,
-    })
+    // `pessoaId` explícito: quem opera já sabe qual pessoa da árvore corresponde
+    // a este requerente (ex.: árvore importada, sem vínculo prévio) — porta
+    // separada (`vincularPessoaExistenteAoRequerente`), mesma trilha de evento e
+    // materialização. Sem `pessoaId`, comportamento de sempre: reusa por
+    // `Requerente.personId` ou cria.
+    const pessoaId = body?.pessoaId != null ? Number(body.pessoaId) : null
+    if (body?.pessoaId != null && (!pessoaId || isNaN(pessoaId))) {
+      return NextResponse.json({ error: "pessoaId inválido" }, { status: 400 })
+    }
+
+    const result = pessoaId != null
+      ? await vincularPessoaExistenteAoRequerente({ arvoreId, requerenteId, pessoaId, actorId })
+      : await vincularRequerente({
+          arvoreId,
+          requerenteId,
+          x: body?.x ?? undefined,
+          y: body?.y ?? undefined,
+          paiId: body?.paiId ?? undefined,
+          maeId: body?.maeId ?? undefined,
+          actorId,
+        })
 
     if (!result.ok) {
       const status = STATUS_POR_ERRO[result.code] ?? 400
       return NextResponse.json({ error: result.message, code: result.code }, { status })
     }
 
-    return NextResponse.json({ pessoaId: result.pessoaId, criada: result.criada })
+    return NextResponse.json({ pessoaId: result.pessoaId, criada: "criada" in result ? result.criada : false })
   } catch (error) {
     console.error("[POST /api/arvore/[arvoreid]/vincular-requerente]", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

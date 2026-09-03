@@ -1410,6 +1410,7 @@ export function ArvoreGenealogicaView({
           pessoas={pessoas}
           unioes={unioes}
           processoId={processoId}
+          arvoreId={arvoreId!}
           requerentesAfetadosPor={requerentesAfetadosPor}
           estadoAtual={operacional.estadoAtual}
           onClose={() => {
@@ -1876,6 +1877,7 @@ function EditPersonModal({
   pessoas,
   unioes,
   processoId,
+  arvoreId,
   requerentesAfetadosPor,
   estadoAtual,
   onClose,
@@ -1885,6 +1887,7 @@ function EditPersonModal({
   pessoas: PessoaArvore[]
   unioes: UniaoArvore[]
   processoId: number
+  arvoreId: number
   /** Nomes dos requerentes cuja linha passa por esta pessoa. */
   requerentesAfetadosPor: (pessoaId: number) => string[]
   /** Números de hoje, para o preview montar a coluna ANTES. */
@@ -1914,6 +1917,53 @@ function EditPersonModal({
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
   const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
+  const jaEhRequerente = ["sim", "maior", "menor"].includes(String((pessoa as any).requerente ?? "").toLowerCase())
+  // ── VINCULAR A UM REQUERENTE JÁ CADASTRADO NO PROCESSO ──────────────────────
+  // Esta pessoa já existe na árvore (ex.: veio de Importar Árvore) e não tem
+  // vínculo de requerente. `Pessoa.requerente` continua sem edição livre — o que
+  // muda aqui é escolher A QUAL requerente do processo (já sem pessoa vinculada)
+  // ela corresponde. Grava via a mesma porta de dedup do fluxo manual
+  // (`vincular-requerente`), nunca `PUT /pessoas` direto.
+  const [requerentesDisponiveis, setRequerentesDisponiveis] = useState<
+    Array<{ requerenteId: number; nome: string; availableForTree: boolean }>
+  >([])
+  const [requerenteEscolhidoId, setRequerenteEscolhidoId] = useState<number | ''>('')
+  const [vinculandoRequerente, setVinculandoRequerente] = useState(false)
+  const [erroVinculoRequerente, setErroVinculoRequerente] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (jaEhRequerente) return
+    let ativo = true
+    authFetch(`/api/processos/${processoId}/requerentes-disponiveis`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Falha ao carregar requerentes'))))
+      .then((data) => {
+        if (!ativo) return
+        setRequerentesDisponiveis((data.requerentes || []).filter((r: { availableForTree: boolean }) => r.availableForTree))
+      })
+      .catch(() => { /* silencioso: o campo mostra o texto padrão se a lista não vier */ })
+    return () => { ativo = false }
+  }, [jaEhRequerente, processoId])
+
+  async function vincularComoRequerente() {
+    if (!requerenteEscolhidoId) return
+    setVinculandoRequerente(true)
+    setErroVinculoRequerente(null)
+    try {
+      const res = await authFetch(`/api/arvore/${arvoreId}/vincular-requerente`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requerenteId: requerenteEscolhidoId, pessoaId: pessoa.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Erro ao vincular requerente')
+      await onSuccess()
+    } catch (e) {
+      setErroVinculoRequerente(e instanceof Error ? e.message : 'Erro ao vincular requerente')
+    } finally {
+      setVinculandoRequerente(false)
+    }
+  }
+
   const [numeroLinhagem, setNumeroLinhagem] = useState((pessoa as any).numeroLinhagem?.toString() || '')
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>((pessoa as any).linhaReta ?? true)
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
@@ -2247,11 +2297,39 @@ function EditPersonModal({
                 {/* Requerente tem o Processo (ProcessoRequerente) como única fonte de verdade:
                     não se marca requerente por edição livre. Já-requerente pode trocar o
                     principal (maior/menor); demais é somente leitura. */}
-                {["sim", "maior", "menor"].includes(String((pessoa as any).requerente ?? "").toLowerCase()) ? (
+                {jaEhRequerente ? (
                   <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
                     <option value="maior">Sim - Maior de idade</option>
                     <option value="menor">Sim - Menor de idade</option>
                   </select>
+                ) : requerentesDisponiveis.length > 0 ? (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-1.5">
+                      <select
+                        value={requerenteEscolhidoId}
+                        onChange={(e) => setRequerenteEscolhidoId(e.target.value ? Number(e.target.value) : '')}
+                        className={selectClass}
+                        style={selectStyle}
+                      >
+                        <option value="">É requerente de...</option>
+                        {requerentesDisponiveis.map((r) => (
+                          <option key={r.requerenteId} value={r.requerenteId}>{r.nome}</option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={vincularComoRequerente}
+                        disabled={!requerenteEscolhidoId || vinculandoRequerente}
+                        className="shrink-0 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {vinculandoRequerente ? 'Vinculando…' : 'Vincular'}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)]">
+                      Esta pessoa já existe na árvore — só vincule se ela for de fato um dos requerentes cadastrados no processo.
+                    </p>
+                    {erroVinculoRequerente && <p className="text-xs text-red-600">{erroVinculoRequerente}</p>}
+                  </div>
                 ) : (
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500">
                     Definido pelo processo — adicione pela lista de requerentes do processo.

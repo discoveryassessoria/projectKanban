@@ -313,3 +313,114 @@ export async function registrarTransicaoParaRequerenteTx(
     correlationId: args.correlationId ?? null,
   })
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A TERCEIRA ENTRADA — a Pessoa já existe na árvore (ex.: importada) E quem
+// opera já SABE a qual Requerente ela corresponde. Ao contrário de
+// `aplicarVinculoNaArvore` (que decide sozinho: reusa por `personId` ou cria),
+// aqui a decisão já foi tomada por um humano — esta função só grava o vínculo,
+// com as MESMAS garantias de dedup: um Requerente nunca aponta pra duas
+// Pessoas, e uma Pessoa nunca é o nó de dois Requerentes.
+//
+// Não reaproveita os branches de `aplicarVinculoNaArvore` de propósito: aquele
+// código assume "isto já pode ter sido resolvido antes" e por isso pula
+// setar `Pessoa.requerente` no caso idempotente — aqui o vínculo é sempre
+// NOVO, então o flag tem que ser setado sempre.
+// ============================================================================
+
+export type VincularPessoaExistenteErro =
+  | "ARVORE_NAO_ENCONTRADA"
+  | "REQUERENTE_NAO_ENCONTRADO"
+  | "PESSOA_NAO_ENCONTRADA"
+  | "REQUERENTE_JA_VINCULADO"
+  | "PESSOA_JA_E_REQUERENTE"
+  | "PESSOA_EM_OUTRA_ARVORE"
+
+export interface VincularPessoaExistenteInput {
+  arvoreId: number
+  requerenteId: number
+  pessoaId: number
+  actorId?: number | null
+  correlationId?: string | null
+}
+
+export type VincularPessoaExistenteResult =
+  | { ok: true; pessoaId: number }
+  | { ok: false; code: VincularPessoaExistenteErro; message: string }
+
+async function aplicarVinculoAPessoaExistenteTx(
+  tx: Prisma.TransactionClient,
+  input: VincularPessoaExistenteInput,
+): Promise<VincularPessoaExistenteResult> {
+  const { arvoreId, requerenteId, pessoaId } = input
+
+  const arvore = await tx.arvore.findUnique({
+    where: { id: arvoreId }, select: { id: true, pessoaPrincipalId: true },
+  })
+  if (!arvore) return { ok: false, code: "ARVORE_NAO_ENCONTRADA", message: "Árvore não encontrada" }
+
+  const requerente = await tx.requerente.findUnique({
+    where: { id: requerenteId }, select: { id: true, personId: true },
+  })
+  if (!requerente) return { ok: false, code: "REQUERENTE_NAO_ENCONTRADO", message: "Requerente não encontrado" }
+  if (requerente.personId != null && requerente.personId !== pessoaId) {
+    return { ok: false, code: "REQUERENTE_JA_VINCULADO", message: "Este requerente já está vinculado a outra pessoa da árvore." }
+  }
+
+  const pessoa = await tx.pessoa.findUnique({
+    where: { id: pessoaId }, select: { id: true, arvoreId: true, removidaEm: true, requerente: true },
+  })
+  if (!pessoa) return { ok: false, code: "PESSOA_NAO_ENCONTRADA", message: "Pessoa não encontrada" }
+  if (pessoa.arvoreId != null && pessoa.arvoreId !== arvoreId) {
+    return { ok: false, code: "PESSOA_EM_OUTRA_ARVORE", message: "Esta pessoa já é nó de outra árvore genealógica." }
+  }
+  if (["sim", "maior", "menor"].includes(String(pessoa.requerente ?? "").toLowerCase())) {
+    // Já é requerente de OUTRO vínculo (o dela não é o `requerenteId` pedido, senão
+    // teria caído no branch idempotente de `requerente.personId === pessoaId` acima).
+    const outro = await tx.requerente.findFirst({ where: { personId: pessoaId }, select: { id: true } })
+    if (outro && outro.id !== requerenteId) {
+      return { ok: false, code: "PESSOA_JA_E_REQUERENTE", message: "Esta pessoa já está vinculada a outro requerente." }
+    }
+  }
+
+  const jaTemPrincipal =
+    (await tx.pessoa.count({ where: { arvoreId, requerente: "maior", id: { not: pessoaId } } })) > 0
+  const flagRequerente = jaTemPrincipal ? "sim" : "maior"
+
+  await tx.pessoa.update({
+    where: { id: pessoaId },
+    data: {
+      arvoreId, requerente: flagRequerente,
+      removidaEm: null, removidaPorId: null, motivoRemocao: null,
+    },
+  })
+  await tx.requerente.update({ where: { id: requerenteId }, data: { personId: pessoaId } })
+  if (arvore.pessoaPrincipalId == null) {
+    await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: pessoaId } })
+  }
+
+  return { ok: true, pessoaId }
+}
+
+/**
+ * A PORTA PÚBLICA da terceira entrada. Mesma transação + mesmos efeitos
+ * pós-commit da porta principal (`vincularRequerente`) — o evento de domínio e a
+ * materialização não podem depender de qual porta o operador usou.
+ */
+export async function vincularPessoaExistenteAoRequerente(
+  input: VincularPessoaExistenteInput,
+): Promise<VincularPessoaExistenteResult> {
+  const resultado = await prisma.$transaction(async (tx) => {
+    const r = await aplicarVinculoAPessoaExistenteTx(tx, input)
+    if (!r.ok) return r
+    await enfileirarEventoRequerente(tx, {
+      pessoaId: r.pessoaId,
+      arvoreId: input.arvoreId,
+      actorId: input.actorId ?? null,
+      correlationId: input.correlationId ?? null,
+    })
+    return r
+  })
+  if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
+  return resultado
+}

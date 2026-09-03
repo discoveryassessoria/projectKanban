@@ -15,7 +15,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
-import { vincularRequerente } from "@/lib/genealogia/vincular-requerente"
+import { vincularRequerente, vincularPessoaExistenteAoRequerente } from "@/lib/genealogia/vincular-requerente"
 
 const MARK = "__TEST_DEDUP_REQ__"
 
@@ -37,10 +37,17 @@ async function limpar(ctx: {
   arvoreIds: number[]
   processoIds: number[]
   requerenteIds: number[]
+  pessoaSoltaIds?: number[]
 }) {
   // Desamarra o principal para permitir excluir Pessoas sem violar FK.
   for (const id of ctx.arvoreIds) {
     await prisma.arvore.update({ where: { id }, data: { pessoaPrincipalId: null } }).catch(() => {})
+  }
+  // Pessoa "solta" (arvoreId null no início do cenário) pode ter sido adotada por
+  // uma árvore durante o teste — o filtro por arvoreId abaixo já cobre, mas apaga
+  // explícito por id também, pro caso de ela continuar solta se o teste falhar cedo.
+  if (ctx.pessoaSoltaIds?.length) {
+    await prisma.pessoa.deleteMany({ where: { id: { in: ctx.pessoaSoltaIds } } }).catch(() => {})
   }
   await prisma.processoRequerente
     .deleteMany({ where: { processoId: { in: ctx.processoIds.length ? ctx.processoIds : [-1] } } })
@@ -132,6 +139,63 @@ async function main() {
     ok(!r3.ok && r3.code === "PESSOA_EM_OUTRA_ARVORE", "não move Pessoa entre árvores (PESSOA_EM_OUTRA_ARVORE)", r3)
     const countOutra = await prisma.pessoa.count({ where: { arvoreId: arvore2.id } })
     ok(countOutra === 0, "nenhuma Pessoa criada na 2ª árvore", countOutra)
+
+    // ── 4) vincularPessoaExistenteAoRequerente — a pessoa JÁ existe (ex.: árvore
+    //      importada), quem opera escolhe a qual requerente ela corresponde ──────
+    console.log("\n4) Vincular pessoa JÁ existente na árvore (fluxo: árvore importada)")
+    const arvoreImportada = await prisma.arvore.create({ data: { nome: `${MARK} importada` } })
+    ctx.arvoreIds.push(arvoreImportada.id)
+    // Simula uma pessoa vinda da importação: já é nó da árvore, sem NENHUM vínculo
+    // de requerente (requerente: "nao", o default).
+    const pessoaImportada = await prisma.pessoa.create({
+      data: { nome: "Maria", sobrenome: "Importada", arvoreId: arvoreImportada.id, requerente: "nao" },
+    })
+    const requerente2 = await prisma.requerente.create({
+      data: { nome: "Maria Importada", observacoes: MARK, personId: null },
+    })
+    ctx.requerenteIds.push(requerente2.id)
+    const processo2 = await prisma.processo.create({ data: { nome: MARK, arvoreId: arvoreImportada.id } })
+    ctx.processoIds.push(processo2.id)
+    await prisma.processoRequerente.create({ data: { processoId: processo2.id, requerenteId: requerente2.id } })
+
+    const antesCount = await prisma.pessoa.count({ where: { arvoreId: arvoreImportada.id } })
+    const r4 = await vincularPessoaExistenteAoRequerente({
+      arvoreId: arvoreImportada.id, requerenteId: requerente2.id, pessoaId: pessoaImportada.id,
+    })
+    ok(r4.ok && r4.pessoaId === pessoaImportada.id, "vincula a MESMA pessoa (não cria outra)", r4)
+    const depoisCount = await prisma.pessoa.count({ where: { arvoreId: arvoreImportada.id } })
+    ok(depoisCount === antesCount, "nenhuma pessoa nova foi criada", { antesCount, depoisCount })
+
+    const reqApos4 = await prisma.requerente.findUnique({ where: { id: requerente2.id } })
+    ok(reqApos4?.personId === pessoaImportada.id, "Requerente.personId aponta pra pessoa existente", reqApos4?.personId)
+    const pessoaApos4 = await prisma.pessoa.findUnique({ where: { id: pessoaImportada.id } })
+    ok(
+      ["sim", "maior"].includes(String(pessoaApos4?.requerente ?? "").toLowerCase()),
+      "Pessoa.requerente foi setado (não fica 'nao')", pessoaApos4?.requerente,
+    )
+
+    console.log("\n4b) Idempotência: repetir o MESMO par não duplica nem falha")
+    const r4b = await vincularPessoaExistenteAoRequerente({
+      arvoreId: arvoreImportada.id, requerenteId: requerente2.id, pessoaId: pessoaImportada.id,
+    })
+    ok(r4b.ok && r4b.pessoaId === pessoaImportada.id, "repetir o mesmo vínculo continua ok", r4b)
+
+    console.log("\n4c) Requerente já vinculado a OUTRA pessoa → recusa")
+    const outraPessoa = await prisma.pessoa.create({
+      data: { nome: "Outra", sobrenome: "Pessoa", arvoreId: arvoreImportada.id, requerente: "nao" },
+    })
+    const r4c = await vincularPessoaExistenteAoRequerente({
+      arvoreId: arvoreImportada.id, requerenteId: requerente2.id, pessoaId: outraPessoa.id,
+    })
+    ok(!r4c.ok && r4c.code === "REQUERENTE_JA_VINCULADO", "recusa trocar a pessoa de um requerente já vinculado", r4c)
+
+    console.log("\n4d) Pessoa já é requerente de OUTRO vínculo → recusa")
+    const requerente3 = await prisma.requerente.create({ data: { nome: "Terceiro Req", observacoes: MARK, personId: null } })
+    ctx.requerenteIds.push(requerente3.id)
+    const r4d = await vincularPessoaExistenteAoRequerente({
+      arvoreId: arvoreImportada.id, requerenteId: requerente3.id, pessoaId: pessoaImportada.id,
+    })
+    ok(!r4d.ok && r4d.code === "PESSOA_JA_E_REQUERENTE", "recusa vincular pessoa que já é requerente de outro", r4d)
   } finally {
     await limpar(ctx)
   }
