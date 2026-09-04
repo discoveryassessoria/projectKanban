@@ -50,13 +50,15 @@ const menuItems = [
     // TAREFAS E PROJETOS — a MESMA Tarefa canônica, vista por quem responde
     // pela operação inteira. Entra logo depois de Operação porque é a mesma
     // matéria com outro alcance: lá se executa, aqui se enxerga e se distribui.
-    // Exige `tarefas.editar` porque ver a fila alheia é ato de gestão.
+    // `tarefas.editar` sozinho não prova gestão — também autoriza editar a
+    // PRÓPRIA tarefa —, então esta aba exige admin.
     title: "Tarefas e Projetos",
     url: "/tarefas",
     icon: BoardIcon,
     textOffset: "",
     iconOffset: "",
     permissao: "tarefas.editar",
+    soAdmin: true,
   },
   {
     title: "Eventos",
@@ -122,7 +124,7 @@ const adminMenuItems = [
 ]
 
 export function BitrixSidebar() {
-  const { pode, carregando } = usePermissoes()
+  const { pode, isAdmin, carregando } = usePermissoes()
   const { isCollapsed, setIsCollapsed } = useSidebarContext()
   const [isHovered, setIsHovered] = useState(false)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -214,7 +216,7 @@ export function BitrixSidebar() {
             </div>
           )}
           <nav className="space-y-1">
-            {menuItems.filter((item) => !item.permissao || pode(item.permissao)).map((item) => {
+            {menuItems.filter((item) => (!item.permissao || pode(item.permissao)) && (!item.soAdmin || isAdmin)).map((item) => {
               const isActive = pathname === item.url
 
               return (

@@ -75,30 +75,6 @@ interface Resposta {
   facetas: Facetas
 }
 
-interface Avaliacao {
-  usuarioId: number
-  nome: string
-  elegivel: boolean
-  motivos: Array<{ codigo: string; texto: string }>
-  carga: {
-    ativas: number; executaveis: number; emAndamento: number; naoIniciadas: number
-    aguardandoTerceiro: number; bloqueadas: number; atrasadas: number; urgentes: number
-  }
-  score: number
-  parcelas: Array<{ componente: string; quantidade: number; peso: number; subtotal: number; explicacao: string }>
-}
-interface Simulacao {
-  taskId: number
-  titulo: string
-  recomendado: { usuarioId: number; nome: string; score: number } | null
-  abstencao: { codigo: string; texto: string } | null
-  explicacao: string[]
-  decididoNoDesempateTecnico: boolean
-  avaliacoes: Avaliacao[]
-  equipe: { exigidaPelaTarefa: string | null; cadastrada: boolean; membros: number[]; nota: string } | null
-  criteriosAusentes: Array<{ criterio: string; porque: string }>
-}
-
 interface Filtros {
   responsavel: number | null
   semResponsavel: boolean
@@ -180,6 +156,8 @@ export function VisaoGlobal() {
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [ordem, setOrdem] = useState<{ campo: keyof LinhaGerencial; asc: boolean }>({ campo: "dataPrazo", asc: true })
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
+  const [alvoLote, setAlvoLote] = useState<{ linhas: LinhaGerencial[] } | null>(null)
   const router = useRouter()
   /**
    * A MESMA NAVEGAÇÃO DA MINHA FILA — uma tarefa, um destino.
@@ -191,8 +169,6 @@ export function VisaoGlobal() {
   const irParaOProcesso = useCallback((l: LinhaGerencial) => {
     router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
   }, [router])
-  /** A tarefa cuja sugestão está aberta. `null` = nenhuma. */
-  const [sugerindo, setSugerindo] = useState<{ l: LinhaGerencial; s: Simulacao | null; erro: string | null } | null>(null)
 
   // A busca não pode disparar um pedido por tecla digitada.
   const [buscaDigitada, setBuscaDigitada] = useState("")
@@ -258,27 +234,44 @@ export function VisaoGlobal() {
   // Referência ESTÁVEL: `dados?.linhas ?? []` cria um array novo a cada render,
   // e os dois `useMemo` abaixo recalculariam sempre — inclusive a ordenação de
   // uma lista de centenas de linhas, a cada tecla digitada na busca.
+
   /**
-   * SUGERIR RESPONSÁVEL — pergunta, não decide.
+   * ATRIBUIÇÃO EM LOTE — a MESMA porta de sempre, chamada uma vez por tarefa.
    *
-   * É um GET. Não atribui, não altera `responsavelId`, não notifica ninguém: o
-   * gestor lê a recomendação e confirma pelo mesmo "Atribuir" de sempre, que
-   * continua sendo a única porta que escreve.
+   * Nada de endpoint novo: cada linha do lote passa pelo `/api/tarefas/{id}/
+   * comando` de sempre, com `acao` decidida pelo estado ATUAL daquela linha
+   * (quem já tem dono é "transferir", quem não tem é "atribuir"). Uma falha
+   * isolada não trava as demais; o resumo no final é honesto sobre as duas
+   * contagens, e só há uma confirmação — a da lista, no fim.
    */
-  const sugerir = useCallback(async (l: LinhaGerencial) => {
-    setSugerindo({ l, s: null, erro: null })
-    try {
-      const r = await fetch(`/api/operacao/sugestao?taskId=${l.taskId}`, { headers: auth() })
-      if (!r.ok) {
-        setSugerindo({ l, s: null, erro: r.status === 403 ? "Você não tem permissão para ver a recomendação." : `Falha (HTTP ${r.status}).` })
-        return
+  const atribuirEmLote = useCallback(async (alvos: LinhaGerencial[], responsavelId: number) => {
+    setOcupado(true)
+    setErroComando(null)
+    let ok = 0
+    let falha = 0
+    for (const l of alvos) {
+      try {
+        const r = await fetch(`/api/tarefas/${l.taskId}/comando`, {
+          method: "POST",
+          headers: auth(),
+          body: JSON.stringify({ acao: l.responsavelId == null ? "atribuir" : "transferir", responsavelId }),
+        })
+        if (r.ok) ok += 1
+        else falha += 1
+      } catch {
+        falha += 1
       }
-      const d = (await r.json()) as { simulacao: Simulacao }
-      setSugerindo({ l, s: d.simulacao, erro: null })
-    } catch {
-      setSugerindo({ l, s: null, erro: "Não foi possível falar com o servidor." })
     }
-  }, [])
+    setOcupado(false)
+    setAlvoLote(null)
+    setSelecionados(new Set())
+    setAviso(
+      falha === 0
+        ? `${ok} tarefa${ok === 1 ? "" : "s"} atribuída${ok === 1 ? "" : "s"}.`
+        : `${ok} atribuída${ok === 1 ? "" : "s"}, ${falha} ${falha === 1 ? "falhou" : "falharam"}.`,
+    )
+    recarregar()
+  }, [recarregar])
 
   const linhas = useMemo(() => dados?.linhas ?? [], [dados])
   const ordenadas = useMemo(() => {
@@ -298,6 +291,14 @@ export function VisaoGlobal() {
     for (const l of linhas) m.get(l.coluna)?.push(l)
     return m
   }, [linhas])
+
+  const todosSelecionadosVisiveis = ordenadas.length > 0 && ordenadas.every((l) => selecionados.has(l.taskId))
+  const alternarTodos = () => setSelecionados(todosSelecionadosVisiveis ? new Set() : new Set(ordenadas.map((l) => l.taskId)))
+  const alternarSelecao = (id: number) => setSelecionados((prev) => {
+    const novo = new Set(prev)
+    if (novo.has(id)) novo.delete(id); else novo.add(id)
+    return novo
+  })
 
   const aplicar = (p: Partial<Filtros>) => setFiltros((f) => ({ ...f, ...p }))
   const limpar = () => { setBuscaDigitada(""); setFiltros(SEM_FILTRO) }
@@ -431,6 +432,27 @@ export function VisaoGlobal() {
         </div>
       )}
 
+      {/* SELEÇÃO EM MASSA — a mesma porta de uma linha só, chamada em lote. */}
+      {selecionados.size > 0 && (
+        <div className="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2">
+          <span className="text-[11px] text-white/85">
+            {selecionados.size} selecionada{selecionados.size === 1 ? "" : "s"}
+          </span>
+          <button
+            onClick={() => setAlvoLote({ linhas: linhas.filter((l) => selecionados.has(l.taskId)) })}
+            className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
+          >
+            Atribuir para…
+          </button>
+          <button
+            onClick={() => setSelecionados(new Set())}
+            className="text-[11px] text-[var(--text-secondary)] hover:text-white/80"
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-auto">
         {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
         {carregando && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
@@ -447,7 +469,10 @@ export function VisaoGlobal() {
             aoOrdenar={(campo) => setOrdem((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }))}
             aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l) }}
             aoDistribuir={setAlvo}
-            aoSugerir={sugerir}
+            selecionados={selecionados}
+            todosSelecionados={todosSelecionadosVisiveis}
+            aoAlternarSelecao={alternarSelecao}
+            aoAlternarTodos={alternarTodos}
           />
         )}
         {dados && linhas.length > 0 && modo === "kanban" && (
@@ -455,18 +480,20 @@ export function VisaoGlobal() {
             porColuna={porColuna}
             aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l) }}
             aoDistribuir={setAlvo}
-            aoSugerir={sugerir}
             aoComandar={comandar}
             ocupado={ocupado}
           />
         )}
       </div>
 
-      {sugerindo && (
-        <PainelSugestao
-          alvo={sugerindo}
-          aoFechar={() => setSugerindo(null)}
-          aoAtribuir={(l) => { setSugerindo(null); setAlvo(l) }}
+      {alvoLote && (
+        <SeletorResponsavel
+          titulo={`Atribuir ${alvoLote.linhas.length} tarefa${alvoLote.linhas.length === 1 ? "" : "s"}`}
+          atual={null}
+          ocupado={ocupado}
+          erro={erroComando}
+          aoFechar={() => { setAlvoLote(null); setErroComando(null) }}
+          aoEscolher={(id) => atribuirEmLote(alvoLote.linhas, id)}
         />
       )}
 
@@ -540,19 +567,32 @@ function tempo(dias: number | null, atrasada: boolean): string {
 }
 
 function Lista({
-  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir, aoSugerir,
+  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir,
+  selecionados, todosSelecionados, aoAlternarSelecao, aoAlternarTodos,
 }: {
   linhas: LinhaGerencial[]
   ordem: { campo: keyof LinhaGerencial; asc: boolean }
   aoOrdenar: (c: keyof LinhaGerencial) => void
   aoAbrir: (id: number) => void
   aoDistribuir: (l: LinhaGerencial) => void
-  aoSugerir: (l: LinhaGerencial) => void
+  selecionados: Set<number>
+  todosSelecionados: boolean
+  aoAlternarSelecao: (id: number) => void
+  aoAlternarTodos: () => void
 }) {
   return (
     <table className="w-full border-collapse text-left">
       <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
         <tr className="border-b border-white/[0.08]">
+          <th className="w-8 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={todosSelecionados}
+              onChange={aoAlternarTodos}
+              aria-label="Selecionar todas as tarefas visíveis"
+              className="cursor-pointer"
+            />
+          </th>
           {COLUNAS_LISTA.map((c) => (
             <th key={String(c.campo)} className={`${c.classe} px-3 py-2`}>
               <button
@@ -570,6 +610,15 @@ function Lista({
       <tbody>
         {linhas.map((l) => (
           <tr key={l.taskId} className="group border-b border-white/[0.05] hover:bg-[var(--surface-primary)]">
+            <td className="px-3 py-2 align-top">
+              <input
+                type="checkbox"
+                checked={selecionados.has(l.taskId)}
+                onChange={() => aoAlternarSelecao(l.taskId)}
+                aria-label={`Selecionar ${l.titulo}`}
+                className="cursor-pointer"
+              />
+            </td>
             <td className="max-w-0 px-3 py-2 align-top">
               <button onClick={() => aoAbrir(l.taskId)} className="w-full cursor-pointer text-left">
                 <span className="block truncate text-[12px] text-white/90">{l.titulo}</span>
@@ -592,16 +641,6 @@ function Lista({
             <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.criadaEm)}</td>
             <td className="px-3 py-2 text-right">
               <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                {/* Só onde não há dono: sugerir para quem já tem responsável
-                    seria propor redistribuição, que é outro problema. */}
-                {l.responsavelId == null && (
-                  <button
-                    onClick={() => aoSugerir(l)}
-                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)]/80 transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]"
-                  >
-                    Sugerir
-                  </button>
-                )}
                 <button
                   onClick={() => aoDistribuir(l)}
                   className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
@@ -647,12 +686,11 @@ const ARRASTOS: Record<string, { acao: string; rotulo: string; pedeMotivo?: bool
 const arrastoDe = (de: ColunaKanban, para: ColunaKanban) => ARRASTOS[`${de}→${para}`] ?? null
 
 function Quadro({
-  porColuna, aoAbrir, aoDistribuir, aoSugerir, aoComandar, ocupado,
+  porColuna, aoAbrir, aoDistribuir, aoComandar, ocupado,
 }: {
   porColuna: Map<ColunaKanban, LinhaGerencial[]>
   aoAbrir: (id: number) => void
   aoDistribuir: (l: LinhaGerencial) => void
-  aoSugerir: (l: LinhaGerencial) => void
   aoComandar: (id: number, corpo: Record<string, unknown>, ok: string) => Promise<boolean>
   ocupado: boolean
 }) {
@@ -705,7 +743,6 @@ function Quadro({
                   l={l}
                   aoAbrir={() => aoAbrir(l.taskId)}
                   aoDistribuir={() => aoDistribuir(l)}
-                  aoSugerir={() => aoSugerir(l)}
                   aoArrastar={(inicio) => setArrastando(inicio ? l : null)}
                 />
               ))}
@@ -749,12 +786,11 @@ function Quadro({
 }
 
 function Card({
-  l, aoAbrir, aoDistribuir, aoSugerir, aoArrastar,
+  l, aoAbrir, aoDistribuir, aoArrastar,
 }: {
   l: LinhaGerencial
   aoAbrir: () => void
   aoDistribuir: () => void
-  aoSugerir: () => void
   aoArrastar: (inicio: boolean) => void
 }) {
   const contexto = [l.pessoaNome, l.processoNome].filter(Boolean).join(" · ")
@@ -795,205 +831,12 @@ function Card({
               {dataCurta(l.dataPrazo)}
             </span>
           )}
-          {l.responsavelId == null && (
-            <button
-              onClick={aoSugerir}
-              className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]/80 transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]"
-            >
-              Sugerir
-            </button>
-          )}
           <button
             onClick={aoDistribuir}
             className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
           >
             {l.responsavelId == null ? "Atribuir" : "Transferir"}
           </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/**
- * O PAINEL DA SUGESTÃO — o modo auditor, na tela.
- *
- * Uma recomendação que só diz um nome pede fé. Esta mostra a conta inteira:
- * quem é elegível e quem não é (com o motivo), a carga de cada um, o score
- * decomposto parcela a parcela, e — o que costuma faltar — o que o sistema NÃO
- * sabe. O gestor decide com o mesmo botão de sempre; aqui não há nada que
- * escreva.
- */
-function PainelSugestao({
-  alvo,
-  aoFechar,
-  aoAtribuir,
-}: {
-  alvo: { l: LinhaGerencial; s: Simulacao | null; erro: string | null }
-  aoFechar: () => void
-  aoAtribuir: (l: LinhaGerencial) => void
-}) {
-  const { l, s, erro } = alvo
-  const elegiveis = (s?.avaliacoes ?? []).filter((a) => a.elegivel).sort((a, b) => a.score - b.score)
-  const inelegiveis = (s?.avaliacoes ?? []).filter((a) => !a.elegivel)
-  const [auditor, setAuditor] = useState(false)
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
-      <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="border-b border-white/[0.08] px-4 py-3">
-          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Sugerir responsável</p>
-          <h2 className="mt-0.5 truncate text-[14px] font-medium text-white/95">{l.titulo}</h2>
-          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-            {[l.pessoaNome, l.processoNome].filter(Boolean).join(" · ") || "—"}
-          </p>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {erro && <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-[11px] text-red-700/90">{erro}</div>}
-          {!s && !erro && <Estado tipo="carregando" mensagem="Calculando elegibilidade e carga…" />}
-
-          {s && (
-            <>
-              {/* ── A RESPOSTA ── */}
-              <div className="border-b border-white/[0.06] px-4 py-3.5">
-                {s.recomendado ? (
-                  <>
-                    <div className="flex items-baseline gap-2">
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-green-800/90">
-                        {iniciais(s.recomendado.nome)}
-                      </span>
-                      <span className="text-[15px] font-medium text-white/95">{s.recomendado.nome}</span>
-                      <span className="text-[11px] tabular-nums text-[var(--text-muted)]">custo operacional {s.recomendado.score}</span>
-                    </div>
-                    <ul className="mt-2.5 space-y-1">
-                      {s.explicacao.map((linha, i) => (
-                        <li key={i} className={`text-[11px] leading-4 ${
-                          linha.startsWith("⚠") ? "text-amber-800/80" : linha.startsWith("ℹ") ? "text-[var(--text-secondary)]" : "text-white/65"
-                        }`}>
-                          {linha}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ) : (
-                  <>
-                    {/* A ABSTENÇÃO É UMA RESPOSTA — com motivo, nunca um nome inventado. */}
-                    <p className="text-[13px] font-medium text-amber-800/90">Sem recomendação automática</p>
-                    <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">{s.abstencao?.texto}</p>
-                    <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
-                      Código: {s.abstencao?.codigo}. A decisão continua sendo sua — atribuir manualmente segue disponível.
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {/* ── QUEM PODE, E QUANTO CADA UM CARREGA ── */}
-              {elegiveis.length > 0 && (
-                <div className="border-b border-white/[0.06] px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Elegíveis · {elegiveis.length}
-                  </p>
-                  <div className="mt-2 space-y-1.5">
-                    {elegiveis.map((a) => (
-                      <div key={a.usuarioId} className="rounded border border-white/[0.07] px-2.5 py-2">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-green-800/90" : "text-white/80"}`}>
-                            {a.nome}
-                          </span>
-                          <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">custo {a.score}</span>
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
-                          <span><span className="tabular-nums text-white/65">{a.carga.executaveis}</span> executáveis</span>
-                          <span><span className="tabular-nums text-white/65">{a.carga.ativas}</span> ativas</span>
-                          <span className={a.carga.atrasadas > 0 ? "text-red-700/70" : ""}>
-                            <span className="tabular-nums">{a.carga.atrasadas}</span> atrasadas
-                          </span>
-                          <span><span className="tabular-nums text-white/65">{a.carga.urgentes}</span> urgentes</span>
-                          <span><span className="tabular-nums text-white/65">{a.carga.aguardandoTerceiro}</span> aguardando terceiro</span>
-                          <span><span className="tabular-nums text-white/65">{a.carga.bloqueadas}</span> bloqueadas</span>
-                        </div>
-                        {auditor && (
-                          <div className="mt-1.5 space-y-0.5 border-t border-white/[0.06] pt-1.5">
-                            {a.parcelas.map((p) => (
-                              <div key={p.componente} className="flex justify-between text-[10px] text-[var(--text-muted)]">
-                                <span>{p.explicacao}</span>
-                                <span className="tabular-nums">{p.quantidade} × {p.peso} = {p.subtotal}</span>
-                              </div>
-                            ))}
-                            <div className="flex justify-between border-t border-white/[0.06] pt-1 text-[10px] text-[var(--text-secondary)]">
-                              <span>custo operacional</span>
-                              <span className="tabular-nums">{a.score}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── QUEM NÃO PODE, E POR QUÊ ── */}
-              {inelegiveis.length > 0 && (
-                <div className="border-b border-white/[0.06] px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Inelegíveis · {inelegiveis.length}
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    {inelegiveis.map((a) => (
-                      <div key={a.usuarioId} className="flex gap-2 text-[11px]">
-                        <span className="shrink-0 text-[var(--text-secondary)]">{a.nome}</span>
-                        <span className="text-[var(--text-muted)]">{a.motivos.map((m) => m.texto).join(" ")}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* ── O QUE O SISTEMA NÃO SABE ── */}
-              <div className="px-4 py-3">
-                <button
-                  onClick={() => setAuditor((v) => !v)}
-                  className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] transition-colors hover:text-white/70"
-                >
-                  {auditor ? "▾" : "▸"} Como esta conta foi feita
-                </button>
-                {auditor && (
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-[10px] leading-4 text-[var(--text-secondary)]">
-                      Elegibilidade tem um critério só neste sistema: permissão de executar tarefa. Os critérios abaixo
-                      são frequentemente esperados e <span className="text-white/70">não existem no cadastro</span> —
-                      nenhum foi inventado:
-                    </p>
-                    {s.criteriosAusentes.map((c) => (
-                      <div key={c.criterio} className="text-[10px] leading-4 text-[var(--text-muted)]">
-                        <span className="text-[var(--text-secondary)]">{c.criterio}</span> — {c.porque}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between gap-2 border-t border-white/[0.08] px-4 py-2.5">
-          <span className="text-[10px] text-[var(--text-muted)]">Nada foi alterado. A atribuição continua sendo sua.</span>
-          <div className="flex gap-2">
-            <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] transition-colors hover:text-white/80">
-              Fechar
-            </button>
-            {/* Confirmar abre o MESMO seletor de sempre — a porta que escreve é uma só. */}
-            <button
-              onClick={() => aoAtribuir(l)}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
-            >
-              Atribuir…
-            </button>
-          </div>
         </div>
       </div>
     </div>

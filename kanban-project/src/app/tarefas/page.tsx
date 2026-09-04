@@ -34,10 +34,12 @@ export default function TarefasEProjetosPage() {
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
   const user = userSalvo ?? { nome: "Usuário" }
 
-  // Ver a operação INTEIRA é ato de gestão: exige a mesma permissão de
-  // distribuir. Quem só executa tem a Minha Fila, que já é a sua visão do
-  // mundo. O backend confere de novo — esconder a tela não é controle de acesso.
-  const autorizado = pode("tarefas.editar")
+  // Ver a operação INTEIRA é ato de gestão: exige admin. `tarefas.editar`
+  // sozinho também autoriza editar a PRÓPRIA tarefa, então não prova que a
+  // pessoa gere a distribuição de todo mundo. Quem só executa tem a Minha
+  // Fila, que já é a sua visão do mundo. O backend confere de novo —
+  // esconder a tela não é controle de acesso.
+  const autorizado = pode("tarefas.editar") && user.tipo === "admin"
 
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/operacao")

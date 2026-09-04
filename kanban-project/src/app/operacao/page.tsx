@@ -31,10 +31,11 @@ export default function OperacaoPage() {
   const user = userSalvo ?? { nome: "Usuário" }
 
   // Ver tarefa é o piso da tela; distribuir é o que separa quem executa de quem
-  // gere. A permissão manda no que aparece — e o backend confere de novo, porque
-  // esconder botão não é controle de acesso.
+  // gere. `tarefas.editar` sozinho não prova isso — também autoriza editar a
+  // PRÓPRIA tarefa —, então distribuir exige admin. O backend confere de novo,
+  // porque esconder aba não é controle de acesso.
   const autorizado = pode("tarefas.ver")
-  const podeDistribuir = pode("tarefas.editar")
+  const podeDistribuir = pode("tarefas.editar") && user.tipo === "admin"
 
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/")

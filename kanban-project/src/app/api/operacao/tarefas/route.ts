@@ -30,6 +30,14 @@ export async function GET(request: NextRequest) {
   const usuario = await extrairUsuarioComPermissoes(request)
   if (!usuario) return NextResponse.json({ error: 'não autenticado' }, { status: 401 })
 
+  // 🔒 HIERARQUIA: "sem responsável" é a fila de DISTRIBUIÇÃO — quem decide de
+  // quem é o trabalho. `tarefas.editar` também autoriza editar a PRÓPRIA
+  // tarefa, então não basta como prova de que a pessoa distribui: só o admin
+  // vê o que ainda não é de ninguém.
+  if (visao === 'sem_responsavel' && usuario.tipo !== 'admin') {
+    return NextResponse.json({ error: 'Apenas administradores veem a fila sem responsável.' }, { status: 403 })
+  }
+
   const agora = new Date()
   if (visao === 'sem_responsavel') {
     const linhas = await semResponsavel(agora)

@@ -13,9 +13,11 @@
 // arrastar um card.
 //
 // ─── ESCOPO ─────────────────────────────────────────────────────────────────
-// Ver a operação inteira é ato de GESTÃO: exige `tarefas.editar`, a mesma
-// permissão de "Sem responsável". Quem só executa continua com a Minha Fila,
-// que já é a sua visão do mundo — e é o backend que decide isso, não a tela.
+// Ver a operação inteira é ato de GESTÃO: exige admin. `tarefas.editar`
+// sozinho não prova isso — também autoriza editar a PRÓPRIA tarefa —, então
+// não basta para abrir a operação de todo mundo. Quem não é admin continua
+// com a Minha Fila, que já é a sua visão do mundo — e é o backend que decide
+// isso, não a tela.
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import type { PrioridadeTarefa, StatusTarefa } from '@prisma/client'
@@ -44,6 +46,13 @@ export async function GET(request: NextRequest) {
 
   const usuario = await extrairUsuarioComPermissoes(request)
   if (!usuario) return NextResponse.json({ error: 'não autenticado' }, { status: 401 })
+
+  // 🔒 HIERARQUIA: esta rota devolve a OPERAÇÃO INTEIRA — sem responsável e de
+  // todo mundo. `tarefas.editar` autoriza editar a PRÓPRIA tarefa; não prova
+  // que a pessoa gere a distribuição de todo mundo. Só o admin passa daqui.
+  if (usuario.tipo !== 'admin') {
+    return NextResponse.json({ error: 'Apenas administradores veem a operação inteira. Use a Minha Fila.' }, { status: 403 })
+  }
 
   const p = request.nextUrl.searchParams
   const colunaPedida = p.get('coluna')
