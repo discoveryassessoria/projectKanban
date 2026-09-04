@@ -85,8 +85,6 @@ const API_PUBLICA: string[] = [
 ]
 
 function isApiPublica(pathname: string): boolean {
-  if (pathname === "/api/whatsapp/webhook") return true
-
   return API_PUBLICA.some(
     (p) => pathname === p || pathname.startsWith(p)
   )

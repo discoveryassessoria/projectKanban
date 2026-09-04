@@ -12,7 +12,6 @@ import { ArvoreGenealogicaView } from "../arvore"
 // ⚠ ALTERAÇÃO: ProcessoTarefas sai do Geral e vai migrar para Central Operacional (aba a criar)
 // import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
-import { MovimentarFaseModal } from "./MovimentarFaseModal"
 import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 // Diagnóstico técnico do Runtime v2 (WorkflowV2Panel/WorkflowV2AtivacaoPanel) foi
 // movido para Gerenciamento → Motor → Diagnóstico do Runtime. A Central Operacional
@@ -31,11 +30,9 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 // ✅ NOVO: header de progresso da fase do processo
 import { PhaseProgressHeader } from "@/src/components/processo/PhaseProgressHeader"
 import { 
-  X, 
-  Phone, 
-  Mail, 
-  Settings, 
-  MoveRight,
+  X,
+  Phone,
+  Mail,
   ChevronDown,
   Plus,
   MessageSquare,
@@ -159,8 +156,6 @@ function ConteudoModal({
   // IDENTIFICA a leitura, e voltar a uma aba já vista mostra o valor em cache enquanto
   // revalida, em vez de piscar.
   const [phaseRefreshExtra, setPhaseRefreshExtra] = useState(0)
-  // Movimentação manual de fase pelo menu do processo (mesma ação do arraste).
-  const [movendoFase, setMovendoFase] = useState(false)
   const phaseRefreshKey = `${activeTab}:${phaseRefreshExtra}`
 
   // Modo edição
@@ -568,19 +563,6 @@ function ConteudoModal({
 
   const modalContent = (
     <>
-      {movendoFase && (
-        <MovimentarFaseModal
-          processoId={processo.id}
-          origem="MENU_PROCESSO"
-          onCancelar={() => setMovendoFase(false)}
-          onMovido={() => {
-            setMovendoFase(false)
-            // A fase mudou: invalida a projeção do header e avisa quem abriu o modal.
-            setPhaseRefreshExtra((k) => k + 1)
-            onSave?.()
-          }}
-        />
-      )}
       <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[9998]" onClick={handleClose} />
 
       <div 
@@ -619,31 +601,6 @@ function ConteudoModal({
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className={finDark ? 'text-white/70 hover:text-white hover:bg-[var(--surface-hover)]' : 'text-gray-500 hover:text-gray-700'}>
-              <Phone className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className={finDark ? 'text-white/70 hover:text-white hover:bg-[var(--surface-hover)]' : 'text-gray-500 hover:text-gray-700'}>
-              <Mail className="h-5 w-5" />
-            </Button>
-            {/* MOVIMENTAR FASE — mesma ação do arraste, pelo menu. Existe para quem
-                não tem drag (acessibilidade, tela sensível ao toque) e como caminho
-                que não depende da biblioteca de drag-and-drop. Mesmo modal, mesmo
-                endpoint, mesma permissão exclusiva. */}
-            {pode('processos.moverFaseManual') && (
-              <Button
-                variant="ghost"
-                size="icon"
-                title="Movimentar fase"
-                aria-label="Movimentar fase"
-                onClick={() => setMovendoFase(true)}
-                className={finDark ? 'text-white/70 hover:text-white hover:bg-[var(--surface-hover)]' : 'text-gray-500 hover:text-gray-700'}
-              >
-                <MoveRight className="h-5 w-5" />
-              </Button>
-            )}
-            <Button variant="ghost" size="icon" className={finDark ? 'text-white/70 hover:text-white hover:bg-[var(--surface-hover)]' : 'text-gray-500 hover:text-gray-700'}>
-              <Settings className="h-5 w-5" />
-            </Button>
             {pode('processos.excluir') && (
               <Button 
                 variant="ghost" 
