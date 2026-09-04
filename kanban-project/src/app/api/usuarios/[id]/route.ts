@@ -15,7 +15,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (!requester) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
-    const requesterId = requester.userId
 
     const { id: idParam } = await params
     const userId = parseInt(idParam)
@@ -32,11 +31,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!usuarioExistente) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
-    }
-
-    // Impedir que admin edite outro admin (exceto a si mesmo)
-    if (usuarioExistente.tipo === "admin" && usuarioExistente.id !== requesterId) {
-      return NextResponse.json({ error: "Você não pode editar outro administrador." }, { status: 403 })
     }
 
     // Validar tipo de usuário se estiver sendo alterado

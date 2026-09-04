@@ -385,14 +385,19 @@ function ConteudoModal({
 
 
   useEffect(() => {
+    // 🔒 Achado real: estas duas chamadas eram as únicas neste arquivo sem
+    // `Authorization` — o servidor recusava com 401, e a tela engolia o erro
+    // em silêncio mostrando "Nenhum requerente/contratante encontrado" em vez
+    // de avisar que a busca falhou. Os dados sempre existiram no banco.
+    const auth = { Authorization: `Bearer ${localStorage.getItem("authToken")}` }
     if (isOpen && contratantesProp.length === 0) {
-      fetch('/api/contratantes')
+      fetch('/api/contratantes', { headers: auth })
         .then(res => res.json())
         .then(data => setContratantes(data.contratantes || []))
         .catch(console.error)
     }
     if (isOpen && requerentesProp.length === 0) {
-      fetch('/api/requerentes')
+      fetch('/api/requerentes', { headers: auth })
         .then(res => res.json())
         .then(data => setRequerentes(data.requerentes || []))
         .catch(console.error)
