@@ -1164,6 +1164,15 @@ registrar({
 //   · executor ESPECIALIZADO que não consome ações cadastradas — tem contrato próprio.
 //     Cadastro vazio é normal.
 //   · fase que NUNCA rodou — é rascunho de futuro, não operação quebrada. Vira INFO.
+//   · fase ainda conduzida pelo MOTOR LEGADO (`motorVigenteDaFase` diz que o Workflow
+//     Interno não assumiu) — o operador nunca abre o painel declarativo destes passos:
+//     `ProcessoCentralOperacional` mostra a tela bespoke da fase (Apostilamento,
+//     Tradução, Emissão Retificada, Análise, Fase Final) ANTES de chegar no editor
+//     genérico, e é essa tela que conclui o trabalho e fecha os passos por baixo
+//     (`concluirFaseBespokeEAvancar`). Cadastro vazio aqui não é o operador travado —
+//     é o motor que ainda não assumiu. Achado real (04/09/2026): os 6 passos de
+//     Apostilamento (fase com tela própria) foram acusados como travamento
+//     operacional quando, na prática, ninguém nunca passa por eles.
 
 registrar({
   id: 'saude.cadastro.passo-ativo-sem-execucao',
@@ -1204,15 +1213,26 @@ registrar({
     const semCadastro = passos.filter((p) =>
       !p.acoes.length && !p.campos.length && !p.checkItens.length && !p.subtarefas.length)
 
+    // MOTOR VIGENTE POR FASE — uma consulta por phaseKey distinta, não por passo.
+    const fasesDistintas = [...new Set(semCadastro.map((p) => p.workflow.phaseKey))]
+    const motorPorFase = new Map(
+      await Promise.all(fasesDistintas.map(async (fk) => [fk, await motorVigenteDaFase(fk)] as const)),
+    )
+
     const achados: Achado[] = []
     let placeholders = 0
     let especializados = 0
+    let legados = 0
     for (const p of semCadastro) {
       // O EXECUTOR EFETIVO decide se cadastro vazio é defeito. Sem `executorKey`, o
       // registro resolve pela chave do passo — pode cair num especializado.
       const exec = executorEfetivo({ key: p.key, executorKey: p.executorKey }, p.workflow.phaseKey)
       const cap = REGISTRO_DE_EXECUTORES[exec as keyof typeof REGISTRO_DE_EXECUTORES]
       if (cap && !cap.acoesCadastradas) { especializados++; continue }
+      // A FASE AINDA É CONDUZIDA PELO MOTOR LEGADO (tela bespoke própria) — o
+      // operador nunca chega no painel declarativo destes passos; quem conclui o
+      // trabalho é a tela anterior, que fecha os passos por baixo ao terminar.
+      if (!motorPorFase.get(p.workflow.phaseKey)?.canonico) { legados++; continue }
       if (!rodaram.has(p.workflow.phaseKey)) { placeholders++; continue }
 
       achados.push({
@@ -1231,12 +1251,12 @@ registrar({
 
     const metricas = {
       passos: passos.length, semCadastro: semCadastro.length,
-      incompletos: achados.length, placeholders, especializados,
+      incompletos: achados.length, placeholders, especializados, legados,
     }
     if (!achados.length) {
       return {
         achados: [], metricas,
-        resumo: `${passos.length} passo(s) ativos; ${especializados} com executor próprio e ${placeholders} em fase que nunca rodou — nenhum operacionalmente vazio.`,
+        resumo: `${passos.length} passo(s) ativos; ${especializados} com executor próprio, ${legados} em fase ainda conduzida pela tela anterior e ${placeholders} em fase que nunca rodou — nenhum operacionalmente vazio.`,
       }
     }
     return { achados, metricas }
