@@ -55,6 +55,7 @@ export type ErroAplicacao =
   | "OPERACAO_NAO_SUPORTADA"
   | "ALVO_INVALIDO"
   | "SEM_ARVORE"
+  | "CONFLITO_CONCORRENCIA"
 
 export interface ResultadoAplicacao {
   ok: boolean
@@ -274,6 +275,29 @@ export async function aplicarProposta(p: {
 
   try {
     const resultado = await prisma.$transaction(async (tx) => {
+      // TRAVA DE CONCORRÊNCIA — primeira escrita da transação, de propósito.
+      //
+      // O `findUnique` que leu `proposta.status` lá em cima é uma leitura SOLTA,
+      // de antes da transação abrir: duas chamadas quase simultâneas (duas
+      // pessoas, ou uma pessoa e o motor automático) passam por ela ao mesmo
+      // tempo, as duas veem PENDENTE, e sem uma trava as duas aplicariam a
+      // mesma proposta.
+      //
+      // A trava é a própria transição de estado, condicionada ao status que
+      // esta chamada leu. Sob READ COMMITTED, a segunda chamada BLOQUEIA nesta
+      // linha até a primeira commitar; ao ser liberada, reavalia o WHERE contra
+      // a linha JÁ ATUALIZADA (agora APLICADA) — não bate mais, `count` vem 0,
+      // e esta chamada aborta em vez de aplicar por cima. Reusar o valor final
+      // ("APLICADA") aqui é seguro: se a transação lançar depois (revalidação
+      // reprovada), o ROLLBACK desfaz esta escrita junto com todas as outras.
+      const claim = await tx.propostaReconciliacao.updateMany({
+        where: { id: proposta.id, status: proposta.status },
+        data: { status: "APLICADA" },
+      })
+      if (claim.count === 0) {
+        throw new ErroConflitoConcorrencia(proposta.id)
+      }
+
       const efeitos = await escrever(tx, {
         proposta: {
           id: proposta.id,
@@ -415,6 +439,20 @@ export async function aplicarProposta(p: {
       falhasRevalidacao: resultado.falhas,
     }
   } catch (e) {
+    // CONFLITO DE CONCORRÊNCIA — não é um aborto: a OUTRA chamada aplicou com
+    // sucesso. Marcar ABORTADA aqui sobrescreveria o resultado dela — a
+    // proposta já está exatamente como deve estar, não se toca em nada.
+    if (e instanceof ErroConflitoConcorrencia) {
+      logRegistral("info", "aplicacao_recusada_por_concorrencia", { propostaId: proposta.id })
+      return {
+        ok: false,
+        propostaId: proposta.id,
+        codigo: "CONFLITO_CONCORRENCIA",
+        mensagem: "Esta proposta já foi decidida por outra ação enquanto esta era processada.",
+        versaoAntes: versaoAntes.versao,
+      }
+    }
+
     const falhas = e instanceof ErroRevalidacao ? e.falhas : [e instanceof Error ? e.message : String(e)]
     // A transação já sofreu ROLLBACK: nada foi escrito. Registrar o aborto é
     // escrita nova, fora da transação revertida.
@@ -460,6 +498,16 @@ class ErroRevalidacao extends Error {
     super(`revalidação falhou: ${falhas.join(" · ")}`)
     this.name = "ErroRevalidacao"
     this.falhas = falhas
+  }
+}
+
+/** Outra chamada já decidiu esta proposta entre a leitura e a trava. Nada foi escrito. */
+class ErroConflitoConcorrencia extends Error {
+  readonly propostaId: number
+  constructor(propostaId: number) {
+    super(`proposta ${propostaId} já foi decidida por outra ação`)
+    this.name = "ErroConflitoConcorrencia"
+    this.propostaId = propostaId
   }
 }
 

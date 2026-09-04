@@ -18,10 +18,15 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { listarObrigacoes } from "@/lib/financeiro/leitura/consultas"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 function dias(d: Date) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // 🔒 Sem checagem nenhuma antes — qualquer usuário autenticado via o gate
+  // genérico do middleware via fornecedor, valores e contas a pagar reais.
+  const erro = await verificarPermissao(req, "financeiro.ver")
+  if (erro) return erro
   try {
     const agora = new Date()
     const mesIni = new Date(agora.getFullYear(), agora.getMonth(), 1)

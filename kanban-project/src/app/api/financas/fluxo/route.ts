@@ -10,11 +10,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 function dias(d: Date) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) }
 function iso(d: Date) { return new Date(d).toISOString().slice(0, 10) }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // 🔒 Sem checagem nenhuma antes — expunha o fluxo de caixa pra qualquer
+  // usuário autenticado.
+  const erro = await verificarPermissao(req, "financeiro.ver")
+  if (erro) return erro
   try {
     const agora = new Date()
     const ini = new Date(agora); ini.setDate(ini.getDate() - 90)

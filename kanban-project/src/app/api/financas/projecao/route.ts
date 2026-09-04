@@ -2,8 +2,13 @@
 // lançamentos de origem (Receita/Custo) + corporativos (ContaPagar). Fonte única.
 import { NextRequest, NextResponse } from 'next/server'
 import { projetarFinanceiroGeral } from '@/lib/financeiro/financeiro-geral-projecao'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // 🔒 Sem checagem nenhuma antes — expunha a projeção financeira geral pra
+  // qualquer usuário autenticado.
+  const erro = await verificarPermissao(req, 'financeiro.ver')
+  if (erro) return erro
   try {
     const projecao = await projetarFinanceiroGeral()
     return NextResponse.json(projecao)

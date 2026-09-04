@@ -47,6 +47,14 @@ interface TarefaNotificacao {
   pais: string | null
 }
 
+interface SaudeCriticaNotificacao {
+  descricao: string
+  criticos: number
+  erros: number
+  desde: string
+  link: string
+}
+
 export function HeaderBar({ 
   title, 
   subtitle, 
@@ -100,7 +108,8 @@ export function HeaderBar({
     vencidas: (notificacoesData?.vencidas || []) as TarefaNotificacao[],
     hoje: (notificacoesData?.hoje || []) as TarefaNotificacao[],
     proximos3Dias: (notificacoesData?.proximos3Dias || []) as TarefaNotificacao[],
-    novas: (notificacoesData?.novas || []) as TarefaNotificacao[]
+    novas: (notificacoesData?.novas || []) as TarefaNotificacao[],
+    saudeCritica: (notificacoesData?.saudeCritica ?? null) as SaudeCriticaNotificacao | null,
   }
   const totalNotificacoes = notificacoesData?.total || 0
 
@@ -307,6 +316,26 @@ export function HeaderBar({
                   </div>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto">
+                    {notificacoes.saudeCritica && (
+                      <div>
+                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-red-600"></span>
+                          Saúde do Sistema
+                        </div>
+                        <button
+                          className="w-full text-left px-3 py-2 border-l-4 border-red-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
+                          onClick={() => { setShowNotifications(false); router.push(notificacoes.saudeCritica!.link) }}
+                        >
+                          <p className="text-sm font-medium text-red-700">{notificacoes.saudeCritica.descricao}</p>
+                          <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                            {notificacoes.saudeCritica.criticos > 0 ? `${notificacoes.saudeCritica.criticos} crítico(s)` : ''}
+                            {notificacoes.saudeCritica.criticos > 0 && notificacoes.saudeCritica.erros > 0 ? ' · ' : ''}
+                            {notificacoes.saudeCritica.erros > 0 ? `${notificacoes.saudeCritica.erros} erro(s)` : ''}
+                            {' — toque para abrir o diagnóstico'}
+                          </p>
+                        </button>
+                      </div>
+                    )}
                     {notificacoes.vencidas.length > 0 && (
                       <div>
                         <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1 sticky top-0">

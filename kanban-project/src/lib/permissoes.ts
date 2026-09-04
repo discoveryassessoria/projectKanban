@@ -397,6 +397,15 @@ export const PERFIS_PADRAO = [
       'processos.excluir_coluna': false,
       'clientes.excluir': false,
       'eventos.excluir': false,
+      'arvore.excluir': false,
+      'arvore.excluir_documento': false,
+      // Sem publicar/gerenciar modelo documental (o DOCX que gera documento real)
+      'modelos.gerenciar': false,
+      'modelos.publicar': false,
+      'modelos.revogar': false,
+      // Sem publicar/excluir regra documental (Matriz Documental)
+      'regras_documentais.publicar': false,
+      'regras_documentais.excluir': false,
       // Sem financeiro avançado
       'financeiro.fatura_criar': false,
       'financeiro.fatura_excluir': false,
@@ -466,6 +475,7 @@ export const PERFIS_PADRAO = [
 
       // Sem admin
       'usuarios.gerenciar': false,
+      'usuarios.excluir': false,
     },
   },
   {

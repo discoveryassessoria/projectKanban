@@ -61,7 +61,7 @@ export async function calcularPendencias(
   const faseDef = faseCode ? getFase(faseCode) : null
 
   // Snapshot carregado (mesma origem que o resolver canônico) — em paralelo.
-  const [necsRaw, certidaoItens, instancia, reqCount, pessoasDocs] = await Promise.all([
+  const [necsRaw, certidaoItens, instancias, reqCount, pessoasDocs] = await Promise.all([
     prisma.necessidadeDocumental.findMany({
       // supersedePorId: null → ignora necessidades SUPERSEDIDAS por reabertura (senão a
       // antiga ATENDIDA + a nova PENDENTE contariam em dobro no gate/progresso).
@@ -69,7 +69,11 @@ export async function calcularPendencias(
       select: { id: true, status: true, obrigatoriedade: true, itemCatalogoId: true },
     }),
     itemCatalogosDeCertidao(prisma),
-    prisma.phaseWorkflowInstance.findFirst({
+    // TODAS as instâncias ativas, não só a de ciclo mais alto — achado PROC-005:
+    // o motor pressupõe uma só, mas quando duas coexistem (anomalia, já vista em
+    // produção) escolher silenciosamente a mais recente apagava do cálculo o
+    // trabalho pendente da outra, e o gate liberava avanço com passo real aberto.
+    prisma.phaseWorkflowInstance.findMany({
       where: { processoId, faseMacroKey, status: { in: INSTANCIA_ATIVA } },
       orderBy: { ciclo: "desc" },
       include: {
@@ -108,8 +112,12 @@ export async function calcularPendencias(
     phaseName: faseDef?.label ?? faseMacroKey,
     scope: faseDef?.scope ?? null,
     processoExists: true,
-    hasActiveInstance: !!instancia,
-    steps: (instancia?.steps ?? []).map(mapStepToGate),
+    hasActiveInstance: instancias.length > 0,
+    // TODAS as instâncias ativas somadas — nunca só a mais recente. Uma
+    // segunda instância ativa é sempre anomalia (ver issue abaixo), mas
+    // enquanto ela existir o gate não pode fingir que o passo pendente nela
+    // não existe.
+    steps: instancias.flatMap((i) => i.steps).map(mapStepToGate),
     necessidades,
     documentos,
     hasArvore: processo.arvoreId != null,
@@ -117,6 +125,22 @@ export async function calcularPendencias(
   }
 
   const issues = computeGate(input)
+  // DUAS INSTÂNCIAS ATIVAS AO MESMO TEMPO NUNCA É ESTADO VÁLIDO (PROC-005) — o
+  // gate não escolhe uma em silêncio nem finge que não viu: bloqueia
+  // explicitamente e nomeia as duas, para o incidente aparecer pra quem for
+  // avançar a fase, não só pra quem abrir a Saúde do Sistema depois.
+  if (instancias.length > 1) {
+    issues.push({
+      code: "INSTANCIA_DUPLICADA_ATIVA",
+      category: "INCIDENTE",
+      severity: "BLOCKING",
+      entityType: "Processo",
+      entityId: processoId,
+      message: `${instancias.length} instâncias ativas simultâneas da fase "${faseMacroKey}" (ciclos ${instancias.map((i) => i.ciclo).join(", ")})`,
+      resolutionHint: "Supersedir a instância que não deveria estar ativa antes de avançar a fase.",
+      metadata: { instanceIds: instancias.map((i) => i.id), ciclos: instancias.map((i) => i.ciclo) },
+    })
+  }
   return finalizar(issues, policy, faseMacroKey, correlationId)
 }
 

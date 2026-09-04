@@ -90,12 +90,40 @@ export async function GET(request: NextRequest) {
       if (t.createdAt >= umDiaAtras) novas.push(item)
     }
 
+    // 🔒 Achado real: quando a Saúde do Sistema encontra um erro crítico, o
+    // único lugar que isso ia parar era o LogAuditoria — sem provedor de
+    // e-mail configurado, ninguém era avisado de verdade, a menos que
+    // alguém abrisse a tela por conta própria. Reusa o MESMO canal que
+    // `notificarAchados` já escreve (nenhum canal paralelo inventado);
+    // só admin vê, e só enquanto o incidente continuar sendo confirmado
+    // pela rodada horária (2h de folga sobre o cron de hora em hora).
+    let saudeCritica: { descricao: string; criticos: number; erros: number; desde: string; link: string } | null = null
+    if (ehAdmin) {
+      const duasHorasAtras = new Date(Date.now() - 2 * 60 * 60_000)
+      const incidente = await prisma.logAuditoria.findFirst({
+        where: { entidade: 'SAUDE', acao: 'SAUDE_INCIDENTE', criadoEm: { gte: duasHorasAtras } },
+        orderBy: { criadoEm: 'desc' },
+        select: { descricao: true, detalhes: true, criadoEm: true },
+      })
+      const d = incidente?.detalhes as { criticos?: number; erros?: number } | null
+      if (incidente && ((d?.criticos ?? 0) > 0 || (d?.erros ?? 0) > 0)) {
+        saudeCritica = {
+          descricao: incidente.descricao ?? 'Saúde do sistema requer atenção',
+          criticos: d?.criticos ?? 0,
+          erros: d?.erros ?? 0,
+          desde: incidente.criadoEm.toISOString(),
+          link: '/administrator?screen=syshealth',
+        }
+      }
+    }
+
     return NextResponse.json({
       vencidas,
       hoje: hojeList,
       proximos3Dias,
       novas,
-      total: vencidas.length + hojeList.length + proximos3Dias.length + novas.length
+      saudeCritica,
+      total: vencidas.length + hojeList.length + proximos3Dias.length + novas.length + (saudeCritica ? 1 : 0)
     })
   } catch (error) {
     console.error('Erro ao buscar notificações:', error)

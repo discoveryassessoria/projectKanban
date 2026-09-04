@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { carregarFx, somarBrl } from "@/lib/financeiro/cambio-financas"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 function intervaloMes(ref: Date) {
   return { ini: new Date(ref.getFullYear(), ref.getMonth(), 1), fim: new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59) }
@@ -25,7 +26,11 @@ function intervaloMes(ref: Date) {
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // 🔒 Sem checagem nenhuma antes — expunha a DRE gerencial pra qualquer
+  // usuário autenticado.
+  const erro = await verificarPermissao(req, "financeiro.ver")
+  if (erro) return erro
   try {
     const agora = new Date()
     const mesAtual = intervaloMes(agora)

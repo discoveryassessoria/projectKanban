@@ -176,8 +176,16 @@ export async function redistribuir(input: RedistribuirInput): Promise<Redistribu
   const criadoPorId = input.criadoPorId ?? null
   const metodo = input.metodo ?? 'PERSONALIZADA'
 
-  // moeda-base homogênea (senão a soma não faz sentido econômico)
-  const moedasDistintas = new Set(estado.participantes.map((p) => p.valorBrl > 0 && p.valorBase > 0 ? moeda : moeda))
+  // moeda-base homogênea (senão a soma não faz sentido econômico).
+  // BUG REAL: o ternário anterior devolvia `moeda` nos dois ramos — a checagem
+  // nunca disparava, não importa o que os participantes tivessem. A moeda de
+  // cada um vem de `ObrigacaoEconomica.moedaContratual`, não de `estado.moedaBase`
+  // (que é só a moeda do grupo já consolidado, sempre uma).
+  const obrsDoGrupo = await prisma.obrigacaoEconomica.findMany({
+    where: { id: { in: estado.participantes.map((p) => p.obrigacaoId) } },
+    select: { moedaContratual: true },
+  })
+  const moedasDistintas = new Set(obrsDoGrupo.map((o) => o.moedaContratual))
   if (moedasDistintas.size > 1) return { ...vazio, erros: ['Grupo com moedas-base distintas — redistribuição indisponível.'] }
 
   const curByObr = new Map(estado.participantes.map((p) => [p.obrigacaoId, p]))
@@ -232,7 +240,19 @@ export async function redistribuir(input: RedistribuirInput): Promise<Redistribu
   }
 
   // 2) AJUSTAR os existentes (transação atômica única)
+  //
+  // RACE REAL: duas chamadas concorrentes de `redistribuir()` pro MESMO grupo
+  // liam o `estado` (pré-transação) uma vez cada, e o `delta` era calculado
+  // contra esse valor PARADO — nunca contra o que a outra chamada já tivesse
+  // commitado. `version` existe no schema exatamente pra isto ("optimistic
+  // locking (aggregate)"), mas só era incrementado, nunca CONFERIDO: a segunda
+  // chamada aplicava um delta calculado sobre uma base que já não valia mais,
+  // e o Ledger ficava com lançamentos que não batem com `valorContratado` final.
+  // Agora o UPDATE só aplica se a versão ainda for a que foi lida — perdeu a
+  // corrida, a transação inteira recua com um erro claro, em vez de gravar
+  // sobre um estado que já mudou.
   let membrosAfetados = 0, removidos = 0
+  const erroConcorrencia: string[] = []
   await prisma.$transaction(async (tx) => {
     for (const p of existentes) {
       const cur = curByObr.get(Number(p.obrigacaoId)); if (!cur) continue
@@ -241,11 +261,22 @@ export async function redistribuir(input: RedistribuirInput): Promise<Redistribu
       if (Math.abs(delta) < 0.005) continue
       const obr = await tx.obrigacaoEconomica.findUnique({ where: { id: cur.obrigacaoId }, include: { ledger: true } })
       if (!obr || !obr.ledger) continue
+      if (Number(obr.valorContratado) !== cur.valorBase) {
+        erroConcorrencia.push(`${cur.nome}: a distribuição mudou desde que a tela foi carregada — recarregue e tente de novo.`)
+        throw new Error('REDISTRIBUIR_CONCORRENCIA')
+      }
 
       if (cur.receitaId != null) {
         await tx.receita.update({ where: { id: cur.receitaId }, data: { valor: alvo, valorUnitario: alvo, valorTotalCongelado: alvo } }).catch(() => {})
       }
-      await tx.obrigacaoEconomica.update({ where: { id: cur.obrigacaoId }, data: { valorContratado: alvo, version: { increment: 1 } } })
+      const aplicado = await tx.obrigacaoEconomica.updateMany({
+        where: { id: cur.obrigacaoId, version: obr.version },
+        data: { valorContratado: alvo, version: { increment: 1 } },
+      })
+      if (aplicado.count === 0) {
+        erroConcorrencia.push(`${cur.nome}: a distribuição mudou desde que a tela foi carregada — recarregue e tente de novo.`)
+        throw new Error('REDISTRIBUIR_CONCORRENCIA')
+      }
 
       const oc = await tx.ocorrenciaFinanceira.create({ data: {
         obrigacaoId: cur.obrigacaoId, tipo: 'AJUSTE', valor: Math.abs(delta), moeda: moeda as never, data: new Date(),
@@ -268,7 +299,14 @@ export async function redistribuir(input: RedistribuirInput): Promise<Redistribu
       membrosAfetados++
       if (!p.incluido) removidos++
     }
+  }).catch((e) => {
+    if (e instanceof Error && e.message === 'REDISTRIBUIR_CONCORRENCIA') return 'concorrencia' as const
+    throw e
   })
+
+  if (erroConcorrencia.length > 0) {
+    return { ...vazio, totalBase, erros: erroConcorrencia }
+  }
 
   return { ok: true, erros: [], totalBase, membrosAfetados: membrosAfetados + novos.length, adicionados: novos.length, removidos }
 }

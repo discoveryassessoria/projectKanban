@@ -108,6 +108,8 @@ async function main() {
   const daquiADois = await tarefa(emSp('2026-08-16T12:00:00'))
   const amanha = await tarefa(emSp('2026-08-15T12:00:00'))
 
+  const hoje = await tarefa(emSp('2026-08-14T18:00:00'))
+
   const r1 = await avisarPrazosEAtrasos({ agora: HOJE })
   ok('A) prazo em dois dias não gera aviso', (await avisosDe(daquiADois)).length === 0)
   ok('B) prazo amanhã gera UM aviso', (await avisosDe(amanha)).length === 1, `${r1.prazo} de prazo`)
@@ -115,6 +117,20 @@ async function main() {
   ok('B) do tipo PRAZO', aviso?.tipo === 'PRAZO', aviso?.tipo)
   ok('§3) com a data de conclusão esperada na mensagem',
     (aviso?.mensagem ?? '').includes('15/08/2026'), aviso?.mensagem ?? '—')
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('B2) PRAZO É HOJE — o marco que faltava entre "amanhã" e "atrasado"')
+  // ══════════════════════════════════════════════════════════════════════════
+  // Achado real (04/09/2026): só existiam os marcos de véspera e de atraso —
+  // uma tarefa com prazo no PRÓPRIO dia não gerava nenhum aviso até o dia
+  // seguinte, quando já estava vencida.
+  ok('B2) prazo hoje gera UM aviso', (await avisosDe(hoje)).length === 1, `${r1.hoje} de hoje`)
+  const avisoHoje = (await avisosDe(hoje))[0]
+  ok('B2) do tipo HOJE', avisoHoje?.tipo === 'HOJE', avisoHoje?.tipo)
+  ok('B2) com a data de hoje na mensagem',
+    (avisoHoje?.mensagem ?? '').includes('14/08/2026'), avisoHoje?.mensagem ?? '—')
+  ok('B2) e não é confundido com o marco de amanhã (chave própria)',
+    avisoHoje?.chaveIdempotencia !== aviso?.chaveIdempotencia)
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('C) RODAR DE NOVO NÃO AVISA DE NOVO')
@@ -278,7 +294,7 @@ async function main() {
     !/iniciarTarefa\(|atribuirTarefa\(|concluir|bloquear/.test(corpo))
   ok('§15) o dia vem da régua canônica',
     /diaOperacional\(prazo\)/.test(semComentarios(ler('lib/operacional/tarefa-comandos.ts'))))
-  ok('§2) só existem os dois tipos permitidos',
+  ok('§2) só existem os tipos permitidos (nenhum marco inventado)',
     !/PROGRESSO|STEP_MUDOU|LEMBRETE/.test(corpo))
 
   const rota = semComentarios(ler('src/app/api/cron/avisos-prazo/route.ts'))
@@ -304,7 +320,7 @@ async function main() {
   console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)
   if (falhas.length) { console.log('\nFALHAS:'); for (const f of falhas) console.log(`  • ${f}`) }
   console.log(falhou === 0
-    ? 'Dois marcos, um aviso cada — e o sino continua significando alguma coisa.'
+    ? 'Três marcos, um aviso cada — e o sino continua significando alguma coisa.'
     : 'A varredura de prazos voltou a fazer barulho.')
   await prisma.$disconnect()
   process.exit(falhou > 0 ? 1 : 0)

@@ -104,13 +104,38 @@ export function calcularNumerosLinhagem(
   // CÔNJUGE herda o número do parceiro DE SANGUE. Casamento entre duas
   // pessoas de sangue (primos na mesma árvore) não precisa de tratamento — as
   // duas já têm número próprio pela travessia acima.
+  //
+  // DOIS CASOS DE BORDA, os dois resolvidos aqui:
+  //
+  //   1) CÔNJUGE COM MAIS DE UMA UNIÃO (re-casamento cadastrado sem remover a
+  //      união anterior): sem isto, o número final dependia da ORDEM em que o
+  //      banco devolvia as linhas — não determinístico. Regra explícita: entre
+  //      os parceiros de sangue candidatos, vence o de MENOR número de
+  //      linhagem (o ramo mais antigo/mais próximo da raiz).
+  //
+  //   2) PARCEIRO DE SANGUE AINDA NÃO VISITADO neste ponto (não deveria
+  //      acontecer — raízes + fallback acima já cobrem todo `sangue` — mas a
+  //      trava explícita evita que um cônjuge fique com `numeroLinhagem` nulo
+  //      em silêncio se essa garantia um dia deixar de valer aqui).
   const numeroFinal = new Map<number, number>(ordem)
+  const candidatosDoConjuge = new Map<number, number[]>()
+  const registrarCandidato = (conjugeId: number, sangueId: number) => {
+    if (!ordem.has(sangueId)) visitar(sangueId) // caso 2 — rede de segurança
+    const n = ordem.get(sangueId)
+    if (n == null) return
+    const lista = candidatosDoConjuge.get(conjugeId)
+    if (lista) lista.push(n)
+    else candidatosDoConjuge.set(conjugeId, [n])
+  }
   for (const u of unioes) {
     const p1 = porId.get(u.pessoa1Id)
     const p2 = porId.get(u.pessoa2Id)
     if (!p1 || !p2) continue
-    if (p1.linhaReta && !p2.linhaReta && ordem.has(p1.id)) numeroFinal.set(p2.id, ordem.get(p1.id)!)
-    else if (p2.linhaReta && !p1.linhaReta && ordem.has(p2.id)) numeroFinal.set(p1.id, ordem.get(p2.id)!)
+    if (p1.linhaReta && !p2.linhaReta) registrarCandidato(p2.id, p1.id)
+    else if (p2.linhaReta && !p1.linhaReta) registrarCandidato(p1.id, p2.id)
+  }
+  for (const [conjugeId, candidatos] of candidatosDoConjuge) {
+    numeroFinal.set(conjugeId, Math.min(...candidatos)) // caso 1 — determinístico
   }
 
   return numeroFinal

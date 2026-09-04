@@ -54,7 +54,7 @@ export const linkDaTarefa = (tarefaId: number, processoId: number | null = null)
 async function notificar(
   tx: Prisma.TransactionClient,
   ev: {
-    tipo: 'ATRIBUICAO' | 'TRANSFERENCIA' | 'PRAZO' | 'ATRASO' | 'BLOQUEIO'
+    tipo: 'ATRIBUICAO' | 'TRANSFERENCIA' | 'PRAZO' | 'HOJE' | 'ATRASO' | 'BLOQUEIO'
     destinatarioId: number
     tarefaId: number
     titulo: string
@@ -326,7 +326,7 @@ export async function iniciarTarefa(args: {
  * atraso renascia todo dia, transformando uma informação em ruído diário até
  * alguém desligar o sino. Um prazo vencido é UM fato, não um fato por manhã.
  */
-export function marcoDoPrazo(tipo: 'PRAZO' | 'ATRASO', tarefaId: number, prazo: Date): string {
+export function marcoDoPrazo(tipo: 'PRAZO' | 'HOJE' | 'ATRASO', tarefaId: number, prazo: Date): string {
   return `notif::${tipo.toLowerCase()}::t${tarefaId}::${diaOperacional(prazo)}`
 }
 
@@ -335,6 +335,7 @@ export interface RelatorioDaVarredura {
   fim: string
   avaliadas: number
   prazo: number
+  hoje: number
   atraso: number
   /** Marcos que já existiam — a prova de que rodar de novo não avisa de novo. */
   deduplicados: number
@@ -343,7 +344,7 @@ export interface RelatorioDaVarredura {
   erros: number
   ensaio: boolean
   /** No ensaio, o que SERIA enviado — para conferir antes de ligar. */
-  previa: Array<{ tarefaId: number; tipo: 'PRAZO' | 'ATRASO'; destinatarioId: number; titulo: string; prazo: string }>
+  previa: Array<{ tarefaId: number; tipo: 'PRAZO' | 'HOJE' | 'ATRASO'; destinatarioId: number; titulo: string; prazo: string }>
 }
 
 /**
@@ -354,10 +355,13 @@ export interface RelatorioDaVarredura {
  * acontece. Não altera prazo, status, workflow, etapa, responsável nem SLA:
  * atraso é uma leitura do relógio contra `dataPrazo`, não um evento de negócio.
  *
- * ─── DOIS MARCOS, UM DE CADA ────────────────────────────────────────────────
- * PRAZO PRÓXIMO no dia anterior ao vencimento, e ATRASO quando ele passa. Um
- * único aviso por marco, para sempre — não um por dia, não um por varredura.
- * Uma escada de avisos (7d/5d/3d/1d) treina as pessoas a ignorar o sino.
+ * ─── TRÊS MARCOS, UM DE CADA ─────────────────────────────────────────────────
+ * PRAZO PRÓXIMO no dia anterior ao vencimento, VENCE HOJE no dia do vencimento,
+ * e ATRASO quando ele passa. Faltava o do meio: sem ele, uma tarefa com prazo
+ * hoje não gerava nenhum aviso até o dia seguinte, quando já estava atrasada.
+ * Um único aviso por marco, para sempre — não um por dia, não um por
+ * varredura. Uma escada de avisos (7d/5d/3d/1d) treina as pessoas a ignorar o
+ * sino.
  *
  * ─── QUEM RECEBE ────────────────────────────────────────────────────────────
  * O responsável ATUAL, lido no momento da varredura. Se a tarefa mudou de mão
@@ -391,7 +395,7 @@ export async function avisarPrazosEAtrasos(
 
   const r: RelatorioDaVarredura = {
     inicio: inicio.toISOString(), fim: inicio.toISOString(),
-    avaliadas: candidatas.length, prazo: 0, atraso: 0,
+    avaliadas: candidatas.length, prazo: 0, hoje: 0, atraso: 0,
     deduplicados: 0, semDestinatario: 0, erros: 0, ensaio, previa: [],
   }
 
@@ -405,11 +409,14 @@ export async function avisarPrazosEAtrasos(
       statusTarefa: t.statusTarefa,
       agora,
     })
-    const tipo: 'PRAZO' | 'ATRASO' | null =
-      tempo.atrasado ? 'ATRASO' : tempo.venceAmanha ? 'PRAZO' : null
+    const tipo: 'PRAZO' | 'HOJE' | 'ATRASO' | null =
+      tempo.atrasado ? 'ATRASO' : tempo.venceHoje ? 'HOJE' : tempo.venceAmanha ? 'PRAZO' : null
     if (tipo == null) continue
 
     if (t.responsavelId == null) { r.semDestinatario++; continue }
+
+    const contar = (n: 'PRAZO' | 'HOJE' | 'ATRASO') =>
+      n === 'ATRASO' ? r.atraso++ : n === 'HOJE' ? r.hoje++ : r.prazo++
 
     if (ensaio) {
       // No ensaio a idempotência também é conferida: o número que o gestor lê
@@ -423,7 +430,7 @@ export async function avisarPrazosEAtrasos(
         tarefaId: t.id, tipo, destinatarioId: t.responsavelId,
         titulo: t.titulo, prazo: diaOperacional(t.dataPrazo!),
       })
-      tipo === 'ATRASO' ? r.atraso++ : r.prazo++
+      contar(tipo)
       continue
     }
 
@@ -434,14 +441,16 @@ export async function avisarPrazosEAtrasos(
           tipo,
           destinatarioId: t.responsavelId!,
           tarefaId: t.id,
-          titulo: tipo === 'ATRASO' ? 'Prazo vencido' : 'Prazo próximo',
+          titulo: tipo === 'ATRASO' ? 'Prazo vencido' : tipo === 'HOJE' ? 'Vence hoje' : 'Prazo próximo',
           mensagem: tipo === 'ATRASO'
             ? `${t.titulo} — o prazo de conclusão era ${data}.`
-            : `${t.titulo} — conclusão esperada até ${data}.`,
+            : tipo === 'HOJE'
+              ? `${t.titulo} — o prazo de conclusão é hoje, ${data}.`
+              : `${t.titulo} — conclusão esperada até ${data}.`,
           chave: marcoDoPrazo(tipo, t.id, t.dataPrazo!),
         }),
       )
-      if (criada.criada) { tipo === 'ATRASO' ? r.atraso++ : r.prazo++ }
+      if (criada.criada) contar(tipo)
       else r.deduplicados++
     } catch (e) {
       // UMA TAREFA QUE FALHA NÃO DERRUBA A VARREDURA. O marco dela continua

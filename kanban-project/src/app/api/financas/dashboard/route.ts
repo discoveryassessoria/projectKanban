@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 
 function inicioDoMes(d = new Date()) {
@@ -29,7 +30,11 @@ function fimDoMes(d = new Date()) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
+  // 🔒 Sem checagem nenhuma antes — expunha caixa, a pagar/receber e
+  // atividade recente pra qualquer usuário autenticado.
+  const erro = await verificarPermissao(req, "financeiro.ver")
+  if (erro) return erro
   try {
     const agora = new Date()
     const mesIni = inicioDoMes(agora)
