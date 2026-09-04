@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
+import { extrairUsuarioKanban } from "@/lib/kanban-auth"
 import { concluirTarefa } from "@/src/services/task-step-sync"
 import { tentarAvancoAutomaticoSeFaseAtual } from "@/src/lib/motor/auto-avanco"
 
@@ -33,7 +34,7 @@ export async function POST(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    const { status, usuarioId } = await request.json()
+    const { status } = await request.json()
 
     const tarefaAtual = await prisma.tarefa.findUnique({
       where: { id },
@@ -78,7 +79,10 @@ export async function POST(
       )
     }
 
-    const r = await concluirTarefa(id, { origem: "USER", usuarioId })
+    // IDENTIDADE DO SERVIDOR, não do corpo — `usuarioId` no corpo deixava o
+    // cliente assinar a conclusão em nome de outra pessoa.
+    const usuario = await extrairUsuarioKanban(request)
+    const r = await concluirTarefa(id, { origem: "USER", usuarioId: usuario?.userId })
     // AUTO-AVANÇO: concluída a tarefa, se a fase ficou sem pendências o card vai sozinho —
     // mas só quando a tarefa era da fase ATUAL do processo. Concluir uma tarefa
     // histórica (fase anterior à atual, regularizada manualmente) não pode mexer na

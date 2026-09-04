@@ -2,7 +2,9 @@
 // CP-4D — ações canônicas de Passo (runtime v2), via TaskStepSyncService.
 // acao ∈ start | complete | approve | dispense | cancel | supersede.
 import { NextRequest, NextResponse } from "next/server"
-import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { prisma } from "@/lib/prisma"
+import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import type { PermissaoChave } from "@/src/lib/permissoes"
 import {
   iniciarPasso, concluirPasso, aprovarPasso, dispensarPasso, cancelarPasso, supersederPasso,
@@ -32,12 +34,33 @@ export async function POST(
   const id = parseInt(idParam)
   if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
 
+  const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
+
+  // 🔒 QUEM EXECUTA É O RESPONSÁVEL — nunca terceiro. A permissão de ação
+  // (`workflow.iniciarPasso` etc.) autoriza executar a PRÓPRIA tarefa; sem
+  // esta conferência, qualquer operador com a permissão genérica agia sobre
+  // a etapa de qualquer tarefa de qualquer colega, em qualquer processo.
+  // Mesma régua do E4 (`negarSeNaoForDonoDaTarefa`).
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id }, select: { tarefas: { take: 1, select: { responsavelId: true } } },
+  })
+  if (passo && passo.tarefas.length > 0) {
+    const negado = await negarSeNaoForDonoDaTarefa(request, passo.tarefas[0].responsavelId)
+    if (negado) return negado
+  }
+
   try {
     const body = await request.json().catch(() => ({}))
     const ctx: SyncContexto = {
-      origem: body.origem ?? "USER",
-      usuarioId: body.usuarioId,
-      aprovadorId: body.aprovadorId,
+      // ORIGEM E IDENTIDADE VÊM DO SERVIDOR, NUNCA DO CLIENTE — esta porta é
+      // sempre um USUÁRIO clicando; automação interna (motor, SYSTEM) chama o
+      // serviço direto, em processo, sem passar por HTTP. Aceitar `origem` e
+      // `usuarioId` do corpo deixava o cliente escolher quem "fez" a ação e
+      // com que credencial, para fins de auditoria e de segregação de funções.
+      origem: "USER",
+      usuarioId: usuario.userId,
+      aprovadorId: usuario.userId,
       correlationId: body.correlationId,
       causationId: body.causationId,
       motivoCodigo: body.motivoCodigo,

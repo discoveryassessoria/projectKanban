@@ -15,6 +15,7 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { negarSeNaoForDonoDaTarefaPorId } from '@/src/lib/tarefa-acesso'
 import type { PermissaoChave } from '@/src/lib/permissoes'
 import { atribuirTarefa, iniciarTarefa } from '@/lib/operacional/tarefa-comandos'
 import {
@@ -69,6 +70,20 @@ const PERMISSAO: Record<string, PermissaoChave> = {
   decidir_causa: 'tarefas.excluir',
 }
 
+/**
+ * AÇÕES DE QUEM EXECUTA — a permissão (`tarefas.iniciar_concluir`,
+ * `tarefas.bloquear`) autoriza mexer na PRÓPRIA tarefa, nunca na de um
+ * colega. Sem esta conferência por TAREFA, `iniciarTarefa` era a única das
+ * seis que checava dono — `bloquear`, `desbloquear`, `aguardar_terceiro`,
+ * `retomar_espera` e `concluir_etapa` aceitavam qualquer `tarefaId` de
+ * quem tivesse a permissão genérica. Achado real: um operacional sem
+ * nenhuma tarefa atribuída conseguia agir sobre a tarefa de outra pessoa
+ * a partir do link de uma notificação.
+ */
+const ACOES_DO_EXECUTOR = new Set([
+  'iniciar', 'aguardar_terceiro', 'retomar_espera', 'concluir_etapa', 'bloquear', 'desbloquear',
+])
+
 export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefaId: string }> }) {
   const tarefaId = Number((await ctx.params).tarefaId)
   if (!Number.isInteger(tarefaId) || tarefaId <= 0) {
@@ -95,6 +110,11 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   const autorId = usuario.userId
   const motivo = typeof body?.motivo === 'string' ? body.motivo.slice(0, 300) : ''
   const lockVersion = Number.isInteger(body?.lockVersion) ? (body.lockVersion as number) : undefined
+
+  if (ACOES_DO_EXECUTOR.has(acao)) {
+    const negado = await negarSeNaoForDonoDaTarefaPorId(request, tarefaId)
+    if (negado) return negado
+  }
 
   const executar = async () => {
     switch (acao) {

@@ -23,6 +23,15 @@ export async function GET(request: NextRequest) {
     const umDiaAtras = new Date()
     umDiaAtras.setDate(umDiaAtras.getDate() - 1)
 
+    // 🔒 HIERARQUIA: "sem responsável" é fila de DISTRIBUIÇÃO — só admin gere
+    // o que ainda não é de ninguém. Sem isto, todo mundo era notificado de
+    // toda tarefa sem dono do sistema inteiro, e o sino virava um segundo
+    // "Tarefas e Projetos" para quem não devia nem ver essa tela.
+    const ehAdmin = usuario.tipo === 'admin'
+    const filtroResponsavel = ehAdmin
+      ? { OR: [{ responsavelId: usuario.userId }, { responsavelId: null }] }
+      : { responsavelId: usuario.userId }
+
     const tarefas = await prisma.tarefa.findMany({
       where: {
         concluida: false,
@@ -32,13 +41,7 @@ export async function GET(request: NextRequest) {
         // continua notificando como se fosse nova, para sempre.
         statusTarefa: { notIn: STATUS_TERMINAIS },
         AND: [
-            // Filtro de responsável (minhas tarefas OU sem responsável)
-            {
-            OR: [
-                { responsavelId: usuario.userId },
-                { responsavelId: null }
-            ]
-            },
+            filtroResponsavel,
             // Janela de tempo (vencidas/próximas OU recém-criadas)
             {
             OR: [

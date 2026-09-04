@@ -47,6 +47,22 @@ export async function negarSeNaoForDonoDaTarefa(
 }
 
 /**
+ * MESMA COISA, mas a rota só tem o `tarefaId` — busca e checa numa chamada só.
+ * Usada pelas portas que não podem falar com o Prisma diretamente (ex.: a
+ * porta única de comando), para não precisarem de um `findUnique` próprio.
+ */
+export async function negarSeNaoForDonoDaTarefaPorId(
+  request: Request,
+  tarefaId: number,
+): Promise<NextResponse | null> {
+  const tarefa = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { responsavelId: true } })
+  if (!tarefa) {
+    return NextResponse.json({ error: "tarefa não encontrada", codigo: "TAREFA_NAO_ENCONTRADA" }, { status: 404 })
+  }
+  return negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+}
+
+/**
  * Versão em LOTE — para rotas que mexem em várias tarefas de uma vez
  * (ex.: /api/tarefas/reordenar). Barra se QUALQUER tarefa da lista tiver
  * dono diferente do usuário (tarefa sem dono é permitida). Admin passa.

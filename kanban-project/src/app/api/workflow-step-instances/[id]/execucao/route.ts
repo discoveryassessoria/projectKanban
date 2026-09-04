@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { listarAlvo, resolverReferencia, type EntidadeReferenciada } from "@/src/services/referencia-canonica"
@@ -196,11 +197,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!acaoKey) return NextResponse.json({ error: "Ação não informada." }, { status: 400 })
 
   const u = await extrairUsuarioComPermissoes(request)
+  if (!u) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
   // O FORNECEDOR é resolvido no SERVIDOR, pelo documento. Aceitá-lo do cliente deixaria
   // o operador escolher por quem a exigência de canal seria julgada.
   const alvo = await prisma.phaseWorkflowStepInstance.findUnique({
-    where: { id }, select: { documento: { select: { orgaoId: true } } },
+    where: { id }, select: { documento: { select: { orgaoId: true } }, tarefas: { take: 1, select: { responsavelId: true } } },
   })
+
+  // 🔒 QUEM EXECUTA É O RESPONSÁVEL — nunca terceiro. `workflow.iniciarPasso`
+  // (e as demais permissões de ação) autorizam executar TAREFA PRÓPRIA; sem
+  // esta conferência, qualquer operador com a permissão genérica executava
+  // qualquer etapa de qualquer tarefa de qualquer colega, em qualquer processo.
+  // Achado real: a Daniela (operacional, sem tarefa atribuída) abria pelo sino
+  // uma tarefa de outra pessoa e a etapa aparecia liberada para "Iniciar".
+  //
+  // MESMA régua do E4 (`negarSeNaoForDonoDaTarefa`, usada em concluir/route.ts):
+  // dono OU tarefa sem responsável passam; tarefa de outra pessoa, não.
+  if (alvo && alvo.tarefas.length > 0) {
+    const negado = await negarSeNaoForDonoDaTarefa(request, alvo.tarefas[0].responsavelId)
+    if (negado) return negado
+  }
+
   const r = await executarAcaoCadastrada(id, acaoKey, (body?.valores ?? {}) as Record<string, unknown>, {
     usuarioId: u?.userId ?? null,
     // A SUBTAREFA em que a ação acontece. Ausente = a ação é do passo.

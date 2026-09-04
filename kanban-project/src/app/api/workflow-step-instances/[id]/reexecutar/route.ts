@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import { impactoDaReabertura, ESTADOS_CUMPRIDOS, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import { reabrirPassoTx } from "@/src/services/task-step-sync"
 import { tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
@@ -91,6 +92,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const u = await unidadeDoPasso(id)
   if (!u) return NextResponse.json({ error: "Etapa não encontrada." }, { status: 404 })
   const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
+
+  // 🔒 REEXECUTAR NÃO É MENOS SENSÍVEL QUE EXECUTAR — é recomeçar trabalho já
+  // feito, de outra pessoa. Mesma régua do E4 (`negarSeNaoForDonoDaTarefa`).
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id }, select: { tarefas: { take: 1, select: { responsavelId: true } } },
+  })
+  if (passo && passo.tarefas.length > 0) {
+    const negado = await negarSeNaoForDonoDaTarefa(request, passo.tarefas[0].responsavelId)
+    if (negado) return negado
+  }
 
   const motivo = String(body?.motivo ?? MOTIVOS_DE_TENTATIVA.REABERTURA_MANUAL)
   const correlationId = String(body?.correlationId ?? `reexec|si${id}|${usuario?.userId ?? 0}|${u.passo.status}`)
