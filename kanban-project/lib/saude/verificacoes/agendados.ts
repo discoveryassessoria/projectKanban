@@ -11,6 +11,7 @@
 import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
+import { phaseKeyToFaseCode, isProcessoFase } from '@/src/lib/process-stage/fases-catalog'
 
 const HORA = 60 * 60 * 1000
 
@@ -258,6 +259,14 @@ registrar({
       // Mexido há pouco não é sintoma: o reconciliador roda de hora em hora, e um
       // processo que acabou de mudar ainda não teve a passagem dele.
       if (p.updatedAt.getTime() > limite) continue
+      // Fase "processo" (checklist + avanço MANUAL, por definição do catálogo)
+      // satisfeita e parada não é sintoma de cron silencioso — é o comportamento
+      // correto: a varredura automática se recusa a avançar essas fases sozinha
+      // (ver AVANCO_MANUAL_OBRIGATORIO em phase-advance.ts). Sinalizar isso aqui
+      // como "cron parado" seria falso positivo permanente para todo processo
+      // nessas fases, todo dia, para sempre.
+      const faseCode = phaseKeyToFaseCode(p.faseAtualKey)
+      if (faseCode && isProcessoFase(faseCode)) continue
       const g = await calcularPendencias(p.id, p.faseAtualKey!, { correlationId: `saude-reconc-${p.id}` }).catch(() => null)
       if (g?.canAdvance) parados.push({ id: p.id, nome: p.nome, fase: p.faseAtualKey! })
     }
