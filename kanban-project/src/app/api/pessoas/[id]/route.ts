@@ -137,7 +137,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
       dataToUpdate.requerente = body.requerente
     }
-    if (body.numeroLinhagem !== undefined) dataToUpdate.numeroLinhagem = body.numeroLinhagem ? parseInt(body.numeroLinhagem) : null
+    // Nº Linhagem NÃO é mais escrito aqui: é CALCULADO por `recalcularNumerosLinhagemDaArvore`,
+    // disparado por `efeitosDoVinculoPosCommit` logo abaixo — toda edição que pode afetar a
+    // ordem (linhaReta, paiId/maeId, data_nasc) já passa por essa mesma porta.
     if (body.linhaReta !== undefined) dataToUpdate.linhaReta = body.linhaReta === true
     if (body.documentacao !== undefined) dataToUpdate.documentacao = body.documentacao === true
 

@@ -238,7 +238,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
                         <span className="w-7 h-7 rounded-full bg-[var(--surface-tertiary)] text-white/68 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{ini(d.pessoaNome)}</span>
-                        <div className="min-w-0"><div className="font-semibold text-white/95">{d.pessoaNome}</div><div className="text-[11px] text-[var(--text-secondary)]">{d.geracao != null ? `G${d.geracao}` : "—"} · {d.linhaReta ? "Linha reta" : "Apoio"}</div></div>
+                        <div className="min-w-0"><div className="font-semibold text-white/95">{d.pessoaNome}</div><div className="text-[11px] text-[var(--text-secondary)]">{d.geracao != null ? `Linhagem ${d.geracao}` : "—"} · {d.linhaReta ? "Linha reta" : "Apoio"}</div></div>
                       </div>
                     </td>
                     <td className="px-3 py-2.5"><div className="font-medium text-white/95">{d.documentoTitulo}</div><div className="text-[11px] text-[var(--text-secondary)]">{d.dataDocumento ? `Recebido em ${d.dataDocumento}` : "—"}</div></td>
@@ -333,7 +333,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
             <span className="w-8 h-8 rounded-full bg-[var(--surface-tertiary)] text-white/68 text-xs font-bold flex items-center justify-center">{ini(div.pessoaNome)}</span>
             <div>
               <div className="font-semibold text-white/95 text-sm">{div.pessoaNome}</div>
-              <div className="text-[11px] text-[var(--text-secondary)]">{div.geracao != null ? `G${div.geracao}` : "—"} · {div.linhaReta ? "Linha reta" : "Apoio"}</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">{div.geracao != null ? `Linhagem ${div.geracao}` : "—"} · {div.linhaReta ? "Linha reta" : "Apoio"}</div>
             </div>
           </div>
 

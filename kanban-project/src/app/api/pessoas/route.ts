@@ -185,7 +185,6 @@ export async function POST(request: NextRequest) {
 
       // ✅ NOVO: Requerente e Linhagem
       requerente,
-      numeroLinhagem,
       linhaReta,
       documentacao,
 
@@ -255,7 +254,8 @@ export async function POST(request: NextRequest) {
         // (ProcessoRequerente, via lib/genealogia/vincular-requerente). Aqui normaliza
         // qualquer tentativa para 'nao'. Fonte única de requerente = ProcessoRequerente.
         requerente: ehRequerente(requerente) ? 'nao' : (requerente || 'nao'),
-        numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
+        // Nº Linhagem nasce vazio: `dispararMaterializacaoPorArvore` (chamado logo
+        // abaixo) já calcula e grava o valor certo — nunca é digitado.
         linhaReta: linhaReta ?? true,
         documentacao: documentacao ?? true,
 

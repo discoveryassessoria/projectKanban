@@ -65,9 +65,11 @@ export async function GET(
 
     const pessoasNaLinha = pessoas.filter((p) => p.numeroLinhagem != null)
 
-    // Origem = pessoa com MAIOR numeroLinhagem (ascendente mais distante)
+    // Origem = pessoa com MENOR numeroLinhagem (o ancestral mais antigo — Nº
+    // Linhagem começa em 1 na raiz da árvore e cresce em direção aos
+    // descendentes; ver src/services/genealogia/numero-linhagem.ts).
     const origemPessoa = pessoasNaLinha.reduce<typeof pessoas[number] | null>(
-      (max, p) => (max == null || (p.numeroLinhagem ?? 0) > (max.numeroLinhagem ?? 0) ? p : max),
+      (min, p) => (min == null || (p.numeroLinhagem ?? Infinity) < (min.numeroLinhagem ?? Infinity) ? p : min),
       null
     )
 

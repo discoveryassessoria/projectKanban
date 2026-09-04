@@ -83,6 +83,26 @@ async function carregarPessoas(processoId: number) {
 function toTree(pessoasRaw: any[]): TreePerson[] {
   const arr = pessoasRaw
   const idsLinha = new Set(arr.map((p) => p.id))
+  const porId = new Map(arr.map((p) => [p.id, p]))
+
+  // "Planilha por geração" (comentário do GET abaixo) precisa da PROFUNDIDADE
+  // real na árvore (raiz=0, filho=1, neto=2…) — irmãos caem na MESMA geração.
+  // Nº Linhagem (Pessoa.numeroLinhagem) NÃO serve pra isso: é uma sequência
+  // única por pessoa (irmãos recebem números diferentes, por definição — ver
+  // src/services/genealogia/numero-linhagem.ts), então usá-lo aqui separaria
+  // irmãos em "gerações" diferentes.
+  const profundidade = new Map<number, number>()
+  const calcProfundidade = (id: number): number => {
+    if (profundidade.has(id)) return profundidade.get(id)!
+    profundidade.set(id, 0) // guarda contra ciclo de dado inválido
+    const p = porId.get(id)
+    const paiNaLinha = p?.paiId != null && idsLinha.has(p.paiId)
+    const maeNaLinha = p?.maeId != null && idsLinha.has(p.maeId)
+    const d = paiNaLinha ? calcProfundidade(p.paiId) + 1 : maeNaLinha ? calcProfundidade(p.maeId) + 1 : 0
+    profundidade.set(id, d)
+    return d
+  }
+
   return arr.map((p) => {
     const temPaiNaLinha = p.paiId != null && idsLinha.has(p.paiId)
     const temMaeNaLinha = p.maeId != null && idsLinha.has(p.maeId)
@@ -90,11 +110,10 @@ function toTree(pessoasRaw: any[]): TreePerson[] {
       id: p.id,
       nome: nomeCompleto(p.nome, p.sobrenome),
       sobrenome: "",
-      gen: p.numeroLinhagem != null ? "G" + p.numeroLinhagem : undefined,
+      gen: p.linhaReta ? "G" + calcProfundidade(p.id) : undefined,
       isLinha: p.linhaReta,
       ehRequerente: (p.requerente ?? "nao") !== "nao",
-      // «AJUSTE» ancestral-base = raiz da linha (sem pai/mãe DENTRO da linha reta).
-      // Se preferir derivar de numeroLinhagem, trocar por p.numeroLinhagem === min.
+      // Ancestral-base = raiz da linha (sem pai/mãe DENTRO da linha reta).
       ehAncestral: p.linhaReta && !temPaiNaLinha && !temMaeNaLinha,
       nascimento: p.data_nasc ? p.data_nasc.toISOString().slice(0, 10) : undefined,
       dataObito: p.data_obito ? p.data_obito.toISOString().slice(0, 10) : undefined,

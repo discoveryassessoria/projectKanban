@@ -57,6 +57,10 @@ export interface PessoaDoProcesso {
   posicao: string
   /** Pendência ADMINISTRATIVA real (cadastro inconsistente). null = sem pendência. */
   pendencia: string | null
+  /** Nº Linhagem (Pessoa.numeroLinhagem) — ordena a pasta documental. Fonte da ORDEM
+   *  de exibição desta lista; `geracao` é outro eixo (grau a partir do requerente),
+   *  usado só para o rótulo, nunca para ordenar. */
+  numeroLinhagem: number | null
 }
 
 export interface PessoaBruta {
@@ -187,10 +191,15 @@ export function montarPessoasDoProcesso(
       geracao,
       posicao,
       pendencia,
+      numeroLinhagem: p.numeroLinhagem ?? null,
     }
   })
 
-  const ordem = (l: PessoaDoProcesso) => (l.geracao == null ? Number.MAX_SAFE_INTEGER : l.geracao)
+  // ORDEM DE EXIBIÇÃO = Nº Linhagem (pasta documental — a mesma régua em toda
+  // tela que lista a "linha reta"). `geracao` continua existindo só para o
+  // rótulo (G1/G2/…); quem não tem numeroLinhagem calculado ainda vai ao fim,
+  // por nome — nunca some.
+  const ordem = (l: PessoaDoProcesso) => (l.numeroLinhagem == null ? Number.MAX_SAFE_INTEGER : l.numeroLinhagem)
   return linhas.sort((a, b) => {
     const d = ordem(a) - ordem(b)
     if (d !== 0) return d

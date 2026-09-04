@@ -1579,7 +1579,6 @@ function AddPersonModal({
   
   // ✅ NOVOS CAMPOS
   const [requerente, setRequerente] = useState<string>('nao')
-  const [numeroLinhagem, setNumeroLinhagem] = useState<string>('')
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>(type !== 'conjuge')
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>(true)
 
@@ -1671,7 +1670,6 @@ function AddPersonModal({
         local_emigracao: isFalecido && localObito ? localObito.trim() : null,
         comentario: comentario.trim() || null,
         requerente: requerente || 'nao',  // ✅ NOVO
-        numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,  // ✅ pasta documental (todos)
         linhaReta: isLinhaReta,  // ✅ Central Operacional / Documentos
         documentacao: precisaDocumentacao,  // ✅ gera documentos ou não
         arvoreId
@@ -1922,13 +1920,8 @@ function AddPersonModal({
           {/* ===== Classificação no processo ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Classificação no processo</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
-                <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
-                <span className="block text-xs text-[var(--text-muted)] mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
-              </div>
-            </div>
+            {/* Nº Linhagem some daqui: a pessoa ainda não existe, não há o que
+                calcular. Aparece (só leitura) em Editar Pessoa, depois de salva. */}
             <p className="text-xs text-[var(--text-muted)] mt-2">
               É um requerente do processo? Use a opção <strong>Requerente do processo</strong> no topo — a pessoa existente é reaproveitada, sem duplicar.
             </p>
@@ -2072,7 +2065,9 @@ function EditPersonModal({
     }
   }
 
-  const [numeroLinhagem, setNumeroLinhagem] = useState((pessoa as any).numeroLinhagem?.toString() || '')
+  // Nº Linhagem NÃO se edita mais — é CALCULADO (ver src/services/genealogia/numero-linhagem.ts),
+  // recalculado sozinho a cada mudança na árvore. Só leitura, direto de `pessoa`.
+  const numeroLinhagem = (pessoa as unknown as { numeroLinhagem?: number | null }).numeroLinhagem ?? null
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>((pessoa as any).linhaReta ?? true)
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
 
@@ -2186,7 +2181,6 @@ function EditPersonModal({
           local_emigracao: isFalecido && localObito ? localObito.trim() : null,
           comentario: comentario.trim() || null,
           requerente: requerente || 'nao',
-          numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,
           linhaReta: isLinhaReta,
           documentacao: precisaDocumentacao,
           paiId: paiSelecionadoId || null,
@@ -2498,8 +2492,10 @@ function EditPersonModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
-                <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
-                <span className="block text-xs text-[var(--text-muted)] mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
+                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                  {numeroLinhagem ?? "—"}
+                </div>
+                <span className="block text-xs text-[var(--text-muted)] mt-1">Calculado automaticamente pela árvore — ordena a pasta documental.</span>
               </div>
             </div>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">

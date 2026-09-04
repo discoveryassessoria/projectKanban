@@ -39,9 +39,12 @@ function check(nome: string, cond: boolean) {
 console.log("\n(A) Roster de pessoas — vínculo com a árvore, nunca a fila")
 
 // Árvore real do processo DE-21 em produção (o caso que exibia "0 pessoa(s)").
-const REQUERENTE: PessoaBruta = { id: 2590, nome: "Marco", sobrenome: "Antonio Rovatti", sexo: "M", publicCode: null, requerente: "maior", linhaReta: true, numeroLinhagem: null, paiId: 2591, maeId: 2592 }
-const PAI: PessoaBruta = { id: 2591, nome: "Joao", sobrenome: "Silva", sexo: "M", publicCode: null, requerente: "nao", linhaReta: true, numeroLinhagem: null, paiId: null, maeId: null }
-const MAE: PessoaBruta = { id: 2592, nome: "Tereza", sobrenome: "Silva", sexo: "F", publicCode: null, requerente: "nao", linhaReta: false, numeroLinhagem: null, paiId: null, maeId: null }
+// numeroLinhagem já vem do cálculo automático (recalcularNumerosLinhagemDaArvore):
+// João é o ancestral (raiz, sem pai/mãe de sangue) = 1; Tereza (cônjuge, fora da
+// linha reta) herda o número dele; Marco (filho de sangue) = 2.
+const REQUERENTE: PessoaBruta = { id: 2590, nome: "Marco", sobrenome: "Antonio Rovatti", sexo: "M", publicCode: null, requerente: "maior", linhaReta: true, numeroLinhagem: 2, paiId: 2591, maeId: 2592 }
+const PAI: PessoaBruta = { id: 2591, nome: "Joao", sobrenome: "Silva", sexo: "M", publicCode: null, requerente: "nao", linhaReta: true, numeroLinhagem: 1, paiId: null, maeId: null }
+const MAE: PessoaBruta = { id: 2592, nome: "Tereza", sobrenome: "Silva", sexo: "F", publicCode: null, requerente: "nao", linhaReta: false, numeroLinhagem: 1, paiId: null, maeId: null }
 const UNIAO: UniaoBruta = { id: 953, pessoa1Id: 2592, pessoa2Id: 2591 }
 
 const roster = montarPessoasDoProcesso([REQUERENTE, PAI, MAE], [UNIAO])
@@ -58,7 +61,10 @@ check("pai é a geração 1", por(2591).geracao === 1)
 check("mãe declarada fora da linha reta fica em 'fora da linhagem'", por(2592).classificacao === "FORA_DA_LINHAGEM")
 check("mãe NÃO é excluída da Central", por(2592) != null)
 check("posição da mãe é nomeada mesmo fora da linha", por(2592).posicao === "mãe")
-check("ordem respeita a sequência genealógica (requerente primeiro)", roster[0].pessoaId === 2590 && roster[1].pessoaId === 2591)
+check(
+  "ordem respeita o Nº Linhagem (ancestral primeiro, não o requerente)",
+  roster[0].pessoaId === 2591 && roster.findIndex((r) => r.pessoaId === 2590) === roster.length - 1,
+)
 check("iniciais derivadas do nome completo", por(2590).iniciais === "MA")
 
 // Inconsistência REAL: declarada na linha reta, sem filiação até o requerente.

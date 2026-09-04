@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
 import { garantirNecessidade, dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
+import { recalcularNumerosLinhagemDaArvore } from "@/src/services/genealogia/numero-linhagem"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
 import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
@@ -284,6 +285,12 @@ async function reconciliarEfinalizar(res: MaterializarResultado, processoId: num
 export async function dispararMaterializacaoPorArvore(arvoreId: number | null | undefined): Promise<void> {
   if (!arvoreId) return
   try {
+    // Nº LINHAGEM primeiro: qualquer edição de árvore (novo ancestral, novo
+    // filho, cônjuge vinculado/desvinculado, data de nascimento corrigida) pode
+    // mudar a ordem — e é o MESMO gatilho único de sempre, sem ponto de
+    // chamada novo espalhado pelo app.
+    try { await recalcularNumerosLinhagemDaArvore(arvoreId) } catch (e) { console.error(`[genealogia] Nº Linhagem da árvore ${arvoreId} falhou (fluxo seguiu):`, e) }
+
     const procs = await prisma.processo.findMany({ where: { arvoreId }, select: { id: true } })
     for (const p of procs) {
       // CONVERGÊNCIA OFICIAL primeiro. Este é o elo causal que faltava: no fluxo

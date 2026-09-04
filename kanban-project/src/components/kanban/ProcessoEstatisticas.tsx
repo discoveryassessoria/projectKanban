@@ -25,7 +25,7 @@ interface ProcessoEstatisticasProps {
 // Sugestão de cálculo no backend (Prisma):
 //
 //   • linhagem.emLinhaDireta  = Pessoa.count({ where: { arvore: { processos: { some: { id } } }, numeroLinhagem: { not: null } } })
-//   • linhagem.origem         = Pessoa onde numeroLinhagem é o MAIOR (italiano de origem)
+//   • linhagem.origem         = Pessoa onde numeroLinhagem é o MENOR (ancestral mais antigo)
 //   • linhagem.requerentePrincipal = Pessoa onde requerente='maior'
 //
 //   • documentacao.total      = Documento.count({ where: { pessoa: { arvore: { processos: { some: { id } } } } } })
