@@ -877,9 +877,12 @@ function PessoaCard({
         <span className="min-w-0 flex-1">
           <b className="text-[14.5px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
           <span className="text-[11.5px] text-[var(--text-muted)] font-semibold flex items-center gap-1.5 mt-0.5 flex-wrap">
-            {p.geracao != null && (
+            {/* O selo "G" é o Nº Linhagem (pasta documental) — 1 no ancestral mais
+                antigo, crescendo em direção aos descendentes. NÃO é o grau a partir
+                do requerente (esse é `posicao`: "pai", "avô", "bisavô"...). */}
+            {p.numeroLinhagem != null && (
               <span className="text-[10px] font-extrabold bg-[var(--surface-tertiary)] border border-[var(--border-default)] rounded px-1.5 py-px">
-                G{p.geracao + 1}
+                G{p.numeroLinhagem}
               </span>
             )}
             <span className="truncate">{p.requerente ? "Requerente" : p.posicao}</span>

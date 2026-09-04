@@ -79,6 +79,15 @@ interface ProcessoDocumentosResponse {
 // ============================================================
 
 const STATUS_VALIDADOS = ["RECEBIDO", "ENTREGUE", "APOSTILADO", "TRADUZIDO"]
+
+// Mesmo recorte de "certidão" usado em .../analise/route.ts (TIPOS_ANALISADOS) —
+// é o que o painel "Informações" desta biblioteca promete mostrar. Necessidade de
+// RG/CPF/comprovante/procuração etc. não é "certidão" e não entra como placeholder.
+const TIPOS_CERTIDAO_PLACEHOLDER = new Set([
+  "CERTIDAO_NASCIMENTO", "CERTIDAO_NASCIMENTO_INTEIRO_TEOR",
+  "CERTIDAO_CASAMENTO", "CERTIDAO_CASAMENTO_INTEIRO_TEOR",
+  "CERTIDAO_OBITO", "CERTIDAO_OBITO_INTEIRO_TEOR",
+])
 const STATUS_EM_OPERACAO = [
   "SOLICITADO", "EM_BUSCA", "SOLICITAR",
   "EM_ANALISE", "RETIFICANDO",
@@ -203,13 +212,64 @@ export async function GET(
               motivoBloqueio: true,
               responsavelId: true,
               ultimaMovimentacao: true,
+              necessidadeId: true,
             },
           })
         : []
 
-    // Agrupa docs por pessoa
+    // NECESSIDADES SEM DOCUMENTO AINDA — o Documento só nasce quando alguém clica
+    // "Iniciar" (garantirDocumentoDaNecessidade). Até lá, a certidão já é EXIGIDA
+    // (a Necessidade existe, materializada pela Genealogia) e precisa aparecer aqui
+    // do mesmo jeito — senão a biblioteca mostra só quem já teve algo iniciado, e é
+    // exatamente isso que escondia todo mundo menos quem já tinha clicado em algo.
+    const necessidadesComDoc = new Set(allDocs.map((d) => d.necessidadeId).filter((x): x is number => x != null))
+    const necessidades =
+      pessoasIds.length > 0
+        ? await prisma.necessidadeDocumental.findMany({
+            where: { processoId: id, supersedePorId: null },
+            select: {
+              id: true, pessoaId: true, itemCatalogoId: true,
+              uniao: { select: { pessoa1Id: true } },
+            },
+          })
+        : []
+    const itemCatalogoIds = [...new Set(necessidades.map((n) => n.itemCatalogoId))]
+    const tiposCadastro = itemCatalogoIds.length
+      ? await prisma.tipoDocumentoCadastro.findMany({
+          where: { itemCatalogoId: { in: itemCatalogoIds } },
+          select: { itemCatalogoId: true, legacyEnumKey: true },
+        })
+      : []
+    const tipoPorItemCatalogo = new Map(tiposCadastro.map((t) => [t.itemCatalogoId, t.legacyEnumKey]))
+
+    // Placeholder por necessidade SEM Documento ainda — mesmo titular que
+    // `garantirDocumentoDaNecessidade` usaria: a pessoa, ou (casamento) o 1º
+    // cônjuge da união. `id` negativo (nunca colide com um Documento real) —
+    // o clique nele materializa o Documento de verdade, pela MESMA porta.
+    const placeholders: typeof allDocs = []
+    for (const n of necessidades) {
+      if (necessidadesComDoc.has(n.id)) continue
+      const tipo = tipoPorItemCatalogo.get(n.itemCatalogoId) ?? null
+      if (!tipo || !TIPOS_CERTIDAO_PLACEHOLDER.has(tipo)) continue
+      const titularId = n.pessoaId ?? n.uniao?.pessoa1Id ?? null
+      if (titularId == null || !pessoasIds.includes(titularId)) continue
+      placeholders.push({
+        id: -n.id,
+        pessoaId: titularId,
+        tipo: tipo as (typeof allDocs)[number]["tipo"],
+        status: "PENDENTE",
+        updatedAt: new Date(0),
+        dataPrazoOperacao: null,
+        motivoBloqueio: null,
+        responsavelId: null,
+        ultimaMovimentacao: null,
+        necessidadeId: n.id,
+      })
+    }
+
+    // Agrupa docs (reais + placeholders) por pessoa
     const docsByPessoa = new Map<number, typeof allDocs>()
-    for (const d of allDocs) {
+    for (const d of [...allDocs, ...placeholders]) {
       const arr = docsByPessoa.get(d.pessoaId) ?? []
       arr.push(d)
       docsByPessoa.set(d.pessoaId, arr)
@@ -332,9 +392,10 @@ export async function GET(
         impedimentos.push({ label: "falta casamento", severity: "warn" })
         }
         if (docObt && docObt.status === "PENDENTE") {
-          // Só conta se houver descendentes
+          // Só conta se houver descendentes. Nº Linhagem cresce em direção aos
+          // descendentes (1 = ancestral mais antigo) — descendente tem número MAIOR.
           const temDescendentes = pessoas.some(
-            (o) => o.numeroLinhagem != null && o.numeroLinhagem < (geracao ?? 0)
+            (o) => o.numeroLinhagem != null && o.numeroLinhagem > (geracao ?? 0)
           )
           if (temDescendentes) {
             impedimentos.push({ label: "falta óbito", severity: "warn" })
@@ -445,11 +506,12 @@ export async function GET(
     const outros = rows.filter((r) => !r.isDirectLine && r.papel !== "Cônjuge")
 
     // -- Stats
+    const todosOsDocs = [...allDocs, ...placeholders]
     const stats = {
-      total: allDocs.length,
-      recebidos: allDocs.filter((d) => STATUS_VALIDADOS.includes(d.status)).length,
-      emOperacao: allDocs.filter((d) => STATUS_EM_OPERACAO.includes(d.status)).length,
-      pendentes: allDocs.filter((d) => d.status === "PENDENTE").length,
+      total: todosOsDocs.length,
+      recebidos: todosOsDocs.filter((d) => STATUS_VALIDADOS.includes(d.status)).length,
+      emOperacao: todosOsDocs.filter((d) => STATUS_EM_OPERACAO.includes(d.status)).length,
+      pendentes: todosOsDocs.filter((d) => d.status === "PENDENTE").length,
     }
 
     const response: ProcessoDocumentosResponse = {
