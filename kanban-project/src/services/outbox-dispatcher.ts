@@ -60,6 +60,19 @@ const TIPOS_SEM_EFEITO = new Set([
   "step.executado",
   "step.aguardando_aprovacao",
   "step.pendente",
+  // `aplicarTarefa` (task-step-sync.ts) publica `tarefa.${alvo.toLowerCase()}` para
+  // TODA transição de status — `tarefa.concluido_recebido` já estava aqui, mas os
+  // outros 8 status possíveis (StatusTarefa) nunca tinham sido declarados. Achado
+  // real (FILA-003): "tarefa.supersedida" acumulava desde 03/09, sem consumidor e
+  // sem erro — mesmo padrão do incidente que motivou esta lista.
+  "tarefa.nao_iniciada",
+  "tarefa.em_andamento",
+  "tarefa.aguardando_cliente",
+  "tarefa.aguardando_terceiro",
+  "tarefa.concluido_nao_possui",
+  "tarefa.bloqueada",
+  "tarefa.supersedida",
+  "tarefa.cancelada",
 ])
 
 /**
@@ -78,6 +91,9 @@ export const TIPOS_DRENADOS = [
     "step.em_andamento", "step.disponivel", "step.bloqueado", "step.reaberto",
     "step.cancelado", "step.dispensado", "step.supersedido", "step.aguardando",
     "step.executado", "step.aguardando_aprovacao", "step.pendente",
+    "tarefa.nao_iniciada", "tarefa.em_andamento", "tarefa.aguardando_cliente",
+    "tarefa.aguardando_terceiro", "tarefa.concluido_nao_possui", "tarefa.bloqueada",
+    "tarefa.supersedida", "tarefa.cancelada",
   ],
   "requerente.adicionado",
   // MRG — reconciliação contínua: nova certidão / necessidade transicionada /
