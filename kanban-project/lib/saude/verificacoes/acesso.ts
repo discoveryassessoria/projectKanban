@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
+import { STATUS_TERMINAIS } from '@/lib/operacional/tarefa-canonica'
 
 const ROTA_USUARIOS = '/administrator?screen=users'
 const ROTA_PERFIS = '/administrator?screen=roles'
@@ -213,7 +214,9 @@ registrar({
   responsavel: 'Operação',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
-    const n = await prisma.tarefa.count({ where: { concluida: false, responsavelId: null } })
+    // `concluida` nunca vira `true` para CANCELADA/SUPERSEDIDA — sem excluir o
+    // status terminal, tarefa já encerrada contava como "aberta sem responsável".
+    const n = await prisma.tarefa.count({ where: { concluida: false, responsavelId: null, statusTarefa: { notIn: STATUS_TERMINAIS } } })
     if (!n) return { achados: [], metricas: { semResponsavel: 0 }, resumo: 'Toda tarefa aberta tem responsável.' }
     return {
       achados: [{
@@ -251,7 +254,7 @@ registrar({
   responsavel: 'Operação',
   ativo: true,
   executar: async ({ agora }): Promise<ResultadoVerificacao> => {
-    const vencidas = await prisma.tarefa.count({ where: { concluida: false, dataPrazo: { lt: agora } } })
+    const vencidas = await prisma.tarefa.count({ where: { concluida: false, dataPrazo: { lt: agora }, statusTarefa: { notIn: STATUS_TERMINAIS } } })
     if (!vencidas) return { achados: [], metricas: { vencidas: 0 }, resumo: 'Nenhuma tarefa aberta vencida.' }
     const severidade = vencidas >= 50 ? 'ERRO' : 'ALERTA'
     return {

@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { STATUS_TERMINAIS } from '@/lib/operacional/tarefa-canonica'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +26,11 @@ export async function GET(request: NextRequest) {
     const tarefas = await prisma.tarefa.findMany({
       where: {
         concluida: false,
+        // `concluida` só vira `true` para CONCLUIDO_RECEBIDO — CANCELADA e
+        // SUPERSEDIDA ficam com `concluida: false` para sempre. Sem isto, uma
+        // tarefa já encerrada (ex.: substituída por Movimentação Manual de Fase)
+        // continua notificando como se fosse nova, para sempre.
+        statusTarefa: { notIn: STATUS_TERMINAIS },
         AND: [
             // Filtro de responsável (minhas tarefas OU sem responsável)
             {

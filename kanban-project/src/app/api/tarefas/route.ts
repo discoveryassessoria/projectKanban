@@ -7,6 +7,7 @@ import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
 import { extrairUsuarioKanban } from "@/lib/kanban-auth"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { STATUS_TERMINAIS } from '@/lib/operacional/tarefa-canonica'
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -90,6 +91,15 @@ export async function GET(request: Request) {
 
     if (concluida !== null && concluida !== undefined && concluida !== "") {
       where.concluida = concluida === "true"
+    }
+
+    // `concluida` (booleano) só vira `true` para CONCLUIDO_RECEBIDO — CANCELADA e
+    // SUPERSEDIDA continuam com `concluida: false` para sempre (achado real: a
+    // tarefa "Preparar pacote" do processo Abellan, já SUPERSEDIDA, continuava
+    // aparecendo como pendente aqui e nas Notificações). "Pendente" tem que
+    // excluir todo estado terminal, não só o de conclusão.
+    if (where.concluida === false) {
+      where.statusTarefa = { notIn: STATUS_TERMINAIS }
     }
 
     if (prioridade && Object.values(PrioridadeTarefa).includes(prioridade)) {
