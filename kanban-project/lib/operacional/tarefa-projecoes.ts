@@ -31,7 +31,7 @@ import type { Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa } from '@pris
 type Leitor = PrismaClient | Prisma.TransactionClient
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
-import { phaseKeyToFaseCode, rotuloDoPasso } from '@/src/lib/process-stage/fases-catalog'
+import { phaseKeyToFaseCode, rotuloDoPasso, labelDaFasePorPhaseKey, getOrdemFase } from '@/src/lib/process-stage/fases-catalog'
 
 // O TEMPO VEM DE UM LUGAR SÓ.
 //
@@ -933,4 +933,179 @@ export async function facetasGerenciais(agora = new Date()) {
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome)),
   }
+}
+
+/** Contagens de um recorte (fase, processo ou família) — sempre os mesmos cinco números. */
+export interface ContagensAgrupadas {
+  total: number
+  aFazer: number
+  concluidas: number
+  atrasadas: number
+  venceEm7Dias: number
+}
+
+export interface FaseAgrupada extends ContagensAgrupadas {
+  faseMacroKey: string
+  label: string
+  ordem: number
+}
+
+export interface ProcessoAgrupado extends ContagensAgrupadas {
+  processoId: number
+  nomeProcesso: string
+  faseAtualKey: string | null
+  fases: FaseAgrupada[]
+}
+
+export interface FamiliaAgrupada extends ContagensAgrupadas {
+  /** `null` quando o processo ainda não tem família (dado legado, pré-backfill). */
+  familiaId: number | null
+  nomeFamilia: string
+  processos: ProcessoAgrupado[]
+  /**
+   * Quem tem mais tarefas ATIVAS (não concluídas) nesta família — informação,
+   * não atribuição. Com processos de responsáveis diferentes ou sem nenhum
+   * responsável ativo, fica `null` e a tela mostra "Vários"/"Sem responsável".
+   */
+  responsavelPrincipal: { id: number; nome: string } | null
+  ultimaAtividade: string | null
+}
+
+const zero = (): ContagensAgrupadas => ({ total: 0, aFazer: 0, concluidas: 0, atrasadas: 0, venceEm7Dias: 0 })
+const somar = (a: ContagensAgrupadas, b: ContagensAgrupadas) => {
+  a.total += b.total; a.aFazer += b.aFazer; a.concluidas += b.concluidas
+  a.atrasadas += b.atrasadas; a.venceEm7Dias += b.venceEm7Dias
+}
+
+/**
+ * A OPERAÇÃO AGRUPADA POR FAMÍLIA — para não rolar uma lista de centenas de
+ * tarefas quando o que se quer é "como está a família Medina Olivares".
+ *
+ * Lê a MESMA Tarefa canônica (nada de tabela de resumo pré-calculada, que
+ * ficaria velha). O volume atual da operação (centenas de tarefas, dezenas de
+ * processos) cabe inteiro em memória de uma vez — agregar em SQL exigiria um
+ * groupBy por processo×fase e outro por responsável, para um ganho que não
+ * existe nesta escala.
+ */
+export async function agregacaoPorFamilia(agora = new Date()): Promise<FamiliaAgrupada[]> {
+  const em7Dias = inicioDoDiaOperacional(agora)
+  em7Dias.setDate(em7Dias.getDate() + 7)
+  const hojeInicio = inicioDoDiaOperacional(agora)
+
+  const registros = await prisma.tarefa.findMany({
+    where: { processoId: { not: null }, statusTarefa: { in: STATUS_NO_QUADRO } },
+    select: {
+      processoId: true, faseMacroKey: true, statusTarefa: true, dataPrazo: true,
+      responsavelId: true, updatedAt: true,
+    },
+  })
+  if (registros.length === 0) return []
+
+  const processoIds = [...new Set(registros.map((r) => r.processoId as number))]
+  const [processos, responsaveis] = await Promise.all([
+    prisma.processo.findMany({
+      where: { id: { in: processoIds } },
+      select: { id: true, nome: true, faseAtualKey: true, familiaId: true, familia: { select: { nome: true } } },
+    }),
+    prisma.usuario.findMany({
+      where: { id: { in: [...new Set(registros.map((r) => r.responsavelId).filter((id): id is number => id != null))] } },
+      select: { id: true, nome: true },
+    }),
+  ])
+  const processoDe = new Map(processos.map((p) => [p.id, p]))
+  const nomeResponsavelDe = new Map(responsaveis.map((u) => [u.id, u.nome]))
+
+  // processoId -> faseMacroKey -> contagens
+  const porProcessoFase = new Map<number, Map<string, ContagensAgrupadas>>()
+  // familiaId sintético (familiaId real, ou "p:<processoId>" sem família) -> responsavelId -> nº de tarefas ATIVAS
+  const cargaPorFamilia = new Map<string, Map<number, number>>()
+  // familiaId sintético -> última atividade
+  const ultimaPorFamilia = new Map<string, Date>()
+
+  for (const r of registros) {
+    const processoId = r.processoId as number
+    const p = processoDe.get(processoId)
+    if (!p) continue // processo apagado/inacessível — não inventa família para ele
+    const chaveFamilia = p.familiaId != null ? `f:${p.familiaId}` : `p:${processoId}`
+    const fase = r.faseMacroKey ?? '—'
+
+    let porFase = porProcessoFase.get(processoId)
+    if (!porFase) { porFase = new Map(); porProcessoFase.set(processoId, porFase) }
+    let c = porFase.get(fase)
+    if (!c) { c = zero(); porFase.set(fase, c) }
+
+    const concluida = (STATUS_CONCLUIDOS as string[]).includes(r.statusTarefa)
+    const atrasada = !concluida && r.dataPrazo != null && r.dataPrazo < hojeInicio
+    const venceEm7 = !concluida && r.dataPrazo != null && r.dataPrazo >= hojeInicio && r.dataPrazo <= em7Dias
+    c.total += 1
+    if (concluida) c.concluidas += 1
+    else c.aFazer += 1
+    if (atrasada) c.atrasadas += 1
+    if (venceEm7) c.venceEm7Dias += 1
+
+    if (!concluida) {
+      let carga = cargaPorFamilia.get(chaveFamilia)
+      if (!carga) { carga = new Map(); cargaPorFamilia.set(chaveFamilia, carga) }
+      if (r.responsavelId != null) carga.set(r.responsavelId, (carga.get(r.responsavelId) ?? 0) + 1)
+    }
+    const atual = ultimaPorFamilia.get(chaveFamilia)
+    if (!atual || r.updatedAt > atual) ultimaPorFamilia.set(chaveFamilia, r.updatedAt)
+  }
+
+  const familias = new Map<string, FamiliaAgrupada>()
+  for (const [processoId, porFase] of porProcessoFase) {
+    const p = processoDe.get(processoId)!
+    const chaveFamilia = p.familiaId != null ? `f:${p.familiaId}` : `p:${processoId}`
+
+    const fases: FaseAgrupada[] = [...porFase.entries()]
+      .map(([faseMacroKey, contagens]) => {
+        const code = phaseKeyToFaseCode(faseMacroKey)
+        return {
+          ...contagens,
+          faseMacroKey,
+          label: labelDaFasePorPhaseKey(faseMacroKey) ?? faseMacroKey,
+          ordem: code ? getOrdemFase(code) : 999,
+        }
+      })
+      .sort((a, b) => a.ordem - b.ordem)
+
+    const totalProcesso = zero()
+    for (const f of fases) somar(totalProcesso, f)
+
+    const processoAgrupado: ProcessoAgrupado = {
+      ...totalProcesso, processoId, nomeProcesso: p.nome, faseAtualKey: p.faseAtualKey, fases,
+    }
+
+    let familia = familias.get(chaveFamilia)
+    if (!familia) {
+      familia = {
+        ...zero(),
+        familiaId: p.familiaId,
+        nomeFamilia: p.familia?.nome ?? p.nome,
+        processos: [],
+        responsavelPrincipal: null,
+        ultimaAtividade: null,
+      }
+      familias.set(chaveFamilia, familia)
+    }
+    familia.processos.push(processoAgrupado)
+    somar(familia, totalProcesso)
+  }
+
+  for (const [chaveFamilia, familia] of familias) {
+    const carga = cargaPorFamilia.get(chaveFamilia)
+    if (carga && carga.size > 0) {
+      const [responsavelId, maior] = [...carga.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]
+      // Só é "principal" se ninguém mais empata — empate é "vários", não um palpite.
+      const empatados = [...carga.values()].filter((n) => n === maior).length
+      if (empatados === 1) {
+        familia.responsavelPrincipal = { id: responsavelId, nome: nomeResponsavelDe.get(responsavelId) ?? `#${responsavelId}` }
+      }
+    }
+    const ultima = ultimaPorFamilia.get(chaveFamilia)
+    familia.ultimaAtividade = ultima ? ultima.toISOString() : null
+    familia.processos.sort((a, b) => a.nomeProcesso.localeCompare(b.nomeProcesso))
+  }
+
+  return [...familias.values()].sort((a, b) => b.total - a.total || a.nomeFamilia.localeCompare(b.nomeFamilia))
 }

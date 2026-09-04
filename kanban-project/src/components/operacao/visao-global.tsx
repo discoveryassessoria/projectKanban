@@ -23,7 +23,7 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import {
@@ -75,6 +75,37 @@ interface Resposta {
   facetas: Facetas
 }
 
+interface Contagens {
+  total: number
+  aFazer: number
+  concluidas: number
+  atrasadas: number
+  venceEm7Dias: number
+}
+interface FaseAgrupada extends Contagens {
+  faseMacroKey: string
+  label: string
+  ordem: number
+}
+interface ProcessoAgrupado extends Contagens {
+  processoId: number
+  nomeProcesso: string
+  faseAtualKey: string | null
+  fases: FaseAgrupada[]
+}
+interface FamiliaAgrupada extends Contagens {
+  familiaId: number | null
+  nomeFamilia: string
+  processos: ProcessoAgrupado[]
+  responsavelPrincipal: { id: number; nome: string } | null
+  ultimaAtividade: string | null
+}
+interface RespostaFamilias {
+  familias: FamiliaAgrupada[]
+  total: number
+  indicadores: { tarefas: number; aFazer: number; atrasadas: number; venceEm7Dias: number; familias: number; processos: number }
+}
+
 interface Filtros {
   responsavel: number | null
   semResponsavel: boolean
@@ -83,14 +114,16 @@ interface Filtros {
   atrasadas: boolean
   venceHoje: boolean
   busca: string
+  /** Preenchido só pelo drill-down família → fase. Não tem controle próprio na barra de filtros. */
+  processoId: number | null
 }
 const SEM_FILTRO: Filtros = {
   responsavel: null, semResponsavel: false, fase: null,
-  prioridade: null, atrasadas: false, venceHoje: false, busca: "",
+  prioridade: null, atrasadas: false, venceHoje: false, busca: "", processoId: null,
 }
 const temFiltro = (f: Filtros) =>
   f.responsavel != null || f.semResponsavel || f.fase != null || f.prioridade != null ||
-  f.atrasadas || f.venceHoje || f.busca.trim() !== ""
+  f.atrasadas || f.venceHoje || f.busca.trim() !== "" || f.processoId != null
 
 function queryDe(f: Filtros, coluna: ColunaKanban | null): string {
   const p = new URLSearchParams()
@@ -101,6 +134,7 @@ function queryDe(f: Filtros, coluna: ColunaKanban | null): string {
   if (f.atrasadas) p.set("atrasadas", "1")
   if (f.venceHoje) p.set("venceHoje", "1")
   if (f.busca.trim()) p.set("busca", f.busca.trim())
+  if (f.processoId != null) p.set("processo", String(f.processoId))
   if (coluna) p.set("coluna", coluna)
   return p.toString()
 }
@@ -146,8 +180,19 @@ const INDICADORES: Array<{ chave: keyof Indicadores; rotulo: string; filtro: Par
   { chave: "venceHoje", rotulo: "Vence hoje", filtro: { venceHoje: true }, tom: "text-amber-800/90" },
 ]
 
+/** Os tiles da Agrupada não filtram — resumem o universo inteiro, sem recorte. */
+const AGRUPADA_TILES: Array<{ chave: keyof RespostaFamilias["indicadores"]; rotulo: string; tom: string }> = [
+  { chave: "tarefas", rotulo: "Tarefas abertas", tom: "text-white/80" },
+  { chave: "atrasadas", rotulo: "Atrasadas", tom: "text-red-700/90" },
+  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-amber-800/90" },
+  { chave: "familias", rotulo: "Famílias", tom: "text-white/80" },
+  { chave: "processos", rotulo: "Processos", tom: "text-white/80" },
+]
+
 export function VisaoGlobal() {
-  const [modo, setModo] = useState<"lista" | "kanban">("lista")
+  const [modo, setModo] = useState<"agrupada" | "lista" | "kanban">("agrupada")
+  /** Contexto do drill-down família → fase — só existe quando se chega pela Agrupada. */
+  const [drillDown, setDrillDown] = useState<{ nomeFamilia: string; faseLabel: string } | null>(null)
   const [filtros, setFiltros] = useState<Filtros>(SEM_FILTRO)
   const [resultado, setResultado] = useState<{ chave: string; d: Resposta | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
@@ -192,6 +237,32 @@ export function VisaoGlobal() {
   const dados = carregando ? null : resultado?.d ?? null
   const falhou = !carregando && dados == null
   const recarregar = useCallback(() => setRecarga((n) => n + 1), [])
+
+  // A AGRUPADA É UMA CONSULTA À PARTE — resume a mesma operação por família,
+  // sem os filtros da Lista/Kanban (que não fazem sentido num resumo). Só
+  // busca quando a aba está aberta, e de novo a cada recarga.
+  const [resultadoFamilias, setResultadoFamilias] = useState<{ chave: string; d: RespostaFamilias | null } | null>(null)
+  const [paginaFamilias, setPaginaFamilias] = useState(1)
+  useEffect(() => {
+    if (modo !== "agrupada") return
+    let vivo = true
+    const chaveFamilias = `${recarga}`
+    fetch(`/api/operacao/visao-global/familias`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: RespostaFamilias) => { if (vivo) setResultadoFamilias({ chave: chaveFamilias, d }) })
+      .catch(() => { if (vivo) setResultadoFamilias({ chave: chaveFamilias, d: null }) })
+    return () => { vivo = false }
+  }, [modo, recarga])
+  const carregandoFamilias = resultadoFamilias?.chave !== `${recarga}`
+  const dadosFamilias = carregandoFamilias ? null : resultadoFamilias?.d ?? null
+  const falhouFamilias = !carregandoFamilias && dadosFamilias == null
+
+  /** Do resumo por família direto para a Lista, já filtrada — o mesmo `taskId` do sempre. */
+  const abrirFaseDaFamilia = useCallback((nomeFamilia: string, faseLabel: string, processoId: number, faseMacroKey: string) => {
+    setDrillDown({ nomeFamilia, faseLabel })
+    setFiltros({ ...SEM_FILTRO, processoId, fase: faseMacroKey })
+    setModo("lista")
+  }, [])
 
   /**
    * TODA MUDANÇA SAI POR UMA PORTA SÓ — inclusive as do Kanban.
@@ -305,49 +376,76 @@ export function VisaoGlobal() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* ── INDICADORES ── contagem do universo filtrado, e cada um é um filtro */}
+      {/* ── RESUMO ── na Agrupada é o universo inteiro; na Lista/Kanban, cada número é um filtro */}
       <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-3">
-        {INDICADORES.map((ind) => {
-          const ativo =
-            (ind.filtro.semResponsavel && filtros.semResponsavel) ||
-            (ind.filtro.atrasadas && filtros.atrasadas) ||
-            (ind.filtro.venceHoje && filtros.venceHoje)
-          const clicavel = Object.keys(ind.filtro).length > 0
-          return (
-            <button
-              key={ind.chave}
-              type="button"
-              disabled={!clicavel}
-              onClick={() => clicavel && aplicar(
-                ativo ? { semResponsavel: false, atrasadas: false, venceHoje: false } : { ...SEM_FILTRO, ...ind.filtro, busca: filtros.busca },
-              )}
-              className={`rounded border px-2.5 py-1.5 text-left transition-colors ${
-                ativo ? "border-[var(--border-strong)] bg-[var(--surface-primary)]" : "border-[var(--border-default)] hover:bg-[var(--surface-primary)]"
-              } ${clicavel ? "cursor-pointer" : "cursor-default"}`}
-            >
-              <div className={`text-[15px] font-medium tabular-nums leading-5 ${ind.tom}`}>
-                {dados ? dados.indicadores[ind.chave] : "—"}
+        {modo === "agrupada" ? (
+          AGRUPADA_TILES.map((t) => (
+            <div key={t.chave} className="rounded border border-[var(--border-default)] px-2.5 py-1.5">
+              <div className={`text-[15px] font-medium tabular-nums leading-5 ${t.tom}`}>
+                {dadosFamilias ? dadosFamilias.indicadores[t.chave] : "—"}
               </div>
-              <div className="text-[10px] leading-4 text-[var(--text-muted)]">{ind.rotulo}</div>
-            </button>
-          )
-        })}
+              <div className="text-[10px] leading-4 text-[var(--text-muted)]">{t.rotulo}</div>
+            </div>
+          ))
+        ) : (
+          INDICADORES.map((ind) => {
+            const ativo =
+              (ind.filtro.semResponsavel && filtros.semResponsavel) ||
+              (ind.filtro.atrasadas && filtros.atrasadas) ||
+              (ind.filtro.venceHoje && filtros.venceHoje)
+            const clicavel = Object.keys(ind.filtro).length > 0
+            return (
+              <button
+                key={ind.chave}
+                type="button"
+                disabled={!clicavel}
+                onClick={() => clicavel && aplicar(
+                  ativo ? { semResponsavel: false, atrasadas: false, venceHoje: false } : { ...SEM_FILTRO, ...ind.filtro, busca: filtros.busca },
+                )}
+                className={`rounded border px-2.5 py-1.5 text-left transition-colors ${
+                  ativo ? "border-[var(--border-strong)] bg-[var(--surface-primary)]" : "border-[var(--border-default)] hover:bg-[var(--surface-primary)]"
+                } ${clicavel ? "cursor-pointer" : "cursor-default"}`}
+              >
+                <div className={`text-[15px] font-medium tabular-nums leading-5 ${ind.tom}`}>
+                  {dados ? dados.indicadores[ind.chave] : "—"}
+                </div>
+                <div className="text-[10px] leading-4 text-[var(--text-muted)]">{ind.rotulo}</div>
+              </button>
+            )
+          })
+        )}
         <div className="ml-auto flex items-center gap-1 rounded border border-[var(--border-default)] p-0.5">
-          {(["lista", "kanban"] as const).map((m) => (
+          {(["agrupada", "lista", "kanban"] as const).map((m) => (
             <button
               key={m}
-              onClick={() => setModo(m)}
+              onClick={() => { setModo(m); setDrillDown(null); aplicar({ processoId: null }) }}
               className={`rounded px-2.5 py-1 text-[11px] transition-colors ${
                 modo === m ? "bg-[var(--surface-primary)] text-white/90" : "text-[var(--text-secondary)] hover:text-white/75"
               }`}
             >
-              {m === "lista" ? "Lista" : "Kanban"}
+              {m === "agrupada" ? "Agrupada" : m === "lista" ? "Lista" : "Kanban"}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── FILTROS ── combináveis, e o que existe vem do que existe */}
+      {drillDown && modo === "lista" && (
+        <div className="flex items-center gap-1.5 border-b border-white/[0.06] px-4 py-2 text-[11px]">
+          <button
+            onClick={() => { setDrillDown(null); setModo("agrupada"); aplicar({ processoId: null }) }}
+            className="text-[var(--text-secondary)] hover:text-white/80"
+          >
+            ← Agrupada
+          </button>
+          <span className="text-[var(--text-muted)]">/</span>
+          <span className="text-white/80">{drillDown.nomeFamilia}</span>
+          <span className="text-[var(--text-muted)]">/</span>
+          <span className="text-white/80">{drillDown.faseLabel}</span>
+        </div>
+      )}
+
+      {/* ── FILTROS ── combináveis, e o que existe vem do que existe. Não existem na Agrupada: são filtro de TAREFA, e ali a unidade é a família. */}
+      {modo !== "agrupada" && (
       <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
         <input
           value={buscaDigitada}
@@ -413,6 +511,7 @@ export function VisaoGlobal() {
           {dados ? `${linhas.length} de ${dados.total}` : ""}
         </span>
       </div>
+      )}
 
       {/* ── CARGA DO FUNCIONÁRIO SELECIONADO ── informação, não ranking */}
       {filtros.responsavel != null && dados && (
@@ -454,9 +553,22 @@ export function VisaoGlobal() {
       )}
 
       <div className="min-h-0 flex-1 overflow-auto">
-        {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
-        {carregando && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
-        {dados && linhas.length === 0 && (
+        {modo === "agrupada" && falhouFamilias && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
+        {modo === "agrupada" && carregandoFamilias && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
+        {modo === "agrupada" && dadosFamilias && dadosFamilias.familias.length === 0 && (
+          <Estado tipo="vazio" mensagem="Nenhuma tarefa na operação." />
+        )}
+        {modo === "agrupada" && dadosFamilias && dadosFamilias.familias.length > 0 && (
+          <Agrupada
+            familias={dadosFamilias.familias}
+            pagina={paginaFamilias}
+            aoMudarPagina={setPaginaFamilias}
+            aoAbrirFase={abrirFaseDaFamilia}
+          />
+        )}
+        {modo !== "agrupada" && falhou && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
+        {modo !== "agrupada" && carregando && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
+        {modo !== "agrupada" && dados && linhas.length === 0 && (
           <Estado
             tipo="vazio"
             mensagem={temFiltro(filtros) ? "Nenhuma tarefa com esses filtros." : "Nenhuma tarefa na operação."}
@@ -564,6 +676,163 @@ function tempo(dias: number | null, atrasada: boolean): string {
   if (atrasada) { const d = Math.abs(dias); return `${d} dia${d === 1 ? "" : "s"} atrás` }
   if (dias === 0) return "hoje"
   return `em ${dias} dia${dias === 1 ? "" : "s"}`
+}
+
+const POR_PAGINA_FAMILIAS = 6
+
+/**
+ * A AGRUPADA — cada linha é uma FAMÍLIA, não uma tarefa.
+ *
+ * Existe para responder "como está a família Medina Olivares" sem rolar uma
+ * lista de centenas de linhas. Expandir mostra as FASES do(s) processo(s) da
+ * família; clicar numa fase vai para a MESMA Lista de sempre, já filtrada por
+ * processo e fase — não existe uma segunda tabela de tarefas por trás disto.
+ */
+function Agrupada({
+  familias, pagina, aoMudarPagina, aoAbrirFase,
+}: {
+  familias: FamiliaAgrupada[]
+  pagina: number
+  aoMudarPagina: (p: number) => void
+  aoAbrirFase: (nomeFamilia: string, faseLabel: string, processoId: number, faseMacroKey: string) => void
+}) {
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
+  const alternar = (chave: string) => setExpandidas((prev) => {
+    const novo = new Set(prev)
+    if (novo.has(chave)) novo.delete(chave); else novo.add(chave)
+    return novo
+  })
+
+  const totalPaginas = Math.max(1, Math.ceil(familias.length / POR_PAGINA_FAMILIAS))
+  const paginaValida = Math.min(Math.max(pagina, 1), totalPaginas)
+  const visiveis = familias.slice((paginaValida - 1) * POR_PAGINA_FAMILIAS, paginaValida * POR_PAGINA_FAMILIAS)
+
+  return (
+    <div className="flex flex-col">
+      <table className="w-full border-collapse text-left">
+        <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
+          <tr className="border-b border-white/[0.08] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
+            <th>Família / Processo / Fase</th>
+            <th className="w-20">Tarefas</th>
+            <th className="w-20">A fazer</th>
+            <th className="w-24">Concluídas</th>
+            <th className="w-20">Atrasadas</th>
+            <th className="w-28">Vencem em 7 dias</th>
+            <th className="w-40">Fase atual</th>
+            <th className="w-36">Responsável</th>
+            <th className="w-28">Última atividade</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visiveis.map((f) => {
+            const chaveFamilia = f.familiaId != null ? `f:${f.familiaId}` : `p:${f.processos[0]?.processoId}`
+            const aberta = expandidas.has(chaveFamilia)
+            const umSoProcesso = f.processos.length === 1
+            return (
+              <Fragment key={chaveFamilia}>
+                <tr className="border-b border-white/[0.05] hover:bg-[var(--surface-primary)]">
+                  <td className="px-3 py-2">
+                    <button onClick={() => alternar(chaveFamilia)} className="flex w-full items-center gap-2 text-left">
+                      <span className="w-3 shrink-0 text-[10px] text-[var(--text-muted)]">{aberta ? "▾" : "▸"}</span>
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-white/80">
+                        {iniciais(f.nomeFamilia)}
+                      </span>
+                      <span>
+                        <span className="block text-[12px] font-medium text-white/90">{f.nomeFamilia}</span>
+                        <span className="block text-[10px] text-[var(--text-muted)]">
+                          {umSoProcesso ? `Processo: ${f.processos[0].nomeProcesso}` : `${f.processos.length} processos`}
+                        </span>
+                      </span>
+                    </button>
+                  </td>
+                  <td className="px-3 py-2 text-[12px] tabular-nums text-white/85">{f.total}</td>
+                  <td className="px-3 py-2 text-[12px] tabular-nums text-white/70">{f.aFazer}</td>
+                  <td className="px-3 py-2 text-[12px] tabular-nums text-green-800/90">{f.concluidas}</td>
+                  <td className={`px-3 py-2 text-[12px] tabular-nums ${f.atrasadas > 0 ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>{f.atrasadas}</td>
+                  <td className={`px-3 py-2 text-[12px] tabular-nums ${f.venceEm7Dias > 0 ? "text-amber-800/90" : "text-[var(--text-muted)]"}`}>{f.venceEm7Dias}</td>
+                  <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+                    {umSoProcesso ? (rotularFase(f.processos[0].faseAtualKey) ?? "—") : "Vários processos"}
+                  </td>
+                  <td className="px-3 py-2 text-[11px]"><Responsavel nome={f.responsavelPrincipal?.nome ?? null} /></td>
+                  <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-muted)]">{dataCurta(f.ultimaAtividade)}</td>
+                </tr>
+                {aberta && f.processos.map((p) => (
+                  <Fragment key={p.processoId}>
+                    {!umSoProcesso && (
+                      <tr className="border-b border-white/[0.05] bg-[var(--surface-primary)]/40">
+                        <td colSpan={9} className="px-3 py-1.5 pl-9 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                          Processo: {p.nomeProcesso}
+                        </td>
+                      </tr>
+                    )}
+                    {p.fases.length === 0 && (
+                      <tr>
+                        <td colSpan={9} className="px-3 py-2 pl-12 text-[11px] text-[var(--text-muted)]">Nenhuma tarefa neste processo.</td>
+                      </tr>
+                    )}
+                    {p.fases.map((fa) => (
+                      <tr
+                        key={fa.faseMacroKey}
+                        className="cursor-pointer border-b border-white/[0.05] hover:bg-[var(--surface-primary)]"
+                        onClick={() => aoAbrirFase(f.nomeFamilia, fa.label, p.processoId, fa.faseMacroKey)}
+                      >
+                        <td className="px-3 py-2 pl-12 text-[11px] text-[var(--text-secondary)]">{fa.label}</td>
+                        <td className="px-3 py-2 text-[12px] tabular-nums text-white/80">{fa.total}</td>
+                        <td className="px-3 py-2 text-[12px] tabular-nums text-white/70">{fa.aFazer}</td>
+                        <td className="px-3 py-2 text-[12px] tabular-nums text-green-800/90">{fa.concluidas}</td>
+                        <td className={`px-3 py-2 text-[12px] tabular-nums ${fa.atrasadas > 0 ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>{fa.atrasadas}</td>
+                        <td className={`px-3 py-2 text-[12px] tabular-nums ${fa.venceEm7Dias > 0 ? "text-amber-800/90" : "text-[var(--text-muted)]"}`}>{fa.venceEm7Dias}</td>
+                        <td className="px-3 py-2" colSpan={3}>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+                              <div
+                                className="h-full rounded-full bg-[var(--action-primary)]"
+                                style={{ width: `${fa.total > 0 ? Math.round((fa.concluidas / fa.total) * 100) : 0}%` }}
+                              />
+                            </div>
+                            <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
+                              {fa.total > 0 ? Math.round((fa.concluidas / fa.total) * 100) : 0}% ({fa.concluidas} de {fa.total})
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+
+      {familias.length > 0 && (
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] px-4 py-2.5">
+          <span className="text-[11px] text-[var(--text-muted)]">
+            Mostrando {visiveis.length} de {familias.length} famílias
+          </span>
+          {totalPaginas > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={paginaValida <= 1}
+                onClick={() => aoMudarPagina(paginaValida - 1)}
+                className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)] disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span className="text-[11px] tabular-nums text-white/80">{paginaValida} / {totalPaginas}</span>
+              <button
+                disabled={paginaValida >= totalPaginas}
+                onClick={() => aoMudarPagina(paginaValida + 1)}
+                className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)] disabled:opacity-40"
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function Lista({
