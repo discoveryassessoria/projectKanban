@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 const DECISOES_VALIDAS = ["aceita", "ressalva", "ignorada", "retificacao", "apoio_solicitado"]
 
@@ -8,6 +9,11 @@ export async function PATCH(
   { params }: { params: Promise<{ processoId: string; divId: string }> }
 ) {
   try {
+    // 🔒 Sem checagem nenhuma antes — qualquer requisição decidia uma
+    // divergência documental.
+    const erroPermissao = await verificarPermissao(request, "tarefas.iniciar_concluir")
+    if (erroPermissao) return erroPermissao
+
     const { divId } = await params
     const id = parseInt(divId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })

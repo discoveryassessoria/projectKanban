@@ -10,6 +10,7 @@ import {
   garantirOperacaoDocumentoV2,
   iniciarOperacaoDocumentoV2,
   controlarOperacaoV2,
+  PERMISSAO_DO_CONTROLE,
 } from "@/src/services/documento-operacao"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 
@@ -53,6 +54,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const documento = await prisma.documento.findUnique({ where: { id: documentoId }, select: { id: true } })
     if (!documento) return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
 
+    const usuario = await extrairUsuarioComPermissoes(request)
+    if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
+    // 🔒 Mesma permissão de iniciar operação — este caminho também decide o
+    // destino do documento (CANCELADO), e não conferia nada antes.
+    if (usuario.permissoes?.[PERMISSAO_DO_CONTROLE.iniciar] !== true) {
+      return NextResponse.json({ error: "Sem permissão." }, { status: 403 })
+    }
+
     // Caso especial: marcar como desnecessário (não cria operação)
     if (body.tipoOperacao === "desnecessario") {
       const obs = (body.observacaoInicial || "").trim()
@@ -66,7 +75,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ workflow: null, status: "CANCELADO" }, { status: 200 })
     }
 
-    const usuario = await extrairUsuarioComPermissoes(request)
     const r = await iniciarOperacaoDocumentoV2(
       documentoId,
       {
@@ -74,7 +82,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         dataPrazoInicial: body.dataPrazoInicial ? new Date(body.dataPrazoInicial) : null,
         observacaoInicial: body.observacaoInicial ?? null,
       },
-      { usuarioId: usuario?.userId ?? null, permissoes: usuario?.permissoes ?? null },
+      { usuarioId: usuario.userId, permissoes: usuario.permissoes ?? null, isAdmin: usuario.tipo === "admin" },
     )
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
     return NextResponse.json({ workflow: r.workflow }, { status: 201 })
@@ -96,9 +104,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ error: "action inválido. Use: pausar | retomar | cancelar | invalidar" }, { status: 400 })
     }
     const usuario = await extrairUsuarioComPermissoes(request)
+    if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
     const r = await controlarOperacaoV2(documentoId, body.action, body.observacao, {
-      usuarioId: usuario?.userId ?? null,
-      permissoes: usuario?.permissoes ?? null,
+      usuarioId: usuario.userId,
+      permissoes: usuario.permissoes ?? null,
+      isAdmin: usuario.tipo === "admin",
     })
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
     return NextResponse.json({ workflow: r.workflow })

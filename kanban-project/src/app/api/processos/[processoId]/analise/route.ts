@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { TipoDocumento } from "@prisma/client"
 import {
   gerarDivergencias,
@@ -68,6 +69,11 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    // 🔒 Sem checagem nenhuma antes — a recomputação em si não destrói dado,
+    // mas ainda assim exige estar autenticado com a permissão de execução.
+    const erroPermissao = await verificarPermissao(request, "tarefas.iniciar_concluir")
+    if (erroPermissao) return erroPermissao
+
     const { processoId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })

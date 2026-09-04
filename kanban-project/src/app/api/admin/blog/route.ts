@@ -2,8 +2,9 @@
 // CRIAR ARQUIVO: app/api/admin/blog/route.ts
 // ========================================
 
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar todos os posts
 export async function GET() {
@@ -20,8 +21,14 @@ export async function GET() {
 }
 
 // POST - Criar novo post
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // 🔒 Mesma permissão que PUT/DELETE em [id]/route.ts já exigem — só
+    // faltava aqui: qualquer requisição, sem autenticação nenhuma, publicava
+    // post no blog público.
+    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    if (erro) return erro
+
     const data = await request.json()
     
     // Gerar slug a partir do título se não for fornecido

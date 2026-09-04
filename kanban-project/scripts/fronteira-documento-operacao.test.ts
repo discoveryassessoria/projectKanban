@@ -156,7 +156,7 @@ async function main() {
       aplicarTransicaoDoPassoTx(tx, {
         id: p.stepIds[0], documentoId: p.documentoId, necessidadeId: p.necessidadeId, processoId: p.processoId,
         workflowInstanceId: p.instanciaId, faseMacroKey: "genealogia", ordem: 1, status: "CONCLUIDO",
-        ciclo: 1, metadata: null, stepKey: `localizar_registro_A`, lockVersion: lvAtual,
+        ciclo: 1, metadata: null, stepKey: `localizar_registro_A`, lockVersion: lvAtual, responsavelId: null,
       }, { status: "bloqueada" }, undefined, new Date()))
   } catch (e) {
     recusou = e instanceof TransicaoDePassoRecusada

@@ -12,6 +12,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 const DATA_STATUS = new Set(["not_filled", "ai_extracted", "manual_filled", "reviewed"])
 
@@ -19,6 +20,11 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ processoId: string; docId: string }> },
 ) {
+  // 🔒 Sem checagem nenhuma antes — gravava dados estruturados do documento
+  // pra qualquer requisição.
+  const erroPermissao = await verificarPermissao(req, "tarefas.iniciar_concluir")
+  if (erroPermissao) return erroPermissao
+
   const { docId } = await params
   const id = Number(docId)
   if (!Number.isFinite(id)) {

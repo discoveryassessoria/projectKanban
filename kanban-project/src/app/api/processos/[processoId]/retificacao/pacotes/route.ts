@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server"
 import { recusarSeCanonicoAssumiu, FASE_RETIFICACAO } from "@/src/services/motor-da-fase"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { buildInitialWorkflow } from "@/src/lib/process-stage/retificacao-engine"
@@ -14,6 +15,11 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    // 🔒 Sem checagem nenhuma antes — criava pacote de retificação pra
+    // qualquer requisição.
+    const erroPermissao = await verificarPermissao(request, "tarefas.iniciar_concluir")
+    if (erroPermissao) return erroPermissao
+
     const { processoId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })

@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { TipoDocumento } from "@prisma/client"
 import {
   initADModel,
@@ -208,10 +209,14 @@ export async function GET(
 // (ramificar + mover card) reaproveitem a infra já em produção.
 // ============================================================
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ processoId: string }> },
 ) {
   try {
+    // 🔒 Sem checagem nenhuma antes.
+    const erroPermissao = await verificarPermissao(req, "tarefas.iniciar_concluir")
+    if (erroPermissao) return erroPermissao
+
     const { processoId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })

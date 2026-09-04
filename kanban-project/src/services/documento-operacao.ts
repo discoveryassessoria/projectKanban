@@ -36,6 +36,7 @@ import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fas
 import { randomUUID } from "crypto"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
+import type { PermissaoChave } from "@/src/lib/permissoes"
 import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
 import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
@@ -288,6 +289,20 @@ export interface WorkflowV2Shape {
 export interface ContextoLeituraWorkflow {
   usuarioId: number | null
   permissoes: Record<string, boolean> | null
+  /** admin ignora a checagem de "dono da etapa" — mesma régua do resto do sistema. */
+  isAdmin?: boolean
+}
+
+/**
+ * PERMISSÃO EXIGIDA PARA CONTROLAR A OPERAÇÃO DO DOCUMENTO — iniciar, pausar,
+ * retomar, cancelar, invalidar. Fonte única, lida pela rota e pelo serviço.
+ */
+export const PERMISSAO_DO_CONTROLE: Record<string, PermissaoChave> = {
+  iniciar: "workflow.iniciarPasso",
+  pausar: "tarefas.bloquear",
+  retomar: "tarefas.bloquear",
+  cancelar: "tarefas.excluir",
+  invalidar: "tarefas.excluir",
 }
 
 /** Monta o objeto "workflow" no formato antigo esperado pela UI, a partir do V2. */
@@ -361,6 +376,19 @@ export async function iniciarOperacaoDocumentoV2(
   opts: IniciarOpts = {},
   ctx?: ContextoLeituraWorkflow,
 ): Promise<OpResult> {
+  // AUTORIZAÇÃO NO SERVIDOR — `ctx` ausente = chamada interna confiável (a
+  // materialização automática de `garantirOperacaoDocumentoV2`, disparada ao
+  // abrir o drawer, sem pedir permissão pra LER); vinda de rota HTTP ela é
+  // SEMPRE preenchida, e aí a permissão é exigida de verdade.
+  if (ctx) {
+    if (ctx.permissoes?.[PERMISSAO_DO_CONTROLE.iniciar] !== true) {
+      return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+    }
+    // Escolher o responsável de outra pessoa é distribuir — ato de gestão.
+    if (!ctx.isAdmin && opts.responsavelId != null && opts.responsavelId !== ctx.usuarioId) {
+      return { ok: false, error: "Só administradores podem iniciar a operação já atribuída a outra pessoa.", status: 403 }
+    }
+  }
   if (await temOperacaoV2(documentoId)) return { ok: false, error: "Operação já existe para este documento", status: 409 }
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
@@ -505,11 +533,13 @@ export type PassoParaTransicao = {
   /** Discrimina a TENTATIVA na chave do evento: reabrir e reconcluir o mesmo
    *  passo, no mesmo ciclo, é outra passagem — não um evento repetido. */
   lockVersion: number
+  responsavelId: number | null
 }
 
 const SELECT_PASSO_TRANSICAO = {
   id: true, documentoId: true, necessidadeId: true, processoId: true, workflowInstanceId: true,
   faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true,
+  responsavelId: true,
 } as const
 
 /**
@@ -540,6 +570,20 @@ export async function carregarPassoAutorizado(
       }
       if (ctx.permissoes?.[PERMISSAO_DA_ACAO[acao]] !== true) {
         return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+      }
+      // 🔒 MESMA TRAVA DO E4 — a permissão da ação autoriza mexer na PRÓPRIA
+      // etapa; "transferir" É a decisão de distribuição, então exige admin
+      // (escolher o responsável de outra pessoa não é do executor). Para as
+      // demais, quem não é admin só age numa etapa já de outra pessoa se for
+      // ele mesmo o responsável — etapa sem responsável passa (mesma régua
+      // do resto do sistema).
+      if (!ctx.isAdmin) {
+        if (acao === "transferir") {
+          return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+        }
+        if (p.responsavelId != null && p.responsavelId !== ctx.usuarioId) {
+          return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+        }
       }
       if (acao === "forcar" && !String(patch.justificativa ?? "").trim()) {
         return { ok: false, error: "VALIDATION_ERROR", status: 422 }
@@ -919,7 +963,7 @@ export async function registrarAndamentoPassoV2(
     where: { id: stepInstanceId },
     select: {
       id: true, documentoId: true, processoId: true, faseMacroKey: true, stepKey: true,
-      status: true, metadata: true, lockVersion: true, ciclo: true,
+      status: true, metadata: true, lockVersion: true, ciclo: true, responsavelId: true,
     },
   })
   if (!p || p.documentoId !== documentoId) return { ok: false, error: "STEP_NOT_FOUND", status: 404 }
@@ -933,6 +977,11 @@ export async function registrarAndamentoPassoV2(
   for (const acao of exigidas) {
     if (!acaoCompativelComEstado(acao, p.status)) return { ok: false, error: "STEP_NOT_AVAILABLE", status: 409 }
     if (ctx.permissoes?.[PERMISSAO_DA_ACAO[acao]] !== true) return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+  }
+  // 🔒 MESMA TRAVA DO E4 — registrar andamento na etapa de outra pessoa
+  // (com dono) exige admin.
+  if (!ctx.isAdmin && p.responsavelId != null && p.responsavelId !== ctx.usuarioId) {
+    return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
   }
 
   // LOCK OTIMISTA contra a versão que o CLIENTE tinha em tela. Sem isto, duas
@@ -1008,6 +1057,25 @@ export async function controlarOperacaoV2(
 ): Promise<OpResult> {
   const passos = await passosOperacaoV2(documentoId)
   if (passos.length === 0) return { ok: false, error: "Operação não encontrada", status: 404 }
+
+  // 🔒 MESMA TRAVA QUE JÁ EXISTE PARA A TAREFA — permissão da AÇÃO, e "só o
+  // dono (ou admin) controla". Achado real: esta função não conferia NADA —
+  // nem permissão, nem quem chamou —, e pausar/cancelar/invalidar aqui
+  // encerra trabalho de verdade (cancela passos, muda o Documento), não é
+  // menos sensível que as mesmas ações do lado da Tarefa.
+  if (ctx) {
+    const chave = PERMISSAO_DO_CONTROLE[action]
+    if (!chave || ctx.permissoes?.[chave] !== true) {
+      return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+    }
+    if (!ctx.isAdmin) {
+      const alheio = passos.find((p) => p.responsavelId != null && p.responsavelId !== ctx.usuarioId)
+      if (alheio) {
+        return { ok: false, error: "Só o responsável pela etapa (ou um administrador) pode controlar esta operação.", status: 403 }
+      }
+    }
+  }
+
   const { where: escopoControlar } = await escopoDaVisita(documentoId)
   const now = new Date()
   const obs = (observacao ?? "").trim()

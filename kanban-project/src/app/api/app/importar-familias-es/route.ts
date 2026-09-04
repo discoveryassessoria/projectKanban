@@ -19,12 +19,16 @@ import { ondePaisEh } from "@/src/lib/identidade/canonica"
 export const maxDuration = 300
 export const dynamic = "force-dynamic"
 
-const TOKEN = "imp-fam-es-9f2a7c14b8d3"
+// 🔒 O token vivia hardcoded no fonte (commitado, visível a quem tiver acesso
+// ao repositório). Migrado pra variável de ambiente — sem ela definida, a
+// rota recusa TUDO (fail-closed), nunca cai de volta pro valor antigo.
+const TOKEN = process.env.IMPORT_FAMILIAS_ES_TOKEN
 
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim()
 
 export async function POST(request: Request) {
+  if (!TOKEN) return NextResponse.json({ error: "rota desativada (IMPORT_FAMILIAS_ES_TOKEN não definido)" }, { status: 503 })
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
   if (body?.token !== TOKEN) return NextResponse.json({ error: "não autorizado" }, { status: 401 })
 

@@ -10,7 +10,9 @@
 // certidão" não é um comando: é ambíguo entre cinquenta certidões. O comando é
 // "reabrir ESTA instância", e o id na URL é a identidade.
 import { NextRequest, NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
+import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import { planejarReabertura, executarReabertura } from "@/src/services/reabertura-de-execucao"
 import { MOTIVOS_MOVIMENTACAO } from "@/src/lib/motor/motivos-movimentacao"
 
@@ -34,6 +36,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const body = await request.json().catch(() => ({}))
   const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
+
+  // 🔒 REABRIR TAMBÉM NÃO É MENOS SENSÍVEL — mesma régua do E4.
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id }, select: { tarefas: { take: 1, select: { responsavelId: true } } },
+  })
+  if (passo && passo.tarefas.length > 0) {
+    const negado = await negarSeNaoForDonoDaTarefa(request, passo.tarefas[0].responsavelId)
+    if (negado) return negado
+  }
 
   // PERMISSÃO POR ETAPA, quando o cadastro a declara. A permissão geral abre a porta;
   // a do cadastro é a tranca que o administrador escolheu pôr nesta etapa específica.

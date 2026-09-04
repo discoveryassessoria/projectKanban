@@ -71,6 +71,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const r = await atualizarPassoV2(documentoId, stepInstanceId, patch, {
       usuarioId: usuario.userId,
       permissoes: usuario.permissoes,
+      isAdmin: usuario.tipo === "admin",
     })
     if (!r.ok) {
       const codigo = r.error.split(":")[0]

@@ -3,9 +3,13 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { exigirPermissao } from "@/src/lib/verificar-permissao"
+import { FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
 
 // GET - Listar árvores órfãs (preview antes de deletar)
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const { erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
+  if (erro) return erro
   try {
     // Buscar todas as árvores que NÃO estão vinculadas a nenhum processo
     const arvoresOrfas = await prisma.arvore.findMany({
@@ -40,10 +44,17 @@ export async function GET() {
 
 // DELETE - Deletar todas as árvores órfãs
 export async function DELETE(request: NextRequest) {
+  // 🔒 Achado real: esta rota apagava em massa (cascade em pessoas, uniões e
+  // documentos) sem NENHUMA verificação — o próprio comentário confessava que
+  // faltava. Mesma trava do resto do sistema para exclusão definitiva:
+  // permissão exclusiva + frase de confirmação, nunca "clicou, apagou".
+  const { erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
+  if (erro) return erro
+  const body = await request.json().catch(() => ({} as Record<string, unknown>))
+  if (String((body as { confirmacao?: string })?.confirmacao ?? "").trim() !== FRASE_CONFIRMACAO) {
+    return NextResponse.json({ error: `Confirmação inválida. Envie { "confirmacao": "${FRASE_CONFIRMACAO}" } no corpo.` }, { status: 400 })
+  }
   try {
-    // Verificar se é admin (você pode ajustar essa lógica conforme seu sistema de autenticação)
-    // Por segurança, você pode adicionar uma verificação de token/sessão aqui
-
     // 1. Buscar IDs de todas as árvores órfãs
     const arvoresOrfas = await prisma.arvore.findMany({
       where: {

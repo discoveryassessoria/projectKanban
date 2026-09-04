@@ -9,6 +9,7 @@
 
 import { NextResponse } from "next/server"
 import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-fase"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import {
@@ -36,6 +37,11 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string; stepId: string }> }
 ) {
   try {
+    // 🔒 Sem checagem nenhuma antes — qualquer requisição concluía etapa de
+    // tradução.
+    const erroPermissao = await verificarPermissao(request, "tarefas.iniciar_concluir")
+    if (erroPermissao) return erroPermissao
+
     const { processoId, stepId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })

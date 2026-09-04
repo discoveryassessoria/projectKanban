@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         contato: body.contato,
         lockVersion: typeof body.lockVersion === "number" ? body.lockVersion : undefined,
       },
-      { usuarioId: usuario.userId, permissoes: usuario.permissoes },
+      { usuarioId: usuario.userId, permissoes: usuario.permissoes, isAdmin: usuario.tipo === "admin" },
     )
 
     if (!r.ok) {

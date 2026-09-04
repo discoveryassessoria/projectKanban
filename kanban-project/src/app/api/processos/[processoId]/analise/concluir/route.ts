@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-fase"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { prisma } from "@/lib/prisma"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
@@ -10,6 +11,11 @@ export async function POST(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    // 🔒 Sem checagem nenhuma antes — qualquer requisição concluía a fase de
+    // análise documental.
+    const erroPermissao = await verificarPermissao(request, "tarefas.iniciar_concluir")
+    if (erroPermissao) return erroPermissao
+
     const { processoId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })

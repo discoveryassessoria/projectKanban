@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server"
 import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-fase"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { prisma } from "@/lib/prisma"
 import {
   applyStep, allValidated, reProgress,
@@ -17,6 +18,11 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ processoId: string; docId: string; stepId: string }> },
 ) {
+  // 🔒 Sem checagem nenhuma antes — qualquer requisição concluía etapa de
+  // emissão retificada.
+  const erroPermissao = await verificarPermissao(req, "tarefas.iniciar_concluir")
+  if (erroPermissao) return erroPermissao
+
   const { processoId: pid, docId: did, stepId } = await params
   const processoId = Number(pid)
   const registroId = Number(did)
