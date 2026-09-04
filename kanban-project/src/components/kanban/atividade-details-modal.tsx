@@ -1118,7 +1118,11 @@ function ConteudoModal({
           )}
 
           {activeTab === "documentos" && (
-            <div className="space-y-6">
+            // Mesmo padrão de rolagem das outras abas (central/faturas): sem
+            // `h-full min-h-0 overflow-y-auto` aqui, o `h-full` da biblioteca lá
+            // dentro não tinha altura de referência nenhuma — crescia sem nunca
+            // rolar, e o conteúdo abaixo da dobra ficava inalcançável.
+            <div className="h-full min-h-0 overflow-y-auto space-y-6">
               <ProcessoDocumentos processo={processo} />
               {/* AÇÃO CONTEXTUAL — o MESMO gerador do cadastro do cliente, com o
                   processo já preenchido. Não existe segundo gerador. */}

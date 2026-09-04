@@ -2065,9 +2065,6 @@ function EditPersonModal({
     }
   }
 
-  // Nº Linhagem NÃO se edita mais — é CALCULADO (ver src/services/genealogia/numero-linhagem.ts),
-  // recalculado sozinho a cada mudança na árvore. Só leitura, direto de `pessoa`.
-  const numeroLinhagem = (pessoa as unknown as { numeroLinhagem?: number | null }).numeroLinhagem ?? null
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>((pessoa as any).linhaReta ?? true)
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
 
@@ -2427,7 +2424,9 @@ function EditPersonModal({
           {/* ===== Classificação no processo ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Classificação no processo</h3>
-            <div className="grid grid-cols-2 gap-3">
+            {/* Nº Linhagem saiu daqui — é calculado, aparece na Central Operacional e
+                na aba Documentos; não precisa de espaço próprio neste formulário. */}
+            <div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
                 {/* Requerente tem o Processo (ProcessoRequerente) como única fonte de verdade:
@@ -2489,13 +2488,6 @@ function EditPersonModal({
                     Definido pelo processo — adicione pela lista de requerentes do processo.
                   </div>
                 )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                  {numeroLinhagem ?? "—"}
-                </div>
-                <span className="block text-xs text-[var(--text-muted)] mt-1">Calculado automaticamente pela árvore — ordena a pasta documental.</span>
               </div>
             </div>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
