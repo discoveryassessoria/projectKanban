@@ -987,13 +987,24 @@ const somar = (a: ContagensAgrupadas, b: ContagensAgrupadas) => {
  * groupBy por processo×fase e outro por responsável, para um ganho que não
  * existe nesta escala.
  */
-export async function agregacaoPorFamilia(agora = new Date()): Promise<FamiliaAgrupada[]> {
+export async function agregacaoPorFamilia(
+  agora = new Date(),
+  filtro: { responsavelId?: number; semResponsavel?: boolean } = {},
+): Promise<FamiliaAgrupada[]> {
   const em7Dias = inicioDoDiaOperacional(agora)
   em7Dias.setDate(em7Dias.getDate() + 7)
   const hojeInicio = inicioDoDiaOperacional(agora)
 
+  // ESCOPO OPCIONAL — a mesma agregação, recortada para "minhas tarefas"
+  // (Operação/Minha Fila) ou para "sem responsável" (Operação/distribuição).
+  // Sem filtro, é a operação inteira (Tarefas e Projetos).
+  const escopo: Prisma.TarefaWhereInput = filtro.semResponsavel
+    ? { responsavelId: null }
+    : filtro.responsavelId != null
+      ? { responsavelId: filtro.responsavelId }
+      : {}
   const registros = await prisma.tarefa.findMany({
-    where: { processoId: { not: null }, statusTarefa: { in: STATUS_NO_QUADRO } },
+    where: { processoId: { not: null }, statusTarefa: { in: STATUS_NO_QUADRO }, ...escopo },
     select: {
       processoId: true, faseMacroKey: true, statusTarefa: true, dataPrazo: true,
       responsavelId: true, updatedAt: true,

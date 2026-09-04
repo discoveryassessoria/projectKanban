@@ -20,7 +20,7 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 // O vocabulário visual e o seletor de responsável são COMPARTILHADOS com a
@@ -31,6 +31,44 @@ import {
 } from "./kit-operacional"
 
 export type { LinhaDeFila }
+
+/** O resumo por família — MESMOS tipos e MESMA agregação de Tarefas e Projetos. */
+interface Contagens {
+  total: number
+  aFazer: number
+  concluidas: number
+  atrasadas: number
+  venceEm7Dias: number
+}
+interface FaseAgrupada extends Contagens {
+  faseMacroKey: string
+  label: string
+  ordem: number
+}
+interface ProcessoAgrupado extends Contagens {
+  processoId: number
+  nomeProcesso: string
+  faseAtualKey: string | null
+  fases: FaseAgrupada[]
+}
+interface FamiliaAgrupada extends Contagens {
+  familiaId: number | null
+  nomeFamilia: string
+  processos: ProcessoAgrupado[]
+  responsavelPrincipal: { id: number; nome: string } | null
+  ultimaAtividade: string | null
+}
+interface RespostaFamilias {
+  familias: FamiliaAgrupada[]
+  total: number
+  indicadores: { tarefas: number; aFazer: number; atrasadas: number; venceEm7Dias: number; familias: number; processos: number }
+}
+
+/** Iniciais para o avatar da família — mesma regra da visão gerencial. */
+function iniciais(nome: string): string {
+  const partes = nome.trim().split(/\s+/)
+  return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase()
+}
 
 /**
  * A LINHA DA FILA, ENRIQUECIDA.
@@ -91,7 +129,7 @@ export function acaoPrincipal(l: LinhaOperacional): { rotulo: string; comando: "
 }
 
 type Visao = "minha_fila" | "sem_responsavel"
-type Modo = "lista" | "calendario"
+type Modo = "agrupada" | "lista" | "calendario"
 
 /**
  * UMA LINHA = UMA TAREFA.
@@ -314,7 +352,9 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const [ocupado, setOcupado] = useState(false)
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
-  const [modo, setModo] = useState<Modo>("lista")
+  const [modo, setModo] = useState<Modo>("agrupada")
+  /** Contexto do drill-down família → fase — só existe quando se chega pela Agrupada. */
+  const [drillDown, setDrillDown] = useState<{ nomeFamilia: string; faseLabel: string; processoId: number; faseMacroKey: string } | null>(null)
 
   // Mesma disciplina do seletor: o pedido tem chave, o "carregando" é derivado
   // e a resposta atrasada de uma aba não pinta a lista da outra.
@@ -332,6 +372,33 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const linhas = carregando ? null : resultado?.lista ?? null
   const falhou = !carregando && linhas == null
   const carregar = useCallback(() => setRecarga((n) => n + 1), [])
+
+  // A AGRUPADA É UMA CONSULTA À PARTE — o mesmo resumo por família de Tarefas
+  // e Projetos, recortado pela visão atual (minha fila / sem responsável). Só
+  // busca quando a aba está aberta, e de novo a cada recarga ou troca de visão.
+  const [resultadoFamilias, setResultadoFamilias] = useState<{ chave: string; d: RespostaFamilias | null } | null>(null)
+  const [paginaFamilias, setPaginaFamilias] = useState(1)
+  useEffect(() => {
+    if (modo !== "agrupada") return
+    let vivo = true
+    fetch(`/api/operacao/tarefas/familias?visao=${visao}`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: RespostaFamilias) => { if (vivo) setResultadoFamilias({ chave, d }) })
+      .catch(() => { if (vivo) setResultadoFamilias({ chave, d: null }) })
+    return () => { vivo = false }
+  }, [modo, chave, visao])
+  const carregandoFamilias = resultadoFamilias?.chave !== chave
+  const dadosFamilias = carregandoFamilias ? null : resultadoFamilias?.d ?? null
+  const falhouFamilias = !carregandoFamilias && dadosFamilias == null
+
+  /** Do resumo por família direto para a lista de sempre, já filtrada — o mesmo `taskId` do sempre. */
+  const abrirFaseDaFamilia = useCallback(
+    (nomeFamilia: string, faseLabel: string, processoId: number, faseMacroKey: string) => {
+      setDrillDown({ nomeFamilia, faseLabel, processoId, faseMacroKey })
+      setModo("lista")
+    },
+    [],
+  )
 
   /**
    * A LISTA, RELIDA E **ESPERADA** — o comando não termina antes de a tela contar
@@ -449,6 +516,13 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
 
   const contagem = useMemo(() => linhas?.length ?? 0, [linhas])
 
+  /** O recorte do drill-down família → fase, sobre a MESMA lista já carregada — sem round-trip novo. */
+  const linhasFiltradas = useMemo(() => {
+    if (!linhas) return linhas
+    if (!drillDown) return linhas
+    return linhas.filter((l) => l.processoId === drillDown.processoId && l.faseMacroKey === drillDown.faseMacroKey)
+  }, [linhas, drillDown])
+
   const abas: Array<{ id: Visao; rotulo: string }> = [
     ...(podeDistribuir ? [{ id: "sem_responsavel" as const, rotulo: "Sem responsável" }] : []),
     { id: "minha_fila", rotulo: "Minha fila" },
@@ -461,7 +535,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           {abas.map((a) => (
             <button
               key={a.id}
-              onClick={() => setVisao(a.id)}
+              onClick={() => { setVisao(a.id); setDrillDown(null); setModo("agrupada") }}
               className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
                 visao === a.id
                   ? "border-[var(--border-default)] text-white/90"
@@ -473,34 +547,49 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           ))}
         </div>
         <div className="flex items-center gap-3 pb-1.5">
-          {!carregando && linhas != null && (
+          {modo !== "agrupada" && !carregando && linhas != null && (
             <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
-              {contagem} tarefa{contagem === 1 ? "" : "s"}
+              {linhasFiltradas?.length ?? contagem} tarefa{(linhasFiltradas?.length ?? contagem) === 1 ? "" : "s"}
             </span>
           )}
           <div className="flex gap-1">
-            {(["lista", "calendario"] as const).map((m) => (
+            {(["agrupada", "lista", "calendario"] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => setModo(m)}
+                onClick={() => { setModo(m); setDrillDown(null) }}
                 className={`rounded px-2 py-0.5 text-[10px] transition-colors ${
                   modo === m ? "bg-[var(--surface-primary)] text-white/80" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 }`}
               >
-                {m === "lista" ? "Lista" : "Calendário"}
+                {m === "agrupada" ? "Agrupada" : m === "lista" ? "Lista" : "Calendário"}
               </button>
             ))}
           </div>
         </div>
       </div>
 
+      {drillDown && modo === "lista" && (
+        <div className="mb-2 flex items-center gap-1.5 text-[11px]">
+          <button
+            onClick={() => { setDrillDown(null); setModo("agrupada") }}
+            className="text-[var(--text-secondary)] hover:text-white/80"
+          >
+            ← Agrupada
+          </button>
+          <span className="text-[var(--text-muted)]">/</span>
+          <span className="text-white/80">{drillDown.nomeFamilia}</span>
+          <span className="text-[var(--text-muted)]">/</span>
+          <span className="text-white/80">{drillDown.faseLabel}</span>
+        </div>
+      )}
+
       {/* FILTROS DA FILA — recortes derivados, sem criar estado novo. Cada um
           mostra a contagem, para o funcionário saber onde está o volume antes
           de clicar. */}
-      {visao === "minha_fila" && linhas != null && linhas.length > 0 && (
+      {modo !== "agrupada" && visao === "minha_fila" && linhasFiltradas != null && linhasFiltradas.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           {FILTROS.map((f) => {
-            const n = linhas.filter(f.aplica).length
+            const n = linhasFiltradas.filter(f.aplica).length
             if (n === 0 && f.id !== "todas") return null
             return (
               <button
@@ -547,9 +636,9 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
       )}
 
       <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-primary)]">
-        {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar as tarefas." aoTentar={carregar} />}
-        {carregando && <Estado tipo="carregando" mensagem="Carregando tarefas…" />}
-        {!falhou && linhas?.length === 0 && (
+        {modo === "agrupada" && falhouFamilias && <Estado tipo="erro" mensagem="Não foi possível carregar o resumo." aoTentar={carregar} />}
+        {modo === "agrupada" && carregandoFamilias && <Estado tipo="carregando" mensagem="Carregando o resumo…" />}
+        {modo === "agrupada" && dadosFamilias && dadosFamilias.familias.length === 0 && (
           <Estado
             tipo="vazio"
             mensagem={
@@ -559,8 +648,32 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             }
           />
         )}
-        {modo === "calendario" && linhas != null && linhas.length > 0 &&
-          agruparPorDia(linhas).map((grupo) => (
+        {modo === "agrupada" && dadosFamilias && dadosFamilias.familias.length > 0 && (
+          <AgrupadaOperacao
+            familias={dadosFamilias.familias}
+            pagina={paginaFamilias}
+            aoMudarPagina={setPaginaFamilias}
+            aoAbrirFase={abrirFaseDaFamilia}
+            mostrarResponsavel={visao === "sem_responsavel"}
+          />
+        )}
+
+        {modo !== "agrupada" && falhou && <Estado tipo="erro" mensagem="Não foi possível carregar as tarefas." aoTentar={carregar} />}
+        {modo !== "agrupada" && carregando && <Estado tipo="carregando" mensagem="Carregando tarefas…" />}
+        {modo !== "agrupada" && !falhou && linhasFiltradas?.length === 0 && (
+          <Estado
+            tipo="vazio"
+            mensagem={
+              drillDown
+                ? "Nenhuma tarefa nesta fase."
+                : visao === "sem_responsavel"
+                  ? "Nenhuma tarefa aguardando distribuição."
+                  : "Você não tem tarefas em aberto."
+            }
+          />
+        )}
+        {modo === "calendario" && linhasFiltradas != null && linhasFiltradas.length > 0 &&
+          agruparPorDia(linhasFiltradas).map((grupo) => (
             <div key={grupo.dia}>
               <div className="sticky top-0 border-b border-white/[0.06] bg-[var(--surface-overlay)] px-4 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                 {grupo.rotulo} · {grupo.linhas.length}
@@ -572,7 +685,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           ))}
 
         {/* MINHA FILA: cockpit. O cartão diz estado, etapa, prazo e a ação. */}
-        {modo === "lista" && visao === "minha_fila" && linhas?.filter(
+        {modo === "lista" && visao === "minha_fila" && linhasFiltradas?.filter(
           (l) => FILTROS.find((f) => f.id === filtro)?.aplica(l) ?? true,
         ).map((l) => (
           <CartaoDaFila
@@ -584,7 +697,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           />
         ))}
 
-        {modo === "lista" && visao === "sem_responsavel" && linhas?.map((l) => (
+        {modo === "lista" && visao === "sem_responsavel" && linhasFiltradas?.map((l) => (
           <Linha
             key={l.taskId}
             l={l}
@@ -639,6 +752,165 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         />
       )}
 
+    </div>
+  )
+}
+
+const POR_PAGINA_FAMILIAS = 6
+
+/**
+ * A AGRUPADA DA OPERAÇÃO — a MESMA leitura de Tarefas e Projetos, recortada
+ * para "minha fila" ou "sem responsável". Cada linha é uma família, expansível
+ * até a fase; clicar numa fase leva à Lista de sempre, já filtrada.
+ */
+function AgrupadaOperacao({
+  familias, pagina, aoMudarPagina, aoAbrirFase, mostrarResponsavel,
+}: {
+  familias: FamiliaAgrupada[]
+  pagina: number
+  aoMudarPagina: (p: number) => void
+  aoAbrirFase: (nomeFamilia: string, faseLabel: string, processoId: number, faseMacroKey: string) => void
+  /** "Sem responsável" mostraria só "Sem responsável" em toda linha — redundante, some daqui. */
+  mostrarResponsavel: boolean
+}) {
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
+  const alternar = (chave: string) => setExpandidas((prev) => {
+    const novo = new Set(prev)
+    if (novo.has(chave)) novo.delete(chave); else novo.add(chave)
+    return novo
+  })
+
+  const totalPaginas = Math.max(1, Math.ceil(familias.length / POR_PAGINA_FAMILIAS))
+  const paginaValida = Math.min(Math.max(pagina, 1), totalPaginas)
+  const visiveis = familias.slice((paginaValida - 1) * POR_PAGINA_FAMILIAS, paginaValida * POR_PAGINA_FAMILIAS)
+  const numColunas = mostrarResponsavel ? 9 : 8
+
+  return (
+    <div className="flex flex-col">
+      <table className="w-full border-collapse text-left">
+        <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
+          <tr className="border-b border-white/[0.08] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
+            <th>Família / Processo / Fase</th>
+            <th className="w-20">Tarefas</th>
+            <th className="w-20">A fazer</th>
+            <th className="w-24">Concluídas</th>
+            <th className="w-20">Atrasadas</th>
+            <th className="w-28">Vencem em 7 dias</th>
+            <th className="w-40">Fase atual</th>
+            {mostrarResponsavel && <th className="w-36">Responsável</th>}
+            <th className="w-28">Última atividade</th>
+          </tr>
+        </thead>
+        <tbody>
+          {visiveis.map((f) => {
+            const chaveFamilia = f.familiaId != null ? `f:${f.familiaId}` : `p:${f.processos[0]?.processoId}`
+            const aberta = expandidas.has(chaveFamilia)
+            const umSoProcesso = f.processos.length === 1
+            return (
+              <Fragment key={chaveFamilia}>
+                <tr className="border-b border-white/[0.05] hover:bg-[var(--surface-primary)]">
+                  <td className="px-3 py-2">
+                    <button onClick={() => alternar(chaveFamilia)} className="flex w-full items-center gap-2 text-left">
+                      <span className="w-3 shrink-0 text-[10px] text-[var(--text-muted)]">{aberta ? "▾" : "▸"}</span>
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-white/80">
+                        {iniciais(f.nomeFamilia)}
+                      </span>
+                      <span>
+                        <span className="block text-[12px] font-medium text-white/90">{f.nomeFamilia}</span>
+                        <span className="block text-[10px] text-[var(--text-muted)]">
+                          {umSoProcesso ? `Processo: ${f.processos[0].nomeProcesso}` : `${f.processos.length} processos`}
+                        </span>
+                      </span>
+                    </button>
+                  </td>
+                  <td className="px-3 py-2 text-[12px] tabular-nums text-white/85">{f.total}</td>
+                  <td className="px-3 py-2 text-[12px] tabular-nums text-white/70">{f.aFazer}</td>
+                  <td className="px-3 py-2 text-[12px] tabular-nums text-green-800/90">{f.concluidas}</td>
+                  <td className={`px-3 py-2 text-[12px] tabular-nums ${f.atrasadas > 0 ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>{f.atrasadas}</td>
+                  <td className={`px-3 py-2 text-[12px] tabular-nums ${f.venceEm7Dias > 0 ? "text-amber-800/90" : "text-[var(--text-muted)]"}`}>{f.venceEm7Dias}</td>
+                  <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">
+                    {umSoProcesso ? (rotularFase(f.processos[0].faseAtualKey) ?? "—") : "Vários processos"}
+                  </td>
+                  {mostrarResponsavel && (
+                    <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{f.responsavelPrincipal?.nome ?? "Sem responsável"}</td>
+                  )}
+                  <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-muted)]">{dataCurta(f.ultimaAtividade)}</td>
+                </tr>
+                {aberta && f.processos.map((p) => (
+                  <Fragment key={p.processoId}>
+                    {!umSoProcesso && (
+                      <tr className="border-b border-white/[0.05] bg-[var(--surface-primary)]/40">
+                        <td colSpan={numColunas} className="px-3 py-1.5 pl-9 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
+                          Processo: {p.nomeProcesso}
+                        </td>
+                      </tr>
+                    )}
+                    {p.fases.length === 0 && (
+                      <tr>
+                        <td colSpan={numColunas} className="px-3 py-2 pl-12 text-[11px] text-[var(--text-muted)]">Nenhuma tarefa neste processo.</td>
+                      </tr>
+                    )}
+                    {p.fases.map((fa) => (
+                      <tr
+                        key={fa.faseMacroKey}
+                        className="cursor-pointer border-b border-white/[0.05] hover:bg-[var(--surface-primary)]"
+                        onClick={() => aoAbrirFase(f.nomeFamilia, fa.label, p.processoId, fa.faseMacroKey)}
+                      >
+                        <td className="px-3 py-2 pl-12 text-[11px] text-[var(--text-secondary)]">{fa.label}</td>
+                        <td className="px-3 py-2 text-[12px] tabular-nums text-white/80">{fa.total}</td>
+                        <td className="px-3 py-2 text-[12px] tabular-nums text-white/70">{fa.aFazer}</td>
+                        <td className="px-3 py-2 text-[12px] tabular-nums text-green-800/90">{fa.concluidas}</td>
+                        <td className={`px-3 py-2 text-[12px] tabular-nums ${fa.atrasadas > 0 ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>{fa.atrasadas}</td>
+                        <td className={`px-3 py-2 text-[12px] tabular-nums ${fa.venceEm7Dias > 0 ? "text-amber-800/90" : "text-[var(--text-muted)]"}`}>{fa.venceEm7Dias}</td>
+                        <td className="px-3 py-2" colSpan={mostrarResponsavel ? 3 : 2}>
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+                              <div
+                                className="h-full rounded-full bg-[var(--action-primary)]"
+                                style={{ width: `${fa.total > 0 ? Math.round((fa.concluidas / fa.total) * 100) : 0}%` }}
+                              />
+                            </div>
+                            <span className="shrink-0 text-[10px] tabular-nums text-[var(--text-muted)]">
+                              {fa.total > 0 ? Math.round((fa.concluidas / fa.total) * 100) : 0}% ({fa.concluidas} de {fa.total})
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+
+      {familias.length > 0 && (
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] px-4 py-2.5">
+          <span className="text-[11px] text-[var(--text-muted)]">
+            Mostrando {visiveis.length} de {familias.length} famílias
+          </span>
+          {totalPaginas > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={paginaValida <= 1}
+                onClick={() => aoMudarPagina(paginaValida - 1)}
+                className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)] disabled:opacity-40"
+              >
+                ‹
+              </button>
+              <span className="text-[11px] tabular-nums text-white/80">{paginaValida} / {totalPaginas}</span>
+              <button
+                disabled={paginaValida >= totalPaginas}
+                onClick={() => aoMudarPagina(paginaValida + 1)}
+                className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)] disabled:opacity-40"
+              >
+                ›
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
