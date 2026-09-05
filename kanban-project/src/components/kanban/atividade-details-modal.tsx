@@ -13,7 +13,6 @@ import { ArvoreGenealogicaView } from "../arvore"
 // import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
 import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
-import { ProcessoAnalise } from "./ProcessoAnalise"
 // Diagnóstico técnico do Runtime v2 (WorkflowV2Panel/WorkflowV2AtivacaoPanel) foi
 // movido para Gerenciamento → Motor → Diagnóstico do Runtime. A Central Operacional
 // é puramente operacional.
@@ -100,7 +99,7 @@ function ehItalia(processo: ProcessoWithStatus | Processo | null): boolean {
 }
 
 /** Abas válidas do modal. */
-type AbaProcesso = "geral" | "central" | "documentos" | "analise" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "eventos"
+type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "eventos"
 
 /**
  * Aba inicial a partir do deep-link. Puro: mesma entrada, mesma saída — era isto que a
@@ -554,14 +553,13 @@ function ConteudoModal({
     ...(pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
     ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Financeiro" }] : []),
     { id: "documentos", label: "Documentos" },           // ← NOVO
-    { id: "analise", label: "Análise Documental" },       // ← NOVO: aba própria (saiu de dentro de Central Operacional)
     ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
     { id: "historico", label: "Histórico" },
   ]
 
   // Abas com o Discovery Design System (dark glass/dourado). As demais permanecem
   // no tema claro. Skin only — layout idêntico.
-  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico" || activeTab === "protocolos" || activeTab === "eventos" || activeTab === "arvore" || activeTab === "analise"
+  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico" || activeTab === "protocolos" || activeTab === "eventos" || activeTab === "arvore"
 
   const modalContent = (
     <>
@@ -1081,21 +1079,6 @@ function ConteudoModal({
             </div>
           )}
 
-          {activeTab === "analise" && (
-            // Aba própria — o mesmo componente que antes só aparecia dentro de
-            // Central Operacional quando a fase ativa era Análise Documental.
-            // Aqui fica acessível direto, sem a trilha macro nem o resumo do
-            // processo por cima: o mockup aprovado mostra o conteúdo sozinho.
-            <div className="h-full min-h-0 overflow-y-auto p-6">
-              <ProcessoAnalise
-                processoId={processo.id}
-                onConcluido={() => {
-                  setPhaseRefreshExtra((k) => k + 1)
-                  onSave?.()
-                }}
-              />
-            </div>
-          )}
 
           {activeTab === "documentos" && (
             // Mesmo padrão de rolagem das outras abas (central/faturas): sem

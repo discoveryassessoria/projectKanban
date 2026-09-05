@@ -16,6 +16,7 @@ import { PainelDaFase, type FaseKpi } from "./PainelDaFase"
 // ESTRUTURA OPERACIONAL — contrato oficial da Central (pessoa → documento →
 // workflow do documento → passos). Vem pronta do backend; a tela não reagrupa.
 import type { DocumentoDoIndice, IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
+import { ProcessoAnalise } from "./ProcessoAnalise"
 import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
 import { ProcessoApostilamento } from "./ProcessoApostilamento"
@@ -902,11 +903,9 @@ export function ProcessoCentralOperacional({
 
   const meta = FASE_META[faseAtualNome] || { sub: "", tabs: ["Resumo"] }
 
-  // Análise Documental saiu daqui: agora é aba própria do processo
-  // (atividade-details-modal.tsx), sempre acessível, sem a trilha/resumo por cima —
-  // era exatamente o que o mockup aprovado pedia. Central Operacional só mostra um
-  // redirecionamento (abaixo) — NUNCA o corpo genérico de fase, que tenta materializar
-  // uma fase que não está no macro do processo e mostra erro de recusa.
+  // Detecta a fase de Análise Documental (tolerante a acento/caixa). É FASE do
+  // processo — mora aqui dentro de Central Operacional, igual às demais
+  // (Tradução, Apostilamento...), nunca como aba irmã.
   const ehAnalise = faseAtualNome
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .includes("analise documental")
@@ -1040,10 +1039,7 @@ export function ProcessoCentralOperacional({
             ? <div className="bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-4 py-3 text-sm text-[var(--accent-text)]">⚠ {viewErro}</div>
             : <div className="flex items-center justify-center py-16 text-[var(--text-muted)]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !isView && ehAnalise ? (
-          <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center">
-            <p className="text-sm font-semibold text-white/90">Análise Documental tem aba própria agora.</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">Abra "Análise Documental" na barra de abas do processo, no topo, para comparar documentos e decidir a retificação.</p>
-          </div>
+          <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehTraducao ? (
           <ProcessoTraducao processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehApostilamento ? (
