@@ -317,18 +317,26 @@ export function ResumoDoProcesso({
     (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "pulada"
   ).length
 
+  const item = (label: string, value: string, destaque?: boolean) => (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span className="text-[var(--text-muted)]">{label}</span>
+      <b className={destaque ? "text-white/95" : "text-[var(--text-secondary)]"}>{value}</b>
+    </span>
+  )
+
   return (
-    <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-2xl p-4 h-full flex flex-col">
-      <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo do processo</h3>
-      <StatRow label="Caminho ativo" value={`${path.length} fases`} />
-      <StatRow label="Fases concluídas" value={String(concluidas)} />
-      <StatRow label="Fase atual" value={currentPhase} />
-      <StatRow label="Fases futuras" value={String(futuras)} />
-      <StatRow label="Fases puladas" value={String(puladas)} />
-      <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-[var(--border-default)]">
-        <span className="text-[var(--text-secondary)]">Progresso geral</span>
-        <b className="text-[var(--text-secondary)] text-[15px]">{overall}%</b>
-      </div>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3.5 py-2 text-[12px]">
+      {item("Caminho ativo", `${path.length} fases`)}
+      <span className="text-[var(--border-default)]">·</span>
+      {item("Concluídas", String(concluidas))}
+      <span className="text-[var(--border-default)]">·</span>
+      {item("Fase atual", currentPhase, true)}
+      <span className="text-[var(--border-default)]">·</span>
+      {item("Futuras", String(futuras))}
+      <span className="text-[var(--border-default)]">·</span>
+      {item("Puladas", String(puladas))}
+      <span className="text-[var(--border-default)]">·</span>
+      {item("Progresso geral", `${overall}%`, true)}
     </div>
   )
 }

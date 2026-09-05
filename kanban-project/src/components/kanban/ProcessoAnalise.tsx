@@ -1,11 +1,12 @@
 // src/components/kanban/ProcessoAnalise.tsx
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useApi } from "@/src/lib/dados"
 import {
   Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X,
-  FileText, Scale, Landmark,
+  FileText, Scale, Landmark, Search, Download, Eye, MoreVertical, ChevronDown,
+  ExternalLink, Link2,
 } from "lucide-react"
 
 interface Divergencia {
@@ -50,6 +51,10 @@ interface DocV2 {
   dataStatus: string
   analysisStatus: string
   structuredData: Record<string, unknown> | null
+  dataEmissao: string | null
+  arquivoUrl: string | null
+  arquivoNome: string | null
+  arquivoMimeType: string | null
 }
 interface PessoaV2 { id: number; nome: string; documentos: DocV2[] }
 interface AnaliseV2Resp { pessoas: PessoaV2[]; kpis: { pessoas: number; totalDocs: number; revisados: number; pendentesRevisao: number }; readiness: { ready: boolean } }
@@ -97,6 +102,10 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   const [aba, setAba] = useState<Aba>("documentos")
   const [docSelecionado, setDocSelecionado] = useState<number | null>(null)
   const [via, setVia] = useState<Via>("administrativa")
+  const [busca, setBusca] = useState("")
+  const [filtroStatus, setFiltroStatus] = useState<"todos" | "com" | "sem">("todos")
+  const [filtroPessoa, setFiltroPessoa] = useState("todas")
+  const [filtroTipo, setFiltroTipo] = useState("todos")
 
   const consulta = useApi<{ analise?: Analise | null }>(`/api/processos/${processoId}/analise`)
   const analise = consulta.dados?.analise ?? null
@@ -210,6 +219,39 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   )
   const semDivergencia = todosDocs.filter((d) => !divs.some((v) => v.documentoId === d.id)).length
 
+  const pessoasUnicas = useMemo(() => [...new Set(todosDocs.map((d) => d.pessoaNome))].sort(), [todosDocs])
+  const tiposUnicos = useMemo(() => [...new Set(todosDocs.map((d) => d.tipo))].sort(), [todosDocs])
+
+  const docsFiltrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase()
+    return todosDocs.filter((d) => {
+      const n = divs.filter((v) => v.documentoId === d.id).length
+      if (filtroStatus === "com" && n === 0) return false
+      if (filtroStatus === "sem" && n > 0) return false
+      if (filtroPessoa !== "todas" && d.pessoaNome !== filtroPessoa) return false
+      if (filtroTipo !== "todos" && d.tipo !== filtroTipo) return false
+      if (termo && !`${d.titulo} ${d.pessoaNome} ${d.tipo}`.toLowerCase().includes(termo)) return false
+      return true
+    })
+  }, [todosDocs, divs, busca, filtroStatus, filtroPessoa, filtroTipo])
+
+  const exportarCsv = () => {
+    const linhas = [
+      ["Documento", "Pessoa", "Tipo", "Data de emissão", "Divergências"],
+      ...docsFiltrados.map((d) => [
+        d.titulo, d.pessoaNome, d.tipo, fmtDia(d.dataEmissao),
+        String(divs.filter((v) => v.documentoId === d.id).length),
+      ]),
+    ]
+    const csv = linhas.map((l) => l.map((c) => `"${c.replace(/"/g, '""')}"`).join(";")).join("\n")
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = `analise-documental-processo-${processoId}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const resumoPorPessoa = useMemo(() => {
     const mapa = new Map<string, { pessoa: string; documentos: number; divergencias: number; comRetificacao: number }>()
     for (const p of pessoasV2) mapa.set(p.nome, { pessoa: p.nome, documentos: p.documentos.length, divergencias: 0, comRetificacao: 0 })
@@ -223,16 +265,16 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   }, [pessoasV2, divs])
 
   const log = useMemo(() => {
-    const linhas: Array<{ quando: string | null; texto: string }> = []
-    if (analise?.startedAt) linhas.push({ quando: analise.startedAt, texto: "Análise iniciada." })
+    const linhas: Array<{ quando: string | null; texto: string; documentoId: number | null }> = []
+    if (analise?.startedAt) linhas.push({ quando: analise.startedAt, texto: "Análise iniciada.", documentoId: null })
     for (const d of divs) {
       if (d.decididoEm) {
         const label = DECISOES.find(([v]) => v === d.status)?.[1] ?? d.status
-        linhas.push({ quando: d.decididoEm, texto: `${d.campoLabel} de ${d.pessoaNome} (${d.documentoTitulo}) — ${label}.` })
+        linhas.push({ quando: d.decididoEm, texto: `${d.campoLabel} de ${d.pessoaNome} (${d.documentoTitulo}) — ${label}.`, documentoId: d.documentoId })
       }
     }
     if (analise?.completedAt) {
-      linhas.push({ quando: analise.completedAt, texto: `Análise concluída ${analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.` })
+      linhas.push({ quando: analise.completedAt, texto: `Análise concluída ${analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.`, documentoId: null })
     }
     return linhas.sort((a, b) => new Date(a.quando ?? 0).getTime() - new Date(b.quando ?? 0).getTime())
   }, [analise, divs])
@@ -245,15 +287,23 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-white/95">Central Operacional · Análise Documental</h2>
-          <p className="text-sm text-[var(--text-secondary)]">Compare documentos, identifique divergências e defina as retificações necessárias.</p>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--action-primary)]/15 text-[var(--action-primary)]">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-white/95">Análise Documental</h2>
+            <p className="text-sm text-[var(--text-secondary)]">Compare documentos, identifique divergências e defina as retificações necessárias.</p>
+          </div>
         </div>
-        {!readOnly && analise?.status !== "concluida" && (
-          <button onClick={rodar} disabled={running} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
-            {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Analisar automaticamente
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {analise && <RelatorioDropdown />}
+          {!readOnly && analise?.status !== "concluida" && (
+            <button onClick={rodar} disabled={running} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
+              {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Analisar automaticamente
+            </button>
+          )}
+        </div>
       </div>
 
       {!analise ? (
@@ -287,13 +337,25 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
           {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
           {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
+          {aba === "documentos" && todosDocs.length > 0 && (
+            <BarraBuscaFiltro
+              busca={busca} onBusca={setBusca}
+              status={filtroStatus} onStatus={setFiltroStatus}
+              pessoa={filtroPessoa} onPessoa={setFiltroPessoa} pessoas={pessoasUnicas}
+              tipo={filtroTipo} onTipo={setFiltroTipo} tipos={tiposUnicos}
+              onExportar={exportarCsv}
+            />
+          )}
+
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-4 items-start">
             <div className="rounded-xl border border-[var(--border-default)] overflow-hidden">
               {aba === "documentos" && (
                 todosDocs.length === 0 ? (
                   <Vazio texto="Nenhum documento elegível para análise nesta linha reta." />
+                ) : docsFiltrados.length === 0 ? (
+                  <Vazio texto="Nenhum documento encontrado para esse filtro." />
                 ) : (
-                  <TabelaDocumentos docs={todosDocs} divs={divs} selecionado={docSelecionado} onSelecionar={setDocSelecionado} />
+                  <TabelaDocumentos docs={docsFiltrados} divs={divs} selecionado={docSelecionado} onSelecionar={setDocSelecionado} onAbrir={(u) => window.open(u, "_blank")} />
                 )
               )}
 
@@ -326,6 +388,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             <PainelDocumento
               doc={docAtivo}
               divergencias={divsDoDocAtivo}
+              historico={docAtivo ? log.filter((l) => l.documentoId === docAtivo.id) : []}
               onVerDetalhes={setDrawerDiv}
             />
           </div>
@@ -413,16 +476,78 @@ function Vazio({ texto }: { texto: string }) {
   return <div className="p-8 text-center text-sm text-[var(--text-secondary)]">{texto}</div>
 }
 
-function TabelaDocumentos({ docs, divs, selecionado, onSelecionar }: {
-  docs: Array<DocV2 & { pessoaNome: string }>; divs: Divergencia[]
-  selecionado: number | null; onSelecionar: (id: number) => void
+function BarraBuscaFiltro({ busca, onBusca, status, onStatus, pessoa, onPessoa, pessoas, tipo, onTipo, tipos, onExportar }: {
+  busca: string; onBusca: (v: string) => void
+  status: "todos" | "com" | "sem"; onStatus: (v: "todos" | "com" | "sem") => void
+  pessoa: string; onPessoa: (v: string) => void; pessoas: string[]
+  tipo: string; onTipo: (v: string) => void; tipos: string[]
+  onExportar: () => void
 }) {
+  const sel = "text-xs border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] text-white/80 focus:outline-none"
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+        <input value={busca} onChange={(e) => onBusca(e.target.value)} placeholder="Buscar documento, pessoa, tipo..."
+          className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] pl-8 pr-3 py-2 text-xs text-white/90 placeholder-[var(--text-muted)] focus:outline-none" />
+      </div>
+      <select value={status} onChange={(e) => onStatus(e.target.value as "todos" | "com" | "sem")} className={sel}>
+        <option value="todos">Todos os status</option>
+        <option value="com">Com divergências</option>
+        <option value="sem">Sem divergências</option>
+      </select>
+      <select value={pessoa} onChange={(e) => onPessoa(e.target.value)} className={sel}>
+        <option value="todas">Todas as pessoas</option>
+        {pessoas.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
+      <select value={tipo} onChange={(e) => onTipo(e.target.value)} className={sel}>
+        <option value="todos">Todos os tipos</option>
+        {tipos.map((t) => <option key={t} value={t}>{t}</option>)}
+      </select>
+      <button onClick={onExportar} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-[var(--surface-hover)]">
+        <Download className="w-3.5 h-3.5" /> Exportar
+      </button>
+    </div>
+  )
+}
+
+function RelatorioDropdown() {
+  const [aberto, setAberto] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setAberto(false) }
+    document.addEventListener("mousedown", onClick)
+    return () => document.removeEventListener("mousedown", onClick)
+  }, [])
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setAberto((v) => !v)} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm font-semibold text-white/80 hover:bg-[var(--surface-hover)]">
+        <FileText className="w-4 h-4" /> Relatório da análise <ChevronDown className="w-3.5 h-3.5" />
+      </button>
+      {aberto && (
+        <div className="absolute right-0 z-10 mt-1 w-56 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-2)] p-1">
+          {["Resumo em PDF", "Planilha de divergências", "Linha do tempo"].map((op) => (
+            <div key={op} title="Ainda não disponível — sem gerador de relatório cadastrado."
+              className="px-3 py-2 text-xs text-[var(--text-muted)] rounded cursor-not-allowed">{op}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TabelaDocumentos({ docs, divs, selecionado, onSelecionar, onAbrir }: {
+  docs: Array<DocV2 & { pessoaNome: string }>; divs: Divergencia[]
+  selecionado: number | null; onSelecionar: (id: number) => void; onAbrir: (url: string) => void
+}) {
+  const [menuAberto, setMenuAberto] = useState<number | null>(null)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
-            {["Documento", "Pessoa", "Status", "Divergências"].map((h) => <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>)}
+            {["Documento", "Pessoa", "Tipo", "Data", "Status da análise", "Divergências"].map((h) => <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>)}
+            <th className="px-3 py-2" />
           </tr>
         </thead>
         <tbody className="divide-y divide-white/10">
@@ -433,12 +558,26 @@ function TabelaDocumentos({ docs, divs, selecionado, onSelecionar }: {
                 className={`cursor-pointer hover:bg-[var(--surface-secondary)] ${selecionado === d.id ? "bg-[var(--surface-secondary)]" : ""}`}>
                 <td className="px-3 py-2.5 flex items-center gap-2 text-white/95 font-medium"><FileText className="w-4 h-4 text-[var(--text-muted)]" />{d.titulo}</td>
                 <td className="px-3 py-2.5 text-white/80">{d.pessoaNome}</td>
+                <td className="px-3 py-2.5 text-white/68">{d.tipo}</td>
+                <td className="px-3 py-2.5 text-white/68 whitespace-nowrap">{fmtDia(d.dataEmissao)}</td>
                 <td className="px-3 py-2.5">
                   {n > 0
                     ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-red-700">Com divergências</span>
                     : <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-green-800">Sem divergências</span>}
                 </td>
                 <td className="px-3 py-2.5 text-white/95">{n}</td>
+                <td className="px-3 py-2.5 text-right relative" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => onSelecionar(d.id)} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Ver detalhes"><Eye className="w-4 h-4" /></button>
+                  <button onClick={() => setMenuAberto((v) => (v === d.id ? null : d.id))} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Mais ações"><MoreVertical className="w-4 h-4" /></button>
+                  {menuAberto === d.id && (
+                    <div className="absolute right-3 top-full z-10 w-44 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-2)] p-1 text-left">
+                      <button onClick={() => { onSelecionar(d.id); setMenuAberto(null) }} className="w-full text-left px-3 py-2 text-xs text-white/80 rounded hover:bg-[var(--surface-hover)]">Ver detalhes</button>
+                      <button disabled={!d.arquivoUrl} onClick={() => { if (d.arquivoUrl) onAbrir(d.arquivoUrl); setMenuAberto(null) }}
+                        title={d.arquivoUrl ? undefined : "Sem arquivo anexado a este documento"}
+                        className="w-full text-left px-3 py-2 text-xs text-white/80 rounded hover:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed">Abrir documento</button>
+                    </div>
+                  )}
+                </td>
               </tr>
             )
           })}
@@ -516,11 +655,16 @@ function ListaSugeridas({ divs, onDecidir, readOnly }: { divs: Divergencia[]; on
   )
 }
 
-function PainelDocumento({ doc, divergencias, onVerDetalhes }: {
+type AbaDoc = "visualizacao" | "dados" | "divergencias" | "historico"
+
+function PainelDocumento({ doc, divergencias, historico, onVerDetalhes }: {
   doc: (DocV2 & { pessoaNome: string }) | null
   divergencias: Divergencia[]
+  historico: Array<{ quando: string | null; texto: string }>
   onVerDetalhes: (d: Divergencia) => void
 }) {
+  const [abaDoc, setAbaDoc] = useState<AbaDoc>("visualizacao")
+
   if (!doc) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border-default)] p-6 text-center text-xs text-[var(--text-muted)]">
@@ -529,52 +673,115 @@ function PainelDocumento({ doc, divergencias, onVerDetalhes }: {
     )
   }
   const dados = doc.structuredData && typeof doc.structuredData === "object" ? Object.entries(doc.structuredData as Record<string, unknown>) : []
-  return (
-    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4 space-y-4">
-      <div className="flex items-center gap-2">
-        <FileText className="w-4 h-4 text-[var(--text-muted)]" />
-        <div>
-          <div className="text-sm font-semibold text-white/95">{doc.titulo}</div>
-          <div className="text-[11px] text-[var(--text-secondary)]">{doc.pessoaNome}</div>
-        </div>
-      </div>
+  const ehImagem = doc.arquivoMimeType?.startsWith("image/")
+  const ehPdf = doc.arquivoMimeType === "application/pdf"
 
-      <div>
-        <div className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Divergências identificadas ({divergencias.length})</div>
-        {divergencias.length === 0 ? (
-          <p className="text-xs text-[var(--text-muted)]">Nenhuma.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {divergencias.map((d, i) => (
-              <li key={d.id} className="rounded-lg border border-[var(--border-default)] px-2.5 py-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-white/90">{i + 1}. {d.campoLabel}</div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">No documento: <span className="text-white/80">{d.valorDocumento || "—"}</span></div>
-                    <div className="text-[11px] text-[var(--text-secondary)]">Esperado: <span className="text-white/80">{d.valorArvore || "—"}</span></div>
-                  </div>
-                  <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${SEV_STYLE[d.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}>{SEV_LABEL[d.severidade] || d.severidade}</span>
-                </div>
-                <button onClick={() => onVerDetalhes(d)} className="mt-1 text-[11px] text-[var(--accent-text)] hover:underline">Ver detalhes</button>
-              </li>
-            ))}
-          </ul>
+  return (
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] overflow-hidden">
+      <div className="flex items-start justify-between gap-2 p-4 pb-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-white/95 truncate">{doc.titulo}</div>
+            <div className="text-[11px] text-[var(--text-secondary)]">{doc.pessoaNome}</div>
+          </div>
+        </div>
+        {doc.arquivoUrl && (
+          <a href={doc.arquivoUrl} target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-text)] hover:underline flex-shrink-0">
+            <ExternalLink className="w-3.5 h-3.5" /> Abrir documento
+          </a>
         )}
       </div>
 
-      {dados.length > 0 && (
-        <details className="text-xs">
-          <summary className="cursor-pointer font-semibold text-[var(--text-secondary)]">Dados principais extraídos</summary>
-          <div className="mt-2 space-y-1">
-            {dados.map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-2 border-b border-white/10 pb-1">
-                <span className="text-[var(--text-secondary)]">{k}</span>
-                <span className="text-white/90 text-right">{v == null || v === "" ? "—" : String(v)}</span>
-              </div>
-            ))}
+      <div className="flex items-center gap-1 px-4 mt-3 border-b border-[var(--border-default)] overflow-x-auto">
+        {([
+          ["visualizacao", "Visualização"], ["dados", "Dados extraídos"],
+          ["divergencias", `Divergências (${divergencias.length})`], ["historico", "Histórico"],
+        ] as Array<[AbaDoc, string]>).map(([k, l]) => (
+          <button key={k} onClick={() => setAbaDoc(k)}
+            className={`whitespace-nowrap px-2 py-2 text-[11px] font-semibold border-b-2 -mb-px ${abaDoc === k ? "border-[var(--action-primary)] text-white/95" : "border-transparent text-[var(--text-secondary)] hover:text-white/80"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-4 space-y-3">
+        {abaDoc === "visualizacao" && (
+          ehImagem && doc.arquivoUrl ? (
+            <img src={doc.arquivoUrl} alt={doc.titulo} className="w-full rounded-lg border border-[var(--border-default)]" />
+          ) : ehPdf && doc.arquivoUrl ? (
+            <iframe src={doc.arquivoUrl} className="w-full h-[360px] rounded-lg border border-[var(--border-default)]" title={doc.titulo} />
+          ) : (
+            <div className="rounded-lg border border-dashed border-[var(--border-default)] p-8 text-center text-xs text-[var(--text-muted)]">
+              Sem arquivo anexado a este documento.
+            </div>
+          )
+        )}
+
+        {abaDoc === "dados" && (
+          dados.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">Nenhum dado estruturado extraído ainda.</p>
+          ) : (
+            <div className="space-y-1">
+              {dados.map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-2 border-b border-white/10 pb-1 text-xs">
+                  <span className="text-[var(--text-secondary)]">{k}</span>
+                  <span className="text-white/90 text-right">{v == null || v === "" ? "—" : String(v)}</span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+
+        {abaDoc === "divergencias" && (
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="text-xs font-semibold text-[var(--text-secondary)]">Divergências identificadas ({divergencias.length})</div>
+              <button
+                disabled={divergencias.length === 0}
+                onClick={() => divergencias[0] && onVerDetalhes(divergencias[0])}
+                title={divergencias.length === 0 ? "Nenhuma divergência para vincular neste documento" : undefined}
+                className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-text)] hover:underline disabled:text-[var(--text-muted)] disabled:cursor-not-allowed disabled:no-underline">
+                <Link2 className="w-3.5 h-3.5" /> Vincular/Editar
+              </button>
+            </div>
+            {divergencias.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)]">Nenhuma.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {divergencias.map((d, i) => (
+                  <li key={d.id} className="rounded-lg border border-[var(--border-default)] px-2.5 py-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-white/90">{i + 1}. {d.campoLabel}</div>
+                        <div className="text-[11px] text-[var(--text-secondary)]">No documento: <span className="text-white/80">{d.valorDocumento || "—"}</span></div>
+                        <div className="text-[11px] text-[var(--text-secondary)]">Esperado: <span className="text-white/80">{d.valorArvore || "—"}</span></div>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${SEV_STYLE[d.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}>{SEV_LABEL[d.severidade] || d.severidade}</span>
+                    </div>
+                    <button onClick={() => onVerDetalhes(d)} className="mt-1 text-[11px] text-[var(--accent-text)] hover:underline">Ver detalhes</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        </details>
-      )}
+        )}
+
+        {abaDoc === "historico" && (
+          historico.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">Sem eventos registrados para este documento.</p>
+          ) : (
+            <ul className="space-y-2">
+              {historico.map((h, i) => (
+                <li key={i} className="text-xs text-white/80">
+                  <span className="text-[var(--text-muted)]">{fmtDiaHora(h.quando)}</span> — {h.texto}
+                </li>
+              ))}
+            </ul>
+          )
+        )}
+      </div>
     </div>
   )
 }

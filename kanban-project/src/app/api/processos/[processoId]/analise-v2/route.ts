@@ -74,6 +74,7 @@ async function carregarPessoas(processoId: number) {
         select: {
           id: true, tipo: true, status: true,
           structuredData: true, dataStatus: true, analysisStatus: true, registral: true,
+          data_emissao: true, arquivo_url: true, arquivo_nome: true, arquivo_mime_type: true,
         },
       },
     },
@@ -178,6 +179,10 @@ export async function GET(
           analysisStatus: d.analysisStatus,
           structuredData: d.structuredData,
           registral: d.registral,
+          dataEmissao: d.data_emissao ? d.data_emissao.toISOString() : null,
+          arquivoUrl: d.arquivo_url ?? null,
+          arquivoNome: d.arquivo_nome ?? null,
+          arquivoMimeType: d.arquivo_mime_type ?? null,
         })),
       }
     })
