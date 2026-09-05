@@ -436,14 +436,30 @@ function urgenciaDaLinha(doc: DocumentoDoIndice): number {
 }
 
 /**
- * A ORDEM É DETERMINÍSTICA — sempre desempatada pelo título.
+ * Ordem de vida do registro civil: nasce, casa, morre. Não é alfabética de
+ * propósito — "Certidão de casamento" viria antes de "Certidão de nascimento"
+ * no dicionário, e isso não é a ordem que ninguém pensa quando olha os
+ * documentos de uma pessoa.
+ */
+function prioridadeDoTipo(titulo: string): number {
+  const t = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  if (t.includes("nascimento")) return 0
+  if (t.includes("casamento")) return 1
+  if (t.includes("obito")) return 2
+  return 3
+}
+
+/**
+ * A ORDEM É DETERMINÍSTICA — sempre desempatada por nascimento → casamento →
+ * óbito e, dentro do mesmo tipo, pelo título.
  *
  * O padrão põe na frente o que exige atenção (bloqueado, atrasado, vence hoje),
  * e isso é uma regra escrita, não um "score" que ninguém consegue explicar
  * depois. As outras ordens são o que o cabeçalho diz: nada de secreto.
  */
 export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
-  const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) => a.titulo.localeCompare(b.titulo, "pt-BR")
+  const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) =>
+    prioridadeDoTipo(a.titulo) - prioridadeDoTipo(b.titulo) || a.titulo.localeCompare(b.titulo, "pt-BR")
   const copia = [...docs]
   switch (ordem) {
     case "progresso":

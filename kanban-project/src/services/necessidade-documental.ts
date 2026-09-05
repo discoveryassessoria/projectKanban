@@ -9,6 +9,8 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { montarChaveIdempotencia } from "@/src/services/necessidade-documental-helpers"
 import { codeDocumentoMestre } from "@/src/services/catalogo-helpers"
+import { transicionarPassoTx } from "@/src/services/task-step-sync"
+import { randomUUID } from "crypto"
 
 export { montarChaveIdempotencia, sujeitoValido } from "@/src/services/necessidade-documental-helpers"
 
@@ -203,6 +205,27 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
   if (!n || n.status === "DISPENSADA") return
   await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "DISPENSADA" } })
   await evento(db, necessidadeId, "DISPENSADA", motivo ? { motivo } : undefined)
+
+  // A NECESSIDADE E A ETAPA SÃO DUAS LINHAS — dispensar só a necessidade deixava a
+  // etapa operacional ("Localizar registro da certidão") viva, contando pendente na
+  // tabela por pessoa mesmo depois de a pessoa deixar de precisar do documento
+  // (achado real: pessoa marcada "fora da linha reta" continuava com o documento
+  // pendente na Central Operacional). Cancela pelo motor canônico — mesma
+  // transição usada em qualquer cancelamento de etapa — nunca um update direto.
+  const passosAtivos = await db.phaseWorkflowStepInstance.findMany({
+    where: { necessidadeId, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO", "DISPENSADO"] } },
+    select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+  })
+  if (passosAtivos.length) {
+    const correlationId = randomUUID()
+    for (const p of passosAtivos) {
+      await transicionarPassoTx(db as Prisma.TransactionClient, p.id, "CANCELADO", {
+        correlationId, operacao: "necessidade-dispensada", ciclo: p.ciclo,
+        processoId: p.processoId, workflowInstanceId: p.workflowInstanceId,
+        extra: { cancelledAt: new Date(), motivo: motivo ?? "Necessidade dispensada" },
+      })
+    }
+  }
 }
 
 /** Reativa uma necessidade DISPENSADA (voltou a ser aplicável) → PENDENTE. */

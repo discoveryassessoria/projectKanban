@@ -399,8 +399,11 @@ function ConteudoModal({
   // -- Conteúdo do modal
   const modalContent = (
     <>
-      {/* Backdrop empilhado por cima da Central da Etapa */}
-      <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10004] transition-opacity" onClick={onClose} />
+      {/* Backdrop empilhado por cima da Central da Etapa. SEM tinta própria: este
+          modal só abre por cima da Central da Etapa (que já abriu por cima do
+          DocumentoOperationalDrawer) — os dois de baixo já escureceram o fundo, e
+          somar mais `--overlay-modal` aqui deixava o conteúdo quase preto. */}
+      <div className="fixed inset-0 bg-transparent z-[10004] transition-opacity" onClick={onClose} />
 
       {/* Container centralizado */}
       <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 pointer-events-none">

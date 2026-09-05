@@ -423,9 +423,12 @@ function ConteudoDrawer({
 
   const drawerContent = (
     <>
-      {/* Backdrop empilhado (z-index acima do DocumentoOperationalDrawer) */}
+      {/* Backdrop empilhado (z-index acima do DocumentoOperationalDrawer). SEM tinta
+          própria: este drawer só abre por cima do DocumentoOperationalDrawer, que já
+          escureceu o fundo — um segundo `--overlay-modal` aqui somaria opacidade e
+          apagaria o conteúdo de baixo. O div continua existindo pra fechar ao clicar fora. */}
       <div
-        className="fixed inset-0 bg-[var(--overlay-modal)] z-[10002] transition-opacity"
+        className="fixed inset-0 bg-transparent z-[10002] transition-opacity"
         onClick={onClose}
       />
 
