@@ -221,29 +221,54 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
         })
         if (existente) { res.stepsReusados++ }
         else {
-          await db.phaseWorkflowStepInstance.create({
-            data: {
-              workflowInstanceId: instancia.id, stepKey: STEP_LOCALIZAR, processoId,
-              faseMacroKey: FASE_GENEALOGIA, ordem: 1, tipo: "HUMANO",
-              // `geraTarefa` NÃO é mais decisão deste materializador — nem aqui
-              // nem em lugar nenhum. Ele descreve a ETAPA; quem responde "este
-              // trabalho entra na fila de alguém?" é a TAREFA da instância,
-              // materializada pelo reconciliador canônico
-              // (lib/operacional/reconciliar-tarefas.ts).
-              //
-              // O literal `false` que ficava aqui era uma decisão de negócio
-              // escondida num materializador local: ela deixou a operação
-              // inteira do Ademir invisível para a fila, o prazo e as
-              // notificações, sem erro e sem aviso. O valor abaixo é só o
-              // default do modelo, e nada o lê para decidir tarefa.
-              obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
-              status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: 5,
-              chaveIdempotencia: chave,
-              snapshot: { stepKey: STEP_LOCALIZAR, label: STEP_LABEL, requisito: snapshot } as Prisma.InputJsonValue,
-              snapshotSchemaVersion: 1,
-            },
+          // A IDENTIDADE (workflow+ciclo+stepKey+necessidade) já pode ter existido
+          // e sido CANCELADA — documento invalidado, operação cancelada. A chave de
+          // idempotência é a mesma identidade; `create` colidiria (P2002) contra a
+          // linha cancelada (achado real: Edithe, processo "Teste" — a colisão
+          // ficava só como `prisma:error` no log e a necessidade continuava
+          // PENDENTE sem etapa nenhuma pra atender).
+          //
+          // NÃO é REABRIR essa linha: reabrir aqui já produziu, na prática, DUAS
+          // etapas ativas para a mesma necessidade (a matdoc reaberta + a que o
+          // lado publicado cria) — a MESMA família de defeito do processo 523
+          // que o comentário acima descreve, só que provocada por este reparo em
+          // vez de evitada por ele. A necessidade já existe e está PENDENTE (a
+          // duas linhas acima); é ELA, não este passo local, que
+          // `instanciarWorkflowDaFase` lê para materializar a etapa real, pelo
+          // formato bilateral (`wfi…`) — que já sabe reconhecer um passo `matdoc`
+          // ativo e não duplicá-lo. Este caminho só precisa PARAR DE MORRER: se a
+          // identidade já tem uma linha (viva ou cancelada), não há nada a criar.
+          const jaExiste = await db.phaseWorkflowStepInstance.findUnique({
+            where: { chaveIdempotencia: chave },
+            select: { id: true },
           })
-          res.stepsCriados++
+          if (jaExiste) {
+            res.stepsReusados++
+          } else {
+            await db.phaseWorkflowStepInstance.create({
+              data: {
+                workflowInstanceId: instancia.id, stepKey: STEP_LOCALIZAR, processoId,
+                faseMacroKey: FASE_GENEALOGIA, ordem: 1, tipo: "HUMANO",
+                // `geraTarefa` NÃO é mais decisão deste materializador — nem aqui
+                // nem em lugar nenhum. Ele descreve a ETAPA; quem responde "este
+                // trabalho entra na fila de alguém?" é a TAREFA da instância,
+                // materializada pelo reconciliador canônico
+                // (lib/operacional/reconciliar-tarefas.ts).
+                //
+                // O literal `false` que ficava aqui era uma decisão de negócio
+                // escondida num materializador local: ela deixou a operação
+                // inteira do Ademir invisível para a fila, o prazo e as
+                // notificações, sem erro e sem aviso. O valor abaixo é só o
+                // default do modelo, e nada o lê para decidir tarefa.
+                obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
+                status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: 5,
+                chaveIdempotencia: chave,
+                snapshot: { stepKey: STEP_LOCALIZAR, label: STEP_LABEL, requisito: snapshot } as Prisma.InputJsonValue,
+                snapshotSchemaVersion: 1,
+              },
+            })
+            res.stepsCriados++
+          }
         }
       }
     }
