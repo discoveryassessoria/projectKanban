@@ -3,10 +3,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useApi } from "@/src/lib/dados"
+import { uploadFiles } from "@/src/lib/storage"
 import {
   Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X,
   FileText, Scale, Landmark, Search, Download, Eye, MoreVertical, ChevronDown,
-  ExternalLink, Link2,
+  ExternalLink, Link2, Paperclip, Upload, Copy, ClipboardCheck,
 } from "lucide-react"
 
 interface Divergencia {
@@ -59,6 +60,18 @@ interface DocV2 {
 interface PessoaV2 { id: number; nome: string; documentos: DocV2[] }
 interface AnaliseV2Resp { pessoas: PessoaV2[]; kpis: { pessoas: number; totalDocs: number; revisados: number; pendentesRevisao: number }; readiness: { ready: boolean } }
 
+interface LinhaRelatorio {
+  pessoa: string
+  documento: string
+  campo: string
+  campoLabel?: string
+  valorNoDocumento: string
+  valorCorreto: string
+  severidade?: string
+  sugestao?: string
+  decisao?: string
+}
+
 interface Props {
   processoId: number
   onConcluido?: () => void
@@ -106,6 +119,8 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   const [filtroStatus, setFiltroStatus] = useState<"todos" | "com" | "sem">("todos")
   const [filtroPessoa, setFiltroPessoa] = useState("todas")
   const [filtroTipo, setFiltroTipo] = useState("todos")
+  const [modalAnexar, setModalAnexar] = useState(false)
+  const [modalImportar, setModalImportar] = useState(false)
 
   const consulta = useApi<{ analise?: Analise | null }>(`/api/processos/${processoId}/analise`)
   const analise = consulta.dados?.analise ?? null
@@ -134,6 +149,23 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
     } finally {
       setRunning(false)
     }
+  }
+
+  /**
+   * Grava um relatório já pronto (feito por um humano comparando certidões, dentro
+   * ou fora do sistema) nas MESMAS tabelas do motor automático. Não decide nada
+   * sozinho: cada linha já chega com o valor errado, o valor correto e a gravidade.
+   */
+  const importarRelatorio = async (linhas: LinhaRelatorio[]) => {
+    const res = await fetch(`/api/processos/${processoId}/analise/importar`, {
+      method: "POST", headers: jsonHeaders(),
+      body: JSON.stringify({ linhas }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.mensagem || data.error || "Erro ao importar o relatório.")
+    setAnalise(data.analise)
+    setResultado(`Relatório importado: ${data.linhasImportadas} divergência(s) registrada(s).`)
+    await consulta.recarregar()
   }
 
   const decidir = async (divId: number, decisao: string, notas?: string) => {
@@ -296,8 +328,18 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             <p className="text-sm text-[var(--text-secondary)]">Compare documentos, identifique divergências e defina as retificações necessárias.</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
           {analise && <RelatorioDropdown />}
+          {!readOnly && (
+            <>
+              <button onClick={() => setModalAnexar(true)} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-hover)] rounded-md inline-flex items-center gap-2">
+                <Paperclip className="w-4 h-4" /> Anexar certidão
+              </button>
+              <button onClick={() => setModalImportar(true)} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-hover)] rounded-md inline-flex items-center gap-2">
+                <Upload className="w-4 h-4" /> Importar relatório
+              </button>
+            </>
+          )}
           {!readOnly && analise?.status !== "concluida" && (
             <button onClick={rodar} disabled={running} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Analisar automaticamente
@@ -306,9 +348,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         </div>
       </div>
 
+      {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+
       {!analise ? (
         <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">
-          A análise ainda não foi rodada. Clique em <b>Analisar automaticamente</b> para comparar a árvore com os documentos e apontar as divergências.
+          A análise ainda não foi rodada. Clique em <b>Analisar automaticamente</b> para comparar os documentos já cadastrados, em <b>Anexar certidão</b> se ainda faltar certidão na aba Documentos, ou em <b>Importar relatório</b> se a comparação já foi feita fora do sistema.
         </div>
       ) : (
         <>
@@ -333,9 +378,6 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               </button>
             ))}
           </div>
-
-          {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
-          {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
           {aba === "documentos" && todosDocs.length > 0 && (
             <BarraBuscaFiltro
@@ -447,6 +489,28 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
           onSalvar={async (decisao, notas) => { await decidir(drawerDiv.id, decisao, notas); setDrawerDiv(null) }}
         />
       )}
+
+      {modalAnexar && (
+        <ModalAnexarCertidao
+          pessoas={pessoasV2}
+          onClose={() => setModalAnexar(false)}
+          onSalvo={async () => { setModalAnexar(false); await consultaV2.recarregar() }}
+          anexar={async (payload) => {
+            const res = await fetch(`/api/processos/${processoId}/analise/documentos`, {
+              method: "POST", headers: jsonHeaders(), body: JSON.stringify(payload),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.mensagem || data.error || "Erro ao anexar a certidão.")
+          }}
+        />
+      )}
+
+      {modalImportar && (
+        <ModalImportarRelatorio
+          onClose={() => setModalImportar(false)}
+          onImportar={async (linhas) => { await importarRelatorio(linhas); setModalImportar(false) }}
+        />
+      )}
     </div>
   )
 }
@@ -507,6 +571,278 @@ function BarraBuscaFiltro({ busca, onBusca, status, onStatus, pessoa, onPessoa, 
       <button onClick={onExportar} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-[var(--surface-hover)]">
         <Download className="w-3.5 h-3.5" /> Exportar
       </button>
+    </div>
+  )
+}
+
+const TIPOS_CERTIDAO: Array<[string, string]> = [
+  ["CERTIDAO_NASCIMENTO", "Certidão de Nascimento"],
+  ["CERTIDAO_NASCIMENTO_INTEIRO_TEOR", "Certidão de Nascimento (Inteiro Teor)"],
+  ["CERTIDAO_CASAMENTO", "Certidão de Casamento"],
+  ["CERTIDAO_CASAMENTO_INTEIRO_TEOR", "Certidão de Casamento (Inteiro Teor)"],
+  ["CERTIDAO_OBITO", "Certidão de Óbito"],
+  ["CERTIDAO_OBITO_INTEIRO_TEOR", "Certidão de Óbito (Inteiro Teor)"],
+]
+
+function ModalAnexarCertidao({ pessoas, onClose, onSalvo, anexar }: {
+  pessoas: Array<{ id: number; nome: string }>
+  onClose: () => void
+  onSalvo: () => void
+  anexar: (payload: { pessoaId: number; tipo: string; arquivoUrl: string; arquivoNome: string; arquivoMimeType: string }) => Promise<void>
+}) {
+  const [pessoaId, setPessoaId] = useState<number | "">("")
+  const [tipo, setTipo] = useState("")
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false)
+  const [progresso, setProgresso] = useState(0)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const salvar = async () => {
+    if (!pessoaId || !tipo || !arquivo) { setErro("Escolha a pessoa, o tipo e o arquivo."); return }
+    setEnviando(true); setErro(null)
+    try {
+      const [up] = await uploadFiles([arquivo], { prefix: "analise-documental", onProgress: (_f, p) => setProgresso(p) })
+      await anexar({ pessoaId: Number(pessoaId), tipo, arquivoUrl: up.url, arquivoNome: up.name, arquivoMimeType: up.type })
+      onSalvo()
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao anexar a certidão.")
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-white/95">Anexar certidão</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
+        </div>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">O arquivo vira um documento da pessoa, disponível para comparação na Análise Documental.</p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Pessoa</label>
+            <select value={pessoaId} onChange={(e) => setPessoaId(e.target.value ? Number(e.target.value) : "")}
+              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white">
+              <option value="">Selecione…</option>
+              {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Tipo de certidão</label>
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white">
+              <option value="">Selecione…</option>
+              {TIPOS_CERTIDAO.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Arquivo (PDF ou imagem)</label>
+            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+              onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
+              className="w-full text-xs text-white/80 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--surface-secondary)] file:px-2 file:py-1.5 file:text-xs file:text-white/80" />
+            {enviando && (
+              <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
+                <div className="h-full bg-[var(--action-primary)] transition-all" style={{ width: `${progresso}%` }} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {erro && <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-red-700">{erro}</div>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
+          <button onClick={() => void salvar()} disabled={enviando}
+            className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--surface-hover)] disabled:opacity-40">
+            {enviando ? "Enviando…" : "Anexar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const MODELO_CSV = `pessoa;documento;campo;campoLabel;valorNoDocumento;valorCorreto;severidade;sugestao;decisao
+Antonio Medina Olivares;Certidão de Casamento;dataNascimento;Data de nascimento;26/07/1910;25/06/1910;critica;Acta de Nacimiento espanhola prova 25/06/1910.;retificacao
+`
+
+const PROMPT_RELATORIO = `Vou te enviar certidões (nascimento, casamento, óbito) de uma mesma linhagem familiar, em imagem ou PDF. Leia cada uma com atenção e compare os dados entre elas — nome, data de nascimento, filiação (pai/mãe), naturalidade. Nunca invente nem complete o que não está escrito.
+
+Quando um nome/data/filiação aparecer diferente entre documentos da mesma pessoa (ou entre um documento e os documentos dos descendentes que citam essa pessoa como pai/mãe/avô), aponte a divergência. Use como valor correto o documento mais próximo do fato: o registro de nascimento no país de origem, ou a averbação de retificação mais recente, tem mais autoridade que uma cópia ou tradução posterior.
+
+Devolva a resposta SOMENTE como uma tabela, sem nenhum texto antes ou depois, separada por ponto e vírgula (;), com EXATAMENTE este cabeçalho e nesta ordem:
+
+pessoa;documento;campo;campoLabel;valorNoDocumento;valorCorreto;severidade;sugestao;decisao
+
+- pessoa: nome completo da pessoa, exatamente como está cadastrado na árvore do processo
+- documento: título do documento com o erro (ex.: "Certidão de Nascimento", "Certidão de Casamento (IT)")
+- campo: chave curta (ex.: dataNascimento, nomePai, nomeMae, sobrenome, localNascimento)
+- campoLabel: nome do campo em português (ex.: "Data de nascimento")
+- valorNoDocumento: o valor errado, como está escrito no documento
+- valorCorreto: o valor correto, com base no documento de maior autoridade
+- severidade: baixa, media ou critica
+- sugestao: uma frase curta explicando a divergência e de onde veio a correção
+- decisao: "retificacao" se precisa corrigir, "aceita" se é só variação aceitável (pode deixar em branco pra decidir depois na tela)`
+
+function parseCsvRelatorio(texto: string): string[][] {
+  const s = texto.replace(/^﻿/, "")
+  const linhas: string[][] = []
+  let campo = "", linha: string[] = [], dentroAspas = false
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i]
+    if (dentroAspas) {
+      if (c === '"') { if (s[i + 1] === '"') { campo += '"'; i++ } else dentroAspas = false }
+      else campo += c
+    } else if (c === '"') dentroAspas = true
+    else if (c === ";") { linha.push(campo); campo = "" }
+    else if (c === "\n") { linha.push(campo); linhas.push(linha); linha = []; campo = "" }
+    else if (c === "\r") { /* ignora */ }
+    else campo += c
+  }
+  if (campo.length > 0 || linha.length > 0) { linha.push(campo); linhas.push(linha) }
+  return linhas.filter((l) => l.some((c) => c.trim() !== ""))
+}
+
+function linhasDoCsv(texto: string): { linhas: LinhaRelatorio[]; erro: string | null } {
+  const tabela = parseCsvRelatorio(texto)
+  if (tabela.length < 2) return { linhas: [], erro: "O arquivo precisa ter o cabeçalho e ao menos uma linha de divergência." }
+  const cabecalho = tabela[0].map((h) => h.trim().toLowerCase())
+  const idx = (chave: string) => cabecalho.indexOf(chave)
+  const obrigatorias = ["pessoa", "documento", "campo", "valornodocumento", "valorcorreto"]
+  const faltando = obrigatorias.filter((c) => idx(c) === -1)
+  if (faltando.length > 0) return { linhas: [], erro: `Cabeçalho sem as colunas: ${faltando.join(", ")}. Use o modelo.` }
+
+  const linhas: LinhaRelatorio[] = tabela.slice(1).map((cols) => ({
+    pessoa: (cols[idx("pessoa")] ?? "").trim(),
+    documento: (cols[idx("documento")] ?? "").trim(),
+    campo: (cols[idx("campo")] ?? "").trim(),
+    campoLabel: idx("campolabel") >= 0 ? (cols[idx("campolabel")] ?? "").trim() : undefined,
+    valorNoDocumento: (cols[idx("valornodocumento")] ?? "").trim(),
+    valorCorreto: (cols[idx("valorcorreto")] ?? "").trim(),
+    severidade: idx("severidade") >= 0 ? (cols[idx("severidade")] ?? "").trim().toLowerCase() : undefined,
+    sugestao: idx("sugestao") >= 0 ? (cols[idx("sugestao")] ?? "").trim() : undefined,
+    decisao: idx("decisao") >= 0 ? (cols[idx("decisao")] ?? "").trim().toLowerCase() : undefined,
+  })).filter((l) => l.pessoa && l.campo)
+
+  if (linhas.length === 0) return { linhas: [], erro: "Nenhuma linha válida encontrada (faltou pessoa ou campo)." }
+  return { linhas, erro: null }
+}
+
+function ModalImportarRelatorio({ onClose, onImportar }: {
+  onClose: () => void
+  onImportar: (linhas: LinhaRelatorio[]) => Promise<void>
+}) {
+  const [copiado, setCopiado] = useState(false)
+  const [linhas, setLinhas] = useState<LinhaRelatorio[]>([])
+  const [erroArquivo, setErroArquivo] = useState<string | null>(null)
+  const [nomeArquivo, setNomeArquivo] = useState<string | null>(null)
+  const [importando, setImportando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const copiarPrompt = async () => {
+    try { await navigator.clipboard.writeText(PROMPT_RELATORIO); setCopiado(true); setTimeout(() => setCopiado(false), 2000) } catch { /* silencioso */ }
+  }
+
+  const baixarModelo = () => {
+    const blob = new Blob(["﻿" + MODELO_CSV], { type: "text/csv;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url; a.download = "modelo-relatorio-analise-documental.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const onArquivo = async (file: File | null) => {
+    setLinhas([]); setErroArquivo(null); setNomeArquivo(null)
+    if (!file) return
+    setNomeArquivo(file.name)
+    const texto = await file.text()
+    const r = linhasDoCsv(texto)
+    if (r.erro) setErroArquivo(r.erro)
+    else setLinhas(r.linhas)
+  }
+
+  const confirmar = async () => {
+    setImportando(true); setErro(null)
+    try { await onImportar(linhas) } catch (e) { setErro(e instanceof Error ? e.message : "Erro ao importar.") } finally { setImportando(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
+      <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold text-white/95">Importar relatório de divergências</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
+        </div>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">
+          Compare as certidões fora do sistema (por exemplo, numa conversa com o Claude) e suba o resultado pronto — o sistema só formata e grava.
+        </p>
+
+        <div className="mt-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-white/90">1. Copie este texto e cole numa conversa com o Claude, junto com as certidões</span>
+            <button onClick={() => void copiarPrompt()} className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-text)] hover:underline">
+              {copiado ? <ClipboardCheck className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copiado ? "Copiado" : "Copiar"}
+            </button>
+          </div>
+          <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-md bg-black/20 p-2 text-[11px] text-white/70">{PROMPT_RELATORIO}</pre>
+        </div>
+
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+          <span className="text-xs font-semibold text-white/90">2. Se preferir montar na mão, baixe o modelo da planilha</span>
+          <button onClick={baixarModelo} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1.5 text-[11px] font-semibold text-white/80 hover:bg-[var(--surface-hover)]">
+            <Download className="w-3.5 h-3.5" /> Baixar modelo
+          </button>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+          <span className="text-xs font-semibold text-white/90">3. Suba o relatório pronto (.csv)</span>
+          <input type="file" accept=".csv,text/csv" onChange={(e) => void onArquivo(e.target.files?.[0] ?? null)}
+            className="mt-2 w-full text-xs text-white/80 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--surface-secondary)] file:px-2 file:py-1.5 file:text-xs file:text-white/80" />
+          {nomeArquivo && !erroArquivo && (
+            <p className="mt-2 text-[11px] text-white/68">{nomeArquivo} · {linhas.length} divergência(s) reconhecida(s)</p>
+          )}
+          {erroArquivo && <p className="mt-2 text-[11px] text-red-700">{erroArquivo}</p>}
+
+          {linhas.length > 0 && (
+            <div className="mt-2 max-h-52 overflow-auto rounded-md border border-[var(--border-default)]">
+              <table className="w-full text-[11px]">
+                <thead>
+                  <tr className="bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+                    {["Pessoa", "Documento", "Campo", "No documento", "Correto", "Gravidade"].map((h) => (
+                      <th key={h} className="px-2 py-1.5 text-left font-semibold whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {linhas.map((l, i) => (
+                    <tr key={i}>
+                      <td className="px-2 py-1.5 text-white/90 whitespace-nowrap">{l.pessoa}</td>
+                      <td className="px-2 py-1.5 text-white/80 whitespace-nowrap">{l.documento}</td>
+                      <td className="px-2 py-1.5 text-white/68">{l.campoLabel || l.campo}</td>
+                      <td className="px-2 py-1.5 text-white/68">{l.valorNoDocumento}</td>
+                      <td className="px-2 py-1.5 text-white/68">{l.valorCorreto}</td>
+                      <td className="px-2 py-1.5 text-white/68">{l.severidade || "media"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {erro && <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-red-700">{erro}</div>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
+          <button onClick={() => void confirmar()} disabled={importando || linhas.length === 0}
+            className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--surface-hover)] disabled:opacity-40">
+            {importando ? "Importando…" : `Importar ${linhas.length || ""} divergência(s)`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
