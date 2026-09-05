@@ -26,6 +26,7 @@ import {
 import { idadeEmAnos, maioridadeEfetiva, ehRequerente } from "@/src/lib/documentos/maioridade"
 import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
+import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
 
 type DB = typeof prisma | Prisma.TransactionClient
 
@@ -340,6 +341,20 @@ export async function dispararMaterializacaoPorArvore(arvoreId: number | null | 
       // (inclui a marcação de requerente) → o FinanceRuleEngine recalcula os honorários da
       // cidadania italiana (1 lançamento consolidado por processo). Best-effort, idempotente.
       try { await aplicarHonorariosCidadaniaItaliana(p.id) } catch (e) { console.error(`[honorarios] processo ${p.id} falhou (fluxo seguiu):`, e) }
+      // AVANÇO AUTOMÁTICO — a última pendência pode ter caído por AQUI (vincular
+      // requerente, remover pessoa, importar árvore), não por conclusão de
+      // passo/documento. Sem isto o processo ficava com o gate satisfeito e
+      // esperando a varredura horária do cron (mesma classe do processo 523,
+      // documentada em reconciliar-motor-fases.ts) para uma pendência que a
+      // própria reconciliação que está rodando agora acabou de resolver.
+      // `origem: "cron-reconciliacao"` de propósito — é a MESMA trava que impede
+      // fase "processo" (checklist manual) de avançar sozinha por reconciliação
+      // (o incidente do processo 573: 0 exigido virando "100% = avança sozinho").
+      try {
+        await reconciliarMotorDeFases(p.id, { origem: "cron-reconciliacao" })
+      } catch (e) {
+        console.error(`[genealogia] reconciliação de fase do processo ${p.id} falhou (fluxo seguiu):`, e)
+      }
     }
   } catch (e) {
     console.error("[genealogia] disparo por árvore falhou (fluxo seguiu):", e)
