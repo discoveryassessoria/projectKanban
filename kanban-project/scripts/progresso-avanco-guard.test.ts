@@ -38,11 +38,28 @@ console.log("\nGuarda progresso↔avanço (regressão 99%)\n");
   check(proj.status.blocked === false && proj.progress.percentage === 100, "2) passo concluído c/ tarefa pendente → 100%, não bloqueia", { b: proj.status.blocked, p: proj.progress.percentage });
 }
 
-// 3) requerente da ÁRVORE = 0 → bloqueado (regra legítima, não mascarada por 99)
+// 3) requerente da ÁRVORE = 0 → bloqueia o AVANÇO (regra legítima), mas não é
+//    trabalho da fase: com a documentação toda resolvida, a barra mostra 100%.
+//    GENEALOGIA_SEM_REQUERENTE é lacuna administrativa do PROCESSO ("quem é o
+//    requerente?"), não certidão pendente nem passo aberto — a decisão (05/09/2026)
+//    foi parar de cobrar 1% da barra por um cadastro que não é tarefa da Genealogia.
 {
   const proj = buildOperationalProjection(baseInput({ requerentesCount: 0 }));
   check(proj.status.blocked === true && proj.metrics.blocked >= 1, "3) sem requerente → bloqueado com issue real", proj.status);
-  check(proj.progress.percentage <= 99, "3b) bloqueado nunca exibe 100%", proj.progress);
+  check(proj.status.canAdvance === false, "3b) sem requerente → não avança", proj.status);
+  check(proj.progress.percentage === 100, "3c) mas a documentação 1/1 mostra 100% (lacuna administrativa não é trabalho)", proj.progress);
+  check(proj.status.operationalState === "BLOQUEADA", "3d) operationalState continua BLOQUEADA mesmo com 100%", proj.status);
+}
+
+// 3e) sem requerente E com certidão de verdade pendente → aí sim capa em 99 (a
+//     lacuna administrativa nunca esconde trabalho de fase que falta)
+{
+  const proj = buildOperationalProjection(baseInput({
+    requerentesCount: 0,
+    steps: [step({ status: "DISPONIVEL" })],
+    necessidades: [{ id: 23, status: "PENDENTE", obrigatoria: true, ehCertidao: true }],
+  }));
+  check(proj.progress.percentage <= 99, "3e) sem requerente + certidão pendente → ainda capa em 99 (trabalho real falta)", proj.progress);
 }
 
 // 4) FONTE ÚNICA: blocked da projeção == existe BLOCKING no computeGate

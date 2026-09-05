@@ -268,7 +268,14 @@ function proximaAcaoDe(
   faseCode: FaseCode | null,
   candidatos: GateStepData[],
 ): { key: string; label: string } | null {
-  const pendentes = candidatos.filter((s) => !passoConcluido(s)).sort((a, b) => a.ordem - b.ordem)
+  // CANCELADO saiu do fluxo — mesma régua de `obrigacaoConcluidaNaFase` ("passo
+  // cancelado não conta como feito nem como pendência"). `passoConcluido` sozinho
+  // não bastava aqui: ele só reconhece CONCLUIDO/DISPENSADO/SUPERSEDIDO como "OK",
+  // então um passo CANCELADO virava "pendente" e a tela sugeria refazer um
+  // trabalho que a dispensa da necessidade já encerrou (achado real: Edithe).
+  const pendentes = candidatos
+    .filter((s) => s.status !== "CANCELADO" && !passoConcluido(s))
+    .sort((a, b) => a.ordem - b.ordem)
   const prox = pendentes[0]
   if (!prox) return null
   return { key: prox.stepKey, label: tituloDoStep(faseCode, prox.stepKey) }
@@ -460,14 +467,28 @@ export function buildOperationalProjection(input: ProjectionInput): OperationalP
   // ALL_REQUIRED_COMPLETED: pode avançar se não houver nenhum BLOCKING.
   const canAdvance = !blocked
 
-  const prog = computeProgress(input, blocked)
+  // A PORCENTAGEM É DO TRABALHO DA FASE — nunca do que falta cadastrar no PROCESSO.
+  // GENEALOGIA_SEM_REQUERENTE trava o avanço (decisão de negócio correta: sem
+  // requerente definido não se sabe PARA QUEM é a cidadania), mas não é uma
+  // certidão pendente nem um passo aberto — é lacuna administrativa do processo,
+  // não tarefa da fase. Antes, ela capava a barra em 99% mesmo com toda a
+  // documentação (4/4) resolvida — a tela dizia "falta 1%" quando o que faltava
+  // era cadastrar uma pessoa, não localizar mais nenhum registro. `canAdvance` e
+  // `operationalState` continuam BLOQUEADA: a decisão de negócio não muda, só
+  // deixa de roubar pontos da barra de progresso documental.
+  const blockingIssuesDoTrabalho = blockingIssues.filter((i) => i.code !== "GENEALOGIA_SEM_REQUERENTE")
+  const blockedNoTrabalho = blockingIssuesDoTrabalho.length > 0
+
+  const prog = computeProgress(input, blockedNoTrabalho)
 
   // ── BLINDAGEM (invariante do sistema) ──────────────────────────────────────
-  // 100% ⟺ o BlockingEngine PERMITE avançar. Logo, uma fase BLOQUEADA jamais pode
-  // exibir 100% (senão o card mostra "concluído" mas não avança). Trava defensiva
-  // de runtime: mesmo que computeProgress regrida, aqui garantimos ≤ 99% se bloqueado.
-  // (`progress` e `advance` derivam do MESMO computeGate → nunca divergem.)
-  if (blocked && prog.percentage >= 100) prog.percentage = 99
+  // 100% ⟺ todo o TRABALHO da fase está feito. Uma fase com trabalho pendente
+  // jamais exibe 100% (senão o card mostra "concluído" quando falta certidão/passo).
+  // Lacuna administrativa (ex.: sem requerente) pode conviver com 100% — ela
+  // aparece em `blocked`/`operationalState`, não na barra. Trava defensiva de
+  // runtime: mesmo que computeProgress regrida, aqui garantimos ≤ 99% se houver
+  // trabalho pendente. (`progress` deriva do mesmo computeGate, filtrado.)
+  if (blockedNoTrabalho && prog.percentage >= 100) prog.percentage = 99
   if (!blocked && prog.completedWeight >= prog.totalWeight && prog.totalWeight > 0) prog.percentage = 100
 
   const hasPhase = input.processoExists && !!input.faseMacroKey
