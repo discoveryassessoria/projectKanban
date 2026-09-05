@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-02
+-- Gerado em : 2026-09-05
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -3033,6 +3033,7 @@ CREATE TABLE "NecessidadeDocumental" (
     "origem" "OrigemNecessidade" NOT NULL DEFAULT 'MANUAL',
     "obrigatoriedade" "ObrigatoriedadeNecessidade" NOT NULL DEFAULT 'OBRIGATORIA',
     "status" "StatusNecessidade" NOT NULL DEFAULT 'PENDENTE',
+    "dispensaManual" BOOLEAN NOT NULL DEFAULT false,
     "matrizRegraId" INTEGER,
     "matrizRegraVersao" INTEGER,
     "matrizSnapshot" JSONB,

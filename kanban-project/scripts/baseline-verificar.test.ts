@@ -275,7 +275,17 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // produção, então a coluna nasce NOT NULL sem backfill nem default mentiroso.
 //
 //   anterior : 7c67e2f5035c1efade5380b3cadeed1a4a43bdb02934c5924cb6ec15c72a9b0c
-const CHECKSUM_LEDGER = '33cade3ecfc12cf07e0a30bb83cb17c7d07dd156fcb2ab157e655182df20f53b'
+// 05/09/2026 — DISPENSA MANUAL NÃO REATIVA SOZINHA. Uma coluna em
+// `NecessidadeDocumental`: `dispensaManual` (BOOLEAN, default false). Cancelar a
+// operação de um documento passou a dispensar a necessidade ligada a ele (decisão
+// de negócio); sem a marca, o materializador da Genealogia reativaria essa mesma
+// necessidade sozinho na primeira reconciliação seguinte, porque a regra
+// documental ainda a considera aplicável. Aditiva, default false, zero linhas
+// tocadas — quem já estava dispensado antes desta migration continua reativável
+// como sempre (nasce sem a marca).
+//
+//   anterior : 33cade3ecfc12cf07e0a30bb83cb17c7d07dd156fcb2ab157e655182df20f53b
+const CHECKSUM_LEDGER = '4e54a69a78b38a349cac01b88e84dd914aa99d7c17f2689a39eb0f20ab6efcea'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -341,6 +351,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260901270000_relatorio_visao_salva',
   '20260902120000_processo_nao_deixa_orfao',
   '20260902150000_todo_vinculo_protegido',
+  '20260905193850_necessidade_dispensa_manual',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
