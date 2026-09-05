@@ -85,7 +85,9 @@ export async function PATCH(
         return NextResponse.json({ necessidade: await retornoGenealogia(id, body.motivo) })
       case "dispensar": {
         // Transição CANÔNICA pelo serviço de domínio (nenhuma escrita direta de status).
-        await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined)
+        // Dispensa pedida por quem opera a tela — MANUAL: não reativa sozinha
+        // na próxima reconciliação, mesmo com a regra ainda achando aplicável.
+        await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined, undefined, true)
         await avancar()
         await reconciliarRegistral()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })

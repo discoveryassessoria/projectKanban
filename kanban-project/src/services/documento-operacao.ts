@@ -30,8 +30,7 @@ import { lerOperacao, gravarOperacao } from "@/src/services/operacao-da-etapa"
 import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
-import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade, dispensarNecessidade } from "@/src/services/necessidade-documental"
 import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 import { randomUUID } from "crypto"
@@ -1082,13 +1081,13 @@ export async function controlarOperacaoV2(
   const obs = (observacao ?? "").trim()
   const correlationId = randomUUID()
   if (action === "cancelar" || action === "invalidar") {
-    const faseMacroKeysCanceladas = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const alvos = await tx.phaseWorkflowStepInstance.findMany({
         // Cancelar a operação cancela os passos da VISITA ATUAL. Sem o escopo, uma
         // etapa aberta de um ciclo antigo era cancelada junto — mexer no histórico
         // por causa de um comando sobre o presente.
         where: { documentoId, ...escopoControlar, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
-        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true, faseMacroKey: true },
+        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true, faseMacroKey: true, necessidadeId: true },
       })
       // Cancelar a operação de um documento cancela os passos dele — pelo motor,
       // que registra PASSO_CANCELADO. Antes esta era a transição mais silenciosa
@@ -1098,7 +1097,20 @@ export async function controlarOperacaoV2(
       }
       for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "CANCELADO", agora: now })
       await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
-      return [...new Set(alvos.map((a) => a.faseMacroKey))]
+      // CANCELAR O DOCUMENTO REMOVE A EXIGÊNCIA — decisão de negócio (não é "refazer
+      // depois"): cancelar/invalidar a operação de um documento dispensa a
+      // NecessidadeDocumental ligada a ele, pelo motor canônico (que já cancela
+      // qualquer etapa ativa remanescente — aqui não sobra nenhuma, o loop acima já
+      // cancelou). Antes, o passo era cancelado mas a necessidade nunca era
+      // dispensada: a obrigação sumia da tabela "Documentos por pessoa" e continuava
+      // contando como pendente no resumo da fase, travando o avanço sem jeito de
+      // fechar (achado real: Edithe, processo "Teste"). Dispensar — não reconciliar
+      // a árvore para recriar a etapa — porque recriar reabriria exatamente a
+      // exigência que o cancelamento pediu para encerrar.
+      const necessidadeIds = [...new Set(alvos.map((a) => a.necessidadeId).filter((x): x is number => x != null))]
+      for (const necId of necessidadeIds) {
+        await dispensarNecessidade(necId, obs || (action === "invalidar" ? "Documento invalidado" : "Operação cancelada"), tx, true)
+      }
     })
     await prisma.documento.update({
       where: { id: documentoId },
@@ -1106,22 +1118,6 @@ export async function controlarOperacaoV2(
         ? { status: "INVALIDO", ultimaMovimentacao: now, motivoBloqueio: obs ? `Documento invalidado: ${obs}` : "Documento invalidado" }
         : { status: "PENDENTE", ultimaMovimentacao: now, dataInicioOperacao: null, dataPrazoOperacao: null, motivoBloqueio: obs ? `Operação cancelada: ${obs}` : "Operação cancelada" },
     })
-    // CANCELAR O PASSO NÃO FECHA A OBRIGAÇÃO — a NecessidadeDocumental (achado real:
-    // um documento invalidado sumia da lista "Documentos por pessoa" — o passo que a
-    // sustentava foi cancelado — mas continuava contando como pendente no resumo da
-    // fase, porque a necessidade nunca é dispensada aqui. A pessoa ficava com uma
-    // obrigação sem etapa nenhuma pra atender: invisível E impossível de concluir.
-    // Reconciliar a Genealogia da árvore recria a etapa "Localizar registro" para
-    // toda necessidade ainda aberta sem etapa ativa — o idempotente de sempre, não
-    // um caminho novo.
-    if (faseMacroKeysCanceladas.includes("genealogia")) {
-      const doc = await prisma.documento.findUnique({ where: { id: documentoId }, select: { pessoa: { select: { arvoreId: true } } } })
-      if (doc?.pessoa.arvoreId != null) {
-        await dispararMaterializacaoPorArvore(doc.pessoa.arvoreId).catch((e) =>
-          console.error(`[documento-operacao] reconciliação da genealogia após ${action} falhou (árvore ${doc.pessoa.arvoreId}):`, e),
-        )
-      }
-    }
   } else if (action === "pausar") {
     await prisma.$transaction(async (tx) => {
       const alvos = await tx.phaseWorkflowStepInstance.findMany({ where: { documentoId, ...escopoControlar, status: "EM_ANDAMENTO" }, select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true } })

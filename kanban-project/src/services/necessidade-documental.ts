@@ -200,10 +200,18 @@ export async function atenderNecessidade(necessidadeId: number, db: DB = prisma)
 }
 
 /** → DISPENSADA (requisito deixou de ser exigido). Idempotente. */
-export async function dispensarNecessidade(necessidadeId: number, motivo?: string, db: DB = prisma) {
-  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
-  if (!n || n.status === "DISPENSADA") return
-  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "DISPENSADA" } })
+export async function dispensarNecessidade(necessidadeId: number, motivo?: string, db: DB = prisma, manual = false) {
+  const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true, dispensaManual: true } })
+  if (!n) return
+  if (n.status === "DISPENSADA") {
+    // Já dispensada — se a chamada é MANUAL e ela ainda não carrega a marca, sobe a
+    // marca agora (dispensa que era automática vira sticky por decisão de operador).
+    if (manual && !n.dispensaManual) {
+      await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { dispensaManual: true } })
+    }
+    return
+  }
+  await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "DISPENSADA", dispensaManual: manual } })
   await evento(db, necessidadeId, "DISPENSADA", motivo ? { motivo } : undefined)
 
   // A NECESSIDADE E A ETAPA SÃO DUAS LINHAS — dispensar só a necessidade deixava a

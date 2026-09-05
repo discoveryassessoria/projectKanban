@@ -4772,6 +4772,12 @@ model NecessidadeDocumental {
   origem          OrigemNecessidade          @default(MANUAL)
   obrigatoriedade ObrigatoriedadeNecessidade @default(OBRIGATORIA)
   status          StatusNecessidade          @default(PENDENTE)
+  /// Dispensa por DECISÃO DE OPERADOR (ex.: cancelar a operação de um documento),
+  /// nunca pela reconciliação da Matriz. O materializador NÃO reativa sozinho quem
+  /// tem esta marca — só a regra deixar de ser aplicável não é motivo pra voltar o
+  /// que um humano decidiu encerrar. Reabertura explícita (endpoint "reabrir") cria
+  /// necessidade NOVA e não herda a marca.
+  dispensaManual  Boolean                    @default(false)
 
   // Snapshot IMUTÃVEL da regra da Matriz que originou + auditoria de origem.
   matrizRegraId        Int?

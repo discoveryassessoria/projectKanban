@@ -182,7 +182,11 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       criada ? res.necessidadesCriadas++ : res.necessidadesReusadas++
 
       // reativa se estava DISPENSADA (voltou a ser aplicável) — via serviço canônico.
-      if (!criada && necessidade.status === "DISPENSADA") {
+      // NUNCA quando a dispensa foi MANUAL (decisão de operador, ex.: cancelar a
+      // operação de um documento): a regra ainda achar aplicável não é motivo pra
+      // desfazer sozinha o que um humano decidiu encerrar. Reabertura manual passa
+      // pelo endpoint "reabrir", que cria necessidade nova — não por aqui.
+      if (!criada && necessidade.status === "DISPENSADA" && !necessidade.dispensaManual) {
         await reativarNecessidade(necessidade.id, db)
         res.reativadas++
       }

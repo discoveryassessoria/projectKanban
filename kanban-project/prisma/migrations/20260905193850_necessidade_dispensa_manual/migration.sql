@@ -1,0 +1,14 @@
+-- DISPENSA MANUAL NÃO REATIVA SOZINHA.
+--
+-- Cancelar a operação de um documento passou a dispensar a NecessidadeDocumental
+-- ligada a ele (decisão de negócio: não é "refazer depois", é "não precisamos
+-- mais desse documento"). Sem marca própria, o materializador da Genealogia
+-- reativaria essa mesma necessidade sozinho na primeira reconciliação seguinte
+-- (qualquer edição na árvore), porque a regra documental ainda a considera
+-- aplicável — a dispensa "voltaria" sem ninguém pedir.
+--
+-- Aditiva, idempotente (D-05): coluna nova, default false, sem tocar dado
+-- existente. Toda necessidade já dispensada antes desta migration continua
+-- sujeita à reativação automática (comportamento antigo, preservado) até que
+-- alguém a dispense de novo pelo caminho que já marca esta coluna.
+ALTER TABLE "NecessidadeDocumental" ADD COLUMN IF NOT EXISTS "dispensaManual" BOOLEAN NOT NULL DEFAULT false;
