@@ -259,15 +259,31 @@ const prisma = new PrismaClient()
 const FASES_MACRO = ["genealogia", "emissao_documental", "analise_documental", "traducao", "apostilamento"]
 
 async function main() {
+  await prisma.$executeRawUnsafe(TRUNCATE_SQL)
+  try {
+    await corpo()
+  } finally {
+    // DEVOLVE O BANCO COMO ENCONTROU — não só antes de rodar (para o caso de uma
+    // execução anterior ter morrado no meio), também DEPOIS. Sem isto, o "MAT-TEST"
+    // criado aqui (FaseMacro com phaseKey "traducao" incluída) sobrevivia para quem
+    // rodasse phasekeys-guard em seguida no MESMO banco de teste — que reprova
+    // exatamente essa chave por não estar no catálogo oficial (achado real: D-04b).
+    await prisma.$executeRawUnsafe(TRUNCATE_SQL)
+    await prisma.$disconnect()
+  }
+  process.exit(falhas.length === 0 ? 0 : 1)
+}
+
+const TRUNCATE_SQL =
+  'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro","MatrizDocumental","TipoDocumentoCadastro","ItemCatalogo","PhaseAdvanceLog","LogAuditoria" RESTART IDENTITY CASCADE'
+
+async function corpo() {
   const { movePhaseManual, advance } = await import("../src/lib/motor/phase-advance")
   const { materializarExecucaoDaFase, validarMaterializacaoDaFase } = await import("../src/services/materializar-fase")
   const { reconciliarFaseAtiva } = await import("../src/services/reconciliar-fase")
   const { getPhaseOperationalStructure } = await import("../src/lib/process-stage/estrutura-operacional")
   const { resolvePendenciasTransversais } = await import("../src/lib/process-stage/pendencias-transversais")
 
-  await prisma.$executeRawUnsafe(
-    'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro","MatrizDocumental","TipoDocumentoCadastro","ItemCatalogo","PhaseAdvanceLog","LogAuditoria" RESTART IDENTITY CASCADE',
-  )
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
 
   const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
@@ -587,8 +603,6 @@ async function main() {
     console.log("\nFalhas:")
     for (const f of falhas) console.log(`  · ${f}`)
   }
-  await prisma.$disconnect()
-  process.exit(falhas.length === 0 ? 0 : 1)
 }
 
 main().catch(async (e) => {
