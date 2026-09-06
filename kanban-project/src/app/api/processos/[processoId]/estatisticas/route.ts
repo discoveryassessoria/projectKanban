@@ -82,9 +82,15 @@ export async function GET(
     // 3) Conta documentos das pessoas da árvore
     const pessoaIds = pessoas.map((p) => p.id)
 
+    // CANCELADO/INVALIDO fora da conta — a exigência acabou (cancelada) ou está
+    // sendo refeita por outra via (invalidada); nenhum dos dois é "documento a
+    // receber" pendente. Sem isto, um documento corretamente dispensado
+    // continuava contando no denominador desta tela (achado real: Antonio,
+    // óbito; Edithe, ambas certidões — "3 de 6" com só 3 documentos de verdade
+    // exigidos).
     const [totalDocs, recebidosDocs] = pessoaIds.length
       ? await Promise.all([
-          prisma.documento.count({ where: { pessoaId: { in: pessoaIds } } }),
+          prisma.documento.count({ where: { pessoaId: { in: pessoaIds }, status: { notIn: ["CANCELADO", "INVALIDO"] } } }),
           prisma.documento.count({
             where: { pessoaId: { in: pessoaIds }, status: "RECEBIDO" },
           }),
