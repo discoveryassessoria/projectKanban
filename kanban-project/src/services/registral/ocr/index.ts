@@ -20,6 +20,7 @@ import type { Prisma } from "@prisma/client"
 import { auditar, logRegistral } from "../auditoria"
 import { notificarDocumentoAlterado } from "../gancho-documental"
 import { provedorPdfCamadaTexto } from "./pdf-camada-texto"
+import { provedorTesseractLocal } from "./tesseract-local"
 import { provedorOcrExterno } from "./http-externo"
 import type { ProvedorTranscricao, ResultadoTranscricao } from "./tipos"
 import { textoUtil } from "./tipos"
@@ -27,7 +28,7 @@ import { textoUtil } from "./tipos"
 type DB = typeof prisma | Prisma.TransactionClient
 
 /** Provedores registrados, na ordem em que são tentados. */
-export const PROVEDORES: ProvedorTranscricao[] = [provedorPdfCamadaTexto, provedorOcrExterno].sort(
+export const PROVEDORES: ProvedorTranscricao[] = [provedorPdfCamadaTexto, provedorTesseractLocal, provedorOcrExterno].sort(
   (a, b) => a.prioridade - b.prioridade,
 )
 
@@ -67,13 +68,12 @@ export async function transcreverArquivo(arquivo: {
   referencia?: number
 }): Promise<{ resultado: ResultadoTranscricao | null; tentativas: ResultadoOperacao["tentativas"] }> {
   const tentativas: ResultadoOperacao["tentativas"] = []
-  const entrada = {
-    documentoId: arquivo.referencia ?? 0,
-    url: "",
-    nome: arquivo.nome,
-    mimeType: arquivo.mimeType,
-    conteudo: arquivo.conteudo,
-  }
+  // CÓPIA por tentativa, nunca a mesma referência: pelo menos um provedor
+  // (pdfjs-dist, usado pela camada de texto) deixa o ArrayBuffer subjacente
+  // "detached" depois de processá-lo — achado real (06/09/2026): o SEGUNDO
+  // provedor da fila sempre falhava com "ArrayBuffer is detached" quando o
+  // primeiro já tinha rodado. Cada provedor recebe seu próprio Uint8Array.
+  const conteudoOriginal = arquivo.conteudo
 
   for (const provedor of PROVEDORES) {
     if (!provedor.suporta({ mimeType: arquivo.mimeType, nome: arquivo.nome })) continue
@@ -81,6 +81,13 @@ export async function transcreverArquivo(arquivo: {
     if (!disp.ok) {
       tentativas.push({ provedor: provedor.nome, ok: false, motivo: disp.motivo })
       continue
+    }
+    const entrada = {
+      documentoId: arquivo.referencia ?? 0,
+      url: "",
+      nome: arquivo.nome,
+      mimeType: arquivo.mimeType,
+      conteudo: Uint8Array.from(conteudoOriginal),
     }
     const r = await provedor.transcrever(entrada)
     tentativas.push({ provedor: provedor.nome, ok: r.ok, motivo: r.motivo })

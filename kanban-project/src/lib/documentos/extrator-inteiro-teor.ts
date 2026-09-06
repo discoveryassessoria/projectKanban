@@ -86,16 +86,51 @@ function casarNormalizado(
   return { grupos, textoCompleto: original.slice(ini, fim) }
 }
 
+/** Mesma técnica de `casarNormalizado`, mas devolve TODAS as ocorrências, em ordem. */
+function casarTodosNormalizados(
+  textoOriginal: string,
+  regex: RegExp,
+): Array<{ grupos: string[]; textoCompleto: string }> {
+  const original = textoOriginal.replace(/\s+/g, " ")
+  const norm = semAcento(original).toLowerCase()
+  const flagsBase = regex.flags.includes("d") ? regex.flags : regex.flags + "d"
+  const flags = flagsBase.includes("g") ? flagsBase : flagsBase + "g"
+  const re = new RegExp(regex.source, flags)
+  const out: Array<{ grupos: string[]; textoCompleto: string }> = []
+  for (const m of norm.matchAll(re)) {
+    const mi = m as RegExpMatchArray & { indices?: Array<[number, number] | undefined> }
+    if (!mi.indices) continue
+    const grupos = mi.indices.slice(1).map((idx) => (idx ? original.slice(idx[0], idx[1]) : ""))
+    const [ini, fim] = mi.indices[0]!
+    out.push({ grupos, textoCompleto: original.slice(ini, fim) })
+  }
+  return out
+}
+
+const PADRAO_FILIACAO =
+  /filh[oa]s?\s+legitim[oa]s?\s+de\s+([a-z'.\s]+?)\s+e\s+(?:de\s+)?(?:sua\s+esposa\s+|dona\s+|d\.\s+)?([a-z'.\s]+?)(?:[,.;]|\s+ambos\b|\s+natural|\s+residente|\s+domicil|$)/
+
+/**
+ * TODAS as filiações do texto, em ordem de aparição — usado no casamento, onde o
+ * boilerplate cita "filho legítimo de X e de Y" do noivo e depois "filha legítima
+ * de X e de Y" da noiva, nessa ordem. Sem um jeito melhor de amarrar cada trecho a
+ * um nubente específico, a ORDEM é o único sinal confiável — e é sempre essa,
+ * porque o texto sempre apresenta o noivo primeiro.
+ */
+export function extrairTodasFiliacoes(texto: string): Array<{ pai: CampoExtraido<string>; mae: CampoExtraido<string> }> {
+  return casarTodosNormalizados(texto, PADRAO_FILIACAO).map((r) => ({
+    pai: { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto },
+    mae: { valor: tituloCase(r.grupos[1]), origem: r.textoCompleto },
+  }))
+}
+
 /**
  * "filho(a) legítimo(a) de PAI e de [dona] MÃE" — filiação, boilerplate padrão do
  * Registro Civil brasileiro. Devolve nulo pros dois lados se a âncora não bater
  * inteira (não arrisca achar só metade e inventar o resto).
  */
 export function extrairFiliacao(texto: string): { pai?: CampoExtraido<string>; mae?: CampoExtraido<string> } {
-  const r = casarNormalizado(
-    texto,
-    /filh[oa]s?\s+legitim[oa]s?\s+de\s+([a-z'.\s]+?)\s+e\s+de\s+(?:sua\s+esposa\s+|dona\s+|d\.\s+)?([a-z'.\s]+?)(?:[,.;]|\s+ambos\b|\s+natural|\s+residente|\s+domicil|$)/,
-  )
+  const r = casarNormalizado(texto, PADRAO_FILIACAO)
   if (!r) return {}
   return {
     pai: { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto },
@@ -184,26 +219,43 @@ export function extrairObito(texto: string, municipioDoRegistro?: string) {
 
 /**
  * Casamento tem DOIS nubentes na mesma certidão — o cabeçalho estruturado lista os
- * dois ("NOME ATUAL DOS CÔNJUGES"), mas a filiação narrativa aparece uma vez pra
- * cada um, em ordem. Sem um jeito confiável de saber qual filiação é de quem só
- * pelo texto corrido, a extração automática preenche os NOMES (alta confiança, vêm
- * do cabeçalho) e deixa a filiação de cada nubente para revisão humana — arriscar
- * trocar pai/mãe de noivo com noiva é pior do que não preencher.
+ * dois ("NOME ATUAL DOS CÔNJUGES"), e a filiação narrativa aparece DUAS vezes no
+ * texto corrido: primeiro a do noivo, depois a da noiva — o boilerplate do
+ * Registro Civil sempre apresenta nessa ordem. `extrairTodasFiliacoes` devolve as
+ * ocorrências na ordem em que aparecem; a posição 0 é do noivo, a 1 é da noiva.
+ * Sem correspondência nenhuma (0 ocorrências), o campo fica vazio — não inventa.
  */
+// Rótulos que aparecem no mesmo bloco do cabeçalho e NUNCA são nome de pessoa —
+// sem esta lista, "NÃO CONSTA"/"MATRICULA"/um número solto de CPF passavam no
+// teste de "parece nome" (letras, 2+ palavras) e viravam nome de cônjuge.
+const RUIDO_CABECALHO_CASAMENTO = [
+  "nao consta", "numero do cpf", "matricula", "certifico", "nome atual", "conjuges",
+]
+/** Linha plausível de ser um NOME de pessoa: só letras/espaço/apóstrofo, 2 a 6 palavras, sem ruído de rótulo. */
+function pareceNomeDePessoa(linha: string): boolean {
+  const norm = semAcento(linha).toLowerCase().trim()
+  if (RUIDO_CABECALHO_CASAMENTO.some((r) => norm.includes(r))) return false
+  if (!/^[a-z'.]+(?:\s+[a-z'.]+){1,5}$/.test(norm)) return false
+  return norm.length >= 6 && norm.length <= 60
+}
+
 export function extrairCasamento(texto: string) {
   const linhas = texto.split("\n").map((l) => l.trim()).filter(Boolean)
   const nomes: string[] = []
   for (let i = 0; i < linhas.length - 1; i++) {
     if (semAcento(linhas[i]).toLowerCase().includes("nome atual dos conjuges") || semAcento(linhas[i]).toLowerCase() === "nome") {
       for (let j = i + 1; j < linhas.length && nomes.length < 2; j++) {
-        if (/^[A-ZÀ-Ú][A-ZÀ-Ú\s']+$/.test(semAcento(linhas[j]).toUpperCase()) && linhas[j].length > 3) nomes.push(tituloCase(linhas[j]))
+        if (pareceNomeDePessoa(linhas[j])) nomes.push(tituloCase(linhas[j]))
       }
       break
     }
   }
+  const filiacoes = extrairTodasFiliacoes(texto)
   return {
     spouse1: { fullName: nomes[0] },
     spouse2: { fullName: nomes[1] },
+    spouse1Parents: { fatherFullName: val(filiacoes[0]?.pai), motherFullName: val(filiacoes[0]?.mae) },
+    spouse2Parents: { fatherFullName: val(filiacoes[1]?.pai), motherFullName: val(filiacoes[1]?.mae) },
     event: { marriageDate: val(extrairDataDoEvento(texto)) },
   }
 }

@@ -220,10 +220,15 @@ async function main() {
   ok(normalizarResposta({ paginas: "nao-e-lista" }).length === 0, "formato inesperado não quebra")
 
   console.log("\n7) Ordem e situação dos provedores")
+  // 3º provedor (06/09/2026): OCR local via Tesseract, grátis e sem credencial —
+  // cobre o que a camada de texto não cobre (inclusive Certidão em Inteiro Teor
+  // "digital" que na prática é imagem, por causa do padrão de segurança
+  // anti-fraude) sem depender de serviço externo pago.
   ok(PROVEDORES[0].nome === "pdf_camada_texto", "camada de texto é tentada primeiro (não custa nada)")
-  ok(PROVEDORES[1].nome === "ocr_externo", "OCR externo é o segundo (custa e precisa de credencial)")
+  ok(PROVEDORES[1].nome === "tesseract_local", "OCR local (Tesseract) é o segundo — também grátis, sem credencial")
+  ok(PROVEDORES[2].nome === "ocr_externo", "OCR externo é o terceiro (custa e precisa de credencial)")
   const situacao = situacaoDosProvedores()
-  ok(situacao.length === 2, "a situação lista os dois provedores")
+  ok(situacao.length === 3, "a situação lista os três provedores")
   ok(
     situacao.every((s) => typeof s.disponivel === "boolean" && (s.disponivel || !!s.motivo)),
     "indisponível sempre vem com motivo",
