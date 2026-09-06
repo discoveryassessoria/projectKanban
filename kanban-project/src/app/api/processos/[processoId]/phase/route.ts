@@ -18,6 +18,7 @@ import { stageFromFaseCode } from "@/src/lib/process-stage/compute-phase-progres
 import { STAGE_LABELS } from "@/src/lib/process-stage/derive-stage"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import { motorVigenteDaFase } from "@/src/services/motor-da-fase"
 
 export async function GET(
   _req: NextRequest,
@@ -39,6 +40,17 @@ export async function GET(
   const total = projection.metrics.required
   const percent = projection.progress.percentage
 
+  // A fase pode estar sob o motor LEGADO (tela bespoke da fase, ex.: Análise
+  // Documental) em vez do Workflow Interno — ver src/services/motor-da-fase.ts.
+  // Nesse modo os passos canônicos existem no banco (a materialização não sabe
+  // qual motor conduz) mas só fecham TODOS DE UMA VEZ quando a tela bespoke
+  // conclui — nunca um de cada vez. "0 / 5 concluído(s)" nesse caso lê como
+  // "nada foi feito", quando na verdade a tela bespoke pode estar com tudo
+  // pronto para concluir. O texto avisa; o percentual em si não muda (seria
+  // uma segunda fonte de verdade para o gate).
+  const motor = projection.activePhase ? await motorVigenteDaFase(projection.activePhase.id) : null
+  const bespoke = motor != null && !motor.canonico
+
   return NextResponse.json({
     // Contrato definitivo (preferir este objeto).
     projection,
@@ -48,8 +60,11 @@ export async function GET(
     done,
     total,
     percent,
+    bespoke,
     reason: total === 0
       ? "Sem itens obrigatórios nesta fase"
-      : `${done} de ${total} concluído(s) nesta fase`,
+      : bespoke
+        ? "Conduzida pela tela desta fase — os passos fecham juntos ao concluir por lá"
+        : `${done} de ${total} concluído(s) nesta fase`,
   })
 }

@@ -261,7 +261,11 @@ function PersonGroup({
 }) {
   const [aberto, setAberto] = useState(true)
   const docs = g.documents.filter((it) => matchFilter(it, g.lineage))
-  if (docs.length === 0) return null
+  // Some da tela SÓ quando é o filtro/busca escondendo os documentos dela.
+  // Quando ela não tem nenhum documento aplicável (tudo dispensado/cancelado),
+  // ela continua no roster — pessoa vem da árvore, doc não condiciona exibição
+  // (achado real: Edithe sumia da seção "Fora da linhagem" depois de dispensada).
+  if (g.documents.length > 0 && docs.length === 0) return null
 
   const ini = (g.personName || "").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
   const genTxt = g.lineage === "Linha reta" ? `Geração ${g.generation}` : "Fora da linha"
@@ -277,10 +281,7 @@ function PersonGroup({
           {ini}
         </span>
         <div className="flex-1 min-w-0">
-          <b className="text-[14.5px] text-white/95">
-            {g.personName}
-            {g.lineage !== "Linha reta" && <span className="font-medium text-[var(--text-secondary)]"> ({g.role})</span>}
-          </b>
+          <b className="text-[14.5px] text-white/95">{g.personName}</b>
           <span className="block text-[12px] text-[var(--text-secondary)] mt-px">{genTxt} · {g.lineage} · {g.role}</span>
         </div>
         <div className="flex gap-2.5">
@@ -300,23 +301,31 @@ function PersonGroup({
       {/* Corpo (tabela) */}
       {aberto && (
         <div className="border-t border-[var(--border-default)]">
-          {/* Cabeçalho de colunas */}
-          <div
-            className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[var(--surface-secondary)] text-[var(--text-muted)] text-[10px] font-bold tracking-wider"
-            style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
-          >
-            <span>DOCUMENTO</span>
-            <span>TIPO</span>
-            <span>CERTIDÃO</span>
-            <span>CERT. RETIFICADA</span>
-            <span>TRADUÇÃO</span>
-            <span>APOSTILA</span>
-            <span>STATUS FINAL</span>
-            <span>AÇÕES</span>
-          </div>
-          {docs.map((it) => (
-            <DocRow key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} />
-          ))}
+          {docs.length === 0 ? (
+            <div className="px-[18px] py-4 text-[12.5px] text-[var(--text-muted)]">
+              Nenhum documento aplicável — exigência dispensada.
+            </div>
+          ) : (
+            <>
+              {/* Cabeçalho de colunas */}
+              <div
+                className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[var(--surface-secondary)] text-[var(--text-muted)] text-[10px] font-bold tracking-wider"
+                style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
+              >
+                <span>DOCUMENTO</span>
+                <span>TIPO</span>
+                <span>CERTIDÃO</span>
+                <span>CERT. RETIFICADA</span>
+                <span>TRADUÇÃO</span>
+                <span>APOSTILA</span>
+                <span>STATUS FINAL</span>
+                <span>AÇÕES</span>
+              </div>
+              {docs.map((it) => (
+                <DocRow key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} />
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

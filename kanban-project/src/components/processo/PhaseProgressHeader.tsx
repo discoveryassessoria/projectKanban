@@ -32,6 +32,8 @@ interface PhaseProgress {
   reason: string
   /** Projeção operacional oficial (fonte única). */
   projection?: OperationalProjection | null
+  /** Fase conduzida pela tela bespoke (motor legado), não pelo Workflow Interno. */
+  bespoke?: boolean
 }
 
 export interface PhaseProgressHeaderProps {
@@ -139,7 +141,9 @@ export function PhaseProgressHeader({
             então o texto diz o estado real e para de atribuir a causa ao documento. */}
         {required === 0
           ? blocked ? "Fase bloqueada · nenhum item obrigatório configurado" : "Sem itens obrigatórios nesta fase"
-          : `${completed} / ${required} concluído(s) nesta fase`}
+          : data.bespoke
+            ? "Conduzida pela tela desta fase — os passos fecham juntos ao concluir por lá"
+            : `${completed} / ${required} concluído(s) nesta fase`}
       </div>
     </div>
   )

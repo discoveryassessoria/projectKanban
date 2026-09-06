@@ -58,16 +58,23 @@ export async function GET(
             nome: true,
             sobrenome: true,
             numeroLinhagem: true,
+            linhaReta: true,
             requerente: true,
           },
         })
       : []
 
-    const pessoasNaLinha = pessoas.filter((p) => p.numeroLinhagem != null)
+    // "Em linha direta" é `linhaReta`, não "tem numeroLinhagem" — o cônjuge
+    // HERDA o número do parceiro de sangue (ver numero-linhagem.ts, é assim
+    // de propósito para a pasta documental ficar agrupada), então usar
+    // `numeroLinhagem != null` como proxy contava o cônjuge como linha direta
+    // e podia até virar "origem" da linhagem (achado real: Edithe, cônjuge,
+    // aparecendo como origem no lugar de Antonio).
+    const pessoasNaLinha = pessoas.filter((p) => p.linhaReta === true)
 
-    // Origem = pessoa com MENOR numeroLinhagem (o ancestral mais antigo — Nº
-    // Linhagem começa em 1 na raiz da árvore e cresce em direção aos
-    // descendentes; ver src/services/genealogia/numero-linhagem.ts).
+    // Origem = pessoa de sangue com MENOR numeroLinhagem (o ancestral mais
+    // antigo — Nº Linhagem começa em 1 na raiz da árvore e cresce em direção
+    // aos descendentes; ver src/services/genealogia/numero-linhagem.ts).
     const origemPessoa = pessoasNaLinha.reduce<typeof pessoas[number] | null>(
       (min, p) => (min == null || (p.numeroLinhagem ?? Infinity) < (min.numeroLinhagem ?? Infinity) ? p : min),
       null
@@ -117,7 +124,11 @@ export async function GET(
         where: { processoId: id, dataProtocolo: null },
       })
     }
-    const protocolo = { apto: false, impeditivos: protocoloImpeditivos }
+    // "Apto" deriva do que já sabemos contar (impeditivos). Fixo em `false`
+    // dizia "Não apto" mesmo com 0 impeditivo(s) — contradição visível no
+    // card. Sem regra formal completa no schema ainda, mas 0 impeditivos
+    // conhecidos é motivo real para não travar a tela numa negativa fixa.
+    const protocolo = { apto: protocoloImpeditivos === 0, impeditivos: protocoloImpeditivos }
 
     // 6) Alertas executivos — derivados dos contadores acima
     const alertas: Array<{ sev: AlertaSev; label: string }> = []
