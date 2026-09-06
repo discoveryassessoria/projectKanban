@@ -2,7 +2,7 @@
 "use client"
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
-import { useApi } from "@/src/lib/dados"
+import { useApi, invalidar } from "@/src/lib/dados"
 import { uploadFiles } from "@/src/lib/storage"
 import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 import {
@@ -144,7 +144,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Erro ao rodar análise")
       setAnalise(data.analise)
-      await Promise.all([consultaV2.recarregar(), consulta.recarregar()])
+      // As abas Documentos e Geral leem /documentos e /estatisticas — telas
+      // DIFERENTES do SWR desta aqui, com cache próprio (revalidateOnFocus:
+      // false + dedupingInterval de 30s). Sem isto, rodar a análise aqui não
+      // avisava ninguém: quem já tinha aberto Documentos/Geral continuava
+      // vendo o dado antigo até o cache expirar sozinho.
+      await Promise.all([consultaV2.recarregar(), consulta.recarregar(), invalidar(`/api/processos/${processoId}/`)])
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao rodar análise")
     } finally {
@@ -166,7 +171,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
     if (!res.ok) throw new Error(data.mensagem || data.error || "Erro ao importar o relatório.")
     setAnalise(data.analise)
     setResultado(`Relatório importado: ${data.linhasImportadas} divergência(s) registrada(s).`)
-    await consulta.recarregar()
+    await Promise.all([consulta.recarregar(), invalidar(`/api/processos/${processoId}/`)])
   }
 
   const decidir = async (divId: number, decisao: string, notas?: string) => {
@@ -178,6 +183,9 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       })
       const data = await res.json()
       if (res.ok && data.analise) setAnalise(data.analise)
+      // Decidir uma divergência muda se ela conta como "aberta" pro gate de
+      // pronto-para-protocolo/apto — biblioteca e Geral precisam saber.
+      void invalidar(`/api/processos/${processoId}/`)
     } catch {
       consulta.recarregar()
     }
@@ -231,7 +239,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       const destino = data.proximaFase === "RETIFICACAO_REGISTROS" ? "Retificação de registros" : "Tradução juramentada"
       setResultado(`Análise concluída (${data.decisao === "com_retificacao" ? "com" : "sem"} retificação). Processo movido para ${destino}.`)
       onConcluido?.()
-      consulta.recarregar()
+      // A CONCLUSÃO é o evento que vira "pronto para protocolo"/"apto" nas
+      // outras abas (analiseConcluida). Sem invalidar aqui, o processo já
+      // tinha avançado de fase de verdade e a tela de Documentos/Geral podia
+      // continuar mostrando o estado de antes por até 30s (dedupingInterval)
+      // ou indefinidamente, já que a política do projeto não revalida no foco.
+      await Promise.all([consulta.recarregar(), invalidar(`/api/processos/${processoId}/`)])
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Erro ao concluir")
     } finally {
