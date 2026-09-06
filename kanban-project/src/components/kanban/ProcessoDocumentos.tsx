@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
 import { PessoaOperacionalDrawer } from "./PessoaOperacionalDrawer"
+import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 import {
   ProcessoDocumentosBiblioteca,
   type BibPersonGroup,
@@ -171,7 +172,11 @@ function deriveRetificacao(status: string): ColunaStatus {
 
 function mapearBiblioteca(data: ProcessoDocumentosData) {
   const toGroup = (row: PersonRow): BibPersonGroup => {
-    const docs: BibDocItem[] = row.docs.map((d) => {
+    // Nasce, casa, morre — nunca alfabética (fonte única: ordem-evento-vida.ts).
+    const docsOrdenados = [...row.docs].sort((a, b) =>
+      compararPorEventoDeVida(NOME_COMPLETO[a.tipoShort] ?? a.tipoShort, NOME_COMPLETO[b.tipoShort] ?? b.tipoShort),
+    )
+    const docs: BibDocItem[] = docsOrdenados.map((d) => {
       const certSt = certStatusFromDoc(d.status, d.isRecebido)
       const finalStatus: "pronta_protocolo" | "pendente" | "aguardando" =
         certSt === "validada" ? "pronta_protocolo" : "pendente"

@@ -6,6 +6,7 @@ import { ChevronDown, UserPlus, ExternalLink } from "lucide-react"
 // Re-export dos tipos centralizados
 export type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 
 interface PessoaCardProps {
   pessoa: PessoaArvore
@@ -224,10 +225,13 @@ function DocumentosIndicadores({ pessoa }: { pessoa: PessoaArvore }) {
   const documentos = pessoa.documentos || []
 
   // Filtrar só certidões civis que NÃO são PENDENTE
-  const docsVisiveis = documentos.filter(d => 
-    ['CERTIDAO_NASCIMENTO_INTEIRO_TEOR', 'CERTIDAO_CASAMENTO_INTEIRO_TEOR', 'CERTIDAO_OBITO_INTEIRO_TEOR'].includes(d.tipo) &&
-    d.status !== 'PENDENTE'
-  )
+  const docsVisiveis = documentos
+    .filter(d =>
+      ['CERTIDAO_NASCIMENTO_INTEIRO_TEOR', 'CERTIDAO_CASAMENTO_INTEIRO_TEOR', 'CERTIDAO_OBITO_INTEIRO_TEOR'].includes(d.tipo) &&
+      d.status !== 'PENDENTE'
+    )
+    // Nasce, casa, morre — nunca alfabética (fonte única: ordem-evento-vida.ts).
+    .sort((a, b) => compararPorEventoDeVida(a.tipo, b.tipo))
 
   if (docsVisiveis.length === 0) return null
 

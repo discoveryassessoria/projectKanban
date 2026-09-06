@@ -49,6 +49,7 @@ import type {
   PessoaDoIndice,
   StatusResumo,
 } from "@/src/lib/process-stage/estrutura-operacional-core"
+import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 
 // ============================================================
 // TIPOS
@@ -436,30 +437,20 @@ function urgenciaDaLinha(doc: DocumentoDoIndice): number {
 }
 
 /**
- * Ordem de vida do registro civil: nasce, casa, morre. Não é alfabética de
- * propósito — "Certidão de casamento" viria antes de "Certidão de nascimento"
- * no dicionário, e isso não é a ordem que ninguém pensa quando olha os
- * documentos de uma pessoa.
- */
-function prioridadeDoTipo(titulo: string): number {
-  const t = titulo.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-  if (t.includes("nascimento")) return 0
-  if (t.includes("casamento")) return 1
-  if (t.includes("obito")) return 2
-  return 3
-}
-
-/**
  * A ORDEM É DETERMINÍSTICA — sempre desempatada por nascimento → casamento →
- * óbito e, dentro do mesmo tipo, pelo título.
+ * óbito (fonte única: lib/documentos/ordem-evento-vida.ts) e, dentro do mesmo
+ * tipo, pelo título.
  *
- * O padrão põe na frente o que exige atenção (bloqueado, atrasado, vence hoje),
- * e isso é uma regra escrita, não um "score" que ninguém consegue explicar
- * depois. As outras ordens são o que o cabeçalho diz: nada de secreto.
+ * O PADRÃO (sem coluna de ordenação escolhida) usa o evento de vida como
+ * critério PRINCIPAL - decisão de negócio (05/09/2026): ler os documentos de
+ * uma pessoa nasce->casa->morre importa mais do que ver primeiro o que está
+ * "atrasado". Urgência só desempata dentro do MESMO tipo (duas certidões de
+ * nascimento, uma bloqueada e outra não). As ordens EXPLÍCITAS do cabeçalho
+ * (progresso, prazo, etapa...) continuam como o nome diz - escolha deliberada
+ * de quem clicou - e usam o evento de vida só como desempate, como sempre foi.
  */
 export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
-  const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) =>
-    prioridadeDoTipo(a.titulo) - prioridadeDoTipo(b.titulo) || a.titulo.localeCompare(b.titulo, "pt-BR")
+  const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) => compararPorEventoDeVida(a.titulo, b.titulo)
   const copia = [...docs]
   switch (ordem) {
     case "progresso":
@@ -480,7 +471,7 @@ export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabel
     case "status":
       return copia.sort((a, b) => a.naFase.estadoLabel.localeCompare(b.naFase.estadoLabel, "pt-BR") || desempate(a, b))
     default:
-      return copia.sort((a, b) => urgenciaDaLinha(a) - urgenciaDaLinha(b) || desempate(a, b))
+      return copia.sort((a, b) => desempate(a, b) || urgenciaDaLinha(a) - urgenciaDaLinha(b))
   }
 }
 
