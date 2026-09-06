@@ -32,6 +32,7 @@ interface DocCompact {
   statusShort: string
   statusClass: string
   isRecebido: boolean
+  analiseOk: boolean
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
@@ -196,8 +197,12 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
     )
     const docs: BibDocItem[] = docsOrdenados.map((d) => {
       const certSt = certStatusFromDoc(d.status, d.isRecebido)
+      // Certidão recebida não é certidão liberada: falta a Análise Documental
+      // (comparação com a árvore) confirmar que não há divergência em aberto.
+      // Sem isto, "pronto para protocolo" virava verdade só de o arquivo ter
+      // chegado — mesmo com a Análise Documental ainda nem rodada.
       const finalStatus: "pronta_protocolo" | "pendente" | "aguardando" =
-        certSt === "validada" ? "pronta_protocolo" : "pendente"
+        certSt !== "validada" ? "pendente" : d.analiseOk ? "pronta_protocolo" : "aguardando"
       return {
         id: d.id,
         documentType: NOME_COMPLETO[d.tipoShort] ?? d.tipoShort,

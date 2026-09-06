@@ -1,9 +1,10 @@
 // src/components/kanban/ProcessoAnalise.tsx
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useApi } from "@/src/lib/dados"
 import { uploadFiles } from "@/src/lib/storage"
+import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 import {
   Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X,
   FileText, Scale, Landmark, Search, Download, Eye, MoreVertical, ChevronDown,
@@ -245,11 +246,23 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   const sugeridas = divs.filter((d) => d.status === "retificacao")
   const podeConcluir = !!analise && pend === 0 && analise.status !== "concluida"
 
+  // Nasce, casa, morre — nunca a ordem crua do id do documento (fonte única:
+  // ordem-evento-vida.ts). Sem isto, Antonio aparecia "Casamento" antes de
+  // "Nascimento" só porque o registro de casamento tinha id menor.
   const todosDocs = useMemo(
-    () => pessoasV2.flatMap((p) => p.documentos.map((d) => ({ ...d, pessoaNome: p.nome }))),
+    () => pessoasV2.flatMap((p) =>
+      [...p.documentos]
+        .sort((a, b) => compararPorEventoDeVida(a.titulo, b.titulo))
+        .map((d) => ({ ...d, pessoaNome: p.nome })),
+    ),
     [pessoasV2],
   )
-  const semDivergencia = todosDocs.filter((d) => !divs.some((v) => v.documentoId === d.id)).length
+  // "Sem divergências" só vale pra quem PASSOU pela comparação (analysisStatus
+  // "ready") — documento nunca analisado não tem "zero divergência", tem "zero
+  // verificação". Sem isto, todo documento nascia "sem divergências" antes de
+  // qualquer análise ter rodado.
+  const semDivergencia = todosDocs.filter((d) => d.analysisStatus === "ready" && !divs.some((v) => v.documentoId === d.id)).length
+  const naoAnalisados = todosDocs.filter((d) => d.analysisStatus !== "ready").length
 
   const pessoasUnicas = useMemo(() => [...new Set(todosDocs.map((d) => d.pessoaNome))].sort(), [todosDocs])
   const tiposUnicos = useMemo(() => [...new Set(todosDocs.map((d) => d.tipo))].sort(), [todosDocs])
@@ -357,11 +370,12 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <Stat label="Documentos analisados" value={`${analise.documentosAnalisados} de ${analise.totalDocumentos || todosDocs.length}`} />
             <Stat label="Divergências identificadas" value={divs.length} danger={divs.length > 0} />
             <Stat label="Retificações sugeridas" value={sugeridas.length} />
             <Stat label="Sem divergências" value={semDivergencia} />
+            <Stat label="Não analisados" value={naoAnalisados} danger={naoAnalisados > 0} />
             <StatSituacao status={analise.status} completedAt={analise.completedAt} />
           </div>
 
@@ -887,34 +901,50 @@ function TabelaDocumentos({ docs, divs, selecionado, onSelecionar, onAbrir }: {
           </tr>
         </thead>
         <tbody className="divide-y divide-white/10">
-          {docs.map((d) => {
+          {docs.map((d, i) => {
             const n = divs.filter((v) => v.documentoId === d.id).length
+            // Bloco por pessoa: cabeçalho sutil sempre que o nome muda — a lista já
+            // vem agrupada por pessoa (ordem de pessoasV2), então mudança de nome
+            // sempre marca o INÍCIO de um bloco novo, nunca dois blocos da mesma
+            // pessoa espalhados.
+            const novoBloco = i === 0 || docs[i - 1].pessoaNome !== d.pessoaNome
             return (
-              <tr key={d.id} onClick={() => onSelecionar(d.id)}
-                className={`cursor-pointer hover:bg-[var(--surface-secondary)] ${selecionado === d.id ? "bg-[var(--surface-secondary)]" : ""}`}>
-                <td className="px-3 py-2.5 flex items-center gap-2 text-white/95 font-medium"><FileText className="w-4 h-4 text-[var(--text-muted)]" />{d.titulo}</td>
-                <td className="px-3 py-2.5 text-white/80">{d.pessoaNome}</td>
-                <td className="px-3 py-2.5 text-white/68">{d.tipo}</td>
-                <td className="px-3 py-2.5 text-white/68 whitespace-nowrap">{fmtDia(d.dataEmissao)}</td>
-                <td className="px-3 py-2.5">
-                  {n > 0
-                    ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-red-700">Com divergências</span>
-                    : <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-green-800">Sem divergências</span>}
-                </td>
-                <td className="px-3 py-2.5 text-white/95">{n}</td>
-                <td className="px-3 py-2.5 text-right relative" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onSelecionar(d.id)} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Ver detalhes"><Eye className="w-4 h-4" /></button>
-                  <button onClick={() => setMenuAberto((v) => (v === d.id ? null : d.id))} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Mais ações"><MoreVertical className="w-4 h-4" /></button>
-                  {menuAberto === d.id && (
-                    <div className="absolute right-3 top-full z-10 w-44 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-2)] p-1 text-left">
-                      <button onClick={() => { onSelecionar(d.id); setMenuAberto(null) }} className="w-full text-left px-3 py-2 text-xs text-white/80 rounded hover:bg-[var(--surface-hover)]">Ver detalhes</button>
-                      <button disabled={!d.arquivoUrl} onClick={() => { if (d.arquivoUrl) onAbrir(d.arquivoUrl); setMenuAberto(null) }}
-                        title={d.arquivoUrl ? undefined : "Sem arquivo anexado a este documento"}
-                        className="w-full text-left px-3 py-2 text-xs text-white/80 rounded hover:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed">Abrir documento</button>
-                    </div>
-                  )}
-                </td>
-              </tr>
+              <Fragment key={d.id}>
+                {novoBloco && (
+                  <tr className="bg-[var(--surface-secondary)]/70">
+                    <td colSpan={7} className="px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
+                      {d.pessoaNome}
+                    </td>
+                  </tr>
+                )}
+                <tr onClick={() => onSelecionar(d.id)}
+                  className={`cursor-pointer hover:bg-[var(--surface-secondary)] ${selecionado === d.id ? "bg-[var(--surface-secondary)]" : ""}`}>
+                  <td className="px-3 py-2.5 flex items-center gap-2 text-white/95 font-medium pl-6"><FileText className="w-4 h-4 text-[var(--text-muted)]" />{d.titulo}</td>
+                  <td className="px-3 py-2.5 text-white/80">{d.pessoaNome}</td>
+                  <td className="px-3 py-2.5 text-white/68">{d.tipo}</td>
+                  <td className="px-3 py-2.5 text-white/68 whitespace-nowrap">{fmtDia(d.dataEmissao)}</td>
+                  <td className="px-3 py-2.5">
+                    {n > 0
+                      ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-red-700">Com divergências</span>
+                      : d.analysisStatus === "ready"
+                        ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-green-800">Sem divergências</span>
+                        : <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-[var(--text-secondary)]" title="Ainda não passou pela comparação da Análise Documental">Não analisado</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-white/95">{n}</td>
+                  <td className="px-3 py-2.5 text-right relative" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => onSelecionar(d.id)} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Ver detalhes"><Eye className="w-4 h-4" /></button>
+                    <button onClick={() => setMenuAberto((v) => (v === d.id ? null : d.id))} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Mais ações"><MoreVertical className="w-4 h-4" /></button>
+                    {menuAberto === d.id && (
+                      <div className="absolute right-3 top-full z-10 w-44 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-2)] p-1 text-left">
+                        <button onClick={() => { onSelecionar(d.id); setMenuAberto(null) }} className="w-full text-left px-3 py-2 text-xs text-white/80 rounded hover:bg-[var(--surface-hover)]">Ver detalhes</button>
+                        <button disabled={!d.arquivoUrl} onClick={() => { if (d.arquivoUrl) onAbrir(d.arquivoUrl); setMenuAberto(null) }}
+                          title={d.arquivoUrl ? undefined : "Sem arquivo anexado a este documento"}
+                          className="w-full text-left px-3 py-2 text-xs text-white/80 rounded hover:bg-[var(--surface-hover)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed">Abrir documento</button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              </Fragment>
             )
           })}
         </tbody>

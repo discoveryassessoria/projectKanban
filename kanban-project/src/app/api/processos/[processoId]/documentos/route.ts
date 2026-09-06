@@ -17,6 +17,13 @@ interface DocCompact {
   statusShort: string     // "recebido", "não iniciado", "em busca", etc.
   statusClass: string     // "received" | "pending" | "searching" | "requesting" | "waiting" | "returned" | "other"
   isRecebido: boolean
+  /**
+   * Passou pela Análise Documental (comparação com a árvore) SEM divergência
+   * em aberto. Documento recebido não é o mesmo que documento analisado —
+   * sem isto, "pronto para protocolo" ficava verdade só de o arquivo ter
+   * chegado, mesmo com a Análise Documental ainda nem rodada.
+   */
+  analiseOk: boolean
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
@@ -219,9 +226,25 @@ export async function GET(
               arquivo_url: true,
               arquivo_nome: true,
               arquivo_mime_type: true,
+              analysisStatus: true,
             },
           })
         : []
+
+    // Divergência em aberto (Análise Documental) por documento — só essas
+    // travam "pronto para protocolo"; decidida/ignorada não é mais pendência.
+    const docIds = allDocs.map((d) => d.id)
+    const divergenciasAbertas = docIds.length
+      ? await prisma.divergencia.findMany({
+          where: {
+            analise: { processoId: id },
+            documentoId: { in: docIds },
+            status: { in: ["pendente", "apoio_solicitado", "retificacao"] },
+          },
+          select: { documentoId: true },
+        })
+      : []
+    const idsComDivergenciaAberta = new Set(divergenciasAbertas.map((d) => d.documentoId))
 
     // NECESSIDADES SEM DOCUMENTO AINDA — o Documento só nasce quando alguém clica
     // "Iniciar" (garantirDocumentoDaNecessidade). Até lá, a certidão já é EXIGIDA
@@ -273,6 +296,7 @@ export async function GET(
         arquivo_url: null,
         arquivo_nome: null,
         arquivo_mime_type: null,
+        analysisStatus: "not_ready",
       })
     }
 
@@ -306,6 +330,7 @@ export async function GET(
         statusShort: statusShortMap[d.status] || d.status.toLowerCase(),
         statusClass: statusToCompactClass(d.status),
         isRecebido: STATUS_VALIDADOS.includes(d.status),
+        analiseOk: d.analysisStatus === "ready" && !idsComDivergenciaAberta.has(d.id),
         arquivoUrl: d.arquivo_url ?? null,
         arquivoNome: d.arquivo_nome ?? null,
         arquivoMimeType: d.arquivo_mime_type ?? null,

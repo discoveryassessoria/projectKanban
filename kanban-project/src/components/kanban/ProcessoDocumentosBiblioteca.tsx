@@ -469,8 +469,8 @@ function Legenda() {
     ["bg-[var(--surface-secondary)]", "Recebida", "Documento recebido, aguardando validação"],
     ["bg-[var(--accent-primary)]/120", "Pendente", "Documento ainda não recebido"],
     ["bg-[var(--surface-secondary)]", "Não se aplica", "Não aplicável para este documento"],
-    ["bg-[var(--surface-secondary)]", "Pronto para protocolo", "Certidão + Tradução + Apostila concluídas"],
-    ["bg-[var(--accent-primary)]/120", "Aguardando", "Etapa pendente para conclusão"],
+    ["bg-[var(--surface-secondary)]", "Pronto para protocolo", "Certidão + Análise Documental + Tradução + Apostila concluídas"],
+    ["bg-[var(--accent-primary)]/120", "Aguardando", "Certidão recebida, aguardando Análise Documental ou outra etapa"],
   ]
   return (
     <div className="flex flex-col gap-[11px]">
