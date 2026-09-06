@@ -97,6 +97,16 @@ const SEV_STYLE: Record<string, string> = {
   critica: "bg-[var(--surface-secondary)] text-red-700",
 }
 const SEV_DOT: Record<string, string> = { baixa: "bg-amber-600", media: "bg-[var(--accent-primary)]", critica: "bg-[var(--surface-secondary)]" }
+const DATA_STATUS_LABEL: Record<string, string> = {
+  not_filled: "Não preenchido", ai_extracted: "Extraído automaticamente (não revisado)",
+  manual_filled: "Rascunho salvo", reviewed: "Revisado",
+}
+const DATA_STATUS_STYLE: Record<string, string> = {
+  not_filled: "bg-[var(--surface-tertiary)] text-white/68",
+  ai_extracted: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
+  manual_filled: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
+  reviewed: "bg-[var(--surface-secondary)] text-green-800",
+}
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
@@ -492,10 +502,14 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             </div>
 
             <PainelDocumento
+              key={docAtivo?.id ?? "nenhum"}
               doc={docAtivo}
               divergencias={divsDoDocAtivo}
               historico={docAtivo ? log.filter((l) => l.documentoId === docAtivo.id) : []}
+              processoId={processoId}
+              readOnly={readOnly || analise.status === "concluida"}
               onVerDetalhes={setDrawerDiv}
+              onSalvo={() => { void Promise.all([consultaV2.recarregar(), invalidar(`/api/processos/${processoId}/`)]) }}
             />
           </div>
 
@@ -1073,13 +1087,134 @@ function ListaSugeridas({ divs, onDecidir, readOnly }: { divs: Divergencia[]; on
 
 type AbaDoc = "visualizacao" | "dados" | "divergencias" | "historico"
 
-function PainelDocumento({ doc, divergencias, historico, onVerDetalhes }: {
+// ============================================================
+// REVISÃO DOS DADOS EXTRAÍDOS — a ponte que faltava entre "Extrair
+// automaticamente" (grava ai_extracted) e "Analisar automaticamente" (só roda
+// em cima de dataStatus="reviewed"). Sem uma tela onde um humano vê, corrige e
+// CONFIRMA o que o OCR leu, a extração automática escreve dado que nunca é
+// usado — a comparação nunca lê "ai_extracted", só "reviewed". Achado real:
+// a extração funcionava perfeitamente e mesmo assim nada mudava, porque não
+// existia como sair de "ai_extracted" pra "reviewed" pela tela.
+// ============================================================
+
+const ROTULO_GRUPO: Record<string, string> = {
+  registered: "Registrado(a)", father: "Pai", mother: "Mãe",
+  paternalGrandparents: "Avós paternos", maternalGrandparents: "Avós maternos",
+  spouse1: "Noivo(a) 1", spouse2: "Noivo(a) 2",
+  spouse1Parents: "Pais do(a) noivo(a) 1", spouse2Parents: "Pais do(a) noivo(a) 2",
+  event: "Evento", deceased: "Falecido(a)", parents: "Pais", deathEvent: "Óbito/Evento",
+}
+const ROTULO_CAMPO: Record<string, string> = {
+  fullName: "Nome completo", birthDate: "Data de nascimento", birthPlace: "Local de nascimento",
+  nationality: "Nacionalidade", fatherFullName: "Nome do pai", motherFullName: "Nome da mãe",
+  grandfatherName: "Nome do avô", grandmotherName: "Nome da avó",
+  marriageDate: "Data do casamento", marriagePlace: "Local do casamento",
+  deathDate: "Data do óbito", deathPlace: "Local do óbito", declaredAge: "Idade declarada",
+  profession: "Profissão", previousCivilStatus: "Estado civil anterior", marriageCountry: "País",
+}
+
+interface CampoAchatado { caminho: string[]; rotulo: string; valor: string }
+
+/** Tipo do evento pelo enum bruto do documento (mesma regra do extrator/servidor). */
+function tipoEventoDoDoc(tipo: string): "nascimento" | "casamento" | "obito" {
+  const t = (tipo || "").toUpperCase()
+  if (t.includes("CASAMENTO")) return "casamento"
+  if (t.includes("OBITO")) return "obito"
+  return "nascimento"
+}
+// Template VAZIO por tipo — todo campo que a comparação (ad-v2-engine.ts) sabe
+// ler, com valor em branco. Existe pra quando a extração automática não achou
+// nada (texto ilegível, sem OCR configurado): sem isto, um documento que falhou
+// na extração ficava sem NENHUM jeito de preencher os dados à mão nesta tela.
+const TEMPLATE_VAZIO: Record<"nascimento" | "casamento" | "obito", Record<string, unknown>> = {
+  nascimento: {
+    registered: { fullName: "", birthDate: "", birthPlace: "", nationality: "" },
+    father: { fullName: "" }, mother: { fullName: "" },
+    paternalGrandparents: { grandfatherName: "", grandmotherName: "" },
+    maternalGrandparents: { grandfatherName: "", grandmotherName: "" },
+  },
+  casamento: {
+    spouse1: { fullName: "" }, spouse2: { fullName: "" },
+    spouse1Parents: { fatherFullName: "", motherFullName: "" },
+    spouse2Parents: { fatherFullName: "", motherFullName: "" },
+    event: { marriageDate: "", marriagePlace: "" },
+  },
+  obito: {
+    deceased: { fullName: "", birthPlace: "", nationality: "", declaredAge: "" },
+    parents: { fatherFullName: "", motherFullName: "" },
+    deathEvent: { deathDate: "", deathPlace: "" },
+  },
+}
+
+/** Achata {birth:{registered:{fullName}}} em campos folha editáveis, com rótulo em português. */
+function achatarStructuredData(obj: unknown, caminho: string[] = []): CampoAchatado[] {
+  if (obj == null || typeof obj !== "object") return []
+  const out: CampoAchatado[] = []
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    const novoCaminho = [...caminho, k]
+    if (v != null && typeof v === "object" && !Array.isArray(v)) {
+      out.push(...achatarStructuredData(v, novoCaminho))
+    } else {
+      const grupoKey = caminho[caminho.length - 1]
+      const rotuloGrupo = grupoKey ? (ROTULO_GRUPO[grupoKey] ?? "") : ""
+      const rotuloCampo = ROTULO_CAMPO[k] ?? k
+      out.push({ caminho: novoCaminho, rotulo: rotuloGrupo ? `${rotuloGrupo} — ${rotuloCampo}` : rotuloCampo, valor: v == null ? "" : String(v) })
+    }
+  }
+  return out
+}
+
+/** Volta os campos achatados pro shape aninhado que structuredData espera. */
+function reconstruirStructuredData(campos: CampoAchatado[]): Record<string, unknown> {
+  const raiz: Record<string, unknown> = {}
+  for (const c of campos) {
+    let atual = raiz
+    for (let i = 0; i < c.caminho.length - 1; i++) {
+      const k = c.caminho[i]
+      if (typeof atual[k] !== "object" || atual[k] == null) atual[k] = {}
+      atual = atual[k] as Record<string, unknown>
+    }
+    atual[c.caminho[c.caminho.length - 1]] = c.valor.trim() || null
+  }
+  return raiz
+}
+
+function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, onVerDetalhes, onSalvo }: {
   doc: (DocV2 & { pessoaNome: string }) | null
   divergencias: Divergencia[]
   historico: Array<{ quando: string | null; texto: string }>
+  processoId: number
+  readOnly: boolean
   onVerDetalhes: (d: Divergencia) => void
+  onSalvo: () => void
 }) {
   const [abaDoc, setAbaDoc] = useState<AbaDoc>("visualizacao")
+  // Inicializado direto do doc (sem efeito) — o componente é remontado por
+  // `key={doc.id}` no chamador sempre que a seleção muda, então o inicializador
+  // já roda com o documento certo. Evita o cascading-render de sincronizar
+  // estado num efeito só pra reagir à troca de prop.
+  const [campos, setCampos] = useState<CampoAchatado[]>(() => (doc ? achatarStructuredData(doc.structuredData) : []))
+  const [salvando, setSalvando] = useState<"rascunho" | "revisado" | null>(null)
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null)
+
+  const salvar = async (dataStatus: "manual_filled" | "reviewed") => {
+    if (!doc) return
+    setSalvando(dataStatus === "reviewed" ? "revisado" : "rascunho")
+    setErroSalvar(null)
+    try {
+      const res = await fetch(`/api/processos/${processoId}/analise-v2/documentos/${doc.id}`, {
+        method: "POST", headers: jsonHeaders(),
+        body: JSON.stringify({ structuredData: reconstruirStructuredData(campos), dataStatus }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || "Erro ao salvar os dados.")
+      onSalvo()
+    } catch (e) {
+      setErroSalvar(e instanceof Error ? e.message : "Erro ao salvar os dados.")
+    } finally {
+      setSalvando(null)
+    }
+  }
 
   if (!doc) {
     return (
@@ -1088,7 +1223,6 @@ function PainelDocumento({ doc, divergencias, historico, onVerDetalhes }: {
       </div>
     )
   }
-  const dados = doc.structuredData && typeof doc.structuredData === "object" ? Object.entries(doc.structuredData as Record<string, unknown>) : []
   const ehImagem = doc.arquivoMimeType?.startsWith("image/")
   const ehPdf = doc.arquivoMimeType === "application/pdf"
 
@@ -1136,18 +1270,65 @@ function PainelDocumento({ doc, divergencias, historico, onVerDetalhes }: {
         )}
 
         {abaDoc === "dados" && (
-          dados.length === 0 ? (
-            <p className="text-xs text-[var(--text-muted)]">Nenhum dado estruturado extraído ainda.</p>
-          ) : (
-            <div className="space-y-1">
-              {dados.map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-2 border-b border-white/10 pb-1 text-xs">
-                  <span className="text-[var(--text-secondary)]">{k}</span>
-                  <span className="text-white/90 text-right">{v == null || v === "" ? "—" : String(v)}</span>
-                </div>
-              ))}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${DATA_STATUS_STYLE[doc.dataStatus] || "bg-[var(--surface-tertiary)] text-white/68"}`}>
+                {DATA_STATUS_LABEL[doc.dataStatus] || doc.dataStatus}
+              </span>
+              {doc.dataStatus !== "reviewed" && (
+                <span className="text-[10px] text-[var(--text-muted)]">A Análise só compara documento marcado como revisado.</span>
+              )}
             </div>
-          )
+
+            {campos.length === 0 ? (
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--text-muted)]">Nenhum dado estruturado ainda — a extração automática não achou nada (ou ainda não rodou).</p>
+                {!readOnly && (
+                  <button
+                    onClick={() => setCampos(achatarStructuredData(TEMPLATE_VAZIO[tipoEventoDoDoc(doc.tipo)]))}
+                    className="px-2.5 py-1.5 text-xs font-semibold rounded-md border border-[var(--border-default)] text-white/80 hover:bg-[var(--surface-hover)]"
+                  >
+                    Preencher manualmente
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {campos.map((c, i) => (
+                  <div key={c.caminho.join(".")} className="flex flex-col gap-1">
+                    <label className="text-[11px] text-[var(--text-secondary)]">{c.rotulo}</label>
+                    <input
+                      value={c.valor}
+                      disabled={readOnly}
+                      onChange={(e) => setCampos((prev) => prev.map((p, j) => (j === i ? { ...p, valor: e.target.value } : p)))}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/95 disabled:opacity-60"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {erroSalvar && <p className="text-xs text-red-700">{erroSalvar}</p>}
+
+            {!readOnly && campos.length > 0 && (
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => salvar("manual_filled")}
+                  disabled={salvando !== null}
+                  className="px-2.5 py-1.5 text-xs font-semibold rounded-md border border-[var(--border-default)] text-white/80 hover:bg-[var(--surface-hover)] disabled:opacity-50"
+                >
+                  {salvando === "rascunho" ? <Loader2 className="w-3.5 h-3.5 animate-spin inline" /> : "Salvar rascunho"}
+                </button>
+                <button
+                  onClick={() => salvar("reviewed")}
+                  disabled={salvando !== null}
+                  className="px-2.5 py-1.5 text-xs font-semibold rounded-md bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {salvando === "revisado" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Salvar e marcar revisado
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {abaDoc === "divergencias" && (
