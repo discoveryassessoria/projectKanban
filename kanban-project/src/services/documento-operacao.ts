@@ -1152,7 +1152,12 @@ export async function controlarOperacaoV2(
     })
     await prisma.documento.update({
       where: { id: documentoId },
-      data: { status: "PENDENTE", ultimaMovimentacao: now, dataInicioOperacao: null, dataPrazoOperacao: null, motivoBloqueio: obs ? `Documento invalidado: ${obs}` : "Documento invalidado" },
+      // analysisStatus volta a "not_ready": o veredito da Análise Documental
+      // (ex.: "sem divergências") foi calculado sobre a tentativa que acabou de
+      // invalidar — sem isto ele sobrevivia como se ainda valesse pra tentativa
+      // nova, e a Central Operacional mostrava "Sem divergências" de um
+      // documento que, pra todos os efeitos, ainda nem existe de verdade.
+      data: { status: "PENDENTE", ultimaMovimentacao: now, dataInicioOperacao: null, dataPrazoOperacao: null, motivoBloqueio: obs ? `Documento invalidado: ${obs}` : "Documento invalidado", analysisStatus: "not_ready" },
     })
   } else if (action === "pausar") {
     await prisma.$transaction(async (tx) => {

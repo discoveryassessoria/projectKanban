@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extrairToken } from '@/src/lib/app-auth';
+import { Prisma } from '@prisma/client';
 
 export async function POST(request: NextRequest) {
   const payload = extrairToken(request);
@@ -71,7 +72,12 @@ export async function POST(request: NextRequest) {
   const documento = documentoExistente
     ? await prisma.documento.update({
         where: { id: documentoExistente.id },
-        data: { ...dadosArquivo, status: 'RECEBIDO' },
+        // Arquivo novo substitui o antigo: o que a Análise Documental já tinha
+        // extraído/comparado (structuredData, analysisStatus) descreve o
+        // ARQUIVO ANTERIOR — sem isto, um documento reenviado corrigido
+        // continuava marcado "ready"/"sem divergências" com base no arquivo
+        // que acabou de ser substituído.
+        data: { ...dadosArquivo, status: 'RECEBIDO', dataStatus: 'not_filled', analysisStatus: 'not_ready', structuredData: Prisma.JsonNull },
       })
     : await prisma.documento.create({
         data: {

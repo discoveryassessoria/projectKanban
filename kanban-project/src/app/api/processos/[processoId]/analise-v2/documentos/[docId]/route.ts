@@ -40,6 +40,15 @@ export async function POST(
   if (body.registral !== undefined) data.registral = body.registral as object
   if (body.dataStatus && DATA_STATUS.has(body.dataStatus)) data.dataStatus = body.dataStatus
 
+  // O que a Análise comparou fica OBSOLETO no instante em que o dado de
+  // origem muda — "Sem divergências" calculado sobre um nome/data antigo não
+  // vale pro nome/data novo. Sem isto, editar o documento aqui deixava o
+  // analysisStatus="ready" (e o veredito junto) sobrevivendo indefinidamente,
+  // como se ainda descrevesse o documento atual.
+  if (data.structuredData !== undefined || data.registral !== undefined) {
+    data.analysisStatus = "not_ready"
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "Nada para salvar." }, { status: 400 })
   }

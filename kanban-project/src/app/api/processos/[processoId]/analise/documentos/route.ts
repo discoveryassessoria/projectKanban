@@ -65,7 +65,7 @@ export async function POST(
       tipo: body.tipo as TipoDocumento,
       status: "RECEBIDO",
       dataStatus: "not_filled",
-      analysisStatus: "pending",
+      analysisStatus: "not_ready",
       arquivo_url: body.arquivoUrl,
       arquivo_nome: body.arquivoNome ?? null,
       arquivo_mime_type: body.arquivoMimeType ?? null,
