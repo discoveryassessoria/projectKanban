@@ -111,7 +111,6 @@ export async function GET(
     const risco = { bloqueantes: 0, graves: 0 }
 
     // 5) Protocolo — para Espanha, conta os protocolos cadastrados.
-    //    "Apto" ainda não tem regra formal no schema → false por enquanto.
     let protocoloImpeditivos = 0
     // IDENTIDADE, NÃO NOME. Este `if` comparava com "ESPANHA" em maiúsculas
     // enquanto o banco grava a chave do cadastro em minúsculas ('espanha') —
@@ -124,11 +123,23 @@ export async function GET(
         where: { processoId: id, dataProtocolo: null },
       })
     }
+    // Análise Documental — impeditivo UNIVERSAL (todo país passa por ela).
+    // "Apto" para protocolar não pode ser "documento chegou": chegou errado
+    // (nome/data/filiação divergente da árvore) e ninguém revisou ainda é
+    // exatamente o que a Análise Documental existe para pegar ANTES do
+    // protocolo, não depois.
+    const divergenciasAbertas = await prisma.divergencia.count({
+      where: {
+        analise: { processoId: id },
+        status: { in: ["pendente", "apoio_solicitado", "retificacao"] },
+      },
+    })
+    const impeditivos = protocoloImpeditivos + divergenciasAbertas
     // "Apto" deriva do que já sabemos contar (impeditivos). Fixo em `false`
     // dizia "Não apto" mesmo com 0 impeditivo(s) — contradição visível no
     // card. Sem regra formal completa no schema ainda, mas 0 impeditivos
     // conhecidos é motivo real para não travar a tela numa negativa fixa.
-    const protocolo = { apto: protocoloImpeditivos === 0, impeditivos: protocoloImpeditivos }
+    const protocolo = { apto: impeditivos === 0, impeditivos }
 
     // 6) Alertas executivos — derivados dos contadores acima
     const alertas: Array<{ sev: AlertaSev; label: string }> = []
@@ -147,6 +158,12 @@ export async function GET(
       alertas.push({
         sev: "info",
         label: `${pendentes} documento(s) ainda não recebido(s)`,
+      })
+    }
+    if (divergenciasAbertas > 0) {
+      alertas.push({
+        sev: "warn",
+        label: `${divergenciasAbertas} divergência(s) da Análise Documental sem decisão`,
       })
     }
 
