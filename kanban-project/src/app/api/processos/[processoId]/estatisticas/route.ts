@@ -134,12 +134,22 @@ export async function GET(
         status: { in: ["pendente", "apoio_solicitado", "retificacao"] },
       },
     })
+    // "Análise deu o OK" é a CONCLUSÃO (analiseDocumental.status="concluida"),
+    // não o algoritmo ter rodado por baixo. Rodar a comparação e olhar o
+    // resultado sem clicar em "concluir análise" não é aprovação — sem isto
+    // o processo virava "Apto" com a própria fase de Análise Documental ainda
+    // em 0% / "Em andamento".
+    const analiseDocumental = await prisma.analiseDocumental.findUnique({
+      where: { processoId: id },
+      select: { status: true },
+    })
+    const analiseConcluida = analiseDocumental?.status === "concluida"
     const impeditivos = protocoloImpeditivos + divergenciasAbertas
-    // "Apto" deriva do que já sabemos contar (impeditivos). Fixo em `false`
-    // dizia "Não apto" mesmo com 0 impeditivo(s) — contradição visível no
-    // card. Sem regra formal completa no schema ainda, mas 0 impeditivos
-    // conhecidos é motivo real para não travar a tela numa negativa fixa.
-    const protocolo = { apto: impeditivos === 0, impeditivos }
+    // "Apto" deriva do que já sabemos contar (impeditivos) + da Análise
+    // Documental estar de fato concluída. Fixo em `false` dizia "Não apto"
+    // mesmo com 0 impeditivo(s) — contradição visível no card. Sem regra
+    // formal completa no schema ainda, mas isto já é um critério real.
+    const protocolo = { apto: impeditivos === 0 && analiseConcluida, impeditivos }
 
     // 6) Alertas executivos — derivados dos contadores acima
     const alertas: Array<{ sev: AlertaSev; label: string }> = []
@@ -164,6 +174,11 @@ export async function GET(
       alertas.push({
         sev: "warn",
         label: `${divergenciasAbertas} divergência(s) da Análise Documental sem decisão`,
+      })
+    } else if (!analiseConcluida) {
+      alertas.push({
+        sev: "info",
+        label: "Análise Documental ainda não foi concluída",
       })
     }
 

@@ -231,6 +231,18 @@ export async function GET(
           })
         : []
 
+    // "Análise deu o OK" É A CONCLUSÃO, não o algoritmo ter rodado em segundo
+    // plano. analysisStatus="ready" só diz que a comparação automática passou
+    // por aquele documento — nada impede rodar a comparação, olhar o
+    // resultado e nunca clicar em "Salvar definição e concluir análise". Sem
+    // isto, um documento comparado (mesmo sem divergência) virava "pronto
+    // para protocolo" com a fase inteira ainda em 0% / "Em andamento".
+    const analise = await prisma.analiseDocumental.findUnique({
+      where: { processoId: id },
+      select: { status: true },
+    })
+    const analiseConcluida = analise?.status === "concluida"
+
     // Divergência em aberto (Análise Documental) por documento — só essas
     // travam "pronto para protocolo"; decidida/ignorada não é mais pendência.
     const docIds = allDocs.map((d) => d.id)
@@ -330,7 +342,7 @@ export async function GET(
         statusShort: statusShortMap[d.status] || d.status.toLowerCase(),
         statusClass: statusToCompactClass(d.status),
         isRecebido: STATUS_VALIDADOS.includes(d.status),
-        analiseOk: d.analysisStatus === "ready" && !idsComDivergenciaAberta.has(d.id),
+        analiseOk: analiseConcluida && d.analysisStatus === "ready" && !idsComDivergenciaAberta.has(d.id),
         arquivoUrl: d.arquivo_url ?? null,
         arquivoNome: d.arquivo_nome ?? null,
         arquivoMimeType: d.arquivo_mime_type ?? null,
