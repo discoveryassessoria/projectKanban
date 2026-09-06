@@ -180,6 +180,47 @@ export function extrairIdade(texto: string): Extraido<number> {
   return idade != null ? { valor: idade, origem: "" } : undefined
 }
 
+/**
+ * "nesta cidade de LOCAL" / "nesta capital do Estado de LOCAL" / "neste município
+ * de LOCAL" — é o município ONDE O ATO FOI LAVRADO, sempre citado logo depois da
+ * data por extenso no boilerplate do Registro Civil. Pra casamento e óbito, esse
+ * É o local do evento (o casamento/óbito acontece na comarca do cartório que
+ * registra); pra nascimento, `extrairNaturalidade` já cobre com fonte melhor
+ * ("natural de X", que é do PRÓPRIO registrado, não do cartório).
+ */
+export function extrairLocalDoRegistro(texto: string): Extraido<string> {
+  const r = casarNormalizado(
+    texto,
+    /nest[ae]\s+(?:cidade|capital(?:\s+do\s+estado)?|municipio|comarca)\s+de\s+([a-z'.\s]+?)(?:[,.]|\s+no\s+tribunal|\s+capital|\s+as\s+\d|\s+às\s+\d|$)/,
+  )
+  if (!r) return undefined
+  return { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto }
+}
+
+// Nacionalidades citadas por extenso em certidão brasileira — vocabulário FECHADO
+// (mesmo espírito do extenso-pt.ts): só reconhece o que está nesta lista, nunca
+// adivinha por outro sinal (não infere "brasileiro" só por "natural deste
+// Estado" — são perguntas diferentes, e conflar as duas já foi engano nesta
+// sessão: "linha direta" ≠ "tem número", mesma lição, campo diferente).
+const NACIONALIDADES: Record<string, string> = {
+  brasileiro: "Brasileira", brasileira: "Brasileira",
+  italiano: "Italiana", italiana: "Italiana",
+  espanhol: "Espanhola", espanhola: "Espanhola",
+  portugues: "Portuguesa", portuguesa: "Portuguesa",
+  alemao: "Alemã", alema: "Alemã",
+  argentino: "Argentina", argentina: "Argentina",
+  uruguaio: "Uruguaia", uruguaia: "Uruguaia",
+}
+/** "natural da Italia" já dá nacionalidade pela âncora de naturalidade; isto cobre quando ela vem como PALAVRA solta ("brasileiro", "italiana") — nunca inferida. */
+export function extrairNacionalidade(texto: string): Extraido<string> {
+  const norm = semAcento(texto).toLowerCase()
+  for (const [chave, rotulo] of Object.entries(NACIONALIDADES)) {
+    const re = new RegExp(`\\b${chave}\\b`)
+    if (re.test(norm)) return { valor: rotulo, origem: chave }
+  }
+  return undefined
+}
+
 // ============================================================
 // MONTAGEM POR TIPO — devolve o shape que ad-v2-engine.ts espera em structuredData
 // ============================================================
@@ -195,6 +236,7 @@ export function extrairNascimento(texto: string, municipioDoRegistro?: string) {
       fullName: val(cab.nomePrincipal),
       birthDate: val(extrairDataDoEvento(texto)),
       birthPlace: val(extrairNaturalidade(texto, municipioDoRegistro)),
+      nationality: val(extrairNacionalidade(texto)),
     },
     father: { fullName: val(fil.pai) },
     mother: { fullName: val(fil.mae) },
@@ -210,10 +252,11 @@ export function extrairObito(texto: string, municipioDoRegistro?: string) {
     deceased: {
       fullName: val(cab.nomePrincipal),
       birthPlace: val(extrairNaturalidade(texto, municipioDoRegistro)),
+      nationality: val(extrairNacionalidade(texto)),
       declaredAge: val(extrairIdade(texto)),
     },
     parents: { fatherFullName: val(fil.pai), motherFullName: val(fil.mae) },
-    deathEvent: { deathDate: val(extrairDataDoEvento(texto)) },
+    deathEvent: { deathDate: val(extrairDataDoEvento(texto)), deathPlace: val(extrairLocalDoRegistro(texto)) },
   }
 }
 
@@ -224,6 +267,13 @@ export function extrairObito(texto: string, municipioDoRegistro?: string) {
  * Registro Civil sempre apresenta nessa ordem. `extrairTodasFiliacoes` devolve as
  * ocorrências na ordem em que aparecem; a posição 0 é do noivo, a 1 é da noiva.
  * Sem correspondência nenhuma (0 ocorrências), o campo fica vazio — não inventa.
+ *
+ * DELIBERADAMENTE NÃO extraído: idade declarada de cada nubente. No texto real
+ * usado nesta sessão, "com trinta e nove annos de idade" aparece logo depois do
+ * nome da MÃE da noiva, não da noiva — um padrão "X anos de idade" ingênuo
+ * atribuiria a idade da mãe à filha. Sem um jeito confiável de saber de quem é a
+ * idade só pelo texto corrido, fica de fora — errar a pessoa é pior que não
+ * preencher.
  */
 // Rótulos que aparecem no mesmo bloco do cabeçalho e NUNCA são nome de pessoa —
 // sem esta lista, "NÃO CONSTA"/"MATRICULA"/um número solto de CPF passavam no
@@ -256,6 +306,6 @@ export function extrairCasamento(texto: string) {
     spouse2: { fullName: nomes[1] },
     spouse1Parents: { fatherFullName: val(filiacoes[0]?.pai), motherFullName: val(filiacoes[0]?.mae) },
     spouse2Parents: { fatherFullName: val(filiacoes[1]?.pai), motherFullName: val(filiacoes[1]?.mae) },
-    event: { marriageDate: val(extrairDataDoEvento(texto)) },
+    event: { marriageDate: val(extrairDataDoEvento(texto)), marriagePlace: val(extrairLocalDoRegistro(texto)) },
   }
 }
