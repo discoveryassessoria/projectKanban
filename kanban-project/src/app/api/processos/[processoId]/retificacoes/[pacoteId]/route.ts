@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/src/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { formatarPontosDeRetificacao } from "@/src/lib/documentos/pontos-retificacao"
 
 const PASSO_ENCERRADO: string[] = ["CONCLUIDO", "CANCELADO", "DISPENSADO", "SUPERSEDIDO"]
 
@@ -72,13 +73,25 @@ export async function GET(
     ? Math.round((passos.filter((p) => p.status === "CONCLUIDO").length / passos.length) * 100)
     : 0
 
+  const divergencias = pacote.divergencias.map((d) => d.divergencia)
+  // Pontos de retificação (a, b, c...) — texto derivado das MESMAS divergências
+  // acima, no formato de uma petição real (ver src/lib/documentos/pontos-retificacao.ts).
+  // Dado, não peça: quem redige a petição pega isto e cola no Modelo Documental.
+  const pontosDeRetificacao = formatarPontosDeRetificacao(
+    divergencias.map((d) => ({
+      documentoTitulo: d.documentoTitulo, pessoaNome: d.pessoaNome, campoLabel: d.campoLabel,
+      valorDocumento: d.valorDocumento, valorArvore: d.valorArvore,
+    })),
+  )
+
   return NextResponse.json({
     pacote: {
       id: pacote.id, num: pacote.num, tipo: pacote.tipo, status: pacote.status,
       motivo: pacote.motivo, processoNum: pacote.processoNum,
       createdAt: pacote.createdAt, updatedAt: pacote.updatedAt,
       orgao: pacote.orgao, protocolo: pacote.protocoloRef, profissional: pacote.profissional,
-      divergencias: pacote.divergencias.map((d) => d.divergencia),
+      divergencias,
+      pontosDeRetificacao,
     },
     passos,
     passoAtualId: passoAtual?.id ?? null,

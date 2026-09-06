@@ -28,7 +28,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import {
-  Loader2, Scale, Landmark, Building2, User, FileText, Clock, ChevronRight, X, HelpCircle,
+  Loader2, Scale, Landmark, Building2, User, FileText, Clock, ChevronRight, X, HelpCircle, Copy, Check,
 } from "lucide-react"
 import PainelDeclarativoDaEtapa from "./workflow/PainelDeclarativoDaEtapa"
 
@@ -69,6 +69,8 @@ interface PedidoDetalhe {
   protocolo: { id: number; numeroProtocolo: string | null; numeroProcesso: string | null; dataProtocolo: string | null; setor: string | null; situacao: string } | null
   profissional: { id: number; nome: string; ativo: boolean; categoria: { nome: string } | null; organizacao: { name: string; nomeFantasia: string | null } | null; registros: Array<{ tipo: string; numero: string; jurisdicao: string | null }> } | null
   divergencias: Divergencia[]
+  /** "a) Corrigir X de 'Y' para 'Z';" por documento — pronto pra colar no Modelo Documental da petição. */
+  pontosDeRetificacao: string
 }
 
 const PASSO_LABEL: Record<string, string> = {
@@ -284,6 +286,42 @@ function useDetalhePedido(processoId: number, pacoteId: number) {
   return { detalhe, carregando, erro, recarregar }
 }
 
+/**
+ * "a) Corrigir X de 'Y' para 'Z';" por documento — pronto pra colar no Modelo
+ * Documental que gera a petição de verdade. É DADO (campo/valor-errado/
+ * valor-correto que a Análise Documental já decidiu), nunca texto jurídico —
+ * os fundamentos e o cabeçalho da peça continuam vindo do Modelo versionado.
+ */
+function PontosDeRetificacao({ texto }: { texto: string }) {
+  const [copiado, setCopiado] = useState(false)
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(texto)
+      setCopiado(true)
+      setTimeout(() => setCopiado(false), 2000)
+    } catch {
+      // Clipboard pode ser negado pelo navegador — o texto continua selecionável abaixo.
+    }
+  }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="text-xs font-semibold text-[var(--text-secondary)]">Pontos de retificação</div>
+        <button
+          onClick={copiar}
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/80 border border-[var(--border-default)] rounded-md px-2 py-1 hover:bg-[var(--surface-hover)]"
+        >
+          {copiado ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+          {copiado ? "Copiado" : "Copiar"}
+        </button>
+      </div>
+      <pre className="text-xs text-white/85 whitespace-pre-wrap rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5 font-sans">
+        {texto}
+      </pre>
+    </div>
+  )
+}
+
 function CardJudicial({ pedido, onAbrir }: { pedido: PedidoResumo; onAbrir: () => void }) {
   return (
     <button onClick={onAbrir} className="w-full text-left rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 hover:bg-[var(--surface-hover)]">
@@ -466,6 +504,8 @@ function DetalhePedidoConteudo({ detalhe, onAbrirPasso, onClose }: {
           ))}
         </ul>
       </div>
+
+      {pacote.pontosDeRetificacao && <PontosDeRetificacao texto={pacote.pontosDeRetificacao} />}
 
       <div>
         <div className="text-xs font-semibold text-[var(--text-secondary)] mb-1.5">Etapas</div>
