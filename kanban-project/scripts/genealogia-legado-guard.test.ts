@@ -104,12 +104,21 @@ ok(/necessidadeDocumental/i.test(blocking) || /NecessidadeDocumental/.test(block
   "blocking-engine gate usa NecessidadeDocumental (camada preservada)")
 // O que continua PROIBIDO é o gate legado por STATUS de validação do documento
 // (STATUS_VALIDADOS) e o percentual da matriz antiga. `linhaReta` permanece PERMITIDO
-// como FILTRO DE ESCOPO na consulta (commit 76210ee: o gate DOCUMENTO precisa dos
-// documentos da linha reta para exigir todas as certidões obrigatórias resolvidas) —
-// não é gate por status. O gate em si é NecessidadeDocumental (asserção acima).
+// como FILTRO DE ESCOPO — na consulta (commit 76210ee: o gate DOCUMENTO precisa dos
+// documentos da linha reta para exigir todas as certidões obrigatórias resolvidas)
+// OU, desde 05/09/2026, como dado buscado (`select`) e filtrado em JS logo em
+// seguida — necessário porque a mesma consulta agora também alimenta
+// `documentosTodos` (toda a árvore, para resolver necessidade de passo por-
+// documento de pessoa fora da linha) sem duplicar a ida ao banco. Em nenhum dos
+// dois formatos `linhaReta` decide bloqueio — é sempre "que documentos entram
+// numa lista", nunca "este passo bloqueia ou não". O gate em si é
+// NecessidadeDocumental (asserção acima).
 ok(!/STATUS_VALIDADOS/.test(blocking) && !/matrix\.percentage/.test(blocking),
   "blocking-engine NÃO usa STATUS_VALIDADOS/matrix.percentage como gate")
-ok(!/linhaReta/.test(blocking) || /where:\s*\{[^}]*linhaReta:\s*true/.test(blocking),
+ok(
+  !/linhaReta/.test(blocking)
+  || /where:\s*\{[^}]*linhaReta:\s*true/.test(blocking)
+  || (/select:\s*\{[^}]*linhaReta:\s*true/.test(blocking) && /\.filter\(\([^)]*\)\s*=>\s*[^)]*\.linhaReta\)/.test(blocking)),
   "blocking-engine só usa linhaReta como filtro de escopo da consulta (nunca como regra de gate)")
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} GUARDA GENEALOGIA-LEGADO — ${passed} ok, ${failed} falhas`)

@@ -89,11 +89,11 @@ export async function calcularPendencias(
     processo.arvoreId != null
       ? prisma.pessoa.count({ where: requerentesAtivosDaArvore(processo.arvoreId) })
       : Promise.resolve(0),
-    // Documentos da LINHA RETA (com necessidadeId) — o gate DOCUMENTO precisa deles para
-    // exigir TODAS as certidões obrigatórias resolvidas. Sem isso o advance congelaria a fase.
+    // TODAS as pessoas da árvore (não só linha reta) — ver o porquê logo abaixo,
+    // onde a lista se divide em duas.
     processo.arvoreId != null
-      ? prisma.pessoa.findMany({ where: { arvoreId: processo.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true, necessidadeId: true } } } })
-      : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
+      ? prisma.pessoa.findMany({ where: { arvoreId: processo.arvoreId }, select: { linhaReta: true, documentos: { select: { id: true, status: true, necessidadeId: true } } } })
+      : Promise.resolve([] as Array<{ linhaReta: boolean; documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
   ])
 
   const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
@@ -103,7 +103,25 @@ export async function calcularPendencias(
     ehCertidao: certidaoItens.has(n.itemCatalogoId),
   }))
 
-  const documentos: DocumentoData[] = pessoasDocs.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })))
+  // DOIS DENOMINADORES, DOIS PROPÓSITOS — não confundir um com o outro:
+  //
+  //  • `documentos` (LINHA RETA) — o gate DOCUMENTO usa isto para exigir TODAS
+  //    as certidões OBRIGATÓRIAS resolvidas. Sem o filtro, cônjuge/fora da
+  //    linha entraria no denominador da fase, e o advance congelaria por um
+  //    documento que a fase nunca exigiu dele.
+  //
+  //  • `documentosTodos` (TODA A ÁRVORE) — usado só para resolver "de qual
+  //    necessidade este passo por-DOCUMENTO é" (necPorDoc, em
+  //    passosPorObrigacao/computeGate), nunca para contar obrigação. Sem isto,
+  //    o passo de uma pessoa FORA DA LINHA (Emissão Documental materializa
+  //    por documentoId, sem necessidadeId) nunca encontrava sua necessidade
+  //    DISPENSADA e continuava bloqueando o avanço mesmo com a exigência já
+  //    encerrada em qualquer fase (achado real: Edithe, processo "Teste").
+  const documentos: DocumentoData[] = pessoasDocs
+    .filter((p) => p.linhaReta)
+    .flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })))
+  const documentosTodos: DocumentoData[] = pessoasDocs
+    .flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: p.linhaReta, necessidadeId: d.necessidadeId })))
 
   const input: ProjectionInput = {
     processId: processoId,
@@ -120,6 +138,7 @@ export async function calcularPendencias(
     steps: instancias.flatMap((i) => i.steps).map(mapStepToGate),
     necessidades,
     documentos,
+    documentosTodos,
     hasArvore: processo.arvoreId != null,
     requerentesCount: reqCount,
   }

@@ -31,7 +31,11 @@ console.log("\n1) Gate (função-base) ignora genéricos por escopo e entidade D
 ok(/computeGate\(/.test(engine), "BlockingEngine delega o gate à função-base computeGate")
 ok(/necStatusById = new Map\(input\.necessidades\.map/.test(core), "core constrói mapa necessidadeId → status")
 ok(/const gateSteps = resolvePassosBloqueantesDaFase\(input\.steps\)/.test(core), "core usa o resolver canônico por escopo (genéricos fora quando há entidade) — sem hardcode")
-ok(/step\.necessidadeId != null && necStatusById\.get\(step\.necessidadeId\) === "DISPENSADA"[\s\S]*?continue/.test(core), "passo de necessidade DISPENSADA não bloqueia")
+// 05/09/2026: generalizado para resolver a necessidade também por documentoId
+// (passo por-DOCUMENTO, como Emissão Documental, não carrega necessidadeId —
+// só o Documento sabe. Sem isto, pessoa FORA DA LINHA com necessidade
+// dispensada continuava bloqueando o avanço em qualquer fase por-DOCUMENTO).
+ok(/necIdDoPasso = step\.necessidadeId \?\? \(step\.documentoId[\s\S]*?necIdDoPasso != null && necStatusById\.get\(necIdDoPasso\) === "DISPENSADA"[\s\S]*?continue/.test(core), "passo de necessidade DISPENSADA não bloqueia (por necessidadeId OU por documentoId)")
 ok(!/const isGenealogia\s*=/.test(engine) && !/step\.stepKey === "localizar_registro"/.test(core), "sem skip hardcoded por nome de fase / stepKey")
 
 console.log("\n2) Não afeta as demais fases (mudança escopada, PASSO_OK inalterado)")

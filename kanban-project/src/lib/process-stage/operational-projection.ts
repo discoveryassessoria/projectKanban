@@ -138,8 +138,8 @@ async function resolveOperationalProjectionParaFase(
     }),
     itemCatalogosDeCertidao(prisma),
     proc.arvoreId != null
-      ? prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { documentos: { select: { id: true, status: true, necessidadeId: true } } } })
-      : Promise.resolve([] as Array<{ documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
+      ? prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId }, select: { linhaReta: true, documentos: { select: { id: true, status: true, necessidadeId: true } } } })
+      : Promise.resolve([] as Array<{ linhaReta: boolean; documentos: Array<{ id: number; status: string; necessidadeId: number | null }> }>),
     // REQUERENTE da GENEALOGIA = Pessoa marcada como requerente na ÁRVORE ('maior'|'menor'),
     // NÃO o vínculo comercial ProcessoRequerente (que pode ser 0 e travava a fase em 99%).
     proc.arvoreId != null
@@ -150,7 +150,12 @@ async function resolveOperationalProjectionParaFase(
   const necessidades: NecessidadeData[] = necsRaw.map((n) => ({
     id: n.id, status: n.status, obrigatoria: n.obrigatoriedade === "OBRIGATORIA", ehCertidao: certidaoItens.has(n.itemCatalogoId),
   }))
-  const documentos: DocumentoData[] = pessoas.flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })))
+  // Dois denominadores — ver o comentário gêmeo em blocking-engine.ts.
+  const documentos: DocumentoData[] = pessoas
+    .filter((p) => p.linhaReta)
+    .flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })))
+  const documentosTodos: DocumentoData[] = pessoas
+    .flatMap((p) => p.documentos.map((d) => ({ id: d.id, status: d.status, linhaReta: p.linhaReta, necessidadeId: d.necessidadeId })))
 
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
   const faseDef = faseCode ? getFase(faseCode) : null
@@ -167,6 +172,7 @@ async function resolveOperationalProjectionParaFase(
     steps,
     necessidades,
     documentos,
+    documentosTodos,
     hasArvore: proc.arvoreId != null,
     requerentesCount: reqCount,
   })
@@ -230,18 +236,29 @@ export async function resolveOperationalProjectionBatch(
     necsByProc.set(n.processoId, arr)
   }
 
-  // (5) Documentos da LINHA RETA por árvore (denominador do escopo DOCUMENTO).
+  // (5) Documentos por árvore — dois denominadores, mesmo porquê do comentário
+  //     gêmeo em blocking-engine.ts: `docsByArvore` (LINHA RETA) é o
+  //     denominador do escopo DOCUMENTO; `docsTodosByArvore` (árvore inteira)
+  //     só resolve de qual necessidade um passo por-DOCUMENTO é, para pessoas
+  //     fora da linha (cônjuge) não ficarem bloqueando o avanço com uma
+  //     exigência já dispensada em outra fase.
   const docsByArvore = new Map<number, DocumentoData[]>()
+  const docsTodosByArvore = new Map<number, DocumentoData[]>()
   if (arvoreIds.length > 0) {
     const pessoas = await prisma.pessoa.findMany({
-      where: { arvoreId: { in: arvoreIds }, linhaReta: true },
-      select: { arvoreId: true, documentos: { select: { id: true, status: true, necessidadeId: true } } },
+      where: { arvoreId: { in: arvoreIds } },
+      select: { arvoreId: true, linhaReta: true, documentos: { select: { id: true, status: true, necessidadeId: true } } },
     })
     for (const p of pessoas) {
       if (p.arvoreId == null) continue
-      const arr = docsByArvore.get(p.arvoreId) ?? []
-      for (const d of p.documentos) arr.push({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })
-      docsByArvore.set(p.arvoreId, arr)
+      const arrTodos = docsTodosByArvore.get(p.arvoreId) ?? []
+      for (const d of p.documentos) arrTodos.push({ id: d.id, status: d.status, linhaReta: p.linhaReta, necessidadeId: d.necessidadeId })
+      docsTodosByArvore.set(p.arvoreId, arrTodos)
+      if (p.linhaReta) {
+        const arr = docsByArvore.get(p.arvoreId) ?? []
+        for (const d of p.documentos) arr.push({ id: d.id, status: d.status, linhaReta: true, necessidadeId: d.necessidadeId })
+        docsByArvore.set(p.arvoreId, arr)
+      }
     }
   }
 
@@ -278,6 +295,7 @@ export async function resolveOperationalProjectionBatch(
       steps,
       necessidades: necsByProc.get(pid) ?? [],
       documentos: proc.arvoreId != null ? docsByArvore.get(proc.arvoreId) ?? [] : [],
+      documentosTodos: proc.arvoreId != null ? docsTodosByArvore.get(proc.arvoreId) ?? [] : [],
       hasArvore: proc.arvoreId != null,
       requerentesCount: proc.arvoreId != null ? reqByArvore.get(proc.arvoreId) ?? 0 : 0,
     }

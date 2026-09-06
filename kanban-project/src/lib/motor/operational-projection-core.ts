@@ -127,6 +127,14 @@ export interface ProjectionInput {
   necessidades: NecessidadeData[]
   /** Documentos da LINHA RETA (denominador do escopo DOCUMENTO). */
   documentos: DocumentoData[]
+  /**
+   * TODOS os documentos da árvore, linha reta ou não. Opcional só por
+   * retrocompatibilidade de quem monta ProjectionInput sem isto (fixture de
+   * teste, por exemplo); usado exclusivamente para resolver de qual
+   * necessidade um passo por-DOCUMENTO é (nunca para contar obrigação — isso
+   * continua sendo só `documentos`). Ausente ⇒ cai para `documentos`.
+   */
+  documentosTodos?: DocumentoData[]
   hasArvore: boolean
   requerentesCount: number
 }
@@ -299,6 +307,12 @@ export function computeGate(input: ProjectionInput): BlockingIssue[] {
   const scope = escopoEfetivo(input)
   const gateSteps = resolvePassosBloqueantesDaFase(input.steps)
   const necStatusById = new Map(input.necessidades.map((n) => [n.id, n.status]))
+  // TODOS os documentos (não só linha reta — ver o campo) só para achar de qual
+  // necessidade um passo por-DOCUMENTO é. Passo por-NECESSIDADE já carrega o
+  // necessidadeId direto e não passa por aqui.
+  const necIdPorDocumentoId = new Map(
+    (input.documentosTodos ?? input.documentos).filter((d) => d.necessidadeId != null).map((d) => [d.id, d.necessidadeId as number]),
+  )
 
   // --- Escopo NECESSIDADE: estrutura mínima (necessidades geradas + árvore + requerente).
   //     A LOCALIZAÇÃO em si é gatada pelos PASSOS por-necessidade (abaixo), nunca pelo
@@ -338,7 +352,13 @@ export function computeGate(input: ProjectionInput): BlockingIssue[] {
       const snap = (step.snapshot as Snapshot | null) ?? {}
 
       // Entidade DISPENSADA não bloqueia (requisito deixou de ser exigido).
-      if (step.necessidadeId != null && necStatusById.get(step.necessidadeId) === "DISPENSADA") continue
+      // Passo por-NECESSIDADE carrega o id direto; passo por-DOCUMENTO (Emissão
+      // Documental materializa assim, sem necessidadeId) resolve pela mesma
+      // ligação Documento→Necessidade que passosPorObrigacao já usa — sem isto,
+      // um passo de pessoa FORA DA LINHA (Edithe) nunca encontrava a dispensa e
+      // continuava bloqueando o avanço mesmo com a exigência já encerrada.
+      const necIdDoPasso = step.necessidadeId ?? (step.documentoId != null ? necIdPorDocumentoId.get(step.documentoId) : undefined)
+      if (necIdDoPasso != null && necStatusById.get(necIdDoPasso) === "DISPENSADA") continue
 
       // INVARIANTE gate↔progresso: um passo já CONCLUÍDO/DISPENSADO/SUPERSEDIDO conta como
       // feito no computeProgress — logo NÃO pode bloquear aqui por tarefas/evidência/deps
