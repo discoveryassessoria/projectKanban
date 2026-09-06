@@ -234,7 +234,23 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
       })
     }
   }
+
+  // NÃO SE APLICA NA GENEALOGIA ⇒ NÃO SE APLICA EM NENHUMA FASE. A etapa é da
+  // fase que materializou (acima); o Documento é da OBRIGAÇÃO inteira, e outras
+  // fases (Emissão Documental, Análise, ...) leem o Documento direto — nunca
+  // consultam o status da necessidade. Sem isto, dispensar em Genealogia
+  // cancelava a etapa de lá e a necessidade, mas o Documento ficava PENDENTE
+  // pra sempre, e a próxima fase o lia como pendência real, achando que a
+  // pessoa ainda precisava do documento que a Genealogia já disse que não
+  // precisa (achado real: Edithe, processo "Teste", reaparecia em Emissão
+  // Documental depois de dispensada em Genealogia).
+  await db.documento.updateMany({
+    where: { necessidadeId, status: { notIn: ["ENTREGUE", "INVALIDO", "CANCELADO"] } },
+    data: { status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO, ultimaMovimentacao: new Date() },
+  })
 }
+
+const MOTIVO_DOCUMENTO_DISPENSADO = "Necessidade dispensada — não se aplica em nenhuma fase"
 
 /** Reativa uma necessidade DISPENSADA (voltou a ser aplicável) → PENDENTE. */
 export async function reativarNecessidade(necessidadeId: number, db: DB = prisma) {
@@ -242,6 +258,16 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
   if (!n || n.status !== "DISPENSADA") return
   await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "PENDENTE" } })
   await evento(db, necessidadeId, "CRIADA", { reativada: true })
+
+  // Espelho da dispensa: só reabre o Documento que ESTE serviço cancelou por
+  // "não se aplica" (motivo próprio) — nunca um documento que um operador
+  // invalidou por outro motivo real (documento errado, ilegível). A regra
+  // voltou a valer; a decisão humana sobre um documento específico não se
+  // desfaz sozinha.
+  await db.documento.updateMany({
+    where: { necessidadeId, status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO },
+    data: { status: "PENDENTE", motivoBloqueio: null, ultimaMovimentacao: new Date() },
+  })
 }
 
 /**
