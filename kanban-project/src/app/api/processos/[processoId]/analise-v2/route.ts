@@ -121,6 +121,10 @@ function toTree(pessoasRaw: any[]): TreePerson[] {
       dataObito: p.data_obito ? p.data_obito.toISOString().slice(0, 10) : undefined,
       nacionalidade: p.nacionalidade || undefined,
       sexo: mapSexo(p.sexo),
+      // Só aponta pra quem também está neste conjunto (linha reta) — pai/mãe fora da
+      // linha nunca aparecem aqui, então não há travessia inválida a temer.
+      paiId: temPaiNaLinha ? p.paiId : null,
+      maeId: temMaeNaLinha ? p.maeId : null,
       docs: p.documentos.map((d: any) => ({
         id: d.id,
         tipo: dtipo(d.tipo),

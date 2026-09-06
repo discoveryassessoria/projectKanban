@@ -8,7 +8,7 @@ import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 import {
   Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X,
   FileText, Scale, Landmark, Search, Download, Eye, MoreVertical, ChevronDown,
-  ExternalLink, Link2, Paperclip, Upload, Copy, ClipboardCheck,
+  ExternalLink, Link2, Paperclip, Upload, Copy, ClipboardCheck, ScanText,
 } from "lucide-react"
 
 interface Divergencia {
@@ -108,6 +108,7 @@ const fmtDia = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(
 const fmtDiaHora = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("pt-BR") : "—")
 
 export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: Props) {
+  const [extraindo, setExtraindo] = useState(false)
   const [running, setRunning] = useState(false)
   const [concluding, setConcluding] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -133,6 +134,35 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   const setAnalise = (proxima: Analise | null | ((anterior: Analise | null) => Analise | null)) => {
     const valor = typeof proxima === "function" ? (proxima as (a: Analise | null) => Analise | null)(analise) : proxima
     void consulta.recarregar({ analise: valor })
+  }
+
+  /**
+   * Extração automática (OCR + leitura de campo) ANTES da comparação: lê o arquivo
+   * de cada documento (camada de texto do PDF, grátis; OCR externo se configurado),
+   * reconhece nome/data/filiação/avós pelo boilerplate padrão do Registro Civil e
+   * grava em structuredData com dataStatus="ai_extracted" — nunca "reviewed"
+   * sozinha, confirmação humana continua obrigatória antes de virar canônico.
+   */
+  const extrair = async () => {
+    if (readOnly) return
+    setExtraindo(true); setErro(null); setResultado(null)
+    try {
+      const res = await fetch(`/api/processos/${processoId}/analise-v2/extrair`, { method: "POST", headers: authHeaders() })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Erro ao extrair dados dos documentos")
+      const r = data.resumo as { total: number; extraidos: number; pulados: number; semTexto: number; semCampos: number }
+      setResultado(
+        `Extração automática: ${r.extraidos} documento(s) com dados extraídos` +
+          (r.semTexto > 0 ? `, ${r.semTexto} sem texto legível (arquivo escaneado sem OCR configurado, ou precisa de revisão manual)` : "") +
+          (r.semCampos > 0 ? `, ${r.semCampos} com texto lido mas sem campo reconhecido` : "") +
+          (r.pulados > 0 ? `, ${r.pulados} já preenchido(s) (não sobrescrito)` : "") + ".",
+      )
+      await Promise.all([consultaV2.recarregar(), invalidar(`/api/processos/${processoId}/`)])
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Erro ao extrair dados dos documentos")
+    } finally {
+      setExtraindo(false)
+    }
   }
 
   const rodar = async () => {
@@ -364,6 +394,13 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               <button onClick={() => setModalImportar(true)} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-hover)] rounded-md inline-flex items-center gap-2">
                 <Upload className="w-4 h-4" /> Importar relatório
               </button>
+              <button
+                onClick={extrair} disabled={extraindo}
+                title="Lê os documentos anexados (camada de texto do PDF, ou OCR se configurado) e preenche os dados automaticamente — ainda precisa de revisão humana antes de virar base de comparação"
+                className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {extraindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanText className="w-4 h-4" />} Extrair automaticamente
+              </button>
             </>
           )}
           {!readOnly && analise?.status !== "concluida" && (
@@ -379,7 +416,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
 
       {!analise ? (
         <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">
-          A análise ainda não foi rodada. Clique em <b>Analisar automaticamente</b> para comparar os documentos já cadastrados, em <b>Anexar certidão</b> se ainda faltar certidão na aba Documentos, ou em <b>Importar relatório</b> se a comparação já foi feita fora do sistema.
+          A análise ainda não foi rodada. Clique em <b>Extrair automaticamente</b> pra ler os documentos e preencher os dados sozinho, depois em <b>Analisar automaticamente</b> para comparar; use <b>Anexar certidão</b> se ainda faltar certidão na aba Documentos, ou <b>Importar relatório</b> se a comparação já foi feita fora do sistema.
         </div>
       ) : (
         <>

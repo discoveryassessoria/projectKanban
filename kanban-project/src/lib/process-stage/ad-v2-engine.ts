@@ -35,6 +35,11 @@ export interface TreePerson {
   sexo?: string
   dataCasamento?: string
   dataObito?: string
+  /** Pai/mãe DE SANGUE na árvore (Pessoa.paiId/maeId) — é a travessia que permite
+   * validar "nome do pai/avô" no nascimento de alguém contra o CANÔNICO DO PAI
+   * (o nascimento dele), em vez de contra o canônico da própria pessoa (circular). */
+  paiId?: number | null
+  maeId?: number | null
   docs?: TreeDoc[]
 }
 export interface TreeDoc {
@@ -56,12 +61,21 @@ export type StructuredData = {
 export interface CanonicalData {
   name?: string; birthDate?: string; birthPlace?: string; nationality?: string
   fatherName?: string; motherName?: string
+  /** Naturalidade/nacionalidade dos PAIS, também extraídas do nascimento da
+   * própria pessoa — é o que permite validar "naturalidade dos pais" citada
+   * no casamento/óbito de alguém (achado real: retificação Medina Olivares,
+   * item "naturalidade dos pais do falecido"). */
+  fatherBirthPlace?: string; fatherNationality?: string
+  motherBirthPlace?: string; motherNationality?: string
 }
 export interface PersonModel {
   _src: TreePerson; id: number; fullName: string; generation: number | null
   branchId: string; branchName: string
   isInTransmissionLine: boolean; roleInLine: string
   isApplicant: boolean; spouseIds: number[]
+  /** Pai/mãe DE SANGUE (espelha TreePerson.paiId/maeId) — base da travessia
+   * pra achar o canônico de quem não é o dono do documento. */
+  paiId: number | null; maeId: number | null
   baseDocumentId: number | null; baseDocumentLabel?: string
   canonicalData: CanonicalData
 }
@@ -245,6 +259,7 @@ export function buildADModelFromTree(people: TreePerson[]): ADModel {
       branchId: "tronco", branchName: "Linha principal",
       isInTransmissionLine: !!p.isLinha, roleInLine: ad2Role(p),
       isApplicant: !!p.ehRequerente, spouseIds: [],
+      paiId: p.paiId ?? null, maeId: p.maeId ?? null,
       baseDocumentId: ((p.docs || []).find((d) => d.tipo === "nascimento") || { id: null }).id,
       // canônico: fallback da árvore (sobrescrito pelo doc-base revisado em buildCanonical)
       canonicalData: { name: ad2FullName(p), birthDate: p.nascimento || undefined, birthPlace: p.pais || undefined, nationality: p.nacionalidade || undefined, fatherName: undefined, motherName: undefined },
@@ -334,6 +349,14 @@ export function buildCanonical(persons: PersonModel[], documents: DocModel[]): P
           nationality: (b.registered && b.registered.nationality) || undefined,
           fatherName: (b.father && b.father.fullName) || undefined,
           motherName: (b.mother && b.mother.fullName) || undefined,
+          // Mesma fonte (o nascimento da PRÓPRIA pessoa) também registra de onde os
+          // pais são — é o único jeito de validar "naturalidade dos pais" citada no
+          // casamento/óbito de alguém quando os pais em si não têm nascimento próprio
+          // cadastrado (caso comum: bisavós citados só como referência).
+          fatherBirthPlace: (b.father && b.father.birthPlace) || undefined,
+          fatherNationality: (b.father && b.father.nationality) || undefined,
+          motherBirthPlace: (b.mother && b.mother.birthPlace) || undefined,
+          motherNationality: (b.mother && b.mother.nationality) || undefined,
         }
         p.baseDocumentLabel = base.fileName || base.documentType
       }
@@ -350,6 +373,26 @@ export function canonicalOf(persons: PersonModel[], personId: number): Canonical
 }
 export function personById(persons: PersonModel[], id: number): PersonModel | null {
   return persons.find((p) => p.id === id) || null
+}
+
+/**
+ * Canônico do PAI ou da MÃE de uma pessoa — sobe um nível na árvore (Pessoa.paiId/
+ * maeId) e devolve o canônico DELE, construído a partir do PRÓPRIO nascimento dele.
+ *
+ * Por que isto existe: "nome do pai" registrado no nascimento de alguém só pode ser
+ * conferido contra uma fonte INDEPENDENTE daquele mesmo documento — o nascimento do
+ * pai. Comparar contra o canônico da PRÓPRIA pessoa (que, uma vez este documento
+ * virar a base dela, foi construído A PARTIR DELE MESMO) nunca diverge — é a mesma
+ * string comparada com ela mesma. Achado real: retificação Medina Olivares — o nome
+ * do pai/avós vinha errado em documento nenhum jamais pegava, porque a comparação
+ * de "Pais"/"Avós" no nascimento nunca teve fonte nenhuma pra comparar (`null` fixo,
+ * ou o canônico circular da própria pessoa).
+ */
+export function canonicalOfParent(persons: PersonModel[], personId: number, qual: "pai" | "mae"): CanonicalData | null {
+  const person = personById(persons, personId)
+  const parentId = qual === "pai" ? person?.paiId : person?.maeId
+  if (parentId == null) return null
+  return canonicalOf(persons, parentId)
 }
 
 // inicializa o modelo (constrói da árvore + aplica canônico)
@@ -427,6 +470,46 @@ export function ad2CompareValue(type: "name" | "date" | "place" | "text", docVal
   return S("divergente", "outro", "media", "media", "revisar_humano", "Valor divergente.")
 }
 
+/**
+ * Idade DECLARADA num documento (ex.: "com trinta e quatro anos de idade" na Acta de
+ * Nacimiento, ou a idade das partes num casamento/óbito) confere contra a idade
+ * CALCULADA a partir da data de nascimento canônica e da data do evento — nunca
+ * contra outro texto solto. Documento antigo raramente erra a IDADE por conta própria
+ * (é calculada na hora do ato pelo escrivão); o valor real dela é apontar quando a
+ * DATA DE NASCIMENTO está errada — a idade declarada é o "terceiro voto" que confirma.
+ */
+export interface AgeCompareResult extends CmpResult {
+  /** Idade calculada (nascimento × data do evento), quando dava pra calcular. */
+  expectedAge?: number
+}
+export function ad2CompareAge(declaredAge: unknown, birthDateISO: unknown, eventDateISO: unknown): AgeCompareResult {
+  const declared = declaredAge != null && String(declaredAge).trim() !== "" ? Number(declaredAge) : null
+  const nasc = birthDateISO ? new Date(String(birthDateISO)) : null
+  const evento = eventDateISO ? new Date(String(eventDateISO)) : null
+  const nascValida = !!nasc && !Number.isNaN(nasc.getTime())
+  const eventoValida = !!evento && !Number.isNaN(evento.getTime())
+  if (declared == null && !(nascValida && eventoValida))
+    return S("nao_comparado", "nenhuma", "nenhuma", "alta", "nenhuma")
+  if (declared == null)
+    return S("ausente_no_documento", "nenhuma", "media", "media", "revisar_humano", "Idade não consta no documento.")
+  if (!(nascValida && eventoValida))
+    return S("ausente_na_base", "nenhuma", "baixa", "media", "nenhuma", "Sem data de nascimento/evento canônica pra calcular a idade esperada.")
+  let esperada = evento!.getUTCFullYear() - nasc!.getUTCFullYear()
+  const aniversarioAindaNaoChegou =
+    evento!.getUTCMonth() < nasc!.getUTCMonth() ||
+    (evento!.getUTCMonth() === nasc!.getUTCMonth() && evento!.getUTCDate() < nasc!.getUTCDate())
+  if (aniversarioAindaNaoChegou) esperada -= 1
+  if (esperada === declared) return { ...S("correto", "nenhuma", "nenhuma", "alta", "nenhuma"), expectedAge: esperada }
+  // 1 ano de folga: registro antigo por vezes arredonda pro aniversário mais próximo —
+  // divergência de exatamente 1 ano é revisão humana, não retificação automática.
+  const sev = Math.abs(esperada - declared) <= 1 ? "media" : "critica"
+  const rec = sev === "critica" ? "retificar" : "revisar_humano"
+  return {
+    ...S("divergente", "idade", sev, "alta", rec, `Idade declarada (${declared}) não bate com a calculada pela data de nascimento (${esperada}).`),
+    expectedAge: esperada,
+  }
+}
+
 // normalizedName é técnico interno: recalculado no save, nunca exibido.
 // fullName→normalizedName; fatherFullName→fatherNormalizedName; grandfatherName→grandfatherNormalizedName
 export function ad2ComputeNormalized(obj: any): void {
@@ -460,6 +543,19 @@ export function ad2CompareDoc(doc: DocModel, persons: PersonModel[]): Comparison
       userDecision: (["divergente", "precisa_revisao", "ausente_no_documento"].includes(r.comparisonStatus) ? "pendente" : "sem_acao") as Comparison["userDecision"], notes: "",
     }, r) as Comparison)
   }
+  // Idade declarada é comparação CALCULADA (data de nascimento × data do evento),
+  // não campo-a-campo — por isso tem a própria entrada em vez de reusar `add`.
+  const addAge = (g: string, k: string, l: string, declaredAge: any, birthDateISO: any, eventDateISO: any) => {
+    const r = ad2CompareAge(declaredAge, birthDateISO, eventDateISO)
+    const expected = r.expectedAge != null ? String(r.expectedAge) : ""
+    rows.push(Object.assign({
+      id: "fc-" + (_fcSeq++), documentId: doc.id, documentLabel: doc.fileName || AD2_DTYPE[doc.documentType], documentType: doc.documentType,
+      personId: doc.personId, personName: doc.personName, personRoleInLine: person.roleInLine,
+      groupLabel: g, fieldKey: k, fieldLabel: l,
+      valueInDocument: has(declaredAge) ? String(declaredAge) : "", expectedValue: expected, expectedValueSource: expected ? baseLabel + " (calculada)" : "",
+      userDecision: (["divergente", "precisa_revisao", "ausente_no_documento"].includes(r.comparisonStatus) ? "pendente" : "sem_acao") as Comparison["userDecision"], notes: "",
+    }, r) as Comparison)
+  }
 
   if (doc.documentType === "nascimento" && sd.birth) {
     const b = sd.birth, reg = b.registered || {}, fa = b.father || {}, mo = b.mother || {}, pg = b.paternalGrandparents || {}, mg = b.maternalGrandparents || {}
@@ -467,18 +563,28 @@ export function ad2CompareDoc(doc: DocModel, persons: PersonModel[]): Comparison
     add("Dados do registrado", "reg.dn", "Data de nascimento", reg.birthDate, can.birthDate, "date")
     add("Dados do registrado", "reg.ln", "Local de nascimento", reg.birthPlace, can.birthPlace, "place")
     add("Dados do registrado", "reg.nac", "Nacionalidade", reg.nationality, can.nationality, "text")
-    add("Pais", "pai.nome", "Nome do pai", fa.fullName, can.fatherName, "name")
-    add("Pais", "mae.nome", "Nome da mãe", mo.fullName, can.motherName, "name")
-    add("Avós paternos", "avp.avo", "Nome do avô paterno", pg.grandfatherName, null, "name")
-    add("Avós paternos", "avp.ava", "Nome da avó paterna", pg.grandmotherName, null, "name")
-    add("Avós maternos", "avm.avo", "Nome do avô materno", mg.grandfatherName, null, "name")
-    add("Avós maternos", "avm.ava", "Nome da avó materna", mg.grandmotherName, null, "name")
+
+    // "Nome do pai/mãe" registrado AQUI só pode ser conferido contra uma fonte
+    // independente deste mesmo documento: o nascimento de cada um deles. Contra o
+    // canônico da PRÓPRIA pessoa seria circular assim que este documento virasse a
+    // base dela (ver canonicalOfParent). "Avós" = pais dos pais: mais um nível acima.
+    const canPai = canonicalOfParent(persons, doc.personId, "pai")
+    const canMae = canonicalOfParent(persons, doc.personId, "mae")
+    add("Pais", "pai.nome", "Nome do pai", fa.fullName, canPai?.name, "name")
+    add("Pais", "pai.nat", "Naturalidade do pai", fa.birthPlace, canPai?.birthPlace, "place")
+    add("Pais", "mae.nome", "Nome da mãe", mo.fullName, canMae?.name, "name")
+    add("Pais", "mae.nat", "Naturalidade da mãe", mo.birthPlace, canMae?.birthPlace, "place")
+    add("Avós paternos", "avp.avo", "Nome do avô paterno", pg.grandfatherName, canPai?.fatherName, "name")
+    add("Avós paternos", "avp.ava", "Nome da avó paterna", pg.grandmotherName, canPai?.motherName, "name")
+    add("Avós maternos", "avm.avo", "Nome do avô materno", mg.grandfatherName, canMae?.fatherName, "name")
+    add("Avós maternos", "avm.ava", "Nome da avó materna", mg.grandmotherName, canMae?.motherName, "name")
   } else if (doc.documentType === "casamento" && sd.marriage) {
     const m = sd.marriage, ev = m.event || {}, s1 = m.spouse1 || {}, s2 = m.spouse2 || {}, p1 = m.spouse1Parents || {}, p2 = m.spouse2Parents || {}
     const role = (m.transmission || {}).transmissionRole
     const canOf = (pid: number | undefined) => (pid ? (canonicalOf(persons, pid) || {}) : {})
     const can1 = role === "husband" ? can : canOf(s1.personId)
     const can2 = role === "wife" ? can : canOf(s2.personId)
+    const eventDate = ev.marriageDate || (person._src && person._src.dataCasamento) || null
     const spouse = (g: string, pre: string, s: any, c: CanonicalData) => {
       add(g, pre + ".nome", "Nome completo", s.fullName, c.name, "name")
       add(g, pre + ".dn", "Data de nascimento", s.birthDate, c.birthDate, "date")
@@ -486,24 +592,34 @@ export function ad2CompareDoc(doc: DocModel, persons: PersonModel[]): Comparison
       add(g, pre + ".nac", "Nacionalidade", s.nationality, c.nationality, "text")
       add(g, pre + ".prof", "Profissão", s.profession, null, "text")
       add(g, pre + ".civil", "Estado civil anterior", s.previousCivilStatus, null, "text")
+      // Idade declarada no ato confere contra nascimento × data do casamento.
+      addAge(g, pre + ".idade", "Idade declarada", s.declaredAge, c.birthDate, eventDate)
     }
     spouse("Dados do noivo", "s1", s1, can1)
     add("Pais do noivo", "p1.pai", "Nome do pai", p1.fatherFullName, can1.fatherName, "name")
+    add("Pais do noivo", "p1.pai_nat", "Naturalidade do pai", p1.fatherBirthPlace, can1.fatherBirthPlace, "place")
     add("Pais do noivo", "p1.mae", "Nome da mãe", p1.motherFullName, can1.motherName, "name")
+    add("Pais do noivo", "p1.mae_nat", "Naturalidade da mãe", p1.motherBirthPlace, can1.motherBirthPlace, "place")
     spouse("Dados da noiva", "s2", s2, can2)
     add("Pais da noiva", "p2.pai", "Nome do pai", p2.fatherFullName, can2.fatherName, "name")
+    add("Pais da noiva", "p2.pai_nat", "Naturalidade do pai", p2.fatherBirthPlace, can2.fatherBirthPlace, "place")
     add("Pais da noiva", "p2.mae", "Nome da mãe", p2.motherFullName, can2.motherName, "name")
+    add("Pais da noiva", "p2.mae_nat", "Naturalidade da mãe", p2.motherBirthPlace, can2.motherBirthPlace, "place")
     add("Evento", "ev.data", "Data do casamento", ev.marriageDate, (person._src && person._src.dataCasamento) || null, "date", tree)
     add("Evento", "ev.local", "Local do casamento", ev.marriagePlace, null, "place")
     add("Evento", "ev.pais", "País", ev.marriageCountry, null, "text")
   } else if (doc.documentType === "obito" && sd.death) {
     const d = sd.death, de = d.deceased || {}, pa = d.parents || {}, cj = d.spouse || {}, ob = d.deathEvent || {}, dec = d.declarant || {}
+    const eventDate = ob.deathDate || (person._src && person._src.dataObito) || null
     add("Dados do falecido", "de.nome", "Nome completo", de.fullName, can.name, "name")
     add("Dados do falecido", "de.dn", "Data de nascimento", de.birthDate, can.birthDate, "date")
     add("Dados do falecido", "de.ln", "Local de nascimento", de.birthPlace, can.birthPlace, "place")
     add("Dados do falecido", "de.nac", "Nacionalidade", de.nationality, can.nationality, "text")
+    addAge("Dados do falecido", "de.idade", "Idade declarada", de.declaredAge, can.birthDate, eventDate)
     add("Pais do falecido", "pa.pai", "Nome do pai", pa.fatherFullName, can.fatherName, "name")
+    add("Pais do falecido", "pa.pai_nat", "Naturalidade do pai", pa.fatherBirthPlace, can.fatherBirthPlace, "place")
     add("Pais do falecido", "pa.mae", "Nome da mãe", pa.motherFullName, can.motherName, "name")
+    add("Pais do falecido", "pa.mae_nat", "Naturalidade da mãe", pa.motherBirthPlace, can.motherBirthPlace, "place")
     add("Cônjuge", "cj.nome", "Nome do cônjuge", cj.fullName, null, "name")
     add("Óbito", "ob.data", "Data do óbito", ob.deathDate, (person._src && person._src.dataObito) || null, "date", tree)
     add("Óbito", "ob.local", "Local do óbito", ob.deathPlace, null, "place")
