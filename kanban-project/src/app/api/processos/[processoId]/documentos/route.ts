@@ -17,6 +17,9 @@ interface DocCompact {
   statusShort: string     // "recebido", "não iniciado", "em busca", etc.
   statusClass: string     // "received" | "pending" | "searching" | "requesting" | "waiting" | "returned" | "other"
   isRecebido: boolean
+  arquivoUrl: string | null
+  arquivoNome: string | null
+  arquivoMimeType: string | null
 }
 
 interface Impediment {
@@ -213,6 +216,9 @@ export async function GET(
               responsavelId: true,
               ultimaMovimentacao: true,
               necessidadeId: true,
+              arquivo_url: true,
+              arquivo_nome: true,
+              arquivo_mime_type: true,
             },
           })
         : []
@@ -264,6 +270,9 @@ export async function GET(
         responsavelId: null,
         ultimaMovimentacao: null,
         necessidadeId: n.id,
+        arquivo_url: null,
+        arquivo_nome: null,
+        arquivo_mime_type: null,
       })
     }
 
@@ -297,6 +306,9 @@ export async function GET(
         statusShort: statusShortMap[d.status] || d.status.toLowerCase(),
         statusClass: statusToCompactClass(d.status),
         isRecebido: STATUS_VALIDADOS.includes(d.status),
+        arquivoUrl: d.arquivo_url ?? null,
+        arquivoNome: d.arquivo_nome ?? null,
+        arquivoMimeType: d.arquivo_mime_type ?? null,
       }))
 
       const received = docsCompact.filter((d) => d.isRecebido).length

@@ -32,6 +32,9 @@ interface DocCompact {
   statusShort: string
   statusClass: string
   isRecebido: boolean
+  arquivoUrl: string | null
+  arquivoNome: string | null
+  arquivoMimeType: string | null
 }
 
 interface Impediment {
@@ -206,6 +209,9 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
         translation: { status: deriveTraducao(d.status) },
         apostille: { status: deriveApostila(d.status) },
         finalStatus,
+        arquivoUrl: d.arquivoUrl,
+        arquivoNome: d.arquivoNome,
+        arquivoMimeType: d.arquivoMimeType,
       }
     })
     const ready = docs.filter((x) => x.finalStatus === "pronta_protocolo").length

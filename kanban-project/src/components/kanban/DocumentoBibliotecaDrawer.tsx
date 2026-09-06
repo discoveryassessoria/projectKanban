@@ -109,22 +109,45 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
             </button>
           </div>
 
-          {/* Ações (arquivos ainda não conectados ao backend) */}
+          {/* Ações — ligadas ao arquivo real (Documento.arquivo_url). Sem arquivo
+              (ex.: necessidade ainda sem operação iniciada), ficam desabilitadas
+              com tooltip honesto — nunca um botão morto sem explicação. */}
           <div className="flex items-center gap-2.5 mt-4 flex-wrap">
-            <button
-              disabled
-              title="Arquivo ainda não disponível"
-              className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <ExternalLink className="w-[15px] h-[15px]" /> Abrir arquivo principal
-            </button>
-            <button
-              disabled
-              title="Arquivo ainda não disponível"
-              className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <Download className="w-[15px] h-[15px]" /> Baixar todos os arquivos
-            </button>
+            {item.arquivoUrl ? (
+              <a
+                href={item.arquivoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-[var(--border-strong)]"
+              >
+                <ExternalLink className="w-[15px] h-[15px]" /> Abrir arquivo principal
+              </a>
+            ) : (
+              <button
+                disabled
+                title="Arquivo ainda não recebido"
+                className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <ExternalLink className="w-[15px] h-[15px]" /> Abrir arquivo principal
+              </button>
+            )}
+            {item.arquivoUrl ? (
+              <a
+                href={item.arquivoUrl}
+                download={item.arquivoNome ?? undefined}
+                className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-[var(--border-strong)]"
+              >
+                <Download className="w-[15px] h-[15px]" /> Baixar todos os arquivos
+              </a>
+            ) : (
+              <button
+                disabled
+                title="Arquivo ainda não recebido"
+                className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Download className="w-[15px] h-[15px]" /> Baixar todos os arquivos
+              </button>
+            )}
             <button className="inline-flex items-center gap-1.5 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-[var(--border-strong)]">
               Mais ações <ChevronDown className="w-[15px] h-[15px]" />
             </button>
@@ -153,7 +176,15 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
           {tab === "Visão geral" && (
             <Overview item={item} context={context} onGoToDados={() => setTab("Dados registrais")} />
           )}
-          {tab === "Certidão" && <FileTab title="Certidão" status={item.certificate.status} />}
+          {tab === "Certidão" && (
+            <FileTab
+              title="Certidão"
+              status={item.certificate.status}
+              arquivoUrl={item.arquivoUrl}
+              arquivoNome={item.arquivoNome}
+              arquivoMimeType={item.arquivoMimeType}
+            />
+          )}
           {tab === "Cert. retificada" && (
             <FileTab
               title="Certidão retificada"
@@ -317,7 +348,10 @@ function toneNode(label: string, st: CellStatus) {
 // ABAS DE ARQUIVO (Certidão / Cert. retificada / Tradução / Apostila)
 // ============================================================
 
-function FileTab({ title, status, emptyMsg }: { title: string; status: CellStatus; emptyMsg?: string }) {
+function FileTab({ title, status, emptyMsg, arquivoUrl, arquivoNome, arquivoMimeType }: {
+  title: string; status: CellStatus; emptyMsg?: string
+  arquivoUrl?: string | null; arquivoNome?: string | null; arquivoMimeType?: string | null
+}) {
   if (status === "nao_aplica") {
     return (
       <div className="text-[12.5px] text-[var(--text-muted)] py-8 text-center">
@@ -327,6 +361,7 @@ function FileTab({ title, status, emptyMsg }: { title: string; status: CellStatu
   }
 
   const available = status === "validada" || status === "recebida"
+  const isImagem = arquivoMimeType?.startsWith("image/") ?? false
 
   return (
     <div className="flex flex-col gap-3">
@@ -335,11 +370,29 @@ function FileTab({ title, status, emptyMsg }: { title: string; status: CellStatu
         <span className="font-semibold text-white/95">{title}</span>
         <span className="text-[var(--text-secondary)]">— {CELL_LABEL[status]}</span>
       </div>
-      <div className="border border-dashed border-[var(--border-default)] rounded-xl p-8 text-center text-[12px] text-[var(--text-muted)]">
-        {available
-          ? "Arquivo recebido. (visualização / download ainda não conectados ao backend)"
-          : "Arquivo ainda não disponível."}
-      </div>
+      {available && arquivoUrl ? (
+        <div className="flex flex-col gap-2">
+          <div className="border border-[var(--border-default)] rounded-xl overflow-hidden bg-[var(--surface-secondary)]">
+            {isImagem ? (
+              <img src={arquivoUrl} alt={arquivoNome ?? title} className="w-full max-h-[420px] object-contain bg-black/20" />
+            ) : (
+              <iframe src={arquivoUrl} title={arquivoNome ?? title} className="w-full h-[420px]" />
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-3 text-[12px] text-[var(--text-secondary)]">
+            <span className="truncate">{arquivoNome ?? "arquivo"}</span>
+            <a href={arquivoUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[var(--accent-text)] hover:underline flex-none">
+              Abrir em nova aba
+            </a>
+          </div>
+        </div>
+      ) : (
+        <div className="border border-dashed border-[var(--border-default)] rounded-xl p-8 text-center text-[12px] text-[var(--text-muted)]">
+          {available
+            ? "Arquivo recebido, mas ainda sem URL registrada."
+            : "Arquivo ainda não disponível."}
+        </div>
+      )}
     </div>
   )
 }

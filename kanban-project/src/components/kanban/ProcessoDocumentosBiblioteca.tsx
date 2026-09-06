@@ -38,6 +38,9 @@ export interface BibDocItem {
   translation: { status: CellStatus; date?: string | null }
   apostille: { status: CellStatus; date?: string | null }
   finalStatus: FinalStatus
+  arquivoUrl: string | null
+  arquivoNome: string | null
+  arquivoMimeType: string | null
 }
 
 export interface BibPersonGroup {
