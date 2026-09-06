@@ -244,10 +244,40 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
   // pessoa ainda precisava do documento que a Genealogia já disse que não
   // precisa (achado real: Edithe, processo "Teste", reaparecia em Emissão
   // Documental depois de dispensada em Genealogia).
-  await db.documento.updateMany({
+  const docsParaCancelar = await db.documento.findMany({
     where: { necessidadeId, status: { notIn: ["ENTREGUE", "INVALIDO", "CANCELADO"] } },
+    select: { id: true },
+  })
+  if (docsParaCancelar.length === 0) return
+  const documentoIds = docsParaCancelar.map((d) => d.id)
+  await db.documento.updateMany({
+    where: { id: { in: documentoIds } },
     data: { status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO, ultimaMovimentacao: new Date() },
   })
+
+  // REGRA DO SISTEMA, NÃO CONSERTO PONTUAL: um Documento CANCELADO nunca tem
+  // passo ativo em NENHUMA fase — não só na fase que o cancelou. Achado real:
+  // outras fases (Emissão Documental) já tinham materializado os PRÓPRIOS passos
+  // pra este documento (solicitar/aguardar/receber/conferir/validar certidão,
+  // ligados por documentoId, sem necessidadeId) ANTES desta dispensa — o
+  // materializador delas já exclui CANCELADO ao decidir o que criar
+  // (carregarContextoEscopo, phase-workflow.ts), mas isso só evita passo NOVO;
+  // não cancela o que outra fase já tinha criado enquanto o documento ainda
+  // valia. Cancela pelo motor canônico, todas as fases, de uma vez.
+  const passosDeOutrasFases = await db.phaseWorkflowStepInstance.findMany({
+    where: { documentoId: { in: documentoIds }, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO", "DISPENSADO"] } },
+    select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+  })
+  if (passosDeOutrasFases.length) {
+    const correlationId = randomUUID()
+    for (const p of passosDeOutrasFases) {
+      await transicionarPassoTx(db as Prisma.TransactionClient, p.id, "CANCELADO", {
+        correlationId, operacao: "documento-cancelado-por-dispensa", ciclo: p.ciclo,
+        processoId: p.processoId, workflowInstanceId: p.workflowInstanceId,
+        extra: { cancelledAt: new Date(), motivo: MOTIVO_DOCUMENTO_DISPENSADO },
+      })
+    }
+  }
 }
 
 const MOTIVO_DOCUMENTO_DISPENSADO = "Necessidade dispensada — não se aplica em nenhuma fase"

@@ -90,10 +90,16 @@ interface ProcessoDocumentosProps {
 function certStatusFromDoc(
   status: string,
   isRecebido: boolean
-): "validada" | "recebida" | "pendente" {
+): "validada" | "recebida" | "pendente" | "nao_aplica" {
   if (isRecebido) return "validada"
   const s = status.toLowerCase()
   if (s === "recebido" || s === "entregue") return "recebida"
+  // CANCELADO/INVALIDO são terminais — a exigência acabou (cancelada) ou o
+  // arquivo está sendo refeito por outra via (invalidado, aberto de novo em
+  // "invalidar"). Nenhum dos dois é "ainda não fiz" — sem isto, um documento
+  // cancelado (não se aplica em nenhuma fase) continuava contando como
+  // pendente aqui (achado real: Antonio, óbito; Edithe, ambas certidões).
+  if (s === "cancelado" || s === "invalido") return "nao_aplica"
   return "pendente"
 }
 
@@ -172,8 +178,17 @@ function deriveRetificacao(status: string): ColunaStatus {
 
 function mapearBiblioteca(data: ProcessoDocumentosData) {
   const toGroup = (row: PersonRow): BibPersonGroup => {
+    // CANCELADO/INVALIDO fora da biblioteca — a exigência acabou (cancelada) ou
+    // está sendo refeita por outra via (invalidado reabre a etapa em separado);
+    // nenhum dos dois é "documento a entregar" pendente. Sem isto, um documento
+    // cancelado (não se aplica em nenhuma fase) continuava contando como
+    // pendente aqui (achado real: Antonio, óbito; Edithe, ambas certidões).
+    const docsAplicaveis = row.docs.filter((d) => {
+      const s = d.status.toLowerCase()
+      return s !== "cancelado" && s !== "invalido"
+    })
     // Nasce, casa, morre — nunca alfabética (fonte única: ordem-evento-vida.ts).
-    const docsOrdenados = [...row.docs].sort((a, b) =>
+    const docsOrdenados = [...docsAplicaveis].sort((a, b) =>
       compararPorEventoDeVida(NOME_COMPLETO[a.tipoShort] ?? a.tipoShort, NOME_COMPLETO[b.tipoShort] ?? b.tipoShort),
     )
     const docs: BibDocItem[] = docsOrdenados.map((d) => {

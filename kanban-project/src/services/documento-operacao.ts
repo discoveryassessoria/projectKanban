@@ -1080,14 +1080,18 @@ export async function controlarOperacaoV2(
   const now = new Date()
   const obs = (observacao ?? "").trim()
   const correlationId = randomUUID()
-  if (action === "cancelar" || action === "invalidar") {
+  if (action === "cancelar") {
+    // CANCELAR = NÃO QUERO MAIS ESTE DOCUMENTO — decisão do usuário (05/09/2026):
+    // remove a exigência DE VEZ, em qualquer fase. Diferente de invalidar
+    // (abaixo): aqui não há "refazer depois".
+    const docAlvo = await prisma.documento.findUnique({ where: { id: documentoId }, select: { necessidadeId: true } })
     await prisma.$transaction(async (tx) => {
       const alvos = await tx.phaseWorkflowStepInstance.findMany({
         // Cancelar a operação cancela os passos da VISITA ATUAL. Sem o escopo, uma
         // etapa aberta de um ciclo antigo era cancelada junto — mexer no histórico
         // por causa de um comando sobre o presente.
         where: { documentoId, ...escopoControlar, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
-        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true, faseMacroKey: true, necessidadeId: true },
+        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
       })
       // Cancelar a operação de um documento cancela os passos dele — pelo motor,
       // que registra PASSO_CANCELADO. Antes esta era a transição mais silenciosa
@@ -1097,26 +1101,58 @@ export async function controlarOperacaoV2(
       }
       for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "CANCELADO", agora: now })
       await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
-      // CANCELAR O DOCUMENTO REMOVE A EXIGÊNCIA — decisão de negócio (não é "refazer
-      // depois"): cancelar/invalidar a operação de um documento dispensa a
-      // NecessidadeDocumental ligada a ele, pelo motor canônico (que já cancela
-      // qualquer etapa ativa remanescente — aqui não sobra nenhuma, o loop acima já
-      // cancelou). Antes, o passo era cancelado mas a necessidade nunca era
-      // dispensada: a obrigação sumia da tabela "Documentos por pessoa" e continuava
-      // contando como pendente no resumo da fase, travando o avanço sem jeito de
-      // fechar (achado real: Edithe, processo "Teste"). Dispensar — não reconciliar
-      // a árvore para recriar a etapa — porque recriar reabriria exatamente a
-      // exigência que o cancelamento pediu para encerrar.
-      const necessidadeIds = [...new Set(alvos.map((a) => a.necessidadeId).filter((x): x is number => x != null))]
-      for (const necId of necessidadeIds) {
-        await dispensarNecessidade(necId, obs || (action === "invalidar" ? "Documento invalidado" : "Operação cancelada"), tx, true)
+      // A NecessidadeDocumental é do Documento (campo direto, não do passo — passos
+      // de fase por-DOCUMENTO como Emissão não carregam necessidadeId nenhum).
+      // dispensarNecessidade cancela sozinha QUALQUER outra etapa ligada ao MESMO
+      // documento em OUTRAS fases (ex.: Emissão Documental já tinha materializado
+      // solicitar/receber/validar certidão pelo documentoId — achado real: Antonio,
+      // óbito, continuava pedindo depois de cancelado na fase anterior).
+      if (docAlvo?.necessidadeId != null) {
+        await dispensarNecessidade(docAlvo.necessidadeId, obs || "Operação cancelada", tx, true)
       }
     })
     await prisma.documento.update({
       where: { id: documentoId },
-      data: action === "invalidar"
-        ? { status: "INVALIDO", ultimaMovimentacao: now, motivoBloqueio: obs ? `Documento invalidado: ${obs}` : "Documento invalidado" }
-        : { status: "PENDENTE", ultimaMovimentacao: now, dataInicioOperacao: null, dataPrazoOperacao: null, motivoBloqueio: obs ? `Operação cancelada: ${obs}` : "Operação cancelada" },
+      data: { status: "CANCELADO", ultimaMovimentacao: now, motivoBloqueio: obs ? `Operação cancelada: ${obs}` : "Operação cancelada" },
+    })
+  } else if (action === "invalidar") {
+    // INVALIDAR = A TAREFA FOI FEITA ERRADA — decisão do usuário (05/09/2026): o
+    // documento/obrigação CONTINUA necessário; a etapa REABRE para nova tentativa
+    // (histórico da tentativa anterior preservado, nunca apagado). Nunca dispensa
+    // nada — é o oposto de cancelar.
+    const docAlvo = await prisma.documento.findUnique({ where: { id: documentoId }, select: { necessidadeId: true } })
+    await prisma.$transaction(async (tx) => {
+      // Inclui CONCLUIDO de propósito: o caso comum É "recebemos e demos como
+      // concluído, mas o arquivo está errado". PENDENTE/DISPONIVEL já estão
+      // abertos — nada a reabrir; CANCELADO/DISPENSADO/SUPERSEDIDO são de outra
+      // história, invalidar não os toca.
+      const alvos = await tx.phaseWorkflowStepInstance.findMany({
+        where: {
+          documentoId, ...escopoControlar,
+          status: { in: ["EM_ANDAMENTO", "AGUARDANDO", "BLOQUEADO", "EXECUTADO", "AGUARDANDO_APROVACAO", "CONCLUIDO", "FALHOU"] },
+        },
+        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+      })
+      for (const alvo of alvos) {
+        await reabrirPassoTx(tx, alvo.id, "DISPONIVEL", {
+          correlationId, operacao: "documento-controlar-invalidar", ciclo: alvo.ciclo,
+          processoId: alvo.processoId, workflowInstanceId: alvo.workflowInstanceId,
+          motivoTentativa: MOTIVOS_DE_TENTATIVA.DOCUMENTO_INVALIDADO,
+          extra: { motivo: obs ? `Documento invalidado: ${obs}` : "Documento invalidado" },
+        })
+      }
+      for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "DISPONIVEL", agora: now })
+      await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
+      // Espelho de dispensarNecessidade: se a necessidade já estava ATENDIDA (ou
+      // NAO_LOCALIZADA), volta pra EM_ATENDIMENTO — o documento não está mais
+      // pronto, porque a tentativa que o entregava acabou de reabrir.
+      if (docAlvo?.necessidadeId != null) {
+        await reabrirAtendimentoNecessidade(docAlvo.necessidadeId, tx)
+      }
+    })
+    await prisma.documento.update({
+      where: { id: documentoId },
+      data: { status: "PENDENTE", ultimaMovimentacao: now, dataInicioOperacao: null, dataPrazoOperacao: null, motivoBloqueio: obs ? `Documento invalidado: ${obs}` : "Documento invalidado" },
     })
   } else if (action === "pausar") {
     await prisma.$transaction(async (tx) => {
