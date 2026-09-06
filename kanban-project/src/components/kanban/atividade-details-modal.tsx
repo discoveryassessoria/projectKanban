@@ -17,7 +17,6 @@ import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 // movido para Gerenciamento → Motor → Diagnóstico do Runtime. A Central Operacional
 // é puramente operacional.
 import { ProcessoDocumentos } from "./ProcessoDocumentos"
-import { ProcuracaoDoProcesso } from "./ProcuracaoDoProcesso"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 // SLA operacional do processo (engine única — src/lib/motor/sla-core.ts)
@@ -1087,14 +1086,6 @@ function ConteudoModal({
             // rolar, e o conteúdo abaixo da dobra ficava inalcançável.
             <div className="h-full min-h-0 overflow-y-auto space-y-6">
               <ProcessoDocumentos processo={processo} />
-              {/* AÇÃO CONTEXTUAL — o MESMO gerador do cadastro do cliente, com o
-                  processo já preenchido. Não existe segundo gerador. */}
-              <ProcuracaoDoProcesso
-                processoId={processo.id}
-                processoRotulo={processo.nome || `#${processo.id}`}
-                contratantes={contratantesSelecionados.map((c) => ({ id: c.id, nome: c.nome }))}
-                requerentes={requerentesSelecionados.map((r) => ({ id: r.id, nome: r.nome }))}
-              />
             </div>
           )}
 
