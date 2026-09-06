@@ -31,8 +31,12 @@ export const PROVEDORES: ProvedorTranscricao[] = [provedorPdfCamadaTexto, proved
   (a, b) => a.prioridade - b.prioridade,
 )
 
-/** Teto de download — certidão não passa disso, e evita puxar arquivo gigante. */
-const MAX_BYTES = 25 * 1024 * 1024
+// Teto de download — certidão não passa disso, e evita puxar arquivo gigante.
+// Medido em produção (06/09/2026): "Certidão em Inteiro Teor" do e-CRC vem com
+// 36-47 MB de verdade — o padrão de segurança (fundo raster de alta resolução)
+// infla o PDF muito além do texto real. 25 MB bloqueava TODA certidão moderna
+// desse formato, não só documento antigo/escaneado.
+const MAX_BYTES = 60 * 1024 * 1024
 
 export interface ResultadoOperacao {
   documentoId: number
