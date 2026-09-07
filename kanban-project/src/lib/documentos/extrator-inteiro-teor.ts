@@ -14,7 +14,7 @@
 // o texto — decisão deliberada (ver ADR da sessão): resultado determinístico,
 // reproduzível, auditável campo a campo.
 
-import { extrairDataPorExtenso, extrairIdadeDeclarada } from "./extenso-pt"
+import { extrairDataPorExtenso, extrairIdadeDeclarada, extensoParaNumero, MESES } from "./extenso-pt"
 
 export interface CampoExtraido<T> {
   valor: T
@@ -108,7 +108,7 @@ function casarTodosNormalizados(
 }
 
 const PADRAO_FILIACAO =
-  /filh[oa]s?\s+legitim[oa]s?\s+de\s+([a-z'.\s]+?)\s+e\s+(?:de\s+)?(?:sua\s+esposa\s+|dona\s+|d\.\s+)?([a-z'.\s]+?)(?:[,.;]|\s+ambos\b|\s+natural|\s+residente|\s+domicil|$)/
+  /filh[oa]s?\s+legitim[oa]s?\s+de\s+([a-z'.\s]+?)(?:,\s*falecid[oa]s?)?\s+e\s+(?:de\s+)?(?:sua\s+esposa\s+|dona\s+|d\.\s+)?([a-z'.\s]+?)(?:[,.;]|\s+ambos\b|\s+natural|\s+residente|\s+domicil|$)/
 
 /**
  * TODAS as filiações do texto, em ordem de aparição — usado no casamento, onde o
@@ -122,6 +122,53 @@ export function extrairTodasFiliacoes(texto: string): Array<{ pai: CampoExtraido
     pai: { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto },
     mae: { valor: tituloCase(r.grupos[1]), origem: r.textoCompleto },
   }))
+}
+
+/**
+ * Nomes dos NUBENTES pelo texto CORRIDO — "o senhor X e dona Y" — em vez do
+ * cabeçalho em caixa com borda. Achado real (06/09/2026): o cabeçalho
+ * "NOME ATUAL DOS CÔNJUGES" é uma caixa com borda, e o OCR lê essa região pior
+ * que o parágrafo corrido (linha de borda se mistura com o texto, saída virava
+ * "Ll Den"/"de Í À" — inútil pra revisão). O texto corrido, mesmo com o mesmo
+ * OCR, leu limpo. Único ponto: o boilerplate deste tipo tem noivo primeiro.
+ */
+const PADRAO_NUBENTES_NARRATIVA =
+  /(?:o\s+)?senhor\s+([a-z'.\s]+?)\s+e\s+(?:dona|sua\s+esposa)\s+([a-z'.\s]+?)(?:[,.;]|\s+ambos\b|\s+solteir|\s+casad|\s+natural|\s+residente|\s+domicil|$)/
+
+export function extrairNubentesNarrativa(texto: string): { noivo?: CampoExtraido<string>; noiva?: CampoExtraido<string> } {
+  const r = casarNormalizado(texto, PADRAO_NUBENTES_NARRATIVA)
+  if (!r) return {}
+  return {
+    noivo: { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto },
+    noiva: { valor: tituloCase(r.grupos[1]), origem: r.textoCompleto },
+  }
+}
+
+const PADRAO_NASCIMENTO_CONJUGE =
+  /nasceu\s+em\s+([a-z'.\s]+?),?\s+no\s+dia\s+([a-z\s]+?)\s+de\s+(janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro),?\s+de\s+((?:mil|hum|um)[a-z\s]*?)(?:[,.;]|\s+filh|\s+domicil|\s+residente|$)/
+
+/**
+ * "nasceu em LOCAL, no dia DIA de MÊS[,] de ANO" — data e naturalidade de CADA
+ * nubente, na ordem em que aparecem (noivo primeiro). É o mesmo boilerplate
+ * que dá a data do REGISTRADO no nascimento, só que aqui narrado sobre um
+ * terceiro (o nubente), dentro da certidão de casamento dele.
+ */
+export function extrairNascimentosDeConjuges(texto: string): Array<{ birthPlace?: CampoExtraido<string>; birthDate?: CampoExtraido<string> }> {
+  return casarTodosNormalizados(texto, PADRAO_NASCIMENTO_CONJUGE).map((r) => {
+    const [localRaw, diaRaw, mesNome, anoRaw] = r.grupos
+    const dia = extensoParaNumero(diaRaw)
+    // mesNome vem recortado do texto ORIGINAL (casarTodosNormalizados preserva
+    // acento/maiúscula) — registro antigo escreve mês como substantivo próprio
+    // ("de Julho"), então a chave de MESES (minúscula, sem acento) só bate depois
+    // de normalizar aqui.
+    const mes = MESES[semAcento(mesNome).toLowerCase()]
+    const ano = extensoParaNumero(anoRaw)
+    const dataValida = dia != null && !!mes && ano != null && dia >= 1 && dia <= 31 && ano >= 1800 && ano <= 2100
+    return {
+      birthPlace: localRaw ? { valor: tituloCase(localRaw), origem: r.textoCompleto } : undefined,
+      birthDate: dataValida ? { valor: `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`, origem: r.textoCompleto } : undefined,
+    }
+  })
 }
 
 /**
@@ -290,20 +337,31 @@ function pareceNomeDePessoa(linha: string): boolean {
 }
 
 export function extrairCasamento(texto: string) {
-  const linhas = texto.split("\n").map((l) => l.trim()).filter(Boolean)
-  const nomes: string[] = []
-  for (let i = 0; i < linhas.length - 1; i++) {
-    if (semAcento(linhas[i]).toLowerCase().includes("nome atual dos conjuges") || semAcento(linhas[i]).toLowerCase() === "nome") {
-      for (let j = i + 1; j < linhas.length && nomes.length < 2; j++) {
-        if (pareceNomeDePessoa(linhas[j])) nomes.push(tituloCase(linhas[j]))
+  // Nome pelo texto CORRIDO primeiro (mais confiável — ver PADRAO_NUBENTES_NARRATIVA);
+  // cabeçalho em caixa só como fallback se a narrativa não bater.
+  const narrativa = extrairNubentesNarrativa(texto)
+  let nomeNoivo = val(narrativa.noivo)
+  let nomeNoiva = val(narrativa.noiva)
+  if (!nomeNoivo || !nomeNoiva) {
+    const linhas = texto.split("\n").map((l) => l.trim()).filter(Boolean)
+    const nomes: string[] = []
+    for (let i = 0; i < linhas.length - 1; i++) {
+      if (semAcento(linhas[i]).toLowerCase().includes("nome atual dos conjuges") || semAcento(linhas[i]).toLowerCase() === "nome") {
+        for (let j = i + 1; j < linhas.length && nomes.length < 2; j++) {
+          if (pareceNomeDePessoa(linhas[j])) nomes.push(tituloCase(linhas[j]))
+        }
+        break
       }
-      break
     }
+    nomeNoivo = nomeNoivo || nomes[0]
+    nomeNoiva = nomeNoiva || nomes[1]
   }
+
   const filiacoes = extrairTodasFiliacoes(texto)
+  const nascimentos = extrairNascimentosDeConjuges(texto)
   return {
-    spouse1: { fullName: nomes[0] },
-    spouse2: { fullName: nomes[1] },
+    spouse1: { fullName: nomeNoivo, birthDate: val(nascimentos[0]?.birthDate), birthPlace: val(nascimentos[0]?.birthPlace) },
+    spouse2: { fullName: nomeNoiva, birthDate: val(nascimentos[1]?.birthDate), birthPlace: val(nascimentos[1]?.birthPlace) },
     spouse1Parents: { fatherFullName: val(filiacoes[0]?.pai), motherFullName: val(filiacoes[0]?.mae) },
     spouse2Parents: { fatherFullName: val(filiacoes[1]?.pai), motherFullName: val(filiacoes[1]?.mae) },
     event: { marriageDate: val(extrairDataDoEvento(texto)), marriagePlace: val(extrairLocalDoRegistro(texto)) },

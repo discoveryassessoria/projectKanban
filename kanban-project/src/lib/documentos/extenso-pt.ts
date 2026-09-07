@@ -27,7 +27,7 @@ const CENTENAS: Record<string, number> = {
   seiscentos: 600, seiscentas: 600, setecentos: 700, setecentas: 700,
   oitocentos: 800, oitocentas: 800, novecentos: 900, novecentas: 900,
 }
-const MESES: Record<string, number> = {
+export const MESES: Record<string, number> = {
   janeiro: 1, fevereiro: 2, marco: 3, março: 3, abril: 4, maio: 5, junho: 6,
   julho: 7, agosto: 8, setembro: 9, outubro: 10, novembro: 11, dezembro: 12,
 }

@@ -1026,7 +1026,7 @@ function TabelaDivergencias({ divs, onDecidir, onVerDetalhes, readOnly }: {
       <table className="w-full text-sm">
         <thead>
           <tr className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
-            {["Pessoa", "Documento", "Campo", "Valor na árvore", "Valor no documento", "Gravidade", "Sugestão", "Decisão"].map((h) => (
+            {["Pessoa", "Documento", "Campo", "Valor esperado", "Valor no documento", "Gravidade", "Sugestão", "Decisão"].map((h) => (
               <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>
             ))}
             <th className="px-3 py-2" />
@@ -1482,7 +1482,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
 
           <div className="rounded-lg border border-[var(--border-default)] divide-y divide-white/10 text-sm">
             <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Campo</span><span className="font-medium text-white/95">{div.campoLabel}</span></div>
-            <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Valor na árvore</span><span className="font-medium text-white/95">{div.valorArvore || "—"}</span></div>
+            <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Valor esperado</span><span className="font-medium text-white/95">{div.valorArvore || "—"}</span></div>
             <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Valor no documento</span><span className="font-medium text-white/95">{div.valorDocumento || "—"}</span></div>
             <div className="flex justify-between px-3 py-2 items-center"><span className="text-[var(--text-secondary)]">Gravidade</span>
               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[div.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}>
