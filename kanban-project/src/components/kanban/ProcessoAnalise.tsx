@@ -1126,23 +1126,34 @@ function tipoEventoDoDoc(tipo: string): "nascimento" | "casamento" | "obito" {
 // ler, com valor em branco. Existe pra quando a extração automática não achou
 // nada (texto ilegível, sem OCR configurado): sem isto, um documento que falhou
 // na extração ficava sem NENHUM jeito de preencher os dados à mão nesta tela.
+// O envelope (birth/marriage/death) é OBRIGATÓRIO — é o que `ad2CompareDoc`
+// checa pra saber qual ramo rodar (`sd.birth`, `sd.marriage`, `sd.death`).
+// Achado real: a primeira versão deste template esquecia o envelope, e o
+// documento preenchido por ele passava pela comparação inteiro SEM RODAR
+// NENHUM campo — nem erro, nem divergência, silenciosamente ignorado.
 const TEMPLATE_VAZIO: Record<"nascimento" | "casamento" | "obito", Record<string, unknown>> = {
   nascimento: {
-    registered: { fullName: "", birthDate: "", birthPlace: "", nationality: "" },
-    father: { fullName: "" }, mother: { fullName: "" },
-    paternalGrandparents: { grandfatherName: "", grandmotherName: "" },
-    maternalGrandparents: { grandfatherName: "", grandmotherName: "" },
+    birth: {
+      registered: { fullName: "", birthDate: "", birthPlace: "", nationality: "" },
+      father: { fullName: "" }, mother: { fullName: "" },
+      paternalGrandparents: { grandfatherName: "", grandmotherName: "" },
+      maternalGrandparents: { grandfatherName: "", grandmotherName: "" },
+    },
   },
   casamento: {
-    spouse1: { fullName: "" }, spouse2: { fullName: "" },
-    spouse1Parents: { fatherFullName: "", motherFullName: "" },
-    spouse2Parents: { fatherFullName: "", motherFullName: "" },
-    event: { marriageDate: "", marriagePlace: "" },
+    marriage: {
+      spouse1: { fullName: "" }, spouse2: { fullName: "" },
+      spouse1Parents: { fatherFullName: "", motherFullName: "" },
+      spouse2Parents: { fatherFullName: "", motherFullName: "" },
+      event: { marriageDate: "", marriagePlace: "" },
+    },
   },
   obito: {
-    deceased: { fullName: "", birthPlace: "", nationality: "", declaredAge: "" },
-    parents: { fatherFullName: "", motherFullName: "" },
-    deathEvent: { deathDate: "", deathPlace: "" },
+    death: {
+      deceased: { fullName: "", birthPlace: "", nationality: "", declaredAge: "" },
+      parents: { fatherFullName: "", motherFullName: "" },
+      deathEvent: { deathDate: "", deathPlace: "" },
+    },
   },
 }
 
