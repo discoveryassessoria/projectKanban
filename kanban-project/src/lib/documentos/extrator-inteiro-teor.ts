@@ -36,6 +36,28 @@ function tituloCase(s: string): string {
 }
 
 /**
+ * Ruído de margem (matrícula/número de página, lido de lado pelo OCR) que gruda
+ * no meio de uma frase do corpo corrido — achado real (doc 2122, texto OCR de
+ * verdade): "Antonio Medina de 70774\nOliveira", "no dia 7\nvinte e seis" — o
+ * dígito nunca é conteúdo de verdade ali: nestas certidões o único dígito solto
+ * que aparece por dentro do corpo é idade de testemunha ("39 anos"); data/idade
+ * do(s) nubente(s)/registrado(s) é sempre por extenso. Troca por espaços do
+ * MESMO tamanho (nunca remove caractere) pra não desalinhar os índices que
+ * `casarNormalizado`/`casarTodosNormalizados` usam pra recortar do texto
+ * original.
+ */
+function limparRuidoDeMargem(texto: string): string {
+  let t = texto.replace(/\d{1,6}(?!\s*ann?os\b)/gi, (m) => " ".repeat(m.length))
+  // Segundo padrão real, mesmo documento: letra maiúscula solta e/ou underscore
+  // que o OCR gruda entre duas palavras da MESMA frase ("filha A\n_ legitima") —
+  // nome de pessoa nunca aparece como letra solta no meio do boilerplate fixo do
+  // registro civil; abreviação de verdade ("D.", "Dr.") sempre vem seguida de
+  // ponto, por isso fica de fora daqui.
+  t = t.replace(/\b[A-Z_]{1,2}\b(?!\.)/g, (m) => " ".repeat(m.length))
+  return t
+}
+
+/**
  * Cabeçalho estruturado da "Certidão em Inteiro Teor" (formato e-CRC, pós-2015):
  *
  *   NOME
@@ -275,6 +297,7 @@ export function extrairNacionalidade(texto: string): Extraido<string> {
 const val = <T>(c: Extraido<T>): T | undefined => c?.valor
 
 export function extrairNascimento(texto: string, municipioDoRegistro?: string) {
+  texto = limparRuidoDeMargem(texto)
   const cab = extrairCabecalho(texto)
   const fil = extrairFiliacao(texto)
   const avos = extrairAvos(texto)
@@ -293,6 +316,7 @@ export function extrairNascimento(texto: string, municipioDoRegistro?: string) {
 }
 
 export function extrairObito(texto: string, municipioDoRegistro?: string) {
+  texto = limparRuidoDeMargem(texto)
   const cab = extrairCabecalho(texto)
   const fil = extrairFiliacao(texto)
   return {
@@ -337,6 +361,7 @@ function pareceNomeDePessoa(linha: string): boolean {
 }
 
 export function extrairCasamento(texto: string) {
+  texto = limparRuidoDeMargem(texto)
   // Nome pelo texto CORRIDO primeiro (mais confiável — ver PADRAO_NUBENTES_NARRATIVA);
   // cabeçalho em caixa só como fallback se a narrativa não bater.
   const narrativa = extrairNubentesNarrativa(texto)
