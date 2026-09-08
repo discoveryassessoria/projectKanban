@@ -59,8 +59,12 @@ check("`passosOperacaoV2` não filtra mais só por fase",
 check("`temOperacaoV2` usa o mesmo escopo", /temOperacaoV2[\s\S]{0,320}escopoDaVisita/.test(codigo))
 check("a progressão e a reabertura por documento ficam na MESMA instância",
   (codigo.match(/documentoId, workflowInstanceId: p\.workflowInstanceId/g) ?? []).length === 2)
-check("controlar operação (cancelar/pausar) não alcança ciclo antigo",
-  (codigo.match(/documentoId, \.\.\.escopoControlar/g) ?? []).length === 2)
+check("controlar operação (cancelar/invalidar/pausar) não alcança ciclo antigo",
+  // 3, não 2: cancelar + invalidar + pausar escopam por escopoControlar
+  // (retomar usa where:{id} direto, no passo já identificado). Reconferido
+  // em 11/09/2026 — o número mudou de 2 pra 3 antes desta sessão (achado ao
+  // corrigir o cancelamento, não introduzido por ela).
+  (codigo.match(/documentoId, \.\.\.escopoControlar/g) ?? []).length === 3)
 check("a materialização usa a MESMA regra de instância vigente da leitura",
   /iniciarOperacaoDocumentoV2[\s\S]{0,1600}resolverInstanciaVigente/.test(codigo))
 
@@ -68,7 +72,10 @@ check("o roteiro devolve de qual visita está falando",
   svc.includes("workflowInstanceId: number | null") && svc.includes("ciclo: number | null") &&
   svc.includes("currentStepId: number | null"))
 check("a etapa atual vem da lista já escopada, não por nome nem por id maior",
-  codigo.includes("const atual = passos.find((p) => ![\"CONCLUIDO\", \"DISPENSADO\"].includes(p.status))"))
+  // CANCELADO/SUPERSEDIDO entraram na exclusão em 11/09/2026 (correção do
+  // cancelamento: `atual` só existe na lista quando `incluirEncerrados`, e
+  // um passo cancelado nunca é "a próxima etapa").
+  codigo.includes("const atual = passos.find((p) => ![\"CONCLUIDO\", \"DISPENSADO\", \"CANCELADO\", \"SUPERSEDIDO\"].includes(p.status))"))
 
 const hist = read("src/app/api/documentos/[id]/workflow/historico/route.ts")
 check("existe porta separada para o histórico das visitas", hist.includes("export async function GET"))

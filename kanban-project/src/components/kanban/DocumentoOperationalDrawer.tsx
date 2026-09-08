@@ -7,7 +7,10 @@ import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
-import { X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText } from "lucide-react"
+import {
+  X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText,
+  UserCog, Paperclip, MessageSquare, Gavel, PlayCircle, Ban, Sparkles, DollarSign, CircleDot,
+} from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { WorkflowTab, type ContextoAntecipada } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
@@ -58,6 +61,7 @@ const STATUS_LABELS: Record<string, string> = {
   ENTREGUE: "Entregue",
   INVALIDO: "Inválido",
   NAO_ENCONTRADO: "Não encontrado",
+  CANCELADO: "Cancelado",
 }
 
 // Mapeamento de cor da pílula por status (mockup): Solicitado = amber,
@@ -70,6 +74,7 @@ const STATUS_PILL_CLS: Record<string, string> = {
   ENTREGUE: "bg-[var(--surface-secondary)] text-green-800",
   INVALIDO: "bg-[var(--surface-secondary)] text-red-700",
   NAO_ENCONTRADO: "bg-[var(--surface-secondary)] text-red-700",
+  CANCELADO: "bg-[var(--surface-secondary)] text-red-700",
 }
 
 // ============================================================
@@ -265,6 +270,9 @@ const ROTULO_STATUS_TAREFA: Record<string, string> = {
   BLOQUEADA: "Bloqueada",
   CONCLUIDO_RECEBIDO: "Concluída",
   CONCLUIDO_NAO_POSSUI: "Concluída",
+  // CANCELADA != CONCLUÍDA — precisa do próprio rótulo, senão cai no `?? tarefa.statusTarefa`
+  // (a string crua do enum) em vez de dizer "Operação cancelada" com clareza.
+  CANCELADA: "Operação cancelada",
 }
 
 
@@ -323,6 +331,7 @@ interface WorkflowDoDrawer {
   prioridade?: string | null
   startedAt: string | Date | null
   cancelledAt?: string | Date | null
+  cancelReason?: string | null
   steps: StepDoDrawer[]
 }
 
@@ -475,7 +484,7 @@ function ConteudoDrawer({
   const tabsAll: Array<{ id: TabId; label: string; count?: number; danger?: boolean }> = [
     { id: "workflow", label: "Workflow" },
     { id: "registry", label: "Dados Registrais" },
-    { id: "history", label: "Histórico" },
+    { id: "history", label: "Andamento" },
     { id: "attach", label: "Anexos" },
     { id: "observ", label: "Observações" },
   ]
@@ -767,7 +776,7 @@ function ConteudoDrawer({
                 </div>
               )}
               {activeTab === "registry" && <TabRegistry doc={doc} tipoLabel={tipoLabel} />}
-              {activeTab === "history" && <TabHistory doc={doc} />}
+              {activeTab === "history" && <TabAndamento documentoId={doc.id} />}
               {activeTab === "workflow" && (
                 <WorkflowTab
                   documentoId={doc.id}
@@ -887,17 +896,91 @@ function TabRegistry({ doc, tipoLabel }: { doc: Documento; tipoLabel: string }) 
 // ============================================================
 // ABA: HISTÓRICO
 // ============================================================
-function TabHistory({ doc }: { doc: Documento }) {
-  const eventos: Array<{ data: string; label: string }> = []
-  if (doc.createdAt) eventos.push({ data: doc.createdAt, label: "Documento criado" })
-  if (doc.dataInicioOperacao) eventos.push({ data: doc.dataInicioOperacao, label: "Operação iniciada" })
-  if (doc.data_registro) eventos.push({ data: doc.data_registro, label: "Data de registro no cartório" })
-  if (doc.data_traducao) eventos.push({ data: doc.data_traducao, label: "Documento traduzido" })
-  if (doc.data_apostila) eventos.push({ data: doc.data_apostila, label: "Documento apostilado" })
-  if (doc.updatedAt && doc.updatedAt !== doc.createdAt) eventos.push({ data: doc.updatedAt, label: "Última atualização" })
+// ============================================================
+// ANDAMENTO — linha do tempo real da operação (src/services/andamento-operacional.ts).
+// SOMENTE LEITURA daqui: cada linha vem de LogAuditoria/WorkflowEvento/
+// NecessidadeDocumentalEvento/DocumentoArquivo/DocumentoObservacao — nunca
+// inferida de timestamp solto do Documento (era o defeito da versão antiga:
+// "Documento criado"/"Última atualização" e mais nada).
+// ============================================================
+interface EventoAndamentoUI {
+  id: string
+  tipo: string
+  categoria: string
+  data: string
+  autor: { tipo: "humano" | "sistema"; id: number | null; nome: string }
+  titulo: string
+  descricao: string | null
+  de: string | null
+  para: string | null
+  etapa: string | null
+  motivo: string | null
+}
 
-  eventos.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+const ICONE_POR_CATEGORIA: Record<string, React.ComponentType<{ className?: string }>> = {
+  criacao: Sparkles,
+  responsabilidade: UserCog,
+  execucao: PlayCircle,
+  estado: CircleDot,
+  prazo: Clock,
+  solicitacao: FileText,
+  anexo: Paperclip,
+  observacao: MessageSquare,
+  decisao: Gavel,
+  financeiro: DollarSign,
+}
 
+/** HOJE / ONTEM / DD/MM/AAAA — mesmo padrão de agrupamento do resto do app. */
+function rotuloDoGrupo(dataISO: string): string {
+  const d = new Date(dataISO)
+  const hoje = new Date()
+  const inicio = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
+  const diffDias = Math.round((inicio(hoje) - inicio(d)) / 86_400_000)
+  if (diffDias === 0) return "HOJE"
+  if (diffDias === 1) return "ONTEM"
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+}
+
+function LinhaEvento({ e }: { e: EventoAndamentoUI }) {
+  const Icone = ICONE_POR_CATEGORIA[e.categoria] ?? CircleDot
+  const cancelado = e.categoria === "decisao" && /CANCEL/.test(e.tipo)
+  return (
+    <div className="flex items-start gap-2.5 py-2 border-b border-[var(--border-subtle)] last:border-0">
+      <Icone className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${cancelado ? "text-red-700" : "text-[var(--text-muted)]"}`} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline justify-between gap-2 flex-wrap">
+          <span className={`text-[13px] font-medium ${cancelado ? "text-red-700" : "text-white"}`}>{e.titulo}</span>
+          <span className="text-[10px] font-mono text-[var(--text-muted)] flex-shrink-0">
+            {new Date(e.data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
+        </div>
+        <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+          Por: <span className={e.autor.tipo === "sistema" ? "italic text-[var(--text-muted)]" : ""}>{e.autor.nome}</span>
+          {e.etapa ? <> · Etapa: {e.etapa}</> : null}
+        </div>
+        {(e.de || e.para) && (
+          <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
+            {e.de ?? "—"} → {e.para ?? "—"}
+          </div>
+        )}
+        {e.descricao && <div className="text-[12px] text-[var(--text-secondary)] mt-0.5">{e.descricao}</div>}
+        {e.motivo && <div className="text-[11px] text-[var(--text-muted)] mt-0.5">Motivo: {e.motivo}</div>}
+      </div>
+    </div>
+  )
+}
+
+function TabAndamento({ documentoId }: { documentoId: number }) {
+  const consulta = useApi<{ eventos: EventoAndamentoUI[] }>(`/api/documentos/${documentoId}/andamento`)
+  const eventos = consulta.dados?.eventos ?? []
+
+  if (!consulta.dados) {
+    return (
+      <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
+        <Loader2 className="w-4 h-4 animate-spin mr-2" /> Carregando andamento…
+      </div>
+    )
+  }
   if (eventos.length === 0) {
     return (
       <div className="text-center py-12 text-[var(--text-muted)]">
@@ -906,24 +989,31 @@ function TabHistory({ doc }: { doc: Documento }) {
     )
   }
 
+  // AGRUPADO POR DIA, na ordem em que `eventos` já chega (mais recente primeiro).
+  const grupos: Array<{ rotulo: string; itens: EventoAndamentoUI[] }> = []
+  for (const e of eventos) {
+    const rotulo = rotuloDoGrupo(e.data)
+    const grupo = grupos[grupos.length - 1]?.rotulo === rotulo ? grupos[grupos.length - 1] : null
+    if (grupo) grupo.itens.push(e)
+    else grupos.push({ rotulo, itens: [e] })
+  }
+
   return (
-    <div className="space-y-3">
-      <Section title="Timeline do documento">
-        <div className="space-y-2.5">
-          {eventos.map((e, i) => (
-            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[var(--surface-overlay)] border border-[var(--border-subtle)]">
-              <div className="w-2 h-2 rounded-full bg-[var(--text-muted)] mt-1.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm text-white">{e.label}</div>
-                <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">{fmtDateTime(e.data)}</div>
-              </div>
-            </div>
-          ))}
+    <div className="space-y-4">
+      {grupos.map((g) => (
+        <div key={g.rotulo}>
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+            {g.rotulo}
+          </div>
+          <div className="rounded-md bg-[var(--surface-overlay)] border border-[var(--border-subtle)] px-3">
+            {g.itens.map((e) => <LinhaEvento key={e.id} e={e} />)}
+          </div>
         </div>
-      </Section>
-      <div className="text-[11px] text-[var(--text-muted)] px-2 pt-2">
-        Marcos do documento. O diário completo da operação (contatos, observações e
-        anexos, com autor e data) fica nas abas Observações e Anexos.
+      ))}
+      <div className="text-[11px] text-[var(--text-muted)] px-2 pt-1">
+        Linha do tempo da operação, a partir dos registros do motor. Eventos anteriores
+        a esta versão podem estar incompletos — o que não foi registrado então não
+        aparece aqui.
       </div>
     </div>
   )

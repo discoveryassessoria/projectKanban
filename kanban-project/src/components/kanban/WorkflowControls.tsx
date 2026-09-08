@@ -24,9 +24,12 @@ import { OpManageModal } from "./OpManageModal"
 interface WorkflowMinimal {
   id: number
   status: string                // em_andamento | pausado | cancelado | concluido
-  progress: number              // 0-100
+  progress: number              // 0-100 — CANCELADA != CONCLUÍDA: quando cancelado, é
+                                 // a fração real concluída ANTES do cancelamento, nunca
+                                 // um indicador de sucesso (ver render abaixo).
   startedAt: string | Date | null
   cancelledAt?: string | Date | null
+  cancelReason?: string | null
 }
 
 interface WorkflowControlsProps {
@@ -70,6 +73,7 @@ export function WorkflowControls({
   const progress = workflow.progress ?? 0
   const startedAt = formatDate(workflow.startedAt)
   const cancelledAt = workflow.cancelledAt ? formatDate(workflow.cancelledAt) : null
+  const cancelReason = workflow.cancelReason ?? null
   const status = workflow.status
 
   const isAndamento = status === "em_andamento"
@@ -128,21 +132,40 @@ export function WorkflowControls({
     <div className="px-6 py-3 border-b border-[var(--border-default)]" style={{ background: "var(--surface-secondary)" }}>
       <div className="bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl px-4 py-3.5">
 
-        {/* Barra de progresso */}
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-            Progresso operacional
-          </span>
-          <span className="text-[11px] font-mono text-[var(--text-secondary)]">
-            {progress}% · {isCancelado && cancelledAt ? `Cancelado em ${cancelledAt}` : `Iniciado em ${startedAt}`}
-          </span>
-        </div>
-        <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden">
-          <div
-            className="h-full bg-[var(--action-primary)] rounded-full transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
+        {/* Estado da operação — CANCELADA != CONCLUÍDA: uma cancelada nunca mostra
+            a barra de progresso como indicador de sucesso (mesmo que uma fração
+            real do roteiro tivesse sido concluída antes do cancelamento). */}
+        {isCancelado ? (
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+              Estado da operação
+            </span>
+            <span className="text-[11px] font-mono text-[var(--text-secondary)]">
+              {cancelledAt ? `Cancelada em ${cancelledAt}` : "Cancelada"}
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Progresso operacional
+            </span>
+            <span className="text-[11px] font-mono text-[var(--text-secondary)]">
+              {progress}% · Iniciado em {startedAt}
+            </span>
+          </div>
+        )}
+        {isCancelado ? (
+          <div className="h-1.5 bg-red-900/40 rounded-full overflow-hidden" role="img" aria-label="Operação cancelada">
+            <div className="h-full w-full bg-red-700/70 rounded-full" />
+          </div>
+        ) : (
+          <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[var(--action-primary)] rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
 
         {/* Banner de status */}
         {isPausado && (
@@ -154,7 +177,11 @@ export function WorkflowControls({
         {isCancelado && (
           <div className="mt-3 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md text-[11px] text-red-700 flex items-center gap-2">
             <Ban className="w-3 h-3 flex-shrink-0" />
-            <span><strong>Operação CANCELADA</strong> · documento voltou pra fila de pendentes</span>
+            <span>
+              <strong>OPERAÇÃO CANCELADA</strong> · documento voltou pra fila de pendentes
+              {cancelReason ? ` · ${cancelReason}` : ""}
+              {progress > 0 ? ` · ${progress}% do roteiro tinha sido concluído antes do cancelamento` : ""}
+            </span>
           </div>
         )}
 

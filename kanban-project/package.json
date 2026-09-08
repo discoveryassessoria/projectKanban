@@ -253,6 +253,8 @@
     "test:home-total-acoes-dedup": "tsx scripts/home-total-acoes-deduplicado.test.ts",
     "test:tarefas-criacao-consolidada": "tsx scripts/tarefas-criacao-consolidada.test.ts",
     "test:projecoes-fecham-por-ids": "tsx scripts/projecoes-fecham-por-ids.test.ts",
+    "test:cancelamento-operacao": "tsx scripts/cancelamento-operacao-documento.test.ts",
+    "test:andamento-operacional": "tsx scripts/andamento-operacional.test.ts",
     "test:regras-documentais": "tsx scripts/regras-documentais.test.ts",
     "test:regras-documentais-guard": "tsx scripts/regras-documentais-guard.test.ts",
     "test:resolver-preco": "tsx scripts/resolver-preco-financeiro.test.ts",

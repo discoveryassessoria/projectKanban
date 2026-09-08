@@ -85,6 +85,8 @@ interface WfShape {
   status: string
   progress: number
   steps: WfStep[]
+  cancelledAt?: string | Date | null
+  cancelReason?: string | null
 }
 
 export interface DocumentProjectionResult {

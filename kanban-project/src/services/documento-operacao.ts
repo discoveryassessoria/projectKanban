@@ -185,14 +185,23 @@ async function escopoDaVisita(documentoId: number): Promise<{ where: Record<stri
   return { where: faseAtualKey ? { faseMacroKey: faseAtualKey } : {}, visita: null }
 }
 
-/** Passos operacionais V2 de UM documento NA VISITA ATUAL (ativos), ordenados. */
-export async function passosOperacaoV2(documentoId: number): Promise<PassoOperacaoV2[]> {
+/**
+ * Passos operacionais V2 de UM documento NA VISITA ATUAL, ordenados.
+ *
+ * Por padrão só os ATIVOS (`status notIn INATIVOS`) — é o que "trabalho a fazer"
+ * significa em toda leitura normal. `incluirEncerrados: true` existe só para quem
+ * precisa mostrar o que ACONTECEU na visita inteira (ex.: `montarWorkflowV2` numa
+ * operação CANCELADA — sem isto os passos cancelados somem da lista, e o que
+ * sobra sozinho — o que já tinha sido concluído ANTES do cancelamento — vira
+ * "100% concluído" por engano. Ver achado real: documento 2131.
+ */
+export async function passosOperacaoV2(documentoId: number, opts?: { incluirEncerrados?: boolean }): Promise<PassoOperacaoV2[]> {
   const { where: escopo } = await escopoDaVisita(documentoId)
   const rows = await prisma.phaseWorkflowStepInstance.findMany({
     // Escopo à VISITA ATUAL (instância da fase), não só à fase: passos de fases
     // anteriores E de ciclos anteriores da mesma fase são histórico, não trabalho a
     // fazer. Sem processo/instância, cai no escopo de fase e, por fim, no antigo.
-    where: { documentoId, status: { notIn: INATIVOS }, ...escopo },
+    where: { documentoId, ...(opts?.incluirEncerrados ? {} : { status: { notIn: INATIVOS } }), ...escopo },
     orderBy: { ordem: "asc" },
     select: {
       id: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
@@ -278,6 +287,14 @@ export interface WorkflowV2Shape {
   ciclo: number | null
   /** A etapa atual DESTA visita — nunca escolhida por nome ou por id maior. */
   currentStepId: number | null
+  /**
+   * CANCELADA != CONCLUÍDA — só preenchidos quando `status === "cancelado"`.
+   * Fonte: `Documento.ultimaMovimentacao`/`motivoBloqueio`, gravados pela MESMA
+   * transação que cancela (ver `controlarOperacaoV2`, ação "cancelar") — nenhum
+   * campo novo, nenhuma segunda fonte.
+   */
+  cancelledAt: string | null
+  cancelReason: string | null
 }
 
 /**
@@ -310,7 +327,23 @@ export async function montarWorkflowV2(
   documentoId: number,
   ctx?: ContextoLeituraWorkflow,
 ): Promise<WorkflowV2Shape | null> {
-  const passos = await passosOperacaoV2(documentoId)
+  // CANCELADA != CONCLUÍDA — achado real (documento 2131, "Certidão de óbito"):
+  // `passosOperacaoV2` sem opções só devolve os passos ATIVOS (`notIn INATIVOS`,
+  // que inclui CANCELADO). Numa operação cancelada NO MEIO do roteiro, os passos
+  // já concluídos ANTES do cancelamento continuam ativos (CONCLUIDO não é
+  // INATIVOS) e os cancelados somem da lista — sobra só quem já tinha sido
+  // concluído, e a conta de progresso/status batia 100%/"concluído" para uma
+  // operação que na verdade foi CANCELADA. `Documento.status` já é a fonte
+  // canônica existente que diz isso (gravada pela MESMA transação que cancela,
+  // em `controlarOperacaoV2`) — reaproveitada aqui, nenhum estado novo.
+  const documento = await prisma.documento.findUnique({
+    where: { id: documentoId },
+    select: { status: true, ultimaMovimentacao: true, motivoBloqueio: true },
+  })
+  const cancelado = documento?.status === "CANCELADO"
+  // Cancelada: lê TODOS os passos da visita (inclusive os cancelados) — é o que
+  // permite mostrar o que realmente aconteceu, não só o que sobrou do filtro.
+  const passos = await passosOperacaoV2(documentoId, cancelado ? { incluirEncerrados: true } : undefined)
   if (passos.length === 0) return null
   const faseMacroKey = passos[0].faseMacroKey
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
@@ -352,18 +385,30 @@ export async function montarWorkflowV2(
       andamento: { ...andamento, previsaoEfetiva: previsaoEfetiva(andamento, p.startedAt) },
     } as Record<string, unknown>
   })
+  // O DENOMINADOR, quando cancelada, é a visita INTEIRA (inclusive os passos
+  // cancelados) — "1 de 5 concluídas antes do cancelamento" é a verdade; "100%"
+  // não é. Passo cancelado nunca soma em `doneW` (não é sucesso).
   const progress = totalW > 0 ? Math.round((doneW / totalW) * 100) : 0
-  const concluido = passos.every((p) => ["CONCLUIDO", "DISPENSADO"].includes(p.status))
+  // CANCELADA nunca é "concluído" — nem quando, por coincidência, todo passo
+  // sobrevivente já estava CONCLUIDO antes do cancelamento (era exatamente essa
+  // coincidência que produzia o bug).
+  const concluido = !cancelado && passos.every((p) => ["CONCLUIDO", "DISPENSADO"].includes(p.status))
   // A ETAPA ATUAL sai da própria lista já escopada: a primeira não-terminal na ordem.
   // Resolver por stepKey, por updatedAt ou pelo maior id atravessaria visitas.
-  const atual = passos.find((p) => !["CONCLUIDO", "DISPENSADO"].includes(p.status)) ?? null
+  // CANCELADO/SUPERSEDIDO também são terminais aqui — só entram na lista quando
+  // `incluirEncerrados`, e não são "a próxima etapa" de coisa nenhuma.
+  const atual = passos.find((p) => !["CONCLUIDO", "DISPENSADO", "CANCELADO", "SUPERSEDIDO"].includes(p.status)) ?? null
   const visita = await visitaAtualDoDocumento(documentoId)
   return {
     id: `v2-${documentoId}-${faseMacroKey}${visita ? `-c${visita.ciclo}` : ""}`,
-    documentoId, faseCode, status: concluido ? "concluido" : "em_andamento", progress, steps,
+    documentoId, faseCode,
+    status: cancelado ? "cancelado" : (concluido ? "concluido" : "em_andamento"),
+    progress, steps,
     workflowInstanceId: visita?.workflowInstanceId ?? null,
     ciclo: visita?.ciclo ?? null,
     currentStepId: atual?.id ?? null,
+    cancelledAt: cancelado ? (documento?.ultimaMovimentacao?.toISOString() ?? null) : null,
+    cancelReason: cancelado ? (documento?.motivoBloqueio ?? null) : null,
   }
 }
 
@@ -1084,7 +1129,30 @@ export async function controlarOperacaoV2(
     // CANCELAR = NÃO QUERO MAIS ESTE DOCUMENTO — decisão do usuário (05/09/2026):
     // remove a exigência DE VEZ, em qualquer fase. Diferente de invalidar
     // (abaixo): aqui não há "refazer depois".
-    const docAlvo = await prisma.documento.findUnique({ where: { id: documentoId }, select: { necessidadeId: true } })
+    const docAlvo = await prisma.documento.findUnique({ where: { id: documentoId }, select: { necessidadeId: true, status: true } })
+
+    // IDEMPOTÊNCIA (achado real, documento 2131): sem esta trava, clicar
+    // "Cancelar operação" de novo numa operação JÁ cancelada não duplicava a
+    // transição de passo (o filtro `notIn CANCELADO` já zera `alvos`), mas
+    // ainda reescrevia `Documento.ultimaMovimentacao`/`motivoBloqueio` a cada
+    // clique — sem motivo operacional novo — e teria duplicado o evento de
+    // Andamento abaixo. Cancelar o que já está cancelado não produz efeito
+    // novo nenhum: devolve o estado atual, só isso.
+    if (docAlvo?.status === "CANCELADO") {
+      return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+    }
+
+    // ESTADO ANTES — fotografado ANTES da transação mudar tudo, para o evento
+    // de Andamento registrar de onde veio (não uma reconstrução a posteriori).
+    const antes = passos.find((p) => !["CONCLUIDO", "DISPENSADO", "CANCELADO", "SUPERSEDIDO"].includes(p.status)) ?? passos[0] ?? null
+    const visitaAntes = await visitaAtualDoDocumento(documentoId)
+    const tarefaAntes = antes
+      ? await prisma.tarefa.findFirst({
+          where: { workflowStepInstanceId: antes.id },
+          select: { id: true, statusTarefa: true, responsavelId: true },
+        })
+      : null
+
     await prisma.$transaction(async (tx) => {
       const alvos = await tx.phaseWorkflowStepInstance.findMany({
         // Cancelar a operação cancela os passos da VISITA ATUAL. Sem o escopo, uma
@@ -1109,6 +1177,33 @@ export async function controlarOperacaoV2(
       // óbito, continuava pedindo depois de cancelado na fase anterior).
       if (docAlvo?.necessidadeId != null) {
         await dispensarNecessidade(docAlvo.necessidadeId, obs || "Operação cancelada", tx, true)
+      }
+      // ANDAMENTO — evento imutável de cancelamento, exatamente UM por operação
+      // cancelada de verdade (a trava de idempotência acima garante isso — nunca
+      // dentro do loop por-passo, que é PASSO_CANCELADO, um conceito diferente).
+      // Reaproveita LogAuditoria (owner já existente do histórico de Tarefa,
+      // entidade='Tarefa'/ação já usada por `cancelarTarefaNucleo` em
+      // tarefa-ciclo.ts) — nenhuma tabela nova.
+      if (tarefaAntes) {
+        await tx.logAuditoria.create({
+          data: {
+            acao: "TAREFA_CANCELADA", entidade: "Tarefa", entidadeId: tarefaAntes.id,
+            usuarioId: ctx?.usuarioId ?? null,
+            descricao: `Operação cancelada pelo documento ${documentoId}${obs ? `. Motivo: ${obs}` : ""}`,
+            detalhes: {
+              tarefaId: tarefaAntes.id, documentoId,
+              faseMacroKey: antes?.faseMacroKey ?? null,
+              workflowInstanceId: visitaAntes?.workflowInstanceId ?? null,
+              ciclo: visitaAntes?.ciclo ?? null,
+              stepInstanceId: antes?.id ?? null,
+              stepKey: antes?.stepKey ?? null,
+              de: tarefaAntes.statusTarefa,
+              para: "CANCELADA",
+              motivo: obs || "Operação cancelada",
+              responsavelId: tarefaAntes.responsavelId,
+            },
+          },
+        })
       }
     })
     await prisma.documento.update({
