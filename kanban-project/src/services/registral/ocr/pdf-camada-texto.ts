@@ -105,6 +105,28 @@ export const provedorPdfCamadaTexto: ProvedorTranscricao = {
         }
       }
 
+      // Achado real (doc 2123 — certidão emitida por portal de e-government
+      // espanhol): o PDF é uma IMAGEM escaneada, mas carrega um carimbo de
+      // assinatura digital como texto de verdade embutido ("FIRMADO
+      // ELECTRÓNICAMENTE...") — repetido, idêntico, em TODA página. Passava no
+      // teto de caracteres (era "útil" o bastante) e o pipeline nunca chegava a
+      // tentar OCR de verdade. Conteúdo de certidão de verdade varia de página
+      // pra página (é o ATO sendo narrado); um carimbo de rodapé/cabeçalho não —
+      // texto IDÊNTICO em todas as páginas nunca é o conteúdo real do documento,
+      // não importa o idioma nem o portal emissor.
+      if (paginas.length >= 2) {
+        const textos = new Set(paginas.map((p) => p.texto.trim()))
+        if (textos.size === 1) {
+          return {
+            ok: false,
+            provedor: this.nome,
+            paginas: [],
+            caracteres,
+            motivo: `Texto idêntico repetido em todas as ${paginas.length} páginas (carimbo/rodapé, não o conteúdo do documento) — precisa de OCR.`,
+          }
+        }
+      }
+
       return { ok: true, provedor: this.nome, paginas, caracteres, motivo: null }
     } catch (e) {
       return {

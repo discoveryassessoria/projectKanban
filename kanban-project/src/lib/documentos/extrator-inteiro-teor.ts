@@ -59,6 +59,16 @@ function limparRuidoDeMargem(texto: string): string {
   // verdade sempre gruda na palavra anterior sem espaço; um "." ou "-" com espaço
   // dos DOIS lados nunca é fim de frase de verdade, é artefato de margem.
   t = t.replace(/(?<=\s)[.-](?=\s)/g, " ")
+  // Quarto padrão real (doc 2125 — muito mais ruidoso que o 2122): letra
+  // MINÚSCULA solta grudada no fim/início de linha quebrada ("Oliveira i\n:
+  // Funcionário") — só remove quando a letra isolada não é palavra de verdade;
+  // "a"/"e"/"o" (e acentuadas) são artigo/conjunção reais, ficam de fora.
+  const LETRA_ISOLADA_REAL = new Set(["a", "e", "o", "á", "à", "â", "ã", "é", "ê", "ó", "ô", "õ"])
+  t = t.replace(/(?<=\s)([a-zà-ÿ])(?=\s)/g, (m) => (LETRA_ISOLADA_REAL.has(m) ? m : " "))
+  // Mesmo espírito do "." /"-" isolado: dois-pontos solto com espaço dos dois
+  // lados também é ruído de margem, nunca pontuação de verdade (que gruda na
+  // palavra anterior sem espaço).
+  t = t.replace(/(?<=\s):(?=\s)/g, " ")
   return t
 }
 
@@ -73,15 +83,30 @@ function limparRuidoDeMargem(texto: string): string {
  * Rótulo numa linha, valor na linha seguinte — alta confiança, é campo de
  * formulário, não texto corrido.
  */
+// Achado real (doc 2125): o rótulo do formulário vem com letra solta de ruído
+// grudada do lado ("o % NOME í") — exigir a linha INTEIRA igual a "nome" nunca
+// bate num scan ruidoso. O rótulo é sempre uma linha curta (é rótulo de
+// formulário, não frase) que CONTÉM a palavra inteira — isso já basta, mesmo
+// com lixo grudado ao redor.
+function linhaEhRotulo(linha: string, rotulo: string): boolean {
+  const norm = semAcento(linha).toLowerCase()
+  return norm.length <= 25 && new RegExp(`\\b${rotulo}\\b`).test(norm)
+}
+/** Só as palavras TODAS EM MAIÚSCULA da linha — é assim que o valor sai impresso na caixa do formulário; descarta ruído de OCR minúsculo/misto grudado do lado. */
+function soMaiusculas(linha: string): string | null {
+  const palavras = linha.split(/\s+/).filter((p) => p.length >= 2 && /^[A-ZÀ-Ú]+$/.test(p))
+  return palavras.length ? palavras.join(" ") : null
+}
+
 export function extrairCabecalho(texto: string): { nomePrincipal?: CampoExtraido<string>; matricula?: CampoExtraido<string> } {
   const linhas = texto.split("\n").map((l) => l.trim()).filter(Boolean)
   const out: { nomePrincipal?: CampoExtraido<string>; matricula?: CampoExtraido<string> } = {}
   for (let i = 0; i < linhas.length - 1; i++) {
-    const rotulo = semAcento(linhas[i]).toLowerCase()
-    if (rotulo === "nome" && !out.nomePrincipal) {
-      out.nomePrincipal = { valor: tituloCase(linhas[i + 1]), origem: `${linhas[i]}\n${linhas[i + 1]}` }
+    if (linhaEhRotulo(linhas[i], "nome") && !out.nomePrincipal) {
+      const valor = soMaiusculas(linhas[i + 1]) ?? linhas[i + 1]
+      out.nomePrincipal = { valor: tituloCase(valor), origem: `${linhas[i]}\n${linhas[i + 1]}` }
     }
-    if (rotulo === "matricula" && !out.matricula) {
+    if (linhaEhRotulo(linhas[i], "matricula") && !out.matricula) {
       out.matricula = { valor: linhas[i + 1].replace(/\s+/g, " ").trim(), origem: `${linhas[i]}\n${linhas[i + 1]}` }
     }
   }
@@ -205,11 +230,34 @@ export function extrairNascimentosDeConjuges(texto: string): Array<{ birthPlace?
  */
 export function extrairFiliacao(texto: string): { pai?: CampoExtraido<string>; mae?: CampoExtraido<string> } {
   const r = casarNormalizado(texto, PADRAO_FILIACAO)
-  if (!r) return {}
-  return {
-    pai: { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto },
-    mae: { valor: tituloCase(r.grupos[1]), origem: r.textoCompleto },
+  if (r) {
+    return {
+      pai: { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto },
+      mae: { valor: tituloCase(r.grupos[1]), origem: r.textoCompleto },
+    }
   }
+  // Variante real de boilerplate (doc 2125): quando quem registra é o PRÓPRIO
+  // pai, a certidão nunca escreve "filho legítimo de X e de Y" pro registrado —
+  // só cita os pais uma vez, no início: "compareceu PAI, [profissão/estado
+  // civil], casado [em LOCAL] com MÃE". Fallback só entra se o padrão principal
+  // não bateu (documento pode legitimamente ter os dois padrões em partes
+  // diferentes — o principal sempre ganha, por vir mais perto do nome do
+  // registrado).
+  return extrairPaisPeloDeclarante(texto)
+}
+
+const PADRAO_PAI_DECLARANTE =
+  /compareceu\s+([a-z'.\s]+?)(?:[,.]|\s+funcionari|\s+comerciant|\s+domestic|\s+lavrador|\s+agricultor|\s+profiss[aã]o|\s+natural|\s+casad[oa]|\s+solteir)/
+const PADRAO_MAE_DECLARANTE =
+  /casad[oa]\s+(?:em\s+[a-z'.\s]+?\s+)?com\s+([a-z'.\s]+?)(?:[,.;]|\s+natura|\s+residente|\s+domicil|$)/
+
+function extrairPaisPeloDeclarante(texto: string): { pai?: CampoExtraido<string>; mae?: CampoExtraido<string> } {
+  const out: { pai?: CampoExtraido<string>; mae?: CampoExtraido<string> } = {}
+  const pai = casarNormalizado(texto, PADRAO_PAI_DECLARANTE)
+  if (pai) out.pai = { valor: tituloCase(pai.grupos[0]), origem: pai.textoCompleto }
+  const mae = casarNormalizado(texto, PADRAO_MAE_DECLARANTE)
+  if (mae) out.mae = { valor: tituloCase(mae.grupos[0]), origem: mae.textoCompleto }
+  return out
 }
 
 /**
