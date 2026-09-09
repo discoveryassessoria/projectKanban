@@ -83,8 +83,13 @@ export function extrairDataPorExtenso(texto: string): string | null {
 
   // "mês"/"mez": grafia mudou na reforma ortográfica de 1943 — registro anterior a
   // isso (comum nas certidões antigas que fundamentam cidadania) escreve com Z.
-  // dia: número por extenso logo antes de "dia(s)"
-  const mDia = t.match(/([a-z\s]+?)\s+dias?\s+(?:do\s+me[sz]|de)/)
+  // dia: número por extenso logo antes de "dia(s)" ("aos vinte e cinco dias do mês
+  // de..."), OU direto antes do nome do mês sem a palavra "dias" ("aos três de
+  // agosto de...") — achado real (doc 2125): boilerplate mais antigo/mais curto
+  // omite "dias" inteiramente, forma tão comum quanto a outra.
+  const mDia =
+    t.match(/([a-z\s]+?)\s+dias?\s+(?:do\s+me[sz]|de)/) ||
+    t.match(/([a-z\s]+?)\s+de\s+(?:janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\s+de/)
   const dia = mDia ? extensoParaNumero(mDia[1]) : null
 
   // mês: nome do mês (por extenso, não numérico)

@@ -311,9 +311,12 @@ export function extrairIdade(texto: string): Extraido<number> {
  * ("natural de X", que é do PRÓPRIO registrado, não do cartório).
  */
 export function extrairLocalDoRegistro(texto: string): Extraido<string> {
+  // "nesta cidade DE Porto Alegre" / "nesta cidade DO Rio Grande" — contração
+  // muda com o nome do lugar (masculino/plural leva "do"), achado real (doc
+  // 2125: "nesta cidade do Rio Grande") — as três formas são igual de comuns.
   const r = casarNormalizado(
     texto,
-    /nest[ae]\s+(?:cidade|capital(?:\s+do\s+estado)?|municipio|comarca)\s+de\s+([a-z'.\s]+?)(?:[,.]|\s+no\s+tribunal|\s+capital|\s+as\s+\d|\s+às\s+\d|$)/,
+    /nest[ae]\s+(?:cidade|capital(?:\s+do\s+estado)?|municipio|comarca)\s+(?:de|do|da)\s+([a-z'.\s]+?)(?:[,.]|\s+no\s+tribunal|\s+capital|\s+as\s+\d|\s+às\s+\d|$)/,
   )
   if (!r) return undefined
   return { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto }
