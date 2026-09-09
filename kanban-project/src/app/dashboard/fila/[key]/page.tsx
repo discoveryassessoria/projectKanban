@@ -9,26 +9,18 @@
 // ============================================================================
 
 import { use } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle2, ChevronRight, Flag } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Flag } from "lucide-react"
 import { useFila } from "@/src/components/home/use-home"
 import { HomeShell } from "@/src/components/home/home-shell"
+import { FilaAgrupada } from "@/src/components/home/fila-agrupada"
 import {
   BlocoCard,
   EmptyState,
   ErrorState,
-  OURO, OURO_TINTA,
-  formatarPrazo,
+  OURO_TINTA,
   nivelStyle,
 } from "@/src/components/home/home-primitives"
-
-const BANDEIRA: Record<string, string> = {
-  ALEMANHA: "🇩🇪",
-  ESPANHA: "🇪🇸",
-  ITALIA: "🇮🇹",
-  PORTUGAL: "🇵🇹",
-}
 
 export default function FilaPage({ params }: { params: Promise<{ key: string }> }) {
   const { key } = use(params)
@@ -40,7 +32,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
 
   return (
     <HomeShell titulo={data?.titulo ?? "Fila operacional"} subtitulo={data?.descricao ?? "Central Operacional"}>
-      <div className="mx-auto w-full max-w-[1200px] space-y-4 px-4 py-5 md:px-6">
+      <div className="mx-auto w-full max-w-[1400px] space-y-4 px-4 py-5 md:px-6">
         <button
           onClick={() => router.push("/dashboard")}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:text-white"
@@ -73,36 +65,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
                 </span>
               </div>
 
-              <ul className="space-y-1.5">
-                {data.itens.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={item.href}
-                      className="group flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20"
-                    >
-                      <span className="w-6 shrink-0 text-center text-base">
-                        {item.pais ? (BANDEIRA[item.pais] ?? "🏳️") : "•"}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-white">{item.titulo}</p>
-                        <p className="truncate text-xs text-[var(--text-secondary)]">
-                          {[item.processoCodigo ?? item.processoNome, item.subtitulo].filter(Boolean).join(" · ")}
-                        </p>
-                      </div>
-                      {item.prazo && (
-                        <span
-                          className={`hidden shrink-0 text-xs font-medium sm:inline ${
-                            item.atrasado ? "text-red-700" : "text-[var(--text-secondary)]"
-                          }`}
-                        >
-                          {formatarPrazo(item.prazo)}
-                        </span>
-                      )}
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <FilaAgrupada itens={data.itens} />
 
               {data.truncado && (
                 <p className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
