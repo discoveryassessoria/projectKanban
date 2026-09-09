@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Bell, LogOut } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -55,7 +55,91 @@ interface SaudeCriticaNotificacao {
   link: string
 }
 
-export function HeaderBar({ 
+// ============================================================
+// BLOCO DE NOTIFICAÇÕES — agrupa por processo/família. Achado real: um único
+// processo (família com várias certidões vencendo no mesmo dia) inundava a
+// lista com uma linha POR TAREFA — "94 pendentes" era, na prática, 3 ou 4
+// famílias repetidas dezenas de vezes. Família com 1 tarefa só mostra a
+// tarefa direto (sem cabeçalho de grupo — nada a agrupar); 2+ tarefas da
+// MESMA família colapsam sob um cabeçalho com o nome da família, que expande
+// ao clicar.
+// ============================================================
+function BlocoNotificacoes({
+  chave, titulo, tarefas, corBorda, corTexto, corPonto, subtitulo, onClickTarefa,
+}: {
+  chave: string
+  titulo: string
+  tarefas: TarefaNotificacao[]
+  corBorda: string
+  corTexto: string
+  corPonto: string
+  subtitulo: (t: TarefaNotificacao) => string
+  onClickTarefa: (t: TarefaNotificacao) => void
+}) {
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
+
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, TarefaNotificacao[]>()
+    for (const t of tarefas) {
+      const chaveGrupo = t.processoNome || "Sem processo"
+      const arr = mapa.get(chaveGrupo) ?? []
+      arr.push(t)
+      mapa.set(chaveGrupo, arr)
+    }
+    return [...mapa.entries()]
+  }, [tarefas])
+
+  if (tarefas.length === 0) return null
+
+  const alternar = (key: string) => {
+    setExpandidos((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  return (
+    <div>
+      <div className={`px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide ${corTexto} font-medium flex items-center gap-1 sticky top-0`}>
+        <span className={`h-2 w-2 rounded-full ${corPonto}`}></span>
+        {titulo} ({tarefas.length})
+      </div>
+      {grupos.map(([processoNome, itens]) => {
+        const key = `${chave}-${processoNome}`
+        const temGrupo = itens.length > 1
+        const aberto = !temGrupo || expandidos.has(key)
+        return (
+          <div key={key}>
+            {temGrupo && (
+              <button
+                className={`w-full text-left px-3 py-2 border-l-4 ${corBorda} hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer flex items-center justify-between gap-2`}
+                onClick={() => alternar(key)}
+              >
+                <span className="text-sm text-gray-800 font-medium truncate">{processoNome}</span>
+                <span className="text-[10px] text-gray-500 flex-none">{itens.length} {aberto ? "▲" : "▼"}</span>
+              </button>
+            )}
+            {aberto && itens.map((t) => (
+              <button
+                key={t.id}
+                className={`w-full text-left px-3 py-2 ${temGrupo ? "pl-6" : ""} border-l-4 ${corBorda} hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer`}
+                onClick={() => onClickTarefa(t)}
+              >
+                <p className="text-sm text-gray-800 truncate font-medium">{t.titulo}</p>
+                {!temGrupo && <p className="text-[10px] text-gray-500">{t.processoNome}</p>}
+                <p className={`text-[10px] font-medium ${corTexto}`}>{subtitulo(t)}</p>
+              </button>
+            ))}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export function HeaderBar({
   title, 
   subtitle, 
   userName = "Usuário",
@@ -336,89 +420,30 @@ export function HeaderBar({
                         </button>
                       </div>
                     )}
-                    {notificacoes.vencidas.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-red-600"></span>
-                          Tarefas Vencidas ({notificacoes.vencidas.length})
-                        </div>
-                        {notificacoes.vencidas.map(tarefa => (
-                          <button
-                            key={`vencida-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-red-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
-                            onClick={() => handleTarefaClick(tarefa)}
-                          >
-                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
-                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
-                            <p className="text-[10px] text-red-500 font-medium">
-                              Venceu em {formatDateBR(tarefa.dataPrazo)}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {notificacoes.hoje.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-[var(--action-primary)]"></span>
-                          Vencem hoje ({notificacoes.hoje.length})
-                        </div>
-                        {notificacoes.hoje.map(tarefa => (
-                          <button
-                            key={`hoje-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
-                            onClick={() => handleTarefaClick(tarefa)}
-                          >
-                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
-                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
-                            <p className="text-[10px] text-amber-600 font-medium">Vence hoje!</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {notificacoes.proximos3Dias.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-[var(--action-primary)]"></span>
-                          Próximos 3 dias ({notificacoes.proximos3Dias.length})
-                        </div>
-                        {notificacoes.proximos3Dias.map(tarefa => (
-                          <button
-                            key={`proximos-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
-                            onClick={() => handleTarefaClick(tarefa)}
-                          >
-                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
-                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
-                            <p className="text-[10px] text-amber-600 font-medium">
-                              Vence em {formatDateBR(tarefa.dataPrazo)}
-                            </p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {notificacoes.novas.length > 0 && (
-                      <div>
-                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)] font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-[var(--surface-secondary)]"></span>
-                          Novas tarefas ({notificacoes.novas.length})
-                        </div>
-                        {notificacoes.novas.map(tarefa => (
-                          <button
-                            key={`nova-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
-                            onClick={() => handleTarefaClick(tarefa)}
-                          >
-                            <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
-                            <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
-                            <p className="text-[10px] text-[var(--text-secondary)] font-medium">Nova tarefa</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                    <BlocoNotificacoes
+                      chave="vencida" titulo="Tarefas Vencidas" tarefas={notificacoes.vencidas}
+                      corBorda="border-red-500" corTexto="text-red-600" corPonto="bg-red-600"
+                      subtitulo={(t) => `Venceu em ${formatDateBR(t.dataPrazo)}`}
+                      onClickTarefa={handleTarefaClick}
+                    />
+                    <BlocoNotificacoes
+                      chave="hoje" titulo="Vencem hoje" tarefas={notificacoes.hoje}
+                      corBorda="border-amber-500" corTexto="text-amber-600" corPonto="bg-[var(--action-primary)]"
+                      subtitulo={() => "Vence hoje!"}
+                      onClickTarefa={handleTarefaClick}
+                    />
+                    <BlocoNotificacoes
+                      chave="proximos" titulo="Próximos 3 dias" tarefas={notificacoes.proximos3Dias}
+                      corBorda="border-amber-500" corTexto="text-amber-600" corPonto="bg-[var(--action-primary)]"
+                      subtitulo={(t) => `Vence em ${formatDateBR(t.dataPrazo)}`}
+                      onClickTarefa={handleTarefaClick}
+                    />
+                    <BlocoNotificacoes
+                      chave="nova" titulo="Novas tarefas" tarefas={notificacoes.novas}
+                      corBorda="border-[var(--border-default)]" corTexto="text-[var(--text-secondary)]" corPonto="bg-[var(--surface-secondary)]"
+                      subtitulo={() => "Nova tarefa"}
+                      onClickTarefa={handleTarefaClick}
+                    />
                   </div>
                 )}
               </div>
