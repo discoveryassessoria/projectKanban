@@ -261,6 +261,21 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
           .filter((t) => t.statusTarefa === "BLOQUEADA")
           .map((tarefa) => ({ tipo: "tarefa" as const, tarefa })),
       ]
+    case "prazos-vencendo": {
+      // MESMO critério do alerta "Prazos vencendo" em `montarAlertas` — prazo até
+      // amanhã, não só o que já venceu (achado real: o alerta contava isto, mas
+      // apontava pra "tarefas-vencidas", que só pega o já vencido e só tarefa,
+      // nunca passo — o clique abria uma fila vazia mesmo com "28 itens").
+      const amanha = fimDoDia(somarDias(agora, 1))
+      return [
+        ...base.passos
+          .filter((s) => STATUS_PASSO_ACIONAVEL.has(s.status) && s.prazo && s.prazo <= amanha)
+          .map((passo) => ({ tipo: "passo" as const, passo })),
+        ...base.tarefas
+          .filter((t) => t.dataPrazo && t.dataPrazo <= amanha)
+          .map((tarefa) => ({ tipo: "tarefa" as const, tarefa })),
+      ]
+    }
     case "tarefas-vencidas":
       return base.tarefas
         .filter((t) => estaAtrasado(t.dataPrazo, agora))
@@ -656,7 +671,7 @@ export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): P
       detalhe: `${prazosCriticos} ${prazosCriticos === 1 ? "item vence" : "itens vencem"} até amanhã`,
       nivel: "critico",
       quantidade: prazosCriticos,
-      href: "/dashboard/fila/tarefas-vencidas",
+      href: "/dashboard/fila/prazos-vencendo",
     })
   }
 

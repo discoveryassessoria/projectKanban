@@ -74,8 +74,8 @@ export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelSt
 // detalhe do processo. A Home importa de lá em vez de manter uma cópia.
 
 // ---- Card / cabeçalho de bloco --------------------------------------------
-export function BlocoCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`${CARD} p-4 md:p-5 ${className}`}>{children}</section>
+export function BlocoCard({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) {
+  return <section id={id} className={`${CARD} p-4 md:p-5 ${className}`}>{children}</section>
 }
 
 export function BlocoHeader({

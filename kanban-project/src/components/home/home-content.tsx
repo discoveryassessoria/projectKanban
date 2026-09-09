@@ -132,7 +132,7 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
 function CentralOperacional({ data }: { data: HomeData }) {
   const total = data.status.totalAcoes
   return (
-    <section className={`${CARD_FOCAL} flex h-full flex-col`}>
+    <section id="central-operacional" className={`${CARD_FOCAL} flex h-full flex-col`}>
       <div className="px-5 pb-3 pt-5">
         <BlocoHeader
           titulo="Central Operacional"
@@ -198,7 +198,7 @@ function PainelSlaBloco({ data }: { data: HomeData }) {
   const sla = data.sla
   if (!sla) return null
   return (
-    <BlocoCard>
+    <BlocoCard id="sla-processos">
       <BlocoHeader
         titulo="SLA dos processos"
         descricao="Prazo previsto de conclusão, a partir do SLA configurado em cada fase"
@@ -307,14 +307,14 @@ function LinhaQuieta({ children }: { children: React.ReactNode }) {
 function Alertas({ data }: { data: HomeData }) {
   if (data.alertas.length === 0) {
     return (
-      <BlocoCard>
+      <BlocoCard id="alertas">
         <BlocoHeader titulo="Alertas" />
         <LinhaQuieta>Nenhum evento travando a operação.</LinhaQuieta>
       </BlocoCard>
     )
   }
   return (
-    <BlocoCard className="border-[var(--border-default)] bg-[var(--surface-secondary)]">
+    <BlocoCard id="alertas" className="border-[var(--border-default)] bg-[var(--surface-secondary)]">
       <BlocoHeader titulo="Alertas" descricao="Eventos críticos que travam a operação" />
       <ul className="space-y-2">
         {data.alertas.map((a) => {
@@ -389,7 +389,7 @@ function ResumoDoDia({ data }: { data: HomeData }) {
   const semMovimento = itens.every((i) => i.valor === 0)
   if (semMovimento) {
     return (
-      <BlocoCard className="flex flex-wrap items-center gap-x-5 gap-y-2 !py-3">
+      <BlocoCard id="operacao-do-dia" className="flex flex-wrap items-center gap-x-5 gap-y-2 !py-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-white/90">Operação de hoje</h2>
         <span className="hidden h-3.5 w-px bg-[var(--surface-primary)] sm:block" />
         {itens.map((i) => (
@@ -406,7 +406,7 @@ function ResumoDoDia({ data }: { data: HomeData }) {
   }
 
   return (
-    <BlocoCard>
+    <BlocoCard id="operacao-do-dia">
       <BlocoHeader titulo="Operação de hoje" descricao="O trabalho do dia, em tempo real" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         {itens.map((i) => (
@@ -428,11 +428,15 @@ function ResumoDoDia({ data }: { data: HomeData }) {
 // inventado nem recalculado aqui. O ladrilho colorido é o mesmo par
 // (pastel + glifo saturado) usado nos KPI da fase.
 // ===========================================================================
+// Achado real: os quatro cartões só mostravam o número — sem destino nenhum,
+// nem pra onde a MESMA página já detalha aquele número (Alertas, SLA, Central
+// Operacional, Operação de hoje estão todos ali embaixo). Cada âncora aponta
+// pra seção que já existe na própria Home; nenhum link novo, nenhuma tela nova.
 const CARTOES_TOPO = [
-  { chave: "criticos",   rotulo: "Itens críticos",       sub: "Exigem atenção imediata", tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertCircle },
-  { chave: "noPrazo",    rotulo: "Processos no prazo",   sub: "Dentro do SLA contratado", tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock },
-  { chave: "abertas",    rotulo: "Ações abertas",        sub: "Pendências operacionais",  tile: "var(--info-tile)",    ink: "var(--info)",    Icone: ListChecks },
-  { chave: "concluidas", rotulo: "Ações concluídas hoje", sub: "Parabéns, ótimo trabalho!", tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2 },
+  { chave: "criticos",   rotulo: "Itens críticos",       sub: "Exigem atenção imediata", tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertCircle, ancora: "#alertas" },
+  { chave: "noPrazo",    rotulo: "Processos no prazo",   sub: "Dentro do SLA contratado", tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock, ancora: "#sla-processos" },
+  { chave: "abertas",    rotulo: "Ações abertas",        sub: "Pendências operacionais",  tile: "var(--info-tile)",    ink: "var(--info)",    Icone: ListChecks, ancora: "#central-operacional" },
+  { chave: "concluidas", rotulo: "Ações concluídas hoje", sub: "Parabéns, ótimo trabalho!", tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2, ancora: "#operacao-do-dia" },
 ] as const
 
 function FaixaIndicadores({ data }: { data: HomeData }) {
@@ -447,7 +451,10 @@ function FaixaIndicadores({ data }: { data: HomeData }) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {CARTOES_TOPO.map((c) => (
-        <div key={c.chave} className={`${CARD} overflow-hidden p-5`}>
+        <a
+          key={c.chave} href={c.ancora}
+          className={`${CARD} block overflow-hidden p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--elev-2)] focus:outline-none focus:ring-2 focus:ring-[var(--action-primary)]/40`}
+        >
           <div className="flex items-start gap-3.5">
             <span
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full"
@@ -466,7 +473,7 @@ function FaixaIndicadores({ data }: { data: HomeData }) {
           </div>
           {/* Filete da cor do indicador, como no mockup. */}
           <div className="mt-4 h-[3px] w-10 rounded-full" style={{ background: c.ink }} />
-        </div>
+        </a>
       ))}
     </div>
   )

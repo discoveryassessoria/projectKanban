@@ -182,6 +182,13 @@ export const FILAS_ESTADO: FilaDef[] = [
     nivelBase: "critico",
   },
   {
+    key: "prazos-vencendo",
+    titulo: "Prazos vencendo",
+    descricao: "Passos e tarefas com prazo até amanhã — mesmo critério do alerta da Home",
+    modulo: "processos",
+    nivelBase: "critico",
+  },
+  {
     key: "tarefas-vencidas",
     titulo: "Tarefas vencidas",
     descricao: "Prazo expirado — exigem ação imediata",
