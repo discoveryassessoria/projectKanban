@@ -114,20 +114,22 @@ function run() {
     palette.includes("<GlobalSearch") && /metaKey|ctrlKey/.test(palette),
     "⌘K abre a MESMA busca global (sem segunda implementação de busca)",
   )
-  ok(content.includes("Central Operacional"), "bloco Central Operacional")
+  // Central Operacional + Alertas MESCLARAM em "Central de Notificações"
+  // (09/09/2026, aprovado pelo usuário) — duas abas, "Prazos" e "Ações"; a
+  // segunda já inclui os alertas (menos o de prazo, que tem aba própria),
+  // ordenados por severidade em vez de viver numa caixa à parte e desconexa.
+  ok(/titulo="Central de Notifica/.test(content), "bloco Central de Notificações (Central Operacional + Alertas mesclados)")
+  ok(/"prazos"|"acoes"/.test(content) && /setAba/.test(content), "duas abas: Prazos e Ações")
   ok(/titulo="Agenda"/.test(content), "bloco Agenda")
   ok(/Hoje/.test(content) && /Amanhã/.test(content) && /Próximos dias/.test(content), "agenda: hoje, amanhã, próximos dias")
-  ok(/titulo="Alertas"/.test(content), "bloco Alertas")
   ok(/Opera[çc][ãa]o de hoje/.test(content), "bloco Resumo da operação do dia")
 
   // ---- 4. Regras de comportamento ----
   console.log("\nRegras do conceito:")
-  // Alertas sem alerta — MUDOU DE INTENTO em 02/08/2026 (aprovado pelo usuário).
-  // A regra original ("some") existia para o bloco não virar um vazio grande. A
-  // densidade adaptativa resolve isso melhor: o bloco fica, mas encolhe para uma
-  // LINHA discreta. O que a guarda protege agora é o custo de espaço — nada de
-  // EmptyState de corpo inteiro para dizer que não há nada.
-  ok(/<LinhaQuieta>Nenhum evento travando a opera/.test(content), "alertas vazios viram linha discreta, não bloco vazio")
+  // Vazio da Central de Notificações (aba Ações) usa um estado compacto com
+  // ícone + duas linhas — nunca um EmptyState de corpo inteiro (mesma regra de
+  // custo de espaço de antes, só que a mensagem mudou porque o bloco mudou).
+  ok(/Nenhuma a[çc][ãa]o nem alerta pendente/.test(content), "vazio da Central de Notificações é compacto, não bloco vazio")
   ok(
     !/EmptyState[^>]*>\s*Nenhum (evento|compromisso)/.test(content),
     "vazio de Alertas/Agenda não usa EmptyState de corpo inteiro",
@@ -139,7 +141,7 @@ function run() {
   ok(/href=\{fila\.href\}/.test(content), "cada fila é clicável")
   ok(/\/dashboard\/fila\/\$\{def\.key\}/.test(coleta), "clique abre exatamente aquela fila (drill-down)")
   ok(/\{fila\.quantidade\}/.test(content), "cada fila mostra quantidade")
-  ok(/nivelStyle\(fila\.nivel\)/.test(content), "cada fila mostra prioridade")
+  ok(/nivelStyle\((?:fila|item)\.nivel\)/.test(content), "cada fila mostra prioridade")
   ok(/\{fila\.descricao\}/.test(content), "cada fila mostra descrição")
   ok(existsSync(join(ROOT, "src/app/dashboard/fila/[key]/page.tsx")), "tela da fila existe")
   ok(/useFila\(/.test(filaPage), "tela da fila consome o drill-down")

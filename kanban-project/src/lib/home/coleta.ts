@@ -32,6 +32,7 @@ import {
   ordenarFilas,
   rotuloDoDia,
   somarDias,
+  venceHoje,
 } from "@/src/lib/home/home-logic"
 import type {
   Agenda,
@@ -42,6 +43,7 @@ import type {
   FilaOperacional,
   HomePermissions,
   PainelSla,
+  PrazosResumo,
   ResumoDia,
 } from "@/src/types/home"
 import type { SlaProcesso } from "@/src/types/sla"
@@ -373,6 +375,26 @@ export function montarSla(base: BaseOperacional, ctx: ContextoHome): PainelSla |
   })
 
   return { cards, resumo: resumirSla([...base.sla.values()]) }
+}
+
+// ---------------------------------------------------------------------------
+// PRAZOS — resumo por status pra aba "Prazos" da Central de Notificações.
+// MESMOS membros de `membrosDaFila("prazos-vencendo", ...)` — só que já
+// quebrados em atrasadas/hoje/futuro, pra Home mostrar a prévia sem baixar a
+// fila inteira (92 itens) só pra contar três números.
+// ---------------------------------------------------------------------------
+export function montarPrazosResumo(base: BaseOperacional, ctx: ContextoHome): PrazosResumo | null {
+  if (!ctx.permissoes.verProcessos) return null
+
+  const membros = membrosDaFila("prazos-vencendo", base, ctx.agora)
+  const resumo: PrazosResumo = { atrasadas: 0, hoje: 0, futuro: 0, total: membros.length }
+  for (const m of membros) {
+    const prazo = prazoDoMembro(m)
+    if (estaAtrasado(prazo, ctx.agora)) resumo.atrasadas++
+    else if (venceHoje(prazo, ctx.agora)) resumo.hoje++
+    else resumo.futuro++
+  }
+  return resumo
 }
 
 // ---------------------------------------------------------------------------

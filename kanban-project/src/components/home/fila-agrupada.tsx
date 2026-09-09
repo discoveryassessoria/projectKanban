@@ -21,6 +21,7 @@ import { useSearchParams } from "next/navigation"
 import { ChevronRight, ChevronDown, Search, X, Calendar } from "lucide-react"
 import type { FilaItem } from "@/src/types/home"
 import { formatarPrazo } from "./home-primitives"
+import { CampoData } from "@/src/components/ui/campo-data"
 
 const BANDEIRA: Record<string, string> = {
   ALEMANHA: "🇩🇪",
@@ -180,36 +181,22 @@ export function FilaAgrupada({ itens }: { itens: FilaItem[] }) {
           <span className="mx-1 hidden h-4 w-px bg-[var(--border-default)] sm:block" />
 
           <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
-            <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-            <input
-              type="date"
-              value={dataDe}
-              max={dataAte || undefined}
-              onChange={(e) => setDataDe(e.target.value)}
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+            <Calendar className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+            <CampoData
+              value={dataDe || null}
+              onChange={(iso) => setDataDe(iso ?? "")}
+              anoMaximo={dataAte ? Number(dataAte.slice(0, 4)) : undefined}
               aria-label="Prazo a partir de"
+              className="w-[122px] rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white outline-none focus:border-[var(--action-primary)]"
             />
             <span>até</span>
-            <input
-              type="date"
-              value={dataAte}
-              min={dataDe || undefined}
-              onChange={(e) => setDataAte(e.target.value)}
-              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+            <CampoData
+              value={dataAte || null}
+              onChange={(iso) => setDataAte(iso ?? "")}
+              anoMinimo={dataDe ? Number(dataDe.slice(0, 4)) : undefined}
               aria-label="Prazo até"
+              className="w-[122px] rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white outline-none focus:border-[var(--action-primary)]"
             />
-            {(dataDe || dataAte) && (
-              <button
-                onClick={() => {
-                  setDataDe("")
-                  setDataAte("")
-                }}
-                className="text-[var(--text-muted)] hover:text-white"
-                title="Limpar período"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
           </div>
         </div>
       )}

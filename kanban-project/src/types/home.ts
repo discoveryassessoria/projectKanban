@@ -85,6 +85,17 @@ export interface PainelSla {
   resumo: ResumoSla
 }
 
+// ---- 2c. Resumo de prazos (aba "Prazos" da Central de Notificações) -------
+// Mesma leitura de `membrosDaFila("prazos-vencendo", ...)`, só que quebrada
+// por status em vez de um total só — é o que alimenta a prévia ao vivo
+// (Atrasadas/Vencem hoje/A vencer) sem duplicar a lista inteira aqui.
+export interface PrazosResumo {
+  atrasadas: number
+  hoje: number
+  futuro: number
+  total: number
+}
+
 // ---- 3. Agenda -------------------------------------------------------------
 export type GrupoAgenda = "hoje" | "amanha" | "proximos"
 
@@ -155,6 +166,8 @@ export interface HomeData {
   filas: FilaOperacional[]
   /** null quando o usuário não vê processos */
   sla: PainelSla | null
+  /** null quando o usuário não vê processos */
+  prazosResumo: PrazosResumo | null
   agenda: Agenda
   /** vazio = o bloco de alertas não é renderizado */
   alertas: AlertaOperacional[]
