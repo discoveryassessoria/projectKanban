@@ -27,6 +27,19 @@ interface DocCompact {
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
+  registro: {
+    descricao: string | null
+    dataEvento: string | null
+    dataRegistro: string | null
+    paisRegistro: string | null
+    estadoRegistro: string | null
+    cidadeRegistro: string | null
+    cartorio: string | null
+    livro: string | null
+    folha: string | null
+    termo: string | null
+    numeroRegistro: string | null
+  }
 }
 
 interface Impediment {
@@ -227,6 +240,17 @@ export async function GET(
               arquivo_nome: true,
               arquivo_mime_type: true,
               analysisStatus: true,
+              descricao: true,
+              data_evento: true,
+              data_registro: true,
+              pais_registro: true,
+              estado_registro: true,
+              cidade_registro: true,
+              cartorio: true,
+              livro: true,
+              folha: true,
+              termo: true,
+              numero_registro: true,
             },
           })
         : []
@@ -309,6 +333,17 @@ export async function GET(
         arquivo_nome: null,
         arquivo_mime_type: null,
         analysisStatus: "not_ready",
+        descricao: null,
+        data_evento: null,
+        data_registro: null,
+        pais_registro: null,
+        estado_registro: null,
+        cidade_registro: null,
+        cartorio: null,
+        livro: null,
+        folha: null,
+        termo: null,
+        numero_registro: null,
       })
     }
 
@@ -346,6 +381,19 @@ export async function GET(
         arquivoUrl: d.arquivo_url ?? null,
         arquivoNome: d.arquivo_nome ?? null,
         arquivoMimeType: d.arquivo_mime_type ?? null,
+        registro: {
+          descricao: d.descricao ?? null,
+          dataEvento: d.data_evento ? d.data_evento.toISOString() : null,
+          dataRegistro: d.data_registro ? d.data_registro.toISOString() : null,
+          paisRegistro: d.pais_registro ?? null,
+          estadoRegistro: d.estado_registro ?? null,
+          cidadeRegistro: d.cidade_registro ?? null,
+          cartorio: d.cartorio ?? null,
+          livro: d.livro ?? null,
+          folha: d.folha ?? null,
+          termo: d.termo ?? null,
+          numeroRegistro: d.numero_registro ?? null,
+        },
       }))
 
       const received = docsCompact.filter((d) => d.isRecebido).length

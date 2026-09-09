@@ -36,6 +36,19 @@ interface DocCompact {
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
+  registro: {
+    descricao: string | null
+    dataEvento: string | null
+    dataRegistro: string | null
+    paisRegistro: string | null
+    estadoRegistro: string | null
+    cidadeRegistro: string | null
+    cartorio: string | null
+    livro: string | null
+    folha: string | null
+    termo: string | null
+    numeroRegistro: string | null
+  }
 }
 
 interface Impediment {
@@ -217,6 +230,7 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
         arquivoUrl: d.arquivoUrl,
         arquivoNome: d.arquivoNome,
         arquivoMimeType: d.arquivoMimeType,
+        registro: d.registro,
       }
     })
     const ready = docs.filter((x) => x.finalStatus === "pronta_protocolo").length

@@ -53,13 +53,23 @@ interface DocV2 {
   dataStatus: string
   analysisStatus: string
   structuredData: Record<string, unknown> | null
+  registral: Record<string, unknown> | null
   dataEmissao: string | null
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
 }
 interface PessoaV2 { id: number; nome: string; documentos: DocV2[] }
-interface AnaliseV2Resp { pessoas: PessoaV2[]; kpis: { pessoas: number; totalDocs: number; revisados: number; pendentesRevisao: number }; readiness: { ready: boolean } }
+interface RegistralDivergencia {
+  docId: number; documentoTitulo: string; pessoaNome: string
+  campo: string; campoLabel: string; valorCadastro: string; valorDocumento: string
+}
+interface AnaliseV2Resp {
+  pessoas: PessoaV2[]
+  kpis: { pessoas: number; totalDocs: number; revisados: number; pendentesRevisao: number }
+  readiness: { ready: boolean; pendencias: Array<{ docId: number; label: string; dataStatus: string }> }
+  registralDivergencias: RegistralDivergencia[]
+}
 
 interface LinhaRelatorio {
   pessoa: string
@@ -292,6 +302,9 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
     }
   }
 
+  const readiness = consultaV2.dados?.readiness ?? null
+  const registralDivergencias = consultaV2.dados?.registralDivergencias ?? []
+
   const divsRaw = analise?.divergencias
   const divs = useMemo(() => divsRaw ?? [], [divsRaw])
   const pend = divs.filter((d) => d.status === "pendente" || d.status === "apoio_solicitado").length
@@ -316,6 +329,21 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   // qualquer análise ter rodado.
   const semDivergencia = todosDocs.filter((d) => d.analysisStatus === "ready" && !divs.some((v) => v.documentoId === d.id)).length
   const naoAnalisados = todosDocs.filter((d) => d.analysisStatus !== "ready").length
+
+  // Detalha o motivo de cada pendência com o que já temos no cliente (arquivoUrl) —
+  // o `readiness.pendencias` do servidor (fonte da verdade pro botão) não distingue
+  // "nunca anexou arquivo" de "anexou mas não revisou"; aqui sim, pro humano saber
+  // exatamente o que falta fazer.
+  const pendenciasRevisao = useMemo(
+    () => todosDocs
+      .filter((d) => d.dataStatus !== "reviewed")
+      .map((d) => ({
+        id: d.id,
+        label: `${d.titulo} — ${d.pessoaNome}`,
+        motivo: !d.arquivoUrl ? "sem arquivo anexado" : (DATA_STATUS_LABEL[d.dataStatus] || d.dataStatus),
+      })),
+    [todosDocs],
+  )
 
   const pessoasUnicas = useMemo(() => [...new Set(todosDocs.map((d) => d.pessoaNome))].sort(), [todosDocs])
   const tiposUnicos = useMemo(() => [...new Set(todosDocs.map((d) => d.tipo))].sort(), [todosDocs])
@@ -414,12 +442,43 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             </>
           )}
           {!readOnly && analise?.status !== "concluida" && (
-            <button onClick={rodar} disabled={running} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
+            <button
+              onClick={rodar} disabled={running || !readiness?.ready}
+              title={!readiness?.ready ? "Aprove (marque como revisado) todos os documentos anexados antes de rodar a análise." : undefined}
+              className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Analisar automaticamente
             </button>
           )}
         </div>
       </div>
+
+      {!readOnly && analise?.status !== "concluida" && pendenciasRevisao.length > 0 && (
+        <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-[var(--text-secondary)]">
+          <span className="font-semibold text-white/90">Faltam aprovar {pendenciasRevisao.length} documento(s) antes de analisar:</span>{" "}
+          {pendenciasRevisao.map((p, i) => (
+            <span key={p.id}>
+              {i > 0 && ", "}
+              {p.label} <span className="text-[var(--text-muted)]">({p.motivo})</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {registralDivergencias.length > 0 && (
+        <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm">
+          <div className="font-semibold text-white/90 mb-1.5">
+            {registralDivergencias.length} divergência(s) de cadastro registral — o documento diz uma coisa, o cadastro (Central Operacional) diz outra
+          </div>
+          <p className="text-xs text-[var(--text-muted)] mb-2">Isto NÃO é erro do registro civil, é erro de digitação no nosso sistema — corrija direto no cadastro, sem petição.</p>
+          <ul className="space-y-1">
+            {registralDivergencias.map((r, i) => (
+              <li key={`${r.docId}-${r.campo}-${i}`} className="text-xs text-[var(--text-secondary)]">
+                <span className="font-semibold text-white/85">{r.campoLabel}</span> de {r.documentoTitulo} — {r.pessoaNome}: cadastro diz <span className="text-white/85">"{r.valorCadastro}"</span>, documento diz <span className="text-white/85">"{r.valorDocumento}"</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
       {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
@@ -1190,6 +1249,30 @@ function reconstruirStructuredData(campos: CampoAchatado[]): Record<string, unkn
   return raiz
 }
 
+// ============================================================
+// DADOS REGISTRAIS — referência administrativa do ato (matrícula/livro/folha/
+// termo/cidade/estado/data do evento), à parte dos dados genealógicos acima.
+// Confirma o que o documento diz contra o que está digitado no cadastro
+// (Central Operacional) — divergência aqui NUNCA vira ponto de retificação
+// judicial, é erro de digitação no nosso próprio sistema.
+// ============================================================
+const CAMPOS_REGISTRAIS = ["numeroRegistro", "livro", "folha", "termo", "cidadeRegistro", "estadoRegistro", "dataEvento"] as const
+type CampoRegistral = (typeof CAMPOS_REGISTRAIS)[number]
+const ROTULO_REGISTRAL: Record<CampoRegistral, string> = {
+  numeroRegistro: "Nº registro (matrícula)", livro: "Livro", folha: "Folha", termo: "Termo",
+  cidadeRegistro: "Cidade do registro", estadoRegistro: "Estado do registro", dataEvento: "Data do evento (no documento)",
+}
+function normalizarRegistral(raw: Record<string, unknown> | null | undefined): Record<CampoRegistral, string> {
+  const out = {} as Record<CampoRegistral, string>
+  for (const k of CAMPOS_REGISTRAIS) out[k] = typeof raw?.[k] === "string" ? (raw[k] as string) : ""
+  return out
+}
+function reconstruirRegistral(campos: Record<CampoRegistral, string>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const k of CAMPOS_REGISTRAIS) out[k] = campos[k].trim() || null
+  return out
+}
+
 function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, onVerDetalhes, onSalvo }: {
   doc: (DocV2 & { pessoaNome: string }) | null
   divergencias: Divergencia[]
@@ -1205,6 +1288,7 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
   // já roda com o documento certo. Evita o cascading-render de sincronizar
   // estado num efeito só pra reagir à troca de prop.
   const [campos, setCampos] = useState<CampoAchatado[]>(() => (doc ? achatarStructuredData(doc.structuredData) : []))
+  const [camposRegistrais, setCamposRegistrais] = useState<Record<CampoRegistral, string>>(() => normalizarRegistral(doc?.registral))
   const [salvando, setSalvando] = useState<"rascunho" | "revisado" | null>(null)
   const [erroSalvar, setErroSalvar] = useState<string | null>(null)
 
@@ -1215,7 +1299,7 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
     try {
       const res = await fetch(`/api/processos/${processoId}/analise-v2/documentos/${doc.id}`, {
         method: "POST", headers: jsonHeaders(),
-        body: JSON.stringify({ structuredData: reconstruirStructuredData(campos), dataStatus }),
+        body: JSON.stringify({ structuredData: reconstruirStructuredData(campos), registral: reconstruirRegistral(camposRegistrais), dataStatus }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || "Erro ao salvar os dados.")
@@ -1280,7 +1364,13 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
           )
         )}
 
-        {abaDoc === "dados" && (
+        {abaDoc === "dados" && !doc.arquivoUrl && (
+          <div className="rounded-lg border border-dashed border-[var(--border-default)] p-6 text-center text-xs text-[var(--text-muted)]">
+            Anexe o arquivo do documento (aba "Visualização" ou botão "Anexar certidão") antes de extrair ou preencher os dados.
+          </div>
+        )}
+
+        {abaDoc === "dados" && doc.arquivoUrl && (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${DATA_STATUS_STYLE[doc.dataStatus] || "bg-[var(--surface-tertiary)] text-white/68"}`}>
@@ -1319,9 +1409,28 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
               </div>
             )}
 
+            <div className="pt-2 border-t border-[var(--border-default)]">
+              <div className="text-[11px] font-semibold text-[var(--text-secondary)] mb-2">
+                Dados registrais <span className="font-normal text-[var(--text-muted)]">— referência administrativa lida do documento; confira contra o cadastro</span>
+              </div>
+              <div className="space-y-2">
+                {CAMPOS_REGISTRAIS.map((k) => (
+                  <div key={k} className="flex flex-col gap-1">
+                    <label className="text-[11px] text-[var(--text-secondary)]">{ROTULO_REGISTRAL[k]}</label>
+                    <input
+                      value={camposRegistrais[k]}
+                      disabled={readOnly}
+                      onChange={(e) => setCamposRegistrais((prev) => ({ ...prev, [k]: e.target.value }))}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/95 disabled:opacity-60"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
             {erroSalvar && <p className="text-xs text-red-700">{erroSalvar}</p>}
 
-            {!readOnly && campos.length > 0 && (
+            {!readOnly && (
               <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => salvar("manual_filled")}

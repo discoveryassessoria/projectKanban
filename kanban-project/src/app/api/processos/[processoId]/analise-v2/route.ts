@@ -33,6 +33,18 @@ const TIPOS_ANALISADOS = Object.keys(DOC_LABEL) as TipoDocumento[]
 const nomeCompleto = (nome: string, sobrenome: string | null) =>
   `${nome}${sobrenome ? " " + sobrenome : ""}`.trim()
 
+// Mesmos 7 campos de `extrairRegistral` (extrator-inteiro-teor.ts) — o formato
+// que `registral` grava e que as colunas soltas do Documento espelham.
+const CAMPOS_REGISTRAIS_COMPARAVEIS: Array<[string, string]> = [
+  ["numeroRegistro", "Nº registro (matrícula)"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"],
+  ["cidadeRegistro", "Cidade do registro"], ["estadoRegistro", "Estado do registro"], ["dataEvento", "Data do evento"],
+]
+const normalizarValorRegistral = (v: unknown): string | null => {
+  if (typeof v !== "string") return null
+  const t = v.trim().toUpperCase().replace(/\s+/g, " ")
+  return t || null
+}
+
 // enum TipoDocumento (MAIÚSCULO) → DocTipo do motor
 function dtipo(tipoEnum: string): DocTipo {
   const t = (tipoEnum || "").toUpperCase()
@@ -75,6 +87,8 @@ async function carregarPessoas(processoId: number) {
           id: true, tipo: true, status: true,
           structuredData: true, dataStatus: true, analysisStatus: true, registral: true,
           data_emissao: true, arquivo_url: true, arquivo_nome: true, arquivo_mime_type: true,
+          numero_registro: true, livro: true, folha: true, termo: true,
+          cidade_registro: true, estado_registro: true, data_evento: true,
         },
       },
     },
@@ -187,6 +201,15 @@ export async function GET(
           arquivoUrl: d.arquivo_url ?? null,
           arquivoNome: d.arquivo_nome ?? null,
           arquivoMimeType: d.arquivo_mime_type ?? null,
+          cadastro: {
+            numeroRegistro: d.numero_registro ?? null,
+            livro: d.livro ?? null,
+            folha: d.folha ?? null,
+            termo: d.termo ?? null,
+            cidadeRegistro: d.cidade_registro ?? null,
+            estadoRegistro: d.estado_registro ?? null,
+            dataEvento: d.data_evento ? d.data_evento.toISOString().slice(0, 10) : null,
+          },
         })),
       }
     })
@@ -204,7 +227,32 @@ export async function GET(
     }
     const readiness = { ready: todosDocs.length > 0 && pendencias.length === 0, pendencias }
 
-    return NextResponse.json({ pessoas, kpis, readiness })
+    // DADOS REGISTRAIS: confere o que foi digitado no cadastro (Central Operacional,
+    // colunas soltas do Documento) contra o que a extração confirmou no próprio
+    // documento (`registral`, Json). NUNCA um ponto de retificação judicial — é erro
+    // de DIGITAÇÃO no nosso sistema, não do registro civil. Só compara documento já
+    // com alguma revisão humana em cima (manual_filled/reviewed) — dado "ai_extracted"
+    // ainda não confirmado não vira acusação de cadastro errado.
+    const registralDivergencias = todosDocs
+      .filter((d) => d.dataStatus === "manual_filled" || d.dataStatus === "reviewed")
+      .flatMap((d) =>
+        CAMPOS_REGISTRAIS_COMPARAVEIS
+          .map(([campo, rotulo]) => {
+            const doDocumento = normalizarValorRegistral((d.registral as Record<string, unknown> | null)?.[campo])
+            const doCadastro = normalizarValorRegistral((d.cadastro as Record<string, unknown>)[campo])
+            if (!doDocumento || !doCadastro) return null
+            if (doDocumento === doCadastro) return null
+            return {
+              docId: d.id, documentoTitulo: d.titulo, pessoaNome: d.pessoaNome,
+              campo, campoLabel: rotulo,
+              valorCadastro: (d.cadastro as Record<string, unknown>)[campo] as string,
+              valorDocumento: ((d.registral as Record<string, unknown>)[campo]) as string,
+            }
+          })
+          .filter((x): x is NonNullable<typeof x> => x !== null),
+      )
+
+    return NextResponse.json({ pessoas, kpis, readiness, registralDivergencias })
   } catch (error) {
     console.error("[GET /api/processos/[processoId]/analise-v2]", error)
     return NextResponse.json({ error: "Erro ao carregar Análise v2" }, { status: 500 })

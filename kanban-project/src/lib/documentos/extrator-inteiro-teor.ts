@@ -54,6 +54,11 @@ function limparRuidoDeMargem(texto: string): string {
   // registro civil; abreviação de verdade ("D.", "Dr.") sempre vem seguida de
   // ponto, por isso fica de fora daqui.
   t = t.replace(/\b[A-Z_]{1,2}\b(?!\.)/g, (m) => " ".repeat(m.length))
+  // Terceiro padrão real, mesmo documento: ponto/traço solto colado no INÍCIO de
+  // uma linha quebrada pelo OCR ("do Rio 7 VA\n. Grande do Sul") — pontuação de
+  // verdade sempre gruda na palavra anterior sem espaço; um "." ou "-" com espaço
+  // dos DOIS lados nunca é fim de frase de verdade, é artefato de margem.
+  t = t.replace(/(?<=\s)[.-](?=\s)/g, " ")
   return t
 }
 
@@ -266,6 +271,120 @@ export function extrairLocalDoRegistro(texto: string): Extraido<string> {
   return { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto }
 }
 
+/** "capital do Estado do/da X" — o Estado onde o ato foi lavrado, logo depois da cidade no mesmo boilerplate. */
+export function extrairEstadoDoRegistro(texto: string): Extraido<string> {
+  const r = casarNormalizado(texto, /estado\s+d[oa]\s+([a-z'.\s]+?)(?:[,.]|\s+no\s+tribunal|\s+as\s+\d|\s+às\s+\d|$)/)
+  if (!r) return undefined
+  return { valor: tituloCase(r.grupos[0]), origem: r.textoCompleto }
+}
+
+// ============================================================
+// DADOS REGISTRAIS — referência administrativa do ato (matrícula/livro/folha/
+// termo/cartório), DISTINTA dos dados genealógicos (nome/filiação/data de
+// nascimento) que `extrairNascimento`/`extrairCasamento`/`extrairObito` já
+// cobrem. Serve pra conferir o que foi DIGITADO no cadastro (Central
+// Operacional: `Documento.livro/folha/termo/...`) contra o que o documento
+// realmente diz — divergência aqui é erro de DIGITAÇÃO no nosso sistema, não
+// erro do registro civil (nunca vira ponto de retificação judicial).
+// ============================================================
+
+/**
+ * Matrícula (formato e-CRC, pós-2015): rótulo "MATRICULA" numa linha, e a
+ * linha seguinte com a sequência de dígitos. Achado real (doc 2122): o rótulo
+ * vem com ruído de OCR ao redor ("— MATRICULA E —"), por isso o critério é
+ * CONTER "matricula", não ser exatamente igual — e o valor é reconhecido pela
+ * densidade de dígitos da linha seguinte (matrícula real sempre tem muitos:
+ * "099002 01 55 1937 2 00001 185 0000251 75"), não por regex de formato fixo
+ * (variações de espaçamento entre cartórios).
+ */
+export function extrairNumeroRegistro(texto: string): Extraido<string> {
+  const linhas = texto.split("\n").map((l) => l.trim()).filter(Boolean)
+  for (let i = 0; i < linhas.length - 1; i++) {
+    if (!semAcento(linhas[i]).toLowerCase().includes("matricula")) continue
+    for (let j = i + 1; j < Math.min(i + 3, linhas.length); j++) {
+      const digitos = linhas[j].replace(/[^0-9]/g, "")
+      if (digitos.length >= 15) {
+        // Só o MAIOR trecho contíguo de dígitos/espaço da linha — o rótulo
+        // colado no início ("NE 100206...") e o ruído de OCR no fim
+        // ("...0000251 75 A É") ficam de fora, não fazem parte do número.
+        const candidatos = linhas[j].match(/[\d ]+/g) ?? [linhas[j]]
+        const maior = candidatos.reduce((a, b) => (b.replace(/\D/g, "").length > a.replace(/\D/g, "").length ? b : a), "")
+        const valor = maior.replace(/\s+/g, " ").trim()
+        if (valor) return { valor, origem: `${linhas[i]}\n${linhas[j]}` }
+      }
+    }
+  }
+  return undefined
+}
+
+/**
+ * "Livro nº X" / "fls. X" / "termo nº X" — formato de registro em livro físico
+ * (certidões mais antigas, sem matrícula unificada). Sem exemplo real desta
+ * árvore pra verificar (os documentos de teste são todos formato matrícula
+ * e-CRC) — mantém o mesmo espírito de recorte literal, nunca inventa.
+ */
+export function extrairLivroFolhaTermo(texto: string): { livro?: Extraido<string>; folha?: Extraido<string>; termo?: Extraido<string> } {
+  const out: ReturnType<typeof extrairLivroFolhaTermo> = {}
+  // "termo" é palavra comum em português corrido ("nos termos da lei") — só conta
+  // como campo administrativo quando o valor capturado tem dígito de verdade,
+  // nunca uma palavra qualquer ("termo que" não é termo de registro nenhum).
+  const temDigito = (s: string) => /\d/.test(s)
+  const livro = casarNormalizado(texto, /livro\s*n?[ºo°]?\.?\s*([a-z0-9/-]+)/)
+  if (livro && temDigito(livro.grupos[0])) out.livro = { valor: livro.grupos[0].toUpperCase(), origem: livro.textoCompleto }
+  const folha = casarNormalizado(texto, /(?:folha|fls?\.)\s*n?[ºo°]?\.?\s*([a-z0-9/-]+)/)
+  if (folha && temDigito(folha.grupos[0])) out.folha = { valor: folha.grupos[0].toUpperCase(), origem: folha.textoCompleto }
+  const termo = casarNormalizado(texto, /termo\s*n?[ºo°]?\.?\s*([a-z0-9/-]+)/)
+  if (termo && temDigito(termo.grupos[0])) out.termo = { valor: termo.grupos[0].toUpperCase(), origem: termo.textoCompleto }
+  return out
+}
+
+export interface DadosRegistraisExtraidos {
+  numeroRegistro?: Extraido<string>
+  livro?: Extraido<string>
+  folha?: Extraido<string>
+  termo?: Extraido<string>
+  cidadeRegistro?: Extraido<string>
+  estadoRegistro?: Extraido<string>
+  dataEvento?: Extraido<string>
+}
+
+/**
+ * Junta toda a referência administrativa do ato num só lugar. Dois textos
+ * diferentes de propósito: a matrícula (`numeroRegistro`) precisa do texto
+ * ORIGINAL (o próprio dígito É o dado — `limparRuidoDeMargem` apagaria);
+ * os campos narrativos (cidade/estado/data) precisam do texto LIMPO (o mesmo
+ * ruído de margem que gruda entre palavras da frase corrida — achado real,
+ * doc 2122: "Rio 7 VA\n. Grande do Sul" — quebraria "Rio Grande do Sul" do
+ * mesmo jeito que quebrava nome/filiação antes do fix da sessão anterior).
+ */
+export function extrairDadosRegistrais(texto: string): DadosRegistraisExtraidos {
+  const limpo = limparRuidoDeMargem(texto)
+  const lft = extrairLivroFolhaTermo(limpo)
+  return {
+    numeroRegistro: extrairNumeroRegistro(texto),
+    livro: lft.livro,
+    folha: lft.folha,
+    termo: lft.termo,
+    cidadeRegistro: extrairLocalDoRegistro(limpo),
+    estadoRegistro: extrairEstadoDoRegistro(limpo),
+    dataEvento: extrairDataDoEvento(limpo),
+  }
+}
+
+/** Mesma coisa que `extrairDadosRegistrais`, mas em valores planos — o shape que `Documento.registral` grava. */
+export function extrairRegistral(texto: string): Record<string, string | undefined> {
+  const d = extrairDadosRegistrais(texto)
+  return {
+    numeroRegistro: val(d.numeroRegistro),
+    livro: val(d.livro),
+    folha: val(d.folha),
+    termo: val(d.termo),
+    cidadeRegistro: val(d.cidadeRegistro),
+    estadoRegistro: val(d.estadoRegistro),
+    dataEvento: val(d.dataEvento),
+  }
+}
+
 // Nacionalidades citadas por extenso em certidão brasileira — vocabulário FECHADO
 // (mesmo espírito do extenso-pt.ts): só reconhece o que está nesta lista, nunca
 // adivinha por outro sinal (não infere "brasileiro" só por "natural deste
@@ -294,7 +413,7 @@ export function extrairNacionalidade(texto: string): Extraido<string> {
 // MONTAGEM POR TIPO — devolve o shape que ad-v2-engine.ts espera em structuredData
 // ============================================================
 
-const val = <T>(c: Extraido<T>): T | undefined => c?.valor
+export const val = <T>(c: Extraido<T>): T | undefined => c?.valor
 
 export function extrairNascimento(texto: string, municipioDoRegistro?: string) {
   texto = limparRuidoDeMargem(texto)

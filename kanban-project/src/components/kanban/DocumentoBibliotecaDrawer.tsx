@@ -194,12 +194,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
           )}
           {tab === "Tradução" && <FileTab title="Tradução juramentada" status={item.translation.status} />}
           {tab === "Apostila" && <FileTab title="Apostila de Haia" status={item.apostille.status} />}
-          {tab === "Dados registrais" && (
-            <PlaceholderTab
-              title="Dados registrais"
-              msg="Os dados registrais (cartório · livro/folha/termo/nº) são preenchidos na Central Operacional e ainda não são expostos por aqui."
-            />
-          )}
+          {tab === "Dados registrais" && <RegistryTab item={item} />}
           {tab === "Histórico" && (
             <PlaceholderTab title="Histórico" msg="Sem movimentações registradas para este documento." />
           )}
@@ -417,6 +412,70 @@ function PlaceholderTab({ title, msg }: { title: string; msg: string }) {
     <div className="flex flex-col gap-2 py-8 text-center">
       <div className="text-[13px] font-bold text-white/95">{title}</div>
       <p className="text-[12px] text-[var(--text-muted)] max-w-[380px] mx-auto leading-relaxed">{msg}</p>
+    </div>
+  )
+}
+
+// ============================================================
+// ABA: DADOS REGISTRAIS — espelho SOMENTE LEITURA do que é editado na Central
+// Operacional (TabRegistry, em DocumentoOperationalDrawer.tsx). Mesma fonte
+// (colunas do próprio Documento), mesmo agrupamento de campos — edita lá,
+// só mostra aqui, pra não ter dois lugares escrevendo o mesmo dado.
+// ============================================================
+
+const fmtDateReg = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : null)
+
+function RegField({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
+        {label}
+      </div>
+      <div className={`text-[13px] ${value ? "text-white/95" : "text-[var(--text-muted)] italic"}`}>
+        {value || "—"}
+      </div>
+    </div>
+  )
+}
+
+function RegSection({ title, fields }: { title: string; fields: Array<[string, string | null | undefined]> }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-2.5">{title}</div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {fields.map(([label, value], i) => <RegField key={i} label={label} value={value} />)}
+      </div>
+    </div>
+  )
+}
+
+function RegistryTab({ item }: { item: BibDocItem }) {
+  const r = item.registro
+  const semNada = !r || Object.values(r).every((v) => !v)
+  return (
+    <div className="space-y-5">
+      {semNada && (
+        <p className="text-[12px] text-[var(--text-muted)] pb-1">
+          Nenhum dado registral cadastrado ainda para este documento — preencha na Central Operacional.
+        </p>
+      )}
+      <RegSection title="Identificação" fields={[["Descrição", r.descricao]]} />
+      <RegSection title="Evento" fields={[
+        ["Data do evento", fmtDateReg(r.dataEvento)],
+        ["Data do registro", fmtDateReg(r.dataRegistro)],
+      ]} />
+      <RegSection title="Localidade" fields={[
+        ["País", r.paisRegistro],
+        ["Estado/Província", r.estadoRegistro],
+        ["Cidade", r.cidadeRegistro],
+        ["Cartório", r.cartorio],
+      ]} />
+      <RegSection title="Referência registral" fields={[
+        ["Livro", r.livro],
+        ["Folha", r.folha],
+        ["Termo", r.termo],
+        ["Nº registro", r.numeroRegistro],
+      ]} />
     </div>
   )
 }

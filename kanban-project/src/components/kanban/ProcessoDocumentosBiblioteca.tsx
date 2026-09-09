@@ -41,6 +41,20 @@ export interface BibDocItem {
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
+  /** Dados registrais — mesmos campos editados na Central Operacional (só leitura aqui). */
+  registro: {
+    descricao: string | null
+    dataEvento: string | null
+    dataRegistro: string | null
+    paisRegistro: string | null
+    estadoRegistro: string | null
+    cidadeRegistro: string | null
+    cartorio: string | null
+    livro: string | null
+    folha: string | null
+    termo: string | null
+    numeroRegistro: string | null
+  }
 }
 
 export interface BibPersonGroup {

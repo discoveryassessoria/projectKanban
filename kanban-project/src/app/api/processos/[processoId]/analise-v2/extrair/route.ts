@@ -19,7 +19,7 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { TipoDocumento } from "@prisma/client"
 import { transcreverDocumento } from "@/src/services/registral/ocr"
-import { extrairNascimento, extrairCasamento, extrairObito } from "@/src/lib/documentos/extrator-inteiro-teor"
+import { extrairNascimento, extrairCasamento, extrairObito, extrairRegistral } from "@/src/lib/documentos/extrator-inteiro-teor"
 
 // Vários documentos, cada um com download + tentativa de transcrição — pode
 // passar do limite padrão em árvore grande.
@@ -114,8 +114,16 @@ export async function POST(
       structuredData = { death: campos }
     }
 
+    // Referência administrativa (matrícula/livro/folha/termo/cidade/estado/data do
+    // evento) — categoria SEPARADA dos dados genealógicos acima: confere o que foi
+    // digitado no cadastro (Central Operacional) contra o que o documento diz, não
+    // vira ponto de retificação judicial (é erro de digitação nosso, não do registro).
+    const registralExtraido = extrairRegistral(textoFinal)
+    const registralComValor = Object.fromEntries(Object.entries(registralExtraido).filter(([, v]) => v))
+    const temRegistral = Object.keys(registralComValor).length > 0
+
     const camposComValor = achatarCamposComValor(campos)
-    if (camposComValor.length === 0) {
+    if (camposComValor.length === 0 && !temRegistral) {
       resultados.push({
         documentoId: doc.id, pessoaNome: nomePessoa, status: "sem_campos_reconhecidos",
         motivo: "O texto foi lido, mas nenhum campo conhecido bateu com o boilerplate esperado — preencha manualmente.",
@@ -126,7 +134,11 @@ export async function POST(
 
     await prisma.documento.update({
       where: { id: doc.id },
-      data: { structuredData: structuredData as object, dataStatus: "ai_extracted" },
+      data: {
+        structuredData: structuredData as object,
+        ...(temRegistral ? { registral: registralComValor as object } : {}),
+        dataStatus: "ai_extracted",
+      },
     })
     resultados.push({ documentoId: doc.id, pessoaNome: nomePessoa, status: "extraido", motivo: null, camposExtraidos: camposComValor })
   }
