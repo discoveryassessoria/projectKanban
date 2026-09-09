@@ -17,7 +17,8 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { ChevronRight, ChevronDown, Search, X } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { ChevronRight, ChevronDown, Search, X, Calendar } from "lucide-react"
 import type { FilaItem } from "@/src/types/home"
 import { formatarPrazo } from "./home-primitives"
 
@@ -31,12 +32,60 @@ const BANDEIRA: Record<string, string> = {
 const semAcento = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
 const chaveGrupoDe = (it: FilaItem) => it.processoNome ?? it.processoCodigo ?? "Sem processo"
 
+type AbaStatus = "todas" | "atrasadas" | "hoje" | "futuro"
+const ABAS_STATUS: Array<[AbaStatus, string]> = [
+  ["todas", "Todas"],
+  ["atrasadas", "Atrasadas"],
+  ["hoje", "Vencem hoje"],
+  ["futuro", "A vencer"],
+]
+/** aceita tanto o nome novo da aba quanto os alias que os links antigos usavam (?janela=vencendo). */
+const ALIAS_JANELA: Record<string, AbaStatus> = { vencendo: "futuro", vencidas: "atrasadas" }
+
+function inicioDoDiaLocal(d: Date) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+function fimDoDiaLocal(d: Date) {
+  const x = new Date(d)
+  x.setHours(23, 59, 59, 999)
+  return x
+}
+function statusDoItem(it: FilaItem, agora: Date): AbaStatus {
+  if (!it.prazo) return "todas"
+  if (it.atrasado) return "atrasadas"
+  const p = new Date(it.prazo)
+  if (p >= inicioDoDiaLocal(agora) && p <= fimDoDiaLocal(agora)) return "hoje"
+  return "futuro"
+}
 export function FilaAgrupada({ itens }: { itens: FilaItem[] }) {
+  const params = useSearchParams()
+  const janelaInicial = (() => {
+    const j = params.get("janela")
+    if (!j) return "todas"
+    return (ALIAS_JANELA[j] ?? j) as AbaStatus
+  })()
+
   const [busca, setBusca] = useState("")
   const [processo, setProcesso] = useState("todos")
   const [pais, setPais] = useState("todos")
-  const [somenteAtrasados, setSomenteAtrasados] = useState(false)
+  const [abaStatus, setAbaStatus] = useState<AbaStatus>(janelaInicial)
+  const [dataDe, setDataDe] = useState(params.get("de") ?? "")
+  const [dataAte, setDataAte] = useState(params.get("ate") ?? "")
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
+  const agora = useMemo(() => new Date(), [])
+
+  const temPrazo = useMemo(() => itens.some((it) => it.prazo), [itens])
+
+  const contagemPorAba = useMemo(() => {
+    const c: Record<AbaStatus, number> = { todas: itens.length, atrasadas: 0, hoje: 0, futuro: 0 }
+    for (const it of itens) {
+      const s = statusDoItem(it, agora)
+      if (s !== "todas") c[s]++
+    }
+    return c
+  }, [itens, agora])
 
   const processos = useMemo(() => {
     const contagem = new Map<string, number>()
@@ -53,22 +102,29 @@ export function FilaAgrupada({ itens }: { itens: FilaItem[] }) {
     return [...set].sort()
   }, [itens])
 
-  const temAtrasados = useMemo(() => itens.some((it) => it.atrasado), [itens])
-
   const filtrados = useMemo(() => {
     const termo = semAcento(busca.trim())
+    const de = dataDe ? inicioDoDiaLocal(new Date(`${dataDe}T00:00:00`)) : null
+    const ate = dataAte ? fimDoDiaLocal(new Date(`${dataAte}T00:00:00`)) : null
     return itens.filter((it) => {
       const nomeProcesso = chaveGrupoDe(it)
       if (processo !== "todos" && nomeProcesso !== processo) return false
       if (pais !== "todos" && it.pais !== pais) return false
-      if (somenteAtrasados && !it.atrasado) return false
+      if (abaStatus !== "todas" && statusDoItem(it, agora) !== abaStatus) return false
+      if ((de || ate) && it.prazo) {
+        const p = new Date(it.prazo)
+        if (de && p < de) return false
+        if (ate && p > ate) return false
+      } else if (de || ate) {
+        return false // filtro de data ativo, item sem prazo não entra
+      }
       if (termo) {
         const alvo = semAcento(`${it.titulo} ${it.subtitulo ?? ""} ${nomeProcesso}`)
         if (!alvo.includes(termo)) return false
       }
       return true
     })
-  }, [itens, busca, processo, pais, somenteAtrasados])
+  }, [itens, busca, processo, pais, abaStatus, dataDe, dataAte, agora])
 
   const grupos = useMemo(() => {
     const mapa = new Map<string, FilaItem[]>()
@@ -89,16 +145,75 @@ export function FilaAgrupada({ itens }: { itens: FilaItem[] }) {
       return next
     })
 
-  const filtroAtivo = busca !== "" || processo !== "todos" || pais !== "todos" || somenteAtrasados
+  const filtroAtivo =
+    busca !== "" || processo !== "todos" || pais !== "todos" || abaStatus !== "todas" || dataDe !== "" || dataAte !== ""
   const limparFiltros = () => {
     setBusca("")
     setProcesso("todos")
     setPais("todos")
-    setSomenteAtrasados(false)
+    setAbaStatus("todas")
+    setDataDe("")
+    setDataAte("")
   }
 
   return (
     <div className="space-y-3">
+      {temPrazo && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--border-default)] pb-2.5">
+          {ABAS_STATUS.map(([valor, rotulo]) => (
+            <button
+              key={valor}
+              onClick={() => setAbaStatus(valor)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                abaStatus === valor
+                  ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
+                  : "bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-white"
+              }`}
+            >
+              {rotulo}
+              {contagemPorAba[valor] > 0 && valor !== "todas" && (
+                <span className="ml-1.5 tabular-nums opacity-80">{contagemPorAba[valor]}</span>
+              )}
+            </button>
+          ))}
+
+          <span className="mx-1 hidden h-4 w-px bg-[var(--border-default)] sm:block" />
+
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+            <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+            <input
+              type="date"
+              value={dataDe}
+              max={dataAte || undefined}
+              onChange={(e) => setDataDe(e.target.value)}
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+              aria-label="Prazo a partir de"
+            />
+            <span>até</span>
+            <input
+              type="date"
+              value={dataAte}
+              min={dataDe || undefined}
+              onChange={(e) => setDataAte(e.target.value)}
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+              aria-label="Prazo até"
+            />
+            {(dataDe || dataAte) && (
+              <button
+                onClick={() => {
+                  setDataDe("")
+                  setDataAte("")
+                }}
+                className="text-[var(--text-muted)] hover:text-white"
+                title="Limpar período"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -136,18 +251,6 @@ export function FilaAgrupada({ itens }: { itens: FilaItem[] }) {
               </option>
             ))}
           </select>
-        )}
-
-        {temAtrasados && (
-          <label className="flex items-center gap-1.5 whitespace-nowrap text-xs text-[var(--text-secondary)]">
-            <input
-              type="checkbox"
-              checked={somenteAtrasados}
-              onChange={(e) => setSomenteAtrasados(e.target.checked)}
-              className="rounded border-[var(--border-default)]"
-            />
-            Só atrasados
-          </label>
         )}
 
         {filtroAtivo && (

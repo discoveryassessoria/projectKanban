@@ -32,7 +32,6 @@ import {
   ordenarFilas,
   rotuloDoDia,
   somarDias,
-  venceHoje,
 } from "@/src/lib/home/home-logic"
 import type {
   Agenda,
@@ -261,29 +260,23 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
           .filter((t) => t.statusTarefa === "BLOQUEADA")
           .map((tarefa) => ({ tipo: "tarefa" as const, tarefa })),
       ]
-    case "prazos-vencendo": {
-      // MESMO critério do alerta "Prazos vencendo" em `montarAlertas` — prazo até
-      // amanhã, não só o que já venceu (achado real: o alerta contava isto, mas
-      // apontava pra "tarefas-vencidas", que só pega o já vencido e só tarefa,
-      // nunca passo — o clique abria uma fila vazia mesmo com "28 itens").
-      const amanha = fimDoDia(somarDias(agora, 1))
+    case "prazos-vencendo":
+      // Central de Prazos — TODO passo/tarefa com prazo definido, sem teto de
+      // data (a tela filtra por status/período no cliente). Achado real, dois
+      // problemas na mesma fila: (1) o alerta "Prazos vencendo" contava
+      // passo+tarefa até amanhã, mas apontava pra "tarefas-vencidas", que só
+      // pegava o já vencido e só tarefa — clique abria fila vazia mesmo com
+      // "28 itens"; (2) cada janela de tempo (vencidas/hoje/vencendo) abria
+      // uma tela DIFERENTE, sem filtro nenhum — pedido explícito do usuário:
+      // uma tela só, com abas de status e período por calendário. As antigas
+      // "tarefas-vencidas"/"tarefas-hoje" saíram do catálogo: a aba de status
+      // desta fila cobre as duas.
       return [
         ...base.passos
-          .filter((s) => STATUS_PASSO_ACIONAVEL.has(s.status) && s.prazo && s.prazo <= amanha)
+          .filter((s) => STATUS_PASSO_ACIONAVEL.has(s.status) && s.prazo)
           .map((passo) => ({ tipo: "passo" as const, passo })),
-        ...base.tarefas
-          .filter((t) => t.dataPrazo && t.dataPrazo <= amanha)
-          .map((tarefa) => ({ tipo: "tarefa" as const, tarefa })),
+        ...base.tarefas.filter((t) => t.dataPrazo).map((tarefa) => ({ tipo: "tarefa" as const, tarefa })),
       ]
-    }
-    case "tarefas-vencidas":
-      return base.tarefas
-        .filter((t) => estaAtrasado(t.dataPrazo, agora))
-        .map((tarefa) => ({ tipo: "tarefa" as const, tarefa }))
-    case "tarefas-hoje":
-      return base.tarefas
-        .filter((t) => venceHoje(t.dataPrazo, agora))
-        .map((tarefa) => ({ tipo: "tarefa" as const, tarefa }))
     case "aguardando-cliente":
       return base.tarefas
         .filter((t) => t.statusTarefa === "AGUARDANDO_CLIENTE")
@@ -671,7 +664,10 @@ export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): P
       detalhe: `${prazosCriticos} ${prazosCriticos === 1 ? "item vence" : "itens vencem"} até amanhã`,
       nivel: "critico",
       quantidade: prazosCriticos,
-      href: "/dashboard/fila/prazos-vencendo",
+      // ?ate= pré-carrega a Central de Prazos já filtrada no mesmo período que
+      // este alerta conta ("até amanhã") — sem isso o clique abria a tela cheia
+      // de tudo, obrigando a filtrar de novo pra ver só o que o alerta prometeu.
+      href: `/dashboard/fila/prazos-vencendo?ate=${amanha.toISOString().slice(0, 10)}`,
     })
   }
 

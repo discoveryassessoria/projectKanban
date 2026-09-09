@@ -183,23 +183,13 @@ export const FILAS_ESTADO: FilaDef[] = [
   },
   {
     key: "prazos-vencendo",
-    titulo: "Prazos vencendo",
-    descricao: "Passos e tarefas com prazo até amanhã — mesmo critério do alerta da Home",
+    titulo: "Central de Prazos",
+    descricao: "Todo passo e tarefa com prazo — filtre por atrasadas, hoje, a vencer ou um período",
     modulo: "processos",
-    nivelBase: "critico",
-  },
-  {
-    key: "tarefas-vencidas",
-    titulo: "Tarefas vencidas",
-    descricao: "Prazo expirado — exigem ação imediata",
-    modulo: "tarefas",
-    nivelBase: "critico",
-  },
-  {
-    key: "tarefas-hoje",
-    titulo: "Tarefas que vencem hoje",
-    descricao: "Precisam ser fechadas até o fim do dia",
-    modulo: "tarefas",
+    // "critico" só quando há atrasado de verdade — `nivelDaFila` eleva
+    // dinamicamente (ver montarFilas). Sem isso, o card ficava sempre
+    // vermelho mesmo quando nada estava realmente vencido (a fila agora
+    // é o total de TODO prazo, não só o urgente).
     nivelBase: "alto",
   },
   {
