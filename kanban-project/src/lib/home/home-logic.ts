@@ -164,6 +164,19 @@ export const FILAS_PASSO: FilaDef[] = [
     verbos: ["definir", "acompanhar"],
   },
   {
+    // Achado real (09/09/2026): os 4 passos da Análise Documental
+    // (comparar/registrar/classificar/concluir) não tinham fila própria —
+    // caíam todos em "outras", um balde opaco sem filtro. São exclusivos
+    // desta fase em TODO o histórico do banco (nenhum outro passo usa esses
+    // verbos), então agrupar aqui não puxa nada de fora do lugar.
+    key: "analise-documental",
+    titulo: "Analisar documentação",
+    descricao: "Comparar dados, registrar divergências e decidir retificação",
+    modulo: "documentos",
+    nivelBase: "alto",
+    verbos: ["comparar", "registrar", "classificar", "concluir"],
+  },
+  {
     key: "outras",
     titulo: "Outras ações do workflow",
     descricao: "Passos executáveis fora das filas acima",
