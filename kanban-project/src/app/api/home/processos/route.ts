@@ -21,9 +21,11 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { temPermissao } from "@/src/lib/permissoes"
 import { resolveOperationalProjectionBatch } from "@/src/lib/process-stage/operational-projection"
 import { resolveSlaProjectionBatch } from "@/src/lib/process-stage/sla-projection"
+import { escopoProcesso, escopoTarefa } from "@/src/lib/autorizacao/escopo-operacional"
 
 /** Ordem de severidade — a maior vence ao agregar as tarefas do processo. */
 const PESO_PRIORIDADE = { URGENTE: 4, ALTA: 3, MEDIA: 2, BAIXA: 1 } as const
@@ -39,30 +41,48 @@ const STATUS_ABERTOS = [
 ] as const
 
 export async function GET(request: NextRequest) {
+  const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
   // Mesmo portão da lista de processos: quem não vê processo não vê a tabela.
-  const negado = await verificarPermissao(request, "processos.ver")
-  if (negado) return negado
+  const isAdmin = usuario.tipo === "admin"
+  if (!isAdmin && !temPermissao(usuario.permissoes, "processos.ver")) {
+    return NextResponse.json({ error: "sem permissão" }, { status: 403 })
+  }
+  const escopoUsuario = { userId: usuario.userId, tipo: usuario.tipo }
 
   const url = new URL(request.url)
   const limite = Math.min(Math.max(Number(url.searchParams.get("limite") ?? 6), 1), 50)
 
-  // Processos operacionais: os que ainda não concluíram.
-  const processos = await prisma.processo.findMany({
-    where: { dataConclusao: null },
-    select: { id: true, nome: true, codigo: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true },
-    orderBy: { updatedAt: "desc" },
-    take: limite,
-  })
+  // ESCOPO: admin vê todo processo aberto; operacional só o que tem
+  // tarefa/passo atribuído a ele — nunca a operação inteira da empresa
+  // (ver src/lib/autorizacao/escopo-operacional.ts).
+  const whereBase = { dataConclusao: null, ...escopoProcesso(escopoUsuario) }
+
+  // Processos operacionais: os que ainda não concluíram, dentro do escopo.
+  const [processos, total] = await Promise.all([
+    prisma.processo.findMany({
+      where: whereBase,
+      select: { id: true, nome: true, codigo: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true },
+      orderBy: { updatedAt: "desc" },
+      take: limite,
+    }),
+    prisma.processo.count({ where: whereBase }),
+  ])
   if (processos.length === 0) return NextResponse.json({ processos: [], total: 0 })
 
   const ids = processos.map((p) => p.id)
 
-  // As tarefas abertas de TODOS os processos numa consulta — sem N+1.
+  // As tarefas abertas numa consulta só — sem N+1. Pendências/prioridade/
+  // responsável são agregadas SÓ das tarefas dentro do escopo do usuário: pra
+  // um operacional, "5 pendências" tem que ser as 5 tarefas DELE naquele
+  // processo, nunca a soma de todo mundo (ver mandato de 10/09 — família
+  // Medina com 16 tarefas no total não pode virar "16" pra quem só tem 5).
   const tarefas = await prisma.tarefa.findMany({
     where: {
       processoId: { in: ids },
       concluida: false,
       statusTarefa: { in: STATUS_ABERTOS as unknown as never[] },
+      ...escopoTarefa(escopoUsuario),
     },
     select: {
       processoId: true,
@@ -72,10 +92,9 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  const [projecoes, slas, total] = await Promise.all([
+  const [projecoes, slas] = await Promise.all([
     resolveOperationalProjectionBatch(ids),
     resolveSlaProjectionBatch(ids),
-    prisma.processo.count({ where: { dataConclusao: null } }),
   ])
 
   // Agrega por processo: contagem, maior prioridade e o responsável dela.

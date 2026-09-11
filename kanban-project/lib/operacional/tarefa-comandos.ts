@@ -532,3 +532,44 @@ export async function redistribuirTarefas(args: {
 
   return { total: itens.length, sucesso, falha: itens.length - sucesso, itens }
 }
+
+/**
+ * REPRIORIZA UM CONJUNTO DE TAREFAS — mesma forma de `redistribuirTarefas`,
+ * mesmo motivo: item a item, auditado, sem transação única (uma tarefa
+ * encerrada no meio do lote não pode reverter as demais).
+ *
+ * Existe para a Central Operacional poder agir sobre uma FAMÍLIA sem virar
+ * "concluir tudo": reatribuir e repriorizar são as DUAS ações em lote que a
+ * operação decidiu permitir — nenhuma delas fecha trabalho por atalho.
+ */
+export async function redistribuirPrioridade(args: {
+  tarefaIds: number[]
+  novaPrioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE'
+  autorId: number
+  motivo?: string | null
+}): Promise<{ total: number; sucesso: number; falha: number; itens: ItemDaRedistribuicao[] }> {
+  const { alterarPrioridade } = await import('./tarefa-ciclo')
+  const itens: ItemDaRedistribuicao[] = []
+
+  for (const tarefaId of [...new Set(args.tarefaIds)]) {
+    const r = await alterarPrioridade({
+      tarefaId, prioridade: args.novaPrioridade, autorId: args.autorId,
+      motivo: args.motivo ?? 'repriorização em lote',
+    })
+    itens.push(r.ok ? { tarefaId, ok: true } : { tarefaId, ok: false, codigo: r.codigo, mensagem: r.mensagem })
+  }
+
+  const sucesso = itens.filter((i) => i.ok).length
+  await prisma.logAuditoria.create({
+    data: {
+      acao: 'TAREFAS_REPRIORIZADAS',
+      entidade: 'Tarefa',
+      entidadeId: 0,
+      usuarioId: args.autorId,
+      descricao: `Repriorização em lote: ${sucesso} de ${itens.length} tarefa(s) para ${args.novaPrioridade}.` + (args.motivo ? ` Motivo: ${args.motivo}` : ''),
+      detalhes: JSON.parse(JSON.stringify({ novaPrioridade: args.novaPrioridade, motivo: args.motivo ?? null, itens })),
+    },
+  })
+
+  return { total: itens.length, sucesso, falha: itens.length - sucesso, itens }
+}

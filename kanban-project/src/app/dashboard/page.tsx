@@ -66,8 +66,16 @@ export default function DashboardPage() {
     )
   }
 
+  // ADMIN: cockpit da empresa. OPERACIONAL: mesa pessoal de execução — o
+  // título já avisa qual das duas telas é essa, antes mesmo do conteúdo.
+  const isAdmin = data?.usuario.tipo === "admin"
+  const titulo = data ? (isAdmin ? "Centro Operacional" : "Meu Trabalho") : "Centro Operacional"
+  const subtitulo = data
+    ? (isAdmin ? "Como está toda a operação e onde precisa intervir" : "O que eu preciso fazer agora")
+    : "O que precisa ser feito agora"
+
   return (
-    <HomeShell>
+    <HomeShell titulo={titulo} subtitulo={subtitulo}>
       {isLoading && !data ? (
         <HomeSkeleton />
       ) : error && !data ? (

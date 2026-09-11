@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
 
   const p = request.nextUrl.searchParams
   const colunaPedida = p.get('coluna')
+  const dias = inteiro(p.get('semMovimentacaoDias'))
   const filtros: FiltrosGerenciais = {
     responsavelId: inteiro(p.get('responsavel')),
     semResponsavel: bandeira(p.get('semResponsavel')),
@@ -67,6 +68,18 @@ export async function GET(request: NextRequest) {
     venceHoje: bandeira(p.get('venceHoje')),
     processoId: inteiro(p.get('processo')),
     pessoaId: inteiro(p.get('pessoa')),
+    // ── Central Operacional (drill-down Família→Processo→Fase→Etapa→Tarefa) ──
+    // A MESMA leitura da Lista/Kanban, só com mais filtros: nenhuma delas é
+    // uma segunda projeção.
+    familiaId: inteiro(p.get('familia')),
+    etapaKey: p.getAll('etapa').filter(Boolean).length ? p.getAll('etapa').filter(Boolean) : null,
+    equipeKey: p.getAll('equipe').filter(Boolean).length ? p.getAll('equipe').filter(Boolean) : null,
+    executavelAgora: p.has('executavelAgora') ? bandeira(p.get('executavelAgora')) : undefined,
+    proximos7Dias: bandeira(p.get('proximos7Dias')),
+    aguardandoTerceiro: bandeira(p.get('aguardandoTerceiro')),
+    bloqueada: bandeira(p.get('bloqueada')),
+    pendenciasFasesAnteriores: bandeira(p.get('pendenciasFasesAnteriores')),
+    semMovimentacao: dias != null ? { diasSemAtividade: dias } : null,
     busca: p.get('busca'),
     incluirEncerradas: bandeira(p.get('incluirEncerradas')),
     pagina: inteiro(p.get('pagina')) ?? 1,

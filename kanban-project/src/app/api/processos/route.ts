@@ -16,10 +16,18 @@ import { processarOutbox } from '@/src/services/outbox-dispatcher'
 import { resolveOperationalProjectionBatch } from '@/src/lib/process-stage/operational-projection'
 import { resolveSlaProjectionBatch } from '@/src/lib/process-stage/sla-projection'
 import { ondePaisEh } from "@/src/lib/identidade/canonica"
+import { escopoProcesso } from "@/src/lib/autorizacao/escopo-operacional"
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
   try {
+    // 🔒 ESCOPO: admin vê todo processo autorizado; operacional só o que tem
+    // tarefa/passo atribuído a ele — essa rota alimenta o Kanban e a Home, e
+    // nenhuma das duas pode devolver a operação inteira da empresa pra quem
+    // não é admin (ver src/lib/autorizacao/escopo-operacional.ts).
+    const usuario = await extrairUsuarioComPermissoes(request)
+    if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
+
     const { searchParams } = new URL(request.url)
     const pais = searchParams.get("pais")
     const requerenteId = searchParams.get("requerenteId")
@@ -27,7 +35,7 @@ export async function GET(request: Request) {
     const motor = searchParams.get("motor") // ✅ MOTOR
 
     // Construir filtro dinâmico
-    const where: any = {}
+    const where: any = { ...escopoProcesso({ userId: usuario.userId, tipo: usuario.tipo }) }
 
     // POR IDENTIDADE. `where.pais = pais` casava texto com texto e dependia de
     // as duas pontas usarem a mesma grafia.

@@ -395,6 +395,41 @@ export const STATUS_TERMINAIS: StatusTarefa[] = [
 ]
 
 /**
+ * Estados em que a tarefa EXISTE, é trabalho de alguém, mas a ação disponível
+ * agora é sobre o IMPEDIMENTO — desbloquear, ou o terceiro/cliente responder —
+ * não sobre o trabalho em si. `BLOQUEADA` e `AGUARDANDO_TERCEIRO`/
+ * `AGUARDANDO_CLIENTE` já são condições PRÓPRIAS na Central (cada uma com seu
+ * próprio filtro); por isso não entram em "executável agora" — contá-las lá
+ * também faria a mesma tarefa aparecer em duas categorias que se anulam.
+ */
+export const STATUS_EM_ESPERA: StatusTarefa[] = ['BLOQUEADA', 'AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE']
+
+/**
+ * EXISTE AÇÃO QUE UM USUÁRIO DA DISCOVERY PODE EXECUTAR NESTA TAREFA AGORA?
+ *
+ * Não é a negação de uma condição só (dependência), que seria insuficiente:
+ * uma tarefa concluída ou cancelada não tem mais o que fazer (estado
+ * terminal); uma bloqueada ou em espera externa tem ação disponível, mas só
+ * sobre o impedimento, não sobre o trabalho — por isso ficam de fora aqui e
+ * aparecem como condições próprias; uma dependência obrigatória ainda aberta
+ * existe e é visível na fila, mas não anda até a outra terminar
+ * (`podeExecutar`); e uma tarefa que perdeu a causa depois de iniciada espera
+ * DECISÃO humana (`causaRemovidaEm`) antes de qualquer trabalho real
+ * continuar — a única ação possível nela é decidir, não avançar a etapa.
+ */
+export function executavelAgora(t: {
+  statusTarefa: StatusTarefa
+  aguardandoDependencia: boolean
+  causaRemovidaEm: Date | null
+}): boolean {
+  if (STATUS_TERMINAIS.includes(t.statusTarefa)) return false
+  if (STATUS_EM_ESPERA.includes(t.statusTarefa)) return false
+  if (t.aguardandoDependencia) return false
+  if (t.causaRemovidaEm != null) return false
+  return true
+}
+
+/**
  * SINCRONIZA a tarefa com o workflow dela: estado derivado + etapa corrente.
  *
  * Não conclui passo, não avança fase, não cria nada. Só faz a tarefa dizer a

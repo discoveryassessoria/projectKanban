@@ -19,6 +19,18 @@
 // ============================================================================
 
 import type { ResumoSla } from "@/src/types/sla"
+import type { FamiliaAgrupada, IndicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
+
+// ---- Central Operacional real (mesmo motor de /operacao/central) ----------
+// ADMIN: filtro vazio, opera no universo global autorizado. OPERACIONAL:
+// escopo obrigatório por responsavelId (ver src/lib/autorizacao/escopo-operacional.ts)
+// — a Home nunca chama esta agregação sem esse filtro, e o filtro não pode
+// ser removido pelo cliente (é decidido no servidor, a partir da sessão).
+export interface CentralOperacionalHome {
+  indicadores: IndicadoresGerenciais
+  familias: FamiliaAgrupada[]
+  fases: Array<{ phaseKey: string; label: string; code: string }>
+}
 
 export type NivelPrioridade = "critico" | "alto" | "medio" | "baixo"
 
@@ -172,4 +184,6 @@ export interface HomeData {
   /** vazio = o bloco de alertas não é renderizado */
   alertas: AlertaOperacional[]
   resumoDia: ResumoDia
+  /** null quando o usuário não vê tarefas. Já escopado no servidor. */
+  centralOperacional: CentralOperacionalHome | null
 }

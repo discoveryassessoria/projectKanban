@@ -40,6 +40,10 @@ export interface LinhaDeFila {
   rotuloDoPrazo: string
   aguardandoDependencia: boolean
   requerDecisao: boolean
+  /** Ver `executavelAgora` em `lib/operacional/tarefa-canonica.ts` — não é `!aguardandoDependencia` sozinho. */
+  executavelAgora: boolean
+  /** Quem é o terceiro esperado, SÓ quando identificável — nunca decide se a tarefa está esperando. */
+  terceiroNome: string | null
   servico: string | null
   criadaEm: string | null
   atribuidaEm: string | null

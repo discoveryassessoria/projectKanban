@@ -51,7 +51,7 @@ const buscar = (url: string) => {
   })
 }
 
-export function ProcessosEmAndamento() {
+export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { titulo?: string } = {}) {
   const { data, error, isLoading } = useSWR<{ total: number; processos: LinhaProcesso[] }>(
     "/api/home/processos?limite=6",
     buscar,
@@ -63,7 +63,10 @@ export function ProcessosEmAndamento() {
   return (
     <BlocoCard className="p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-3 pt-5">
-        <BlocoHeader titulo="Processos em andamento" descricao="Situação de cada processo aberto" />
+        <BlocoHeader
+          titulo={data ? `${titulo} · ${data.total}` : titulo}
+          descricao="Situação de cada processo aberto"
+        />
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)]">
             <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros

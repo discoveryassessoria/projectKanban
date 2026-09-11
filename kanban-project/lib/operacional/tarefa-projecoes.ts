@@ -29,9 +29,117 @@ import type { Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa } from '@pris
  * afirmação sobre o código, não um fato verificado com volume.
  */
 type Leitor = PrismaClient | Prisma.TransactionClient
-import { STATUS_ATIVOS } from './tarefa-canonica'
+import { STATUS_ATIVOS, STATUS_TERMINAIS, STATUS_EM_ESPERA, executavelAgora as tarefaExecutavelAgora } from './tarefa-canonica'
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
-import { phaseKeyToFaseCode, rotuloDoPasso, labelDaFasePorPhaseKey, getOrdemFase } from '@/src/lib/process-stage/fases-catalog'
+import { phaseKeyToFaseCode, faseCodeToPhaseKey, rotuloDoPasso, labelDaFasePorPhaseKey, getOrdemFase } from '@/src/lib/process-stage/fases-catalog'
+import { fasesAnterioresA } from '@/src/services/regularizacao-historica'
+
+/** Estados concluídos — fora deles, "atrasada"/"sem movimentação"/etc. deixam de fazer sentido. */
+const STATUS_CONCLUIDOS: StatusTarefa[] = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI']
+/** Tudo que aparece no quadro operacional: em curso + concluído (fora cancelada/supersedida). */
+const STATUS_NO_QUADRO: StatusTarefa[] = [...STATUS_ATIVOS, ...STATUS_CONCLUIDOS]
+
+/** Fragmento Prisma: a tarefa TEM (ou não) dependência obrigatória ainda aberta — mesma regra de `podeExecutar`, em SQL. */
+function whereDependenciaAberta(aberta: boolean): Prisma.TarefaWhereInput {
+  const condicao: Prisma.TarefaDependenciaWhereInput = {
+    obrigatoria: true,
+    dependeDe: { statusTarefa: { notIn: STATUS_CONCLUIDOS } },
+  }
+  return aberta ? { dependeDe: { some: condicao } } : { dependeDe: { none: condicao } }
+}
+
+/**
+ * "EXECUTÁVEL AGORA" como filtro de BANCO — o mesmo predicado de
+ * `executavelAgora` (`tarefa-canonica.ts`), traduzido para SQL em vez de
+ * aplicado linha a linha: terminal, em espera (bloqueada/aguardando
+ * terceiro/cliente), com dependência obrigatória aberta, ou com causa
+ * removida pendente de decisão — nenhuma dessas tem ação sobre o TRABALHO
+ * disponível agora.
+ */
+function whereExecutavelAgora(executavel: boolean): Prisma.TarefaWhereInput {
+  const naoExecutavel: Prisma.TarefaWhereInput = {
+    OR: [
+      { statusTarefa: { in: [...STATUS_TERMINAIS, ...STATUS_EM_ESPERA] } },
+      { causaRemovidaEm: { not: null } },
+      whereDependenciaAberta(true),
+    ],
+  }
+  return executavel ? { NOT: naoExecutavel } : naoExecutavel
+}
+
+/**
+ * A ÚLTIMA ATIVIDADE REAL de cada tarefa — a última linha da auditoria com
+ * `entidade='Tarefa'` para aquele id, NUNCA `updatedAt`: `updatedAt` sobe por
+ * efeitos em cascata de OUTROS registros (ex.: necessidade documental
+ * recalculada por um documento vizinho), sem que ninguém tenha de fato
+ * trabalhado nesta tarefa. "Sem movimentação" precisa da atividade que
+ * alguém REGISTROU, não da que o banco marcou.
+ */
+async function ultimaAtividadeReal(ids: number[], db: Leitor = prisma): Promise<Map<number, Date>> {
+  const mapa = new Map<number, Date>()
+  if (ids.length === 0) return mapa
+  const logs = await db.logAuditoria.groupBy({
+    by: ['entidadeId'],
+    where: { entidade: 'Tarefa', entidadeId: { in: ids } },
+    _max: { criadoEm: true },
+  })
+  for (const l of logs) {
+    if (l.entidadeId != null && l._max.criadoEm) mapa.set(l.entidadeId, l._max.criadoEm)
+  }
+  return mapa
+}
+
+/**
+ * IDs de tarefas SEM MOVIMENTAÇÃO REAL há N dias, dentro de um recorte já
+ * filtrado (`where`) — dois passos porque `LogAuditoria` não tem relação
+ * declarada com `Tarefa` (é polimórfica): primeiro os candidatos do recorte,
+ * depois a última atividade real deles em lote. O resultado entra como
+ * `id: { in: [...] }` no `where` final, então paginação e contagem continuam
+ * batendo com o que é devolvido — o filtro nunca corta a lista já paginada.
+ */
+async function idsSemMovimentacao(
+  where: Prisma.TarefaWhereInput, diasSemAtividade: number, agora: Date, db: Leitor = prisma,
+): Promise<number[]> {
+  const candidatos = await db.tarefa.findMany({ where, select: { id: true, createdAt: true } })
+  if (candidatos.length === 0) return []
+  const ultimas = await ultimaAtividadeReal(candidatos.map((c) => c.id), db)
+  const limite = new Date(agora.getTime() - diasSemAtividade * 86400000)
+  return candidatos.filter((c) => (ultimas.get(c.id) ?? c.createdAt) < limite).map((c) => c.id)
+}
+
+/**
+ * PENDÊNCIAS DE FASES ANTERIORES — como filtro de banco para a leitura linha a
+ * linha (`visaoGerencial`/`indicadoresGerenciais`): tarefa ativa cujo
+ * `faseMacroKey` mapeia para uma fase ANTERIOR à fase atual do PRÓPRIO
+ * processo dela (`fasesAnterioresA`, catálogo canônico). O avanço de fase do
+ * processo nunca conclui essas tarefas — é exatamente essa lacuna que a Home
+ * hoje ignora por design (`carregarBase`) e que este filtro existe para
+ * expor, aditivamente, sem mudar o que a Home já faz.
+ */
+async function whereFasesAnteriores(
+  escopo: { processoId?: number | null; familiaId?: number | null }, db: Leitor = prisma,
+): Promise<Prisma.TarefaWhereInput> {
+  const whereProcesso: Prisma.ProcessoWhereInput = { faseAtualKey: { not: null } }
+  if (escopo.processoId != null) whereProcesso.id = escopo.processoId
+  if (escopo.familiaId != null) whereProcesso.familiaId = escopo.familiaId
+  const processos = await db.processo.findMany({ where: whereProcesso, select: { id: true, faseAtualKey: true } })
+
+  const clauses: Prisma.TarefaWhereInput[] = []
+  for (const p of processos) {
+    // `fasesAnterioresA` recebe a PHASE KEY (não o `FaseCode`) e resolve
+    // sozinha — chamar `phaseKeyToFaseCode` aqui é só para descartar chave
+    // que não pertence ao fluxo oficial, sem deixar a função lançar.
+    if (!phaseKeyToFaseCode(p.faseAtualKey)) continue
+    const anteriores = fasesAnterioresA(p.faseAtualKey as string)
+      .map((c) => faseCodeToPhaseKey(c))
+      .filter((k): k is string => k != null)
+    if (anteriores.length === 0) continue
+    clauses.push({ processoId: p.id, faseMacroKey: { in: anteriores }, statusTarefa: { in: STATUS_ATIVOS } })
+  }
+  // Nenhum processo no escopo tem fase anterior pendente: `id: -1` nunca bate
+  // com nenhuma tarefa real, em vez de um `where` vazio que bateria com todas.
+  return clauses.length > 0 ? { OR: clauses } : { id: -1 }
+}
 
 // O TEMPO VEM DE UM LUGAR SÓ.
 //
@@ -62,6 +170,18 @@ export interface LinhaDeFila {
   aguardandoDependencia: boolean
   /** Perdeu a causa depois de iniciada e espera decisão humana. */
   requerDecisao: boolean
+  /**
+   * EXISTE AÇÃO SOBRE O TRABALHO AGORA? Ver `executavelAgora` em
+   * `tarefa-canonica.ts` — não é `!aguardandoDependencia` sozinho: também
+   * exclui terminal, bloqueada/aguardando terceiro-cliente e `requerDecisao`.
+   */
+  executavelAgora: boolean
+  /**
+   * QUEM é o terceiro esperado — SÓ quando `Documento.orgao` resolve, nunca
+   * usado para decidir SE a tarefa está esperando (isso é `statusTarefa`).
+   * `null` = espera real, terceiro não identificado.
+   */
+  terceiroNome: string | null
   /** O que se está obtendo: o item do catálogo por trás da obrigação. */
   servico: string | null
   criadaEm: string | null
@@ -84,6 +204,10 @@ const SELECT = {
   necessidade: { select: { itemCatalogo: { select: { name: true } } } },
   workflowStepInstance: { select: { stepKey: true, snapshot: true, stepDefinitionId: true } },
   dependeDe: { select: { obrigatoria: true, dependeDe: { select: { statusTarefa: true } } } },
+  // SÓ para IDENTIFICAR o terceiro quando a tarefa já está esperando um — o
+  // vínculo em si nunca decide o estado (ver `aguardandoTerceiro` em
+  // `whereGerencial`).
+  documento: { select: { orgao: { select: { name: true } } } },
 } satisfies Prisma.TarefaSelect
 
 type Bruta = Prisma.TarefaGetPayload<{ select: typeof SELECT }>
@@ -104,6 +228,9 @@ function projetar(
     criadaEm: t.createdAt,
     agora,
   })
+  const aguardandoDependencia = t.dependeDe.some(
+    (d) => d.obrigatoria && !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa),
+  )
   return {
     taskId: t.id,
     titulo: t.titulo,
@@ -148,10 +275,12 @@ function projetar(
     atrasada: tempo.atrasado,
     diasParaPrazo: tempo.diasParaPrazo,
     rotuloDoPrazo: tempo.rotulo,
-    aguardandoDependencia: t.dependeDe.some(
-      (d) => d.obrigatoria && !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa),
-    ),
+    aguardandoDependencia: aguardandoDependencia,
     requerDecisao: t.causaRemovidaEm != null,
+    executavelAgora: tarefaExecutavelAgora({
+      statusTarefa: t.statusTarefa, aguardandoDependencia, causaRemovidaEm: t.causaRemovidaEm,
+    }),
+    terceiroNome: t.documento?.orgao?.name ?? null,
     servico: t.necessidade?.itemCatalogo?.name ?? null,
     criadaEm: t.createdAt?.toISOString() ?? null,
     atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
@@ -714,16 +843,37 @@ export interface FiltrosGerenciais {
   venceHoje?: boolean
   processoId?: number | null
   pessoaId?: number | null
-  /** Busca por tarefa, pessoa ou processo — uma caixa só, como se procura. */
+  /** Agrupamento visual da Central Operacional — nunca dono da tarefa. */
+  familiaId?: number | null
+  etapaKey?: string[] | null
+  equipeKey?: string[] | null
+  /** Negação de `aguardandoDependencia`/em-espera/terminal/causa-removida — ver `tarefa-canonica.ts`. */
+  executavelAgora?: boolean
+  proximos7Dias?: boolean
+  /** Açúcar sobre `status`: idêntico a `status: ['AGUARDANDO_TERCEIRO','AGUARDANDO_CLIENTE']`. */
+  aguardandoTerceiro?: boolean
+  /** Açúcar sobre `status`: idêntico a `status: ['BLOQUEADA']`. */
+  bloqueada?: boolean
+  /** Sem atividade REAL (auditoria, não `updatedAt`) há N dias — ver `ultimaAtividadeReal`. */
+  semMovimentacao?: { diasSemAtividade: number } | null
+  /** Tarefa ativa numa fase anterior à fase ATUAL do próprio processo — ver `whereFasesAnteriores`. */
+  pendenciasFasesAnteriores?: boolean
+  /** Busca por tarefa, pessoa, processo, família, documento, protocolo ou órgão — uma caixa só, como se procura. */
   busca?: string | null
   /** Encerradas sem entrega (cancelada/supersedida) ficam fora por padrão. */
   incluirEncerradas?: boolean
   pagina?: number
   porPagina?: number
+  /**
+   * Ordenação da LISTA DE FAMÍLIAS (`agregacaoPorFamilia`) — nunca um score
+   * artificial: cada modo é uma ordenação lexicográfica sobre contagens reais.
+   * `atencao` (padrão) = mais atrasadas primeiro, depois mais paradas
+   * (bloqueadas+aguardando terceiro), depois mais executáveis agora — cada
+   * critério é um número que já aparece na tela, então dá para explicar
+   * qualquer posição só apontando pra ele.
+   */
+  ordenacaoFamilia?: 'atencao' | 'prazo' | 'familia' | 'ultimaAtividade'
 }
-
-const STATUS_CONCLUIDOS: StatusTarefa[] = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI']
-const STATUS_NO_QUADRO: StatusTarefa[] = [...STATUS_ATIVOS, ...STATUS_CONCLUIDOS]
 
 /**
  * O `where` do Prisma para os filtros gerenciais.
@@ -748,6 +898,9 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   if (f.prioridade?.length) where.prioridade = { in: f.prioridade }
   if (f.processoId != null) where.processoId = f.processoId
   if (f.pessoaId != null) where.pessoaId = f.pessoaId
+  if (f.familiaId != null) where.processo = { familiaId: f.familiaId }
+  if (f.etapaKey?.length) e.push({ workflowStepInstance: { stepKey: { in: f.etapaKey } } })
+  if (f.equipeKey?.length) where.equipeKey = { in: f.equipeKey }
 
   // Atrasada é condição derivada, mas se traduz exatamente em SQL: prazo no
   // passado e trabalho ainda por fazer.
@@ -756,11 +909,44 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
     const { inicio, fim } = janelaDoDiaOperacional(agora)
     e.push({ dataPrazo: { gte: inicio, lte: fim } })
   }
+  if (f.proximos7Dias) {
+    const limite = new Date(inicioDoDiaOperacional(agora))
+    limite.setDate(limite.getDate() + 7)
+    e.push({ dataPrazo: { gte: inicioDoDiaOperacional(agora), lte: limite }, statusTarefa: { in: STATUS_ATIVOS } })
+  }
+
+  // AGUARDANDO TERCEIRO — CANÔNICO e EVENTADO: `statusTarefa` só chega a
+  // AGUARDANDO_TERCEIRO/AGUARDANDO_CLIENTE por `aguardarTerceiro()` (ação
+  // humana registrada) ou por uma etapa do workflow em `AGUARDANDO`
+  // (`estadoDerivado`) — nunca por inferência. QUEM é o terceiro é outra
+  // pergunta (identificação, não estado): ver `terceiroNome` na projeção da
+  // linha, resolvido via `Documento.orgao` SÓ quando esse vínculo existe, e
+  // nunca usado para DECIDIR se a tarefa está esperando.
+  if (f.aguardandoTerceiro) e.push({ statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } })
+  if (f.bloqueada) e.push({ statusTarefa: 'BLOQUEADA' })
+  if (f.executavelAgora != null) e.push(whereExecutavelAgora(f.executavelAgora))
 
   // A busca é uma caixa só porque é assim que se procura: o gestor lembra do
-  // nome da pessoa OU do processo OU do que é a tarefa, não de qual campo.
+  // nome da pessoa, do processo, da família, do documento, do protocolo ou do
+  // órgão — não de qual campo exatamente guarda o que ele lembra.
   const q = f.busca?.trim()
-  if (q) e.push({ OR: [{ titulo: { contains: q, mode: 'insensitive' } }, { processo: { nome: { contains: q, mode: 'insensitive' } } }] })
+  if (q) {
+    e.push({
+      OR: [
+        { titulo: { contains: q, mode: 'insensitive' } },
+        { processo: { nome: { contains: q, mode: 'insensitive' } } },
+        { processo: { familia: { nome: { contains: q, mode: 'insensitive' } } } },
+        { pessoa: { nome: { contains: q, mode: 'insensitive' } } },
+        { pessoa: { sobrenome: { contains: q, mode: 'insensitive' } } },
+        { documento: { descricao: { contains: q, mode: 'insensitive' } } },
+        { documento: { orgao: { name: { contains: q, mode: 'insensitive' } } } },
+        { processo: { protocolos: { some: { OR: [
+          { numeroProtocolo: { contains: q, mode: 'insensitive' } },
+          { numeroProcesso: { contains: q, mode: 'insensitive' } },
+        ] } } } },
+      ],
+    })
+  }
 
   if (e.length) where.AND = e
   return where
@@ -788,6 +974,27 @@ async function contextoDeParada(ids: number[], db: Leitor = prisma): Promise<Map
   return mapa
 }
 
+/**
+ * Os dois filtros que `whereGerencial` não consegue expressar sozinho, porque
+ * dependem de outra tabela (auditoria, para "sem movimentação") ou do estado
+ * de OUTROS registros (a fase atual do processo, para "pendências de fases
+ * anteriores") — mesclados SEMPRE antes de contar/paginar, para que o número
+ * do card e a página do drill-down nunca discordem.
+ */
+async function mergeFiltrosAssincronos(
+  f: FiltrosGerenciais, where: Prisma.TarefaWhereInput, agora: Date, db: Leitor,
+): Promise<Prisma.TarefaWhereInput> {
+  const extra: Prisma.TarefaWhereInput[] = []
+  if (f.semMovimentacao) {
+    const ids = await idsSemMovimentacao(where, f.semMovimentacao.diasSemAtividade, agora, db)
+    extra.push({ id: { in: ids } })
+  }
+  if (f.pendenciasFasesAnteriores) {
+    extra.push(await whereFasesAnteriores({ processoId: f.processoId, familiaId: f.familiaId }, db))
+  }
+  return extra.length > 0 ? { AND: [where, ...extra] } : where
+}
+
 /** O que o topo da tela mostra — contagens, não uma tela de BI. */
 export interface IndicadoresGerenciais {
   total: number
@@ -798,6 +1005,8 @@ export interface IndicadoresGerenciais {
   atrasadas: number
   venceHoje: number
   concluidas: number
+  /** Ver `executavelAgora` em `tarefa-canonica.ts` — não é `total - bloqueadas - aguardando`. */
+  executavelAgora: number
 }
 
 /**
@@ -807,11 +1016,14 @@ export interface IndicadoresGerenciais {
  * números no topo — e o número passaria a depender da página aberta, que é
  * pior do que não ter o número.
  */
-export async function indicadoresGerenciais(f: FiltrosGerenciais = {}, agora = new Date()): Promise<IndicadoresGerenciais> {
+export async function indicadoresGerenciais(
+  f: FiltrosGerenciais = {}, agora = new Date(),
+): Promise<IndicadoresGerenciais> {
   const base = { ...f, atrasadas: false, venceHoje: false, coluna: null, status: undefined }
-  const w = (extra: Prisma.TarefaWhereInput) => ({ AND: [whereGerencial(base, agora), extra] })
+  const baseWhere = await mergeFiltrosAssincronos(base, whereGerencial(base, agora), agora, prisma)
+  const w = (extra: Prisma.TarefaWhereInput) => ({ AND: [baseWhere, extra] })
   const janela = janelaDoDiaOperacional(agora)
-  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas] = await Promise.all([
+  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas, executavel] = await Promise.all([
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS } }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, responsavelId: null }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: 'EM_ANDAMENTO' }) }),
@@ -825,10 +1037,11 @@ export async function indicadoresGerenciais(f: FiltrosGerenciais = {}, agora = n
       }),
     }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_CONCLUIDOS } }) }),
+    prisma.tarefa.count({ where: w(whereExecutavelAgora(true)) }),
   ])
   return {
     total, semResponsavel: semResp, emAndamento: andamento, aguardandoTerceiro: aguardando,
-    bloqueadas, atrasadas, venceHoje, concluidas,
+    bloqueadas, atrasadas, venceHoje, concluidas, executavelAgora: executavel,
   }
 }
 
@@ -853,7 +1066,7 @@ export async function visaoGerencial(
 ): Promise<{ linhas: LinhaGerencial[]; total: number; pagina: number; porPagina: number }> {
   const porPagina = Math.min(Math.max(f.porPagina ?? 200, 1), 500)
   const pagina = Math.max(f.pagina ?? 1, 1)
-  const where = whereGerencial(f, agora)
+  const where = await mergeFiltrosAssincronos(f, whereGerencial(f, agora), agora, db)
 
   const [total, brutas] = await Promise.all([
     db.tarefa.count({ where }),
@@ -911,10 +1124,13 @@ export async function visaoGerencial(
  */
 export async function facetasGerenciais(agora = new Date()) {
   const ativas = { statusTarefa: { in: STATUS_ATIVOS } }
-  const [porFase, porResponsavel, usuarios] = await Promise.all([
+  const [porFase, porResponsavel, usuarios, porEquipe] = await Promise.all([
     prisma.tarefa.groupBy({ by: ['faseMacroKey'], where: ativas, _count: { _all: true } }),
     prisma.tarefa.groupBy({ by: ['responsavelId'], where: ativas, _count: { _all: true } }),
     prisma.usuario.findMany({ select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
+    // `equipeKey` é texto livre (não há cadastro de Equipe ainda) — as opções
+    // vêm do que EXISTE na operação, nunca de uma lista fixa.
+    prisma.tarefa.groupBy({ by: ['equipeKey'], where: ativas, _count: { _all: true } }),
   ])
   const nomeDe = new Map(usuarios.map((u) => [u.id, u.nome]))
   const carga = new Map((await cargaPorResponsavel(agora)).map((c) => [c.responsavelId, c]))
@@ -932,6 +1148,10 @@ export async function facetasGerenciais(agora = new Date()) {
         atrasadas: carga.get(r.responsavelId as number)?.atrasadas ?? 0,
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome)),
+    equipes: porEquipe
+      .filter((e) => e.equipeKey)
+      .map((e) => ({ equipeKey: e.equipeKey as string, tarefas: e._count._all }))
+      .sort((a, b) => b.tarefas - a.tarefas),
   }
 }
 
@@ -942,6 +1162,11 @@ export interface ContagensAgrupadas {
   concluidas: number
   atrasadas: number
   venceEm7Dias: number
+  semResponsavel: number
+  bloqueadas: number
+  aguardandoTerceiro: number
+  /** Ver `executavelAgora` em `tarefa-canonica.ts` — não é `aFazer - bloqueadas - aguardandoTerceiro`. */
+  executavelAgora: number
 }
 
 export interface FaseAgrupada extends ContagensAgrupadas {
@@ -955,6 +1180,12 @@ export interface ProcessoAgrupado extends ContagensAgrupadas {
   nomeProcesso: string
   faseAtualKey: string | null
   fases: FaseAgrupada[]
+  /**
+   * Tarefas ATIVAS numa fase ANTERIOR à fase atual DESTE processo — o avanço
+   * de fase não as conclui, e a Home hoje as ignora por design. Soma de
+   * `fases[].aFazer` para toda fase com `ordem` menor que a da fase atual.
+   */
+  pendenciasFaseAnterior: number
 }
 
 export interface FamiliaAgrupada extends ContagensAgrupadas {
@@ -969,12 +1200,21 @@ export interface FamiliaAgrupada extends ContagensAgrupadas {
    */
   responsavelPrincipal: { id: number; nome: string } | null
   ultimaAtividade: string | null
+  /** O prazo mais próximo entre as tarefas ATIVAS da família — `null` quando nenhuma tem prazo. */
+  prazoMaisProximo: string | null
+  /** Soma de `processos[].pendenciasFaseAnterior`. */
+  pendenciasFaseAnterior: number
 }
 
-const zero = (): ContagensAgrupadas => ({ total: 0, aFazer: 0, concluidas: 0, atrasadas: 0, venceEm7Dias: 0 })
+const zero = (): ContagensAgrupadas => ({
+  total: 0, aFazer: 0, concluidas: 0, atrasadas: 0, venceEm7Dias: 0,
+  semResponsavel: 0, bloqueadas: 0, aguardandoTerceiro: 0, executavelAgora: 0,
+})
 const somar = (a: ContagensAgrupadas, b: ContagensAgrupadas) => {
   a.total += b.total; a.aFazer += b.aFazer; a.concluidas += b.concluidas
   a.atrasadas += b.atrasadas; a.venceEm7Dias += b.venceEm7Dias
+  a.semResponsavel += b.semResponsavel; a.bloqueadas += b.bloqueadas
+  a.aguardandoTerceiro += b.aguardandoTerceiro; a.executavelAgora += b.executavelAgora
 }
 
 /**
@@ -982,32 +1222,32 @@ const somar = (a: ContagensAgrupadas, b: ContagensAgrupadas) => {
  * tarefas quando o que se quer é "como está a família Medina Olivares".
  *
  * Lê a MESMA Tarefa canônica (nada de tabela de resumo pré-calculada, que
- * ficaria velha). O volume atual da operação (centenas de tarefas, dezenas de
- * processos) cabe inteiro em memória de uma vez — agregar em SQL exigiria um
- * groupBy por processo×fase e outro por responsável, para um ganho que não
- * existe nesta escala.
+ * ficaria velha), e o MESMO `whereGerencial` da Lista/Kanban/Central: o
+ * conjunto de tarefas que entra nesta agregação é EXATAMENTE o que
+ * `visaoGerencial` devolveria com o mesmo `filtro` — é isso que garante que a
+ * contagem da família bate com o drill-down, sem duas implementações do
+ * mesmo predicado divergindo.
+ *
+ * O volume atual da operação (centenas de tarefas, dezenas de processos) cabe
+ * inteiro em memória de uma vez — agregar em SQL exigiria um groupBy por
+ * processo×fase e outro por responsável, para um ganho que não existe nesta
+ * escala.
  */
 export async function agregacaoPorFamilia(
   agora = new Date(),
-  filtro: { responsavelId?: number; semResponsavel?: boolean } = {},
+  filtro: FiltrosGerenciais = {},
 ): Promise<FamiliaAgrupada[]> {
   const em7Dias = inicioDoDiaOperacional(agora)
   em7Dias.setDate(em7Dias.getDate() + 7)
   const hojeInicio = inicioDoDiaOperacional(agora)
 
-  // ESCOPO OPCIONAL — a mesma agregação, recortada para "minhas tarefas"
-  // (Operação/Minha Fila) ou para "sem responsável" (Operação/distribuição).
-  // Sem filtro, é a operação inteira (Tarefas e Projetos).
-  const escopo: Prisma.TarefaWhereInput = filtro.semResponsavel
-    ? { responsavelId: null }
-    : filtro.responsavelId != null
-      ? { responsavelId: filtro.responsavelId }
-      : {}
+  const escopo = await mergeFiltrosAssincronos(filtro, whereGerencial(filtro, agora), agora, prisma)
   const registros = await prisma.tarefa.findMany({
-    where: { processoId: { not: null }, statusTarefa: { in: STATUS_NO_QUADRO }, ...escopo },
+    where: { AND: [{ processoId: { not: null } }, escopo] },
     select: {
-      processoId: true, faseMacroKey: true, statusTarefa: true, dataPrazo: true,
-      responsavelId: true, updatedAt: true,
+      id: true, processoId: true, faseMacroKey: true, statusTarefa: true, dataPrazo: true,
+      responsavelId: true, updatedAt: true, causaRemovidaEm: true,
+      dependeDe: { select: { obrigatoria: true, dependeDe: { select: { statusTarefa: true } } } },
     },
   })
   if (registros.length === 0) return []
@@ -1032,6 +1272,8 @@ export async function agregacaoPorFamilia(
   const cargaPorFamilia = new Map<string, Map<number, number>>()
   // familiaId sintético -> última atividade
   const ultimaPorFamilia = new Map<string, Date>()
+  // familiaId sintético -> prazo mais próximo entre as tarefas ainda ATIVAS (para ordenação "atenção")
+  const prazoMaisProximoPorFamilia = new Map<string, Date>()
 
   for (const r of registros) {
     const processoId = r.processoId as number
@@ -1048,11 +1290,21 @@ export async function agregacaoPorFamilia(
     const concluida = (STATUS_CONCLUIDOS as string[]).includes(r.statusTarefa)
     const atrasada = !concluida && r.dataPrazo != null && r.dataPrazo < hojeInicio
     const venceEm7 = !concluida && r.dataPrazo != null && r.dataPrazo >= hojeInicio && r.dataPrazo <= em7Dias
+    const aguardandoDependencia = r.dependeDe.some(
+      (d) => d.obrigatoria && !STATUS_CONCLUIDOS.includes(d.dependeDe.statusTarefa),
+    )
+    const executavel = tarefaExecutavelAgora({
+      statusTarefa: r.statusTarefa, aguardandoDependencia, causaRemovidaEm: r.causaRemovidaEm,
+    })
     c.total += 1
     if (concluida) c.concluidas += 1
     else c.aFazer += 1
     if (atrasada) c.atrasadas += 1
     if (venceEm7) c.venceEm7Dias += 1
+    if (!concluida && r.responsavelId == null) c.semResponsavel += 1
+    if (r.statusTarefa === 'BLOQUEADA') c.bloqueadas += 1
+    if (r.statusTarefa === 'AGUARDANDO_TERCEIRO' || r.statusTarefa === 'AGUARDANDO_CLIENTE') c.aguardandoTerceiro += 1
+    if (executavel) c.executavelAgora += 1
 
     if (!concluida) {
       let carga = cargaPorFamilia.get(chaveFamilia)
@@ -1061,6 +1313,11 @@ export async function agregacaoPorFamilia(
     }
     const atual = ultimaPorFamilia.get(chaveFamilia)
     if (!atual || r.updatedAt > atual) ultimaPorFamilia.set(chaveFamilia, r.updatedAt)
+
+    if (!concluida && r.dataPrazo != null) {
+      const menor = prazoMaisProximoPorFamilia.get(chaveFamilia)
+      if (!menor || r.dataPrazo < menor) prazoMaisProximoPorFamilia.set(chaveFamilia, r.dataPrazo)
+    }
   }
 
   const familias = new Map<string, FamiliaAgrupada>()
@@ -1083,8 +1340,19 @@ export async function agregacaoPorFamilia(
     const totalProcesso = zero()
     for (const f of fases) somar(totalProcesso, f)
 
+    // PENDÊNCIAS DE FASES ANTERIORES: soma do que falta fazer em toda fase
+    // com `ordem` menor que a da fase ATUAL deste processo. Não é consulta
+    // nova — é a MESMA repartição por fase que a família já mostra, só
+    // recortada pela ordem canônica do catálogo.
+    const faseAtualCode = phaseKeyToFaseCode(p.faseAtualKey)
+    const ordemAtual = faseAtualCode ? getOrdemFase(faseAtualCode) : null
+    const pendenciasFaseAnterior = ordemAtual != null
+      ? fases.filter((f) => f.ordem < ordemAtual).reduce((n, f) => n + f.aFazer, 0)
+      : 0
+
     const processoAgrupado: ProcessoAgrupado = {
       ...totalProcesso, processoId, nomeProcesso: p.nome, faseAtualKey: p.faseAtualKey, fases,
+      pendenciasFaseAnterior,
     }
 
     let familia = familias.get(chaveFamilia)
@@ -1096,11 +1364,14 @@ export async function agregacaoPorFamilia(
         processos: [],
         responsavelPrincipal: null,
         ultimaAtividade: null,
+        prazoMaisProximo: null,
+        pendenciasFaseAnterior: 0,
       }
       familias.set(chaveFamilia, familia)
     }
     familia.processos.push(processoAgrupado)
     somar(familia, totalProcesso)
+    familia.pendenciasFaseAnterior += pendenciasFaseAnterior
   }
 
   for (const [chaveFamilia, familia] of familias) {
@@ -1115,8 +1386,27 @@ export async function agregacaoPorFamilia(
     }
     const ultima = ultimaPorFamilia.get(chaveFamilia)
     familia.ultimaAtividade = ultima ? ultima.toISOString() : null
+    const menorPrazo = prazoMaisProximoPorFamilia.get(chaveFamilia)
+    familia.prazoMaisProximo = menorPrazo ? menorPrazo.toISOString() : null
     familia.processos.sort((a, b) => a.nomeProcesso.localeCompare(b.nomeProcesso))
   }
 
-  return [...familias.values()].sort((a, b) => b.total - a.total || a.nomeFamilia.localeCompare(b.nomeFamilia))
+  const porNome = (a: FamiliaAgrupada, b: FamiliaAgrupada) => a.nomeFamilia.localeCompare(b.nomeFamilia)
+  // Ascendente com nulo por último (prazo: sem prazo não é "mais urgente").
+  const tempoOuMaisInfinito = (iso: string | null) => (iso ? new Date(iso).getTime() : Infinity)
+  // Descendente com nulo por último (última atividade: nunca ter mexido não é "mais recente").
+  const tempoOuMenosInfinito = (iso: string | null) => (iso ? new Date(iso).getTime() : -Infinity)
+  const ORDENADORES: Record<NonNullable<FiltrosGerenciais['ordenacaoFamilia']>, (a: FamiliaAgrupada, b: FamiliaAgrupada) => number> = {
+    // "Atenção necessária": lexicográfico sobre contagens já visíveis na tela —
+    // nunca uma fórmula ponderada que ninguém consegue explicar de cabeça.
+    atencao: (a, b) =>
+      b.atrasadas - a.atrasadas ||
+      (b.bloqueadas + b.aguardandoTerceiro) - (a.bloqueadas + a.aguardandoTerceiro) ||
+      b.executavelAgora - a.executavelAgora ||
+      porNome(a, b),
+    prazo: (a, b) => tempoOuMaisInfinito(a.prazoMaisProximo) - tempoOuMaisInfinito(b.prazoMaisProximo) || porNome(a, b),
+    familia: porNome,
+    ultimaAtividade: (a, b) => tempoOuMenosInfinito(b.ultimaAtividade) - tempoOuMenosInfinito(a.ultimaAtividade) || porNome(a, b),
+  }
+  return [...familias.values()].sort(ORDENADORES[filtro.ordenacaoFamilia ?? 'atencao'])
 }

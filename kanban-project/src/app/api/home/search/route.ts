@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
+import { escopoProcesso } from "@/src/lib/autorizacao/escopo-operacional"
 
 export interface SearchResult {
   tipo: "processo" | "familia" | "requerente" | "cliente"
@@ -40,36 +41,46 @@ export async function GET(request: NextRequest) {
     const href = (pid: number, pais: string | null) =>
       pais ? `/kanban?pais=${encodeURIComponent(pais)}&processoId=${pid}` : `/kanban?processoId=${pid}`
 
+    // 🔒 ESCOPO: admin busca no universo global; operacional só acha
+    // processo/família/requerente/cliente que tenham ALGUM processo dentro do
+    // que é dela — autocomplete nunca pode revelar nome fora do escopo (ver
+    // src/lib/autorizacao/escopo-operacional.ts).
+    const escopo = escopoProcesso({ userId: usuario.userId, tipo: usuario.tipo })
+
     const [processos, familias, requerentes, contratantes] = await Promise.all([
       prisma.processo.findMany({
         // busca por NOME ou por CÓDIGO PÚBLICO (ex.: "DE-7", "IT-125").
-        where: { OR: [{ nome: contains }, { codigo: contains }] },
+        // `AND`, nunca espalhar `...escopo` direto aqui: `escopo` também é um
+        // `OR` (ver escopoProcesso), e um objeto JS só pode ter uma chave
+        // `OR` — espalhar as duas apagava a condição de busca por completo e
+        // devolvia qualquer processo do escopo, ignorando o texto digitado.
+        where: { AND: [{ OR: [{ nome: contains }, { codigo: contains }] }, escopo] },
         select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, codigo: true, familia: { select: { nome: true } } },
         take: LIMITE,
         orderBy: { updatedAt: "desc" },
       }),
       prisma.familia.findMany({
-        where: { nome: contains },
-        select: { id: true, nome: true, processos: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: 3 } },
+        where: { nome: contains, processos: { some: escopo } },
+        select: { id: true, nome: true, processos: { where: escopo, select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: 3 } },
         take: LIMITE,
       }),
       prisma.requerente.findMany({
-        where: { OR: [{ nome: contains }, { publicCode: contains }] },
+        where: { OR: [{ nome: contains }, { publicCode: contains }], processos: { some: { processo: escopo } } },
         select: {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
+          processos: { where: { processo: escopo }, select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
         },
         take: LIMITE,
       }),
       prisma.contratante.findMany({
-        where: { OR: [{ nome: contains }, { publicCode: contains }] },
+        where: { OR: [{ nome: contains }, { publicCode: contains }], processos: { some: { processo: escopo } } },
         select: {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
+          processos: { where: { processo: escopo }, select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
         },
         take: LIMITE,
       }),

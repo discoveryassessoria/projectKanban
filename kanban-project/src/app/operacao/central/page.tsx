@@ -1,42 +1,29 @@
-// src/app/operacao/page.tsx
+// src/app/operacao/central/page.tsx
 //
-// OPERAÇÃO — casca da tela de tarefas canônicas.
-//
-// Mesmo shell das demais telas (fundo + HeaderBar + main), mesmo contrato de
-// hidratação e mesmo porteiro por PERMISSÃO. O conteúdo vive em
-// src/components/operacao/central-tarefas.tsx.
-//
-// Superfície NOVA: nasce sobre a Tarefa canônica. A árvore de subtarefas que
-// existia antes (`tarefaPaiId`) foi removida do schema — a execução se desdobra
-// nos PASSOS do workflow, não em tarefas-filhas.
+// CENTRAL OPERACIONAL — casca da tela. Mesmo shell das demais telas de
+// operação (fundo + HeaderBar + main), mesmo porteiro por PERMISSÃO. O
+// conteúdo vive em src/components/operacao/central-operacional.tsx.
 
 "use client"
 
 import { useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
-import { CentralTarefas } from "@/src/components/operacao/central-tarefas"
+import { CentralOperacional } from "@/src/components/operacao/central-operacional"
 
-const FUNDO =
-  "var(--landscape-veil)"
+const FUNDO = "var(--landscape-veil)"
 
-export default function OperacaoPage() {
+export default function CentralOperacionalPage() {
   const router = useRouter()
   const { pode, carregando } = usePermissoes()
   const mounted = useIsClient()
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
   const user = userSalvo ?? { nome: "Usuário" }
 
-  // Ver tarefa é o piso da tela; distribuir é o que separa quem executa de quem
-  // gere. `tarefas.editar` sozinho não prova isso — também autoriza editar a
-  // PRÓPRIA tarefa —, então distribuir exige admin. O backend confere de novo,
-  // porque esconder aba não é controle de acesso.
   const autorizado = pode("tarefas.ver")
-  const podeDistribuir = pode("tarefas.editar") && user.tipo === "admin"
 
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/")
@@ -50,7 +37,7 @@ export default function OperacaoPage() {
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[var(--border-default)] border-t-transparent" />
-            <p className="text-white/70">Carregando operação…</p>
+            <p className="text-white/70">Carregando a Central Operacional…</p>
           </div>
         </div>
       </div>
@@ -63,23 +50,15 @@ export default function OperacaoPage() {
       <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: FUNDO }} />
 
       <HeaderBar
-        title="Operação"
-        subtitle="Tarefas, distribuição e minha fila"
+        title="Central Operacional"
+        subtitle="O que a empresa precisa fazer agora — agrupado por família"
         userName={user.nome}
         userRole={user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"}
         onLogout={() => void encerrarSessao("manual")}
       />
 
       <main className="px-6 pb-16 pt-6">
-        <div className="mb-4 flex justify-end">
-          <Link
-            href="/operacao/central"
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-1.5 text-[12px] font-medium text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
-          >
-            Abrir Central Operacional →
-          </Link>
-        </div>
-        <CentralTarefas podeDistribuir={podeDistribuir} />
+        <CentralOperacional />
       </main>
     </div>
   )

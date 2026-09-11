@@ -33,16 +33,12 @@ import {
   Calendar,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
   Clock,
-  DollarSign,
-  FileText,
   Layers,
   ListChecks,
-  Search,
   ShieldAlert,
 } from "lucide-react"
-import type { AgendaItem, FilaOperacional, HomeData, ModuloFila, NivelPrioridade } from "@/src/types/home"
+import type { AgendaItem, FilaOperacional, HomeData } from "@/src/types/home"
 import { CommandPalette } from "@/src/components/home/command-palette"
 import {
   BlocoCard,
@@ -51,20 +47,12 @@ import {
   EmptyState,
   OURO, OURO_TINTA,
   formatarHorario,
-  nivelStyle,
   saudacao,
   CARD,
 } from "@/src/components/home/home-primitives"
 import { ProcessosEmAndamento } from "@/src/components/home/processos-andamento"
 import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
 import { faixaDaFilaSla } from "@/src/lib/home/home-logic"
-
-const ICONE_MODULO: Record<ModuloFila, React.ComponentType<{ className?: string }>> = {
-  documentos: FileText,
-  processos: Layers,
-  tarefas: ClipboardList,
-  financeiro: DollarSign,
-}
 
 // ===========================================================================
 // 1. CABEÇALHO — saudação, data, status operacional, busca global
@@ -113,249 +101,147 @@ function Cabecalho({ data }: { data: HomeData }) {
 }
 
 // ===========================================================================
-// 2. CENTRAL DE NOTIFICAÇÕES — duas abas, nunca uma lista achatada
+// 2. CENTRAL OPERACIONAL — o mesmo motor de /operacao/central, sempre por
+//    família. ADMIN vê a operação inteira; OPERACIONAL só o próprio trabalho
+//    — o filtro é decidido no SERVIDOR (/api/home), nunca aqui.
 // ---------------------------------------------------------------------------
-// Achado real (usuário, ao vivo): a lista antiga misturava "Central de
-// Prazos" (uma fila baseada em DATA) com "Localizar registros" (uma fila
-// baseada em AÇÃO/etapa do workflow) na mesma lista solta, como se fossem a
-// mesma categoria de coisa — e não são. "Prazos" responde QUANDO; "Ações"
-// responde O QUÊ. Cada uma vira sua própria aba, e Alertas (que hoje vivia
-// numa caixinha separada, desconectada) entra DENTRO de "Ações" — é a mesma
-// categoria de "precisa da sua atenção", só que mais grave.
+// Decisão do usuário em 10/09/2026: "Central de Notificações" (Prazos/Ações
+// em abas soltas, sem categoria real do motor) deixou de ser o conceito
+// principal. Este bloco é um RESUMO — a tela cheia, com filtro por fase,
+// etapa, condição e busca, é /operacao/central; aqui é só "o que eu preciso
+// saber sem sair da Home", com link pra lá.
 // ===========================================================================
+type FamiliasCentral = NonNullable<HomeData["centralOperacional"]>["familias"]
 
-interface ItemAcao {
-  key: string
-  titulo: string
-  descricao: string
-  quantidade: number
-  nivel: NivelPrioridade
-  modulo: ModuloFila
-  href: string
-  ehAlerta: boolean
-}
-
-const ROTULO_NIVEL: Record<NivelPrioridade, string> = {
-  critico: "Crítico",
-  alto: "Alto",
-  medio: "Médio",
-  baixo: "Baixo",
-}
-const PONTO_NIVEL: Record<NivelPrioridade, string> = {
-  critico: "bg-red-600",
-  alto: "bg-amber-600",
-  medio: "bg-[var(--action-primary)]",
-  baixo: "bg-[var(--text-muted)]",
-}
-const ROTULO_MODULO: Record<ModuloFila, string> = {
-  documentos: "Documentos",
-  processos: "Processos",
-  tarefas: "Tarefas",
-  financeiro: "Financeiro",
-}
-
-function montarItensAcao(data: HomeData): ItemAcao[] {
-  const dasFilas: ItemAcao[] = data.filas
-    .filter((f) => f.key !== "prazos-vencendo") // prazo tem aba própria
-    .map((f) => ({
-      key: f.key, titulo: f.titulo, descricao: f.descricao, quantidade: f.quantidade,
-      nivel: f.nivel, modulo: f.modulo, href: f.href, ehAlerta: false,
-    }))
-  const dosAlertas: ItemAcao[] = data.alertas
-    .filter((a) => a.tipo !== "prazo") // idem — o alerta de prazo pertence à aba Prazos
-    .map((a) => ({
-      key: `alerta-${a.key}`, titulo: a.titulo, descricao: a.detalhe, quantidade: a.quantidade,
-      nivel: a.nivel, modulo: a.tipo === "documento_invalido" ? "documentos" : "processos",
-      href: a.href, ehAlerta: true,
-    }))
-  return [...dosAlertas, ...dasFilas]
-}
-
-function LinhaAcao({ item }: { item: ItemAcao }) {
-  const st = nivelStyle(item.nivel)
-  const Icone = item.ehAlerta ? ShieldAlert : ICONE_MODULO[item.modulo]
-  return (
-    <Link
-      href={item.href}
-      className="group flex items-center gap-3 rounded-xl border border-transparent bg-[var(--surface-primary)] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4"
-    >
-      <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border ${st.chip}`}>
-        <Icone className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{item.titulo}</p>
-        <p className="truncate text-xs text-[var(--text-secondary)]">{item.descricao}</p>
-      </div>
-      <span className={`shrink-0 text-xl font-semibold tabular-nums ${item.nivel === "critico" ? st.texto : "text-[var(--text-primary)]"}`}>
-        {item.quantidade}
-      </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-secondary)]" />
-    </Link>
-  )
-}
-
-function AbaAcoes({ data }: { data: HomeData }) {
-  const [busca, setBusca] = useState("")
-  const [modulo, setModulo] = useState<"todos" | ModuloFila>("todos")
-  const itens = useMemo(() => montarItensAcao(data), [data])
-
-  const filtrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase()
-    return itens.filter((i) => {
-      if (modulo !== "todos" && i.modulo !== modulo) return false
-      if (termo && !`${i.titulo} ${i.descricao}`.toLowerCase().includes(termo)) return false
-      return true
-    })
-  }, [itens, busca, modulo])
-
-  const grupos = useMemo(() => {
-    const ordem: NivelPrioridade[] = ["critico", "alto", "medio", "baixo"]
-    return ordem
-      .map((n) => [n, filtrados.filter((i) => i.nivel === n)] as const)
-      .filter(([, arr]) => arr.length > 0)
-  }, [filtrados])
-
-  const modulosPresentes = useMemo(() => [...new Set(itens.map((i) => i.modulo))], [itens])
-
-  if (itens.length === 0) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-6 text-center">
-        <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800">
-          <CheckCircle2 className="h-6 w-6" />
-        </span>
-        <p className="text-[15px] font-medium text-[var(--text-primary)]">Tudo limpo por aqui</p>
-        <p className="text-sm text-[var(--text-secondary)]">Nenhuma ação nem alerta pendente para você.</p>
-      </div>
-    )
+function fasesAgregadas(familias: FamiliasCentral | undefined) {
+  const porFase = new Map<string, number>()
+  for (const f of familias ?? []) {
+    for (const p of f.processos) {
+      for (const fa of p.fases) {
+        if (fa.aFazer === 0) continue
+        porFase.set(fa.label, (porFase.get(fa.label) ?? 0) + fa.aFazer)
+      }
+    }
   }
-
-  return (
-    <div className="flex flex-1 flex-col px-3 pb-3">
-      <div className="mb-2.5 flex flex-wrap items-center gap-2 px-2">
-        <div className="relative min-w-[180px] flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar ação ou alerta..."
-            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] py-1.5 pl-8 pr-3 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] outline-none focus:border-[var(--action-primary)]"
-          />
-        </div>
-        {modulosPresentes.length > 1 && (
-          <select
-            value={modulo}
-            onChange={(e) => setModulo(e.target.value as "todos" | ModuloFila)}
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
-          >
-            <option value="todos">Todos os módulos</option>
-            {modulosPresentes.map((m) => (
-              <option key={m} value={m}>{ROTULO_MODULO[m]}</option>
-            ))}
-          </select>
-        )}
-      </div>
-
-      {filtrados.length === 0 ? (
-        <div className="px-2 py-6 text-center text-sm text-[var(--text-muted)]">Nenhum item bate com esse filtro.</div>
-      ) : (
-        <div className="space-y-3">
-          {grupos.map(([nivel, arr]) => (
-            <div key={nivel}>
-              <div className="mb-1.5 flex items-center gap-1.5 px-2">
-                <span className={`h-1.5 w-1.5 rounded-full ${PONTO_NIVEL[nivel]}`} />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                  {ROTULO_NIVEL[nivel]} · {arr.length}
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                {arr.map((i) => <LinhaAcao key={i.key} item={i} />)}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  return [...porFase.entries()].map(([label, total]) => ({ label, total })).sort((a, b) => b.total - a.total)
 }
 
-function AbaPrazos({ data }: { data: HomeData }) {
-  const r = data.prazosResumo
-  if (!r) return null
-  const tiles: Array<{ rotulo: string; valor: number; tom: string; janela: string }> = [
-    { rotulo: "Atrasadas", valor: r.atrasadas, tom: "text-red-700", janela: "atrasadas" },
-    { rotulo: "Vencem hoje", valor: r.hoje, tom: "text-amber-700", janela: "hoje" },
-    { rotulo: "A vencer", valor: r.futuro, tom: "text-[var(--text-primary)]", janela: "futuro" },
+function CentralOperacionalBloco({ data }: { data: HomeData }) {
+  const central = data.centralOperacional
+  const isAdmin = data.usuario.tipo === "admin"
+  const fases = useMemo(() => fasesAgregadas(central?.familias), [central])
+  const familiasOrdenadas = useMemo(
+    () => [...(central?.familias ?? [])].sort((a, b) => b.total - a.total).slice(0, 6),
+    [central],
+  )
+
+  if (!central) return null
+
+  const tilesResumo = [
+    { rotulo: isAdmin ? "Abertas" : "Minhas abertas", valor: central.indicadores.total },
+    { rotulo: "Executáveis agora", valor: central.indicadores.executavelAgora },
+    { rotulo: isAdmin ? "Atrasadas" : "Minhas atrasadas", valor: central.indicadores.atrasadas },
+    isAdmin
+      ? { rotulo: "Sem responsável", valor: central.indicadores.semResponsavel }
+      : { rotulo: "Bloqueadas", valor: central.indicadores.bloqueadas },
   ]
-  if (r.total === 0) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-6 text-center">
-        <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800">
-          <CheckCircle2 className="h-6 w-6" />
-        </span>
-        <p className="text-[15px] font-medium text-[var(--text-primary)]">Nenhum prazo em aberto</p>
-        <p className="text-sm text-[var(--text-secondary)]">Nenhum passo nem tarefa com prazo definido agora.</p>
-      </div>
-    )
-  }
-  return (
-    <div className="flex flex-1 flex-col justify-center gap-4 px-5 pb-6 pt-2">
-      <div className="grid grid-cols-3 gap-3">
-        {tiles.map((t) => (
-          <Link
-            key={t.janela}
-            href={`/dashboard/fila/prazos-vencendo?janela=${t.janela}`}
-            className="group flex flex-col items-center gap-1 rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-4 text-center transition hover:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/20"
-          >
-            <span className={`text-3xl font-bold tabular-nums ${t.tom}`}>{t.valor}</span>
-            <span className="text-xs font-medium text-[var(--text-secondary)]">{t.rotulo}</span>
-          </Link>
-        ))}
-      </div>
-      <Link
-        href="/dashboard/fila/prazos-vencendo"
-        className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--border-strong)]"
-      >
-        <Calendar className="h-4 w-4" /> Ver Central de Prazos completa ({r.total})
-      </Link>
-    </div>
-  )
-}
-
-function CentralDeNotificacoes({ data }: { data: HomeData }) {
-  const [aba, setAba] = useState<"prazos" | "acoes">("acoes")
-  const totalAcoes = montarItensAcao(data).reduce((s, i) => s + i.quantidade, 0)
-  const totalPrazos = data.prazosResumo?.total ?? 0
 
   return (
-    // min-h (não h-full): o conteúdo agora MUDA de altura entre as abas
-    // (Prazos é curto, Ações pode ser longo) — h-full herdava a altura da
-    // aba mais alta já renderizada no grid (a coluna ao lado, com Agenda,
-    // esticava a linha inteira) e sobrava vazio/cortado ao trocar de aba.
     <section id="central-operacional" className={`${CARD_FOCAL} flex min-h-[280px] flex-col`}>
       <div className="px-5 pb-3 pt-5">
-        <BlocoHeader titulo="Central de Notificações" descricao="O que precisa da sua atenção agora" />
-        <div className="mt-3 flex gap-1.5 rounded-lg bg-[var(--surface-secondary)] p-1">
-          {([
-            ["prazos", "Prazos", totalPrazos],
-            ["acoes", "Ações", totalAcoes],
-          ] as const).map(([valor, rotulo, contagem]) => (
-            <button
-              key={valor}
-              onClick={() => setAba(valor)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-semibold transition ${
-                aba === valor
-                  ? "bg-[var(--surface-primary)] text-[var(--text-primary)] shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-            >
-              {rotulo}
-              {contagem > 0 && <span className="tabular-nums opacity-70">{contagem}</span>}
-            </button>
-          ))}
-        </div>
+        <BlocoHeader
+          titulo={isAdmin ? "Central Operacional" : "Minha Central Operacional"}
+          descricao={isAdmin ? "Toda a operação, agrupada por família" : "O que eu preciso fazer agora, por família"}
+        />
       </div>
-      {aba === "prazos" ? <AbaPrazos data={data} /> : <AbaAcoes data={data} />}
+
+      {central.familias.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-2 text-center">
+          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800">
+            <CheckCircle2 className="h-6 w-6" />
+          </span>
+          <p className="text-[15px] font-medium text-[var(--text-primary)]">Tudo limpo por aqui</p>
+          <p className="text-sm text-[var(--text-secondary)]">
+            {isAdmin ? "Nenhuma tarefa aberta na operação." : "Nenhuma tarefa aberta atribuída a você."}
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-4 px-5 pb-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {tilesResumo.map((t) => (
+              <div key={t.rotulo} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5">
+                <div className="text-xl font-bold tabular-nums text-[var(--text-primary)]">{t.valor}</div>
+                <div className="text-[11px] text-[var(--text-secondary)]">{t.rotulo}</div>
+              </div>
+            ))}
+          </div>
+
+          {fases.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {fases.slice(0, 8).map((f) => (
+                <span
+                  key={f.label}
+                  className="inline-flex items-center gap-1 rounded-full border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)]"
+                >
+                  {f.label} <b className="tabular-nums text-[var(--text-primary)]">{f.total}</b>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1.5 pb-3">
+            {familiasOrdenadas.map((f) => (
+              <Link
+                key={f.familiaId ?? f.nomeFamilia}
+                href={`/operacao/central?busca=${encodeURIComponent(f.nomeFamilia)}`}
+                className="group flex items-center justify-between gap-3 rounded-lg border border-transparent bg-[var(--surface-primary)] px-3 py-2.5 transition hover:border-[var(--border-strong)] focus:outline-none focus:ring-2 focus:ring-white/20"
+              >
+                <span className="truncate text-sm font-semibold text-[var(--text-primary)]">{f.nomeFamilia}</span>
+                <span className="shrink-0 text-sm tabular-nums text-[var(--text-secondary)]">
+                  {f.total} {isAdmin ? (f.total === 1 ? "tarefa" : "tarefas") : (f.total === 1 ? "minha tarefa" : "minhas tarefas")}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-auto border-t border-[var(--border-default)] px-5 py-3">
+        <Link
+          href="/operacao/central"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--action-primary)] transition hover:opacity-80"
+        >
+          Ver {isAdmin ? "a Central Operacional completa" : "minha Central Operacional completa"} <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
     </section>
+  )
+}
+
+// ===========================================================================
+// 2a. TRABALHO PARA DISTRIBUIR — só ADMIN. Operacional não distribui trabalho
+// global (mandato de 10/09/2026, item 16/17).
+// ===========================================================================
+function TrabalhoParaDistribuir({ data }: { data: HomeData }) {
+  const central = data.centralOperacional
+  if (data.usuario.tipo !== "admin" || !central || central.indicadores.semResponsavel === 0) return null
+  const familias = central.familias.filter((f) => f.semResponsavel > 0).length
+  return (
+    <BlocoCard>
+      <BlocoHeader
+        titulo="Trabalho para distribuir"
+        descricao={`${central.indicadores.semResponsavel} tarefa(s) sem responsável, em ${familias} família(s)`}
+        acao={
+          <Link
+            href="/operacao/central?escopo=sem_responsavel"
+            className="inline-flex items-center gap-1 text-xs font-medium transition hover:opacity-80"
+            style={{ color: OURO_TINTA }}
+          >
+            Ver tarefas <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        }
+      />
+    </BlocoCard>
   )
 }
 
@@ -389,11 +275,12 @@ function CardSla({ fila }: { fila: FilaOperacional }) {
 function PainelSlaBloco({ data }: { data: HomeData }) {
   const sla = data.sla
   if (!sla) return null
+  const isAdmin = data.usuario.tipo === "admin"
   return (
     <BlocoCard id="sla-processos">
       <BlocoHeader
-        titulo="SLA dos processos"
-        descricao="Prazo previsto de conclusão, a partir do SLA configurado em cada fase"
+        titulo={isAdmin ? "SLA dos processos" : "Meus prazos"}
+        descricao={isAdmin ? "Prazo previsto de conclusão, a partir do SLA configurado em cada fase" : "Prazo previsto de conclusão dos seus processos"}
         acao={
           sla.resumo.semPrazo > 0 ? (
             <span className="text-xs font-medium tabular-nums text-[var(--text-secondary)]">
@@ -583,29 +470,38 @@ function ResumoDoDia({ data }: { data: HomeData }) {
 // inventado nem recalculado aqui. O ladrilho colorido é o mesmo par
 // (pastel + glifo saturado) usado nos KPI da fase.
 // ===========================================================================
-// Achado real: os quatro cartões só mostravam o número — sem destino nenhum,
-// nem pra onde a MESMA página já detalha aquele número (Alertas, SLA, Central
-// Operacional, Operação de hoje estão todos ali embaixo). Cada âncora aponta
-// pra seção que já existe na própria Home; nenhum link novo, nenhuma tela nova.
-const CARTOES_TOPO = [
-  { chave: "criticos",   rotulo: "Itens críticos",       sub: "Exigem atenção imediata", tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertCircle, ancora: "#central-operacional" },
-  { chave: "noPrazo",    rotulo: "Processos no prazo",   sub: "Dentro do SLA contratado", tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock, ancora: "#sla-processos" },
-  { chave: "abertas",    rotulo: "Ações abertas",        sub: "Pendências operacionais",  tile: "var(--info-tile)",    ink: "var(--info)",    Icone: ListChecks, ancora: "#central-operacional" },
-  { chave: "concluidas", rotulo: "Ações concluídas hoje", sub: "Parabéns, ótimo trabalho!", tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2, ancora: "#operacao-do-dia" },
-] as const
+// Cada âncora aponta pra seção que já existe na própria Home; nenhum link
+// novo, nenhuma tela nova. Os NÚMEROS vêm de `data.centralOperacional`, que o
+// servidor já escopou (admin = universo global; operacional = só o próprio
+// trabalho) — esta faixa nunca decide escopo, só rotula e aponta.
+interface CartaoTopo { chave: string; rotulo: string; sub: string; valor: number; tile: string; ink: string; Icone: React.ComponentType<{ className?: string }>; ancora: string }
+
+function cartoesTopo(data: HomeData): CartaoTopo[] {
+  const isAdmin = data.usuario.tipo === "admin"
+  const ind = data.centralOperacional?.indicadores
+  if (isAdmin) {
+    return [
+      { chave: "abertas", rotulo: "Abertas", sub: "Pendências operacionais", valor: ind?.total ?? 0, tile: "var(--info-tile)", ink: "var(--info)", Icone: ListChecks, ancora: "#central-operacional" },
+      { chave: "executaveis", rotulo: "Executáveis agora", sub: "Prontas para avançar", valor: ind?.executavelAgora ?? 0, tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2, ancora: "#central-operacional" },
+      { chave: "atrasadas", rotulo: "Atrasadas", sub: "Fora do prazo", valor: ind?.atrasadas ?? 0, tile: "var(--danger-tile)", ink: "var(--danger)", Icone: AlertCircle, ancora: "#central-operacional" },
+      { chave: "semResponsavel", rotulo: "Sem responsável", sub: "Aguardando distribuição", valor: ind?.semResponsavel ?? 0, tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Layers, ancora: "#central-operacional" },
+      { chave: "bloqueadas", rotulo: "Bloqueadas", sub: "Impedimento a resolver", valor: ind?.bloqueadas ?? 0, tile: "var(--danger-tile)", ink: "var(--danger)", Icone: ShieldAlert, ancora: "#central-operacional" },
+    ]
+  }
+  return [
+    { chave: "abertas", rotulo: "Minhas abertas", sub: "O que é meu para fazer", valor: ind?.total ?? 0, tile: "var(--info-tile)", ink: "var(--info)", Icone: ListChecks, ancora: "#central-operacional" },
+    { chave: "executaveis", rotulo: "Executáveis agora", sub: "Prontas para avançar", valor: ind?.executavelAgora ?? 0, tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2, ancora: "#central-operacional" },
+    { chave: "atrasadas", rotulo: "Minhas atrasadas", sub: "Fora do prazo", valor: ind?.atrasadas ?? 0, tile: "var(--danger-tile)", ink: "var(--danger)", Icone: AlertCircle, ancora: "#central-operacional" },
+    { chave: "prazos", rotulo: "Próximos prazos", sub: "Nos próximos dias", valor: data.prazosResumo?.futuro ?? 0, tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Calendar, ancora: "#sla-processos" },
+    { chave: "bloqueadas", rotulo: "Bloqueadas", sub: "Impedimento a resolver", valor: ind?.bloqueadas ?? 0, tile: "var(--danger-tile)", ink: "var(--danger)", Icone: ShieldAlert, ancora: "#central-operacional" },
+  ]
+}
 
 function FaixaIndicadores({ data }: { data: HomeData }) {
-  const valores: Record<string, number> = {
-    // Alerta crítico é o que o motor já classificou como crítico — não é uma
-    // releitura das filas com outro critério.
-    criticos: data.alertas.filter((a) => a.nivel === "critico").length,
-    noPrazo: data.sla?.resumo.noPrazo ?? 0,
-    abertas: data.filas.reduce((s, f) => s + f.quantidade, 0),
-    concluidas: data.resumoDia.tarefasConcluidas,
-  }
+  const cartoes = cartoesTopo(data)
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {CARTOES_TOPO.map((c) => (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {cartoes.map((c) => (
         <a
           key={c.chave} href={c.ancora}
           className={`${CARD} block overflow-hidden p-5 transition hover:border-[var(--border-strong)] hover:shadow-[var(--elev-2)] focus:outline-none focus:ring-2 focus:ring-[var(--action-primary)]/40`}
@@ -620,7 +516,7 @@ function FaixaIndicadores({ data }: { data: HomeData }) {
             </span>
             <div className="min-w-0">
               <div className="text-[28px] font-semibold leading-none tabular-nums text-[var(--text-primary)]">
-                {valores[c.chave]}
+                {c.valor}
               </div>
               <div className="mt-1.5 text-[13px] font-medium text-[var(--text-primary)]">{c.rotulo}</div>
               <div className="text-[12px] text-[var(--text-muted)]">{c.sub}</div>
@@ -652,10 +548,12 @@ export function HomeContent({ data }: { data: HomeData }) {
         </BlocoCard>
       ) : (
         <>
+          <TrabalhoParaDistribuir data={data} />
+
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <div className="space-y-5 lg:col-span-2">
-              <ProcessosEmAndamento />
-              <CentralDeNotificacoes data={data} />
+              <ProcessosEmAndamento {...(data.usuario.tipo === "admin" ? {} : { titulo: "Meus processos" })} />
+              <CentralOperacionalBloco data={data} />
             </div>
             <div className="space-y-5">
               <AgendaBloco data={data} />
