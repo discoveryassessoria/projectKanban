@@ -36,6 +36,17 @@ interface WorkflowControlsProps {
   documentoId: number | null
   workflow: WorkflowMinimal | null
   onChange: () => void          // chamar após qualquer ação bem-sucedida
+  /**
+   * PERMISSÃO EFETIVA DE QUEM ESTÁ VENDO — a MESMA régua que o servidor já
+   * aplica em `PERMISSAO_DO_CONTROLE` (src/services/documento-operacao.ts):
+   * pausar/retomar exigem `tarefas.bloquear`, cancelar/invalidar exigem
+   * `tarefas.excluir`. O servidor SEMPRE confere de novo — esconder o botão
+   * aqui é desenho, não controle de acesso — mas mostrar um botão que vai
+   * dar 403 é uma tela mentindo sobre o que a pessoa pode fazer. Default
+   * `true` preserva o comportamento anterior para quem ainda não passa a prop.
+   */
+  podeBloquear?: boolean
+  podeExcluir?: boolean
 }
 
 type ActionKey = "pausar" | "retomar" | "cancelar" | "invalidar"
@@ -62,6 +73,8 @@ export function WorkflowControls({
   documentoId,
   workflow,
   onChange,
+  podeBloquear = true,
+  podeExcluir = true,
 }: WorkflowControlsProps) {
   const [actionLoading, setActionLoading] = useState<ActionKey | null>(null)
   const [confirmAction, setConfirmAction] = useState<ActionKey | null>(null)
@@ -188,7 +201,7 @@ export function WorkflowControls({
         {/* Botões (só aparecem se workflow não está cancelado) */}
         {!isCancelado && (
           <div className="flex gap-2 flex-wrap mt-3.5">
-            {isAndamento && (
+            {isAndamento && podeBloquear && (
               <button
                 onClick={handlePausar}
                 disabled={!!actionLoading}
@@ -198,7 +211,7 @@ export function WorkflowControls({
                 Pausar operação
               </button>
             )}
-            {isPausado && (
+            {isPausado && podeBloquear && (
               <button
                 onClick={handleRetomar}
                 disabled={!!actionLoading}
@@ -208,15 +221,17 @@ export function WorkflowControls({
                 Retomar operação
               </button>
             )}
-            <button
-              onClick={() => setConfirmAction("cancelar")}
-              disabled={!!actionLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-white/80 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)]"
-            >
-              <X className="w-3 h-3" />
-              Cancelar operação
-            </button>
-            {isAndamento && (
+            {podeExcluir && (
+              <button
+                onClick={() => setConfirmAction("cancelar")}
+                disabled={!!actionLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-white/80 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)]"
+              >
+                <X className="w-3 h-3" />
+                Cancelar operação
+              </button>
+            )}
+            {isAndamento && podeExcluir && (
               <button
                 onClick={() => setConfirmAction("invalidar")}
                 disabled={!!actionLoading}

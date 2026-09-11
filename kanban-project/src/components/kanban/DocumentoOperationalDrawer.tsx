@@ -714,11 +714,15 @@ function ConteudoDrawer({
               )}
             </div>
 
-            {/* CONTROLES DO WORKFLOW (barra de progresso + botões pausar/cancelar/invalidar) */}
+            {/* CONTROLES DO WORKFLOW (barra de progresso + botões pausar/cancelar/invalidar) —
+                a MESMA permissão que o servidor confere (PERMISSAO_DO_CONTROLE); esconder o
+                botão aqui é desenho, o servidor é quem trava de verdade. */}
             <WorkflowControls
               documentoId={documentoId}
               workflow={workflow}
               onChange={() => { carregar(); onSave?.() }}
+              podeBloquear={pode("tarefas.bloquear")}
+              podeExcluir={pode("tarefas.excluir")}
             />
 
             {/* TABS */}
