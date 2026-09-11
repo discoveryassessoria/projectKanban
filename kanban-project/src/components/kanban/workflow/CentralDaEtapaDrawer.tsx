@@ -20,7 +20,6 @@ import { createPortal } from "react-dom"
 import {
   X,
   Loader2,
-  Check,
   AlertTriangle,
   Lock,
   ArrowLeftRight,
@@ -229,7 +228,11 @@ function ConteudoDrawer({
   onClose,
   onUpdate,
 }: CentralDaEtapaDrawerProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("anexos")
+  // Timeline por padrão: `step.createdAt` sempre existe, então a aba quase
+  // nunca abre vazia. "Anexos" era o padrão e, no início de qualquer etapa
+  // (antes de alguém anexar algo), abria neste estado vazio — o painel
+  // inteiro (h-screen) parecia uma tela quebrada.
+  const [activeTab, setActiveTab] = useState<TabId>("timeline")
   const [saving, setSaving] = useState<string | null>(null)
 
   // -- Estados dos formulários inline (bloquear, transferir)
@@ -308,13 +311,6 @@ function ConteudoDrawer({
   }
 
   // -- Handlers
-  const handleConcluir = () => {
-    // "Concluir etapa" do header AGORA abre o editor da etapa.
-    // O editor é que faz a validação dos campos obrigatórios e dispara
-    // o PATCH status="concluida" no final.
-    setEditorAberto(true)
-  }
-
   const handleBloquear = async () => {
     if (!blockReason.trim()) {
       alert("Informe um motivo de bloqueio.")
@@ -567,23 +563,16 @@ function ConteudoDrawer({
                 </div>
               ) : (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Concluir — abre o editor da etapa, que valida e conclui */}
-                  {permite(step, "concluir") && (
-                    <button
-                      onClick={handleConcluir}
-                      disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md transition-colors"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Concluir etapa
-                    </button>
-                  )}
-
-                  {/* Abrir editor — sempre disponível: toda etapa publicada tem interface */}
+                  {/* Um botão só: "Abrir editor" já FAZ a conclusão (o editor valida
+                      os campos obrigatórios e dispara o PATCH que conclui). Havia um
+                      segundo botão "Concluir etapa" chamando exatamente o mesmo
+                      handler — dois rótulos para a mesma ação, sempre lado a lado.
+                      Sempre disponível: toda etapa publicada tem interface; quem não
+                      tem permissão de concluir abre em modo consulta. */}
                   <button
                     onClick={() => setEditorAberto(true)}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md transition-colors"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Abrir editor

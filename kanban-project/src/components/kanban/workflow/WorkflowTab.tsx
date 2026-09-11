@@ -575,13 +575,15 @@ function StepCard({
           )}
         </div>
 
-        {/* Botão Central da Etapa — esconde no lock-step wait (não há ação útil) */}
+        {/* Botão que abre a Central da Etapa — o rótulo é sempre "Iniciar" (o
+            que a pessoa faz ao clicar: entrar na etapa e trabalhar nela),
+            independente do estado. Esconde no lock-step wait (não há ação útil). */}
         {!isLockStepWait && (
           <button
             onClick={onOpenCentral}
             className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
           >
-            Central da Etapa →
+            Iniciar →
           </button>
         )}
       </div>

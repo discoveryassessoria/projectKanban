@@ -1066,7 +1066,15 @@ const CLS_ARTEFATO: Record<StatusResumo, string> = {
  * Nada aqui é persistido: se o percentual e o workflow divergirem, é o
  * percentual que está errado, e ele se corrige sozinho na próxima leitura.
  */
-function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] }) {
+function CelulaProgresso({ p, estado }: { p: DocumentoDoIndice["naFase"]["progresso"]; estado: EstadoOperacionalDaLinha }) {
+  // CANCELADA/SUPERSEDIDA não mostra porcentagem — a fração que sobreviveu ao
+  // cancelamento não é "progresso" de nada em andamento, é só o que tinha sido
+  // feito antes de parar. Um número ali lido rápido lê como "quanto falta",
+  // e nada falta: a operação acabou. (O detalhe continua no drawer, com o
+  // texto explícito "X% do roteiro tinha sido concluído antes do cancelamento".)
+  if (estado === "CANCELADA" || estado === "SUPERSEDIDA") {
+    return <span className="text-[11px] text-[var(--text-muted)]">—</span>
+  }
   const completo = p.pct >= 100
   const detalhe = p.total > 0
     ? `${p.concluidos} de ${p.total} etapas · ${p.pontosFeitos} de ${p.pontosTotais} pontos`
@@ -1298,7 +1306,7 @@ function LinhaDocumento({
         )}
       </div>
 
-      <CelulaProgresso p={doc.naFase.progresso} />
+      <CelulaProgresso p={doc.naFase.progresso} estado={doc.naFase.estado} />
 
       <div className="min-w-0">
         <div className="text-[12px] text-white/80 truncate" title={doc.naFase.etapaAtual ?? undefined}>
