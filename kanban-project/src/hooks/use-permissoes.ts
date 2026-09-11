@@ -29,11 +29,13 @@ export function usePermissoes() {
   const permissoes: Record<string, boolean> = data?.permissoes || {}
   const pode = (chave: string) => !!permissoes[chave]
   const tipo: string | null = data?.tipo ?? null
+  const userId: number | null = data?.userId ?? null
 
   return {
     permissoes,
     pode,
     tipo,
+    userId,
     isAdmin: tipo === 'admin',   // ações destrutivas (exclusão definitiva) — SEMPRE revalidado no backend
     carregando: isLoading,
     erro: error

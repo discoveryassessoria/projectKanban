@@ -131,3 +131,42 @@ fase atual (botão "Atribuir fase atual" na expansão) chama
 `POST /api/tarefas/redistribuir`, que já exige `tarefas.editar` e faz
 enforcement server-side independente da UI. Nenhuma permissão nova foi
 criada; nenhum atalho client-side substitui a checagem do backend.
+
+`GET /api/processos/[processoId]/documentos` (consumida pela aba
+Documentos da expansão) não tinha NENHUMA checagem de permissão antes desta
+consolidação — lacuna pré-existente, fechada ao conectar a rota (agora
+exige `processos.ver`); único chamador confirmado no código é o próprio
+`processo-expandido.tsx`, então a mudança não quebra nenhum consumidor
+existente.
+
+### "Minhas visões" / "Salvar visão" reaproveita `RelatorioVisao`
+
+Existe uma tabela genérica de visão salva (`RelatorioVisao`:
+`dominio`/`nome`/`spec: Json`/`usuarioId`/`favorita`), já usada pelo motor
+de Relatórios via `/api/relatorios/visoes`. Em vez de criar uma segunda
+tabela (`VisaoSalva`, chegou a ser esboçada e revertida), "Tarefas e
+Projetos" grava na MESMA tabela com `dominio: "tarefas-e-projetos"`, por
+uma rota PRÓPRIA (`/api/operacao/visao-global/visoes`) — a rota é nova
+porque o contrato de `spec` é diferente (`{ filtros: FiltrosGerenciais,
+modo }`, não o `QuerySpec` do motor de Relatórios) e a permissão exigida é
+`tarefas.editar`, não `relatorios.ver`. Mesma tabela, dois contratos de
+`spec` coexistindo por `dominio` — não duas tabelas para o mesmo conceito.
+
+### Regra permanente adicional — separação de responsabilidades
+
+**Regra 14.** "Tarefas e Projetos concentra consulta e gestão operacional.
+O redirecionamento para o processo ocorre quando o usuário inicia uma
+tarefa ou executa ação que depende do contexto operacional completo. O
+botão Iniciar deve abrir diretamente o contexto canônico da tarefa, sem
+exigir nova procura manual."
+
+Implementação: a aba Tarefas da expansão (`AcaoDaTarefa` em
+`processo-expandido.tsx`) mostra "Aguardando atribuição" (sem
+responsável), "Atribuída a X" (responsável ≠ usuário logado) ou
+"Iniciar"/"Continuar" (responsável = usuário logado, executável, e
+`tarefas.iniciar_concluir`) — e mesmo "Iniciar" só NAVEGA, via
+`urlOperacionalDaTarefa` (`lib/operacional/navegacao.ts`), o MESMO
+deep-link canônico que Minha Fila e a Central já usam
+(`/kanban?processoId=X&tab=central&taskId=Y`, resolvido no servidor por
+`resolverAlvoDaTarefa`). A execução em si acontece na Central Operacional;
+Tarefas e Projetos nunca chama `acao: 'iniciar'` diretamente.

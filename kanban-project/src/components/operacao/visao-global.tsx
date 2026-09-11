@@ -31,6 +31,10 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import {
+  ListChecks, AlertTriangle, Clock, CheckCircle2, Users2, FileStack,
+  Bookmark, ChevronDown, Plus, SlidersHorizontal, X as XIcon,
+} from "lucide-react"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ProcessoExpandido } from "./processo-expandido"
@@ -160,6 +164,18 @@ function Responsavel({ nome }: { nome: string | null }) {
   )
 }
 
+const CLASSE_CAMPO = "w-full rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
+
+/** Um campo rotulado da barra de filtros — rótulo em cima, controle embaixo, sempre a mesma forma. */
+function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[10px] text-[var(--text-muted)]">{rotulo}</span>
+      {children}
+    </label>
+  )
+}
+
 /** As condições derivadas que mudam a decisão de quem lê — nunca status novo. */
 function Sinais({ l }: { l: LinhaGerencial }) {
   return (
@@ -175,14 +191,22 @@ function Sinais({ l }: { l: LinhaGerencial }) {
 }
 
 /** Os seis números do topo — CANÔNICOS e IDÊNTICOS nas quatro abas (spec §4: nunca um número independente da listagem). */
-const TILES: Array<{ chave: keyof RespostaFamilias["indicadores"]; rotulo: string; tom: string; filtro?: Partial<Filtros> }> = [
-  { chave: "tarefasAbertas", rotulo: "Tarefas abertas", tom: "text-white/80" },
-  { chave: "atrasadas", rotulo: "Atrasadas", tom: "text-red-700/90", filtro: { atrasadas: true } },
-  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-amber-800/90" },
-  { chave: "concluidasHoje", rotulo: "Concluídas (hoje)", tom: "text-green-800/90", filtro: { dataTipo: "concluida", dataInicio: new Date().toISOString().slice(0, 10), dataFim: new Date().toISOString().slice(0, 10) } },
-  { chave: "familias", rotulo: "Famílias", tom: "text-white/80" },
-  { chave: "processos", rotulo: "Processos", tom: "text-white/80" },
+const TILES: Array<{
+  chave: keyof RespostaFamilias["indicadores"]; rotulo: string; tom: string; icone: typeof ListChecks
+  iconeTom: string; filtro?: Partial<Filtros>
+}> = [
+  { chave: "tarefasAbertas", rotulo: "Tarefas abertas", tom: "text-white/90", icone: ListChecks, iconeTom: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
+  { chave: "atrasadas", rotulo: "Atrasadas", tom: "text-red-700/90", icone: AlertTriangle, iconeTom: "bg-red-950/30 text-red-400", filtro: { atrasadas: true } },
+  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-amber-800/90", icone: Clock, iconeTom: "bg-amber-950/30 text-amber-400", filtro: { venceHoje: true } },
+  {
+    chave: "concluidasHoje", rotulo: "Concluídas (hoje)", tom: "text-green-800/90", icone: CheckCircle2, iconeTom: "bg-green-950/30 text-green-400",
+    filtro: { dataTipo: "concluida", dataInicio: new Date().toISOString().slice(0, 10), dataFim: new Date().toISOString().slice(0, 10) },
+  },
+  { chave: "familias", rotulo: "Famílias", tom: "text-white/90", icone: Users2, iconeTom: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
+  { chave: "processos", rotulo: "Processos", tom: "text-white/90", icone: FileStack, iconeTom: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
 ]
+
+interface VisaoSalva { id: number; nome: string; spec: { filtros: Filtros; modo: string } }
 
 export function VisaoGlobal() {
   const { pode } = usePermissoes()
@@ -341,7 +365,58 @@ export function VisaoGlobal() {
   })
 
   const aplicar = (p: Partial<Filtros>) => setFiltros((f) => ({ ...f, ...p }))
-  const limpar = () => { setBuscaDigitada(""); setFiltros(SEM_FILTRO) }
+  const limpar = () => { setBuscaDigitada(""); setFiltros(SEM_FILTRO); setRascunho(SEM_FILTRO) }
+
+  // ── RASCUNHO DE FILTROS — a segunda linha e "Mais filtros" só valem depois
+  // de "Aplicar filtros" (spec: reproduzir a referência, que tem um botão de
+  // aplicar explícito). Busca e os TILES continuam instantâneos: são o atalho
+  // rápido, não a composição de uma consulta complexa.
+  const [rascunho, setRascunho] = useState<Filtros>(SEM_FILTRO)
+  useEffect(() => { setRascunho(filtros) }, [filtros])
+  const mudarRascunho = (p: Partial<Filtros>) => setRascunho((f) => ({ ...f, ...p }))
+  const aplicarRascunho = () => setFiltros(rascunho)
+  const rascunhoDivergeDoAplicado = JSON.stringify(rascunho) !== JSON.stringify(filtros)
+
+  // ── SALVAR VISÃO / MINHAS VISÕES — reaproveita RelatorioVisao (dominio
+  // "tarefas-e-projetos"), a MESMA tabela genérica de visão salva do motor de
+  // Relatórios. Ver src/app/api/operacao/visao-global/visoes/route.ts.
+  const [minhasVisoes, setMinhasVisoes] = useState<VisaoSalva[] | null>(null)
+  const [menuVisoesAberto, setMenuVisoesAberto] = useState(false)
+  const [salvarAberto, setSalvarAberto] = useState(false)
+  const [nomeVisao, setNomeVisao] = useState("")
+  const [salvandoVisao, setSalvandoVisao] = useState(false)
+  const carregarVisoes = useCallback(() => {
+    fetch("/api/operacao/visao-global/visoes", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { visoes: VisaoSalva[] }) => setMinhasVisoes(d.visoes))
+      .catch(() => setMinhasVisoes([]))
+  }, [])
+  const salvarVisaoAtual = async () => {
+    const nome = nomeVisao.trim()
+    if (!nome) return
+    setSalvandoVisao(true)
+    try {
+      const r = await fetch("/api/operacao/visao-global/visoes", {
+        method: "POST", headers: auth(), body: JSON.stringify({ nome, filtros, modo }),
+      })
+      if (r.ok) { setSalvarAberto(false); setNomeVisao(""); setAviso(`Visão "${nome}" salva.`); carregarVisoes() }
+      else setErroComando("Não foi possível salvar a visão.")
+    } catch {
+      setErroComando("Não foi possível falar com o servidor.")
+    } finally {
+      setSalvandoVisao(false)
+    }
+  }
+  const abrirVisaoSalva = (v: VisaoSalva) => {
+    setFiltros(v.spec.filtros)
+    setBuscaDigitada(v.spec.filtros.busca ?? "")
+    if (v.spec.modo === "visaoGeral" || v.spec.modo === "lista" || v.spec.modo === "kanban" || v.spec.modo === "calendario") setModo(v.spec.modo)
+    setMenuVisoesAberto(false)
+  }
+  const excluirVisaoSalva = async (id: number) => {
+    await fetch(`/api/operacao/visao-global/visoes?id=${id}`, { method: "DELETE", headers: auth() }).catch(() => {})
+    carregarVisoes()
+  }
 
   // Opções de família/processo vêm do que EXISTE na agregação — nunca lista fixa.
   const opcoesProcesso = useMemo(() => {
@@ -358,209 +433,276 @@ export function VisaoGlobal() {
   return (
     <div className="flex h-full flex-col">
       {/* ── CABEÇALHO DA CENTRAL ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.06] px-5 py-4">
         <div>
-          <h1 className="text-[16px] font-medium text-white/95">Tarefas e Projetos</h1>
-          <p className="text-[11px] text-[var(--text-muted)]">Acompanhe todas as tarefas, processos e atividades da sua equipe.</p>
+          <h1 className="text-[20px] font-semibold text-white/95">Tarefas e Projetos</h1>
+          <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">Acompanhe todas as tarefas, processos e atividades da sua equipe.</p>
         </div>
-        <div className="flex items-center gap-1 rounded border border-[var(--border-default)] p-0.5">
-          {([
-            ["visaoGeral", "Visão Geral"], ["lista", "Lista"], ["kanban", "Kanban"], ["calendario", "Calendário"],
-          ] as const).map(([m, r]) => (
+        <div className="flex items-center gap-2">
+          <div className="relative">
             <button
-              key={m}
-              onClick={() => setModo(m)}
-              className={`rounded px-2.5 py-1 text-[11px] transition-colors ${
-                modo === m ? "bg-[var(--surface-primary)] text-white/90" : "text-[var(--text-secondary)] hover:text-white/75"
-              }`}
+              onClick={() => setSalvarAberto((v) => !v)}
+              className="flex items-center gap-1.5 rounded border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
             >
-              {r}
+              <Bookmark size={13} /> Salvar visão
             </button>
-          ))}
+            {salvarAberto && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setSalvarAberto(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-64 rounded border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
+                  <label className="block text-[10px] text-[var(--text-muted)]">Nome da visão</label>
+                  <input
+                    autoFocus value={nomeVisao} onChange={(e) => setNomeVisao(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && salvarVisaoAtual()}
+                    placeholder="Ex.: Minha fila de hoje"
+                    className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/85 focus:border-white/25 focus:outline-none"
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button onClick={() => setSalvarAberto(false)} className="text-[11px] text-[var(--text-secondary)] hover:text-white/80">Cancelar</button>
+                    <button
+                      disabled={!nomeVisao.trim() || salvandoVisao} onClick={salvarVisaoAtual}
+                      className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] text-white/85 disabled:opacity-40"
+                    >
+                      Salvar
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => { setMenuVisoesAberto((v) => !v); if (!minhasVisoes) carregarVisoes() }}
+              className="flex items-center gap-1.5 rounded border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
+            >
+              Minhas visões <ChevronDown size={13} />
+            </button>
+            {menuVisoesAberto && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuVisoesAberto(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-72 rounded border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--elev-3)]">
+                  {minhasVisoes == null && <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">Carregando…</div>}
+                  {minhasVisoes?.length === 0 && <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">Nenhuma visão salva ainda.</div>}
+                  {minhasVisoes?.map((v) => (
+                    <div key={v.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--surface-primary)]">
+                      <button onClick={() => abrirVisaoSalva(v)} className="min-w-0 flex-1 truncate text-left text-[12px] text-white/85">{v.nome}</button>
+                      <button onClick={() => excluirVisaoSalva(v.id)} aria-label={`Excluir visão ${v.nome}`} className="ml-2 shrink-0 text-[var(--text-muted)] hover:text-red-400">
+                        <XIcon size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <button
+            onClick={() => setMaisFiltros(true)}
+            className="flex items-center gap-1.5 rounded bg-[var(--action-primary)] px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
+          >
+            <Plus size={14} /> Novo Filtro
+          </button>
         </div>
       </div>
 
-      {/* ── INDICADORES ── canônicos e clicáveis: cada número é um atalho de filtro. */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/[0.06] px-4 py-3">
-        {TILES.map((t) => (
+      {/* ── NAVEGAÇÃO DE ABAS ── */}
+      <div className="flex items-center gap-1 border-b border-white/[0.06] px-5 pt-1">
+        {([
+          ["visaoGeral", "Visão Geral"], ["lista", "Lista"], ["kanban", "Kanban"], ["calendario", "Calendário"],
+        ] as const).map(([m, r]) => (
           <button
-            key={t.chave}
-            type="button"
-            disabled={!t.filtro}
-            onClick={() => t.filtro && aplicar(t.filtro)}
-            className={`rounded border px-2.5 py-1.5 text-left transition-colors ${
-              t.filtro ? "cursor-pointer border-[var(--border-default)] hover:bg-[var(--surface-primary)]" : "cursor-default border-[var(--border-default)]"
+            key={m}
+            onClick={() => setModo(m)}
+            className={`border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${
+              modo === m ? "border-[var(--action-primary)] text-white/95" : "border-transparent text-[var(--text-secondary)] hover:text-white/80"
             }`}
           >
-            <div className={`text-[15px] font-medium tabular-nums leading-5 ${t.tom}`}>
-              {dadosFamilias ? dadosFamilias.indicadores[t.chave] : "—"}
-            </div>
-            <div className="text-[10px] leading-4 text-[var(--text-muted)]">{t.rotulo}</div>
+            {r}
           </button>
         ))}
       </div>
 
-      {/* ── FILTROS ── uma barra só, para as quatro abas (spec §5). */}
-      <div className="flex flex-wrap items-end gap-2 border-b border-white/[0.06] px-4 py-2.5">
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-[var(--text-muted)]">Pesquisar</span>
-          <input
-            value={buscaDigitada}
-            onChange={(e) => setBuscaDigitada(e.target.value)}
-            placeholder="Processo, família, tarefa…"
-            className="w-56 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-[var(--text-muted)]">Período</span>
-          <div className="flex items-center gap-1">
-            <select
-              value={filtros.dataTipo}
-              onChange={(e) => aplicar({ dataTipo: e.target.value as DataTipo })}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1.5 text-[11px] text-white/80 focus:outline-none"
+      {/* ── INDICADORES ── canônicos e clicáveis: cada número é um atalho de filtro. */}
+      <div className="grid grid-cols-2 gap-3 border-b border-white/[0.06] px-5 py-4 sm:grid-cols-3 lg:grid-cols-6">
+        {TILES.map((t) => {
+          const Icone = t.icone
+          return (
+            <button
+              key={t.chave}
+              type="button"
+              disabled={!t.filtro}
+              onClick={() => t.filtro && aplicar(t.filtro)}
+              className={`flex items-center justify-between gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3.5 py-3 text-left transition-colors ${
+                t.filtro ? "cursor-pointer hover:border-[var(--border-strong)]" : "cursor-default"
+              }`}
             >
-              {(Object.keys(ROTULO_DATA_TIPO) as DataTipo[]).map((k) => <option key={k} value={k}>{ROTULO_DATA_TIPO[k]}</option>)}
-            </select>
-            <input
-              type="date" value={filtros.dataInicio ?? ""} onChange={(e) => aplicar({ dataInicio: e.target.value || null })}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1.5 text-[11px] text-white/80 focus:outline-none"
-            />
-            <span className="text-[10px] text-[var(--text-muted)]">–</span>
-            <input
-              type="date" value={filtros.dataFim ?? ""} onChange={(e) => aplicar({ dataFim: e.target.value || null })}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1.5 text-[11px] text-white/80 focus:outline-none"
-            />
-          </div>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-[var(--text-muted)]">Responsável</span>
-          <select
-            value={filtros.semResponsavel ? "sem" : filtros.responsavel ?? ""}
-            onChange={(e) => { const v = e.target.value; aplicar({ semResponsavel: v === "sem", responsavel: v && v !== "sem" ? Number(v) : null }) }}
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
-          >
-            <option value="">Todos</option>
-            <option value="sem">Sem responsável</option>
-            {dados?.facetas.responsaveis.map((r) => <option key={r.responsavelId} value={r.responsavelId}>{r.nome} ({r.tarefas})</option>)}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-[var(--text-muted)]">Fase</span>
-          <select
-            value={filtros.fase ?? ""} onChange={(e) => aplicar({ fase: e.target.value || null })}
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
-          >
-            <option value="">Todas</option>
-            {dados?.facetas.fases.map((f) => <option key={f.faseMacroKey} value={f.faseMacroKey}>{rotularFase(f.faseMacroKey)} ({f.tarefas})</option>)}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-[var(--text-muted)]">Status da tarefa</span>
-          <select
-            value={filtros.statusTarefa[0] ?? ""}
-            onChange={(e) => aplicar({ statusTarefa: e.target.value ? [e.target.value] : [] })}
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
-          >
-            <option value="">Todos</option>
-            {Object.entries(ROTULO_STATUS).map(([k, r]) => <option key={k} value={k}>{r}</option>)}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-[10px] text-[var(--text-muted)]">Status do processo</span>
-          <select
-            value={filtros.statusProcesso ?? ""}
-            onChange={(e) => aplicar({ statusProcesso: (e.target.value || null) as Filtros["statusProcesso"] })}
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
-          >
-            <option value="">Todos</option>
-            <option value="ATIVO">Ativo</option>
-            <option value="CONCLUIDO">Concluído</option>
-          </select>
-        </label>
-        <button
-          onClick={() => setMaisFiltros((v) => !v)}
-          className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-            maisFiltros ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/90" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
-          }`}
-        >
-          Mais filtros
-          {(filtros.tipoTarefa.length > 0 || filtros.familia != null || filtros.processoId != null || filtros.marcoFaseConcluida) && (
-            <span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--action-primary)] text-[9px] text-white">
-              {[filtros.tipoTarefa.length > 0, filtros.familia != null, filtros.processoId != null, filtros.marcoFaseConcluida].filter(Boolean).length}
-            </span>
-          )}
-        </button>
-        {temFiltro(filtros) && (
-          <button onClick={limpar} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">
-            Limpar filtros
-          </button>
-        )}
-        <span className="ml-auto text-[11px] tabular-nums text-[var(--text-muted)]">
-          {modo === "visaoGeral" ? (dadosFamilias ? `${dadosFamilias.familias.length} famílias` : "")
-            : dados ? `${linhas.length} de ${dados.total}` : ""}
-        </span>
+              <div>
+                <div className={`text-[22px] font-semibold leading-6 tabular-nums ${t.tom}`}>
+                  {dadosFamilias ? dadosFamilias.indicadores[t.chave] : "—"}
+                </div>
+                <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-muted)]">{t.rotulo}</div>
+              </div>
+              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${t.iconeTom}`}>
+                <Icone size={16} />
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      {maisFiltros && (
-        <div className="flex flex-wrap items-end gap-2 border-b border-white/[0.06] bg-[var(--surface-primary)]/40 px-4 py-2.5">
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-[var(--text-muted)]">Tipo de tarefa</span>
+      {/* ── FILTROS ── uma barra só, para as quatro abas (spec §5): primeira
+          linha sempre visível, segunda linha com tipo/família/processo +
+          ações, "Mais filtros" abre a terceira. Só "Aplicar filtros" busca —
+          exceto Pesquisar e os TILES, que continuam instantâneos. */}
+      <div className="border-b border-white/[0.06] px-5 py-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <Campo rotulo="Pesquisar">
+            <input
+              value={buscaDigitada}
+              onChange={(e) => setBuscaDigitada(e.target.value)}
+              placeholder="Nome do processo, família, tarefa…"
+              className={CLASSE_CAMPO}
+            />
+          </Campo>
+          <Campo rotulo="Período">
+            <div className="flex items-center gap-1">
+              <input
+                type="date" value={rascunho.dataInicio ?? ""} onChange={(e) => mudarRascunho({ dataInicio: e.target.value || null })}
+                className={CLASSE_CAMPO}
+              />
+              <span className="text-[10px] text-[var(--text-muted)]">–</span>
+              <input
+                type="date" value={rascunho.dataFim ?? ""} onChange={(e) => mudarRascunho({ dataFim: e.target.value || null })}
+                className={CLASSE_CAMPO}
+              />
+            </div>
+          </Campo>
+          <Campo rotulo="Responsável">
             <select
-              value={filtros.tipoTarefa[0] ?? ""}
-              onChange={(e) => aplicar({ tipoTarefa: e.target.value ? [e.target.value] : [] })}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+              value={rascunho.semResponsavel ? "sem" : rascunho.responsavel ?? ""}
+              onChange={(e) => { const v = e.target.value; mudarRascunho({ semResponsavel: v === "sem", responsavel: v && v !== "sem" ? Number(v) : null }) }}
+              className={CLASSE_CAMPO}
+            >
+              <option value="">Todos</option>
+              <option value="sem">Sem responsável</option>
+              {dados?.facetas.responsaveis.map((r) => <option key={r.responsavelId} value={r.responsavelId}>{r.nome} ({r.tarefas})</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo="Fase">
+            <select value={rascunho.fase ?? ""} onChange={(e) => mudarRascunho({ fase: e.target.value || null })} className={CLASSE_CAMPO}>
+              <option value="">Todas</option>
+              {dados?.facetas.fases.map((f) => <option key={f.faseMacroKey} value={f.faseMacroKey}>{rotularFase(f.faseMacroKey)} ({f.tarefas})</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo="Status da tarefa">
+            <select
+              value={rascunho.statusTarefa[0] ?? ""}
+              onChange={(e) => mudarRascunho({ statusTarefa: e.target.value ? [e.target.value] : [] })}
+              className={CLASSE_CAMPO}
+            >
+              <option value="">Todos</option>
+              {Object.entries(ROTULO_STATUS).map(([k, r]) => <option key={k} value={k}>{r}</option>)}
+            </select>
+          </Campo>
+          <Campo rotulo="Status do processo">
+            <select
+              value={rascunho.statusProcesso ?? ""}
+              onChange={(e) => mudarRascunho({ statusProcesso: (e.target.value || null) as Filtros["statusProcesso"] })}
+              className={CLASSE_CAMPO}
+            >
+              <option value="">Todos</option>
+              <option value="ATIVO">Ativo</option>
+              <option value="CONCLUIDO">Concluído</option>
+            </select>
+          </Campo>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 items-end gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <Campo rotulo="Tipo de tarefa">
+            <select
+              value={rascunho.tipoTarefa[0] ?? ""}
+              onChange={(e) => mudarRascunho({ tipoTarefa: e.target.value ? [e.target.value] : [] })}
+              className={CLASSE_CAMPO}
             >
               <option value="">Todos</option>
               <option value="NORMAL">Normal</option>
               <option value="TRANSVERSAL">Antecipada</option>
             </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-[var(--text-muted)]">Família</span>
-            <select
-              value={filtros.familia ?? ""} onChange={(e) => aplicar({ familia: e.target.value ? Number(e.target.value) : null })}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
-            >
+          </Campo>
+          <Campo rotulo="Família">
+            <select value={rascunho.familia ?? ""} onChange={(e) => mudarRascunho({ familia: e.target.value ? Number(e.target.value) : null })} className={CLASSE_CAMPO}>
               <option value="">Todas</option>
               {opcoesFamilia.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
             </select>
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[10px] text-[var(--text-muted)]">Processo</span>
-            <select
-              value={filtros.processoId ?? ""} onChange={(e) => aplicar({ processoId: e.target.value ? Number(e.target.value) : null })}
-              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
-            >
+          </Campo>
+          <Campo rotulo="Processo">
+            <select value={rascunho.processoId ?? ""} onChange={(e) => mudarRascunho({ processoId: e.target.value ? Number(e.target.value) : null })} className={CLASSE_CAMPO}>
               <option value="">Todos</option>
               {opcoesProcesso.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
             </select>
-          </label>
-          <button
-            onClick={() => aplicar({ marcoFaseConcluida: !filtros.marcoFaseConcluida })}
-            className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-              filtros.marcoFaseConcluida ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
-            }`}
-            title="Processos cuja fase (filtro 'Fase' = fase de origem) foi concluída no período"
-          >
-            Marco: fase concluída
-          </button>
-          {([["atrasadas", "Atrasadas"], ["venceHoje", "Vence hoje"]] as const).map(([k, r]) => (
+          </Campo>
+          <div className="flex items-center gap-2">
             <button
-              key={k}
-              onClick={() => aplicar({ [k]: !filtros[k] } as Partial<Filtros>)}
-              className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-                filtros[k] ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
+              onClick={() => setMaisFiltros((v) => !v)}
+              className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
+                maisFiltros ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/90" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
               }`}
             >
-              {r}
+              <SlidersHorizontal size={12} /> Mais filtros
+              {(rascunho.marcoFaseConcluida || rascunho.atrasadas || rascunho.venceHoje) && (
+                <span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--action-primary)] text-[9px] text-white">
+                  {[rascunho.marcoFaseConcluida, rascunho.atrasadas, rascunho.venceHoje].filter(Boolean).length}
+                </span>
+              )}
             </button>
-          ))}
+            {temFiltro(filtros) && (
+              <button onClick={limpar} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">
+                Limpar filtros
+              </button>
+            )}
+          </div>
+          <div className="col-span-2 flex items-center justify-end gap-3 sm:col-span-1 lg:col-span-3">
+            <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
+              {modo === "visaoGeral" ? (dadosFamilias ? `${dadosFamilias.familias.length} famílias` : "")
+                : dados ? `${linhas.length} de ${dados.total}` : ""}
+            </span>
+            <button
+              onClick={aplicarRascunho}
+              className={`rounded px-4 py-1.5 text-[12px] font-medium text-white transition-opacity ${rascunhoDivergeDoAplicado ? "bg-[var(--action-primary)] hover:opacity-90" : "bg-[var(--action-primary)]/60"}`}
+            >
+              Aplicar filtros
+            </button>
+          </div>
         </div>
-      )}
+
+        {maisFiltros && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
+            <button
+              onClick={() => mudarRascunho({ marcoFaseConcluida: !rascunho.marcoFaseConcluida })}
+              className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
+                rascunho.marcoFaseConcluida ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
+              }`}
+              title="Processos cuja fase (filtro 'Fase' = fase de origem) foi concluída no período"
+            >
+              Marco: fase concluída
+            </button>
+            {([["atrasadas", "Atrasadas"], ["venceHoje", "Vence hoje"]] as const).map(([k, r]) => (
+              <button
+                key={k}
+                onClick={() => mudarRascunho({ [k]: !rascunho[k] } as Partial<Filtros>)}
+                className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
+                  rascunho[k] ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── CHIPS DE FILTRO ATIVO ── */}
       {temFiltro(filtros) && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-4 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-5 py-2">
           {filtros.busca && <Chip rotulo={`Buscar: ${filtros.busca}`} aoRemover={() => { setBuscaDigitada(""); aplicar({ busca: "" }) }} />}
           {(filtros.dataInicio || filtros.dataFim) && (
             <Chip
@@ -584,6 +726,12 @@ export function VisaoGlobal() {
           {filtros.marcoFaseConcluida && <Chip rotulo="Marco: fase concluída" aoRemover={() => aplicar({ marcoFaseConcluida: false })} />}
           {filtros.atrasadas && <Chip rotulo="Atrasadas" aoRemover={() => aplicar({ atrasadas: false })} />}
           {filtros.venceHoje && <Chip rotulo="Vence hoje" aoRemover={() => aplicar({ venceHoje: false })} />}
+          <button
+            onClick={() => { setNomeVisao(""); setSalvarAberto(true) }}
+            className="ml-1 text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline"
+          >
+            Salvar filtro
+          </button>
         </div>
       )}
 

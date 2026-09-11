@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 // ============================================================
 // TIPOS DE RESPOSTA
@@ -189,6 +190,11 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
+  // Lacuna pré-existente fechada ao conectar esta rota à aba "Documentos" de
+  // Tarefas e Projetos: nenhuma leitura de documento operacional deve passar
+  // sem RBAC — esconder botão não é controle de acesso (spec §18).
+  const erro = await verificarPermissao(request, "processos.ver")
+  if (erro) return erro
   try {
     const { processoId } = await params
     const id = parseInt(processoId)
