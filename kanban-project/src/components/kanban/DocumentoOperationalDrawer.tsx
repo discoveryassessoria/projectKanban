@@ -790,6 +790,8 @@ function ConteudoDrawer({
                 <WorkflowTab
                   documentoId={doc.id}
                   contextoAntecipada={contextoAntecipada}
+                  tarefaResponsavelId={tarefa?.responsavelId ?? null}
+                  tarefaResponsavelNome={tarefa?.responsavelNome ?? null}
                   onChange={() => {
                     onSave?.()
                     carregar()

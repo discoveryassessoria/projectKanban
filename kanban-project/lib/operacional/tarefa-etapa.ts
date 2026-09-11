@@ -113,6 +113,19 @@ export async function concluirEtapa(args: {
   let processoAfetado: number | null = null
   /** A fase da etapa concluída — o auto-avanço só reage se for a fase ATUAL do processo. */
   let faseMacroKeyAfetada: string | null = null
+  /**
+   * O QUE VAI NA AUDITORIA — preenchido dentro da transação, GRAVADO depois do commit.
+   *
+   * `LogAuditoria` é o registro PARA HUMANOS; a verdade transacional (o que garante
+   * consistência e é o que a trava de coerência protege) é o `WorkflowEvento`, que
+   * continua gravado ATOMICAMENTE dentro da transação, junto com o passo e a tarefa.
+   * Medido ao vivo (11/09/2026, tarefa 3571): contra o pool de produção
+   * (`pooled.db.prisma.io`) cada ida-e-volta desta transação custa ~150-400ms, e a
+   * cadeia de escritas dependentes (CAS do passo concluído → ativação do próximo →
+   * projeção da tarefa) já soma sozinha ~18-20 delas — o registro humano, que NINGUÉM
+   * lê no mesmo instante do commit, não precisa competir pelo mesmo orçamento de 5s.
+   */
+  let logAuditoriaPendente: Prisma.LogAuditoriaUncheckedCreateInput | null = null
 
   const resultado = await prisma.$transaction(async (tx) => {
     const tarefa = await tx.tarefa.findUnique({
@@ -179,6 +192,11 @@ export async function concluirEtapa(args: {
         id: true, status: true, obrigatorio: true, ordem: true, stepKey: true,
         documentoId: true, necessidadeId: true, processoId: true, dependeDeStepKeys: true, ciclo: true,
         faseMacroKey: true,
+        // lockVersion/startedAt/workflowInstanceId: só para poder passar este `alvo`
+        // como `stepPreCarregado` a `transicionarPassoTx` — ver o comentário lá. Sem
+        // eles, `transicionarPassoTx`/`aplicarPasso` releriam esta MESMA linha do
+        // banco um instante depois de ela já estar em mãos.
+        lockVersion: true, startedAt: true, workflowInstanceId: true, completedAt: true,
       },
       orderBy: { ordem: 'asc' },
     })
@@ -254,6 +272,10 @@ export async function concluirEtapa(args: {
       processoId: alvo.processoId,
       workflowInstanceId: tarefa.workflowInstanceId,
       ...(args.observacao ? { extra: { motivo: args.observacao.slice(0, 300) } } : {}),
+      // `alvo` já É a linha atual desta etapa (lida acima, nesta mesma transação,
+      // sem escrita entre a leitura e aqui) — evita o `findUnique` redundante que
+      // `transicionarPassoTx`/`aplicarPasso` fariam sobre a MESMA linha.
+      stepPreCarregado: alvo,
     })
     if (!transicao.changed) {
       return transicao.code === 'TRANSICAO_INVALIDA'
@@ -306,6 +328,9 @@ export async function concluirEtapa(args: {
         ciclo: alvo.ciclo,
         processoId: alvo.processoId,
         workflowInstanceId: tarefa.workflowInstanceId,
+        // `tarefa` já É a linha atual (lida no topo desta transação) — mesmo motivo
+        // do `stepPreCarregado` acima: corta o `findUnique` redundante.
+        tarefaPreCarregada: tarefa,
       })
     }
 
@@ -321,35 +346,35 @@ export async function concluirEtapa(args: {
       },
     })
 
-    // §10 — UM registro por conclusão, com tudo o que a auditoria precisa.
-    await tx.logAuditoria.create({
-      data: {
-        acao: concluiuAgora ? 'TAREFA_ETAPA_CONCLUIDA_E_TAREFA_CONCLUIDA' : 'TAREFA_ETAPA_CONCLUIDA',
-        entidade: 'Tarefa',
-        entidadeId: tarefa.id,
-        usuarioId: args.autorId,
-        descricao:
-          `Etapa "${alvo.stepKey}" concluída na tarefa "${tarefa.titulo}".` +
-          (proxima ? ` Próxima etapa: "${proxima.stepKey}".` : ' Não há próxima etapa.') +
-          (concluiuAgora ? ' O workflow chegou ao fim e a tarefa foi concluída.' : ` A tarefa segue ${status}.`) +
-          (faltando.length > 0 ? ` FORÇADA — evidências faltando: ${faltando.join(', ')}.` : ''),
-        detalhes: {
-          tarefaId: tarefa.id,
-          workflowInstanceId: tarefa.workflowInstanceId,
-          etapaId: alvo.id,
-          stepKey: alvo.stepKey,
-          etapaDe: alvo.status,
-          etapaPara: 'CONCLUIDO',
-          tarefaDe: tarefa.statusTarefa,
-          tarefaPara: status,
-          proximaEtapaId: proxima?.id ?? null,
-          forcada: !!args.permiteForcar && faltando.length > 0,
-          evidenciasFaltando: faltando,
-          observacao: args.observacao ?? null,
-          em: agora.toISOString(),
-        },
+    // §10 — UM registro por conclusão, com tudo o que a auditoria precisa. A
+    // ESCRITA sai da transação (ver `logAuditoriaPendente` acima); só o CONTEÚDO
+    // nasce aqui, porque é aqui que `proxima`/`status`/`concluiuAgora` existem.
+    logAuditoriaPendente = {
+      acao: concluiuAgora ? 'TAREFA_ETAPA_CONCLUIDA_E_TAREFA_CONCLUIDA' : 'TAREFA_ETAPA_CONCLUIDA',
+      entidade: 'Tarefa',
+      entidadeId: tarefa.id,
+      usuarioId: args.autorId,
+      descricao:
+        `Etapa "${alvo.stepKey}" concluída na tarefa "${tarefa.titulo}".` +
+        (proxima ? ` Próxima etapa: "${proxima.stepKey}".` : ' Não há próxima etapa.') +
+        (concluiuAgora ? ' O workflow chegou ao fim e a tarefa foi concluída.' : ` A tarefa segue ${status}.`) +
+        (faltando.length > 0 ? ` FORÇADA — evidências faltando: ${faltando.join(', ')}.` : ''),
+      detalhes: {
+        tarefaId: tarefa.id,
+        workflowInstanceId: tarefa.workflowInstanceId,
+        etapaId: alvo.id,
+        stepKey: alvo.stepKey,
+        etapaDe: alvo.status,
+        etapaPara: 'CONCLUIDO',
+        tarefaDe: tarefa.statusTarefa,
+        tarefaPara: status,
+        proximaEtapaId: proxima?.id ?? null,
+        forcada: !!args.permiteForcar && faltando.length > 0,
+        evidenciasFaltando: faltando,
+        observacao: args.observacao ?? null,
+        em: agora.toISOString(),
       },
-    })
+    }
 
     // TRAVA ANTES DO COMMIT — a mesma que `task-step-sync` usa. Se o par
     // (passo, tarefa) ficar contraditório, a transação inteira volta atrás. Um
@@ -369,13 +394,43 @@ export async function concluirEtapa(args: {
       tarefaConcluida: concluiuAgora,
       statusTarefa: status,
     }
+  }, {
+    // TIMEOUT EVIDENCIADO, NÃO ADIVINHADO — mesma convenção já usada neste projeto
+    // para transações legitimamente longas contra este banco (ver
+    // `registrar-pagamento-composto.ts`, `backfill-codigo-servicos-catalogo.ts`,
+    // rota `orgaos-protocolo`: todas `{ timeout: 20000|30000, maxWait: 10000 }`).
+    //
+    // Medido ao vivo (11/09/2026, tarefa 3571, `pooled.db.prisma.io`): mesmo DEPOIS
+    // de cortar os `findUnique` redundantes (ver `stepPreCarregado`/`tarefaPreCarregada`
+    // em `task-step-sync.ts`) e de tirar o `LogAuditoria` da transação (abaixo), a
+    // cadeia mínima e não-paralelizável desta operação — CAS do passo concluído,
+    // emissão de evento+outbox+tentativa, ativação do próximo passo (mesma cadeia de
+    // novo), projeção da tarefa, trava de coerência — ainda soma ~18-20 idas-e-voltas
+    // dependentes. A ~150-400ms cada contra o pool de produção, isso fica em ~5-8s: o
+    // default de 5s do Prisma não é suficiente para NENHUMA execução real desta
+    // porta, não só para casos extremos. Não há mais trabalho supérfluo a cortar
+    // dentro da transação — o que resta é o preço de rede de escritas que têm de
+    // acontecer em sequência para preservar CAS e append-only.
+    timeout: 20000,
+    maxWait: 10000,
   })
 
   // ─── EFEITOS PÓS-COMMIT ────────────────────────────────────────────────────
-  // Só depois do commit, e só quando a etapa realmente mudou agora. Os dois são
-  // best-effort de propósito: o evento já está gravado, então uma falha aqui
-  // atrasa o efeito, não o perde — o outbox reprocessa e o avanço é reavaliado
-  // na próxima conclusão.
+  // Só depois do commit. Três efeitos, todos best-effort de propósito:
+  //
+  //  • `LogAuditoria` — o registro PARA HUMANOS (nunca decide nada, nunca é lido
+  //    pela trava de coerência); a verdade transacional é o `WorkflowEvento`, já
+  //    gravado ATOMICAMENTE dentro da transação acima. Uma falha aqui atrasaria o
+  //    aparecimento no histórico administrativo, nunca corrompe estado — e o
+  //    outbox/reconciliação não dependem dele para nada.
+  //  • `processarOutbox`/`tentarAvancoAutomaticoSeFaseAtual` — o evento já está
+  //    gravado, então uma falha aqui atrasa o efeito, não o perde: o outbox
+  //    reprocessa e o avanço é reavaliado na próxima conclusão.
+  if (resultado.ok && !resultado.jaEstavaConcluida && logAuditoriaPendente) {
+    await prisma.logAuditoria.create({ data: logAuditoriaPendente }).catch((e) => {
+      console.error('[concluirEtapa] LogAuditoria pós-commit falhou (estado já consistente, só o registro humano atrasou):', e)
+    })
+  }
   if (resultado.ok && !resultado.jaEstavaConcluida) {
     // Antecipa a projeção financeira documental para o mesmo clique, em vez de
     // esperar o próximo ciclo da fila.

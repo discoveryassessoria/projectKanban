@@ -217,8 +217,16 @@ export async function registrarNaTentativa(
     payload?: Prisma.InputJsonValue | null
   },
   db: DB = prisma,
+  /**
+   * A TENTATIVA VIGENTE, QUANDO QUEM CHAMA JÁ A TEM.
+   *
+   * `garantirTentativa`, chamada logo antes por `aplicarPasso`, já leu/criou esta
+   * mesma linha na mesma transação. Sem isto, esta função a buscava de novo — um
+   * segundo round trip para o dado que acabou de passar pelas mãos de quem chamou.
+   */
+  tentativaConhecida?: Tentativa | null,
 ): Promise<Tentativa | null> {
-  const vigente = await tentativaVigente(stepInstanceId, db)
+  const vigente = tentativaConhecida !== undefined ? tentativaConhecida : await tentativaVigente(stepInstanceId, db)
   if (!vigente) return null
   // CUMPRIDA TEM MOMENTO. Passar a tentativa para CONCLUIDO sem data deixaria um
   // estado de conclusão sem a conclusão — o mesmo buraco que o Gate 2 fechou do outro

@@ -28,6 +28,7 @@ import {
 } from "@/src/lib/process-stage/andamento-etapa"
 import { lerOperacao, gravarOperacao } from "@/src/services/operacao-da-etapa"
 import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
+import { normalizarUnidade, chaveDaUnidade, tarefasVivasDasUnidades } from "@/lib/operacional/identidade-da-tarefa"
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade, dispensarNecessidade } from "@/src/services/necessidade-documental"
@@ -622,11 +623,38 @@ export async function carregarPassoAutorizado(
       // demais, quem não é admin só age numa etapa já de outra pessoa se for
       // ele mesmo o responsável — etapa sem responsável passa (mesma régua
       // do resto do sistema).
+      //
+      // O "responsável" que vale aqui é o da TAREFA (`Tarefa.responsavelId`,
+      // atribuído pela porta canônica `POST /api/tarefas/[id]/atribuir`), não
+      // `PhaseWorkflowStepInstance.responsavelId` — este último é escrito por
+      // "Alterar Executor" (quem EXECUTA a etapa, um dado de exibição) e nunca
+      // é tocado ao atribuir/transferir a Tarefa. Usar o campo do passo aqui
+      // fazia um usuário recém-designado responsável pela Tarefa continuar
+      // levando 403 em qualquer ação, porque o passo guardava um dono antigo
+      // (ou nenhum) que nunca foi sincronizado com a atribuição.
+      //
+      // A TAREFA é resolvida pela MESMA régua canônica de identidade que
+      // `resolveDocumentOperationalProjection` usa para o cabeçalho "Responsável"
+      // (`normalizarUnidade` + `tarefasVivasDasUnidades`) — nunca um `findFirst`
+      // por `workflowStepInstanceId`: esse campo não segue o ciclo da OBRIGAÇÃO,
+      // só o da fase, e já divergiu em produção para uma tarefa da própria
+      // Daniela (ver comentário em `tarefasVivasDasUnidades`). Duas réguas
+      // diferentes para "qual é a tarefa deste passo" é o defeito, não a
+      // correção.
       if (!ctx.isAdmin) {
         if (acao === "transferir") {
           return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
         }
-        if (p.responsavelId != null && p.responsavelId !== ctx.usuarioId) {
+        const unidade = await normalizarUnidade(prisma, {
+          processoId: p.processoId,
+          documentoId: p.documentoId,
+          ciclo: 1,
+        })
+        const tarefaDoPasso = (await tarefasVivasDasUnidades(prisma, [unidade])).get(chaveDaUnidade(unidade)) ?? null
+        // Sem Tarefa canônica encontrada (dado legado/gap), cai para o campo do
+        // próprio passo — nunca menos permissivo do que antes.
+        const responsavelDaEtapa = tarefaDoPasso ? tarefaDoPasso.responsavelId : p.responsavelId
+        if (responsavelDaEtapa != null && responsavelDaEtapa !== ctx.usuarioId) {
           return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
         }
       }

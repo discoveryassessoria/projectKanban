@@ -14,6 +14,23 @@ import {
 import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
 import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAvaliacaoUI } from "./OperacaoAntecipadaPainel"
 import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
+
+// ============================================================
+// HELPER — pega userId logado do localStorage (mesmo padrão do
+// DocumentoOperationalDrawer / CentralDaEtapaDrawer)
+// ============================================================
+
+const getUserId = (): number | null => {
+  try {
+    const stored = localStorage.getItem("user")
+    if (stored) {
+      const u = JSON.parse(stored)
+      return u.id ?? null
+    }
+  } catch {}
+  return null
+}
 
 // ============================================================
 // TIPOS
@@ -91,6 +108,14 @@ interface WorkflowTabProps {
   documentoId: number
   onChange?: () => void
   contextoAntecipada?: ContextoAntecipada
+  /**
+   * Responsabilidade pertence à TAREFA (contrato canônico), não ao passo — o
+   * `assignee` do passo é só "quem costuma executar" (ver comentário em
+   * `StepCard`). É contra ESTE id que o botão "Iniciar" de cada passo é
+   * travado: sem tarefa atribuída a este usuário, não há o que iniciar aqui.
+   */
+  tarefaResponsavelId?: number | null
+  tarefaResponsavelNome?: string | null
 }
 
 // ============================================================
@@ -153,8 +178,22 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: WorkflowTabProps) {
+export function WorkflowTab({
+  documentoId,
+  onChange,
+  contextoAntecipada,
+  tarefaResponsavelId = null,
+  tarefaResponsavelNome = null,
+}: WorkflowTabProps) {
   // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
+
+  const { isAdmin } = usePermissoes()
+  const currentUserId = getUserId()
+  // A MESMA regra que o servidor aplica em `carregarPassoAutorizado`, só que
+  // antes do clique: sem tarefa atribuída a alguém, ou atribuída a outra
+  // pessoa, "Iniciar" não é uma ação real — é um convite a um 403.
+  const podeIniciarEtapas =
+    isAdmin || (tarefaResponsavelId != null && tarefaResponsavelId === currentUserId)
 
   // ✅ NOVO: stepId aberto na Central da Etapa (drawer empilhado)
   const [centralStepId, setCentralStepId] = useState<number | null>(null)
@@ -310,6 +349,8 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
             step={step}
             onOpenCentral={() => setCentralStepId(step.id)}
             refDoAtual={(el) => { if (el) passoAtual.current = el }}
+            podeIniciar={podeIniciarEtapas}
+            tarefaResponsavelNome={tarefaResponsavelNome}
           />
         ))}
       </div>
@@ -390,11 +431,20 @@ function StepCard({
   step,
   onOpenCentral,
   refDoAtual,
+  podeIniciar,
+  tarefaResponsavelNome,
 }: {
   step: WorkflowStep
   onOpenCentral: () => void
   /** Recebe o nó do passo ATIVO para que ele apareça sem ninguém procurar. */
   refDoAtual?: (el: HTMLDivElement | null) => void
+  /**
+   * Se a TAREFA (não o passo) está atribuída ao usuário logado. Sem isso, o
+   * passo é mostrado, mas "Iniciar" não é oferecido — abrir a Central da
+   * Etapa sem poder agir nela só levava a um 403 depois do clique.
+   */
+  podeIniciar: boolean
+  tarefaResponsavelNome?: string | null
 }) {
   const isDone = step.status === "concluida"
   const isActive =
@@ -577,14 +627,26 @@ function StepCard({
 
         {/* Botão que abre a Central da Etapa — o rótulo é sempre "Iniciar" (o
             que a pessoa faz ao clicar: entrar na etapa e trabalhar nela),
-            independente do estado. Esconde no lock-step wait (não há ação útil). */}
+            independente do estado. Esconde no lock-step wait (não há ação útil).
+            Sem a TAREFA atribuída a este usuário, "Iniciar" nem abre: o
+            servidor já barra a ação (403 em `carregarPassoAutorizado`) — deixar
+            o botão e a janela abertos só escondia isso até o clique errado. */}
         {!isLockStepWait && (
-          <button
-            onClick={onOpenCentral}
-            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
-          >
-            Iniciar →
-          </button>
+          podeIniciar ? (
+            <button
+              onClick={onOpenCentral}
+              className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
+            >
+              Iniciar →
+            </button>
+          ) : (
+            <span
+              title="A tarefa precisa estar atribuída a você para iniciar esta etapa"
+              className="px-2.5 py-1.5 text-[10.5px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded whitespace-nowrap"
+            >
+              {tarefaResponsavelNome ? `Atribuído a ${tarefaResponsavelNome}` : "Sem responsável"}
+            </span>
+          )
         )}
       </div>
 

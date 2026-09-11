@@ -17,6 +17,18 @@
 // etapa concluída, fechar o editor fecha a Central da Etapa inteira — nunca
 // revela o painel. Quem TEM essas ações continua vendo tudo como antes.
 //
+// SEGUNDO ACHADO (mesmo dia, mesma relatora): a rede de segurança que fecha
+// sem `temAcoesExtras` vivia num `useEffect` SEPARADO do que abre o editor
+// sozinho, reagindo às mesmas dependências. No commit em que a etapa carrega
+// pela primeira vez, os dois disparavam juntos — o de fechar lia
+// `editorAberto` do render atual (ainda `false`, porque `setEditorAberto`
+// só agenda) e fechava a Central da Etapa ANTES do editor aparecer. Para
+// quem tem `temAcoesExtras` (Admin) nunca dava pra notar; para quem não tem
+// (o caso comum, Assistente) a etapa parecia simplesmente não abrir. Os dois
+// efeitos foram unidos: a checagem de fechar só roda numa passada em que a
+// tentativa de abrir para aquele passo já aconteceu, nunca no mesmo commit
+// em que acabou de ser agendada.
+//
 //   npx tsx scripts/central-etapa-sem-tela-vazia.test.ts
 // ============================================================================
 import { readFileSync } from "fs"
@@ -67,8 +79,34 @@ check("2a) temAcoesExtras existe e considera cancelada/reabrir/bloquear/desbloqu
 check("2b) o painel de status/abas só renderiza com temAcoesExtras", /\{step && temAcoesExtras && \(/.test(drawer))
 check("2c) sem temAcoesExtras, fechar o editor fecha a Central inteira (fecharEditor chama onClose)",
   /if \(!temAcoesExtras\) onClose\(\)/.test(drawer))
-check("2d) rede de segurança: qualquer caminho (inclusive onSaved) que zere editorAberto sem temAcoesExtras também fecha",
-  /if \(isOpen && step && !editorAberto && !temAcoesExtras\) onClose\(\)/.test(drawer))
+// 2d) A REDE DE SEGURANÇA RACEAVA COM A ABERTURA AUTOMÁTICA (achado real,
+// 11/09/2026, mesmo relato da Daniela — ASSISTENTE, agora testando de novo
+// depois de atribuída à tarefa): eram DOIS `useEffect` reagindo às MESMAS
+// dependências (`step`, `editorAberto`). No commit em que `step` passava de
+// nulo pra carregado, os dois disparavam JUNTOS — o de abrir chamava
+// `setEditorAberto(true)` (só AGENDA a próxima renderização) e o de fechar,
+// no MESMO commit, ainda lia `editorAberto` do render atual (`false`) e
+// chamava `onClose()` — fechando a Central da Etapa inteira antes do editor
+// aparecer. Para quem tem `temAcoesExtras` (hoje só Admin) a condição do
+// close nunca era satisfeita e o bug não aparecia; para Assistente (o caso
+// comum) a etapa "não abria" — na real abria e fechava sozinha no mesmo
+// instante. Corrigido juntando os dois num efeito só: a MESMA verificação
+// (`!editorAberto && !temAcoesExtras`) só decide fechar numa passada em que a
+// abertura para este passo já foi tentada — nunca no commit em que acabou de
+// ser agendada.
+check("2d) rede de segurança: existe, e o gatilho de abertura automática e o de fechar vivem no MESMO useEffect (nunca corre contra editorAberto desatualizado)",
+  drawer.includes("if (autoAbertoParaStep.current !== step.id) {") &&
+  drawer.includes("if (!editorAberto && !temAcoesExtras) onClose()") &&
+  // As DUAS decisões (abrir / fechar) precisam estar dentro do MESMO bloco de
+  // efeito — nunca em dois `useEffect` distintos reagindo a `step` ao mesmo
+  // tempo, que foi exatamente a race que reabriu este achado.
+  (() => {
+    const iAbre = drawer.indexOf("if (autoAbertoParaStep.current !== step.id) {")
+    const iFecha = drawer.indexOf("if (!editorAberto && !temAcoesExtras) onClose()")
+    const iUseEffectAntesDoAbre = drawer.lastIndexOf("useEffect(", iAbre)
+    const iFimDoEfeito = drawer.indexOf("}, [", iFecha)
+    return iAbre > iUseEffectAntesDoAbre && iFecha > iAbre && iFimDoEfeito > iFecha
+  })())
 check("2e) os editores (registral e StepEditorRouter) usam fecharEditor, não um setEditorAberto(false) cru",
   (drawer.match(/onClose=\{fecharEditor\}/g) ?? []).length === 2)
 

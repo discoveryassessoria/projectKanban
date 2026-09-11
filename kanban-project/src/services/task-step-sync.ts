@@ -25,6 +25,23 @@ const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
 
 /**
+ * TIMEOUT EVIDENCIADO, NÃO ADIVINHADO — mesma convenção de `concluirEtapa`
+ * (`lib/operacional/tarefa-etapa.ts`), aplicada aqui porque este módulo é a
+ * MESMA máquina de transição que aquela porta chama.
+ *
+ * Medido ao vivo (11/09/2026, `pooled.db.prisma.io`): mesmo depois de cortar os
+ * `findUnique` redundantes (`stepPreCarregado`/`tarefaPreCarregada`) e a segunda
+ * leitura de `tentativaVigente`, uma transição simples de UM passo (`iniciarPasso`
+ * na tarefa 3571, sem próxima etapa a liberar) levou 5521ms — já acima do default
+ * de 5000ms — e uma que ativa a seguinte (`concluirPasso`) fica mais alta ainda: a
+ * cadeia CAS+evento+outbox+tentativa se repete para cada passo tocado, e cada ida-
+ * e-volta custa ~150-400ms contra este banco. Não sobrou trabalho supérfluo para
+ * cortar dentro da transação — o que resta é o preço de rede de escritas que têm
+ * de acontecer em sequência para preservar CAS e append-only.
+ */
+const TX_OPTS = { timeout: 20000, maxWait: 10000 }
+
+/**
  * O QUE AS ETAPAS DIZEM SOBRE A TAREFA — uma conta só, importada.
  *
  * A regra ("a tarefa acabou quando todas as etapas obrigatórias acabaram") não
@@ -82,6 +99,22 @@ export type SyncResultado =
   | { success: false; code: H.FailureCodeD; errors: H.SyncIssue[]; correlationId: string }
 
 type TX = Prisma.TransactionClient
+
+/**
+ * O SUBCONJUNTO DE CAMPOS QUE `aplicarPasso` REALMENTE LÊ.
+ *
+ * Não é o modelo inteiro — de propósito. Quem já leu a linha antes, na mesma
+ * transação, normalmente leu com um `select` (não o registro inteiro), e exigir o
+ * modelo completo aqui forçaria esse `select` a crescer sem necessidade. Se
+ * `aplicarPasso` passar a usar outro campo do passo, ele entra aqui também.
+ */
+type StepPreCarregado = Pick<
+  PhaseWorkflowStepInstance,
+  "id" | "status" | "lockVersion" | "dependeDeStepKeys" | "workflowInstanceId" | "necessidadeId" | "documentoId" | "startedAt" | "completedAt"
+>
+/** Mesma ideia, para `aplicarTarefa` — só os três campos que ela lê da Tarefa. */
+type TarefaPreCarregada = Pick<Tarefa, "statusTarefa" | "dataInicio" | "lockVersion">
+
 interface ApplyOpts {
   correlationId: string
   causationId: string
@@ -143,8 +176,25 @@ async function travarUnidade(
 }
 
 // ---------------- APLICADOR: PASSO (CAS) ----------------
-async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: WorkflowEventoTipo, o: ApplyOpts) {
-  const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId } })
+/**
+ * `stepPreCarregado` — EVITA UM ROUND TRIP REDUNDANTE.
+ *
+ * Contra um banco remoto, cada ida-e-volta custa dezenas a centenas de ms mesmo para a
+ * query mais trivial (medido: ~130-290ms por query "quente" nesta base). Quando quem
+ * chama já leu a MESMA linha um instante antes na MESMA transação (ex.: `concluirEtapa`
+ * lê `steps` para decidir qual é a etapa corrente, e no parágrafo seguinte pedia a
+ * `aplicarPasso` para lê-la de novo), essa segunda leitura não muda a decisão — só soma
+ * latência. Passar a linha já lida corta o round trip sem tocar em nenhuma escrita.
+ *
+ * Só é usado por quem já tem a linha INTEIRA e ATUAL (dentro da mesma transação, sem
+ * escrita entre a leitura e esta chamada) — nunca por quem só tem um subconjunto de
+ * campos ou leu antes de outra escrita na mesma unidade.
+ */
+async function aplicarPasso(
+  tx: TX, stepId: number, alvo: string, tipoEvento: WorkflowEventoTipo, o: ApplyOpts,
+  stepPreCarregado?: StepPreCarregado | null,
+) {
+  const step = stepPreCarregado ?? (await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId } }))
   if (!step) return { changed: false, anterior: "", atual: "", code: "STEP_NAO_ENCONTRADO" as H.FailureCodeD }
   if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }
   if (!H.podeAplicarPasso(step.status, alvo)) return { changed: false, anterior: step.status, atual: step.status, code: "TRANSICAO_INVALIDA" as H.FailureCodeD }
@@ -221,7 +271,11 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
   // A TENTATIVA REGISTRA O QUE ACONTECEU. O status do passo continua sendo o estado
   // corrente da obrigação; a tentativa é o fato — com início, fim, autor e dados.
   // Passo anterior a este modelo ganha a primeira tentativa aqui, marcada como tal.
-  await garantirTentativa(stepId, {
+  // `garantirTentativa` JÁ devolve a tentativa vigente (criada agora ou preexistente).
+  // `registrarNaTentativa` recebia esse mesmo dado por um SEGUNDO round trip
+  // (`tentativaVigente` de novo, para a MESMA linha) — passar adiante o que acabou de
+  // ser lido/criado corta essa repetição sem mudar o que é gravado.
+  const tentativaAtual = await garantirTentativa(stepId, {
     motivo: MOTIVOS_DE_TENTATIVA.BACKFILL, status: step.status as StepInstanceStatus,
     startedAt: step.startedAt, completedAt: step.completedAt,
   }, tx)
@@ -230,7 +284,7 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
     startedAt: (data as { startedAt?: Date }).startedAt ?? undefined,
     completedAt: (data as { completedAt?: Date }).completedAt ?? undefined,
     executadoPorId: o.usuarioId ?? undefined,
-  }, tx)
+  }, tx, tentativaAtual)
 
   return { changed: true, anterior: step.status, atual: alvo }
 }
@@ -314,6 +368,14 @@ export interface TransicaoPassoOpts {
    * concluídos, porque são fato consumado que ninguém mandou desfazer.
    */
   alcancarConcluidos?: boolean
+  /**
+   * A LINHA DO PASSO, QUANDO QUEM CHAMA JÁ A TEM NA MESMA TRANSAÇÃO.
+   *
+   * Ver o comentário de `aplicarPasso`: corta o `findUnique` que esta função e
+   * `aplicarPasso` fariam cada uma por conta própria, sobre a MESMA linha, um
+   * parágrafo de distância uma da outra.
+   */
+  stepPreCarregado?: StepPreCarregado | null
 }
 
 export type TransicaoPassoResultado = {
@@ -341,17 +403,22 @@ export async function transicionarPassoTx(
   if (!tipoEvento) {
     throw new Error(`transicionarPassoTx: alvo "${alvo}" não tem evento canônico — passe tipoEvento explicitamente.`)
   }
-  const atual = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId }, select: { lockVersion: true } })
+  // COM `stepPreCarregado`: o lockVersion vem da própria linha já em mãos — corta o
+  // `findUnique` que esta função fazia só para montar a causationId, e o outro que
+  // `aplicarPasso` faria mais adiante para ler a MESMA linha de novo.
+  const lockVersion = o.stepPreCarregado
+    ? o.stepPreCarregado.lockVersion
+    : (await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId }, select: { lockVersion: true } }))?.lockVersion
   return aplicarPasso(tx, stepId, alvo, tipoEvento, {
     correlationId: o.correlationId,
-    causationId: H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, atual?.lockVersion),
+    causationId: H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, lockVersion),
     ciclo: o.ciclo,
     processoId: o.processoId,
     workflowInstanceId: o.workflowInstanceId,
     extra: o.extra,
     usuarioId: o.usuarioId,
     ignorarDependencias: o.ignorarDependencias,
-  })
+  }, o.stepPreCarregado)
 }
 
 /**
@@ -396,13 +463,17 @@ export async function ativarProximoPassoTx(
   // concluir A podia liberar B e C ao mesmo tempo.
   //
   // A ordem continua no `orderBy`: ela desempata a apresentação. Não é ela que libera.
+  // SEM `select`: a linha INTEIRA já sai daqui — é a mesma que `transicionarPassoTx`
+  // (via `stepPreCarregado`, abaixo) passaria para `aplicarPasso` em vez de buscar de
+  // novo. Mesma ida-e-volta, mais colunas — contra um round trip que já paga o preço
+  // fixo da latência de rede, isto não custa nada a mais e evita uma segunda leitura
+  // da MESMA linha um parágrafo adiante.
   const daUnidade = await tx.phaseWorkflowStepInstance.findMany({
     where: escopoDaUnidade({
       workflowInstanceId: args.workflowInstanceId,
       necessidadeId: args.necessidadeId,
       documentoId: args.documentoId,
     }),
-    select: { id: true, stepKey: true, ordem: true, status: true, ciclo: true, processoId: true, dependeDeStepKeys: true },
     orderBy: { ordem: "asc" },
   })
   const comoDependencia: PassoComDependencia[] = daUnidade.map((p) => ({
@@ -434,6 +505,9 @@ export async function ativarProximoPassoTx(
       ciclo: info.ciclo,
       processoId: info.processoId,
       workflowInstanceId: args.workflowInstanceId,
+      // `daUnidade`, acima, já é a linha INTEIRA e nada escreveu sobre ESTA linha
+      // entre a leitura e aqui (só sobre a que acabou de ser concluída, que é outra).
+      stepPreCarregado: info,
     })
     if (r.changed && primeiro === null) primeiro = alvo.id
   }
@@ -455,17 +529,23 @@ export async function aplicarTarefaTx(
   tarefaId: number,
   alvo: string,
   tipoEvento: WorkflowEventoTipo,
-  o: TransicaoPassoOpts & { extra?: Record<string, unknown> },
+  o: TransicaoPassoOpts & {
+    extra?: Record<string, unknown>
+    /** A linha da Tarefa, quando quem chama já a tem na mesma transação — ver `aplicarTarefa`. */
+    tarefaPreCarregada?: TarefaPreCarregada | null
+  },
 ) {
-  const t = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { lockVersion: true } })
+  const lockVersion = o.tarefaPreCarregada
+    ? o.tarefaPreCarregada.lockVersion
+    : (await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { lockVersion: true } }))?.lockVersion
   return aplicarTarefa(tx, tarefaId, alvo, tipoEvento, {
     correlationId: o.correlationId,
-    causationId: H.chaveComando(o.operacao, "tarefa", tarefaId, alvo, o.ciclo, t?.lockVersion),
+    causationId: H.chaveComando(o.operacao, "tarefa", tarefaId, alvo, o.ciclo, lockVersion),
     ciclo: o.ciclo,
     processoId: o.processoId,
     workflowInstanceId: o.workflowInstanceId,
     extra: o.extra,
-  })
+  }, o.tarefaPreCarregada)
 }
 
 /**
@@ -685,8 +765,13 @@ export async function reabrirPassoTx(
 }
 
 // ---------------- APLICADOR: TAREFA (CAS) ----------------
-async function aplicarTarefa(tx: TX, tarefaId: number, alvo: string, tipoEvento: WorkflowEventoTipo, o: ApplyOpts) {
-  const t = await tx.tarefa.findUnique({ where: { id: tarefaId } })
+/** `tarefaPreCarregada` — mesma lógica de `aplicarPasso`: corta o `findUnique` quando
+ * quem chama já tem a linha INTEIRA e ATUAL, lida na mesma transação. */
+async function aplicarTarefa(
+  tx: TX, tarefaId: number, alvo: string, tipoEvento: WorkflowEventoTipo, o: ApplyOpts,
+  tarefaPreCarregada?: TarefaPreCarregada | null,
+) {
+  const t = tarefaPreCarregada ?? (await tx.tarefa.findUnique({ where: { id: tarefaId } }))
   if (!t) return { changed: false, anterior: "", atual: "", code: "TAREFA_NAO_ENCONTRADA" as H.FailureCodeD }
   if (t.statusTarefa === alvo) return { changed: false, anterior: t.statusTarefa, atual: t.statusTarefa }
   if (!H.podeAplicarTarefa(t.statusTarefa, alvo)) return { changed: false, anterior: t.statusTarefa, atual: t.statusTarefa, code: "TRANSICAO_INVALIDA" as H.FailureCodeD }
@@ -781,7 +866,7 @@ export async function iniciarTarefa(tarefaId: number, ctx: SyncContexto): Promis
       if (t.workflowStepInstanceId) rp = await aplicarPasso(tx, t.workflowStepInstanceId, "EM_ANDAMENTO", "PASSO_INICIADO", base)
       if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
       return ok(rt.changed || rp.changed, correlationId, { tarefa: rt.anterior, passo: rp.anterior }, { tarefa: rt.atual, passo: rp.atual }, ["TAREFA_INICIADA", ...(rp.changed ? ["PASSO_INICIADO"] : [])])
-    })
+    }, TX_OPTS)
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
@@ -824,7 +909,7 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
       }
       if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnterior }, { tarefa: rt.atual, passo: passoAtual }, eventos)
-    })
+    }, TX_OPTS)
     if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(t.processoId, "tarefa:terminal")
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -853,7 +938,7 @@ export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promi
         if (rp.changed) eventos.push("PASSO_BLOQUEADO")
       }
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
-    })
+    }, TX_OPTS)
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
@@ -882,7 +967,7 @@ export async function desbloquearTarefa(tarefaId: number, ctx: SyncContexto): Pr
         if (rp.changed) eventos.push("PASSO_DESBLOQUEADO")
       }
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
-    })
+    }, TX_OPTS)
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
@@ -913,7 +998,7 @@ export async function cancelarTarefa(tarefaId: number, ctx: SyncContexto): Promi
         if (rp.changed) eventos.push(evtP)
       }
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
-    })
+    }, TX_OPTS)
     if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(t.processoId, "tarefa:cancelada")
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -970,7 +1055,7 @@ async function opPassoSimples(stepInstanceId: number, ctx: SyncContexto, alvoPas
       }
       await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(rp.changed, correlationId, { passo: rp.anterior, tarefa: tAnt }, { passo: rp.atual, tarefa: tAt }, eventos)
-    })
+    }, TX_OPTS)
     if (resultado.success && resultado.changed && TRANSICOES_QUE_MEXEM_NO_GATE.has(alvoPasso)) {
       await reconciliarMotorAposCommit(step.processoId, `passo:${opKey}`.slice(0, 20))
     }
@@ -1057,7 +1142,7 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
       // desalinhamento aparece na hora, não meses depois num relatório.
       await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(eventos.length > 0, correlationId, { passo: pAnt, tarefa: tAnt }, { passo: pAt, tarefa: tAt }, eventos)
-    })
+    }, TX_OPTS)
     // O `step.concluido` já foi emitido DENTRO da transação acima. Drenar aqui só
     // antecipa o efeito (projeção financeira documental) para o mesmo clique, em
     // vez de esperar o próximo ciclo da fila. Best-effort: se falhar, o evento
@@ -1093,7 +1178,7 @@ export async function aprovarPasso(stepInstanceId: number, ctx: SyncContexto): P
       await projetarTarefaDoPasso(tx, { stepInstanceId, statusPasso: "CONCLUIDO", usuarioId: ctx.aprovadorId })
       await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(ra.changed, correlationId, { passo: ra.anterior }, { passo: ra.atual }, eventos)
-    })
+    }, TX_OPTS)
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 

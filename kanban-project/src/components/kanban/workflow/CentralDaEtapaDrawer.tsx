@@ -422,13 +422,35 @@ function ConteudoDrawer({
   // além do editor (`temAcoesExtras`), este painel continua atrás, alcançável
   // fechando o editor. Dispara UMA vez por etapa (guarda por stepId): fechar
   // o editor pra ver o painel não pode reabri-lo sozinho.
+  //
+  // JUNTADO À REDE DE SEGURANÇA (abaixo) num efeito só, de propósito: eram dois
+  // `useEffect` separados reagindo às MESMAS dependências (`step`, `editorAberto`),
+  // e os dois disparavam no mesmo commit sempre que `step` passava de nulo para
+  // carregado. Neste, `setEditorAberto(true)` só AGENDA a atualização — o efeito
+  // seguinte, no mesmo commit, ainda lia `editorAberto` do render atual (`false`).
+  // Para qualquer etapa sem `temAcoesExtras` (o caso comum: Assistente numa
+  // etapa em andamento, sem permissão de bloquear/transferir/forçar — só quem
+  // tem essas permissões, hoje só Admin, escapava por acidente), a "rede de
+  // segurança" fechava a Central da Etapa NO MESMO INSTANTE em que este efeito
+  // pedia pra abrir o editor: abria e fechava sozinha, sem o usuário ver nada.
+  // Um efeito só decide uma coisa de cada vez: abre nesta etapa nova, ou (só
+  // numa passada seguinte, com editorAberto já refletido) fecha se não sobrou
+  // nada pra mostrar.
   const autoAbertoParaStep = useRef<number | null>(null)
   useEffect(() => {
     if (!isOpen || loading || !step) return
-    if (autoAbertoParaStep.current === step.id) return
-    autoAbertoParaStep.current = step.id
-    setEditorAberto(true)
-  }, [isOpen, loading, step])
+    if (autoAbertoParaStep.current !== step.id) {
+      autoAbertoParaStep.current = step.id
+      setEditorAberto(true)
+      return
+    }
+    // REDE DE SEGURANÇA: qualquer caminho que feche o editor sem passar por
+    // `fecharEditor` (ex.: `onSaved`, que só zera `editorAberto` e recarrega o
+    // workflow) cai aqui. Se, depois de recarregado, a etapa continuar sem nada
+    // além do editor, fecha a Central da Etapa inteira — nunca deixa a "tela de
+    // trás" aparecer por uma fresta.
+    if (!editorAberto && !temAcoesExtras) onClose()
+  }, [isOpen, loading, step, editorAberto, temAcoesExtras, onClose])
 
   // Sem NADA além do editor: fechar o editor fecha a Central da Etapa inteira
   // — não há painel de trás para revelar.
@@ -441,15 +463,6 @@ function ConteudoDrawer({
   useEffect(() => {
     if (!isOpen) autoAbertoParaStep.current = null
   }, [isOpen])
-
-  // REDE DE SEGURANÇA: qualquer caminho que feche o editor sem passar por
-  // `fecharEditor` (ex.: `onSaved`, que só zera `editorAberto` e recarrega o
-  // workflow) cai aqui. Se, depois de recarregado, a etapa continuar sem nada
-  // além do editor, fecha a Central da Etapa inteira — nunca deixa a "tela de
-  // trás" aparecer por uma fresta.
-  useEffect(() => {
-    if (isOpen && step && !editorAberto && !temAcoesExtras) onClose()
-  }, [isOpen, step, editorAberto, temAcoesExtras, onClose])
 
   // ✅ Se o drawer está aberto, já terminou de carregar, tem um workflow
   // carregado, mas o stepId que deveríamos mostrar NÃO está mais nele —
