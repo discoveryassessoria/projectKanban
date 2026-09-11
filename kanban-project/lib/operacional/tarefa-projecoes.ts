@@ -16,6 +16,7 @@ import { prisma } from '@/lib/prisma'
 import {
   diaOperacional,
   janelaDoDiaOperacional,
+  janelaDoDiaOperacionalDe,
   inicioDoDiaOperacional,
   estadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
@@ -119,8 +120,10 @@ async function idsComAtividadeNoPeriodo(
   const candidatos = await db.tarefa.findMany({ where, select: { id: true } })
   if (candidatos.length === 0) return []
   const ultimas = await ultimaAtividadeReal(candidatos.map((c) => c.id), db)
-  const de = dataInicio ? new Date(dataInicio).getTime() : -Infinity
-  const ate = dataFim ? new Date(dataFim).getTime() : Infinity
+  // Mesma régua de `janelaDoDiaOperacionalDe` — `dataFim` precisa ir até o
+  // ÚLTIMO instante do dia, nunca até a meia-noite dele.
+  const de = dataInicio ? janelaDoDiaOperacionalDe(dataInicio).inicio.getTime() : -Infinity
+  const ate = dataFim ? janelaDoDiaOperacionalDe(dataFim).fim.getTime() : Infinity
   return candidatos.filter((c) => { const t = ultimas.get(c.id); return t != null && t.getTime() >= de && t.getTime() <= ate }).map((c) => c.id)
 }
 
@@ -1075,9 +1078,15 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   // banco (auditoria / PhaseAdvanceLog) e são resolvidos em
   // `mergeFiltrosAssincronos`, não aqui.
   if ((f.dataInicio || f.dataFim) && f.dataTipo && f.dataTipo !== 'ultimaAtividade' && f.dataTipo !== 'mudancaFase') {
+    // `dataInicio`/`dataFim` são "AAAA-MM-DD" (o dia escolhido na tela) — o
+    // FIM precisa ir até o ÚLTIMO instante daquele dia operacional, nunca até
+    // a meia-noite dele. `new Date("2026-09-11")` nos dois extremos do MESMO
+    // dia vira um único instante (meia-noite UTC): um `gte`/`lte` apontando
+    // para o mesmo ponto não casa com nada que aconteceu durante o dia. Ver
+    // `janelaDoDiaOperacionalDe` — a mesma régua de fuso do resto do sistema.
     const range: Prisma.DateTimeFilter = {}
-    if (f.dataInicio) range.gte = new Date(f.dataInicio)
-    if (f.dataFim) range.lte = new Date(f.dataFim)
+    if (f.dataInicio) range.gte = janelaDoDiaOperacionalDe(f.dataInicio).inicio
+    if (f.dataFim) range.lte = janelaDoDiaOperacionalDe(f.dataFim).fim
     if (f.dataTipo === 'criada') e.push({ createdAt: range })
     else if (f.dataTipo === 'concluida') e.push({ dataConclusao: range })
     else if (f.dataTipo === 'vencimento') e.push({ dataPrazo: range })
@@ -1183,8 +1192,8 @@ async function processosComMudancaDeFase(
   if (args.faseOrigemKey) where.faseAtual = args.faseOrigemKey
   if (args.dataInicio || args.dataFim) {
     where.criadoEm = {
-      ...(args.dataInicio ? { gte: new Date(args.dataInicio) } : {}),
-      ...(args.dataFim ? { lte: new Date(args.dataFim) } : {}),
+      ...(args.dataInicio ? { gte: janelaDoDiaOperacionalDe(args.dataInicio).inicio } : {}),
+      ...(args.dataFim ? { lte: janelaDoDiaOperacionalDe(args.dataFim).fim } : {}),
     }
   }
   const logs = await db.phaseAdvanceLog.findMany({ where, select: { processoId: true }, distinct: ['processoId'] })

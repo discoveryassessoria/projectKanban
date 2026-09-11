@@ -137,6 +137,26 @@ export function inicioDoDiaOperacional(agora: Date): Date {
 }
 
 /**
+ * A JANELA DO DIA OPERACIONAL DE UMA DATA ESPECÍFICA (`"AAAA-MM-DD"`) — a
+ * MESMA conta de `janelaDoDiaOperacional`, para quando o dia vem de um FILTRO
+ * escolhido na tela (período de "Tarefas e Projetos"), não do relógio.
+ *
+ * Nasceu de um bug real: um filtro de período fazia `new Date("2026-09-11")`
+ * nos dois extremos (`dataInicio`/`dataFim` do mesmo dia), o que em JS vira
+ * meia-noite UTC — um INSTANTE ÚNICO, não um dia inteiro. Um `gte`/`lte`
+ * apontando para o mesmo instante nunca casa com nada que aconteceu durante o
+ * dia (quase tudo, no fuso de São Paulo). O card "Concluídas hoje" mostrava
+ * um número, e aplicar o filtro equivalente devolvia zero — a mesma classe de
+ * divergência de fuso que este arquivo existe para eliminar, só que reintroduzida
+ * num código novo que não passou por aqui.
+ */
+export function janelaDoDiaOperacionalDe(dataYMD: string): { inicio: Date; fim: Date } {
+  const meiaNoiteNominal = new Date(`${dataYMD}T00:00:00.000Z`)
+  const inicio = new Date(meiaNoiteNominal.getTime() + deslocamentoDoFuso(meiaNoiteNominal))
+  return { inicio, fim: new Date(inicio.getTime() + 86400000 - 1) }
+}
+
+/**
  * DIAS ENTRE DOIS DIAS OPERACIONAIS — inteiro, com sinal.
  *
  * Conta DIAS CIVIS, não períodos de 24 horas. "Vence amanhã" às 23h50 continua

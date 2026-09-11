@@ -110,6 +110,35 @@ export function ProcessoExpandido({
   const [ocupado, setOcupado] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  // ATRIBUIÇÃO INDIVIDUAL — a MESMA porta de sempre (`/api/tarefas/{id}/
+  // comando`), a mesma que Lista e Kanban chamam. Nunca um endpoint exclusivo
+  // desta aba: atribuir uma tarefa aqui precisa ser IDÊNTICO a atribuir na
+  // Lista — mesmo ownership canônico, mesmo histórico, mesma notificação.
+  const [alvoIndividual, setAlvoIndividual] = useState<LinhaDeFila | null>(null)
+  const comandarTarefaIndividual = async (tarefaId: number, corpo: Record<string, unknown>, sucesso: string) => {
+    setOcupado(true); setErro(null)
+    try {
+      const r = await fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        setErro(
+          r.status === 409 ? "Outra pessoa mexeu nesta tarefa agora. Recarregamos a lista."
+          : r.status === 403 ? "Você não tem permissão para esta ação."
+          : d?.error ?? `Falha (HTTP ${r.status}).`,
+        )
+        setOcupado(false)
+        if (r.status === 409) setRecarga((n) => n + 1)
+        return
+      }
+      setAviso(sucesso)
+      setAlvoIndividual(null)
+      setOcupado(false)
+      setRecarga((n) => n + 1)
+    } catch {
+      setErro("Não foi possível falar com o servidor.")
+      setOcupado(false)
+    }
+  }
 
   // TUDO CARREGA UMA VEZ, na hora em que a linha abre — não uma vez por aba
   // clicada. É a MESMA leitura que a Central Operacional já faz para este
@@ -209,7 +238,9 @@ export function ProcessoExpandido({
               linhas={listaTarefas}
               usuarioAtualId={usuarioAtualId}
               podeIniciar={podeIniciar}
+              podeAtribuir={podeAtribuir}
               aoAbrir={(id) => aoAbrirTarefa(id, processo.processoId)}
+              aoAtribuir={setAlvoIndividual}
             />
           )}
           {aba === "documentos" && <AbaDocumentos dados={documentosDoProcesso} />}
@@ -234,6 +265,23 @@ export function ProcessoExpandido({
           erro={erro}
           aoFechar={() => { setAtribuindo(false); setErro(null) }}
           aoEscolher={atribuirFaseAtual}
+        />
+      )}
+
+      {alvoIndividual && (
+        <SeletorResponsavel
+          titulo={alvoIndividual.responsavelId == null ? "Atribuir tarefa" : `Transferir de ${alvoIndividual.responsavelNome ?? "—"}`}
+          atual={alvoIndividual.responsavelId}
+          ocupado={ocupado}
+          erro={erro}
+          aoFechar={() => { setAlvoIndividual(null); setErro(null) }}
+          aoEscolher={(id) =>
+            comandarTarefaIndividual(
+              alvoIndividual.taskId,
+              { acao: alvoIndividual.responsavelId == null ? "atribuir" : "transferir", responsavelId: id },
+              alvoIndividual.responsavelId == null ? "Tarefa atribuída." : "Tarefa transferida.",
+            )
+          }
         />
       )}
     </div>
@@ -341,19 +389,22 @@ function AbaVisaoGeral({ processo, faseProjecao }: { processo: ProcessoAgrupado;
 
 /**
  * A COLUNA DE AÇÃO — separação de responsabilidades entre Tarefas e Projetos
- * (consulta/gestão) e o Processo/Workflow Interno (execução).
+ * (consulta/gestão) e o Processo/Workflow Interno (execução), MAIS a
+ * atribuição individual — que é gestão, não execução, e por isso convive com
+ * as duas colunas acima sem se confundir com elas.
  *
  * "Iniciar"/"Continuar" só aparecem quando a tarefa é do usuário logado, está
  * executável e ele tem `tarefas.iniciar_concluir` — e mesmo assim só
  * NAVEGAM (deep-link canônico via `urlOperacionalDaTarefa`, a MESMA rota que
- * Minha Fila e Central usam); a execução em si acontece lá, nunca aqui. Sem
- * dono é "Aguardando atribuição"; de outra pessoa é "Atribuída a X" — em
- * nenhum dos dois casos existe botão de iniciar, porque a ação não é do
- * usuário logado.
+ * Minha Fila e Central usam); a execução em si acontece lá, nunca aqui.
+ *
+ * "Atribuir"/"Transferir" é a MESMA ação da Lista/Kanban global — mesmo
+ * `POST /api/tarefas/{id}/comando`, mesmo `SeletorResponsavel` — só que sem
+ * precisar sair do processo expandido pra achar a tarefa de novo.
  */
 const ESTADOS_TERMINAIS: string[] = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"]
 
-function AcaoDaTarefa({
+function AcaoExecucao({
   t, usuarioAtualId, podeIniciar, aoAbrir,
 }: {
   t: LinhaDeFila
@@ -383,12 +434,14 @@ function AcaoDaTarefa({
 }
 
 function AbaTarefas({
-  linhas, usuarioAtualId, podeIniciar, aoAbrir,
+  linhas, usuarioAtualId, podeIniciar, podeAtribuir, aoAbrir, aoAtribuir,
 }: {
   linhas: LinhaDeFila[] | null
   usuarioAtualId: number | null
   podeIniciar: boolean
+  podeAtribuir: boolean
   aoAbrir: (id: number) => void
+  aoAtribuir: (t: LinhaDeFila) => void
 }) {
   if (linhas == null) return <Estado tipo="carregando" mensagem="Carregando tarefas…" />
   if (linhas.length === 0) return <Estado tipo="vazio" mensagem="Nenhuma tarefa neste processo." />
@@ -397,27 +450,40 @@ function AbaTarefas({
       <table className="w-full border-collapse text-left">
         <thead className="sticky top-0 bg-[var(--surface-secondary)]">
           <tr className="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-[10.5px] [&>th]:font-semibold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-secondary)]">
-            <th>Tarefa</th><th>Fase</th><th>Status</th><th>Responsável</th><th>Prazo</th><th>Conclusão</th><th className="text-right">Ação</th>
+            <th>Tarefa</th><th>Fase</th><th>Status</th><th>Responsável</th><th>Prazo</th><th>Conclusão</th><th className="text-right">Execução</th>
+            {podeAtribuir && <th className="text-right">Atribuição</th>}
           </tr>
         </thead>
         <tbody>
-          {linhas.map((t) => (
-            <tr key={t.taskId} className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)] [&>td]:px-3.5 [&>td]:py-2.5">
-              <td className="max-w-0 truncate text-[12.5px] font-medium text-[var(--text-primary)]">
-                <button onClick={() => aoAbrir(t.taskId)} className="truncate text-left hover:underline">{t.titulo}</button>
-              </td>
-              <td className="text-[12px] text-[var(--text-secondary)]">{rotularFase(t.faseMacroKey) ?? "—"}</td>
-              <td className="text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</td>
-              <td className="text-[12px] text-[var(--text-secondary)]">{t.responsavelNome ?? "Sem responsável"}</td>
-              <td className={`text-[12px] tabular-nums ${t.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(t.dataPrazo)}</td>
-              <td className="text-[12px] tabular-nums text-[var(--text-muted)]">
-                {t.statusTarefa === "CONCLUIDO_RECEBIDO" || t.statusTarefa === "CONCLUIDO_NAO_POSSUI" ? dataCurta(t.criadaEm) : "—"}
-              </td>
-              <td className="text-right">
-                <AcaoDaTarefa t={t} usuarioAtualId={usuarioAtualId} podeIniciar={podeIniciar} aoAbrir={() => aoAbrir(t.taskId)} />
-              </td>
-            </tr>
-          ))}
+          {linhas.map((t) => {
+            const permiteReatribuir = podeAtribuir && !ESTADOS_TERMINAIS.includes(t.statusTarefa)
+            return (
+              <tr key={t.taskId} className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)] [&>td]:px-3.5 [&>td]:py-2.5">
+                <td className="max-w-0 truncate text-[12.5px] font-medium text-[var(--text-primary)]">
+                  <button onClick={() => aoAbrir(t.taskId)} className="truncate text-left hover:underline">{t.titulo}</button>
+                </td>
+                <td className="text-[12px] text-[var(--text-secondary)]">{rotularFase(t.faseMacroKey) ?? "—"}</td>
+                <td className="text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</td>
+                <td className="text-[12px] text-[var(--text-secondary)]">{t.responsavelNome ?? "Sem responsável"}</td>
+                <td className={`text-[12px] tabular-nums ${t.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(t.dataPrazo)}</td>
+                <td className="text-[12px] tabular-nums text-[var(--text-muted)]">
+                  {t.statusTarefa === "CONCLUIDO_RECEBIDO" || t.statusTarefa === "CONCLUIDO_NAO_POSSUI" ? dataCurta(t.criadaEm) : "—"}
+                </td>
+                <td className="text-right">
+                  <AcaoExecucao t={t} usuarioAtualId={usuarioAtualId} podeIniciar={podeIniciar} aoAbrir={() => aoAbrir(t.taskId)} />
+                </td>
+                {podeAtribuir && (
+                  <td className="text-right">
+                    {permiteReatribuir && (
+                      <Button variant="outline" size="sm" onClick={() => aoAtribuir(t)}>
+                        {t.responsavelId == null ? "Atribuir" : "Transferir"}
+                      </Button>
+                    )}
+                  </td>
+                )}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>

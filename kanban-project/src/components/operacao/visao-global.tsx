@@ -190,6 +190,8 @@ function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode
 }
 
 const CLASSE_SELECT = "w-full bg-[var(--surface-elevated)] text-[13px] data-[size=default]:h-9"
+/** SSOT de camadas (`src/lib/ui/layers.ts`, LAYER.popover=10060) — nunca o z-50 de fábrica do shadcn. */
+const Z_POPOVER = "z-[10060]"
 
 /** As condições derivadas que mudam a decisão de quem lê — nunca status novo. */
 function Sinais({ l }: { l: LinhaGerencial }) {
@@ -455,7 +457,7 @@ export function VisaoGlobal() {
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm"><Bookmark size={14} /> Salvar visão</Button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 bg-[var(--surface-overlay)]">
+            <PopoverContent align="end" className={`w-72 bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
               <label className="block text-[11px] font-medium text-[var(--text-secondary)]">Nome da visão</label>
               <Input
                 autoFocus value={nomeVisao} onChange={(e) => setNomeVisao(e.target.value)}
@@ -474,7 +476,7 @@ export function VisaoGlobal() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">Minhas visões <ChevronDown size={14} /></Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72 bg-[var(--surface-overlay)]">
+            <DropdownMenuContent align="end" className={`w-72 bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
               {minhasVisoes == null && <div className="px-2 py-2 text-[12px] text-[var(--text-muted)]">Carregando…</div>}
               {minhasVisoes?.length === 0 && <div className="px-2 py-2 text-[12px] text-[var(--text-muted)]">Nenhuma visão salva ainda.</div>}
               {minhasVisoes?.map((v, i) => (
@@ -560,10 +562,15 @@ export function VisaoGlobal() {
             />
           </Campo>
           <Campo rotulo="Período">
-            <div className="flex items-center gap-1.5">
-              <CampoData value={rascunho.dataInicio} onChange={(v) => mudarRascunho({ dataInicio: v })} className="w-full rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-2 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]" />
-              <span className="text-[11px] text-[var(--text-muted)]">–</span>
-              <CampoData value={rascunho.dataFim} onChange={(v) => mudarRascunho({ dataFim: v })} className="w-full rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-2 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]" />
+            <div className="flex flex-col gap-1">
+              <CampoData
+                value={rascunho.dataInicio} onChange={(v) => mudarRascunho({ dataInicio: v })} placeholder="De"
+                className="w-full rounded-[8px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+              />
+              <CampoData
+                value={rascunho.dataFim} onChange={(v) => mudarRascunho({ dataFim: v })} placeholder="Até"
+                className="w-full rounded-[8px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+              />
             </div>
           </Campo>
           <Campo rotulo="Responsável">
@@ -572,7 +579,7 @@ export function VisaoGlobal() {
               onValueChange={(v) => mudarRascunho({ semResponsavel: v === "sem", responsavel: v !== TODOS && v !== "sem" ? Number(v) : null })}
             >
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todos</SelectItem>
                 <SelectItem value="sem">Sem responsável</SelectItem>
                 {dados?.facetas.responsaveis.map((r) => <SelectItem key={r.responsavelId} value={String(r.responsavelId)}>{r.nome} ({r.tarefas})</SelectItem>)}
@@ -582,7 +589,7 @@ export function VisaoGlobal() {
           <Campo rotulo="Fase">
             <Select value={rascunho.fase ?? TODOS} onValueChange={(v) => mudarRascunho({ fase: v === TODOS ? null : v })}>
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todas</SelectItem>
                 {dados?.facetas.fases.map((f) => <SelectItem key={f.faseMacroKey} value={f.faseMacroKey}>{rotularFase(f.faseMacroKey)} ({f.tarefas})</SelectItem>)}
               </SelectContent>
@@ -591,7 +598,7 @@ export function VisaoGlobal() {
           <Campo rotulo="Status da tarefa">
             <Select value={rascunho.statusTarefa[0] ?? TODOS} onValueChange={(v) => mudarRascunho({ statusTarefa: v === TODOS ? [] : [v] })}>
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todos</SelectItem>
                 {Object.entries(ROTULO_STATUS).map(([k, r]) => <SelectItem key={k} value={k}>{r}</SelectItem>)}
               </SelectContent>
@@ -600,7 +607,7 @@ export function VisaoGlobal() {
           <Campo rotulo="Status do processo">
             <Select value={rascunho.statusProcesso ?? TODOS} onValueChange={(v) => mudarRascunho({ statusProcesso: v === TODOS ? null : (v as Filtros["statusProcesso"]) })}>
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todos</SelectItem>
                 <SelectItem value="ATIVO">Ativo</SelectItem>
                 <SelectItem value="CONCLUIDO">Concluído</SelectItem>
@@ -613,7 +620,7 @@ export function VisaoGlobal() {
           <Campo rotulo="Tipo de tarefa">
             <Select value={rascunho.tipoTarefa[0] ?? TODOS} onValueChange={(v) => mudarRascunho({ tipoTarefa: v === TODOS ? [] : [v] })}>
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todos</SelectItem>
                 <SelectItem value="NORMAL">Normal</SelectItem>
                 <SelectItem value="TRANSVERSAL">Antecipada</SelectItem>
@@ -623,7 +630,7 @@ export function VisaoGlobal() {
           <Campo rotulo="Família">
             <Select value={rascunho.familia != null ? String(rascunho.familia) : TODOS} onValueChange={(v) => mudarRascunho({ familia: v === TODOS ? null : Number(v) })}>
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todas</SelectItem>
                 {opcoesFamilia.map(([id, nome]) => <SelectItem key={id} value={String(id)}>{nome}</SelectItem>)}
               </SelectContent>
@@ -632,7 +639,7 @@ export function VisaoGlobal() {
           <Campo rotulo="Processo">
             <Select value={rascunho.processoId != null ? String(rascunho.processoId) : TODOS} onValueChange={(v) => mudarRascunho({ processoId: v === TODOS ? null : Number(v) })}>
               <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-[var(--surface-overlay)]">
+              <SelectContent className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`}>
                 <SelectItem value={TODOS}>Todos</SelectItem>
                 {opcoesProcesso.map(([id, nome]) => <SelectItem key={id} value={String(id)}>{nome}</SelectItem>)}
               </SelectContent>
@@ -974,8 +981,9 @@ function MenuAcoesFamilia({ processoId }: { processoId: number | null }) {
           <MoreVertical size={15} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-[var(--surface-overlay)]" onClick={(e) => e.stopPropagation()}>
+      <DropdownMenuContent align="end" className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`} onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem asChild><a href={`/processos/${processoId}`}>Abrir processo</a></DropdownMenuItem>
+        <DropdownMenuItem asChild><a href={`/kanban?processoId=${processoId}&tab=central`}>Abrir na Central Operacional</a></DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -1146,7 +1154,7 @@ function Quadro({
       })}
 
       {pedindo && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setPedindo(null)}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setPedindo(null)}>
           <div className="w-full max-w-sm rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] p-4 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{pedindo.rotulo}</h2>
             <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{pedindo.l.titulo}</p>

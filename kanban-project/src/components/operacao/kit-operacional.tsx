@@ -199,7 +199,11 @@ export function SeletorResponsavel({
   const carregar = () => setTentativa((n) => n + 1)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
+    // z-index da SSOT de camadas (`src/lib/ui/layers.ts`) — `z-[60]` cravado
+    // não respeitava a régua do shell (HeaderBar cria stacking context próprio
+    // via `backdrop-blur`); um modal fora dessa régua pode renderizar atrás
+    // do header em vez de acima.
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
         className="w-full max-w-sm overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()}

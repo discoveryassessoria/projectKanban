@@ -160,7 +160,7 @@ tarefa ou executa ação que depende do contexto operacional completo. O
 botão Iniciar deve abrir diretamente o contexto canônico da tarefa, sem
 exigir nova procura manual."
 
-Implementação: a aba Tarefas da expansão (`AcaoDaTarefa` em
+Implementação: a aba Tarefas da expansão (`AcaoExecucao` em
 `processo-expandido.tsx`) mostra "Aguardando atribuição" (sem
 responsável), "Atribuída a X" (responsável ≠ usuário logado) ou
 "Iniciar"/"Continuar" (responsável = usuário logado, executável, e
@@ -168,5 +168,77 @@ responsável), "Atribuída a X" (responsável ≠ usuário logado) ou
 `urlOperacionalDaTarefa` (`lib/operacional/navegacao.ts`), o MESMO
 deep-link canônico que Minha Fila e a Central já usam
 (`/kanban?processoId=X&tab=central&taskId=Y`, resolvido no servidor por
-`resolverAlvoDaTarefa`). A execução em si acontece na Central Operacional;
-Tarefas e Projetos nunca chama `acao: 'iniciar'` diretamente.
+`resolverAlvoDaTarefa`, e lido no cliente por `kanban-content.tsx` via
+`searchParams.get("taskId")`). A execução em si acontece na Central
+Operacional; Tarefas e Projetos nunca chama `acao: 'iniciar'` diretamente.
+Testado por clique real (WebKit): expandir → aba Tarefas → "Iniciar" →
+navegação confirmada para `/kanban?processoId=592&tab=central&taskId=3571`.
+
+## Correção sistêmica de 11/09/2026 — duas causas-raiz reais, não patches de tela
+
+Uma rodada de correção pedida explicitamente como "sistêmica, não 7
+patches" encontrou e corrigiu DUAS causas-raiz que explicavam vários
+sintomas reportados de uma vez só — nenhuma delas era um bug de CSS ou de
+um botão isolado.
+
+### Causa-raiz 1 — "indicadores ≠ lista" era um bug de fuso horário, não de query divergente
+
+O card "Concluídas (hoje)" mostrava um número (ex.: 2), mas aplicar o
+filtro de período equivalente (`dataTipo=concluida&dataInicio=dataFim=hoje`)
+devolvia ZERO processos. A causa não era duas regras de negócio diferentes
+— era `new Date("2026-09-11")` aplicado nos DOIS extremos do intervalo:
+em JS isso vira meia-noite UTC nos dois lados, ou seja, um `gte`/`lte`
+apontando para o MESMO instante — uma janela de largura zero que não casa
+com nada que aconteceu durante o dia real (quase tudo, no fuso de São
+Paulo). É a MESMA classe de bug que `lib/operacional/tempo-operacional.ts`
+já existia para eliminar (ver o cabeçalho do arquivo — Minha Fila x
+Central discordando por fuso, incidente antigo), só que reintroduzida em
+código novo que não passou por aquele módulo.
+
+Corrigido exportando `janelaDoDiaOperacionalDe(dataYMD)` — a mesma conta
+de `janelaDoDiaOperacional`, para uma data ESCOLHIDA NUM FILTRO em vez do
+relógio — e aplicando-a nos três pontos de `tarefa-projecoes.ts` que
+faziam `new Date(string)` cru: o filtro de período de `whereGerencial`, o
+filtro de "última atividade" (`idsComAtividadeNoPeriodo`) e o filtro de
+marco gerencial por período (`processosComMudancaDeFase`). Verificado por
+script direto contra produção: `agregacaoPorFamilia` com o filtro do tile
+passou a devolver exatamente os mesmos registros que o indicador conta.
+
+**Regra 15.** "Data" em qualquer filtro novo passa por
+`lib/operacional/tempo-operacional.ts` (`janelaDoDiaOperacionalDe` para
+uma data escolhida, `janelaDoDiaOperacional` para "agora") — nunca
+`new Date(string)` cru. Um `gte`/`lte` do mesmo dia em UTC vira um
+instante, não um dia.
+
+### Causa-raiz 2 — z-index fora da régua do projeto
+
+O projeto já tem um SSOT de camadas (`src/lib/ui/layers.ts`), criado
+depois de um incidente documentado com a MESMA assinatura do relato desta
+rodada ("menu abre, ação não funciona"). Os componentes novos
+(`Select`/`Popover`/`DropdownMenu` de `components/ui/*`) chegam com
+`z-50` de fábrica do shadcn — fora da régua (`LAYER.popover = 10060`).
+Modais próprios do kit operacional (`SeletorResponsavel`, o prompt de
+motivo do Kanban) usavam `z-[60]` cravado, também fora da régua.
+
+Corrigido aplicando `z-[10060]` (`LAYER.popover`) em todo `SelectContent`/
+`PopoverContent`/`DropdownMenuContent` de Tarefas e Projetos, e
+`z-[10000]` (`LAYER.aboveProcess`) nos dois modais do kit operacional.
+
+**Regra 16.** Nenhum overlay novo (`Select`/`Popover`/`DropdownMenu`/
+modal próprio) usa o z-index de fábrica da biblioteca. Sempre
+`src/lib/ui/layers.ts` — `LAYER.popover` para menus/popovers efêmeros,
+`LAYER.aboveProcess`/`aboveProcessDrawer`/`aboveProcessCritical` para
+modais e drawers.
+
+### Atribuição individual por tarefa (aba Tarefas do processo expandido)
+
+Adicionado botão "Atribuir"/"Transferir" por linha (coluna "Atribuição"),
+visível só para quem tem `tarefas.editar`, chamando o MESMO
+`POST /api/tarefas/{id}/comando` que Lista/Kanban/lote já usam — nenhum
+endpoint novo, nenhum ownership paralelo. Testado por clique real contra
+produção (processo "Teste", tarefa 3571 "Preparar pacote de análise"):
+atribuída a Daniela Brait via UI, verificado no banco
+(`Tarefa.responsavelId`, `LogAuditoria.TAREFA_ATRIBUIDA`,
+`NotificacaoOperacional.ATRIBUICAO` — os três escreveram, nenhum
+paralelo), e revertido ao estado original (`devolver_a_fila`) ao final do
+teste para não deixar rastro em produção.

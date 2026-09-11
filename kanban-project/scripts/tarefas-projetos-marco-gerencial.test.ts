@@ -168,6 +168,27 @@ async function main() {
     indDepoisDeCancelar.concluidasHoje === indAntesDeCancelar.concluidasHoje,
     `antes ${indAntesDeCancelar.concluidasHoje} · depois ${indDepoisDeCancelar.concluidasHoje}`)
 
+  // ══════════════════════════════════════════════════════════════════════════
+  secao("8) O FILTRO DE PERÍODO RECONCILIA COM O INDICADOR (regressão do bug de fuso)")
+  // ══════════════════════════════════════════════════════════════════════════
+  // Achado real (11/09/2026): `new Date(dataInicio)`/`new Date(dataFim)` nos
+  // dois extremos do MESMO dia viravam meia-noite UTC nos dois lados — uma
+  // janela de largura ZERO. O card "Concluídas (hoje)" mostrava um número e
+  // aplicar o filtro equivalente devolvia zero. Trava aqui para nunca
+  // regredir: aplicar o filtro de período do próprio tile precisa achar
+  // EXATAMENTE as mesmas tarefas que o indicador sem filtro conta.
+  const hojeYMD = new Date().toISOString().slice(0, 10)
+  const indSemFiltroDePeriodo = await indicadoresGerenciais({ processoId: processo.id }, agora)
+  const familiasComFiltroDePeriodo = await agregacaoPorFamilia(agora, {
+    processoId: processo.id, dataTipo: "concluida", dataInicio: hojeYMD, dataFim: hojeYMD,
+  })
+  const concluidasNoFiltro = familiasComFiltroDePeriodo.reduce((n, f) => n + f.concluidas, 0)
+  ok("8a) filtro dataTipo=concluida (hoje→hoje) encontra as MESMAS concluídas que o indicador sem filtro",
+    concluidasNoFiltro === indSemFiltroDePeriodo.concluidasHoje,
+    `indicador ${indSemFiltroDePeriodo.concluidasHoje} · filtro aplicado ${concluidasNoFiltro}`)
+  ok("8b) o filtro não devolve zero processos quando existe conclusão real hoje",
+    familiasComFiltroDePeriodo.length > 0 || indSemFiltroDePeriodo.concluidasHoje === 0)
+
   await limpar()
   await prisma.$disconnect()
 
