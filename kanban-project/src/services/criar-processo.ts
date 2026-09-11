@@ -23,7 +23,8 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { primeiraFasePorOrdem, montarEventoEntered } from "@/src/lib/motor/phase-advance-helpers"
 import { instanciarWorkflowDaFase } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
-import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
+import { gerarCodigoPublico, modoReutilizaLacunaProcessoLigado, proximoNumeroProcessoComPossivelLacuna } from "@/lib/codigos/code-generator"
+import { isoDoPais, formatarCodigo } from "@/lib/codigos/code-patterns"
 
 export type CriarProcessoFailureCode =
   | "NOME_OBRIGATORIO"
@@ -151,7 +152,11 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
   try {
     const out = await prisma.$transaction(async (tx) => {
       // CÓDIGO PÚBLICO gerado pelo serviço central (IT-1, DE-2...), dentro da MESMA transação.
-      const codigoPublico = await gerarCodigoPublico(tx, "PROCESS", { pais: input.pais })
+      // Reaproveitamento de furo é EXCEÇÃO temporária (ver code-generator.ts) —
+      // com o interruptor desligado, é sempre a mesma regra de sempre.
+      const codigoPublico = (await modoReutilizaLacunaProcessoLigado(tx))
+        ? formatarCodigo("PROCESS", await proximoNumeroProcessoComPossivelLacuna(tx, isoDoPais(input.pais)), input.pais)
+        : await gerarCodigoPublico(tx, "PROCESS", { pais: input.pais })
       const processo = await tx.processo.create({
         data: {
           codigo: codigoPublico,

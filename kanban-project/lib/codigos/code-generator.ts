@@ -45,6 +45,56 @@ export async function gerarCodigoPublico(
   return formatarCodigo(entidade, numero, opts?.pais)
 }
 
+/**
+ * MODO TEMPORÁRIO DE REAPROVEITAMENTO — só para Processo, só enquanto ligado.
+ *
+ * Pedido explícito do usuário em 10/09/2026: durante a carga inicial dos
+ * processos reais, ele cria/testa/exclui processo à vontade, e não quer os
+ * furos que isso deixaria no código público (ES-5, ES-9, ES-11...). Continua
+ * valendo a regra de sempre — "nunca reutiliza" — para TODAS as outras
+ * entidades (cliente, documento, tarefa etc.), e para o Processo assim que
+ * ele mandar desligar.
+ *
+ * Interruptor em `ConfiguracaoSistema['processo_reutiliza_codigo_lacuna']`
+ * (não em variável de ambiente) para poder ligar/desligar sem novo deploy.
+ */
+export async function modoReutilizaLacunaProcessoLigado(db: DB): Promise<boolean> {
+  const row = await db.configuracaoSistema.findUnique({
+    where: { chave: 'processo_reutiliza_codigo_lacuna' },
+    select: { valor: true },
+  })
+  return row?.valor === '1'
+}
+
+/**
+ * O MENOR número de Processo ainda livre nesse país (entre 1 e o maior já
+ * usado); se a sequência já estiver densa (sem furo), cai no próximo número
+ * normal. Nos dois casos, ressincroniza `CodeSequence` para não ficar para
+ * trás (`semearSequencia` só AVANÇA — nunca poderia devolver um número já
+ * emitido para frente de novo).
+ *
+ * Só chamada quando `modoReutilizaLacunaProcessoLigado` está ligado — com o
+ * interruptor desligado, `gerarCodigoPublico` normal (nunca reutiliza) segue
+ * sendo o único caminho.
+ */
+export async function proximoNumeroProcessoComPossivelLacuna(db: DB, iso: string): Promise<number> {
+  const registros = await (db as PrismaClient).processo.findMany({
+    where: { codigo: { startsWith: `${iso}-` } },
+    select: { codigo: true },
+  })
+  const usados = new Set(
+    registros
+      .map((r) => r.codigo)
+      .filter((c): c is string => c != null)
+      .map((c) => Number(c.slice(iso.length + 1)))
+      .filter((n) => Number.isInteger(n) && n > 0),
+  )
+  let candidato = 1
+  while (usados.has(candidato)) candidato++
+  await semearSequencia(db, iso, candidato)
+  return candidato
+}
+
 /** Semeia/avança a sequência de um escopo para >= `ate` (usado pelo backfill; idempotente). */
 export async function semearSequencia(db: DB, scope: string, ate: number): Promise<void> {
   await db.$executeRaw`
