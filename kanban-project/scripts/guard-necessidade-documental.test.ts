@@ -93,6 +93,18 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "cancela a Tarefa correspondente via reconciliarTarefas — monta e derruba os PRÓPRIOS " +
     "processos/necessidades (marca DISPTASK) só no banco de teste; a dispensa passa por " +
     "dispensarNecessidade (o dono canônico), só o `deleteMany` de limpeza é direto",
+  "scripts/cancelamento-operacao-documento.test.ts":
+    "CANCELADA != CONCLUÍDA (11/09/2026, achado real: documento 2131): monta e derruba o " +
+    "PRÓPRIO palco por TRUNCATE (fixture completa: tipo/macro/fase/workflow/processo/" +
+    "necessidade/documento) só no banco de teste — a necessidade existe só para o " +
+    "materializador oficial (reconciliarFaseAtiva) ter o que operar; a escrita real do " +
+    "cenário é `prisma.necessidadeDocumental.create` direto porque o teste está provando " +
+    "o CANCELAMENTO da operação, não a materialização da necessidade em si",
+  "scripts/andamento-operacional.test.ts":
+    "Andamento (11/09/2026): prova que a linha do tempo agrega LogAuditoria/WorkflowEvento/" +
+    "NecessidadeDocumentalEvento/DocumentoArquivo/DocumentoObservacao — monta e derruba o " +
+    "PRÓPRIO palco por TRUNCATE só no banco de teste, mesmo padrão do teste de cancelamento " +
+    "acima (a necessidade é insumo do cenário, não o que está sendo provado)",
   "scripts/motor-operacional-fases.test.ts":
     "motor operacional através das fases: monta e derruba os PRÓPRIOS processos " +
     "(marca MOTOR-FASE) só no banco de teste",

@@ -116,8 +116,14 @@ const ordemDoc = [...drawerDoc.matchAll(/\{ id: "(\w+)", label: "([^"]+)" \}/g)]
 // documento — status, próxima ação, responsável, SLA e atalhos que a linha da
 // Central já responde, com régua de prazo própria. O painel abre no WORKFLOW,
 // que é onde o trabalho acontece.
+// "Histórico" virou "Andamento" em 11/09/2026 (pedido explícito do usuário):
+// a aba deixou de fabricar timeline a partir de timestamps soltos do
+// Documento e passou a mostrar a linha do tempo REAL, agregada de fontes
+// canônicas (LogAuditoria/WorkflowEvento/NecessidadeDocumentalEvento/
+// DocumentoArquivo/DocumentoObservacao — ver src/services/andamento-operacional.ts).
+// Mesma posição na ordem congelada; só o nome (e o conteúdo por trás) mudou.
 ok(JSON.stringify(ordemDoc) === JSON.stringify(
-     ["Workflow", "Dados Registrais", "Histórico", "Anexos", "Observações"]),
+     ["Workflow", "Dados Registrais", "Andamento", "Anexos", "Observações"]),
   `4.1 D11: as cinco abas do documento na ordem congelada (${ordemDoc.join(" · ")})`)
 ok(/type TabId = "anexos" \| "comentarios" \| "timeline"/.test(drawerEtapa),
   "4.2 D11: a etapa tem exatamente três abas")
