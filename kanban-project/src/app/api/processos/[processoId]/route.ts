@@ -122,36 +122,39 @@ export async function PUT(
     // exclusivamente pelo PhaseAdvanceService (faseAtualKey). O legado
     // Processo.statusId foi removido — não há mais "mudar de fase" na edição.
 
-    // Atualizar contratantes se fornecidos
+    // Atualizar contratantes se fornecidos.
+    //
+    // DELETE + CREATE PRECISA SER UMA TRANSAÇÃO. Sem ela, dois PUTs quase
+    // simultâneos (duplo clique em "Salvar", ou um retry depois de um erro
+    // transitório) intercalam: A apaga, B apaga (nada), A recria, B recria —
+    // e o `createMany` de B colide com a linha que A acabou de criar (unique
+    // em processoId+contratanteId/requerenteId). Foi exatamente esse P2002
+    // que apareceu em produção. `skipDuplicates` é o cinto de segurança: se
+    // ainda assim sobrar uma corrida com OUTRO processo concorrente, o PUT
+    // converge em vez de falhar.
     if (contratanteIds !== undefined) {
-      await prisma.processoContratante.deleteMany({
-        where: { processoId: id }
-      })
-
-      if (contratanteIds.length > 0) {
-        await prisma.processoContratante.createMany({
-          data: contratanteIds.map((contratanteId: number) => ({
-            processoId: id,
-            contratanteId
-          }))
-        })
-      }
+      await prisma.$transaction([
+        prisma.processoContratante.deleteMany({ where: { processoId: id } }),
+        ...(contratanteIds.length > 0
+          ? [prisma.processoContratante.createMany({
+              data: contratanteIds.map((contratanteId: number) => ({ processoId: id, contratanteId })),
+              skipDuplicates: true,
+            })]
+          : []),
+      ])
     }
 
-    // Atualizar requerentes se fornecidos
+    // Atualizar requerentes se fornecidos — mesmo motivo da transação acima.
     if (requerenteIds !== undefined) {
-      await prisma.processoRequerente.deleteMany({
-        where: { processoId: id }
-      })
-
-      if (requerenteIds.length > 0) {
-        await prisma.processoRequerente.createMany({
-          data: requerenteIds.map((requerenteId: number) => ({
-            processoId: id,
-            requerenteId
-          }))
-        })
-      }
+      await prisma.$transaction([
+        prisma.processoRequerente.deleteMany({ where: { processoId: id } }),
+        ...(requerenteIds.length > 0
+          ? [prisma.processoRequerente.createMany({
+              data: requerenteIds.map((requerenteId: number) => ({ processoId: id, requerenteId })),
+              skipDuplicates: true,
+            })]
+          : []),
+      ])
     }
 
     // Atualizar o processo
