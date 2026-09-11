@@ -379,6 +379,12 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
           sub: `${resumo.prontos} concluído${resumo.prontos === 1 ? "" : "s"}` },
         { label: "Pendentes", value: resumo.pendentes, tone: "busca", sub: "Aguardando" },
         { label: "Divergentes", value: resumo.divergentes, tone: "late", sub: "Requer atenção" },
+        // CANCELADA ≠ CONCLUÍDA: some das quatro contagens sempre fecha com
+        // `documentos` (CLAUDE.md §17). Só aparece quando há algo cancelado —
+        // a maioria das fases nunca teve uma operação cancelada.
+        ...(resumo.cancelados > 0
+          ? [{ label: "Cancelados", value: resumo.cancelados, tone: "late" as const, sub: "Operação encerrada" }]
+          : []),
       ]
     : // Janela de deploy (back sem `estrutura`): números da matriz oficial, sem
       // inventar um agregado paralelo.
@@ -424,7 +430,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
 // Back sem `indice` (janela de deploy): a tela renderiza o índice VAZIO, que diz que
 // não há trabalho materializado — nunca uma lista montada de outra fonte.
 const INDICE_VAZIO: IndiceOperacional = {
-  resumo: { documentos: 0, prontos: 0, pendentes: 0, divergentes: 0, pessoasComTrabalho: 0 },
+  resumo: { documentos: 0, prontos: 0, pendentes: 0, divergentes: 0, cancelados: 0, pessoasComTrabalho: 0 },
   linhaPrincipal: [], foraDaLinha: [], pendenteClassificacao: [], semDono: [],
 }
 

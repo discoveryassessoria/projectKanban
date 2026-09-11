@@ -284,7 +284,7 @@ for (const exigido of ["progresso", "etapaAtual", "responsavelNome", "prazo", "e
 check("uma linha por documento, com identidade por ID", idxDe(3).documentos.length === 2 && idxDe(3).documentos.every((d) => d.necessidadeId != null))
 check("todas as pessoas continuam no índice", linhasIdx.length === 4)
 check("pessoa sem documento aplicável é marcada, não removida", idxDe(4).semDocumentoAplicavel === true && idxDe(4).documentos.length === 0)
-check("contadores por pessoa vêm do domínio", JSON.stringify(idxDe(3).totais) === JSON.stringify({ documentos: 2, prontos: 0, pendentes: 2, divergentes: 0 }))
+check("contadores por pessoa vêm do domínio", JSON.stringify(idxDe(3).totais) === JSON.stringify({ documentos: 2, prontos: 0, pendentes: 2, divergentes: 0, cancelados: 0 }))
 check("documento concluído vira status final PRONTO", idxDe(1).documentos[0].statusFinal === "PRONTO")
 check("documento parcialmente executado vira EM_ANDAMENTO", (() => {
   const d = idxDe(3).documentos.find((x) => x.chave === "necessidade:13")!
@@ -345,7 +345,17 @@ check("a rota NÃO devolve mais a estrutura completa nem a lista plana", !/^\s*e
 check("o DTO de índice existe e é explícito", nucleo.includes("export interface IndiceOperacional") && nucleo.includes("export interface DocumentoDoIndice"))
 check("o índice é PROJETADO da estrutura (uma fonte, dois recortes)", nucleo.includes("export function montarIndiceOperacional"))
 check("a consulta lê PhaseWorkflowStepInstance da fase (fonte única)", consulta.includes("phaseWorkflowStepInstance.findMany") && consulta.includes("faseMacroKey: ctx.faseMacroKey"))
-check("a consulta exclui SUPERSEDIDO/CANCELADO (saíram do fluxo)", consulta.includes('notIn: ["SUPERSEDIDO", "CANCELADO"]'))
+// MUDOU DE INTENTO (11/09/2026): a exclusão deixou de ser um filtro no WHERE do
+// Prisma e passou a ser um filtro em memória sobre a MESMA consulta (`todasInstancias`
+// → `instancias`) — a razão é o bug real "cancelada mostrava Concluída/100%"
+// (Certidão de Óbito, documento 2131): a fração REAL de progresso de um alvo
+// cancelado no meio do roteiro (`progressoRealPorChave`) precisa dos registros
+// SUPERSEDIDO/CANCELADO, e uma segunda ida ao banco só para eles seria uma segunda
+// fonte da mesma leitura. O resultado ativo (`instancias`) continua excluindo os
+// dois status — só mudou ONDE.
+check("a consulta exclui SUPERSEDIDO/CANCELADO do conjunto ATIVO (saíram do fluxo)",
+  consulta.includes('new Set(["SUPERSEDIDO", "CANCELADO"])') &&
+  consulta.includes("todasInstancias.filter((s) => !INSTANCIAS_ENCERRADAS.has(s.status))"))
 // REGRA ENDURECIDA: o escopo por instância deixou de ser condicional. Sem instância
 // explícita, a consulta resolve a VIGENTE — uma fase com mais de um ciclo (retorno,
 // movimentação manual) não pode ter os ciclos somados na leitura.

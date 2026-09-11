@@ -40,7 +40,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from "react"
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink, FileText, Layers, Search, Star, Users } from "lucide-react"
+import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink, FileText, Layers, Search, Star, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type {
   DocumentoDoIndice,
@@ -75,6 +75,7 @@ const LADRILHO_KPI: Record<string, { tile: string; ink: string; Icone: LucideIco
   Prontos:     { tile: "var(--success-tile)", ink: "var(--success)", Icone: CheckCircle2 },
   Pendentes:   { tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock },
   Divergentes: { tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertTriangle },
+  Cancelados:  { tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: Ban },
 }
 
 export interface PainelDaFaseProps {
@@ -353,7 +354,7 @@ const LINHAS_POR_PESSOA = 25
 // consulta nada, nenhum filtro grava nada: são recortes do mesmo conjunto, e é
 // por isso que os números do topo e os da tabela nunca podem discordar.
 
-export type RecorteRapido = "todos" | "prontos" | "pendentes" | "divergentes" | "atrasados" | "sem_responsavel"
+export type RecorteRapido = "todos" | "prontos" | "pendentes" | "divergentes" | "cancelados" | "atrasados" | "sem_responsavel"
 
 export interface Recorte {
   rapido: RecorteRapido
@@ -382,6 +383,7 @@ export function recorteDoKpi(label: string): RecorteRapido | null {
   if (t.includes("pronto") || t.includes("valida")) return "prontos"
   if (t.includes("pendente")) return "pendentes"
   if (t.includes("divergen") || t.includes("invalid")) return "divergentes"
+  if (t.includes("cancelad") || t.includes("substitu")) return "cancelados"
   if (t.includes("atrasad") || t.includes("vencid")) return "atrasados"
   if (t.includes("sem responsavel")) return "sem_responsavel"
   return null
@@ -404,8 +406,9 @@ export function passaNoRecorte(doc: DocumentoDoIndice, r: Recorte, pessoaNome: s
   if (r.rapido === "prontos" && doc.statusFinal !== "PRONTO") return false
   if (r.rapido === "pendentes" && doc.statusFinal !== "PENDENTE" && doc.statusFinal !== "EM_ANDAMENTO") return false
   if (r.rapido === "divergentes" && doc.statusFinal !== "DIVERGENTE" && doc.statusFinal !== "INVALIDADO") return false
+  if (r.rapido === "cancelados" && doc.statusFinal !== "CANCELADO" && doc.statusFinal !== "SUPERSEDIDO") return false
   if (r.rapido === "atrasados" && !f.atrasado) return false
-  if (r.rapido === "sem_responsavel" && (f.responsavelId != null || f.estado === "CONCLUIDA")) return false
+  if (r.rapido === "sem_responsavel" && (f.responsavelId != null || f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA")) return false
 
   if (r.estado !== "" && f.estado !== r.estado) return false
   if (r.responsavelId === "sem" && f.responsavelId != null) return false
@@ -671,6 +674,8 @@ function IndiceView({
         <option value="AGUARDANDO_TERCEIRO">Aguardando terceiro</option>
         <option value="BLOQUEADA">Bloqueada</option>
         <option value="CONCLUIDA">Concluída</option>
+        <option value="CANCELADA">Cancelada</option>
+        <option value="SUPERSEDIDA">Substituída</option>
       </select>
 
       <select
@@ -915,6 +920,7 @@ function PessoaCard({
             <Pilula valor={t.prontos} rotulo="prontos" tone="ok" />
             <Pilula valor={t.pendentes} rotulo="pendentes" tone="busca" />
             {t.divergentes > 0 && <Pilula valor={t.divergentes} rotulo="divergentes" tone="late" />}
+            {t.cancelados > 0 && <Pilula valor={t.cancelados} rotulo="cancelados" tone="late" />}
           </span>
         )}
 
@@ -1039,6 +1045,8 @@ const CLS_ARTEFATO: Record<StatusResumo, string> = {
   DIVERGENTE: "text-red-700",
   INVALIDADO: "text-red-700",
   NAO_APLICAVEL: "text-[var(--text-muted)]",
+  CANCELADO: "text-red-700",
+  SUPERSEDIDO: "text-[var(--text-muted)]",
 }
 
 // ------------------------------------------------------------
@@ -1089,6 +1097,10 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
   AGUARDANDO_TERCEIRO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
   BLOQUEADA: "bg-[var(--surface-secondary)] text-red-700",
   CONCLUIDA: "bg-[var(--surface-secondary)] text-green-800",
+  // CANCELADA ≠ CONCLUÍDA: nunca a mesma cor de sucesso (verde). Ver memória do
+  // projeto "cancelada-diferente-de-concluida".
+  CANCELADA: "bg-[var(--surface-secondary)] text-red-700",
+  SUPERSEDIDA: "bg-[var(--surface-tertiary)] text-white/68",
 }
 
 /**
@@ -1103,7 +1115,8 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
  * reescrever um SLA de cinco.
  */
 function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
-  if (f.estado === "CONCLUIDA") return <span className="text-[11px] text-[var(--text-muted)]">—</span>
+  if (f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA")
+    return <span className="text-[11px] text-[var(--text-muted)]">—</span>
   if (f.prazo == null) return <span className="text-[11px] text-[var(--text-muted)]">{f.rotuloDoPrazo}</span>
   // A FRASE VEM DO SERVIDOR. Cada tela montando a sua produzia "Vence em 1
   // dias", "Vence amanhã" e "1 dia restante" para o mesmo prazo — e, pior, réguas
@@ -1128,6 +1141,8 @@ function rotuloDaAcao(f: DocumentoDoIndice["naFase"]): string {
     case "AGUARDANDO_TERCEIRO": return "Ver etapa"
     case "BLOQUEADA": return "Ver bloqueio"
     case "CONCLUIDA": return "Ver detalhes"
+    case "CANCELADA": return "Ver detalhes"
+    case "SUPERSEDIDA": return "Ver detalhes"
   }
 }
 
@@ -1168,16 +1183,20 @@ function CelulaResponsavel({
   const salvando = gestao?.salvandoResponsavel != null && gestao.salvandoResponsavel === taskId
   // SEM TAREFA NÃO HÁ A QUEM ATRIBUIR — e isso é dito, não escondido atrás de um
   // botão que não faria nada. Documento concluído também não se redistribui.
+  // CANCELADA/SUPERSEDIDA também não se redistribui — a operação acabou, e
+  // reatribuir responsável por um trabalho encerrado por cancelamento não faz
+  // sentido operacional (mesma régua de CONCLUIDA).
+  const encerrada = f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA"
   const podeGerir =
     !readOnly
     && taskId != null
-    && f.estado !== "CONCLUIDA"
+    && !encerrada
     && !!gestao?.onAtribuirResponsavel
     && (gestao?.usuarios?.length ?? 0) > 0
 
   const nome = f.responsavelNome
     ? <span className="text-white/80 truncate">{f.responsavelNome}</span>
-    : f.estado === "CONCLUIDA"
+    : encerrada
       ? <span className="text-[var(--text-muted)]">—</span>
       : <span className="text-[var(--accent-text)]">Sem responsável</span>
 

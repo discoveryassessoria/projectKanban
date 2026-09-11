@@ -30,11 +30,13 @@ import {
   montarIndiceOperacional,
   chaveDoAlvo,
   escopoDoAlvo,
+  progresso,
   type AlvoBruto,
   type ArtefatosPorChave,
   type EstruturaOperacional,
   type IndiceOperacional,
   type PassoBruto,
+  type ProgressoEstrutura,
   type StatusResumo,
   type TarefasPorChave,
 } from "./estrutura-operacional-core"
@@ -164,6 +166,10 @@ export interface EstruturaFaseResultado {
    * precisa do ciclo certo, senão não encontra a que existe.
    */
   cicloDaObrigacao: Map<number, number>
+  /** Ver `montarDocumentoDoIndice` — fração real de um alvo cancelado no meio do roteiro. */
+  progressoRealPorChave: Map<string, ProgressoEstrutura>
+  /** Ver `montarDocumentoDoIndice` — CHAVE → Documento por trás do alvo está CANCELADO. */
+  canceladoPorChave: Map<string, boolean>
 }
 
 /** Roster já carregado pelo chamador (evita reler a árvore na mesma requisição). */
@@ -211,7 +217,7 @@ export async function getPhaseOperationalStructure(
     registrar(d)
   }
 
-  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map() }
+  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map() }
 
   // ------------------------------------------------------------
   // 1) ROSTER — vínculo oficial com a árvore. A pessoa existe na Central por estar
@@ -256,11 +262,16 @@ export async function getPhaseOperationalStructure(
     (await resolverInstanciaVigente(ctx.processoId, ctx.faseMacroKey, db))?.id ??
     null
 
-  const instancias = instanciaAlvo == null ? [] : await db.phaseWorkflowStepInstance.findMany({
+  // Uma SÓ consulta, com todos os status: `instancias` (o conjunto ativo, usado por
+  // toda a estrutura) filtra em memória logo abaixo — a MESMA régua de antes, sem
+  // segunda ida ao banco. Os registros SUPERSEDIDO/CANCELADO que o filtro descarta
+  // ficam em `todasInstancias`, guardados só para recompor a fração REAL de
+  // progresso de um alvo cancelado no meio do roteiro (ver `progressoRealPorChave`
+  // abaixo) — nunca para reentrar em bloqueio, dependência ou passo corrente.
+  const todasInstancias = instanciaAlvo == null ? [] : await db.phaseWorkflowStepInstance.findMany({
     where: {
       processoId: ctx.processoId,
       faseMacroKey: ctx.faseMacroKey,
-      status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
       workflowInstanceId: instanciaAlvo,
     },
     orderBy: [{ ciclo: "desc" }, { ordem: "asc" }, { id: "asc" }],
@@ -271,11 +282,13 @@ export async function getPhaseOperationalStructure(
       ciclo: true, dependeDeStepKeys: true,
     },
   })
+  const INSTANCIAS_ENCERRADAS = new Set(["SUPERSEDIDO", "CANCELADO"])
+  const instancias = todasInstancias.filter((s) => !INSTANCIAS_ENCERRADAS.has(s.status))
 
   // Fase sem instância materializada: as PESSOAS continuam aparecendo (o roster não
   // depende de trabalho). O que falta é workflow publicado, e isso a tela diz.
   if (instancias.length === 0) {
-    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map() }
+    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map() }
   }
 
   // ------------------------------------------------------------
@@ -560,7 +573,52 @@ export async function getPhaseOperationalStructure(
     diag("ALVO_SEM_DONO", { chave: a.chave, necessidadeId: a.necessidadeId, documentoId: a.documentoId })
   }
 
-  return { estrutura, diagnosticos, cicloDaObrigacao: new Map(necessidades.map((n) => [n.id, n.ciclo])) }
+  // ------------------------------------------------------------
+  // 7) PROGRESSO REAL de alvos com cancelamento NO MEIO do roteiro.
+  //
+  // `passos` (e por consequência `alvo.progresso`) só carrega os sobreviventes ao
+  // filtro do passo 2 — de propósito, para bloqueio/dependência/passo-corrente. Mas
+  // isso faz o progresso de um alvo CANCELADO, cujo único passo concluído
+  // sobreviveu ao filtro, bater "1/1 · 100%" quando o roteiro tinha 5 passos. Esta
+  // segunda conta usa TODAS as instâncias do mesmo alvo (ativas + encerradas) —
+  // só para a fração, nunca para decidir o que está bloqueado ou disponível.
+  // ------------------------------------------------------------
+  const progressoRealPorChave = new Map<string, ProgressoEstrutura>()
+  if (todasInstancias.length > instancias.length) {
+    const porAlvo = new Map<string, { obrigatorio: boolean; status: string; peso: number }[]>()
+    for (const s of todasInstancias) {
+      const chave = chaveDoAlvo(s, necessidadePorDocumento)
+      const item = { obrigatorio: s.obrigatorio, status: s.status, peso: getStepDef(faseCode, s.stepKey)?.weight ?? 1 }
+      const lista = porAlvo.get(chave)
+      if (lista) lista.push(item)
+      else porAlvo.set(chave, [item])
+    }
+    for (const [chave, itens] of porAlvo) {
+      progressoRealPorChave.set(chave, progresso(itens))
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 8) CANCELAMENTO — a fonte autoritativa é o Documento, não a Tarefa.
+  //
+  // `tarefasVivasDasUnidades` (consultada em `getPhaseOperationalSummary`) só
+  // devolve tarefas NÃO terminais por definição — uma Tarefa CANCELADA nunca
+  // aparece ali. `documentos` já foi lido no passo 3 com `status` incluído (para
+  // o casamento por documentTypeId); é a MESMA leitura, sem consulta nova.
+  // ------------------------------------------------------------
+  const documentoCanceladoPorId = new Map<number, boolean>(documentos.map((d) => [d.id, d.status === "CANCELADO"]))
+  const canceladoPorChave = new Map<string, boolean>()
+  for (const a of alvos) {
+    if (a.documentoId != null && documentoCanceladoPorId.get(a.documentoId)) canceladoPorChave.set(a.chave, true)
+  }
+
+  return {
+    estrutura,
+    diagnosticos,
+    cicloDaObrigacao: new Map(necessidades.map((n) => [n.id, n.ciclo])),
+    progressoRealPorChave,
+    canceladoPorChave,
+  }
 }
 
 // ============================================================
@@ -592,7 +650,7 @@ export async function getPhaseOperationalSummary(
   opcoes: EstruturaFaseOpcoes = {},
 ): Promise<IndiceFaseResultado> {
   const db = opcoes.db ?? prisma
-  const { estrutura, diagnosticos, cicloDaObrigacao } = await getPhaseOperationalStructure(ctx, opcoes)
+  const { estrutura, diagnosticos, cicloDaObrigacao, progressoRealPorChave, canceladoPorChave } = await getPhaseOperationalStructure(ctx, opcoes)
 
   // ARTEFATOS — colunas "Certidão retificada", "Tradução" e "Apostila" da tabela.
   // Vêm dos registros OFICIAIS do documento; o que o domínio não registra fica
@@ -694,5 +752,5 @@ export async function getPhaseOperationalSummary(
     }
   }
 
-  return { indice: montarIndiceOperacional(estrutura, artefatos, tarefas), diagnosticos }
+  return { indice: montarIndiceOperacional(estrutura, artefatos, tarefas, progressoRealPorChave, canceladoPorChave), diagnosticos }
 }

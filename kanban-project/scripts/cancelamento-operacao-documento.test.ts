@@ -17,6 +17,7 @@ import { PrismaClient } from "@prisma/client"
 import { montarWorkflowV2, controlarOperacaoV2 } from "../src/services/documento-operacao"
 import { concluirPasso } from "../src/services/task-step-sync"
 import { reconciliarFaseAtiva } from "../src/services/reconciliar-fase"
+import { getPhaseOperationalStructure, getPhaseOperationalSummary } from "../src/lib/process-stage/estrutura-operacional"
 import { garantirOferta } from "./_fixture-oferta"
 
 const url = process.env.PRISMA_DATABASE_URL ?? ""
@@ -151,15 +152,82 @@ async function main() {
   check("4c) não entra em 'concluidas' (cancelar != concluir)", ind.concluidas === 0, String(ind.concluidas))
 
   // ══════════════════════════════════════════════════════════════════════════
-  secao("5) Cenário controle: cancelar SEM nenhuma etapa concluída antes (roteiro inteiro cancelado)")
+  secao("5) SEGUNDA PROJEÇÃO — Central Operacional (achado real 11/09/2026, mesmo caso Santin/2131)")
+  // ══════════════════════════════════════════════════════════════════════════
+  // PRECISA rodar ANTES do cenário-controle abaixo: `montarPalco()` faz TRUNCATE e
+  // apagaria o processo/documento p1 que este bloco lê.
+  // O Part 1 corrigiu `montarWorkflowV2` (o drawer do documento). O usuário reportou
+  // com screenshot que a MESMA certidão cancelada continuava aparecendo como
+  // "Concluída"/100%/"1/1" numa tela INDEPENDENTE: o card da pessoa na Central
+  // Operacional (`getPhaseOperationalStructure`/`getPhaseOperationalSummary`,
+  // `estrutura-operacional.ts` + `estrutura-operacional-core.ts`). Raiz dupla:
+  // (a) a consulta que monta `alvo.passos` já excluía CANCELADO/SUPERSEDIDO, então
+  // só sobrava o passo concluído (1/1 = 100%); (b) `tarefasVivasDasUnidades` só
+  // devolve tarefas NÃO terminais — uma Tarefa CANCELADA nunca chegava a
+  // `estadoNaFase` para o mapa `ESTADO_POR_STATUS_TAREFA` decidir. A fonte
+  // autoritativa usada na correção é `Documento.status`, não a Tarefa.
+  const { estrutura } = await getPhaseOperationalStructure({ processoId: p1.processoId, faseMacroKey: FASE_DOC })
+  const todasPessoasEstrutura = [...estrutura.linhaPrincipal, ...estrutura.foraDaLinha, ...estrutura.pendenteClassificacao]
+  const pessoaEstrutura = todasPessoasEstrutura.find((l) => l.documentos.some((d) => d.documentoId === p1.documentoId))!
+  const alvoEstrutura = pessoaEstrutura.documentos.find((d) => d.documentoId === p1.documentoId)!
+  check("5a) getPhaseOperationalStructure: alvo existe e é encontrado pelo documentoId", alvoEstrutura != null)
+
+  const { indice } = await getPhaseOperationalSummary({ processoId: p1.processoId, faseMacroKey: FASE_DOC })
+  const todasPessoas = [...indice.linhaPrincipal, ...indice.foraDaLinha, ...indice.pendenteClassificacao]
+  const pessoa = todasPessoas.find((p) => p.documentos.some((d) => d.documentoId === p1.documentoId))!
+  const linha = pessoa.documentos.find((d) => d.documentoId === p1.documentoId)!
+
+  check("5b) statusFinal = CANCELADO, NUNCA PRONTO", linha.statusFinal === "CANCELADO", linha.statusFinal)
+  check("5c) statusFinalLabel = 'Cancelado'", linha.statusFinalLabel === "Cancelado", linha.statusFinalLabel)
+  check("5d) naFase.estado = CANCELADA, NUNCA CONCLUIDA", linha.naFase.estado === "CANCELADA", linha.naFase.estado)
+  check("5e) naFase.estadoLabel = 'Cancelada', NUNCA 'Concluída'", linha.naFase.estadoLabel === "Cancelada", linha.naFase.estadoLabel)
+  check("5f) progresso NÃO é 1/1 · 100% — é a fração REAL (1 de 5 · 31%, mesmo peso do Part 1)",
+    linha.naFase.progresso.total === 5 && linha.naFase.progresso.concluidos === 1 && linha.naFase.progresso.pct === 31,
+    JSON.stringify(linha.naFase.progresso))
+  check("5g) documento continua VISÍVEL na lista (não desaparece)", linha != null)
+
+  check("5h) resumo do índice: 'cancelados' soma 1, e documentos = prontos+pendentes+divergentes+cancelados (fecha)",
+    indice.resumo.cancelados === 1 &&
+    indice.resumo.documentos === indice.resumo.prontos + indice.resumo.pendentes + indice.resumo.divergentes + indice.resumo.cancelados,
+    JSON.stringify(indice.resumo))
+  check("5i) totais da pessoa também fecham (mesma régua)",
+    pessoa.totais.cancelados === 1 &&
+    pessoa.totais.documentos === pessoa.totais.prontos + pessoa.totais.pendentes + pessoa.totais.divergentes + pessoa.totais.cancelados,
+    JSON.stringify(pessoa.totais))
+  check("5j) o cancelado NÃO conta em 'prontos'", pessoa.totais.prontos === 0, String(pessoa.totais.prontos))
+
+  // Re-lê do zero: a projeção não é cache — cada leitura recalcula do banco.
+  const { indice: indice2 } = await getPhaseOperationalSummary({ processoId: p1.processoId, faseMacroKey: FASE_DOC })
+  const linha2 = [...indice2.linhaPrincipal, ...indice2.foraDaLinha, ...indice2.pendenteClassificacao]
+    .flatMap((p) => p.documentos).find((d) => d.documentoId === p1.documentoId)!
+  check("5k) segunda leitura é idêntica (determinístico, não é acaso de cache)",
+    linha2.statusFinal === "CANCELADO" && linha2.naFase.estado === "CANCELADA")
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao("6) Cenário controle: cancelar SEM nenhuma etapa concluída antes (roteiro inteiro cancelado)")
   // ══════════════════════════════════════════════════════════════════════════
   const p2 = await montarPalco()
   const rc3 = await controlarOperacaoV2(p2.documentoId, "cancelar", "Nunca chegou a avançar", p2.ctx)
-  check("5a) cancela ok mesmo sem nenhum passo concluído", rc3.ok === true)
+  check("6a) cancela ok mesmo sem nenhum passo concluído", rc3.ok === true)
   const depois2 = await montarWorkflowV2(p2.documentoId, p2.ctx)
-  check("5b) status = cancelado", depois2?.status === "cancelado")
-  check("5c) progress = 0 (nada foi concluído antes)", depois2?.progress === 0, String(depois2?.progress))
-  check("5d) NUNCA 'concluido' mesmo com progress 0", depois2?.status !== "concluido")
+  check("6b) status = cancelado", depois2?.status === "cancelado")
+  check("6c) progress = 0 (nada foi concluído antes)", depois2?.progress === 0, String(depois2?.progress))
+  check("6d) NUNCA 'concluido' mesmo com progress 0", depois2?.status !== "concluido")
+  // LIMITAÇÃO CONHECIDA, PRÉ-EXISTENTE, FORA DO ESCOPO DESTA CORREÇÃO: quando TODOS
+  // os passos do alvo são cancelados (nenhum jamais chegou a ser concluído),
+  // `getPhaseOperationalStructure` cai no early-return "fase sem instância
+  // materializada" (`instancias.length === 0`, ANTES de `alvos` existir) — o
+  // documento nem chega a aparecer na Central Operacional. Isso já acontecia antes
+  // desta correção (é o MESMO comportamento para qualquer fase sem instância ativa)
+  // e é diferente do bug relatado (que tinha 1 passo concluído sobrevivendo ao
+  // filtro). Decidir se um cancelamento "do zero" deve gerar uma linha fantasma
+  // 0%/Cancelada é decisão de produto, não bug — registrado aqui para não
+  // desaparecer da memória do projeto.
+  const { indice: indiceControle } = await getPhaseOperationalSummary({ processoId: p2.processoId, faseMacroKey: FASE_DOC })
+  const linhaControle = [...indiceControle.linhaPrincipal, ...indiceControle.foraDaLinha, ...indiceControle.pendenteClassificacao]
+    .flatMap((p) => p.documentos).find((d) => d.documentoId === p2.documentoId)
+  check("6e) LIMITAÇÃO CONHECIDA (documentada, não corrigida agora): cancelamento sem NENHUM passo jamais concluído não gera linha na Central — early-return por falta de instância ativa",
+    linhaControle === undefined)
 
   console.log(`\n${ok} passaram, ${falhas.length} falharam`)
   if (falhas.length) console.log("Falhas:", falhas.join(", "))
