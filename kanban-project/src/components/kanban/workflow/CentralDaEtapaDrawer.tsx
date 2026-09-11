@@ -396,11 +396,32 @@ function ConteudoDrawer({
   const step = workflow?.steps.find((s) => s.id === stepId) || null
   const totalSteps = workflow?.steps.length || 0
 
+  // A "TELA DE TRÁS" (status + Anexos/Observações/Timeline) SÓ EXISTE quando
+  // tem algo que o editor da etapa não oferece: uma etapa cancelada (dizer
+  // isso), uma concluída com permissão de reabrir, ou uma ação de GESTÃO
+  // (bloquear/desbloquear/transferir/forçar) que o usuário pode executar.
+  //
+  // Achado real (11/09/2026): no caso comum — etapa em andamento, usuário só
+  // com permissão de trabalhar nela (ex.: Assistente) — este painel não tinha
+  // nada além de "Abrir editor"/"Fechar" e três abas quase sempre vazias, num
+  // container de altura cheia. Um clique a mais para ver uma tela sem ação
+  // nenhuma. Sem NENHUMA dessas condições, a etapa vai direto para o editor
+  // e fechar o editor fecha a Central da Etapa inteira — nunca mais volta
+  // para trás mostrar nada.
+  const temAcoesExtras = !!step && (
+    step.status === "cancelada" ||
+    (step.status === "concluida" && permite(step, "reabrir")) ||
+    permite(step, "bloquear") ||
+    permite(step, "desbloquear") ||
+    permite(step, "transferir") ||
+    permite(step, "forcar")
+  )
+
   // ABRE O EDITOR DIRETO — ninguém precisa clicar em "Abrir editor" pra
-  // trabalhar na etapa; toda etapa publicada TEM editor. Este painel (status,
-  // bloquear, transferir, forçar) continua atrás, alcançável fechando o
-  // editor. Dispara UMA vez por etapa (guarda por stepId): fechar o editor
-  // pra ver o painel não pode reabri-lo sozinho.
+  // trabalhar na etapa; toda etapa publicada TEM editor. Quando existe algo
+  // além do editor (`temAcoesExtras`), este painel continua atrás, alcançável
+  // fechando o editor. Dispara UMA vez por etapa (guarda por stepId): fechar
+  // o editor pra ver o painel não pode reabri-lo sozinho.
   const autoAbertoParaStep = useRef<number | null>(null)
   useEffect(() => {
     if (!isOpen || loading || !step) return
@@ -408,11 +429,27 @@ function ConteudoDrawer({
     autoAbertoParaStep.current = step.id
     setEditorAberto(true)
   }, [isOpen, loading, step])
+
+  // Sem NADA além do editor: fechar o editor fecha a Central da Etapa inteira
+  // — não há painel de trás para revelar.
+  const fecharEditor = useCallback(() => {
+    setEditorAberto(false)
+    if (!temAcoesExtras) onClose()
+  }, [temAcoesExtras, onClose])
   // Fechado: esquece o que já abriu sozinho — reabrir (mesma etapa ou outra)
   // deve ir direto ao editor de novo, não lembrar que "já abriu uma vez".
   useEffect(() => {
     if (!isOpen) autoAbertoParaStep.current = null
   }, [isOpen])
+
+  // REDE DE SEGURANÇA: qualquer caminho que feche o editor sem passar por
+  // `fecharEditor` (ex.: `onSaved`, que só zera `editorAberto` e recarrega o
+  // workflow) cai aqui. Se, depois de recarregado, a etapa continuar sem nada
+  // além do editor, fecha a Central da Etapa inteira — nunca deixa a "tela de
+  // trás" aparecer por uma fresta.
+  useEffect(() => {
+    if (isOpen && step && !editorAberto && !temAcoesExtras) onClose()
+  }, [isOpen, step, editorAberto, temAcoesExtras, onClose])
 
   // ✅ Se o drawer está aberto, já terminou de carregar, tem um workflow
   // carregado, mas o stepId que deveríamos mostrar NÃO está mais nele —
@@ -474,7 +511,7 @@ function ConteudoDrawer({
           </div>
         )}
 
-        {step && (
+        {step && temAcoesExtras && (
           <>
             {/* ============== HEADER ============== */}
             <div
@@ -851,6 +888,17 @@ function ConteudoDrawer({
             </div>
           </>
         )}
+
+        {/* SEM NADA ALÉM DO EDITOR: nunca mostra o painel de status/abas — o
+            editor específico da etapa (abaixo, 3º nível) abre sozinho por
+            cima disto. Este placeholder cobre só o instante entre montar e o
+            editor abrir; a rede de segurança acima fecha a Central inteira
+            assim que o editor sai de cena. */}
+        {step && !temAcoesExtras && (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-[var(--text-secondary)]" />
+          </div>
+        )}
       </div>
 
       {/* ============== EDITORES DE ETAPA (3º nível, empilhados) ============== */}
@@ -860,7 +908,7 @@ function ConteudoDrawer({
           stepKey={step.stepKey}
           stepId={step.id}
           isOpen={editorAberto}
-          onClose={() => setEditorAberto(false)}
+          onClose={fecharEditor}
           onSaved={() => {
             setEditorAberto(false)
             carregar()
@@ -878,7 +926,7 @@ function ConteudoDrawer({
           stepId={step.id}
           stepStatus={step.status}
           isOpen={editorAberto}
-          onClose={() => setEditorAberto(false)}
+          onClose={fecharEditor}
           onSaved={() => {
             setEditorAberto(false)
             carregar()
