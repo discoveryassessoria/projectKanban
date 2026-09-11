@@ -34,17 +34,24 @@ export async function POST(
     if (!usuario) return NextResponse.json({ error: "PERMISSION_REQUIRED" }, { status: 401 })
 
     const body = (await request.json()) as {
-      numeroProtocolo?: string
+      numeroProtocolo?: string | null
       observacoes?: string | null
       comprovante?: { url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null } | null
+      custoPago?: number | null
+      formaPagamento?: string | null
     }
 
     const r = await informarProtocoloPosterior(
       documentoId,
       idSolicitacao,
-      String(body.numeroProtocolo ?? ""),
+      body.numeroProtocolo ? String(body.numeroProtocolo) : null,
       { usuarioId: usuario.userId, permissoes: usuario.permissoes },
-      { observacoes: body.observacoes ?? null, comprovante: body.comprovante ?? null },
+      {
+        observacoes: body.observacoes ?? null,
+        comprovante: body.comprovante ?? null,
+        custoPago: typeof body.custoPago === "number" ? body.custoPago : null,
+        formaPagamento: body.formaPagamento ?? null,
+      },
     )
     if (!r.ok) {
       const codigo = r.error.split(":")[0]

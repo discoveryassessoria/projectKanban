@@ -801,7 +801,6 @@ function FormSolicitarCertidao({
   const opcoesCanal = canaisCadastrados.length > 0 ? canaisCadastrados : opcoesDaEtapa("canal")
   const CANAIS = opcoesCanal.length > 0 ? canaisDoCadastro(opcoesCanal) : CANAIS_SEMENTE
   const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal) ?? null : null
-  const recomendacao = doc ? getRecomendacao(doc) : null
 
   // EXIGÊNCIA DE EVIDÊNCIA — QUAL documento mestre esta etapa pede. Vem do
   // servidor, que a lê da configuração oficial. A tela não decide isso por canal
@@ -823,28 +822,32 @@ function FormSolicitarCertidao({
   // os canais semeados — o que muda é quem manda quando o administrador mexer.
   const canalDominio = canalDoTexto(form.canal)
   const anexoDisponivel = form.attachmentUrl || anexoJaRegistrado?.url || ""
+  // NÚMERO DO PROTOCOLO e CARTÓRIO/DESTINATÁRIO saíram da exigência de ENVIO —
+  // decisão do usuário em 10/09/2026: o protocolo só existe quando o cartório
+  // RESPONDE ao pedido, então exigi-lo aqui obrigava a operadora a inventar um
+  // número pra poder enviar. Quem registra o retorno é a etapa seguinte
+  // ("Aguardar retorno do cartório" → InformarProtocoloInline). O destinatário
+  // já é conhecido pelo Documento (`doc.cartorio`) — pedir de novo era repetir
+  // um dado que o pedido já carrega.
   const faltando = canaisCadastrados.length > 0
     ? (() => {
         if (!canalConfig) return ["CANAL_INVALIDO"]
         const f: string[] = []
-        if (canalConfig.requires.protocol && !form.protocolo.trim()) f.push("NUMERO_PROTOCOLO")
         if (canalConfig.requires.attachment && !anexoDisponivel.trim()) f.push("REQUERIMENTO")
         if (canalConfig.requires.trackingCode && !form.trackingCode.trim()) f.push("CODIGO_RASTREIO")
         if (canalConfig.requires.observation && !form.observacao.trim()) f.push("OBSERVACAO")
-        if (!form.destinatario.trim()) f.push("DESTINATARIO")
         return f
       })()
     : canalDominio
       ? faltamCamposDoCanal({
           canal: canalDominio,
-          numeroProtocolo: form.protocolo,
           // O que já está REGISTRADO satisfaz a exigência: etapa reaberta não pede
           // de novo o arquivo que o sistema já tem.
           anexoUrl: anexoDisponivel,
           codigoRastreio: form.trackingCode,
           observacao: form.observacao,
-          destinatarioNome: form.destinatario,
-        })
+          destinatarioNome: doc?.cartorio || "—", // sempre satisfeito — ver comentário acima
+        }).filter((f) => f !== "NUMERO_PROTOCOLO")
       : ["CANAL_INVALIDO"]
   const errosValidacao = faltando.map((f) => LABEL_CAMPO_FALTANDO[f] ?? f)
   const podeConcluir = errosValidacao.length === 0
@@ -1058,41 +1061,6 @@ function FormSolicitarCertidao({
               </ResumoCard>
             </div>
 
-            {/* Histórico Discovery × cartório (placeholder por enquanto) */}
-            <div className="px-4 pb-3">
-              <div className="text-[10.5px] text-[var(--text-secondary)] leading-relaxed">
-                📊 Histórico Discovery × {doc.cartorio || "este cartório"}:{" "}
-                <span className="italic">cálculo de insights na próxima rodada</span>
-              </div>
-            </div>
-
-            {/* Recomendação */}
-            {recomendacao && (
-              <div className="px-4 pb-4">
-                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 flex items-start gap-3">
-                  <span className="text-[18px] mt-0.5">💡</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[12px] font-semibold text-white mb-0.5">
-                      Recomendação: canal{" "}
-                      <strong className="text-white">
-                        {CANAIS.find((c) => c.id === recomendacao.canal)?.label}
-                      </strong>
-                    </div>
-                    <div className="text-[11px] text-white/70 leading-relaxed">
-                      {recomendacao.razao}
-                    </div>
-                  </div>
-                  {!readOnly && form.canal !== recomendacao.canal && (
-                    <button
-                      onClick={() => setForm({ ...form, canal: recomendacao.canal })}
-                      className="text-[10.5px] font-semibold px-2 py-1 bg-[var(--accent-primary)]/20 hover:bg-[var(--accent-primary)]/30 text-[var(--accent-text)] rounded border border-[var(--accent-primary)]/30 whitespace-nowrap"
-                    >
-                      Usar este
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* ========================================================== */}
@@ -1196,28 +1164,6 @@ function FormSolicitarCertidao({
                   </>
                 )}
 
-                {/* Protocolo */}
-                {canalConfig.requires.protocol && (
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
-                        🏷 Número do protocolo
-                      </label>
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
-                        obrigatório
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      value={form.protocolo}
-                      onChange={(e) => setForm({ ...form, protocolo: e.target.value })}
-                      placeholder="Número retornado pelo canal"
-                      disabled={readOnly}
-                      className={form.protocolo.trim() ? inputCls : inputClsInvalid}
-                    />
-                  </div>
-                )}
-
                 {/* Tracking code (correios) */}
                 {canalConfig.requires.trackingCode && (
                   <div>
@@ -1274,87 +1220,6 @@ function FormSolicitarCertidao({
               </div>
 
               {/* ========================================================== */}
-              {/* DETALHES DO ENVIO                                           */}
-              {/* ========================================================== */}
-              <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-3">
-                3. Detalhes do envio
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label required>Cartório / destinatário</Label>
-                  <input
-                    type="text"
-                    value={form.destinatario}
-                    onChange={(e) => setForm({ ...form, destinatario: e.target.value })}
-                    placeholder="ex: 2º Registro Civil de São Paulo"
-                    disabled={readOnly}
-                    className={form.destinatario.trim() ? inputCls : inputClsInvalid}
-                  />
-                </div>
-
-                <div>
-                  <Label>Atendente</Label>
-                  <input
-                    type="text"
-                    value={form.externalEntityName}
-                    onChange={(e) =>
-                      setForm({ ...form, externalEntityName: e.target.value })
-                    }
-                    placeholder="ex: João Silva"
-                    disabled={readOnly}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  {/* Prazo REAL informado pelo cartório — era um campo desabilitado
-                      com "~30 dias úteis" fixo, que não ia para lugar nenhum. */}
-                  <Label>Prazo esperado (dias)</Label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.prazoEsperadoDias}
-                    onChange={(e) => setForm({ ...form, prazoEsperadoDias: e.target.value })}
-                    placeholder="ex: 30"
-                    disabled={readOnly}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <Label>Custo cobrado pelo cartório (R$)</Label>
-                  <input
-                    type="text"
-                    value={form.costPaid}
-                    onChange={(e) => setForm({ ...form, costPaid: e.target.value })}
-                    placeholder="ex: 380,00"
-                    disabled={readOnly}
-                    className={inputCls}
-                  />
-                </div>
-
-                <div>
-                  <Label>Forma de pagamento</Label>
-                  <select
-                    value={form.paymentMethod}
-                    onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
-                    disabled={readOnly}
-                    className={inputCls}
-                  >
-                    <option value="" className="bg-[var(--surface-secondary)]">
-                      — Selecione —
-                    </option>
-                    {FORMAS_PAGAMENTO.map((fp) => (
-                      <option key={fp.id} value={fp.id} className="bg-[var(--surface-secondary)]">
-                        {fp.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* ========================================================== */}
               {/* ANEXOS DESTA ETAPA                                          */}
               {/* ========================================================== */}
               {/* A MESMA consulta da aba Anexos da etapa e da aba do documento,
@@ -1363,7 +1228,7 @@ function FormSolicitarCertidao({
                   paralelo. Só leitura: quem anexa nesta etapa é o campo acima. */}
               <div className="mt-5 pt-4 border-t border-[var(--border-default)]">
                 <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-2">
-                  4. Anexos desta etapa
+                  3. Anexos desta etapa
                 </div>
                 <AbaAnexosDocumentais documentoId={documentoId} stepInstanceId={stepId} />
               </div>
@@ -1911,12 +1776,18 @@ function FormAguardarRetorno({
 }
 
 /**
- * INFORMAR PROTOCOLO DEPOIS — a ação que vivia na aba Protocolo do documento e
- * mudou para o lugar onde o fato acontece: a espera pelo cartório.
+ * INFORMAR O RETORNO DO CARTÓRIO — protocolo, custo e forma de pagamento.
+ *
+ * As três coisas só existem quando o cartório RESPONDE (decisão do usuário em
+ * 10/09/2026): "Solicitar certidão" não pede nenhuma delas — pedir na hora do
+ * envio obrigava a operadora a inventar valores. É aqui, na espera, que elas
+ * chegam de verdade.
  *
  * Chama a MESMA rota canônica de antes (`.../solicitacoes/{id}/protocolos`), que
- * acrescenta o número ao histórico da solicitação e liga o requerimento já
- * registrado ao protocolo novo. Nada é duplicado e nada é sobrescrito.
+ * acrescenta o número ao histórico da solicitação, atualiza custo/forma de
+ * pagamento e liga o requerimento já registrado ao protocolo novo. Nada é
+ * duplicado e nada é sobrescrito — os três campos são independentes: dá pra
+ * registrar só o custo hoje e o protocolo depois.
  */
 function InformarProtocoloInline({
   documentoId,
@@ -1931,25 +1802,34 @@ function InformarProtocoloInline({
 }) {
   const [aberto, setAberto] = useState(false)
   const [numero, setNumero] = useState("")
+  const [custo, setCusto] = useState("")
+  const [formaPagamento, setFormaPagamento] = useState("")
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
   const registrar = async () => {
     const n = numero.trim()
-    if (!n || salvando) return
+    const custoNum = custo.trim() ? parseFloat(custo.replace(",", ".")) : NaN
+    if ((!n && isNaN(custoNum) && !formaPagamento) || salvando) return
     setSalvando(true)
     setErro(null)
     try {
       const res = await fetch(`/api/documentos/${documentoId}/solicitacoes/${solicitacaoId}/protocolos`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ numeroProtocolo: n }),
+        body: JSON.stringify({
+          numeroProtocolo: n || null,
+          custoPago: !isNaN(custoNum) ? custoNum : null,
+          formaPagamento: formaPagamento || null,
+        }),
       })
       if (!res.ok) {
-        setErro(res.status === 403 ? "Você não tem permissão para registrar protocolo." : "Não foi possível registrar agora.")
+        setErro(res.status === 403 ? "Você não tem permissão para registrar isso." : "Não foi possível registrar agora.")
         return
       }
       setNumero("")
+      setCusto("")
+      setFormaPagamento("")
       setAberto(false)
       onRegistrado()
     } catch {
@@ -1966,32 +1846,68 @@ function InformarProtocoloInline({
           onClick={() => setAberto(true)}
           className="px-2.5 py-1 text-[11px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-white/85 rounded"
         >
-          {jaTemProtocolo ? "+ Informar novo protocolo" : "+ Informar protocolo"}
+          {jaTemProtocolo ? "+ Informar novo retorno" : "+ Informar retorno do cartório"}
         </button>
       ) : (
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={numero}
-            onChange={(e) => setNumero(e.target.value)}
-            placeholder="Número devolvido pelo cartório"
-            autoFocus
-            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] font-mono"
-          />
-          <button
-            onClick={registrar}
-            disabled={salvando || !numero.trim()}
-            className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 text-[var(--action-primary-ink)] rounded inline-flex items-center gap-1.5"
-          >
-            {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
-            Registrar
-          </button>
-          <button
-            onClick={() => { setAberto(false); setNumero(""); setErro(null) }}
-            className="px-2 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white"
-          >
-            Cancelar
-          </button>
+        <div className="space-y-2">
+          <div>
+            <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1 block">
+              Número do protocolo
+            </label>
+            <input
+              type="text"
+              value={numero}
+              onChange={(e) => setNumero(e.target.value)}
+              placeholder="Número devolvido pelo cartório"
+              autoFocus
+              className="w-full px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] font-mono"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1 block">
+                Custo cobrado (R$)
+              </label>
+              <input
+                type="text"
+                value={custo}
+                onChange={(e) => setCusto(e.target.value)}
+                placeholder="ex: 380,00"
+                className="w-full px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1 block">
+                Forma de pagamento
+              </label>
+              <select
+                value={formaPagamento}
+                onChange={(e) => setFormaPagamento(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-default)]"
+              >
+                <option value="" className="bg-[var(--surface-secondary)]">— Selecione —</option>
+                {FORMAS_PAGAMENTO.map((fp) => (
+                  <option key={fp.id} value={fp.id} className="bg-[var(--surface-secondary)]">{fp.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={registrar}
+              disabled={salvando || (!numero.trim() && !custo.trim() && !formaPagamento)}
+              className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 text-[var(--action-primary-ink)] rounded inline-flex items-center gap-1.5"
+            >
+              {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
+              Registrar
+            </button>
+            <button
+              onClick={() => { setAberto(false); setNumero(""); setCusto(""); setFormaPagamento(""); setErro(null) }}
+              className="px-2 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
       {erro && <div className="mt-1.5 text-[11px] text-red-700">{erro}</div>}

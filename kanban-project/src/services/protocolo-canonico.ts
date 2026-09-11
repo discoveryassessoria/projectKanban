@@ -36,7 +36,7 @@ export type OrigemDeProtocolo = (typeof ORIGENS_DE_PROTOCOLO)[keyof typeof ORIGE
 /**
  * PARA QUE o ato serve. Catálogo FECHADO, espelhado no CHECK do banco.
  *
- * `tipoProtocolo` diz ONDE (consular, judicial, comune). `origem` diz QUEM criou
+ * `tipoProtocoloId` (cadastro) diz ONDE (consular, judicial, comune). `origem` diz QUEM criou
  * (tela do processo, solicitação de certidão, etapa do workflow). Faltava o para
  * quê: sem ele, um relatório do tribunal de Veneza mistura o ricorso de cidadania
  * com o protocolo de uma retificação — dois fatos que não se somam.
@@ -93,8 +93,6 @@ export interface DadosDoProtocolo {
   solicitacaoId?: number | null
   /** Classificação do ato pelo CADASTRO (Tipos de Protocolo). */
   tipoProtocoloId?: number | null
-  /** @deprecated Enum legado; sai na migration de remoção. */
-  tipoProtocolo?: unknown
   formaEnvio?: unknown
   contratanteId?: number | null
   /**
@@ -173,7 +171,6 @@ export async function registrarProtocoloTx(
       responsavelId: dados.responsavelId ?? null,
       observacoes: dados.observacoes ?? null,
       solicitacaoId: dados.solicitacaoId ?? null,
-      ...(dados.tipoProtocolo != null ? { tipoProtocolo: dados.tipoProtocolo as never } : {}),
       ...(dados.tipoProtocoloId != null ? { tipoProtocoloId: dados.tipoProtocoloId } : {}),
       ...(dados.formaEnvio != null ? { formaEnvio: dados.formaEnvio as never } : {}),
       contratanteId: dados.contratanteId ?? null,

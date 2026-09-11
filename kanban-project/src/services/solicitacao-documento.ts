@@ -195,14 +195,18 @@ export async function registrarSolicitacaoDocumento(
   // desde 21/08. A lista em código continua sendo a semente e a prova de regressão;
   // quem responde no runtime é a tabela, e é por isso que um canal cadastrado hoje
   // já é validado por este caminho sem deploy.
-  const faltando = await faltamCamposDoCanalCadastrado({
+  // NÚMERO DO PROTOCOLO não é mais exigido no ENVIO — decisão do usuário em
+  // 10/09/2026: o cartório só devolve o número na RESPOSTA, então cobrá-lo aqui
+  // obrigava a operadora a inventar um. Quem registra o retorno é a etapa
+  // seguinte (`informarProtocoloPosterior`, "Aguardar retorno do cartório").
+  const faltando = (await faltamCamposDoCanalCadastrado({
     canal,
     numeroProtocolo,
     anexoUrl: requerimentoUrl ?? requerimentoJaRegistrado?.url ?? null,
     codigoRastreio,
     observacao,
     destinatarioNome,
-  })
+  })).filter((f) => f !== "NUMERO_PROTOCOLO")
   if (faltando.length > 0) {
     return { ok: false, error: `VALIDATION_ERROR:${faltando.join(",")}`, status: 422 }
   }
@@ -513,13 +517,6 @@ export async function registrarSolicitacaoDocumento(
 
 // ── Blocos reutilizáveis (também usados pelo backfill e pelo andamento) ──────
 
-/** Canal → natureza do ato de protocolo, para o cadastro único de Protocolo. */
-function tipoProtocoloDoCanal(canal: CanalSolicitacaoDocumento): "CARTORIO" | "COMUNE" | "CONSULAR" {
-  if (canal === "COMUNE") return "COMUNE"
-  if (canal === "CONSULADO") return "CONSULAR"
-  return "CARTORIO"
-}
-
 function formaEnvioDoCanal(canal: CanalSolicitacaoDocumento): "PRESENCIAL" | "CORREIO" | "EMAIL" | "PORTAL_ONLINE" {
   switch (canal) {
     case "BALCAO": return "PRESENCIAL"
@@ -562,7 +559,6 @@ export async function registrarProtocoloDaSolicitacaoTx(
     origem: ORIGENS_DE_PROTOCOLO.SOLICITACAO_DOCUMENTO,
     orgaoId: args.orgaoId ?? null,
     numeroProtocolo: args.numeroProtocolo,
-    tipoProtocolo: tipoProtocoloDoCanal(args.canal),
     formaEnvio: formaEnvioDoCanal(args.canal),
     dataProtocolo: args.dataProtocolo,
     responsavelId: args.responsavelId,
@@ -812,16 +808,31 @@ export async function listarObservacoesDocumento(
 /**
  * INFORMAR PROTOCOLO DEPOIS — o canal não devolveu número no envio e ele chegou
  * agora. Acrescenta ao histórico da solicitação; NUNCA sobrescreve o anterior.
+ *
+ * TAMBÉM é aqui que CUSTO e FORMA DE PAGAMENTO entram — decisão do usuário em
+ * 10/09/2026: as três coisas (protocolo, valor, forma de pagamento) só existem
+ * quando o cartório RESPONDE, nunca no momento do envio. `numeroProtocolo` virou
+ * OPCIONAL para permitir registrar só o custo/pagamento numa volta e o protocolo
+ * noutra, sem forçar os três juntos.
  */
 export async function informarProtocoloPosterior(
   documentoId: number,
   solicitacaoId: number,
-  numeroProtocolo: string,
+  numeroProtocolo: string | null,
   ctx: ContextoLeituraWorkflow,
-  extras?: { observacoes?: string | null; comprovante?: { url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null } | null },
-): Promise<{ ok: true; protocoloId: number } | { ok: false; error: string; status: number }> {
+  extras?: {
+    observacoes?: string | null
+    comprovante?: { url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null } | null
+    custoPago?: number | null
+    formaPagamento?: string | null
+  },
+): Promise<{ ok: true; protocoloId: number | null } | { ok: false; error: string; status: number }> {
   const numero = texto(numeroProtocolo)
-  if (!numero) return { ok: false, error: "VALIDATION_ERROR:NUMERO_PROTOCOLO", status: 422 }
+  const custoPago = extras?.custoPago != null && Number.isFinite(extras.custoPago) ? extras.custoPago : null
+  const formaPagamento = texto(extras?.formaPagamento)
+  if (!numero && custoPago == null && formaPagamento == null) {
+    return { ok: false, error: "VALIDATION_ERROR:NUMERO_PROTOCOLO", status: 422 }
+  }
 
   const s = await prisma.solicitacaoDocumento.findUnique({
     where: { id: solicitacaoId },
@@ -835,45 +846,56 @@ export async function informarProtocoloPosterior(
   }
 
   const agora = new Date()
-  let protocoloId = 0
+  let protocoloId: number | null = null
   await prisma.$transaction(async (tx) => {
-    protocoloId = await registrarProtocoloDaSolicitacaoTx(tx, {
-      solicitacaoId: s.id,
-      documentoId,
-      processoId: s.processoId,
-      numeroProtocolo: numero,
-      canal: s.canal,
-      dataProtocolo: agora,
-      responsavelId: ctx.usuarioId,
-      observacoes: texto(extras?.observacoes),
-    })
-    if (extras?.comprovante?.url) {
-      await vincularArquivoDocumentoTx(tx, {
-        documentoId,
+    if (numero) {
+      protocoloId = await registrarProtocoloDaSolicitacaoTx(tx, {
         solicitacaoId: s.id,
-        stepInstanceId: s.stepInstanceId,
-        protocoloId,
-        url: extras.comprovante.url,
-        nome: texto(extras.comprovante.nome) ?? nomeDaUrl(extras.comprovante.url),
-        mimeType: extras.comprovante.mimeType ?? null,
-        tamanho: extras.comprovante.tamanho ?? null,
-        tipo: "COMPROVANTE_PROTOCOLO",
-        criadoPorId: ctx.usuarioId,
+        documentoId,
+        processoId: s.processoId,
+        numeroProtocolo: numero,
+        canal: s.canal,
+        dataProtocolo: agora,
+        responsavelId: ctx.usuarioId,
+        observacoes: texto(extras?.observacoes),
       })
+      if (extras?.comprovante?.url) {
+        await vincularArquivoDocumentoTx(tx, {
+          documentoId,
+          solicitacaoId: s.id,
+          stepInstanceId: s.stepInstanceId,
+          protocoloId,
+          url: extras.comprovante.url,
+          nome: texto(extras.comprovante.nome) ?? nomeDaUrl(extras.comprovante.url),
+          mimeType: extras.comprovante.mimeType ?? null,
+          tamanho: extras.comprovante.tamanho ?? null,
+          tipo: "COMPROVANTE_PROTOCOLO",
+          criadoPorId: ctx.usuarioId,
+        })
+      }
+      // O REQUERIMENTO já enviado passa a apontar para o protocolo que acabou de
+      // chegar. Nada é reenviado nem duplicado: é o mesmo registro, agora completo.
+      // Sem isto, protocolo informado depois nasceria sem o requerimento que o gerou.
+      await ligarArquivosAoProtocoloTx(tx, { solicitacaoId: s.id, protocoloId })
+      await tx.documento.update({ where: { id: documentoId }, data: { protocolo: numero, ultimaMovimentacao: agora } })
     }
-    // O REQUERIMENTO já enviado passa a apontar para o protocolo que acabou de
-    // chegar. Nada é reenviado nem duplicado: é o mesmo registro, agora completo.
-    // Sem isto, protocolo informado depois nasceria sem o requerimento que o gerou.
-    await ligarArquivosAoProtocoloTx(tx, { solicitacaoId: s.id, protocoloId })
-    await tx.solicitacaoDocumento.update({ where: { id: s.id }, data: { status: "PROTOCOLADA" } })
-    await tx.documento.update({ where: { id: documentoId }, data: { protocolo: numero, ultimaMovimentacao: agora } })
+    await tx.solicitacaoDocumento.update({
+      where: { id: s.id },
+      data: {
+        ...(numero ? { status: "PROTOCOLADA" } : {}),
+        ...(custoPago != null ? { custoPago } : {}),
+        ...(formaPagamento != null ? { formaPagamento } : {}),
+      },
+    })
     await tx.logAuditoria.create({
       data: {
         acao: "PROTOCOLO_INFORMADO_POSTERIORMENTE",
         entidade: "SolicitacaoDocumento",
         entidadeId: s.id,
-        descricao: `Protocolo ${numero} informado para o documento ${documentoId} após o envio.`,
-        detalhes: { documentoId, solicitacaoId: s.id, protocoloId, numero } as Prisma.InputJsonValue,
+        descricao: numero
+          ? `Protocolo ${numero} informado para o documento ${documentoId} após o envio.`
+          : `Custo/forma de pagamento informados para o documento ${documentoId} após o envio.`,
+        detalhes: { documentoId, solicitacaoId: s.id, protocoloId, numero, custoPago, formaPagamento } as Prisma.InputJsonValue,
         usuarioId: ctx.usuarioId,
       },
     })
