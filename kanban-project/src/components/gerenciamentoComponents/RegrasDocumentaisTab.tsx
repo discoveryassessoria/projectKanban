@@ -8,8 +8,9 @@ import { useEffect, useMemo, useState, useCallback } from "react"
 import {
   PUBLICOS_ALVO_PRINCIPAIS, PUBLICO_ALVO_LABEL, OPERADORES, OPERADOR_LABEL,
   CAMPOS_CONDICAO, CAMPO_CONDICAO_LABEL, MODOS_SATISFACAO, MODO_SATISFACAO_LABEL,
+  ALVOS_NECESSIDADE, ALVO_NECESSIDADE_LABEL,
   type RegraDocumental, type ConjuntoCondicoes, type Condicao, type PublicoAlvo,
-  type Combinador, type CampoCondicao, type Operador, type Obrigatoriedade, type ModoSatisfacao, type ResultadoAvaliacao,
+  type Combinador, type CampoCondicao, type Operador, type Obrigatoriedade, type ModoSatisfacao, type ResultadoAvaliacao, type AlvoNecessidade,
 } from "@/src/lib/documentos/regras-documentais/tipos"
 import { validarConjunto, justificativaDoConjunto } from "@/src/lib/documentos/regras-documentais/condicoes"
 import { resumoRegra } from "@/src/lib/documentos/regras-documentais/resumo"
@@ -32,6 +33,7 @@ type RegraForm = {
   aplicaTodosProcessos: boolean; tipoProcessoIds: number[]
   requisitoNome: string; documentosAceitos: string[]; modoSatisfacao: ModoSatisfacao; obrigatoriedade: Obrigatoriedade
   publicosAlvo: PublicoAlvo[]
+  alvoNecessidade: AlvoNecessidade
   condicoes: ConjuntoCondicoes
   faseExigencia: string; faseBloqueio: string; bloqueiaConclusaoFase: boolean
   continuaObrigatorioNasFasesSeguintes: boolean; faseFinalExigencia: string; obrigatorioAteFinalProcesso: boolean
@@ -43,7 +45,7 @@ const blankForm = (tipoProcessoId: number): RegraForm => ({
   nome: "", descricao: "", prioridade: 0,
   aplicaTodosProcessos: false, tipoProcessoIds: tipoProcessoId ? [tipoProcessoId] : [],
   requisitoNome: "", documentosAceitos: [], modoSatisfacao: "QUALQUER_UM_ATENDE", obrigatoriedade: "OBRIGATORIA",
-  publicosAlvo: ["PESSOA_DA_ARVORE_COM_DOCUMENTACAO"], condicoes: { combinador: "TODAS", regras: [] },
+  publicosAlvo: ["PESSOA_DA_ARVORE_COM_DOCUMENTACAO"], alvoNecessidade: "PESSOA", condicoes: { combinador: "TODAS", regras: [] },
   faseExigencia: "", faseBloqueio: "", bloqueiaConclusaoFase: false,
   continuaObrigatorioNasFasesSeguintes: false, faseFinalExigencia: "", obrigatorioAteFinalProcesso: false,
   possuiValidade: false, validadeDias: null, exigeDataEmissao: false, renovarQuandoExpirado: false, antecedenciaRenovacaoDias: null,
@@ -55,6 +57,7 @@ const regraParaForm = (r: RegraDocumental): RegraForm => ({
   requisitoNome: r.requisitoNome ?? r.nome ?? "", documentosAceitos: r.documentosAceitos.length ? r.documentosAceitos : [r.documentTypeCode],
   modoSatisfacao: r.modoSatisfacao, obrigatoriedade: r.obrigatoriedade,
   publicosAlvo: r.publicosAlvo.length ? r.publicosAlvo : [r.publicoAlvo],
+  alvoNecessidade: r.alvoNecessidade ?? "PESSOA",
   condicoes: r.condicoes ?? { combinador: "TODAS", regras: [] },
   faseExigencia: r.faseExigencia ?? "", faseBloqueio: r.faseBloqueio ?? "", bloqueiaConclusaoFase: r.bloqueiaConclusaoFase,
   continuaObrigatorioNasFasesSeguintes: r.continuaObrigatorioNasFasesSeguintes, faseFinalExigencia: r.faseFinalExigencia ?? "", obrigatorioAteFinalProcesso: r.obrigatorioAteFinalProcesso,
@@ -70,6 +73,7 @@ const formParaRegra = (f: RegraForm): RegraDocumental => ({
   requisitoNome: f.requisitoNome || f.nome || null, documentosAceitos: f.documentosAceitos, modoSatisfacao: f.modoSatisfacao,
   documentTypeCode: f.documentosAceitos[0] ?? "", categoriaCode: null, obrigatoriedade: f.obrigatoriedade,
   publicosAlvo: f.publicosAlvo, publicoAlvo: f.publicosAlvo[0] ?? "PESSOA_DA_ARVORE_COM_DOCUMENTACAO",
+  alvoNecessidade: f.alvoNecessidade,
   condicoes: f.condicoes.regras.length ? f.condicoes : null,
   faseExigencia: f.faseExigencia || null, faseBloqueio: f.faseBloqueio || null, bloqueiaConclusaoFase: f.bloqueiaConclusaoFase,
   continuaObrigatorioNasFasesSeguintes: f.continuaObrigatorioNasFasesSeguintes, faseFinalExigencia: f.faseFinalExigencia || null, obrigatorioAteFinalProcesso: f.obrigatorioAteFinalProcesso,
@@ -232,7 +236,10 @@ export default function RegrasDocumentaisTab() {
                     <td className="px-2 py-2 font-medium text-white">{r.nome ?? "—"}</td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.aplicaTodosProcessos ? "Todos" : `${(r.tipoProcessoIds.length || 1)} tipo(s)`}</td>
                     <td className="px-2 py-2 text-xs text-white/80">{r.requisitoNome ?? docName(r.documentTypeCode)}<span className="text-[var(--text-muted)]"> · {(r.documentosAceitos.length || 1)} doc{r.modoSatisfacao === "TODOS_SAO_EXIGIDOS" ? " (todos)" : ""}</span></td>
-                    <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{(r.publicosAlvo.length ? r.publicosAlvo : [r.publicoAlvo]).map((p) => PUBLICO_ALVO_LABEL[p]).join(", ")}</td>
+                    <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">
+                      {(r.publicosAlvo.length ? r.publicosAlvo : [r.publicoAlvo]).map((p) => PUBLICO_ALVO_LABEL[p]).join(", ")}
+                      {r.alvoNecessidade === "UNIAO" && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-white/80">1 por união</span>}
+                    </td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.condicoes && r.condicoes.regras.length ? justificativaDoConjunto(r.condicoes) : "—"}</td>
                     <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">{faseName(r.faseExigencia)}</td>
                     <td className="px-2 py-2 text-xs">{r.bloqueiaConclusaoFase ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-red-700">{faseName(r.faseBloqueio)}</span> : <span className="text-[var(--text-muted)]">—</span>}</td>
@@ -280,7 +287,9 @@ function matrizRowParaRegra(row: Record<string, unknown>): RegraDocumental {
     tipoProcessoVersao: g("tipoProcessoVersao", null),
     requisitoNome: g("requisitoNome", null), documentosAceitos: arrS("documentosAceitos", [dt]), modoSatisfacao: g("modoSatisfacao", "QUALQUER_UM_ATENDE") as ModoSatisfacao,
     documentTypeCode: dt, categoriaCode: g("categoriaCode", null), obrigatoriedade: g("obrigatoriedade", "OBRIGATORIA") as Obrigatoriedade,
-    publicosAlvo: (arrS("publicosAlvo", [pub]) as PublicoAlvo[]), publicoAlvo: pub, condicoes: (row.condicoes as ConjuntoCondicoes) ?? null,
+    publicosAlvo: (arrS("publicosAlvo", [pub]) as PublicoAlvo[]), publicoAlvo: pub,
+    alvoNecessidade: g("alvoNecessidade", "PESSOA") as AlvoNecessidade,
+    condicoes: (row.condicoes as ConjuntoCondicoes) ?? null,
     faseExigencia: g("faseExigencia", null), faseBloqueio: g("faseBloqueio", null), bloqueiaConclusaoFase: g("blocksPhaseCompletion", false),
     continuaObrigatorioNasFasesSeguintes: g("continuaObrigatorioNasFasesSeguintes", false), faseFinalExigencia: g("faseFinalExigencia", null), obrigatorioAteFinalProcesso: g("obrigatorioAteFinalProcesso", false),
     possuiValidade: g("possuiValidade", false), validadeDias: g("validadeDias", null), exigeDataEmissao: g("exigeDataEmissao", false),
@@ -375,6 +384,15 @@ function FormWizard(props: {
                 ))}
               </div>
               <p className="mt-2 text-[11px] text-[var(--text-muted)]">Linha reta / casado / falecido etc. são CONDIÇÕES (etapa 5), não público. O público não é inferido pelo nome do documento.</p>
+              <div className="mt-4">
+                <label className={label}>Este documento representa</label>
+                <select className={input} value={form.alvoNecessidade} onChange={(e) => up({ alvoNecessidade: e.target.value as AlvoNecessidade })}>
+                  {ALVOS_NECESSIDADE.map((a) => <option key={a} value={a} className={opt}>{ALVO_NECESSIDADE_LABEL[a]}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                  "Pessoa" (padrão): uma necessidade por pessoa elegível — nascimento, óbito, RG... "União/casamento": o documento é do CASAMENTO em si — os dois cônjuges compartilham UMA única necessidade, nunca uma cada.
+                </p>
+              </div>
             </div>
           )}
           {etapa === 4 && <ConstrutorCondicoes form={form} setForm={setForm} modalidades={data.modalidades} />}

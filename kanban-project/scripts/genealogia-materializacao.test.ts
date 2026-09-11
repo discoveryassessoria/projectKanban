@@ -21,6 +21,7 @@ const baseR: Omit<RegraDocumental, "id" | "nome" | "codigo" | "documentTypeCode"
   modoSatisfacao: "QUALQUER_UM_ATENDE", categoriaCode: null, obrigatoriedade: "OBRIGATORIA",
   bloqueiaConclusaoFase: true, continuaObrigatorioNasFasesSeguintes: true, faseFinalExigencia: null, obrigatorioAteFinalProcesso: false,
   possuiValidade: false, validadeDias: null, exigeDataEmissao: false, renovarQuandoExpirado: false, antecedenciaRenovacaoDias: null,
+  alvoNecessidade: "PESSOA",
 }
 const cert = (id: number, cod: string, doc: string, req: string, cond: RegraDocumental["condicoes"]): RegraDocumental => ({
   ...baseR, id, codigo: cod, nome: cod, requisitoNome: req, documentTypeCode: doc, documentosAceitos: [doc],

@@ -12,7 +12,7 @@ import {
   type RegraInput, matrizParaRegra,
 } from "./mapear"
 import {
-  PUBLICOS_ALVO, MODOS_SATISFACAO, type PublicoAlvo, type Obrigatoriedade, type ConjuntoCondicoes, type ModoSatisfacao,
+  PUBLICOS_ALVO, MODOS_SATISFACAO, type PublicoAlvo, type Obrigatoriedade, type ConjuntoCondicoes, type ModoSatisfacao, type AlvoNecessidade,
 } from "./tipos"
 import { validarConjunto } from "./condicoes"
 
@@ -127,6 +127,7 @@ export function normalizarInput(b: Record<string, unknown>): RegraInput {
     obrigatoriedade: b.obrigatoriedade as Obrigatoriedade | undefined,
     publicosAlvo: strArr(b.publicosAlvo) as PublicoAlvo[] | undefined,
     publicoAlvo: b.publicoAlvo as PublicoAlvo | undefined,
+    alvoNecessidade: b.alvoNecessidade as AlvoNecessidade | undefined,
     condicoes: cond === undefined ? undefined : cond,
     faseExigencia: asStrN(b.faseExigencia),
     faseBloqueio: asStrN(b.faseBloqueio),

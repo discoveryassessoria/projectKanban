@@ -69,6 +69,16 @@ export const OPERADOR_LABEL: Record<Operador, string> = {
   nao_existe: "não existe",
 }
 
+// GRÃO da NecessidadeDocumental que a regra materializa. PESSOA (default): uma
+// necessidade por pessoa elegível. UNIAO: o documento representa o CASAMENTO
+// em si — UMA única necessidade serve os dois cônjuges (nunca uma por pessoa).
+export const ALVOS_NECESSIDADE = ["PESSOA", "UNIAO"] as const
+export type AlvoNecessidade = (typeof ALVOS_NECESSIDADE)[number]
+export const ALVO_NECESSIDADE_LABEL: Record<AlvoNecessidade, string> = {
+  PESSOA: "Pessoa (uma necessidade por pessoa elegível)",
+  UNIAO: "União/casamento (uma única necessidade para o casal)",
+}
+
 export type Combinador = "TODAS" | "QUALQUER"
 
 export type Obrigatoriedade = "OBRIGATORIA" | "OPCIONAL"
@@ -154,6 +164,8 @@ export interface RegraDocumental {
   // PÚBLICO-ALVO — múltiplo
   publicosAlvo: PublicoAlvo[]
   publicoAlvo: PublicoAlvo // primário — dual-read
+  // GRÃO da necessidade materializada (ver AlvoNecessidade acima)
+  alvoNecessidade: AlvoNecessidade
   // CONDIÇÕES
   condicoes: ConjuntoCondicoes | null
   // FASE E BLOQUEIO

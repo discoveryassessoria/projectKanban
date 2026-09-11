@@ -23,6 +23,7 @@ const base: Omit<RegraDocumental, "id" | "documentTypeCode" | "publicoAlvo" | "d
   faseExigencia: null, faseBloqueio: null, bloqueiaConclusaoFase: false, continuaObrigatorioNasFasesSeguintes: false,
   faseFinalExigencia: null, obrigatorioAteFinalProcesso: false,
   possuiValidade: false, validadeDias: null, exigeDataEmissao: false, renovarQuandoExpirado: false, antecedenciaRenovacaoDias: null,
+  alvoNecessidade: "PESSOA",
 }
 const mk = (id: number, doc: string, publico: RegraDocumental["publicoAlvo"], extra: Partial<RegraDocumental> = {}): RegraDocumental =>
   ({ ...base, id, documentTypeCode: doc, documentosAceitos: [doc], publicoAlvo: publico, publicosAlvo: [publico], tipoProcessoIds: [base.tipoProcessoId], ...extra })

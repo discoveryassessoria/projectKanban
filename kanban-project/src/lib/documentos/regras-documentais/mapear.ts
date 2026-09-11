@@ -7,8 +7,8 @@
 import type { MatrizDocumental, Prisma } from "@prisma/client"
 import {
   type RegraDocumental, type ConjuntoCondicoes, type PublicoAlvo, type Obrigatoriedade,
-  type StatusRegra, type Combinador, type Operador, type CampoCondicao, type ModoSatisfacao,
-  PUBLICOS_ALVO, OPERADORES, CAMPOS_CONDICAO, STATUS_REGRA, MODOS_SATISFACAO,
+  type StatusRegra, type Combinador, type Operador, type CampoCondicao, type ModoSatisfacao, type AlvoNecessidade,
+  PUBLICOS_ALVO, OPERADORES, CAMPOS_CONDICAO, STATUS_REGRA, MODOS_SATISFACAO, ALVOS_NECESSIDADE,
 } from "./tipos"
 
 function parseIntArray(json: unknown): number[] | null {
@@ -76,6 +76,7 @@ export function matrizParaRegra(row: MatrizDocumental): RegraDocumental {
     obrigatoriedade,
     publicosAlvo: parsePublicoArray(row.publicosAlvo) ?? [publicoAlvo],
     publicoAlvo,
+    alvoNecessidade: ((ALVOS_NECESSIDADE as readonly string[]).includes(row.alvoNecessidade) ? row.alvoNecessidade : "PESSOA") as AlvoNecessidade,
     condicoes: parseCondicoes(row.condicoes),
     // dual-read: novos campos caem para os legados quando ausentes
     faseExigencia: row.faseExigencia ?? row.phaseKey ?? null,
@@ -110,6 +111,7 @@ export interface RegraInput {
   obrigatoriedade?: Obrigatoriedade
   publicosAlvo?: PublicoAlvo[]
   publicoAlvo?: PublicoAlvo
+  alvoNecessidade?: AlvoNecessidade
   condicoes?: ConjuntoCondicoes | null
   faseExigencia?: string | null
   faseBloqueio?: string | null
@@ -139,6 +141,7 @@ export function regraInputParaData(input: RegraInput): Record<string, unknown> {
   set("modoSatisfacao", input.modoSatisfacao)
   set("categoriaCode", input.categoriaCode)
   set("prioridade", input.prioridade)
+  set("alvoNecessidade", input.alvoNecessidade)
 
   // APLICABILIDADE múltipla — grava a coleção e o primário (dual-write)
   if (input.tipoProcessoIds !== undefined) {

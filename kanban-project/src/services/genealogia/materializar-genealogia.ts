@@ -117,8 +117,20 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
 
   // Pessoa REMOVIDA com histórico preservado não volta a materializar: seria
   // recriar necessidade, passo e tarefa para quem já saiu da operação.
+  //
+  // `documentacao: false` é a PROMESSA do próprio checkbox "Precisa de
+  // documentação" na Árvore ("Se desligado, o sistema não gera os documentos
+  // desta pessoa e ela não entra na Central Operacional / workflow") — nenhuma
+  // Regra Documental publicada (nascimento/casamento/óbito, público
+  // TODAS_AS_PESSOAS_DA_ARVORE) tinha essa condição, então desligar o campo não
+  // tirava a pessoa da avaliação: a necessidade nascia e ficava, mesmo depois de
+  // desligado. O gate é estrutural aqui (não por regra) para valer pra toda
+  // regra presente e futura, sem depender de cada uma lembrar de checar o
+  // campo. Ficar fora desta lista também remove da RECONCILIAÇÃO: quem já tinha
+  // necessidade PENDENTE criada antes de desligar é dispensada (e o passo
+  // cancelado) na próxima materialização, por `reconciliarEfinalizar` abaixo.
   const pessoas = await db.pessoa.findMany({
-    where: pessoasAtivasDaArvore(processo.arvoreId),
+    where: { ...pessoasAtivasDaArvore(processo.arvoreId), documentacao: true },
     select: { id: true, nome: true, sobrenome: true, documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true, data_nasc: true },
   })
 
@@ -134,6 +146,27 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
   const tiposPorId = await resolverTiposDocumentais(db)
   const tipoPorCode = new Map<string, TipoDocumentalResolvido>()
   for (const t of tiposPorId.values()) if (t.code) tipoPorCode.set(t.code, t)
+
+  // UNIÕES de cada pessoa — só para regras cujo alvo é UNIAO (ex.: certidão de
+  // casamento). Casamento é ato entre DUAS pessoas: a regra continua avaliada
+  // POR PESSOA (a condição `casado` lê o atributo dela), mas a necessidade
+  // materializada aponta pra UNIÃO, não pra pessoa — assim os dois cônjuges
+  // convergem na MESMA linha (mesma chaveIdempotencia) em vez de uma cada.
+  const pessoaIds = pessoas.map((p) => p.id)
+  const uniõesRaw = pessoaIds.length
+    ? await db.uniao.findMany({
+        where: { OR: [{ pessoa1Id: { in: pessoaIds } }, { pessoa2Id: { in: pessoaIds } }] },
+        select: { id: true, pessoa1Id: true, pessoa2Id: true },
+      })
+    : []
+  const uniõesPorPessoa = new Map<number, number[]>()
+  for (const u of uniõesRaw) {
+    for (const pid of [u.pessoa1Id, u.pessoa2Id]) {
+      const lista = uniõesPorPessoa.get(pid) ?? []
+      lista.push(u.id)
+      uniõesPorPessoa.set(pid, lista)
+    }
+  }
 
   // instância ativa do Workflow Interno da Genealogia (para pendurar o passo)
   const instancia = await db.phaseWorkflowInstance.findFirst({
@@ -166,8 +199,26 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       const itemCatalogoId = tipoDoc?.itemCatalogoId ?? null
       if (itemCatalogoId == null) { res.pendencias.push(`sem ItemCatalogo para "${ap.documentTypeCode}" (pessoa ${p.id}, regra ${codigo}) — necessidade não materializada`); continue }
 
+      // GRÃO da necessidade: PESSOA (padrão) — um sujeito, esta pessoa. UNIAO —
+      // um sujeito por união DELA (uma pessoa com duas uniões distintas gera
+      // duas necessidades de casamento; o cônjuge da MESMA união, avaliado na
+      // sua própria volta do `for (const p of pessoas)`, converge pra ESTE
+      // mesmo uniaoId — `garantirNecessidade` é idempotente por
+      // chaveIdempotencia, então a segunda chamada só reaproveita a linha, não
+      // duplica.
+      type Alvo = { pessoaId?: number; uniaoId?: number; chave: string }
+      const alvos: Alvo[] =
+        regra.alvoNecessidade === "UNIAO"
+          ? (uniõesPorPessoa.get(p.id) ?? []).map((uniaoId) => ({ uniaoId, chave: `u${uniaoId}::${varianteKey}` }))
+          : [{ pessoaId: p.id, chave: `p${p.id}::${varianteKey}` }]
+      if (regra.alvoNecessidade === "UNIAO" && alvos.length === 0) {
+        res.pendencias.push(`"${ap.documentTypeCode}": regra de união aplicável a ${p.id}, mas a pessoa não tem nenhuma União cadastrada — necessidade não materializada`)
+        continue
+      }
+
+      for (const alvo of alvos) {
       // materializa a variante aplicável (para reconciliação depois)
-      aplicaveisVariante.add(`${p.id}::${varianteKey}`)
+      aplicaveisVariante.add(alvo.chave)
 
       const snapshot = {
         codigo, requisito: ap.requisitoNome ?? regra.requisitoNome ?? ap.documentTypeCode,
@@ -176,7 +227,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
         publicoAlvo: regra.publicoAlvo, condicoes: regra.condicoes ?? null,
       } as unknown as Prisma.InputJsonValue
       const { necessidade, criada } = await garantirNecessidade({
-        processoId, itemCatalogoId, pessoaId: p.id, varianteKey, origem: "MATRIZ",
+        processoId, itemCatalogoId, pessoaId: alvo.pessoaId ?? null, uniaoId: alvo.uniaoId ?? null, varianteKey, origem: "MATRIZ",
         obrigatoriedade: ap.obrigatoriedade, matrizRegraId: regra.id, matrizRegraVersao: regra.versao,
         matrizSnapshot: snapshot, motivoAplicabilidade: ap.justificativa, arvoreId: processo.arvoreId, ruleCode: codigo.slice(0, 20),
       }, db)
@@ -276,6 +327,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
           }
         }
       }
+      } // fim do for (const alvo of alvos)
     }
   }
 
@@ -294,10 +346,12 @@ async function reconciliarEfinalizar(res: MaterializarResultado, processoId: num
   // ---- reconciliação: necessidades desta origem que deixaram de ser aplicáveis ----
   const existentes = await db.necessidadeDocumental.findMany({
     where: { processoId, origem: "MATRIZ", varianteKey: { startsWith: "rd:" } },
-    select: { id: true, pessoaId: true, varianteKey: true, status: true },
+    select: { id: true, pessoaId: true, uniaoId: true, varianteKey: true, status: true },
   })
   for (const n of existentes) {
-    const chaveAplic = `${n.pessoaId}::${n.varianteKey}`
+    // MESMA convenção de chave usada ao materializar (pXX / uXX) — sujeito é
+    // SEMPRE um dos dois (pessoaId XOR uniaoId), nunca os dois.
+    const chaveAplic = n.pessoaId != null ? `p${n.pessoaId}::${n.varianteKey}` : `u${n.uniaoId}::${n.varianteKey}`
     if (aplicaveisVariante.has(chaveAplic)) continue
     // deixou de ser aplicável: se ainda não começou (PENDENTE), DISPENSA (reversível);
     // se já em atendimento/atendida/não localizada → preserva histórico, não mexe.
