@@ -391,8 +391,18 @@ export const PERFIS_PADRAO = [
     sistema: true,
     permissoes: {
       ...TODAS_PERMISSOES,
-      // Sem exclusões
+      // Sem exclusões, sem bloqueio administrativo, sem cancelar/invalidar operação.
+      //
+      // ── REGRA PERMANENTE (11/09/2026, achado real: relato da Daniela) ──
+      // Assistente EXECUTA operação. Não GOVERNA, CANCELA, INVALIDA, BLOQUEIA
+      // administrativamente, EXCLUI nem DESTRÓI estrutura do processo. A régua
+      // vale para toda ação equivalente, não só as listadas nominalmente aqui.
       'tarefas.excluir': false,
+      // CP-4D — pausar/retomar/cancelar/invalidar operação (WorkflowControls,
+      // documento-operacao.ts::PERMISSAO_DO_CONTROLE). Estava AUSENTE deste
+      // bloco: sem override aqui, o perfil herdava `true` de TODAS_PERMISSOES,
+      // e um Assistente pausava/cancelava/invalidava operação administrativamente.
+      'tarefas.bloquear': false,
       'processos.excluir': false,
       'processos.excluir_coluna': false,
       'clientes.excluir': false,
@@ -473,8 +483,12 @@ export const PERFIS_PADRAO = [
       'workflow.gerarTarefa': false,
       'tarefas.editar': false,
 
-      // Sem admin
+      // Sem admin — gerenciar contas de outras pessoas é governança, não
+      // trabalho operacional. `usuarios.criar`/`usuarios.editar` faltavam
+      // aqui: sem override, herdavam `true` de TODAS_PERMISSOES.
       'usuarios.gerenciar': false,
+      'usuarios.criar': false,
+      'usuarios.editar': false,
       'usuarios.excluir': false,
     },
   },
