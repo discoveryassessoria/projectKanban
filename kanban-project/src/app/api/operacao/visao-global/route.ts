@@ -20,25 +20,9 @@
 // isso, não a tela.
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
-import type { PrioridadeTarefa, StatusTarefa } from '@prisma/client'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import {
-  visaoGerencial,
-  indicadoresGerenciais,
-  facetasGerenciais,
-  type ColunaKanban,
-  type FiltrosGerenciais,
-} from '@/lib/operacional/tarefa-projecoes'
-
-const COLUNAS: ColunaKanban[] = [
-  'SEM_RESPONSAVEL', 'A_FAZER', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'BLOQUEADA', 'CONCLUIDA',
-]
-
-const inteiro = (v: string | null): number | null => {
-  const n = Number(v)
-  return v != null && Number.isInteger(n) && n > 0 ? n : null
-}
-const bandeira = (v: string | null) => v === '1' || v === 'true'
+import { visaoGerencial, indicadoresGerenciais, facetasGerenciais } from '@/lib/operacional/tarefa-projecoes'
+import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'tarefas.editar')
@@ -54,37 +38,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Apenas administradores veem a operação inteira. Use a Minha Fila.' }, { status: 403 })
   }
 
-  const p = request.nextUrl.searchParams
-  const colunaPedida = p.get('coluna')
-  const dias = inteiro(p.get('semMovimentacaoDias'))
-  const filtros: FiltrosGerenciais = {
-    responsavelId: inteiro(p.get('responsavel')),
-    semResponsavel: bandeira(p.get('semResponsavel')),
-    faseMacroKey: p.get('fase') || null,
-    status: (p.getAll('status').filter(Boolean) as StatusTarefa[]) || undefined,
-    coluna: colunaPedida && (COLUNAS as string[]).includes(colunaPedida) ? (colunaPedida as ColunaKanban) : null,
-    prioridade: (p.getAll('prioridade').filter(Boolean) as PrioridadeTarefa[]) || undefined,
-    atrasadas: bandeira(p.get('atrasadas')),
-    venceHoje: bandeira(p.get('venceHoje')),
-    processoId: inteiro(p.get('processo')),
-    pessoaId: inteiro(p.get('pessoa')),
-    // ── Central Operacional (drill-down Família→Processo→Fase→Etapa→Tarefa) ──
-    // A MESMA leitura da Lista/Kanban, só com mais filtros: nenhuma delas é
-    // uma segunda projeção.
-    familiaId: inteiro(p.get('familia')),
-    etapaKey: p.getAll('etapa').filter(Boolean).length ? p.getAll('etapa').filter(Boolean) : null,
-    equipeKey: p.getAll('equipe').filter(Boolean).length ? p.getAll('equipe').filter(Boolean) : null,
-    executavelAgora: p.has('executavelAgora') ? bandeira(p.get('executavelAgora')) : undefined,
-    proximos7Dias: bandeira(p.get('proximos7Dias')),
-    aguardandoTerceiro: bandeira(p.get('aguardandoTerceiro')),
-    bloqueada: bandeira(p.get('bloqueada')),
-    pendenciasFasesAnteriores: bandeira(p.get('pendenciasFasesAnteriores')),
-    semMovimentacao: dias != null ? { diasSemAtividade: dias } : null,
-    busca: p.get('busca'),
-    incluirEncerradas: bandeira(p.get('incluirEncerradas')),
-    pagina: inteiro(p.get('pagina')) ?? 1,
-    porPagina: inteiro(p.get('porPagina')) ?? 300,
-  }
+  const filtros = parseFiltrosGerenciais(request)
 
   const agora = new Date()
   // Os indicadores contam o universo dos MESMOS filtros, menos os de recorte

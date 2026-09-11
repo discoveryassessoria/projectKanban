@@ -19,7 +19,7 @@ import {
   inicioDoDiaOperacional,
   estadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
-import type { Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa } from '@prisma/client'
+import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoTarefa } from '@prisma/client'
 
 /**
  * O LEITOR — o cliente global por padrão, outro quando quem chama precisa.
@@ -105,6 +105,23 @@ async function idsSemMovimentacao(
   const ultimas = await ultimaAtividadeReal(candidatos.map((c) => c.id), db)
   const limite = new Date(agora.getTime() - diasSemAtividade * 86400000)
   return candidatos.filter((c) => (ultimas.get(c.id) ?? c.createdAt) < limite).map((c) => c.id)
+}
+
+/**
+ * IDs de tarefa com atividade REAL (auditoria, não `updatedAt`) DENTRO do
+ * período — a resposta a "o que Fulano fez hoje", quando combinado com
+ * `responsavelId`. Sem atividade real registrada, a tarefa nunca entra aqui:
+ * `createdAt` não é usado como substituto (isso é `dataTipo: 'criada'`).
+ */
+async function idsComAtividadeNoPeriodo(
+  where: Prisma.TarefaWhereInput, dataInicio: string | null | undefined, dataFim: string | null | undefined, db: Leitor = prisma,
+): Promise<number[]> {
+  const candidatos = await db.tarefa.findMany({ where, select: { id: true } })
+  if (candidatos.length === 0) return []
+  const ultimas = await ultimaAtividadeReal(candidatos.map((c) => c.id), db)
+  const de = dataInicio ? new Date(dataInicio).getTime() : -Infinity
+  const ate = dataFim ? new Date(dataFim).getTime() : Infinity
+  return candidatos.filter((c) => { const t = ultimas.get(c.id); return t != null && t.getTime() >= de && t.getTime() <= ate }).map((c) => c.id)
 }
 
 /**
@@ -740,6 +757,118 @@ export async function dossieDaTarefa(tarefaId: number) {
   }
 }
 
+const FRASE_DO_RESULTADO_DE_FASE: Partial<Record<AdvanceResultado, (de: string, para: string | null) => string>> = {
+  AVANCADO: (de, para) => `Fase concluída: ${de} → ${para ?? '—'}`,
+  FORCADO: (de, para) => `Fase concluída (avanço forçado): ${de} → ${para ?? '—'}`,
+  REABERTO: (de) => `Fase reaberta: ${de}`,
+  RETORNADO: (de, para) => `Processo retornado para ${para ?? de}`,
+  MOVIDO: (de, para) => `Movimentação manual de fase: ${de} → ${para ?? '—'}`,
+}
+
+/** Um fato do PROCESSO — mesma forma de `FatoDaTimeline`, grain maior (todas as tarefas do processo, não uma). */
+export interface AtividadeDoProcesso {
+  em: string
+  tipo: 'marco' | 'tarefa' | 'etapa' | 'observacao' | 'anexo'
+  texto: string
+  autor: string | null
+}
+
+/**
+ * O HISTÓRICO DE ATIVIDADES DE UM PROCESSO — a granularidade completa (spec
+ * §10/§11), incluindo os marcos gerenciais (spec §12) na MESMA linha do
+ * tempo, sem tabela nova: cada fato já mora em `LogAuditoria` (por tarefa),
+ * `PhaseAdvanceLog` (transição de fase), `DocumentoObservacao` e
+ * `DocumentoArquivo` (via os documentos das tarefas deste processo) — aqui
+ * eles são só LIDOS e intercalados por data, como `montarTimeline` já faz por
+ * tarefa.
+ */
+export async function atividadesDoProcesso(processoId: number, opts: { limite?: number } = {}): Promise<AtividadeDoProcesso[]> {
+  const limite = Math.min(Math.max(opts.limite ?? 200, 1), 500)
+
+  const tarefas = await prisma.tarefa.findMany({
+    where: { processoId }, select: { id: true, documentoId: true, workflowInstanceId: true },
+  })
+  const tarefaIds = tarefas.map((t) => t.id)
+  const documentoIds = [...new Set(tarefas.map((t) => t.documentoId).filter((x): x is number => x != null))]
+  const workflowInstanceIds = [...new Set(tarefas.map((t) => t.workflowInstanceId).filter((x): x is number => x != null))]
+
+  const [historico, logsDeFase, observacoes, anexos, eventosDeWorkflow] = await Promise.all([
+    tarefaIds.length
+      ? prisma.logAuditoria.findMany({
+          where: { entidade: 'Tarefa', entidadeId: { in: tarefaIds } },
+          orderBy: { id: 'desc' }, take: limite,
+          select: { id: true, acao: true, descricao: true, criadoEm: true, usuario: { select: { nome: true } } },
+        })
+      : [],
+    prisma.phaseAdvanceLog.findMany({
+      where: { processoId, resultado: { in: RESULTADOS_TRANSICAO_REAL } },
+      orderBy: { criadoEm: 'desc' }, take: limite,
+      select: { id: true, faseAtual: true, fasePretendida: true, resultado: true, criadoEm: true },
+    }),
+    documentoIds.length
+      ? prisma.documentoObservacao.findMany({
+          where: { documentoId: { in: documentoIds } },
+          orderBy: { createdAt: 'desc' }, take: limite,
+          select: { id: true, texto: true, createdAt: true, criadoPor: { select: { nome: true } } },
+        })
+      : [],
+    documentoIds.length
+      ? prisma.documentoArquivo.findMany({
+          where: { documentoId: { in: documentoIds } },
+          orderBy: { createdAt: 'desc' }, take: limite,
+          select: { id: true, nome: true, createdAt: true, criadoPor: { select: { nome: true } }, documentType: { select: { name: true } } },
+        })
+      : [],
+    workflowInstanceIds.length
+      ? prisma.workflowEvento.findMany({
+          where: { workflowInstanceId: { in: workflowInstanceIds } },
+          orderBy: { id: 'desc' }, take: limite,
+          select: { id: true, tipo: true, criadoEm: true, stepInstanceId: true },
+        })
+      : [],
+  ])
+
+  const fatos: AtividadeDoProcesso[] = []
+  for (const h of historico) fatos.push({ em: h.criadoEm.toISOString(), tipo: 'tarefa', texto: h.descricao ?? h.acao, autor: h.usuario?.nome ?? null })
+
+  for (const l of logsDeFase) {
+    const frase = FRASE_DO_RESULTADO_DE_FASE[l.resultado]
+    if (!frase) continue
+    const de = labelDaFasePorPhaseKey(l.faseAtual) ?? l.faseAtual
+    const para = l.fasePretendida ? labelDaFasePorPhaseKey(l.fasePretendida) ?? l.fasePretendida : null
+    fatos.push({ em: l.criadoEm.toISOString(), tipo: 'marco', texto: frase(de, para), autor: null })
+  }
+
+  // Mesma regra de `montarTimeline`: "tarefa iniciada"/"tarefa concluída" já
+  // vêm da auditoria em português — os eventos do workflow que sobram aqui
+  // são só os de ETAPA.
+  const EVENTOS_JA_CONTADOS_PELA_AUDITORIA = new Set(['TAREFA_INICIADA', 'TAREFA_CONCLUIDA'])
+  for (const e of eventosDoWorkflowComFrase(eventosDeWorkflow, EVENTOS_JA_CONTADOS_PELA_AUDITORIA)) fatos.push(e)
+
+  for (const o of observacoes) fatos.push({ em: o.createdAt.toISOString(), tipo: 'observacao', texto: o.texto, autor: o.criadoPor?.nome ?? null })
+  for (const a of anexos) {
+    const oque = a.documentType?.name ?? 'Arquivo'
+    fatos.push({ em: a.createdAt.toISOString(), tipo: 'anexo', texto: `${oque} anexado: ${a.nome}`, autor: a.criadoPor?.nome ?? null })
+  }
+
+  return fatos.sort((a, b) => Date.parse(b.em) - Date.parse(a.em)).slice(0, limite)
+}
+
+/** Fração compartilhada com `montarTimeline`: eventos de ETAPA em português, sem os que a auditoria da tarefa já narra. */
+function eventosDoWorkflowComFrase(
+  eventos: Array<{ id: number; tipo: string; criadoEm: Date; stepInstanceId: number | null }>,
+  jaContados: Set<string>,
+): AtividadeDoProcesso[] {
+  const fatos: AtividadeDoProcesso[] = []
+  for (const e of eventos) {
+    if (jaContados.has(e.tipo)) continue
+    const base = FRASE_DO_EVENTO[e.tipo]
+    if (!base) continue
+    fatos.push({ em: e.criadoEm.toISOString(), tipo: 'etapa', texto: base, autor: null })
+  }
+  return fatos
+}
+
 /**
  * CARGA DE TRABALHO — conta TAREFAS, nunca etapas.
  *
@@ -862,6 +991,33 @@ export interface FiltrosGerenciais {
   busca?: string | null
   /** Encerradas sem entrega (cancelada/supersedida) ficam fora por padrão. */
   incluirEncerradas?: boolean
+  /** NORMAL (obrigação da fase) ou TRANSVERSAL (Operação Antecipada) — ver `motor-antecipacao`. */
+  tipoTarefa?: TipoTarefa[] | null
+  /**
+   * Derivado de `Processo.dataConclusao` — não existe enum de status do
+   * processo (removido como legado, ver `docs/architecture`). CONCLUIDO =
+   * `dataConclusao` preenchida; ATIVO = ainda não.
+   */
+  statusProcesso?: 'ATIVO' | 'CONCLUIDO' | null
+  /**
+   * QUAL DATA o período (`dataInicio`/`dataFim`) recorta — "data" nunca é um
+   * conceito único (CLAUDE.md + spec Tarefas e Projetos §5): criação, entrega,
+   * vencimento, última atividade REAL e mudança de fase são perguntas
+   * diferentes e usam fontes diferentes. Default `vencimento` preserva o
+   * comportamento anterior de quem só passava `dataInicio`/`dataFim`.
+   */
+  dataTipo?: 'criada' | 'concluida' | 'vencimento' | 'ultimaAtividade' | 'mudancaFase' | null
+  dataInicio?: string | null
+  dataFim?: string | null
+  /**
+   * MARCO GERENCIAL: recorta por PROCESSO que teve uma fase real e
+   * efetivamente concluída (`PhaseAdvanceLog.resultado` em AVANCADO/FORCADO)
+   * — nunca por contagem de tarefas. Combinado com `faseMacroKey`, filtra pela
+   * fase de ORIGEM da transição ("Fase = Genealogia + Marco = fase concluída"
+   * = processos que SAÍRAM de Genealogia). Combinado com `dataTipo:
+   * 'mudancaFase'` + período, recorta pela data da transição, não da tarefa.
+   */
+  marcoFaseConcluida?: boolean
   pagina?: number
   porPagina?: number
   /**
@@ -898,9 +1054,34 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   if (f.prioridade?.length) where.prioridade = { in: f.prioridade }
   if (f.processoId != null) where.processoId = f.processoId
   if (f.pessoaId != null) where.pessoaId = f.pessoaId
-  if (f.familiaId != null) where.processo = { familiaId: f.familiaId }
   if (f.etapaKey?.length) e.push({ workflowStepInstance: { stepKey: { in: f.etapaKey } } })
   if (f.equipeKey?.length) where.equipeKey = { in: f.equipeKey }
+  if (f.tipoTarefa?.length) where.tipo = { in: f.tipoTarefa }
+
+  // `familiaId` e `statusProcesso` recortam pelo mesmo relacionamento
+  // (`Tarefa.processo`) — um único objeto, nunca dois `where.processo`
+  // sobrescrevendo um ao outro.
+  if (f.familiaId != null || f.statusProcesso) {
+    where.processo = {
+      ...(f.familiaId != null ? { familiaId: f.familiaId } : {}),
+      // Não existe enum de status do processo (legado removido, ver
+      // `docs/architecture`): ATIVO/CONCLUIDO é derivado de `dataConclusao`.
+      ...(f.statusProcesso ? { dataConclusao: f.statusProcesso === 'CONCLUIDO' ? { not: null } : null } : {}),
+    }
+  }
+
+  // "DATA" NÃO É UM CONCEITO ÚNICO — cada `dataTipo` filtra uma COLUNA
+  // diferente. `ultimaAtividade` e `mudancaFase` exigem ida assíncrona ao
+  // banco (auditoria / PhaseAdvanceLog) e são resolvidos em
+  // `mergeFiltrosAssincronos`, não aqui.
+  if ((f.dataInicio || f.dataFim) && f.dataTipo && f.dataTipo !== 'ultimaAtividade' && f.dataTipo !== 'mudancaFase') {
+    const range: Prisma.DateTimeFilter = {}
+    if (f.dataInicio) range.gte = new Date(f.dataInicio)
+    if (f.dataFim) range.lte = new Date(f.dataFim)
+    if (f.dataTipo === 'criada') e.push({ createdAt: range })
+    else if (f.dataTipo === 'concluida') e.push({ dataConclusao: range })
+    else if (f.dataTipo === 'vencimento') e.push({ dataPrazo: range })
+  }
 
   // Atrasada é condição derivada, mas se traduz exatamente em SQL: prazo no
   // passado e trabalho ainda por fazer.
@@ -975,6 +1156,42 @@ async function contextoDeParada(ids: number[], db: Leitor = prisma): Promise<Map
 }
 
 /**
+ * RESULTADOS que representam uma transição de fase REAL e efetiva — nunca
+ * `BLOQUEADO` (tentativa negada), `CONFLITO` (CAS perdido) ou `IDEMPOTENTE`
+ * (retry do mesmo pedido: o motor já garantiu que não é uma segunda
+ * transição). É esta lista, e só ela, que decide "quantas vezes a fase
+ * realmente mudou" — nunca contar linhas de `PhaseAdvanceLog` cruas.
+ */
+const RESULTADOS_TRANSICAO_REAL: AdvanceResultado[] = ['AVANCADO', 'FORCADO', 'REABERTO', 'RETORNADO', 'MOVIDO']
+/** Dentre as transições reais, as que representam "esta fase terminou" — não reabertura/retorno/movimentação administrativa. */
+const RESULTADOS_FASE_CONCLUIDA: AdvanceResultado[] = ['AVANCADO', 'FORCADO']
+
+/**
+ * IDs de PROCESSO com uma mudança de fase real dentro do período — a fonte é
+ * `PhaseAdvanceLog`, o MESMO log que decide se um avanço aconteceu (nunca
+ * contagem de tarefa, nunca `WorkflowEvento` recontado à parte). Combinado com
+ * `faseMacroKey`, filtra pela fase de ORIGEM (`faseAtual` no log) — responde
+ * "quais processos SAÍRAM desta fase", que é a pergunta gerencial real.
+ */
+async function processosComMudancaDeFase(
+  args: { dataInicio?: string | null; dataFim?: string | null; faseOrigemKey?: string | null; apenasConcluida: boolean },
+  db: Leitor = prisma,
+): Promise<number[]> {
+  const where: Prisma.PhaseAdvanceLogWhereInput = {
+    resultado: { in: args.apenasConcluida ? RESULTADOS_FASE_CONCLUIDA : RESULTADOS_TRANSICAO_REAL },
+  }
+  if (args.faseOrigemKey) where.faseAtual = args.faseOrigemKey
+  if (args.dataInicio || args.dataFim) {
+    where.criadoEm = {
+      ...(args.dataInicio ? { gte: new Date(args.dataInicio) } : {}),
+      ...(args.dataFim ? { lte: new Date(args.dataFim) } : {}),
+    }
+  }
+  const logs = await db.phaseAdvanceLog.findMany({ where, select: { processoId: true }, distinct: ['processoId'] })
+  return logs.map((l) => l.processoId)
+}
+
+/**
  * Os dois filtros que `whereGerencial` não consegue expressar sozinho, porque
  * dependem de outra tabela (auditoria, para "sem movimentação") ou do estado
  * de OUTROS registros (a fase atual do processo, para "pendências de fases
@@ -992,6 +1209,17 @@ async function mergeFiltrosAssincronos(
   if (f.pendenciasFasesAnteriores) {
     extra.push(await whereFasesAnteriores({ processoId: f.processoId, familiaId: f.familiaId }, db))
   }
+  if (f.dataTipo === 'ultimaAtividade' && (f.dataInicio || f.dataFim)) {
+    const ids = await idsComAtividadeNoPeriodo(where, f.dataInicio, f.dataFim, db)
+    extra.push({ id: { in: ids } })
+  }
+  if (f.marcoFaseConcluida || f.dataTipo === 'mudancaFase') {
+    const processoIds = await processosComMudancaDeFase(
+      { dataInicio: f.dataInicio, dataFim: f.dataFim, faseOrigemKey: f.faseMacroKey, apenasConcluida: !!f.marcoFaseConcluida },
+      db,
+    )
+    extra.push({ processoId: { in: processoIds } })
+  }
   return extra.length > 0 ? { AND: [where, ...extra] } : where
 }
 
@@ -1005,6 +1233,8 @@ export interface IndicadoresGerenciais {
   atrasadas: number
   venceHoje: number
   concluidas: number
+  /** Concluídas HOJE (dia operacional) — distinto de `concluidas` (todo o recorte). */
+  concluidasHoje: number
   /** Ver `executavelAgora` em `tarefa-canonica.ts` — não é `total - bloqueadas - aguardando`. */
   executavelAgora: number
 }
@@ -1023,7 +1253,7 @@ export async function indicadoresGerenciais(
   const baseWhere = await mergeFiltrosAssincronos(base, whereGerencial(base, agora), agora, prisma)
   const w = (extra: Prisma.TarefaWhereInput) => ({ AND: [baseWhere, extra] })
   const janela = janelaDoDiaOperacional(agora)
-  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas, executavel] = await Promise.all([
+  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas, concluidasHoje, executavel] = await Promise.all([
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS } }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, responsavelId: null }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: 'EM_ANDAMENTO' }) }),
@@ -1037,11 +1267,14 @@ export async function indicadoresGerenciais(
       }),
     }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_CONCLUIDOS } }) }),
+    // CANCELADA/SUPERSEDIDA nunca contam aqui: `STATUS_CONCLUIDOS` já as
+    // exclui por desenho (spec: CANCELADA ≠ CONCLUÍDA).
+    prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_CONCLUIDOS }, dataConclusao: { gte: janela.inicio, lte: janela.fim } }) }),
     prisma.tarefa.count({ where: w(whereExecutavelAgora(true)) }),
   ])
   return {
     total, semResponsavel: semResp, emAndamento: andamento, aguardandoTerceiro: aguardando,
-    bloqueadas, atrasadas, venceHoje, concluidas, executavelAgora: executavel,
+    bloqueadas, atrasadas, venceHoje, concluidas, concluidasHoje, executavelAgora: executavel,
   }
 }
 
@@ -1155,6 +1388,182 @@ export async function facetasGerenciais(agora = new Date()) {
   }
 }
 
+/**
+ * O MARCO GERENCIAL de um processo — a transição de fase mais recente, com o
+ * contexto que o Administrador precisa para não abrir mais nada: quantas
+ * obrigações da fase que terminou foram cumpridas, quem as executava, e quem
+ * (se alguém) já é responsável pela fase nova.
+ *
+ * Fonte única: `PhaseAdvanceLog` (o mesmo log que decide se um avanço
+ * aconteceu — nunca `WorkflowEvento` recontado, nunca contagem de tarefa
+ * inferindo conclusão). "Concluídas/total" e "responsável" são CONTAGENS
+ * ABSOLUTAS da fase (não recortadas pelo filtro da tela): o marco descreve um
+ * fato que já aconteceu, e não muda porque o Administrador aplicou um filtro.
+ */
+export interface MarcoGerencial {
+  processoId: number
+  resultado: AdvanceResultado
+  faseAnteriorKey: string
+  faseAnteriorLabel: string
+  faseNovaKey: string | null
+  faseNovaLabel: string | null
+  em: string
+  concluidasNaFaseAnterior: number
+  totalNaFaseAnterior: number
+  /** `null` = ninguém executava (fase sem tarefa atribuída ainda). `'VARIOS'` = mais de um dono distinto. */
+  responsavelAnterior: { id: number; nome: string } | 'VARIOS' | null
+  /**
+   * Quem já responde pela fase nova. `null` quando a fase nova tem tarefa
+   * ATIVA mas nenhuma ainda tem responsável — é o "AGUARDANDO ATRIBUIÇÃO" que
+   * o Administrador precisa ver sem abrir o processo (spec §16): o motor NÃO
+   * atribui automaticamente quem termina uma fase à fase seguinte.
+   */
+  responsavelNovo: { id: number; nome: string } | 'VARIOS' | null
+  /** A fase nova já tem QUALQUER tarefa materializada? `false` = ainda não deu para saber quem assume. */
+  faseNovaMaterializada: boolean
+}
+
+/** Quem executa (distinto, não-nulo) as tarefas ATIVAS+CONCLUÍDAS de uma `(processo, fase)` — em lote, nunca um groupBy por linha. */
+async function responsavelDaFase(
+  pares: Array<{ processoId: number; faseMacroKey: string }>, db: Leitor,
+): Promise<Map<string, { id: number; nome: string } | 'VARIOS' | null>> {
+  const mapa = new Map<string, { id: number; nome: string } | 'VARIOS' | null>()
+  if (pares.length === 0) return mapa
+  const linhas = await db.tarefa.findMany({
+    where: {
+      OR: pares.map((p) => ({ processoId: p.processoId, faseMacroKey: p.faseMacroKey })),
+      statusTarefa: { in: STATUS_NO_QUADRO },
+      responsavelId: { not: null },
+    },
+    select: { processoId: true, faseMacroKey: true, responsavelId: true, responsavel: { select: { nome: true } } },
+  })
+  const porPar = new Map<string, Map<number, string>>()
+  for (const l of linhas) {
+    const chave = `${l.processoId}::${l.faseMacroKey}`
+    let m = porPar.get(chave)
+    if (!m) { m = new Map(); porPar.set(chave, m) }
+    if (l.responsavelId != null) m.set(l.responsavelId, l.responsavel?.nome ?? `#${l.responsavelId}`)
+  }
+  for (const p of pares) {
+    const chave = `${p.processoId}::${p.faseMacroKey}`
+    const m = porPar.get(chave)
+    if (!m || m.size === 0) mapa.set(chave, null)
+    else if (m.size === 1) { const [id, nome] = [...m.entries()][0]; mapa.set(chave, { id, nome }) }
+    else mapa.set(chave, 'VARIOS')
+  }
+  return mapa
+}
+
+/**
+ * A FASE ATUAL de cada processo tem tarefa ATIVA materializada, e quem já
+ * responde por ela — uma consulta em lote, base do "AGUARDANDO ATRIBUIÇÃO"
+ * (spec §16): só é `true` quando existe trabalho ativo real e ninguém o
+ * possui, nunca por presunção de fase recém-chegada.
+ */
+async function statusDaFaseAtual(
+  pares: Array<{ processoId: number; faseMacroKey: string }>, db: Leitor,
+): Promise<Map<string, { temTarefaAtiva: boolean; responsavel: { id: number; nome: string } | 'VARIOS' | null }>> {
+  const mapa = new Map<string, { temTarefaAtiva: boolean; responsavel: { id: number; nome: string } | 'VARIOS' | null }>()
+  if (pares.length === 0) return mapa
+  const linhas = await db.tarefa.findMany({
+    where: { OR: pares.map((p) => ({ processoId: p.processoId, faseMacroKey: p.faseMacroKey })), statusTarefa: { in: STATUS_ATIVOS } },
+    select: { processoId: true, faseMacroKey: true, responsavelId: true, responsavel: { select: { nome: true } } },
+  })
+  const porPar = new Map<string, Map<number, string>>()
+  const temAtivaPorPar = new Set<string>()
+  for (const l of linhas) {
+    const chave = `${l.processoId}::${l.faseMacroKey}`
+    temAtivaPorPar.add(chave)
+    if (l.responsavelId != null) {
+      let m = porPar.get(chave)
+      if (!m) { m = new Map(); porPar.set(chave, m) }
+      m.set(l.responsavelId, l.responsavel?.nome ?? `#${l.responsavelId}`)
+    }
+  }
+  for (const p of pares) {
+    const chave = `${p.processoId}::${p.faseMacroKey}`
+    const m = porPar.get(chave)
+    const responsavel = !m || m.size === 0 ? null : m.size === 1 ? (() => { const [id, nome] = [...m.entries()][0]; return { id, nome } })() : 'VARIOS' as const
+    mapa.set(chave, { temTarefaAtiva: temAtivaPorPar.has(chave), responsavel })
+  }
+  return mapa
+}
+
+/**
+ * O MARCO GERENCIAL mais recente de cada processo pedido — uma consulta em
+ * lote (nunca uma por processo). `null` quando o processo nunca teve uma
+ * transição de fase real.
+ */
+export async function marcosGerenciaisPorProcesso(
+  processoIds: number[], db: Leitor = prisma,
+): Promise<Map<number, MarcoGerencial>> {
+  const mapa = new Map<number, MarcoGerencial>()
+  if (processoIds.length === 0) return mapa
+
+  // Um log por processo: o mais recente, entre resultados que são transição
+  // REAL (nunca BLOQUEADO/CONFLITO/IDEMPOTENTE).
+  const logs = await db.phaseAdvanceLog.findMany({
+    where: { processoId: { in: processoIds }, resultado: { in: RESULTADOS_TRANSICAO_REAL } },
+    orderBy: { criadoEm: 'desc' },
+    select: { processoId: true, faseAtual: true, fasePretendida: true, resultado: true, criadoEm: true },
+  })
+  const maisRecentePorProcesso = new Map<number, (typeof logs)[number]>()
+  for (const l of logs) if (!maisRecentePorProcesso.has(l.processoId)) maisRecentePorProcesso.set(l.processoId, l)
+  if (maisRecentePorProcesso.size === 0) return mapa
+
+  const entradas = [...maisRecentePorProcesso.values()]
+  const paresAnterior = entradas.map((l) => ({ processoId: l.processoId, faseMacroKey: l.faseAtual }))
+  const paresNova = entradas.filter((l) => l.fasePretendida).map((l) => ({ processoId: l.processoId, faseMacroKey: l.fasePretendida! }))
+
+  // Contagens ABSOLUTAS da fase de origem — total e concluídas, direto da
+  // Tarefa canônica, sem recorte de filtro de tela.
+  const contagens = await db.tarefa.groupBy({
+    by: ['processoId', 'faseMacroKey', 'statusTarefa'],
+    where: { OR: paresAnterior.map((p) => ({ processoId: p.processoId, faseMacroKey: p.faseMacroKey })) },
+    _count: { _all: true },
+  })
+  const contagemPorPar = new Map<string, { total: number; concluidas: number }>()
+  for (const c of contagens) {
+    if (!c.faseMacroKey) continue
+    const chave = `${c.processoId}::${c.faseMacroKey}`
+    const atual = contagemPorPar.get(chave) ?? { total: 0, concluidas: 0 }
+    atual.total += c._count._all
+    if ((STATUS_CONCLUIDOS as string[]).includes(c.statusTarefa)) atual.concluidas += c._count._all
+    contagemPorPar.set(chave, atual)
+  }
+
+  const [responsaveisAnterior, responsaveisNova] = await Promise.all([
+    responsavelDaFase(paresAnterior, db),
+    responsavelDaFase(paresNova, db),
+  ])
+  // A fase nova já tem QUALQUER tarefa materializada (independente de responsável)?
+  const materializacaoNova = paresNova.length > 0
+    ? await db.tarefa.groupBy({ by: ['processoId', 'faseMacroKey'], where: { OR: paresNova } })
+    : []
+  const materializadaSet = new Set(materializacaoNova.map((m) => `${m.processoId}::${m.faseMacroKey}`))
+
+  for (const l of entradas) {
+    const chaveAnterior = `${l.processoId}::${l.faseAtual}`
+    const chaveNova = l.fasePretendida ? `${l.processoId}::${l.fasePretendida}` : null
+    const c = contagemPorPar.get(chaveAnterior) ?? { total: 0, concluidas: 0 }
+    mapa.set(l.processoId, {
+      processoId: l.processoId,
+      resultado: l.resultado,
+      faseAnteriorKey: l.faseAtual,
+      faseAnteriorLabel: labelDaFasePorPhaseKey(l.faseAtual) ?? l.faseAtual,
+      faseNovaKey: l.fasePretendida,
+      faseNovaLabel: l.fasePretendida ? labelDaFasePorPhaseKey(l.fasePretendida) ?? l.fasePretendida : null,
+      em: l.criadoEm.toISOString(),
+      totalNaFaseAnterior: c.total,
+      concluidasNaFaseAnterior: c.concluidas,
+      responsavelAnterior: responsaveisAnterior.get(chaveAnterior) ?? null,
+      responsavelNovo: chaveNova ? responsaveisNova.get(chaveNova) ?? null : null,
+      faseNovaMaterializada: chaveNova ? materializadaSet.has(chaveNova) : false,
+    })
+  }
+  return mapa
+}
+
 /** Contagens de um recorte (fase, processo ou família) — sempre os mesmos cinco números. */
 export interface ContagensAgrupadas {
   total: number
@@ -1186,6 +1595,16 @@ export interface ProcessoAgrupado extends ContagensAgrupadas {
    * `fases[].aFazer` para toda fase com `ordem` menor que a da fase atual.
    */
   pendenciasFaseAnterior: number
+  /** Derivado de `Processo.dataConclusao` — não existe enum de status do processo. */
+  statusProcesso: 'ATIVO' | 'CONCLUIDO'
+  /** A transição de fase mais recente deste processo — `null` se nunca avançou por este motor. */
+  ultimoMarco: MarcoGerencial | null
+  /**
+   * A fase ATUAL já tem tarefa materializada sem NENHUM responsável — o
+   * "AGUARDANDO ATRIBUIÇÃO" da spec §16. Nunca presumido: só `true` quando
+   * existe tarefa ativa na fase atual e todas estão sem dono.
+   */
+  aguardandoAtribuicao: boolean
 }
 
 export interface FamiliaAgrupada extends ContagensAgrupadas {
@@ -1204,6 +1623,8 @@ export interface FamiliaAgrupada extends ContagensAgrupadas {
   prazoMaisProximo: string | null
   /** Soma de `processos[].pendenciasFaseAnterior`. */
   pendenciasFaseAnterior: number
+  /** O marco gerencial mais recente entre os processos da família — para priorizar na "última atividade". */
+  ultimoMarco: MarcoGerencial | null
 }
 
 const zero = (): ContagensAgrupadas => ({
@@ -1256,7 +1677,7 @@ export async function agregacaoPorFamilia(
   const [processos, responsaveis] = await Promise.all([
     prisma.processo.findMany({
       where: { id: { in: processoIds } },
-      select: { id: true, nome: true, faseAtualKey: true, familiaId: true, familia: { select: { nome: true } } },
+      select: { id: true, nome: true, faseAtualKey: true, familiaId: true, familia: { select: { nome: true } }, dataConclusao: true },
     }),
     prisma.usuario.findMany({
       where: { id: { in: [...new Set(registros.map((r) => r.responsavelId).filter((id): id is number => id != null))] } },
@@ -1265,6 +1686,16 @@ export async function agregacaoPorFamilia(
   ])
   const processoDe = new Map(processos.map((p) => [p.id, p]))
   const nomeResponsavelDe = new Map(responsaveis.map((u) => [u.id, u.nome]))
+
+  // MARCO GERENCIAL e "AGUARDANDO ATRIBUIÇÃO" — em lote, absolutos (não
+  // recortados pelo filtro da tela), fonte `PhaseAdvanceLog`/`Tarefa` direto.
+  const paresFaseAtual = processos
+    .filter((p): p is typeof p & { faseAtualKey: string } => p.faseAtualKey != null)
+    .map((p) => ({ processoId: p.id, faseMacroKey: p.faseAtualKey }))
+  const [marcosPorProcesso, statusFaseAtualPorPar] = await Promise.all([
+    marcosGerenciaisPorProcesso(processoIds),
+    statusDaFaseAtual(paresFaseAtual, prisma),
+  ])
 
   // processoId -> faseMacroKey -> contagens
   const porProcessoFase = new Map<number, Map<string, ContagensAgrupadas>>()
@@ -1350,9 +1781,17 @@ export async function agregacaoPorFamilia(
       ? fases.filter((f) => f.ordem < ordemAtual).reduce((n, f) => n + f.aFazer, 0)
       : 0
 
+    const chaveFaseAtual = p.faseAtualKey != null ? `${processoId}::${p.faseAtualKey}` : null
+    const statusFaseAtual = chaveFaseAtual ? statusFaseAtualPorPar.get(chaveFaseAtual) : undefined
+
     const processoAgrupado: ProcessoAgrupado = {
       ...totalProcesso, processoId, nomeProcesso: p.nome, faseAtualKey: p.faseAtualKey, fases,
       pendenciasFaseAnterior,
+      statusProcesso: p.dataConclusao != null ? 'CONCLUIDO' : 'ATIVO',
+      ultimoMarco: marcosPorProcesso.get(processoId) ?? null,
+      // Só é "aguardando atribuição" quando existe trabalho ATIVO real na fase
+      // atual e nenhuma dessas tarefas tem dono — nunca por a fase ser nova.
+      aguardandoAtribuicao: !!statusFaseAtual?.temTarefaAtiva && statusFaseAtual.responsavel == null,
     }
 
     let familia = familias.get(chaveFamilia)
@@ -1366,8 +1805,12 @@ export async function agregacaoPorFamilia(
         ultimaAtividade: null,
         prazoMaisProximo: null,
         pendenciasFaseAnterior: 0,
+        ultimoMarco: null,
       }
       familias.set(chaveFamilia, familia)
+    }
+    if (processoAgrupado.ultimoMarco && (!familia.ultimoMarco || processoAgrupado.ultimoMarco.em > familia.ultimoMarco.em)) {
+      familia.ultimoMarco = processoAgrupado.ultimoMarco
     }
     familia.processos.push(processoAgrupado)
     somar(familia, totalProcesso)
@@ -1385,7 +1828,14 @@ export async function agregacaoPorFamilia(
       }
     }
     const ultima = ultimaPorFamilia.get(chaveFamilia)
-    familia.ultimaAtividade = ultima ? ultima.toISOString() : null
+    // "ÚLTIMA ATIVIDADE" PRIORIZA O MARCO GERENCIAL quando ele é o fato mais
+    // recente — "Genealogia concluída → Emissão Documental" conta mais do que
+    // "Daniela concluiu tarefa" na mesma janela de tempo (spec §15). As nove
+    // conclusões individuais continuam no Histórico de Atividades; aqui só o
+    // fato mais recente aparece.
+    const marcoEm = familia.ultimoMarco?.em ? new Date(familia.ultimoMarco.em) : null
+    const maisRecente = marcoEm && (!ultima || marcoEm > ultima) ? marcoEm : ultima
+    familia.ultimaAtividade = maisRecente ? maisRecente.toISOString() : null
     const menorPrazo = prazoMaisProximoPorFamilia.get(chaveFamilia)
     familia.prazoMaisProximo = menorPrazo ? menorPrazo.toISOString() : null
     familia.processos.sort((a, b) => a.nomeProcesso.localeCompare(b.nomeProcesso))
