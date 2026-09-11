@@ -349,6 +349,8 @@ function AbaVisaoGeral({ processo, faseProjecao }: { processo: ProcessoAgrupado;
  * nenhum dos dois casos existe botão de iniciar, porque a ação não é do
  * usuário logado.
  */
+const ESTADOS_TERMINAIS: string[] = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"]
+
 function AcaoDaTarefa({
   t, usuarioAtualId, podeIniciar, aoAbrir,
 }: {
@@ -357,6 +359,14 @@ function AcaoDaTarefa({
   podeIniciar: boolean
   aoAbrir: () => void
 }) {
+  // TERMINAL VENCE SEMPRE — uma tarefa CANCELADA/CONCLUÍDA sem responsável
+  // não está "aguardando atribuição" (isso implicaria ação pendente); ela só
+  // não tem mais dono porque não precisa de um. Checar isto ANTES do
+  // `responsavelId == null` evita ler "aguardando atribuição" numa linha que
+  // já acabou.
+  if (ESTADOS_TERMINAIS.includes(t.statusTarefa)) {
+    return <button onClick={aoAbrir} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">Abrir</button>
+  }
   if (t.responsavelId == null) {
     return <span className="text-[10px] uppercase tracking-wide text-amber-800/80">Aguardando atribuição</span>
   }
@@ -366,10 +376,6 @@ function AcaoDaTarefa({
         Atribuída a {t.responsavelNome ?? "—"}
       </button>
     )
-  }
-  const estadosTerminais = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"]
-  if (estadosTerminais.includes(t.statusTarefa)) {
-    return <button onClick={aoAbrir} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">Abrir</button>
   }
   if (!podeIniciar) {
     return <span className="text-[11px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</span>
