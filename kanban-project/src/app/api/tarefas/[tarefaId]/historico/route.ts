@@ -17,6 +17,7 @@ export async function GET(
     }
 
     // 🔒 E4 — confere o dono antes de ler o histórico (a tarefa e suas subtarefas).
+    // LEITURA: sem dono continua visível — ver o histórico não executa nada.
     const tarefa = await prisma.tarefa.findUnique({
       where: { id: tarefaId },
       select: { responsavelId: true }
@@ -24,7 +25,7 @@ export async function GET(
     if (!tarefa) {
       return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
     }
-    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+    const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId, { permiteSemDono: true })
     if (negado) return negado
 
     // O histórico é o da própria Tarefa. A execução se desdobra nos PASSOS do

@@ -1,20 +1,42 @@
 // src/lib/tarefa-acesso.ts
 //
 // ETAPA 4 — SEGURANÇA DE TAREFAS (anti-IDOR).
-// Cadeado de DONO no backend: um usuário comum só mexe/vê a PRÓPRIA tarefa
-// (ou uma sem dono). Admin vê tudo. O frontend NÃO é camada de segurança —
-// esta checagem roda no servidor, sempre.
+// Cadeado de DONO no backend: um usuário comum só mexe na PRÓPRIA tarefa.
+// Admin mexe em tudo. O frontend NÃO é camada de segurança — esta checagem
+// roda no servidor, sempre.
 //
-// Regra igual à da lista /api/tarefas (GET): dono = a tarefa é do usuário
-// OU está sem responsável. Admin ignora a regra.
+// SEM DONO ≠ QUALQUER UM PODE. "Está sem responsável" é motivo para permitir
+// LEITURA (ver na lista, abrir o deep-link, ver o histórico) — é a régua de
+// /api/tarefas (GET). Para EXECUTAR (iniciar, concluir, bloquear, agir num
+// passo do workflow), sem dono é bloqueio: a tarefa precisa de responsável
+// ANTES de alguém trabalhar nela, senão o trabalho fica em andamento sem
+// ninguém por trás. `permiteSemDono` é o opt-in explícito para o caso de
+// leitura; por padrão a função NEGA sem dono.
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioKanban } from "@/lib/kanban-auth"
 
+export interface OpcoesAcessoTarefa {
+  /**
+   * Sem dono NÃO é "qualquer um pode agir" — é "ninguém pode agir ainda". A
+   * régua antiga tratava `responsavelId === null` como dono automático para
+   * TODA chamada, inclusive EXECUTAR (iniciar, concluir, bloquear, um passo
+   * do workflow). Achado real (11/09/2026): a tela mostrava "Sem responsável"
+   * e mesmo assim deixava iniciar a etapa — a mesma regra que `iniciarTarefa`
+   * já aplicava explicitamente ("iniciar sem dono deixaria o trabalho em
+   * andamento e sem ninguém responsável por ele") não valia para as ações do
+   * passo do workflow, porque elas passam por ESTA função, que nunca negava.
+   *
+   * `true` só faz sentido para LEITURA/navegação (abrir o deep-link, ver o
+   * histórico) — nunca para uma ação que muda estado. Default `false`.
+   */
+  permiteSemDono?: boolean
+}
+
 /**
  * Confere se o usuário do request PODE acessar/mexer numa tarefa.
- * @returns null se PODE; ou uma Response de erro (401/403) se NÃO pode.
+ * @returns null se PODE; ou uma Response de erro (401/403/422) se NÃO pode.
  *
  * Uso nas rotas: buscar a tarefa → checar existência (404) → então:
  *   const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
@@ -23,6 +45,7 @@ import { extrairUsuarioKanban } from "@/lib/kanban-auth"
 export async function negarSeNaoForDonoDaTarefa(
   request: Request,
   responsavelId: number | null,
+  opcoes?: OpcoesAcessoTarefa,
 ): Promise<NextResponse | null> {
   const usuario = await extrairUsuarioKanban(request)
 
@@ -34,16 +57,24 @@ export async function negarSeNaoForDonoDaTarefa(
   // Admin vê e mexe em tudo
   if (usuario.tipo === "admin") return null
 
-  // Comum: só a própria tarefa OU uma sem dono (mesma régua da lista)
-  const ehDono = responsavelId === usuario.userId || responsavelId === null
-  if (!ehDono) {
+  if (responsavelId === usuario.userId) return null
+
+  // Sem dono: só passa quem pediu explicitamente (leitura/navegação). Para
+  // EXECUTAR, sem dono é bloqueio — mesma mensagem e código que
+  // `iniciarTarefa` já usa, para o frontend reconhecer os dois casos como o
+  // mesmo problema ("atribua antes de agir").
+  if (responsavelId === null) {
+    if (opcoes?.permiteSemDono) return null
     return NextResponse.json(
-      { error: "Você não tem acesso a esta tarefa." },
-      { status: 403 },
+      { error: "Esta tarefa/etapa não tem responsável. Atribua antes de agir sobre ela.", codigo: "SEM_RESPONSAVEL" },
+      { status: 422 },
     )
   }
 
-  return null
+  return NextResponse.json(
+    { error: "Você não tem acesso a esta tarefa." },
+    { status: 403 },
+  )
 }
 
 /**
@@ -54,12 +85,13 @@ export async function negarSeNaoForDonoDaTarefa(
 export async function negarSeNaoForDonoDaTarefaPorId(
   request: Request,
   tarefaId: number,
+  opcoes?: OpcoesAcessoTarefa,
 ): Promise<NextResponse | null> {
   const tarefa = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { responsavelId: true } })
   if (!tarefa) {
     return NextResponse.json({ error: "tarefa não encontrada", codigo: "TAREFA_NAO_ENCONTRADA" }, { status: 404 })
   }
-  return negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
+  return negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId, opcoes)
 }
 
 /**

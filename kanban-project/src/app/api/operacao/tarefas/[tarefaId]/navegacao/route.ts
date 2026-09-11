@@ -38,7 +38,10 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ tarefaI
   if (!alvo) {
     return NextResponse.json({ error: 'tarefa não encontrada' }, { status: 404 })
   }
-  const negado = await negarSeNaoForDonoDaTarefa(request, responsavelId)
+  // LEITURA: sem dono continua visível (é assim que a lista mostra tarefas
+  // não atribuídas). Quem executa a partir daqui passa por OUTRA porta, que
+  // nega sem dono por padrão.
+  const negado = await negarSeNaoForDonoDaTarefa(request, responsavelId, { permiteSemDono: true })
   if (negado) return negado
 
   return NextResponse.json({ alvo })

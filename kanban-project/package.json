@@ -258,6 +258,7 @@
     "test:workflow-controls-permissao": "tsx scripts/workflow-controls-permissao.test.ts",
     "test:perfil-assistente": "tsx scripts/perfil-assistente-sem-poder-destrutivo.test.ts",
     "test:central-etapa-sem-tela-vazia": "tsx scripts/central-etapa-sem-tela-vazia.test.ts",
+    "test:tarefa-acesso-sem-dono": "tsx scripts/tarefa-acesso-sem-dono.test.ts",
     "test:andamento-operacional": "tsx scripts/andamento-operacional.test.ts",
     "test:regras-documentais": "tsx scripts/regras-documentais.test.ts",
     "test:regras-documentais-guard": "tsx scripts/regras-documentais-guard.test.ts",
