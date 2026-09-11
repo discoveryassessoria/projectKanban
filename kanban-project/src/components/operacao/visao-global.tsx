@@ -14,6 +14,13 @@
 // pergunta "o que a Daniela concluiu hoje" não muda de resposta por causa da
 // aba em que foi feita.
 //
+// ─── IDENTIDADE VISUAL ──────────────────────────────────────────────────────
+// Componentes de `components/ui/*` (shadcn/radix, já no tema Discovery
+// ivory/azul) — nunca `<select>`/`<input>`/`<button>` cru. Elevação em
+// `--elev-1/2/3`, superfícies de leitura sempre OPACAS (nunca
+// `bg-.../30`), radius `--radius-md/lg`. Mesmo vocabulário de
+// `src/components/home/home-primitives.tsx`.
+//
 // ─── A COLUNA NÃO É UMA MÁQUINA DE ESTADOS ──────────────────────────────────
 // O Kanban global mostra o estado da TAREFA, nunca os passos do workflow. Uma
 // certidão em "Em andamento" pode estar na etapa "Conferir certidão" — a etapa
@@ -33,8 +40,14 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ListChecks, AlertTriangle, Clock, CheckCircle2, Users2, FileStack,
-  Bookmark, ChevronDown, Plus, SlidersHorizontal, X as XIcon,
+  Bookmark, ChevronDown, Plus, SlidersHorizontal, X as XIcon, MoreVertical, ArrowUpDown,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { CampoData } from "@/src/components/ui/campo-data"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ProcessoExpandido } from "./processo-expandido"
@@ -145,6 +158,8 @@ const ROTULO_DATA_TIPO: Record<DataTipo, string> = {
   criada: "Criada em", concluida: "Concluída em", vencimento: "Vencimento",
   ultimaAtividade: "Última atividade", mudancaFase: "Mudança de fase",
 }
+/** Sentinela do shadcn Select — Radix não aceita `value=""`. `null`/`""` no domínio vira `"todos"` na UI. */
+const TODOS = "todos"
 
 /** Iniciais para o avatar — quem é o responsável se lê antes de ler o nome. */
 function iniciais(nome: string): string {
@@ -153,28 +168,28 @@ function iniciais(nome: string): string {
 }
 
 function Responsavel({ nome }: { nome: string | null }) {
-  if (!nome) return <span className="text-[11px] text-[var(--text-muted)]">Sem responsável</span>
+  if (!nome) return <span className="text-[12px] text-[var(--text-muted)]">Sem responsável</span>
   return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--surface-primary)] text-[9px] font-medium text-white/70">
+    <span className="inline-flex items-center gap-2">
+      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--surface-tertiary)] text-[10px] font-semibold text-[var(--text-primary)]">
         {iniciais(nome)}
       </span>
-      <span className="truncate text-[11px] text-white/70">{nome}</span>
+      <span className="truncate text-[12px] text-[var(--text-primary)]">{nome}</span>
     </span>
   )
 }
 
-const CLASSE_CAMPO = "w-full rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
-
 /** Um campo rotulado da barra de filtros — rótulo em cima, controle embaixo, sempre a mesma forma. */
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[10px] text-[var(--text-muted)]">{rotulo}</span>
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[11px] font-medium text-[var(--text-secondary)]">{rotulo}</span>
       {children}
     </label>
   )
 }
+
+const CLASSE_SELECT = "w-full bg-[var(--surface-elevated)] text-[13px] data-[size=default]:h-9"
 
 /** As condições derivadas que mudam a decisão de quem lê — nunca status novo. */
 function Sinais({ l }: { l: LinhaGerencial }) {
@@ -190,20 +205,20 @@ function Sinais({ l }: { l: LinhaGerencial }) {
   )
 }
 
-/** Os seis números do topo — CANÔNICOS e IDÊNTICOS nas quatro abas (spec §4: nunca um número independente da listagem). */
+/** Os seis números do topo — CANÔNICOS e IDÊNTICOS nas quatro abas (nunca um número independente da listagem). */
 const TILES: Array<{
   chave: keyof RespostaFamilias["indicadores"]; rotulo: string; tom: string; icone: typeof ListChecks
   iconeTom: string; filtro?: Partial<Filtros>
 }> = [
-  { chave: "tarefasAbertas", rotulo: "Tarefas abertas", tom: "text-white/90", icone: ListChecks, iconeTom: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
-  { chave: "atrasadas", rotulo: "Atrasadas", tom: "text-red-700/90", icone: AlertTriangle, iconeTom: "bg-red-950/30 text-red-400", filtro: { atrasadas: true } },
-  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-amber-800/90", icone: Clock, iconeTom: "bg-amber-950/30 text-amber-400", filtro: { venceHoje: true } },
+  { chave: "tarefasAbertas", rotulo: "Tarefas abertas", tom: "text-[var(--text-primary)]", icone: ListChecks, iconeTom: "bg-[var(--info-tile)] text-[var(--info-text)]" },
+  { chave: "atrasadas", rotulo: "Atrasadas", tom: "text-[var(--danger-text)]", icone: AlertTriangle, iconeTom: "bg-[var(--danger-tile)] text-[var(--danger-text)]", filtro: { atrasadas: true } },
+  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-[var(--warning-text)]", icone: Clock, iconeTom: "bg-[var(--warning-tile)] text-[var(--warning-text)]", filtro: { venceHoje: true } },
   {
-    chave: "concluidasHoje", rotulo: "Concluídas (hoje)", tom: "text-green-800/90", icone: CheckCircle2, iconeTom: "bg-green-950/30 text-green-400",
+    chave: "concluidasHoje", rotulo: "Concluídas (hoje)", tom: "text-[var(--success-text)]", icone: CheckCircle2, iconeTom: "bg-[var(--success-tile)] text-[var(--success-text)]",
     filtro: { dataTipo: "concluida", dataInicio: new Date().toISOString().slice(0, 10), dataFim: new Date().toISOString().slice(0, 10) },
   },
-  { chave: "familias", rotulo: "Famílias", tom: "text-white/90", icone: Users2, iconeTom: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
-  { chave: "processos", rotulo: "Processos", tom: "text-white/90", icone: FileStack, iconeTom: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
+  { chave: "familias", rotulo: "Famílias", tom: "text-[var(--text-primary)]", icone: Users2, iconeTom: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]" },
+  { chave: "processos", rotulo: "Processos", tom: "text-[var(--text-primary)]", icone: FileStack, iconeTom: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]" },
 ]
 
 interface VisaoSalva { id: number; nome: string; spec: { filtros: Filtros; modo: string } }
@@ -368,9 +383,8 @@ export function VisaoGlobal() {
   const limpar = () => { setBuscaDigitada(""); setFiltros(SEM_FILTRO); setRascunho(SEM_FILTRO) }
 
   // ── RASCUNHO DE FILTROS — a segunda linha e "Mais filtros" só valem depois
-  // de "Aplicar filtros" (spec: reproduzir a referência, que tem um botão de
-  // aplicar explícito). Busca e os TILES continuam instantâneos: são o atalho
-  // rápido, não a composição de uma consulta complexa.
+  // de "Aplicar filtros". Busca e os TILES continuam instantâneos: são o
+  // atalho rápido, não a composição de uma consulta complexa.
   const [rascunho, setRascunho] = useState<Filtros>(SEM_FILTRO)
   useEffect(() => { setRascunho(filtros) }, [filtros])
   const mudarRascunho = (p: Partial<Filtros>) => setRascunho((f) => ({ ...f, ...p }))
@@ -381,7 +395,6 @@ export function VisaoGlobal() {
   // "tarefas-e-projetos"), a MESMA tabela genérica de visão salva do motor de
   // Relatórios. Ver src/app/api/operacao/visao-global/visoes/route.ts.
   const [minhasVisoes, setMinhasVisoes] = useState<VisaoSalva[] | null>(null)
-  const [menuVisoesAberto, setMenuVisoesAberto] = useState(false)
   const [salvarAberto, setSalvarAberto] = useState(false)
   const [nomeVisao, setNomeVisao] = useState("")
   const [salvandoVisao, setSalvandoVisao] = useState(false)
@@ -411,7 +424,6 @@ export function VisaoGlobal() {
     setFiltros(v.spec.filtros)
     setBuscaDigitada(v.spec.filtros.busca ?? "")
     if (v.spec.modo === "visaoGeral" || v.spec.modo === "lista" || v.spec.modo === "kanban" || v.spec.modo === "calendario") setModo(v.spec.modo)
-    setMenuVisoesAberto(false)
   }
   const excluirVisaoSalva = async (id: number) => {
     await fetch(`/api/operacao/visao-global/visoes?id=${id}`, { method: "DELETE", headers: auth() }).catch(() => {})
@@ -431,98 +443,82 @@ export function VisaoGlobal() {
   }, [dadosFamilias])
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[var(--surface-page)]">
       {/* ── CABEÇALHO DA CENTRAL ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/[0.06] px-5 py-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-6 py-5">
         <div>
-          <h1 className="text-[20px] font-semibold text-white/95">Tarefas e Projetos</h1>
-          <p className="mt-0.5 text-[12px] text-[var(--text-muted)]">Acompanhe todas as tarefas, processos e atividades da sua equipe.</p>
+          <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">Tarefas e Projetos</h1>
+          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">Acompanhe todas as tarefas, processos e atividades da sua equipe.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <button
-              onClick={() => setSalvarAberto((v) => !v)}
-              className="flex items-center gap-1.5 rounded border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
-            >
-              <Bookmark size={13} /> Salvar visão
-            </button>
-            {salvarAberto && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setSalvarAberto(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-64 rounded border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
-                  <label className="block text-[10px] text-[var(--text-muted)]">Nome da visão</label>
-                  <input
-                    autoFocus value={nomeVisao} onChange={(e) => setNomeVisao(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && salvarVisaoAtual()}
-                    placeholder="Ex.: Minha fila de hoje"
-                    className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/85 focus:border-white/25 focus:outline-none"
-                  />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button onClick={() => setSalvarAberto(false)} className="text-[11px] text-[var(--text-secondary)] hover:text-white/80">Cancelar</button>
+          <Popover open={salvarAberto} onOpenChange={setSalvarAberto}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm"><Bookmark size={14} /> Salvar visão</Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 bg-[var(--surface-overlay)]">
+              <label className="block text-[11px] font-medium text-[var(--text-secondary)]">Nome da visão</label>
+              <Input
+                autoFocus value={nomeVisao} onChange={(e) => setNomeVisao(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && salvarVisaoAtual()}
+                placeholder="Ex.: Minha fila de hoje"
+                className="mt-1.5 h-9 bg-[var(--surface-elevated)] text-[13px]"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setSalvarAberto(false)}>Cancelar</Button>
+                <Button size="sm" disabled={!nomeVisao.trim() || salvandoVisao} onClick={salvarVisaoAtual}>Salvar</Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <DropdownMenu onOpenChange={(v) => v && !minhasVisoes && carregarVisoes()}>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">Minhas visões <ChevronDown size={14} /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72 bg-[var(--surface-overlay)]">
+              {minhasVisoes == null && <div className="px-2 py-2 text-[12px] text-[var(--text-muted)]">Carregando…</div>}
+              {minhasVisoes?.length === 0 && <div className="px-2 py-2 text-[12px] text-[var(--text-muted)]">Nenhuma visão salva ainda.</div>}
+              {minhasVisoes?.map((v, i) => (
+                <Fragment key={v.id}>
+                  {i > 0 && <DropdownMenuSeparator />}
+                  <DropdownMenuItem className="flex items-center justify-between gap-2" onSelect={() => abrirVisaoSalva(v)}>
+                    <span className="min-w-0 flex-1 truncate">{v.nome}</span>
                     <button
-                      disabled={!nomeVisao.trim() || salvandoVisao} onClick={salvarVisaoAtual}
-                      className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] text-white/85 disabled:opacity-40"
+                      onClick={(e) => { e.stopPropagation(); excluirVisaoSalva(v.id) }}
+                      aria-label={`Excluir visão ${v.nome}`}
+                      className="shrink-0 text-[var(--text-muted)] hover:text-[var(--danger-text)]"
                     >
-                      Salvar
+                      <XIcon size={13} />
                     </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-          <div className="relative">
-            <button
-              onClick={() => { setMenuVisoesAberto((v) => !v); if (!minhasVisoes) carregarVisoes() }}
-              className="flex items-center gap-1.5 rounded border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
-            >
-              Minhas visões <ChevronDown size={13} />
-            </button>
-            {menuVisoesAberto && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuVisoesAberto(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-72 rounded border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--elev-3)]">
-                  {minhasVisoes == null && <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">Carregando…</div>}
-                  {minhasVisoes?.length === 0 && <div className="px-3 py-2 text-[11px] text-[var(--text-muted)]">Nenhuma visão salva ainda.</div>}
-                  {minhasVisoes?.map((v) => (
-                    <div key={v.id} className="flex items-center justify-between px-3 py-1.5 hover:bg-[var(--surface-primary)]">
-                      <button onClick={() => abrirVisaoSalva(v)} className="min-w-0 flex-1 truncate text-left text-[12px] text-white/85">{v.nome}</button>
-                      <button onClick={() => excluirVisaoSalva(v.id)} aria-label={`Excluir visão ${v.nome}`} className="ml-2 shrink-0 text-[var(--text-muted)] hover:text-red-400">
-                        <XIcon size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-          <button
-            onClick={() => setMaisFiltros(true)}
-            className="flex items-center gap-1.5 rounded bg-[var(--action-primary)] px-3 py-1.5 text-[12px] font-medium text-white transition-opacity hover:opacity-90"
-          >
-            <Plus size={14} /> Novo Filtro
-          </button>
+                  </DropdownMenuItem>
+                </Fragment>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button size="sm" onClick={() => setMaisFiltros(true)}><Plus size={14} /> Novo Filtro</Button>
         </div>
       </div>
 
       {/* ── NAVEGAÇÃO DE ABAS ── */}
-      <div className="flex items-center gap-1 border-b border-white/[0.06] px-5 pt-1">
+      <div className="flex items-center gap-1 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-6">
         {([
           ["visaoGeral", "Visão Geral"], ["lista", "Lista"], ["kanban", "Kanban"], ["calendario", "Calendário"],
         ] as const).map(([m, r]) => (
           <button
             key={m}
             onClick={() => setModo(m)}
-            className={`border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${
-              modo === m ? "border-[var(--action-primary)] text-white/95" : "border-transparent text-[var(--text-secondary)] hover:text-white/80"
+            className={`relative px-3 py-3 text-[13px] font-medium transition-colors ${
+              modo === m ? "text-[var(--action-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             }`}
           >
             {r}
+            {modo === m && <span className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-[var(--action-primary)]" />}
           </button>
         ))}
       </div>
 
       {/* ── INDICADORES ── canônicos e clicáveis: cada número é um atalho de filtro. */}
-      <div className="grid grid-cols-2 gap-3 border-b border-white/[0.06] px-5 py-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 px-6 py-5 sm:grid-cols-3 lg:grid-cols-6">
         {TILES.map((t) => {
           const Icone = t.icone
           return (
@@ -531,170 +527,153 @@ export function VisaoGlobal() {
               type="button"
               disabled={!t.filtro}
               onClick={() => t.filtro && aplicar(t.filtro)}
-              className={`flex items-center justify-between gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3.5 py-3 text-left transition-colors ${
-                t.filtro ? "cursor-pointer hover:border-[var(--border-strong)]" : "cursor-default"
+              className={`flex items-center justify-between gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3.5 text-left shadow-[var(--elev-1)] transition-all ${
+                t.filtro ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-[var(--elev-2)]" : "cursor-default"
               }`}
             >
               <div>
-                <div className={`text-[22px] font-semibold leading-6 tabular-nums ${t.tom}`}>
+                <div className={`text-[24px] font-semibold leading-7 tabular-nums ${t.tom}`}>
                   {dadosFamilias ? dadosFamilias.indicadores[t.chave] : "—"}
                 </div>
-                <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-muted)]">{t.rotulo}</div>
+                <div className="mt-0.5 text-[12px] leading-4 text-[var(--text-muted)]">{t.rotulo}</div>
               </div>
-              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${t.iconeTom}`}>
-                <Icone size={16} />
+              <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${t.iconeTom}`}>
+                <Icone size={18} />
               </span>
             </button>
           )
         })}
       </div>
 
-      {/* ── FILTROS ── uma barra só, para as quatro abas (spec §5): primeira
-          linha sempre visível, segunda linha com tipo/família/processo +
-          ações, "Mais filtros" abre a terceira. Só "Aplicar filtros" busca —
-          exceto Pesquisar e os TILES, que continuam instantâneos. */}
-      <div className="border-b border-white/[0.06] px-5 py-3">
+      {/* ── FILTROS ── uma barra só, para as quatro abas: primeira linha
+          sempre visível, segunda linha com tipo/família/processo + ações,
+          "Mais filtros" abre a terceira. Só "Aplicar filtros" busca — exceto
+          Pesquisar e os TILES, que continuam instantâneos. */}
+      <div className="mx-6 rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-5 py-4 shadow-[var(--elev-1)]">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Campo rotulo="Pesquisar">
-            <input
+            <Input
               value={buscaDigitada}
               onChange={(e) => setBuscaDigitada(e.target.value)}
-              placeholder="Nome do processo, família, tarefa…"
-              className={CLASSE_CAMPO}
+              placeholder="Processo, família, tarefa…"
+              className="h-9 bg-[var(--surface-elevated)] text-[13px]"
             />
           </Campo>
           <Campo rotulo="Período">
-            <div className="flex items-center gap-1">
-              <input
-                type="date" value={rascunho.dataInicio ?? ""} onChange={(e) => mudarRascunho({ dataInicio: e.target.value || null })}
-                className={CLASSE_CAMPO}
-              />
-              <span className="text-[10px] text-[var(--text-muted)]">–</span>
-              <input
-                type="date" value={rascunho.dataFim ?? ""} onChange={(e) => mudarRascunho({ dataFim: e.target.value || null })}
-                className={CLASSE_CAMPO}
-              />
+            <div className="flex items-center gap-1.5">
+              <CampoData value={rascunho.dataInicio} onChange={(v) => mudarRascunho({ dataInicio: v })} className="w-full rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-2 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]" />
+              <span className="text-[11px] text-[var(--text-muted)]">–</span>
+              <CampoData value={rascunho.dataFim} onChange={(v) => mudarRascunho({ dataFim: v })} className="w-full rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-2 text-[12.5px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]" />
             </div>
           </Campo>
           <Campo rotulo="Responsável">
-            <select
-              value={rascunho.semResponsavel ? "sem" : rascunho.responsavel ?? ""}
-              onChange={(e) => { const v = e.target.value; mudarRascunho({ semResponsavel: v === "sem", responsavel: v && v !== "sem" ? Number(v) : null }) }}
-              className={CLASSE_CAMPO}
+            <Select
+              value={rascunho.semResponsavel ? "sem" : rascunho.responsavel != null ? String(rascunho.responsavel) : TODOS}
+              onValueChange={(v) => mudarRascunho({ semResponsavel: v === "sem", responsavel: v !== TODOS && v !== "sem" ? Number(v) : null })}
             >
-              <option value="">Todos</option>
-              <option value="sem">Sem responsável</option>
-              {dados?.facetas.responsaveis.map((r) => <option key={r.responsavelId} value={r.responsavelId}>{r.nome} ({r.tarefas})</option>)}
-            </select>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                <SelectItem value="sem">Sem responsável</SelectItem>
+                {dados?.facetas.responsaveis.map((r) => <SelectItem key={r.responsavelId} value={String(r.responsavelId)}>{r.nome} ({r.tarefas})</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Campo>
           <Campo rotulo="Fase">
-            <select value={rascunho.fase ?? ""} onChange={(e) => mudarRascunho({ fase: e.target.value || null })} className={CLASSE_CAMPO}>
-              <option value="">Todas</option>
-              {dados?.facetas.fases.map((f) => <option key={f.faseMacroKey} value={f.faseMacroKey}>{rotularFase(f.faseMacroKey)} ({f.tarefas})</option>)}
-            </select>
+            <Select value={rascunho.fase ?? TODOS} onValueChange={(v) => mudarRascunho({ fase: v === TODOS ? null : v })}>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {dados?.facetas.fases.map((f) => <SelectItem key={f.faseMacroKey} value={f.faseMacroKey}>{rotularFase(f.faseMacroKey)} ({f.tarefas})</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Campo>
           <Campo rotulo="Status da tarefa">
-            <select
-              value={rascunho.statusTarefa[0] ?? ""}
-              onChange={(e) => mudarRascunho({ statusTarefa: e.target.value ? [e.target.value] : [] })}
-              className={CLASSE_CAMPO}
-            >
-              <option value="">Todos</option>
-              {Object.entries(ROTULO_STATUS).map(([k, r]) => <option key={k} value={k}>{r}</option>)}
-            </select>
+            <Select value={rascunho.statusTarefa[0] ?? TODOS} onValueChange={(v) => mudarRascunho({ statusTarefa: v === TODOS ? [] : [v] })}>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                {Object.entries(ROTULO_STATUS).map(([k, r]) => <SelectItem key={k} value={k}>{r}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Campo>
           <Campo rotulo="Status do processo">
-            <select
-              value={rascunho.statusProcesso ?? ""}
-              onChange={(e) => mudarRascunho({ statusProcesso: (e.target.value || null) as Filtros["statusProcesso"] })}
-              className={CLASSE_CAMPO}
-            >
-              <option value="">Todos</option>
-              <option value="ATIVO">Ativo</option>
-              <option value="CONCLUIDO">Concluído</option>
-            </select>
+            <Select value={rascunho.statusProcesso ?? TODOS} onValueChange={(v) => mudarRascunho({ statusProcesso: v === TODOS ? null : (v as Filtros["statusProcesso"]) })}>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                <SelectItem value="ATIVO">Ativo</SelectItem>
+                <SelectItem value="CONCLUIDO">Concluído</SelectItem>
+              </SelectContent>
+            </Select>
           </Campo>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 items-end gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="mt-3.5 grid grid-cols-2 items-end gap-3 border-t border-[var(--border-subtle)] pt-3.5 sm:grid-cols-3 lg:grid-cols-6">
           <Campo rotulo="Tipo de tarefa">
-            <select
-              value={rascunho.tipoTarefa[0] ?? ""}
-              onChange={(e) => mudarRascunho({ tipoTarefa: e.target.value ? [e.target.value] : [] })}
-              className={CLASSE_CAMPO}
-            >
-              <option value="">Todos</option>
-              <option value="NORMAL">Normal</option>
-              <option value="TRANSVERSAL">Antecipada</option>
-            </select>
+            <Select value={rascunho.tipoTarefa[0] ?? TODOS} onValueChange={(v) => mudarRascunho({ tipoTarefa: v === TODOS ? [] : [v] })}>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                <SelectItem value="NORMAL">Normal</SelectItem>
+                <SelectItem value="TRANSVERSAL">Antecipada</SelectItem>
+              </SelectContent>
+            </Select>
           </Campo>
           <Campo rotulo="Família">
-            <select value={rascunho.familia ?? ""} onChange={(e) => mudarRascunho({ familia: e.target.value ? Number(e.target.value) : null })} className={CLASSE_CAMPO}>
-              <option value="">Todas</option>
-              {opcoesFamilia.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
-            </select>
+            <Select value={rascunho.familia != null ? String(rascunho.familia) : TODOS} onValueChange={(v) => mudarRascunho({ familia: v === TODOS ? null : Number(v) })}>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todas</SelectItem>
+                {opcoesFamilia.map(([id, nome]) => <SelectItem key={id} value={String(id)}>{nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Campo>
           <Campo rotulo="Processo">
-            <select value={rascunho.processoId ?? ""} onChange={(e) => mudarRascunho({ processoId: e.target.value ? Number(e.target.value) : null })} className={CLASSE_CAMPO}>
-              <option value="">Todos</option>
-              {opcoesProcesso.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
-            </select>
+            <Select value={rascunho.processoId != null ? String(rascunho.processoId) : TODOS} onValueChange={(v) => mudarRascunho({ processoId: v === TODOS ? null : Number(v) })}>
+              <SelectTrigger className={CLASSE_SELECT}><SelectValue /></SelectTrigger>
+              <SelectContent className="bg-[var(--surface-overlay)]">
+                <SelectItem value={TODOS}>Todos</SelectItem>
+                {opcoesProcesso.map(([id, nome]) => <SelectItem key={id} value={String(id)}>{nome}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Campo>
           <div className="flex items-center gap-2">
-            <button
+            <Button
+              variant={maisFiltros ? "secondary" : "outline"} size="sm"
               onClick={() => setMaisFiltros((v) => !v)}
-              className={`flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-                maisFiltros ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/90" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
-              }`}
             >
-              <SlidersHorizontal size={12} /> Mais filtros
+              <SlidersHorizontal size={13} /> Mais filtros
               {(rascunho.marcoFaseConcluida || rascunho.atrasadas || rascunho.venceHoje) && (
-                <span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--action-primary)] text-[9px] text-white">
+                <span className="grid h-4 w-4 place-items-center rounded-full bg-[var(--action-primary)] text-[9px] font-semibold text-[var(--action-primary-ink)]">
                   {[rascunho.marcoFaseConcluida, rascunho.atrasadas, rascunho.venceHoje].filter(Boolean).length}
                 </span>
               )}
-            </button>
-            {temFiltro(filtros) && (
-              <button onClick={limpar} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">
-                Limpar filtros
-              </button>
-            )}
+            </Button>
+            {temFiltro(filtros) && <Button variant="link" size="sm" onClick={limpar} className="px-0 text-[var(--text-secondary)]">Limpar filtros</Button>}
           </div>
           <div className="col-span-2 flex items-center justify-end gap-3 sm:col-span-1 lg:col-span-3">
-            <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
+            <span className="text-[12px] tabular-nums text-[var(--text-muted)]">
               {modo === "visaoGeral" ? (dadosFamilias ? `${dadosFamilias.familias.length} famílias` : "")
                 : dados ? `${linhas.length} de ${dados.total}` : ""}
             </span>
-            <button
-              onClick={aplicarRascunho}
-              className={`rounded px-4 py-1.5 text-[12px] font-medium text-white transition-opacity ${rascunhoDivergeDoAplicado ? "bg-[var(--action-primary)] hover:opacity-90" : "bg-[var(--action-primary)]/60"}`}
-            >
-              Aplicar filtros
-            </button>
+            <Button size="sm" onClick={aplicarRascunho} disabled={!rascunhoDivergeDoAplicado && !temFiltro(rascunho)}>Aplicar filtros</Button>
           </div>
         </div>
 
         {maisFiltros && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-3">
-            <button
+          <div className="mt-3.5 flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3.5">
+            <Button
+              variant={rascunho.marcoFaseConcluida ? "secondary" : "outline"} size="sm"
               onClick={() => mudarRascunho({ marcoFaseConcluida: !rascunho.marcoFaseConcluida })}
-              className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-                rascunho.marcoFaseConcluida ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
-              }`}
               title="Processos cuja fase (filtro 'Fase' = fase de origem) foi concluída no período"
             >
               Marco: fase concluída
-            </button>
+            </Button>
             {([["atrasadas", "Atrasadas"], ["venceHoje", "Vence hoje"]] as const).map(([k, r]) => (
-              <button
-                key={k}
-                onClick={() => mudarRascunho({ [k]: !rascunho[k] } as Partial<Filtros>)}
-                className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-                  rascunho[k] ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
-                }`}
-              >
+              <Button key={k} variant={rascunho[k] ? "secondary" : "outline"} size="sm" onClick={() => mudarRascunho({ [k]: !rascunho[k] } as Partial<Filtros>)}>
                 {r}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -702,7 +681,7 @@ export function VisaoGlobal() {
 
       {/* ── CHIPS DE FILTRO ATIVO ── */}
       {temFiltro(filtros) && (
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-white/[0.06] px-5 py-2">
+        <div className="mx-6 mt-3 flex flex-wrap items-center gap-1.5">
           {filtros.busca && <Chip rotulo={`Buscar: ${filtros.busca}`} aoRemover={() => { setBuscaDigitada(""); aplicar({ busca: "" }) }} />}
           {(filtros.dataInicio || filtros.dataFim) && (
             <Chip
@@ -728,7 +707,7 @@ export function VisaoGlobal() {
           {filtros.venceHoje && <Chip rotulo="Vence hoje" aoRemover={() => aplicar({ venceHoje: false })} />}
           <button
             onClick={() => { setNomeVisao(""); setSalvarAberto(true) }}
-            className="ml-1 text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline"
+            className="ml-1 text-[12px] font-medium text-[var(--action-primary)] underline-offset-2 hover:underline"
           >
             Salvar filtro
           </button>
@@ -736,71 +715,66 @@ export function VisaoGlobal() {
       )}
 
       {(erroComando || aviso) && (
-        <div className={`border-b px-4 py-2 text-[11px] ${erroComando ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700/90" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800/90"}`}>
+        <div className={`mx-6 mt-3 rounded-lg border px-3.5 py-2 text-[12.5px] ${erroComando ? "border-[var(--danger-tile)] bg-[var(--danger-tile)] text-[var(--danger-text)]" : "border-[var(--success-tile)] bg-[var(--success-tile)] text-[var(--success-text)]"}`}>
           {erroComando ?? aviso}
         </div>
       )}
 
       {modo !== "visaoGeral" && modo !== "calendario" && selecionados.size > 0 && (
-        <div className="flex items-center gap-3 border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2">
-          <span className="text-[11px] text-white/85">{selecionados.size} selecionada{selecionados.size === 1 ? "" : "s"}</span>
-          <button
-            onClick={() => setAlvoLote({ linhas: linhas.filter((l) => selecionados.has(l.taskId)) })}
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
-          >
-            Atribuir para…
-          </button>
-          <button onClick={() => setSelecionados(new Set())} className="text-[11px] text-[var(--text-secondary)] hover:text-white/80">
-            Limpar seleção
-          </button>
+        <div className="mx-6 mt-3 flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3.5 py-2">
+          <span className="text-[12px] font-medium text-[var(--text-primary)]">{selecionados.size} selecionada{selecionados.size === 1 ? "" : "s"}</span>
+          <Button size="sm" variant="outline" onClick={() => setAlvoLote({ linhas: linhas.filter((l) => selecionados.has(l.taskId)) })}>Atribuir para…</Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelecionados(new Set())}>Limpar seleção</Button>
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {modo === "visaoGeral" && falhouFamilias && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
-        {modo === "visaoGeral" && carregandoFamilias && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
-        {modo === "visaoGeral" && dadosFamilias && dadosFamilias.familias.length === 0 && (
-          <Estado tipo="vazio" mensagem={temFiltro(filtros) ? "Nenhum processo com esses filtros." : "Nenhuma tarefa na operação."} />
-        )}
-        {modo === "visaoGeral" && dadosFamilias && dadosFamilias.familias.length > 0 && (
-          <VisaoGeralTabela
-            familias={dadosFamilias.familias}
-            pagina={paginaFamilias}
-            aoMudarPagina={setPaginaFamilias}
-            podeAtribuir={podeAtribuir}
-            aoAbrirTarefa={irParaOProcesso}
-          />
-        )}
-        {modo === "calendario" && (
-          <Calendario linhas={linhas} carregando={carregando} falhou={falhou} aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }} />
-        )}
-        {modo !== "visaoGeral" && modo !== "calendario" && falhou && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
-        {modo !== "visaoGeral" && modo !== "calendario" && carregando && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
-        {modo !== "visaoGeral" && modo !== "calendario" && dados && linhas.length === 0 && (
-          <Estado tipo="vazio" mensagem={temFiltro(filtros) ? "Nenhuma tarefa com esses filtros." : "Nenhuma tarefa na operação."} />
-        )}
-        {dados && linhas.length > 0 && modo === "lista" && (
-          <Lista
-            linhas={ordenadas}
-            ordem={ordem}
-            aoOrdenar={(campo) => setOrdem((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }))}
-            aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }}
-            aoDistribuir={setAlvo}
-            selecionados={selecionados}
-            todosSelecionados={todosSelecionadosVisiveis}
-            aoAlternarSelecao={alternarSelecao}
-            aoAlternarTodos={alternarTodos}
-          />
-        )}
-        {dados && linhas.length > 0 && modo === "kanban" && (
-          <Quadro
-            porColuna={porColuna}
-            aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }}
-            aoDistribuir={setAlvo}
-            aoComandar={comandar}
-            ocupado={ocupado}
-          />
-        )}
+      <div className="mx-6 mb-6 mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-1)]">
+        <div className="h-full overflow-auto">
+          {modo === "visaoGeral" && falhouFamilias && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
+          {modo === "visaoGeral" && carregandoFamilias && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
+          {modo === "visaoGeral" && dadosFamilias && dadosFamilias.familias.length === 0 && (
+            <Estado tipo="vazio" mensagem={temFiltro(filtros) ? "Nenhum processo com esses filtros." : "Nenhuma tarefa na operação."} />
+          )}
+          {modo === "visaoGeral" && dadosFamilias && dadosFamilias.familias.length > 0 && (
+            <VisaoGeralTabela
+              familias={dadosFamilias.familias}
+              pagina={paginaFamilias}
+              aoMudarPagina={setPaginaFamilias}
+              podeAtribuir={podeAtribuir}
+              aoAbrirTarefa={irParaOProcesso}
+            />
+          )}
+          {modo === "calendario" && (
+            <Calendario linhas={linhas} carregando={carregando} falhou={falhou} aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }} />
+          )}
+          {modo !== "visaoGeral" && modo !== "calendario" && falhou && <Estado tipo="erro" mensagem="Não foi possível carregar a operação." aoTentar={recarregar} />}
+          {modo !== "visaoGeral" && modo !== "calendario" && carregando && <Estado tipo="carregando" mensagem="Carregando a operação…" />}
+          {modo !== "visaoGeral" && modo !== "calendario" && dados && linhas.length === 0 && (
+            <Estado tipo="vazio" mensagem={temFiltro(filtros) ? "Nenhuma tarefa com esses filtros." : "Nenhuma tarefa na operação."} />
+          )}
+          {dados && linhas.length > 0 && modo === "lista" && (
+            <Lista
+              linhas={ordenadas}
+              ordem={ordem}
+              aoOrdenar={(campo) => setOrdem((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }))}
+              aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }}
+              aoDistribuir={setAlvo}
+              selecionados={selecionados}
+              todosSelecionados={todosSelecionadosVisiveis}
+              aoAlternarSelecao={alternarSelecao}
+              aoAlternarTodos={alternarTodos}
+            />
+          )}
+          {dados && linhas.length > 0 && modo === "kanban" && (
+            <Quadro
+              porColuna={porColuna}
+              aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l.taskId, l.processoId) }}
+              aoDistribuir={setAlvo}
+              aoComandar={comandar}
+              ocupado={ocupado}
+            />
+          )}
+        </div>
       </div>
 
       {alvoLote && (
@@ -829,9 +803,11 @@ export function VisaoGlobal() {
 
 function Chip({ rotulo, aoRemover }: { rotulo: string; aoRemover: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] text-white/80">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1 text-[11px] font-medium text-[var(--text-secondary)]">
       {rotulo}
-      <button onClick={aoRemover} className="text-[var(--text-muted)] hover:text-white/90" aria-label={`Remover filtro ${rotulo}`}>×</button>
+      <button onClick={aoRemover} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label={`Remover filtro ${rotulo}`}>
+        <XIcon size={11} />
+      </button>
     </span>
   )
 }
@@ -864,8 +840,8 @@ function VisaoGeralTabela({
   return (
     <div className="flex flex-col">
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
-          <tr className="border-b border-white/[0.08] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
+        <thead className="sticky top-0 z-10 bg-[var(--surface-secondary)]">
+          <tr className="border-b border-[var(--border-subtle)] [&>th]:px-4 [&>th]:py-2.5 [&>th]:text-[11px] [&>th]:font-semibold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-secondary)]">
             <th>Família / Processo</th>
             <th className="w-36">Fase atual</th>
             <th className="w-16">Tarefas</th>
@@ -886,47 +862,47 @@ function VisaoGeralTabela({
             const marco = f.ultimoMarco
             return (
               <Fragment key={chaveFamilia}>
-                <tr className="border-b border-white/[0.05] hover:bg-[var(--surface-primary)]">
-                  <td className="px-3 py-2">
-                    <button onClick={() => alternar(chaveFamilia)} className="flex w-full items-center gap-2 text-left">
-                      <span className="w-3 shrink-0 text-[10px] text-[var(--text-muted)]">{aberta ? "▾" : "▸"}</span>
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-white/80">
+                <tr className={`border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)] ${aberta ? "bg-[var(--surface-secondary)]" : ""}`}>
+                  <td className="px-4 py-2.5">
+                    <button onClick={() => alternar(chaveFamilia)} className="flex w-full items-center gap-2.5 text-left">
+                      <ChevronDown size={13} className={`shrink-0 text-[var(--text-muted)] transition-transform ${aberta ? "" : "-rotate-90"}`} />
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-[11px] font-semibold text-[var(--accent-text)]">
                         {iniciais(f.nomeFamilia)}
                       </span>
-                      <span>
-                        <span className="block text-[12px] font-medium text-white/90">{f.nomeFamilia}</span>
-                        <span className="block text-[10px] text-[var(--text-muted)]">
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">{f.nomeFamilia}</span>
+                        <span className="block truncate text-[11px] text-[var(--text-muted)]">
                           {umSoProcesso ? `Processo: ${f.processos[0].nomeProcesso}` : `${f.processos.length} processos`}
                         </span>
                       </span>
                     </button>
                   </td>
-                  <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">
-                    {umSoProcesso ? (rotularFase(f.processos[0].faseAtualKey) ?? "—") : "Vários processos"}
+                  <td className="px-4 py-2.5">
+                    {umSoProcesso ? <Etiqueta tom="acento">{rotularFase(f.processos[0].faseAtualKey) ?? "—"}</Etiqueta> : <span className="text-[12px] text-[var(--text-secondary)]">Vários processos</span>}
                   </td>
-                  <td className="px-3 py-2 text-[12px] tabular-nums text-white/85">{f.total}</td>
-                  <td className="px-3 py-2 text-[12px] tabular-nums text-white/70">{f.aFazer}</td>
-                  <td className="px-3 py-2 text-[12px] tabular-nums text-green-800/90">{f.concluidas}</td>
-                  <td className={`px-3 py-2 text-[12px] tabular-nums ${f.atrasadas > 0 ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>{f.atrasadas}</td>
-                  <td className={`px-3 py-2 text-[12px] tabular-nums ${f.venceEm7Dias > 0 ? "text-amber-800/90" : "text-[var(--text-muted)]"}`}>{f.venceEm7Dias}</td>
-                  <td className="px-3 py-2 text-[11px]">
+                  <td className="px-4 py-2.5 text-[13px] font-medium tabular-nums text-[var(--text-primary)]">{f.total}</td>
+                  <td className="px-4 py-2.5 text-[13px] tabular-nums text-[var(--text-secondary)]">{f.aFazer}</td>
+                  <td className="px-4 py-2.5 text-[13px] font-medium tabular-nums text-[var(--success-text)]">{f.concluidas}</td>
+                  <td className={`px-4 py-2.5 text-[13px] font-medium tabular-nums ${f.atrasadas > 0 ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>{f.atrasadas}</td>
+                  <td className={`px-4 py-2.5 text-[13px] font-medium tabular-nums ${f.venceEm7Dias > 0 ? "text-[var(--warning-text)]" : "text-[var(--text-muted)]"}`}>{f.venceEm7Dias}</td>
+                  <td className="px-4 py-2.5 text-[12px]">
                     {umSoProcesso && f.processos[0].aguardandoAtribuicao ? (
                       <Etiqueta tom="alerta">Aguardando atribuição</Etiqueta>
                     ) : (
                       <Responsavel nome={f.responsavelPrincipal?.nome ?? null} />
                     )}
                   </td>
-                  <td className="px-3 py-2 text-[11px] text-[var(--text-muted)]">
+                  <td className="px-4 py-2.5 text-[11px] text-[var(--text-muted)]">
                     {marco ? (
                       <span className="block">
-                        <span className="block text-[11px] text-white/85">{marco.faseAnteriorLabel} concluída → {marco.faseNovaLabel ?? "—"}</span>
-                        <span className="block text-[10px] tabular-nums">{marco.concluidasNaFaseAnterior}/{marco.totalNaFaseAnterior} · {dataCurta(f.ultimaAtividade)}</span>
+                        <span className="block text-[12px] font-medium text-[var(--text-primary)]">{marco.faseAnteriorLabel} concluída → {marco.faseNovaLabel ?? "—"}</span>
+                        <span className="block tabular-nums">{marco.concluidasNaFaseAnterior}/{marco.totalNaFaseAnterior} · {dataCurta(f.ultimaAtividade)}</span>
                       </span>
                     ) : (
                       <span className="tabular-nums">{dataCurta(f.ultimaAtividade)}</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-4 py-2.5 text-right">
                     <MenuAcoesFamilia processoId={umSoProcesso ? f.processos[0].processoId : null} />
                   </td>
                 </tr>
@@ -941,18 +917,18 @@ function VisaoGeralTabela({
                   const abertoP = processosAbertos.has(p.processoId)
                   return (
                     <Fragment key={p.processoId}>
-                      <tr className="cursor-pointer border-b border-white/[0.05] bg-[var(--surface-primary)]/40 hover:bg-[var(--surface-primary)]" onClick={() => alternarProcesso(p.processoId)}>
-                        <td className="px-3 py-1.5 pl-9 text-[11px] text-[var(--text-secondary)]" colSpan={2}>
-                          <span className="mr-1.5 text-[10px] text-[var(--text-muted)]">{abertoP ? "▾" : "▸"}</span>
+                      <tr className="cursor-pointer border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)]" onClick={() => alternarProcesso(p.processoId)}>
+                        <td className="px-4 py-2 pl-11 text-[12px] font-medium text-[var(--text-secondary)]" colSpan={2}>
+                          <ChevronDown size={12} className={`mr-1.5 inline-block text-[var(--text-muted)] transition-transform ${abertoP ? "" : "-rotate-90"}`} />
                           {p.nomeProcesso}
                         </td>
-                        <td className="px-3 py-1.5 text-[12px] tabular-nums text-white/80">{p.total}</td>
-                        <td className="px-3 py-1.5 text-[12px] tabular-nums text-white/70">{p.aFazer}</td>
-                        <td className="px-3 py-1.5 text-[12px] tabular-nums text-green-800/90">{p.concluidas}</td>
-                        <td className={`px-3 py-1.5 text-[12px] tabular-nums ${p.atrasadas > 0 ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>{p.atrasadas}</td>
-                        <td className={`px-3 py-1.5 text-[12px] tabular-nums ${p.venceEm7Dias > 0 ? "text-amber-800/90" : "text-[var(--text-muted)]"}`}>{p.venceEm7Dias}</td>
-                        <td className="px-3 py-1.5 text-[11px]" colSpan={2}>
-                          {p.aguardandoAtribuicao ? <Etiqueta tom="alerta">Aguardando atribuição</Etiqueta> : rotularFase(p.faseAtualKey)}
+                        <td className="px-4 py-2 text-[12px] tabular-nums text-[var(--text-primary)]">{p.total}</td>
+                        <td className="px-4 py-2 text-[12px] tabular-nums text-[var(--text-secondary)]">{p.aFazer}</td>
+                        <td className="px-4 py-2 text-[12px] tabular-nums text-[var(--success-text)]">{p.concluidas}</td>
+                        <td className={`px-4 py-2 text-[12px] tabular-nums ${p.atrasadas > 0 ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>{p.atrasadas}</td>
+                        <td className={`px-4 py-2 text-[12px] tabular-nums ${p.venceEm7Dias > 0 ? "text-[var(--warning-text)]" : "text-[var(--text-muted)]"}`}>{p.venceEm7Dias}</td>
+                        <td className="px-4 py-2 text-[12px]" colSpan={2}>
+                          {p.aguardandoAtribuicao ? <Etiqueta tom="alerta">Aguardando atribuição</Etiqueta> : <Etiqueta tom="acento">{rotularFase(p.faseAtualKey) ?? "—"}</Etiqueta>}
                         </td>
                         <td />
                       </tr>
@@ -973,19 +949,13 @@ function VisaoGeralTabela({
       </table>
 
       {familias.length > 0 && (
-        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] px-4 py-2.5">
-          <span className="text-[11px] text-[var(--text-muted)]">Mostrando {visiveis.length} de {familias.length} famílias</span>
+        <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-4 py-3">
+          <span className="text-[12px] text-[var(--text-muted)]">Mostrando {visiveis.length} de {familias.length} famílias</span>
           {totalPaginas > 1 && (
             <div className="flex items-center gap-2">
-              <button disabled={paginaValida <= 1} onClick={() => aoMudarPagina(paginaValida - 1)} className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)] disabled:opacity-40">‹</button>
-              <span className="text-[11px] tabular-nums text-white/80">{paginaValida} / {totalPaginas}</span>
-              <button disabled={paginaValida >= totalPaginas} onClick={() => aoMudarPagina(paginaValida + 1)} className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)] disabled:opacity-40">›</button>
-              <label className="ml-2 flex items-center gap-1 text-[11px] text-[var(--text-muted)]">
-                Itens por página
-                <select className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1 text-[11px] text-white/80" disabled value={POR_PAGINA_FAMILIAS}>
-                  <option value={POR_PAGINA_FAMILIAS}>{POR_PAGINA_FAMILIAS}</option>
-                </select>
-              </label>
+              <Button variant="outline" size="icon-sm" disabled={paginaValida <= 1} onClick={() => aoMudarPagina(paginaValida - 1)}>‹</Button>
+              <span className="text-[12px] tabular-nums text-[var(--text-primary)]">{paginaValida} / {totalPaginas}</span>
+              <Button variant="outline" size="icon-sm" disabled={paginaValida >= totalPaginas} onClick={() => aoMudarPagina(paginaValida + 1)}>›</Button>
             </div>
           )}
         </div>
@@ -996,20 +966,18 @@ function VisaoGeralTabela({
 
 /** As DUAS ações reais desta linha — nunca um menu com item que não faz nada. */
 function MenuAcoesFamilia({ processoId }: { processoId: number | null }) {
-  const [aberto, setAberto] = useState(false)
   if (processoId == null) return null
   return (
-    <div className="relative inline-block text-left" onClick={(e) => e.stopPropagation()}>
-      <button onClick={() => setAberto((v) => !v)} className="rounded px-1.5 py-1 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-white/90">⋮</button>
-      {aberto && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setAberto(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-44 rounded border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--elev-3)]">
-            <a href={`/processos/${processoId}`} className="block px-3 py-1.5 text-[11px] text-white/85 hover:bg-[var(--surface-primary)]">Abrir processo</a>
-          </div>
-        </>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button onClick={(e) => e.stopPropagation()} className="rounded p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]">
+          <MoreVertical size={15} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="bg-[var(--surface-overlay)]" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem asChild><a href={`/processos/${processoId}`}>Abrir processo</a></DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -1051,49 +1019,47 @@ function Lista({
 }) {
   return (
     <table className="w-full border-collapse text-left">
-      <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
-        <tr className="border-b border-white/[0.08]">
-          <th className="w-8 px-3 py-2">
-            <input type="checkbox" checked={todosSelecionados} onChange={aoAlternarTodos} aria-label="Selecionar todas as tarefas visíveis" className="cursor-pointer" />
+      <thead className="sticky top-0 z-10 bg-[var(--surface-secondary)]">
+        <tr className="border-b border-[var(--border-subtle)]">
+          <th className="w-8 px-4 py-2.5">
+            <input type="checkbox" checked={todosSelecionados} onChange={aoAlternarTodos} aria-label="Selecionar todas as tarefas visíveis" className="cursor-pointer accent-[var(--action-primary)]" />
           </th>
           {COLUNAS_LISTA.map((c) => (
-            <th key={String(c.campo)} className={`${c.classe} px-3 py-2`}>
-              <button onClick={() => aoOrdenar(c.campo)} className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)] transition-colors hover:text-white/70">
+            <th key={String(c.campo)} className={`${c.classe} px-4 py-2.5`}>
+              <button onClick={() => aoOrdenar(c.campo)} className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]">
                 {c.rotulo}
-                {ordem.campo === c.campo && <span className="ml-1 text-[var(--text-secondary)]">{ordem.asc ? "↑" : "↓"}</span>}
+                {ordem.campo === c.campo ? <span className="text-[var(--action-primary)]">{ordem.asc ? "↑" : "↓"}</span> : <ArrowUpDown size={10} className="opacity-40" />}
               </button>
             </th>
           ))}
-          <th className="w-24 px-3 py-2" />
+          <th className="w-24 px-4 py-2.5" />
         </tr>
       </thead>
       <tbody>
         {linhas.map((l) => (
-          <tr key={l.taskId} className="group border-b border-white/[0.05] hover:bg-[var(--surface-primary)]">
-            <td className="px-3 py-2 align-top">
-              <input type="checkbox" checked={selecionados.has(l.taskId)} onChange={() => aoAlternarSelecao(l.taskId)} aria-label={`Selecionar ${l.titulo}`} className="cursor-pointer" />
+          <tr key={l.taskId} className="group border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)]">
+            <td className="px-4 py-2.5 align-top">
+              <input type="checkbox" checked={selecionados.has(l.taskId)} onChange={() => aoAlternarSelecao(l.taskId)} aria-label={`Selecionar ${l.titulo}`} className="cursor-pointer accent-[var(--action-primary)]" />
             </td>
-            <td className="max-w-0 px-3 py-2 align-top">
+            <td className="max-w-0 px-4 py-2.5 align-top">
               <button onClick={() => aoAbrir(l.taskId)} className="w-full cursor-pointer text-left">
-                <span className="block truncate text-[12px] text-white/90">{l.titulo}</span>
+                <span className="block truncate text-[13px] font-medium text-[var(--text-primary)]">{l.titulo}</span>
                 <span className="mt-1 flex flex-wrap gap-1"><Sinais l={l} /></span>
               </button>
             </td>
-            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{l.pessoaNome ?? "—"}</td>
-            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{l.processoNome ?? "—"}</td>
-            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{rotularFase(l.faseMacroKey) ?? "—"}</td>
-            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{l.etapaAtual ?? "—"}</td>
-            <td className="px-3 py-2"><Responsavel nome={l.responsavelNome} /></td>
-            <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
-            <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
-            <td className={`px-3 py-2 text-[11px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-[var(--text-secondary)]"}`}>{dataCurta(l.dataPrazo)}</td>
-            <td className={`px-3 py-2 text-[11px] ${l.atrasada ? "text-red-700/80" : "text-[var(--text-muted)]"}`}>{tempo(l.diasParaPrazo, l.atrasada)}</td>
-            <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.criadaEm)}</td>
-            <td className="px-3 py-2 text-right">
+            <td className="truncate px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{l.pessoaNome ?? "—"}</td>
+            <td className="truncate px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{l.processoNome ?? "—"}</td>
+            <td className="truncate px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{rotularFase(l.faseMacroKey) ?? "—"}</td>
+            <td className="truncate px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{l.etapaAtual ?? "—"}</td>
+            <td className="px-4 py-2.5"><Responsavel nome={l.responsavelNome} /></td>
+            <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
+            <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
+            <td className={`px-4 py-2.5 text-[12px] tabular-nums ${l.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(l.dataPrazo)}</td>
+            <td className={`px-4 py-2.5 text-[12px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>{tempo(l.diasParaPrazo, l.atrasada)}</td>
+            <td className="px-4 py-2.5 text-[12px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.criadaEm)}</td>
+            <td className="px-4 py-2.5 text-right">
               <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <button onClick={() => aoDistribuir(l)} className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90">
-                  {l.responsavelId == null ? "Atribuir" : "Transferir"}
-                </button>
+                <Button size="sm" variant="outline" onClick={() => aoDistribuir(l)}>{l.responsavelId == null ? "Atribuir" : "Transferir"}</Button>
               </div>
             </td>
           </tr>
@@ -1158,19 +1124,19 @@ function Quadro({
             onDragOver={(e) => { if (alvoValido) { e.preventDefault(); setSobre(c.chave) } }}
             onDragLeave={() => setSobre((s) => (s === c.chave ? null : s))}
             onDrop={() => soltar(c.chave)}
-            className={`flex h-full w-72 shrink-0 flex-col rounded-lg border transition-colors ${
-              sobre === c.chave && alvoValido ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
-              : alvoInvalido ? "border-white/[0.04] bg-[var(--surface-primary)] opacity-40"
-              : "border-white/[0.08] bg-[var(--surface-primary)]"
+            className={`flex h-full w-72 shrink-0 flex-col rounded-xl border transition-colors ${
+              sobre === c.chave && alvoValido ? "border-[var(--action-primary)] bg-[var(--surface-secondary)]"
+              : alvoInvalido ? "border-[var(--border-subtle)] bg-[var(--surface-secondary)]/60 opacity-40"
+              : "border-[var(--border-default)] bg-[var(--surface-secondary)]"
             }`}
           >
-            <div className="flex items-baseline justify-between border-b border-white/[0.06] px-3 py-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">{c.rotulo}</span>
-              <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{linhas.length}</span>
+            <div className="flex items-baseline justify-between border-b border-[var(--border-subtle)] px-3.5 py-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{c.rotulo}</span>
+              <span className="rounded-full bg-[var(--surface-tertiary)] px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-[var(--text-secondary)]">{linhas.length}</span>
             </div>
-            {alvoValido && <div className="border-b border-[var(--border-default)] px-3 py-1.5 text-[10px] text-[var(--text-secondary)]/80">{permitido.rotulo}</div>}
-            <div className="flex min-h-[60px] flex-1 flex-col gap-2 overflow-y-auto p-2">
-              {linhas.length === 0 && <p className="px-1 py-3 text-[11px] text-[var(--text-muted)]">{c.nota ?? "Nada aqui."}</p>}
+            {alvoValido && <div className="border-b border-[var(--border-default)] bg-[var(--accent-soft)] px-3.5 py-1.5 text-[11px] font-medium text-[var(--accent-text)]">{permitido.rotulo}</div>}
+            <div className="flex min-h-[60px] flex-1 flex-col gap-2 overflow-y-auto p-2.5">
+              {linhas.length === 0 && <p className="px-1 py-3 text-[12px] text-[var(--text-muted)]">{c.nota ?? "Nada aqui."}</p>}
               {linhas.map((l) => (
                 <Card key={l.taskId} l={l} aoAbrir={() => aoAbrir(l.taskId)} aoDistribuir={() => aoDistribuir(l)} aoArrastar={(inicio) => setArrastando(inicio ? l : null)} />
               ))}
@@ -1181,23 +1147,23 @@ function Quadro({
 
       {pedindo && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setPedindo(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-[13px] font-medium text-white/90">{pedindo.rotulo}</h2>
-            <p className="mt-1 text-[11px] text-[var(--text-secondary)]">{pedindo.l.titulo}</p>
+          <div className="w-full max-w-sm rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] p-4 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">{pedindo.rotulo}</h2>
+            <p className="mt-1 text-[12px] text-[var(--text-secondary)]">{pedindo.l.titulo}</p>
             <textarea
               value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={3}
               placeholder="Por quê? Quem ler depois precisa entender sem perguntar."
-              className="mt-3 w-full rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-2 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
+              className="mt-3 w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--action-primary)] focus:outline-none"
             />
             <div className="mt-3 flex justify-end gap-2">
-              <button onClick={() => setPedindo(null)} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white/80">Cancelar</button>
-              <button
+              <Button variant="ghost" size="sm" onClick={() => setPedindo(null)}>Cancelar</Button>
+              <Button
+                size="sm"
                 disabled={ocupado || motivo.trim().length < 3}
                 onClick={async () => { const ok = await aoComandar(pedindo.l.taskId, { acao: pedindo.acao, motivo: motivo.trim() }, `${pedindo.rotulo}: feito.`); if (ok) setPedindo(null) }}
-                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Confirmar
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1213,33 +1179,33 @@ function Card({ l, aoAbrir, aoDistribuir, aoArrastar }: { l: LinhaGerencial; aoA
       draggable
       onDragStart={() => aoArrastar(true)}
       onDragEnd={() => aoArrastar(false)}
-      className={`cursor-grab rounded border border-white/[0.08] bg-[var(--surface-primary)] p-2.5 transition-colors hover:border-[var(--border-strong)] active:cursor-grabbing ${
-        l.atrasada ? "border-l-2 border-l-red-400/60" : l.venceHoje ? "border-l-2 border-l-amber-300/60" : ""
+      className={`cursor-grab rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[var(--elev-1)] transition-shadow hover:shadow-[var(--elev-2)] active:cursor-grabbing ${
+        l.atrasada ? "border-l-[3px] border-l-[var(--danger)]" : l.venceHoje ? "border-l-[3px] border-l-[var(--warning)]" : ""
       }`}
     >
       <button onClick={aoAbrir} className="w-full cursor-pointer text-left">
-        <p className="text-[12px] font-medium leading-4 text-white/90">{l.titulo}</p>
-        {contexto && <p className="mt-1 truncate text-[10px] text-[var(--text-muted)]">{contexto}</p>}
+        <p className="text-[13px] font-medium leading-4 text-[var(--text-primary)]">{l.titulo}</p>
+        {contexto && <p className="mt-1 truncate text-[11px] text-[var(--text-muted)]">{contexto}</p>}
         <div className="mt-1.5 flex flex-wrap gap-1"><Sinais l={l} /></div>
-        <div className="mt-1.5 space-y-0.5 text-[10px] text-[var(--text-muted)]">
+        <div className="mt-1.5 space-y-0.5 text-[11px] text-[var(--text-muted)]">
           {rotularFase(l.faseMacroKey) && <p>{rotularFase(l.faseMacroKey)}</p>}
           {l.etapaAtual && <p className="truncate"><span className="text-[var(--text-muted)]">Etapa:</span> {l.etapaAtual}</p>}
           {l.esperandoHaDias != null && (
-            <p className={l.esperandoHaDias >= 15 ? "text-amber-800/70" : ""}>
+            <p className={l.esperandoHaDias >= 15 ? "font-medium text-[var(--warning-text)]" : ""}>
               Aguardando {l.esperandoDe === "cliente" ? "o cliente" : "terceiro"} há {l.esperandoHaDias} dia{l.esperandoHaDias === 1 ? "" : "s"}
             </p>
           )}
-          {l.motivoBloqueio && <p className="text-red-700/70">Bloqueio: {l.motivoBloqueio}</p>}
+          {l.motivoBloqueio && <p className="text-[var(--danger-text)]">Bloqueio: {l.motivoBloqueio}</p>}
           {l.concluidaEm && <p>Concluída em {dataCurta(l.concluidaEm)}</p>}
         </div>
       </button>
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-white/[0.06] pt-2">
+      <div className="mt-2 flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-2">
         <Responsavel nome={l.responsavelNome} />
         <div className="flex shrink-0 items-center gap-2">
-          {l.dataPrazo && <span className={`text-[10px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-[var(--text-secondary)]"}`}>{dataCurta(l.dataPrazo)}</span>}
-          <button onClick={aoDistribuir} className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90">
+          {l.dataPrazo && <span className={`text-[11px] tabular-nums ${l.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(l.dataPrazo)}</span>}
+          <Button size="sm" variant="outline" onClick={aoDistribuir} className="h-6 px-2 text-[11px]">
             {l.responsavelId == null ? "Atribuir" : "Transferir"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -1257,6 +1223,7 @@ function Calendario({ linhas, carregando, falhou, aoAbrir }: { linhas: LinhaGere
   if (carregando) return <Estado tipo="carregando" mensagem="Carregando a operação…" />
 
   const ano = mesRef.getFullYear(), mes = mesRef.getMonth()
+  const hoje = new Date()
   const primeiroDiaSemana = new Date(ano, mes, 1).getDay()
   const diasNoMes = new Date(ano, mes + 1, 0).getDate()
   const porDia = new Map<number, LinhaGerencial[]>()
@@ -1270,34 +1237,35 @@ function Calendario({ linhas, carregando, falhou, aoAbrir }: { linhas: LinhaGere
     }
   }
   const celulas: Array<number | null> = [...Array(primeiroDiaSemana).fill(null), ...Array.from({ length: diasNoMes }, (_, i) => i + 1)]
+  const ehHoje = (d: number) => ano === hoje.getFullYear() && mes === hoje.getMonth() && d === hoje.getDate()
 
   return (
-    <div className="flex h-full flex-col p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <button onClick={() => setMesRef(new Date(ano, mes - 1, 1))} className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)]">‹</button>
-        <span className="text-[12px] font-medium text-white/90">{mesRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</span>
-        <button onClick={() => setMesRef(new Date(ano, mes + 1, 1))} className="rounded border border-[var(--border-default)] px-2 py-1 text-[11px] text-[var(--text-secondary)]">›</button>
+    <div className="flex h-full flex-col p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <Button variant="outline" size="icon-sm" onClick={() => setMesRef(new Date(ano, mes - 1, 1))}>‹</Button>
+        <span className="text-[14px] font-semibold capitalize text-[var(--text-primary)]">{mesRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</span>
+        <Button variant="outline" size="icon-sm" onClick={() => setMesRef(new Date(ano, mes + 1, 1))}>›</Button>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase text-[var(--text-muted)]">
+      <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
         {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => <div key={d}>{d}</div>)}
       </div>
-      <div className="mt-1 grid flex-1 grid-cols-7 gap-1 overflow-y-auto">
+      <div className="mt-1.5 grid flex-1 grid-cols-7 gap-1.5 overflow-y-auto">
         {celulas.map((dia, i) => (
-          <div key={i} className={`min-h-[84px] rounded border p-1 ${dia == null ? "border-transparent" : "border-white/[0.06]"}`}>
+          <div key={i} className={`min-h-[88px] rounded-lg border p-1.5 ${dia == null ? "border-transparent" : ehHoje(dia) ? "border-[var(--action-primary)] bg-[var(--accent-soft)]" : "border-[var(--border-subtle)] bg-[var(--surface-secondary)]"}`}>
             {dia != null && (
               <>
-                <div className="text-[10px] text-[var(--text-muted)]">{dia}</div>
-                <div className="mt-0.5 space-y-0.5">
+                <div className={`text-[11px] font-medium ${ehHoje(dia) ? "text-[var(--action-primary)]" : "text-[var(--text-muted)]"}`}>{dia}</div>
+                <div className="mt-1 space-y-1">
                   {(porDia.get(dia) ?? []).slice(0, 3).map((l) => (
                     <button
                       key={l.taskId} onClick={() => aoAbrir(l.taskId)}
-                      className={`block w-full truncate rounded px-1 py-0.5 text-left text-[9px] ${l.atrasada ? "bg-red-950/40 text-red-300" : "bg-[var(--surface-secondary)] text-white/75"}`}
+                      className={`block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium ${l.atrasada ? "bg-[var(--danger-tile)] text-[var(--danger-text)]" : "bg-[var(--surface-tertiary)] text-[var(--text-primary)]"}`}
                     >
                       {l.titulo}
                     </button>
                   ))}
                   {(porDia.get(dia)?.length ?? 0) > 3 && (
-                    <div className="text-[9px] text-[var(--text-muted)]">+{(porDia.get(dia)?.length ?? 0) - 3}</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">+{(porDia.get(dia)?.length ?? 0) - 3}</div>
                   )}
                 </div>
               </>

@@ -18,8 +18,13 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { ArrowRight, CheckCircle2, ExternalLink, GitBranch, MessageSquare, Paperclip } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { auth, dataCurta, Estado, rotularFase, ROTULO_STATUS, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
+import { auth, dataCurta, Estado, Etiqueta, rotularFase, ROTULO_STATUS, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
 import type { ProcessoAgrupado } from "@/lib/operacional/tarefa-projecoes"
 
 type Aba = "visao" | "tarefas" | "documentos" | "historico" | "observacoes" | "dados"
@@ -78,9 +83,13 @@ function horaCurta(iso: string): string {
   return mesmoDia ? `Hoje, ${hora}` : `${dataCurta(iso)}, ${hora}`
 }
 
-const ICONE_ATIVIDADE: Record<Atividade["tipo"], string> = {
-  marco: "◆", tarefa: "✓", etapa: "›", observacao: "✎", anexo: "📎",
+const ICONE_ATIVIDADE: Record<Atividade["tipo"], typeof GitBranch> = {
+  marco: GitBranch, tarefa: CheckCircle2, etapa: ArrowRight, observacao: MessageSquare, anexo: Paperclip,
 }
+
+/** Bloco lateral/inferior padrão — mesma moldura em toda a expansão. */
+const PAINEL = "rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[var(--elev-1)]"
+const TITULO_PAINEL = "text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]"
 
 export function ProcessoExpandido({
   processo, podeAtribuir, aoAbrirTarefa,
@@ -163,46 +172,36 @@ export function ProcessoExpandido({
   }
 
   return (
-    <div className="border-b border-white/[0.05] bg-[var(--surface-primary)]/30 px-4 py-3">
+    <div className="border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-5 py-4">
       {/* ── ABAS + AÇÕES ── */}
-      <div className="flex flex-wrap items-center gap-1 border-b border-white/[0.06] pb-2">
-        {ABAS.map((a) => (
-          <button
-            key={a.chave}
-            onClick={() => setAba(a.chave)}
-            className={`rounded px-2.5 py-1 text-[11px] transition-colors ${
-              aba === a.chave ? "bg-[var(--surface-secondary)] text-white/90" : "text-[var(--text-secondary)] hover:text-white/75"
-            }`}
-          >
-            {a.rotulo({ tarefas: listaTarefas?.length ?? processo.total, documentos: documentosDoProcesso?.stats.total ?? 0 })}
-          </button>
-        ))}
-        <div className="ml-auto flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)}>
+          <TabsList className="bg-[var(--surface-tertiary)]">
+            {ABAS.map((a) => (
+              <TabsTrigger key={a.chave} value={a.chave} className="text-[12.5px] data-[state=active]:bg-[var(--surface-elevated)]">
+                {a.rotulo({ tarefas: listaTarefas?.length ?? processo.total, documentos: documentosDoProcesso?.stats.total ?? 0 })}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
           {podeAtribuir && processo.faseAtualKey && (
-            <button
-              onClick={() => setAtribuindo(true)}
-              className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-white/90"
-            >
-              Atribuir fase atual
-            </button>
+            <Button variant="outline" size="sm" onClick={() => setAtribuindo(true)}>Atribuir fase atual</Button>
           )}
-          <Link
-            href={`/processos/${processo.processoId}`}
-            className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-white/90"
-          >
-            Abrir processo →
-          </Link>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/processos/${processo.processoId}`}>Abrir processo <ExternalLink size={13} /></Link>
+          </Button>
         </div>
       </div>
 
       {(erro || aviso) && (
-        <div className={`mt-2 rounded border px-2.5 py-1.5 text-[11px] ${erro ? "border-[var(--border-default)] text-red-700/90" : "border-[var(--border-default)] text-green-800/90"}`}>
+        <div className={`mt-3 rounded-lg border px-3 py-2 text-[12px] ${erro ? "border-[var(--danger-tile)] bg-[var(--danger-tile)] text-[var(--danger-text)]" : "border-[var(--success-tile)] bg-[var(--success-tile)] text-[var(--success-text)]"}`}>
           {erro ?? aviso}
         </div>
       )}
 
       {/* ── CONTEÚDO + PAINÉIS ── */}
-      <div className="mt-3 flex flex-col gap-4 lg:flex-row">
+      <div className="mt-4 flex flex-col gap-4 lg:flex-row">
         <div className="min-w-0 flex-1">
           {aba === "visao" && <AbaVisaoGeral processo={processo} faseProjecao={faseProjecao} />}
           {aba === "tarefas" && (
@@ -221,7 +220,7 @@ export function ProcessoExpandido({
 
         {/* PAINÉIS LATERAIS — o mesmo contexto em toda aba: onde o processo
             está agora, e o que vem a seguir. */}
-        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-64">
+        <div className="flex w-full shrink-0 flex-col gap-3 lg:w-72">
           <PainelStatusDoProcesso processo={processo} faseProjecao={faseProjecao} />
           <PainelProximasTarefas linhas={proximasTarefas} />
         </div>
@@ -246,34 +245,31 @@ function PainelStatusDoProcesso({ processo, faseProjecao }: { processo: Processo
     ? processo.ultimoMarco.responsavelNovo
     : null
   return (
-    <div className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
-      <h3 className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status do Processo</h3>
-      <div className="mt-2 inline-flex items-center rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] text-white/85">
-        {rotularFase(processo.faseAtualKey) ?? "—"}
-      </div>
+    <div className={PAINEL}>
+      <h3 className={TITULO_PAINEL}>Status do Processo</h3>
+      <div className="mt-2.5"><Etiqueta tom="acento">{rotularFase(processo.faseAtualKey) ?? "—"}</Etiqueta></div>
       {processo.statusProcesso === "CONCLUIDO" && (
-        <div className="mt-1 text-[10px] text-green-800/90">Processo concluído</div>
+        <div className="mt-2"><Etiqueta tom="sucesso">Processo concluído</Etiqueta></div>
       )}
-      <div className="mt-3">
-        <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)]">
+      <div className="mt-4">
+        <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
           <span>Progresso</span>
-          <span className="tabular-nums text-white/80">{faseProjecao ? `${faseProjecao.percent}%` : "—"}</span>
+          <span className="font-semibold tabular-nums text-[var(--text-primary)]">{faseProjecao ? `${faseProjecao.percent}%` : "—"}</span>
         </div>
-        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface-secondary)]">
-          <div className="h-full rounded-full bg-[var(--action-primary)]" style={{ width: `${faseProjecao?.percent ?? 0}%` }} />
-        </div>
+        <Progress value={faseProjecao?.percent ?? 0} className="mt-1.5 h-2 bg-[var(--surface-tertiary)] [&>div]:bg-[var(--action-primary)]" />
         {faseProjecao && (
-          <p className="mt-1 text-[10px] text-[var(--text-muted)]">{faseProjecao.done} de {faseProjecao.total} tarefas concluídas</p>
+          <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">{faseProjecao.done} de {faseProjecao.total} tarefas concluídas</p>
         )}
       </div>
       {processo.aguardandoAtribuicao ? (
-        <div className="mt-3 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-amber-800/90">
-          Aguardando atribuição
-        </div>
+        <div className="mt-4"><Etiqueta tom="alerta">Aguardando atribuição</Etiqueta></div>
       ) : responsavel && typeof responsavel === "object" ? (
-        <div className="mt-3">
-          <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Responsável</div>
-          <div className="mt-1 text-[11px] text-white/85">{responsavel.nome}</div>
+        <div className="mt-4">
+          <div className="text-[11px] font-medium text-[var(--text-secondary)]">Responsável</div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px]">{responsavel.nome.slice(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+            <span className="text-[12.5px] text-[var(--text-primary)]">{responsavel.nome}</span>
+          </div>
         </div>
       ) : null}
     </div>
@@ -282,18 +278,18 @@ function PainelStatusDoProcesso({ processo, faseProjecao }: { processo: Processo
 
 function PainelProximasTarefas({ linhas }: { linhas: LinhaDeFila[] }) {
   return (
-    <div className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
-      <h3 className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Próximas Tarefas</h3>
-      {linhas.length === 0 && <p className="mt-2 text-[10px] text-[var(--text-muted)]">Nada a fazer nesta fase.</p>}
-      <ul className="mt-2 space-y-2">
+    <div className={PAINEL}>
+      <h3 className={TITULO_PAINEL}>Próximas Tarefas</h3>
+      {linhas.length === 0 && <p className="mt-2.5 text-[12px] text-[var(--text-muted)]">Nada a fazer nesta fase.</p>}
+      <ul className="mt-2.5 space-y-3">
         {linhas.map((t) => (
-          <li key={t.taskId} className="flex items-start gap-2">
-            <span className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full border border-[var(--border-strong)]" />
+          <li key={t.taskId} className="flex items-start gap-2.5">
+            <span className="mt-1 h-2 w-2 shrink-0 rounded-full border-2 border-[var(--border-strong)]" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-[11px] text-white/85">{t.titulo}</span>
-              <span className="block text-[10px] text-[var(--text-muted)]">{rotularFase(t.faseMacroKey) ?? "—"}</span>
+              <span className="block truncate text-[12.5px] font-medium text-[var(--text-primary)]">{t.titulo}</span>
+              <span className="block text-[11px] text-[var(--text-muted)]">{rotularFase(t.faseMacroKey) ?? "—"}</span>
             </span>
-            <span className={`shrink-0 text-[10px] tabular-nums ${t.atrasada ? "text-red-700/90" : "text-[var(--text-muted)]"}`}>
+            <span className={`shrink-0 text-[11px] font-medium tabular-nums ${t.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>
               {dataCurta(t.dataPrazo)}
             </span>
           </li>
@@ -303,27 +299,33 @@ function PainelProximasTarefas({ linhas }: { linhas: LinhaDeFila[] }) {
   )
 }
 
+function Estatistica({ rotulo, valor, tom }: { rotulo: string; valor: number; tom?: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
+      <div className={`text-[16px] font-semibold tabular-nums ${tom ?? "text-[var(--text-primary)]"}`}>{valor}</div>
+      <div className="text-[11px] text-[var(--text-muted)]">{rotulo}</div>
+    </div>
+  )
+}
+
 function AbaVisaoGeral({ processo, faseProjecao }: { processo: ProcessoAgrupado; faseProjecao: FaseProjecao | null }) {
   const marco = processo.ultimoMarco
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        {([
-          ["Tarefas", processo.total], ["A fazer", processo.aFazer], ["Concluídas", processo.concluidas],
-          ["Atrasadas", processo.atrasadas], ["Vencem em 7 dias", processo.venceEm7Dias],
-        ] as const).map(([r, v]) => (
-          <div key={r} className="rounded border border-[var(--border-default)] px-2.5 py-1.5">
-            <div className="text-[14px] font-medium tabular-nums text-white/85">{v}</div>
-            <div className="text-[10px] text-[var(--text-muted)]">{r}</div>
-          </div>
-        ))}
+        <Estatistica rotulo="Tarefas" valor={processo.total} />
+        <Estatistica rotulo="A fazer" valor={processo.aFazer} />
+        <Estatistica rotulo="Concluídas" valor={processo.concluidas} tom="text-[var(--success-text)]" />
+        <Estatistica rotulo="Atrasadas" valor={processo.atrasadas} tom={processo.atrasadas > 0 ? "text-[var(--danger-text)]" : undefined} />
+        <Estatistica rotulo="Vencem em 7 dias" valor={processo.venceEm7Dias} tom={processo.venceEm7Dias > 0 ? "text-[var(--warning-text)]" : undefined} />
       </div>
       {marco && (
-        <div className="rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
-          <div className="text-[11px] font-medium text-white/90">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--accent-soft)] p-3.5">
+          <div className="flex items-center gap-2 text-[13px] font-semibold text-[var(--text-primary)]">
+            <GitBranch size={14} className="text-[var(--accent-text)]" />
             {rotularFase(marco.faseAnteriorKey) ?? marco.faseAnteriorKey} concluída → {marco.faseNovaLabel ?? "—"}
           </div>
-          <div className="mt-1 text-[10px] text-[var(--text-muted)]">
+          <div className="mt-1 pl-[22px] text-[11px] text-[var(--text-secondary)]">
             {marco.concluidasNaFaseAnterior}/{marco.totalNaFaseAnterior} tarefas concluídas
             {marco.responsavelAnterior && typeof marco.responsavelAnterior === "object" && ` · ${marco.responsavelAnterior.nome}`}
             {" · "}{horaCurta(marco.em)}
@@ -331,7 +333,7 @@ function AbaVisaoGeral({ processo, faseProjecao }: { processo: ProcessoAgrupado;
         </div>
       )}
       {faseProjecao?.total === 0 && (
-        <p className="text-[11px] text-[var(--text-muted)]">Sem itens obrigatórios nesta fase.</p>
+        <p className="text-[12px] text-[var(--text-muted)]">Sem itens obrigatórios nesta fase.</p>
       )}
     </div>
   )
@@ -365,30 +367,19 @@ function AcaoDaTarefa({
   // `responsavelId == null` evita ler "aguardando atribuição" numa linha que
   // já acabou.
   if (ESTADOS_TERMINAIS.includes(t.statusTarefa)) {
-    return <button onClick={aoAbrir} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">Abrir</button>
+    return <Button variant="link" size="sm" className="h-auto p-0 text-[12px]" onClick={aoAbrir}>Abrir</Button>
   }
   if (t.responsavelId == null) {
-    return <span className="text-[10px] uppercase tracking-wide text-amber-800/80">Aguardando atribuição</span>
+    return <Etiqueta tom="alerta">Aguardando atribuição</Etiqueta>
   }
   if (t.responsavelId !== usuarioAtualId) {
-    return (
-      <button onClick={aoAbrir} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">
-        Atribuída a {t.responsavelNome ?? "—"}
-      </button>
-    )
+    return <Button variant="link" size="sm" className="h-auto p-0 text-[12px]" onClick={aoAbrir}>Atribuída a {t.responsavelNome ?? "—"}</Button>
   }
   if (!podeIniciar) {
-    return <span className="text-[11px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</span>
+    return <span className="text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</span>
   }
   const rotulo = t.statusTarefa === "NAO_INICIADA" ? "Iniciar" : t.executavelAgora ? "Continuar" : "Abrir"
-  return (
-    <button
-      onClick={aoAbrir}
-      className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] font-medium text-white/90 transition-colors hover:bg-[var(--surface-secondary)]"
-    >
-      {rotulo}
-    </button>
-  )
+  return <Button size="sm" onClick={aoAbrir}>{rotulo}</Button>
 }
 
 function AbaTarefas({
@@ -402,24 +393,24 @@ function AbaTarefas({
   if (linhas == null) return <Estado tipo="carregando" mensagem="Carregando tarefas…" />
   if (linhas.length === 0) return <Estado tipo="vazio" mensagem="Nenhuma tarefa neste processo." />
   return (
-    <div className="max-h-96 overflow-y-auto rounded border border-[var(--border-default)]">
+    <div className="max-h-96 overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-1)]">
       <table className="w-full border-collapse text-left">
-        <thead className="sticky top-0 bg-[var(--surface-overlay)]">
-          <tr className="[&>th]:px-2.5 [&>th]:py-1.5 [&>th]:text-[10px] [&>th]:uppercase [&>th]:text-[var(--text-muted)]">
+        <thead className="sticky top-0 bg-[var(--surface-secondary)]">
+          <tr className="[&>th]:px-3.5 [&>th]:py-2.5 [&>th]:text-[10.5px] [&>th]:font-semibold [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-secondary)]">
             <th>Tarefa</th><th>Fase</th><th>Status</th><th>Responsável</th><th>Prazo</th><th>Conclusão</th><th className="text-right">Ação</th>
           </tr>
         </thead>
         <tbody>
           {linhas.map((t) => (
-            <tr key={t.taskId} className="border-t border-white/[0.05] hover:bg-[var(--surface-primary)] [&>td]:px-2.5 [&>td]:py-1.5">
-              <td className="max-w-0 truncate text-[11px] text-white/85">
+            <tr key={t.taskId} className="border-t border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)] [&>td]:px-3.5 [&>td]:py-2.5">
+              <td className="max-w-0 truncate text-[12.5px] font-medium text-[var(--text-primary)]">
                 <button onClick={() => aoAbrir(t.taskId)} className="truncate text-left hover:underline">{t.titulo}</button>
               </td>
-              <td className="text-[11px] text-[var(--text-secondary)]">{rotularFase(t.faseMacroKey) ?? "—"}</td>
-              <td className="text-[11px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</td>
-              <td className="text-[11px] text-[var(--text-secondary)]">{t.responsavelNome ?? "Sem responsável"}</td>
-              <td className={`text-[11px] tabular-nums ${t.atrasada ? "text-red-700/90" : "text-[var(--text-secondary)]"}`}>{dataCurta(t.dataPrazo)}</td>
-              <td className="text-[11px] tabular-nums text-[var(--text-muted)]">
+              <td className="text-[12px] text-[var(--text-secondary)]">{rotularFase(t.faseMacroKey) ?? "—"}</td>
+              <td className="text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</td>
+              <td className="text-[12px] text-[var(--text-secondary)]">{t.responsavelNome ?? "Sem responsável"}</td>
+              <td className={`text-[12px] tabular-nums ${t.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(t.dataPrazo)}</td>
+              <td className="text-[12px] tabular-nums text-[var(--text-muted)]">
                 {t.statusTarefa === "CONCLUIDO_RECEBIDO" || t.statusTarefa === "CONCLUIDO_NAO_POSSUI" ? dataCurta(t.criadaEm) : "—"}
               </td>
               <td className="text-right">
@@ -436,21 +427,21 @@ function AbaTarefas({
 /** Uma pessoa e seus documentos — a MESMA linha que a Biblioteca Documental do processo já mostra. */
 function LinhaPessoaDocumentos({ pessoa }: { pessoa: PessoaComDocumentos }) {
   return (
-    <div className="rounded border border-[var(--border-default)]">
-      <div className="flex items-center justify-between border-b border-white/[0.05] bg-[var(--surface-primary)]/60 px-2.5 py-1.5">
-        <span className="text-[11px] font-medium text-white/90">{pessoa.nome}</span>
-        <span className="text-[10px] text-[var(--text-muted)]">{pessoa.papel} · {pessoa.received}/{pessoa.total}</span>
+    <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-1)]">
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-3.5 py-2">
+        <span className="text-[12.5px] font-semibold text-[var(--text-primary)]">{pessoa.nome}</span>
+        <span className="text-[11px] text-[var(--text-muted)]">{pessoa.papel} · {pessoa.received}/{pessoa.total}</span>
       </div>
-      <div className="divide-y divide-white/[0.04]">
+      <div className="divide-y divide-[var(--border-subtle)]">
         {pessoa.docs.map((d) => (
-          <div key={d.id} className="flex items-center justify-between px-2.5 py-1.5">
-            <span className="min-w-0 truncate text-[11px] text-white/80">{d.tipo ?? d.tipoShort}</span>
-            <span className="flex shrink-0 items-center gap-2">
-              <span className={`text-[10px] ${d.status === "RECEBIDO" || d.status === "ENTREGUE" ? "text-green-800/90" : "text-[var(--text-muted)]"}`}>
-                {d.statusShort ?? d.status}
-              </span>
+          <div key={d.id} className="flex items-center justify-between px-3.5 py-2">
+            <span className="min-w-0 truncate text-[12px] text-[var(--text-primary)]">{d.tipo ?? d.tipoShort}</span>
+            <span className="flex shrink-0 items-center gap-2.5">
+              {d.status === "RECEBIDO" || d.status === "ENTREGUE"
+                ? <Etiqueta tom="sucesso">{d.statusShort ?? d.status}</Etiqueta>
+                : <Etiqueta tom="neutro">{d.statusShort ?? d.status}</Etiqueta>}
               {d.arquivoUrl && (
-                <a href={d.arquivoUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">
+                <a href={d.arquivoUrl} target="_blank" rel="noreferrer" className="text-[11px] font-medium text-[var(--action-primary)] underline-offset-2 hover:underline">
                   Abrir
                 </a>
               )}
@@ -469,14 +460,11 @@ function AbaDocumentos({ dados }: { dados: DocumentosDoProcesso | null }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-2">
-        {([["Total", dados.stats.total], ["Recebidos", dados.stats.recebidos], ["Pendentes", dados.stats.pendentes]] as const).map(([r, v]) => (
-          <div key={r} className="rounded border border-[var(--border-default)] px-2.5 py-1.5">
-            <div className="text-[14px] font-medium tabular-nums text-white/85">{v}</div>
-            <div className="text-[10px] text-[var(--text-muted)]">{r}</div>
-          </div>
-        ))}
+        <Estatistica rotulo="Total" valor={dados.stats.total} />
+        <Estatistica rotulo="Recebidos" valor={dados.stats.recebidos} tom="text-[var(--success-text)]" />
+        <Estatistica rotulo="Pendentes" valor={dados.stats.pendentes} tom={dados.stats.pendentes > 0 ? "text-[var(--warning-text)]" : undefined} />
       </div>
-      <div className="max-h-96 space-y-2 overflow-y-auto pr-1">
+      <div className="max-h-96 space-y-2.5 overflow-y-auto pr-1">
         {pessoas.map((p) => <LinhaPessoaDocumentos key={p.pessoaId} pessoa={p} />)}
       </div>
     </div>
@@ -511,35 +499,35 @@ function AbaAtividades({ atividades, filtro }: { atividades: Atividade[] | null;
   const cabecalhosDeDia = agrupamentoPorDia(visiveis)
 
   return (
-    <div className="max-h-96 space-y-3 overflow-y-auto pr-1">
-      {visiveis.map((a, i) => (
-        <div key={i}>
-          {cabecalhosDeDia.has(i) && (
-            <p className="mb-2 mt-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)] first:mt-0">{cabecalhosDeDia.get(i)}</p>
-          )}
-          <div className="flex gap-2.5">
-            <div className="flex w-14 shrink-0 flex-col items-end pt-0.5 text-[10px] tabular-nums text-[var(--text-muted)]">
-              {horaCurta(a.em)}
-            </div>
-            <div className={`mt-0.5 h-4 w-4 shrink-0 rounded-full text-center text-[9px] leading-4 ${
-              a.tipo === "marco" ? "bg-[var(--action-primary)] text-white" : "border border-[var(--border-strong)] text-[var(--text-secondary)]"
-            }`}>
-              {ICONE_ATIVIDADE[a.tipo]}
-            </div>
-            <div className="min-w-0 flex-1 pb-1">
-              <p className={`text-[11px] ${a.tipo === "marco" ? "font-medium text-white/95" : "text-white/85"}`}>{a.texto}</p>
-              {a.autor && <p className="text-[10px] text-[var(--text-muted)]">{a.autor}</p>}
+    <div className="max-h-96 space-y-1 overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[var(--elev-1)]">
+      {visiveis.map((a, i) => {
+        const Icone = ICONE_ATIVIDADE[a.tipo]
+        return (
+          <div key={i}>
+            {cabecalhosDeDia.has(i) && (
+              <p className="mb-2.5 mt-3 text-[10.5px] font-semibold uppercase tracking-wide text-[var(--text-muted)] first:mt-0">{cabecalhosDeDia.get(i)}</p>
+            )}
+            <div className="flex gap-3 pb-3">
+              <div className="flex w-14 shrink-0 flex-col items-end pt-0.5 text-[11px] tabular-nums text-[var(--text-muted)]">
+                {horaCurta(a.em)}
+              </div>
+              <div className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ${
+                a.tipo === "marco" ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)]" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
+              }`}>
+                <Icone size={12} />
+              </div>
+              <div className="min-w-0 flex-1 pb-1">
+                <p className={`text-[12.5px] ${a.tipo === "marco" ? "font-semibold text-[var(--text-primary)]" : "text-[var(--text-primary)]"}`}>{a.texto}</p>
+                {a.autor && <p className="text-[11px] text-[var(--text-muted)]">{a.autor}</p>}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
       {filtradas.length > mostrar && (
-        <button
-          onClick={() => setMostrar((n) => n + LOTE_ATIVIDADES * 3)}
-          className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
-        >
+        <Button variant="outline" size="sm" onClick={() => setMostrar((n) => n + LOTE_ATIVIDADES * 3)}>
           Ver histórico completo ({filtradas.length - mostrar} restantes)
-        </button>
+        </Button>
       )}
     </div>
   )
@@ -547,12 +535,14 @@ function AbaAtividades({ atividades, filtro }: { atividades: Atividade[] | null;
 
 function AbaDados({ processo }: { processo: ProcessoAgrupado }) {
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
-      <dt className="text-[var(--text-muted)]">Processo</dt><dd className="text-white/85">{processo.nomeProcesso}</dd>
-      <dt className="text-[var(--text-muted)]">ID</dt><dd className="tabular-nums text-white/85">#{processo.processoId}</dd>
-      <dt className="text-[var(--text-muted)]">Fase atual</dt><dd className="text-white/85">{rotularFase(processo.faseAtualKey) ?? "—"}</dd>
-      <dt className="text-[var(--text-muted)]">Status do processo</dt>
-      <dd className="text-white/85">{processo.statusProcesso === "CONCLUIDO" ? "Concluído" : "Ativo"}</dd>
-    </dl>
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[var(--elev-1)]">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-[12.5px]">
+        <dt className="text-[var(--text-muted)]">Processo</dt><dd className="font-medium text-[var(--text-primary)]">{processo.nomeProcesso}</dd>
+        <dt className="text-[var(--text-muted)]">ID</dt><dd className="tabular-nums text-[var(--text-primary)]">#{processo.processoId}</dd>
+        <dt className="text-[var(--text-muted)]">Fase atual</dt><dd><Etiqueta tom="acento">{rotularFase(processo.faseAtualKey) ?? "—"}</Etiqueta></dd>
+        <dt className="text-[var(--text-muted)]">Status do processo</dt>
+        <dd>{processo.statusProcesso === "CONCLUIDO" ? <Etiqueta tom="sucesso">Concluído</Etiqueta> : <Etiqueta tom="neutro">Ativo</Etiqueta>}</dd>
+      </dl>
+    </div>
   )
 }

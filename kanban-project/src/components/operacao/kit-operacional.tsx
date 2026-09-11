@@ -113,15 +113,23 @@ export function rotularFase(k: string | null): string | null {
   return labelDaFasePorPhaseKey(k) ?? k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
 }
 
-export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "acento"; children: React.ReactNode }) {
+/**
+ * A ETIQUETA — pílula semântica, nos MESMOS tokens de tile/tinta do DS
+ * (`--success-tile`/`--warning-tile`/`--danger-tile`/`--info-tile` +
+ * seus pares `-text`) que `home-primitives.tsx` já usa. Nunca cor
+ * inventada por tela: quem lê "alerta" vê o mesmo âmbar em qualquer canto
+ * do produto.
+ */
+export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "acento" | "sucesso"; children: React.ReactNode }) {
   const cores = {
-    neutro: "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]",
-    alerta: "bg-[var(--surface-secondary)] text-amber-800/90 border-[var(--border-default)]",
-    critico: "bg-[var(--surface-secondary)] text-red-700/90 border-[var(--border-default)]",
-    acento: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]/90 border-[var(--border-default)]",
+    neutro: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]",
+    alerta: "bg-[var(--warning-tile)] text-[var(--warning-text)]",
+    critico: "bg-[var(--danger-tile)] text-[var(--danger-text)]",
+    acento: "bg-[var(--info-tile)] text-[var(--info-text)]",
+    sucesso: "bg-[var(--success-tile)] text-[var(--success-text)]",
   }[tom]
   return (
-    <span className={`inline-flex items-center rounded border px-1.5 py-[1px] text-[10px] font-medium leading-4 ${cores}`}>
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium leading-4 ${cores}`}>
       {children}
     </span>
   )
@@ -131,11 +139,11 @@ export function Estado({ tipo, mensagem, aoTentar }: { tipo: "carregando" | "vaz
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
       {tipo === "carregando" && <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-transparent" />}
-      <p className="text-[12px] text-[var(--text-secondary)]">{mensagem}</p>
+      <p className="text-[13px] text-[var(--text-secondary)]">{mensagem}</p>
       {tipo === "erro" && aoTentar && (
         <button
           onClick={aoTentar}
-          className="rounded border border-[var(--border-default)] px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:bg-[var(--surface-primary)]"
+          className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--text-primary)] shadow-[var(--elev-1)] transition-colors hover:bg-[var(--surface-secondary)]"
         >
           Tentar novamente
         </button>
