@@ -279,7 +279,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
     <div className="space-y-4">
 
       {/* ============== HEADER ============== */}
-      <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 border border-[var(--border-default)] rounded-lg px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+      <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[13px] font-bold text-white">{workflow.templateName}</div>
           <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">

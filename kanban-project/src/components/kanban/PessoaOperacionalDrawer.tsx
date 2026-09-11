@@ -301,7 +301,7 @@ function ConteudoDrawer({
             {/* ============== HEADER ============== */}
             <div
               className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-[var(--border-default)]"
-              style={{ background: "linear-gradient(180deg,#181d24 0%,#11151b 100%)" }}
+              style={{ background: "var(--surface-secondary)" }}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">

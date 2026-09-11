@@ -439,10 +439,15 @@ function ConteudoModal({
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1">
+                    {/* Fundo é o gradiente AZUL de marca — a tinta padrão do tema
+                        (`text-white`/`text-[var(--text-secondary)]`) é graphite
+                        escuro, feita para superfície clara, e fica ilegível aqui.
+                        `text-pure` é o branco de verdade, para tinta sobre
+                        superfície colorida (ver globals.css). */}
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-pure/70 mb-1">
                       Dados registrais — {tipoLabel}
                     </div>
-                    <div className="text-[13px] text-white/70 leading-snug">
+                    <div className="text-[13px] text-pure/70 leading-snug">
                       {pessoaNome} ·{" "}
                       {isModoBuscar
                         ? "Preencha cartório + livro/folha/termo para concluir a etapa Localizar registro da certidão."
@@ -451,7 +456,7 @@ function ConteudoModal({
                   </div>
                   <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[var(--text-primary)] flex-shrink-0"
+                    className="w-8 h-8 rounded-md bg-pure/10 hover:bg-pure/20 flex items-center justify-center text-pure flex-shrink-0"
                     aria-label="Fechar"
                   >
                     <X className="w-4 h-4" />

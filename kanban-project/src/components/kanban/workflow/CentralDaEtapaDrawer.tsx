@@ -14,7 +14,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
@@ -400,6 +400,24 @@ function ConteudoDrawer({
   const step = workflow?.steps.find((s) => s.id === stepId) || null
   const totalSteps = workflow?.steps.length || 0
 
+  // ABRE O EDITOR DIRETO — ninguém precisa clicar em "Abrir editor" pra
+  // trabalhar na etapa; toda etapa publicada TEM editor. Este painel (status,
+  // bloquear, transferir, forçar) continua atrás, alcançável fechando o
+  // editor. Dispara UMA vez por etapa (guarda por stepId): fechar o editor
+  // pra ver o painel não pode reabri-lo sozinho.
+  const autoAbertoParaStep = useRef<number | null>(null)
+  useEffect(() => {
+    if (!isOpen || loading || !step) return
+    if (autoAbertoParaStep.current === step.id) return
+    autoAbertoParaStep.current = step.id
+    setEditorAberto(true)
+  }, [isOpen, loading, step])
+  // Fechado: esquece o que já abriu sozinho — reabrir (mesma etapa ou outra)
+  // deve ir direto ao editor de novo, não lembrar que "já abriu uma vez".
+  useEffect(() => {
+    if (!isOpen) autoAbertoParaStep.current = null
+  }, [isOpen])
+
   // ✅ Se o drawer está aberto, já terminou de carregar, tem um workflow
   // carregado, mas o stepId que deveríamos mostrar NÃO está mais nele —
   // significa que a etapa foi concluída e o avanço de fase arquivou este
@@ -465,7 +483,7 @@ function ConteudoDrawer({
             {/* ============== HEADER ============== */}
             <div
               className="flex-shrink-0 px-6 pt-5 pb-4 border-b border-[var(--border-default)]"
-              style={{ background: "linear-gradient(180deg,#1c222b 0%,#161b22 100%)" }}
+              style={{ background: "var(--surface-secondary)" }}
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
