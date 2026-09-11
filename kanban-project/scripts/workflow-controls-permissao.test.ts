@@ -57,6 +57,12 @@ check("3a) o drawer chama WorkflowControls com podeBloquear/podeExcluir", /<Work
 check("3b) e com podeExcluir vindo da MESMA fonte (pode(), não um valor fixo)", /<WorkflowControls[\s\S]{0,340}podeExcluir=\{pode\("tarefas\.excluir"\)\}/.test(drawer))
 check("3c) `pode` vem de usePermissoes() — permissão efetiva do usuário logado, não um cadastro estático no componente", drawer.includes("usePermissoes()"))
 
+secao("4) 'Delegar' (transferir responsável) — achado real 11/09/2026: Assistente não distribui trabalho")
+const atribuirRoute = read("src/app/api/tarefas/[tarefaId]/atribuir/route.ts")
+check("4a) o servidor exige tarefas.editar em POST /api/tarefas/[id]/atribuir (a porta que 'Delegar' chama)", /verificarPermissao\(request, 'tarefas\.editar'\)/.test(atribuirRoute))
+check("4b) o link 'Delegar' no drawer só renderiza com pode('tarefas.editar')", /pode\('tarefas\.editar'\)[\s\S]{0,1200}Delegar/.test(drawer))
+check("4c) o seletor de responsável (aberto) também exige a permissão, não só o link que o abre", /delegandoResp && pode\('tarefas\.editar'\)/.test(drawer))
+
 console.log(`\n${ok} passaram, ${falhas.length} falharam`)
 if (falhas.length) console.log("Falhas:", falhas.join(", "))
 process.exit(falhas.length > 0 ? 1 : 0)

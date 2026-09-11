@@ -622,7 +622,12 @@ function ConteudoDrawer({
                     <UserRound className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
                     <span className="truncate">{tarefa?.responsavelNome || "Não atribuído"}</span>
                   </div>
-                  {delegandoResp ? (
+                  {/* DELEGAR É GESTÃO, NÃO EXECUÇÃO — mesma permissão que o servidor já
+                      confere na porta canônica (POST /api/tarefas/[id]/atribuir exige
+                      tarefas.editar). Assistente não distribui trabalho de terceiro,
+                      só executa a própria fila; sem esta checagem o link aparecia pra
+                      todo mundo e só falhava (403) depois do clique. */}
+                  {delegandoResp && pode('tarefas.editar') ? (
                     <select
                       autoFocus
                       disabled={salvando}
@@ -639,7 +644,7 @@ function ConteudoDrawer({
                         <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
                       ))}
                     </select>
-                  ) : (
+                  ) : pode('tarefas.editar') ? (
                     /* DELEGAR MOVE A TAREFA — pela porta canônica de atribuição, a
                        mesma que a tela de Tarefas usa. Este botão escrevia
                        `Documento.responsavelId`: um TERCEIRO lugar para guardar de
@@ -654,7 +659,7 @@ function ConteudoDrawer({
                     >
                       Delegar
                     </button>
-                  )}
+                  ) : null}
                 </div>
                 {/* SLA */}
                 <div className="flex flex-col gap-1.5">
