@@ -166,9 +166,10 @@ function main() {
   ok('§3) e os materializadores delegam a ela',
     /export const calcularPrazo = prazoOperacional/.test(semComentarios(ler('lib/operacional/tarefa-canonica.ts')))
     && /return prazoOperacional\(sla, base\)/.test(semComentarios(ler('src/services/passo-tarefa-helpers.ts'))))
-  ok('§3) o motor legado também',
-    /prazoOperacional\(spec\.slaDays/.test(semComentarios(ler('src/services/processEngine/taskEngine.ts'))),
-    'era uma TERCEIRA conta, em milissegundos')
+  // O "motor legado" (src/services/processEngine/taskEngine.ts) que tinha a
+  // TERCEIRA conta de prazo (em milissegundos) foi REMOVIDO na Unidade 5
+  // (10/09/2026) — não delegou, deixou de existir. Uma conta a menos, não uma
+  // conta sem prova.
 
   // Varredura: ninguém somando dias em milissegundos para virar prazo.
   const varrer = (dir: string, acc: string[] = []): string[] => {

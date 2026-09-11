@@ -25,7 +25,6 @@ import { ordenarRequerentes, classificarRequerente, valorDoRequerente, chaveIdem
 // periodicidade e vencimentos. O motor consome o plano pronto.
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
 import { criarObrigacaoEconomicaComLedgerTx, removerObrigacaoOrfaTx } from '@/lib/financeiro/ledger/ledger-service'
-import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 // ✅ E8 (fatia Emissão) — motor econômico por ELEGIBILIDADE. Roda AO LADO do
 // executor clássico, atrás da MESMA trava (autoExecutarAoAvancar). Import
 // relativo porque os dois arquivos vivem em src/lib/motor/.
@@ -322,9 +321,10 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
   // TAREFAS — NEUTRALIZADO (arquitetura nova).
   // Automações não criam mais tarefas obrigatórias da fase: isso é exclusivo do
   // Workflow Interno. Regras kind=task existentes são apenas REPORTADAS como
-  // neutralizadas; nenhuma Tarefa é criada aqui. (Os helpers de criação de tarefa
-  // — criarTarefaDeSpec/mapPrio/resolverResponsavelDaRegra — ficaram sem uso de
-  // propósito; mantidos para minimizar churn até a nova arquitetura.)
+  // neutralizadas; nenhuma Tarefa é criada aqui. (`criarTarefaDeSpec`/
+  // taskEngine.ts foram removidos na Unidade 5 — segundo owner de Tarefa
+  // aposentado. `mapPrio`/`resolverResponsavelDaRegra` seguem sem uso de
+  // propósito, mantidos para minimizar churn até a nova arquitetura.)
   for (const rule of taskRules) {
     skipped.push({ name: rule.name ?? `automação #${rule.id}`, reason: 'automação de tarefa NEUTRALIZADA — tarefas obrigatórias da fase são exclusivas do Workflow Interno' })
   }

@@ -150,6 +150,18 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/portas-tarefa.test.ts":
     "portas canônicas da tarefa: monta e derruba os PRÓPRIOS processos (marca PORTAS) " +
     "só no banco de teste",
+  "scripts/central-operacional-contrato.test.ts":
+    "contrato da Central Operacional: monta e derruba as PRÓPRIAS árvores e pessoas " +
+    "(marca CENTRALOP) só no banco de teste",
+  "scripts/escopo-operacional-contrato.test.ts":
+    "contrato de escopo ADMIN x OPERACIONAL: monta e derruba as PRÓPRIAS árvores e pessoas " +
+    "(marca ESCOPOOP) só no banco de teste",
+  "scripts/casamento-por-uniao.test.ts":
+    "casamento materializado por UNIÃO: monta e derruba as PRÓPRIAS árvores/pessoas/uniões " +
+    "(marca UNIAOCAS) só no banco de teste",
+  "scripts/necessidade-dispensada-cancela-tarefa.test.ts":
+    "Unidade 1 do plano de consolidação (10/09/2026): monta e derruba as PRÓPRIAS " +
+    "árvores/pessoas (marca DISPTASK) só no banco de teste",
   "scripts/motor-operacional-fases.test.ts":
     "motor operacional através das fases: monta e derruba os PRÓPRIOS processos " +
     "(marca MOTOR-FASE) só no banco de teste",

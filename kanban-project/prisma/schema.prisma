@@ -4468,7 +4468,6 @@ model MatrizDocumental {
   required              Boolean                    @default(true)
   conditional           Boolean                    @default(false)
   condition             String?                    @db.Text
-  createsTask           Boolean                    @default(true)
   createsCost           Boolean                    @default(false)
   createsRevenue        Boolean                    @default(false)
   blocksPhaseCompletion Boolean                    @default(false)
@@ -4509,6 +4508,9 @@ model MatrizDocumental {
   obrigatoriedade                      ObrigatoriedadeRegra    @default(OBRIGATORIA)
   // PÃBLICO-ALVO â mÃºltiplo. publicoAlvo (singular) permanece como primÃ¡rio (dual-read).
   publicoAlvo                          PublicoAlvoRegra        @default(PESSOA_DA_LINHA_RETA)
+  // GRAO da necessidade materializada — ver enum AlvoNecessidadeRegra. NAO É
+  // o "target" legado acima (motor eliminado, outro vocabulario).
+  alvoNecessidade                      AlvoNecessidadeRegra    @default(PESSOA)
   publicosAlvo                         Json? // [PublicoAlvoRegra] â coleÃ§Ã£o
   // CONDIÃÃES estruturadas: { combinador: TODAS|QUALQUER, regras: [{campo,operador,valor}] }
   condicoes                            Json?
@@ -4563,6 +4565,16 @@ enum PublicoAlvoRegra {
   PESSOA_DA_LINHA_RETA
   PESSOA_FORA_DA_LINHA_RETA
   TODAS_AS_PESSOAS_DA_ARVORE
+}
+
+/// GRÃO da NecessidadeDocumental que a regra materializa. PESSOA (default):
+/// uma necessidade por pessoa elegível — nascimento, óbito, RG... UNIAO: o
+/// documento representa o CASAMENTO em si (ato entre duas pessoas), então UMA
+/// única necessidade serve os dois cônjuges — nunca uma por pessoa (senão o
+/// mesmo casamento pede a mesma certidão duas vezes, uma para cada lado).
+enum AlvoNecessidadeRegra {
+  PESSOA
+  UNIAO
 }
 
 model MotorArtefato {

@@ -3,11 +3,11 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import {PrioridadeTarefa} from '@prisma/client'
-import { logTarefa } from "@/lib/auditoria"
 import { toUTCNoon } from "@/src/lib/date-utils"
 import { extrairUsuarioKanban } from "@/lib/kanban-auth"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { STATUS_TERMINAIS } from '@/lib/operacional/tarefa-canonica'
+import { criarTarefaManual } from '@/lib/operacional/tarefa-ciclo'
 
 // GET - Buscar tarefas (com filtros opcionais)
 export async function GET(request: Request) {
@@ -181,22 +181,36 @@ export async function GET(request: Request) {
 }
 
 // POST - Criar nova tarefa
+//
+// UNIDADE 6 (10/09/2026): esta rota tinha `prisma.tarefa.create` PRÓPRIO — um
+// segundo owner de criação, sem o motivo obrigatório, a checagem de
+// duplicidade nem a auditoria canônica de `criarTarefaManual`
+// (lib/operacional/tarefa-ciclo.ts). Nenhum chamador real foi encontrado no
+// frontend deste repositório (grep exaustivo em src/), mas a rota permanece
+// por compatibilidade externa — agora DELEGANDO para o owner único.
+//
+// INCOMPATIBILIDADE REAL (decisão do usuário, 10/09/2026): `criarTarefaManual`
+// exige `motivo` (SEM_MOTIVO se ausente) — o contrato antigo desta rota nunca
+// teve esse campo. Em vez de inventar um texto, o campo passou a ser aceito
+// no body como opcional; sua ausência agora resulta em 400 explícito, não em
+// um motivo forjado.
 export async function POST(request: Request) {
   try {
     const erro = await verificarPermissao(request, 'tarefas.criar')
     if (erro) return erro
+    const usuario = await extrairUsuarioKanban(request)
+    if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
 
     const body = await request.json()
-    const { 
-      titulo, 
-      descricao, 
-      processoId, 
+    const {
+      titulo,
+      descricao,
+      processoId,
       responsavelId,
       prioridade,
       dataPrazo,
       statusId,
-      pais,
-      ordem
+      motivo,
     } = body
 
     if (!titulo) {
@@ -206,20 +220,17 @@ export async function POST(request: Request) {
       )
     }
 
-    let processoNome: string | undefined
     if (processoId) {
       const processo = await prisma.processo.findUnique({
         where: { id: processoId },
-        select: { nome: true }
+        select: { id: true },
       })
-
       if (!processo) {
         return NextResponse.json(
           { error: "Processo não encontrado" },
           { status: 404 }
         )
       }
-      processoNome = processo.nome
     }
 
     if (responsavelId) {
@@ -252,33 +263,35 @@ export async function POST(request: Request) {
       ? prioridade
       : PrioridadeTarefa.MEDIA
 
-    // Validado contra o CADASTRO, não contra uma lista do schema.
-    const paisValido = pais
-      ? (await prisma.catalogoPais.findFirst({
-          where: { countryKey: String(pais).toLowerCase() }, select: { countryKey: true },
-        }))?.countryKey ?? null
-      : null
+    const resultado = await criarTarefaManual({
+      processoId,
+      titulo,
+      autorId: usuario.userId,
+      responsavelId: responsavelId || null,
+      prioridade: prioridadeValida,
+      dataPrazo: toUTCNoon(dataPrazo),
+      motivo: motivo ?? '',
+      // `criarTarefaManual` sempre checa duplicidade; o contrato antigo desta
+      // rota nunca checou — confirmar de propósito preserva "sempre cria",
+      // sem inventar comportamento novo.
+      confirmarDuplicidade: true,
+      // Campos que `criarTarefaManual` não modela como parâmetro próprio, mas
+      // que a Tarefa aceita — a mesma porta grava o que quem chamou pediu.
+      camposDeDominio: {
+        ...(descricao ? { descricao } : {}),
+        ...(statusId ? { statusId } : {}),
+      },
+    })
 
-    let ordemFinal = ordem
-    if (ordemFinal === undefined || ordemFinal === null) {
-      const ultimaTarefa = await prisma.tarefa.findFirst({
-        where: { processoId: processoId || undefined },
-        orderBy: { ordem: "desc" }
-      })
-      ordemFinal = (ultimaTarefa?.ordem ?? -1) + 1
+    if (!resultado.ok) {
+      const status = resultado.codigo === 'SEM_MOTIVO' || resultado.codigo === 'INVALIDO' ? 400
+        : resultado.codigo === 'CONFLITO' ? 409
+        : 500
+      return NextResponse.json({ error: resultado.mensagem }, { status })
     }
 
-    const tarefa = await prisma.tarefa.create({
-      data: {
-        titulo,
-        descricao: descricao || null,
-        processoId: processoId || null,
-        responsavelId: responsavelId || null,
-        prioridade: prioridadeValida,
-        dataPrazo: toUTCNoon(dataPrazo),
-        statusId: statusId || null,
-        ordem: ordemFinal
-      },
+    const tarefa = await prisma.tarefa.findUnique({
+      where: { id: resultado.tarefaId },
       include: {
         processo: {
           select: {
@@ -302,8 +315,6 @@ export async function POST(request: Request) {
         }
       }
     })
-
-    await logTarefa.criar(tarefa.titulo, tarefa.id, processoNome)
 
     // A ÁRVORE PAI/FILHO FOI REMOVIDA DAQUI.
     //

@@ -105,7 +105,7 @@ async function montarCenario() {
     data: {
       tipoProcessoId: TIPO_PROCESSO, phaseKey: FASE, documentTypeCode: CODE_DOC,
       target: "direct_line_person", generationRule: "all_direct_line",
-      createsTask: false, createsCost: true, createsRevenue: false, status: 'PUBLICADA',
+      createsCost: true, createsRevenue: false, status: 'PUBLICADA',
     },
   })
   criado.matrizIds.push(matriz.id)
@@ -276,7 +276,7 @@ async function main() {
     data: {
       tipoProcessoId: TIPO_PROCESSO, phaseKey: FASE, documentTypeCode: tipoNovo.code as string,
       target: "direct_line_person", generationRule: "all_direct_line",
-      createsTask: false, createsCost: true, createsRevenue: false, status: 'PUBLICADA',
+      createsCost: true, createsRevenue: false, status: 'PUBLICADA',
     },
   })
   const econNova = await prisma.phaseEconomicRule.create({
@@ -305,7 +305,7 @@ async function main() {
     data: {
       tipoProcessoId: TIPO_PROCESSO, phaseKey: FASE, documentTypeCode: `INEXISTENTE_${TS}`.slice(0, 40),
       target: "direct_line_person", generationRule: "all_direct_line",
-      createsTask: false, createsCost: true, createsRevenue: false, status: 'PUBLICADA',
+      createsCost: true, createsRevenue: false, status: 'PUBLICADA',
     },
   })
   const recOrfa = await reconciliarDocumentalFinanceiro({ processoId: pid, executar: false })

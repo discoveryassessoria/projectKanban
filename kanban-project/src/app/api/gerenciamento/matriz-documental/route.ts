@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
         required: b.required !== false,
         conditional: !!b.conditional,
         condition: b.condition ? String(b.condition) : null,
-        createsTask: b.createsTask !== false,
         createsCost: !!b.createsCost,
         createsRevenue: !!b.createsRevenue,
         blocksPhaseCompletion: !!b.blocksPhaseCompletion,

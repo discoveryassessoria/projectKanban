@@ -15,9 +15,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
-import { carregarBase, montarAgenda, montarAlertas, montarFilas, montarPrazosResumo, montarResumoDia, montarSla, type ContextoHome } from "@/src/lib/home/coleta"
+import { carregarBase, contarTrabalhoPendenteDistinto, montarAgenda, montarAlertas, montarFilas, montarPrazosResumo, montarResumoDia, montarSla, type ContextoHome } from "@/src/lib/home/coleta"
 import { montarStatus } from "@/src/lib/home/home-logic"
 import type { HomeData, HomePermissions } from "@/src/types/home"
+import { agregacaoPorFamilia, indicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
+import { fasesParaSelecao } from "@/src/lib/process-stage/fases-catalog"
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,14 +44,24 @@ export async function GET(request: NextRequest) {
     })
 
     const base = await carregarBase(ctx)
-    const [filas, agenda, resumoDia, alertas] = await Promise.all([
+    // ESCOPO — admin sem filtro (universo global autorizado); operacional só
+    // o próprio trabalho. Decidido AQUI, a partir da sessão — nunca aceito do
+    // cliente (ver src/lib/autorizacao/escopo-operacional.ts).
+    const filtroCentral = isAdmin ? {} : { responsavelId: usuario.userId }
+    const [filas, agenda, resumoDia, alertas, familiasCentral, indicadoresCentral] = await Promise.all([
       Promise.resolve(montarFilas(base, ctx)),
       montarAgenda(ctx),
       montarResumoDia(base, ctx),
       montarAlertas(base, ctx),
+      permissoes.verTarefas ? agregacaoPorFamilia(ctx.agora, filtroCentral) : Promise.resolve([]),
+      permissoes.verTarefas ? indicadoresGerenciais(filtroCentral, ctx.agora) : Promise.resolve(null),
     ])
 
-    const totalAcoes = filas.reduce((acc, f) => acc + f.quantidade, 0)
+    // Métrica COMPOSTA e deduplicada — não é Σ fila.quantidade (isso contava o
+    // mesmo Step/Tarefa/Processo mais de uma vez quando ele pertencia a mais de
+    // uma fila ao mesmo tempo; achado real da auditoria de 10/09/2026 — ver
+    // `contarTrabalhoPendenteDistinto`). Nunca ler como contagem de Tarefa.
+    const totalAcoes = contarTrabalhoPendenteDistinto(base, ctx)
     const criticos = filas.filter((f) => f.nivel === "critico").reduce((acc, f) => acc + f.quantidade, 0)
 
     const payload: HomeData = {
@@ -68,6 +80,9 @@ export async function GET(request: NextRequest) {
       agenda,
       alertas,
       resumoDia,
+      centralOperacional: indicadoresCentral
+        ? { indicadores: indicadoresCentral, familias: familiasCentral, fases: fasesParaSelecao() }
+        : null,
     }
 
     return NextResponse.json(payload, {

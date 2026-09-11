@@ -123,7 +123,14 @@ export async function GET(request: NextRequest) {
       proximos3Dias,
       novas,
       saudeCritica,
-      total: vencidas.length + hojeList.length + proximos3Dias.length + novas.length + (saudeCritica ? 1 : 0)
+      // GRAIN = TAREFA, sem duplicidade: uma tarefa criada há menos de 24h E com
+      // prazo nos próximos dias cai em DOIS buckets de exibição ao mesmo tempo
+      // (`novas` + a janela de prazo correspondente — `novas` é um `if` à parte,
+      // não `else if`, de propósito, porque os dois fatos são independentes e a
+      // tela mostra os dois). O TOTAL não pode somar os buckets (contaria essa
+      // tarefa 2x) — é sempre `tarefas.length`, a query já traz cada Tarefa uma
+      // única vez (achado real da auditoria de 10/09/2026).
+      total: tarefas.length + (saudeCritica ? 1 : 0)
     })
   } catch (error) {
     console.error('Erro ao buscar notificações:', error)

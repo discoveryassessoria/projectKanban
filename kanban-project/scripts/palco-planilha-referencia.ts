@@ -158,7 +158,7 @@ async function main() {
     await prisma.matrizDocumental.create({
       data: {
         tipoProcessoId: tipo.id, phaseKey: FASE, documentTypeCode: t.code!,
-        status: "PUBLICADA", createsCost: true, createsTask: false, arquivado: false,
+        status: "PUBLICADA", createsCost: true, arquivado: false,
       },
     })
     await prisma.phaseEconomicRule.create({

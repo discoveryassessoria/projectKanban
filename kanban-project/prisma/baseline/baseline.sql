@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-05
+-- Gerado em : 2026-09-10
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -53,6 +53,9 @@ CREATE TYPE "ModoSatisfacaoRequisito" AS ENUM ('QUALQUER_UM_ATENDE', 'TODOS_SAO_
 
 -- CreateEnum
 CREATE TYPE "PublicoAlvoRegra" AS ENUM ('REQUERENTE', 'CONTRATANTE', 'PESSOA_DA_ARVORE_COM_DOCUMENTACAO', 'PESSOA_DA_LINHA_RETA', 'PESSOA_FORA_DA_LINHA_RETA', 'TODAS_AS_PESSOAS_DA_ARVORE');
+
+-- CreateEnum
+CREATE TYPE "AlvoNecessidadeRegra" AS ENUM ('PESSOA', 'UNIAO');
 
 -- CreateEnum
 CREATE TYPE "OrigemNecessidade" AS ENUM ('ARVORE', 'MATRIZ', 'MANUAL', 'MIGRACAO');
@@ -2862,7 +2865,6 @@ CREATE TABLE "MatrizDocumental" (
     "required" BOOLEAN NOT NULL DEFAULT true,
     "conditional" BOOLEAN NOT NULL DEFAULT false,
     "condition" TEXT,
-    "createsTask" BOOLEAN NOT NULL DEFAULT true,
     "createsCost" BOOLEAN NOT NULL DEFAULT false,
     "createsRevenue" BOOLEAN NOT NULL DEFAULT false,
     "blocksPhaseCompletion" BOOLEAN NOT NULL DEFAULT false,
@@ -2887,6 +2889,7 @@ CREATE TABLE "MatrizDocumental" (
     "categoriaCode" VARCHAR(40),
     "obrigatoriedade" "ObrigatoriedadeRegra" NOT NULL DEFAULT 'OBRIGATORIA',
     "publicoAlvo" "PublicoAlvoRegra" NOT NULL DEFAULT 'PESSOA_DA_LINHA_RETA',
+    "alvoNecessidade" "AlvoNecessidadeRegra" NOT NULL DEFAULT 'PESSOA',
     "publicosAlvo" JSONB,
     "condicoes" JSONB,
     "faseExigencia" VARCHAR(60),

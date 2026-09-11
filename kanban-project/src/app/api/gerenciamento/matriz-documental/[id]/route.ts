@@ -22,7 +22,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         required: b.required !== undefined ? !!b.required : atual.required,
         conditional: b.conditional !== undefined ? !!b.conditional : atual.conditional,
         condition: b.condition !== undefined ? (b.condition ? String(b.condition) : null) : atual.condition,
-        createsTask: b.createsTask !== undefined ? !!b.createsTask : atual.createsTask,
         createsCost: b.createsCost !== undefined ? !!b.createsCost : atual.createsCost,
         createsRevenue: b.createsRevenue !== undefined ? !!b.createsRevenue : atual.createsRevenue,
         blocksPhaseCompletion: b.blocksPhaseCompletion !== undefined ? !!b.blocksPhaseCompletion : atual.blocksPhaseCompletion,

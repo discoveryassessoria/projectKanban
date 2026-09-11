@@ -53,7 +53,7 @@ async function montar() {
   })
   c.econId = econ.id
   const m = await prisma.matrizDocumental.create({
-    data: { tipoProcessoId: tp.id, phaseKey: FASE, documentTypeCode: 'X-WIZ', nome: `Regra ${TAG}`, createsTask: false, createsCost: true, createsRevenue: false },
+    data: { tipoProcessoId: tp.id, phaseKey: FASE, documentTypeCode: 'X-WIZ', nome: `Regra ${TAG}`, createsCost: true, createsRevenue: false },
   })
   c.matrizId = m.id
 }

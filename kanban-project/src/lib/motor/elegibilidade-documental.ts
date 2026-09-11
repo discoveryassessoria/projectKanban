@@ -44,7 +44,6 @@ import type { ConjuntoCondicoes, SujeitoContexto } from '@/src/lib/documentos/re
 /** Um lançamento que DEVE existir: pessoa × documento × componente econômico. */
 export interface ItemElegivel {
   regraId: number
-  criaTarefa: boolean
   criaCusto: boolean
   criaReceita: boolean
   pessoaId: number
@@ -227,7 +226,7 @@ export async function resolverElegibilidadeDocumental(
         for (const econ of plano) {
           itens.push({
             regraId: regra.id,
-            criaTarefa: regra.createsTask, criaCusto: regra.createsCost, criaReceita: regra.createsRevenue,
+            criaCusto: regra.createsCost, criaReceita: regra.createsRevenue,
             pessoaId: pessoa.id,
             pessoaNome: [pessoa.nome, pessoa.sobrenome].filter(Boolean).join(' ').trim(),
             documentoId: doc.id,

@@ -249,20 +249,34 @@ export async function reconciliarTarefas(
       // encerrado, não a marca — remarcaria a tarefa na passada seguinte e
       // pediria de novo uma decisão já tomada.
       causaDecididaEm: null,
-      workflowInstance: { status: { in: ['CANCELADO', 'SUPERSEDIDO'] } },
-      // A CAUSA É A OBRIGAÇÃO — não a instância de workflow.
+      // A CAUSA É A OBRIGAÇÃO — não a instância de workflow. Por isso o filtro de
+      // `workflowInstance` NÃO é mais global: cada ramo do OR abaixo decide, pelo
+      // seu próprio sinal, se a causa desapareceu — não pelo status do container.
       //
       // Instância SUPERSEDIDA não é obrigação cancelada: mover o processo de
       // fase supersede o roteiro da fase anterior, e a certidão que faltava
-      // continua faltando. Sem esta condição, mudar de fase CANCELAVA as
-      // certidões pendentes que ainda não tinham sido iniciadas — trabalho real
-      // sumindo da fila porque o processo andou.
+      // continua faltando. Por isso o ramo "sem necessidade nenhuma" só dispara
+      // quando o CONTAINER inteiro (a instância da fase) foi cancelado ou
+      // supersedido — não quando ele terminou normalmente (CONCLUIDO) ou está
+      // ativo. Mudar de fase não pode cancelar certidões pendentes que ainda não
+      // foram iniciadas — trabalho real sumindo da fila porque o processo andou.
       //
-      // Só é "sem causa" quem perdeu a obrigação de verdade: a necessidade foi
-      // dispensada, supersedida por outra, ou nunca existiu.
+      // Já a necessidade/documento dispensados são a OBRIGAÇÃO em si dizendo que
+      // não vale mais — isso é verdade INDEPENDENTE do container ainda estar
+      // ATIVO ou já ter CONCLUÍDO normalmente. Exigir `workflowInstance` cancelado
+      // aqui era o bug real: uma necessidade dispensada DEPOIS que a fase de
+      // Genealogia já tinha concluído normalmente (workflowInstance CONCLUIDO,
+      // não CANCELADO/SUPERSEDIDO) nunca era pega — a Tarefa ficava órfã pra
+      // sempre (achado real: processo 589/Santin, necessidades 405/406/408/409
+      // dispensadas, Steps corretamente cancelados, Tarefas T3556/T3557/T3559/
+      // T3560 nunca canceladas).
       OR: [
-        { necessidadeId: null },
+        { necessidadeId: null, workflowInstance: { status: { in: ['CANCELADO', 'SUPERSEDIDO'] } } },
         { necessidade: { OR: [{ status: 'DISPENSADA' }, { supersedePorId: { not: null } }] } },
+        // Tarefa de Emissão Documental liga por `documentoId`, não `necessidadeId`
+        // — `dispensarNecessidade` cancela o Documento (status CANCELADO) no mesmo
+        // ato que dispensa a necessidade; é o sinal equivalente para este lado.
+        { documento: { status: 'CANCELADO' } },
       ],
       ...(opts.processoId ? { processoId: opts.processoId } : {}),
     },

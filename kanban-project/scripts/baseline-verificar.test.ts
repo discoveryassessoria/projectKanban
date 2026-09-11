@@ -285,7 +285,28 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // como sempre (nasce sem a marca).
 //
 //   anterior : 33cade3ecfc12cf07e0a30bb83cb17c7d07dd156fcb2ab157e655182df20f53b
-const CHECKSUM_LEDGER = '4e54a69a78b38a349cac01b88e84dd914aa99d7c17f2689a39eb0f20ab6efcea'
+// 10/09/2026 — DUAS mudanças aditivas ao schema bundladas nesta regeneração
+// (a reconciliação do ledger ficou pendente desde a primeira e só foi feita
+// agora, junto com a segunda):
+//   1. CASAMENTO POR UNIÃO: enum `AlvoNecessidadeRegra` (PESSOA/UNIAO) + coluna
+//      `MatrizDocumental.alvoNecessidade`, default PESSOA — preserva todo
+//      comportamento publicado; só a regra de casamento passa a materializar
+//      por União, não por Pessoa (evita duas necessidades de casamento pro
+//      mesmo casal). Migration 20260910190000_alvo_necessidade_uniao.
+//   2. UNIDADE 5 (aposentadoria do segundo owner de Tarefa): DROP COLUMN
+//      `MatrizDocumental.createsTask`. Prova de segurança: as 6 linhas reais
+//      de produção já tinham createsTask=false; 0 Tarefas foram criadas por
+//      esse caminho (MotorArtefato ruleKind=task/targetTable=Tarefa = 0).
+//      createsCost/createsRevenue (efeito financeiro) NÃO foram tocados.
+//      Migration 20260910200000_remove_matriz_documental_createstask.
+// Diff do baseline: só a linha da coluna trocada (createsTask →
+// alvoNecessidade) dentro do mesmo CREATE TABLE — zero DROP/TRUNCATE/DELETE
+// de dado. Backup do ledger em
+// ~/.discovery-backups/prisma-migrations-20260910-pre-checksum.json (62
+// linhas) antes do UPDATE.
+//
+//   anterior : 6bedd6ce1a99b6cc8ec1444b9dc1c235b157b52b39895075123574619014af0c
+const CHECKSUM_LEDGER = '75d717a0e730194a596aed61f2a50e4a66f143d1cb94f32cf852348886024948'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -352,6 +373,8 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260902120000_processo_nao_deixa_orfao',
   '20260902150000_todo_vinculo_protegido',
   '20260905193850_necessidade_dispensa_manual',
+  '20260910190000_alvo_necessidade_uniao',
+  '20260910200000_remove_matriz_documental_createstask',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

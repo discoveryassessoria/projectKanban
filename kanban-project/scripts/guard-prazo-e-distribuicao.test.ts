@@ -78,7 +78,8 @@ ok('§95) e ela é pura — não consulta, não escreve',
 for (const [arquivo, marca] of [
   ['lib/operacional/tarefa-canonica.ts', /calcularPrazo = prazoOperacional/],
   ['src/services/passo-tarefa-helpers.ts', /prazoOperacional\(sla, base\)/],
-  ['src/services/processEngine/taskEngine.ts', /prazoOperacional\(spec\.slaDays/],
+  // 'src/services/processEngine/taskEngine.ts' foi REMOVIDO na Unidade 5
+  // (10/09/2026) — a terceira conta de prazo que ele tinha não existe mais.
   ['src/services/documento-operacao.ts', /prazoOperacional\(/],
 ] as const) {
   ok(`§95) ${arquivo.split('/').pop()} usa a conta canônica`, marca.test(semComentarios(ler(arquivo))))

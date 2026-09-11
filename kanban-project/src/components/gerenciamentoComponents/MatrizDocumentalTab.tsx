@@ -11,7 +11,7 @@ interface DocType { id: number; publicCode?: string | null; code: string | null;
 interface Regra {
   id: number; tipoProcessoId: number; phaseKey: string | null; documentTypeCode: string
   target: string; generationRule: string; required: boolean; conditional: boolean; condition: string | null
-  createsTask: boolean; createsCost: boolean; createsRevenue: boolean; blocksPhaseCompletion: boolean
+  createsCost: boolean; createsRevenue: boolean; blocksPhaseCompletion: boolean
   usedByCount: number; arquivado: boolean
 }
 interface Data { tiposProcesso: TipoProcesso[]; docTypes: DocType[]; matriz: Regra[] }
@@ -44,11 +44,11 @@ const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" s
 type Form = {
   id?: number; tipoProcessoId: number; phaseKey: string; documentTypeCode: string; target: string; generationRule: string
   required: boolean; conditional: boolean; condition: string
-  createsTask: boolean; createsCost: boolean; createsRevenue: boolean; blocksPhaseCompletion: boolean
+  createsCost: boolean; createsRevenue: boolean; blocksPhaseCompletion: boolean
 }
 const blankForm = (tipoProcessoId: number): Form => ({
   tipoProcessoId, phaseKey: "", documentTypeCode: "", target: "direct_line_person", generationRule: "all_direct_line",
-  required: true, conditional: false, condition: "", createsTask: true, createsCost: false, createsRevenue: false, blocksPhaseCompletion: false,
+  required: true, conditional: false, condition: "", createsCost: false, createsRevenue: false, blocksPhaseCompletion: false,
 })
 
 // ============================================================
@@ -107,8 +107,8 @@ export default function MatrizDocumentalTab() {
     } finally { setBusy(false) }
   }
   async function dup(r: Regra) {
-    const { tipoProcessoId, phaseKey, documentTypeCode, target, generationRule, required, conditional, condition, createsTask, createsCost, createsRevenue, blocksPhaseCompletion } = r
-    const res = await fetch("/api/gerenciamento/matriz-documental", { method: "POST", headers: authHeaders(), body: JSON.stringify({ tipoProcessoId, phaseKey, documentTypeCode, target, generationRule, required, conditional, condition, createsTask, createsCost, createsRevenue, blocksPhaseCompletion }) })
+    const { tipoProcessoId, phaseKey, documentTypeCode, target, generationRule, required, conditional, condition, createsCost, createsRevenue, blocksPhaseCompletion } = r
+    const res = await fetch("/api/gerenciamento/matriz-documental", { method: "POST", headers: authHeaders(), body: JSON.stringify({ tipoProcessoId, phaseKey, documentTypeCode, target, generationRule, required, conditional, condition, createsCost, createsRevenue, blocksPhaseCompletion }) })
     const j = await res.json().catch(() => ({}))
     if (res.ok && j.regra) { upsert(j.regra); showFlash("Regra duplicada.") } else showFlash(j.error || "Erro.")
   }
@@ -127,7 +127,7 @@ export default function MatrizDocumentalTab() {
   }
 
   function openEdit(r: Regra) {
-    setForm({ id: r.id, tipoProcessoId: r.tipoProcessoId, phaseKey: r.phaseKey || "", documentTypeCode: r.documentTypeCode, target: r.target, generationRule: r.generationRule, required: r.required, conditional: r.conditional, condition: r.condition || "", createsTask: r.createsTask, createsCost: r.createsCost, createsRevenue: r.createsRevenue, blocksPhaseCompletion: r.blocksPhaseCompletion })
+    setForm({ id: r.id, tipoProcessoId: r.tipoProcessoId, phaseKey: r.phaseKey || "", documentTypeCode: r.documentTypeCode, target: r.target, generationRule: r.generationRule, required: r.required, conditional: r.conditional, condition: r.condition || "", createsCost: r.createsCost, createsRevenue: r.createsRevenue, blocksPhaseCompletion: r.blocksPhaseCompletion })
   }
 
   if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
@@ -178,7 +178,7 @@ export default function MatrizDocumentalTab() {
                       <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-[var(--surface-secondary)] text-amber-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{m.required ? "obrigatório" : "opcional"}</span>
                       {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-red-700">bloqueia fase</span>}
                     </td>
-                    <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)]">{[m.createsTask && "tarefa", m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)]">{[m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                         {m.arquivado ? (
@@ -246,7 +246,6 @@ export default function MatrizDocumentalTab() {
               </div>
               <div className="col-span-2"><label className={labelCls}>Condição (se condicional)</label><input value={form.condition} onChange={e => setForm(f => f && { ...f, condition: e.target.value })} className={inputCls} /></div>
               <div className="col-span-2 flex flex-wrap gap-x-5 gap-y-2 pt-1 text-xs text-white/70">
-                <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.createsTask} onChange={e => setForm(f => f && { ...f, createsTask: e.target.checked })} />Cria tarefa</label>
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.createsCost} onChange={e => setForm(f => f && { ...f, createsCost: e.target.checked })} />Cria custo</label>
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.createsRevenue} onChange={e => setForm(f => f && { ...f, createsRevenue: e.target.checked })} />Cria receita</label>
                 <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.blocksPhaseCompletion} onChange={e => setForm(f => f && { ...f, blocksPhaseCompletion: e.target.checked })} />Bloqueia conclusão da fase</label>

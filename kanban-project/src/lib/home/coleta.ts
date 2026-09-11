@@ -47,6 +47,7 @@ import type {
   ResumoDia,
 } from "@/src/types/home"
 import type { SlaProcesso } from "@/src/types/sla"
+import { escopoTarefa, escopoPasso, escopoProcesso, escopoDocumento, escopoEvento } from "@/src/lib/autorizacao/escopo-operacional"
 
 /** Dias sem movimentação a partir dos quais o processo entra na fila "parados". */
 export const DIAS_PROCESSO_PARADO = 15
@@ -121,18 +122,24 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
   const { permissoes: p, isAdmin, userId, agora } = ctx
   const limiteParado = somarDias(inicioDoDia(agora), -DIAS_PROCESSO_PARADO)
 
-  // Escopo do usuário comum: o que é dele ou está sem dono (espelha /api/tarefas).
-  const escopoResponsavel = isAdmin ? {} : { OR: [{ responsavelId: userId }, { responsavelId: null }] }
+  // ESCOPO CANÔNICO — admin sem filtro; operacional só o que é DELE (nunca o
+  // sem-dono: isso é fila da empresa, não "minha fila" — ver
+  // src/lib/autorizacao/escopo-operacional.ts).
+  const usuarioEscopo = { userId, tipo: isAdmin ? "admin" : "operacional" }
+  const escopoResponsavel = escopoTarefa(usuarioEscopo)
+  const escopoDoPasso = escopoPasso(usuarioEscopo)
+  const escopoDoProcesso = escopoProcesso(usuarioEscopo)
 
   const [processosRaw, passosRaw, tarefasRaw, pendenciasRaw, instanciasRaw] = await Promise.all([
     p.verProcessos
       ? prisma.processo.findMany({
+          where: escopoDoProcesso,
           select: { id: true, codigo: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, faseAtualKey: true, updatedAt: true },
         })
       : Promise.resolve([] as ProcessoBase[]),
     p.verProcessos
       ? prisma.phaseWorkflowStepInstance.findMany({
-          where: { status: { in: STATUS_PASSO_VIVO as unknown as any[] }, ...(escopoResponsavel as any) },
+          where: { status: { in: STATUS_PASSO_VIVO as unknown as any[] }, ...(escopoDoPasso as any) },
           select: {
             id: true,
             stepKey: true,
@@ -163,16 +170,18 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
           },
         })
       : Promise.resolve([] as any[]),
+    // Financeiro: módulo (`verFinanceiro`) E escopo — as duas coisas, não uma
+    // no lugar da outra. Sem `processo`, a pendência não tem como ser filtrada.
     p.verFinanceiro
       ? prisma.pendenciaFinanceira.findMany({
-          where: { resolvida: false },
+          where: { resolvida: false, processo: escopoDoProcesso },
           select: { id: true, processoId: true, motivo: true, detalhe: true, phaseKey: true, criadoEm: true },
           orderBy: { criadoEm: "desc" },
         })
       : Promise.resolve([] as PendenciaBase[]),
     p.verProcessos
       ? prisma.phaseWorkflowInstance.findMany({
-          where: { status: "CONCLUIDO" as any },
+          where: { status: "CONCLUIDO" as any, processo: escopoDoProcesso },
           select: { processoId: true, faseMacroKey: true },
         })
       : Promise.resolve([] as { processoId: number; faseMacroKey: string }[]),
@@ -324,6 +333,46 @@ function permissaoDaFila(key: string, p: HomePermissions): boolean {
   if (def.modulo === "financeiro") return p.verFinanceiro
   if (def.modulo === "tarefas") return p.verTarefas
   return p.verProcessos
+}
+
+/**
+ * IDENTIDADE REAL do membro — não a fila em que ele apareceu. Um Step com
+ * prazo aparece em DUAS filas (a do verbo, ex. "localizar", e
+ * "prazos-vencendo"); um Tarefa AGUARDANDO_CLIENTE com prazo idem
+ * ("aguardando-cliente" + "prazos-vencendo"). É o MESMO Step/Tarefa nas duas —
+ * a identidade tem que dizer isso, senão ele conta duas vezes.
+ */
+function identidadeDoMembro(m: Membro): string {
+  if (m.tipo === "passo") return `passo:${m.passo.id}`
+  if (m.tipo === "tarefa") return `tarefa:${m.tarefa.id}`
+  if (m.tipo === "processo" || m.tipo === "processo-sla") return `processo:${m.processo.id}`
+  return `pendencia:${m.pendencia.id}`
+}
+
+/**
+ * QUANTIDADE DE ITENS DE TRABALHO PENDENTES DISTINTOS, agregada de todas as
+ * filas visíveis para o usuário (Step/Tarefa/Processo/Pendência Financeira —
+ * grãos DIFERENTES, deliberadamente combinados aqui como métrica composta de
+ * "coisas que pedem atenção hoje").
+ *
+ * NÃO é `Σ fila.quantidade`: essa soma contava o MESMO item mais de uma vez
+ * quando ele pertencia a mais de uma fila ao mesmo tempo (achado real, ver
+ * auditoria de 10/09/2026 — "35 ações pendentes" era essa soma). Aqui a
+ * identidade (`identidadeDoMembro`) é resolvida ANTES de contar — um mesmo
+ * Step/Tarefa/Processo/Pendência conta 1 vez, não importa em quantas filas
+ * apareça.
+ *
+ * NUNCA chamar isto de "tarefas" nem de contagem de um grão só — é
+ * explicitamente uma métrica composta. `home-logic.ts` só recebe o número
+ * pronto e não decide o que ele representa.
+ */
+export function contarTrabalhoPendenteDistinto(base: BaseOperacional, ctx: ContextoHome): number {
+  const vistos = new Set<string>()
+  for (const def of [...FILAS_PASSO, ...FILAS_ESTADO]) {
+    if (!permissaoDaFila(def.key, ctx.permissoes)) continue
+    for (const m of membrosDaFila(def.key, base, ctx.agora)) vistos.add(identidadeDoMembro(m))
+  }
+  return vistos.size
 }
 
 // ---------------------------------------------------------------------------
@@ -591,6 +640,7 @@ export async function montarAgenda(ctx: ContextoHome): Promise<Agenda> {
   const eventos = await prisma.evento.findMany({
     where: {
       dataInicio: { gte: inicioDoDia(ctx.agora), lte: fimDoDia(somarDias(ctx.agora, DIAS_AGENDA)) },
+      ...escopoEvento({ userId: ctx.userId, tipo: ctx.isAdmin ? "admin" : "operacional" }),
     },
     orderBy: { dataInicio: "asc" },
     select: {
@@ -645,7 +695,11 @@ export async function montarResumoDia(base: BaseOperacional, ctx: ContextoHome):
         })
       : Promise.resolve(0),
     ctx.permissoes.verProcessos
-      ? prisma.documento.groupBy({ by: ["status"], _count: { _all: true } })
+      ? prisma.documento.groupBy({
+          by: ["status"],
+          _count: { _all: true },
+          where: escopoDocumento({ userId: ctx.userId, tipo: ctx.isAdmin ? "admin" : "operacional" }),
+        })
       : Promise.resolve([] as { status: string; _count: { _all: number } }[]),
   ])
 
@@ -693,9 +747,12 @@ export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): P
     })
   }
 
+  const usuarioEscopoAlertas = { userId: ctx.userId, tipo: ctx.isAdmin ? "admin" : "operacional" }
   const [documentosInvalidos, automacoesFalhas] = await Promise.all([
     ctx.permissoes.verProcessos
-      ? prisma.documento.count({ where: { status: { in: ["INVALIDO", "NAO_ENCONTRADO"] as any } } })
+      ? prisma.documento.count({
+          where: { status: { in: ["INVALIDO", "NAO_ENCONTRADO"] as any }, ...escopoDocumento(usuarioEscopoAlertas) },
+        })
       : Promise.resolve(0),
     ctx.permissoes.isAdmin
       ? prisma.domainOutbox.count({ where: { status: "ERRO" as any } })

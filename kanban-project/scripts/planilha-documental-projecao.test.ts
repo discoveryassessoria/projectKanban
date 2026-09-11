@@ -143,7 +143,7 @@ async function montarPalco(): Promise<Palco> {
   await prisma.matrizDocumental.create({
     data: {
       tipoProcessoId: tipo.id, phaseKey: FASE, documentTypeCode: `${MARCA}-NASC`,
-      status: "PUBLICADA", createsCost: true, createsTask: false, arquivado: false,
+      status: "PUBLICADA", createsCost: true, arquivado: false,
     },
   })
   // Certidão, Sem-preço e Zero são aplicáveis. Tradução NÃO tem regra econômica

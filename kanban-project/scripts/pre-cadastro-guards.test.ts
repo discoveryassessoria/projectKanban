@@ -50,7 +50,7 @@ async function montar() {
   criado.econId = econ.id
   // regra documental em RASCUNHO (status default), declarando que gera custo
   const m = await prisma.matrizDocumental.create({
-    data: { tipoProcessoId: tp.id, phaseKey: FASE, documentTypeCode: 'X-GUARD', nome: `Regra ${TAG}`, createsTask: false, createsCost: true, createsRevenue: false },
+    data: { tipoProcessoId: tp.id, phaseKey: FASE, documentTypeCode: 'X-GUARD', nome: `Regra ${TAG}`, createsCost: true, createsRevenue: false },
   })
   criado.matrizId = m.id
 }

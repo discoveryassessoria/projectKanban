@@ -76,6 +76,23 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/portas-tarefa.test.ts":
     "portas canônicas da tarefa: monta e derruba os PRÓPRIOS processos (marca PORTAS) " +
     "só no banco de teste",
+  "scripts/central-operacional-contrato.test.ts":
+    "contrato da Central Operacional: monta e derruba os PRÓPRIOS processos (marca CENTRALOP) " +
+    "só no banco de teste — o cenário precisa de obrigação real para provar executável agora, " +
+    "aguardando terceiro e pendências de fases anteriores sobre a Tarefa canônica",
+  "scripts/escopo-operacional-contrato.test.ts":
+    "contrato de escopo ADMIN x OPERACIONAL: monta e derruba os PRÓPRIOS processos " +
+    "(marca ESCOPOOP) só no banco de teste — o cenário precisa de obrigação real com " +
+    "responsáveis diferentes por família para provar que operacional não vê trabalho alheio",
+  "scripts/casamento-por-uniao.test.ts":
+    "casamento materializado por UNIÃO, não por pessoa: monta e derruba os PRÓPRIOS " +
+    "processos/árvores/uniões (marca UNIAOCAS) só no banco de teste — só o `deleteMany` " +
+    "de limpeza da própria marca; a criação passa pelo materializador oficial",
+  "scripts/necessidade-dispensada-cancela-tarefa.test.ts":
+    "Unidade 1 do plano de consolidação (10/09/2026): prova que necessidade dispensada " +
+    "cancela a Tarefa correspondente via reconciliarTarefas — monta e derruba os PRÓPRIOS " +
+    "processos/necessidades (marca DISPTASK) só no banco de teste; a dispensa passa por " +
+    "dispensarNecessidade (o dono canônico), só o `deleteMany` de limpeza é direto",
   "scripts/motor-operacional-fases.test.ts":
     "motor operacional através das fases: monta e derruba os PRÓPRIOS processos " +
     "(marca MOTOR-FASE) só no banco de teste",

@@ -594,11 +594,15 @@ const CRIADORES_DE_TAREFA: Record<string, string> = {
   "src/app/api/documentos/route.ts": "LEGADO: cria a árvore pai/subtarefa junto com o documento",
   "src/app/api/documentos/[id]/route.ts": "LEGADO: idem, na criação avulsa de documento",
   "prisma/backfill-cp4-workflow.ts": "BACKFILL de uma vez só",
-  "src/app/api/tarefas/route.ts": "LEGADO: criação avulsa de tarefa pela tela de atividades",
+  // "src/app/api/tarefas/route.ts" (criação avulsa de tarefa pela tela de
+  // atividades) foi CONSOLIDADO na Unidade 6 (10/09/2026) — a rota delega
+  // para `criarTarefaManual`, não tem mais `prisma.tarefa.create` próprio.
   "src/app/api/tarefas/[tarefaId]/subtarefas/route.ts": "LEGADO: subtarefa da árvore pai/filho",
   "src/app/api/tarefas/[tarefaId]/cobranca/route.ts": "LEGADO: nova cobrança nasce como irmã da anterior",
   "src/services/tarefa-transversal.ts": "Tarefa Transversal — substituída pela Operação Antecipada",
-  "src/services/processEngine/taskEngine.ts": "motor legado de tarefas do processo",
+  // "src/services/processEngine/taskEngine.ts" (motor legado de tarefas do
+  // processo) foi REMOVIDO na Unidade 5 (10/09/2026) — segundo owner de
+  // Tarefa aposentado, não uma nova origem escondida.
 }
 const criadores: string[] = []
 for (const arq of TODOS) {

@@ -31,12 +31,10 @@ import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import type { ResultadoPreco, ResultadoPrecoOK } from './resolver-preco-financeiro'
 import { resolverPendenciaPorChave } from '@/lib/financeiro/pendencia'
 import { NaturezaPreco } from '@prisma/client'
-import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
 import { resolverElegibilidadeDocumental } from './elegibilidade-documental'
 
 export interface ItemEconomico {
   pessoaId: number; documentoId: number; componente: string
-  tarefaId?: number
   custoId?: number; custo?: { valor: number; moeda: string }
   receitaId?: number; receita?: { valor: number; moeda: string }
 }
@@ -102,14 +100,11 @@ export async function gerarEconomicoDaMatriz(
     const vinc = { personId: el.pessoaId, documentoId: el.documentoId, tipoServicoId: tipoServico.id, phaseKey, phaseCycle }
     const item: ItemEconomico = { pessoaId: el.pessoaId, documentoId: el.documentoId, componente }
 
-    if (el.criaTarefa) {
-      await comIdempotencia(`${base}::tarefa`, processoId, tipoProcessoId, phaseKey, 'task', el.regraId, 'Tarefa', `Solicitar ${componente} de ${el.pessoaNome}`,
-        async () => (await criarTarefaDeSpec({
-          titulo: `Solicitar ${componente} de ${el.pessoaNome}`, processoId,
-          observacoes: `Motor econômico (Matriz) · fase "${phaseKey}" · ciclo ${phaseCycle} · doc ${el.documentoId}`,
-        })).id,
-        (id) => { item.tarefaId = id }, pulados, erros)
-    }
+    // Unidade 5 (10/09/2026): a Matriz JÁ criou Tarefa aqui — um segundo owner,
+    // com identidade paralela (MotorArtefato.automaticKey, não
+    // identidade-da-tarefa.ts) e sem necessidadeId/documentoId. Aposentado:
+    // Genealogia/Emissão já têm ownership da obrigação documental; a Matriz
+    // continua decidindo só custo/receita (efeito financeiro, nunca Tarefa).
     // PREÇO-FONTE-ÚNICA (§5): a Configuração Financeira NÃO é preço. Resolve SÓ
     // pela Tabela de Preços; sem fallback de valorPadrao; sem zero silencioso.
     // Sem preço válido → PENDÊNCIA rastreável (não lança). Conflito de mesma
@@ -156,7 +151,7 @@ export async function gerarEconomicoDaMatriz(
         }
       }
     }
-    if (item.tarefaId || item.custoId || item.receitaId) criados.push(item)
+    if (item.custoId || item.receitaId) criados.push(item)
   }
   return { criados, pulados, erros, esperados }
 }

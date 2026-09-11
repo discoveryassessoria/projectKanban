@@ -1,0 +1,21 @@
+-- Aposenta o caminho de criação de TAREFA via MatrizDocumental.createsTask.
+--
+-- ACHADO REAL (auditoria do motor operacional, 10/09/2026 — Unidade 5): esta
+-- coluna era um SEGUNDO owner de criação de Tarefa (via src/lib/motor/
+-- matriz-economica.ts → src/services/processEngine/taskEngine.ts), com
+-- identidade PARALELA à canônica (MotorArtefato.automaticKey, não
+-- identidade-da-tarefa.ts) e SEM necessidadeId/documentoId — invisível às
+-- projeções canônicas de Tarefa.
+--
+-- Prova de segurança: as 6 linhas reais de MatrizDocumental em produção têm
+-- createsTask=false; 0 Tarefas foram criadas por este caminho. Nenhum dado é
+-- perdido; a obrigação documental continua coberta por Genealogia/Emissão.
+--
+-- Removida a COLUNA (não só o código que a lia) por decisão explícita: um
+-- campo de configuração morto, mas presente, convida a ser religado sem que
+-- ninguém perceba que ele recriaria o segundo owner.
+--
+-- Efeitos financeiros de MatrizDocumental (createsCost/createsRevenue) NÃO
+-- são tocados — apenas createsTask, exclusiva da criação de Tarefa.
+
+ALTER TABLE "MatrizDocumental" DROP COLUMN IF EXISTS "createsTask";
