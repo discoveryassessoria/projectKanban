@@ -105,6 +105,13 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "NecessidadeDocumentalEvento/DocumentoArquivo/DocumentoObservacao — monta e derruba o " +
     "PRÓPRIO palco por TRUNCATE só no banco de teste, mesmo padrão do teste de cancelamento " +
     "acima (a necessidade é insumo do cenário, não o que está sendo provado)",
+  "scripts/central-operacional-fase-visualizada.test.ts":
+    "faseVisualizada != faseAtiva (11/09/2026, achado real: relato da Daniela — tarefa da " +
+    "Emissão vazando no painel de Genealogia concluída): monta e derruba o PRÓPRIO palco por " +
+    "TRUNCATE só no banco de teste (marca FASEVIS) — a necessidade é insumo do cenário " +
+    "(precisa de UMA obrigação que atravesse duas fases reais, com workflow/macro próprios), " +
+    "não o que está sendo provado; a materialização/avanço de fase passam pelos serviços " +
+    "oficiais (materializarExecucaoDaFase, movePhaseManual, concluirPasso)",
   "scripts/motor-operacional-fases.test.ts":
     "motor operacional através das fases: monta e derruba os PRÓPRIOS processos " +
     "(marca MOTOR-FASE) só no banco de teste",

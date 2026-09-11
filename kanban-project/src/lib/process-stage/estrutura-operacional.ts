@@ -170,6 +170,18 @@ export interface EstruturaFaseResultado {
   progressoRealPorChave: Map<string, ProgressoEstrutura>
   /** Ver `montarDocumentoDoIndice` — CHAVE → Documento por trás do alvo está CANCELADO. */
   canceladoPorChave: Map<string, boolean>
+  /**
+   * A INSTÂNCIA que esta leitura escopou (`ctx.workflowInstanceId` ou a VIGENTE
+   * resolvida). `null` só quando a fase nunca foi materializada.
+   *
+   * Existe para `getPhaseOperationalSummary` poder filtrar a TAREFA de cada alvo
+   * pela MESMA instância — `tarefasVivasDasUnidades` devolve a tarefa viva da
+   * OBRIGAÇÃO (necessidade/documento), sem saber de fase nenhuma: é a resposta
+   * certa para "existe tarefa duplicada?", mas a MESMA obrigação atravessa várias
+   * fases (Genealogia localiza, Emissão solicita) — sem este filtro, consultar uma
+   * fase CONCLUÍDA mostrava a tarefa VIVA da fase seguinte dentro dela.
+   */
+  instanciaId: number | null
 }
 
 /** Roster já carregado pelo chamador (evita reler a árvore na mesma requisição). */
@@ -217,7 +229,7 @@ export async function getPhaseOperationalStructure(
     registrar(d)
   }
 
-  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map() }
+  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map(), instanciaId: null }
 
   // ------------------------------------------------------------
   // 1) ROSTER — vínculo oficial com a árvore. A pessoa existe na Central por estar
@@ -288,7 +300,7 @@ export async function getPhaseOperationalStructure(
   // Fase sem instância materializada: as PESSOAS continuam aparecendo (o roster não
   // depende de trabalho). O que falta é workflow publicado, e isso a tela diz.
   if (instancias.length === 0) {
-    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map() }
+    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map(), instanciaId: instanciaAlvo }
   }
 
   // ------------------------------------------------------------
@@ -618,6 +630,7 @@ export async function getPhaseOperationalStructure(
     cicloDaObrigacao: new Map(necessidades.map((n) => [n.id, n.ciclo])),
     progressoRealPorChave,
     canceladoPorChave,
+    instanciaId: instanciaAlvo,
   }
 }
 
@@ -650,7 +663,7 @@ export async function getPhaseOperationalSummary(
   opcoes: EstruturaFaseOpcoes = {},
 ): Promise<IndiceFaseResultado> {
   const db = opcoes.db ?? prisma
-  const { estrutura, diagnosticos, cicloDaObrigacao, progressoRealPorChave, canceladoPorChave } = await getPhaseOperationalStructure(ctx, opcoes)
+  const { estrutura, diagnosticos, cicloDaObrigacao, progressoRealPorChave, canceladoPorChave, instanciaId } = await getPhaseOperationalStructure(ctx, opcoes)
 
   // ARTEFATOS — colunas "Certidão retificada", "Tradução" e "Apostila" da tabela.
   // Vêm dos registros OFICIAIS do documento; o que o domínio não registra fica
@@ -699,6 +712,17 @@ export async function getPhaseOperationalSummary(
   for (const [chave, u] of unidadePorChave) {
     const t = vivas.get(chaveDaUnidade(u))
     if (!t) continue
+    // FASE VISUALIZADA ≠ TAREFA DE OUTRA FASE (achado real, 11/09/2026): a mesma
+    // OBRIGAÇÃO (necessidade/documento) atravessa várias fases — Genealogia
+    // localiza o registro, Emissão solicita a certidão — e `tarefasVivasDasUnidades`
+    // responde por OBRIGAÇÃO, sem saber de fase: é a pergunta certa para "existe
+    // tarefa duplicada?", mas não para "qual tarefa pertence à fase que estou
+    // olhando?". Sem este filtro, consultar Genealogia (CONCLUÍDA, somente
+    // leitura) enquanto Emissão está ATIVA devolvia a tarefa VIVA da Emissão —
+    // "Em andamento"/"Iniciar" dentro do painel de uma fase encerrada. Só rejeita
+    // quando dá para PROVAR que é de outra instância; `workflowInstanceId` nulo
+    // (tarefa administrativa/legada) passa como sempre passou.
+    if (t.workflowInstanceId != null && instanciaId != null && t.workflowInstanceId !== instanciaId) continue
     tarefas.set(chave, {
       taskId: t.id,
       statusTarefa: t.statusTarefa,
