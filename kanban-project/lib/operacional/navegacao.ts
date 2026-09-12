@@ -50,6 +50,18 @@ export function urlOperacionalDaTarefa(alvo: AlvoDaNavegacao): string {
 }
 
 /**
+ * A URL OPERACIONAL DE UM PROCESSO — grão PROCESSO, sem tarefa específica.
+ *
+ * Usada por acontecimentos de FASE (Etapa 4: "fase concluída"), que não são
+ * sobre uma Tarefa, mas sobre o processo como um todo. Mesma Central
+ * Operacional, sem `taskId` para localizar.
+ */
+export function urlOperacionalDoProcesso(processoId: number): string {
+  const p = new URLSearchParams({ processoId: String(processoId), tab: 'central' })
+  return `/kanban?${p.toString()}`
+}
+
+/**
  * O QUE A CENTRAL PRECISA PARA SE POSICIONAR.
  *
  * Resolvido no servidor a partir do `taskId`, com permissão conferida lá — a

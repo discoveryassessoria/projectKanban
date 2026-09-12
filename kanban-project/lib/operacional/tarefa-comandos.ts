@@ -26,6 +26,8 @@ import type { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
+import { notificarAcontecimento } from './notificacao-canonica'
+import { estadosTemporaisDasOperacoes } from './proximo-acontecimento'
 
 export type ResultadoComando =
   /** `jaEstavaIniciada` distingue "fiz agora" de "já estava feito" sem virar erro. */
@@ -42,70 +44,6 @@ export type ResultadoComando =
  */
 export const linkDaTarefa = (tarefaId: number, processoId: number | null = null) =>
   urlOperacionalDaTarefa({ taskId: tarefaId, processoId })
-
-/**
- * O AVISO DE UM MARCO DA TAREFA.
- *
- * `chaveIdempotencia` inclui o que torna o marco único: para atribuição, o
- * responsável e o instante do ato; para prazo e atraso, o PRAZO de referência
- * (ver `marcoDoPrazo`). Sem isso o aviso renasceria a cada varredura e o sino
- * viraria ruído.
- */
-async function notificar(
-  tx: Prisma.TransactionClient,
-  ev: {
-    tipo: 'ATRIBUICAO' | 'TRANSFERENCIA' | 'PRAZO' | 'HOJE' | 'ATRASO' | 'BLOQUEIO'
-    destinatarioId: number
-    tarefaId: number
-    titulo: string
-    mensagem?: string | null
-    autorId?: number | null
-    chave: string
-  },
-  // Devolve `criada` além do id: sem essa distinção, uma varredura que só
-  // reencontra o aviso de ontem relata que avisou hoje — e o número do
-  // relatório passa a crescer sem que ninguém tenha sido avisado de nada.
-): Promise<{ id: number; criada: boolean }> {
-  const ja = await tx.notificacaoOperacional.findUnique({
-    where: { chaveIdempotencia: ev.chave },
-    select: { id: true },
-  })
-  if (ja) return { id: ja.id, criada: false }
-
-  // O PROCESSO VEM DA TAREFA, para o aviso levar direto ao trabalho e não à
-  // home da operação. Uma consulta, e só quando o aviso é realmente criado.
-  const daTarefa = await tx.tarefa.findUnique({ where: { id: ev.tarefaId }, select: { processoId: true } })
-
-  // A IDEMPOTÊNCIA É DO BANCO, não da consulta acima.
-  //
-  // Ler-e-então-criar tem uma janela: duas varreduras simultâneas leem "não
-  // existe" e as duas criam. `chaveIdempotencia` é `@unique`, então a segunda
-  // colide — e colidir é a resposta CERTA, desde que ela seja lida como "já
-  // avisado" em vez de virar erro. A verificação acima continua valendo por
-  // ser mais barata no caso comum; esta é a que garante.
-  try {
-    const criada = await tx.notificacaoOperacional.create({
-      data: {
-        tipo: ev.tipo,
-        destinatarioId: ev.destinatarioId,
-        tarefaId: ev.tarefaId,
-        titulo: ev.titulo.slice(0, 200),
-        mensagem: ev.mensagem ?? null,
-        link: linkDaTarefa(ev.tarefaId, daTarefa?.processoId ?? null),
-        autorId: ev.autorId ?? null,
-        chaveIdempotencia: ev.chave,
-      },
-      select: { id: true },
-    })
-    return { id: criada.id, criada: true }
-  } catch (e) {
-    if ((e as { code?: string })?.code !== 'P2002') throw e
-    const existente = await tx.notificacaoOperacional.findUnique({
-      where: { chaveIdempotencia: ev.chave }, select: { id: true },
-    })
-    return { id: existente?.id ?? 0, criada: false }
-  }
-}
 
 const auditar = (
   tx: Prisma.TransactionClient,
@@ -134,6 +72,17 @@ export async function atribuirTarefa(args: {
   motivo?: string | null
   /** CAS otimista: a versão que quem chama leu. Ausente = sem checagem. */
   lockVersion?: number
+  /**
+   * PRESENTE = esta atribuição é UM item de um lote (`redistribuirTarefas`).
+   *
+   * O FATO individual continua registrado por inteiro — mesma auditoria,
+   * mesmo `dataAtribuicao`, mesma tarefa. O que muda é só a NOTIFICAÇÃO: ela
+   * fica a cargo de quem orquestra o lote, que a consolida em UM aviso para
+   * o destinatário em vez de N. Sem isto, "atribuir 20 operações" gerava 20
+   * notificações idênticas em sequência — o mesmo defeito de fundo que uma
+   * "escada de avisos" treina as pessoas a ignorar (ver `marcoDoPrazo`).
+   */
+  loteId?: string | null
 }): Promise<ResultadoComando> {
   const agora = new Date()
   return prisma.$transaction(async (tx) => {
@@ -192,10 +141,18 @@ export async function atribuirTarefa(args: {
       { tarefaId: t.id, de: anterior, para: args.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null },
     )
 
+    // LOTE: a notificação individual é suprimida — quem orquestra o lote
+    // (`redistribuirTarefas`) consolida em UM aviso, depois que o laço todo
+    // terminar. O fato (auditoria acima, `dataAtribuicao`) já está gravado
+    // por inteiro; só o AVISO muda de forma.
+    if (args.loteId) {
+      return { ok: true as const, tarefaId: t.id, notificacaoId: null }
+    }
+
     // A chave carrega o par (tarefa, responsável): reatribuir para a MESMA
     // pessoa depois de ela ter passado para outra avisa de novo, que é o certo;
     // um retry da mesma chamada, não.
-    const aviso = await notificar(tx, {
+    const aviso = await notificarAcontecimento(tx, {
       tipo: transferencia ? 'TRANSFERENCIA' : 'ATRIBUICAO',
       destinatarioId: args.responsavelId,
       tarefaId: t.id,
@@ -204,7 +161,8 @@ export async function atribuirTarefa(args: {
       mensagem: t.dataPrazo
         ? `${t.titulo} — concluir até ${t.dataPrazo.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.`
         : t.titulo,
-      chave: `notif::atribuicao::t${t.id}::u${args.responsavelId}::v${t.lockVersion}`,
+      link: linkDaTarefa(t.id, t.processoId),
+      chaveIdempotencia: `notif::atribuicao::t${t.id}::u${args.responsavelId}::v${t.lockVersion}`,
     })
 
     return { ok: true as const, tarefaId: t.id, notificacaoId: aviso.id }
@@ -389,7 +347,7 @@ export async function avisarPrazosEAtrasos(
     },
     select: {
       id: true, titulo: true, responsavelId: true, dataPrazo: true,
-      dataConclusao: true, statusTarefa: true,
+      dataConclusao: true, statusTarefa: true, processoId: true,
     },
   })
 
@@ -437,7 +395,7 @@ export async function avisarPrazosEAtrasos(
     try {
       const data = t.dataPrazo!.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL })
       const criada = await prisma.$transaction((tx) =>
-        notificar(tx, {
+        notificarAcontecimento(tx, {
           tipo,
           destinatarioId: t.responsavelId!,
           tarefaId: t.id,
@@ -447,7 +405,8 @@ export async function avisarPrazosEAtrasos(
             : tipo === 'HOJE'
               ? `${t.titulo} — o prazo de conclusão é hoje, ${data}.`
               : `${t.titulo} — conclusão esperada até ${data}.`,
-          chave: marcoDoPrazo(tipo, t.id, t.dataPrazo!),
+          link: linkDaTarefa(t.id, t.processoId),
+          chaveIdempotencia: marcoDoPrazo(tipo, t.id, t.dataPrazo!),
         }),
       )
       if (criada.criada) contar(tipo)
@@ -458,6 +417,182 @@ export async function avisarPrazosEAtrasos(
       // identidade do marco não depende do dia da varredura.
       r.erros++
       console.error(`[avisos] falha ao avisar tarefa ${t.id}:`, e)
+    }
+  }
+
+  r.fim = new Date().toISOString()
+  return r
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ATENÇÃO OPERACIONAL — retorno de terceiro, acompanhamento vencido, EM_RISCO
+// ═══════════════════════════════════════════════════════════════════════════
+
+export type TipoDeAtencao = 'RETORNO_TERCEIRO' | 'ACOMPANHAMENTO_VENCIDO' | 'EM_RISCO'
+
+export interface RelatorioDeAtencao {
+  inicio: string
+  fim: string
+  avaliadas: number
+  retorno: number
+  acompanhamento: number
+  risco: number
+  deduplicados: number
+  semDestinatario: number
+  erros: number
+  ensaio: boolean
+  previa: Array<{ tarefaId: number; tipo: TipoDeAtencao; destinatarioId: number; titulo: string }>
+}
+
+/**
+ * A VARREDURA DE ATENÇÃO — retorno de terceiro, acompanhamento vencido e
+ * ENTRADA em EM_RISCO, lidos do núcleo canônico da Etapa 3
+ * (`estadosTemporaisDasOperacoes`). Etapa 4, itens 7/8/9/19.
+ *
+ * ─── A FILA NÃO DEPENDE DISTO ───────────────────────────────────────────────
+ * `proximo-acontecimento.ts` já é a garantia primária (item 8): esta função
+ * NUNCA escreve prazo, status, workflow, responsável ou histórico — só decide
+ * se um FATO já visível na leitura canônica merece notificação. Falhar aqui
+ * (erro de rede, notificação não persistida) não tira a operação da fila nem
+ * do estado de risco: a próxima leitura da tela mostra a mesma coisa,
+ * notificado ou não. Isso é o que o CASO 18 exige.
+ *
+ * ─── TRÊS CHAVES, TRÊS DESENHOS DE IDEMPOTÊNCIA DIFERENTES ──────────────────
+ * RETORNO_TERCEIRO   → chave = tarefa + `retornoFatoChave` (a identidade do
+ *                       FATO: a solicitação ou o contato específico). Um retry
+ *                       do MESMO retorno cai na mesma chave; um retorno NOVO
+ *                       (nova solicitação, novo contato) tem uma chave nova,
+ *                       legitimamente — não é duplicação, é um fato novo.
+ * ACOMPANHAMENTO_VENCIDO → chave = tarefa + a DATA agendada específica. A
+ *                       mesma data nunca renotifica (item 8: "não notificar
+ *                       repetidamente a cada leitura/job"); reagendar para uma
+ *                       data nova é o fluxo normal reabrindo o marco.
+ * EM_RISCO            → chave = tarefa + `motivosRisco` ORDENADO, SEM
+ *                       componente de dia. Permanecer em risco pelo MESMO
+ *                       motivo nunca renotifica (item 9: "permanecer não
+ *                       renotifica continuamente"); o motivo mudar de verdade
+ *                       é que produz uma chave nova — a própria chave
+ *                       carrega a transição, sem precisar guardar "estava em
+ *                       risco antes?" em lugar nenhum.
+ *
+ * ─── QUEM RECEBE ─────────────────────────────────────────────────────────────
+ * O responsável ATUAL da tarefa — a mesma regra de `avisarPrazosEAtrasos`.
+ * Tarefa sem responsável (`SEM_RESPONSAVEL_PARA_PROXIMA_ACAO`) não tem a quem
+ * notificar: a fila continua sendo a garantia, e a fila não exige destinatário.
+ * Escalonamento para admin em EM_RISCO estrutural/crítico (item 9, "pode
+ * notificar admin") fica de fora desta rodada — classificar
+ * "estrutural/crítico" a partir de `motivosRisco` hoje seria a heurística
+ * frágil que o item 5 proíbe por analogia; registrado como dívida (item T).
+ */
+export async function avisarAcontecimentosOperacionais(
+  opts: { agora?: Date; ensaio?: boolean } = {},
+): Promise<RelatorioDeAtencao> {
+  const agora = opts.agora ?? new Date()
+  const ensaio = opts.ensaio === true
+  const inicio = new Date()
+
+  const abertas = await prisma.tarefa.findMany({
+    where: { statusTarefa: { notIn: STATUS_TERMINAIS } },
+    select: { id: true, titulo: true, processoId: true },
+  })
+  const tituloPorTarefa = new Map(abertas.map((t) => [t.id, t.titulo]))
+  const processoPorTarefa = new Map(abertas.map((t) => [t.id, t.processoId]))
+  const estados = await estadosTemporaisDasOperacoes(prisma, abertas.map((t) => t.id), agora)
+
+  const r: RelatorioDeAtencao = {
+    inicio: inicio.toISOString(), fim: inicio.toISOString(),
+    avaliadas: abertas.length, retorno: 0, acompanhamento: 0, risco: 0,
+    deduplicados: 0, semDestinatario: 0, erros: 0, ensaio, previa: [],
+  }
+
+  const contar = (n: TipoDeAtencao) =>
+    n === 'RETORNO_TERCEIRO' ? r.retorno++ : n === 'ACOMPANHAMENTO_VENCIDO' ? r.acompanhamento++ : r.risco++
+
+  for (const [tarefaId, estado] of estados) {
+    const titulo = tituloPorTarefa.get(tarefaId) ?? `Tarefa ${tarefaId}`
+    const processoId = processoPorTarefa.get(tarefaId) ?? null
+    const destinatarioId = estado.proximoAcontecimento.responsavelId
+
+    if (destinatarioId == null) {
+      // Havia um fato notificável, mas ninguém para receber — a fila continua
+      // sendo a garantia (item 8); aqui só contamos o caso em vez de escondê-lo.
+      if (estado.retornoRecebido || estado.acompanhamentoVencido || estado.emRisco) r.semDestinatario++
+      continue
+    }
+
+    const acontecimentos: Array<{
+      tipo: TipoDeAtencao
+      chave: string
+      titulo: string
+      mensagem: string
+    }> = []
+
+    // A chave carrega SEMPRE o destinatário — a mesma identidade de fato, para
+    // DUAS pessoas diferentes, são duas notificações, não uma. Sem isto, uma
+    // transferência (item 17/CASO 15) faria o novo responsável nunca ser
+    // avisado de um risco/retorno/acompanhamento que o antigo já tinha visto:
+    // a chave já "existiria" para aquele fato, mesmo para outro destinatário.
+
+    // ── RETORNO DE TERCEIRO — item 7: ação necessária imediata ───────────────
+    if (estado.retornoRecebido && estado.retornoFatoChave) {
+      acontecimentos.push({
+        tipo: 'RETORNO_TERCEIRO',
+        chave: `notif::retorno_terceiro::t${tarefaId}::${estado.retornoFatoChave}::u${destinatarioId}`,
+        titulo: 'Retorno recebido — ação necessária',
+        mensagem: `${titulo} — o terceiro respondeu; a operação precisa de ação interna.`,
+      })
+    }
+
+    // ── ACOMPANHAMENTO VENCIDO — item 8: 1 por data agendada ──────────────────
+    if (estado.acompanhamentoVencido && estado.proximoAcompanhamentoData) {
+      acontecimentos.push({
+        tipo: 'ACOMPANHAMENTO_VENCIDO',
+        chave: `notif::acompanhamento_vencido::t${tarefaId}::${diaOperacional(new Date(estado.proximoAcompanhamentoData))}::u${destinatarioId}`,
+        titulo: 'Acompanhamento vencido',
+        mensagem: `${titulo} — a data de acompanhamento já passou.`,
+      })
+    }
+
+    // ── EM_RISCO — item 9: 1 por conjunto de motivos, nunca por leitura ───────
+    if (estado.emRisco && estado.motivosRisco.length > 0) {
+      const motivos = [...estado.motivosRisco].sort().join('+')
+      acontecimentos.push({
+        tipo: 'EM_RISCO',
+        chave: `notif::em_risco::t${tarefaId}::${motivos}::u${destinatarioId}`,
+        titulo: 'Operação em risco',
+        mensagem: `${titulo} — ${estado.proximoAcontecimento.descricao}.`,
+      })
+    }
+
+    for (const a of acontecimentos) {
+      if (ensaio) {
+        const ja = await prisma.notificacaoOperacional.findUnique({
+          where: { chaveIdempotencia: a.chave }, select: { id: true },
+        })
+        if (ja) { r.deduplicados++; continue }
+        r.previa.push({ tarefaId, tipo: a.tipo, destinatarioId, titulo: a.titulo })
+        contar(a.tipo)
+        continue
+      }
+
+      try {
+        const criada = await prisma.$transaction((tx) =>
+          notificarAcontecimento(tx, {
+            tipo: a.tipo,
+            destinatarioId,
+            tarefaId,
+            titulo: a.titulo,
+            mensagem: a.mensagem,
+            link: linkDaTarefa(tarefaId, processoId),
+            chaveIdempotencia: a.chave,
+          }),
+        )
+        if (criada.criada) contar(a.tipo)
+        else r.deduplicados++
+      } catch (e) {
+        r.erros++
+        console.error(`[atencao] falha ao notificar tarefa ${tarefaId} (${a.tipo}):`, e)
+      }
     }
   }
 
@@ -500,6 +635,10 @@ export async function redistribuirTarefas(args: {
   motivo?: string | null
 }): Promise<{ total: number; sucesso: number; falha: number; itens: ItemDaRedistribuicao[] }> {
   const itens: ItemDaRedistribuicao[] = []
+  // Só um FLAG interno para `atribuirTarefa` suprimir o aviso individual — não
+  // é a chave de idempotência da notificação consolidada (essa é determinada
+  // pelo CONTEÚDO do lote, abaixo, para sobreviver a um retry do mesmo POST).
+  const loteId = randomUUID()
 
   for (const tarefaId of [...new Set(args.tarefaIds)]) {
     if (args.novoResponsavelId == null) {
@@ -510,12 +649,32 @@ export async function redistribuirTarefas(args: {
     }
     const r = await atribuirTarefa({
       tarefaId, responsavelId: args.novoResponsavelId, autorId: args.autorId,
-      motivo: args.motivo ?? 'redistribuição em lote',
+      motivo: args.motivo ?? 'redistribuição em lote', loteId,
     })
     itens.push(r.ok ? { tarefaId, ok: true } : { tarefaId, ok: false, codigo: r.codigo, mensagem: r.mensagem })
   }
 
   const sucesso = itens.filter((i) => i.ok).length
+
+  // NOTIFICAÇÃO CONSOLIDADA — UMA para o lote inteiro, nunca uma por tarefa.
+  //
+  // A chave vem do CONTEÚDO do lote (tarefas que de fato mudaram + destinatário
+  // + dia operacional), não de `loteId` (que é gerado de novo a cada chamada e
+  // por isso não sobreviveria a um retry do mesmo POST). Duas tentativas do
+  // MESMO lote, no mesmo dia, produzem a MESMA chave — a segunda não duplica.
+  if (sucesso > 0 && args.novoResponsavelId != null) {
+    const idsComSucesso = itens.filter((i) => i.ok).map((i) => i.tarefaId).sort((a, b) => a - b)
+    await notificarAcontecimento(prisma, {
+      tipo: 'ATRIBUICAO_LOTE',
+      destinatarioId: args.novoResponsavelId,
+      autorId: args.autorId,
+      titulo: `${sucesso} nova${sucesso === 1 ? '' : 's'} operaç${sucesso === 1 ? 'ão' : 'ões'} atribuída${sucesso === 1 ? '' : 's'}`,
+      mensagem: args.motivo ? `Redistribuição em lote. Motivo: ${args.motivo}` : 'Redistribuição em lote.',
+      link: `/tarefas?responsavel=${args.novoResponsavelId}`,
+      chaveIdempotencia: `notif::atribuicao_lote::u${args.novoResponsavelId}::${diaOperacional(new Date())}::${idsComSucesso.join('-')}`,
+    })
+  }
+
   await prisma.logAuditoria.create({
     data: {
       acao: 'TAREFAS_REDISTRIBUIDAS',

@@ -9,6 +9,12 @@
 // vencia e ninguém era avisado, porque não havia quem perguntasse as horas.
 // Esta rota é esse chamador — e não faz mais nada.
 //
+// Etapa 4 (item 19): a mesma rota também chama `avisarAcontecimentosOperacionais`
+// — retorno de terceiro, acompanhamento vencido, entrada em EM_RISCO — porque
+// nenhum cron pode ter sua própria definição de atrasado/risco/retorno; as
+// duas varreduras leem os mesmos motores canônicos (`tempo-operacional.ts`,
+// `proximo-acontecimento.ts`) e não um segundo cron com semântica própria.
+//
 // ─── O QUE ELA NÃO FAZ ──────────────────────────────────────────────────────
 // Não muda status, não move prazo, não toca em workflow, etapa, responsável
 // nem SLA. Um cron que escreve estado é um segundo motor operando sem ninguém
@@ -26,7 +32,7 @@
 // CRON_SECRET ou operador autenticado com permissão de gerenciamento).
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
-import { avisarPrazosEAtrasos } from '@/lib/operacional/tarefa-comandos'
+import { avisarPrazosEAtrasos, avisarAcontecimentosOperacionais } from '@/lib/operacional/tarefa-comandos'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 
@@ -52,17 +58,26 @@ async function executar(req: NextRequest) {
   const ensaio = new URL(req.url).searchParams.get('ensaio') === '1'
 
   try {
-    const r = await avisarPrazosEAtrasos({ ensaio })
+    const [prazos, atencao] = await Promise.all([
+      avisarPrazosEAtrasos({ ensaio }),
+      avisarAcontecimentosOperacionais({ ensaio }),
+    ])
     // O log da EXECUÇÃO, não da tarefa: registrar "verifiquei a tarefa 3358"
     // uma vez por hora encheria o histórico de cada tarefa com o fato de nada
     // ter acontecido.
     console.log(
-      `[cron/avisos-prazo]${ensaio ? ' ENSAIO' : ''} avaliadas=${r.avaliadas} ` +
-      `prazo=${r.prazo} atraso=${r.atraso} dedup=${r.deduplicados} ` +
-      `semDestinatario=${r.semDestinatario} erros=${r.erros}`,
+      `[cron/avisos-prazo]${ensaio ? ' ENSAIO' : ''} avaliadas=${prazos.avaliadas} ` +
+      `prazo=${prazos.prazo} atraso=${prazos.atraso} dedup=${prazos.deduplicados} ` +
+      `semDestinatario=${prazos.semDestinatario} erros=${prazos.erros}`,
+    )
+    console.log(
+      `[cron/atencao]${ensaio ? ' ENSAIO' : ''} avaliadas=${atencao.avaliadas} ` +
+      `retorno=${atencao.retorno} acompanhamento=${atencao.acompanhamento} risco=${atencao.risco} ` +
+      `dedup=${atencao.deduplicados} semDestinatario=${atencao.semDestinatario} erros=${atencao.erros}`,
     )
     // Erro em tarefa isolada não é sucesso: o agendador precisa enxergar.
-    return NextResponse.json(r, { status: r.erros > 0 ? 207 : 200 })
+    const erros = prazos.erros + atencao.erros
+    return NextResponse.json({ prazos, atencao }, { status: erros > 0 ? 207 : 200 })
   } catch (e) {
     console.error('[cron/avisos-prazo] falha na varredura:', e)
     return NextResponse.json(

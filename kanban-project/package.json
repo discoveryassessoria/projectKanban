@@ -343,6 +343,8 @@
     "test:guard-passo": "tsx scripts/guard-maquina-passo-unica.test.ts",
     "test:guard-tarefa": "tsx scripts/guard-tarefa-operacional.test.ts",
     "test:tarefa-atribuicao": "tsx scripts/tarefa-atribuicao.test.ts",
+    "test:etapa4-eventos-notificacoes": "tsx scripts/etapa4-eventos-notificacoes.test.ts",
+    "test:etapa4-fase-concluida": "tsx scripts/etapa4-fase-concluida.test.ts",
     "test:motor-fases-tarefas": "tsx scripts/motor-operacional-fases.test.ts",
     "reparar:passo-duplicado": "tsx scripts/reparar-passo-duplicado.ts",
     "test:progresso-coerencia": "tsx scripts/progresso-coerencia.test.ts",

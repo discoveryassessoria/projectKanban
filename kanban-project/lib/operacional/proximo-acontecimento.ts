@@ -97,6 +97,17 @@ export interface EstadoTemporalDaOperacao {
   emRisco: boolean
   motivosRisco: string[]
 
+  /** Retorno confiável de terceiro — Etapa 4, item 7. */
+  retornoRecebido: boolean
+  /**
+   * Identidade estável do FATO que produziu `retornoRecebido` — `solicitacao:<id>`
+   * ou `contato:<chave>`. É o que a notificação usa como base de idempotência:
+   * o mesmo fato nunca gera uma segunda notificação; um retorno NOVO (nova
+   * solicitação, novo contato) tem uma chave diferente, legitimamente.
+   * `null` quando `retornoRecebido` é `false`.
+   */
+  retornoFatoChave: string | null
+
   /** De onde vieram os dados usados — auditoria, nunca decisão da tela. */
   origemDosDados: string[]
 }
@@ -119,9 +130,12 @@ export interface EntradaOperacao {
     startedAt: Date | null
     andamento: AndamentoEtapa
     ultimoContatoResultado: string | null
+    /** `ContatoEtapa.chave` do último contato — identidade estável do FATO, para idempotência (Etapa 4). */
+    ultimoContatoChave?: string | null
   } | null
   /** A solicitação de documento vinculada a esta Tarefa, quando existe (`SolicitacaoDocumento.tarefaId`). */
   solicitacao: {
+    id: number
     status: string
     previsaoRetorno: Date | null
     prazoEsperadoDias: number | null
@@ -190,12 +204,15 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
 
   // ── RETORNO RECEBIDO — sinal confiável, de QUALQUER uma das duas fontes ──
   let retornoRecebido = false
+  let retornoFatoChave: string | null = null
   if (e.solicitacao?.status === "RESPONDIDA") {
     retornoRecebido = true
+    retornoFatoChave = `solicitacao:${e.solicitacao.id}`
     origemDosDados.push("SolicitacaoDocumento.status=RESPONDIDA")
   }
   if (e.passo?.ultimoContatoResultado === "RETORNO_RECEBIDO") {
     retornoRecebido = true
+    retornoFatoChave = retornoFatoChave ?? `contato:${e.passo.ultimoContatoChave ?? "sem-chave"}`
     origemDosDados.push("ContatoEtapa.resultado=RETORNO_RECEBIDO")
   }
   // CONFLITO: a solicitação formal ainda não fechou, mas o último contato
@@ -338,6 +355,8 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
     acompanhamentoVencido,
     emRisco,
     motivosRisco,
+    retornoRecebido,
+    retornoFatoChave,
     origemDosDados,
   }
 }
@@ -381,7 +400,7 @@ export async function estadosTemporaisDasOperacoes(
   const solicitacoes = await db.solicitacaoDocumento.findMany({
     where: { tarefaId: { in: tarefaIds } },
     select: {
-      tarefaId: true, status: true, previsaoRetorno: true, prazoEsperadoDias: true, dataEnvio: true,
+      id: true, tarefaId: true, status: true, previsaoRetorno: true, prazoEsperadoDias: true, dataEnvio: true,
       destinatarioNome: true, orgao: { select: { name: true, nomeFantasia: true } },
       createdAt: true,
     },
@@ -418,10 +437,12 @@ export async function estadosTemporaisDasOperacoes(
             startedAt: stepRow.startedAt,
             andamento,
             ultimoContatoResultado: ultimoContato?.resultado ?? null,
+            ultimoContatoChave: ultimoContato?.chave ?? null,
           }
         : null,
       solicitacao: solRow
         ? {
+            id: solRow.id,
             status: solRow.status,
             previsaoRetorno: solRow.previsaoRetorno,
             prazoEsperadoDias: solRow.prazoEsperadoDias,

@@ -27,6 +27,8 @@ import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/service
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/services/materializar-fase"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
+import { notificarAcontecimento } from "@/lib/operacional/notificacao-canonica"
+import { urlOperacionalDoProcesso } from "@/lib/operacional/navegacao"
 import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
 import {
   fotografarObrigacoes,
@@ -458,6 +460,35 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
             payload: evtCompleted.payload as Prisma.InputJsonValue,
           },
         })
+
+        // 7b) NOTIFICAÇÃO DE FASE CONCLUÍDA — Etapa 4, item 10.
+        //
+        // Só aqui: `encerramento === "CONCLUIR"` é exclusivo de avanço normal
+        // (FASE_AVANCADA) e forçado (FASE_AVANCADA_FORCADO) — reabertura,
+        // retorno (`SUPERSEDER`) e movimentação manual (`moverFaseManual`,
+        // que nunca usa "CONCLUIR") nunca passam por aqui, então nunca "fingem"
+        // ser uma conclusão de fase.
+        //
+        // Idempotente pela MESMA `chave` que já protege `WorkflowEvento` e
+        // `PhaseAdvanceLog` desta transição (inclui `lockVersion`): a
+        // conclusão desta fase é UM fato, e reprocessar a transação não pode
+        // produzir uma segunda notificação por admin. Grão PROCESSO — sem
+        // `tarefaId`: 15 tarefas concluindo a mesma fase não geram 15 avisos.
+        const admins = await tx.usuario.findMany({ where: { tipo: "admin" }, select: { id: true } })
+        for (const admin of admins) {
+          await notificarAcontecimento(tx, {
+            tipo: "FASE_CONCLUIDA",
+            destinatarioId: admin.id,
+            processoId: p.processoId,
+            autorId: p.solicitadoPorId ?? null,
+            titulo: p.forcado ? "Fase concluída (avanço forçado)" : "Fase concluída",
+            mensagem: p.forcado
+              ? `Processo ${p.processoId}: fase "${p.faseAtual}" encerrada por avanço forçado.`
+              : `Processo ${p.processoId}: fase "${p.faseAtual}" concluída.`,
+            link: urlOperacionalDoProcesso(p.processoId),
+            chaveIdempotencia: `notif::fase_concluida::${chave}::u${admin.id}`,
+          })
+        }
       }
 
       const evtEntered = montarEventoEntered(eventoBase)

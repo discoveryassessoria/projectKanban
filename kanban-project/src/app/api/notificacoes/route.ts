@@ -117,20 +117,39 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // 🔒 Etapa 4 (item 15) — o SINO REAL passa a consumir a porta canônica de
+    // notificação (`notificarAcontecimento`). Só NÃO LIDAS: uma notificação
+    // arquivada/lida sai do sino sozinha, sem precisar de um segundo estado.
+    // RBAC embutido na própria query: cada usuário só vê o que É destinatário
+    // dele — nunca por vazamento de acesso ao processo/tarefa (item 17).
+    const acontecimentosRaw = await prisma.notificacaoOperacional.findMany({
+      where: { destinatarioId: usuario.userId, lidaEm: null },
+      select: { id: true, tipo: true, titulo: true, mensagem: true, link: true, criadoEm: true },
+      orderBy: { criadoEm: 'desc' },
+      take: 30,
+    })
+    const acontecimentos = acontecimentosRaw.map((n) => ({
+      id: n.id, tipo: n.tipo, titulo: n.titulo, mensagem: n.mensagem, link: n.link,
+      criadoEm: n.criadoEm.toISOString(),
+    }))
+
     return NextResponse.json({
       vencidas,
       hoje: hojeList,
       proximos3Dias,
       novas,
       saudeCritica,
+      acontecimentos,
       // GRAIN = TAREFA, sem duplicidade: uma tarefa criada há menos de 24h E com
       // prazo nos próximos dias cai em DOIS buckets de exibição ao mesmo tempo
       // (`novas` + a janela de prazo correspondente — `novas` é um `if` à parte,
       // não `else if`, de propósito, porque os dois fatos são independentes e a
       // tela mostra os dois). O TOTAL não pode somar os buckets (contaria essa
       // tarefa 2x) — é sempre `tarefas.length`, a query já traz cada Tarefa uma
-      // única vez (achado real da auditoria de 10/09/2026).
-      total: tarefas.length + (saudeCritica ? 1 : 0)
+      // única vez (achado real da auditoria de 10/09/2026). `acontecimentos` é
+      // grão NOTIFICAÇÃO — nunca TAREFA — e soma à parte, de propósito (item 19
+      // do contrato: "Notification NÃO é Tarefa").
+      total: tarefas.length + (saudeCritica ? 1 : 0) + acontecimentos.length
     })
   } catch (error) {
     console.error('Erro ao buscar notificações:', error)

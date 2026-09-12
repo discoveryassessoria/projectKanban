@@ -55,6 +55,16 @@ interface SaudeCriticaNotificacao {
   link: string
 }
 
+/** Etapa 4 — item da porta canônica de notificação (`NotificacaoOperacional`). */
+interface AcontecimentoNotificacao {
+  id: number
+  tipo: string
+  titulo: string
+  mensagem: string | null
+  link: string | null
+  criadoEm: string
+}
+
 // ============================================================
 // BLOCO DE NOTIFICAÇÕES — agrupa por processo/família. Achado real: um único
 // processo (família com várias certidões vencendo no mesmo dia) inundava a
@@ -194,8 +204,23 @@ export function HeaderBar({
     proximos3Dias: (notificacoesData?.proximos3Dias || []) as TarefaNotificacao[],
     novas: (notificacoesData?.novas || []) as TarefaNotificacao[],
     saudeCritica: (notificacoesData?.saudeCritica ?? null) as SaudeCriticaNotificacao | null,
+    acontecimentos: (notificacoesData?.acontecimentos || []) as AcontecimentoNotificacao[],
   }
   const totalNotificacoes = notificacoesData?.total || 0
+
+  // Marcar como lida NUNCA muda estado operacional — só `lidaEm` da própria
+  // notificação (regra-mãe da Etapa 4). O clique navega de qualquer forma;
+  // a falha de marcar-como-lida é silenciosa de propósito (não pode bloquear
+  // a navegação ao trabalho real).
+  const handleAcontecimentoClick = (a: AcontecimentoNotificacao) => {
+    setShowNotifications(false)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+    if (token) {
+      fetch(`/api/notificacoes/${a.id}/lida`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+        .catch(() => {})
+    }
+    if (a.link) router.push(a.link)
+  }
 
   // useEffect para fechar ao clicar fora
   useEffect(() => {
@@ -418,6 +443,26 @@ export function HeaderBar({
                             {' — toque para abrir o diagnóstico'}
                           </p>
                         </button>
+                      </div>
+                    )}
+                    {notificacoes.acontecimentos.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)] font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-[var(--action-primary)]"></span>
+                          Atenção operacional
+                        </div>
+                        {notificacoes.acontecimentos.map((a) => (
+                          <button
+                            key={a.id}
+                            className="w-full text-left px-3 py-2 border-l-4 border-[var(--action-primary)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer block"
+                            onClick={() => handleAcontecimentoClick(a)}
+                          >
+                            <p className="text-sm font-medium text-[var(--text-primary)]">{a.titulo}</p>
+                            {a.mensagem && (
+                              <p className="text-xs text-[var(--text-muted)] mt-0.5">{a.mensagem}</p>
+                            )}
+                          </button>
+                        ))}
                       </div>
                     )}
                     <BlocoNotificacoes

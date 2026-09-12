@@ -498,6 +498,9 @@ model Processo {
   custos                      Custo[]
   custosPessoa                CustoPessoa[]
   eventos                     Evento[]
+  /// Marcos de PROCESSO (fase concluída/avançada) — nunca marco de Tarefa
+  /// (esse é `Tarefa.notificacoes`). Etapa 4, 12/09/2026.
+  notificacoesOperacionais    NotificacaoOperacional[]
   faturas                     Fatura[]
   mensagens                   Mensagem[]
   outrosCustos                OutroCusto[]
@@ -7981,23 +7984,32 @@ model PlanilhaCelulaOverride {
 model NotificacaoOperacional {
   id Int @id @default(autoincrement())
 
-  /// ATRIBUICAO | TRANSFERENCIA | PRAZO | ATRASO | BLOQUEIO
+  /// ATRIBUICAO | TRANSFERENCIA | PRAZO | ATRASO | BLOQUEIO | RETORNO_TERCEIRO |
+  /// ACOMPANHAMENTO_VENCIDO | EM_RISCO | FASE_CONCLUIDA
   tipo String @db.VarChar(24)
 
   destinatarioId Int
   destinatario   Usuario @relation("NotificacaoDestinatario", fields: [destinatarioId], references: [id], onDelete: Cascade)
 
-  /// A tarefa a que o marco pertence. `Cascade`: tarefa apagada não deixa aviso
-  /// apontando para o vazio.
-  tarefaId Int
-  tarefa   Tarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  /// A tarefa a que o marco pertence. NULO quando o marco é de PROCESSO
+  /// (ex.: fase concluída) — grão diferente, âncora diferente; nunca a mesma
+  /// coluna fingindo ser as duas coisas (Etapa 4, 12/09/2026). `Cascade`:
+  /// tarefa apagada não deixa aviso apontando para o vazio.
+  tarefaId Int?
+  tarefa   Tarefa? @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  /// O processo a que o marco pertence, quando o marco é de PROCESSO (fase
+  /// concluída/avançada) — nunca preenchido junto com `tarefaId` na mesma
+  /// linha. `Cascade`: processo apagado não deixa aviso órfão.
+  processoId Int?
+  processo   Processo? @relation(fields: [processoId], references: [id], onDelete: Cascade)
 
   titulo   String  @db.VarChar(200)
   mensagem String? @db.Text
   link     String? @db.VarChar(300)
 
   /// Quem provocou o marco (quem atribuiu, quem transferiu). Nulo quando o
-  /// marco é do relógio (prazo, atraso).
+  /// marco é do relógio (prazo, atraso, acompanhamento, risco, fase).
   autorId Int?
 
   chaveIdempotencia String @unique @db.VarChar(220)
@@ -8007,6 +8019,7 @@ model NotificacaoOperacional {
 
   @@index([destinatarioId, lidaEm])
   @@index([tarefaId])
+  @@index([processoId])
 }
 
 /// DEPENDÊNCIA ENTRE TAREFAS — duas obrigações distintas, uma esperando a outra.
