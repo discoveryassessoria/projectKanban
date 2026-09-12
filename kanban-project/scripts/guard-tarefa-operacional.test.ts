@@ -218,7 +218,15 @@ const corpoNotif = modeloNotif.slice(0, modeloNotif.indexOf("\n}"))
 ok("ela aponta para a TAREFA, não para o passo",
   /tarefaId Int/.test(corpoNotif) && !/stepInstance/i.test(corpoNotif))
 ok("e tem chave de idempotência", /chaveIdempotencia String @unique/.test(corpoNotif))
-ok("o retry não duplica", /findUnique\(\{\s*where: \{ chaveIdempotencia: ev\.chave \}/.test(comandos))
+// Etapa 4 (12/09/2026): a porta única passou a viver em
+// notificacao-canonica.ts — tarefa-comandos.ts (e todo o resto do sistema)
+// DELEGA a ela, em vez de reimplementar a leitura+P2002 em cada chamador.
+const notifCanonica = ler("lib/operacional/notificacao-canonica.ts")
+ok("existe UMA porta canônica de notificação", /export async function notificarAcontecimento/.test(notifCanonica))
+ok("o retry não duplica (leitura prévia pela chave, na porta única)",
+  /findUnique\(\{\s*where: \{ chaveIdempotencia: e\.chaveIdempotencia \}/.test(notifCanonica))
+ok("tarefa-comandos.ts DELEGA à porta única, não reimplementa",
+  /notificarAcontecimento\(/.test(comandos) && !/notificacaoOperacional\.create\(/.test(comandos))
 // A IDENTIDADE DO MARCO É O PRAZO, não o dia da varredura.
 //
 // Com o dia na chave, o aviso de atraso renascia toda manhã: um prazo vencido
@@ -229,8 +237,8 @@ ok("o marco é tarefa + tipo + PRAZO de referência",
   /diaOperacional\(prazo\)/.test(comandos) && /export function marcoDoPrazo/.test(comandos),
   "um prazo vencido é um fato, não um fato por manhã")
 ok("a varredura distingue criada de reencontrada", /criada\.criada/.test(comandos))
-ok("e a idempotência é garantida pelo BANCO, não só pela leitura",
-  /code !== 'P2002'/.test(comandos),
+ok("e a idempotência é garantida pelo BANCO, não só pela leitura (na porta única)",
+  /code !== "P2002"/.test(notifCanonica),
   "duas varreduras simultâneas leem 'não existe' ao mesmo tempo")
 // A notificação é da TAREFA. Avisar por etapa transformaria um pedido de
 // certidão em seis avisos e devolveria, pelo sino, o desenho "etapa é tarefa"
@@ -241,7 +249,7 @@ ok("nenhum tipo de notificação é de etapa",
   !/tipo:\s*'(STEP|PASSO_|ETAPA_)/.test(comandos))
 // O link passou a carregar o PROCESSO, para o aviso abrir a Central no
 // documento certo em vez da home da operação. Continua sendo o helper canônico.
-ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(ev\.tarefaId,/.test(comandos))
+ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(/.test(comandos))
 ok("e ele leva ao processo, não à home da operação", /urlOperacionalDaTarefa/.test(comandos))
 
 // ═══════════════════════════════════════════════════════════════════════════

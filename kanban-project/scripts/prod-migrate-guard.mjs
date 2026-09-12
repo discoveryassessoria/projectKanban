@@ -157,6 +157,46 @@ try {
     console.log(`[migrate-guard] AVISO: não consegui montar o plano (${String(e?.message ?? e).slice(0, 150)}). Seguindo — o Prisma loga cada migration aplicada.`)
   }
 
+  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (Etapa 4, 12/09/2026) --
+  // `prisma/migrations/0000_baseline/migration.sql` foi regenerado por
+  // `npm run baseline:gerar` depois de `NotificacaoOperacional.tarefaId` virar
+  // opcional + `processoId` novo (ambos NULLABLE — diff conferido manualmente:
+  // SÓ inserções, zero DROP/TRUNCATE/DELETE). Isso muda o sha256 do arquivo, e
+  // `migrate deploy` recusa aplicar quando o checksum registrado diverge do
+  // arquivo ("migration modificada depois de aplicada"). Sem acesso local ao
+  // banco real (Sensitive), a reconciliação roda aqui, no build, onde a
+  // conexão de produção existe de verdade — mesmo procedimento das 6
+  // reconciliações anteriores (ver scripts/baseline-verificar.test.ts):
+  // backup da linha no log > diff já conferido como aditivo > UPDATE de UMA
+  // coluna, com o checksum ANTIGO no WHERE (nunca sobrescreve um checksum que
+  // não seja exatamente o esperado — qualquer outro valor aborta o build).
+  const CHECKSUM_BASELINE_ANTERIOR = '75d717a0e730194a596aed61f2a50e4a66f143d1cb94f32cf852348886024948'
+  const CHECKSUM_BASELINE_ATUAL = 'ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6'
+  const linhaBaseline = (
+    await prisma.$queryRawUnsafe(
+      `SELECT migration_name, checksum, finished_at, applied_steps_count FROM _prisma_migrations WHERE migration_name = '0000_baseline'`,
+    )
+  )[0]
+  if (linhaBaseline) {
+    console.log(`[migrate-guard] 0000_baseline (ledger, backup) = ${JSON.stringify(linhaBaseline, (_, v) => typeof v === 'bigint' ? v.toString() : v)}`)
+    if (linhaBaseline.checksum === CHECKSUM_BASELINE_ATUAL) {
+      console.log('[migrate-guard] 0000_baseline já reconciliado (checksum atual) — nada a fazer.')
+    } else if (linhaBaseline.checksum === CHECKSUM_BASELINE_ANTERIOR) {
+      const r = await prisma.$executeRawUnsafe(
+        `UPDATE "_prisma_migrations" SET checksum = $1 WHERE migration_name = '0000_baseline' AND checksum = $2`,
+        CHECKSUM_BASELINE_ATUAL,
+        CHECKSUM_BASELINE_ANTERIOR,
+      )
+      if (r !== 1) abortar(`reconciliação de checksum afetou ${r} linha(s) — esperado exatamente 1. Nenhuma escrita adicional foi tentada.`)
+      console.log(`[migrate-guard] 0000_baseline reconciliado: ${CHECKSUM_BASELINE_ANTERIOR.slice(0, 12)}… → ${CHECKSUM_BASELINE_ATUAL.slice(0, 12)}…`)
+    } else {
+      abortar(
+        `checksum de 0000_baseline no ledger (${linhaBaseline.checksum}) não é nem o esperado-anterior nem o esperado-atual — ` +
+        'divergência não prevista por esta reconciliação pontual. Nenhuma escrita foi feita.',
+      )
+    }
+  }
+
   console.log('[migrate-guard] identidade CONFIRMADA — aplicando migrations (migrate deploy).')
 
   // directUrl forçada para a mesma URL: DIRECT_DATABASE_URL do projeto está

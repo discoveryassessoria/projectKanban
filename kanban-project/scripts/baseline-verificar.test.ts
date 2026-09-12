@@ -306,7 +306,21 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // linhas) antes do UPDATE.
 //
 //   anterior : 6bedd6ce1a99b6cc8ec1444b9dc1c235b157b52b39895075123574619014af0c
-const CHECKSUM_LEDGER = '75d717a0e730194a596aed61f2a50e4a66f143d1cb94f32cf852348886024948'
+// 12/09/2026 — ETAPA 4 (eventos + histórico + notificações):
+// `NotificacaoOperacional.tarefaId` vira NULLABLE + coluna nova `processoId`
+// (também NULLABLE) + FK + índice — a segunda âncora que uma notificação de
+// FASE CONCLUÍDA precisa (grão PROCESSO, não TAREFA; decisão tomada com o
+// usuário depois de comparar 3 alternativas). Migration
+// 20260912200000_notificacao_operacional_grao_processo. Diff do baseline: a
+// coluna tarefaId perde o NOT NULL, processoId/FK/índice são inseridos — zero
+// DROP/TRUNCATE/DELETE, nenhuma linha existente perde o tarefaId que já tinha.
+// Sem acesso local à conexão real de produção (Sensitive), a reconciliação do
+// ledger roda dentro do build (scripts/prod-migrate-guard.mjs), com backup da
+// linha no log do build antes do UPDATE de uma coluna só, checksum anterior
+// no WHERE.
+//
+//   anterior : 75d717a0e730194a596aed61f2a50e4a66f143d1cb94f32cf852348886024948
+const CHECKSUM_LEDGER = 'ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -375,6 +389,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260905193850_necessidade_dispensa_manual',
   '20260910190000_alvo_necessidade_uniao',
   '20260910200000_remove_matriz_documental_createstask',
+  '20260912200000_notificacao_operacional_grao_processo',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

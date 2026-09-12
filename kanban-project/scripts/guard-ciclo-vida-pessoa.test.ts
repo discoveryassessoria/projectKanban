@@ -168,6 +168,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/tarefa-atribuicao.test.ts":
     "atribuição/transferência/notificação: cria e derruba o PRÓPRIO cenário (marca ATRIB-TEST) " +
     "só no banco de teste",
+  "scripts/etapa4-eventos-notificacoes.test.ts":
+    "Etapa 4 (retorno/acompanhamento/EM_RISCO/lote/RBAC): cria e derruba o PRÓPRIO cenário " +
+    "(marca ETAPA4-TEST) só no banco de teste",
   // ── Guard ────────────────────────────────────────────────────────────────
   // O backfill de resíduos NÃO entra aqui: ele não remove nenhum dos quatro
   // modelos protegidos (só Tarefa, Passo e Necessidade — esta pelo serviço dono).

@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-10
+-- Gerado em : 2026-09-12
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -4514,7 +4514,8 @@ CREATE TABLE "NotificacaoOperacional" (
     "id" SERIAL NOT NULL,
     "tipo" VARCHAR(24) NOT NULL,
     "destinatarioId" INTEGER NOT NULL,
-    "tarefaId" INTEGER NOT NULL,
+    "tarefaId" INTEGER,
+    "processoId" INTEGER,
     "titulo" VARCHAR(200) NOT NULL,
     "mensagem" TEXT,
     "link" VARCHAR(300),
@@ -6436,6 +6437,9 @@ CREATE INDEX "NotificacaoOperacional_destinatarioId_lidaEm_idx" ON "NotificacaoO
 CREATE INDEX "NotificacaoOperacional_tarefaId_idx" ON "NotificacaoOperacional"("tarefaId");
 
 -- CreateIndex
+CREATE INDEX "NotificacaoOperacional_processoId_idx" ON "NotificacaoOperacional"("processoId");
+
+-- CreateIndex
 CREATE INDEX "TarefaDependencia_dependeDeId_idx" ON "TarefaDependencia"("dependeDeId");
 
 -- CreateIndex
@@ -7637,6 +7641,9 @@ ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_dest
 
 -- AddForeignKey
 ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;

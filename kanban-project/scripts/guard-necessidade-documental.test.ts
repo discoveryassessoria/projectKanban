@@ -118,6 +118,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/tarefa-atribuicao.test.ts":
     "atribuição/transferência/notificação: cria e derruba o PRÓPRIO cenário (marca ATRIB-TEST) " +
     "só no banco de teste",
+  "scripts/etapa4-eventos-notificacoes.test.ts":
+    "Etapa 4 (retorno/acompanhamento/EM_RISCO/lote/RBAC): cria e derruba o PRÓPRIO cenário " +
+    "(marca ETAPA4-TEST) só no banco de teste",
   "scripts/tarefa-unidade-operacional.test.ts":
     "unidade operacional da Tarefa: cria e derruba as PRÓPRIAS necessidades (marca TAREFA-OP) " +
     "só no banco de teste — o cenário precisa de uma obrigação real para a tarefa ter causa",
