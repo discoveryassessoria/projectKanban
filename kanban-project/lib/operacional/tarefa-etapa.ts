@@ -170,7 +170,9 @@ export async function concluirEtapa(args: {
       }
     }
 
-    // OS PASSOS DESTA UNIDADE — não os da instância inteira.
+    // OS PASSOS DESTA UNIDADE — não os da instância inteira quando a unidade é
+    // um DOCUMENTO; a fase inteira quando a unidade é PROCESSO (sem
+    // necessidade/documento — ver o comentário de `escopoDaUnidade`).
     //
     // A instância é da FASE e abriga uma tarefa por certidão. Lendo todos os
     // passos dela, esta porta misturava o trabalho de pessoas diferentes em
@@ -180,13 +182,19 @@ export async function concluirEtapa(args: {
     // etapa acabava apontando para o documento de outra pessoa — que é
     // exatamente o que o "Continuar" da fila abriria.
     //
+    // NUNCA passar `workflowStepInstanceId` aqui — ele estreitava o escopo
+    // PROCESSO para "só o passo que acabou de concluir", e por isso esta
+    // função nunca enxergava o sucessor que `ativarProximoPassoTx` (abaixo)
+    // acabara de liberar: `etapaCorrente(depois)` voltava vazio e a Tarefa
+    // perdia o ponteiro do passo corrente mesmo com trabalho executável à
+    // frente (comprovado em produção — tarefa 3571, processo 592).
+    //
     // O escopo é o mesmo que a sincronização canônica usa; ele mora num lugar só.
     const steps = await tx.phaseWorkflowStepInstance.findMany({
       where: escopoDaUnidade({
         workflowInstanceId: tarefa.workflowInstanceId,
         necessidadeId: tarefa.necessidadeId,
         documentoId: tarefa.documentoId,
-        workflowStepInstanceId: tarefa.workflowStepInstanceId,
       }),
       select: {
         id: true, status: true, obrigatorio: true, ordem: true, stepKey: true,

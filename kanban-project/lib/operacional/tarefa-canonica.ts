@@ -304,7 +304,8 @@ export function estadoDerivado(
 }
 
 /**
- * OS PASSOS DESTA UNIDADE DE TRABALHO — não os da fase inteira.
+ * OS PASSOS DESTA UNIDADE DE TRABALHO — não os da fase inteira, quando a
+ * unidade é UM DOCUMENTO; a fase inteira, quando a unidade é o PROCESSO.
  *
  * A instância do workflow é da FASE, e a fase abriga UMA tarefa por unidade:
  * quatro certidões de uma Emissão Documental são quatro tarefas dentro da mesma
@@ -322,15 +323,35 @@ export function estadoDerivado(
  *     e recusa ou libera a etapa por causa de trabalho alheio.
  *
  * O filtro é a OBRIGAÇÃO — a mesma coisa que dá identidade à tarefa
- * (`identidade-da-tarefa`). Um passo administrativo de fase não tem obrigação;
- * ali a unidade é o próprio passo da tarefa, e sem nem isso são os passos que
- * também não têm alvo nenhum.
+ * (`identidade-da-tarefa`). DOCUMENTO/NECESSIDADE são âncoras reais no schema
+ * (`PhaseWorkflowStepInstance.necessidadeId`/`documentoId`); PROCESSO não tem
+ * âncora nenhuma além da própria instância — não existe, hoje, um campo que
+ * separe "duas operações administrativas independentes" dentro da mesma fase.
+ * Por isso a unidade de cardinalidade PROCESSO É a fase inteira: é a
+ * granularidade mais fina que o schema consegue expressar sem uma âncora.
+ *
+ * ─── UM PARÂMETRO `workflowStepInstanceId` EXISTIU AQUI E FOI REMOVIDO ───────
+ * Ele estreitava o escopo PROCESSO para "só este passo" quando o chamador
+ * passava o ponteiro (quase sempre `tarefa.workflowStepInstanceId`, LIDO ANTES
+ * da conclusão). Para uma fase PROCESSO com dependência entre passos —
+ * "Análise Documental": 5 passos encadeados, sem necessidade/documento — isso
+ * fazia `concluirEtapa`/`sincronizarTarefaComWorkflow`/`statusDerivadoDaTarefa`
+ * enxergarem SÓ o passo recém-concluído, nunca o sucessor liberado por
+ * `ativarProximoPassoTx` (que sempre leu a fase inteira, corretamente). O
+ * resultado: `etapaCorrente()` não encontrava mais nada, e a Tarefa perdia o
+ * ponteiro (`workflowStepInstanceId = null`) mesmo com o próximo passo já
+ * executável — comprovado em produção (tarefa 3571, processo 592, 11/09/2026).
+ * A mesma chamada também esvaziava, para PROCESSO, a checagem de dependência
+ * (`pendentes`, em `tarefa-etapa.ts`): um array de 1 elemento nunca acusa
+ * pendência alheia. As DUAS chamadas que já liam a fase inteira
+ * (`ativarProximoPassoTx`, e as consultas de "irmãos" em `aplicarPasso`) nunca
+ * tiveram esse defeito — a correção alinha as demais a elas, em vez de inventar
+ * uma terceira leitura.
  */
 export function escopoDaUnidade(u: {
   workflowInstanceId: number
   necessidadeId?: number | null
   documentoId?: number | null
-  workflowStepInstanceId?: number | null
 }): Prisma.PhaseWorkflowStepInstanceWhereInput {
   // A UNIDADE É A CONJUNÇÃO DAS ÂNCORAS, NÃO A DISJUNÇÃO.
   //
@@ -351,11 +372,7 @@ export function escopoDaUnidade(u: {
   if (u.documentoId != null) conjuncao.push({ documentoId: u.documentoId })
   return {
     workflowInstanceId: u.workflowInstanceId,
-    ...(conjuncao.length > 0
-      ? { AND: conjuncao }
-      : u.workflowStepInstanceId != null
-        ? { id: u.workflowStepInstanceId }
-        : { necessidadeId: null, documentoId: null }),
+    ...(conjuncao.length > 0 ? { AND: conjuncao } : { necessidadeId: null, documentoId: null }),
   }
 }
 
@@ -463,14 +480,15 @@ export async function sincronizarTarefaComWorkflow(
     return { mudou: false, status: tarefa.statusTarefa, stepAtualId: tarefa.workflowStepInstanceId }
   }
 
-  // OS PASSOS DA UNIDADE — não os da instância inteira. A regra mora em
-  // `escopoDaUnidade`, e é a MESMA que a conclusão de etapa e o motor usam.
+  // OS PASSOS DA UNIDADE — a mesma regra de `escopoDaUnidade` que a conclusão
+  // de etapa e o motor usam (documento/necessidade ancoram; sem âncora, é a
+  // fase inteira — nunca só o ponteiro atual da tarefa, que é o que perdíamos
+  // ao concluir a última etapa PROCESSO antes desta correção).
   const steps = await tx.phaseWorkflowStepInstance.findMany({
     where: escopoDaUnidade({
       workflowInstanceId: tarefa.workflowInstanceId,
       necessidadeId: tarefa.necessidadeId,
       documentoId: tarefa.documentoId,
-      workflowStepInstanceId: tarefa.workflowStepInstanceId,
     }),
     select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },
     orderBy: { ordem: 'asc' },

@@ -56,7 +56,7 @@ async function statusDerivadoDaTarefa(tx: TX, tarefaId: number): Promise<string 
       // A UNIDADE. Sem ela a conta lia os passos da FASE inteira: numa Emissão
       // com quatro certidões, a tarefa de uma só concluía quando as outras três
       // concluíssem, e ficava BLOQUEADA porque a certidão de outra pessoa travou.
-      necessidadeId: true, documentoId: true, workflowStepInstanceId: true,
+      necessidadeId: true, documentoId: true,
     },
   })
   if (!t?.workflowInstanceId) return null
@@ -65,7 +65,6 @@ async function statusDerivadoDaTarefa(tx: TX, tarefaId: number): Promise<string 
       workflowInstanceId: t.workflowInstanceId,
       necessidadeId: t.necessidadeId,
       documentoId: t.documentoId,
-      workflowStepInstanceId: t.workflowStepInstanceId,
     }),
     select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },
     orderBy: { ordem: "asc" },

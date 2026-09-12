@@ -110,14 +110,14 @@ export async function planejarReabertura(stepInstanceId: number): Promise<PlanoD
   const titulo = def?.label ?? (passo.snapshot as { titulo?: string } | null)?.titulo ?? rotulo(passo.stepKey)
 
   // OS IRMÃOS DA MESMA UNIDADE — e só eles. É `escopoDaUnidade` que garante que a
-  // certidão do Ademir não enxergue a da Tereza.
+  // certidão do Ademir não enxergue a da Tereza (e que, numa fase PROCESSO sem
+  // documento/necessidade, os irmãos sejam a fase inteira — nunca só este passo).
   const daUnidade = passo.workflowInstanceId
     ? await prisma.phaseWorkflowStepInstance.findMany({
         where: escopoDaUnidade({
           workflowInstanceId: passo.workflowInstanceId,
           necessidadeId: passo.necessidadeId,
           documentoId: passo.documentoId,
-          workflowStepInstanceId: passo.id,
         }),
         select: { id: true, stepKey: true, ordem: true, status: true, dependeDeStepKeys: true, snapshot: true },
         orderBy: { ordem: "asc" },
