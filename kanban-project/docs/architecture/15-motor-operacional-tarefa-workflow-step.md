@@ -171,3 +171,111 @@ falha o guard.
 - A auditoria original (26 seções, entregue em texto de sessão) não foi
   persistida como arquivo — este documento é o resumo durável dela, não uma
   transcrição integral.
+
+## 10. Responsabilidade operacional (ownership de negócio) — consolidação de 12/09/2026
+
+Diagnóstico + correção completos: `docs/architecture/16-tarefas-e-projetos-projecao-gerencial.md`
+("Diagnóstico de ownership — mapa tela-a-tela", Regra 17) tem o mapa
+tela-a-tela; aqui fica a REGRA, para qualquer código futuro que toque
+`responsavelId`.
+
+**Fonte canônica: `Tarefa.responsavelId`.** É o único campo que Operação,
+Tarefas e Projetos, Lista, Kanban e processo expandido leem para "quem é
+dono desta operação" — todas passam pela mesma função (`lib/operacional/
+tarefa-projecoes.ts`). Escrito só por `atribuirTarefa`/`transferirTarefa`
+(`lib/operacional/tarefa-comandos.ts`), `devolverAFila`/`criarTarefaManual`
+(`tarefa-ciclo.ts`), e pelo materializador no NASCIMENTO da tarefa
+(`garantirTarefaDePasso`/`tarefa-canonica.ts`).
+
+**Regras permanentes:**
+
+1. **`Tarefa.responsavelId` é a fonte canônica do ownership efetivo da
+   operação.** Nenhuma tela decide "responsável" por conta própria — decidir
+   fora desta leitura é o defeito, não uma otimização.
+2. **Responsável configurado/executor de um PASSO não é ownership da
+   operação.** `PhaseWorkflowStepInstance.responsavelId` (escrito hoje só por
+   "Alterar Executor", `src/services/documento-operacao.ts:800`) e
+   `StepExecution.executadoPorId` (quem executou uma tentativa, fato passado)
+   são conceitos DIFERENTES e não substituem `Tarefa.responsavelId` em
+   nenhuma decisão de permissão ou em nenhuma tela — incidente real e já
+   corrigido documentado em `documento-operacao.ts:627-641` ("já divergiu em
+   produção para uma tarefa da própria Daniela").
+3. **Liberar o próximo passo automaticamente NÃO constitui nova atribuição.**
+   `ativarProximoPassoTx`/`concluirEtapa` nunca escrevem `responsavelId`,
+   `dataAtribuicao` nem `atribuidoPorId` — só o ponteiro `workflowStepInstanceId`
+   muda. Só `atribuirTarefa`/`transferirTarefa` produzem uma atribuição real
+   (e só eles notificam).
+4. **Avanço de passo preserva a identidade da Tarefa quando a unidade é a
+   mesma.** `reancorarTarefaNaUnidade`/`garantirTarefaDePasso` reancoram a
+   Tarefa existente da unidade ao novo passo corrente — nunca criam uma
+   segunda Tarefa para o mesmo trabalho.
+5. **`workflowStepInstanceId` deve ficar deterministicamente ancorado ao
+   passo corrente executável.** Bug real e corrigido em 12/09/2026: `escopoDaUnidade()`
+   (`lib/operacional/tarefa-canonica.ts`) tinha um parâmetro que, em fases
+   PROCESSO/GLOBAL (sem necessidade/documento), estreitava a leitura para "só
+   o passo concluído" — a Tarefa perdia o ponteiro (ou, num caso real,
+   `estadoDerivado` declarava a tarefa concluída com passo obrigatório aberto
+   — Tarefa 3571/processo 592, reconciliada pela porta canônica `reabrirTarefa`).
+   Removido; regressão permanente em `scripts/escopo-processo-reancoragem.test.ts`.
+6. **Reatribuir não reinicia prazo/SLA sem regra explícita.**
+   `atribuirTarefa`/`transferirTarefa` nunca tocam `dataPrazo` — só
+   `alterarPrazo` (`tarefa-ciclo.ts`), que exige motivo. Verificado por código
+   e por histórico real (Tarefa 3570, 2 transferências, prazo idêntico do
+   início ao fim).
+7. **Retry/reconciliação não pode duplicar Tarefa, ownership, histórico ou
+   notificação.** `atribuirTarefa` é idempotente por `chaveIdempotencia` de
+   notificação (carrega o `lockVersion` do momento do ato); `concluirEtapa`
+   é idempotente por `jaEstavaConcluida`; `reabrirTarefa` recusa (`NAO_TERMINAL`)
+   se a tarefa já não está encerrada. Auditoria de produção (12/09/2026):
+   14/14 `NotificacaoOperacional.chaveIdempotencia` únicas, 0 Tarefas vivas
+   duplicadas para a mesma unidade, 0 tarefa concluída com passo obrigatório
+   aberto após a reconciliação de 3571.
+8. **Projeções não podem inventar ownership próprio.** Qualquer tela que
+   compute "responsável" fora de `tarefa-projecoes.ts`/`tarefasVivasDasUnidades`
+   é uma segunda fonte (CLAUDE.md §23/§25). Divergência real conhecida e
+   **não corrigida** (fora do escopo desta consolidação): `src/lib/home/
+   coleta.ts` mistura, na mesma fila de pendências, itens tipo "passo" (lê
+   `PhaseWorkflowStepInstance.responsavelId`) e itens tipo "tarefa" (lê
+   `Tarefa.responsavelId`) sob o mesmo rótulo "responsável"; e a sub-rota de
+   Genealogia de `ProcessoCentralOperacional`/`src/app/api/processos/
+   [processoId]/central-operacional/route.ts` (seção "docs") ainda calcula
+   `Documento.responsavelId ?? stepOwner`, nunca `Tarefa`.
+9. **Registros legados devem ser considerados em qualquer alteração do
+   motor.** Antes de mudar `escopoDaUnidade`/materialização, audite o banco
+   real (não só o código) pelos 3 padrões: tarefa concluída com obrigatório
+   aberto, ponteiro obsoleto (aponta pra passo concluído havendo executável),
+   e tarefa não-terminal sem ponteiro havendo passo vivo.
+10. **`step.disponivel` não deve virar um segundo motor de materialização
+    ingenuamente.** O outbox dispatcher hoje trata `step.disponivel` como
+    no-op (`src/services/outbox-dispatcher.ts`, comentário "tipo conhecido
+    sem efeito conectado ainda"). Ligá-lo a `garantirTarefaDePasso` sem antes
+    resolver a divergência abaixo criaria uma SEGUNDA Tarefa por passo em
+    fases PROCESSO com múltiplos passos encadeados — dívida técnica registrada,
+    não corrigida.
+11. **Divergência de identidade ainda aberta (raiz do item 10):**
+    `chaveDaUnidade()` (`lib/operacional/identidade-da-tarefa.ts`) usa
+    `stepinst{id}` como identidade de fallback para GLOBAL sem
+    necessidade/documento — ou seja, KEYA CADA PASSO como sua própria unidade —
+    enquanto `escopoDaUnidade()` (pós-correção) trata TODOS os passos GLOBAL
+    da mesma instância como uma unidade só. As duas funções respondem "qual é
+    a unidade" de formas diferentes para a MESMA cardinalidade; o motor hoje
+    só funciona porque nada re-materializa os passos 2+ de uma cadeia GLOBAL.
+    Resolver isso é pré-requisito para o item 10.
+12. **`Documento.responsavelId` permanece legado/paralelo.** Não é lido por
+    nenhuma tela operacional principal (Operação, Tarefas e Projetos, Lista,
+    Kanban, processo expandido, indicadores) — só pela seção "docs" citada no
+    item 8. Não é a fonte canônica e não deve ser tratado como tal em nenhum
+    código novo.
+
+**Fora do escopo desta consolidação (regras já vigentes, não descobertas
+hoje, mas reafirmadas por não terem sido violadas):** `CANCELADA != CONCLUÍDA`
+em nenhuma tela (`cancelada-diferente-de-concluida`); `faseVisualizada !=
+faseAtiva` — tarefa de fase não-atual nunca vaza para a consulta da fase
+atual; movimentação de fase (`Processo.faseAtualKey`) nunca apaga, recria,
+reseta ou conclui Tarefa automaticamente (CLAUDE.md §9/§10).
+
+**Evidência:** commits `7a8eec5e` (correção de escopo), `52105515` (guard de
+teste), reconciliação da Tarefa 3571 via `reabrirTarefa` (12/09/2026,
+`lockVersion` 9→10, `LogAuditoria` 8368-8374 preservados + 8392 novo).
+Regressão: `scripts/escopo-processo-reancoragem.test.ts` (37/37) +
+suíte completa do motor (561 casos, 0 falhas) — ver commit para lista.

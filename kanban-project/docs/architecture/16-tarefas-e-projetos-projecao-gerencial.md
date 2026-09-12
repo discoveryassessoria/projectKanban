@@ -242,3 +242,32 @@ atribuída a Daniela Brait via UI, verificado no banco
 `NotificacaoOperacional.ATRIBUICAO` — os três escreveram, nenhum
 paralelo), e revertido ao estado original (`devolver_a_fila`) ao final do
 teste para não deixar rastro em produção.
+
+## Diagnóstico de ownership — mapa tela-a-tela (12/09/2026)
+
+Consolida a Regra 9 com evidência de código, uma tela por vez. Fonte
+canônica: `lib/operacional/tarefa-projecoes.ts` (`Tarefa.responsavelId`).
+Regra completa e divergências não corrigidas: `docs/architecture/
+15-motor-operacional-tarefa-workflow-step.md` §10.
+
+| Tela | Fonte | Pode divergir de `Tarefa.responsavelId`? |
+|---|---|---|
+| Operação / Minha Fila | `minhaFila`/`semResponsavel` → `visaoGerencial` | Não |
+| Tarefas e Projetos (Lista/Kanban/Calendário) | `visaoGerencial` (linha) | Não |
+| Tarefas e Projetos — rollup por família | `agregacaoPorFamilia.responsavelPrincipal` | **Sim, por desenho** — é o voto majoritário da família, não o dono de nenhuma tarefa individual |
+| Kanban (coluna) | `colunaDaTarefa` | Não |
+| Processo expandido → aba Tarefas | `visaoGerencial` (escopado por processo) | Não |
+| Painel da fase (índice por documento, dentro do processo) | `estadoNaFase`/`tarefasVivasDasUnidades` | Não (bug histórico já corrigido — ver comentário em `estrutura-operacional-core.ts`) |
+| Indicadores gerenciais | `indicadoresGerenciais` (`COUNT` direto) | Não |
+| Sino de notificações (HeaderBar) | query própria em `Tarefa` (`/api/notificacoes`) | Não diverge do campo, mas **não lê `NotificacaoOperacional`** — são dois sistemas de aviso que nunca se cruzam |
+| Workflow Interno — cabeçalho/gate de Iniciar | `tarefasVivasDasUnidades` | Não |
+| Workflow Interno — rótulo "quem executa" por passo | `PhaseWorkflowStepInstance.responsavelId` ("Alterar Executor") | **Sim, por desenho** — é o executor do passo, não o dono da operação; nunca usado para permissão (ver `documento-operacao.ts:627-641`) |
+| Home — fila de pendências tipo "passo" | `PhaseWorkflowStepInstance.responsavelId` | **Sim — divergência real, não corrigida** (mesmo rótulo "responsável" que os itens tipo "tarefa" da mesma fila, que leem `Tarefa.responsavelId`) |
+| `ProcessoCentralOperacional` — sub-rota Genealogia ("docs") | `Documento.responsavelId ?? stepOwner` | **Sim — divergência real, não corrigida**, nunca olha `Tarefa` |
+
+**Regra 17.** Toda tela nova que precisar mostrar "responsável" de uma
+operação lê `Tarefa.responsavelId` via `tarefa-projecoes.ts`/
+`tarefasVivasDasUnidades` — nunca computa por conta própria, nunca lê
+`PhaseWorkflowStepInstance.responsavelId`/`Documento.responsavelId` como se
+fossem o dono da operação. As duas exceções da tabela acima (Home e a
+sub-rota de Genealogia) são dívida conhecida, não modelo a seguir.
