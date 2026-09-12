@@ -37,6 +37,10 @@ const ok = (nome: string, cond: boolean, extra = "") => {
 const secao = (t: string) => console.log(`\n${t}`)
 
 async function limpar() {
+  // SEM Pessoa aqui de propósito: este cenário é PROCESSO/GLOBAL — nenhum passo
+  // tem pessoaId, então `palco()` nunca cria uma. Apagar Pessoa é ato de um
+  // serviço só (`src/services/pessoa-ciclo-vida.ts`, ver guard-ciclo-vida-pessoa);
+  // um teste que não cria Pessoa não deve tocar nela na limpeza.
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
   const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
@@ -45,7 +49,6 @@ async function limpar() {
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
-  for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
   await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: MARCA } } })
   await prisma.usuario.deleteMany({ where: { email: { endsWith: "@procglobal.test" } } })
