@@ -181,6 +181,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // O backfill de resíduos NÃO entra aqui: ele não remove nenhum dos quatro
   // modelos protegidos (só Tarefa, Passo e Necessidade — esta pelo serviço dono).
   "scripts/guard-ciclo-vida-pessoa.test.ts": "este guard (cita os padrões que procura)",
+  "scripts/invalidacao-downstream.test.ts":
+    "cadeia de impacto downstream de invalidação pós-validação (mandato Emissão Documental): " +
+    "monta e derruba a PRÓPRIA árvore/pessoa/documento (marca INVDOWN) só no banco de teste — " +
+    "prova que invalidar documento regride a necessidade e que dependentes downstream são identificados",
   "scripts/handoff-4-passos.test.ts":
     "handoff dedicado (mandato Emissão Documental): cria a PRÓPRIA árvore/pessoa " +
     "(marca HANDOFF4-TEST) só no banco de teste — nenhuma pessoa é removida por este teste",
