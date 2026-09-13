@@ -26,6 +26,7 @@ import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/Processo
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { confirmarExclusaoProcesso } from "@/src/lib/confirmar-exclusao-processo"
 // ✅ NOVO: header de progresso da fase do processo
 import { PhaseProgressHeader } from "@/src/components/processo/PhaseProgressHeader"
 import { 
@@ -472,13 +473,9 @@ function ConteudoModal({
 
   const handleDelete = async () => {
     if (!processo) return
-    
-    const confirmDelete = window.confirm(
-      `Tem certeza que deseja excluir o processo "${processo.nome}"?\n\nEsta ação não pode ser desfeita.`
-    )
-    
-    if (!confirmDelete) return
-    
+
+    if (!(await confirmarExclusaoProcesso(processo.id, processo.nome))) return
+
     try {
       const response = await fetch(`/api/processos/${processo.id}`, {
         method: 'DELETE',
@@ -486,12 +483,13 @@ function ConteudoModal({
           'Authorization': `Bearer ${localStorage.getItem("authToken")}`
         }
       })
-      
+
       if (response.ok) {
         onSave?.()
         onClose()
       } else {
-        alert('Erro ao excluir processo')
+        const body = await response.json().catch(() => null)
+        alert(body?.error ?? 'Erro ao excluir processo')
       }
     } catch (error) {
       console.error('Erro ao excluir:', error)
@@ -600,7 +598,7 @@ function ConteudoModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {pode('processos.excluir') && (
+            {pode('processos.excluirDefinitivo') && (
               <Button 
                 variant="ghost" 
                 size="icon" 

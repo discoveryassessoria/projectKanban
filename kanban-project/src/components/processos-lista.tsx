@@ -23,6 +23,8 @@ import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
 import { SlaBadge } from "@/src/components/sla/sla-ui"
 import type { ProcessoWithStatus, Contratante } from "@/src/types/kanban"
 import type { StatusSla } from "@/src/types/sla"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { confirmarExclusaoProcesso } from "@/src/lib/confirmar-exclusao-processo"
 
 interface ProcessosListaProps {
   processos: ProcessoWithStatus[]
@@ -53,6 +55,7 @@ export function ProcessosLista({
   // Estados para o modal de edição
   const [selectedProcesso, setSelectedProcesso] = useState<ProcessoWithStatus | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const { pode } = usePermissoes()
 
   // Função para abrir modal de edição
   const handleEdit = (processo: ProcessoWithStatus) => {
@@ -84,19 +87,22 @@ export function ProcessosLista({
   const startIndex = (paginaAtual - 1) * itemsPerPage
   const paginatedProcessos = filteredProcessos.slice(startIndex, startIndex + itemsPerPage)
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Tem certeza que deseja excluir este processo?")) return
+  const handleDelete = async (id: number, nome: string) => {
+    if (!(await confirmarExclusaoProcesso(id, nome))) return
 
     try {
       const response = await fetch(`/api/processos/${id}`, {
         method: "DELETE"
       })
 
-      if (!response.ok) throw new Error("Erro ao excluir processo")
+      if (!response.ok) {
+        const body = await response.json().catch(() => null)
+        throw new Error(body?.error ?? "Erro ao excluir processo")
+      }
       onRefresh()
     } catch (error) {
       console.error(error)
-      alert("Erro ao excluir processo")
+      alert(error instanceof Error ? error.message : "Erro ao excluir processo")
     }
   }
 
@@ -248,13 +254,15 @@ export function ProcessosLista({
                             <Pencil className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDelete(processo.id)}
-                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-[var(--surface-secondary)] cursor-pointer"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2 text-red-500" />
-                            Excluir
-                          </DropdownMenuItem>
+                          {pode('processos.excluirDefinitivo') && (
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(processo.id, processo.nome)}
+                              className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-[var(--surface-secondary)] cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2 text-red-500" />
+                              Excluir
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>

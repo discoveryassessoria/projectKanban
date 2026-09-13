@@ -4,9 +4,10 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
 import { logProcesso } from "@/lib/auditoria"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 import { removerFamiliaSeOrfa } from "@/src/services/familia"
+import { excluirProcesso } from "@/src/services/processo-ciclo-vida"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -226,13 +227,29 @@ export async function PUT(
   }
 }
 
-// DELETE - Excluir processo
+// DELETE - Excluir processo definitivamente
+//
+// NÃO faz `prisma.processo.delete()` cru. `excluirProcesso` (processo-ciclo-vida.ts)
+// recusa a exclusão se existir fato financeiro já materializado (pagamento,
+// estorno, baixa ou liquidação) ligado a este processo — a mesma régua que
+// `pessoa-ciclo-vida.ts` já usa para Pessoa, aqui aplicada direto por
+// `processoId` (ver docs/architecture/26-delete-processo-lifecycle-seguro.md).
+//
+// TAMBÉM NÃO apaga a Árvore. A versão anterior chamava `prisma.arvore.delete()`
+// direto quando este era o último processo dela — sem `analisarExclusaoArvore`,
+// sem frase de confirmação, contornando o guard que `DELETE /api/arvore/[id]`
+// já paga o preço de ter. Uma árvore que fica sem processo depois desta rota
+// permanece para os mecanismos canônicos JÁ EXISTENTES cuidarem dela.
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.excluir')
+    // EXCLUSIVA (ver PERMISSOES_EXCLUSIVAS): nunca concedida por perfil padrão
+    // nem por `tipo = 'admin'` — só por concessão nominal, mesma régua de
+    // `processos.moverFaseManual`. `processos.excluir` continua existindo para
+    // outras portas (ex.: DELETE /api/familias/[id]) e não é usada aqui.
+    const erro = await verificarPermissao(request, 'processos.excluirDefinitivo')
     if (erro) return erro
 
     const { processoId } = await params
@@ -245,58 +262,41 @@ export async function DELETE(
       )
     }
 
-    // Buscar o processo para pegar nome e arvoreId ANTES de deletar
-    const processo = await prisma.processo.findUnique({
-      where: { id },
-      select: { nome: true, arvoreId: true, familiaId: true }
-    })
+    const usuario = await extrairUsuarioComPermissoes(request)
 
-    if (!processo) {
-      return NextResponse.json(
-        { error: "Processo não encontrado" },
-        { status: 404 }
-      )
-    }
+    const resultado = await excluirProcesso({ processoId: id, actorUserId: usuario?.userId ?? null })
 
-    const arvoreId = processo.arvoreId
-    const familiaId = processo.familiaId
-    const nomeProcesso = processo.nome
-
-    // Excluir o processo
-    await prisma.processo.delete({
-      where: { id }
-    })
-
-    // ✅ REGISTRAR LOG
-    await logProcesso.excluir(nomeProcesso, id)
-
-    // Se tinha uma árvore vinculada, verificar se ficou órfã
-    let arvoreRemovida = false
-    if (arvoreId) {
-      const outrosProcessos = await prisma.processo.count({
-        where: { arvoreId }
-      })
-
-      if (outrosProcessos === 0) {
-        await prisma.arvore.delete({
-          where: { id: arvoreId }
-        })
-        arvoreRemovida = true
+    if (!resultado.ok) {
+      if (resultado.code === "PROCESSO_NAO_ENCONTRADO") {
+        return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
       }
+      if (resultado.code === "FATO_FINANCEIRO_PROTEGIDO") {
+        return NextResponse.json(
+          {
+            error: resultado.erro,
+            code: resultado.code,
+            fatos: resultado.plano?.fatosProtegidos.map((f) => f.descricao) ?? [],
+          },
+          { status: 409 },
+        )
+      }
+      return NextResponse.json({ error: resultado.erro ?? "Erro ao excluir processo" }, { status: 500 })
     }
 
-    // A FAMÍLIA TAMBÉM NÃO PODE FICAR PARA TRÁS. Sem processo e sem árvore, ela
-    // não é mais alcançável por porta nenhuma — é resíduo. Se ainda houver
-    // outro processo ou outra árvore nela, ela continua sendo de alguém e fica.
-    const familiaRemovida = await removerFamiliaSeOrfa(familiaId)
+    const plano = resultado.plano!
+
+    // A FAMÍLIA NÃO PODE FICAR PARA TRÁS. Sem processo e sem árvore, ela não é
+    // mais alcançável por porta nenhuma — é resíduo. `removerFamiliaSeOrfa` já
+    // rechecha a contagem antes de apagar; comportamento preexistente, não
+    // alterado por esta correção (ver docs/architecture/25, ND/portas de
+    // exclusão — classificado como guardado).
+    const familiaRemovida = await removerFamiliaSeOrfa(plano.familiaId)
 
     return NextResponse.json({
       message: [
         "Processo excluído com sucesso",
-        arvoreRemovida ? "árvore órfã removida" : null,
         familiaRemovida ? "família órfã removida" : null,
       ].filter(Boolean).join(" · "),
-      arvoreRemovida,
       familiaRemovida,
     })
   } catch (error) {

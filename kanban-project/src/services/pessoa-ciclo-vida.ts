@@ -51,8 +51,13 @@ type DB = Prisma.TransactionClient | typeof prisma
 
 export type ModoRemocao = "AUTO" | "HARD" | "DESATIVAR"
 
-/** Tipos de ocorrência financeira que representam MOVIMENTO de dinheiro. */
-const OCORRENCIAS_DE_MOVIMENTO = [
+/**
+ * Tipos de ocorrência financeira que representam MOVIMENTO de dinheiro.
+ *
+ * Exportado para reuso por `processo-ciclo-vida.ts`: a régua de "isto é fato
+ * financeiro protegido" é uma só — não é redefinida por quem a consome.
+ */
+export const OCORRENCIAS_DE_MOVIMENTO = [
   "PAGAMENTO", "PAGAMENTO_PARCIAL", "ESTORNO", "REEMBOLSO",
   "CREDITO", "BAIXA", "RENEGOCIACAO", "DESCONTO", "JUROS", "MULTA",
 ]

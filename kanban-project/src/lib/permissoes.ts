@@ -34,6 +34,19 @@ export const PERMISSOES = {
   // permissão do "Administrador Master": EXCLUSIVA (ver PERMISSOES_EXCLUSIVAS), nunca
   // concedida por perfil padrão nem por `tipo = 'admin'`. Funcionário não a recebe.
   'processos.moverFaseManual': 'Administrador Master: mover o processo manualmente para qualquer fase, sem as validações do fluxo',
+  // EXCLUSÃO DEFINITIVA DO PROCESSO — apaga o Processo e tudo que é exclusivo
+  // dele (tarefas, passos, necessidades, anexos, solicitações). Auditoria de
+  // integridade sistêmica (docs/architecture/22-25) classificou o DELETE de
+  // Processo como blast radius CRÍTICO — a mesma cascata que remove uma tarefa
+  // recém-criada alcança, sem distinção, Ledger/obrigação financeira. Nenhuma
+  // permissão existente representa essa ação corretamente: `processos.excluir`
+  // é comum demais (Assistente/Estagiário são o único corte hoje) e também
+  // autoriza `DELETE /api/familias/[id]`; `sistema.exclusaoDefinitiva` é do
+  // domínio de config/catálogo, não de Processo. É EXCLUSIVA (ver
+  // PERMISSOES_EXCLUSIVAS) pelo mesmo motivo de `processos.moverFaseManual`:
+  // nunca concedida por perfil padrão nem por `tipo = 'admin'`, só por
+  // concessão nominal.
+  'processos.excluirDefinitivo': 'Excluir processo definitivamente (ação irreversível, alcança tarefas, workflow e obrigações financeiras do processo)',
 
   // Relatórios
   // MÓDULO PRÓPRIO. O menu de Relatórios estava pendurado em
@@ -341,6 +354,7 @@ export const MODULOS_PERMISSOES = [
 export const PERMISSOES_EXCLUSIVAS = new Set<string>([
   'processos.regularizarHistorico',
   'processos.moverFaseManual',
+  'processos.excluirDefinitivo',
 ])
 
 export const PERMISSOES_OPT_IN = new Set<string>([

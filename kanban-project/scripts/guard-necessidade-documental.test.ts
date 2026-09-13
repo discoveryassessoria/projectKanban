@@ -191,6 +191,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/mrg-e2e.test.ts": "teste e2e do Motor Registral: monta cenário",
   "scripts/estrutura-operacional-integracao.test.ts": "teste de integração: monta cenário",
   "scripts/guard-necessidade-documental.test.ts": "este guard (cita os padrões que procura)",
+  "scripts/delete-processo-lifecycle-seguro.test.ts":
+    "DELETE de Processo seguro (docs/architecture/26): só LEITURA (`count`) de " +
+    "NecessidadeDocumental — prova que o preview/plano de exclusão do processo " +
+    "reflete o que realmente sai; nunca cria/edita necessidade",
   "scripts/backfill-residuos-pessoa.ts":
     "backfill: remove necessidade SEM SUJEITO (viola pessoaId XOR uniaoId); dry-run por padrão",
   "scripts/pessoa-tortura.test.ts": "teste de tortura do ciclo de vida da Pessoa: monta e limpa o cenário",

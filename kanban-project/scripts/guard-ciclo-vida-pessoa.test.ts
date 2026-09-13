@@ -181,6 +181,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // O backfill de resíduos NÃO entra aqui: ele não remove nenhum dos quatro
   // modelos protegidos (só Tarefa, Passo e Necessidade — esta pelo serviço dono).
   "scripts/guard-ciclo-vida-pessoa.test.ts": "este guard (cita os padrões que procura)",
+  "scripts/delete-processo-lifecycle-seguro.test.ts":
+    "DELETE de Processo seguro (docs/architecture/26): cria as PRÓPRIAS árvores/pessoas " +
+    "(marca DELPROC-TEST) só no banco de teste — prova que excluir Processo NÃO cascateia " +
+    "para Árvore/Pessoa; nenhuma pessoa é removida por este teste, só criada e lida",
 
   // ── Teste do próprio ciclo de vida ───────────────────────────────────────
   "scripts/pessoa-tortura.test.ts": "teste de tortura: 10 ciclos criar→excluir→recriar",
