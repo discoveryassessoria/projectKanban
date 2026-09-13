@@ -15,6 +15,16 @@ export async function GET(
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    // CONSULTAR/ABRIR PROCESSO — mandato Bloco 4 (matriz de RBAC).
+    //
+    // Achado real: esta rota (a que devolve contratantes, árvore, requerentes,
+    // tarefas e anexos do processo) não tinha NENHUMA verificação de permissão
+    // nem de autenticação — qualquer chamada, autenticada ou não, devolvia o
+    // processo inteiro só por acertar o ID. PUT/DELETE, no mesmo arquivo, já
+    // conferem permissão; GET era a única porta desprotegida.
+    const erroPermissao = await verificarPermissao(request, 'processos.ver')
+    if (erroPermissao) return erroPermissao
+
     const { processoId } = await params
     const id = parseInt(processoId)
 
