@@ -63,6 +63,7 @@ async function limpar() {
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
   await prisma.regraTemporalOrgao.deleteMany({ where: { chaveRegra: { startsWith: MARCA } } })
   await prisma.orgaoProtocolo.deleteMany({ where: { name: { startsWith: MARCA } } })
+  await prisma.phaseInternalWorkflow.deleteMany({ where: { wfUid: { startsWith: MARCA } } })
   await prisma.usuario.deleteMany({ where: { email: { endsWith: "@slacartorio.test" } } })
 }
 

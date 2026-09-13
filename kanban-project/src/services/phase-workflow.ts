@@ -14,6 +14,7 @@ import { validarDefinicao } from "@/src/services/workflow-definition-validator"
 import { exigirDocumentoNoPasso } from "@/src/services/invariante-documental"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolverEscopoDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
+import { lerVersaoPublicada } from "@/src/services/versao-publicada"
 import {
   type DefWorkflow,
   type DefStep,
@@ -155,6 +156,74 @@ export async function resolverWorkflowAplicavel(
     dependeDeStepKeys: null,
   }))
   return { workflow, steps }
+}
+
+/**
+ * ÂNCORA NA VERSÃO PUBLICADA — mandato Bloco 3 (rascunho/publicação).
+ *
+ * `resolverWorkflowAplicavel` lê `PhaseInternalWorkflowStep` — a definição VIVA,
+ * que É o rascunho editável (comentário original de `publicacao-de-workflow.ts`:
+ * "a definição viva SEMPRE foi o rascunho"). Enquanto ninguém publicava um passo
+ * NOVO no meio de uma edição, isso não importava: rascunho e última publicação
+ * coincidiam. Confirmado por reprodução real (`scripts/mandato-rascunho-publicacao.test.ts`)
+ * que NÃO coincidem mais a partir do instante em que alguém salva uma alteração
+ * sem publicar (`rascunhoAlteradoEm` fica preenchido): uma Tarefa nova materializada
+ * NESSE INSTANTE herdava o `slaDays` do rascunho, nunca revisado, e o
+ * `PhaseWorkflowInstance.workflowVersion` gravado apontava para um número que a
+ * publicação ainda nem criou (`PhaseInternalWorkflowVersao` correspondente não
+ * existe) — a mesma classe de problema que `politicaDeSla` já resolveu para leituras
+ * de instância existente (ver seu comentário), agora fechada também na CRIAÇÃO.
+ *
+ * Esta função ANCORA a materialização de uma instância NOVA na última versão
+ * REALMENTE publicada sempre que existir uma edição de rascunho pendente:
+ * substitui `slaDays` por passo (o único campo do qual os 4 relógios do mandato
+ * dependem — Bloco 1/2) pelo valor CONGELADO, e ancora `workflow.versao` na
+ * versão que o congelamento comprova existir, nunca no contador "próxima versão"
+ * que `PhaseInternalWorkflow.versao` passa a representar assim que alguém edita.
+ *
+ * NÃO reconstrói a lista de passos a partir da versão congelada (isso exigiria
+ * reconciliar identidade entre `DefStep`/`PassoCongelado` para AÇÕES/CAMPOS/
+ * CANAIS/CHECKLIST — mudança estrutural maior, fora do escopo mínimo desta
+ * correção) — a estrutura (quais passos existem) continua vindo do rascunho. O
+ * que se ancora é exatamente o que os 4 relógios (SLA) precisam para não vazar
+ * uma edição em andamento para uma operação nova. Sem rascunho pendente
+ * (`rascunhoAlteradoEm == null`), não há nada a ancorar: devolve o resolvido tal
+ * como veio — é o caminho de sempre, sem custo extra.
+ */
+async function ancorarNaVersaoPublicada(
+  resolvido: { workflow: DefWorkflow; steps: DefStep[] },
+  db: Prisma.TransactionClient | typeof prisma,
+): Promise<{ workflow: DefWorkflow; steps: DefStep[] }> {
+  const { workflow, steps } = resolvido
+  const wf = await db.phaseInternalWorkflow.findUnique({
+    where: { id: workflow.id },
+    select: { rascunhoAlteradoEm: true },
+  })
+  if (!wf?.rascunhoAlteradoEm) return resolvido
+
+  const ultimaPublicada = await db.phaseInternalWorkflowVersao.findFirst({
+    where: { workflowId: workflow.id },
+    orderBy: { versao: "desc" },
+    select: { versao: true },
+  })
+  // Workflow nunca publicado (raríssimo em produção: `active:true` sem NUNCA ter
+  // passado por "Publicar") — não há para onde ancorar; segue o comportamento
+  // anterior (a única opção honesta é usar o que existe).
+  if (!ultimaPublicada) return resolvido
+
+  const publicada = await lerVersaoPublicada(workflow.id, ultimaPublicada.versao, db)
+  if (!publicada) return resolvido
+
+  const slaPorKey = new Map(publicada.passos.map((p) => [p.key, p.slaDays]))
+  const stepsAncorados: DefStep[] = steps.map((s) => {
+    const slaPublicado = slaPorKey.get(s.key)
+    return slaPublicado != null && slaPublicado !== s.slaDays ? { ...s, slaDays: slaPublicado } : s
+  })
+
+  return {
+    workflow: { ...workflow, versao: ultimaPublicada.versao },
+    steps: stepsAncorados,
+  }
 }
 
 /**
@@ -549,7 +618,7 @@ export async function instanciarWorkflowDaFase(
       ? [{ code: resolvido.erro, message: resolvido.detalhe, entityType: "fase", entityId: input.faseMacroKey }]
       : [])
   }
-  const { workflow, steps } = resolvido
+  const { workflow, steps } = await ancorarNaVersaoPublicada(resolvido, db)
 
   // 4) validação completa da definição ANTES de escrever
   const val = validarDefinicao(workflow, steps)
