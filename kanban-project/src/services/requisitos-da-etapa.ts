@@ -112,6 +112,57 @@ export async function requisitosPendentes(args: {
     }
   }
 
+  // ── EXIGÊNCIA DE EVIDÊNCIA POR TIPO DOCUMENTAL (ExigenciaEvidenciaEtapa) ──
+  //
+  // Fonte mais antiga e mais específica que `RequisitoCongelado`: por
+  // stepKey × tipo documental (× canal, quando aplicável), exige uma
+  // evidência com FINALIDADE PRECISA (ex.: REQUERIMENTO_ENVIADO) — não
+  // "qualquer arquivo", como o requisito genérico EVIDENCIA_ANEXADA acima.
+  //
+  // Sem isto, dado real cadastrado em `ExigenciaEvidenciaEtapa` (ex.: os 3
+  // tipos documentais de "Solicitar Certidão" exigindo comprovante de
+  // requerimento enviado, confirmado em produção) era ignorado pelo único
+  // portão real de execução (`executarAcaoCadastrada`) — configuração salva
+  // e ignorada pelo runtime é defeito (invariante #48 do mandato de Emissão
+  // Documental). Não cria um segundo portão: converge no MESMO
+  // `requisitosPendentes` que `executarAcaoCadastrada` já consulta.
+  {
+    const passoExig = await prisma.phaseWorkflowStepInstance.findUnique({
+      where: { id: args.stepInstanceId },
+      select: { stepKey: true, documentoId: true, documento: { select: { documentTypeId: true } } },
+    })
+    if (passoExig?.stepKey && passoExig.documentoId != null) {
+      const canalAtual = typeof args.valores.canal === "string" ? args.valores.canal : null
+      const exigencias = await prisma.exigenciaEvidenciaEtapa.findMany({
+        where: {
+          stepKey: passoExig.stepKey,
+          ativo: true,
+          obrigatoria: true,
+          AND: [
+            { OR: [{ documentoTipoId: null }, { documentoTipoId: passoExig.documento?.documentTypeId ?? -1 }] },
+            ...(canalAtual ? [{ OR: [{ canal: null }, { canal: canalAtual as never }] }] : []),
+          ],
+        },
+        select: { id: true, finalidade: true, cardinalidadeMax: true },
+      })
+      if (exigencias.length > 0) {
+        const arquivos = await prisma.documentoArquivo.findMany({
+          where: { documentoId: passoExig.documentoId, vigente: true },
+          select: { tipo: true },
+        })
+        for (const ex of exigencias) {
+          const qtd = arquivos.filter((a) => a.tipo === ex.finalidade).length
+          if (qtd < 1) {
+            pendentes.push({
+              key: `exigencia-evidencia:${ex.id}`, label: String(ex.finalidade), tipo: "EVIDENCIA_ANEXADA", alvoKey: ex.finalidade,
+              motivo: `Anexe a evidência "${ex.finalidade}" exigida para este tipo documental.`,
+            })
+          }
+        }
+      }
+    }
+  }
+
   // ── O QUE O CANAL ESCOLHIDO EXIGE ─────────────────────────────────────────
   //
   // Isto vivia dentro do executor de solicitação — a lista de canais e, para cada um,
