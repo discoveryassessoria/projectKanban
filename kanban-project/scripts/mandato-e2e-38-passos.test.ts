@@ -97,7 +97,7 @@ async function limpar() {
   // outros scripts que também usam os stepKeys reais da Emissão Documental
   // (handoff-4-passos.test.ts, etapa6-circuito-completo.test.ts). Precisa sair
   // ANTES do TipoDocumentoCadastro que ela referencia (Restrict).
-  await prisma.exigenciaEvidenciaEtapa.deleteMany({ where: { stepKey: { in: STEP_KEYS } } })
+  await prisma.exigenciaEvidenciaEtapa.deleteMany({ where: { stepKey: { in: [...STEP_KEYS] } } })
   await prisma.tipoDocumentoCadastro.deleteMany({ where: { name: { startsWith: MARCA } } })
 
   const wf = await prisma.phaseInternalWorkflow.findUnique({ where: { wfUid: `${M}::emissao` }, select: { id: true } })
