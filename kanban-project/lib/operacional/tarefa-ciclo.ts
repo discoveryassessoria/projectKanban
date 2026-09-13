@@ -24,7 +24,8 @@ import type { Prisma, StatusTarefa } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonica'
 import { reabrirPassoTx } from '@/src/services/task-step-sync'
-import { versaoDaInstancia } from '@/src/services/versao-publicada'
+import { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
+export { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 
 export type Falha =
   | 'NAO_ENCONTRADA' | 'TERMINAL' | 'NAO_TERMINAL' | 'CONFLITO' | 'SEM_MOTIVO' | 'INVALIDO'
@@ -308,66 +309,17 @@ async function reabrirTarefaNucleo(args: {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BLOQUEIO E ESPERA — e o relógio do SLA
+//
+// `politicaDeSla`/`pausarSla`/`retomarSla` moraram aqui até esta correção;
+// agora vivem em `lib/operacional/sla-pausa.ts` (importadas/reexportadas no
+// topo do arquivo) porque `task-step-sync.ts` — a OUTRA porta de
+// bloqueio/espera do sistema, a que `PAUSE_FOR_EXTERNAL_WAIT` do
+// `CATALOGO_DE_EFEITOS` efetivamente usa — precisa do MESMO relógio, e este
+// arquivo já importa `task-step-sync.ts` (para `reabrirPassoTx`): importar de
+// volta daqui criaria um ciclo. Ver `lib/operacional/sla-pausa.ts` para o
+// porquê da unificação (ela existia só aqui; `task-step-sync.ts::bloquearTarefa`
+// nunca pausava o SLA — mandato Bloco 1, corrigido nesta rodada).
 // ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * A POLÍTICA DE PAUSA vem do workflow publicado, nunca do código.
- *
- * Sem workflow (tarefa manual), o padrão é NÃO pausar: prazo que para sozinho
- * é prazo que ninguém cobra.
- */
-export async function politicaDeSla(workflowInstanceId: number | null): Promise<{ pausaEspera: boolean; pausaBloqueio: boolean }> {
-  if (workflowInstanceId == null) return { pausaEspera: false, pausaBloqueio: false }
-
-  // A POLÍTICA É A DA VERSÃO QUE A EXECUÇÃO REGISTROU, não a de hoje.
-  //
-  // Esta leitura decide se o relógio de uma tarefa EM ANDAMENTO pausa. Enquanto ela
-  // consultava a definição VIVA, marcar "pausar na espera externa" no cadastro
-  // mudava o prazo de tarefas que tinham começado sob a regra anterior — a
-  // configuração nova reinterpretando execução antiga, em silêncio.
-  const daVersao = await versaoDaInstancia(workflowInstanceId)
-  if (daVersao) {
-    return { pausaEspera: daVersao.pausarSlaEmEsperaExterna, pausaBloqueio: daVersao.pausarSlaEmBloqueio }
-  }
-
-  // SEM VERSÃO CONGELADA — instância anterior ao versionamento. Ler a definição viva
-  // aqui é o comportamento antigo, mantido de propósito: o alternativo seria mudar o
-  // SLA dessas tarefas para "nunca pausa", o que também seria reinterpretar o
-  // passado, só que na direção contrária. O backfill da V1 esvazia este caminho.
-  const inst = await prisma.phaseWorkflowInstance.findUnique({
-    where: { id: workflowInstanceId },
-    select: { workflowDefinitionId: true },
-  })
-  if (!inst?.workflowDefinitionId) return { pausaEspera: false, pausaBloqueio: false }
-  const def = await prisma.phaseInternalWorkflow.findUnique({
-    where: { id: inst.workflowDefinitionId },
-    select: { pausarSlaEmEsperaExterna: true, pausarSlaEmBloqueio: true },
-  })
-  return { pausaEspera: !!def?.pausarSlaEmEsperaExterna, pausaBloqueio: !!def?.pausarSlaEmBloqueio }
-}
-
-/**
- * PAUSA / RETOMA o relógio do prazo.
- *
- * O prazo NÃO é reescrito enquanto a pausa dura — ele é empurrado quando ela
- * termina, pelo tempo exato que passou. Mexer no `dataPrazo` no início da pausa
- * significaria adivinhar quanto o cartório vai demorar.
- */
-export async function pausarSla(tx: Prisma.TransactionClient, tarefaId: number, agora: Date) {
-  await tx.tarefa.updateMany({ where: { id: tarefaId, slaPausadoEm: null }, data: { slaPausadoEm: agora } })
-}
-
-export async function retomarSla(tx: Prisma.TransactionClient, tarefaId: number, agora: Date) {
-  const t = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { slaPausadoEm: true, dataPrazo: true, slaPausaAcumuladaMin: true } })
-  if (!t?.slaPausadoEm) return 0
-  const minutos = Math.max(0, Math.round((agora.getTime() - t.slaPausadoEm.getTime()) / 60000))
-  const novoPrazo = t.dataPrazo ? new Date(t.dataPrazo.getTime() + minutos * 60000) : null
-  await tx.tarefa.update({
-    where: { id: tarefaId },
-    data: { slaPausadoEm: null, slaPausaAcumuladaMin: t.slaPausaAcumuladaMin + minutos, ...(novoPrazo ? { dataPrazo: novoPrazo } : {}) },
-  })
-  return minutos
-}
 
 export async function bloquearTarefa(args: {
   tarefaId: number; autorId: number; motivo: string
@@ -383,7 +335,7 @@ export async function bloquearTarefa(args: {
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
       return { ok: false as const, codigo: 'TERMINAL' as const, mensagem: 'Tarefa encerrada não se bloqueia.' }
     }
-    const politica = await politicaDeSla(t.workflowInstanceId)
+    const politica = await politicaDeSla(t.workflowInstanceId, tx)
     await tx.tarefa.update({
       where: { id: t.id },
       data: {
@@ -574,7 +526,7 @@ export async function aguardarTerceiro(args: {
       // registrar de novo criaria uma segunda pausa de SLA sobre a primeira.
       return { ok: true as const, tarefaId: t.id }
     }
-    const politica = await politicaDeSla(t.workflowInstanceId)
+    const politica = await politicaDeSla(t.workflowInstanceId, tx)
     await tx.tarefa.update({
       where: { id: t.id },
       data: {

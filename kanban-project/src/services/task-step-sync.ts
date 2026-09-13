@@ -20,6 +20,7 @@ import { liberadosPor, descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
+import { politicaDeSla, pausarSla, retomarSla } from "@/lib/operacional/sla-pausa"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
@@ -923,7 +924,32 @@ export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promi
   if (!gate.ok) return ko(gate.code, correlationId)
   const ciclo = t.ciclo ?? 1
   const causationId = ctx.causationId ?? H.chaveComando("task-block", "tarefa", tarefaId, "BLOQUEADA", ciclo)
-  const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId }
+  // AUTOR — mandato Bloco 1 ("Registrar: motivo; autor; início; fim").
+  //
+  // `usuarioId` já é um campo suportado de `ApplyOpts` ("carimbado na
+  // TENTATIVA, que é onde a autoria é fato" — comentário original da
+  // interface), mas esta porta nunca o preenchia: quem bloqueava uma tarefa
+  // não ficava registrado em lugar nenhum (nem na Tentativa do passo, nem no
+  // WorkflowEvento). `dados` replica o mesmo autor + motivo/justificativa no
+  // próprio evento, para quem lê o histórico da TAREFA (que não tem Tentativa).
+  const base: ApplyOpts = {
+    correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId,
+    usuarioId: ctx.usuarioId ?? null,
+    dados: { usuarioId: ctx.usuarioId ?? null, motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa ?? null },
+  }
+  // O RELÓGIO DO PRAZO — mandato Bloco 1 (pausa/suspensão/bloqueio).
+  //
+  // `PAUSE_FOR_EXTERNAL_WAIT`/`RESUME` do CATALOGO_DE_EFEITOS chegam aqui com
+  // `motivoCodigo: "AGUARDANDO_TERCEIRO"` (ver executar-acao-cadastrada.ts) — a
+  // mesma distinção espera-externa×bloqueio-interno que `tarefa-ciclo.ts`
+  // já fazia por função separada (`aguardarTerceiro` vs `bloquearTarefa`).
+  // Antes desta correção esta porta NUNCA pausava — o catálogo prometia
+  // ("O relógio interno pausa se o workflow estiver configurado para
+  // pausar") e a implementação não cumpria: o prazo da operação continuava
+  // correndo durante toda a espera do cartório, escondendo/mascarando atraso
+  // interno como se fosse falta de ação, quando na verdade era espera legítima
+  // sem o relógio pausado. Ver `scripts/mandato-pausa-relogios.test.ts`.
+  const espera = ctx.motivoCodigo === "AGUARDANDO_TERCEIRO"
   try {
     const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, "BLOQUEADA", "TAREFA_BLOQUEADA", { ...base, extra: { blockedPreviousStatus: t.statusTarefa, motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa } })
@@ -936,6 +962,8 @@ export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promi
         passoAnt = rp.anterior; passoAt = rp.atual
         if (rp.changed) eventos.push("PASSO_BLOQUEADO")
       }
+      const politica = await politicaDeSla(t.workflowInstanceId, tx)
+      if (espera ? politica.pausaEspera : politica.pausaBloqueio) await pausarSla(tx, tarefaId, new Date())
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
     }, TX_OPTS)
     return resultado
@@ -951,7 +979,11 @@ export async function desbloquearTarefa(tarefaId: number, ctx: SyncContexto): Pr
   const ciclo = t.ciclo ?? 1
   const alvoT = H.restaurarStatusTarefa(t.blockedPreviousStatus)
   const causationId = ctx.causationId ?? H.chaveComando("task-unblock", "tarefa", tarefaId, alvoT, ciclo)
-  const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId }
+  const base: ApplyOpts = {
+    correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId,
+    usuarioId: ctx.usuarioId ?? null,
+    dados: { usuarioId: ctx.usuarioId ?? null },
+  }
   try {
     const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, alvoT, "TAREFA_DESBLOQUEADA", { ...base, extra: { blockedPreviousStatus: null } })
@@ -965,6 +997,10 @@ export async function desbloquearTarefa(tarefaId: number, ctx: SyncContexto): Pr
         passoAnt = rp.anterior; passoAt = rp.atual
         if (rp.changed) eventos.push("PASSO_DESBLOQUEADO")
       }
+      // Retomada é sempre segura de chamar (`retomarSla` é no-op se não havia
+      // pausa) — não precisa repetir a política aqui, só desfazer o que ela
+      // tiver aplicado ao bloquear.
+      await retomarSla(tx, tarefaId, new Date())
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
     }, TX_OPTS)
     return resultado

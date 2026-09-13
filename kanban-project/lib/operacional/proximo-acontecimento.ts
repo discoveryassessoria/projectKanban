@@ -48,6 +48,25 @@ type Leitor = PrismaClient | Prisma.TransactionClient
 
 /** Espera de terceiro OU cliente — a mesma régua que `tarefa-projecoes.ts` já usa. */
 const STATUS_AGUARDANDO = new Set(["AGUARDANDO_TERCEIRO", "AGUARDANDO_CLIENTE"])
+
+/**
+ * ESPERA EXTERNA TAMBÉM CHEGA COMO "BLOQUEADA" — mandato Bloco 1.
+ *
+ * `PAUSE_FOR_EXTERNAL_WAIT` (CATALOGO_DE_EFEITOS, a porta real usada por
+ * "Solicitar Certidão") passa pela máquina canônica de passo
+ * (`task-step-sync.ts::bloquearTarefa`), que só tem UM status de "parada":
+ * `BLOQUEADA`. A distinção espera-externa×impedimento-interno sobrevive em
+ * `motivoCodigo` ("AGUARDANDO_TERCEIRO" vs "BLOQUEIO"/outro), não no status.
+ *
+ * Sem isto, uma Tarefa parada pelo cartório por essa porta caía no ramo
+ * "ação interna" deste núcleo (por não estar em `STATUS_AGUARDANDO`) — e as
+ * dimensões C/D (previsão do terceiro, próximo acompanhamento) e a regra
+ * "atraso de terceiro não é atraso interno" (`atrasoInterno`) nunca eram
+ * aplicadas: a pausa escondia exatamente o que o mandato proíbe esconder.
+ */
+function ehEsperaExterna(statusTarefa: string, motivoCodigo: string | null | undefined): boolean {
+  return STATUS_AGUARDANDO.has(statusTarefa) || (statusTarefa === "BLOQUEADA" && motivoCodigo === "AGUARDANDO_TERCEIRO")
+}
 const STATUS_ENCERRADOS = new Set(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"])
 /** Solicitação de documento que já não representa espera ativa. */
 const SOLICITACAO_ENCERRADA = new Set(["RESPONDIDA", "CANCELADA"])
@@ -116,6 +135,8 @@ export interface EstadoTemporalDaOperacao {
 export interface EntradaOperacao {
   tarefaId: number
   statusTarefa: string
+  /** Distingue espera externa de bloqueio interno quando `statusTarefa==="BLOQUEADA"` — ver `ehEsperaExterna`. */
+  motivoCodigo?: string | null
   dataPrazo: Date | null
   dataConclusao: Date | null
   dataInicio: Date | null
@@ -155,7 +176,7 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
   const motivosRisco: string[] = []
   const origemDosDados: string[] = []
   const encerrada = STATUS_ENCERRADOS.has(e.statusTarefa)
-  const aguardando = STATUS_AGUARDANDO.has(e.statusTarefa)
+  const aguardando = ehEsperaExterna(e.statusTarefa, e.motivoCodigo)
 
   // ── DIMENSÃO A ────────────────────────────────────────────────────────────
   const prazoOperacao = e.dataPrazo
@@ -366,7 +387,7 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
 // ============================================================================
 
 const SELECT_TAREFA_TEMPORAL = {
-  id: true, statusTarefa: true, dataPrazo: true, dataConclusao: true, dataInicio: true,
+  id: true, statusTarefa: true, motivoCodigo: true, dataPrazo: true, dataConclusao: true, dataInicio: true,
   slaPausadoEm: true, slaPausaAcumuladaMin: true, responsavelId: true, createdAt: true,
   workflowStepInstanceId: true,
 } satisfies Prisma.TarefaSelect
@@ -423,6 +444,7 @@ export async function estadosTemporaisDasOperacoes(
     const entrada: EntradaOperacao = {
       tarefaId: t.id,
       statusTarefa: t.statusTarefa,
+      motivoCodigo: t.motivoCodigo,
       dataPrazo: t.dataPrazo,
       dataConclusao: t.dataConclusao,
       dataInicio: t.dataInicio,
