@@ -320,7 +320,19 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // no WHERE.
 //
 //   anterior : 75d717a0e730194a596aed61f2a50e4a66f143d1cb94f32cf852348886024948
-const CHECKSUM_LEDGER = 'ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6'
+// 13/09/2026 — mandato Emissão Documental, Bloco 2 (regra temporal por
+// cartório/terceiro): tabela nova `RegraTemporalOrgao` (stepKey ×
+// orgaoProtocoloId, mesmo padrão de identidade de `ExigenciaEvidenciaEtapa`)
+// + FK para `OrgaoProtocolo` + 2 índices. Migration real
+// 20260913120000_regra_temporal_orgao. Diff do baseline: só CREATE TABLE +
+// CREATE INDEX ×2 + ADD CONSTRAINT — zero DROP/TRUNCATE/DELETE, nenhuma linha
+// existente é tocada. Sem acesso local à conexão real de produção
+// (Sensitive), a reconciliação do ledger roda dentro do build
+// (scripts/prod-migrate-guard.mjs), com backup da linha no log do build antes
+// do UPDATE de uma coluna só, checksum anterior no WHERE.
+//
+//   anterior : ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6
+const CHECKSUM_LEDGER = 'c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -390,6 +402,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260910190000_alvo_necessidade_uniao',
   '20260910200000_remove_matriz_documental_createstask',
   '20260912200000_notificacao_operacional_grao_processo',
+  '20260913120000_regra_temporal_orgao',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

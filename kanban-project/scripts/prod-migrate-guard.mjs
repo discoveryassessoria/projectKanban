@@ -157,21 +157,24 @@ try {
     console.log(`[migrate-guard] AVISO: não consegui montar o plano (${String(e?.message ?? e).slice(0, 150)}). Seguindo — o Prisma loga cada migration aplicada.`)
   }
 
-  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (Etapa 4, 12/09/2026) --
+  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (mandato Emissão Documental, Bloco 2, 13/09/2026) --
   // `prisma/migrations/0000_baseline/migration.sql` foi regenerado por
-  // `npm run baseline:gerar` depois de `NotificacaoOperacional.tarefaId` virar
-  // opcional + `processoId` novo (ambos NULLABLE — diff conferido manualmente:
-  // SÓ inserções, zero DROP/TRUNCATE/DELETE). Isso muda o sha256 do arquivo, e
-  // `migrate deploy` recusa aplicar quando o checksum registrado diverge do
-  // arquivo ("migration modificada depois de aplicada"). Sem acesso local ao
-  // banco real (Sensitive), a reconciliação roda aqui, no build, onde a
-  // conexão de produção existe de verdade — mesmo procedimento das 6
-  // reconciliações anteriores (ver scripts/baseline-verificar.test.ts):
-  // backup da linha no log > diff já conferido como aditivo > UPDATE de UMA
-  // coluna, com o checksum ANTIGO no WHERE (nunca sobrescreve um checksum que
-  // não seja exatamente o esperado — qualquer outro valor aborta o build).
-  const CHECKSUM_BASELINE_ANTERIOR = '75d717a0e730194a596aed61f2a50e4a66f143d1cb94f32cf852348886024948'
-  const CHECKSUM_BASELINE_ATUAL = 'ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6'
+  // `npm run baseline:gerar` depois da tabela nova `RegraTemporalOrgao` (regra
+  // temporal por cartório/terceiro — diff conferido manualmente: SÓ
+  // CREATE TABLE + 2 índices + 1 FK, zero DROP/TRUNCATE/DELETE). Isso muda o
+  // sha256 do arquivo, e `migrate deploy` recusa aplicar quando o checksum
+  // registrado diverge do arquivo ("migration modificada depois de
+  // aplicada"). Sem acesso local ao banco real (Sensitive), a reconciliação
+  // roda aqui, no build, onde a conexão de produção existe de verdade — mesmo
+  // procedimento das 7 reconciliações anteriores (ver
+  // scripts/baseline-verificar.test.ts): backup da linha no log > diff já
+  // conferido como aditivo > UPDATE de UMA coluna, com o checksum ANTIGO no
+  // WHERE (nunca sobrescreve um checksum que não seja exatamente o esperado —
+  // qualquer outro valor aborta o build). A tabela em si nasce na migration
+  // real `20260913120000_regra_temporal_orgao`, aplicada normalmente por este
+  // mesmo `migrate deploy` logo abaixo.
+  const CHECKSUM_BASELINE_ANTERIOR = 'ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6'
+  const CHECKSUM_BASELINE_ATUAL = 'c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128'
   const linhaBaseline = (
     await prisma.$queryRawUnsafe(
       `SELECT migration_name, checksum, finished_at, applied_steps_count FROM _prisma_migrations WHERE migration_name = '0000_baseline'`,
