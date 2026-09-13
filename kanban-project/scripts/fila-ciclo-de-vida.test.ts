@@ -559,7 +559,13 @@ async function main() {
   })
   const ms = Date.now() - t0
   ok('a fila devolve as 120 tarefas', filaGrande.length >= 120, `${filaGrande.length}`)
-  ok('em POUCAS consultas — não uma por tarefa', consultas120 <= 12,
+  // Etapa 5: `visaoGerencial` passou a chamar `estadosTemporaisDasOperacoes`
+  // (leitura temporal completa da Etapa 3 — EM_RISCO/acompanhamento/retorno)
+  // em lote, uma vez por chamada — +1 consulta em relação ao teto anterior.
+  // O que este teste prova é ausência de N+1 (constante em volume), não um
+  // número mágico: a asserção logo abaixo confirma que 60 e 120 tarefas
+  // custam o MESMO número de consultas.
+  ok('em POUCAS consultas — não uma por tarefa', consultas120 <= 13,
     `${consultas120} consulta(s) para ${filaGrande.length} tarefas`)
   ok('e num tempo de tela', ms < 4000, `${ms}ms`)
   // O NÚMERO NÃO PODE SUBIR COM O VOLUME. É a única prova que separa "está

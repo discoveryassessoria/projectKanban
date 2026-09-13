@@ -20,6 +20,7 @@ import {
   inicioDoDiaOperacional,
   estadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
+import { estadosTemporaisDasOperacoes } from '@/lib/operacional/proximo-acontecimento'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoTarefa } from '@prisma/client'
 
 /**
@@ -106,6 +107,21 @@ async function idsSemMovimentacao(
   const ultimas = await ultimaAtividadeReal(candidatos.map((c) => c.id), db)
   const limite = new Date(agora.getTime() - diasSemAtividade * 86400000)
   return candidatos.filter((c) => (ultimas.get(c.id) ?? c.createdAt) < limite).map((c) => c.id)
+}
+
+/**
+ * IDs de tarefa EM_RISCO segundo a leitura temporal canônica, dentro de um
+ * recorte já filtrado — mesmo desenho de `idsSemMovimentacao`: candidatos do
+ * `where`, depois o motor completo em lote (`estadosTemporaisDasOperacoes`),
+ * nunca uma reimplementação de "risco" aqui. O card (`indicadoresGerenciais`)
+ * e a lista filtrada (`visaoGerencial` com `emRisco: true`) chamam o MESMO
+ * `where` de entrada — o universo lógico é idêntico entre os dois.
+ */
+async function idsEmRisco(where: Prisma.TarefaWhereInput, agora: Date, db: Leitor = prisma): Promise<number[]> {
+  const candidatos = await db.tarefa.findMany({ where, select: { id: true } })
+  if (candidatos.length === 0) return []
+  const estados = await estadosTemporaisDasOperacoes(db, candidatos.map((c) => c.id), agora)
+  return candidatos.filter((c) => estados.get(c.id)?.emRisco === true).map((c) => c.id)
 }
 
 /**
@@ -207,6 +223,31 @@ export interface LinhaDeFila {
   criadaEm: string | null
   /** Quando a responsabilidade foi definida — nulo enquanto ninguém a assumiu. */
   atribuidaEm: string | null
+
+  // ── ETAPA 5 — LEITURA TEMPORAL COMPLETA (Etapa 3), NUNCA RECALCULADA AQUI ──
+  //
+  // `atrasada` acima é só a dimensão A (prazo vs. agora) — a mesma régua desde
+  // sempre. Estes campos vêm de `estadosTemporaisDasOperacoes`
+  // (`proximo-acontecimento.ts`), o motor que também decide o que o cron de
+  // atenção notifica: aguardando terceiro sem previsão, acompanhamento
+  // vencido, conflito de prazo, ausência de próximo acontecimento. Nenhuma
+  // tela que leia `LinhaDeFila` pode reimplementar esta conta — se falta um
+  // campo, ele entra aqui, aditivamente, nunca como cálculo local.
+  /** EM_RISCO — derivado, nunca um `statusTarefa` novo. */
+  emRisco: boolean
+  /** Por que está em risco — vazio quando `emRisco` é `false`. */
+  motivosRisco: string[]
+  /** Atraso do PRAZO INTERNO — nunca `true` durante espera de terceiro/cliente. */
+  atrasoInterno: boolean
+  /** Atraso da PREVISÃO DO TERCEIRO — nunca vira atraso interno. */
+  atrasoTerceiro: boolean
+  acompanhamentoVencido: boolean
+  /** O que a operação espera a seguir, e de onde vem — nunca inventado pela tela. */
+  proximoAcontecimento: {
+    tipo: string
+    data: string | null
+    descricao: string
+  } | null
 }
 
 const SELECT = {
@@ -304,7 +345,48 @@ function projetar(
     servico: t.necessidade?.itemCatalogo?.name ?? null,
     criadaEm: t.createdAt?.toISOString() ?? null,
     atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
+    // Defaults — SEMPRE sobrescritos por `comAtencaoTemporal` logo depois.
+    // `projetar` é síncrona e não tem como chamar o motor temporal (que lê
+    // passo/solicitação em lote); ficar sem chamar `comAtencaoTemporal` depois
+    // desta função é o defeito, não estes valores.
+    emRisco: false, motivosRisco: [], atrasoInterno: false, atrasoTerceiro: false,
+    acompanhamentoVencido: false, proximoAcontecimento: null,
   }
+}
+
+/**
+ * ENRIQUECE linhas já projetadas com a leitura temporal completa da Etapa 3 —
+ * o passo final, sempre, depois de `projetar`. Uma consulta em lote
+ * (`estadosTemporaisDasOperacoes`), nunca uma por linha.
+ *
+ * Custo aceito conscientemente: `estadosTemporaisDasOperacoes` relê a Tarefa
+ * (ela é uma função de I/O completa, feita para ser chamada só com IDs) —
+ * um SELECT que `SELECT`/`SELECT_GERENCIAL` já tinham feito. A alternativa
+ * seria destrinchar `computarProximoAcontecimento` (o núcleo puro) aqui dentro
+ * com os dados já carregados, o que reintroduziria exatamente a duplicação de
+ * lógica que a Etapa 5 proíbe. Consumir a função pronta, mesmo com uma
+ * releitura, é a regra: nunca replicar o cálculo.
+ */
+async function comAtencaoTemporal<T extends LinhaDeFila>(linhas: T[], agora: Date, db: Leitor = prisma): Promise<T[]> {
+  if (linhas.length === 0) return linhas
+  const estados = await estadosTemporaisDasOperacoes(db, linhas.map((l) => l.taskId), agora)
+  return linhas.map((l) => {
+    const e = estados.get(l.taskId)
+    if (!e) return l
+    return {
+      ...l,
+      emRisco: e.emRisco,
+      motivosRisco: e.motivosRisco,
+      atrasoInterno: e.atrasoInterno,
+      atrasoTerceiro: e.atrasoTerceiro,
+      acompanhamentoVencido: e.acompanhamentoVencido,
+      proximoAcontecimento: {
+        tipo: e.proximoAcontecimento.tipo,
+        data: e.proximoAcontecimento.data,
+        descricao: e.proximoAcontecimento.descricao,
+      },
+    }
+  })
 }
 
 /**
@@ -366,7 +448,8 @@ export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promi
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
   const [nomes, rotulos] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas)])
-  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes, rotulos)))
+  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos)), agora)
+  return ordenarFila(projetadas)
 }
 
 /**
@@ -424,7 +507,8 @@ export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: s
     select: SELECT,
   })
   const [nomes, rotulos] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas)])
-  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes, rotulos)))
+  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos)), agora)
+  return ordenarFila(projetadas)
 }
 
 /** Os recortes que a fila mostra separados — sem virar estados novos. */
@@ -641,7 +725,11 @@ export async function dossieDaTarefa(tarefaId: number) {
     select: { id: true, acao: true, usuarioId: true, descricao: true, criadoEm: true },
   })
 
-  const linha = projetar(t as unknown as Bruta, new Date(), await nomesDasPessoas([t]))
+  const agoraDossie = new Date()
+  const [linha] = await comAtencaoTemporal(
+    [projetar(t as unknown as Bruta, agoraDossie, await nomesDasPessoas([t]))],
+    agoraDossie,
+  )
   return {
     ...linha,
     // PROVENANCE: a cadeia inteira do "por quê", por IDs canônicos.
@@ -919,10 +1007,10 @@ export async function cargaPorResponsavel(agora = new Date()) {
 
 export type ColunaKanban =
   | 'SEM_RESPONSAVEL' | 'A_FAZER' | 'EM_ANDAMENTO'
-  | 'AGUARDANDO_TERCEIRO' | 'BLOQUEADA' | 'CONCLUIDA'
+  | 'AGUARDANDO_TERCEIRO' | 'BLOQUEADA' | 'CONCLUIDA' | 'CANCELADA'
 
 export const COLUNAS_KANBAN: ColunaKanban[] = [
-  'SEM_RESPONSAVEL', 'A_FAZER', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'BLOQUEADA', 'CONCLUIDA',
+  'SEM_RESPONSAVEL', 'A_FAZER', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'BLOQUEADA', 'CONCLUIDA', 'CANCELADA',
 ]
 
 /**
@@ -947,6 +1035,28 @@ export function colunaDaTarefa(l: { statusTarefa: StatusTarefa; responsavelId: n
   if (l.statusTarefa === 'AGUARDANDO_TERCEIRO' || l.statusTarefa === 'AGUARDANDO_CLIENTE') return 'AGUARDANDO_TERCEIRO'
   if (l.statusTarefa === 'EM_ANDAMENTO') return 'EM_ANDAMENTO'
   return 'A_FAZER'
+}
+
+/**
+ * O MESMO MAPEAMENTO DE `colunaDaTarefa`, EM SQL — Etapa 5 (item 10).
+ *
+ * `coluna` era filtrada em memória DEPOIS de `skip`/`take`: o `total` contava
+ * o universo pré-coluna, e uma página podia devolver menos linhas do que
+ * `porPagina` mesmo havendo mais na coluna pedida — filtro que corta a lista
+ * já paginada. `colunaDaTarefa` é função pura de `statusTarefa`+`responsavelId`
+ * (as duas colunas do banco), então dá para expressar a MESMA regra como
+ * `where` — nunca uma segunda definição de coluna, só a mesma traduzida.
+ */
+function whereColuna(coluna: ColunaKanban): Prisma.TarefaWhereInput {
+  switch (coluna) {
+    case 'CONCLUIDA': return { statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] } }
+    case 'SEM_RESPONSAVEL': return { responsavelId: null, statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] } }
+    case 'BLOQUEADA': return { responsavelId: { not: null }, statusTarefa: 'BLOQUEADA' }
+    case 'AGUARDANDO_TERCEIRO': return { responsavelId: { not: null }, statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } }
+    case 'EM_ANDAMENTO': return { responsavelId: { not: null }, statusTarefa: 'EM_ANDAMENTO' }
+    case 'A_FAZER': return { responsavelId: { not: null }, statusTarefa: 'NAO_INICIADA' }
+    case 'CANCELADA': return { statusTarefa: { in: ['CANCELADA', 'SUPERSEDIDA'] } }
+  }
 }
 
 export interface LinhaGerencial extends LinhaDeFila {
@@ -986,6 +1096,13 @@ export interface FiltrosGerenciais {
   aguardandoTerceiro?: boolean
   /** Açúcar sobre `status`: idêntico a `status: ['BLOQUEADA']`. */
   bloqueada?: boolean
+  /**
+   * EM_RISCO segundo a leitura temporal canônica (Etapa 3/5) — não expressável
+   * em SQL puro (depende de passo/solicitação), resolvido em duas fases como
+   * `semMovimentacao`: candidatos do `where` → `estadosTemporaisDasOperacoes`
+   * → `id: { in: [...] }` antes de paginar. Ver `idsEmRisco`.
+   */
+  emRisco?: boolean
   /** Sem atividade REAL (auditoria, não `updatedAt`) há N dias — ver `ultimaAtividadeReal`. */
   semMovimentacao?: { diasSemAtividade: number } | null
   /** Tarefa ativa numa fase anterior à fase ATUAL do próprio processo — ver `whereFasesAnteriores`. */
@@ -1115,6 +1232,9 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   if (f.aguardandoTerceiro) e.push({ statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } })
   if (f.bloqueada) e.push({ statusTarefa: 'BLOQUEADA' })
   if (f.executavelAgora != null) e.push(whereExecutavelAgora(f.executavelAgora))
+  // `coluna` agora filtra no BANCO, antes da paginação (Etapa 5, item 10) —
+  // ver `whereColuna`.
+  if (f.coluna) e.push(whereColuna(f.coluna))
 
   // A busca é uma caixa só porque é assim que se procura: o gestor lembra do
   // nome da pessoa, do processo, da família, do documento, do protocolo ou do
@@ -1229,6 +1349,10 @@ async function mergeFiltrosAssincronos(
     )
     extra.push({ processoId: { in: processoIds } })
   }
+  if (f.emRisco) {
+    const ids = await idsEmRisco(where, agora, db)
+    extra.push({ id: { in: ids } })
+  }
   return extra.length > 0 ? { AND: [where, ...extra] } : where
 }
 
@@ -1246,6 +1370,13 @@ export interface IndicadoresGerenciais {
   concluidasHoje: number
   /** Ver `executavelAgora` em `tarefa-canonica.ts` — não é `total - bloqueadas - aguardando`. */
   executavelAgora: number
+  /**
+   * EM_RISCO segundo a leitura temporal canônica — o MESMO universo que
+   * `visaoGerencial({ ...f, emRisco: true })` devolve (mesmo `where` de
+   * entrada, mesma função `idsEmRisco`). Card e lista filtrada não podem
+   * discordar (Etapa 5, item 11).
+   */
+  emRisco: number
 }
 
 /**
@@ -1258,11 +1389,11 @@ export interface IndicadoresGerenciais {
 export async function indicadoresGerenciais(
   f: FiltrosGerenciais = {}, agora = new Date(),
 ): Promise<IndicadoresGerenciais> {
-  const base = { ...f, atrasadas: false, venceHoje: false, coluna: null, status: undefined }
+  const base = { ...f, atrasadas: false, venceHoje: false, coluna: null, status: undefined, emRisco: false }
   const baseWhere = await mergeFiltrosAssincronos(base, whereGerencial(base, agora), agora, prisma)
   const w = (extra: Prisma.TarefaWhereInput) => ({ AND: [baseWhere, extra] })
   const janela = janelaDoDiaOperacional(agora)
-  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas, concluidasHoje, executavel] = await Promise.all([
+  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas, concluidasHoje, executavel, emRiscoIds] = await Promise.all([
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS } }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, responsavelId: null }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: 'EM_ANDAMENTO' }) }),
@@ -1280,10 +1411,12 @@ export async function indicadoresGerenciais(
     // exclui por desenho (spec: CANCELADA ≠ CONCLUÍDA).
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_CONCLUIDOS }, dataConclusao: { gte: janela.inicio, lte: janela.fim } }) }),
     prisma.tarefa.count({ where: w(whereExecutavelAgora(true)) }),
+    idsEmRisco(w({ statusTarefa: { in: STATUS_ATIVOS } }), agora, prisma),
   ])
   return {
     total, semResponsavel: semResp, emAndamento: andamento, aguardandoTerceiro: aguardando,
     bloqueadas, atrasadas, venceHoje, concluidas, concluidasHoje, executavelAgora: executavel,
+    emRisco: emRiscoIds.length,
   }
 }
 
@@ -1341,7 +1474,12 @@ export async function visaoGerencial(
       ...base,
       // Vence hoje é o DIA no fuso operacional — não "menos de 24 horas".
       venceHoje: t.dataPrazo != null && diaOperacional(t.dataPrazo) === hoje,
-      coluna: colunaDaTarefa(t) ?? 'CONCLUIDA',
+      // `colunaDaTarefa` devolve `null` para CANCELADA/SUPERSEDIDA de propósito
+      // ("ficam FORA do quadro" — comentário da própria função, testado em
+      // visao-gerencial-global.test.ts). Etapa 5 (item 7, CASO 8): o fallback
+      // aqui NÃO pode ser 'CONCLUIDA' — nada foi entregue. Só aparece quando
+      // `incluirEncerradas` pede explicitamente, e cai na sua própria coluna.
+      coluna: colunaDaTarefa(t) ?? 'CANCELADA',
       esperandoDe: esperando ? (t.statusTarefa === 'AGUARDANDO_CLIENTE' ? 'cliente' : 'terceiro') : null,
       esperandoDesde: esperando ? espera?.toISOString() ?? null : null,
       esperandoHaDias: esperando && espera ? Math.floor((agora.getTime() - espera.getTime()) / 86400000) : null,
@@ -1350,11 +1488,10 @@ export async function visaoGerencial(
     }
   })
 
-  // Filtros DERIVADOS que não existem como coluna no banco entram por último,
-  // sobre a página já lida. `coluna` é o único caso, e é o que o Kanban usa
-  // para recortar sem uma segunda consulta.
-  const recortadas = f.coluna ? linhas.filter((l) => l.coluna === f.coluna) : linhas
-  return { linhas: ordenarFila(recortadas) as LinhaGerencial[], total, pagina, porPagina }
+  // `coluna` já entrou no `where` (ver `whereGerencial`) — total/página/lista
+  // batem sobre o MESMO universo lógico, sem recorte pós-paginação.
+  const enriquecidas = await comAtencaoTemporal(linhas, agora, db)
+  return { linhas: ordenarFila(enriquecidas) as LinhaGerencial[], total, pagina, porPagina }
 }
 
 /**

@@ -90,6 +90,7 @@ const INATIVOS: StepInstanceStatus[] = ["SUPERSEDIDO", "CANCELADO"]
 
 export interface PassoOperacaoV2 {
   id: number
+  processoId: number
   stepKey: string
   status: StepInstanceStatus
   faseMacroKey: string
@@ -205,7 +206,7 @@ export async function passosOperacaoV2(documentoId: number, opts?: { incluirEnce
     where: { documentoId, ...(opts?.incluirEncerrados ? {} : { status: { notIn: INATIVOS } }), ...escopo },
     orderBy: { ordem: "asc" },
     select: {
-      id: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
+      id: true, processoId: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
       responsavelId: true, prazo: true, startedAt: true, completedAt: true, motivo: true, metadata: true,
       lockVersion: true,
     },
@@ -219,7 +220,7 @@ export async function passosOperacaoV2(documentoId: number, opts?: { incluirEnce
   return Promise.all(rows.map(async (r) => {
     const { payload } = await lerOperacao(r.id)
     return {
-      id: r.id, stepKey: r.stepKey, status: r.status, faseMacroKey: r.faseMacroKey, ordem: r.ordem,
+      id: r.id, processoId: r.processoId, stepKey: r.stepKey, status: r.status, faseMacroKey: r.faseMacroKey, ordem: r.ordem,
       responsavelId: r.responsavelId, prazo: r.prazo, startedAt: r.startedAt, completedAt: r.completedAt,
       motivo: r.motivo, lockVersion: r.lockVersion, operacao: payload,
     }
@@ -1141,9 +1142,24 @@ export async function controlarOperacaoV2(
     if (!chave || ctx.permissoes?.[chave] !== true) {
       return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
     }
+    // 🔒 MESMA TRAVA DO E4/`carregarPassoAutorizado` (Etapa 5, item 2). O
+    // "responsável" que vale é o da TAREFA (`Tarefa.responsavelId`), não
+    // `PhaseWorkflowStepInstance.responsavelId` — este é escrito por "Alterar
+    // Executor" (quem EXECUTA, exibição) e nunca sincronizado com a
+    // atribuição da Tarefa. Usar o campo do passo aqui reproduzia o mesmo
+    // defeito já corrigido para `atualizarPassoV2`: um usuário recém-atribuído
+    // à Tarefa continuava levando 403 aqui, porque o passo guardava um dono
+    // antigo (ou nenhum).
     if (!ctx.isAdmin) {
-      const alheio = passos.find((p) => p.responsavelId != null && p.responsavelId !== ctx.usuarioId)
-      if (alheio) {
+      const p0 = passos[0]
+      const unidade = await normalizarUnidade(prisma, { processoId: p0.processoId, documentoId, ciclo: 1 })
+      const tarefaDaOperacao = (await tarefasVivasDasUnidades(prisma, [unidade])).get(chaveDaUnidade(unidade)) ?? null
+      // Sem Tarefa canônica encontrada (dado legado/gap), cai para o campo do
+      // próprio passo — nunca menos permissivo do que antes.
+      const responsavelDaOperacao = tarefaDaOperacao
+        ? tarefaDaOperacao.responsavelId
+        : (passos.find((p) => p.responsavelId != null)?.responsavelId ?? null)
+      if (responsavelDaOperacao != null && responsavelDaOperacao !== ctx.usuarioId) {
         return { ok: false, error: "Só o responsável pela etapa (ou um administrador) pode controlar esta operação.", status: 403 }
       }
     }

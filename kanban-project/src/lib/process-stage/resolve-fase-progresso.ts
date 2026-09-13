@@ -13,6 +13,7 @@ import { escopoDaFase } from "@/src/lib/motor/resolve-passos-bloqueantes"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-core"
+import { normalizarUnidade, chaveDaUnidade, tarefasVivasDasUnidades, type UnidadeDeTrabalho } from "@/lib/operacional/identidade-da-tarefa"
 import type { FaseCode } from "@prisma/client"
 
 /**
@@ -28,7 +29,7 @@ const stepConcluidoRe = (status: string) => PASSO_CONTA_COMO_FEITO.has(String(st
 export interface WfDocSteps {
   documentoId: number
   faseCode: FaseCode | null
-  steps: Array<{ ordem: number; stepKey: string; status: string; assigneeId: number | null; assignee: { nome: string } | null }>
+  steps: Array<{ id: number; ordem: number; stepKey: string; status: string; assigneeId: number | null; assignee: { nome: string } | null }>
 }
 
 export interface ProgressoFaseDoc {
@@ -84,7 +85,7 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
           OR: [{ documentoId: { not: null } }, { necessidadeId: { not: null } }],
           status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
         },
-        select: { documentoId: true, necessidadeId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, obrigatorio: true, responsavelId: true, ciclo: true, updatedAt: true },
+        select: { id: true, documentoId: true, necessidadeId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, obrigatorio: true, responsavelId: true, ciclo: true, updatedAt: true },
         orderBy: [{ documentoId: "asc" }, { ordem: "asc" }],
       })
     : []
@@ -112,7 +113,7 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
     let e = wfPorDoc.get(docId)
     if (!e) { e = { documentoId: docId, faseCode: phaseKeyToFaseCode(s.faseMacroKey), steps: [] }; wfPorDoc.set(docId, e) }
     e.steps.push({
-      ordem: s.ordem, stepKey: s.stepKey, status: s.status,
+      id: s.id, ordem: s.ordem, stepKey: s.stepKey, status: s.status,
       assigneeId: s.responsavelId,
       assignee: s.responsavelId != null ? { nome: respNomes.get(s.responsavelId) ?? "" } : null,
     })
@@ -192,12 +193,52 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
   }
 
   const concluidosPorDoc = new Set<number>(linhaRetaDocIds.filter(concluiuDoc))
-  const proximaAcaoPorDoc = new Map<number, string | null>()
-  for (const id of docIdsComWf) proximaAcaoPorDoc.set(id, proximaAcao(id))
 
-  // responsável do passo ATIVO por doc
+  // ────────────────────────────────────────────────────────────────────────────
+  // RESPONSÁVEL E PASSO ATUAL — TAREFA PRIMEIRO (Etapa 5, item 13).
+  //
+  // `PhaseWorkflowStepInstance.responsavelId` é "Alterar Executor" (quem
+  // EXECUTA a etapa, dado de exibição) — nunca sincronizado com a atribuição
+  // canônica da Tarefa. Escaneiar os passos por ordem para achar "o próximo"
+  // também nunca lê `Tarefa.workflowStepInstanceId`, o ponteiro determinístico
+  // que a Tarefa já carrega. As duas contas abaixo agora perguntam à Tarefa
+  // canônica da unidade PRIMEIRO — a varredura por ordem/passo do próprio
+  // `PhaseWorkflowStepInstance` só decide quando não existe Tarefa viva
+  // (documento sem obrigação materializada como Tarefa — legado/gap), e nesse
+  // caso é FALLBACK explícito, não a fonte.
+  // ────────────────────────────────────────────────────────────────────────────
+  const unidadesPorDoc = new Map<number, UnidadeDeTrabalho>()
+  if (processo) {
+    await Promise.all([...docIdsComWf].map(async (docId) => {
+      unidadesPorDoc.set(docId, await normalizarUnidade(prisma, { processoId: processo.id, documentoId: docId, ciclo: 1 }))
+    }))
+  }
+  const tarefaVivaPorDoc = unidadesPorDoc.size
+    ? await tarefasVivasDasUnidades(prisma, [...unidadesPorDoc.values()])
+    : new Map()
+  const tarefaDoDoc = (docId: number) => {
+    const u = unidadesPorDoc.get(docId)
+    return u ? tarefaVivaPorDoc.get(chaveDaUnidade(u)) ?? null : null
+  }
+
+  const proximaAcaoPorDoc = new Map<number, string | null>()
+  for (const id of docIdsComWf) {
+    const tarefa = tarefaDoDoc(id)
+    const passoAtual = tarefa?.workflowStepInstanceId != null
+      ? (wfPorDoc.get(id)?.steps ?? []).find((s) => s.id === tarefa.workflowStepInstanceId)
+      : null
+    proximaAcaoPorDoc.set(id, passoAtual ? tituloStep(passoAtual.stepKey) : proximaAcao(id))
+  }
+
+  // responsável do passo ATIVO por doc — Tarefa canônica primeiro.
   const stepOwnerPorDoc = new Map<number, { id: number; nome: string }>()
   for (const [docId, wf] of wfPorDoc) {
+    const tarefa = tarefaDoDoc(docId)
+    if (tarefa?.responsavelId != null) {
+      stepOwnerPorDoc.set(docId, { id: tarefa.responsavelId, nome: tarefa.responsavelNome ?? "" })
+      continue
+    }
+    // FALLBACK — só quando não há Tarefa viva para esta obrigação.
     const comResp = wf.steps.filter((s) => s.assigneeId && s.assignee?.nome)
     if (!comResp.length) continue
     const escolhida = comResp.find((s) => !stepConcluidoRe(s.status)) ?? comResp[0]

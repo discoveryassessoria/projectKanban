@@ -29,6 +29,7 @@ import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS,
   rotularFase, SeletorResponsavel, type LinhaDeFila,
 } from "./kit-operacional"
+import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 
 export type { LinhaDeFila }
 
@@ -80,7 +81,7 @@ function iniciais(nome: string): string {
  */
 export interface LinhaOperacional extends LinhaDeFila {
   venceHoje: boolean
-  coluna: "SEM_RESPONSAVEL" | "A_FAZER" | "EM_ANDAMENTO" | "AGUARDANDO_TERCEIRO" | "BLOQUEADA" | "CONCLUIDA"
+  coluna: ColunaKanban
   esperandoDe: "terceiro" | "cliente" | null
   esperandoDesde: string | null
   esperandoHaDias: number | null

@@ -48,10 +48,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { CampoData } from "@/src/components/ui/campo-data"
-import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
+import { urlOperacionalDaTarefa, urlOperacionalDoProcesso } from "@/lib/operacional/navegacao"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ProcessoExpandido } from "./processo-expandido"
-import type { FamiliaAgrupada, ProcessoAgrupado } from "@/lib/operacional/tarefa-projecoes"
+import type { FamiliaAgrupada, ProcessoAgrupado, ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS,
   rotularFase, SeletorResponsavel, type LinhaDeFila,
@@ -67,10 +67,13 @@ export interface LinhaGerencial extends LinhaDeFila {
   concluidaEm: string | null
 }
 
-type ColunaKanban =
-  | "SEM_RESPONSAVEL" | "A_FAZER" | "EM_ANDAMENTO"
-  | "AGUARDANDO_TERCEIRO" | "BLOQUEADA" | "CONCLUIDA"
-
+// `ColunaKanban` é importado de `tarefa-projecoes.ts` (Etapa 5, item 1) — três
+// cópias hardcoded do mesmo union (aqui, em `central-tarefas.tsx` e no
+// canônico) já discordavam entre si assim que uma coluna nova nascia lá e não
+// aqui. `COLUNAS` abaixo continua com as MESMAS 6 colunas visíveis — a coluna
+// canônica ganhou um valor a mais (`CANCELADA`, Etapa 5 item 7), mas esta
+// tela não busca `incluirEncerradas`, então nunca a vê; o tipo só deixou de
+// ser uma mentira sobre o que `visaoGerencial` pode devolver.
 const COLUNAS: Array<{ chave: ColunaKanban; rotulo: string; nota?: string }> = [
   { chave: "SEM_RESPONSAVEL", rotulo: "Sem responsável", nota: "esperando decisão de quem distribui" },
   { chave: "A_FAZER", rotulo: "A fazer" },
@@ -983,7 +986,7 @@ function MenuAcoesFamilia({ processoId }: { processoId: number | null }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={`bg-[var(--surface-overlay)] ${Z_POPOVER}`} onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem asChild><a href={`/processos/${processoId}`}>Abrir processo</a></DropdownMenuItem>
-        <DropdownMenuItem asChild><a href={`/kanban?processoId=${processoId}&tab=central`}>Abrir na Central Operacional</a></DropdownMenuItem>
+        <DropdownMenuItem asChild><a href={urlOperacionalDoProcesso(processoId)}>Abrir na Central Operacional</a></DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

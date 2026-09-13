@@ -9,6 +9,7 @@ import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { parseLocalDate, formatDateBR, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { CambioMini } from "@/src/components/cambio/cambio-mini"
+import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import useSWR from 'swr'
 
 // Mapeamento de bandeiras por país
@@ -299,8 +300,12 @@ export function HeaderBar({
 
   const handleTarefaClick = (tarefa: TarefaNotificacao) => {
     if (tarefa.processoId) {
-      const pais = tarefa.pais || 'PORTUGAL'
-      router.push(`/kanban?pais=${pais}&processoId=${tarefa.processoId}&tab=tarefas&atividadeId=${tarefa.id}`)
+      // Etapa 5 (item 12) — o MESMO construtor de deep-link que o resto do
+      // sistema usa (Etapa 4 já usa para `acontecimentos`). Este bloco tinha
+      // seu próprio formato (`tab=tarefas&atividadeId=`), que não é o que
+      // `resolverAlvoDaTarefa` espera — dois contratos de URL para a mesma
+      // ação ("abrir esta tarefa").
+      router.push(urlOperacionalDaTarefa({ taskId: tarefa.id, processoId: tarefa.processoId }))
     } else {
       // A operação de tarefas é uma só. `/activities` era a tela antiga, que
       // abria o modal legado da árvore de subtarefas.
