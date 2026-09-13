@@ -204,8 +204,14 @@ function main() {
   ok('§16) a fila mostra a frase canônica', /texto: l\.rotuloDoPrazo/.test(fila))
   const painel = semComentarios(ler('src/components/kanban/PainelDaFase.tsx'))
   ok('§16) a tabela da fase também', /const texto = f\.rotuloDoPrazo/.test(painel))
+  // A régua migrou para o servidor (document-operational-projection.ts) — o
+  // Drawer não chama mais `estadoTemporal` por conta própria; ele só lê a
+  // frase que a projeção já calculou, igual à fila e à tabela da fase.
+  const drawer = semComentarios(ler('src/components/kanban/DocumentoOperationalDrawer.tsx'))
   ok('§95) e o drawer do documento parou de ter régua própria',
-    /estadoTemporal\(\{ dataPrazo: prazo \}\)/.test(semComentarios(ler('src/components/kanban/DocumentoOperationalDrawer.tsx'))))
+    !/estadoTemporal\(/.test(drawer) && /text:\s*tarefa\.rotuloDoPrazo/.test(drawer))
+  ok('§95) quem calcula agora é a projeção do servidor, uma vez só',
+    /estadoTemporal\(\{/.test(semComentarios(ler('src/lib/process-stage/document-operational-projection.ts'))))
   ok('§95) a Home também',
     /estadoTemporal\(\{ dataPrazo: d \}\)/.test(semComentarios(ler('src/components/home/home-primitives.tsx'))),
     'o corte era meia-noite do NAVEGADOR — um gestor em Lisboa via outro dia')

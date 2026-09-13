@@ -2,7 +2,6 @@
 
 "use client"
 
-import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
