@@ -128,6 +128,43 @@ export interface VisitaDoDocumento {
   ciclo: number
 }
 
+export interface ImpactoDownstreamDocumento {
+  dominio: "PASTA_APOSTILAMENTO" | "PASTA_TRADUCAO" | "EMISSAO_RETIFICADA" | "DIVERGENCIA" | "OBRIGACAO_ECONOMICA"
+  id: number
+  descricao: string
+  status: string | null
+}
+
+/**
+ * IDENTIFICAÇÃO (read-only) do que depende deste documento fora da própria
+ * cadeia de vias (`derivadoDeId`/`substituidoEm`, já coberta por
+ * `novaViaDocumental`). Existe porque invalidar/substituir um documento já
+ * VALIDADO não pode ser silencioso para quem consumiu esse documento como
+ * insumo — apostilamento, tradução, retificação, divergência de análise e
+ * obrigação econômica vinculada.
+ *
+ * Não reverte nada. Reversão automática de um ato já consumado (ex.: um
+ * apostilamento que já saiu para o cartório) fabricaria um fato que não
+ * aconteceu — o mandato pede que o sistema torne o impacto VISÍVEL para
+ * decisão humana, não que decida sozinho por ela.
+ */
+export async function identificarImpactoDownstream(documentoId: number): Promise<ImpactoDownstreamDocumento[]> {
+  const [apostilamentos, traducoes, retificadas, divergencias, obrigacoes] = await Promise.all([
+    prisma.pastaApostilamentoDocumento.findMany({ where: { documentoId }, select: { id: true, documentoTitulo: true, status: true } }),
+    prisma.pastaTraducaoDocumento.findMany({ where: { documentoId }, select: { id: true, documentoTitulo: true, status: true } }),
+    prisma.emissaoRetificada.findMany({ where: { documentoId }, select: { id: true, documentoTitulo: true, status: true } }),
+    prisma.divergencia.findMany({ where: { documentoId }, select: { id: true, documentoTitulo: true, campoLabel: true } }),
+    prisma.obrigacaoEconomica.findMany({ where: { documentoId }, select: { id: true, codigoOperacional: true, natureza: true, status: true } }),
+  ])
+  return [
+    ...apostilamentos.map((r): ImpactoDownstreamDocumento => ({ dominio: "PASTA_APOSTILAMENTO", id: r.id, descricao: r.documentoTitulo, status: r.status })),
+    ...traducoes.map((r): ImpactoDownstreamDocumento => ({ dominio: "PASTA_TRADUCAO", id: r.id, descricao: r.documentoTitulo, status: r.status })),
+    ...retificadas.map((r): ImpactoDownstreamDocumento => ({ dominio: "EMISSAO_RETIFICADA", id: r.id, descricao: r.documentoTitulo, status: r.status })),
+    ...divergencias.map((r): ImpactoDownstreamDocumento => ({ dominio: "DIVERGENCIA", id: r.id, descricao: r.campoLabel, status: null })),
+    ...obrigacoes.map((r): ImpactoDownstreamDocumento => ({ dominio: "OBRIGACAO_ECONOMICA", id: r.id, descricao: r.codigoOperacional ?? r.natureza, status: r.status })),
+  ]
+}
+
 export async function visitaAtualDoDocumento(documentoId: number): Promise<VisitaDoDocumento | null> {
   // 1) O documento JÁ TEM passo materializado (em qualquer fase)? A visita é a
   //    instância ONDE O TRABALHO REALMENTE ESTÁ — nunca a fase atual do processo.

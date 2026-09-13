@@ -18,6 +18,7 @@ import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { efeito as definicaoDeEfeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import type { StatusDocumento } from "@prisma/client"
 import { reopenPhase } from "@/src/lib/motor/phase-advance"
+import { reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 
 export interface AlvoDoEfeito {
   stepInstanceId: number
@@ -88,6 +89,17 @@ export async function concluirDocumento(a: AlvoDoEfeito) {
 export async function invalidarDocumento(a: AlvoDoEfeito) {
   const mudou = await status(a, "INVALIDO")
   await observar(a, "invalidado", `Documento invalidado. Motivo: ${texto(a.valores.motivo) ?? "não informado"}.`)
+  // A NECESSIDADE REFLETE O AGORA, NÃO O PASSADO: se este documento já tinha
+  // satisfeito (ATENDIDA/NAO_LOCALIZADA) a NecessidadeDocumental dele, invalidá-lo
+  // faz a necessidade deixar de estar satisfeita — senão a necessidade continuaria
+  // "concluída" apontando para um documento que não vale mais. Mesmo tratamento
+  // que `controlarOperacaoV2` (ação "invalidar") já dá ao reabrir o passo;
+  // reusa o único mecanismo de regressão que existe (idempotente, append-only,
+  // preserva o histórico da conclusão anterior).
+  if (a.documentoId != null) {
+    const doc = await prisma.documento.findUnique({ where: { id: a.documentoId }, select: { necessidadeId: true } })
+    if (doc?.necessidadeId != null) await reabrirAtendimentoNecessidade(doc.necessidadeId)
+  }
   return { documentoId: a.documentoId, statusAlterado: mudou, novoStatus: "INVALIDO" }
 }
 

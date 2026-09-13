@@ -216,6 +216,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "teste de membership: monta e limpa o próprio cenário; prova que requerente do processo ≠ membro da árvore",
   "scripts/arvore-preview-impacto.test.ts":
     "teste do preview de impacto: só LIMPA o cenário que ele mesmo criou — quem cria a necessidade no teste é o materializador oficial",
+  "scripts/invalidacao-downstream.test.ts":
+    "cadeia de impacto downstream de invalidação (mandato Emissão Documental, doc 20 §§43/79): " +
+    "monta e derruba o PRÓPRIO cenário (marca INVDOWN) só no banco de teste — a necessidade é " +
+    "criada direto para provar a regressão ATENDIDA→EM_ATENDIMENTO ao invalidar o documento " +
+    "vigente; a regressão em si passa por `reabrirAtendimentoNecessidade` (o dono canônico)",
 }
 
 /** Diretórios de RUNTIME — onde a regra é absoluta. */
