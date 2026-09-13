@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-12
+-- Gerado em : 2026-09-13
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2760,6 +2760,21 @@ CREATE TABLE "OrgaoProtocolo" (
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "OrgaoProtocolo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RegraTemporalOrgao" (
+    "id" SERIAL NOT NULL,
+    "stepKey" VARCHAR(80) NOT NULL,
+    "orgaoProtocoloId" INTEGER NOT NULL,
+    "slaDays" INTEGER NOT NULL,
+    "followUpDays" INTEGER,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "chaveRegra" VARCHAR(140) NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RegraTemporalOrgao_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5627,6 +5642,15 @@ CREATE INDEX "OrgaoProtocolo_funcoes_idx" ON "OrgaoProtocolo"("funcoes");
 CREATE UNIQUE INDEX "OrgaoProtocolo_name_paisId_key" ON "OrgaoProtocolo"("name", "paisId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "RegraTemporalOrgao_chaveRegra_key" ON "RegraTemporalOrgao"("chaveRegra");
+
+-- CreateIndex
+CREATE INDEX "RegraTemporalOrgao_stepKey_idx" ON "RegraTemporalOrgao"("stepKey");
+
+-- CreateIndex
+CREATE INDEX "RegraTemporalOrgao_orgaoProtocoloId_idx" ON "RegraTemporalOrgao"("orgaoProtocoloId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "TipoDocumentoCadastro_publicCode_key" ON "TipoDocumentoCadastro"("publicCode");
 
 -- CreateIndex
@@ -7095,6 +7119,9 @@ ALTER TABLE "PhaseAutomationRule" ADD CONSTRAINT "PhaseAutomationRule_tipoProces
 
 -- AddForeignKey
 ALTER TABLE "OrgaoProtocolo" ADD CONSTRAINT "OrgaoProtocolo_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RegraTemporalOrgao" ADD CONSTRAINT "RegraTemporalOrgao_orgaoProtocoloId_fkey" FOREIGN KEY ("orgaoProtocoloId") REFERENCES "OrgaoProtocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_itemCatalogoId_fkey" FOREIGN KEY ("itemCatalogoId") REFERENCES "ItemCatalogo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
