@@ -4227,6 +4227,8 @@ model OrgaoProtocolo {
   // protocolizações recebidas por este órgão (ocorrências dentro dos processos)
   protocolos            Protocolo[]
   solicitacaoDocumentos SolicitacaoDocumento[]
+  /// Regra temporal ESPECÍFICA deste órgão, por passo — ver RegraTemporalOrgao.
+  regrasTemporais       RegraTemporalOrgao[]
   /// Por onde ESTA organização atende. Ver `OrganizacaoCanal`.
   canais                OrganizacaoCanal[]
   execucoesDeSubtarefa  SubtaskExecution[]
@@ -4246,6 +4248,56 @@ model OrgaoProtocolo {
   @@index([ativo])
   @@index([provincia])
   @@index([funcoes])
+}
+
+/// REGRA TEMPORAL ESPECÍFICA DO TERCEIRO/CARTÓRIO — mandato Bloco 2.
+///
+/// Precedência (nunca escolhida em código, sempre lida nesta ordem por
+/// `lib/operacional/sla-por-orgao.ts::resolverPoliticaTemporal`):
+///   1. esta linha (o cartório X é sabidamente mais rápido/lento que a média);
+///   2. `PhaseWorkflowStepInstance.slaDays` (o passo/workflow publicado);
+///   3. sem prazo (nenhuma data inventada — mesma filosofia de `PRAZO_HERDADO`).
+///
+/// Identidade por `stepKey` (chave canônica do passo publicado), o MESMO
+/// padrão já usado por `ExigenciaEvidenciaEtapa` — não por nome/label, e sem
+/// FK forte a uma linha específica de `PhaseInternalWorkflowStep` (que pode ser
+/// recriada em cada edição do workflow; a chave lógica é o que sobrevive).
+///
+/// NÃO é o override local (`Tarefa.dataPrazo`/`alterarPrazo`, que já existe e
+/// continua sendo a porta certa para uma exceção pontual, auditada, de UMA
+/// operação). Isto é CADASTRO: vale para toda solicitação futura a este órgão,
+/// neste passo — até alguém desativar ou trocar o valor aqui.
+model RegraTemporalOrgao {
+  id Int @id @default(autoincrement())
+
+  /// Chave canônica do passo publicado (mesmo padrão de ExigenciaEvidenciaEtapa.stepKey).
+  stepKey String @db.VarChar(80)
+
+  orgaoProtocoloId Int
+  orgao            OrgaoProtocolo @relation(fields: [orgaoProtocoloId], references: [id], onDelete: Cascade)
+
+  /// Substitui o `slaDays` do passo PARA ESTE ÓRGÃO, neste passo (ex.: "confirmação
+  /// estimada 2 dias" no passo de solicitar; "emissão estimada 15 dias" no passo de
+  /// aguardar retorno — dois passos reais, duas linhas, cada uma com o número certo).
+  slaDays Int
+
+  /// Cadência sugerida do PRÓXIMO ACOMPANHAMENTO (dimensão D) para este órgão —
+  /// nunca substitui o que o operador já agendou manualmente
+  /// (`metadata.operacao.proximoAcompanhamento`), só sugere o padrão quando
+  /// nada foi agendado ainda.
+  followUpDays Int?
+
+  ativo Boolean @default(true)
+
+  /// Chave de identidade derivada dos IDs (mesmo padrão de `chaveExigencia`) —
+  /// impede duas regras para o mesmo (órgão, passo).
+  chaveRegra String @unique @db.VarChar(140)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([stepKey])
+  @@index([orgaoProtocoloId])
 }
 
 /// Funções que uma organização exerce. Uma organização = UM registro, N funções.

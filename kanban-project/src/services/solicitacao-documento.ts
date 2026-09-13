@@ -39,6 +39,8 @@ import {
 } from "@/src/services/documento-operacao"
 import { canalDoTexto, configDoCanal } from "@/src/lib/process-stage/canais-solicitacao"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { resolverPoliticaTemporal } from "@/lib/operacional/sla-por-orgao"
+import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
 import { faltamCamposDoCanalCadastrado, canaisVigentes } from "@/src/lib/process-stage/canais-fonte"
 import {
@@ -73,6 +75,16 @@ export type ResultadoSolicitacao =
 export interface EntradaSolicitacao {
   canal: string
   destinatarioNome?: string | null
+  /**
+   * O TERCEIRO/CARTÓRIO, quando identificado no cadastro (`OrgaoProtocolo`).
+   *
+   * Campo já existe em `SolicitacaoDocumento.orgaoId` desde antes — mas nunca
+   * era escrito por este criador (achado do mandato Bloco 2: `destinatarioNome`
+   * era o único dado de fato gravado, então "cartório como terceiro" ficava
+   * sem vínculo estrutural nenhum na solicitação real). Passá-lo aqui é o que
+   * permite `RegraTemporalOrgao` (regra específica do terceiro) de fato valer.
+   */
+  orgaoId?: number | null
   atendente?: string | null
   numeroProtocolo?: string | null
   observacao?: string | null
@@ -280,6 +292,29 @@ export async function registrarSolicitacaoDocumento(
   let liberouProximo = false
 
   await prisma.$transaction(async (tx) => {
+    // ── 4.0 PRECEDÊNCIA TEMPORAL — mandato Bloco 2 ──────────────────────────
+    //
+    // Só resolve quando o operador NÃO digitou um prazo — o que ele digita à
+    // mão para ESTA solicitação é o dado mais forte que existe (mais forte até
+    // que a regra do órgão: é a promessa que o próprio cartório deu, agora,
+    // por este canal). Precedência: 1) regra do órgão (RegraTemporalOrgao) →
+    // 2) SLA do passo (`PhaseWorkflowStepInstance.slaDays`, já snapshot da
+    // instância) → 3) sem prazo.
+    const orgaoId = entrada.orgaoId ?? null
+    const prazoDigitado = inteiro(entrada.prazoEsperadoDias)
+    let prazoEsperadoDiasResolvido = prazoDigitado
+    let previsaoRetornoResolvida: Date | null = null
+    let origemPrazo: "OPERADOR" | "ORGAO" | "PASSO" | "DEFAULT" = prazoDigitado != null ? "OPERADOR" : "DEFAULT"
+    if (prazoDigitado == null) {
+      const stepRow = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: passo.id }, select: { slaDays: true } })
+      const resolvido = await resolverPoliticaTemporal(tx, { stepKey: passo.stepKey, orgaoProtocoloId: orgaoId, slaDaysDoPasso: stepRow?.slaDays ?? null })
+      prazoEsperadoDiasResolvido = resolvido.slaDays
+      origemPrazo = resolvido.origem
+    }
+    if (prazoEsperadoDiasResolvido != null) {
+      previsaoRetornoResolvida = prazoOperacional(prazoEsperadoDiasResolvido, agora)
+    }
+
     // ── 4.1 SOLICITAÇÃO (cria ou atualiza — nunca duplica) ───────────────────
     const dadosSolicitacao = {
       documentoId,
@@ -290,9 +325,15 @@ export async function registrarSolicitacaoDocumento(
       stepInstanceId: passo.id,
       canal,
       destinatarioNome,
+      // ESTRUTURAL — antes deste ponto nenhum criador real gravava este vínculo
+      // (achado do mandato Bloco 2): `destinatarioNome` (texto livre) era o
+      // único dado de fato persistido, e a regra por-cartório não tinha como
+      // valer sem saber QUAL órgão é este.
+      orgaoId,
       atendente: texto(entrada.atendente),
       dataEnvio: agora,
-      prazoEsperadoDias: inteiro(entrada.prazoEsperadoDias),
+      prazoEsperadoDias: prazoEsperadoDiasResolvido,
+      previsaoRetorno: previsaoRetornoResolvida,
       observacao,
       custoPago: entrada.custoPago != null ? new Prisma.Decimal(entrada.custoPago) : null,
       formaPagamento: texto(entrada.formaPagamento),
@@ -312,8 +353,10 @@ export async function registrarSolicitacaoDocumento(
         // o que NÃO se atualiza é a data de envio original nem a autoria.
         canal: dadosSolicitacao.canal,
         destinatarioNome: dadosSolicitacao.destinatarioNome,
+        orgaoId: dadosSolicitacao.orgaoId,
         atendente: dadosSolicitacao.atendente,
         prazoEsperadoDias: dadosSolicitacao.prazoEsperadoDias,
+        previsaoRetorno: dadosSolicitacao.previsaoRetorno,
         observacao: dadosSolicitacao.observacao,
         custoPago: dadosSolicitacao.custoPago,
         formaPagamento: dadosSolicitacao.formaPagamento,
