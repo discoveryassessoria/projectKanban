@@ -15,7 +15,11 @@ import { DOMINIOS } from './tipos'
 // identidade de execução (EXE-001/002, CAD-001..005, DOC-L01). Cada uma existe
 // porque a classe de falha correspondente virou impossível por construção, e o que
 // se vigia aqui é justamente a construção continuar valendo no ambiente real.
-export const VERSAO_CATALOGO = '1.7.0'
+// 1.8.0 — 13/09/2026: entraram as 20 verificações do fluxo "Solicitar
+// Certidão" (EMI-001..EMI-020) — Tarefa×Step×Necessidade×Documento na
+// Emissão Documental. Ver docs/architecture (mandato de integridade
+// sistêmica) e `scripts/verificador-integridade-emissao.test.ts`.
+export const VERSAO_CATALOGO = '1.8.0'
 
 export interface ContextoVerificacao {
   /** agora, congelado no início da rodada (execuções são comparáveis) */

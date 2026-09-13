@@ -20,6 +20,7 @@ import './verificacoes/interface'
 import './capacidades/operacionais'
 import './verificacoes/cadastro-execucao'
 import './verificacoes/prontidao'
+import './verificacoes/emissao-documental'
 
 export { catalogo, cobertura, dominiosSemCobertura, elegiveis, metadados, VERSAO_CATALOGO } from './catalogo'
 export { executarDiagnostico, consolidar } from './motor'
