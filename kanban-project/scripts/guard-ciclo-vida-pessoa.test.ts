@@ -174,6 +174,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/etapa5-projecoes-convergem.test.ts":
     "Etapa 5 (convergência de projeções): cria e derruba o PRÓPRIO cenário " +
     "(marca ETAPA5-TEST) só no banco de teste",
+  "scripts/etapa6-circuito-completo.test.ts":
+    "Etapa 6 (circuito operacional completo): cria e derruba o PRÓPRIO cenário " +
+    "(marca ETAPA6-TEST) só no banco de teste",
   // ── Guard ────────────────────────────────────────────────────────────────
   // O backfill de resíduos NÃO entra aqui: ele não remove nenhum dos quatro
   // modelos protegidos (só Tarefa, Passo e Necessidade — esta pelo serviço dono).

@@ -124,6 +124,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/etapa5-projecoes-convergem.test.ts":
     "Etapa 5 (convergência de projeções): cria e derruba o PRÓPRIO cenário " +
     "(marca ETAPA5-TEST) só no banco de teste",
+  "scripts/etapa6-circuito-completo.test.ts":
+    "Etapa 6 (circuito operacional completo): cria e derruba o PRÓPRIO cenário " +
+    "(marca ETAPA6-TEST) só no banco de teste",
   "scripts/tarefa-unidade-operacional.test.ts":
     "unidade operacional da Tarefa: cria e derruba as PRÓPRIAS necessidades (marca TAREFA-OP) " +
     "só no banco de teste — o cenário precisa de uma obrigação real para a tarefa ter causa",
