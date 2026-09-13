@@ -166,11 +166,46 @@ Regressão: `pessoa-tortura.test.ts` (197/197) e `test:guards-arquitetura`
 `npm run typecheck`, `npm run lint` (0 erros, mesmos 13 warnings
 pré-existentes em arquivos não tocados) e `npm run build` (produção) limpos.
 
+## Validação autenticada pela interface real (rodada de fechamento, mesma data)
+
+Encontrado e corrigido durante esta validação: `confirmar-exclusao-processo.ts`
+(preview) e `processos-lista.tsx` (DELETE) chamavam `fetch()` **sem o header
+`Authorization`** — `extrairUsuarioKanban` só lê o header, nunca o cookie de
+sessão, então as duas chamadas voltavam 401 e a interface caía no fallback
+genérico (sem contagem, sem o aviso de bloqueio financeiro). Corrigido nos
+dois pontos (commit `d62a3760`). Regressão confirmada depois: `npm run build`
+completo (guards + baseline + `next build`) e o teste de serviço (33/33)
+verdes.
+
+**Banco de teste local (mutação real, controlada)** —
+`tests/ui/delete-processo-lifecycle.smoke.ts`, 2 testes, 100% verde:
+preview real citando contagens corretas; bloqueio por fato financeiro visual
+(`alert`) **e** server-side (409) para o mesmo processo; exclusão real de um
+processo limpo, persistindo depois de `reload`; Árvore/Pessoa compartilhada
+com outro processo continuam intactas ao excluir um dos dois; segunda
+exclusão do mesmo processo → 404 (idempotente); RBAC frontend (item
+"Excluir" ausente do menu) e backend (403) para um `tipo='admin'` **sem** a
+concessão nominal — mesmo sendo admin; zero 5xx; todo 4xx de API é um dos
+provocados de propósito pelo próprio teste.
+
+**Produção real (leitura + RBAC, sem exclusão destrutiva)** — servidor local
+rodando o build já deployado, apontado para o banco de produção (token
+assinado localmente não é aceito pelo Vercel real — mesma técnica já usada
+nas Etapas 4-6 desta sessão): `GET /api/me/permissoes` do admin real inclui
+`processos.excluirDefinitivo: false`; `GET .../impacto-exclusao` e `DELETE`
+para o Processo 592 real ("Teste") retornam 403 **sem tocar em nada**;
+requisição sem token retorna 401; navegação autenticada real
+(`/kanban`→Itália→Lista) mostra o Processo 592 real e confirma que "Excluir"
+não aparece no menu para este admin; zero 5xx, console limpo. Processo 592
+confirmado byte-idêntico (`id`/`nome`) antes e depois de toda a validação —
+**nenhuma exclusão destrutiva foi executada contra produção**.
+
 ## Evidência de produção
 
 Consulta de leitura confirmou 2 Processos / 2 obrigações / 0 movimento —
-ver "Registros existentes" acima. Nenhuma alteração foi feita em produção
-nesta rodada; a mudança de código ainda depende de deploy.
+ver "Registros existentes" acima. Deploy realizado (`vercel --prod`,
+commit `d62a3760`, alias `https://app.discovery.com.br`, `readyState: READY`)
+e validado conforme a seção anterior.
 
 ## Limitações / itens FORA DE ESCOPO (não tocados nesta rodada)
 
