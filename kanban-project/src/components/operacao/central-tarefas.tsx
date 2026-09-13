@@ -363,6 +363,13 @@ const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional)
   { id: "a_fazer", rotulo: "A fazer", aplica: (l) => l.coluna === "A_FAZER" },
   { id: "em_andamento", rotulo: "Em andamento", aplica: (l) => l.coluna === "EM_ANDAMENTO" },
   { id: "aguardando", rotulo: "Aguardando terceiro", aplica: (l) => l.coluna === "AGUARDANDO_TERCEIRO" },
+  // "Nova atribuição" = chegou na minha fila há pouco (48h) e ainda não foi
+  // iniciada — mesma janela de recência usada para notificar `TRANSFERENCIA`
+  // (Etapa 6/handoff). Não é status novo: é um recorte temporal sobre A_FAZER.
+  {
+    id: "novas_atribuicoes", rotulo: "Novas atribuições",
+    aplica: (l) => l.coluna === "A_FAZER" && !!l.atribuidaEm && Date.now() - new Date(l.atribuidaEm).getTime() <= 48 * 3600_000,
+  },
   { id: "bloqueadas", rotulo: "Bloqueadas", aplica: (l) => l.coluna === "BLOQUEADA" },
   { id: "atrasadas", rotulo: "Atrasadas", aplica: (l) => l.atrasada },
   { id: "vence_hoje", rotulo: "Vence hoje", aplica: (l) => l.venceHoje },
