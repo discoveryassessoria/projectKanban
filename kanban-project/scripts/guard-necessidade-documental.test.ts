@@ -58,6 +58,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/provas-finais.test.ts":
     "provas finais: monta e derruba a PRÓPRIA árvore, pessoas e necessidades (marca PROVA) " +
     "só no banco de teste — a prova de exclusão precisa de alguém para excluir",
+  "scripts/verificador-integridade-emissao.test.ts":
+    "verificador EMI-001..020 (Saúde do Sistema, fluxo Solicitar Certidão): monta e derruba " +
+    "os PRÓPRIOS processos/necessidades (marca EMIINTEG) só no banco de teste — cada cenário " +
+    "precisa de uma NecessidadeDocumental real para provar as 20 verificações de integridade",
   "scripts/isolamento-50-certidoes.test.ts":
     "isolamento em escala: monta e derruba 10 pessoas, 50 documentos e 50 necessidades " +
     "próprios (marca ESCALA50) só no banco de teste — o isolamento só se prova com massa",
@@ -195,6 +199,30 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "handoff dedicado (mandato Emissão Documental): monta e derruba o PRÓPRIO cenário " +
     "(marca HANDOFF4-TEST) só no banco de teste — a necessidade é insumo do cenário " +
     "(4 passos precisam de uma obrigação real para a tarefa ter causa), não o que está sendo provado",
+  "scripts/mandato-110-testes.test.ts":
+    "suíte literal do mandato Emissão Documental (110 itens numerados): monta e derruba o " +
+    "PRÓPRIO cenário (marca MANDATO110-TEST) só no banco de teste — necessidade/documento " +
+    "são insumo dos cenários (cada certidão precisa de obrigação real para a tarefa ter " +
+    "causa e para o gate de fase ter o que avaliar), nunca o que está sendo provado",
+  "scripts/mandato-e2e-38-passos.test.ts":
+    "teste real ponta a ponta dos 38 passos literais + caminho NÃO VALIDADA (mandato " +
+    "Emissão Documental): monta e derruba o PRÓPRIO cenário (marca MANDATOE2E-TEST) só no " +
+    "banco de teste — a necessidade é insumo do cenário (passo 1 do mandato é literalmente " +
+    "'criar necessidade', e o ciclo 2 do caminho alternativo precisa da mesma necessidade " +
+    "do ciclo 1 para provar que ela só é ATENDIDA na segunda tentativa), nunca escrita por " +
+    "fora do que o mandato pede para ser provado",
+  "scripts/mandato-20-adversariais.test.ts":
+    "20 cenários adversariais A-T (mandato) sobre Solicitar Certidão: monta e derruba os " +
+    "PRÓPRIOS processos/necessidades (marca MANDATOADV) só no banco de teste — cada cenário " +
+    "precisa de uma NecessidadeDocumental real para materializar a Tarefa/Steps reais (5 " +
+    "passos) e provar concorrência, idempotência, invalidação e retrocesso de fase; a leitura " +
+    "e a transição de estado da necessidade em si passam por `atenderNecessidade`/" +
+    "`reabrirAtendimentoNecessidade`/`dispensarNecessidade` (os donos canônicos) — só a criação " +
+    "e a marca DISPENSADA do cenário T (simulação de migration parcial) são diretas",
+  "scripts/mandato-pausa-relogios.test.ts":
+    "os 4 relógios de pausa/suspensão/bloqueio do workflow 'Solicitar Certidão' (mandato " +
+    "Emissão Documental): monta e derruba o PRÓPRIO cenário só no banco de teste — a " +
+    "necessidade é insumo real para a tarefa ter causa, nunca o que está sendo provado",
   "scripts/delete-processo-lifecycle-seguro.test.ts":
     "DELETE de Processo seguro (docs/architecture/26): só LEITURA (`count`) de " +
     "NecessidadeDocumental — prova que o preview/plano de exclusão do processo " +

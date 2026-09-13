@@ -111,6 +111,10 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/verificador-integridade-emissao.test.ts":
+    "verificador EMI-001..020 (Saúde do Sistema, fluxo Solicitar Certidão): monta e derruba " +
+    "as PRÓPRIAS árvores/pessoas/documentos (marca EMIINTEG) só no banco de teste — nenhuma " +
+    "pessoa/documento real é removida, só o que este teste mesmo criou",
   "scripts/isolamento-50-certidoes.test.ts":
     "isolamento em escala: monta e derruba 10 pessoas, 50 documentos e 50 necessidades " +
     "próprios (marca ESCALA50) só no banco de teste — o isolamento só se prova com massa",
@@ -188,6 +192,24 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/handoff-4-passos.test.ts":
     "handoff dedicado (mandato Emissão Documental): cria a PRÓPRIA árvore/pessoa " +
     "(marca HANDOFF4-TEST) só no banco de teste — nenhuma pessoa é removida por este teste",
+  "scripts/mandato-110-testes.test.ts":
+    "suíte literal do mandato Emissão Documental (110 itens numerados): cria as PRÓPRIAS " +
+    "árvores/pessoas (marca MANDATO110-TEST) só no banco de teste — cada certidão exige uma " +
+    "pessoa própria; a limpeza remove só o que a marca criou, nunca dado alheio",
+  "scripts/mandato-e2e-38-passos.test.ts":
+    "teste real ponta a ponta dos 38 passos literais + caminho NÃO VALIDADA (mandato Emissão " +
+    "Documental): cria as PRÓPRIAS árvores/pessoas (marca MANDATOE2E-TEST) só no banco de " +
+    "teste — a limpeza remove só o que a marca criou (deleteMany direto, nunca via " +
+    "pessoa-ciclo-vida.ts, porque não é remoção de pessoa da árvore de um processo real: é " +
+    "desmontar o próprio cenário de teste), nunca dado alheio",
+  "scripts/mandato-20-adversariais.test.ts":
+    "20 cenários adversariais (A-T) sobre 'Solicitar Certidão' (mandato Emissão Documental): " +
+    "cria as PRÓPRIAS árvores/pessoas só no banco de teste — a limpeza remove só o que o " +
+    "próprio teste criou",
+  "scripts/mandato-pausa-relogios.test.ts":
+    "os 4 relógios de pausa/suspensão/bloqueio do workflow 'Solicitar Certidão' (mandato " +
+    "Emissão Documental): cria as PRÓPRIAS árvores/pessoas só no banco de teste — a limpeza " +
+    "remove só o que o próprio teste criou",
   "scripts/delete-processo-lifecycle-seguro.test.ts":
     "DELETE de Processo seguro (docs/architecture/26): cria as PRÓPRIAS árvores/pessoas " +
     "(marca DELPROC-TEST) só no banco de teste — prova que excluir Processo NÃO cascateia " +

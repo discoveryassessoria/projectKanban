@@ -260,6 +260,12 @@ secao("10) O motor atravessa fases sem destruir trabalho")
 // destroem trabalho real — e nenhum deles pode existir no código.
 const ciclo = ler("lib/operacional/tarefa-ciclo.ts")
 const projecoes = ler("lib/operacional/tarefa-projecoes.ts")
+// `politicaDeSla`/`pausarSla`/`retomarSla` moraram em tarefa-ciclo.ts até a
+// unificação do mandato "4 relógios" (Bloco 1): `task-step-sync.ts::bloquearTarefa`
+// nunca pausava o SLA por chamar sua própria cópia da política, e a resposta foi
+// ter UM lugar só (`sla-pausa.ts`), reexportado por tarefa-ciclo.ts para quem já
+// importava dali. O conteúdo verificado abaixo é o mesmo; só o arquivo mudou.
+const slaPausa = ler("lib/operacional/sla-pausa.ts")
 
 // G/H — voltar não recria, avançar não conclui: só o RECONCILIADOR mexe em
 // tarefa por causa de fase, e ele nem sequer lê a fase do processo.
@@ -337,7 +343,7 @@ ok("a pausa de SLA é configurável no workflow publicado",
   /pausarSlaEmEsperaExterna/.test(schema) && /pausarSlaEmBloqueio/.test(schema))
 ok("e o código apenas OBEDECE a política", /politicaDeSla/.test(ciclo))
 ok("sem workflow, o padrão é NÃO pausar",
-  /workflowInstanceId == null\) return \{ pausaEspera: false/.test(ciclo))
+  /workflowInstanceId == null\) return \{ pausaEspera: false/.test(slaPausa))
 
 // §35 — dependência é entre tarefas, não etapa disfarçada.
 ok("dependência tem entidade própria", /model TarefaDependencia \{/.test(schema))

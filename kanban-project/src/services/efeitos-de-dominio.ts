@@ -18,7 +18,7 @@ import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { efeito as definicaoDeEfeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import type { StatusDocumento } from "@prisma/client"
 import { reopenPhase } from "@/src/lib/motor/phase-advance"
-import { reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
+import { reabrirAtendimentoNecessidade, atenderNecessidade } from "@/src/services/necessidade-documental"
 
 export interface AlvoDoEfeito {
   stepInstanceId: number
@@ -69,10 +69,25 @@ export async function marcarDocumentoRecebido(a: AlvoDoEfeito) {
 
 export async function aprovarParaAnalise(a: AlvoDoEfeito) {
   // A EMISSÃO ENTREGA; NÃO JULGA. O documento sai da conferência operacional pronto
-  // para a Análise, e é a Análise que decide se ele serve juridicamente.
+  // para a Análise, e é a Análise que decide se ele serve juridicamente — mas a
+  // OBRIGAÇÃO de obter o documento (a NecessidadeDocumental) já foi cumprida: o
+  // que faltava era o documento existir e ter passado pela conferência operacional,
+  // não o veredito jurídico da Análise.
+  //
+  // SEM ISTO, a necessidade nunca saía de PENDENTE/EM_ATENDIMENTO pela Emissão
+  // Documental V2 (`task-step-sync.ts`/`executarAcaoCadastrada`) — só o caminho
+  // legado (`documento-operacao.ts::evoluirNecessidadePorPasso`) chamava
+  // `atenderNecessidade`. A prova de que isto é dívida, não desenho: `invalidarDocumento`
+  // já chama `reabrirAtendimentoNecessidade` (que só faz algo quando a necessidade
+  // está ATENDIDA/NAO_LOCALIZADA) — código morto para todo documento que passa pela
+  // Emissão V2, porque nada a tinha marcado ATENDIDA antes.
   const mudou = await status(a, "EM_ANALISE")
   await observar(a, "aprovado-analise",
     `Conferência operacional aprovada; documento liberado para a Análise Documental.${texto(a.valores.observacao) ? ` ${texto(a.valores.observacao)}` : ""}`)
+  if (a.documentoId != null) {
+    const doc = await prisma.documento.findUnique({ where: { id: a.documentoId }, select: { necessidadeId: true } })
+    if (doc?.necessidadeId != null) await atenderNecessidade(doc.necessidadeId)
+  }
   return { documentoId: a.documentoId, statusAlterado: mudou, novoStatus: "EM_ANALISE" }
 }
 
