@@ -47,7 +47,20 @@ export interface PreviewDePublicacao {
   problemas: ProblemaDePublicacao[]
   podePublicar: boolean
   aviso: string
+  /**
+   * QUANTAS OPERAÇÕES EM ANDAMENTO ficariam "para trás" — na versão atual,
+   * não na que está prestes a nascer. Contagem real (`PhaseWorkflowInstance`
+   * não-terminal com `workflowVersion = versaoAtual`), não estimativa: é o
+   * que o mandato de evolução de configuração exige mostrar ANTES de
+   * publicar, não descobrir depois. Publicar não afeta essas operações —
+   * elas continuam na versão que registraram — mas quem publica precisa
+   * saber quantas existem antes de decidir.
+   */
+  operacoesEmAndamentoNaVersaoAtual: number
 }
+
+/** Status de `PhaseWorkflowInstance` que ainda representam trabalho em curso. */
+const STATUS_INSTANCIA_ATIVA = ["PENDENTE", "INSTANCIANDO", "ATIVO", "BLOQUEADO", "AGUARDANDO"] as const
 
 /** A definição VIVA, no mesmo formato da congelada — para comparar maçã com maçã. */
 /**
@@ -264,6 +277,19 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
   }
 
   const problemas = await validarWorkflowParaPublicar(workflowId)
+
+  // CONTAGEM REAL, não estimativa: quantas instâncias não-terminais ainda
+  // registram a versão ATUAL (a que vai ficar "para trás" quando a nova for
+  // publicada). `workflowDefinitionId` é o snapshot solto (sem FK) que liga a
+  // instância ao workflow — a mesma coluna que `workflowVersion` acompanha.
+  const operacoesEmAndamentoNaVersaoAtual = await prisma.phaseWorkflowInstance.count({
+    where: {
+      workflowDefinitionId: workflowId,
+      workflowVersion: wf.versao,
+      status: { in: [...STATUS_INSTANCIA_ATIVA] },
+    },
+  })
+
   return {
     workflowId: wf.id,
     nome: wf.name,
@@ -273,9 +299,15 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
     mudancas,
     problemas,
     podePublicar: problemas.length === 0 && mudancas.length > 0,
+    operacoesEmAndamentoNaVersaoAtual,
     aviso:
-      "Publicar cria a versão " + (wf.versao + 1) + ". Os processos que já rodam continuam na versão que registraram — " +
-      "nada do que eles materializaram muda. O que é removido aqui continua legível no histórico deles.",
+      "Publicar cria a versão " + (wf.versao + 1) + ". " +
+      (operacoesEmAndamentoNaVersaoAtual > 0
+        ? `${operacoesEmAndamentoNaVersaoAtual} operação(ões) em andamento hoje ` +
+          `registra(m) a versão ${wf.versao} e continuará(ão) nela — nada do que já ` +
+          "materializaram muda. "
+        : `Nenhuma operação em andamento hoje está na versão ${wf.versao}. `) +
+      "O que é removido aqui continua legível no histórico de quem já registrou.",
   }
 }
 

@@ -25,6 +25,8 @@ interface Preview {
   problemas: Array<{ codigo: string; stepKey: string | null; mensagem: string }>
   podePublicar: boolean
   aviso: string
+  /** Contagem real de `PhaseWorkflowInstance` não-terminal ainda na versão atual. */
+  operacoesEmAndamentoNaVersaoAtual: number
 }
 
 /**
@@ -121,6 +123,15 @@ export default function PublicarWorkflowModal({
         <div className="flex-1 space-y-3 overflow-auto px-6 py-4">
           {!preview && !erro && <p className="text-sm text-[var(--text-muted)]">Comparando o rascunho com a versão publicada…</p>}
           {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-red-700">{erro}</div>}
+
+          {/* IMPACTO REAL — contagem, não estimativa, ANTES de decidir publicar. */}
+          {preview && preview.operacoesEmAndamentoNaVersaoAtual > 0 && (
+            <div className="rounded-lg border border-amber-800/30 bg-[var(--surface-secondary)] p-3 text-xs text-amber-800">
+              <span className="font-medium">{preview.operacoesEmAndamentoNaVersaoAtual} operação(ões) em andamento</span>
+              {" "}hoje na versão {preview.versaoAtual}. Elas continuarão nela — publicar não muda
+              nada do que já materializaram.
+            </div>
+          )}
 
           {preview && preview.problemas.length > 0 && (
             <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">

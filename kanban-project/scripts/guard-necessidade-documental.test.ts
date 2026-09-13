@@ -191,6 +191,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/mrg-e2e.test.ts": "teste e2e do Motor Registral: monta cenário",
   "scripts/estrutura-operacional-integracao.test.ts": "teste de integração: monta cenário",
   "scripts/guard-necessidade-documental.test.ts": "este guard (cita os padrões que procura)",
+  "scripts/handoff-4-passos.test.ts":
+    "handoff dedicado (mandato Emissão Documental): monta e derruba o PRÓPRIO cenário " +
+    "(marca HANDOFF4-TEST) só no banco de teste — a necessidade é insumo do cenário " +
+    "(4 passos precisam de uma obrigação real para a tarefa ter causa), não o que está sendo provado",
   "scripts/delete-processo-lifecycle-seguro.test.ts":
     "DELETE de Processo seguro (docs/architecture/26): só LEITURA (`count`) de " +
     "NecessidadeDocumental — prova que o preview/plano de exclusão do processo " +

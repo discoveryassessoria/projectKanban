@@ -141,6 +141,7 @@
     "test:contrato-doc": "tsx scripts/contrato-documental.test.ts",
     "test:cp-sec": "tsx scripts/cp-sec.test.ts",
     "test:delete-processo": "tsx scripts/delete-processo-lifecycle-seguro.test.ts",
+    "test:handoff-4-passos": "tsx scripts/handoff-4-passos.test.ts",
     "test:cp1": "tsx scripts/cp1.test.ts",
     "test:cp2": "tsx scripts/cp2.test.ts",
     "test:cp3": "tsx scripts/cp3.test.ts",

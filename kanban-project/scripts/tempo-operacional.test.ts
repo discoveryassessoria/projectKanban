@@ -21,6 +21,7 @@ import {
   janelaDoDiaOperacional,
   rotuloDaPrevisaoExterna,
 } from '../lib/operacional/tempo-operacional'
+import { isDiaUtil } from '../src/lib/diasUteis'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -208,6 +209,41 @@ function main() {
   ok('§95) a Home também',
     /estadoTemporal\(\{ dataPrazo: d \}\)/.test(semComentarios(ler('src/components/home/home-primitives.tsx'))),
     'o corte era meia-noite do NAVEGADOR — um gestor em Lisboa via outro dia')
+
+  secao('§96 — Calendário operacional: feriados, virada de mês/ano (mandato Emissão Documental)')
+  // SLA de 1 dia útil a partir de uma sexta pula sábado e domingo.
+  const sextaCal = new Date('2026-09-11T12:00:00.000Z')
+  ok('§96) SLA=1 a partir de sexta cai na segunda seguinte',
+    prazoOperacional(1, sextaCal)?.toISOString().slice(0, 10) === '2026-09-14')
+  // Virada de mês: 5 dias úteis a partir de 27/08/2026 (quinta) atravessa para setembro sem quebrar.
+  const finalDeAgosto = new Date('2026-08-27T12:00:00.000Z')
+  const pMes = prazoOperacional(5, finalDeAgosto)
+  ok('§96) SLA atravessa virada de mês sem quebrar', pMes !== null && pMes.getTime() > finalDeAgosto.getTime(),
+    pMes?.toISOString().slice(0, 10))
+  // Virada de ano: 10 dias úteis a partir de 22/12/2026 atravessa Natal, Ano Novo e o ano civil.
+  const antesDoNatal = new Date('2026-12-22T12:00:00.000Z')
+  const pAno = prazoOperacional(10, antesDoNatal)
+  ok('§96) SLA atravessa virada de ano sem quebrar', pAno !== null && pAno.getUTCFullYear() === 2027,
+    pAno?.toISOString().slice(0, 10))
+  // Feriados fixos não contam como dia útil.
+  ok('§96) 25/12 (Natal) não é dia útil', !isDiaUtil(new Date('2026-12-25T12:00:00.000Z')))
+  ok('§96) 01/01 (Ano Novo) não é dia útil', !isDiaUtil(new Date('2027-01-01T12:00:00.000Z')))
+  ok('§96) dia útil comum continua sendo dia útil', isDiaUtil(new Date('2026-12-23T12:00:00.000Z')))
+  ok('§96) sábado não é dia útil', !isDiaUtil(new Date('2026-09-12T12:00:00.000Z')))
+  ok('§96) domingo não é dia útil', !isDiaUtil(new Date('2026-09-13T12:00:00.000Z')))
+  // Feriados MÓVEIS (baseados na Páscoa) calculados dinamicamente — não é
+  // tabela fixa: prova-se calculando para DOIS anos civis diferentes.
+  ok('§96) Sexta-feira Santa 2026 (03/04, calculada) não é dia útil',
+    !isDiaUtil(new Date('2026-04-03T12:00:00.000Z')))
+  ok('§96) Sexta-feira Santa 2027 (26/03, ano diferente, calculada) não é dia útil',
+    !isDiaUtil(new Date('2027-03-26T12:00:00.000Z')))
+  // Timezone: FUSO_OPERACIONAL é fixo (America/Sao_Paulo) por desenho — é o SLA
+  // INTERNO do escritório processando, não o fuso do país do processo (Itália/
+  // Alemanha/Espanha só mudam o TEMA visual, nunca a régua de prazo). Isso já
+  // está prescrito no próprio arquivo (linhas 104-126, `deslocamentoDoFuso`
+  // medido no instante — cobre DST automaticamente, sem tabela).
+  ok('§96) FUSO_OPERACIONAL é America/Sao_Paulo (fixo, por desenho — SLA é do escritório, não do país do processo)',
+    /FUSO_OPERACIONAL = 'America\/Sao_Paulo'/.test(ler('lib/operacional/tempo-operacional.ts')))
 
   console.log(`\n${'═'.repeat(70)}`)
   console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)
