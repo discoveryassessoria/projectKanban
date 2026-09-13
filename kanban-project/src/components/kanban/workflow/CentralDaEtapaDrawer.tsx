@@ -27,6 +27,9 @@ import {
   Clock,
   User as UserIcon,
   FileText,
+  CheckCircle2,
+  Circle,
+  CircleDot,
 } from "lucide-react"
 import { EditorRegistralModal } from "./EditorRegistralModal"
 import { StepEditorRouter } from "./StepEditors"
@@ -205,6 +208,36 @@ const kindDoEditor = (step: WorkflowStep): StepEditorKind =>
 /** A ação está autorizada pelo servidor para esta etapa e este usuário? */
 const permite = (step: WorkflowStep | null, acao: AcaoEtapa): boolean =>
   !!step?.acoesPermitidas?.includes(acao)
+
+/**
+ * A PROGRESSÃO VISUAL — mandato de Emissão Documental: "✓ 1. Enviar
+ * requerimento · ● 2. Confirmar pedido · ○ 3. Receber e digitalizar · ○ 4.
+ * Conferir e validar". "Etapa X de N" já existia; faltava a trilha em si —
+ * cada passo com seu próprio estado, não só um contador.
+ */
+function TrilhaDeEtapas({ steps, atualId }: { steps: WorkflowStep[]; atualId: number }) {
+  if (steps.length <= 1) return null
+  const ordenadas = [...steps].sort((a, b) => a.ordem - b.ordem)
+  return (
+    <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 mb-3">
+      {ordenadas.map((s, i) => {
+        const ehAtual = s.id === atualId
+        const concluida = s.status === "concluida"
+        const Icone = concluida ? CheckCircle2 : ehAtual ? CircleDot : Circle
+        const cor = concluida ? "text-emerald-400" : ehAtual ? "text-[var(--accent-text)]" : "text-white/30"
+        return (
+          <div key={s.id} className="flex items-center gap-1">
+            <span className={`flex items-center gap-1 text-[11px] ${ehAtual ? "font-semibold text-white/90" : cor}`}>
+              <Icone className={`w-3.5 h-3.5 ${cor}`} />
+              {s.ordem}. {s.title}
+            </span>
+            {i < ordenadas.length - 1 && <span className="text-white/20 mx-0.5">·</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 
 // ============================================================
@@ -552,6 +585,8 @@ function ConteudoDrawer({
                   {step.description}
                 </div>
               )}
+
+              {workflow && <TrilhaDeEtapas steps={workflow.steps} atualId={step.id} />}
 
               {/* Pills: status / responsável / prazo */}
               <div className="flex items-center gap-2 flex-wrap mb-4">
