@@ -777,13 +777,25 @@ async function aplicarTarefa(
   if (!H.podeAplicarTarefa(t.statusTarefa, alvo)) return { changed: false, anterior: t.statusTarefa, atual: t.statusTarefa, code: "TRANSICAO_INVALIDA" as H.FailureCodeD }
 
   const now = new Date()
-  const data: Prisma.TarefaUpdateManyMutationInput = {
-    statusTarefa: alvo as Prisma.TarefaUpdateManyMutationInput["statusTarefa"],
+  // `Unchecked` (não só `TarefaUpdateManyMutationInput`) porque este bloco
+  // agora também escreve `workflowStepInstanceId` — uma FK escalar só
+  // aparece na variante Unchecked do tipo gerado pelo Prisma.
+  const data: Prisma.TarefaUncheckedUpdateManyInput = {
+    statusTarefa: alvo as Prisma.TarefaUncheckedUpdateManyInput["statusTarefa"],
     lockVersion: { increment: 1 },
     ...(o.extra as object),
   }
   if (alvo === "EM_ANDAMENTO") data.dataInicio = t.dataInicio ?? now
-  if (alvo === TAREFA_CONCLUIDA_STATUS) { data.concluida = true; data.dataConclusao = now }
+  // Ambos os alvos concluídos (`CONCLUIDO_RECEBIDO` e `CONCLUIDO_NAO_POSSUI`)
+  // precisam do mesmo tratamento — antes só o primeiro setava `concluida`/
+  // `dataConclusao`. E, assim como `concluirEtapa` (tarefa-etapa.ts) e
+  // `sincronizarTarefaComWorkflow` (tarefa-canonica.ts) já fazem quando não
+  // há mais passo corrente, o ponteiro precisa ser limpo aqui também: sem
+  // isto, uma Tarefa concluída por ESTE caminho (o único que o passo final
+  // de "Solicitar Certidão" percorre) ficava com `workflowStepInstanceId`
+  // apontando para um passo já histórico — Tarefa concluída com Step "atual"
+  // é exatamente a contradição que o verificador de integridade sinaliza.
+  if (TAREFA_CONCLUIDA_SET.has(alvo)) { data.concluida = true; data.dataConclusao = now; data.workflowStepInstanceId = null }
 
   const res = await tx.tarefa.updateMany({
     where: { id: tarefaId, statusTarefa: t.statusTarefa as Prisma.TarefaWhereInput["statusTarefa"], lockVersion: t.lockVersion },

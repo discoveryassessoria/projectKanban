@@ -656,20 +656,18 @@ async function main() {
   ok("31) Step 5 CONCLUIDO", step5Depois.status === "CONCLUIDO")
   const tFinal = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefaId } })
   ok("31) a MESMA Tarefa (id igual do início ao fim) está concluída", tFinal.id === tarefaId && ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"].includes(tFinal.statusTarefa), tFinal.statusTarefa)
-  // NOTA DE ARQUITETURA (achado real, não corrigido nesta rodada): o doc 27
-  // registra que a Tarefa 3570 de produção terminou com
-  // `workflowStepInstanceId=null` — mas aquela conclusão passou por
-  // `concluirEtapa` (lib/operacional/tarefa-etapa.ts), que zera o ponteiro
-  // explicitamente (`corrente?.id ?? null`). O caminho usado aqui
-  // (`executarAcaoCadastrada` → `concluirPasso`, task-step-sync.ts) NÃO zera
-  // — `aplicarTarefa` só muda `statusTarefa`/`lockVersion`, nunca o ponteiro
-  // de passo. As DUAS portas concluem tarefas de produção; convergir esse
-  // detalhe fica fora do escopo mínimo deste mandato (tocaria o núcleo
-  // genérico de transição de passo). O estado continua coerente: a Tarefa é
-  // terminal e o ponteiro, quando não nulo, aponta para o ÚLTIMO passo
-  // concluído — nunca para um passo aberto.
-  ok("31) a Tarefa é terminal e o ponteiro de passo (quando não nulo) aponta para o ÚLTIMO passo, concluído",
-    tFinal.workflowStepInstanceId === null || tFinal.workflowStepInstanceId === step5,
+  // FIX aplicado nesta rodada: `aplicarTarefa` (task-step-sync.ts) só mudava
+  // `statusTarefa`/`lockVersion` ao concluir — nunca zerava o ponteiro do
+  // passo, diferente de `concluirEtapa` (tarefa-etapa.ts) e
+  // `sincronizarTarefaComWorkflow` (tarefa-canonica.ts), que sempre escrevem
+  // `corrente?.id ?? null`. Uma Tarefa concluída por ESTE caminho
+  // (`executarAcaoCadastrada` → `concluirPasso`) ficava com
+  // `workflowStepInstanceId` apontando para um passo já histórico — a mesma
+  // contradição que o verificador de integridade sinaliza (Tarefa concluída
+  // com Step "atual"). Agora as duas portas convergem: `TAREFA_CONCLUIDA_SET`
+  // sempre zera o ponteiro.
+  ok("31) a Tarefa concluída tem o ponteiro de passo ZERADO (mesmo padrão de concluirEtapa/sincronizarTarefaComWorkflow — doc 27, Tarefa 3570 real)",
+    tFinal.workflowStepInstanceId === null,
     `workflowStepInstanceId=${tFinal.workflowStepInstanceId}`)
   ok("31) ainda 1 única Tarefa do início ao fim", (await prisma.tarefa.count({ where: { processoId: processo.id } })) === 1)
 
