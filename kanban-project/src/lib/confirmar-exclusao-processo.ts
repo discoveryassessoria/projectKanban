@@ -24,7 +24,10 @@ export async function confirmarExclusaoProcesso(
   let preview: ImpactoExclusaoProcesso | null = null
 
   try {
-    const res = await fetch(`/api/processos/${processoId}/impacto-exclusao`)
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+    const res = await fetch(`/api/processos/${processoId}/impacto-exclusao`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
     if (res.ok) preview = await res.json()
   } catch {
     // Preview indisponível (rede) — segue para a confirmação genérica abaixo;

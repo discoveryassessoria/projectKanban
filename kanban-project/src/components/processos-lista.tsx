@@ -92,7 +92,10 @@ export function ProcessosLista({
 
     try {
       const response = await fetch(`/api/processos/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
       })
 
       if (!response.ok) {

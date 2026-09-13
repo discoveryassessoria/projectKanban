@@ -185,6 +185,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "DELETE de Processo seguro (docs/architecture/26): cria as PRÓPRIAS árvores/pessoas " +
     "(marca DELPROC-TEST) só no banco de teste — prova que excluir Processo NÃO cascateia " +
     "para Árvore/Pessoa; nenhuma pessoa é removida por este teste, só criada e lida",
+  "scripts/ui-fixtures-delete-processo.ts":
+    "fixture da validação Playwright do DELETE de Processo (marca UIDELPROC), só no banco " +
+    "de teste local — cria as PRÓPRIAS árvore/pessoa para o cenário de árvore compartilhada; " +
+    "nenhuma pessoa é removida por este script, só criada/lida/limpa pela própria marca",
 
   // ── Teste do próprio ciclo de vida ───────────────────────────────────────
   "scripts/pessoa-tortura.test.ts": "teste de tortura: 10 ciclos criar→excluir→recriar",
