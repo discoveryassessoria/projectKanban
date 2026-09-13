@@ -191,6 +191,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "backfill histórico CP-3: cria necessidades na migração inicial",
   "prisma/consolidar-itemcatalogo-duplicatas.ts":
     "backfill: repontar itemCatalogoId ao consolidar duplicatas do Catálogo",
+  "scripts/mandato-sla-cartorio-override.test.ts":
+    "mandato Bloco 2 (SLA por cartório): monta e derruba o PRÓPRIO cenário (marca SLACARTORIO-TEST), só no banco de teste — a resolução de precedência (regra do órgão > SLA do passo > default) e o wiring real de registrarSolicitacaoDocumento precisam de uma NecessidadeDocumental real para materializar o passo que recebe a solicitação",
+  "scripts/mandato-financeiro-cartorio-isolado.test.ts":
+    "mandato Bloco 5 (isolamento financeiro do custo de cartório): monta e derruba o PRÓPRIO cenário (marca FINCARTORIO-TEST), só no banco de teste — prova que custoPago não gera ObrigacaoEconomica e que o gerador real de custo documental recusa o passo, exigindo uma NecessidadeDocumental real para o documento existir",
   "scripts/motor-documental-idempotencia.test.ts": "teste: monta e limpa o cenário das 20 rodadas",
   "scripts/mrg-e2e.test.ts": "teste e2e do Motor Registral: monta cenário",
   "scripts/estrutura-operacional-integracao.test.ts": "teste de integração: monta cenário",

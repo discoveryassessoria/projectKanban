@@ -210,6 +210,18 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "os 4 relógios de pausa/suspensão/bloqueio do workflow 'Solicitar Certidão' (mandato " +
     "Emissão Documental): cria as PRÓPRIAS árvores/pessoas só no banco de teste — a limpeza " +
     "remove só o que o próprio teste criou",
+  "scripts/mandato-sla-cartorio-override.test.ts":
+    "regra temporal por cartório + override local (mandato Bloco 2): cria as PRÓPRIAS " +
+    "árvores/pessoas (marca SLACARTORIO-TEST) só no banco de teste — a limpeza remove só o " +
+    "que o próprio teste criou",
+  "scripts/mandato-rascunho-publicacao.test.ts":
+    "rascunho e publicação de Workflow Interno (mandato Bloco 3): cria as PRÓPRIAS " +
+    "árvores/pessoas (marca RASCUNHOPUB-TEST) só no banco de teste — a limpeza remove só o " +
+    "que o próprio teste criou",
+  "scripts/mandato-financeiro-cartorio-isolado.test.ts":
+    "isolamento financeiro do custo de cartório (mandato Bloco 5): cria a PRÓPRIA " +
+    "árvore/pessoa (marca FINCARTORIO-TEST) só no banco de teste — a limpeza remove só o " +
+    "que o próprio teste criou",
   "scripts/delete-processo-lifecycle-seguro.test.ts":
     "DELETE de Processo seguro (docs/architecture/26): cria as PRÓPRIAS árvores/pessoas " +
     "(marca DELPROC-TEST) só no banco de teste — prova que excluir Processo NÃO cascateia " +
