@@ -32,7 +32,11 @@ import { estadosTemporaisDasOperacoes } from './proximo-acontecimento'
 export type ResultadoComando =
   /** `jaEstavaIniciada` distingue "fiz agora" de "já estava feito" sem virar erro. */
   | { ok: true; tarefaId: number; notificacaoId: number | null; jaEstavaIniciada?: boolean }
-  | { ok: false; codigo: 'NAO_ENCONTRADA' | 'TERMINAL' | 'CONFLITO' | 'SEM_RESPONSAVEL' | 'MESMO_RESPONSAVEL'; mensagem: string }
+  | {
+      ok: false
+      codigo: 'NAO_ENCONTRADA' | 'TERMINAL' | 'CONFLITO' | 'SEM_RESPONSAVEL' | 'MESMO_RESPONSAVEL' | 'RESPONSAVEL_INDISPONIVEL'
+      mensagem: string
+    }
 
 /**
  * O LINK CANÔNICO DA TAREFA — um só, para todas as visões e avisos.
@@ -105,6 +109,30 @@ export async function atribuirTarefa(args: {
     }
     if (t.responsavelId === args.responsavelId) {
       return { ok: false as const, codigo: 'MESMO_RESPONSAVEL' as const, mensagem: 'A tarefa já é dessa pessoa.' }
+    }
+
+    // O DESTINO NÃO PODE ESTAR INDISPONÍVEL — handoff (atribuição/transferência)
+    // para quem está com `IndisponibilidadeOperacional` vigente (o cadastro que já
+    // representa "esta pessoa não deve receber trabalho novo agora", inclusive
+    // `BLOQUEIO_OPERACIONAL` = pessoa inativa/desabilitada operacionalmente) nunca
+    // pode passar em silêncio. Achado real do mandato adversarial, cenário P: nada
+    // aqui verificava isto antes — a transferência para um usuário inativo era
+    // aceita como se fosse válida. Bloqueia com um código explícito em vez de
+    // silenciosamente transferir para um destino inválido.
+    const indisponibilidade = await tx.indisponibilidadeOperacional.findFirst({
+      where: {
+        usuarioId: args.responsavelId,
+        inicio: { lte: agora },
+        OR: [{ fim: null }, { fim: { gt: agora } }],
+      },
+      orderBy: { inicio: 'desc' },
+      select: { tipo: true, motivo: true },
+    })
+    if (indisponibilidade) {
+      return {
+        ok: false as const, codigo: 'RESPONSAVEL_INDISPONIVEL' as const,
+        mensagem: `Esta pessoa está indisponível agora (${indisponibilidade.tipo}${indisponibilidade.motivo ? `: ${indisponibilidade.motivo}` : ''}) — não é possível atribuir ou transferir trabalho para ela.`,
+      }
     }
 
     const transferencia = t.responsavelId != null

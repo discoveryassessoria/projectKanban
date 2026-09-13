@@ -46,6 +46,18 @@ export interface ResultadoVinculoArquivo {
   criado: boolean
   /** Id da versão que esta substituiu (null = nada foi substituído). */
   substituiuId: number | null
+  /**
+   * MESMO CONTEÚDO (hashConteudo idêntico) já vinculado a um documento de OUTRA
+   * pessoa. `null` quando não há colisão, ou quando o chamador não informou
+   * `hashConteudo` (sem impressão digital, não dá para comparar).
+   *
+   * NÃO BLOQUEIA o vínculo: o mesmo binário pode legitimamente valer para duas
+   * pessoas (uma certidão de casamento é o mesmo arquivo para os dois cônjuges).
+   * O que não pode acontecer é isso passar em SILÊNCIO — por isso, além deste
+   * campo, uma `DocumentoObservacao` fica registrada nos DOIS documentos,
+   * para revisão humana (mandato adversarial, cenário E).
+   */
+  mesmoConteudoEmOutraPessoa: { documentoArquivoId: number; documentoId: number; pessoaId: number } | null
 }
 
 /**
@@ -110,6 +122,52 @@ export async function vincularArquivoDocumentoTx(
     hashConteudo: args.hashConteudo ?? undefined,
   }
 
+  // ── MESMO ARQUIVO, PESSOA DIFERENTE — NUNCA EM SILÊNCIO ─────────────────────
+  //
+  // A dedup acima (`documentoId_url`) só enxerga o MESMO documento. O mesmo
+  // binário vinculado por engano a DUAS PESSOAS diferentes (dois documentos
+  // distintos, cada um da sua pessoa) passava sem nenhum sinal — achado real do
+  // mandato adversarial, cenário E. Não bloqueia (a mesma certidão de casamento
+  // legitimamente serve aos dois cônjuges), mas fica registrado nos DOIS
+  // documentos: o que não pode existir é aceitar isso calado.
+  let mesmoConteudoEmOutraPessoa: ResultadoVinculoArquivo["mesmoConteudoEmOutraPessoa"] = null
+  if (args.hashConteudo) {
+    const alvo = await tx.documento.findUnique({ where: { id: args.documentoId }, select: { pessoaId: true } })
+    if (alvo) {
+      const colisao = await tx.documentoArquivo.findFirst({
+        where: {
+          hashConteudo: args.hashConteudo,
+          documentoId: { not: args.documentoId },
+          vigente: true,
+          documento: { pessoaId: { not: alvo.pessoaId } },
+        },
+        select: { id: true, documentoId: true, documento: { select: { pessoaId: true } } },
+        orderBy: { id: "asc" },
+      })
+      if (colisao) {
+        mesmoConteudoEmOutraPessoa = { documentoArquivoId: colisao.id, documentoId: colisao.documentoId, pessoaId: colisao.documento.pessoaId }
+        const chave = `arquivo-conteudo-duplicado|${args.hashConteudo}|doc${args.documentoId}|doc${colisao.documentoId}`
+        await tx.documentoObservacao.createMany({
+          data: [
+            {
+              documentoId: args.documentoId,
+              texto: `Atenção: este arquivo (mesmo conteúdo — ${args.hashConteudo}) também está vinculado ao documento #${colisao.documentoId}, de OUTRA pessoa (id ${colisao.documento.pessoaId}). Confira se não foi anexado por engano.`,
+              criadoPorId: args.criadoPorId,
+              chaveIdempotencia: `${chave}|doc${args.documentoId}`,
+            },
+            {
+              documentoId: colisao.documentoId,
+              texto: `Atenção: este arquivo (mesmo conteúdo — ${args.hashConteudo}) também foi vinculado ao documento #${args.documentoId}, de OUTRA pessoa (id ${alvo.pessoaId}). Confira se não foi anexado por engano.`,
+              criadoPorId: args.criadoPorId,
+              chaveIdempotencia: `${chave}|doc${colisao.documentoId}`,
+            },
+          ],
+          skipDuplicates: true,
+        })
+      }
+    }
+  }
+
   const r = await tx.documentoArquivo.upsert({
     where: { documentoId_url: { documentoId: args.documentoId, url: args.url } },
     create: {
@@ -139,7 +197,7 @@ export async function vincularArquivoDocumentoTx(
     select: { id: true },
   })
 
-  return { id: r.id, criado: mesmaUrl == null, substituiuId }
+  return { id: r.id, criado: mesmaUrl == null, substituiuId, mesmoConteudoEmOutraPessoa }
 }
 
 /**
