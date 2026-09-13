@@ -253,6 +253,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "monta e derruba o PRÓPRIO cenário (marca INVDOWN) só no banco de teste — a necessidade é " +
     "criada direto para provar a regressão ATENDIDA→EM_ATENDIMENTO ao invalidar o documento " +
     "vigente; a regressão em si passa por `reabrirAtendimentoNecessidade` (o dono canônico)",
+  "scripts/fix-exigencia-evidencia-bridge.test.ts":
+    "prova o fix real de ExigenciaEvidenciaEtapa ignorada por executarAcaoCadastrada (mandato " +
+    "Emissão Documental, item 08): monta e derruba o PRÓPRIO cenário isolado (workflow de 1 " +
+    "passo) só no banco de teste — a necessidade é criada direto para montar o palco mínimo, " +
+    "nunca para simular o materializador oficial",
 }
 
 /** Diretórios de RUNTIME — onde a regra é absoluta. */
