@@ -53,6 +53,10 @@ export interface LinhaDeFila {
   acompanhamentoVencido: boolean
   /** Terceiro respondeu antes do acompanhamento agendado — reativa a atenção AGORA. */
   retornoRecebido: boolean
+  /** Atraso do OPERADOR (interno) — distinto de `atrasoTerceiro`. Nunca a mesma coisa. */
+  atrasoInterno: boolean
+  /** Atraso do TERCEIRO (cartório/tradutor/etc.) — nunca conta como atraso do operador. */
+  atrasoTerceiro: boolean
 }
 
 interface Funcionario {

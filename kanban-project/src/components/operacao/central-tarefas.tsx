@@ -162,6 +162,9 @@ function Linha({
           {l.requerDecisao && <Etiqueta tom="alerta">Requer decisão</Etiqueta>}
           {l.emRisco && <Etiqueta tom="alerta">Em risco</Etiqueta>}
           {l.retornoRecebido && <Etiqueta tom="neutro">Retorno recebido</Etiqueta>}
+          {/* Atraso do terceiro nunca aparece como atraso do operador — etiquetas distintas. */}
+          {l.atrasoTerceiro && <Etiqueta tom="alerta">Terceiro atrasado</Etiqueta>}
+          {l.atrasoInterno && <Etiqueta tom="critico">Atraso interno</Etiqueta>}
         </div>
         {contexto && <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{contexto}</div>}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
@@ -311,6 +314,13 @@ function CartaoDaFila({
           {l.retornoRecebido && (
             <div className="mt-1 text-[11px] text-emerald-700/90">Retorno recebido — aguardando ação</div>
           )}
+          {/* Atraso do terceiro nunca é atraso do operador — mensagens distintas. */}
+          {l.atrasoTerceiro && (
+            <div className="mt-1 text-[11px] text-amber-800/90">Terceiro atrasado</div>
+          )}
+          {l.atrasoInterno && (
+            <div className="mt-1 text-[11px] text-red-700/90">Atraso interno</div>
+          )}
           {/* EM_RISCO — motivo explícito, nunca "risco" genérico sem explicação. */}
           {l.emRisco && l.motivosRisco.length > 0 && (
             <div className="mt-1 text-[11px] text-amber-800/90">Em risco: {l.motivosRisco.join(" · ")}</div>
@@ -356,10 +366,14 @@ const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional)
   { id: "bloqueadas", rotulo: "Bloqueadas", aplica: (l) => l.coluna === "BLOQUEADA" },
   { id: "atrasadas", rotulo: "Atrasadas", aplica: (l) => l.atrasada },
   { id: "vence_hoje", rotulo: "Vence hoje", aplica: (l) => l.venceHoje },
-  // Os três abaixo usam a MESMA leitura temporal canônica (Etapa 3/5) que já
+  // Os cinco abaixo usam a MESMA leitura temporal canônica (Etapa 3/5) que já
   // alimenta a notificação e a visão gerencial — nenhum cálculo novo aqui.
   { id: "acompanhar_hoje", rotulo: "Acompanhar hoje", aplica: (l) => l.acompanhamentoVencido },
   { id: "retornos", rotulo: "Retornos recebidos", aplica: (l) => l.retornoRecebido },
+  // Atraso interno (operador) nunca é a mesma coisa que atraso do terceiro —
+  // dois filtros distintos, nunca colapsados em "Atrasadas" genérico.
+  { id: "atraso_interno", rotulo: "Atraso interno", aplica: (l) => l.atrasoInterno },
+  { id: "terceiro_atrasado", rotulo: "Terceiro atrasado", aplica: (l) => l.atrasoTerceiro },
   { id: "em_risco", rotulo: "Em risco", aplica: (l) => l.emRisco },
 ]
 
