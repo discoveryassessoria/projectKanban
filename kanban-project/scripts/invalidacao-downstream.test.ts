@@ -129,6 +129,38 @@ async function main() {
   ok("5b) o apostilamento fabricado aparece no impacto downstream", comImpacto.length === 1, String(comImpacto.length))
   ok("5c) domínio identificado corretamente", comImpacto[0]?.dominio === "PASTA_APOSTILAMENTO", comImpacto[0]?.dominio)
   ok("5d) status do dependente é reportado (para decisão humana, não reversão automática)", comImpacto[0]?.status === "incluido_na_pasta", comImpacto[0]?.status ?? "null")
+  ok("5e) status intermediário (não validado, não bloqueado) classifica como BLOQUEADO — seguir adiante sobre insumo inválido não é seguro", comImpacto[0]?.consequencia === "BLOQUEADO", comImpacto[0]?.consequencia)
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao("5f) classificação semântica cobre os 6 rótulos exigidos pelo mandato (nunca reverte, só classifica)")
+  // ══════════════════════════════════════════════════════════════════════════
+  await prisma.pastaApostilamentoDocumento.updateMany({ where: { documentoId: doc.id }, data: { status: "validado" } })
+  const classValidado = (await identificarImpactoDownstream(doc.id))[0]
+  ok("5f.1) PASTA validada após base invalidada → PRECISA_REVISAO (nunca reescreve o passado nem finge continuar válida)", classValidado?.consequencia === "PRECISA_REVISAO", classValidado?.consequencia)
+
+  await prisma.pastaApostilamentoDocumento.updateMany({ where: { documentoId: doc.id }, data: { status: "bloqueado" } })
+  const classBloqueado = (await identificarImpactoDownstream(doc.id))[0]
+  ok("5f.2) PASTA já bloqueada → permanece BLOQUEADO", classBloqueado?.consequencia === "BLOQUEADO", classBloqueado?.consequencia)
+
+  await prisma.pastaApostilamentoDocumento.updateMany({ where: { documentoId: doc.id }, data: { status: "correcao_solicitada" } })
+  const classCorrecao = (await identificarImpactoDownstream(doc.id))[0]
+  ok("5f.3) PASTA em correção → PRECISA_REPROCESSAR", classCorrecao?.consequencia === "PRECISA_REPROCESSAR", classCorrecao?.consequencia)
+
+  const obrig = await prisma.obrigacaoEconomica.create({
+    data: {
+      processoId: proc.id, documentoId: doc.id, natureza: "RECEITA", direcao: "ENTRADA",
+      codigoOperacional: `${MARCA}-DOWNCLASS`, moedaContratual: "BRL", moedaContabil: "BRL",
+      valorContratado: "500.00", status: "LIQUIDADO",
+    },
+    select: { id: true },
+  })
+  const impactoComObrigacao = await identificarImpactoDownstream(doc.id)
+  const classObrigLiquidada = impactoComObrigacao.find((i) => i.dominio === "OBRIGACAO_ECONOMICA")
+  ok("5f.4) obrigação econômica LIQUIDADA → APENAS_HISTORICO (fato financeiro consumado nunca é revertido/recalculado aqui)", classObrigLiquidada?.consequencia === "APENAS_HISTORICO", classObrigLiquidada?.consequencia)
+  await prisma.obrigacaoEconomica.update({ where: { id: obrig.id }, data: { status: "ATIVO" } })
+  const classObrigAtiva = (await identificarImpactoDownstream(doc.id)).find((i) => i.dominio === "OBRIGACAO_ECONOMICA")
+  ok("5f.5) obrigação econômica ATIVA → PRECISA_REVISAO (ainda aberta, decisão humana necessária)", classObrigAtiva?.consequencia === "PRECISA_REVISAO", classObrigAtiva?.consequencia)
+  await prisma.obrigacaoEconomica.delete({ where: { id: obrig.id } })
 
   // ══════════════════════════════════════════════════════════════════════════
   secao("6) Idempotência: invalidar de novo não duplica a reabertura")

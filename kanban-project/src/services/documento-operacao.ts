@@ -128,11 +128,64 @@ export interface VisitaDoDocumento {
   ciclo: number
 }
 
+/**
+ * Classificação semântica da consequência para um dependente downstream,
+ * exigida pelo mandato de Emissão Documental — nunca reversão automática,
+ * só o rótulo que orienta a decisão humana.
+ */
+export type ConsequenciaDownstream =
+  | "CONTINUA_VALIDO"
+  | "PRECISA_REVISAO"
+  | "BLOQUEADO"
+  | "INVALIDADO"
+  | "PRECISA_REPROCESSAR"
+  | "APENAS_HISTORICO"
+
+const STATUS_PASTA_JA_BLOQUEADA = new Set(["bloqueado"])
+const STATUS_PASTA_EM_CORRECAO = new Set(["correcao_solicitada"])
+const STATUS_PASTA_VALIDADA = new Set(["validado"])
+
+function classificarPastaDocumento(status: string | null): ConsequenciaDownstream {
+  if (!status) return "PRECISA_REVISAO"
+  if (STATUS_PASTA_JA_BLOQUEADA.has(status)) return "BLOQUEADO"
+  if (STATUS_PASTA_EM_CORRECAO.has(status)) return "PRECISA_REPROCESSAR"
+  // "validado" consumiu o documento-base como insumo definitivo — a base
+  // mudou, então o downstream já concluído precisa de revisão humana, nunca
+  // é invalidado silenciosamente nem segue "continua válido" por inércia.
+  if (STATUS_PASTA_VALIDADA.has(status)) return "PRECISA_REVISAO"
+  // Qualquer estágio intermediário (pendente/incluido_na_pasta/enviado/
+  // apostila_recebida/traducao_recebida/conferido) ainda não se comprometeu
+  // com o documento-base como definitivo — seguir adiante sem revisão seria
+  // construir sobre um insumo já inválido.
+  return "BLOQUEADO"
+}
+
+function classificarEmissaoRetificada(status: string | null): ConsequenciaDownstream {
+  if (!status) return "PRECISA_REVISAO"
+  if (status === "bloqueado") return "BLOQUEADO"
+  if (status === "correcao_solicitada") return "PRECISA_REPROCESSAR"
+  if (status === "averbado" || status === "concluido") return "PRECISA_REVISAO"
+  return "BLOQUEADO"
+}
+
+function classificarObrigacaoEconomica(status: string | null): ConsequenciaDownstream {
+  if (!status) return "PRECISA_REVISAO"
+  // Fato financeiro já consumado (LIQUIDADO) ou já encerrado (CANCELADO) é
+  // passado — o mandato veda "apagar fato financeiro materializado" e
+  // "não resolver todo o financeiro incidentalmente"; aqui só registramos
+  // que é histórico, nunca revertemos ou recalculamos.
+  if (status === "LIQUIDADO" || status === "CANCELADO") return "APENAS_HISTORICO"
+  // RASCUNHO/ATIVO/SUSPENSO ainda podem ser afetados por decisão humana.
+  return "PRECISA_REVISAO"
+}
+
 export interface ImpactoDownstreamDocumento {
   dominio: "PASTA_APOSTILAMENTO" | "PASTA_TRADUCAO" | "EMISSAO_RETIFICADA" | "DIVERGENCIA" | "OBRIGACAO_ECONOMICA"
   id: number
   descricao: string
   status: string | null
+  /** Nunca reverte nada — só classifica para orientar decisão humana. */
+  consequencia: ConsequenciaDownstream
 }
 
 /**
@@ -157,11 +210,11 @@ export async function identificarImpactoDownstream(documentoId: number): Promise
     prisma.obrigacaoEconomica.findMany({ where: { documentoId }, select: { id: true, codigoOperacional: true, natureza: true, status: true } }),
   ])
   return [
-    ...apostilamentos.map((r): ImpactoDownstreamDocumento => ({ dominio: "PASTA_APOSTILAMENTO", id: r.id, descricao: r.documentoTitulo, status: r.status })),
-    ...traducoes.map((r): ImpactoDownstreamDocumento => ({ dominio: "PASTA_TRADUCAO", id: r.id, descricao: r.documentoTitulo, status: r.status })),
-    ...retificadas.map((r): ImpactoDownstreamDocumento => ({ dominio: "EMISSAO_RETIFICADA", id: r.id, descricao: r.documentoTitulo, status: r.status })),
-    ...divergencias.map((r): ImpactoDownstreamDocumento => ({ dominio: "DIVERGENCIA", id: r.id, descricao: r.campoLabel, status: null })),
-    ...obrigacoes.map((r): ImpactoDownstreamDocumento => ({ dominio: "OBRIGACAO_ECONOMICA", id: r.id, descricao: r.codigoOperacional ?? r.natureza, status: r.status })),
+    ...apostilamentos.map((r): ImpactoDownstreamDocumento => ({ dominio: "PASTA_APOSTILAMENTO", id: r.id, descricao: r.documentoTitulo, status: r.status, consequencia: classificarPastaDocumento(r.status) })),
+    ...traducoes.map((r): ImpactoDownstreamDocumento => ({ dominio: "PASTA_TRADUCAO", id: r.id, descricao: r.documentoTitulo, status: r.status, consequencia: classificarPastaDocumento(r.status) })),
+    ...retificadas.map((r): ImpactoDownstreamDocumento => ({ dominio: "EMISSAO_RETIFICADA", id: r.id, descricao: r.documentoTitulo, status: r.status, consequencia: classificarEmissaoRetificada(r.status) })),
+    ...divergencias.map((r): ImpactoDownstreamDocumento => ({ dominio: "DIVERGENCIA", id: r.id, descricao: r.campoLabel, status: null, consequencia: "PRECISA_REVISAO" as const })),
+    ...obrigacoes.map((r): ImpactoDownstreamDocumento => ({ dominio: "OBRIGACAO_ECONOMICA", id: r.id, descricao: r.codigoOperacional ?? r.natureza, status: r.status, consequencia: classificarObrigacaoEconomica(r.status) })),
   ]
 }
 
