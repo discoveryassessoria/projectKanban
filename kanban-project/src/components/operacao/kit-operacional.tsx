@@ -47,6 +47,12 @@ export interface LinhaDeFila {
   servico: string | null
   criadaEm: string | null
   atribuidaEm: string | null
+  /** EM_RISCO — derivado (Etapa 3/5), nunca um `statusTarefa` novo. */
+  emRisco: boolean
+  motivosRisco: string[]
+  acompanhamentoVencido: boolean
+  /** Terceiro respondeu antes do acompanhamento agendado — reativa a atenção AGORA. */
+  retornoRecebido: boolean
 }
 
 interface Funcionario {

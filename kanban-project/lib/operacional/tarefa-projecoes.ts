@@ -242,6 +242,13 @@ export interface LinhaDeFila {
   /** Atraso da PREVISÃO DO TERCEIRO — nunca vira atraso interno. */
   atrasoTerceiro: boolean
   acompanhamentoVencido: boolean
+  /**
+   * O terceiro respondeu (ou o contato mais recente registrou retorno) antes do
+   * próximo acompanhamento programado — Etapa 6/Mandato Emissão Documental:
+   * "retorno reativa imediatamente a atenção", nunca espera a data agendada.
+   * Vem de `proximo-acontecimento.ts::retornoRecebido`, nunca recalculado aqui.
+   */
+  retornoRecebido: boolean
   /** O que a operação espera a seguir, e de onde vem — nunca inventado pela tela. */
   proximoAcontecimento: {
     tipo: string
@@ -350,7 +357,7 @@ function projetar(
     // passo/solicitação em lote); ficar sem chamar `comAtencaoTemporal` depois
     // desta função é o defeito, não estes valores.
     emRisco: false, motivosRisco: [], atrasoInterno: false, atrasoTerceiro: false,
-    acompanhamentoVencido: false, proximoAcontecimento: null,
+    acompanhamentoVencido: false, retornoRecebido: false, proximoAcontecimento: null,
   }
 }
 
@@ -380,6 +387,7 @@ async function comAtencaoTemporal<T extends LinhaDeFila>(linhas: T[], agora: Dat
       atrasoInterno: e.atrasoInterno,
       atrasoTerceiro: e.atrasoTerceiro,
       acompanhamentoVencido: e.acompanhamentoVencido,
+      retornoRecebido: e.retornoRecebido,
       proximoAcontecimento: {
         tipo: e.proximoAcontecimento.tipo,
         data: e.proximoAcontecimento.data,

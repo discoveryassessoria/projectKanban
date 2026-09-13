@@ -160,6 +160,8 @@ function Linha({
           {l.prioridade === "URGENTE" && <Etiqueta tom="alerta">Urgente</Etiqueta>}
           {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
           {l.requerDecisao && <Etiqueta tom="alerta">Requer decisão</Etiqueta>}
+          {l.emRisco && <Etiqueta tom="alerta">Em risco</Etiqueta>}
+          {l.retornoRecebido && <Etiqueta tom="neutro">Retorno recebido</Etiqueta>}
         </div>
         {contexto && <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{contexto}</div>}
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
@@ -175,6 +177,10 @@ function Linha({
               pedido de duas semanas sem dono não aparece na régua de prazo. */}
           {l.criadaEm && <span className="text-[var(--text-muted)]">Entrou em {dataCurta(l.criadaEm)}</span>}
         </div>
+        {/* EM_RISCO sempre com motivo explícito — nunca um selo sem explicação. */}
+        {l.emRisco && l.motivosRisco.length > 0 && (
+          <div className="mt-1 text-[11px] text-amber-800/90">Em risco: {l.motivosRisco.join(" · ")}</div>
+        )}
       </button>
 
       <div className="flex shrink-0 items-center gap-4">
@@ -300,6 +306,15 @@ function CartaoDaFila({
           {l.motivoBloqueio && (
             <div className="mt-1 text-[11px] text-red-700/75">Bloqueio: {l.motivoBloqueio}</div>
           )}
+          {/* RETORNO ANTECIPADO — o terceiro respondeu antes do acompanhamento
+              programado; a atenção reativa AGORA, sem esperar a data agendada. */}
+          {l.retornoRecebido && (
+            <div className="mt-1 text-[11px] text-emerald-700/90">Retorno recebido — aguardando ação</div>
+          )}
+          {/* EM_RISCO — motivo explícito, nunca "risco" genérico sem explicação. */}
+          {l.emRisco && l.motivosRisco.length > 0 && (
+            <div className="mt-1 text-[11px] text-amber-800/90">Em risco: {l.motivosRisco.join(" · ")}</div>
+          )}
         </button>
 
         <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -341,6 +356,11 @@ const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional)
   { id: "bloqueadas", rotulo: "Bloqueadas", aplica: (l) => l.coluna === "BLOQUEADA" },
   { id: "atrasadas", rotulo: "Atrasadas", aplica: (l) => l.atrasada },
   { id: "vence_hoje", rotulo: "Vence hoje", aplica: (l) => l.venceHoje },
+  // Os três abaixo usam a MESMA leitura temporal canônica (Etapa 3/5) que já
+  // alimenta a notificação e a visão gerencial — nenhum cálculo novo aqui.
+  { id: "acompanhar_hoje", rotulo: "Acompanhar hoje", aplica: (l) => l.acompanhamentoVencido },
+  { id: "retornos", rotulo: "Retornos recebidos", aplica: (l) => l.retornoRecebido },
+  { id: "em_risco", rotulo: "Em risco", aplica: (l) => l.emRisco },
 ]
 
 export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) {
@@ -587,7 +607,10 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
       {/* FILTROS DA FILA — recortes derivados, sem criar estado novo. Cada um
           mostra a contagem, para o funcionário saber onde está o volume antes
           de clicar. */}
-      {modo !== "agrupada" && visao === "minha_fila" && linhasFiltradas != null && linhasFiltradas.length > 0 && (
+      {/* Também em "Sem responsável": em risco/acompanhar hoje/retorno recebido
+          importam tanto quanto na fila pessoal — trabalho sem dono e em risco é,
+          se algo, o caso mais urgente de distribuir. */}
+      {modo !== "agrupada" && (visao === "minha_fila" || visao === "sem_responsavel") && linhasFiltradas != null && linhasFiltradas.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1">
           {FILTROS.map((f) => {
             const n = linhasFiltradas.filter(f.aplica).length
