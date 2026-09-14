@@ -23,7 +23,8 @@ import { publicarWorkflow } from "@/src/services/publicacao-de-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
 import { atribuirTarefa } from "@/lib/operacional/tarefa-comandos"
-import { minhaFila } from "@/lib/operacional/tarefa-projecoes"
+import { minhaFila, agregacaoPorFamilia, indicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
+import { STATUS_ATIVOS } from "@/lib/operacional/tarefa-canonica"
 import { humanizarMotivoRisco } from "@/lib/operacional/atencao-operacional"
 import { catalogo } from "@/lib/saude/catalogo"
 import "@/lib/saude/verificacoes/emissao-documental"
@@ -192,6 +193,49 @@ async function main() {
     const r22 = await emi22.executar({ agora: new Date(), modo: "PROFUNDO" })
     ok("19) EMI-022 continua sem achado para as Tarefas com próxima ação determinável (Diana/Carla têm passo 1 disponível)", !r22.achados.some((ac) => [d.tarefaId, c.tarefaId].includes(Number((ac.evidencia as { tarefaId?: number })?.tarefaId))), JSON.stringify(r22.achados.map((a2) => a2.evidencia)))
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("5) HOME × MINHA OPERAÇÃO — os dois números da MESMA família convergem")
+  // ══════════════════════════════════════════════════════════════════════
+  // Achado real (14/09/2026): a Home mostrava, no MESMO card "MINHA CENTRAL
+  // OPERACIONAL", o topo com `indicadoresGerenciais.total` (só STATUS_ATIVOS)
+  // e a lista por família com `agregacaoPorFamilia` SEM filtro de status
+  // (ativos + concluídos) — a família Santin aparecia com "5 minhas tarefas"
+  // na lista contra "4" no topo do mesmo card, porque uma Tarefa concluída
+  // (3561) entrava numa consulta e não na outra. `/api/home/route.ts` agora
+  // passa `status: STATUS_ATIVOS` para `agregacaoPorFamilia` — replicado aqui.
+  const eDoc = await palco(wfId, wfVersao, "Elisa", arv, processo)
+  await atribuirTarefa({ tarefaId: eDoc.tarefaId, responsavelId: daniela.id, autorId: null })
+  const ctxDanielaConclusao = { usuarioId: daniela.id, permissoes: ["tarefas.editar", "documentos.editar"], correlationId: randomUUID(), origem: "USER" as const }
+  await executarAcaoCadastrada(eDoc.stepIds[0], "enviado", {}, ctxDanielaConclusao)
+  await executarAcaoCadastrada(eDoc.stepIds[1], "retorno_chegou", {}, ctxDanielaConclusao)
+  await prisma.documentoArquivo.create({ data: { documentoId: eDoc.doc.id, tipo: "OUTRO", url: `https://x/${MARCA}/elisa.pdf`, nome: "elisa.pdf" } })
+  await executarAcaoCadastrada(eDoc.stepIds[2], "recebido", { documento_url: `https://x/${MARCA}/elisa.pdf` }, ctxDanielaConclusao)
+  await executarAcaoCadastrada(eDoc.stepIds[3], "aprovado", {
+    checklist: { legivel: true, integro: true, dados_minimos: true, apostila_ok: true, traducao_ok: true },
+  }, { ...ctxDanielaConclusao, subtaskKey: "conferencia", correlationId: randomUUID() })
+  await executarAcaoCadastrada(eDoc.stepIds[3], "aprovado", { parecer: "Íntegro." }, { ...ctxDanielaConclusao, subtaskKey: "validacao_juridica", correlationId: randomUUID() })
+  const eDepois = await prisma.tarefa.findUniqueOrThrow({ where: { id: eDoc.tarefaId }, select: { statusTarefa: true } })
+  ok("20) a Tarefa de Elisa está CONCLUÍDA (mesmo processo/família de Antonio e Bianca, ainda abertas)", ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"].includes(eDepois.statusTarefa), eDepois.statusTarefa)
+
+  // O `processo` é compartilhado por VÁRIOS palcos ao longo deste arquivo
+  // (a, b, c, d, eDoc — a mesma "família" por processoId, já que
+  // `familiaId` é null, igual à Santin real). A comparação correta é: TODAS
+  // as Tarefas ativas da Daniela NESTE processo (minhaFila) contra o total
+  // que `agregacaoPorFamilia` devolve para esse mesmo processo — não só o
+  // subconjunto a/b/eDoc.
+  const filaAtiva = await minhaFila(daniela.id)
+  const totalAtivoDoProcesso = filaAtiva.filter((l) => l.processoId === processo.id).length
+  const indicadoresHome = await indicadoresGerenciais({ responsavelId: daniela.id, processoId: processo.id }, new Date())
+  const familiasSemFiltro = await agregacaoPorFamilia(new Date(), { responsavelId: daniela.id, processoId: processo.id })
+  const familiaSemFiltro = familiasSemFiltro.find((f) => f.processos.some((p2) => p2.processoId === processo.id))
+  const familiasComFiltro = await agregacaoPorFamilia(new Date(), { responsavelId: daniela.id, processoId: processo.id, status: STATUS_ATIVOS })
+  const familiaComFiltro = familiasComFiltro.find((f) => f.processos.some((p2) => p2.processoId === processo.id))
+
+  ok("21) Minha Operação (minhaFila) exclui a Tarefa concluída (Elisa) do processo", totalAtivoDoProcesso === familiaComFiltro?.total, `minhaFila=${totalAtivoDoProcesso} agregacaoPorFamilia(ativos)=${familiaComFiltro?.total}`)
+  ok("22) REPRODUZ o bug real: agregacaoPorFamilia SEM filtro de status inclui a concluída (diverge do topo do card)", (familiaSemFiltro?.total ?? 0) === totalAtivoDoProcesso + 1, `semFiltro.total=${familiaSemFiltro?.total} ativos=${totalAtivoDoProcesso}`)
+  ok("23) CORRIGIDO: agregacaoPorFamilia COM status:STATUS_ATIVOS bate com Minha Operação (minhaFila) para o mesmo processo", familiaComFiltro?.total === totalAtivoDoProcesso, `familia.total=${familiaComFiltro?.total} minhaFila=${totalAtivoDoProcesso}`)
+  ok("24) o total do card (indicadoresGerenciais, escopado ao processo) e a lista por família (corrigida) concordam no MESMO universo", indicadoresHome.total === familiaComFiltro?.total, `indicadores.total=${indicadoresHome.total} familia.total=${familiaComFiltro?.total}`)
 
   await limpar()
   console.log(`\n${"=".repeat(70)}`)

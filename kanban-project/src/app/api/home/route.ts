@@ -19,6 +19,7 @@ import { carregarBase, contarTrabalhoPendenteDistinto, montarAgenda, montarAlert
 import { montarStatus } from "@/src/lib/home/home-logic"
 import type { HomeData, HomePermissions } from "@/src/types/home"
 import { agregacaoPorFamilia, indicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
+import { STATUS_ATIVOS } from "@/lib/operacional/tarefa-canonica"
 import { fasesParaSelecao } from "@/src/lib/process-stage/fases-catalog"
 
 export async function GET(request: NextRequest) {
@@ -48,12 +49,21 @@ export async function GET(request: NextRequest) {
     // o próprio trabalho. Decidido AQUI, a partir da sessão — nunca aceito do
     // cliente (ver src/lib/autorizacao/escopo-operacional.ts).
     const filtroCentral = isAdmin ? {} : { responsavelId: usuario.userId }
+    // "MINHA CENTRAL OPERACIONAL" (card da Home) é literalmente "o que preciso
+    // fazer agora, por família" — os indicadores do topo do card
+    // (`indicadoresGerenciais`) já só contam STATUS_ATIVOS. A lista por
+    // família (`agregacaoPorFamilia`) sem este filtro usava o padrão mais
+    // amplo (ativos + concluídos) — achado real (14/09/2026): a mesma família
+    // aparecia com "5 minhas tarefas" na lista e "4" no total do topo do
+    // MESMO card, porque as duas consultas tinham escopos de status
+    // diferentes. As duas leituras de UM card precisam concordar.
+    const filtroFamiliasCentral = { ...filtroCentral, status: STATUS_ATIVOS }
     const [filas, agenda, resumoDia, alertas, familiasCentral, indicadoresCentral] = await Promise.all([
       Promise.resolve(montarFilas(base, ctx)),
       montarAgenda(ctx),
       montarResumoDia(base, ctx),
       montarAlertas(base, ctx),
-      permissoes.verTarefas ? agregacaoPorFamilia(ctx.agora, filtroCentral) : Promise.resolve([]),
+      permissoes.verTarefas ? agregacaoPorFamilia(ctx.agora, filtroFamiliasCentral) : Promise.resolve([]),
       permissoes.verTarefas ? indicadoresGerenciais(filtroCentral, ctx.agora) : Promise.resolve(null),
     ])
 
