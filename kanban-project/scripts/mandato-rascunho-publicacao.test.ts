@@ -26,15 +26,21 @@
 // exato do que o mandato exige ("alterações estruturais importantes não devem
 // entrar em produção operacional enquanto o admin ainda está editando").
 //
-// CORRIGIDO (mínimo, cirúrgico): `src/services/phase-workflow.ts::ancorarNaVersaoPublicada`
-// — quando há rascunho pendente, ancora `slaDays` de cada passo (o campo do
-// qual os 4 relógios do mandato — Blocos 1/2 — dependem) na ÚLTIMA VERSÃO
-// REALMENTE PUBLICADA, e ancora `workflowVersion` da instância nova nessa mesma
-// versão, nunca no contador ao vivo que uma edição em andamento já adiantou.
-// A ESTRUTURA (quais passos existem) continua vindo do rascunho — reconstruí-la
-// a partir do congelado exigiria reconciliar identidade entre `DefStep` e
-// `PassoCongelado` para ações/campos/canais/checklist, mudança maior e fora do
-// escopo mínimo desta correção; documentado como limitação residual conhecida.
+// CORRIGIDO: `src/services/phase-workflow.ts::ancorarNaVersaoPublicada` — quando
+// há rascunho pendente, ancora TODO o conjunto de passos (não só `slaDays`)
+// na ÚLTIMA VERSÃO REALMENTE PUBLICADA, e ancora `workflowVersion` da
+// instância nova nessa mesma versão, nunca no contador ao vivo que uma edição
+// em andamento já adiantou. Contraprova (13/09/2026, segunda rodada): a
+// ESTRUTURA (quais passos existem, quantos) TAMBÉM vazava — um passo novo
+// criado no rascunho, sem publicar, aparecia numa Tarefa materializada nesse
+// intervalo. Fechado: a lista de passos agora vem inteira do congelado
+// (`PassoCongelado` já carrega tudo que `DefStep` precisa; `stepDefinitionId`
+// é resolvido por chave contra a tabela viva, com fallback seguro — esse
+// ponteiro já era conhecidamente frágil, ver `versaoDaInstancia`). Ações/
+// campos/canais/checklist de CADA passo já eram protegidos antes disso, em
+// EXECUÇÃO, via `definicaoHistoricaDoPasso` (par workflowVersion×key) — o que
+// faltava era só o CONJUNTO de passos na hora de decidir quais materializar.
+// Seções 7-8 abaixo provam a contraprova estrutural.
 //
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
@@ -184,6 +190,58 @@ async function main() {
     const stepInst1Depois = await prisma.phaseWorkflowStepInstance.findFirst({ where: { workflowInstanceId: r1.workflowInstance.id }, select: { slaDays: true } })
     ok("6.1) a Tarefa 1 (nascida na V1) continua com slaDays=5 depois de DUAS publicações posteriores", stepInst1Depois?.slaDays === 5, String(stepInst1Depois?.slaDays))
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("7) CONTRAPROVA ESTRUTURAL — admin ADICIONA um passo novo (rascunho), sem publicar")
+  // ══════════════════════════════════════════════════════════════════════
+  // V2 publicada (seção 5) tem 1 passo só. Agora o admin cria um SEGUNDO passo
+  // na tabela viva, sem publicar — a contagem de passos em si diverge da
+  // última versão publicada, não só um campo de um passo existente.
+  await prisma.phaseInternalWorkflowStep.create({
+    data: { workflowId: wf.id, key: "passo_dois", label: "Passo Dois (rascunho, não publicado)", ordem: 2, slaDays: 3, cardinalidade: "PROCESSO" },
+    select: { id: true },
+  })
+  await marcarRascunho(wf.id, null)
+  const wfAposAdicao = await prisma.phaseInternalWorkflow.findUniqueOrThrow({ where: { id: wf.id }, select: { rascunhoAlteradoEm: true } })
+  ok("7.1) rascunho pendente está marcado depois de adicionar o passo 2", wfAposAdicao.rascunhoAlteradoEm != null)
+
+  const arv4 = await prisma.arvore.create({ data: { nome: `${MARCA} arv4` }, select: { id: true } })
+  const proc4 = await prisma.processo.create({
+    data: { nome: `${MARCA} proc4`, arvoreId: arv4.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    select: { id: true },
+  })
+  const r4 = await instanciarWorkflowDaFase({ processoId: proc4.id, faseMacroKey: PHASE_KEY })
+  ok("7.2) quarta materialização sucede mesmo com passo novo não publicado", r4.success === true)
+  if (r4.success) {
+    const steps4 = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: r4.workflowInstance.id }, select: { stepKey: true } })
+    ok(
+      "7.3) A CORREÇÃO ESTRUTURAL: a Tarefa nova nasce com o CONJUNTO PUBLICADO de passos (1) — o passo 2 do rascunho NÃO vaza",
+      steps4.length === 1 && steps4[0]?.stepKey === "passo_unico",
+      `stepKeys materializados=${JSON.stringify(steps4.map((s) => s.stepKey))}`,
+    )
+  }
+
+  secao("8) PUBLICAR a estrutura nova (2 passos) — só então a Tarefa nova ganha o segundo passo")
+  const pub3 = await publicarWorkflow({ workflowId: wf.id, actorId: null })
+  ok("8.1) terceira publicação (2 passos) sucede", pub3.ok === true, JSON.stringify(pub3).slice(0, 150))
+
+  const arv5 = await prisma.arvore.create({ data: { nome: `${MARCA} arv5` }, select: { id: true } })
+  const proc5 = await prisma.processo.create({
+    data: { nome: `${MARCA} proc5`, arvoreId: arv5.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    select: { id: true },
+  })
+  const r5 = await instanciarWorkflowDaFase({ processoId: proc5.id, faseMacroKey: PHASE_KEY })
+  ok("8.2) quinta materialização sucede", r5.success === true)
+  if (r5.success) {
+    const steps5 = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: r5.workflowInstance.id }, select: { stepKey: true }, orderBy: { ordem: "asc" } })
+    ok(
+      "8.3) DEPOIS de publicar, a Tarefa nova ganha os 2 passos",
+      steps5.length === 2 && steps5[0]?.stepKey === "passo_unico" && steps5[1]?.stepKey === "passo_dois",
+      `stepKeys=${JSON.stringify(steps5.map((s) => s.stepKey))}`,
+    )
+  }
+
+  ok("8.4) a Tarefa 4 (nascida durante o rascunho estrutural) continua com 1 passo só, mesmo após a publicação", (await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: r4.success ? r4.workflowInstance.id : -1 } })) === 1)
 
   await limpar()
 

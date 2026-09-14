@@ -176,19 +176,33 @@ export async function resolverWorkflowAplicavel(
  *
  * Esta função ANCORA a materialização de uma instância NOVA na última versão
  * REALMENTE publicada sempre que existir uma edição de rascunho pendente:
- * substitui `slaDays` por passo (o único campo do qual os 4 relógios do mandato
- * dependem — Bloco 1/2) pelo valor CONGELADO, e ancora `workflow.versao` na
- * versão que o congelamento comprova existir, nunca no contador "próxima versão"
- * que `PhaseInternalWorkflow.versao` passa a representar assim que alguém edita.
+ * substitui o CONJUNTO de passos (quais existem, quantos, ordem, `slaDays` —
+ * o campo do qual os 4 relógios do mandato dependem, Bloco 1/2) pelo
+ * CONGELADO, e ancora `workflow.versao` na versão que o congelamento
+ * comprova existir, nunca no contador "próxima versão" que
+ * `PhaseInternalWorkflow.versao` passa a representar assim que alguém edita.
  *
- * NÃO reconstrói a lista de passos a partir da versão congelada (isso exigiria
- * reconciliar identidade entre `DefStep`/`PassoCongelado` para AÇÕES/CAMPOS/
- * CANAIS/CHECKLIST — mudança estrutural maior, fora do escopo mínimo desta
- * correção) — a estrutura (quais passos existem) continua vindo do rascunho. O
- * que se ancora é exatamente o que os 4 relógios (SLA) precisam para não vazar
- * uma edição em andamento para uma operação nova. Sem rascunho pendente
- * (`rascunhoAlteradoEm == null`), não há nada a ancorar: devolve o resolvido tal
- * como veio — é o caminho de sempre, sem custo extra.
+ * Reconstrói a LISTA de passos a partir da versão congelada (`PassoCongelado`
+ * já carrega tudo que `DefStep` precisa). `stepDefinitionId` é resolvido por
+ * `key` contra a tabela viva quando uma linha ainda existe com essa chave;
+ * quando não existe (passo removido/recriado numa edição posterior — o
+ * comentário de `versaoDaInstancia` já documenta que esse ponteiro é
+ * inerentemente frágil: TODA edição de workflow apaga e recria as linhas de
+ * `PhaseInternalWorkflowStep`, mesmo sem trocar a versão publicada), cai para
+ * `null` — a coluna é opcional e sem FK forte exatamente por isto; quem
+ * resolve a definição de verdade em runtime é `versaoDaInstancia`/
+ * `definicaoHistoricaDoPasso`, pelo par (versão, chave), nunca por este id.
+ *
+ * O QUE AINDA NÃO SE COBRE: ações/campos/canais/checklist/requisitos de CADA
+ * passo continuam sendo lidos, em EXECUÇÃO, pelo par (workflowVersion, key)
+ * via `definicaoHistoricaDoPasso` — e `workflowVersion` já vem ancorado aqui.
+ * Ou seja: mesmo antes desta função existir, o conteúdo interno de cada passo
+ * (o que a tela de execução cobra) já nunca vazava do rascunho — só o
+ * CONJUNTO de passos vazava. Esta função fecha essa lacuna também.
+ *
+ * Sem rascunho pendente (`rascunhoAlteradoEm == null`), não há nada a
+ * ancorar: devolve o resolvido tal como veio — é o caminho de sempre, sem
+ * custo extra.
  */
 async function ancorarNaVersaoPublicada(
   resolvido: { workflow: DefWorkflow; steps: DefStep[] },
@@ -214,11 +228,21 @@ async function ancorarNaVersaoPublicada(
   const publicada = await lerVersaoPublicada(workflow.id, ultimaPublicada.versao, db)
   if (!publicada) return resolvido
 
-  const slaPorKey = new Map(publicada.passos.map((p) => [p.key, p.slaDays]))
-  const stepsAncorados: DefStep[] = steps.map((s) => {
-    const slaPublicado = slaPorKey.get(s.key)
-    return slaPublicado != null && slaPublicado !== s.slaDays ? { ...s, slaDays: slaPublicado } : s
-  })
+  const idPorKey = new Map(steps.map((s) => [s.key, s.id]))
+  const stepsAncorados: DefStep[] = publicada.passos
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((p) => ({
+      id: idPorKey.get(p.key) ?? 0,
+      key: p.key, label: p.label, description: p.description, ordem: p.ordem,
+      createsTask: p.createsTask, required: p.required, owner: p.owner, priority: p.priority,
+      slaDays: p.slaDays, completionRule: p.completionRule, checklist: p.checklist, versao: p.versao,
+      cardinalidade: normalizarCardinalidade(p.cardinalidade),
+      tipo: null,
+      dependeDe: Array.isArray(p.dependeDe) ? p.dependeDe : null,
+      executorKey: p.executorKey,
+      dependeDeStepKeys: null,
+    }))
 
   return {
     workflow: { ...workflow, versao: ultimaPublicada.versao },
