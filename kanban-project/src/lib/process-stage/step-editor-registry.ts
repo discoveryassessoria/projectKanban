@@ -51,6 +51,10 @@ export type StepEditorKind =
   | "recebimento_documento"
   | "conferencia_documento"
   | "validacao_juridica"
+  /** CORREÇÃO FINAL (14/09/2026): conferência + validação jurídica unificadas
+   *  num único passo operacional (4/4), com as duas como SUBTAREFAS do mesmo
+   *  Step — nunca um quinto Step. Ver docs/architecture/29. */
+  | "conferencia_e_validacao"
   | "padrao"
 
 /** Editores ESPECÍFICOS registrados, por stepKey canônico do passo publicado. */
@@ -63,6 +67,9 @@ const EDITOR_POR_STEP_KEY: Record<string, Exclude<StepEditorKind, "padrao">> = {
   receber_certidao: "recebimento_documento",
   conferir_certidao: "conferencia_documento",
   validar_certidao: "validacao_juridica",
+  // CORREÇÃO FINAL (14/09/2026): conferir_certidao + validar_certidao saíram
+  // do cadastro vivo — conferir_e_validar_certidao é o passo 4/4 canônico.
+  conferir_e_validar_certidao: "conferencia_e_validacao",
 }
 
 export interface ResolucaoEditor {
@@ -130,6 +137,13 @@ export const APRESENTACAO_EDITOR: Record<StepEditorKind, { titulo: string; descr
     titulo: "Validação jurídica",
     descricao:
       "Decisão jurídica final: validar, marcar como divergente ou inválido. Parecer obrigatório.",
+  },
+  conferencia_e_validacao: {
+    titulo: "Conferir e validar certidão",
+    descricao:
+      "Duas subtarefas do mesmo passo: conferência operacional (checklist) e, em seguida, " +
+      "validação jurídica final (parecer + VALIDADA/NÃO VALIDADA). O passo só conclui quando " +
+      "as duas estiverem feitas — nunca é preciso reatribuir para uma Tarefa nova.",
   },
   padrao: {
     titulo: "Painel operacional da etapa",

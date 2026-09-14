@@ -145,6 +145,24 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     suportaEsperaExterna: false,
     suportaCondicoes: true,
   },
+  conferencia_e_validacao: {
+    key: "conferencia_e_validacao",
+    label: "Conferir e validar certidão",
+    // UNIÃO das capacidades de conferencia_documento + validacao_juridica — as
+    // duas subtarefas do mesmo passo continuam precisando exatamente do que
+    // precisavam separadas; só o AGRUPAMENTO mudou, não o que cada uma sabe
+    // desenhar/disparar. GO_RETIFICATION/INVALIDATE_DOCUMENT continuam fora por
+    // competência de fase (a Emissão não decide retificação — mesma trava de
+    // antes, agora reafirmada para o passo unificado).
+    campos: ["texto", "textarea", "checkbox", "select", "radio", "upload"],
+    efeitos: ["APPROVE_FOR_ANALYSIS", "REQUEST_NEW_COPY", "COMPLETE_STEP", "REGISTER_ONLY", "COMPLETE_DOCUMENT", "REGISTER_DIVERGENCE"],
+    acoesCadastradas: true,
+    checklistCadastrado: true,
+    suportaCanais: false,
+    suportaEvidencia: true,
+    suportaEsperaExterna: false,
+    suportaCondicoes: true,
+  },
   registral: {
     key: "registral",
     label: "Editor registral",

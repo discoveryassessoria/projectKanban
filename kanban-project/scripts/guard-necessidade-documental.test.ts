@@ -258,6 +258,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "Emissão Documental, item 08): monta e derruba o PRÓPRIO cenário isolado (workflow de 1 " +
     "passo) só no banco de teste — a necessidade é criada direto para montar o palco mínimo, " +
     "nunca para simular o materializador oficial",
+  "scripts/correcao-4-passos-unificado.test.ts":
+    "correção final (mandato Emissão Documental, 14/09/2026): prova o passo unificado " +
+    "'conferir_e_validar_certidao' (2 subtarefas) — monta e derruba o PRÓPRIO cenário só " +
+    "no banco de teste; a necessidade é criada direto para montar o palco mínimo, a " +
+    "materialização em si usa garantirTarefaDePasso (o caminho oficial)",
   "scripts/contraprova-granularidade-multipessoa.test.ts":
     "contraprova independente (mandato Emissão Documental) de que 3 necessidades/pessoas geram " +
     "3 Tarefas isoladas — monta e derruba o PRÓPRIO cenário só no banco de teste; a necessidade " +
