@@ -473,7 +473,15 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: L
  * próximo, depois prioridade. Tarefa sem prazo vai para o fim, não para o
  * começo: ausência de prazo não é urgência.
  */
-export async function minhaFila(usuarioId: number, agora = new Date(), db: Leitor = prisma): Promise<LinhaGerencial[]> {
+export async function minhaFila(
+  usuarioId: number, agora = new Date(), db: Leitor = prisma,
+  // FILTROS SERVER-SIDE (mandato "Minha Operação" §20): fase/terceiro/prazo/
+  // busca entram no `where` do banco, ANTES da paginação — nunca "busca tudo
+  // e filtra no JS". `responsavelId`/`porPagina` do chamador são ignorados de
+  // propósito: quem executa só vê a própria fila, e o teto de 500 é o mesmo
+  // de sempre.
+  filtrosExtra: Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> = {},
+): Promise<LinhaGerencial[]> {
   // UMA FONTE, DUAS TELAS.
   //
   // A Minha Fila lia uma projeção mais pobre que a da visão gerencial: sem
@@ -482,7 +490,7 @@ export async function minhaFila(usuarioId: number, agora = new Date(), db: Leito
   // projeções do mesmo fato acabam divergindo.
   //
   // Agora é a MESMA consulta, com o recorte de quem executa.
-  const { linhas } = await visaoGerencial({ responsavelId: usuarioId, porPagina: 500 }, agora, db)
+  const { linhas } = await visaoGerencial({ ...filtrosExtra, responsavelId: usuarioId, porPagina: 500 }, agora, db)
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
   return ordenarFila(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
 }
@@ -1174,6 +1182,8 @@ export interface FiltrosGerenciais {
   /** Negação de `aguardandoDependencia`/em-espera/terminal/causa-removida — ver `tarefa-canonica.ts`. */
   executavelAgora?: boolean
   proximos7Dias?: boolean
+  /** O terceiro (Documento.orgao.name), exato — dropdown "Terceiro" de Minha Operação. Server-side, antes da paginação. */
+  terceiro?: string | null
   /** Açúcar sobre `status`: idêntico a `status: ['AGUARDANDO_TERCEIRO','AGUARDANDO_CLIENTE']`. */
   aguardandoTerceiro?: boolean
   /** Açúcar sobre `status`: idêntico a `status: ['BLOQUEADA']`. */
@@ -1311,6 +1321,7 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   // pergunta (identificação, não estado): ver `terceiroNome` na projeção da
   // linha, resolvido via `Documento.orgao` SÓ quando esse vínculo existe, e
   // nunca usado para DECIDIR se a tarefa está esperando.
+  if (f.terceiro) e.push({ documento: { orgao: { name: f.terceiro } } })
   if (f.aguardandoTerceiro) e.push({ statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } })
   if (f.bloqueada) e.push({ statusTarefa: 'BLOQUEADA' })
   if (f.executavelAgora != null) e.push(whereExecutavelAgora(f.executavelAgora))

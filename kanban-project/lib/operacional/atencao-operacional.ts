@@ -97,6 +97,32 @@ export function rotuloDeAtencao(l: LinhaComAtencao & { prioridade: string }): { 
   return { rotulo: 'Normal', tom: 'neutro' }
 }
 
+/**
+ * HUMANIZAÇÃO DE MOTIVO DE RISCO — mandato "Minha Operação" §16-18.
+ *
+ * `motivosRisco` (de `computarProximoAcontecimento`, `proximo-acontecimento.ts`)
+ * é diagnóstico técnico: o código é estável e às vezes carrega detalhe bruto
+ * depois de ":" (ex. `CONFLITO_PRAZO_TAREFA_PASSO: Tarefa.dataPrazo=... ×
+ * PhaseWorkflowStepInstance.prazo=...`). Isso é correto para auditoria/Saúde
+ * do Sistema — NUNCA para a Daniela. Esta função é a ÚNICA tradução para
+ * linguagem operacional; o código técnico continua disponível (chamador
+ * decide se mostra, ex. um tooltip administrativo), nunca é apagado.
+ */
+const HUMANIZACAO_RISCO: Record<string, string> = {
+  CONFLITO_PRAZO_TAREFA_PASSO: 'Conflito de prazo: o prazo do passo atual diverge do prazo geral desta operação.',
+  CONFLITO_RETORNO_TERCEIRO: 'O último contato registra retorno recebido, mas o pedido formal ainda não foi confirmado como respondido — divergência entre as duas fontes.',
+  RETORNO_SEM_ACAO_INTERNA: 'O terceiro respondeu, mas a operação continua marcada como em espera.',
+  AGUARDANDO_SEM_PREVISAO_NEM_ACOMPANHAMENTO: 'Esta operação está aguardando terceiro sem previsão de retorno nem próximo acompanhamento definidos.',
+  ACOMPANHAMENTO_VENCIDO: 'O próximo acompanhamento programado já venceu.',
+  SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL: 'Não foi possível determinar o que acontece a seguir nesta operação.',
+  SEM_RESPONSAVEL_PARA_PROXIMA_ACAO: 'Esta operação não possui responsável definido para agir.',
+}
+
+export function humanizarMotivoRisco(motivo: string): { texto: string; codigo: string } {
+  const codigo = motivo.split(':')[0]?.trim() ?? motivo
+  return { texto: HUMANIZACAO_RISCO[codigo] ?? 'Não foi possível determinar a próxima ação desta operação com segurança.', codigo }
+}
+
 /** A ordem que a operação olha primeiro — dentro do mesmo degrau, prazo mais próximo, depois `taskId` (determinístico). */
 export function ordenarPorAtencaoOperacional<T extends LinhaComAtencao>(linhas: T[]): T[] {
   return [...linhas].sort((a, b) => {

@@ -153,6 +153,14 @@ export interface EntradaOperacao {
     ultimoContatoResultado: string | null
     /** `ContatoEtapa.chave` do último contato — identidade estável do FATO, para idempotência (Etapa 4). */
     ultimoContatoChave?: string | null
+    /**
+     * O RÓTULO PUBLICADO DO PASSO (ex.: "Enviar requerimento ao cartório") —
+     * mesma cadeia de resolução de `rotuloDoPasso` (snapshot → definição
+     * publicada → chave). Usado para compor a "próxima ação" com a AÇÃO real
+     * configurada no cadastro, em vez de só a data ("Responsável deve agir
+     * até..."). `null` = sem rótulo resolvível, cai no texto genérico.
+     */
+    etapaLabel?: string | null
   } | null
   /** A solicitação de documento vinculada a esta Tarefa, quando existe (`SolicitacaoDocumento.tarefaId`). */
   solicitacao: {
@@ -314,16 +322,20 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
                   ? false
                   : true // as duas já venceram — o acompanhamento é a ação interna mais direta
       if (acompanhamentoVenceAntes) {
+        // SITUAÇÃO × PRÓXIMA AÇÃO (mandato "Minha Operação" §7): a descrição
+        // diz O QUE está sendo aguardado; a DATA já viaja separada em
+        // `data` — quem lê decide se/como mostra "acompanhar em X" como
+        // contexto secundário, sem embuti-la na frase de ação.
         proximoAcontecimento = {
           tipo: "aguardando_terceiro_acompanhamento", data: proximoAcompanhamentoData!.toISOString(),
-          descricao: `Aguardando ${terceiroAguardado ?? "terceiro"} — acompanhar em ${dataBR(proximoAcompanhamentoData!)}`,
+          descricao: `Aguardando ${terceiroAguardado ?? "terceiro"}`,
           responsavelId: e.responsavelId, aguardandoTerceiro: true, terceiroAguardado,
           origem: "metadata.operacao.proximoAcompanhamento",
         }
       } else {
         proximoAcontecimento = {
           tipo: "aguardando_terceiro_previsao", data: previsaoTerceiro!.toISOString(),
-          descricao: `Aguardando retorno de ${terceiroAguardado ?? "terceiro"} — previsto para ${dataBR(previsaoTerceiro!)}`,
+          descricao: `Aguardando retorno de ${terceiroAguardado ?? "terceiro"}`,
           responsavelId: e.responsavelId, aguardandoTerceiro: true, terceiroAguardado,
           origem: solicitacaoAtiva ? "SolicitacaoDocumento.previsaoRetorno" : "metadata.operacao.previsaoEfetiva",
         }
@@ -331,9 +343,14 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
       if (acompanhamentoVencido) motivosRisco.push("ACOMPANHAMENTO_VENCIDO")
     }
   } else if (prazoOperacao) {
+    // A AÇÃO, não só o prazo (mandato "Minha Operação" §4/§6-C): quando o
+    // passo atual tem rótulo publicado (o caso normal), ele diz O QUE fazer
+    // — "Enviar requerimento ao cartório", não "Responsável deve agir até
+    // 21/09". A data já viaja separada em `data`/`prazoOperacao` — quem lê
+    // decide se mostra "até X" como contexto secundário.
     proximoAcontecimento = {
       tipo: "acao_interna", data: prazoOperacao.toISOString(),
-      descricao: `Responsável deve agir até ${dataBR(prazoOperacao)}`,
+      descricao: e.passo?.etapaLabel ? e.passo.etapaLabel : `Responsável deve agir até ${dataBR(prazoOperacao)}`,
       responsavelId: e.responsavelId, aguardandoTerceiro: false, terceiroAguardado: null, origem: "Tarefa.dataPrazo",
     }
     if (acompanhamentoVencido) motivosRisco.push("ACOMPANHAMENTO_VENCIDO")
@@ -342,7 +359,7 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
     // antes de declarar risco — este é exatamente esse caso.
     proximoAcontecimento = {
       tipo: "acompanhamento", data: proximoAcompanhamentoData.toISOString(),
-      descricao: `Acompanhar em ${dataBR(proximoAcompanhamentoData)}`,
+      descricao: e.passo?.etapaLabel ? e.passo.etapaLabel : "Acompanhar",
       responsavelId: e.responsavelId, aguardandoTerceiro: false, terceiroAguardado: null,
       origem: "metadata.operacao.proximoAcompanhamento",
     }
@@ -413,10 +430,24 @@ export async function estadosTemporaisDasOperacoes(
   const steps = stepIds.length
     ? await db.phaseWorkflowStepInstance.findMany({
         where: { id: { in: stepIds } },
-        select: { id: true, prazo: true, startedAt: true, metadata: true },
+        select: { id: true, prazo: true, startedAt: true, metadata: true, stepKey: true, stepDefinitionId: true, snapshot: true },
       })
     : []
   const stepPorId = new Map(steps.map((s) => [s.id, s]))
+
+  // O RÓTULO PUBLICADO DO PASSO — batched pelo `stepDefinitionId` (mesmo
+  // padrão de `rotulosDosPassos` em `tarefa-projecoes.ts`; não importado
+  // daqui para não criar ciclo de import — este arquivo é importado por ele).
+  const defIds = [...new Set(steps.map((s) => s.stepDefinitionId).filter((id): id is number => id != null))]
+  const definicoes = defIds.length
+    ? await db.phaseInternalWorkflowStep.findMany({ where: { id: { in: defIds } }, select: { id: true, label: true } })
+    : []
+  const labelPorDefId = new Map(definicoes.map((d) => [d.id, d.label]))
+  const etapaLabelDoStep = (s: { snapshot: unknown; stepDefinitionId: number | null; stepKey: string } | null): string | null => {
+    if (!s) return null
+    const snap = s.snapshot as { label?: string; titulo?: string } | null
+    return snap?.label ?? snap?.titulo ?? (s.stepDefinitionId != null ? labelPorDefId.get(s.stepDefinitionId) : null) ?? null
+  }
 
   const solicitacoes = await db.solicitacaoDocumento.findMany({
     where: { tarefaId: { in: tarefaIds } },
@@ -460,6 +491,7 @@ export async function estadosTemporaisDasOperacoes(
             andamento,
             ultimoContatoResultado: ultimoContato?.resultado ?? null,
             ultimoContatoChave: ultimoContato?.chave ?? null,
+            etapaLabel: etapaLabelDoStep(stepRow),
           }
         : null,
       solicitacao: solRow

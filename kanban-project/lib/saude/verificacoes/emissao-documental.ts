@@ -1,10 +1,18 @@
 // lib/saude/verificacoes/emissao-documental.ts
 //
-// EMISSÃO DOCUMENTAL — "Solicitar Certidão" (1 Tarefa canônica, 5 Steps reais):
-// solicitar_certidao → aguardar_retorno_do_cartorio → receber_certidao →
-// conferir_certidao → validar_certidao.
+// EMISSÃO DOCUMENTAL — "Solicitar Certidão" (1 Tarefa canônica, EXATAMENTE 4
+// Steps operacionais, decisão de negócio de 14/09/2026): solicitar_certidao →
+// aguardar_retorno_do_cartorio → receber_certidao → conferir_e_validar_certidao.
+// O passo 4 reúne conferência + validação como DUAS SUBTAREFAS do MESMO
+// Step (StepSubtaskDefinition/SubtaskExecution) — nunca um quinto Step — e é
+// executado integralmente por quem detém a Tarefa (sem handoff automático).
 //
-// Estas 20 verificações vigiam especificamente a integridade do par
+// HISTÓRICO LEGÍTIMO: Tarefas concluídas/canceladas ANTES da unificação
+// (14/09/2026) podem legitimamente ter 5 Steps — são fato histórico
+// preservado, nunca reescrito. As verificações EMI-021/EMI-022 (fim do
+// arquivo) distinguem esse histórico de um ESTADO ATUAL INVÁLIDO.
+//
+// Estas verificações vigiam especificamente a integridade do par
 // Tarefa↔Step↔Necessidade↔Documento neste fluxo — read-only, como todo o
 // resto do motor de Saúde do Sistema. Nenhuma delas escreve nada; nenhuma
 // corrige nada. O que cada uma prova está descrito no comentário de cada
@@ -1090,6 +1098,127 @@ registrar({
         evidencia: { tarefaId: l.tarefaid, documentoId: l.documentoid, responsavelTarefa: l.resptarefa, responsavelDocumento: l.respdocumento },
       })),
       metricas: { divergentes: linhas.length },
+    }
+  },
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 21 — CADEIA ATUAL COM QUANTIDADE DE STEPS DIVERGENTE DO CADASTRO PUBLICADO
+// ═══════════════════════════════════════════════════════════════════════════
+registrar({
+  id: 'saude.emissao.quantidade-steps-diverge-do-publicado',
+  codigo: 'EMI-021',
+  nome: 'Cadeia ativa tem a mesma quantidade de Steps da versão publicada que usa',
+  descricao: 'Uma `PhaseWorkflowInstance` ATIVA aponta para uma `workflowVersion` cujo snapshot publicado tem N passos — a cadeia materializada (por documento) precisa ter exatamente N `PhaseWorkflowStepInstance`, nem a mais nem a menos. Histórico CONCLUÍDO/CANCELADO de versões antigas (ex.: 5 passos, antes da unificação de 14/09/2026) fica FORA deste alcance — é fato preservado, não estado atual.',
+  dominio: 'WORKFLOW',
+  modulo: 'Emissão Documental',
+  severidadePadrao: 'CRITICO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.9.0',
+  timeoutMs: 25_000,
+  orientacao: 'Rode a reconciliação (`scripts/reconciliar-4-passos.ts`) em dry-run para este documento, ou investigue manualmente por que a cadeia materializada diverge da versão publicada que a instância referencia.',
+  rotaCorrecao: ROTA_RUNTIME,
+  responsavel: 'Emissão Documental',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // HISTÓRICO LEGÍTIMO ≠ ESTADO ATUAL INVÁLIDO: `PhaseWorkflowInstance` é
+    // compartilhada por VÁRIOS documentos da mesma fase (achado real da
+    // reconciliação — instância #350 serve 6 documentos da família Santin).
+    // `wi.status='ATIVO'` sozinho não basta: a Tarefa de UM documento pode
+    // estar CONCLUÍDA/CANCELADA (5 passos históricos, corretos) enquanto a
+    // instância continua ATIVA para OUTROS documentos. O alcance real é a
+    // Tarefa do PRÓPRIO documento, não terminal.
+    const linhas = await prisma.$queryRawUnsafe<Array<{ documentoid: number; instanciaid: number; esperado: number; real: number }>>(
+      `WITH cadeias AS (
+         SELECT psi."documentoId" AS documentoid, psi."workflowInstanceId" AS instanciaid, COUNT(*)::int AS real
+           FROM "PhaseWorkflowStepInstance" psi
+           JOIN "PhaseWorkflowInstance" wi ON wi.id = psi."workflowInstanceId"
+           JOIN "Tarefa" t ON t."documentoId" = psi."documentoId" AND t."faseMacroKey" = '${PHASE_KEY}'
+          WHERE psi."faseMacroKey" = '${PHASE_KEY}'
+            AND wi.status = 'ATIVO'
+            AND psi."documentoId" IS NOT NULL
+            AND psi.status NOT IN ('CANCELADO')
+            AND t."statusTarefa" NOT IN ('${STATUS_TAREFA_TERMINAL.join("','")}')
+          GROUP BY psi."documentoId", psi."workflowInstanceId"
+       ),
+       esperado AS (
+         SELECT wi.id AS instanciaid, jsonb_array_length(v.passos) AS esperado
+           FROM "PhaseWorkflowInstance" wi
+           JOIN "PhaseInternalWorkflowVersao" v ON v."workflowId" = wi."workflowDefinitionId" AND v.versao = wi."workflowVersion"
+          WHERE wi."faseMacroKey" = '${PHASE_KEY}' AND wi.status = 'ATIVO'
+       )
+       SELECT c.documentoid, c.instanciaid, e.esperado, c.real
+         FROM cadeias c JOIN esperado e ON e.instanciaid = c.instanciaid
+        WHERE c.real != e.esperado
+        LIMIT 100`,
+    )
+    if (!linhas.length) return vazio({ divergentes: 0 }, 'Toda cadeia ativa da Emissão Documental tem a quantidade de Steps da versão publicada que usa.')
+    return {
+      achados: linhas.map((l): Achado => ({
+        chave: `emi-qtd-steps-diverge:${l.documentoid}`,
+        severidade: 'CRITICO',
+        titulo: `Documento #${l.documentoid} tem ${l.real} Steps materializados, a versão publicada da instância prevê ${l.esperado}`,
+        descricao: `A instância #${l.instanciaid} referencia uma versão publicada com ${l.esperado} passos, mas a cadeia materializada tem ${l.real}.`,
+        explicacao: 'A cadeia materializada de uma instância ATIVA precisa corresponder exatamente à versão publicada que ela referencia — divergência aqui é exatamente o defeito que a correção de 14/09/2026 (unificação conferir+validar) existe para nunca mais acontecer silenciosamente.',
+        impacto: 'A tela pode mostrar um progresso (X/N) que não bate com o que existe de verdade, ou faltar/sobrar um passo na execução real.',
+        entidade: 'PhaseWorkflowStepInstance', registroId: String(l.instanciaid), quantidade: 1,
+        link: ROTA_RUNTIME,
+        recomendacao: 'Rode a reconciliação em dry-run para este documento antes de qualquer correção manual.',
+        evidencia: { documentoId: l.documentoid, workflowInstanceId: l.instanciaid, stepsEsperados: l.esperado, stepsReais: l.real },
+      })),
+      metricas: { divergentes: linhas.length },
+    }
+  },
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 22 — OPERAÇÃO SEM PRÓXIMA AÇÃO DETERMINÁVEL (RISCO PERSISTENTE)
+// ═══════════════════════════════════════════════════════════════════════════
+registrar({
+  id: 'saude.emissao.proxima-acao-indeterminada',
+  codigo: 'EMI-022',
+  nome: 'Nenhuma Tarefa aberta fica sem próxima ação determinável',
+  descricao: 'A leitura temporal canônica (`computarProximoAcontecimento`) não conseguiu determinar quem deve agir, o quê, ou quando a operação volta à atenção — o motivo aparece em `motivosRisco` como `SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL` ou `SEM_RESPONSAVEL_PARA_PROXIMA_ACAO`. Isso é exatamente o que o mandato "Minha Operação" (15/09/2026) exige nunca acontecer sem EM_RISCO explícito — esta verificação garante que a Saúde do Sistema enxergue os mesmos casos que a tela mostra.',
+  dominio: 'TAREFAS',
+  modulo: 'Emissão Documental',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.9.0',
+  timeoutMs: 30_000,
+  orientacao: 'Abra a Tarefa em Minha Operação/Central — o painel "Pontos de atenção" explica a causa em linguagem humana. Preencha o dado que falta (responsável, previsão ou próximo acompanhamento).',
+  rotaCorrecao: ROTA_CENTRAL,
+  responsavel: 'Emissão Documental',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const { estadosTemporaisDasOperacoes } = await import('@/lib/operacional/proximo-acontecimento')
+    const candidatas = await prisma.tarefa.findMany({
+      where: { faseMacroKey: PHASE_KEY, statusTarefa: { notIn: STATUS_TAREFA_TERMINAL } },
+      select: { id: true, titulo: true, processoId: true },
+      take: 500,
+    })
+    if (!candidatas.length) return vazio({ semProximaAcao: 0 }, 'Nenhuma Tarefa aberta da Emissão Documental no momento.')
+    const estados = await estadosTemporaisDasOperacoes(prisma, candidatas.map((c) => c.id), new Date())
+    const CODIGOS = ['SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL', 'SEM_RESPONSAVEL_PARA_PROXIMA_ACAO']
+    const semProximaAcao = candidatas
+      .map((c) => ({ tarefa: c, estado: estados.get(c.id) }))
+      .filter((x) => x.estado && x.estado.motivosRisco.some((m) => CODIGOS.some((cod) => m.startsWith(cod))))
+    if (!semProximaAcao.length) return vazio({ total: candidatas.length, semProximaAcao: 0 }, `${candidatas.length} Tarefa(s) aberta(s), todas com próxima ação determinável.`)
+    return {
+      achados: semProximaAcao.map(({ tarefa: t, estado }): Achado => ({
+        chave: `emi-proxima-acao-indeterminada:${t.id}`,
+        severidade: 'ALERTA',
+        titulo: `Tarefa #${t.id} está aberta sem próxima ação determinável`,
+        descricao: `"${t.titulo}": ${estado!.motivosRisco.join(' · ')}`,
+        explicacao: 'A tela de Minha Operação mostra esta Tarefa como EM_RISCO — a Saúde do Sistema precisa enxergar o mesmo caso, para acompanhamento centralizado.',
+        impacto: 'Ninguém sabe, olhando só a lista, que essa operação não tem um próximo passo claro.',
+        entidade: 'Tarefa', registroId: String(t.id), registroNome: t.titulo, quantidade: 1,
+        link: ROTA_CENTRAL,
+        recomendacao: 'Preencha o dado que falta (responsável, previsão do terceiro ou próximo acompanhamento).',
+        evidencia: { tarefaId: t.id, processoId: t.processoId, motivosRisco: estado!.motivosRisco },
+      })),
+      metricas: { total: candidatas.length, semProximaAcao: semProximaAcao.length },
     }
   },
 })

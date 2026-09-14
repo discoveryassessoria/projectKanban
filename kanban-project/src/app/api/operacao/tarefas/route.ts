@@ -16,7 +16,29 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { minhaFila, semResponsavel } from '@/lib/operacional/tarefa-projecoes'
+import { minhaFila, semResponsavel, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
+
+/**
+ * OS FILTROS DA QUERY STRING → `FiltrosGerenciais` — SERVER-SIDE, antes da
+ * paginação (mandato "Minha Operação" §20). `busca` já cobre pessoa/família/
+ * processo/documento/terceiro/protocolo numa caixa só (`whereGerencial`,
+ * mesma leitura de Tarefas e Projetos); `prazo` é o mesmo açúcar
+ * atrasadas/venceHoje/proximos7Dias que a visão gerencial já suportava.
+ */
+function filtrosDaQuery(sp: URLSearchParams): Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> {
+  const f: Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> = {}
+  const busca = sp.get('busca')?.trim()
+  if (busca) f.busca = busca
+  const fase = sp.get('fase')?.trim()
+  if (fase) f.faseMacroKey = fase
+  const terceiro = sp.get('terceiro')?.trim()
+  if (terceiro) f.terceiro = terceiro
+  const prazo = sp.get('prazo')
+  if (prazo === 'atrasadas') f.atrasadas = true
+  else if (prazo === 'hoje') f.venceHoje = true
+  else if (prazo === '7dias') f.proximos7Dias = true
+  return f
+}
 
 export async function GET(request: NextRequest) {
   const visao = request.nextUrl.searchParams.get('visao') ?? 'minha_fila'
@@ -46,7 +68,7 @@ export async function GET(request: NextRequest) {
   if (visao === 'minha_fila') {
     // Sempre o usuário do TOKEN. Aceitar um `usuarioId` no query string deixaria
     // qualquer pessoa ler a fila de qualquer outra só trocando um número.
-    const linhas = await minhaFila(usuario.userId, agora)
+    const linhas = await minhaFila(usuario.userId, agora, undefined, filtrosDaQuery(request.nextUrl.searchParams))
     return NextResponse.json({ visao, total: linhas.length, linhas })
   }
   return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel'] }, { status: 400 })

@@ -204,6 +204,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "correção final (mandato Emissão Documental, 14/09/2026): prova o passo unificado " +
     "'conferir_e_validar_certidao' (2 subtarefas) — cria a PRÓPRIA árvore/pessoas (marca " +
     "CORR4PASSOS) só no banco de teste — nenhuma pessoa é removida por este teste",
+  "scripts/minha-operacao-semantica.test.ts":
+    "correção executiva (Minha Operação, 15/09/2026): prova próxima ação humana, " +
+    "humanização de risco, filtros server-side e EMI-021/022 — cria a PRÓPRIA árvore/" +
+    "pessoas (marca MINHAOP-SEM) só no banco de teste — nenhuma pessoa é removida por este teste",
   "scripts/contraprova-granularidade-multipessoa.test.ts":
     "contraprova independente (mandato Emissão Documental) de granularidade: cria a PRÓPRIA " +
     "árvore/pessoas (marca CONTRAPROVA2-GRAN) só no banco de teste — nenhuma pessoa é removida " +

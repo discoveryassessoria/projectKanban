@@ -19,7 +19,12 @@ import { DOMINIOS } from './tipos'
 // Certidão" (EMI-001..EMI-020) — Tarefa×Step×Necessidade×Documento na
 // Emissão Documental. Ver docs/architecture (mandato de integridade
 // sistêmica) e `scripts/verificador-integridade-emissao.test.ts`.
-export const VERSAO_CATALOGO = '1.8.0'
+// 1.9.0 — 15/09/2026: entraram EMI-021 (cadeia ativa com quantidade de
+// Steps divergente da versão publicada — distingue histórico legítimo de
+// 5 passos, pré-unificação, de estado atual inválido) e EMI-022 (Tarefa
+// aberta sem próxima ação determinável) — correção "4 passos operacionais"
+// + "Minha Operação" (14-15/09/2026).
+export const VERSAO_CATALOGO = '1.9.0'
 
 export interface ContextoVerificacao {
   /** agora, congelado no início da rodada (execuções são comparáveis) */

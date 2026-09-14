@@ -113,7 +113,7 @@ const POR_PAGINA = 10
 
 export function MinhaOperacao() {
   const router = useRouter()
-  const [resultado, setResultado] = useState<{ chave: number; lista: LinhaOperacional[] | null } | null>(null)
+  const [resultado, setResultado] = useState<{ chave: string; lista: LinhaOperacional[] | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
   const [categoria, setCategoria] = useState<CategoriaAtencao | "todas">("todas")
   const [filtros, setFiltros] = useState<Filtros>(SEM_FILTRO)
@@ -129,59 +129,80 @@ export function MinhaOperacao() {
     } catch { /* leitura best-effort — sem usuário salvo, cai no fallback do saudação */ }
   }, [])
 
-  const chave = recarga
+  // A BUSCA TEM DEBOUNCE — não dispara um request por tecla (mandato §21).
+  const [buscaDigitada, setBuscaDigitada] = useState("")
+  useEffect(() => {
+    const t = setTimeout(() => { setFiltros((f) => ({ ...f, busca: buscaDigitada })); setPagina(1) }, 350)
+    return () => clearTimeout(t)
+  }, [buscaDigitada])
+
+  // ── FILTROS SERVER-SIDE (mandato §20): fase/terceiro/prazo/busca viram
+  // query string e entram no `where` do banco, ANTES da paginação — a MESMA
+  // leitura de `visaoGerencial`/Tarefas e Projetos. A categoria de atenção
+  // (KPI/chip) continua client-side: é estado COMPOSTO (`categoriasDaLinha`),
+  // não uma coluna do banco — filtrar por ela sobre o universo já filtrado
+  // pelo servidor é o mesmo padrão que os TILES de Tarefas e Projetos usam.
+  const query = useMemo(() => {
+    const p = new URLSearchParams({ visao: "minha_fila" })
+    if (filtros.busca.trim()) p.set("busca", filtros.busca.trim())
+    if (filtros.fase) p.set("fase", filtros.fase)
+    if (filtros.terceiro) p.set("terceiro", filtros.terceiro)
+    if (filtros.prazo !== "todos") p.set("prazo", filtros.prazo)
+    return p.toString()
+  }, [filtros])
+
+  const chave = `${query}#${recarga}`
   useEffect(() => {
     let vivo = true
-    fetch(`/api/operacao/tarefas?visao=minha_fila`, { headers: auth() })
+    fetch(`/api/operacao/tarefas?${query}`, { headers: auth() })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: { linhas?: LinhaOperacional[] }) => { if (vivo) setResultado({ chave, lista: d.linhas ?? [] }) })
       .catch(() => { if (vivo) setResultado({ chave, lista: null }) })
     return () => { vivo = false }
-  }, [chave])
+  }, [chave, query])
 
   const carregando = resultado?.chave !== chave
   const linhas = carregando ? null : resultado?.lista ?? null
   const falhou = !carregando && linhas == null
 
+  // ── OPÇÕES DOS FILTROS — de um universo ESTÁVEL (fetch próprio, sem
+  // filtro), nunca do resultado já filtrado — senão escolher uma fase faria
+  // as outras fases desaparecerem do próprio seletor de fase.
+  const [universo, setUniverso] = useState<LinhaOperacional[] | null>(null)
+  useEffect(() => {
+    let vivo = true
+    fetch(`/api/operacao/tarefas?visao=minha_fila`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { linhas?: LinhaOperacional[] }) => { if (vivo) setUniverso(d.linhas ?? []) })
+      .catch(() => { if (vivo) setUniverso([]) })
+    return () => { vivo = false }
+  }, [recarga])
+  const opcoesFase = useMemo(() => {
+    const vistos = new Map<string, string>()
+    for (const l of universo ?? []) if (l.faseMacroKey) vistos.set(l.faseMacroKey, rotularFase(l.faseMacroKey) ?? l.faseMacroKey)
+    return [...vistos.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [universo])
+  const opcoesTerceiro = useMemo(() => {
+    const vistos = new Set<string>()
+    for (const l of universo ?? []) if (l.terceiroNome) vistos.add(l.terceiroNome)
+    return [...vistos].sort((a, b) => a.localeCompare(b))
+  }, [universo])
+
   // ── AS 8 CONTAGENS DE ATENÇÃO — MESMO UNIVERSO da tabela (mandato §43: KPI e
-  // filtro nunca podem divergir). Cada linha pode pertencer a várias categorias.
+  // filtro nunca podem divergir): sobre o resultado JÁ FILTRADO pelo servidor
+  // (fase/terceiro/prazo/busca), nunca sobre o universo total. Cada linha
+  // pode pertencer a várias categorias.
   const porCategoria = useMemo(() => {
     const mapa = new Map<CategoriaAtencao, LinhaOperacional[]>(CATEGORIAS_ATENCAO.map((c) => [c.chave, []]))
     for (const l of linhas ?? []) for (const c of categoriasDaLinha(l)) mapa.get(c)?.push(l)
     return mapa
   }, [linhas])
 
-  // ── OPÇÕES DOS FILTROS — vêm do que EXISTE na fila, nunca lista fixa.
-  const opcoesFase = useMemo(() => {
-    const vistos = new Map<string, string>()
-    for (const l of linhas ?? []) if (l.faseMacroKey) vistos.set(l.faseMacroKey, rotularFase(l.faseMacroKey) ?? l.faseMacroKey)
-    return [...vistos.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [linhas])
-  const opcoesTerceiro = useMemo(() => {
-    const vistos = new Set<string>()
-    for (const l of linhas ?? []) if (l.terceiroNome) vistos.add(l.terceiroNome)
-    return [...vistos].sort((a, b) => a.localeCompare(b))
-  }, [linhas])
-
   const filtradas = useMemo(() => {
     if (!linhas) return null
-    const busca = filtros.busca.trim().toLowerCase()
-    const hoje = new Date().toISOString().slice(0, 10)
-    return linhas.filter((l) => {
-      if (categoria !== "todas" && !categoriasDaLinha(l).includes(categoria)) return false
-      if (filtros.fase && l.faseMacroKey !== filtros.fase) return false
-      if (filtros.terceiro && l.terceiroNome !== filtros.terceiro) return false
-      if (filtros.prazo === "atrasadas" && !l.atrasada) return false
-      if (filtros.prazo === "hoje" && !l.venceHoje) return false
-      if (filtros.prazo === "7dias" && !(l.diasParaPrazo != null && l.diasParaPrazo >= 0 && l.diasParaPrazo <= 7)) return false
-      if (busca) {
-        const alvo = [l.titulo, l.pessoaNome, l.processoNome, l.servico, l.terceiroNome].filter(Boolean).join(" ").toLowerCase()
-        if (!alvo.includes(busca)) return false
-      }
-      void hoje
-      return true
-    })
-  }, [linhas, categoria, filtros])
+    if (categoria === "todas") return linhas
+    return linhas.filter((l) => categoriasDaLinha(l).includes(categoria))
+  }, [linhas, categoria])
 
   const ordenadas = useMemo(() => (filtradas ? ordenarPorAtencaoOperacional(filtradas) : null), [filtradas])
 
@@ -190,7 +211,7 @@ export function MinhaOperacao() {
   const visiveis = ordenadas?.slice((paginaValida - 1) * POR_PAGINA, paginaValida * POR_PAGINA) ?? null
 
   const temFiltro = filtros.busca.trim() !== "" || filtros.fase != null || filtros.terceiro != null || filtros.prazo !== "todos" || categoria !== "todas"
-  const limparFiltros = () => { setFiltros(SEM_FILTRO); setCategoria("todas"); setPagina(1) }
+  const limparFiltros = () => { setFiltros(SEM_FILTRO); setBuscaDigitada(""); setCategoria("todas"); setPagina(1) }
 
   const abrirNoProcesso = (l: LinhaOperacional) => router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
 
@@ -209,8 +230,8 @@ export function MinhaOperacao() {
         <div className="relative w-full max-w-sm sm:w-72">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
           <Input
-            value={filtros.busca}
-            onChange={(e) => { setFiltros((f) => ({ ...f, busca: e.target.value })); setPagina(1) }}
+            value={buscaDigitada}
+            onChange={(e) => setBuscaDigitada(e.target.value)}
             placeholder="Buscar por pessoa, processo, documento, cartório…"
             className="h-9 bg-[var(--surface-elevated)] pl-8 text-[13px]"
           />

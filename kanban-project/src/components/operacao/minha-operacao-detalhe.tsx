@@ -15,6 +15,7 @@ import { ArrowUpRight, X as XIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, rotularFase } from "./kit-operacional"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
+import { humanizarMotivoRisco } from "@/lib/operacional/atencao-operacional"
 
 interface Etapa {
   id: number; ordem: number; titulo: string; stepKey: string; status: string
@@ -161,7 +162,12 @@ export function MinhaOperacaoDetalhe({ taskId, aoFechar }: { taskId: number; aoF
                   <div>
                     <BlocoTitulo>Pontos de atenção</BlocoTitulo>
                     <ul className="list-inside list-disc space-y-1 text-[12px] text-[var(--warning-text)]">
-                      {d.tarefa.motivosRisco.map((m, i) => <li key={i}>{m}</li>)}
+                      {d.tarefa.motivosRisco.map((m, i) => {
+                        const h = humanizarMotivoRisco(m)
+                        return (
+                          <li key={i} title={`Código técnico: ${h.codigo}`}>{h.texto}</li>
+                        )
+                      })}
                     </ul>
                   </div>
                 )}
