@@ -81,14 +81,17 @@ async function montarWorkflowAntigo(): Promise<{ id: number; versao: number }> {
 }
 
 let seq = 0
-async function palcoAntigo(wf: { id: number; versao: number }, arv: { id: number }, processo: { id: number }, nome: string) {
+async function palcoAntigo(wf: { id: number; versao: number }, arv: { id: number }, processo: { id: number }, nome: string, instCompartilhada?: { id: number }) {
   seq++
   const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_ITEM_${seq}`, name: "Certidão", natureza: "DOCUMENTO" }, select: { id: true } })
   const pessoa = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome, sobrenome: MARCA }, select: { id: true } })
   const nec = await prisma.necessidadeDocumental.create({ data: { processoId: processo.id, itemCatalogoId: item.id, pessoaId: pessoa.id, ciclo: 1, chaveIdempotencia: `${MARCA}-nec-${seq}` }, select: { id: true } })
   const doc = await prisma.documento.create({ data: { pessoaId: pessoa.id, necessidadeId: nec.id, status: "SOLICITAR", descricao: `${MARCA} doc`, tipo: "CERTIDAO_NASCIMENTO" }, select: { id: true } })
   const defSteps = await prisma.phaseInternalWorkflowStep.findMany({ where: { workflowId: wf.id }, orderBy: { ordem: "asc" }, select: { id: true, key: true } })
-  const inst = await prisma.phaseWorkflowInstance.create({
+  // Réplica do fato real de produção: várias Tarefas (documentos distintos)
+  // podem compartilhar a MESMA PhaseWorkflowInstance — é exatamente o cenário
+  // que expôs o bug de pareamento por workflowInstanceId sozinho.
+  const inst = instCompartilhada ?? await prisma.phaseWorkflowInstance.create({
     data: { processoId: processo.id, faseMacroKey: `emissao_documental_${MARCA.toLowerCase()}`, ciclo: 1, status: "ATIVO", workflowDefinitionId: wf.id, workflowVersion: wf.versao, chaveIdempotencia: `${MARCA}-inst-${seq}` },
     select: { id: true },
   })
@@ -140,6 +143,15 @@ async function main() {
   const step4B = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: b.stepIds[3] }, select: { status: true } })
   console.log("Classe B — status do passo 4 antes da reconciliação:", step4B.status)
 
+  // Classe C — compartilha a MESMA PhaseWorkflowInstance de B (réplica exata
+  // do fato real de produção: várias Tarefas/documentos na mesma instância).
+  // Documento diferente, passo 4 em status DIFERENTE de B (PENDENTE vs
+  // DISPONIVEL) — se o pareamento usar só workflowInstanceId (bug), C e B
+  // colidem no mesmo validar_certidao e um dos dois é corrompido/quebra.
+  const c = await palcoAntigo(wf, arv, processo, "ClasseC", b.inst)
+  await atribuirTarefa({ tarefaId: c.tarefaId, responsavelId: daniela.id, autorId: null })
+  // fica só no passo 1 — passo 4 continua PENDENTE (diferente de B, DISPONIVEL)
+
   // Classe E — CONCLUÍDA (5/5), intocável (como Tarefas 3570/3561 reais)
   const e = await palcoAntigo(wf, arv, processo, "ClasseConcluida")
   await atribuirTarefa({ tarefaId: e.tarefaId, responsavelId: daniela.id, autorId: null })
@@ -160,8 +172,13 @@ async function main() {
   // ── DRY-RUN ──
   console.log("\n--- DRY-RUN ---")
   const { elegiveis, foraDeEscopo } = await planejar()
-  const elegiveisDoTeste = elegiveis.filter((el) => [a.tarefaId, b.tarefaId].includes(el.tarefaId))
-  ok("dry-run identifica exatamente as 2 Tarefas abertas elegíveis (A e B)", elegiveisDoTeste.length === 2, `count=${elegiveisDoTeste.length}`)
+  const elegiveisDoTeste = elegiveis.filter((el) => [a.tarefaId, b.tarefaId, c.tarefaId].includes(el.tarefaId))
+  ok("dry-run identifica exatamente as 3 Tarefas abertas elegíveis (A, B e C)", elegiveisDoTeste.length === 3, `count=${elegiveisDoTeste.length}`)
+  const elB = elegiveisDoTeste.find((el) => el.tarefaId === b.tarefaId)
+  const elC = elegiveisDoTeste.find((el) => el.tarefaId === c.tarefaId)
+  ok("dry-run pareia B e C (mesma instância) com validarId DIFERENTES — cada um o seu próprio documento", !!elB && !!elC && elB.validarId !== elC.validarId, `B.validarId=${elB?.validarId} C.validarId=${elC?.validarId}`)
+  ok("dry-run: validarId de B pertence ao documento de B", elB?.documentoId === b.doc.id)
+  ok("dry-run: validarId de C pertence ao documento de C", elC?.documentoId === c.doc.id)
   const foraDoTeste = foraDeEscopo.filter((f) => f.documentoId === e.doc.id)
   console.log("fora de escopo (classe E, esperado, concluída):", JSON.stringify(foraDoTeste))
 
@@ -176,14 +193,26 @@ async function main() {
   ok("classe A: agora tem 4 steps (não 5)", stepsA.length === 4, `stepKeys=${JSON.stringify(stepsA.map((s) => s.stepKey))}`)
   ok("classe A: passo 4 é o unificado", stepsA.some((s) => s.stepKey === "conferir_e_validar_certidao"))
 
-  const stepsB = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: b.inst.id }, select: { stepKey: true, status: true } })
-  ok("classe B: agora tem 4 steps (não 5)", stepsB.length === 4, `stepKeys=${JSON.stringify(stepsB.map((s) => s.stepKey))}`)
+  const stepsB = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: b.inst.id, documentoId: b.doc.id }, select: { stepKey: true, status: true } })
+  ok("classe B: agora tem 4 steps (não 5), do seu próprio documento (instância compartilhada com C)", stepsB.length === 4, `stepKeys=${JSON.stringify(stepsB.map((s) => s.stepKey))}`)
   const step4BDepois = stepsB.find((s) => s.stepKey === "conferir_e_validar_certidao")
   ok("classe B: passo 4 unificado preserva o status DISPONIVEL que já tinha", step4BDepois?.status === "DISPONIVEL", step4BDepois?.status)
 
   const tarefaBDepois = await prisma.tarefa.findUniqueOrThrow({ where: { id: b.tarefaId }, select: { workflowStepInstanceId: true } })
-  const novoStep4B = await prisma.phaseWorkflowStepInstance.findFirst({ where: { workflowInstanceId: b.inst.id, stepKey: "conferir_e_validar_certidao" }, select: { id: true } })
+  const novoStep4B = await prisma.phaseWorkflowStepInstance.findFirst({ where: { workflowInstanceId: b.inst.id, stepKey: "conferir_e_validar_certidao", documentoId: b.doc.id }, select: { id: true, status: true } })
   ok("classe B: Tarefa.workflowStepInstanceId foi repontado para o novo step unificado", tarefaBDepois.workflowStepInstanceId === novoStep4B?.id)
+
+  // Classe C — MESMA instância de B, documento e status DIFERENTES. Prova
+  // direta do fix: cada um reconciliado para o SEU PRÓPRIO passo unificado,
+  // sem cruzar dados entre documentos que compartilham a instância.
+  const novoStep4C = await prisma.phaseWorkflowStepInstance.findFirst({ where: { workflowInstanceId: c.inst.id, stepKey: "conferir_e_validar_certidao", documentoId: c.doc.id }, select: { id: true, status: true } })
+  ok("classe C: tem seu PRÓPRIO step unificado (documentoId correto, distinto de B)", !!novoStep4C && novoStep4C.id !== novoStep4B?.id, `C=${novoStep4C?.id} B=${novoStep4B?.id}`)
+  ok("classe C: status preservado é o dela (PENDENTE), não o de B (DISPONIVEL)", novoStep4C?.status === "PENDENTE", novoStep4C?.status)
+  ok("classe B: status preservado continua DISPONIVEL (não foi sobrescrito por C)", novoStep4B?.status === "DISPONIVEL", novoStep4B?.status)
+  const stepsC = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: c.inst.id, documentoId: c.doc.id }, select: { stepKey: true } })
+  ok("classe C: 4 steps (não 5), do seu próprio documento", stepsC.length === 4, `stepKeys=${JSON.stringify(stepsC.map((s) => s.stepKey))}`)
+  const tarefaCDepois = await prisma.tarefa.findUniqueOrThrow({ where: { id: c.tarefaId }, select: { workflowStepInstanceId: true } })
+  ok("classe C: Tarefa.workflowStepInstanceId NÃO foi repontado (ainda no passo 1, não aponta pro conferir)", tarefaCDepois.workflowStepInstanceId !== novoStep4C?.id)
 
   // Classe E (concluída) — NUNCA TOCADA
   const stepsEDepois = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: e.inst.id }, select: { stepKey: true, status: true } })
@@ -194,8 +223,8 @@ async function main() {
 
   // ── IDEMPOTÊNCIA: rodar de novo não encontra mais nada elegível para A/B ──
   const { elegiveis: elegiveis2 } = await planejar()
-  const restam = elegiveis2.filter((el) => [a.tarefaId, b.tarefaId].includes(el.tarefaId))
-  ok("reconciliação é idempotente — rodar de novo não encontra A/B novamente elegíveis", restam.length === 0, `count=${restam.length}`)
+  const restam = elegiveis2.filter((el) => [a.tarefaId, b.tarefaId, c.tarefaId].includes(el.tarefaId))
+  ok("reconciliação é idempotente — rodar de novo não encontra A/B/C novamente elegíveis", restam.length === 0, `count=${restam.length}`)
 
   // ── A Tarefa da classe B consegue operar normalmente no novo passo unificado ──
   const rContinua = await executarAcaoCadastrada(novoStep4B!.id, "aprovado", {

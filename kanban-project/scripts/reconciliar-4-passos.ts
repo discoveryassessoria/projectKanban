@@ -62,8 +62,13 @@ export async function planejar(): Promise<{ elegiveis: Elegivel[]; foraDeEscopo:
   })
 
   for (const c of conferirInstancias) {
+    // PAREAMENTO POR documentoId — não só workflowInstanceId: várias Tarefas
+    // (documentos distintos) podem compartilhar a MESMA PhaseWorkflowInstance,
+    // então pareá-las só pela instância pegaria o validar_certidao ERRADO
+    // (de outro documento). documentoId é a chave real de correspondência
+    // 1:1 entre o conferir e o validar do MESMO documento.
     const v = await prisma.phaseWorkflowStepInstance.findFirst({
-      where: { workflowInstanceId: c.workflowInstanceId, stepKey: "validar_certidao" },
+      where: { workflowInstanceId: c.workflowInstanceId, stepKey: "validar_certidao", documentoId: c.documentoId },
       select: { id: true, status: true, startedAt: true, completedAt: true },
     })
     if (!v) { foraDeEscopo.push({ tarefaId: null, documentoId: c.documentoId ?? -1, motivo: `instância ${c.workflowInstanceId}: conferir_certidao existe mas validar_certidao não foi encontrado` }); continue }
