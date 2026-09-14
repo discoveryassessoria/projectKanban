@@ -460,6 +460,8 @@ export function StepEditorRouter(props: StepEditorRouterProps) {
       return <EditorReceberCertidao {...rest} />
     case "conferencia_documento":
       return <EditorConferirCertidao {...rest} />
+    case "conferencia_e_validacao":
+      return <EditorConferirEValidarCertidao {...rest} />
     case "validacao_juridica":
       return <EditorValidarCertidao {...rest} />
     case "registral":
@@ -2422,6 +2424,51 @@ function fullName(p: { nome: string | null; sobrenome: string | null } | null): 
 }
 
 /** Casca: carrega, e monta o formulário com a semente já em mãos. */
+/**
+ * CORREÇÃO FINAL (14/09/2026) — mandato Emissão Documental: 1 Tarefa, EXATAMENTE
+ * 4 passos operacionais. "Conferir certidão" e "Validar certidão" deixaram de
+ * ser dois Steps para virar DUAS SUBTAREFAS ("conferencia"/"validacao_juridica")
+ * do MESMO passo "conferir_e_validar_certidao" — progresso continua 4/4, nunca
+ * 5/5. A autoridade de Marco/Admin na validação final é HANDOFF INTERNO
+ * (reatribuir a mesma Tarefa), nunca um passo novo.
+ *
+ * Este roteador decide, pelo estado real das duas subtarefas (nunca por
+ * suposição de tela), qual formulário mostrar: a conferência primeiro; a
+ * validação jurídica só depois dela concluída (a própria dependência
+ * declarada no cadastro — `dependeDe: ["conferencia"]` — já garante isso).
+ * As DUAS telas continuam sendo as mesmas de sempre (FormConferirCertidao/
+ * FormValidarCertidao) — só a decisão de qual mostrar mudou de "duas rotas
+ * de Step" para "duas subtarefas do mesmo Step".
+ */
+export function EditorConferirEValidarCertidao(props: StepEditorBaseProps) {
+  const { subtarefas, carregando: carregandoCfg } = useConfiguracaoDaEtapa(props.isOpen ? props.stepId : null)
+  const { doc, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  if (!props.isOpen) return null
+  if (carregandoCfg) return null
+
+  const conferencia = subtarefas.find((s) => s.key === "conferencia")
+  const validacao = subtarefas.find((s) => s.key === "validacao_juridica")
+
+  // ETAPA PUBLICADA ANTES DA UNIFICAÇÃO (ainda não reconciliada) — sem
+  // subtarefas cadastradas, cai no comportamento antigo (Step único =
+  // conferência), preservando o que já funcionava para dado histórico.
+  if (!conferencia && !validacao) {
+    return <FormConferirCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} loading={carregando} />
+  }
+
+  // Conferência ainda não concluída (ou não existe — defensivo) → é ela que
+  // aparece. Só depois que ela concluir é que a validação fica disponível
+  // (dependência declarada no cadastro, não decisão desta tela).
+  if (!conferencia?.concluida) {
+    return <FormConferirCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} loading={carregando} />
+  }
+  // NO PASSO UNIFICADO, conferência e validação são a MESMA etapa (mesmo
+  // stepInstanceId) — não há uma "etapa anterior" separada para ler; o que
+  // a conferência decidiu está nesta própria etapa (SubtaskExecution da
+  // subtarefa "conferencia", já refletido em `etapa` pelo carregador).
+  return <FormValidarCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} conferenciaEtapa={etapa} loading={carregando} />
+}
+
 export function EditorConferirCertidao(props: StepEditorBaseProps) {
   const { doc, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
   if (!props.isOpen) return null
@@ -2480,13 +2527,22 @@ function FormConferirCertidao({
 
   // Checklist + resultado. O padrão só vale quando a etapa ainda não tem checklist
   // gravado — era o `if (step.reviewChecklist)` do carregador.
-  const { cfg: cfgConferencia, opcoesDe: _opcoesConf, executarAcao: executarAcaoConferencia } = useConfiguracaoDaEtapa(stepId)
-  const CHECKLIST_ITEMS = (cfgConferencia?.checklist?.length ?? 0) > 0
-    ? cfgConferencia!.checklist.map((i) => ({ id: i.key as keyof ReviewChecklist, label: i.label, desc: i.descricao ?? "" }))
+  const { cfg: cfgConferencia, opcoesDe: _opcoesConf, executarAcao: executarAcaoConferenciaBase } = useConfiguracaoDaEtapa(stepId)
+  // CORREÇÃO FINAL (14/09/2026): conferir_certidao virou a subtarefa "conferencia"
+  // dentro do passo unificado "conferir_e_validar_certidao". Quando essa subtarefa
+  // existe, checklist/ações vêm DELA (ela tem seu próprio cadastro, igual o passo
+  // tinha); sem ela (etapas antigas ainda não reconciliadas), cai no cadastro do
+  // passo como sempre foi — nenhum comportamento antigo quebra.
+  const subConferencia = cfgConferencia?.subtarefas.find((s) => s.key === "conferencia") ?? null
+  const executarAcaoConferencia = (acaoKey: string, valores: Record<string, unknown>) =>
+    executarAcaoConferenciaBase(acaoKey, valores, subConferencia ? "conferencia" : null)
+  const checklistCadastrado = subConferencia ? subConferencia.definicao.checkItens : (cfgConferencia?.checklist ?? [])
+  const CHECKLIST_ITEMS = checklistCadastrado.length > 0
+    ? checklistCadastrado.map((i) => ({ id: i.key as keyof ReviewChecklist, label: i.label, desc: i.descricao ?? "" }))
     : CHECKLIST_SEMENTE
   // OS RESULTADOS TAMBÉM. Se o cadastro declarou ações para esta etapa, são elas que
   // o operador vê — e é pela porta canônica que a escolha é executada.
-  const acoesConferencia = cfgConferencia?.acoes ?? []
+  const acoesConferencia = subConferencia ? subConferencia.definicao.acoes : (cfgConferencia?.acoes ?? [])
   const usandoCadastroConferencia = acoesConferencia.length > 0
   const [checklist, setChecklist] = useState<ReviewChecklist>(() => {
     const gravado = etapa?.reviewChecklist as Record<string, unknown> | undefined
@@ -3094,9 +3150,17 @@ function FormValidarCertidao({
   // da conferência. Antes isso eram dois efeitos em sequência — carregar e depois
   // pré-selecionar — e a tela mostrava "nenhuma decisão" no meio do caminho.
   // O QUE ESTA ETAPA PODE DECIDIR, pela versão que ela registrou.
-  const { cfg: cfgValidacao, executarAcao: executarAcaoValidacao } = useConfiguracaoDaEtapa(stepId)
-  const DECISAO_OPTIONS = (cfgValidacao?.acoes?.length ?? 0) > 0
-    ? cfgValidacao!.acoes.map((a) => ({
+  const { cfg: cfgValidacao, executarAcao: executarAcaoValidacaoBase } = useConfiguracaoDaEtapa(stepId)
+  // CORREÇÃO FINAL (14/09/2026): validar_certidao virou a subtarefa
+  // "validacao_juridica" dentro do passo unificado — mesmo padrão da
+  // conferência acima. Sem a subtarefa (etapa antiga não reconciliada), cai
+  // no cadastro do passo como sempre foi.
+  const subValidacao = cfgValidacao?.subtarefas.find((s) => s.key === "validacao_juridica") ?? null
+  const executarAcaoValidacao = (acaoKey: string, valores: Record<string, unknown>) =>
+    executarAcaoValidacaoBase(acaoKey, valores, subValidacao ? "validacao_juridica" : null)
+  const acoesValidacao = subValidacao ? subValidacao.definicao.acoes : (cfgValidacao?.acoes ?? [])
+  const DECISAO_OPTIONS = acoesValidacao.length > 0
+    ? acoesValidacao.map((a) => ({
         value: a.key as ValidarDecisao,
         icon: ICONE_POR_EFEITO[a.effectKey] ?? <Check className="w-4 h-4" />,
         label: a.label,
@@ -3104,7 +3168,7 @@ function FormValidarCertidao({
         cor: CORES_POR_EFEITO[a.effectKey] ?? "blue",
       }))
     : DECISAO_SEMENTE
-  const usandoCadastro = (cfgValidacao?.acoes?.length ?? 0) > 0
+  const usandoCadastro = acoesValidacao.length > 0
   const [decisao, setDecisao] = useState<ValidarDecisao | null>(() => {
     const gravada = (etapa?.validationResult as ValidarDecisao) || null
     if (gravada) return gravada
