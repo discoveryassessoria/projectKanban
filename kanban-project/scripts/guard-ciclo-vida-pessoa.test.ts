@@ -196,6 +196,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "prova o fix real de ExigenciaEvidenciaEtapa ignorada por executarAcaoCadastrada (mandato " +
     "Emissão Documental, item 08): cria a PRÓPRIA árvore/pessoa (marca EXIGBRIDGE-TEST) só no " +
     "banco de teste — nenhuma pessoa é removida por este teste",
+  "scripts/contraprova-granularidade-multipessoa.test.ts":
+    "contraprova independente (mandato Emissão Documental) de granularidade: cria a PRÓPRIA " +
+    "árvore/pessoas (marca CONTRAPROVA2-GRAN) só no banco de teste — nenhuma pessoa é removida " +
+    "por este teste",
   "scripts/mandato-110-testes.test.ts":
     "suíte literal do mandato Emissão Documental (110 itens numerados): cria as PRÓPRIAS " +
     "árvores/pessoas (marca MANDATO110-TEST) só no banco de teste — cada certidão exige uma " +

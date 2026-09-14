@@ -100,6 +100,7 @@
     "start": "next start",
     "test:abas": "tsx scripts/abas-central-operacional.test.ts",
     "test:mandato-e2e": "tsx scripts/mandato-e2e-38-passos.test.ts",
+    "test:contraprova-granularidade": "tsx scripts/contraprova-granularidade-multipessoa.test.ts",
     "test:accordion": "tsx scripts/accordion-logic.test.ts",
     "test:acoes-financeiras": "tsx scripts/acoes-lancamento.test.ts",
     "test:aplicacao-territorial": "tsx scripts/servico-aplicacao-territorial.test.ts",
