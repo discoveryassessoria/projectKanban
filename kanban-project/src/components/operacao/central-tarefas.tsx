@@ -160,8 +160,6 @@ function Linha({
           {l.prioridade === "URGENTE" && <Etiqueta tom="alerta">Urgente</Etiqueta>}
           {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
           {l.requerDecisao && <Etiqueta tom="alerta">Requer decisão</Etiqueta>}
-          {l.emRisco && <Etiqueta tom="alerta">Em risco</Etiqueta>}
-          {l.retornoRecebido && <Etiqueta tom="neutro">Retorno recebido</Etiqueta>}
           {/* Atraso do terceiro nunca aparece como atraso do operador — etiquetas distintas. */}
           {l.atrasoTerceiro && <Etiqueta tom="alerta">Terceiro atrasado</Etiqueta>}
           {l.atrasoInterno && <Etiqueta tom="critico">Atraso interno</Etiqueta>}
@@ -180,10 +178,6 @@ function Linha({
               pedido de duas semanas sem dono não aparece na régua de prazo. */}
           {l.criadaEm && <span className="text-[var(--text-muted)]">Entrou em {dataCurta(l.criadaEm)}</span>}
         </div>
-        {/* EM_RISCO sempre com motivo explícito — nunca um selo sem explicação. */}
-        {l.emRisco && l.motivosRisco.length > 0 && (
-          <div className="mt-1 text-[11px] text-amber-800/90">Em risco: {l.motivosRisco.join(" · ")}</div>
-        )}
       </button>
 
       <div className="flex shrink-0 items-center gap-4">
@@ -309,21 +303,12 @@ function CartaoDaFila({
           {l.motivoBloqueio && (
             <div className="mt-1 text-[11px] text-red-700/75">Bloqueio: {l.motivoBloqueio}</div>
           )}
-          {/* RETORNO ANTECIPADO — o terceiro respondeu antes do acompanhamento
-              programado; a atenção reativa AGORA, sem esperar a data agendada. */}
-          {l.retornoRecebido && (
-            <div className="mt-1 text-[11px] text-emerald-700/90">Retorno recebido — aguardando ação</div>
-          )}
           {/* Atraso do terceiro nunca é atraso do operador — mensagens distintas. */}
           {l.atrasoTerceiro && (
             <div className="mt-1 text-[11px] text-amber-800/90">Terceiro atrasado</div>
           )}
           {l.atrasoInterno && (
             <div className="mt-1 text-[11px] text-red-700/90">Atraso interno</div>
-          )}
-          {/* EM_RISCO — motivo explícito, nunca "risco" genérico sem explicação. */}
-          {l.emRisco && l.motivosRisco.length > 0 && (
-            <div className="mt-1 text-[11px] text-amber-800/90">Em risco: {l.motivosRisco.join(" · ")}</div>
           )}
         </button>
 
@@ -363,25 +348,20 @@ const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional)
   { id: "a_fazer", rotulo: "A fazer", aplica: (l) => l.coluna === "A_FAZER" },
   { id: "em_andamento", rotulo: "Em andamento", aplica: (l) => l.coluna === "EM_ANDAMENTO" },
   { id: "aguardando", rotulo: "Aguardando terceiro", aplica: (l) => l.coluna === "AGUARDANDO_TERCEIRO" },
-  // "Nova atribuição" = chegou na minha fila há pouco (48h) e ainda não foi
-  // iniciada — mesma janela de recência usada para notificar `TRANSFERENCIA`
-  // (Etapa 6/handoff). Não é status novo: é um recorte temporal sobre A_FAZER.
-  {
-    id: "novas_atribuicoes", rotulo: "Novas atribuições",
-    aplica: (l) => l.coluna === "A_FAZER" && !!l.atribuidaEm && Date.now() - new Date(l.atribuidaEm).getTime() <= 48 * 3600_000,
-  },
   { id: "bloqueadas", rotulo: "Bloqueadas", aplica: (l) => l.coluna === "BLOQUEADA" },
   { id: "atrasadas", rotulo: "Atrasadas", aplica: (l) => l.atrasada },
   { id: "vence_hoje", rotulo: "Vence hoje", aplica: (l) => l.venceHoje },
-  // Os cinco abaixo usam a MESMA leitura temporal canônica (Etapa 3/5) que já
+  // Os dois abaixo usam a MESMA leitura temporal canônica (Etapa 3/5) que já
   // alimenta a notificação e a visão gerencial — nenhum cálculo novo aqui.
+  // "Novas atribuições", "Retornos recebidos" e "Em risco" saíram (correção
+  // 15/09/2026, mesma decisão de `atencao-operacional.ts`): "Em risco" é
+  // diagnóstico de configuração — vai para a Saúde do Sistema, não para o
+  // operador que distribui trabalho.
   { id: "acompanhar_hoje", rotulo: "Acompanhar hoje", aplica: (l) => l.acompanhamentoVencido },
-  { id: "retornos", rotulo: "Retornos recebidos", aplica: (l) => l.retornoRecebido },
   // Atraso interno (operador) nunca é a mesma coisa que atraso do terceiro —
   // dois filtros distintos, nunca colapsados em "Atrasadas" genérico.
   { id: "atraso_interno", rotulo: "Atraso interno", aplica: (l) => l.atrasoInterno },
   { id: "terceiro_atrasado", rotulo: "Terceiro atrasado", aplica: (l) => l.atrasoTerceiro },
-  { id: "em_risco", rotulo: "Em risco", aplica: (l) => l.emRisco },
 ]
 
 export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) {

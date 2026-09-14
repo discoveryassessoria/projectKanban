@@ -13,19 +13,25 @@
 // pelos dois lados (KPI, chip e tabela nunca podem divergir, mandato §43).
 // ============================================================================
 
+// CORREÇÃO (15/09/2026) — "Novas atribuições", "Retorno recebido" e "Em
+// risco" saíram do quadro de categorias operacionais. Decisão do
+// Administrador: "Em risco" em particular NUNCA deveria existir aqui —
+// quando o motor não consegue determinar com segurança quem age, o quê, ou
+// quando volta à atenção, isso é um problema de CONFIGURAÇÃO do cadastro
+// (passo sem previsão/acompanhamento definível), e problema de configuração
+// vai para a Saúde do Sistema (EMI-022 já lê o mesmo `motivosRisco`/`emRisco`
+// — a leitura continua existindo, só não é mais oferecida como categoria
+// operacional aqui). O operador não deve ver "risco" como se fosse dele.
 export type CategoriaAtencao =
-  | 'paraAgirAgora' | 'novasAtribuicoes' | 'acompanharHoje' | 'atrasoInterno'
-  | 'terceirosAtrasados' | 'aguardandoTerceiros' | 'retornoRecebido' | 'emRisco'
+  | 'paraAgirAgora' | 'acompanharHoje' | 'atrasoInterno'
+  | 'terceirosAtrasados' | 'aguardandoTerceiros'
 
 export const CATEGORIAS_ATENCAO: Array<{ chave: CategoriaAtencao; rotulo: string; tooltip: string }> = [
   { chave: 'paraAgirAgora', rotulo: 'Para agir agora', tooltip: 'A operação está executável e é sua vez de agir.' },
-  { chave: 'novasAtribuicoes', rotulo: 'Novas atribuições', tooltip: 'Atribuída a você nas últimas 48 horas e ainda não iniciada.' },
   { chave: 'acompanharHoje', rotulo: 'Acompanhar hoje', tooltip: 'O próximo acompanhamento programado já venceu.' },
   { chave: 'atrasoInterno', rotulo: 'Atraso interno', tooltip: 'O prazo interno (seu) já passou — não é atraso de terceiro.' },
   { chave: 'terceirosAtrasados', rotulo: 'Terceiros atrasados', tooltip: 'A previsão do terceiro (cartório/tradutor/etc.) já venceu; não é atraso seu.' },
   { chave: 'aguardandoTerceiros', rotulo: 'Aguardando terceiros', tooltip: 'A operação está aberta, esperando uma resposta externa.' },
-  { chave: 'retornoRecebido', rotulo: 'Retorno recebido', tooltip: 'O terceiro respondeu — existe ação operacional pendente.' },
-  { chave: 'emRisco', rotulo: 'Em risco', tooltip: 'O motor não conseguiu determinar com segurança quem age, o quê, ou quando volta à atenção.' },
 ]
 
 /** O contrato mínimo que a categorização e o ranking precisam — um subconjunto estrutural de `LinhaGerencial`. */
@@ -50,13 +56,10 @@ const JANELA_NOVA_ATRIBUICAO_MS = 48 * 3600_000
 export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
   const cats: CategoriaAtencao[] = []
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) cats.push('paraAgirAgora')
-  if (l.coluna === 'A_FAZER' && l.atribuidaEm != null && Date.now() - new Date(l.atribuidaEm).getTime() <= JANELA_NOVA_ATRIBUICAO_MS) cats.push('novasAtribuicoes')
   if (l.acompanhamentoVencido) cats.push('acompanharHoje')
   if (l.atrasoInterno) cats.push('atrasoInterno')
   if (l.atrasoTerceiro) cats.push('terceirosAtrasados')
   if (l.coluna === 'AGUARDANDO_TERCEIRO') cats.push('aguardandoTerceiros')
-  if (l.retornoRecebido) cats.push('retornoRecebido')
-  if (l.emRisco) cats.push('emRisco')
   return cats
 }
 
@@ -64,8 +67,10 @@ export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
  * O DEGRAU DE ATENÇÃO — determinístico, excludente, nesta ordem (mandato
  * "Minha Operação" §78): atraso interno crítico (atrasada + a causa é
  * interna) → atraso interno → follow-up vencido → retorno recebido → ação
- * necessária hoje → nova atribuição → em risco → aguardando terceiro →
- * demais.
+ * necessária hoje → nova atribuição → aguardando terceiro → demais.
+ *
+ * "Em risco" NÃO é mais um degrau — não é prioridade operacional da
+ * Daniela, é sinal de configuração (Saúde do Sistema, EMI-022).
  */
 function degrauDeAtencao(l: LinhaComAtencao): number {
   if (l.atrasada && l.atrasoInterno) return 0
@@ -74,9 +79,8 @@ function degrauDeAtencao(l: LinhaComAtencao): number {
   if (l.retornoRecebido) return 3
   if (l.venceHoje && l.executavelAgora) return 4
   if (l.coluna === 'A_FAZER' && l.atribuidaEm != null && Date.now() - new Date(l.atribuidaEm).getTime() <= JANELA_NOVA_ATRIBUICAO_MS) return 5
-  if (l.emRisco) return 6
-  if (l.coluna === 'AGUARDANDO_TERCEIRO') return 7
-  return 8
+  if (l.coluna === 'AGUARDANDO_TERCEIRO') return 6
+  return 7
 }
 
 /**
@@ -92,7 +96,6 @@ export function rotuloDeAtencao(l: LinhaComAtencao & { prioridade: string }): { 
   if (l.acompanhamentoVencido || l.retornoRecebido) return { rotulo: 'Atenção', tom: 'alerta' }
   if (l.venceHoje && l.executavelAgora) return { rotulo: 'Hoje', tom: 'alerta' }
   if (l.prioridade === 'URGENTE') return { rotulo: 'Urgente', tom: 'alerta' }
-  if (l.emRisco) return { rotulo: 'Em risco', tom: 'alerta' }
   if (l.coluna === 'AGUARDANDO_TERCEIRO') return { rotulo: 'Aguardando', tom: 'neutro' }
   return { rotulo: 'Normal', tom: 'neutro' }
 }

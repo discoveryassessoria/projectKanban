@@ -304,9 +304,13 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
   } else if (aguardando) {
     if (!previsaoTerceiro && !proximoAcompanhamentoData) {
       motivosRisco.push("AGUARDANDO_SEM_PREVISAO_NEM_ACOMPANHAMENTO")
+      // A DESCRIÇÃO NÃO ALARMA O OPERADOR — "em risco" é leitura de
+      // configuração (falta previsão/acompanhamento cadastrado), não uma
+      // urgência dela. Quem trata isso é a Saúde do Sistema (EMI-022, que lê
+      // o mesmo `motivosRisco`); aqui ela só vê que está esperando terceiro.
       proximoAcontecimento = {
         tipo: "em_risco", data: null,
-        descricao: "EM RISCO — aguardando terceiro sem previsão de retorno nem próximo acompanhamento definidos",
+        descricao: `Aguardando ${terceiroAguardado ?? "terceiro"}`,
         responsavelId: e.responsavelId, aguardandoTerceiro: true, terceiroAguardado, origem: "nenhuma fonte",
       }
     } else {
@@ -375,9 +379,12 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
     if (acompanhamentoVencido) motivosRisco.push("ACOMPANHAMENTO_VENCIDO")
   } else {
     motivosRisco.push("SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL")
+    // MESMA REGRA: "risco" é diagnóstico de configuração, não vocabulário
+    // para o operador. `tipo`/`motivosRisco` continuam carregando o sinal
+    // técnico para a Saúde do Sistema.
     proximoAcontecimento = {
       tipo: "em_risco", data: null,
-      descricao: "EM RISCO — operação aberta sem próximo acontecimento esperado",
+      descricao: "Sem próxima ação definida",
       responsavelId: e.responsavelId, aguardandoTerceiro: false, terceiroAguardado: null, origem: "nenhuma fonte",
     }
   }

@@ -15,7 +15,6 @@ import { ArrowUpRight, X as XIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, rotularFase } from "./kit-operacional"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
-import { humanizarMotivoRisco } from "@/lib/operacional/atencao-operacional"
 
 interface Etapa {
   id: number; ordem: number; titulo: string; stepKey: string; status: string
@@ -111,9 +110,6 @@ export function MinhaOperacaoDetalhe({ taskId, aoFechar }: { taskId: number; aoF
                 <div className="flex flex-wrap items-center gap-1.5">
                   <h2 className="truncate text-[14px] font-semibold text-[var(--text-primary)]">{d.tarefa.titulo}</h2>
                   {d.tarefa.requerDecisao && <Etiqueta tom="alerta">Ação necessária</Etiqueta>}
-                  {d.tarefa.atribuidaEm && Date.now() - new Date(d.tarefa.atribuidaEm).getTime() <= 48 * 3600_000 && (
-                    <Etiqueta tom="acento">Nova</Etiqueta>
-                  )}
                 </div>
                 <p className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">
                   {[d.tarefa.pessoaNome, d.tarefa.processoNome, rotularFase(d.tarefa.faseMacroKey)].filter(Boolean).join(" · ")}
@@ -158,19 +154,6 @@ export function MinhaOperacaoDetalhe({ taskId, aoFechar }: { taskId: number; aoF
                     {d.tarefa.terceiroNome && <Linha rotulo="Terceiro" valor={d.tarefa.terceiroNome} />}
                   </div>
                 </div>
-                {d.tarefa.emRisco && d.tarefa.motivosRisco.length > 0 && (
-                  <div>
-                    <BlocoTitulo>Pontos de atenção</BlocoTitulo>
-                    <ul className="list-inside list-disc space-y-1 text-[12px] text-[var(--warning-text)]">
-                      {d.tarefa.motivosRisco.map((m, i) => {
-                        const h = humanizarMotivoRisco(m)
-                        return (
-                          <li key={i} title={`Código técnico: ${h.codigo}`}>{h.texto}</li>
-                        )
-                      })}
-                    </ul>
-                  </div>
-                )}
               </TabsContent>
 
               {/* ── PASSOS — item 25, READ-ONLY ── */}
@@ -212,9 +195,7 @@ export function MinhaOperacaoDetalhe({ taskId, aoFechar }: { taskId: number; aoF
                     {d.tarefa.atrasoInterno && <Etiqueta tom="critico">Atraso interno</Etiqueta>}
                     {d.tarefa.atrasoTerceiro && <Etiqueta tom="alerta">Terceiro atrasado</Etiqueta>}
                     {d.tarefa.acompanhamentoVencido && <Etiqueta tom="alerta">Acompanhar hoje</Etiqueta>}
-                    {d.tarefa.retornoRecebido && <Etiqueta tom="acento">Retorno recebido</Etiqueta>}
-                    {d.tarefa.emRisco && <Etiqueta tom="alerta">Em risco</Etiqueta>}
-                    {!d.tarefa.atrasoInterno && !d.tarefa.atrasoTerceiro && !d.tarefa.acompanhamentoVencido && !d.tarefa.retornoRecebido && !d.tarefa.emRisco && (
+                    {!d.tarefa.atrasoInterno && !d.tarefa.atrasoTerceiro && !d.tarefa.acompanhamentoVencido && (
                       <span className="text-[12px] text-[var(--text-muted)]">Nenhuma condição de atenção no momento.</span>
                     )}
                   </div>

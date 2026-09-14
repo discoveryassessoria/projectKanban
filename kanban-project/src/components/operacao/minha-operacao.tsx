@@ -28,8 +28,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-  Search, Play, UserPlus, CalendarClock, AlertTriangle, Clock3, Hourglass,
-  FileCheck2, AlertOctagon, SlidersHorizontal, X as XIcon, ArrowUpRight,
+  Search, Play, CalendarClock, AlertTriangle, Clock3, Hourglass,
+  SlidersHorizontal, X as XIcon, ArrowUpRight,
   ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -47,24 +47,18 @@ import { MinhaOperacaoDetalhe } from "./minha-operacao-detalhe"
 
 const ICONE_CATEGORIA: Record<CategoriaAtencao, React.ComponentType<{ className?: string }>> = {
   paraAgirAgora: Play,
-  novasAtribuicoes: UserPlus,
   acompanharHoje: CalendarClock,
   atrasoInterno: AlertTriangle,
   terceirosAtrasados: Clock3,
   aguardandoTerceiros: Hourglass,
-  retornoRecebido: FileCheck2,
-  emRisco: AlertOctagon,
 }
 /** Mesmos tokens semânticos de tile/tinta que `visao-global.tsx` (Etapa 5) já usa — nunca cor inventada. */
 const TOM_CATEGORIA: Record<CategoriaAtencao, string> = {
   paraAgirAgora: "bg-[var(--info-tile)] text-[var(--info-text)]",
-  novasAtribuicoes: "bg-[var(--info-tile)] text-[var(--info-text)]",
   acompanharHoje: "bg-[var(--warning-tile)] text-[var(--warning-text)]",
   atrasoInterno: "bg-[var(--danger-tile)] text-[var(--danger-text)]",
   terceirosAtrasados: "bg-[var(--warning-tile)] text-[var(--warning-text)]",
   aguardandoTerceiros: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]",
-  retornoRecebido: "bg-[var(--success-tile)] text-[var(--success-text)]",
-  emRisco: "bg-[var(--warning-tile)] text-[var(--warning-text)]",
 }
 
 const TODOS = "todos"
