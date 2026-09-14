@@ -42,7 +42,10 @@ export async function montarWorkflowReal(): Promise<number> {
     ],
   })
   await prisma.stepAction.createMany({
-    data: [{ stepId: porChave.get("receber_certidao")!, key: "recebido", label: "Recebido", effectKey: "MARK_DOCUMENT_RECEIVED", ordem: 1 }],
+    data: [
+      { stepId: porChave.get("receber_certidao")!, key: "recebido", label: "Recebido", effectKey: "MARK_DOCUMENT_RECEIVED", ordem: 1 },
+      { stepId: porChave.get("receber_certidao")!, key: "aguardando_cartorio", label: "Ainda aguardando o cartório", effectKey: "PAUSE_FOR_EXTERNAL_WAIT", ordem: 2 },
+    ],
   })
 
   // ── conferir_certidao — réplica fiel do cadastro real de produção ──

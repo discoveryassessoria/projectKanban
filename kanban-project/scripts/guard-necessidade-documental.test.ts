@@ -278,6 +278,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "3 Tarefas isoladas — monta e derruba o PRÓPRIO cenário só no banco de teste; a necessidade " +
     "é criada direto para montar o palco, a materialização em si usa garantirTarefaDePasso (o " +
     "caminho oficial)",
+  "scripts/receber-certidao-segunda-espera.test.ts":
+    "correção 'Receber certidão' tem espera de terceiro própria (15/09/2026): prova " +
+    "PAUSE_FOR_EXTERNAL_WAIT reaproveitado no passo 3 — monta e derruba o PRÓPRIO cenário só " +
+    "no banco de teste; a necessidade é criada direto para montar o palco mínimo, a " +
+    "materialização em si usa garantirTarefaDePasso (o caminho oficial)",
 }
 
 /** Diretórios de RUNTIME — onde a regra é absoluta. */

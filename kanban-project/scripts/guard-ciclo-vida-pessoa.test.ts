@@ -212,6 +212,14 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "contraprova independente (mandato Emissão Documental) de granularidade: cria a PRÓPRIA " +
     "árvore/pessoas (marca CONTRAPROVA2-GRAN) só no banco de teste — nenhuma pessoa é removida " +
     "por este teste",
+  "scripts/receber-certidao-segunda-espera.test.ts":
+    "correção 'Receber certidão' tem espera de terceiro própria (15/09/2026): prova " +
+    "PAUSE_FOR_EXTERNAL_WAIT reaproveitado no passo 3 — cria a PRÓPRIA árvore/pessoa (marca " +
+    "RECEBERCERT2ESPERA) só no banco de teste — nenhuma pessoa é removida por este teste",
+  "scripts/notificacao-auto-lida-ao-iniciar.test.ts":
+    "correção notificação de atribuição some do sino ao iniciar a tarefa (15/09/2026) — cria " +
+    "a PRÓPRIA árvore/pessoa (marca AUTOLIDA) só no banco de teste — nenhuma pessoa é removida " +
+    "por este teste",
   "scripts/mandato-110-testes.test.ts":
     "suíte literal do mandato Emissão Documental (110 itens numerados): cria as PRÓPRIAS " +
     "árvores/pessoas (marca MANDATO110-TEST) só no banco de teste — cada certidão exige uma " +

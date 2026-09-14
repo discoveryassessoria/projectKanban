@@ -161,3 +161,30 @@ export async function marcarNotificacaoComoLida(
   }
   return { ok: true }
 }
+
+/**
+ * MARCAR COMO LIDA A NOTIFICAÇÃO DE ATRIBUIÇÃO/TRANSFERÊNCIA — quando o
+ * RESPONSÁVEL da tarefa gera progresso de verdade (`iniciarTarefa`).
+ *
+ * "Você recebeu esta tarefa" deixa de precisar de sino no instante em que a
+ * própria pessoa começa a trabalhar nela — continuar mostrando é ruído: ela
+ * já sabe, ela já está fazendo. Só ATRIBUICAO/TRANSFERENCIA fecham aqui — são
+ * as ÚNICAS cujo propósito ("avise que isto chegou para você") se cumpre ao
+ * iniciar; PRAZO/ATRASO/RETORNO_TERCEIRO/EM_RISCO/FASE_CONCLUIDA continuam
+ * abertas, porque começar a tarefa não resolve o fato que elas avisam.
+ */
+export async function marcarAtribuicaoComoLidaAoIniciar(
+  db: Leitor,
+  args: { tarefaId: number; destinatarioId: number },
+): Promise<{ quantidade: number }> {
+  const r = await db.notificacaoOperacional.updateMany({
+    where: {
+      tarefaId: args.tarefaId,
+      destinatarioId: args.destinatarioId,
+      tipo: { in: ["ATRIBUICAO", "TRANSFERENCIA"] },
+      lidaEm: null,
+    },
+    data: { lidaEm: new Date() },
+  })
+  return { quantidade: r.count }
+}

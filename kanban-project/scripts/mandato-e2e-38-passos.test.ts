@@ -560,12 +560,18 @@ async function main() {
   ok("21) ainda 1 única Tarefa", (await prisma.tarefa.count({ where: { processoId: processo.id } })) === 1)
 
   // ==========================================================================
-  secao("22) ESPERA (nova espera externa) — não aplicável a receber_certidao")
+  secao("22) ESPERA (nova espera externa) — receber_certidao tem espera PRÓPRIA")
   // ==========================================================================
+  // CORREÇÃO (15/09/2026): "receber_certidao" tem sua PRÓPRIA espera de
+  // terceiro — entre o protocolo confirmado (passo 2) e a certidão física
+  // chegar, o operador ainda depende do cartório. O achado registrado aqui
+  // antes ("não aplicável") era exatamente a lacuna que motivou a correção:
+  // ver scripts/receber-certidao-segunda-espera.test.ts para a prova completa
+  // (pausa → motor temporal lê espera externa → recebimento desbloqueia sozinho).
   const execReceber = executorEfetivo({ key: "receber_certidao", executorKey: null }, "emissao_documental")
   const capReceber = REGISTRO_DE_EXECUTORES[execReceber as keyof typeof REGISTRO_DE_EXECUTORES]
-  ok("22) o executor real de receber_certidao NÃO suporta espera externa — não aplicável ao stepKey real (achado esperado, não bug)",
-    capReceber != null && !capReceber.efeitos.includes?.("PAUSE_FOR_EXTERNAL_WAIT") && (capReceber.efeitos as readonly string[]).indexOf("PAUSE_FOR_EXTERNAL_WAIT") === -1)
+  ok("22) o executor real de receber_certidao suporta espera externa (segunda espera de terceiro, cadastro próprio)",
+    capReceber != null && (capReceber.efeitos as readonly string[]).includes("PAUSE_FOR_EXTERNAL_WAIT") && capReceber.suportaEsperaExterna === true)
 
   // ==========================================================================
   secao("23) TERCEIRO ATRASADO (sem virar atraso do operador)")

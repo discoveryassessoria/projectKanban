@@ -101,12 +101,16 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     key: "recebimento_documento",
     label: "Recebimento do documento",
     campos: ["texto", "textarea", "data", "select", "radio", "upload"],
-    efeitos: ["MARK_DOCUMENT_RECEIVED", "COMPLETE_STEP", "REGISTER_ONLY"],
+    // "Receber certidão" tem sua PRÓPRIA espera de terceiro: entre o protocolo
+    // confirmado (passo "Aguardar retorno do cartório") e a certidão física
+    // chegar, o operador ainda depende do cartório — mesmo mecanismo já usado
+    // por `solicitacao_cartorio`/`acompanhamento_retorno` (PAUSE_FOR_EXTERNAL_WAIT).
+    efeitos: ["MARK_DOCUMENT_RECEIVED", "COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT"],
     acoesCadastradas: true,
     checklistCadastrado: false,
     suportaCanais: false,
     suportaEvidencia: true,
-    suportaEsperaExterna: false,
+    suportaEsperaExterna: true,
     suportaCondicoes: true,
   },
   conferencia_documento: {

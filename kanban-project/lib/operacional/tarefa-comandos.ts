@@ -26,7 +26,7 @@ import type { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
-import { notificarAcontecimento } from './notificacao-canonica'
+import { notificarAcontecimento, marcarAtribuicaoComoLidaAoIniciar } from './notificacao-canonica'
 import { estadosTemporaisDasOperacoes } from './proximo-acontecimento'
 
 export type ResultadoComando =
@@ -293,6 +293,11 @@ export async function iniciarTarefa(args: {
         if (r.changed) etapaIniciada = step.id
       }
     }
+
+    // O SINO NÃO PRECISA MAIS AVISAR "isto chegou para você" — quem começou já
+    // sabe. Só a notificação de ATRIBUIÇÃO/TRANSFERÊNCIA fecha aqui; ver
+    // `marcarAtribuicaoComoLidaAoIniciar`.
+    await marcarAtribuicaoComoLidaAoIniciar(tx, { tarefaId: t.id, destinatarioId: t.responsavelId })
 
     await auditar(tx, 'TAREFA_INICIADA', t.id, args.autorId, `Tarefa "${t.titulo}" iniciada.`, {
       tarefaId: t.id, workflowInstanceId: t.workflowInstanceId, etapaIniciada,
