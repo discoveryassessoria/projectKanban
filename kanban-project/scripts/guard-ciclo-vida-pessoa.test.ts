@@ -196,6 +196,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "prova o fix real de ExigenciaEvidenciaEtapa ignorada por executarAcaoCadastrada (mandato " +
     "Emissão Documental, item 08): cria a PRÓPRIA árvore/pessoa (marca EXIGBRIDGE-TEST) só no " +
     "banco de teste — nenhuma pessoa é removida por este teste",
+  "scripts/teste-reconciliacao-4-passos.ts":
+    "teste da reconciliação de dados (mandato Emissão Documental, 14/09/2026): cria a " +
+    "PRÓPRIA árvore/pessoas (marca RECONC4P) só no banco de teste — nenhuma pessoa é " +
+    "removida por este teste",
   "scripts/correcao-4-passos-unificado.test.ts":
     "correção final (mandato Emissão Documental, 14/09/2026): prova o passo unificado " +
     "'conferir_e_validar_certidao' (2 subtarefas) — cria a PRÓPRIA árvore/pessoas (marca " +

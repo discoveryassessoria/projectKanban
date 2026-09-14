@@ -126,6 +126,15 @@ export async function unificarConferirValidar(workflowId: number) {
   await prisma.stepAction.create({
     data: { stepId: novo.id, subtaskId: subValidacao.id, key: "aprovado", label: "Validado — enviar para a Análise", effectKey: "APPROVE_FOR_ANALYSIS", ordem: 1 },
   })
+  // REQUEST_NEW_COPY exige "motivo" (catálogo de efeitos, camposObrigatorios).
+  // Se o passo de origem não tinha esse campo cadastrado, criar aqui é
+  // indispensável para a ação publicar — nunca hardcode a exigência sem a
+  // peça que ela referencia.
+  if (!validar.campos.some((c) => c.key === "motivo")) {
+    await prisma.stepField.create({
+      data: { stepId: novo.id, subtaskId: subValidacao.id, key: "motivo", label: "Motivo", tipo: "textarea", obrigatorio: false, ordem: validar.campos.length + 1 },
+    })
+  }
   await prisma.stepAction.create({
     data: { stepId: novo.id, subtaskId: subValidacao.id, key: "nova_via", label: "Solicitar nova via", effectKey: "REQUEST_NEW_COPY", requerCampos: ["motivo"] as never, ordem: 2 },
   })

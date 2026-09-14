@@ -258,6 +258,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "Emissão Documental, item 08): monta e derruba o PRÓPRIO cenário isolado (workflow de 1 " +
     "passo) só no banco de teste — a necessidade é criada direto para montar o palco mínimo, " +
     "nunca para simular o materializador oficial",
+  "scripts/teste-reconciliacao-4-passos.ts":
+    "teste da reconciliação de dados (mandato Emissão Documental, 14/09/2026): monta e " +
+    "derruba o PRÓPRIO cenário (marca RECONC4P — 2 Tarefas abertas elegíveis + 1 concluída " +
+    "intocável) só no banco de teste, para provar reconciliar-4-passos.ts com segurança " +
+    "antes de aplicar em produção",
   "scripts/correcao-4-passos-unificado.test.ts":
     "correção final (mandato Emissão Documental, 14/09/2026): prova o passo unificado " +
     "'conferir_e_validar_certidao' (2 subtarefas) — monta e derruba o PRÓPRIO cenário só " +
