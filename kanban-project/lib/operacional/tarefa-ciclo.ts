@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonica'
 import { reabrirPassoTx } from '@/src/services/task-step-sync'
 import { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
+import { marcarAtribuicaoComoLidaAoProgredir } from './notificacao-canonica'
 export { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 
 export type Falha =
@@ -619,7 +620,7 @@ export async function concluirTarefaSemWorkflow(args: {
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
-      select: { id: true, titulo: true, statusTarefa: true, workflowInstanceId: true, dataInicio: true, lockVersion: true },
+      select: { id: true, titulo: true, statusTarefa: true, workflowInstanceId: true, dataInicio: true, lockVersion: true, responsavelId: true },
     })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
@@ -652,6 +653,12 @@ export async function concluirTarefaSemWorkflow(args: {
     await auditar(tx, 'TAREFA_CONCLUIDA', t.id, args.autorId,
       `Tarefa "${t.titulo}" concluída${args.resultado ? `. Resultado: ${args.resultado}` : ''}.`,
       { tarefaId: t.id, de: t.statusTarefa, para: alvo, resultado: args.resultado ?? null })
+    // Concluir É progresso real, mesmo quando a tarefa nunca passou por
+    // EM_ANDAMENTO explicitamente (tarefa transversal sem workflow pode
+    // concluir direto) — ver marcarAtribuicaoComoLidaAoProgredir.
+    if (t.responsavelId != null) {
+      await marcarAtribuicaoComoLidaAoProgredir(tx, { tarefaId: t.id, destinatarioId: t.responsavelId })
+    }
     return { ok: true as const, tarefaId: t.id }
   })
 }
@@ -664,7 +671,7 @@ async function cancelarTarefaNucleo(args: {
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
-      select: { id: true, titulo: true, statusTarefa: true, dataInicio: true },
+      select: { id: true, titulo: true, statusTarefa: true, dataInicio: true, responsavelId: true },
     })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     // Cancelar tarefa concluída apagaria um fato: o trabalho ACONTECEU. Para
@@ -689,6 +696,11 @@ async function cancelarTarefaNucleo(args: {
     await auditar(tx, 'TAREFA_CANCELADA', t.id, args.autorId,
       `Tarefa "${t.titulo}" cancelada (estava ${t.statusTarefa}${t.dataInicio ? ', com trabalho já iniciado' : ''}). Motivo: ${args.motivo}`,
       { tarefaId: t.id, de: t.statusTarefa, motivo: args.motivo, codigo: args.codigo ?? 'CANCELAMENTO', jaIniciada: t.dataInicio != null })
+    // Cancelar É progresso/resolução real — inclusive quando a tarefa nunca
+    // chegou a ser iniciada (o caso que `iniciarTarefa` sozinho nunca cobre).
+    if (t.responsavelId != null) {
+      await marcarAtribuicaoComoLidaAoProgredir(tx, { tarefaId: t.id, destinatarioId: t.responsavelId })
+    }
     return { ok: true as const, tarefaId: t.id }
   })
 }

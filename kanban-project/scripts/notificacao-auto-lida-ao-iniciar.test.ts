@@ -4,13 +4,23 @@
 // PROVOU QUE FOI VISTA — "se ela já iniciou a tarefa, por que a notificação
 // continua no sino?"
 //
-// `iniciarTarefa` (lib/operacional/tarefa-comandos.ts) passa a marcar como
-// lida a notificação de ATRIBUICAO/TRANSFERENCIA daquela Tarefa para aquele
-// destinatário, na MESMA transação da transição NAO_INICIADA → EM_ANDAMENTO —
-// via a porta canônica `marcarAtribuicaoComoLidaAoIniciar`
-// (lib/operacional/notificacao-canonica.ts). Nenhuma outra notificação
-// (PRAZO/ATRASO/RETORNO_TERCEIRO/EM_RISCO/FASE_CONCLUIDA) é tocada: começar a
-// tarefa não resolve o fato que elas avisam.
+// AMPLIADO (15/09/2026, mesma correção): "agir" não é só iniciar. Concluir e
+// cancelar também são progresso/resolução real, e chamam a MESMA porta —
+// `marcarAtribuicaoComoLidaAoProgredir` (lib/operacional/notificacao-canonica.ts)
+// — a partir de `iniciarTarefa` (tarefa-comandos.ts), `concluirTarefaSemWorkflow`/
+// `cancelarTarefaNucleo` (tarefa-ciclo.ts) e `concluirPasso`/`concluirTarefa`
+// (src/services/task-step-sync.ts, o caminho mais comum — workflow concluindo
+// sem que ninguém tenha clicado "Iniciar" à parte). Achado real: tarefas
+// atribuídas ANTES desta correção existir ficaram com a notificação presa no
+// sino mesmo já iniciadas/concluídas/canceladas — a correção só vale daqui
+// pra frente; dado antigo precisou de reconciliação à parte (script
+// `reconciliar-notificacoes-atribuicao-presas.ts`).
+//
+// `iniciarTarefa` (lib/operacional/tarefa-comandos.ts) marca como lida a
+// notificação de ATRIBUICAO/TRANSFERENCIA daquela Tarefa para aquele
+// destinatário, na MESMA transação da transição NAO_INICIADA → EM_ANDAMENTO.
+// Nenhuma outra notificação (PRAZO/ATRASO/RETORNO_TERCEIRO/EM_RISCO/
+// FASE_CONCLUIDA) é tocada: agir na tarefa não resolve o fato que elas avisam.
 //
 //   npx tsx scripts/notificacao-auto-lida-ao-iniciar.test.ts
 //
@@ -19,6 +29,7 @@
 import { prisma } from "../lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { atribuirTarefa, iniciarTarefa } from "../lib/operacional/tarefa-comandos"
+import { concluirTarefaSemWorkflow, cancelarTarefa } from "../lib/operacional/tarefa-ciclo"
 import { notificarAcontecimento } from "../lib/operacional/notificacao-canonica"
 
 let passou = 0, falhou = 0
@@ -123,6 +134,44 @@ async function main() {
     where: { tarefaId: tarefa2.id, destinatarioId: daniela.id, tipo: "TRANSFERENCIA" }, select: { lidaEm: true },
   })
   ok("13) notificação TRANSFERENCIA também é marcada como lida ao iniciar", transfDepois.lidaEm != null)
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("14-16) CONCLUIR sem nunca ter iniciado também marca a notificação como lida (tarefa transversal)")
+  // ══════════════════════════════════════════════════════════════════════
+  const tarefa3 = await prisma.tarefa.create({
+    data: { titulo: `${MARCA} Certidão 3`, processoId: processo.id, chaveIdempotencia: `${MARCA}-t-3`, statusTarefa: "NAO_INICIADA" },
+    select: { id: true },
+  })
+  await atribuirTarefa({ tarefaId: tarefa3.id, responsavelId: daniela.id, autorId: gestor.id })
+  const antesConcluir = await prisma.notificacaoOperacional.findFirstOrThrow({
+    where: { tarefaId: tarefa3.id, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  })
+  ok("14) notificação nasce não lida", antesConcluir.lidaEm == null)
+  const rConcluir = await concluirTarefaSemWorkflow({ tarefaId: tarefa3.id, autorId: daniela.id })
+  ok("15) concluir sem workflow sucede mesmo SEM nunca ter chamado iniciarTarefa", rConcluir.ok === true, JSON.stringify(rConcluir))
+  const depoisConcluir = await prisma.notificacaoOperacional.findFirstOrThrow({
+    where: { tarefaId: tarefa3.id, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  })
+  ok("16) notificação é marcada como lida ao concluir — concluir também é progresso real", depoisConcluir.lidaEm != null)
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("17-19) CANCELAR sem nunca ter iniciado também marca a notificação como lida")
+  // ══════════════════════════════════════════════════════════════════════
+  const tarefa4 = await prisma.tarefa.create({
+    data: { titulo: `${MARCA} Certidão 4`, processoId: processo.id, chaveIdempotencia: `${MARCA}-t-4`, statusTarefa: "NAO_INICIADA" },
+    select: { id: true },
+  })
+  await atribuirTarefa({ tarefaId: tarefa4.id, responsavelId: daniela.id, autorId: gestor.id })
+  const antesCancelar = await prisma.notificacaoOperacional.findFirstOrThrow({
+    where: { tarefaId: tarefa4.id, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  })
+  ok("17) notificação nasce não lida", antesCancelar.lidaEm == null)
+  const rCancelar = await cancelarTarefa({ tarefaId: tarefa4.id, autorId: gestor.id, motivo: "Processo arquivado" })
+  ok("18) cancelar sucede mesmo SEM nunca ter iniciado (o caso que iniciarTarefa sozinho nunca cobre)", rCancelar.ok === true, JSON.stringify(rCancelar))
+  const depoisCancelar = await prisma.notificacaoOperacional.findFirstOrThrow({
+    where: { tarefaId: tarefa4.id, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  })
+  ok("19) notificação é marcada como lida ao cancelar", depoisCancelar.lidaEm != null)
 
   console.log(`\n${"─".repeat(70)}\nRESULTADO: ${passou} passaram, ${falhou} falharam\n${"─".repeat(70)}`)
   if (falhou > 0) { console.log("FALHAS:", falhas); process.exit(1) }

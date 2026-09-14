@@ -164,16 +164,22 @@ export async function marcarNotificacaoComoLida(
 
 /**
  * MARCAR COMO LIDA A NOTIFICAÇÃO DE ATRIBUIÇÃO/TRANSFERÊNCIA — quando o
- * RESPONSÁVEL da tarefa gera progresso de verdade (`iniciarTarefa`).
+ * RESPONSÁVEL da tarefa gera progresso de verdade.
  *
  * "Você recebeu esta tarefa" deixa de precisar de sino no instante em que a
- * própria pessoa começa a trabalhar nela — continuar mostrando é ruído: ela
- * já sabe, ela já está fazendo. Só ATRIBUICAO/TRANSFERENCIA fecham aqui — são
- * as ÚNICAS cujo propósito ("avise que isto chegou para você") se cumpre ao
- * iniciar; PRAZO/ATRASO/RETORNO_TERCEIRO/EM_RISCO/FASE_CONCLUIDA continuam
- * abertas, porque começar a tarefa não resolve o fato que elas avisam.
+ * própria pessoa AGE sobre ela — continuar mostrando é ruído: ela já sabe.
+ * "Agir" não é só iniciar: CONCLUIR (com ou sem passar por EM_ANDAMENTO
+ * antes — uma tarefa transversal pode concluir direto) e CANCELAR também são
+ * progresso real, e todos chamam esta MESMA porta (`iniciarTarefa` em
+ * tarefa-comandos.ts, `concluirTarefaSemWorkflow`/`cancelarTarefaNucleo` em
+ * tarefa-ciclo.ts, e `concluirPasso` em task-step-sync.ts para o caminho mais
+ * comum — workflow concluindo sem que ninguém tenha clicado "Iniciar" à
+ * parte). Só ATRIBUICAO/TRANSFERENCIA fecham aqui — são as ÚNICAS cujo
+ * propósito ("avise que isto chegou para você") se cumpre com qualquer
+ * dessas ações; PRAZO/ATRASO/RETORNO_TERCEIRO/EM_RISCO/FASE_CONCLUIDA
+ * continuam abertas, porque agir na tarefa não resolve o fato que elas avisam.
  */
-export async function marcarAtribuicaoComoLidaAoIniciar(
+export async function marcarAtribuicaoComoLidaAoProgredir(
   db: Leitor,
   args: { tarefaId: number; destinatarioId: number },
 ): Promise<{ quantidade: number }> {

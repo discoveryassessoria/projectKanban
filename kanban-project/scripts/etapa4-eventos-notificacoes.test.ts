@@ -170,7 +170,7 @@ async function main() {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  secao("CASO 9/10/11 — EM_RISCO: entra 1x, permanece sem spam, motivo novo é evento novo")
+  secao("CASO 9/10/11 — EM_RISCO NÃO NOTIFICA (correção 15/09/2026): é diagnóstico de configuração, não urgência da operadora")
   // ═══════════════════════════════════════════════════════════════════════
   {
     const daniela = await usuario("Daniela9")
@@ -181,28 +181,27 @@ async function main() {
     // aguardando — cai em SEM_PROXIMO_ACONTECIMENTO_DETERMINAVEL.
     await prisma.tarefa.update({ where: { id: p.tarefaId }, data: { statusTarefa: "NAO_INICIADA", dataPrazo: null } })
 
+    const estado = await estadoTemporalDaOperacao(prisma, p.tarefaId)
+    ok("CASO 9) o estado canônico CONTINUA calculando emRisco/motivosRisco (Saúde do Sistema precisa disso)",
+      estado?.emRisco === true && estado.motivosRisco.length > 0, JSON.stringify(estado?.motivosRisco))
+
     const r1 = await avisarAcontecimentosOperacionais()
-    ok("CASO 9) entrada em EM_RISCO gera notificação", r1.risco >= 1, JSON.stringify(r1))
-    const primeira = await notifs(p.tarefaId, "EM_RISCO")
-    ok("CASO 9) exatamente 1 registrada", primeira.length === 1, String(primeira.length))
+    ok("CASO 9) entrar em EM_RISCO NÃO gera notificação nenhuma", r1.risco === 0, JSON.stringify(r1))
+    ok("CASO 9) zero notificações EM_RISCO no banco", (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
 
-    const r2 = await avisarAcontecimentosOperacionais()
-    ok("CASO 10) permanecer no MESMO risco não renotifica", r2.risco === 0 && r2.deduplicados >= 1, JSON.stringify(r2))
-    ok("CASO 10) continua exatamente 1", (await notifs(p.tarefaId, "EM_RISCO")).length === 1)
-
-    // Motivo NOVO e real: Tarefa.dataPrazo diverge do SLA do passo.
+    // Motivo NOVO e real: Tarefa.dataPrazo diverge do SLA do passo. Antes isto
+    // seria "2º fato, notificação nova permitida" — agora continua sem notificar.
     const hoje = new Date()
     await prisma.tarefa.update({ where: { id: p.tarefaId }, data: { dataPrazo: new Date(hoje.getTime() + 5 * 86400000) } })
     await prisma.phaseWorkflowStepInstance.update({ where: { id: p.stepId }, data: { prazo: new Date(hoje.getTime() + 10 * 86400000) } })
 
-    const r3 = await avisarAcontecimentosOperacionais()
-    ok("CASO 11) motivo de risco MUDOU de verdade → notificação NOVA permitida", r3.risco >= 1, JSON.stringify(r3))
-    const depois = await notifs(p.tarefaId, "EM_RISCO")
-    ok("CASO 11) agora são 2 notificações distintas (2 fatos, não duplicação do mesmo)", depois.length === 2, String(depois.length))
+    const r2 = await avisarAcontecimentosOperacionais()
+    ok("CASO 10/11) motivo de risco mudando de verdade CONTINUA sem notificar", r2.risco === 0, JSON.stringify(r2))
+    ok("CASO 10/11) zero notificações EM_RISCO, mesmo depois do motivo mudar", (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  secao("CASO 15 — Transferência: o antigo para de receber, o novo recebe a ocorrência")
+  secao("CASO 15 — Transferência de uma tarefa EM_RISCO: nenhum dos dois responsáveis é notificado do risco")
   // ═══════════════════════════════════════════════════════════════════════
   {
     const daniela = await usuario("Daniela15")
@@ -213,19 +212,13 @@ async function main() {
     await prisma.tarefa.update({ where: { id: p.tarefaId }, data: { statusTarefa: "NAO_INICIADA", dataPrazo: null } })
 
     const r1 = await avisarAcontecimentosOperacionais()
-    ok("CASO 15) Daniela é notificada do risco", r1.risco >= 1)
-    const paraDaniela = await notifs(p.tarefaId, "EM_RISCO")
-    ok("CASO 15) 1 notificação, para a Daniela", paraDaniela.length === 1 && paraDaniela[0].destinatarioId === daniela.id)
+    ok("CASO 15) Daniela NÃO é notificada do risco", r1.risco === 0)
+    ok("CASO 15) zero notificações EM_RISCO", (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
 
     await transferirTarefa({ tarefaId: p.tarefaId, responsavelId: joao.id, autorId: gestor.id, motivo: "redistribuição" })
     const r2 = await avisarAcontecimentosOperacionais()
-    ok("CASO 15) após a transferência, o NOVO responsável recebe a ocorrência", r2.risco >= 1, JSON.stringify(r2))
-    const tudo = await notifs(p.tarefaId, "EM_RISCO")
-    ok("CASO 15) agora 2 notificações — uma para cada destinatário, nenhuma repetida para o mesmo",
-      tudo.length === 2 && tudo.some((n) => n.destinatarioId === daniela.id) && tudo.some((n) => n.destinatarioId === joao.id))
-
-    const r3 = await avisarAcontecimentosOperacionais()
-    ok("CASO 15) rodar de novo não renotifica NINGUÉM (o fato já foi visto por ambos)", r3.risco === 0)
+    ok("CASO 15) depois da transferência, o novo responsável também não é notificado do risco", r2.risco === 0, JSON.stringify(r2))
+    ok("CASO 15) continuam zero notificações EM_RISCO para os dois", (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
   }
 
   // ═══════════════════════════════════════════════════════════════════════

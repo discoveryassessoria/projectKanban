@@ -26,7 +26,7 @@ import type { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
-import { notificarAcontecimento, marcarAtribuicaoComoLidaAoIniciar } from './notificacao-canonica'
+import { notificarAcontecimento, marcarAtribuicaoComoLidaAoProgredir } from './notificacao-canonica'
 import { estadosTemporaisDasOperacoes } from './proximo-acontecimento'
 
 export type ResultadoComando =
@@ -296,8 +296,8 @@ export async function iniciarTarefa(args: {
 
     // O SINO NÃO PRECISA MAIS AVISAR "isto chegou para você" — quem começou já
     // sabe. Só a notificação de ATRIBUIÇÃO/TRANSFERÊNCIA fecha aqui; ver
-    // `marcarAtribuicaoComoLidaAoIniciar`.
-    await marcarAtribuicaoComoLidaAoIniciar(tx, { tarefaId: t.id, destinatarioId: t.responsavelId })
+    // `marcarAtribuicaoComoLidaAoProgredir`.
+    await marcarAtribuicaoComoLidaAoProgredir(tx, { tarefaId: t.id, destinatarioId: t.responsavelId })
 
     await auditar(tx, 'TAREFA_INICIADA', t.id, args.autorId, `Tarefa "${t.titulo}" iniciada.`, {
       tarefaId: t.id, workflowInstanceId: t.workflowInstanceId, etapaIniciada,
@@ -549,7 +549,8 @@ export async function avisarAcontecimentosOperacionais(
     if (destinatarioId == null) {
       // Havia um fato notificável, mas ninguém para receber — a fila continua
       // sendo a garantia (item 8); aqui só contamos o caso em vez de escondê-lo.
-      if (estado.retornoRecebido || estado.acompanhamentoVencido || estado.emRisco) r.semDestinatario++
+      // `emRisco` não entra mais: deixou de ser fato notificável (ver acima).
+      if (estado.retornoRecebido || estado.acompanhamentoVencido) r.semDestinatario++
       continue
     }
 
@@ -586,16 +587,15 @@ export async function avisarAcontecimentosOperacionais(
       })
     }
 
-    // ── EM_RISCO — item 9: 1 por conjunto de motivos, nunca por leitura ───────
-    if (estado.emRisco && estado.motivosRisco.length > 0) {
-      const motivos = [...estado.motivosRisco].sort().join('+')
-      acontecimentos.push({
-        tipo: 'EM_RISCO',
-        chave: `notif::em_risco::t${tarefaId}::${motivos}::u${destinatarioId}`,
-        titulo: 'Operação em risco',
-        mensagem: `${titulo} — ${estado.proximoAcontecimento.descricao}.`,
-      })
-    }
+    // EM_RISCO NÃO NOTIFICA MAIS (correção 15/09/2026, decisão do
+    // Administrador) — "em risco" é diagnóstico de CONFIGURAÇÃO (o motor não
+    // conseguiu determinar previsão/acompanhamento), não uma urgência da
+    // operadora. Continuar mandando "Operação em risco" pro sino dela seria a
+    // mesma leitura errada que já saiu do card/chip/coluna SITUAÇÃO — só que
+    // proativa. Quem trata isso agora é a Saúde do Sistema (EMI-022, que lê
+    // o mesmo `motivosRisco`/`emRisco`; a leitura continua existindo, só não
+    // vira mais um FATO notificável aqui). `TipoDeAtencao`/`RelatorioDeAtencao.risco`
+    // ficam no tipo por compatibilidade de forma — sempre zero na prática.
 
     for (const a of acontecimentos) {
       if (ensaio) {

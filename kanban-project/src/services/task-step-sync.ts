@@ -22,6 +22,7 @@ import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { politicaDeSla, pausarSla, retomarSla } from "@/lib/operacional/sla-pausa"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { marcarAtribuicaoComoLidaAoProgredir } from "@/lib/operacional/notificacao-canonica"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
@@ -921,6 +922,9 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
         }
       }
       if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
+      // Concluir É progresso real — a notificação "isto foi atribuído a você"
+      // não precisa mais de sino (ver marcarAtribuicaoComoLidaAoProgredir).
+      if (t.responsavelId != null) await marcarAtribuicaoComoLidaAoProgredir(tx, { tarefaId: t.id, destinatarioId: t.responsavelId })
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnterior }, { tarefa: rt.atual, passo: passoAtual }, eventos)
     }, TX_OPTS)
     if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(t.processoId, "tarefa:terminal")
@@ -1242,6 +1246,13 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
             if (espera.aplicado) { tAt = "BLOQUEADA"; eventos.push(...espera.eventos) }
           }
         }
+      }
+      // CONCLUIR UM PASSO — QUALQUER PASSO — É PROGRESSO REAL de quem executou,
+      // mesmo quando ninguém clicou "Iniciar" antes (a ação do passo 1 pode
+      // acontecer direto). Cobre tanto a tarefa concluindo de vez quanto só
+      // avançando de passo — ver marcarAtribuicaoComoLidaAoProgredir.
+      if (tarefa?.responsavelId != null) {
+        await marcarAtribuicaoComoLidaAoProgredir(tx, { tarefaId: tarefa.id, destinatarioId: tarefa.responsavelId })
       }
       // TRAVA antes do commit: o par não pode terminar contraditório. Se o mapeamento
       // desta operação divergir do mapeamento OFICIAL, a transação cai aqui — o

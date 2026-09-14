@@ -409,16 +409,15 @@ async function main() {
     estado = await estadoTemporalDaOperacao(prisma, t1.id)
     ok("13) follow-up ATRASADO — acompanhamento vencido, sem depender de notificação", estado?.acompanhamentoVencido === true)
 
-    // 14) escalonamento — REGISTRADO COMO DÍVIDA em proximo-acontecimento.ts
-    // ("Escalonamento para admin em EM_RISCO estrutural/crítico... fica de fora
-    // desta rodada; registrado como dívida"). O comportamento SEGURO hoje é
-    // notificar o responsável ATUAL (nunca ninguém, nunca o antigo) — provamos
-    // esse comportamento presente, em vez de fingir uma escalada que não existe.
-    const antesNotifsRisco = (await notifs(t1.id, "EM_RISCO")).length
+    // 14) CORREÇÃO 15/09/2026: EM_RISCO deixou de notificar NINGUÉM — nem o
+    // responsável atual, nem escalado para admin. É diagnóstico de
+    // configuração (Saúde do Sistema lê o mesmo motivosRisco), não urgência
+    // da operadora. O escalonamento para admin citado no comentário original
+    // (dívida arquitetural em proximo-acontecimento.ts) ficou moot: não há
+    // mais notificação de risco nenhuma para escalar.
     await avisarAcontecimentosOperacionais()
-    const depoisNotifsRisco = await notifs(t1.id, "EM_RISCO")
-    ok("14) escalonamento (hoje: notifica o responsável ATUAL da tarefa em risco — escalar para admin é dívida arquitetural registrada, não uma regressão desta suíte)",
-      depoisNotifsRisco.length >= antesNotifsRisco && depoisNotifsRisco.every((n) => n.destinatarioId === daniela.id))
+    const notifsRisco = await notifs(t1.id, "EM_RISCO")
+    ok("14) EM_RISCO não notifica ninguém — nem o responsável atual, nem admin", notifsRisco.length === 0)
 
     // 15) retorno antecipado — antes de qualquer previsão vencer
     await registrarContato(stepAguardar, { canal: "EMAIL", resultado: "RETORNO_RECEBIDO", observacao: "Cartório respondeu" })

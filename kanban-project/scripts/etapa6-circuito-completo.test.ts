@@ -317,10 +317,13 @@ async function main() {
     const { linhas: filtradas } = await visaoGerencial({ processoId: p.processoId, emRisco: true }, hoje)
     ok("10) contador e filtro fecham no mesmo universo", card.emRisco === filtradas.length && filtradas.length >= 1)
 
+    // CORREÇÃO 15/09/2026: EM_RISCO deixou de notificar — é diagnóstico de
+    // configuração (Saúde do Sistema), não urgência da operadora. A projeção/
+    // contador/filtro acima continuam corretos; só o sino fica quieto.
     const r1 = await avisarAcontecimentosOperacionais()
-    ok("10) notificação de risco enviada (política Etapa 4)", (await notifs(p.tarefaId, "EM_RISCO")).length >= 1)
+    ok("10) EM_RISCO não gera notificação nenhuma (correção 15/09/2026)", r1.risco === 0 && (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
     const r2 = await avisarAcontecimentosOperacionais()
-    ok("10) reprocessar não gera spam (mesmo motivo, mesma chave)", r2.risco === 0 || (await notifs(p.tarefaId, "EM_RISCO")).length === 1)
+    ok("10) reprocessar continua sem notificar ninguém", r2.risco === 0 && (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
 
     // A causa é resolvida — o conflito deixa de existir.
     await prisma.phaseWorkflowStepInstance.update({ where: { id: p.stepIds[1] }, data: { prazo: new Date(hoje.getTime() + 9 * 86400000) } })

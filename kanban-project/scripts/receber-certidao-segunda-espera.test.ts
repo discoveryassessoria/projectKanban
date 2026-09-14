@@ -138,8 +138,21 @@ async function main() {
   const antesDeEnviar = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true } })
   ok("01) antes de enviar, Tarefa NÃO está bloqueada", antesDeEnviar.statusTarefa !== "BLOQUEADA", antesDeEnviar.statusTarefa)
 
+  const notifAntes = await prisma.notificacaoOperacional.findFirstOrThrow({
+    where: { tarefaId: p.tarefaId, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  })
+  ok("01b) notificação de atribuição nasce não lida", notifAntes.lidaEm == null)
+
   const r1 = await executarAcaoCadastrada(p.stepIds[0], "enviado", {}, ctx)
   ok("02) passo 1 (solicitar) conclui", r1.ok === true, JSON.stringify(r1).slice(0, 150))
+
+  // CORREÇÃO (15/09/2026) — Daniela nunca chamou iniciarTarefa() explicitamente
+  // neste teste; concluir o passo 1 direto (concluirPasso → marcarAtribuicaoComoLidaAoProgredir)
+  // já é progresso real e precisa limpar a notificação sozinho.
+  const notifDepois = await prisma.notificacaoOperacional.findFirstOrThrow({
+    where: { tarefaId: p.tarefaId, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  })
+  ok("02b) concluir o passo 1 (sem nunca ter chamado iniciarTarefa) já marca a notificação como lida", notifDepois.lidaEm != null)
 
   const step1Depois = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[0] }, select: { status: true } })
   ok("03) passo 1 fica CONCLUIDO (não fica preso em BLOQUEADO)", step1Depois.status === "CONCLUIDO", step1Depois.status)
