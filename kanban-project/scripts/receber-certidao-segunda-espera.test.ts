@@ -1,25 +1,22 @@
 // scripts/receber-certidao-segunda-espera.test.ts
 // ============================================================================
-// CORREÇÃO — "Receber certidão" tem sua PRÓPRIA espera de terceiro.
+// CORREÇÃO CONCEITUAL — "Aguardar retorno do cartório" e "Receber certidão"
+// SÃO espera de terceiro, por definição, desde o instante em que ficam
+// disponíveis. Uma correção anterior (revertida) tratava isso como uma AÇÃO
+// que o operador precisava disparar manualmente ("Ainda aguardando o
+// cartório"). Está errado: o cadastro do PASSO
+// (`PhaseInternalWorkflowStep.esperaExternaAoLiberar`) é quem decide, e o
+// motor entra em AGUARDANDO_TERCEIRO sozinho, na MESMA transação que libera o
+// passo — nunca stepKey hardcoded, vale para qualquer workflow configurado
+// assim (ver `aplicarEsperaExternaSeConfigurado`, task-step-sync.ts).
 //
-// O passo 2 ("Aguardar retorno do cartório") cobre a espera pelo COMPROVANTE
-// do pedido. O passo 3 ("Receber certidão") cobre uma espera DIFERENTE: depois
-// que o cartório confirmou o pedido, ainda falta a certidão física/digital
-// chegar. Antes desta correção o passo 3 só tinha "Registrar recebimento" —
-// sem jeito de declarar "ainda aguardando", então a Tarefa parada nessa espera
-// aparecia como ação interna pendente, nunca como espera externa.
-//
-// A correção REAPROVEITA o mecanismo já testado (`PAUSE_FOR_EXTERNAL_WAIT`,
-// ver scripts/mandato-pausa-relogios.test.ts) — nenhum efeito novo, nenhum
-// campo de schema novo:
-//   - src/lib/motor/registro-de-executores.ts: o executor `recebimento_documento`
-//     passa a declarar PAUSE_FOR_EXTERNAL_WAIT/suportaEsperaExterna (sem isso a
-//     publicação e `executarAcaoCadastrada` recusam a ação por capacidade não
-//     declarada — ver validacao-de-publicacao.ts:393 e executorSuportaEfeito).
-//   - scripts/adicionar-aguardando-receber-certidao.ts: cadastra a StepAction
-//     "aguardando_cartorio" (PAUSE_FOR_EXTERNAL_WAIT) no passo "receber_certidao".
-//   - src/components/kanban/workflow/StepEditors.tsx (FormReceberCertidao):
-//     botão "Ainda aguardando o cartório" chamando a ação cadastrada.
+// Prova as DUAS transições:
+//   1→2: concluir "Solicitar certidão" já deixa "Aguardar retorno do
+//        cartório" nascendo em espera — sem clicar em nada.
+//   2→3: concluir "Aguardar retorno do cartório" já deixa "Receber certidão"
+//        nascendo em espera — sem clicar em nada.
+// E que "Registrar recebimento" (MARK_DOCUMENT_RECEIVED) continua
+// funcionando com a Tarefa BLOQUEADA e desbloqueando sozinha ao concluir.
 //
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
@@ -28,7 +25,7 @@ import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { montarWorkflowReal } from "./_fixture-workflow-real"
 import { unificarConferirValidar } from "./unificar-conferir-validar"
-import { adicionarAguardandoEmReceberCertidao } from "./adicionar-aguardando-receber-certidao"
+import { configurarEsperaExternaAutomatica } from "./configurar-espera-externa-automatica"
 import { publicarWorkflow } from "@/src/services/publicacao-de-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
@@ -104,17 +101,24 @@ async function palco(wfId: number, wfVersao: number, pessoaNome: string, arv: { 
 async function main() {
   exigirBancoDeTeste("receber-certidao-segunda-espera.test.ts")
   await limpar()
-  console.log("RECEBER CERTIDÃO — SEGUNDA ESPERA DE TERCEIRO (reaproveita PAUSE_FOR_EXTERNAL_WAIT)\n")
+  console.log("ESPERA DE TERCEIRO AUTOMÁTICA — 'Aguardar retorno do cartório' e 'Receber certidão' nascem esperando\n")
 
   const wfId = await montarWorkflowReal()
   await unificarConferirValidar(wfId)
-  const cad = await adicionarAguardandoEmReceberCertidao(wfId)
-  ok("00) migração adiciona a ação ao cadastro (1ª vez)", cad.adicionado === true, JSON.stringify(cad))
-  const cad2 = await adicionarAguardandoEmReceberCertidao(wfId)
-  ok("00b) migração é idempotente (2ª vez não duplica)", cad2.jaExistia === true && cad2.adicionado === false, JSON.stringify(cad2))
+  const cfg = await configurarEsperaExternaAutomatica(wfId)
+  ok("00) aguardar_retorno_do_cartorio marcado esperaExternaAoLiberar", cfg["aguardar_retorno_do_cartorio"]?.depois === true, JSON.stringify(cfg["aguardar_retorno_do_cartorio"]))
+  ok("00b) receber_certidao marcado esperaExternaAoLiberar", cfg["receber_certidao"]?.depois === true, JSON.stringify(cfg["receber_certidao"]))
+  const cfg2 = await configurarEsperaExternaAutomatica(wfId)
+  ok("00c) idempotente — 2ª chamada não muda nada (antes já era true)", cfg2["aguardar_retorno_do_cartorio"]?.antes === true && cfg2["receber_certidao"]?.antes === true)
+
+  const stepReceber = await prisma.phaseInternalWorkflowStep.findFirstOrThrow({
+    where: { workflowId: wfId, key: "receber_certidao" }, select: { acoes: { select: { key: true } } },
+  })
+  ok("00d) a ação manual 'aguardando_cartorio' NÃO existe mais no cadastro (era o botão removido)",
+    !stepReceber.acoes.some((a) => a.key === "aguardando_cartorio"), JSON.stringify(stepReceber.acoes.map((a) => a.key)))
 
   const pub = await publicarWorkflow({ workflowId: wfId, actorId: null })
-  ok("01) publicação sucede com a nova ação no cadastro", pub.ok === true, JSON.stringify(pub).slice(0, 200))
+  ok("01) publicação sucede com os dois passos marcados", pub.ok === true, JSON.stringify(pub).slice(0, 250))
   const wfVersao = pub.ok ? pub.versaoNova! : 0
 
   const daniela = await usuario("Daniela")
@@ -125,58 +129,75 @@ async function main() {
   const p = await palco(wfId, wfVersao, "Beatriz", arv, processo)
   await atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: daniela.id, autorId: null })
 
+  const agora = () => new Date()
+
   // ══════════════════════════════════════════════════════════════════════
-  secao("1-2) avança até 'Receber certidão' (passos 1 e 2 concluídos)")
+  secao("1-7) TRANSIÇÃO 1→2 — concluir 'Solicitar certidão' já deixa a Tarefa esperando o cartório, sem clique nenhum")
   // ══════════════════════════════════════════════════════════════════════
+  const antesDeEnviar = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true } })
+  ok("01) antes de enviar, Tarefa NÃO está bloqueada", antesDeEnviar.statusTarefa !== "BLOQUEADA", antesDeEnviar.statusTarefa)
+
   const r1 = await executarAcaoCadastrada(p.stepIds[0], "enviado", {}, ctx)
-  ok("01) passo 1 (solicitar) conclui", r1.ok === true, JSON.stringify(r1).slice(0, 150))
+  ok("02) passo 1 (solicitar) conclui", r1.ok === true, JSON.stringify(r1).slice(0, 150))
+
+  const step1Depois = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[0] }, select: { status: true } })
+  ok("03) passo 1 fica CONCLUIDO (não fica preso em BLOQUEADO)", step1Depois.status === "CONCLUIDO", step1Depois.status)
+
+  const step2Depois = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[1] }, select: { status: true, stepKey: true } })
+  ok("04) passo 2 (aguardar_retorno_do_cartorio) já nasce BLOQUEADO — automático", step2Depois.status === "BLOQUEADO" && step2Depois.stepKey === "aguardar_retorno_do_cartorio", JSON.stringify(step2Depois))
+
+  const tarefaAposEnviar = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true, motivoCodigo: true, justificativa: true, workflowStepInstanceId: true } })
+  ok("05) Tarefa vira BLOQUEADA SOZINHA — sem nenhuma ação manual 'ainda aguardando'", tarefaAposEnviar.statusTarefa === "BLOQUEADA", tarefaAposEnviar.statusTarefa)
+  ok("06) motivoCodigo é AGUARDANDO_TERCEIRO", tarefaAposEnviar.motivoCodigo === "AGUARDANDO_TERCEIRO", String(tarefaAposEnviar.motivoCodigo))
+  ok("07) ponteiro da Tarefa já aponta para o passo 2", tarefaAposEnviar.workflowStepInstanceId === p.stepIds[1])
+
+  const estados1 = await estadosTemporaisDasOperacoes(prisma, [p.tarefaId], agora())
+  const estado1 = estados1.get(p.tarefaId)
+  ok("08) motor temporal já lê ESPERA EXTERNA para o passo 2 (aguardandoTerceiro=true)", estado1?.proximoAcontecimento.aguardandoTerceiro === true, JSON.stringify(estado1?.proximoAcontecimento).slice(0, 200))
+  ok("08b) nunca atraso interno enquanto espera automática (Etapa 3, item 3)", estado1?.atrasoInterno === false)
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("9-16) TRANSIÇÃO 2→3 — concluir 'Aguardar retorno do cartório' já deixa 'Receber certidão' esperando, sem clique nenhum")
+  // ══════════════════════════════════════════════════════════════════════
   const r2 = await executarAcaoCadastrada(p.stepIds[1], "retorno_chegou", {}, ctx)
-  ok("02) passo 2 (aguardar retorno) conclui", r2.ok === true, JSON.stringify(r2).slice(0, 150))
+  ok("09) passo 2 conclui mesmo com a Tarefa BLOQUEADA (a mesma ação que sempre concluiu)", r2.ok === true, JSON.stringify(r2).slice(0, 200))
 
-  const step3Antes = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[2] }, select: { status: true, stepKey: true } })
-  ok("03) passo 3 é 'receber_certidao' e está DISPONÍVEL", step3Antes.stepKey === "receber_certidao" && step3Antes.status === "DISPONIVEL", JSON.stringify(step3Antes))
+  const step2FinalStatus = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[1] }, select: { status: true } })
+  ok("10) passo 2 fica CONCLUIDO", step2FinalStatus.status === "CONCLUIDO", step2FinalStatus.status)
 
-  // ══════════════════════════════════════════════════════════════════════
-  secao("3-8) a NOVA ação: 'ainda aguardando o cartório' (PAUSE_FOR_EXTERNAL_WAIT)")
-  // ══════════════════════════════════════════════════════════════════════
-  const rAguardando = await executarAcaoCadastrada(p.stepIds[2], "aguardando_cartorio", {}, ctx)
-  ok("04) ação 'aguardando_cartorio' é aceita (capacidade declarada no executor)", rAguardando.ok === true, JSON.stringify(rAguardando).slice(0, 200))
+  const step3Depois = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[2] }, select: { status: true, stepKey: true } })
+  ok("11) passo 3 (receber_certidao) já nasce BLOQUEADO — automático, de novo", step3Depois.status === "BLOQUEADO" && step3Depois.stepKey === "receber_certidao", JSON.stringify(step3Depois))
 
-  const tarefaBloqueada = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true, motivoCodigo: true, justificativa: true } })
-  ok("05) Tarefa vira BLOQUEADA", tarefaBloqueada.statusTarefa === "BLOQUEADA", tarefaBloqueada.statusTarefa)
-  ok("06) motivoCodigo é AGUARDANDO_TERCEIRO (mesmo mecanismo do passo 2)", tarefaBloqueada.motivoCodigo === "AGUARDANDO_TERCEIRO", String(tarefaBloqueada.motivoCodigo))
+  const tarefaAposRetorno = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true, motivoCodigo: true, workflowStepInstanceId: true } })
+  ok("12) Tarefa CONTINUA BLOQUEADA — a espera passou do cartório-protocolo para o cartório-certidão sem sair da espera", tarefaAposRetorno.statusTarefa === "BLOQUEADA", tarefaAposRetorno.statusTarefa)
+  ok("13) motivoCodigo continua AGUARDANDO_TERCEIRO", tarefaAposRetorno.motivoCodigo === "AGUARDANDO_TERCEIRO")
+  ok("14) ponteiro avança para o passo 3", tarefaAposRetorno.workflowStepInstanceId === p.stepIds[2])
 
-  const step3Bloqueado = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[2] }, select: { status: true } })
-  ok("07) o PASSO também bloqueia — mesma transação, mesma verdade", step3Bloqueado.status === "BLOQUEADO", step3Bloqueado.status)
-
-  const agora = new Date()
-  const estados = await estadosTemporaisDasOperacoes(prisma, [p.tarefaId], agora)
-  const estadoBloqueado = estados.get(p.tarefaId)
-  ok("08) motor temporal lê como ESPERA EXTERNA (aguardandoTerceiro=true), não ação interna",
-    estadoBloqueado?.proximoAcontecimento.aguardandoTerceiro === true, JSON.stringify(estadoBloqueado?.proximoAcontecimento).slice(0, 200))
-  ok("08b) NUNCA vira atraso interno enquanto aguarda o cartório (Etapa 3, item 3)",
-    estadoBloqueado?.atrasoInterno === false, String(estadoBloqueado?.atrasoInterno))
+  const estados2 = await estadosTemporaisDasOperacoes(prisma, [p.tarefaId], agora())
+  const estado2 = estados2.get(p.tarefaId)
+  ok("15) motor temporal lê ESPERA EXTERNA para o passo 3 também", estado2?.proximoAcontecimento.aguardandoTerceiro === true, JSON.stringify(estado2?.proximoAcontecimento).slice(0, 200))
+  ok("16) nunca atraso interno", estado2?.atrasoInterno === false)
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("9-13) certidão chega → 'Registrar recebimento' DESBLOQUEIA automaticamente")
+  secao("17-22) certidão chega → 'Registrar recebimento' funciona bloqueado e desbloqueia sozinho")
   // ══════════════════════════════════════════════════════════════════════
   await prisma.documentoArquivo.create({ data: { documentoId: p.doc.id, tipo: "OUTRO", url: `https://x/${MARCA}/cert.pdf`, nome: "cert.pdf" } })
-  const rRecebido = await executarAcaoCadastrada(p.stepIds[2], "recebido", { documento_url: `https://x/${MARCA}/cert.pdf` }, ctx)
-  ok("09) 'Registrar recebimento' sucede mesmo com a Tarefa BLOQUEADA", rRecebido.ok === true, JSON.stringify(rRecebido).slice(0, 200))
+  const r3 = await executarAcaoCadastrada(p.stepIds[2], "recebido", { documento_url: `https://x/${MARCA}/cert.pdf` }, ctx)
+  ok("17) 'Registrar recebimento' sucede com a Tarefa BLOQUEADA", r3.ok === true, JSON.stringify(r3).slice(0, 200))
 
-  const step3Depois = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[2] }, select: { status: true } })
-  ok("10) passo 3 conclui", step3Depois.status === "CONCLUIDO", step3Depois.status)
+  const step3Final = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[2] }, select: { status: true } })
+  ok("18) passo 3 conclui", step3Final.status === "CONCLUIDO", step3Final.status)
 
-  const tarefaDepois = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true, motivoCodigo: true, workflowStepInstanceId: true } })
-  ok("11) Tarefa SAI de BLOQUEADA sozinha (sincronizarTarefaComWorkflow deriva de volta pelos passos)", tarefaDepois.statusTarefa !== "BLOQUEADA", tarefaDepois.statusTarefa)
-  ok("12) ponteiro da Tarefa avança para o passo 4 (conferir e validar)", tarefaDepois.workflowStepInstanceId === p.stepIds[3])
+  const tarefaFinal = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true, workflowStepInstanceId: true } })
+  ok("19) Tarefa SAI de BLOQUEADA sozinha", tarefaFinal.statusTarefa !== "BLOQUEADA", tarefaFinal.statusTarefa)
+  ok("20) ponteiro avança para o passo 4", tarefaFinal.workflowStepInstanceId === p.stepIds[3])
 
   const step4 = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[3] }, select: { status: true, stepKey: true } })
-  ok("13) passo 4 fica DISPONÍVEL", step4.status === "DISPONIVEL", JSON.stringify(step4))
+  ok("21) passo 4 (conferir e validar) fica DISPONÍVEL — não é espera externa, é ação interna normal", step4.status === "DISPONIVEL" && step4.stepKey === "conferir_e_validar_certidao", JSON.stringify(step4))
 
-  const estadosDepois = await estadosTemporaisDasOperacoes(prisma, [p.tarefaId], agora)
-  const estadoDepois = estadosDepois.get(p.tarefaId)
-  ok("14) motor temporal não lê mais espera externa depois do recebimento", estadoDepois?.proximoAcontecimento.aguardandoTerceiro === false, String(estadoDepois?.proximoAcontecimento.aguardandoTerceiro))
+  const estados3 = await estadosTemporaisDasOperacoes(prisma, [p.tarefaId], agora())
+  const estado3 = estados3.get(p.tarefaId)
+  ok("22) motor temporal não lê mais espera externa depois do recebimento", estado3?.proximoAcontecimento.aguardandoTerceiro === false, String(estado3?.proximoAcontecimento.aguardandoTerceiro))
 
   console.log(`\n${"─".repeat(70)}\nRESULTADO: ${passou} passaram, ${falhou} falharam\n${"─".repeat(70)}`)
   if (falhou > 0) { console.log("FALHAS:", falhas); process.exit(1) }

@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-13
+-- Gerado em : 2026-09-14
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2478,6 +2478,7 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "reaberturaEstrategia" VARCHAR(24) NOT NULL DEFAULT 'ESCOLHA_MANUAL',
     "reaberturaExigeJustificativa" BOOLEAN NOT NULL DEFAULT true,
     "reaberturaPermissao" VARCHAR(60),
+    "esperaExternaAoLiberar" BOOLEAN NOT NULL DEFAULT false,
     "regraDeConclusao" VARCHAR(40) NOT NULL DEFAULT 'ACAO_DO_PASSO',
 
     CONSTRAINT "PhaseInternalWorkflowStep_pkey" PRIMARY KEY ("id")

@@ -332,7 +332,23 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // do UPDATE de uma coluna só, checksum anterior no WHERE.
 //
 //   anterior : ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6
-const CHECKSUM_LEDGER = 'c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128'
+// 15/09/2026 — CORREÇÃO CONCEITUAL (espera de terceiro automática): coluna
+// nova `PhaseInternalWorkflowStep.esperaExternaAoLiberar` (boolean, default
+// false) — cadastro canônico que diz que um passo NASCE em AGUARDANDO_TERCEIRO
+// ao ser liberado, sem exigir ação manual do operador. Migration real
+// 20260914194923_espera_externa_ao_liberar. Diff do baseline: só ADD COLUMN
+// dentro do mesmo CREATE TABLE — zero DROP/TRUNCATE/DELETE, nenhuma linha
+// existente perde dado (toda linha existente nasce com o default false, igual
+// ao comportamento de sempre). Migration já aplicada em produção via
+// `prisma migrate deploy` (conexão local direta, `.env`). Ledger reconciliado
+// na hora: backup de `_prisma_migrations` em
+// ~/.discovery-backups/prisma-migrations-20260914-pre-checksum.json (65
+// linhas) antes do UPDATE de uma coluna só (checksum), com o checksum anterior
+// no WHERE — `started_at`/`finished_at`/`applied_steps_count` da linha
+// `0000_baseline` continuam os originais de 02/08/2026.
+//
+//   anterior : c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128
+const CHECKSUM_LEDGER = 'bfefeef373b4787228f2accd6cfa96a38e75ab2ac47ec677c6cbdababfd601a2'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -403,6 +419,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260910200000_remove_matriz_documental_createstask',
   '20260912200000_notificacao_operacional_grao_processo',
   '20260913120000_regra_temporal_orgao',
+  '20260914194923_espera_externa_ao_liberar',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

@@ -101,15 +101,19 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     key: "recebimento_documento",
     label: "Recebimento do documento",
     campos: ["texto", "textarea", "data", "select", "radio", "upload"],
-    // "Receber certidão" tem sua PRÓPRIA espera de terceiro: entre o protocolo
-    // confirmado (passo "Aguardar retorno do cartório") e a certidão física
-    // chegar, o operador ainda depende do cartório — mesmo mecanismo já usado
-    // por `solicitacao_cartorio`/`acompanhamento_retorno` (PAUSE_FOR_EXTERNAL_WAIT).
-    efeitos: ["MARK_DOCUMENT_RECEIVED", "COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT"],
+    efeitos: ["MARK_DOCUMENT_RECEIVED", "COMPLETE_STEP", "REGISTER_ONLY"],
     acoesCadastradas: true,
     checklistCadastrado: false,
     suportaCanais: false,
     suportaEvidencia: true,
+    // "Receber certidão" tem sua PRÓPRIA espera de terceiro: entre o protocolo
+    // confirmado (passo "Aguardar retorno do cartório") e a certidão física
+    // chegar, o operador ainda depende do cartório. Não é uma AÇÃO que o
+    // operador dispara (por isso `PAUSE_FOR_EXTERNAL_WAIT` não está em
+    // `efeitos`) — é o cadastro do PASSO (`esperaExternaAoLiberar`) que diz
+    // isso, e o motor entra em espera sozinho ao liberar o passo. Este
+    // executor precisa declarar `suportaEsperaExterna: true` para que a tela
+    // de cadastro permita marcar essa opção nele.
     suportaEsperaExterna: true,
     suportaCondicoes: true,
   },

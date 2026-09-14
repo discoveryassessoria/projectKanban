@@ -62,6 +62,9 @@ export interface PassoParaValidar {
   requisitos?: { key: string; tipo: string; alvoKey?: string | null; acaoKey?: string | null; condicao?: unknown; ativo?: boolean }[]
   /// REGRA DE CONCLUSÃO em vocabulário fechado.
   regraDeConclusao?: string | null
+  /// Nasce em AGUARDANDO_TERCEIRO automaticamente ao ser liberado — exige
+  /// executor com `suportaEsperaExterna`.
+  esperaExternaAoLiberar?: boolean | null
   subtarefas?: SubtarefaParaValidar[]
 }
 
@@ -141,10 +144,20 @@ export function validarConfiguracao(
     }
 
     const exec = executorEfetivo(p, ctx.phaseKey)
-    if (!capacidades(exec)) {
+    const capExec = capacidades(exec)
+    if (!capExec) {
       problemas.push({ codigo: "EXECUTOR_INEXISTENTE", stepKey: p.key,
         mensagem: `"${p.label}" declara o executor "${exec}", que não existe.` })
       continue
+    }
+    // O CADASTRO NÃO PODE PROMETER O QUE O EXECUTOR NÃO SABE REPRESENTAR. Um
+    // passo marcado "nasce em espera de terceiro ao ser liberado" cujo
+    // executor não declara `suportaEsperaExterna` publicaria uma Tarefa que o
+    // motor bloqueia mas cuja tela não sabe mostrar como espera — a mesma
+    // classe de recusa que já existe para ação/campo sem suporte do executor.
+    if (p.esperaExternaAoLiberar === true && capExec.suportaEsperaExterna !== true) {
+      problemas.push({ codigo: "ESPERA_EXTERNA_SEM_SUPORTE", stepKey: p.key,
+        mensagem: `"${p.label}" está marcado para nascer em espera de terceiro, e o executor "${exec}" não declara suporte a espera externa.` })
     }
 
     const camposAtivos = (p.campos ?? []).filter((c) => c.ativo !== false)
@@ -571,6 +584,7 @@ export async function validarWorkflowParaPublicar(workflowId: number, db: DB = p
       })),
       requisitos: p.requisitos.map(paraValidarRequisito),
       regraDeConclusao: p.regraDeConclusao,
+      esperaExternaAoLiberar: p.esperaExternaAoLiberar,
       subtarefas: p.subtarefas.map((st) => ({
         key: st.key, label: st.label, ativo: st.ativo, obrigatoria: st.obrigatoria,
         repetivel: st.repetivel, maxOcorrencias: st.maxOcorrencias,

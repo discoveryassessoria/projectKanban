@@ -21,6 +21,7 @@ import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/serv
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { politicaDeSla, pausarSla, retomarSla } from "@/lib/operacional/sla-pausa"
+import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
@@ -927,6 +928,52 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
+/**
+ * A ESPERA DE TERCEIRO NASCE COM O PASSO, QUANDO O CADASTRO DIZ ISSO.
+ *
+ * "Aguardar retorno do cartório" e "Receber certidão" não são passos em que o
+ * operador PRECISA declarar "estou esperando" — eles SÃO espera, por definição,
+ * desde o instante em que ficam disponíveis. `PhaseInternalWorkflowStep.
+ * esperaExternaAoLiberar` (cadastro, congelado na versão publicada — nunca
+ * `stepKey` hardcoded) é quem decide isso. Chamada de DENTRO da MESMA
+ * transação que libera o passo (`concluirPasso` → `ativarProximoPassoTx` →
+ * `sincronizarTarefaComWorkflow`): a Tarefa nunca fica, nem por um commit,
+ * "disponível" sem já refletir que está esperando um terceiro.
+ *
+ * Reaproveita o MESMO par `aplicarTarefa`/`aplicarPasso` que `bloquearTarefa`
+ * usa — não é um caminho paralelo: é o mesmo efeito, disparado por liberação
+ * de passo em vez de ação manual do operador.
+ *
+ * Idempotente: `aplicarTarefa`/`aplicarPasso` já não fazem nada quando o
+ * estado atual é o alvo.
+ */
+async function aplicarEsperaExternaSeConfigurado(
+  tx: TX,
+  args: { tarefaId: number; stepInstanceId: number; statusTarefaAtual: string },
+  o: ApplyOpts,
+): Promise<{ aplicado: boolean; eventos: string[] }> {
+  const def = await definicaoHistoricaDoPasso(args.stepInstanceId, tx)
+  if (def?.passo.esperaExternaAoLiberar !== true) return { aplicado: false, eventos: [] }
+
+  const eventos: string[] = []
+  const justificativa = "Passo liberado como dependência externa — aguardando o terceiro automaticamente."
+  const rt = await aplicarTarefa(tx, args.tarefaId, "BLOQUEADA", "TAREFA_BLOQUEADA", {
+    ...o,
+    extra: { blockedPreviousStatus: args.statusTarefaAtual, motivoCodigo: "AGUARDANDO_TERCEIRO", justificativa },
+    dados: { motivoCodigo: "AGUARDANDO_TERCEIRO", justificativa, automatico: true },
+  })
+  if (rt.changed) eventos.push("TAREFA_BLOQUEADA")
+
+  const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: args.stepInstanceId }, select: { status: true } })
+  const rp = await aplicarPasso(tx, args.stepInstanceId, "BLOQUEADO", "PASSO_BLOQUEADO", { ...o, extra: { statusAnteriorBloqueio: step?.status } })
+  if (rp.changed) eventos.push("PASSO_BLOQUEADO")
+
+  const politica = await politicaDeSla(o.workflowInstanceId ?? null, tx)
+  if (politica.pausaEspera) await pausarSla(tx, args.tarefaId, new Date())
+
+  return { aplicado: eventos.length > 0, eventos }
+}
+
 export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promise<SyncResultado> {
   const correlationId = corr(ctx)
   const t = await prisma.tarefa.findUnique({ where: { id: tarefaId } })
@@ -1182,6 +1229,18 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
           const r = await sincronizarTarefaComWorkflow(tx, tarefa.id, new Date())
           tAnt = tarefa.statusTarefa; tAt = r.status
           if (r.mudou) eventos.push("TAREFA_SINCRONIZADA")
+
+          // O PASSO QUE ACABOU DE FICAR CORRENTE PODE SER, ELE MESMO, ESPERA
+          // DE TERCEIRO DESDE A LIBERAÇÃO — cadastro, não stepKey hardcoded.
+          // Ver `aplicarEsperaExternaSeConfigurado`.
+          if (r.stepAtualId != null) {
+            const espera = await aplicarEsperaExternaSeConfigurado(
+              tx,
+              { tarefaId: tarefa.id, stepInstanceId: r.stepAtualId, statusTarefaAtual: r.status },
+              base,
+            )
+            if (espera.aplicado) { tAt = "BLOQUEADA"; eventos.push(...espera.eventos) }
+          }
         }
       }
       // TRAVA antes do commit: o par não pode terminar contraditório. Se o mapeamento

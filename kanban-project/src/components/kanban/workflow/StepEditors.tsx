@@ -2061,8 +2061,7 @@ function FormReceberCertidao({
   const [arquivoMime, setArquivoMime] = useState<string | null>(() => textoOuNulo(doc?.arquivo_mime_type))
   // AS OPÇÕES VÊM DO CADASTRO. Acrescentar uma forma de recebimento passa a ser
   // configuração — a tela desenha o que o campo `midia` da versão declara.
-  const { opcoesDe: opcoesDaEtapa, executarAcao: executarAcaoDoRecebimento } = useConfiguracaoDaEtapa(stepId)
-  const [marcandoAguardando, setMarcandoAguardando] = useState(false)
+  const { opcoesDe: opcoesDaEtapa } = useConfiguracaoDaEtapa(stepId)
   const opcoesMidia = opcoesDaEtapa("midia")
   const MEDIUM_OPTIONS = opcoesMidia.length > 0
     ? opcoesMidia.map((o) => ({
@@ -2145,30 +2144,6 @@ function FormReceberCertidao({
   }
 
   /**
-   * AINDA AGUARDANDO O CARTÓRIO — a SEGUNDA espera de terceiro deste fluxo.
-   *
-   * "Aguardar retorno do cartório" (passo 2) só cobre a espera pelo PROTOCOLO.
-   * Entre o protocolo confirmado e a certidão física chegar, a Daniela espera
-   * de novo — e até aqui não havia como declarar isso: só existia "Registrar
-   * recebimento" (conclui). Reaproveita o efeito PAUSE_FOR_EXTERNAL_WAIT
-   * (mesmo mecanismo de "Solicitar certidão", já testado) — não conclui a
-   * etapa, só marca que quem espera agora é o cartório, não a Daniela.
-   */
-  const handleAguardando = async () => {
-    if (readOnly || marcandoAguardando) return
-    setMarcandoAguardando(true)
-    setErroServidor(null)
-    try {
-      const r = await executarAcaoDoRecebimento("aguardando_cartorio", {})
-      if (!r.ok) { setErroServidor(r.mensagem ?? "Não foi possível marcar como aguardando."); return }
-      onSaved?.()
-      onClose()
-    } finally {
-      setMarcandoAguardando(false)
-    }
-  }
-
-  /**
    * O ERRO DO SERVIDOR PRECISA APARECER.
    *
    * Aqui a falha era `console.warn` seguido de `onSaved?.()`: o modal fechava,
@@ -2196,15 +2171,6 @@ function FormReceberCertidao({
             className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
           >
             Cancelar
-          </button>
-          <button
-            onClick={handleAguardando}
-            disabled={saving || marcandoAguardando || readOnly}
-            title="A solicitação já foi protocolada, mas o cartório ainda não enviou a certidão."
-            className="px-4 py-2 text-[12.5px] font-semibold text-[var(--text-primary)] border border-[var(--border-default)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-          >
-            {marcandoAguardando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Clock className="w-3.5 h-3.5" />}
-            Ainda aguardando o cartório
           </button>
           <button
             onClick={handleSalvar}

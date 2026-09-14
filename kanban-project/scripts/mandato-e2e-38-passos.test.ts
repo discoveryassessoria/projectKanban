@@ -560,18 +560,22 @@ async function main() {
   ok("21) ainda 1 única Tarefa", (await prisma.tarefa.count({ where: { processoId: processo.id } })) === 1)
 
   // ==========================================================================
-  secao("22) ESPERA (nova espera externa) — receber_certidao tem espera PRÓPRIA")
+  secao("22) ESPERA (nova espera externa) — receber_certidao tem espera PRÓPRIA, automática")
   // ==========================================================================
-  // CORREÇÃO (15/09/2026): "receber_certidao" tem sua PRÓPRIA espera de
-  // terceiro — entre o protocolo confirmado (passo 2) e a certidão física
-  // chegar, o operador ainda depende do cartório. O achado registrado aqui
-  // antes ("não aplicável") era exatamente a lacuna que motivou a correção:
-  // ver scripts/receber-certidao-segunda-espera.test.ts para a prova completa
-  // (pausa → motor temporal lê espera externa → recebimento desbloqueia sozinho).
+  // CORREÇÃO (15/09/2026, refinada): "receber_certidao" tem sua PRÓPRIA
+  // espera de terceiro — entre o protocolo confirmado (passo 2) e a certidão
+  // física chegar, o operador ainda depende do cartório. Não é uma AÇÃO que o
+  // operador dispara (por isso `PAUSE_FOR_EXTERNAL_WAIT` não precisa estar em
+  // `efeitos`): é o cadastro do PASSO (`esperaExternaAoLiberar`) que decide, e
+  // o motor entra em espera sozinho ao liberar o passo — o executor só precisa
+  // declarar `suportaEsperaExterna` para a tela de cadastro permitir marcar
+  // essa opção nele. Ver scripts/receber-certidao-segunda-espera.test.ts para
+  // a prova completa (liberação → motor entra em espera sozinho → motor
+  // temporal lê espera externa → recebimento desbloqueia sozinho).
   const execReceber = executorEfetivo({ key: "receber_certidao", executorKey: null }, "emissao_documental")
   const capReceber = REGISTRO_DE_EXECUTORES[execReceber as keyof typeof REGISTRO_DE_EXECUTORES]
-  ok("22) o executor real de receber_certidao suporta espera externa (segunda espera de terceiro, cadastro próprio)",
-    capReceber != null && (capReceber.efeitos as readonly string[]).includes("PAUSE_FOR_EXTERNAL_WAIT") && capReceber.suportaEsperaExterna === true)
+  ok("22) o executor real de receber_certidao declara suporte a espera externa (segunda espera de terceiro, automática por cadastro)",
+    capReceber != null && capReceber.suportaEsperaExterna === true)
 
   // ==========================================================================
   secao("23) TERCEIRO ATRASADO (sem virar atraso do operador)")

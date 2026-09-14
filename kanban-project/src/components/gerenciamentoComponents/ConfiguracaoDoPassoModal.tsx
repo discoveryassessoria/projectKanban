@@ -54,6 +54,9 @@ export interface PassoConfiguravel {
   reaberturaEstrategia?: string
   reaberturaExigeJustificativa?: boolean
   reaberturaPermissao?: string | null
+  /// Este passo nasce em espera de terceiro (AGUARDANDO_TERCEIRO)
+  /// automaticamente ao ser liberado — sem exigir ação manual do operador.
+  esperaExternaAoLiberar?: boolean
   acoes?: AcaoCfg[]
   campos?: CampoCfg[]
   checkItens?: ItemCfg[]
@@ -116,6 +119,7 @@ export default function ConfiguracaoDoPassoModal({
     reaberturaEstrategia: passo.reaberturaEstrategia ?? "ESCOLHA_MANUAL",
     reaberturaExigeJustificativa: passo.reaberturaExigeJustificativa !== false,
     reaberturaPermissao: passo.reaberturaPermissao ?? null,
+    esperaExternaAoLiberar: passo.esperaExternaAoLiberar === true,
     acoes: passo.acoes ?? [],
     campos: passo.campos ?? [],
     checkItens: passo.checkItens ?? [],
@@ -736,6 +740,32 @@ export default function ConfiguracaoDoPassoModal({
                   </div>
                 </div>
               )}
+                </div>
+              </details>
+
+              <details className={card}>
+                <summary className="cursor-pointer text-sm font-medium text-white/80">
+                  Espera de terceiro
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Alguns passos SÃO espera de terceiro, por definição, desde o instante em que ficam
+                    disponíveis — &quot;Aguardar retorno do cartório&quot;, &quot;Receber certidão&quot;. Marcando
+                    esta opção, o motor coloca a Tarefa em AGUARDANDO_TERCEIRO automaticamente ao liberar este
+                    passo, sem exigir que o operador clique em nada para começar a espera.
+                  </p>
+                  <label className="flex items-center gap-2 text-sm text-white/80">
+                    <input type="checkbox" checked={f.esperaExternaAoLiberar === true}
+                      disabled={exec != null && exec.suportaEsperaExterna === false}
+                      onChange={(e) => set("esperaExternaAoLiberar", e.target.checked)} />
+                    Este passo nasce em espera de terceiro ao ser liberado
+                  </label>
+                  {exec != null && exec.suportaEsperaExterna === false && (
+                    <p className="text-[11px] text-amber-800/70">
+                      O executor &quot;{exec.label}&quot; não declara suporte a espera externa — escolha um
+                      executor compatível antes de marcar esta opção.
+                    </p>
+                  )}
                 </div>
               </details>
 

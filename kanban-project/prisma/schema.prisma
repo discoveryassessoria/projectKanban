@@ -3639,6 +3639,16 @@ model PhaseInternalWorkflowStep {
   /// Permissão exigida para reabrir esta etapa. `null` = a permissão geral de reabrir.
   reaberturaPermissao          String? @db.VarChar(60)
 
+  /// ESTE PASSO NASCE EM ESPERA DE TERCEIRO — cadastro canônico, nunca stepKey
+  /// hardcoded. Quando true, o motor coloca a Tarefa em BLOQUEADA/
+  /// AGUARDANDO_TERCEIRO automaticamente no instante em que este passo é
+  /// liberado como corrente (mesma transação de `ativarProximoPassoTx`) — sem
+  /// exigir que o operador declare manualmente "ainda aguardando". Vale para
+  /// qualquer workflow que configure um passo assim, não é específico de
+  /// nenhuma fase: "Aguardar retorno do cartório" e "Receber certidão", na
+  /// Emissão Documental, são o primeiro uso — não o único possível.
+  esperaExternaAoLiberar Boolean @default(false)
+
   /// REGRA DE CONCLUSÃO do passo, em vocabulário fechado.
   ///
   /// `completionRule` acima é texto livre herdado e continua sendo exibido; ele nunca

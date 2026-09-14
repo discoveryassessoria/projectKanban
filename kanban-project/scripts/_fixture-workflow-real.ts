@@ -19,8 +19,10 @@ export async function montarWorkflowReal(): Promise<number> {
       passos: {
         create: [
           { key: "solicitar_certidao", label: "Solicitar certidão", ordem: 1, createsTask: true, required: true, slaDays: 7, cardinalidade: "DOCUMENTO", executorKey: "solicitacao_cartorio" },
-          { key: "aguardar_retorno_do_cartorio", label: "Aguardar retorno do cartório", ordem: 2, createsTask: true, required: true, slaDays: 15, cardinalidade: "DOCUMENTO", executorKey: "acompanhamento_retorno" },
-          { key: "receber_certidao", label: "Receber certidão", ordem: 3, createsTask: true, required: true, slaDays: 2, cardinalidade: "DOCUMENTO", executorKey: "recebimento_documento" },
+          // ESPERA DE TERCEIRO POR DEFINIÇÃO — não é ação manual do operador,
+          // é o cadastro do passo (ver aplicarEsperaExternaSeConfigurado).
+          { key: "aguardar_retorno_do_cartorio", label: "Aguardar retorno do cartório", ordem: 2, createsTask: true, required: true, slaDays: 15, cardinalidade: "DOCUMENTO", executorKey: "acompanhamento_retorno", esperaExternaAoLiberar: true },
+          { key: "receber_certidao", label: "Receber certidão", ordem: 3, createsTask: true, required: true, slaDays: 2, cardinalidade: "DOCUMENTO", executorKey: "recebimento_documento", esperaExternaAoLiberar: true },
           { key: "conferir_certidao", label: "Conferir certidão", ordem: 4, createsTask: true, required: true, slaDays: 0, cardinalidade: "DOCUMENTO", executorKey: "conferencia_documento" },
           { key: "validar_certidao", label: "Validar certidão", ordem: 5, createsTask: true, required: true, slaDays: 0, cardinalidade: "DOCUMENTO", executorKey: "validacao_juridica" },
         ],
@@ -42,10 +44,7 @@ export async function montarWorkflowReal(): Promise<number> {
     ],
   })
   await prisma.stepAction.createMany({
-    data: [
-      { stepId: porChave.get("receber_certidao")!, key: "recebido", label: "Recebido", effectKey: "MARK_DOCUMENT_RECEIVED", ordem: 1 },
-      { stepId: porChave.get("receber_certidao")!, key: "aguardando_cartorio", label: "Ainda aguardando o cartório", effectKey: "PAUSE_FOR_EXTERNAL_WAIT", ordem: 2 },
-    ],
+    data: [{ stepId: porChave.get("receber_certidao")!, key: "recebido", label: "Recebido", effectKey: "MARK_DOCUMENT_RECEIVED", ordem: 1 }],
   })
 
   // ── conferir_certidao — réplica fiel do cadastro real de produção ──

@@ -61,6 +61,10 @@ export interface PassoCongelado {
   reaberturaEstrategia: string
   reaberturaExigeJustificativa: boolean
   reaberturaPermissao: string | null
+  /// ESTE PASSO NASCE EM ESPERA DE TERCEIRO — congelado como o resto: mudar o
+  /// cadastro hoje não muda o que valia para uma execução já materializada.
+  /// Ver `aplicarEsperaExternaSeConfigurado` (task-step-sync.ts).
+  esperaExternaAoLiberar: boolean
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
   checkItens: ItemChecklistCongelado[]
@@ -354,6 +358,7 @@ export function retratarPassos(passos: PassosComFilhos): PassoCongelado[] {
     reaberturaEstrategia: p.reaberturaEstrategia,
     reaberturaExigeJustificativa: p.reaberturaExigeJustificativa,
     reaberturaPermissao: p.reaberturaPermissao,
+    esperaExternaAoLiberar: p.esperaExternaAoLiberar,
     regraDeConclusao: p.regraDeConclusao,
     subtarefas: p.subtarefas.map((st) => ({
       key: st.key, label: st.label, descricao: st.descricao, ordem: st.ordem, ativo: st.ativo,

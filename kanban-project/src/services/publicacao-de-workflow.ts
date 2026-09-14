@@ -196,6 +196,7 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
       { nome: "responsável padrão", ler: (p) => p.owner },
       { nome: "dependências", ler: (p) => p.dependeDe },
       { nome: "política de reabertura", ler: (p) => [p.reaberturaPermitida, p.reaberturaEstrategia, p.reaberturaExigeJustificativa] },
+      { nome: "espera externa ao liberar", ler: (p) => p.esperaExternaAoLiberar },
     ],
   )
 

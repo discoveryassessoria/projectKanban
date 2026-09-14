@@ -230,3 +230,30 @@ a segunda tarefa não conseguia nascer. Quem garante "etapa não é tarefa" é
 de `34976e69df86f7d3970db180943eb374da1b28658917c6e4c50636bd1b3db2ad` para
 `4851fb0b39535fcbd3cee99740c48a11895e5458d80d3f1b95bfa9d2070db0b6`,
 reconciliado no ledger com backup da linha e sem tocar em schema nem em dados.
+
+## Reconciliação de 15/09/2026 — espera de terceiro automática
+
+**Motivo.** Correção conceitual: "Aguardar retorno do cartório" e "Receber
+certidão" SÃO espera de terceiro por definição, desde o instante em que ficam
+disponíveis — não uma ação que o operador declara manualmente. Coluna nova
+`PhaseInternalWorkflowStep.esperaExternaAoLiberar` (boolean, default `false`)
+— cadastro canônico, nunca `stepKey` hardcoded — que o motor lê ao liberar um
+passo (`aplicarEsperaExternaSeConfigurado`, `src/services/task-step-sync.ts`)
+para colocar a Tarefa em `AGUARDANDO_TERCEIRO` sozinho, na mesma transação.
+
+| | |
+|---|---|
+| checksum anterior | `c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128` |
+| checksum atual | `bfefeef373b4787228f2accd6cfa96a38e75ab2ac47ec677c6cbdababfd601a2` |
+| linha do ledger | `0000_baseline` — apenas a coluna `checksum` foi atualizada |
+| backup do ledger | `~/.discovery-backups/prisma-migrations-20260914-pre-checksum.json` (65 linhas) |
+| migration nova | `20260914194923_espera_externa_ao_liberar` (aditiva, idempotente — `ADD COLUMN IF NOT EXISTS`) |
+| aplicação em produção | `prisma migrate deploy` direto (conexão local via `.env`, `PRISMA_DATABASE_URL` de produção) |
+
+Diff do baseline: só `ADD COLUMN` dentro do `CREATE TABLE` de
+`PhaseInternalWorkflowStep` — zero DROP/TRUNCATE/DELETE, nenhuma linha
+existente perde dado (toda linha existente nasce com o default `false`, igual
+ao comportamento de sempre — nenhum passo publicado antes desta correção passa
+a ter espera automática sem que alguém marque explicitamente). `started_at`,
+`finished_at` e `applied_steps_count` da linha `0000_baseline` seguem os
+originais de 02/08/2026.

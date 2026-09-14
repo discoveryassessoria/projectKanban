@@ -60,6 +60,9 @@ function buildSteps(raw: any[], workflowId: number) {
         : 'ESCOLHA_MANUAL',
       reaberturaExigeJustificativa: s?.reaberturaExigeJustificativa !== false,
       reaberturaPermissao: s?.reaberturaPermissao ? String(s.reaberturaPermissao) : null,
+      // ESPERA DE TERCEIRO AO LIBERAR — cadastro canônico, nunca stepKey
+      // hardcoded. Ver PhaseInternalWorkflowStep.esperaExternaAoLiberar.
+      esperaExternaAoLiberar: s?.esperaExternaAoLiberar === true,
     }
   })
 }
