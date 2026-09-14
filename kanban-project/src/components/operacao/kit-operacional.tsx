@@ -19,45 +19,13 @@
 
 import { useEffect, useState } from "react"
 import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
-
-export interface LinhaDeFila {
-  taskId: number
-  titulo: string
-  processoId: number | null
-  processoNome: string | null
-  pessoaNome: string | null
-  faseMacroKey: string | null
-  etapaAtual: string | null
-  statusTarefa: string
-  equipeKey: string | null
-  responsavelId: number | null
-  responsavelNome: string | null
-  prioridade: string
-  dataPrazo: string | null
-  atrasada: boolean
-  diasParaPrazo: number | null
-  /** A frase única do prazo, montada no servidor — a tela só escolhe a cor. */
-  rotuloDoPrazo: string
-  aguardandoDependencia: boolean
-  requerDecisao: boolean
-  /** Ver `executavelAgora` em `lib/operacional/tarefa-canonica.ts` — não é `!aguardandoDependencia` sozinho. */
-  executavelAgora: boolean
-  /** Quem é o terceiro esperado, SÓ quando identificável — nunca decide se a tarefa está esperando. */
-  terceiroNome: string | null
-  servico: string | null
-  criadaEm: string | null
-  atribuidaEm: string | null
-  /** EM_RISCO — derivado (Etapa 3/5), nunca um `statusTarefa` novo. */
-  emRisco: boolean
-  motivosRisco: string[]
-  acompanhamentoVencido: boolean
-  /** Terceiro respondeu antes do acompanhamento agendado — reativa a atenção AGORA. */
-  retornoRecebido: boolean
-  /** Atraso do OPERADOR (interno) — distinto de `atrasoTerceiro`. Nunca a mesma coisa. */
-  atrasoInterno: boolean
-  /** Atraso do TERCEIRO (cartório/tradutor/etc.) — nunca conta como atraso do operador. */
-  atrasoTerceiro: boolean
-}
+// O CONTRATO DE LEITURA É UM SÓ — antes esta interface era uma SEGUNDA
+// declaração (mesmo nome, campos DIVERGENTES: sem `proximoAcontecimento`, sem
+// `passoAtual`) da que `lib/operacional/tarefa-projecoes.ts` já definia e a
+// API já devolvia. A tela recebia os campos e o tipo não sabia — reexportar o
+// tipo canônico (import type, apagado no build do client) fecha a divergência
+// em vez de perpetuá-la numa terceira tela.
+export type { LinhaDeFila } from "@/lib/operacional/tarefa-projecoes"
 
 interface Funcionario {
   id: number

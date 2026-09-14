@@ -1,13 +1,25 @@
 // scripts/handoff-4-passos.test.ts
 // ============================================================================
-// HANDOFF DEDICADO — mandato Emissão Documental: "1-3 Daniela, 4 Marco".
+// HANDOFF DEDICADO — capacidade GENÉRICA do motor (`transferirTarefa`),
+// testada sobre uma cadeia sintética de 4 passos.
+//
+// CORREÇÃO DE PRECEDÊNCIA (15/09/2026): "1-3 Daniela, 4 Marco" NÃO É o
+// mandato real da Emissão Documental — o passo 4 real
+// ("conferir_e_validar_certidao") é integralmente de quem detém a Tarefa,
+// sem handoff automático (ver `correcao-4-passos-unificado.test.ts`, itens
+// 09-14 e 19-21). Este arquivo usa um fixture SINTÉTICO (stepKeys
+// genéricos, sem as subtarefas reais de conferência/validação) só para
+// provar que a transferência MANUAL — exceção configurada à parte, em
+// qualquer fase, em qualquer passo — continua preservando taskId,
+// histórico e progresso corretamente. Não é prova do fluxo padrão da
+// Emissão Documental.
+//
 // Rodar: PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/handoff-4-passos.test.ts
 //
-// Prova, literalmente, o cenário do mandato: uma Tarefa com 4 passos onde
-// os 3 primeiros são concluídos por Daniela e o 4º é transferido para Marco
-// ANTES de ser concluído. Confirma: mesma taskId, histórico contínuo, os 4
-// passos pertencem à mesma tarefa, notificação ao novo responsável, saída
-// da fila de Daniela / entrada na fila de Marco, zero Tarefa nova.
+// Confirma: uma Tarefa com 4 passos, transferida manualmente ANTES do
+// último ser concluído — mesma taskId, histórico contínuo, notificação ao
+// novo responsável, saída da fila de quem tinha / entrada na fila de quem
+// recebeu, zero Tarefa nova.
 //
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
@@ -81,9 +93,9 @@ const usuario = (nome: string) =>
   prisma.usuario.create({ data: { nome, email: `${nome.toLowerCase()}.${++seq}@handoff4.test`, senha: "x", tipo: "assistente" }, select: { id: true, nome: true } })
 
 async function main() {
-  exigirBancoDeTeste("handoff-4-passos.test.ts — 1-3 Daniela, 4 Marco")
+  exigirBancoDeTeste("handoff-4-passos.test.ts — transferência manual (capacidade genérica), fixture sintético")
   await limpar()
-  console.log("HANDOFF DEDICADO — 4 passos, troca de responsável antes do último\n")
+  console.log("HANDOFF DEDICADO — capacidade genérica de transferência, 4 passos sintéticos, troca de responsável antes do último\n")
 
   const marco = await usuario("Marco")
   const daniela = await usuario("Daniela")
@@ -109,8 +121,8 @@ async function main() {
   ok("3) a Tarefa está na fila da Daniela ANTES do handoff", filaDanielaAntes.some((l) => l.taskId === p.tarefaId))
   ok("3) a Tarefa NÃO está na fila do Marco ANTES do handoff", !filaMarcoAntes.some((l) => l.taskId === p.tarefaId))
 
-  secao("4) HANDOFF — transferir para Marco ANTES de concluir o passo 4")
-  const handoff = await transferirTarefa({ tarefaId: p.tarefaId, responsavelId: marco.id, autorId: daniela.id, motivo: "Handoff: passo 4 é competência do Marco", lockVersion: meio.lockVersion })
+  secao("4) HANDOFF — transferência manual (exceção configurada à parte), não o fluxo padrão do passo 4")
+  const handoff = await transferirTarefa({ tarefaId: p.tarefaId, responsavelId: marco.id, autorId: daniela.id, motivo: "Reatribuição administrativa (exceção pontual, não fluxo padrão)", lockVersion: meio.lockVersion })
   ok("4) handoff (transferência) sucede", handoff.ok === true, JSON.stringify(handoff))
 
   const depoisHandoff = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { id: true, responsavelId: true, workflowStepInstanceId: true } })

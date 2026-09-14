@@ -223,6 +223,13 @@ export interface LinhaDeFila {
   criadaEm: string | null
   /** Quando a responsabilidade foi definida — nulo enquanto ninguém a assumiu. */
   atribuidaEm: string | null
+  /**
+   * X/N — o ordinal do passo atual dentro do workflow publicado da MESMA
+   * obrigação (documento). Batched (`totalDePassos`), nunca uma consulta por
+   * linha. `null` quando a tarefa não tem step atual (fase sem workflow
+   * interno, ou passo ainda não materializado).
+   */
+  passoAtual: { ordem: number; total: number } | null
 
   // ── ETAPA 5 — LEITURA TEMPORAL COMPLETA (Etapa 3), NUNCA RECALCULADA AQUI ──
   //
@@ -270,7 +277,13 @@ const SELECT = {
   pessoaId: true,
   createdAt: true, dataAtribuicao: true,
   necessidade: { select: { itemCatalogo: { select: { name: true } } } },
-  workflowStepInstance: { select: { stepKey: true, snapshot: true, stepDefinitionId: true } },
+  workflowStepInstance: { select: { stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true } },
+  // Par que identifica a CADEIA de passos da obrigação — várias Tarefas
+  // (documentos distintos) podem compartilhar a mesma `workflowInstanceId`
+  // (fato real de produção, achado na reconciliação da Emissão Documental),
+  // então o total de passos precisa ser contado por (instância, documento),
+  // nunca só por instância.
+  workflowInstanceId: true, documentoId: true,
   dependeDe: { select: { obrigatoria: true, dependeDe: { select: { statusTarefa: true } } } },
   // SÓ para IDENTIFICAR o terceiro quando a tarefa já está esperando um — o
   // vínculo em si nunca decide o estado (ver `aguardandoTerceiro` em
@@ -284,6 +297,7 @@ function projetar(
   t: Bruta, agora: Date,
   nomes?: Map<number, string>,
   rotulosDePasso?: Map<number, string>,
+  totaisDePassos?: Map<string, number>,
 ): LinhaDeFila {
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
@@ -352,6 +366,10 @@ function projetar(
     servico: t.necessidade?.itemCatalogo?.name ?? null,
     criadaEm: t.createdAt?.toISOString() ?? null,
     atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
+    passoAtual:
+      t.workflowStepInstance?.ordem != null && t.workflowInstanceId != null
+        ? { ordem: t.workflowStepInstance.ordem, total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem }
+        : null,
     // Defaults — SEMPRE sobrescritos por `comAtencaoTemporal` logo depois.
     // `projetar` é síncrona e não tem como chamar o motor temporal (que lê
     // passo/solicitação em lote); ficar sem chamar `comAtencaoTemporal` depois
@@ -414,6 +432,32 @@ async function rotulosDosPassos(linhas: Bruta[], db: Leitor = prisma): Promise<M
   return new Map(defs.map((d) => [d.id, d.label]))
 }
 
+/**
+ * O TOTAL DE PASSOS DA CADEIA (o "N" de X/N) — UMA consulta, nunca uma por
+ * tarefa. Agrupado por (workflowInstanceId, documentoId): várias Tarefas
+ * (documentos distintos) podem compartilhar a mesma `PhaseWorkflowInstance` —
+ * achado real da reconciliação da Emissão Documental (produção: instância 350
+ * compartilhada por 6 documentos) — então contar só por instância inflaria o
+ * total de todo mundo pelo total de todo mundo junto.
+ */
+async function totalDePassos(
+  linhas: Array<{ workflowInstanceId: number | null; documentoId: number | null }>,
+  db: Leitor = prisma,
+): Promise<Map<string, number>> {
+  const instanciaIds = [...new Set(linhas.map((l) => l.workflowInstanceId).filter((x): x is number => x != null))]
+  if (instanciaIds.length === 0) return new Map()
+  const passos = await db.phaseWorkflowStepInstance.findMany({
+    where: { workflowInstanceId: { in: instanciaIds } },
+    select: { workflowInstanceId: true, documentoId: true },
+  })
+  const totais = new Map<string, number>()
+  for (const p of passos) {
+    const chave = `${p.workflowInstanceId}:${p.documentoId}`
+    totais.set(chave, (totais.get(chave) ?? 0) + 1)
+  }
+  return totais
+}
+
 /** Os nomes das pessoas das linhas — UMA consulta, nunca uma por tarefa. */
 async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma): Promise<Map<number, string>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
@@ -455,8 +499,8 @@ export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promi
     select: SELECT,
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
-  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas)])
-  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos)), agora)
+  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas), totalDePassos(linhas)])
+  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos, totais)), agora)
   return ordenarFila(projetadas)
 }
 
@@ -493,6 +537,11 @@ export function ordenarFila(linhas: LinhaDeFila[]): LinhaDeFila[] {
   })
 }
 
+// O ranking de atenção ("Minha Operação") mora em `atencao-operacional.ts` —
+// módulo PURO (sem `prisma`), importável tanto daqui quanto do componente de
+// cliente. Reexportado aqui só para quem já importa deste arquivo.
+export { ordenarPorAtencaoOperacional, categoriasDaLinha, rotuloDeAtencao, type CategoriaAtencao } from './atencao-operacional'
+
 /**
  * SEM RESPONSÁVEL — o trabalho que existe e ainda não é de ninguém.
  *
@@ -514,8 +563,8 @@ export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: s
     },
     select: SELECT,
   })
-  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas)])
-  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos)), agora)
+  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas), totalDePassos(linhas)])
+  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos, totais)), agora)
   return ordenarFila(projetadas)
 }
 
@@ -647,6 +696,7 @@ export async function dossieDaTarefa(tarefaId: number) {
             select: {
               id: true, stepKey: true, ordem: true, status: true, obrigatorio: true, completedAt: true,
               snapshot: true, necessidadeId: true, documentoId: true, prazo: true, responsavelId: true,
+              stepDefinitionId: true,
             },
             orderBy: { ordem: 'asc' },
           },
@@ -733,6 +783,27 @@ export async function dossieDaTarefa(tarefaId: number) {
     select: { id: true, acao: true, usuarioId: true, descricao: true, criadoEm: true },
   })
 
+  // AS ETAPAS DESTA UNIDADE DE TRABALHO — extraída antes do `return` porque
+  // serve DUAS respostas: a lista completa (`etapas`) e o total real do X/N
+  // (`passoAtual.total`, corrigido abaixo). `projetar` não recebe o mapa
+  // batched aqui (é uma tarefa só, não uma fila) — sem correção, `total`
+  // ficaria igual ao próprio `ordem` (fallback de `projetar` para quando não
+  // há mapa), o que exibiria sempre "X/X".
+  const etapasDaUnidade = (t.workflowInstance?.steps ?? []).filter((s) =>
+    t.necessidadeId != null ? s.necessidadeId === t.necessidadeId
+    : t.documentoId != null ? s.documentoId === t.documentoId
+    : s.id === t.workflowStepInstanceId,
+  )
+  // O TÍTULO DO PASSO — mesma cadeia de resolução de `rotuloDoPasso` (snapshot
+  // → definição publicada → chave). Uma instância sem `label` gravado no
+  // snapshot (ex.: criada por reconciliação de cadastro, sem passar pela
+  // materialização normal) não pode cair direto na chave técnica crua —
+  // rotulosDosPassos já resolve pelo `stepDefinitionId`, o mesmo mecanismo
+  // que a fila/Central usam, em lote.
+  const rotulosDosPassosDaUnidade = await rotulosDosPassos(
+    etapasDaUnidade.map((s) => ({ workflowStepInstance: { stepDefinitionId: s.stepDefinitionId } }) as unknown as Bruta),
+  )
+
   const agoraDossie = new Date()
   const [linha] = await comAtencaoTemporal(
     [projetar(t as unknown as Bruta, agoraDossie, await nomesDasPessoas([t]))],
@@ -740,6 +811,7 @@ export async function dossieDaTarefa(tarefaId: number) {
   )
   return {
     ...linha,
+    passoAtual: linha.passoAtual ? { ordem: linha.passoAtual.ordem, total: etapasDaUnidade.length || linha.passoAtual.total } : null,
     // PROVENANCE: a cadeia inteira do "por quê", por IDs canônicos.
     porQueExisto: {
       origem: t.origem,
@@ -792,9 +864,11 @@ export async function dossieDaTarefa(tarefaId: number) {
         especializado: resolveWorkflowStepEditor({ stepKey: s.stepKey, phaseKey: t.faseMacroKey }).especifico,
         // O executor é documental: sem documento ele não tem o que operar.
         documentoId: s.documentoId,
-        // O rótulo publicado vem do snapshot; a chave técnica é o último recurso.
+        // O rótulo publicado vem do snapshot; sem ele, da definição publicada
+        // (pelo `stepDefinitionId`, em lote); a chave técnica é o ÚLTIMO recurso.
         titulo: (s.snapshot as { label?: string; titulo?: string } | null)?.label
           ?? (s.snapshot as { label?: string; titulo?: string } | null)?.titulo
+          ?? (s.stepDefinitionId != null ? rotulosDosPassosDaUnidade.get(s.stepDefinitionId) : null)
           ?? s.stepKey,
         stepKey: s.stepKey,
         status: s.status,
@@ -1466,7 +1540,7 @@ export async function visaoGerencial(
   // uma contagem, uma página de tarefas, os nomes das pessoas, os rótulos dos
   // passos e o contexto de parada. Cinco idas ao banco para 10 tarefas e cinco
   // para 500.
-  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db)])
+  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db)])
   const paradas = await contextoDeParada(
     brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
     db,
@@ -1474,7 +1548,7 @@ export async function visaoGerencial(
   const hoje = diaOperacional(agora)
 
   const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes, rotulos)
+    const base = projetar(t, agora, nomes, rotulos, totais)
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE'

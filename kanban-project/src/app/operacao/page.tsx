@@ -12,7 +12,7 @@
 
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
@@ -20,6 +20,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { CentralTarefas } from "@/src/components/operacao/central-tarefas"
+import { MinhaOperacao } from "@/src/components/operacao/minha-operacao"
 
 const FUNDO =
   "var(--landscape-veil)"
@@ -37,6 +38,11 @@ export default function OperacaoPage() {
   // porque esconder aba não é controle de acesso.
   const autorizado = pode("tarefas.ver")
   const podeDistribuir = pode("tarefas.editar") && user.tipo === "admin"
+  // Minha Operação é a projeção PESSOAL (mandato 15/09/2026) — o que era
+  // `CentralTarefas` inteira vira, para quem distribui, uma segunda aba: a
+  // distribuição ("Sem responsável") continua exatamente como estava, sem
+  // nenhuma mudança de comportamento — só deixou de ser a única vista.
+  const [aba, setAba] = useState<"minha_operacao" | "distribuicao">("minha_operacao")
 
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/")
@@ -70,8 +76,28 @@ export default function OperacaoPage() {
         onLogout={() => void encerrarSessao("manual")}
       />
 
-      <main className="px-6 pb-16 pt-6">
-        <div className="mb-4 flex justify-end">
+      <main className={`px-6 pb-16 pt-6 ${aba === "minha_operacao" ? "flex h-[calc(100vh-80px)] flex-col" : ""}`}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setAba("minha_operacao")}
+              className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
+                aba === "minha_operacao" ? "border-[var(--border-default)] text-white/90" : "border-transparent text-[var(--text-muted)] hover:text-white/70"
+              }`}
+            >
+              Minha Operação
+            </button>
+            {podeDistribuir && (
+              <button
+                onClick={() => setAba("distribuicao")}
+                className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
+                  aba === "distribuicao" ? "border-[var(--border-default)] text-white/90" : "border-transparent text-[var(--text-muted)] hover:text-white/70"
+                }`}
+              >
+                Distribuição
+              </button>
+            )}
+          </div>
           <Link
             href="/operacao/central"
             className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-1.5 text-[12px] font-medium text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
@@ -79,7 +105,12 @@ export default function OperacaoPage() {
             Abrir Central Operacional →
           </Link>
         </div>
-        <CentralTarefas podeDistribuir={podeDistribuir} />
+        {aba === "minha_operacao" && (
+          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-white/[0.08]">
+            <MinhaOperacao />
+          </div>
+        )}
+        {aba === "distribuicao" && podeDistribuir && <CentralTarefas podeDistribuir={podeDistribuir} />}
       </main>
     </div>
   )

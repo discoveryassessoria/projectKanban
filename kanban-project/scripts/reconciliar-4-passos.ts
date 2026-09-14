@@ -123,7 +123,7 @@ export async function aplicar(e: Elegivel) {
   })
   const inst = await prisma.phaseWorkflowInstance.findUniqueOrThrow({ where: { id: e.workflowInstanceId }, select: { workflowDefinitionId: true, workflowVersion: true } })
   if (inst.workflowDefinitionId == null) throw new Error(`instância ${e.workflowInstanceId} sem workflowDefinitionId`)
-  const unificado = await prisma.phaseInternalWorkflowStep.findFirstOrThrow({ where: { workflowId: inst.workflowDefinitionId, key: "conferir_e_validar_certidao" }, select: { id: true, slaDays: true } })
+  const unificado = await prisma.phaseInternalWorkflowStep.findFirstOrThrow({ where: { workflowId: inst.workflowDefinitionId, key: "conferir_e_validar_certidao" }, select: { id: true, slaDays: true, label: true } })
 
   // A INSTÂNCIA PRECISA APONTAR PARA A VERSÃO QUE REALMENTE CONTÉM O PASSO
   // UNIFICADO — sem isto, `definicaoHistoricaDoPasso` (que resolve pela
@@ -152,6 +152,12 @@ export async function aplicar(e: Elegivel) {
         dependeDeStepKeys: ["receber_certidao"] as never,
         stepDefinitionId: unificado.id, stepDefinitionVersion: novaVersao,
         chaveIdempotencia: `reconciliacao-4passos|doc${e.documentoId}|inst${e.workflowInstanceId}`,
+        // SEM snapshot, `dossieDaTarefa` cairia na chave técnica crua
+        // ("conferir_e_validar_certidao") em vez do rótulo publicado — o
+        // mesmo formato mínimo que `construirSnapshotPasso` grava na
+        // materialização normal (`titulo`/`label`, o par que a resolução em
+        // cascata de `rotuloDoPasso`/dossiê consulta primeiro).
+        snapshot: { titulo: unificado.label, label: unificado.label, stepKey: "conferir_e_validar_certidao" } as never,
       },
       select: { id: true },
     })
