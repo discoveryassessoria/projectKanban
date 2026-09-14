@@ -83,6 +83,18 @@ const COLUNAS: Array<{ chave: ColunaKanban; rotulo: string; nota?: string }> = [
   { chave: "CONCLUIDA", rotulo: "Concluída" },
 ]
 
+/**
+ * A COLUNA DA LISTA É A MESMA DO KANBAN, NA MESMA TELA — nunca o
+ * `statusTarefa` cru. `ROTULO_STATUS[l.statusTarefa]` não sabe que
+ * `BLOQUEADA` com `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de
+ * terceiro (`colunaDaTarefa` já resolve isso — ver `ehEsperaExterna`); usar
+ * o rótulo cru aqui fazia a MESMA tarefa dizer "Bloqueada" na Lista e
+ * aparecer na coluna "Aguardando terceiro" no Kanban, ao lado.
+ */
+const ROTULO_COLUNA: Record<ColunaKanban, string> = Object.fromEntries(
+  COLUNAS.map((c) => [c.chave, c.rotulo]),
+) as Record<ColunaKanban, string>
+
 interface Facetas {
   fases: Array<{ faseMacroKey: string; tarefas: number }>
   responsaveis: Array<{ responsavelId: number; nome: string; tarefas: number; atrasadas: number }>
@@ -1063,7 +1075,7 @@ function Lista({
             <td className="truncate px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{rotularFase(l.faseMacroKey) ?? "—"}</td>
             <td className="truncate px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{l.etapaAtual ?? "—"}</td>
             <td className="px-4 py-2.5"><Responsavel nome={l.responsavelNome} /></td>
-            <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
+            <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{ROTULO_COLUNA[l.coluna] ?? ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
             <td className="px-4 py-2.5 text-[12px] text-[var(--text-secondary)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
             <td className={`px-4 py-2.5 text-[12px] tabular-nums ${l.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(l.dataPrazo)}</td>
             <td className={`px-4 py-2.5 text-[12px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>{tempo(l.diasParaPrazo, l.atrasada)}</td>
