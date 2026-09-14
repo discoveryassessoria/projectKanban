@@ -72,6 +72,17 @@ async function main() {
   ok('§4) aguardando CLIENTE e TERCEIRO dividem coluna, e o estado continua distinto',
     colunaDaTarefa({ statusTarefa: 'AGUARDANDO_CLIENTE', responsavelId: 1 }) === 'AGUARDANDO_TERCEIRO' &&
     colunaDaTarefa({ statusTarefa: 'AGUARDANDO_TERCEIRO', responsavelId: 1 }) === 'AGUARDANDO_TERCEIRO')
+  // CORREÇÃO (15/09/2026) — BLOQUEADA não é sempre bloqueio interno.
+  // `motivoCodigo === "AGUARDANDO_TERCEIRO"` é a MESMA semântica canônica de
+  // `ehEsperaExterna` (proximo-acontecimento.ts): quem bloqueia uma Tarefa
+  // porque um passo é espera de terceiro (automática ao liberar o passo, ou
+  // manual via "ainda aguardando") precisa aparecer na coluna/card
+  // "Aguardando terceiros" — nunca só na coluna genérica "Bloqueada".
+  ok('§4) BLOQUEADA + motivoCodigo=AGUARDANDO_TERCEIRO vai para a coluna AGUARDANDO_TERCEIRO, não BLOQUEADA',
+    colunaDaTarefa({ statusTarefa: 'BLOQUEADA', motivoCodigo: 'AGUARDANDO_TERCEIRO', responsavelId: 1 }) === 'AGUARDANDO_TERCEIRO')
+  ok('§4) BLOQUEADA sem motivoCodigo (ou com outro motivo) continua na coluna BLOQUEADA — bloqueio interno de verdade',
+    colunaDaTarefa({ statusTarefa: 'BLOQUEADA', responsavelId: 1 }) === 'BLOQUEADA' &&
+    colunaDaTarefa({ statusTarefa: 'BLOQUEADA', motivoCodigo: 'OUTRO_MOTIVO', responsavelId: 1 }) === 'BLOQUEADA')
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('§5) KANBAN GLOBAL ≠ WORKFLOW INTERNO')

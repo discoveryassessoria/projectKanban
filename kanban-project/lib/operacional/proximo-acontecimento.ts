@@ -64,7 +64,16 @@ const STATUS_AGUARDANDO = new Set(["AGUARDANDO_TERCEIRO", "AGUARDANDO_CLIENTE"])
  * "atraso de terceiro não é atraso interno" (`atrasoInterno`) nunca eram
  * aplicadas: a pausa escondia exatamente o que o mandato proíbe esconder.
  */
-function ehEsperaExterna(statusTarefa: string, motivoCodigo: string | null | undefined): boolean {
+/**
+ * A SEMÂNTICA CANÔNICA DE "ESPERA EXTERNA" — usada por qualquer projeção que
+ * precise saber se uma Tarefa está esperando terceiro, não só pelo núcleo
+ * temporal. `BLOQUEADA` sozinho é bloqueio genérico (pode ser interno); só
+ * `motivoCodigo === "AGUARDANDO_TERCEIRO"` diz que é o cartório/terceiro que
+ * se espera. Os valores literais do enum (`AGUARDANDO_TERCEIRO`/
+ * `AGUARDANDO_CLIENTE`) são o caminho legado — nada escreve mais neles, mas
+ * continuam reconhecidos.
+ */
+export function ehEsperaExterna(statusTarefa: string, motivoCodigo: string | null | undefined): boolean {
   return STATUS_AGUARDANDO.has(statusTarefa) || (statusTarefa === "BLOQUEADA" && motivoCodigo === "AGUARDANDO_TERCEIRO")
 }
 const STATUS_ENCERRADOS = new Set(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"])

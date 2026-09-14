@@ -31,6 +31,7 @@ import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
 import { atribuirTarefa } from "@/lib/operacional/tarefa-comandos"
 import { estadosTemporaisDasOperacoes } from "@/lib/operacional/proximo-acontecimento"
+import { colunaDaTarefa, visaoGerencial } from "@/lib/operacional/tarefa-projecoes"
 
 const MARCA = "RECEBERCERT2ESPERA"
 
@@ -155,6 +156,16 @@ async function main() {
   const estado1 = estados1.get(p.tarefaId)
   ok("08) motor temporal já lê ESPERA EXTERNA para o passo 2 (aguardandoTerceiro=true)", estado1?.proximoAcontecimento.aguardandoTerceiro === true, JSON.stringify(estado1?.proximoAcontecimento).slice(0, 200))
   ok("08b) nunca atraso interno enquanto espera automática (Etapa 3, item 3)", estado1?.atrasoInterno === false)
+  // CORREÇÃO (15/09/2026) — a PROJEÇÃO (coluna, cards de Minha Operação/
+  // Tarefas e Projetos/Kanban) tem que ler o mesmo estado que o motor
+  // temporal já lia corretamente — não uma checagem paralela que só olhava
+  // `statusTarefa` literal.
+  ok("08c) colunaDaTarefa lê AGUARDANDO_TERCEIRO (não BLOQUEADA) — mesma semântica de ehEsperaExterna",
+    colunaDaTarefa({ statusTarefa: tarefaAposEnviar.statusTarefa, motivoCodigo: tarefaAposEnviar.motivoCodigo, responsavelId: daniela.id }) === "AGUARDANDO_TERCEIRO")
+  const visaoAguardando1 = await visaoGerencial({ processoId: processo.id, coluna: "AGUARDANDO_TERCEIRO" }, agora(), prisma)
+  ok("08d) visaoGerencial(coluna=AGUARDANDO_TERCEIRO) inclui a Tarefa", visaoAguardando1.linhas.some((l) => l.taskId === p.tarefaId), `total=${visaoAguardando1.total}`)
+  const visaoBloqueada1 = await visaoGerencial({ processoId: processo.id, coluna: "BLOQUEADA" }, agora(), prisma)
+  ok("08e) visaoGerencial(coluna=BLOQUEADA) NÃO inclui a Tarefa (não é bloqueio interno)", !visaoBloqueada1.linhas.some((l) => l.taskId === p.tarefaId))
 
   // ══════════════════════════════════════════════════════════════════════
   secao("9-16) TRANSIÇÃO 2→3 — concluir 'Aguardar retorno do cartório' já deixa 'Receber certidão' esperando, sem clique nenhum")

@@ -20,7 +20,7 @@ import {
   inicioDoDiaOperacional,
   estadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
-import { estadosTemporaisDasOperacoes } from '@/lib/operacional/proximo-acontecimento'
+import { estadosTemporaisDasOperacoes, ehEsperaExterna } from '@/lib/operacional/proximo-acontecimento'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoTarefa } from '@prisma/client'
 
 /**
@@ -1116,15 +1116,42 @@ export const COLUNAS_KANBAN: ColunaKanban[] = [
  *
  * `CANCELADA` e `SUPERSEDIDA` NÃO viram "Concluída": nada foi entregue. Ficam
  * fora do quadro, e só aparecem se o filtro de status pedir explicitamente.
+ *
+ * `BLOQUEADA` NÃO é sempre bloqueio interno. `motivoCodigo` distingue —
+ * mesma semântica canônica de `ehEsperaExterna` (proximo-acontecimento.ts):
+ * `BLOQUEADA` com `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de
+ * terceiro, e a coluna precisa dizer isso, ou toda Tarefa que o motor
+ * bloqueia automaticamente ao liberar um passo de espera (ou que alguém
+ * bloqueia manualmente por "ainda aguardando") cai na coluna genérica
+ * "Bloqueada" e some do card "Aguardando terceiros" — sem a Tarefa ter
+ * mudado de estado nenhum, só a leitura errada.
  */
-export function colunaDaTarefa(l: { statusTarefa: StatusTarefa; responsavelId: number | null }): ColunaKanban | null {
+export function colunaDaTarefa(l: { statusTarefa: StatusTarefa; motivoCodigo?: string | null; responsavelId: number | null }): ColunaKanban | null {
   if (l.statusTarefa === 'CONCLUIDO_RECEBIDO' || l.statusTarefa === 'CONCLUIDO_NAO_POSSUI') return 'CONCLUIDA'
   if (l.statusTarefa === 'CANCELADA' || l.statusTarefa === 'SUPERSEDIDA') return null
   if (l.responsavelId == null) return 'SEM_RESPONSAVEL'
+  if (ehEsperaExterna(l.statusTarefa, l.motivoCodigo)) return 'AGUARDANDO_TERCEIRO'
   if (l.statusTarefa === 'BLOQUEADA') return 'BLOQUEADA'
-  if (l.statusTarefa === 'AGUARDANDO_TERCEIRO' || l.statusTarefa === 'AGUARDANDO_CLIENTE') return 'AGUARDANDO_TERCEIRO'
   if (l.statusTarefa === 'EM_ANDAMENTO') return 'EM_ANDAMENTO'
   return 'A_FAZER'
+}
+
+/**
+ * AS DUAS METADES DE "BLOQUEADA", EM SQL — mesma semântica de `ehEsperaExterna`
+ * (proximo-acontecimento.ts), única fonte. Todo `where` do Prisma que precisa
+ * separar espera de terceiro de bloqueio interno usa ESTAS DUAS constantes —
+ * nunca reescreve a condição, para não nascer uma terceira definição que
+ * diverge silenciosamente da primeira.
+ */
+const WHERE_AGUARDANDO_TERCEIRO: Prisma.TarefaWhereInput = {
+  OR: [
+    { statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } },
+    { statusTarefa: 'BLOQUEADA', motivoCodigo: 'AGUARDANDO_TERCEIRO' },
+  ],
+}
+const WHERE_BLOQUEADA_INTERNA: Prisma.TarefaWhereInput = {
+  statusTarefa: 'BLOQUEADA',
+  motivoCodigo: { not: 'AGUARDANDO_TERCEIRO' },
 }
 
 /**
@@ -1133,16 +1160,18 @@ export function colunaDaTarefa(l: { statusTarefa: StatusTarefa; responsavelId: n
  * `coluna` era filtrada em memória DEPOIS de `skip`/`take`: o `total` contava
  * o universo pré-coluna, e uma página podia devolver menos linhas do que
  * `porPagina` mesmo havendo mais na coluna pedida — filtro que corta a lista
- * já paginada. `colunaDaTarefa` é função pura de `statusTarefa`+`responsavelId`
- * (as duas colunas do banco), então dá para expressar a MESMA regra como
- * `where` — nunca uma segunda definição de coluna, só a mesma traduzida.
+ * já paginada. `colunaDaTarefa` é função pura de `statusTarefa`+`motivoCodigo`+
+ * `responsavelId` (as três colunas do banco), então dá para expressar a MESMA
+ * regra como `where` — nunca uma segunda definição de coluna, só a mesma
+ * traduzida. `BLOQUEADA` exclui explicitamente `motivoCodigo === "AGUARDANDO_TERCEIRO"`
+ * pela mesma razão que `colunaDaTarefa` testa a espera externa primeiro.
  */
 function whereColuna(coluna: ColunaKanban): Prisma.TarefaWhereInput {
   switch (coluna) {
     case 'CONCLUIDA': return { statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] } }
     case 'SEM_RESPONSAVEL': return { responsavelId: null, statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] } }
-    case 'BLOQUEADA': return { responsavelId: { not: null }, statusTarefa: 'BLOQUEADA' }
-    case 'AGUARDANDO_TERCEIRO': return { responsavelId: { not: null }, statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } }
+    case 'BLOQUEADA': return { responsavelId: { not: null }, ...WHERE_BLOQUEADA_INTERNA }
+    case 'AGUARDANDO_TERCEIRO': return { responsavelId: { not: null }, ...WHERE_AGUARDANDO_TERCEIRO }
     case 'EM_ANDAMENTO': return { responsavelId: { not: null }, statusTarefa: 'EM_ANDAMENTO' }
     case 'A_FAZER': return { responsavelId: { not: null }, statusTarefa: 'NAO_INICIADA' }
     case 'CANCELADA': return { statusTarefa: { in: ['CANCELADA', 'SUPERSEDIDA'] } }
@@ -1490,8 +1519,11 @@ export async function indicadoresGerenciais(
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS } }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, responsavelId: null }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: 'EM_ANDAMENTO' }) }),
-    prisma.tarefa.count({ where: w({ statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } }) }),
-    prisma.tarefa.count({ where: w({ statusTarefa: 'BLOQUEADA' }) }),
+    // MESMA SEMÂNTICA DE `ehEsperaExterna` — `BLOQUEADA` com
+    // `motivoCodigo === "AGUARDANDO_TERCEIRO"` também é espera de terceiro,
+    // nunca só os valores literais legados do enum. Ver WHERE_AGUARDANDO_TERCEIRO.
+    prisma.tarefa.count({ where: w(WHERE_AGUARDANDO_TERCEIRO) }),
+    prisma.tarefa.count({ where: w(WHERE_BLOQUEADA_INTERNA) }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, dataPrazo: { lt: inicioDoDiaOperacional(agora) } }) }),
     prisma.tarefa.count({
       where: w({
@@ -1562,7 +1594,10 @@ export async function visaoGerencial(
     const base = projetar(t, agora, nomes, rotulos, totais)
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
-    const esperando = t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE'
+    // MESMA SEMÂNTICA DE `ehEsperaExterna`: `BLOQUEADA` com
+    // `motivoCodigo === "AGUARDANDO_TERCEIRO"` também é espera de terceiro —
+    // não só os valores literais legados do enum.
+    const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
     return {
       ...base,
       // Vence hoje é o DIA no fuso operacional — não "menos de 24 horas".
@@ -1905,7 +1940,7 @@ export async function agregacaoPorFamilia(
   const registros = await prisma.tarefa.findMany({
     where: { AND: [{ processoId: { not: null } }, escopo] },
     select: {
-      id: true, processoId: true, faseMacroKey: true, statusTarefa: true, dataPrazo: true,
+      id: true, processoId: true, faseMacroKey: true, statusTarefa: true, motivoCodigo: true, dataPrazo: true,
       responsavelId: true, updatedAt: true, causaRemovidaEm: true,
       dependeDe: { select: { obrigatoria: true, dependeDe: { select: { statusTarefa: true } } } },
     },
@@ -1972,8 +2007,11 @@ export async function agregacaoPorFamilia(
     if (atrasada) c.atrasadas += 1
     if (venceEm7) c.venceEm7Dias += 1
     if (!concluida && r.responsavelId == null) c.semResponsavel += 1
-    if (r.statusTarefa === 'BLOQUEADA') c.bloqueadas += 1
-    if (r.statusTarefa === 'AGUARDANDO_TERCEIRO' || r.statusTarefa === 'AGUARDANDO_CLIENTE') c.aguardandoTerceiro += 1
+    // MESMA SEMÂNTICA DE `ehEsperaExterna` — `BLOQUEADA` com
+    // `motivoCodigo === "AGUARDANDO_TERCEIRO"` conta como espera de terceiro,
+    // nunca como bloqueio interno genérico.
+    if (ehEsperaExterna(r.statusTarefa, r.motivoCodigo)) c.aguardandoTerceiro += 1
+    else if (r.statusTarefa === 'BLOQUEADA') c.bloqueadas += 1
     if (executavel) c.executavelAgora += 1
 
     if (!concluida) {
