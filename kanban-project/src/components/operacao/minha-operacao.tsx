@@ -80,7 +80,6 @@ function textoDaSituacao(l: LinhaOperacional): string {
     return l.esperandoDe === "cliente" ? "Aguardando o cliente" : `Aguardando ${l.terceiroNome ?? "terceiro"}`
   }
   if (l.coluna === "BLOQUEADA") return l.motivoBloqueio ? `Bloqueada — ${l.motivoBloqueio}` : "Bloqueada"
-  if (l.retornoRecebido) return "Retorno recebido — ação necessária"
   if (l.coluna === "A_FAZER") return "Ação necessária"
   if (l.coluna === "CONCLUIDA") return "Concluída"
   return ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa
