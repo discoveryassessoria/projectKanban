@@ -67,20 +67,28 @@ agora pausa/retoma pela política do workflow e registra autor.
 `proximo-acontecimento.ts::ehEsperaExterna` reconhece `BLOQUEADA+motivoCodigo`.
 Prova: `mandato-pausa-relogios.test.ts` (33/33).
 
-### 2.4 Rascunho não publicado vazava para materialização nova (Bloco 3)
+### 2.4 Rascunho não publicado vazava para materialização nova (Bloco 3 + contraprova)
 `resolverWorkflowAplicavel` lia os passos da tabela viva/editável
 (`PhaseInternalWorkflowStep`), não da última versão publicada. Entre "Salvar
 rascunho" e "Publicar", uma Tarefa nova herdava `slaDays` do rascunho nunca
 revisado. Corrigido em `phase-workflow.ts::ancorarNaVersaoPublicada`: com
 rascunho pendente, ancora `slaDays`/`workflowVersion` na última versão
-REALMENTE publicada. **Limitação residual documentada**: a estrutura de
-passos (ações/campos/canais/checklist) continua vindo do rascunho —
-reconciliar identidade `DefStep`×`PassoCongelado` é mudança maior de núcleo,
-fora do escopo mínimo. Confirmado com dado real: o workflow id=12 tem um
+REALMENTE publicada. Confirmado com dado real: o workflow id=12 tem um
 rascunho não publicado desde 21/08/2026 (achado pré-existente, sinalizado
 pelo próprio motor de Saúde do Sistema como `CAD-011`, severidade
-informativa — não é uma falha introduzida nesta rodada). Prova:
-`mandato-rascunho-publicacao.test.ts` (13/13).
+informativa — não é uma falha introduzida nesta rodada).
+
+**Contraprova independente (14/09/2026) fechou o gap estrutural residual**:
+o CONJUNTO de passos (não só `slaDays`) também vazava — um passo novo
+criado no rascunho, sem publicar, aparecia numa Tarefa materializada nesse
+intervalo. Investigação mostrou que o conteúdo de cada passo (ações/campos/
+canais/checklist/requisitos) já era protegido em EXECUÇÃO via
+`definicaoHistoricaDoPasso` (par workflowVersion×key — e `workflowVersion`
+já vinha ancorado pela correção original); só faltava proteger o CONJUNTO na
+materialização. `ancorarNaVersaoPublicada` agora reconstrói a lista inteira
+de passos a partir da versão congelada (`PassoCongelado` já carrega tudo que
+`DefStep` precisa). Não há mais limitação residual conhecida neste ponto.
+Prova: `mandato-rascunho-publicacao.test.ts` (20/20, seções 7-8 novas).
 
 ### 2.5 `GET /api/processos/[id]` sem nenhuma checagem de permissão (Bloco 4)
 Achado crítico da auditoria de RBAC: a rota devolvia o processo inteiro para
@@ -191,12 +199,13 @@ esperado de uma feature nova).
 | `verificador-integridade-emissao.test.ts` (EMI-001..020) | 62 |
 | `mandato-pausa-relogios.test.ts` (Bloco 1) | 33 |
 | `mandato-sla-cartorio-override.test.ts` (Bloco 2) | 26 |
-| `mandato-rascunho-publicacao.test.ts` (Bloco 3) | 13 |
+| `mandato-rascunho-publicacao.test.ts` (Bloco 3 + contraprova estrutural) | 20 |
 | `mandato-rbac-matriz.test.ts` (Bloco 4) | 24 |
 | `mandato-financeiro-cartorio-isolado.test.ts` (Bloco 5) | 10 |
 | `fix-exigencia-evidencia-bridge.test.ts` | 6 |
+| `contraprova-granularidade-multipessoa.test.ts` (independente) | 12 |
 | Regressão (handoff/tempo-operacional/preview-impacto/invalidação/etapa5/etapa6/delete-processo) | 239 |
-| **Total desta rodada** | **767** |
+| **Total** | **786** |
 
 Todas rodadas de verdade contra `postgresql://postgres@127.0.0.1:55432/discovery_test`
 (banco de teste local, nunca produção). Zero falha na rodada final,
@@ -231,12 +240,17 @@ inesperado.
 
 ## 11. Limitações reais remanescentes
 
-- Reconciliar a estrutura de passos (ações/campos/canais/checklist) com a
-  última versão PUBLICADA quando existe rascunho pendente (hoje só
-  `slaDays`/`workflowVersion` são ancorados) — mudança de núcleo, não
-  minimalmente segura de fazer nesta rodada.
-- Clonagem de workflow inteiro — não implementada, condicional no mandato,
-  sem necessidade de negócio confirmada.
+- Clonagem de workflow inteiro — não implementada. O mandato usa linguagem
+  condicional ("quando suportado") e não há necessidade de negócio
+  confirmada; `dupStep` (duplicar um passo dentro do mesmo workflow) já
+  existe e cobre o caso real de reaproveitamento de configuração sem
+  duplicar motor.
 - Decisão de negócio sobre se o custo de cartório deve virar uma
   `ObrigacaoEconomica` real — isolada, não decidida (fora do escopo do
   motor financeiro, que este mandato explicitamente não deveria resolver).
+  Confirmado sem risco de duplicidade (upsert idempotente por
+  documento/step/ciclo).
+
+(A reconciliação da estrutura de passos com a versão publicada durante um
+rascunho pendente — listada aqui na primeira rodada — foi fechada pela
+contraprova independente; ver §2.4.)
