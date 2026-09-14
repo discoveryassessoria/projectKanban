@@ -1,9 +1,13 @@
 // scripts/correcao-4-passos-unificado.test.ts
 // ============================================================================
-// CORREÇÃO FINAL OBRIGATÓRIA — decisão do Administrador (14/09/2026): Emissão
-// Documental tem EXATAMENTE 4 passos operacionais. Passo 4 ("Conferir e
-// validar certidão") reúne conferência (Daniela) + validação jurídica
-// (Marco/Admin) como DUAS SUBTAREFAS do MESMO passo — nunca um quinto Step.
+// CORREÇÃO FINAL OBRIGATÓRIA — decisão do Administrador (14/09/2026, refinada
+// em correção de precedência posterior): Emissão Documental tem EXATAMENTE 4
+// passos operacionais. Passo 4 ("Conferir e validar certidão") reúne
+// conferência + validação jurídica como DUAS SUBTAREFAS do MESMO passo —
+// nunca um quinto Step — E É INTEGRALMENTE DA MESMA PESSOA (Daniela, dona da
+// Tarefa). Não existe handoff automático para Marco/Admin: reatribuição
+// continua sendo capacidade GENÉRICA do motor (itens 19-21), não o fluxo
+// padrão.
 //
 // Prova os 40 itens do mandato de correção (numerados nos comentários OK()).
 // ESCREVE NO BANCO — só roda no banco de teste local.
@@ -150,26 +154,24 @@ async function main() {
   ok("progresso continua 4/4 (não virou 5/5, não pulou etapa)", stepAindaAberto.status !== "CONCLUIDO", stepAindaAberto.status)
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("9-11) handoff para Marco — mesma taskId, mesmo stepInstanceId, 4/4")
+  secao("9-11) NENHUM HANDOFF AUTOMÁTICO — Daniela continua dona da Tarefa após conferir")
   // ══════════════════════════════════════════════════════════════════════
-  const tarefaAntesHandoff = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { id: true, workflowStepInstanceId: true, responsavelId: true } })
-  const handoff = await atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: marco.id, autorId: daniela.id })
-  ok("09) handoff sucede (mesma Tarefa reatribuída, não uma nova)", handoff.ok === true, JSON.stringify(handoff))
-  const tarefaDepoisHandoff = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { id: true, workflowStepInstanceId: true, responsavelId: true } })
-  ok("09b) mesma taskId", tarefaDepoisHandoff.id === tarefaAntesHandoff.id)
-  ok("10) mesmo stepInstanceId (não avançou nem criou novo Step)", tarefaDepoisHandoff.workflowStepInstanceId === tarefaAntesHandoff.workflowStepInstanceId)
-  ok("10b) responsável agora é Marco", tarefaDepoisHandoff.responsavelId === marco.id)
-  ok("11) progresso continua 4/4 (Step ainda aberto)", (await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[3] }, select: { status: true } })).status !== "CONCLUIDO")
-
-  ok("Tarefa some da fila de Daniela após o handoff", !(await minhaFila(daniela.id)).some((l) => l.taskId === p.tarefaId))
-  ok("Tarefa aparece na fila de Marco após o handoff", (await minhaFila(marco.id)).some((l) => l.taskId === p.tarefaId))
+  // CORREÇÃO DE PRECEDÊNCIA (14/09/2026): o passo 4 é INTEGRALMENTE da
+  // Daniela — não existe "Marco precisa validar" como fluxo padrão. Concluir
+  // a subtarefa "conferencia" NÃO reatribui a Tarefa a ninguém.
+  const tarefaAposConferencia = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { id: true, workflowStepInstanceId: true, responsavelId: true } })
+  ok("09) nenhum handoff automático para Marco — responsável continua Daniela", tarefaAposConferencia.responsavelId === daniela.id, `responsavelId=${tarefaAposConferencia.responsavelId}`)
+  ok("10) mesma taskId, mesmo stepInstanceId (nada foi recriado)", tarefaAposConferencia.id === p.tarefaId && tarefaAposConferencia.workflowStepInstanceId === p.stepIds[3])
+  ok("11) progresso continua 4/4 (Step ainda aberto — validação pendente, não uma 5ª etapa)", (await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[3] }, select: { status: true } })).status !== "CONCLUIDO")
+  ok("Tarefa continua na fila de Daniela (não sumiu, não foi para Marco)", (await minhaFila(daniela.id)).some((l) => l.taskId === p.tarefaId))
+  ok("Tarefa NÃO aparece na fila de Marco (ele nunca foi envolvido)", !(await minhaFila(marco.id)).some((l) => l.taskId === p.tarefaId))
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("12-14) Marco valida — VALIDADA conclui o passo 4 e a Tarefa")
+  secao("12-14) Daniela valida (mesma pessoa que conferiu) — VALIDADA conclui o passo 4 e a Tarefa")
   // ══════════════════════════════════════════════════════════════════════
-  const ctxMarco = { usuarioId: marco.id, permissoes: ["tarefas.editar", "documentos.editar"], correlationId: randomUUID(), origem: "USER" as const, subtaskKey: "validacao_juridica" }
-  const rVal = await executarAcaoCadastrada(p.stepIds[3], "aprovado", { parecer: "Documento íntegro, dados conferem." }, ctxMarco)
-  ok("12) Marco valida (subtarefa 'validacao_juridica')", rVal.ok === true, JSON.stringify(rVal))
+  const ctxDanielaValidacao = { usuarioId: daniela.id, permissoes: ["tarefas.editar", "documentos.editar"], correlationId: randomUUID(), origem: "USER" as const, subtaskKey: "validacao_juridica" }
+  const rVal = await executarAcaoCadastrada(p.stepIds[3], "aprovado", { parecer: "Documento íntegro, dados conferem." }, ctxDanielaValidacao)
+  ok("12) Daniela valida (subtarefa 'validacao_juridica') — passo 4 pertence a ela do início ao fim", rVal.ok === true, JSON.stringify(rVal))
   ok("13) VALIDADA conclui o PASSO 4 (ambas subtarefas obrigatórias concluídas)", rVal.ok && rVal.concluiuPasso === true, JSON.stringify(rVal))
   const stepFinal = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[3] }, select: { status: true } })
   ok("13b) Step 4 está CONCLUIDO", stepFinal.status === "CONCLUIDO", stepFinal.status)
@@ -189,9 +191,9 @@ async function main() {
     checklist: { legivel: true, integro: true, dados_minimos: true, apostila_ok: true, traducao_ok: true },
   }, { ...ctxDaniela })
   ok("conferência do 2º cenário sucede", rConf2.ok === true)
-  await atribuirTarefa({ tarefaId: p2.tarefaId, responsavelId: marco.id, autorId: daniela.id })
-  const rNaoValidada = await executarAcaoCadastrada(p2.stepIds[3], "nova_via", { motivo: "Nome divergente do cadastro.", parecer: "Nome do registrado não confere com o cadastro." }, { usuarioId: marco.id, permissoes: ["tarefas.editar", "documentos.editar"], correlationId: randomUUID(), origem: "USER" as const, subtaskKey: "validacao_juridica" })
-  ok("15) NÃO VALIDADA (nova_via) sucede", rNaoValidada.ok === true, JSON.stringify(rNaoValidada))
+  // NÃO VALIDADA também é decisão da Daniela — mesma pessoa, sem handoff.
+  const rNaoValidada = await executarAcaoCadastrada(p2.stepIds[3], "nova_via", { motivo: "Nome divergente do cadastro.", parecer: "Nome do registrado não confere com o cadastro." }, { usuarioId: daniela.id, permissoes: ["tarefas.editar", "documentos.editar"], correlationId: randomUUID(), origem: "USER" as const, subtaskKey: "validacao_juridica" })
+  ok("15) NÃO VALIDADA (nova_via) sucede — decidida pela própria Daniela", rNaoValidada.ok === true, JSON.stringify(rNaoValidada))
   const nec2Depois = await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: p2.nec.id }, select: { status: true } })
   ok("15b) NÃO VALIDADA não produz falsa conclusão — necessidade NÃO fica ATENDIDA no 1º ciclo", nec2Depois.status !== "ATENDIDA", nec2Depois.status)
   const docsDoCiclo2 = await prisma.documento.count({ where: { necessidadeId: p2.nec.id } })
@@ -199,6 +201,29 @@ async function main() {
   const docOriginal2 = await prisma.documento.findUniqueOrThrow({ where: { id: p2.doc.id }, select: { substituidoEm: true, status: true } })
   ok("17) histórico da tentativa anterior preservado (documento original não apagado, marcado substituído)", docOriginal2.substituidoEm !== null)
   ok("18) documento/versionamento preservados (original legível, nunca sobrescrito)", docOriginal2.status !== undefined)
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("19-21) reatribuição é capacidade GENÉRICA do motor — NÃO o fluxo padrão do passo 4")
+  // ══════════════════════════════════════════════════════════════════════
+  // Item 41 da correção de precedência: `atribuirTarefa`/`transferirTarefa`
+  // continuam existindo como mecanismo UNIVERSAL do motor operacional (útil
+  // para uma exceção configurada à parte, em qualquer fase) — mas não fazem
+  // parte do fluxo canônico da Emissão Documental, e nada no passo 4 os
+  // aciona automaticamente (provado acima, itens 09-11). Este bloco só prova
+  // que, SE alguém decidir reatribuir manualmente, o motor genérico continua
+  // preservando taskId/stepInstanceId/progresso — sem criar Tarefa nova nem
+  // quinto passo. Não é o comportamento esperado da Emissão Documental.
+  const p3 = await palco(wfId, wfVersao, "Carla", arv, processo)
+  await avancarAte4(wfId, wfVersao, daniela, p3)
+  await executarAcaoCadastrada(p3.stepIds[3], "aprovado", {
+    checklist: { legivel: true, integro: true, dados_minimos: true, apostila_ok: true, traducao_ok: true },
+  }, { ...ctxDaniela, correlationId: randomUUID() })
+  const reatribuicaoManual = await atribuirTarefa({ tarefaId: p3.tarefaId, responsavelId: marco.id, autorId: daniela.id })
+  ok("19) reatribuição manual (exceção configurada à parte) sucede — mesma Tarefa, não uma nova", reatribuicaoManual.ok === true, JSON.stringify(reatribuicaoManual))
+  const tarefaReatribuida = await prisma.tarefa.findUniqueOrThrow({ where: { id: p3.tarefaId }, select: { id: true, workflowStepInstanceId: true, responsavelId: true } })
+  ok("20) mesma taskId, mesmo stepInstanceId, progresso continua 4/4 sob reatribuição manual", tarefaReatribuida.id === p3.tarefaId && tarefaReatribuida.workflowStepInstanceId === p3.stepIds[3] && tarefaReatribuida.responsavelId === marco.id)
+  const rValReatribuida = await executarAcaoCadastrada(p3.stepIds[3], "aprovado", { parecer: "Conferido por outra pessoa; validação assumida por decisão administrativa." }, { usuarioId: marco.id, permissoes: ["tarefas.editar", "documentos.editar"], correlationId: randomUUID(), origem: "USER" as const, subtaskKey: "validacao_juridica" })
+  ok("21) quem quer que esteja com a Tarefa consegue concluir o passo 4 — nenhuma quinta etapa criada", rValReatribuida.ok === true && rValReatribuida.concluiuPasso === true, JSON.stringify(rValReatribuida))
 
   await limpar()
   console.log(`\n${"=".repeat(70)}`)

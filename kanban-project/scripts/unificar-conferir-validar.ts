@@ -15,14 +15,15 @@
 //                              [APPROVE_FOR_ANALYSIS] e "nova_via"
 //                              [REQUEST_NEW_COPY]). depende de "conferencia".
 //
-// A autoridade de Marco/Admin na validação final é preservada por HANDOFF
-// INTERNO (reatribuir a MESMA Tarefa — mesma taskId, mesmo stepInstanceId,
-// mesmo progresso "4/4" — via atribuirTarefa/transferirTarefa, o mecanismo
-// já provado nesta sessão), NUNCA por uma quinta subtarefa/Step. Não criamos
-// nenhuma permissão nova: em produção, HOJE, ambas as ações já usam a mesma
-// permissão "documentos.editar" (catálogo de efeitos) — a distinção
-// Daniela/Marco já era, e continua sendo, organizacional (quem está com a
-// Tarefa), não uma trava técnica nova.
+// CORREÇÃO DE PRECEDÊNCIA (14/09/2026): o PASSO 4 É INTEGRALMENTE DA DANIELA —
+// ela confere E valida, sem handoff automático para Marco. Não existe "Marco
+// precisa validar" como fluxo padrão da Emissão Documental. A reatribuição
+// (atribuirTarefa/transferirTarefa) continua existindo como capacidade
+// GENÉRICA e OPCIONAL do motor — útil para uma exceção configurada à parte —
+// mas não é parte do fluxo canônico, e nada aqui a aciona automaticamente. Não
+// criamos nenhuma permissão nova: as duas subtarefas já usam a mesma
+// permissão "documentos.editar" (catálogo de efeitos), porque são a MESMA
+// pessoa (a dona da Tarefa) que as executa.
 //
 // IDEMPOTENTE: rodar de novo não duplica. Detecta o workflow "Solicitar
 // Certidão" (Emissão Documental) por phaseKey+active+arquivado (produção)

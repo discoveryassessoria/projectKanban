@@ -2429,8 +2429,14 @@ function fullName(p: { nome: string | null; sobrenome: string | null } | null): 
  * 4 passos operacionais. "Conferir certidão" e "Validar certidão" deixaram de
  * ser dois Steps para virar DUAS SUBTAREFAS ("conferencia"/"validacao_juridica")
  * do MESMO passo "conferir_e_validar_certidao" — progresso continua 4/4, nunca
- * 5/5. A autoridade de Marco/Admin na validação final é HANDOFF INTERNO
- * (reatribuir a mesma Tarefa), nunca um passo novo.
+ * 5/5.
+ *
+ * O PASSO 4 É INTEGRALMENTE DA DANIELA (ou de quem for a dona da Tarefa): ela
+ * confere E decide VALIDADA/NÃO VALIDADA, sem handoff automático para
+ * Marco/Admin — este roteador nunca olha QUEM está logado, só o estado das
+ * duas subtarefas. Reatribuir a Tarefa continua sendo uma capacidade GENÉRICA
+ * do motor (via atribuirTarefa/transferirTarefa, para uma exceção configurada
+ * à parte), mas não faz parte do fluxo padrão e nada aqui a aciona.
  *
  * Este roteador decide, pelo estado real das duas subtarefas (nunca por
  * suposição de tela), qual formulário mostrar: a conferência primeiro; a
