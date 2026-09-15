@@ -69,6 +69,10 @@ export type ResultadoSolicitacao =
       /** Versão anterior que saiu de vigência nesta gravação (null = não houve troca). */
       substituiuArquivoId: number | null
       workflow: WorkflowV2Shape | null
+      /** Presente só quando o passo tem subtarefas: qual delas este ato concluiu. */
+      subtarefaConcluida?: string
+      /** O que ainda falta para o PASSO (não a subtarefa) fechar. */
+      aindaFaltam?: Array<{ key: string; label: string; motivo: string }>
     }
   | { ok: false; error: string; status: number }
 
@@ -285,11 +289,23 @@ export async function registrarSolicitacaoDocumento(
   // clique e retry caem na mesma chave e atualizam em vez de criar a segunda.
   const chave = `solicitacao:doc${documentoId}:step${stepInstanceId}:ciclo${passo.ciclo}`
 
+  // ETAPA-PONTE (achado real 15/09/2026): este ato é o "concluir etapa" do editor
+  // "Solicitar certidão" de antes da consolidação — quando o passo virou UM passo
+  // com QUATRO subtarefas, concluir "o passo inteiro" aqui deixou de fazer sentido
+  // (fecharia com 0/4 subtarefas feitas, o incidente que gerou a trava de hoje mais
+  // cedo). Quando o passo TEM subtarefas cadastradas, a conclusão do passo sai de
+  // dentro da transação de domínio (abaixo) e vira uma etapa própria, depois do
+  // commit — ver o bloco após a transação.
+  const { subtarefasDaEtapa } = await import("@/src/services/subtarefas-da-etapa")
+  const temSubtarefas = (await subtarefasDaEtapa({ stepInstanceId, fornecedorId: entrada.orgaoId ?? null })).length > 0
+
   let solicitacaoId = 0
   let protocoloId: number | null = null
   let arquivoId: number | null = null
   let substituiuArquivoId: number | null = null
   let liberouProximo = false
+  let subtarefaConcluida: string | undefined
+  let aindaFaltam: Array<{ key: string; label: string; motivo: string }> | undefined
 
   await prisma.$transaction(async (tx) => {
     // ── 4.0 PRECEDÊNCIA TEMPORAL — mandato Bloco 2 ──────────────────────────
@@ -500,7 +516,11 @@ export async function registrarSolicitacaoDocumento(
     })
 
     // ── 4.6 TRANSIÇÃO DO PASSO — motor único, na MESMA transação ─────────────
-    if (entrada.concluirEtapa) {
+    // Só quando o passo NÃO tem subtarefas (dado anterior à consolidação, ainda
+    // não reconciliado): aí "concluir etapa" continua significando o passo
+    // inteiro, como sempre significou. Com subtarefas, a conclusão sai daqui —
+    // ver o bloco depois da transação.
+    if (entrada.concluirEtapa && !temSubtarefas) {
       liberouProximo = await aplicarTransicaoDoPassoTx(
         tx,
         passo,
@@ -544,6 +564,53 @@ export async function registrarSolicitacaoDocumento(
     })
   })
 
+  // ── CONCLUSÃO DA SUBTAREFA — fora da transação de domínio, de propósito ────
+  //
+  // A solicitação/protocolo/arquivo JÁ COMITARAM acima, independente disto: o
+  // envio ao cartório é fato mesmo que o passo, como um todo, ainda não feche.
+  // `concluirSubtarefaCorrentePeloPasso` grava a subtarefa corrente ("enviar
+  // requerimento ao cartório", tipicamente) como concluída e só then confere se
+  // TODAS as subtarefas obrigatórias já estão prontas — se sim, roda a transição
+  // do passo agora, numa transação própria.
+  if (entrada.concluirEtapa && temSubtarefas) {
+    const { concluirSubtarefaCorrentePeloPasso } = await import("@/src/services/subtarefas-da-etapa")
+    const r = await concluirSubtarefaCorrentePeloPasso({
+      stepInstanceId,
+      executadoPorId: ctx.usuarioId,
+      payload: {
+        canal: canal.toLowerCase(), destinatarioNome, numeroProtocolo,
+        codigoRastreio, observacao, solicitacaoId, atendente: texto(entrada.atendente),
+      },
+      resultado: "enviado",
+      protocoloId, protocolo: numeroProtocolo,
+      canalKey: canal.toLowerCase(),
+      fornecedorId: entrada.orgaoId ?? null,
+    })
+    if (r.aplicavel) {
+      subtarefaConcluida = r.subtarefaKey
+      if (r.podeConcluirPasso) {
+        liberouProximo = await prisma.$transaction((tx) =>
+          aplicarTransicaoDoPassoTx(
+            tx, passo,
+            {
+              status: "concluida",
+              requestChannel: canal.toLowerCase(),
+              externalProtocol: numeroProtocolo,
+              externalEntityName: texto(entrada.atendente),
+              trackingCode: codigoRastreio,
+              costPaid: entrada.custoPago ?? null,
+              paymentMethod: texto(entrada.formaPagamento),
+              solicitacaoId,
+            },
+            ctx, new Date(),
+          ),
+        )
+      } else {
+        aindaFaltam = r.faltando
+      }
+    }
+  }
+
   // Fora da transação de propósito: o avanço de fase abre a sua própria.
   if (liberouProximo) await avancarFaseSeCouber(documentoId)
 
@@ -554,6 +621,8 @@ export async function registrarSolicitacaoDocumento(
     arquivoId,
     evidenciaTipoId: exigidoNoAnexo?.documentoMestre.id ?? null,
     substituiuArquivoId,
+    ...(subtarefaConcluida ? { subtarefaConcluida } : {}),
+    ...(aindaFaltam ? { aindaFaltam } : {}),
     workflow: await montarWorkflowV2(documentoId, ctx),
   }
 }

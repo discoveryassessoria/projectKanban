@@ -39,7 +39,7 @@ import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/serv
 import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import type { PermissaoChave } from "@/src/lib/permissoes"
 import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
-import { passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
+import { passoPodeConcluir, concluirSubtarefaCorrentePeloPasso } from "@/src/services/subtarefas-da-etapa"
 import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
@@ -506,7 +506,17 @@ export async function montarWorkflowV2(
 }
 
 type IniciarOpts = { responsavelId?: number | null; dataPrazoInicial?: Date | null; observacaoInicial?: string | null }
-type OpResult = { ok: true; workflow: WorkflowV2Shape | null } | { ok: false; error: string; status: number }
+type OpResult =
+  | {
+      ok: true
+      workflow: WorkflowV2Shape | null
+      /** Presente só quando o PATCH pedia concluir o passo e ele tinha subtarefas
+       *  pendentes: a subtarefa corrente foi concluída, mas o passo ainda não —
+       *  ver `concluirSubtarefaCorrentePeloPasso`. */
+      subtarefaConcluida?: string
+      aindaFaltam?: Array<{ key: string; label: string; motivo: string }>
+    }
+  | { ok: false; error: string; status: number }
 
 /** "Iniciar operação" no V2: cria os passos por-documento sob a instância da fase. */
 export async function iniciarOperacaoDocumentoV2(
@@ -775,13 +785,59 @@ export async function atualizarPassoV2(
   // estado atual) é conflito de estado, e quem opera precisa ler isso e
   // recarregar — não um erro interno genérico.
   let liberarProximo: boolean
+  let subtarefaConcluida: string | undefined
+  let aindaFaltam: Array<{ key: string; label: string; motivo: string }> | undefined
   try {
     liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, now))
   } catch (e) {
     if (e instanceof TransicaoDePassoRecusada) {
-      return { ok: false, error: e.code === "CONFLITO" ? "CONCURRENT_UPDATE" : "STEP_TRANSITION_REJECTED", status: 409 }
+      // ETAPA-PONTE (achado real 15/09/2026): este PATCH é o "concluir etapa" dos
+      // QUATRO editores antigos de Emissão Documental (Solicitar/Aguardar/Receber/
+      // Conferir-e-validar certidão) — escritos quando cada um era o PASSO inteiro.
+      // A consolidação uniu os quatro em subtarefas de UM passo só, e
+      // `passoPodeConcluir` (dentro de `aplicarTransicaoDoPassoTx`) passou a recusar
+      // esta mesma chamada sempre, porque "concluir o passo" não é mais o que
+      // aconteceu — o operador só terminou a subtarefa CORRENTE. Sem esta ponte, a
+      // tela ficava permanentemente travada em 409 em qualquer uma das quatro.
+      //
+      // `concluirSubtarefaCorrentePeloPasso` não sabe qual subtarefa é (sem
+      // executorKey hardcoded): pega a corrente, grava o que este PATCH trazia nela,
+      // e só então checa de novo se o PASSO fecha. Fora da transação de propósito —
+      // ver o comentário dela (invariante transação×conexão).
+      if (e.code.startsWith("SUBTAREFAS_PENDENTES")) {
+        const payload: Record<string, unknown> = {}
+        for (const k of CAMPOS_OPERACAO) if (patch[k] !== undefined) payload[k] = patch[k]
+        const r = await concluirSubtarefaCorrentePeloPasso({
+          stepInstanceId,
+          executadoPorId: ctx?.usuarioId ?? null,
+          payload,
+          resultado: "concluida_via_editor_legado",
+          protocolo: typeof patch.externalProtocol === "string" ? patch.externalProtocol : null,
+          canalKey: typeof patch.requestChannel === "string" ? patch.requestChannel : null,
+        })
+        if (!r.aplicavel) {
+          return { ok: false, error: "STEP_TRANSITION_REJECTED", status: 409 }
+        }
+        subtarefaConcluida = r.subtarefaKey
+        if (!r.podeConcluirPasso) {
+          aindaFaltam = r.faltando
+          liberarProximo = false
+        } else {
+          try {
+            liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, new Date()))
+          } catch (e2) {
+            if (e2 instanceof TransicaoDePassoRecusada) {
+              return { ok: false, error: e2.code === "CONFLITO" ? "CONCURRENT_UPDATE" : "STEP_TRANSITION_REJECTED", status: 409 }
+            }
+            throw e2
+          }
+        }
+      } else {
+        return { ok: false, error: e.code === "CONFLITO" ? "CONCURRENT_UPDATE" : "STEP_TRANSITION_REJECTED", status: 409 }
+      }
+    } else {
+      throw e
     }
-    throw e
   }
 
   // CONCLUSÃO DA FASE E AVANÇO — automáticos, e no serviço, não na rota. Concluir a
@@ -801,7 +857,12 @@ export async function atualizarPassoV2(
     await avancarFaseSeCouber(documentoId, p.faseMacroKey)
   }
 
-  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+  return {
+    ok: true,
+    workflow: await montarWorkflowV2(documentoId, ctx),
+    ...(subtarefaConcluida ? { subtarefaConcluida } : {}),
+    ...(aindaFaltam ? { aindaFaltam } : {}),
+  }
 }
 
 /**

@@ -446,11 +446,22 @@ function PainelDeclarativoComFallback({
   return <PainelDeclarativoDaEtapa stepInstanceId={stepInstanceId} onExecutado={onExecutado} />
 }
 
-export function StepEditorRouter(props: StepEditorRouterProps) {
-  const { stepKey, phaseKey, editorKind, stepTitle, ...rest } = props
-  const kind: StepEditorKind =
-    editorKind ?? resolveWorkflowStepEditor({ stepKey, phaseKey }).kind
+/** O que os editores específicos recebem — as props do router menos as que só
+ *  servem para RESOLVER qual editor é (essas o router já consumiu). */
+interface EditorEspecificoProps {
+  documentoId: number
+  stepId: number
+  stepStatus: string
+  isOpen: boolean
+  onClose: () => void
+  onSaved?: () => void
+}
 
+/** Monta o editor de um KIND resolvido — extraído do router para ser reusado
+ *  pela ponte de subtarefas abaixo, sem duplicar o switch. */
+function EditorDoKind({
+  kind, stepTitle, rest,
+}: { kind: StepEditorKind; stepTitle?: string; rest: EditorEspecificoProps }) {
   switch (kind) {
     case "solicitacao_cartorio":
       return <EditorSolicitarCertidao {...rest} />
@@ -487,6 +498,54 @@ export function StepEditorRouter(props: StepEditorRouterProps) {
         />
       )
   }
+}
+
+/**
+ * PONTE — quando o PASSO tem SUBTAREFAS cadastradas, quem decide o editor é a
+ * SUBTAREFA CORRENTE, não a chave do passo.
+ *
+ * "Solicitar certidão", "Aguardar retorno", "Receber certidão" e "Conferir e
+ * validar" nasceram como QUATRO PASSOS, cada um com seu `stepKey` e seu editor
+ * fixo no registry. A consolidação (14-15/09/2026) uniu os quatro numa Tarefa
+ * com UM passo ("solicitar_certidao") e quatro subtarefas — mas o registry
+ * continuou resolvendo pelo `stepKey` do passo, que agora é sempre o mesmo,
+ * então esta tela sempre mostrava "Solicitar certidão", nunca "Aguardar
+ * retorno" nem as demais, mesmo depois de a subtarefa 1 estar concluída.
+ * Achado real: 15/09/2026, testando o processo Teste.
+ *
+ * O cadastro de cada subtarefa já carrega `executorKey` no MESMO vocabulário
+ * de `StepEditorKind` (não por coincidência — é a mesma identidade de editor,
+ * um nível mais fundo). Sem subtarefas (passo anterior à consolidação, ainda
+ * não reconciliado), cai no `kindPadrao` resolvido pelo `stepKey` — o
+ * comportamento de sempre, intocado.
+ */
+function EditorPorSubtarefaCorrente({
+  kindPadrao, stepTitle, rest,
+}: { kindPadrao: StepEditorKind; stepTitle?: string; rest: EditorEspecificoProps }) {
+  const { subtarefas, carregando } = useConfiguracaoDaEtapa(rest.isOpen ? rest.stepId : null)
+  if (!rest.isOpen) return null
+  if (carregando) return null
+  if (subtarefas.length === 0) return <EditorDoKind kind={kindPadrao} stepTitle={stepTitle} rest={rest} />
+
+  const corrente = subtarefas.find((s) => !s.concluida)
+  // Todas concluídas: o passo já deveria ter fechado sozinho (a última subtarefa
+  // obrigatória conclui ele). Se chegou aqui, é uma fresta entre a subtarefa
+  // fechar e a tela recarregar — mostrar a última é mais seguro que travar.
+  const kindDaSubtarefa = ((corrente ?? subtarefas[subtarefas.length - 1]).executorKey as StepEditorKind | null) ?? "padrao"
+  return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={rest} />
+}
+
+export function StepEditorRouter(props: StepEditorRouterProps) {
+  const { stepKey, phaseKey, editorKind, stepTitle, ...rest } = props
+  const kind: StepEditorKind =
+    editorKind ?? resolveWorkflowStepEditor({ stepKey, phaseKey }).kind
+
+  // O editor registral tem contrato próprio (montagem pela Central da Etapa) —
+  // nunca passa pela ponte de subtarefas, que abriria uma segunda consulta à
+  // toa para um `kind` que sempre devolve null.
+  if (kind === "registral") return null
+
+  return <EditorPorSubtarefaCorrente kindPadrao={kind} stepTitle={stepTitle} rest={rest} />
 }
 
 // ============================================================

@@ -358,6 +358,87 @@ export async function aplicarEsperaExternaDaSubtarefaSeConfigurado(args: {
   return { aplicado: true }
 }
 
+/**
+ * CONCLUI A SUBTAREFA CORRENTE — quando um caminho antigo (editor específico de
+ * uma etapa, escrito antes de ela ganhar subtarefas) pede para concluir O PASSO
+ * inteiro, mas o passo agora se decompõe em subtarefas.
+ *
+ * ─── POR QUE ISTO EXISTE ────────────────────────────────────────────────────
+ * "Solicitar certidão", "Aguardar retorno", "Receber certidão" e "Conferir e
+ * validar" nasceram como QUATRO PASSOS separados, cada um com seu editor e sua
+ * rota própria terminando em "conclua o passo". A consolidação (14-15/09/2026)
+ * uniu os quatro numa TAREFA com um único Passo e quatro SUBTAREFAS — mas os
+ * editores e rotas antigos continuaram pedindo para concluir o passo, porque é
+ * só isso que eles sabem pedir. Sem esta ponte, `passoPodeConcluir` recusava
+ * sempre (0 de 4 subtarefas feitas nunca é "pode"), e a recusa acontecia DEPOIS
+ * de o operador já ter preenchido e enviado o formulário — que, numa
+ * transação só com o resto do ato (ex.: `registrarSolicitacaoDocumento`),
+ * desfazia até o que era válido. Achado real: 15/09/2026, testando o processo
+ * Teste — a tela travava em qualquer envio, sempre.
+ *
+ * ─── O QUE ELA FAZ ───────────────────────────────────────────────────────────
+ * NÃO sabe qual subtarefa é — não tem `executorKey` hardcoded em lugar nenhum.
+ * Pega a CORRENTE (a mesma noção de `aplicarEsperaExternaDaSubtarefaSeConfigurado`:
+ * a primeira, na ordem, ainda não concluída), grava a execução dela como
+ * CONCLUIDO com o que o formulário antigo mandou, reconcilia as dependentes e
+ * checa de novo se o PASSO já pode concluir. Só quando a resposta é "pode" é
+ * que o chamador deve, ele mesmo, rodar a transição do passo — esta função não
+ * conclui o passo.
+ *
+ * ─── FORA DE TRANSAÇÃO, DE PROPÓSITO ────────────────────────────────────────
+ * As mesmas primitivas de `reconciliarSubtarefas`/`aplicarEsperaExternaDaSubtarefaSeConfigurado`
+ * usam o prisma cru — chamar isto dentro do `tx` de quem pediu violaria a
+ * invariante transação×conexão. Os chamadores (`atualizarPassoV2`,
+ * `registrarSolicitacaoDocumento`) chamam isto DEPOIS que a própria transação
+ * deles já comitou.
+ */
+export async function concluirSubtarefaCorrentePeloPasso(args: {
+  stepInstanceId: number
+  executadoPorId: number | null
+  payload: Record<string, unknown>
+  resultado?: string
+  protocoloId?: number | null
+  protocolo?: string | null
+  canalKey?: string | null
+  fornecedorId?: number | null
+  valores?: Record<string, unknown>
+}): Promise<
+  | { aplicavel: false }
+  | {
+      aplicavel: true
+      subtarefaKey: string
+      podeConcluirPasso: boolean
+      faltando: Array<{ key: string; label: string; motivo: string }>
+    }
+> {
+  const subs = await subtarefasDaEtapa({
+    stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId,
+  })
+  const corrente = subs.find((s) => !s.concluida)
+  if (!corrente) return { aplicavel: false }
+
+  const { garantirExecucao, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
+  const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+  await garantirExecucao({
+    stepInstanceId: args.stepInstanceId, subtaskKey: corrente.key,
+    workflowVersao: hist?.versao ?? null, status: ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO,
+  })
+  await registrarNaExecucao(args.stepInstanceId, corrente.key, {
+    status: ESTADOS_DA_SUBTAREFA.CONCLUIDO,
+    resultado: args.resultado ?? "concluida",
+    executadoPorId: args.executadoPorId,
+    startedAt: new Date(),
+    payload: args.payload as never,
+    ...(args.canalKey ? { canalKey: args.canalKey } : {}),
+    ...(args.protocoloId ? { protocoloId: args.protocoloId, protocolo: args.protocolo ?? null } : {}),
+    ...(args.fornecedorId ? { fornecedorId: args.fornecedorId } : {}),
+  })
+  await reconciliarSubtarefas({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+  await aplicarEsperaExternaDaSubtarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+  const gate = await passoPodeConcluir({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+  return { aplicavel: true, subtarefaKey: corrente.key, podeConcluirPasso: gate.pode, faltando: gate.faltando }
+}
+
 /** Só para a tela: o texto do que falta, sem repetir a conta. */
 export function textoDoQueFalta(faltando: Array<{ label: string; motivo: string }>): string {
   if (faltando.length === 0) return ""
