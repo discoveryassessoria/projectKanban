@@ -15,6 +15,7 @@ import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
 import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAvaliacaoUI } from "./OperacaoAntecipadaPainel"
 import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { useConfiguracaoDaEtapa } from "./useConfiguracaoDaEtapa"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -344,7 +345,7 @@ export function WorkflowTab({
           caminho do documento — e a Central, que era onde ele via, virou índice. */}
       <div className="space-y-2">
         {workflow.steps.map((step) => (
-          <StepCard
+          <StepOuSubtarefas
             key={step.id}
             step={step}
             onOpenCentral={() => setCentralStepId(step.id)}
@@ -418,6 +419,141 @@ export function WorkflowTab({
         }}
       />
 
+    </div>
+  )
+}
+
+// ============================================================
+// STEP QUE SE DECOMPÕE EM SUBTAREFAS — mostra AS SUBTAREFAS, não o passo.
+// ============================================================
+//
+// Achado real (15/09/2026, testando o processo Teste): a arquitetura final da
+// Emissão Documental é 1 Tarefa → 1 Passo → 4 subtarefas ("enviar
+// requerimento", "aguardar retorno", "receber certidão", "conferir e
+// validar"). Cadastradas assim no Gerenciamento — mas esta lista mostrava só
+// o PASSO ("1. Solicitar certidão"), escondendo as 4 subtarefas dentro de um
+// card só. O operador via progresso, mas não via O QUE estava concluído e o
+// que faltava sem abrir a Central da Etapa e adivinhar. Sem subtarefas
+// cadastradas (passo anterior à consolidação), cai no StepCard de sempre.
+
+function StepOuSubtarefas({
+  step, onOpenCentral, refDoAtual, podeIniciar, tarefaResponsavelNome,
+}: {
+  step: WorkflowStep
+  onOpenCentral: () => void
+  refDoAtual?: (el: HTMLDivElement | null) => void
+  podeIniciar: boolean
+  tarefaResponsavelNome?: string | null
+}) {
+  // Só as etapas ATIVAS valem a pergunta: uma concluída ou futura não precisa
+  // saber se tem subtarefa — o StepCard de sempre já resume isso direito.
+  const isActive =
+    step.status === "em_andamento" ||
+    step.status === "aguardando_terceiro" ||
+    step.status === "atrasada" ||
+    (step.status === "bloqueada" && step.motivoBloqueio !== null)
+  const { subtarefas, carregando } = useConfiguracaoDaEtapa(isActive ? step.id : null)
+
+  if (!isActive || carregando || subtarefas.length === 0) {
+    return (
+      <StepCard
+        step={step} onOpenCentral={onOpenCentral} refDoAtual={refDoAtual}
+        podeIniciar={podeIniciar} tarefaResponsavelNome={tarefaResponsavelNome}
+      />
+    )
+  }
+
+  return (
+    <div ref={refDoAtual} className="space-y-1.5">
+      {subtarefas.map((s, i) => (
+        <SubtarefaRow
+          key={s.key}
+          subtarefa={s}
+          ordem={i + 1}
+          onOpenCentral={onOpenCentral}
+          podeIniciar={podeIniciar}
+          tarefaResponsavelNome={tarefaResponsavelNome}
+        />
+      ))}
+    </div>
+  )
+}
+
+const SUBTAREFA_STATUS_LABEL: Record<string, string> = {
+  PENDENTE: "Pendente",
+  DISPONIVEL: "Disponível",
+  EM_ANDAMENTO: "Em execução",
+  AGUARDANDO_EXTERNO: "Aguardando terceiro",
+  BLOQUEADO: "Bloqueada",
+  CONCLUIDO: "Concluída",
+  CANCELADO: "Cancelada",
+  INVALIDADO: "Invalidada",
+  FALHOU: "Falhou",
+}
+
+function SubtarefaRow({
+  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome,
+}: {
+  subtarefa: {
+    key: string; label: string; concluida: boolean; disponivel: boolean
+    status: string; bloqueioTexto: string | null
+  }
+  ordem: number
+  onOpenCentral: () => void
+  podeIniciar: boolean
+  tarefaResponsavelNome?: string | null
+}) {
+  const s = subtarefa
+  if (s.concluida) {
+    return (
+      <div className="bg-[var(--surface-secondary)]/30 border border-green-900/60 rounded-md px-3 py-2 flex items-center gap-3">
+        <div className="w-5 h-5 rounded-full bg-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
+          <Check className="w-3 h-3 text-white" />
+        </div>
+        <div className="flex-1 min-w-0 text-[12px] font-semibold text-green-800">{ordem}. {s.label}</div>
+      </div>
+    )
+  }
+
+  // A ESPERANDO É A MESMA IDEIA DO BLOQUEADO PRA TELA: nenhuma ação a fazer
+  // agora, só um motivo pra explicar por quê — a diferença é a cor (âmbar =
+  // esperando terceiro/dependência, não é um problema; vermelho fica só pra
+  // bloqueio manual real, que nem chega aqui hoje).
+  const aguardando = s.status === "AGUARDANDO_EXTERNO" || !s.disponivel
+  const podeAgir = s.disponivel && podeIniciar && !aguardando
+
+  return (
+    <div className={`bg-[var(--surface-primary)] border rounded-md px-3 py-2.5 flex items-center gap-3 ${aguardando ? "border-amber-900/60" : "border-[var(--border-default)]"} ${!s.disponivel && !aguardando ? "opacity-60" : ""}`}>
+      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${aguardando ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`}>
+        {s.disponivel ? <Play className="w-2.5 h-2.5 text-white fill-white ml-0.5" /> : <Lock className="w-2.5 h-2.5 text-[var(--text-secondary)]" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[12px] font-semibold text-white">{ordem}. {s.label}</span>
+          <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${aguardando ? "text-amber-800 border-amber-800" : "text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
+            {SUBTAREFA_STATUS_LABEL[s.status] ?? s.status}
+          </span>
+        </div>
+        {s.bloqueioTexto && (
+          <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5">{s.bloqueioTexto}</div>
+        )}
+      </div>
+      {podeAgir && (
+        <button
+          onClick={onOpenCentral}
+          className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
+        >
+          Iniciar →
+        </button>
+      )}
+      {!podeAgir && s.disponivel && !aguardando && (
+        <span
+          title="A tarefa precisa estar atribuída a você para iniciar esta subtarefa"
+          className="px-2.5 py-1.5 text-[10.5px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded whitespace-nowrap"
+        >
+          {tarefaResponsavelNome ? `Atribuído a ${tarefaResponsavelNome}` : "Sem responsável"}
+        </span>
+      )}
     </div>
   )
 }
