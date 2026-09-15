@@ -733,6 +733,7 @@ export async function getPhaseOperationalSummary(
       slaPausadoEm: t.slaPausadoEm?.toISOString() ?? null,
       slaPausaAcumuladaMin: t.slaPausaAcumuladaMin,
       criadaEm: t.criadaEm?.toISOString() ?? null,
+      motivoCodigo: t.motivoCodigo,
     })
   }
 

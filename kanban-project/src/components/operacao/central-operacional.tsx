@@ -573,7 +573,9 @@ export function CentralOperacional() {
                                     {l.executavelAgora && <Etiqueta tom="acento">Executável</Etiqueta>}
                                     {l.atrasada && <Etiqueta tom="critico">Atrasada</Etiqueta>}
                                     {!l.atrasada && l.venceHoje && <Etiqueta tom="alerta">Vence hoje</Etiqueta>}
-                                    {l.statusTarefa === "BLOQUEADA" && <Etiqueta tom="critico">Bloqueada</Etiqueta>}
+                                    {/* BLOQUEADA por espera de terceiro NÃO é "Bloqueada" genérica — é
+                                        `esperandoDe` (já resolvido via ehEsperaExterna) quem decide o rótulo. */}
+                                    {l.statusTarefa === "BLOQUEADA" && !l.esperandoDe && <Etiqueta tom="critico">Bloqueada</Etiqueta>}
                                     {l.esperandoDe && <Etiqueta tom="alerta">Aguardando {l.terceiroNome ?? l.esperandoDe}</Etiqueta>}
                                     {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
                                     <span className="text-[9px] text-[var(--text-muted)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</span>

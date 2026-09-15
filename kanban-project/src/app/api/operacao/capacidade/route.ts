@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     lerOrganizacao(agora),
     prisma.tarefa.findMany({
       where: { statusTarefa: { in: STATUS_ATIVOS }, responsavelId: { not: null } },
-      select: { responsavelId: true, statusTarefa: true, dataPrazo: true, prioridade: true },
+      select: { responsavelId: true, statusTarefa: true, dataPrazo: true, prioridade: true, motivoCodigo: true },
     }),
   ])
 

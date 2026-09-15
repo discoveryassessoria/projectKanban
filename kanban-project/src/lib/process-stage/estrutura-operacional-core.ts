@@ -38,6 +38,7 @@
 import type { PessoaDoProcesso } from "./central-operacional-core"
 import { baldeDoPasso, rotuloStatusPasso, type BaldeTarefa } from "./central-operacional-core"
 import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
+import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
 import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-core"
 
 /**
@@ -291,6 +292,8 @@ export interface TarefaDoAlvo {
   slaPausadoEm: string | null
   slaPausaAcumuladaMin: number | null
   criadaEm: string | null
+  /** Distingue espera de terceiro de bloqueio genérico quando statusTarefa==='BLOQUEADA' — ver `ehEsperaExterna`. */
+  motivoCodigo: string | null
 }
 
 /** Tarefa canônica por CHAVE DE ALVO (a mesma `chaveDoAlvo` da estrutura). */
@@ -319,6 +322,20 @@ const ESTADO_POR_STATUS_TAREFA: Record<string, EstadoOperacionalDaLinha> = {
   // Lorenzo Giovanni Santin (documento 2131, processo 589), 11/09/2026.
   CANCELADA: "CANCELADA",
   SUPERSEDIDA: "SUPERSEDIDA",
+}
+
+/**
+ * `ESTADO_POR_STATUS_TAREFA`, mas ciente de `motivoCodigo` — BLOQUEADA com
+ * motivoCodigo=AGUARDANDO_TERCEIRO é espera de terceiro (mesma semântica de
+ * `ehEsperaExterna`), não bloqueio genérico. Sem isto a Central Operacional
+ * do processo mostrava "Bloqueada"/"Ver bloqueio" para uma Tarefa só
+ * esperando o cartório — a Daniela via um estado que não deixa fazer nada,
+ * quando o correto era "Aguardando terceiro" (achado real, tarefas
+ * 3562/3564, família Santin, 15/09/2026).
+ */
+function estadoDaTarefa(tarefa: { statusTarefa: string; motivoCodigo?: string | null }): EstadoOperacionalDaLinha | undefined {
+  if (ehEsperaExterna(tarefa.statusTarefa, tarefa.motivoCodigo)) return "AGUARDANDO_TERCEIRO"
+  return ESTADO_POR_STATUS_TAREFA[tarefa.statusTarefa]
 }
 
 /**
@@ -835,7 +852,7 @@ function estadoNaFase(
   // contradizer; onde eles legitimamente DIFEREM — passo DISPONIVEL com tarefa
   // já iniciada — quem tem razão é a tarefa, porque é ela que alguém começou.
   const estado: EstadoOperacionalDaLinha =
-    estadoForcado ?? (tarefa != null ? ESTADO_POR_STATUS_TAREFA[tarefa.statusTarefa] ?? estadoDosPassos : estadoDosPassos)
+    estadoForcado ?? (tarefa != null ? estadoDaTarefa(tarefa) ?? estadoDosPassos : estadoDosPassos)
 
   // O PRAZO É O DA TAREFA. A previsão que o cartório deu continua no andamento
   // da etapa, que é onde ela foi registrada — não vira prazo de ninguém.
@@ -897,7 +914,7 @@ function montarDocumentoDoIndice(
   // tarefa terminal, o estado dela também vence — nunca fica pior que hoje.
   const estadoDaTarefaEncerrada: EstadoOperacionalDaLinha | undefined =
     tarefa != null && (tarefa.statusTarefa === "CANCELADA" || tarefa.statusTarefa === "SUPERSEDIDA")
-      ? ESTADO_POR_STATUS_TAREFA[tarefa.statusTarefa]
+      ? estadoDaTarefa(tarefa)
       : undefined
   const estadoForcado: EstadoOperacionalDaLinha | undefined = documentoCancelado ? "CANCELADA" : estadoDaTarefaEncerrada
   // CANCELADA ≠ CONCLUÍDA (regra permanente, ver memória do projeto). A consulta

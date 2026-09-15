@@ -71,6 +71,7 @@ import { prisma } from '@/lib/prisma'
 import { inicioDoDiaOperacional } from '@/lib/operacional/tempo-operacional'
 import type { StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
+import { ehEsperaExterna } from './proximo-acontecimento'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
   lerOrganizacao, unidadesComAptidaoDeclarada, unidadesDasTarefas, rotulosDasUnidades,
@@ -267,6 +268,8 @@ export interface TarefaParaCarga {
   dataPrazo: Date | null
   prioridade: string
   dataAtribuicao?: Date | null
+  /** Distingue espera de terceiro (motivoCodigo=AGUARDANDO_TERCEIRO) de bloqueio genérico — ver `ehEsperaExterna`. */
+  motivoCodigo?: string | null
 }
 
 /**
@@ -297,7 +300,10 @@ export function classificarCarga(
     const c = cargas.get(t.responsavelId)
     if (!c) continue
     c.ativas++
-    if (t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE') c.aguardandoTerceiro++
+    // MESMA SEMÂNTICA DE `ehEsperaExterna` — BLOQUEADA com
+    // motivoCodigo=AGUARDANDO_TERCEIRO é espera de terceiro (não ocupa
+    // execução, mas também não é "bloqueada esperando decisão interna").
+    if (ehEsperaExterna(t.statusTarefa, t.motivoCodigo)) c.aguardandoTerceiro++
     else if (t.statusTarefa === 'BLOQUEADA') c.bloqueadas++
     else {
       c.executaveis++

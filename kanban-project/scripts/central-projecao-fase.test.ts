@@ -111,6 +111,7 @@ function tarefasDasCenas(cenas: Cena[]): TarefasPorChave {
     m.set(`necessidade:${c.necessidadeId}`, {
       taskId: id,
       statusTarefa: statusTarefaDaCena(c),
+      motivoCodigo: null,
       responsavelId: c.tarefaResponsavelId ?? null,
       responsavelNome: c.tarefaResponsavelNome ?? null,
       dataPrazo: dias != null ? new Date(Date.now() + dias * 86400000).toISOString() : null,

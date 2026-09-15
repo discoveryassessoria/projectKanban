@@ -1351,8 +1351,11 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   // linha, resolvido via `Documento.orgao` SÓ quando esse vínculo existe, e
   // nunca usado para DECIDIR se a tarefa está esperando.
   if (f.terceiro) e.push({ documento: { orgao: { name: f.terceiro } } })
-  if (f.aguardandoTerceiro) e.push({ statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } })
-  if (f.bloqueada) e.push({ statusTarefa: 'BLOQUEADA' })
+  // MESMA SEMÂNTICA DE `ehEsperaExterna`/`colunaDaTarefa` — BLOQUEADA com
+  // motivoCodigo=AGUARDANDO_TERCEIRO é espera de terceiro, não bloqueio
+  // interno. Ver WHERE_AGUARDANDO_TERCEIRO/WHERE_BLOQUEADA_INTERNA.
+  if (f.aguardandoTerceiro) e.push(WHERE_AGUARDANDO_TERCEIRO)
+  if (f.bloqueada) e.push(WHERE_BLOQUEADA_INTERNA)
   if (f.executavelAgora != null) e.push(whereExecutavelAgora(f.executavelAgora))
   // `coluna` agora filtra no BANCO, antes da paginação (Etapa 5, item 10) —
   // ver `whereColuna`.

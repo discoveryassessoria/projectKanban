@@ -22,6 +22,7 @@ import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { STATUS_TERMINAIS, escopoDaUnidade, estadoDerivado, etapaCorrente } from './tarefa-canonica'
+import { ehEsperaExterna } from './proximo-acontecimento'
 import { transicionarPassoTx, ativarProximoPassoTx, aplicarTarefaTx } from '@/src/services/task-step-sync'
 import { assegurarCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
@@ -133,6 +134,7 @@ export async function concluirEtapa(args: {
       select: {
         id: true, titulo: true, statusTarefa: true, workflowInstanceId: true,
         workflowStepInstanceId: true, dataInicio: true, dataConclusao: true, lockVersion: true,
+        motivoCodigo: true,
         // A UNIDADE DE TRABALHO. Sem ela esta porta lia os passos da FASE
         // inteira — ver o comentário da consulta abaixo.
         necessidadeId: true, documentoId: true,
@@ -147,20 +149,25 @@ export async function concluirEtapa(args: {
         mensagem: `Tarefa já encerrada (${tarefa.statusTarefa}). Reabra antes de concluir etapas.`,
       }
     }
+    // §16 — a volta do terceiro tem porta própria. Concluir direto da espera
+    // pularia o cálculo da pausa de SLA e o registro de que a resposta chegou.
+    // MESMA SEMÂNTICA DE `ehEsperaExterna` — checado ANTES do bloqueio
+    // genérico: BLOQUEADA com motivoCodigo=AGUARDANDO_TERCEIRO é espera de
+    // terceiro (mensagem "aguarda terceiro"), não bloqueio interno
+    // ("desbloqueie") — dar o motivo errado manda o operador clicar no botão
+    // errado.
+    if (ehEsperaExterna(tarefa.statusTarefa, tarefa.motivoCodigo) && !args.permiteForcar) {
+      return {
+        ok: false as const, codigo: 'TAREFA_AGUARDANDO' as const,
+        mensagem: 'A tarefa aguarda terceiro — registre a retomada antes de concluir a etapa.',
+      }
+    }
     // §15 — bloqueio é impedimento real: concluir por cima esconderia o motivo
     // pelo qual o trabalho parou. Só o administrador força, e fica auditado.
     if (tarefa.statusTarefa === 'BLOQUEADA' && !args.permiteForcar) {
       return {
         ok: false as const, codigo: 'TAREFA_BLOQUEADA' as const,
         mensagem: 'A tarefa está bloqueada — desbloqueie antes de concluir a etapa.',
-      }
-    }
-    // §16 — a volta do terceiro tem porta própria. Concluir direto da espera
-    // pularia o cálculo da pausa de SLA e o registro de que a resposta chegou.
-    if (tarefa.statusTarefa === 'AGUARDANDO_TERCEIRO' && !args.permiteForcar) {
-      return {
-        ok: false as const, codigo: 'TAREFA_AGUARDANDO' as const,
-        mensagem: 'A tarefa aguarda terceiro — registre a retomada antes de concluir a etapa.',
       }
     }
     if (!tarefa.workflowInstanceId) {

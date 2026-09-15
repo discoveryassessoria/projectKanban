@@ -159,13 +159,15 @@ export interface TarefaVivaDaUnidade {
   documentoId: number | null
   ciclo: number | null
   processoId: number | null
+  /** Distingue espera de terceiro de bloqueio genérico quando statusTarefa==='BLOQUEADA' — ver `ehEsperaExterna`. */
+  motivoCodigo: string | null
 }
 
 const SELECT_VIVA = {
   id: true, workflowInstanceId: true, workflowStepInstanceId: true, statusTarefa: true,
   chaveIdempotencia: true, responsavelId: true, dataPrazo: true, dataConclusao: true,
   slaPausadoEm: true, slaPausaAcumuladaMin: true, createdAt: true,
-  necessidadeId: true, documentoId: true, ciclo: true, processoId: true,
+  necessidadeId: true, documentoId: true, ciclo: true, processoId: true, motivoCodigo: true,
   responsavel: { select: { nome: true } },
 } satisfies Prisma.TarefaSelect
 
@@ -286,6 +288,7 @@ export async function tarefasVivasDasUnidades(
       documentoId: t.documentoId,
       ciclo: t.ciclo,
       processoId: t.processoId,
+      motivoCodigo: t.motivoCodigo,
     })
   }
   return mapa

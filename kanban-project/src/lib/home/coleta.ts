@@ -12,6 +12,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
 import { resolveSlaProjectionBatch, resumirSla } from "@/src/lib/process-stage/sla-projection"
 import {
   FILAS_PASSO,
@@ -84,6 +85,8 @@ interface PassoBase {
   prazo: Date | null
   documentoId: number | null
   necessidadeId: number | null
+  /** BLOQUEADO por espera de terceiro (motivoCodigo da Tarefa dele) não é bloqueio genérico. */
+  motivoCodigoDaTarefa: string | null
 }
 interface TarefaBase {
   id: number
@@ -92,6 +95,7 @@ interface TarefaBase {
   dataPrazo: Date | null
   processoId: number | null
   responsavelId: number | null
+  motivoCodigo: string | null
 }
 interface PendenciaBase {
   id: number
@@ -150,8 +154,11 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
             prazo: true,
             documentoId: true,
             necessidadeId: true,
+            // MESMA SEMÂNTICA DE `ehEsperaExterna` — BLOQUEADO por espera de
+            // terceiro (motivoCodigo da Tarefa dele) não é bloqueio genérico.
+            tarefas: { select: { motivoCodigo: true }, take: 1 },
           },
-        })
+        }).then((rows) => rows.map((r) => ({ ...r, motivoCodigoDaTarefa: r.tarefas[0]?.motivoCodigo ?? null })))
       : Promise.resolve([] as any[]),
     p.verTarefas
       ? prisma.tarefa.findMany({
@@ -167,6 +174,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
             dataPrazo: true,
             processoId: true,
             responsavelId: true,
+            motivoCodigo: true,
           },
         })
       : Promise.resolve([] as any[]),
@@ -265,10 +273,17 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
 
   switch (key) {
     case "bloqueios":
+      // MESMA SEMÂNTICA DE `ehEsperaExterna` — BLOQUEADO/BLOQUEADA por espera
+      // de terceiro (motivoCodigo=AGUARDANDO_TERCEIRO) não é bloqueio
+      // genérico: essa fila é "algo travado que PRECISA de decisão interna",
+      // não "está esperando o cartório responder" (isso é a fila/coluna
+      // "Aguardando terceiro").
       return [
-        ...base.passos.filter((s) => s.status === "BLOQUEADO").map((passo) => ({ tipo: "passo" as const, passo })),
+        ...base.passos
+          .filter((s) => s.status === "BLOQUEADO" && !ehEsperaExterna("BLOQUEADA", s.motivoCodigoDaTarefa))
+          .map((passo) => ({ tipo: "passo" as const, passo })),
         ...base.tarefas
-          .filter((t) => t.statusTarefa === "BLOQUEADA")
+          .filter((t) => t.statusTarefa === "BLOQUEADA" && !ehEsperaExterna(t.statusTarefa, t.motivoCodigo))
           .map((tarefa) => ({ tipo: "tarefa" as const, tarefa })),
       ]
     case "prazos-vencendo":
@@ -708,9 +723,12 @@ export async function montarResumoDia(base: BaseOperacional, ctx: ContextoHome):
   )
   const soma = (...st: string[]) => st.reduce((acc, s) => acc + (porStatus.get(s) ?? 0), 0)
 
+  // MESMA SEMÂNTICA DE `ehEsperaExterna` — um processo com uma Tarefa
+  // aguardando o cartório não é um processo "bloqueado" (que precisa de
+  // decisão interna); é um processo em andamento normal, só esperando.
   const bloqueados = new Set<number>()
-  for (const s of base.passos) if (s.status === "BLOQUEADO") bloqueados.add(s.processoId)
-  for (const t of base.tarefas) if (t.statusTarefa === "BLOQUEADA" && t.processoId) bloqueados.add(t.processoId)
+  for (const s of base.passos) if (s.status === "BLOQUEADO" && !ehEsperaExterna("BLOQUEADA", s.motivoCodigoDaTarefa)) bloqueados.add(s.processoId)
+  for (const t of base.tarefas) if (t.statusTarefa === "BLOQUEADA" && !ehEsperaExterna(t.statusTarefa, t.motivoCodigo) && t.processoId) bloqueados.add(t.processoId)
 
   return {
     tarefasConcluidas,
