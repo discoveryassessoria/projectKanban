@@ -699,7 +699,8 @@ export async function montarResumoDia(base: BaseOperacional, ctx: ContextoHome):
   const ini = inicioDoDia(ctx.agora)
   const fim = fimDoDia(ctx.agora)
 
-  const [tarefasConcluidas, docsPorStatus] = await Promise.all([
+  const usuarioEscopo = { userId: ctx.userId, tipo: ctx.isAdmin ? "admin" : "operacional" }
+  const [tarefasConcluidas, passosEmValidacao] = await Promise.all([
     ctx.permissoes.verTarefas
       ? prisma.tarefa.count({
           where: {
@@ -709,19 +710,21 @@ export async function montarResumoDia(base: BaseOperacional, ctx: ContextoHome):
           },
         })
       : Promise.resolve(0),
+    // `AGUARDANDO_APROVACAO` fica de fora de `STATUS_PASSO_VIVO` (não é fila
+    // executável do dono do passo) — por isso não vem em `base.passos`, e
+    // precisa da própria consulta, com o MESMO escopo e o MESMO recorte de
+    // fase atual que `carregarBase` já aplica.
     ctx.permissoes.verProcessos
-      ? prisma.documento.groupBy({
-          by: ["status"],
-          _count: { _all: true },
-          where: escopoDocumento({ userId: ctx.userId, tipo: ctx.isAdmin ? "admin" : "operacional" }),
+      ? prisma.phaseWorkflowStepInstance.findMany({
+          where: { status: "AGUARDANDO_APROVACAO" as any, ...(escopoPasso(usuarioEscopo) as any) },
+          select: { processoId: true, faseMacroKey: true },
         })
-      : Promise.resolve([] as { status: string; _count: { _all: number } }[]),
+      : Promise.resolve([] as { processoId: number; faseMacroKey: string }[]),
   ])
-
-  const porStatus = new Map<string, number>(
-    (docsPorStatus as any[]).map((d) => [String(d.status), d._count._all as number]),
-  )
-  const soma = (...st: string[]) => st.reduce((acc, s) => acc + (porStatus.get(s) ?? 0), 0)
+  const emValidacao = passosEmValidacao.filter((s) => {
+    const pr = base.processos.get(s.processoId)
+    return !!pr && pr.faseAtualKey === s.faseMacroKey
+  }).length
 
   // MESMA SEMÂNTICA DE `ehEsperaExterna` — um processo com uma Tarefa
   // aguardando o cartório não é um processo "bloqueado" (que precisa de
@@ -733,8 +736,24 @@ export async function montarResumoDia(base: BaseOperacional, ctx: ContextoHome):
   return {
     tarefasConcluidas,
     aguardandoCliente: base.tarefas.filter((t) => t.statusTarefa === "AGUARDANDO_CLIENTE").length,
-    aguardandoCartorio: soma("SOLICITADO", "EM_BUSCA"),
-    emValidacao: soma("EM_ANALISE"),
+    // GRAIN TAREFA, NUNCA `Documento.status` — esse campo é o workflow escrito
+    // uma segunda vez (enum legado, ver memória "documento-status-legado":
+    // decisão de 26/08/2026 já tirou o campo da superfície operacional em
+    // PainelDaFase/DocumentoOperationalDrawer). `soma("SOLICITADO","EM_BUSCA")`
+    // contava TODO documento nesses status, mesmo quando a Tarefa dona já
+    // tinha avançado para um passo seguinte que não escreve nesse campo —
+    // achado real: família Santin, 4 documentos com `status=SOLICITADO`
+    // (nunca atualizado), mas só 2 Tarefas realmente aguardando o cartório
+    // (`ehEsperaExterna`); as outras 2 já estavam em "Conferir e validar
+    // certidão", e o card mostrava 4 em vez de 2. `AGUARDANDO_CLIENTE` sai
+    // daqui porque já tem o próprio balde acima.
+    aguardandoCartorio: base.tarefas.filter((t) => t.statusTarefa != null && ehEsperaExterna(t.statusTarefa, t.motivoCodigo) && t.statusTarefa !== "AGUARDANDO_CLIENTE").length,
+    // GRAIN PASSO — `AGUARDANDO_APROVACAO` é o status NATIVO do passo para
+    // "executado, esperando alguém validar" (mesmo enum que
+    // `PASSO_AGUARDANDO_APROVACAO`/`PASSO_APROVADO` já usam em
+    // andamento-operacional.ts), nunca `Documento.status = "EM_ANALISE"`
+    // (mesma razão do campo acima — segunda fonte de verdade legada).
+    emValidacao,
     processosBloqueados: bloqueados.size,
   }
 }
