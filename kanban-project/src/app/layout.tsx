@@ -1,13 +1,16 @@
 import React from "react";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SidebarWrapper } from "@/src/components/sidebar-wrapper";
 import { Providers } from "@/src/components/providers";
 import { Toaster } from "@/components/ui/toaster";
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
-const geistSans = Geist({
+// IDENTIDADE BITRIX (14-15/09/2026): Inter é a fonte mais próxima, sem ter o
+// arquivo real do Bitrix — mantém o nome de variável `--font-geist-sans` pra
+// não precisar tocar globals.css/`--font-sans` nem nenhum consumidor.
+const geistSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });

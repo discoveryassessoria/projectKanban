@@ -148,20 +148,35 @@ export function BitrixSidebar() {
     setIsHovered(false)
   }
 
+  // IDENTIDADE BITRIX (14-15/09/2026): dois estados de verdade, não só
+  // largura — trilho colapsado CLARO, painel expandido AZUL-MARINHO com
+  // texto claro. `text-white` aqui resolveria pro pigmento do vidro
+  // (graphite, --color-white) — errado num fundo escuro — por isso os dois
+  // estados usam tokens explícitos (`--sidebar-rail-*`/`--sidebar-expanded-*`),
+  // nunca a classe `text-white`.
+  const corTextoInativo = isExpanded ? "text-[var(--sidebar-expanded-text)]" : "text-[var(--sidebar-rail-text)]"
+  const corHover = isExpanded ? "hover:bg-[var(--sidebar-expanded-item-hover)]" : "hover:bg-[var(--surface-hover)]"
+
   const getIconClasses = (isActive: boolean) => {
-    // Regra global do item ativo (§11): superfície azul sólida, tinta e glifo
-    // BRANCOS de verdade — `text-white` é o pigmento do vidro (tinta escura),
-    // não o branco real, que mora em --text-inverse.
     if (isActive) {
-      return "h-5 w-5 flex-shrink-0 fill-[var(--text-inverse)] text-[var(--text-inverse)]"
+      return `h-5 w-5 flex-shrink-0 ${isExpanded ? "text-[var(--sidebar-expanded-item-active-text)]" : "text-[var(--text-inverse)]"}`
     }
-    return "h-5 w-5 flex-shrink-0 text-white"
+    return `h-5 w-5 flex-shrink-0 ${corTextoInativo}`
   }
 
   // Função para renderizar o ícone corretamente
   const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof BoardIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
-  // Todos os ícones são customizados agora, passa a prop filled
-    return <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? "text-[var(--text-inverse)]" : "text-white"} ${iconOffset}`} filled={isActive} />
+    // Trilho colapsado: ícone ativo ganha uma bolha verde (destaque Bitrix),
+    // ícone atrás fica branco pra contrastar. Painel expandido: pill de
+    // fundo translúcido claro sobre o azul-marinho (ver `getIconClasses`).
+    if (!isExpanded && isActive) {
+      return (
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--sidebar-rail-icon-active-bg)]">
+          <Icon className={`h-5 w-5 flex-shrink-0 text-[var(--text-inverse)] ${iconOffset}`} filled={isActive} />
+        </span>
+      )
+    }
+    return <Icon className={`${getIconClasses(isActive)} ${iconOffset}`} filled={isActive} />
   }
 
   return (
@@ -169,10 +184,10 @@ export function BitrixSidebar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       className={`
-        ${isExpanded ? "w-64" : "w-16"} 
-        bg-[var(--surface-sidebar)] text-white 
+        ${isExpanded ? "w-64" : "w-16"}
+        ${isExpanded ? "bg-[var(--sidebar-expanded-background)]" : "bg-[var(--sidebar-rail-background)]"}
         border-r border-[var(--border-default)] shadow-[var(--elev-3)]
-        transition-[width] duration-300 ease-in-out
+        transition-[width,background-color] duration-300 ease-in-out
         flex flex-col h-screen fixed left-0 top-0 z-50
         overflow-hidden
       `}
@@ -188,14 +203,14 @@ export function BitrixSidebar() {
             setIsCollapsed(!isCollapsed)
             setIsHovered(false)
           }}
-          className="hover:bg-[var(--surface-hover)] rounded-lg p-2 transition-colors flex items-center justify-center flex-shrink-0"
+          className={`${corHover} rounded-lg p-2 transition-colors flex items-center justify-center flex-shrink-0`}
           aria-label="Toggle sidebar"
         >
-          <Menu className="h-6 w-6 text-white" />
+          <Menu className={`h-6 w-6 ${corTextoInativo}`} />
         </button>
 
         {isExpanded && (
-          <span className="font-semibold text-base text-white ml-1 leading-none whitespace-nowrap">
+          <span className={`font-semibold text-base ${corTextoInativo} ml-1 leading-none whitespace-nowrap`}>
             {isHovered ? "Expandir menu" : "Grupo Discovery"}
           </span>
         )}
@@ -211,7 +226,7 @@ export function BitrixSidebar() {
         {/* Seção Navegação */}
         <div>
           {isExpanded && (
-            <div className="text-xs uppercase tracking-wide text-white/70 font-medium px-3 mb-3 whitespace-nowrap">
+            <div className={`text-xs uppercase tracking-wide ${corTextoInativo} opacity-70 font-medium px-3 mb-3 whitespace-nowrap`}>
               Navegação
             </div>
           )}
@@ -225,8 +240,12 @@ export function BitrixSidebar() {
                   href={item.url}
                   className={`
                     flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
-                    hover:bg-[var(--surface-hover)] relative
-                    ${isActive ? "bg-[var(--action-primary)] text-[var(--text-inverse)]" : "text-white/90"}
+                    ${corHover} relative
+                    ${isActive
+                      ? isExpanded
+                        ? "bg-[var(--sidebar-expanded-item-active-bg)] text-[var(--sidebar-expanded-item-active-text)]"
+                        : "text-[var(--text-inverse)]"
+                      : corTextoInativo}
                     ${!isExpanded ? "justify-center" : ""}
                   `}
                   title={!isExpanded ? item.title : undefined}
@@ -248,7 +267,7 @@ export function BitrixSidebar() {
         {adminMenuItems.filter((item) => !item.permissao || pode(item.permissao)).length > 0 && (
           <div>
             {isExpanded && (
-              <div className="text-xs uppercase tracking-wide text-white/70 font-medium px-3 mb-3 whitespace-nowrap">
+              <div className={`text-xs uppercase tracking-wide ${corTextoInativo} opacity-70 font-medium px-3 mb-3 whitespace-nowrap`}>
                 Administração
               </div>
             )}
@@ -262,8 +281,12 @@ export function BitrixSidebar() {
                     href={item.url}
                     className={`
                       flex items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors
-                      hover:bg-[var(--surface-hover)]
-                      ${isActive ? "bg-[var(--action-primary)] text-[var(--text-inverse)]" : "text-white/90"}
+                      ${corHover}
+                      ${isActive
+                        ? isExpanded
+                          ? "bg-[var(--sidebar-expanded-item-active-bg)] text-[var(--sidebar-expanded-item-active-text)]"
+                          : "text-[var(--text-inverse)]"
+                        : corTextoInativo}
                       ${!isExpanded ? "justify-center" : ""}
                     `}
                     title={!isExpanded ? item.title : undefined}
@@ -279,6 +302,18 @@ export function BitrixSidebar() {
           </div>
         )}
       </div>
+
+      {/* CTA fixado embaixo — equivalente ao "Atualize seu plano" do Bitrix. */}
+      {isExpanded && (
+        <div className="p-3">
+          <div
+            className="rounded-xl px-3 py-2.5 text-center text-[13px] font-semibold text-[var(--text-inverse)] cursor-pointer transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, var(--brand) 0%, var(--stepper-current-bg) 100%)" }}
+          >
+            Central de Ajuda
+          </div>
+        </div>
+      )}
     </aside>
   )
 }

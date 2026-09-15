@@ -219,11 +219,58 @@
      continuam significando o que sempre significaram — verde é sucesso, âmbar é
      atenção, vermelho é bloqueio, azul é andamento. O champagne é identidade, e
      por isso aparece em seleção e detalhe, não como fundo de qualquer ação. */
-  --action-primary: #2875b7;
-  --action-primary-hover: #174d76;
+  /* ============================================================
+     IDENTIDADE BITRIX — sobrepõe a Identidade AZUL por instrução
+     direta do usuário (14-15/09/2026): "o layout do meu sistema
+     idêntico ao Bitrix, literalmente idêntico". Ver plano em
+     ~/.claude/plans/dapper-plotting-barto.md.
+
+     Sem os arquivos-fonte do Bitrix (SVG/fonte/hex exatos) — os
+     valores abaixo são amostrados visualmente de uma gravação de
+     tela real do Bitrix24 do usuário (conta "Discovery 24"), de
+     melhor esforço, não cópia exata de ativo. Cada bloco cita a
+     tela de origem.
+     ============================================================ */
+  /* Botão "Criar"/"Comprar agora" do Bitrix é VERDE — a cor de ação
+     primária inteira do produto, não azul. */
+  --action-primary: #29cc5c;
+  --action-primary-hover: #1f9e48;
   --action-primary-ink: #ffffff;
   --action-secondary: #d8ecf8;
   --action-secondary-ink: #174d76;
+
+  /* Sidebar de DOIS ESTADOS (gravação: trilho de ícones colapsado,
+     claro; painel expandido, azul-marinho, com texto claro). */
+  --sidebar-rail-background: #f4f8fc;
+  --sidebar-rail-text: #45516b;
+  --sidebar-rail-icon-active-bg: #29cc5c;
+  --sidebar-expanded-background: #1a2540;
+  --sidebar-expanded-text: rgba(255, 255, 255, 0.86);
+  --sidebar-expanded-item-hover: rgba(255, 255, 255, 0.06);
+  --sidebar-expanded-item-active-bg: rgba(255, 255, 255, 0.1);
+  --sidebar-expanded-item-active-text: #ffffff;
+
+  /* Paleta FIXA de coluna do Kanban (gravação: "Negócios") — nunca
+     vermelho aqui: vermelho fica reservado ao alerta de atraso no
+     card (ver identidade-azul-discovery: coluna vermelha competia
+     com o vermelho de atraso). */
+  --stage-color-1: #2a7de1; /* ex.: "Em Desenvolvimento" */
+  --stage-color-2: #17b6c9; /* ex.: "Criar documentos" */
+  --stage-color-3: #14b8a6; /* ex.: "Fatura" */
+  --stage-color-4: #29cc5c; /* ex.: "Em andamento" */
+  --stage-color-5: #f5a524; /* ex.: "Fatura final" */
+
+  /* Stepper horizontal de etapas (gravação: detalhe do negócio) —
+     futura cinza, passada âmbar, atual azul, etapa final de sucesso
+     verde. */
+  --stepper-future-bg: #e7edf3;
+  --stepper-future-text: #7a8aa0;
+  --stepper-passed-bg: #f5a524;
+  --stepper-passed-text: #ffffff;
+  --stepper-current-bg: #2a7de1;
+  --stepper-current-text: #ffffff;
+  --stepper-success-bg: #29cc5c;
+  --stepper-success-text: #ffffff;
 
   /* Cortina azulada leve: a tela de origem continua reconhecível (§17). */
   --overlay-modal: rgba(20, 50, 70, 0.18);
@@ -247,19 +294,19 @@
   --text-disabled: #8fa6b5;
   --text-inverse: #ffffff;
 
-  /* Acento institucional (dourado) — ação/navegação ativa apenas */
-  /* ── ACENTO DA MARCA ────────────────────────────────────────────────────
-     Dourado bronze, amostrado dos mockups aprovados (#a17938): botão de ação
-     principal, barra de progresso do cabeçalho, marcador do item ativo da
-     sidebar. Substitui o graphite da rodada anterior — o alvo mudou. */
-  --brand-light: #b9ddf4;
-  --brand: #4f91c5;
-  --brand-hover: #2875b7;
-  --brand-active: #2875b7;
-  --brand-dark: #174d76;
-  --accent-primary: #2875b7;
-  --accent-hover: #174d76;
-  --accent-soft: #cde6f6;      /* realce de seleção / superfície azul suave */
+  /* ── ACENTO DA MARCA — IDENTIDADE BITRIX ─────────────────────────────────
+     `--accent-primary`/`--brand` alimentam PrimaryButton, item ativo da
+     sidebar e barra de progresso em quase toda tela do sistema — por isso
+     viram verde Bitrix aqui, e não só em `--action-primary`. Ver bloco
+     "IDENTIDADE BITRIX" acima. */
+  --brand-light: #a8ecc0;
+  --brand: #29cc5c;
+  --brand-hover: #1f9e48;
+  --brand-active: #1f9e48;
+  --brand-dark: #146530;
+  --accent-primary: #29cc5c;
+  --accent-hover: #1f9e48;
+  --accent-soft: #d3f5df;      /* realce de seleção / superfície verde suave */
   --accent-ink: #ffffff;
   /* Vermelho SÓLIDO: só ação destrutiva confirmada. Tinta branca real. */
   --danger-solid: #b91c1c;
@@ -283,7 +330,9 @@
   --warning-text: #8f4a0c;
   --info-text: #174d76;
   --pessoa-text: #5c4490;
-  --accent-text: #174d76;
+  /* Acompanha `--accent-primary`/`--accent-soft` (verde Bitrix) — texto sobre
+     ladrilho de seleção precisa do mesmo matiz escurecido até AA. */
+  --accent-text: #146530;
   --danger-text: #b30001;
   --pessoa: #6d51a8;
   --pessoa-tile: #d1bfea;
