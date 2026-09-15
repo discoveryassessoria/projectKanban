@@ -47,6 +47,9 @@ interface WorkflowControlsProps {
    */
   podeBloquear?: boolean
   podeExcluir?: boolean
+  /** Nome da Tarefa/passo que este workflow conduz — ex.: "Solicitar certidão".
+   *  Sem isto, o bloco de progresso não dizia DO QUÊ era o 0%. */
+  titulo?: string | null
 }
 
 type ActionKey = "pausar" | "retomar" | "cancelar" | "invalidar"
@@ -75,6 +78,7 @@ export function WorkflowControls({
   onChange,
   podeBloquear = true,
   podeExcluir = true,
+  titulo,
 }: WorkflowControlsProps) {
   const [actionLoading, setActionLoading] = useState<ActionKey | null>(null)
   const [confirmAction, setConfirmAction] = useState<ActionKey | null>(null)
@@ -159,9 +163,14 @@ export function WorkflowControls({
           </div>
         ) : (
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              Progresso operacional
-            </span>
+            <div>
+              {titulo && (
+                <div className="text-[13px] font-bold text-white mb-0.5">{titulo}</div>
+              )}
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                Progresso operacional
+              </span>
+            </div>
             <span className="text-[11px] font-mono text-[var(--text-secondary)]">
               {progress}% · Iniciado em {startedAt}
             </span>

@@ -727,6 +727,7 @@ function ConteudoDrawer({
               onChange={() => { carregar(); onSave?.() }}
               podeBloquear={pode("tarefas.bloquear")}
               podeExcluir={pode("tarefas.excluir")}
+              titulo={workflow?.steps?.[0]?.title}
             />
 
             {/* TABS */}

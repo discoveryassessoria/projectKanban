@@ -240,6 +240,16 @@ export function WorkflowTab({
   const erro = consulta.erro ? "Erro ao carregar workflow." : null
   const carregar = consulta.recarregar
 
+  // AS "ETAPAS" DO CABEÇALHO SÃO AS SUBTAREFAS, QUANDO O PASSO TEM.
+  //
+  // Esta arquitetura tem 1 Step só ("Solicitar certidão") com 4 subtarefas por
+  // dentro — "1 etapas · 0/25 pontos" no cabeçalho contava o STEP, nunca o que
+  // o operador via como "4 passos". Precisa vir aqui (antes de qualquer return
+  // condicional) por causa da regra dos hooks — `useConfiguracaoDaEtapa` já
+  // lida com `null` sem disparar fetch.
+  const primeiroStepId = workflow?.steps?.[0]?.id ?? null
+  const { subtarefas: subtarefasDoTopo } = useConfiguracaoDaEtapa(primeiroStepId)
+
   // O foco só existe DEPOIS que a lista chegou: no primeiro render ainda é o
   // esqueleto de carregamento, e não há cartão nenhum para trazer à vista.
   useEffect(() => {
@@ -309,11 +319,27 @@ export function WorkflowTab({
   }
 
   // -- Render do workflow
-  const totalWeight = workflow.steps.reduce((s, x) => s + x.weight, 0)
-  const doneWeight = workflow.steps
+  const totalWeightSteps = workflow.steps.reduce((s, x) => s + x.weight, 0)
+  const doneWeightSteps = workflow.steps
     .filter((x) => x.status === "concluida")
     .reduce((s, x) => s + x.weight, 0)
-  const doneCount = workflow.steps.filter((s) => s.status === "concluida").length
+  const doneCountSteps = workflow.steps.filter((s) => s.status === "concluida").length
+
+  // QUANDO O PASSO TEM SUBTAREFAS, "ETAPAS" SÃO ELAS — não o Step único que as
+  // contém. Achado real: 15/09/2026 — "1 etapas · 0/25 pontos" para um passo
+  // com 4 subtarefas cadastradas escondia o que de fato existe pra fazer.
+  const temSubtarefasNoTopo = subtarefasDoTopo.length > 0
+  const etapasTotal = temSubtarefasNoTopo ? subtarefasDoTopo.length : workflow.steps.length
+  const etapasConcluidas = temSubtarefasNoTopo
+    ? subtarefasDoTopo.filter((s) => s.concluida).length
+    : doneCountSteps
+  const totalWeight = totalWeightSteps
+  const doneWeight = temSubtarefasNoTopo
+    ? Math.round((totalWeightSteps * etapasConcluidas) / etapasTotal)
+    : doneWeightSteps
+  const pctExibido = temSubtarefasNoTopo
+    ? Math.round((100 * etapasConcluidas) / etapasTotal)
+    : workflow.progress
 
   return (
     <div className="space-y-4">
@@ -323,15 +349,15 @@ export function WorkflowTab({
         <div>
           <div className="text-[13px] font-bold text-white">{workflow.templateName}</div>
           <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-            {workflow.steps.length} etapas · {doneCount} concluídas · iniciado em {fmtDate(workflow.startedAt)}
+            {etapasTotal} etapas · {etapasConcluidas} concluídas · iniciado em {fmtDate(workflow.startedAt)}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 min-w-[160px]">
-          <div className="text-[18px] font-bold text-white leading-none">{workflow.progress}%</div>
+          <div className="text-[18px] font-bold text-white leading-none">{pctExibido}%</div>
           <div className="w-40 h-1.5 bg-[var(--text-muted)] rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
-              style={{ width: `${workflow.progress}%` }}
+              style={{ width: `${pctExibido}%` }}
             />
           </div>
           <div className="text-[10px] text-[var(--text-secondary)] font-mono">{doneWeight}/{totalWeight} pontos</div>
@@ -467,7 +493,25 @@ function StepOuSubtarefas({
     step.status === "bloqueada"
   const { subtarefas, carregando } = useConfiguracaoDaEtapa(isActive ? step.id : null)
 
-  if (!isActive || carregando || subtarefas.length === 0) {
+  // ENQUANTO CARREGA, NÃO MOSTRA O CARD ANTIGO COMPLETO.
+  //
+  // Mostrar o StepCard de sempre (com botão "Iniciar" e tudo) durante a busca
+  // das subtarefas parecia um estado ESTÁVEL — "carregou, é isso mesmo" — e não
+  // uma pergunta ainda em aberto. Achado real: 15/09/2026, processo novo — a
+  // resposta de `/execucao` demora um pouco mais que o primeiro paint (cold
+  // start/latência), e nesse intervalo a tela mostrava o card antigo como se
+  // fosse a versão final, parecendo que a correção de hoje tinha voltado a
+  // quebrar. Um esqueleto deixa claro que ainda não é a resposta.
+  if (isActive && carregando) {
+    return (
+      <div ref={refDoAtual} className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-md px-3 py-3 flex items-center gap-2 animate-pulse">
+        <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--text-secondary)]" />
+        <span className="text-[11px] text-[var(--text-secondary)]">Carregando subtarefas…</span>
+      </div>
+    )
+  }
+
+  if (!isActive || subtarefas.length === 0) {
     return (
       <StepCard
         step={step} onOpenCentral={onOpenCentral} refDoAtual={refDoAtual}
@@ -508,8 +552,8 @@ function SubtarefaRow({
   subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome,
 }: {
   subtarefa: {
-    key: string; label: string; concluida: boolean; disponivel: boolean
-    status: string; bloqueioTexto: string | null
+    key: string; label: string; descricao: string | null; concluida: boolean; disponivel: boolean
+    status: string; bloqueioTexto: string | null; slaDays: number | null
   }
   ordem: number
   onOpenCentral: () => void
@@ -517,13 +561,14 @@ function SubtarefaRow({
   tarefaResponsavelNome?: string | null
 }) {
   const s = subtarefa
+  // MODO CONCLUÍDA — compacto, mesmo padrão visual do StepCard concluído.
   if (s.concluida) {
     return (
       <div className="bg-[var(--surface-secondary)]/30 border border-green-900/60 rounded-md px-3 py-2 flex items-center gap-3">
-        <div className="w-5 h-5 rounded-full bg-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
-          <Check className="w-3 h-3 text-white" />
+        <div className="w-6 h-6 rounded-full bg-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
+          <Check className="w-3.5 h-3.5 text-white" />
         </div>
-        <div className="flex-1 min-w-0 text-[12px] font-semibold text-green-800">{ordem}. {s.label}</div>
+        <div className="flex-1 min-w-0 text-[12.5px] font-semibold text-green-800">{ordem}. {s.label}</div>
       </div>
     )
   }
@@ -531,46 +576,76 @@ function SubtarefaRow({
   // AGUARDANDO TERCEIRO NÃO É BLOQUEIO — é o padrão da subtarefa ao ficar
   // corrente (`esperaExternaAoLiberar`), mas ela continua `disponivel`: o
   // operador precisa poder abrir "Receber certidão" JUSTAMENTE enquanto ela
-  // diz "aguardando terceiro", para registrar que a certidão chegou. Achado
-  // real: 15/09/2026 — o botão sumia exatamente na subtarefa que mais
-  // precisava dele. Só quem trava de verdade é a DEPENDÊNCIA pendente
-  // (`!s.disponivel`), essa sim sem ação possível ainda.
+  // diz "aguardando terceiro", para registrar que a certidão chegou. Só quem
+  // trava de verdade é a DEPENDÊNCIA pendente (`!s.disponivel`).
   const esperandoTerceiro = s.status === "AGUARDANDO_EXTERNO"
   const bloqueadaPorDependencia = !s.disponivel
   const podeAgir = s.disponivel && podeIniciar
+  const cardBorderCls = esperandoTerceiro ? "border-amber-900/60" : "border-[var(--border-default)]"
+  const statusBadgeCls = esperandoTerceiro
+    ? "bg-[var(--surface-secondary)] text-amber-800 border-amber-800"
+    : "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]"
 
+  // MODO ATIVO/BLOQUEADA — MESMO layout rico do StepCard (número + título,
+  // badge, descrição, "executa · SLA", botão "Iniciar →"), só que por
+  // SUBTAREFA em vez de por passo. Achado real: 15/09/2026 — a versão
+  // resumida escondia justamente a riqueza que o StepCard sempre teve.
   return (
-    <div className={`bg-[var(--surface-primary)] border rounded-md px-3 py-2.5 flex items-center gap-3 ${esperandoTerceiro ? "border-amber-900/60" : "border-[var(--border-default)]"} ${bloqueadaPorDependencia ? "opacity-60" : ""}`}>
-      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 bg-[var(--surface-secondary)]">
-        {s.disponivel ? <Play className="w-2.5 h-2.5 text-white fill-white ml-0.5" /> : <Lock className="w-2.5 h-2.5 text-[var(--text-secondary)]" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[12px] font-semibold text-white">{ordem}. {s.label}</span>
-          <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${esperandoTerceiro ? "text-amber-800 border-amber-800" : "text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
-            {SUBTAREFA_STATUS_LABEL[s.status] ?? s.status}
-          </span>
+    <div className={`bg-[var(--surface-primary)] border ${cardBorderCls} rounded-md overflow-hidden ${bloqueadaPorDependencia ? "opacity-60" : ""}`}>
+      <div className="px-3 py-3 flex items-start gap-3">
+        <div className="w-6 h-6 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center flex-shrink-0 mt-0.5">
+          {s.disponivel ? <Play className="w-3 h-3 text-white fill-white ml-0.5" /> : <Lock className="w-3 h-3 text-[var(--text-secondary)]" />}
         </div>
-        {s.bloqueioTexto && (
-          <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5">{s.bloqueioTexto}</div>
-        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-[12.5px] font-semibold text-white">{ordem}. {s.label}</div>
+            <span className={`text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${statusBadgeCls}`}>
+              {SUBTAREFA_STATUS_LABEL[s.status] ?? s.status}
+            </span>
+          </div>
+          {s.descricao && (
+            <div className="text-[11px] text-[var(--text-secondary)] mt-1">{s.descricao}</div>
+          )}
+          <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+              <span className="text-[var(--text-secondary)]">executa</span>
+              {tarefaResponsavelNome || "—"}
+            </span>
+            {s.slaDays != null && (
+              <>
+                <span className="text-[var(--text-secondary)]">·</span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-[var(--text-secondary)]">SLA</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-green-800 bg-[var(--surface-secondary)]">
+                    {s.slaDays} dia(s)
+                  </span>
+                </span>
+              </>
+            )}
+          </div>
+          {s.bloqueioTexto && (
+            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-800">
+              {s.bloqueioTexto}
+            </div>
+          )}
+        </div>
+        {podeAgir ? (
+          <button
+            onClick={onOpenCentral}
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
+          >
+            Iniciar →
+          </button>
+        ) : s.disponivel ? (
+          <span
+            title="A tarefa precisa estar atribuída a você para iniciar esta subtarefa"
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded whitespace-nowrap"
+          >
+            {tarefaResponsavelNome ? `Atribuído a ${tarefaResponsavelNome}` : "Sem responsável"}
+          </span>
+        ) : null}
       </div>
-      {podeAgir && (
-        <button
-          onClick={onOpenCentral}
-          className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
-        >
-          Iniciar →
-        </button>
-      )}
-      {!podeAgir && s.disponivel && (
-        <span
-          title="A tarefa precisa estar atribuída a você para iniciar esta subtarefa"
-          className="px-2.5 py-1.5 text-[10.5px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded whitespace-nowrap"
-        >
-          {tarefaResponsavelNome ? `Atribuído a ${tarefaResponsavelNome}` : "Sem responsável"}
-        </span>
-      )}
     </div>
   )
 }
