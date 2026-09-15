@@ -167,23 +167,36 @@ export function WorkflowMacroTrilha({
           const prog = progressOf(title)
           const conditional = RETIF_PHASES.includes(title)
 
+          // IDENTIDADE BITRIX (14-15/09/2026): a fase ATUAL é azul, uma fase
+          // já PASSADA é âmbar, e só a ÚLTIMA fase (o processo de verdade
+          // encerrado) é verde — nunca "concluída" genérica em verde, que era
+          // a leitura da Identidade AZUL. Ver `--stepper-*` em globals.css.
+          const ehFaseFinal = title === PROCESS_PHASES[PROCESS_PHASES.length - 1]
           const dotCls =
-            st === "concluida" ? "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
-            : st === "atual" ? "bg-[var(--surface-tertiary)] text-white/95 border border-[var(--border-default)]"
+            st === "concluida" ? (ehFaseFinal ? "text-[var(--stepper-success-text)]" : "text-[var(--stepper-passed-text)]")
+            : st === "atual" ? "text-[var(--stepper-current-text)]"
             : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
             : st === "condicional" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
             : st === "bloqueada" ? "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]"
             : "border-2 border-[var(--border-default)] bg-[var(--surface-popover)] text-[var(--text-muted)]"
+          const dotStyle: React.CSSProperties | undefined =
+            st === "concluida" ? { backgroundColor: ehFaseFinal ? "var(--stepper-success-bg)" : "var(--stepper-passed-bg)" }
+            : st === "atual" ? { backgroundColor: "var(--stepper-current-bg)" }
+            : undefined
 
           const badgeCls =
-            st === "concluida" ? "bg-[var(--surface-secondary)] text-green-800"
-            : st === "atual" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]"
+            st === "concluida" ? (ehFaseFinal ? "text-[var(--stepper-success-text)]" : "text-[var(--stepper-passed-text)]")
+            : st === "atual" ? "text-[var(--stepper-current-text)]"
             : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
             : st === "condicional" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
             : st === "bloqueada" ? "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]"
             : "bg-[var(--surface-secondary)] text-[var(--text-muted)]"
+          const badgeStyle: React.CSSProperties | undefined =
+            st === "concluida" ? { backgroundColor: ehFaseFinal ? "var(--stepper-success-bg)" : "var(--stepper-passed-bg)" }
+            : st === "atual" ? { backgroundColor: "var(--stepper-current-bg)" }
+            : undefined
           const badgeTxt =
-            st === "concluida" ? "Concluída"
+            st === "concluida" ? (ehFaseFinal ? "Concluída" : "Passada")
             : st === "atual" ? "Atual"
             : st === "pulada" ? "Pulada"
             : st === "condicional" ? "Condicional"
@@ -192,13 +205,13 @@ export function WorkflowMacroTrilha({
           const badgeFinalCls = badgeCls
 
           const barColor =
-            st === "concluida" ? "#16a34a"
-            : st === "atual" ? "#2875b7"
+            st === "concluida" ? (ehFaseFinal ? "#29cc5c" : "#f5a524")
+            : st === "atual" ? "#2a7de1"
             : st === "pulada" ? "#a7c9de"
             : "#d1d5db"
           const pctColor =
-            st === "concluida" ? "text-green-800"
-            : st === "atual" ? "text-[var(--text-secondary)]"
+            st === "concluida" ? (ehFaseFinal ? "text-[var(--stepper-success-bg)]" : "text-[var(--stepper-passed-bg)]")
+            : st === "atual" ? "text-[var(--stepper-current-bg)]"
             : "text-[var(--text-muted)]"
 
           // conector pra próxima fase
@@ -231,7 +244,7 @@ export function WorkflowMacroTrilha({
               >
                 {/* dot + conector */}
                 <div className="flex items-center w-full justify-center relative">
-                  <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold flex-none relative z-30 ${dotCls}`}>
+                  <span className={`w-7 h-7 rounded-full grid place-items-center text-xs font-bold flex-none relative z-30 ${dotCls}`} style={dotStyle}>
                     {st === "concluida" ? <Check className="w-3.5 h-3.5" strokeWidth={3} />
                       : st === "atual" ? <b>{i + 1}</b>
                       : st === "pulada" ? "⤳" : ""}
@@ -239,7 +252,7 @@ export function WorkflowMacroTrilha({
                   {i < PROCESS_PHASES.length - 1 && (
                     <div
                       className="absolute left-1/2 w-full h-0.5 top-1/2 -translate-y-1/2 z-20"
-                      style={{ background: nextDone ? "#16a34a" : "#bfd8e8" }}
+                      style={{ background: nextDone ? "#f5a524" : "#bfd8e8" }}
                     />
                   )}
                 </div>
@@ -252,7 +265,7 @@ export function WorkflowMacroTrilha({
 
                 {/* badge */}
                 <span className="min-h-[19px]">
-                  <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${badgeFinalCls}`}>
+                  <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md whitespace-nowrap ${badgeFinalCls}`} style={badgeStyle}>
                     {badgeTxt}
                   </span>
                 </span>
