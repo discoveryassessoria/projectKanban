@@ -39,7 +39,7 @@ import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/serv
 import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import type { PermissaoChave } from "@/src/lib/permissoes"
 import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
-import { passoPodeConcluir, concluirSubtarefaCorrentePeloPasso } from "@/src/services/subtarefas-da-etapa"
+import { passoPodeConcluir, concluirSubtarefaCorrentePeloPasso, subtarefasDaEtapa } from "@/src/services/subtarefas-da-etapa"
 import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
@@ -431,7 +431,7 @@ export async function montarWorkflowV2(
   // em `controlarOperacaoV2`) — reaproveitada aqui, nenhum estado novo.
   const documento = await prisma.documento.findUnique({
     where: { id: documentoId },
-    select: { status: true, ultimaMovimentacao: true, motivoBloqueio: true },
+    select: { status: true, ultimaMovimentacao: true, motivoBloqueio: true, orgaoId: true },
   })
   const cancelado = documento?.status === "CANCELADO"
   // Cancelada: lê TODOS os passos da visita (inclusive os cancelados) — é o que
@@ -452,7 +452,16 @@ export async function montarWorkflowV2(
   const uMap = new Map(usuarios.map((u) => [u.id, u]))
 
   let totalW = 0, doneW = 0
-  const steps = passos.map((p) => {
+  // AS SUBTAREFAS VÊM JUNTO, NA MESMA RESPOSTA — não é uma segunda chamada.
+  //
+  // Achado real (15/09/2026): a tela buscava as subtarefas por uma rota À PARTE
+  // (`/workflow-step-instances/[id]/execucao`, via `useConfiguracaoDaEtapa`)
+  // depois que este workflow já tinha chegado — e nesse intervalo (latência
+  // normal de servidor) a Central mostrava o passo como se não tivesse
+  // subtarefa nenhuma, porque a segunda resposta ainda não tinha voltado.
+  // Calculando aqui, subtarefas chegam PRONTAS no mesmo payload — não existe
+  // mais janela de "ainda não sei se tem subtarefa".
+  const steps = await Promise.all(passos.map(async (p) => {
     const c = catOf(p.stepKey)
     const w = c?.weight ?? 1
     totalW += w
@@ -463,6 +472,7 @@ export async function montarWorkflowV2(
     // qual interface montar a partir da chave do passo — e "sem editor específico"
     // resolve para o editor PADRÃO, nunca para uma tela de erro.
     const editor = resolveWorkflowStepEditor({ stepKey: p.stepKey, phaseKey: p.faseMacroKey })
+    const subtarefas = await subtarefasDaEtapa({ stepInstanceId: p.id, fornecedorId: documento?.orgaoId ?? null }).catch(() => [])
     return {
       ...op,
       id: p.id, ordem: p.ordem, stepKey: p.stepKey,
@@ -476,8 +486,9 @@ export async function montarWorkflowV2(
       editor: { kind: editor.kind, especifico: editor.especifico, stepKeyCanonico: editor.stepKeyCanonico },
       acoesPermitidas: acoesPermitidasDaEtapa({ status: p.status, permissoes: ctx?.permissoes ?? null }),
       andamento: { ...andamento, previsaoEfetiva: previsaoEfetiva(andamento, p.startedAt) },
+      subtarefas,
     } as Record<string, unknown>
-  })
+  }))
   // O DENOMINADOR, quando cancelada, é a visita INTEIRA (inclusive os passos
   // cancelados) — "1 de 5 concluídas antes do cancelamento" é a verdade; "100%"
   // não é. Passo cancelado nunca soma em `doneW` (não é sucesso).

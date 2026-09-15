@@ -15,7 +15,7 @@ import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
 import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAvaliacaoUI } from "./OperacaoAntecipadaPainel"
 import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { useConfiguracaoDaEtapa } from "./useConfiguracaoDaEtapa"
+import type { SubtarefaProjetada } from "./useConfiguracaoDaEtapa"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -73,6 +73,9 @@ interface WorkflowStep {
   slaDays: number
   trackingCode: string | null
   externalProtocol: string | null
+  /** Vem JUNTO nesta mesma resposta agora — nunca mais uma segunda chamada
+   *  separada só para saber se o passo tem subtarefas (ver montarWorkflowV2). */
+  subtarefas?: SubtarefaProjetada[]
 }
 
 interface Workflow {
@@ -240,16 +243,6 @@ export function WorkflowTab({
   const erro = consulta.erro ? "Erro ao carregar workflow." : null
   const carregar = consulta.recarregar
 
-  // AS "ETAPAS" DO CABEÇALHO SÃO AS SUBTAREFAS, QUANDO O PASSO TEM.
-  //
-  // Esta arquitetura tem 1 Step só ("Solicitar certidão") com 4 subtarefas por
-  // dentro — "1 etapas · 0/25 pontos" no cabeçalho contava o STEP, nunca o que
-  // o operador via como "4 passos". Precisa vir aqui (antes de qualquer return
-  // condicional) por causa da regra dos hooks — `useConfiguracaoDaEtapa` já
-  // lida com `null` sem disparar fetch.
-  const primeiroStepId = workflow?.steps?.[0]?.id ?? null
-  const { subtarefas: subtarefasDoTopo } = useConfiguracaoDaEtapa(primeiroStepId)
-
   // O foco só existe DEPOIS que a lista chegou: no primeiro render ainda é o
   // esqueleto de carregamento, e não há cartão nenhum para trazer à vista.
   useEffect(() => {
@@ -328,6 +321,10 @@ export function WorkflowTab({
   // QUANDO O PASSO TEM SUBTAREFAS, "ETAPAS" SÃO ELAS — não o Step único que as
   // contém. Achado real: 15/09/2026 — "1 etapas · 0/25 pontos" para um passo
   // com 4 subtarefas cadastradas escondia o que de fato existe pra fazer.
+  // Vêm no PRÓPRIO `workflow.steps[0].subtarefas` agora — mesma resposta,
+  // sem segunda chamada e sem janela de corrida onde ainda não se sabe se
+  // tem subtarefa.
+  const subtarefasDoTopo = workflow.steps[0]?.subtarefas ?? []
   const temSubtarefasNoTopo = subtarefasDoTopo.length > 0
   const etapasTotal = temSubtarefasNoTopo ? subtarefasDoTopo.length : workflow.steps.length
   const etapasConcluidas = temSubtarefasNoTopo
@@ -491,25 +488,13 @@ function StepOuSubtarefas({
     step.status === "aguardando_terceiro" ||
     step.status === "atrasada" ||
     step.status === "bloqueada"
-  const { subtarefas, carregando } = useConfiguracaoDaEtapa(isActive ? step.id : null)
-
-  // ENQUANTO CARREGA, NÃO MOSTRA O CARD ANTIGO COMPLETO.
-  //
-  // Mostrar o StepCard de sempre (com botão "Iniciar" e tudo) durante a busca
-  // das subtarefas parecia um estado ESTÁVEL — "carregou, é isso mesmo" — e não
-  // uma pergunta ainda em aberto. Achado real: 15/09/2026, processo novo — a
-  // resposta de `/execucao` demora um pouco mais que o primeiro paint (cold
-  // start/latência), e nesse intervalo a tela mostrava o card antigo como se
-  // fosse a versão final, parecendo que a correção de hoje tinha voltado a
-  // quebrar. Um esqueleto deixa claro que ainda não é a resposta.
-  if (isActive && carregando) {
-    return (
-      <div ref={refDoAtual} className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-md px-3 py-3 flex items-center gap-2 animate-pulse">
-        <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--text-secondary)]" />
-        <span className="text-[11px] text-[var(--text-secondary)]">Carregando subtarefas…</span>
-      </div>
-    )
-  }
+  // SEM FETCH PRÓPRIO — `step.subtarefas` já chega pronto na MESMA resposta
+  // de `/api/documentos/[id]/workflow` (ver montarWorkflowV2). Antes disto
+  // havia uma segunda chamada aqui (`useConfiguracaoDaEtapa`), e a corrida
+  // entre ela e o primeiro paint fazia a lista de subtarefas sumir por alguns
+  // segundos em processos novos — parecia bug, era só uma resposta que ainda
+  // não tinha voltado. Sem segunda chamada, sem corrida.
+  const subtarefas = step.subtarefas ?? []
 
   if (!isActive || subtarefas.length === 0) {
     return (
