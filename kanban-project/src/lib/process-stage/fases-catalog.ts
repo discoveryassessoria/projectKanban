@@ -59,11 +59,17 @@ export const FASES: Record<FaseCode, FaseDef> = {
   GENEALOGIA: {
     code: "GENEALOGIA", phaseKey: "genealogia", ordem: 0, label: "Genealogia", kind: "documento", scope: "NECESSIDADE",
     next: "EMISSAO_DOCUMENTAL",
-    steps: [
-      { ordem: 1, stepKey: "localizar_registro", title: "Localizar registro da certidão",
-        description: "Localizar o registro civil e preencher os dados registrais necessários.",
-        weight: 100, ownerKey: "equipe_documental", slaDays: 5 },
-    ],
+    // SEM STEPS AQUI DE PROPÓSITO. Havia um `localizar_registro` com
+    // `slaDays: 5` fixo neste catálogo estático — uma SEGUNDA fonte de
+    // verdade, nunca lida por `materializar-genealogia.ts` (que tinha o SEU
+    // PRÓPRIO `slaDays: 5` hardcoded, coincidentemente igual), mas capaz de
+    // enganar quem lesse só este arquivo. O prazo real vem do cadastro
+    // (Gerenciamento › Workflow Interno › Genealogia →
+    // `PhaseInternalWorkflowStep.slaDays`), resolvido em runtime por
+    // `resolverWorkflowAplicavel`. `getStepDef` sem entrada aqui cai nos
+    // defaults tolerantes de quem chama (peso 1 — inofensivo com um único
+    // passo na fase; título vem do snapshot da instância, sempre presente).
+    steps: [],
   },
 
   EMISSAO_DOCUMENTAL: {

@@ -27,6 +27,7 @@ import { idadeEmAnos, maioridadeEfetiva, ehRequerente } from "@/src/lib/document
 import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
+import { resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
 
 type DB = typeof prisma | Prisma.TransactionClient
 
@@ -114,6 +115,19 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
 
   const regras = await regrasGenealogiaDoProcesso(processo.tipoProcessoMotorId ?? null, db)
   if (regras.length === 0) { res.pendencias.push("nenhuma Regra Documental publicada exigida na Genealogia"); return res }
+
+  // O PRAZO DO PASSO VEM DO CADASTRO (Gerenciamento › Workflow › Workflow
+  // Interno), nunca de um número escrito aqui. Um `slaDays: 5` literal neste
+  // arquivo é exatamente a segunda fonte de verdade que o resto do motor já
+  // eliminou para Emissão Documental — o administrador editava o prazo na
+  // tela e a tarefa nascida aqui continuava materializando o valor antigo,
+  // sem erro e sem aviso. `resolverWorkflowAplicavel` é o mesmo resolvedor
+  // que a Emissão Documental usa (tipo-específico → fallback global);
+  // ausência de cadastro publicado cai no default do domínio (5d), nunca
+  // trava a materialização por um problema de configuração que não é dela.
+  const wfGenealogia = await resolverWorkflowAplicavel(processo.tipoProcessoMotorId ?? null, FASE_GENEALOGIA, db)
+  const slaDaysLocalizarRegistro =
+    ("steps" in wfGenealogia ? wfGenealogia.steps.find((s) => s.key === STEP_LOCALIZAR)?.slaDays : null) ?? 5
 
   // Pessoa REMOVIDA com histórico preservado não volta a materializar: seria
   // recriar necessidade, passo e tarefa para quem já saiu da operação.
@@ -317,7 +331,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
                 // notificações, sem erro e sem aviso. O valor abaixo é só o
                 // default do modelo, e nada o lê para decidir tarefa.
                 obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
-                status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: 5,
+                status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: slaDaysLocalizarRegistro,
                 chaveIdempotencia: chave,
                 snapshot: { stepKey: STEP_LOCALIZAR, label: STEP_LABEL, requisito: snapshot } as Prisma.InputJsonValue,
                 snapshotSchemaVersion: 1,
