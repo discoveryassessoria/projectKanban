@@ -528,22 +528,26 @@ function SubtarefaRow({
     )
   }
 
-  // A ESPERANDO É A MESMA IDEIA DO BLOQUEADO PRA TELA: nenhuma ação a fazer
-  // agora, só um motivo pra explicar por quê — a diferença é a cor (âmbar =
-  // esperando terceiro/dependência, não é um problema; vermelho fica só pra
-  // bloqueio manual real, que nem chega aqui hoje).
-  const aguardando = s.status === "AGUARDANDO_EXTERNO" || !s.disponivel
-  const podeAgir = s.disponivel && podeIniciar && !aguardando
+  // AGUARDANDO TERCEIRO NÃO É BLOQUEIO — é o padrão da subtarefa ao ficar
+  // corrente (`esperaExternaAoLiberar`), mas ela continua `disponivel`: o
+  // operador precisa poder abrir "Receber certidão" JUSTAMENTE enquanto ela
+  // diz "aguardando terceiro", para registrar que a certidão chegou. Achado
+  // real: 15/09/2026 — o botão sumia exatamente na subtarefa que mais
+  // precisava dele. Só quem trava de verdade é a DEPENDÊNCIA pendente
+  // (`!s.disponivel`), essa sim sem ação possível ainda.
+  const esperandoTerceiro = s.status === "AGUARDANDO_EXTERNO"
+  const bloqueadaPorDependencia = !s.disponivel
+  const podeAgir = s.disponivel && podeIniciar
 
   return (
-    <div className={`bg-[var(--surface-primary)] border rounded-md px-3 py-2.5 flex items-center gap-3 ${aguardando ? "border-amber-900/60" : "border-[var(--border-default)]"} ${!s.disponivel && !aguardando ? "opacity-60" : ""}`}>
-      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${aguardando ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`}>
+    <div className={`bg-[var(--surface-primary)] border rounded-md px-3 py-2.5 flex items-center gap-3 ${esperandoTerceiro ? "border-amber-900/60" : "border-[var(--border-default)]"} ${bloqueadaPorDependencia ? "opacity-60" : ""}`}>
+      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 bg-[var(--surface-secondary)]">
         {s.disponivel ? <Play className="w-2.5 h-2.5 text-white fill-white ml-0.5" /> : <Lock className="w-2.5 h-2.5 text-[var(--text-secondary)]" />}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[12px] font-semibold text-white">{ordem}. {s.label}</span>
-          <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${aguardando ? "text-amber-800 border-amber-800" : "text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
+          <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded border ${esperandoTerceiro ? "text-amber-800 border-amber-800" : "text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
             {SUBTAREFA_STATUS_LABEL[s.status] ?? s.status}
           </span>
         </div>
@@ -559,7 +563,7 @@ function SubtarefaRow({
           Iniciar →
         </button>
       )}
-      {!podeAgir && s.disponivel && !aguardando && (
+      {!podeAgir && s.disponivel && (
         <span
           title="A tarefa precisa estar atribuída a você para iniciar esta subtarefa"
           className="px-2.5 py-1.5 text-[10.5px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded whitespace-nowrap"
