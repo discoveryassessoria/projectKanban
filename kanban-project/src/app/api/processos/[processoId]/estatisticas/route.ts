@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { estadoOperacionalDosDocumentos } from "@/lib/operacional/documento-estado"
 
 type AlertaSev = "crit" | "warn" | "info"
 
@@ -94,15 +95,23 @@ export async function GET(
     // receber" pendente. Sem isto, um documento corretamente dispensado
     // continuava contando no denominador desta tela (achado real: Antonio,
     // óbito; Edithe, ambas certidões — "3 de 6" com só 3 documentos de verdade
-    // exigidos).
-    const [totalDocs, recebidosDocs] = pessoaIds.length
-      ? await Promise.all([
-          prisma.documento.count({ where: { pessoaId: { in: pessoaIds }, status: { notIn: ["CANCELADO", "INVALIDO"] } } }),
-          prisma.documento.count({
-            where: { pessoaId: { in: pessoaIds }, status: "RECEBIDO" },
-          }),
-        ])
-      : [0, 0]
+    // exigidos). CANCELADO/INVALIDO são as exceções vivas do campo (memória
+    // "documento-status-legado") — o resto do estado vem da Tarefa
+    // (`documento-estado.ts`), nunca de `Documento.status === "RECEBIDO"`
+    // (congelado: um documento cuja Tarefa já concluiu não voltava a mexer
+    // nesse campo, então "recebido" ficava contando errado assim que a Tarefa
+    // avançava sem que ninguém tivesse tocado no campo do Documento).
+    let totalDocs = 0
+    let recebidosDocs = 0
+    if (pessoaIds.length) {
+      const docsValidos = await prisma.documento.findMany({
+        where: { pessoaId: { in: pessoaIds }, status: { notIn: ["CANCELADO", "INVALIDO"] } },
+        select: { id: true },
+      })
+      totalDocs = docsValidos.length
+      const estados = await estadoOperacionalDosDocumentos(docsValidos.map((d) => d.id))
+      recebidosDocs = docsValidos.filter((d) => estados.get(d.id)?.jaRecebido).length
+    }
 
     const percentual = totalDocs > 0 ? Math.round((recebidosDocs / totalDocs) * 100) : 0
 

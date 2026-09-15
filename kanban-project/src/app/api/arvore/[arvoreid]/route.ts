@@ -10,6 +10,7 @@ import { analisarExclusaoArvore, removerPessoaDaArvore } from "@/src/services/pe
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { removerFamiliaSeOrfa } from "@/src/services/familia"
 import { FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
+import { estadoOperacionalDosDocumentos, rotularEstadoDoDocumento } from "@/lib/operacional/documento-estado"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
   const semPermissao = await verificarPermissao(request, "arvore.ver")
@@ -56,7 +57,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Árvore não encontrada" }, { status: 404 })
     }
 
-    return NextResponse.json(arvore)
+    // `documento.status` (o campo do banco) congela — memória
+    // "documento-status-legado". A Árvore mostrava, por exemplo, "Solicitado"
+    // pra sempre num documento cuja Tarefa já tinha avançado dez passos. O
+    // `status` que sai daqui é o REAL: a Tarefa viva do documento, ou o
+    // resultado de quando ela concluiu — nunca o campo cru.
+    const todosOsDocumentoIds = arvore.pessoas.flatMap((p) => p.documentos.map((d) => d.id))
+    const estados = await estadoOperacionalDosDocumentos(todosOsDocumentoIds)
+    const arvoreComEstadoReal = {
+      ...arvore,
+      pessoas: arvore.pessoas.map((p) => ({
+        ...p,
+        documentos: p.documentos.map((d) => ({
+          ...d,
+          status: rotularEstadoDoDocumento(d.status, estados.get(d.id)).status,
+        })),
+      })),
+    }
+
+    return NextResponse.json(arvoreComEstadoReal)
   } catch (error) {
     console.error("Erro ao buscar árvore:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })

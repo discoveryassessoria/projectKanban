@@ -139,17 +139,19 @@ const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
   OUTRO: 'Outro'
 }
 
+// `documento.status` já vem derivado da Tarefa viva (nunca `Documento.status`
+// cru, que congela — ver `lib/operacional/documento-estado.ts`).
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; icon: any }> = {
-  PENDENTE: { label: 'Pendente', color: '#4e6879', bg: '#d8ecf8', icon: Clock },            // Cinza
-  EM_BUSCA: { label: 'Em Busca', color: '#DC2626', bg: '#FEE2E2', icon: AlertCircle },      // 🔴 !
-  SOLICITAR: { label: 'Solicitar', color: '#D97706', bg: '#FEF3C7', icon: AlertCircle },     // 🟡 !
-  SOLICITADO: { label: 'Solicitado', color: '#059669', bg: '#D1FAE5', icon: Clock },         // 🟢 relógio
-  RECEBIDO: { label: 'Recebido', color: '#2875b7', bg: '#DBEAFE', icon: CheckCircle2 },     // 🔵 ✓
-  EM_TRADUCAO: { label: 'Em Tradução', color: '#7C3AED', bg: '#EDE9FE', icon: Clock },
-  TRADUZIDO: { label: 'Traduzido', color: '#0891B2', bg: '#CFFAFE', icon: CheckCircle2 },
-  APOSTILADO: { label: 'Apostilado', color: '#059669', bg: '#D1FAE5', icon: CheckCircle2 },
-  ENTREGUE: { label: 'Entregue', color: '#166534', bg: '#DCFCE7', icon: CheckCircle2 },
+  PENDENTE: { label: 'Pendente', color: '#4e6879', bg: '#d8ecf8', icon: Clock },                     // Cinza
+  SEM_RESPONSAVEL: { label: 'Sem responsável', color: '#D97706', bg: '#FEF3C7', icon: AlertCircle }, // 🟡 !
+  A_FAZER: { label: 'A fazer', color: '#D97706', bg: '#FEF3C7', icon: AlertCircle },                 // 🟡 !
+  AGUARDANDO_TERCEIRO: { label: 'Aguardando terceiro', color: '#059669', bg: '#D1FAE5', icon: Clock },// 🟢 relógio
+  EM_ANDAMENTO: { label: 'Em andamento', color: '#059669', bg: '#D1FAE5', icon: Clock },              // 🟢 relógio
+  BLOQUEADA: { label: 'Bloqueado', color: '#DC2626', bg: '#FEE2E2', icon: AlertCircle },              // 🔴 !
+  RECEBIDO: { label: 'Recebido', color: '#2875b7', bg: '#DBEAFE', icon: CheckCircle2 },              // 🔵 ✓
+  CANCELADO: { label: 'Cancelado', color: '#4e6879', bg: '#d8ecf8', icon: AlertCircle },
   INVALIDO: { label: 'Inválido', color: '#991B1B', bg: '#FEE2E2', icon: AlertCircle },
+  NAO_ENCONTRADO: { label: 'Não encontrado', color: '#991B1B', bg: '#FEE2E2', icon: AlertCircle },
 }
 
 // ========================================

@@ -9,6 +9,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import type { StatusDocumento, TipoDocumento, Prisma } from "@prisma/client"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { estadoOperacionalDosDocumentos } from "@/lib/operacional/documento-estado"
 import {
   buildInitialWorkflow,
   calcProgress,
@@ -70,19 +71,37 @@ export async function GET(
         return NextResponse.json({ pasta: null })
       }
 
+      // `Documento.status` congela (memória "documento-status-legado") — a
+      // segunda consulta é REDE DE SEGURANÇA por Tarefa concluída
+      // (`jaRecebido`) para o que `READY_STATUSES` sozinho deixaria de fora,
+      // nunca removendo o que já estava incluído (ver mesma correção em
+      // .../traducao/route.ts).
+      const escopoBase: Prisma.DocumentoWhereInput = {
+        tipo: { notIn: SKIP_TIPOS },
+        pessoa: { arvoreId: processo.arvoreId, linhaReta: true },
+      }
+      const selectDoc = {
+        id: true as const, tipo: true as const, descricao: true as const, traduzido: true as const,
+        pessoa: { select: { nome: true, sobrenome: true } },
+      }
       const docs = processo.arvoreId
-        ? await prisma.documento.findMany({
-            where: {
-              status: { in: READY_STATUSES },
-              tipo: { notIn: SKIP_TIPOS },
-              pessoa: { arvoreId: processo.arvoreId, linhaReta: true },
-            },
-            select: {
-              id: true, tipo: true, descricao: true, traduzido: true,
-              pessoa: { select: { nome: true, sobrenome: true } },
-            },
-            orderBy: { id: "asc" },
-          })
+        ? await (async () => {
+            const [porStatus, candidatosRestantes] = await Promise.all([
+              prisma.documento.findMany({
+                where: { ...escopoBase, status: { in: READY_STATUSES } },
+                select: selectDoc,
+                orderBy: { id: "asc" },
+              }),
+              prisma.documento.findMany({
+                where: { ...escopoBase, status: { notIn: READY_STATUSES } },
+                select: selectDoc,
+                orderBy: { id: "asc" },
+              }),
+            ])
+            const estados = await estadoOperacionalDosDocumentos(candidatosRestantes.map((d) => d.id))
+            const viaTarefa = candidatosRestantes.filter((d) => estados.get(d.id)?.jaRecebido)
+            return [...porStatus, ...viaTarefa]
+          })()
         : []
 
       try {

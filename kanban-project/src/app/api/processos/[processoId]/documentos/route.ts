@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { estadoOperacionalDosDocumentos, rotularEstadoDoDocumento } from "@/lib/operacional/documento-estado"
 
 // ============================================================
 // TIPOS DE RESPOSTA
@@ -102,8 +103,6 @@ interface ProcessoDocumentosResponse {
 // CONSTANTES & HELPERS
 // ============================================================
 
-const STATUS_VALIDADOS = ["RECEBIDO", "ENTREGUE", "APOSTILADO", "TRADUZIDO"]
-
 // Mesmo recorte de "certidão" usado em .../analise/route.ts (TIPOS_ANALISADOS) —
 // é o que o painel "Informações" desta biblioteca promete mostrar. Necessidade de
 // RG/CPF/comprovante/procuração etc. não é "certidão" e não entra como placeholder.
@@ -112,11 +111,6 @@ const TIPOS_CERTIDAO_PLACEHOLDER = new Set([
   "CERTIDAO_CASAMENTO", "CERTIDAO_CASAMENTO_INTEIRO_TEOR",
   "CERTIDAO_OBITO", "CERTIDAO_OBITO_INTEIRO_TEOR",
 ])
-const STATUS_EM_OPERACAO = [
-  "SOLICITADO", "EM_BUSCA", "SOLICITAR",
-  "EM_ANALISE", "RETIFICANDO",
-  "EM_TRADUCAO", "EM_APOSTILAMENTO",
-]
 
 const tipoShort = (tipo: string): string => {
   if (tipo.includes("NASCIMENTO")) return "Nasc."
@@ -135,32 +129,11 @@ const tipoShort = (tipo: string): string => {
   return tipo.slice(0, 8)
 }
 
-const statusShortMap: Record<string, string> = {
-  PENDENTE: "não iniciado",
-  SOLICITADO: "solicitado",
-  EM_BUSCA: "em busca",
-  SOLICITAR: "solicitar",
-  RECEBIDO: "recebido",
-  EM_ANALISE: "em análise",
-  RETIFICANDO: "retificando",
-  EM_TRADUCAO: "em tradução",
-  TRADUZIDO: "traduzido",
-  EM_APOSTILAMENTO: "em apostilamento",
-  APOSTILADO: "apostilado",
-  ENTREGUE: "entregue",
-  INVALIDO: "inválido",
-  NAO_ENCONTRADO: "não encontrado",
-}
-
-const statusToCompactClass = (status: string): string => {
-  if (status === "PENDENTE") return "pending"
-  if (["RECEBIDO", "ENTREGUE", "APOSTILADO", "TRADUZIDO"].includes(status)) return "received"
-  if (["EM_BUSCA"].includes(status)) return "searching"
-  if (["SOLICITAR", "SOLICITADO"].includes(status)) return "requesting"
-  if (["EM_ANALISE", "RETIFICANDO"].includes(status)) return "waiting"
-  if (["INVALIDO", "NAO_ENCONTRADO"].includes(status)) return "returned"
-  return "other"
-}
+// `statusShortMap`/`statusToCompactClass`/`derivarStatusDocumento` moraram
+// aqui antes — agora vivem em `lib/operacional/documento-estado.ts`
+// (`ROTULO_CURTO_ESTADO`/`classeCompactaDoEstado`/`rotularEstadoDoDocumento`),
+// compartilhados com a Árvore Genealógica e a Pesquisa de Documentos: mesma
+// leitura em toda tela que mostra o estado de um documento.
 
 const relTime = (date: Date | null): string | null => {
   if (!date) return null
@@ -361,6 +334,11 @@ export async function GET(
       docsByPessoa.set(d.pessoaId, arr)
     }
 
+    // O ESTADO REAL — Tarefa viva por documento, nunca `Documento.status`
+    // congelado. Placeholders (id negativo) não têm Tarefa nenhuma: resolvem
+    // sozinhos para "nunca iniciado", sem consulta extra nem caso especial.
+    const estadosPorDocumento = await estadoOperacionalDosDocumentos([...allDocs, ...placeholders].map((d) => d.id))
+
     // -- Constroi cada linha
     const buildRow = (p: typeof pessoas[number]): PersonRow => {
       const nome = `${p.nome}${p.sobrenome ? " " + p.sobrenome : ""}`
@@ -375,14 +353,16 @@ export async function GET(
         else papel = "Cônjuge"  // sem numeroLinhagem → assumimos que é cônjuge
 
       // Documentos compactos
-      const docsCompact: DocCompact[] = docs.map((d) => ({
+      const docsCompact: DocCompact[] = docs.map((d) => {
+        const derivado = rotularEstadoDoDocumento(d.status, estadosPorDocumento.get(d.id))
+        return {
         id: d.id,
         tipo: d.tipo,
         tipoShort: tipoShort(d.tipo ?? ""),
-        status: d.status,
-        statusShort: statusShortMap[d.status] || d.status.toLowerCase(),
-        statusClass: statusToCompactClass(d.status),
-        isRecebido: STATUS_VALIDADOS.includes(d.status),
+        status: derivado.status,
+        statusShort: derivado.statusShort,
+        statusClass: derivado.statusClass,
+        isRecebido: derivado.isRecebido,
         analiseOk: analiseConcluida && d.analysisStatus === "ready" && !idsComDivergenciaAberta.has(d.id),
         arquivoUrl: d.arquivo_url ?? null,
         arquivoNome: d.arquivo_nome ?? null,
@@ -400,7 +380,7 @@ export async function GET(
           termo: d.termo ?? null,
           numeroRegistro: d.numero_registro ?? null,
         },
-      }))
+      }})
 
       const received = docsCompact.filter((d) => d.isRecebido).length
       const total = docsCompact.length
@@ -477,7 +457,7 @@ export async function GET(
         (d) =>
           d.dataPrazoOperacao &&
           d.dataPrazoOperacao < now &&
-          !STATUS_VALIDADOS.includes(d.status)
+          !estadosPorDocumento.get(d.id)?.jaRecebido
       )
       if (slaCrit) {
         impedimentos.push({ label: "SLA vencido", severity: "crit" })
@@ -506,11 +486,13 @@ export async function GET(
         }
       }
 
-      // Sem responsável (algum doc em operação sem responsável)
-      const docsEmOpSemResp = docs.filter(
-        (d) =>
-          STATUS_EM_OPERACAO.includes(d.status) && !d.responsavelId
-      )
+      // Sem responsável (algum doc em operação sem responsável) — o dono real
+      // é o da TAREFA viva, não `Documento.responsavelId` (nunca escrito por
+      // nenhum caminho do motor — mesma classe de campo congelado).
+      const docsEmOpSemResp = docs.filter((d) => {
+        const viva = estadosPorDocumento.get(d.id)?.tarefaViva
+        return viva != null && !viva.responsavelId
+      })
       if (docsEmOpSemResp.length > 0 && impedimentos.length < 3) {
         impedimentos.push({ label: "sem responsável", severity: "warn" })
       }
@@ -557,7 +539,7 @@ export async function GET(
       // -- Aging (dias do doc mais antigo em operação)
       let agingDays: number | null = null
       let agingCls: PersonRow["agingCls"] = null
-      const docsEmOp = docs.filter((d) => STATUS_EM_OPERACAO.includes(d.status))
+      const docsEmOp = docs.filter((d) => estadosPorDocumento.get(d.id)?.tarefaViva != null)
       if (docsEmOp.length > 0) {
         const oldest = docsEmOp.reduce((acc, d) => {
           const ref = d.ultimaMovimentacao ?? d.updatedAt
@@ -608,13 +590,13 @@ export async function GET(
 
     const outros = rows.filter((r) => !r.isDirectLine && r.papel !== "Cônjuge")
 
-    // -- Stats
+    // -- Stats (mesma fonte da linha: Tarefa viva, nunca `Documento.status`)
     const todosOsDocs = [...allDocs, ...placeholders]
     const stats = {
       total: todosOsDocs.length,
-      recebidos: todosOsDocs.filter((d) => STATUS_VALIDADOS.includes(d.status)).length,
-      emOperacao: todosOsDocs.filter((d) => STATUS_EM_OPERACAO.includes(d.status)).length,
-      pendentes: todosOsDocs.filter((d) => d.status === "PENDENTE").length,
+      recebidos: todosOsDocs.filter((d) => estadosPorDocumento.get(d.id)?.jaRecebido).length,
+      emOperacao: todosOsDocs.filter((d) => estadosPorDocumento.get(d.id)?.tarefaViva != null).length,
+      pendentes: todosOsDocs.filter((d) => estadosPorDocumento.get(d.id)?.nuncaIniciado).length,
     }
 
     const response: ProcessoDocumentosResponse = {

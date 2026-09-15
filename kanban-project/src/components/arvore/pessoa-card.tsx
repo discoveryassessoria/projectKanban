@@ -188,11 +188,15 @@ function DocumentoIndicador({ doc }: { doc: DocumentoArvore }) {
     'CERTIDAO_OBITO_INTEIRO_TEOR': 'Óbito',
   }
 
+  // `doc.status` já vem derivado da Tarefa viva (nunca `Documento.status`
+  // cru) — ver `lib/operacional/documento-estado.ts`.
   const statusConfig: Record<string, { color: string; label: string }> = {
-    'EM_BUSCA':    { color: '#EF4444', label: 'Em busca' },
-    'SOLICITAR':   { color: '#F59E0B', label: 'Solicitar' },
-    'SOLICITADO':  { color: '#22C55E', label: 'Solicitado' },
-    'RECEBIDO':    { color: '#4f91c5', label: 'Recebido' },
+    'BLOQUEADA':          { color: '#EF4444', label: 'Bloqueado' },
+    'SEM_RESPONSAVEL':    { color: '#F59E0B', label: 'Sem responsável' },
+    'A_FAZER':            { color: '#F59E0B', label: 'A fazer' },
+    'AGUARDANDO_TERCEIRO': { color: '#22C55E', label: 'Aguardando terceiro' },
+    'EM_ANDAMENTO':       { color: '#22C55E', label: 'Em andamento' },
+    'RECEBIDO':           { color: '#4f91c5', label: 'Recebido' },
   }
 
   const config = statusConfig[doc.status]

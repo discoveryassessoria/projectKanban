@@ -30,6 +30,22 @@ interface Usuario {
   tipo: string
 }
 
+// O estado real de um documento (a Tarefa viva, nunca `Documento.status`
+// congelado — ver `lib/operacional/documento-estado.ts`, cujos valores esta
+// tela apenas rotula em português).
+const ROTULO_STATUS_DOCUMENTO: Record<string, string> = {
+  PENDENTE: "Pendente",
+  SEM_RESPONSAVEL: "Sem responsável",
+  A_FAZER: "A fazer",
+  EM_ANDAMENTO: "Em andamento",
+  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  BLOQUEADA: "Bloqueado",
+  RECEBIDO: "Recebido",
+  CANCELADO: "Cancelado",
+  INVALIDO: "Inválido",
+  NAO_ENCONTRADO: "Não encontrado",
+}
+
 interface Arvore {
   id: number
   nome: string
@@ -523,7 +539,7 @@ export default function GenealogyPage() {
                         >
                           <option value="" className="bg-[var(--surface-popover)]">Todos os status</option>
                           <option value="PENDENTE" className="bg-[var(--surface-popover)]">Pendente</option>
-                          <option value="SOLICITADO" className="bg-[var(--surface-popover)]">Solicitado</option>
+                          <option value="EM_ANDAMENTO" className="bg-[var(--surface-popover)]">Em andamento</option>
                           <option value="RECEBIDO" className="bg-[var(--surface-popover)]">Recebido</option>
                         </select>
                       </div>
@@ -667,10 +683,11 @@ export default function GenealogyPage() {
                                   
                                   <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 ${
                                     doc.status === 'RECEBIDO' ? 'bg-[var(--surface-secondary)] text-green-800' :
-                                    doc.status === 'SOLICITADO' ? 'bg-[var(--surface-secondary)] text-amber-800' :
+                                    doc.status === 'BLOQUEADA' ? 'bg-[var(--surface-secondary)] text-red-800' :
+                                    ['SEM_RESPONSAVEL', 'A_FAZER', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO'].includes(doc.status) ? 'bg-[var(--surface-secondary)] text-amber-800' :
                                     'bg-[var(--surface-primary)] text-[var(--text-secondary)]'
                                   }`}>
-                                    {doc.status}
+                                    {ROTULO_STATUS_DOCUMENTO[doc.status] ?? doc.status}
                                   </span>
                                   
                                   {doc.pessoaNome && (

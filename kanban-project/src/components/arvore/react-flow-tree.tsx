@@ -97,24 +97,30 @@ function DocumentoIndicador({ tipo, label, status, mode }: DocumentoIndicadorPro
   )
 }
 
-// Função para verificar documentos de uma pessoa
+// O círculo do nó da árvore — a Tarefa viva do documento (`status` já vem
+// derivado da API, nunca `Documento.status` cru; ver
+// `lib/operacional/documento-estado.ts`). `BLOQUEADA` acende vermelho
+// (impedimento real), `AGUARDANDO_TERCEIRO` e os estados internos (sem
+// responsável/a fazer/em andamento) acendem âmbar/verde como antes — a
+// distinção que importa aqui é "precisa de atenção" vs. "em andamento normal".
 function getDocumentosStatus(pessoa: PessoaArvore, temConjuge: boolean) {
   const documentos = pessoa.documentos || []
   const falecido = pessoa.vivo === false || !!pessoa.data_obito
-  
-  // ✅ ATUALIZADO: Status que fazem o círculo aparecer (agora inclui em_busca)
-  const statusVisiveis = ['em_busca', 'solicitar', 'solicitado', 'recebido']
-  
+
+  const CORES_POR_ESTADO: Record<string, 'em_busca' | 'solicitar' | 'solicitado' | 'recebido'> = {
+    BLOQUEADA: 'em_busca',
+    SEM_RESPONSAVEL: 'solicitar',
+    A_FAZER: 'solicitar',
+    AGUARDANDO_TERCEIRO: 'solicitado',
+    EM_ANDAMENTO: 'solicitado',
+    RECEBIDO: 'recebido',
+  }
+
   const verificarDocumento = (tipo: string): 'em_busca' | 'solicitar' | 'solicitado' | 'recebido' | null => {
     // ✅ CORRIGIDO: Usar includes() ao invés de ===
     const doc = documentos.find(d => d.tipo?.toUpperCase().includes(tipo))
     if (!doc) return null
-    
-    const statusLower = doc.status?.toLowerCase()
-    if (statusVisiveis.includes(statusLower || '')) {
-      return statusLower as 'em_busca' | 'solicitar' | 'solicitado' | 'recebido'
-    }
-    return null // Pendente ou sem status = não mostrar
+    return CORES_POR_ESTADO[doc.status ?? ''] ?? null // Pendente/cancelado/inválido = não mostrar
   }
   
   return {
