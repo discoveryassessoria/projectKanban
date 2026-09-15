@@ -452,6 +452,80 @@ export async function analisarRemocaoPessoa(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DESVINCULAR SÓ O REQUERENTE — mantém a Pessoa no nó da árvore.
+//
+// `removerPessoaDaArvore` tira a PESSOA inteira (e, por tabela, desfaz o
+// vínculo de requerente como um dos seus efeitos). Às vezes o que houve foi
+// só um clique errado em "é requerente": a pessoa continua sendo nó válido
+// da árvore, só não deveria ter virado requerente. Esta é essa operação,
+// sozinha — reusa o MESMO plano (`analisarRemocaoPessoa`) para decidir se é
+// seguro, e toca só o vínculo, nunca necessidade, documento, tarefa,
+// financeiro ou a Pessoa em si.
+//
+// Sem fato protegido: o vínculo (`ProcessoRequerente`) é apagado de verdade e
+// `Requerente.personId` volta a `null` — o cadastro do requerente sobrevive,
+// só perde o nó. Com fato protegido: RECUSA. Diferente da desativação de
+// pessoa (que aceita fato protegido saindo por `removidoEm`), aqui a pessoa
+// PERMANECE ativa — um requerente ativo com fato materializado não se desfaz
+// por um botão de "desvincular"; exige decisão humana explícita sobre o que
+// fazer com o que já foi feito (cancelar a Tarefa, etc.), que não é desta
+// operação.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ResultadoDesvinculoRequerente {
+  ok: boolean
+  code?: "PESSOA_NAO_ENCONTRADA" | "NAO_E_REQUERENTE" | "FATO_PROTEGIDO"
+  message?: string
+  fatosProtegidos?: FatoProtegido[]
+}
+
+export async function desvincularRequerenteMantendoPessoa(
+  pessoaId: number,
+  actorUserId: number | null,
+): Promise<ResultadoDesvinculoRequerente> {
+  const plano = await analisarRemocaoPessoa(pessoaId)
+  if (!plano) return { ok: false, code: "PESSOA_NAO_ENCONTRADA", message: "Pessoa não encontrada." }
+  if (plano.requerenteId == null) {
+    return { ok: false, code: "NAO_E_REQUERENTE", message: "Esta pessoa não está vinculada a nenhum requerente." }
+  }
+  if (plano.fatosProtegidos.length > 0) {
+    return {
+      ok: false,
+      code: "FATO_PROTEGIDO",
+      message:
+        `Esta pessoa já tem histórico como requerente (${plano.fatosProtegidos.map((f) => f.descricao).join("; ")}) — ` +
+        `desvincular exigiria decidir o que fazer com esse histórico, e isso não é feito por aqui.`,
+      fatosProtegidos: plano.fatosProtegidos,
+    }
+  }
+
+  const requerenteId = plano.requerenteId
+  const processoIds = plano.processoIds
+  await prisma.$transaction(async (tx) => {
+    if (processoIds.length) {
+      await tx.processoRequerente.deleteMany({
+        where: { requerenteId, processoId: { in: processoIds } },
+      })
+    }
+    await tx.requerente.update({ where: { id: requerenteId }, data: { personId: null } })
+    await tx.pessoa.update({ where: { id: pessoaId }, data: { requerente: "nao" } })
+    await tx.arvore.updateMany({ where: { pessoaPrincipalId: pessoaId }, data: { pessoaPrincipalId: null } })
+    await tx.logAuditoria.create({
+      data: {
+        acao: "REQUERENTE_DESVINCULADO",
+        entidade: "Pessoa",
+        entidadeId: pessoaId,
+        descricao: `Vínculo de requerente removido — requerente ${requerenteId} volta a ficar sem nó na árvore; cadastro do requerente preservado.`,
+        detalhes: { requerenteId, processoIds } as never,
+        usuarioId: actorUserId,
+      },
+    }).catch(() => null)
+  })
+
+  return { ok: true }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PLANO DA ÁRVORE INTEIRA — soma o plano de cada pessoa. Nenhum cálculo novo:
 // é o MESMO `analisarRemocaoPessoa` que a remoção individual usa, pessoa a
 // pessoa. A prévia (GET) e a execução (DELETE /api/arvore/[id]) chamam esta

@@ -2065,6 +2065,33 @@ function EditPersonModal({
     }
   }
 
+  // ── DESFAZER O VÍNCULO — a pessoa continua no nó, só deixa de ser requerente ──
+  // Corrige o clique errado ("marquei requerente sem querer"). Recusa (com o
+  // motivo do servidor) quando já existe fato protegido — desvincular não é a
+  // porta pra decidir o que fazer com histórico já materializado.
+  const [desvinculando, setDesvinculando] = useState(false)
+  const [erroDesvincular, setErroDesvincular] = useState<string | null>(null)
+  async function desvincularRequerente() {
+    if (desvinculando) return
+    if (!window.confirm(`Remover o vínculo de requerente de ${pessoa.nome}? A pessoa continua na árvore.`)) return
+    setDesvinculando(true)
+    setErroDesvincular(null)
+    try {
+      const res = await authFetch(`/api/arvore/${arvoreId}/desvincular-requerente`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pessoaId: pessoa.id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Erro ao remover o vínculo')
+      await onSuccess()
+    } catch (e) {
+      setErroDesvincular(e instanceof Error ? e.message : 'Erro ao remover o vínculo')
+    } finally {
+      setDesvinculando(false)
+    }
+  }
+
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>((pessoa as any).linhaReta ?? true)
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
 
@@ -2433,15 +2460,26 @@ function EditPersonModal({
                     não se marca requerente por edição livre. Já-requerente pode trocar o
                     principal (maior/menor); demais é somente leitura. */}
                 {jaEhRequerente ? (
-                  <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
-                    {/* "sim" é o estado de quem foi vinculado como requerente sem ainda
-                        ter maioridade classificada (2º+ requerente vinculado na mesma
-                        árvore — só o 1º vira "maior" automaticamente). Fica listado pra
-                        o select não cair num valor sem option correspondente. */}
-                    {requerente === 'sim' && <option value="sim">Sim - a classificar</option>}
-                    <option value="maior">Sim - Maior de idade</option>
-                    <option value="menor">Sim - Menor de idade</option>
-                  </select>
+                  <div className="space-y-1.5">
+                    <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
+                      {/* "sim" é o estado de quem foi vinculado como requerente sem ainda
+                          ter maioridade classificada (2º+ requerente vinculado na mesma
+                          árvore — só o 1º vira "maior" automaticamente). Fica listado pra
+                          o select não cair num valor sem option correspondente. */}
+                      {requerente === 'sim' && <option value="sim">Sim - a classificar</option>}
+                      <option value="maior">Sim - Maior de idade</option>
+                      <option value="menor">Sim - Menor de idade</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={desvincularRequerente}
+                      disabled={desvinculando}
+                      className="text-[11px] font-medium text-red-700 hover:text-red-800 underline decoration-dotted underline-offset-2 disabled:opacity-50"
+                    >
+                      {desvinculando ? 'Removendo…' : 'Remover vínculo de requerente'}
+                    </button>
+                    {erroDesvincular && <p className="text-xs text-red-600">{erroDesvincular}</p>}
+                  </div>
                 ) : requerentesDisponiveis.length > 0 ? (
                   <div className="space-y-1.5">
                     <select
