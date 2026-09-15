@@ -206,6 +206,9 @@ function buildFilhos(s: any, stepId: number) {
       reaberturaPermitida: typeof t?.reaberturaPermitida === 'boolean' ? t.reaberturaPermitida : null,
       reaberturaExigeJustificativa: typeof t?.reaberturaExigeJustificativa === 'boolean' ? t.reaberturaExigeJustificativa : null,
       reaberturaPermissao: t?.reaberturaPermissao ? String(t.reaberturaPermissao) : null,
+      // ESPERA DE TERCEIRO AO LIBERAR — mesmo cadastro do passo, um nível
+      // abaixo. Ver PhaseInternalWorkflowStep.esperaExternaAoLiberar acima.
+      esperaExternaAoLiberar: t?.esperaExternaAoLiberar === true,
       _filhos: buildFilhosSimples(t),
     })),
   }

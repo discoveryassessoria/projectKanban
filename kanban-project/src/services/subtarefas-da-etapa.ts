@@ -159,11 +159,23 @@ export async function subtarefasDaEtapa(args: {
     const disponivel = !concluida && bloqueioCodigo === null
     // O ESTADO GRAVADO MANDA quando existe: ele é fato. Sem execução, o estado é o que
     // a projeção calcula — e "bloqueada" precisa de causa para poder ser bloqueada.
+    //
+    // ESPERA EXTERNA AO LIBERAR (mesma régua de `PhaseInternalWorkflowStep`, um
+    // nível abaixo — ver `esperaExternaAoLiberar` em `StepSubtaskDefinition`): a
+    // subtarefa que acabou de ficar disponível, sem execução ainda, e está
+    // cadastrada como espera de terceiro, nasce em AGUARDANDO_EXTERNO — não em
+    // DISPONIVEL. A escrita real (execução + Tarefa BLOQUEADA/AGUARDANDO_TERCEIRO)
+    // é feita por `aplicarEsperaExternaDaSubtarefaSeConfigurado`; esta projeção só
+    // precisa REFLETIR isso antes mesmo de existir execução persistida, do
+    // contrário a tela mostraria "Disponível" por uma fresta entre o passo
+    // liberar e a escrita automática acontecer.
     const status: EstadoDaSubtarefa = execucao
       ? (execucao.status as EstadoDaSubtarefa)
       : bloqueioCodigo
         ? ESTADOS_DA_SUBTAREFA.BLOQUEADO
-        : ESTADOS_DA_SUBTAREFA.DISPONIVEL
+        : d.esperaExternaAoLiberar === true
+          ? ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO
+          : ESTADOS_DA_SUBTAREFA.DISPONIVEL
 
     projetadas.push({
       key: d.key, label: d.label, descricao: d.descricao, ordem: d.ordem,
@@ -293,6 +305,57 @@ export async function reconciliarSubtarefas(args: {
     ajustadas++
   }
   return { ajustadas }
+}
+
+/**
+ * ESPERA EXTERNA AUTOMÁTICA NO NÍVEL DA SUBTAREFA — mesma régua de
+ * `aplicarEsperaExternaSeConfigurado` (task-step-sync.ts), um nível abaixo, e
+ * reaproveitando o MESMO efeito de Tarefa que a espera manual já usa. Não é um
+ * motor novo: é a mesma transição (`bloquearTarefa` com
+ * `motivoCodigo: "AGUARDANDO_TERCEIRO"`) que `PAUSE_FOR_EXTERNAL_WAIT` já
+ * dispara quando o operador clica "ainda aguardando" — aqui ela dispara
+ * sozinha, porque o cadastro da subtarefa (`esperaExternaAoLiberar`) diz que
+ * ela É espera, por definição, desde o instante em que fica corrente.
+ *
+ * CORRENTE = a primeira subtarefa, na ordem, ainda não concluída e sem
+ * bloqueio de dependência/condição — a mesma noção que `subtarefasDaEtapa` já
+ * usa para decidir "disponível".
+ *
+ * IDEMPOTENTE: se a subtarefa já tem execução (já foi tratada, manual ou
+ * automaticamente), não faz nada. Chamar de novo depois de já ter aplicado é
+ * um no-op.
+ */
+export async function aplicarEsperaExternaDaSubtarefaSeConfigurado(args: {
+  stepInstanceId: number
+  valores?: Record<string, unknown>
+  fornecedorId?: number | null
+}): Promise<{ aplicado: boolean }> {
+  const subs = await subtarefasDaEtapa(args)
+  const corrente = subs.find((s) => !s.concluida && s.bloqueioCodigo === null)
+  if (!corrente || corrente.execucao) return { aplicado: false }
+  if (corrente.definicao.esperaExternaAoLiberar !== true) return { aplicado: false }
+
+  const tarefa = await prisma.tarefa.findFirst({
+    where: { workflowStepInstanceId: args.stepInstanceId },
+    select: { id: true },
+  })
+  if (!tarefa) return { aplicado: false }
+
+  const { garantirExecucao } = await import("@/src/services/execucao-da-subtarefa")
+  await garantirExecucao({
+    stepInstanceId: args.stepInstanceId,
+    subtaskKey: corrente.key,
+    workflowVersao: (await definicaoHistoricaDoPasso(args.stepInstanceId))?.versao ?? null,
+    status: ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO,
+  })
+
+  const { bloquearTarefa } = await import("@/src/services/task-step-sync")
+  await bloquearTarefa(tarefa.id, {
+    origem: "MOTOR",
+    motivoCodigo: "AGUARDANDO_TERCEIRO",
+    justificativa: `"${corrente.label}" liberada como dependência externa — aguardando o terceiro automaticamente.`,
+  })
+  return { aplicado: true }
 }
 
 /** Só para a tela: o texto do que falta, sem repetir a conta. */

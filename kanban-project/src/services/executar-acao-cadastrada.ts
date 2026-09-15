@@ -405,8 +405,14 @@ export async function executarAcaoCadastrada(
     })
     // CONCLUIR A SUBTAREFA MUDA O ESTADO DAS QUE DEPENDIAM DELA. Sem reconciliar, elas
     // continuariam BLOQUEADO no banco enquanto a projeção já as considera disponíveis.
-    const { reconciliarSubtarefas } = await import("@/src/services/subtarefas-da-etapa")
+    const { reconciliarSubtarefas, aplicarEsperaExternaDaSubtarefaSeConfigurado } =
+      await import("@/src/services/subtarefas-da-etapa")
     await reconciliarSubtarefas({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
+    // A SUBTAREFA QUE ACABOU DE FICAR CORRENTE PODE, ELA MESMA, SER ESPERA DE
+    // TERCEIRO DESDE QUE FICOU DISPONÍVEL — cadastro (`esperaExternaAoLiberar`),
+    // nunca `subtaskKey` hardcoded. Mesma régua do passo, ver
+    // `aplicarEsperaExternaSeConfigurado` (task-step-sync.ts).
+    await aplicarEsperaExternaDaSubtarefaSeConfigurado({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
   }
 
   // ── O QUE O EFEITO CONSUMIU SAI DA EXECUÇÃO ─────────────────────────────

@@ -3752,6 +3752,14 @@ model StepSubtaskDefinition {
   reaberturaExigeJustificativa Boolean?
   reaberturaPermissao          String?  @db.VarChar(60)
 
+  /// ESTA SUBTAREFA NASCE EM ESPERA DE TERCEIRO — mesmo campo que
+  /// `PhaseInternalWorkflowStep.esperaExternaAoLiberar`, um nível abaixo. Quando
+  /// a subtarefa vira a corrente do passo (a primeira disponível, ainda sem
+  /// execução), ela entra automaticamente em AGUARDANDO_EXTERNO e a Tarefa
+  /// reflete isso pelo mesmo caminho que a espera manual (`PAUSE_FOR_EXTERNAL_WAIT`)
+  /// já usa. Ver `aplicarEsperaExternaDaSubtarefaSeConfigurado` (subtarefas-da-etapa.ts).
+  esperaExternaAoLiberar Boolean @default(false)
+
   metadata Json?
 
   criadoEm     DateTime @default(now())

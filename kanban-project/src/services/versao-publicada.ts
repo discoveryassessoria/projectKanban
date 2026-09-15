@@ -104,6 +104,10 @@ export interface SubtarefaCongelada {
   reaberturaPermitida: boolean | null
   reaberturaExigeJustificativa: boolean | null
   reaberturaPermissao: string | null
+  /// ESTA SUBTAREFA NASCE EM ESPERA DE TERCEIRO — congelada como o resto: mudar
+  /// o cadastro hoje não muda o que valia para uma execução já materializada.
+  /// Ver `aplicarEsperaExternaDaSubtarefaSeConfigurado` (subtarefas-da-etapa.ts).
+  esperaExternaAoLiberar: boolean
   /// Os filhos DELA — os que o passo tem para si ficam no passo.
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
@@ -375,6 +379,7 @@ export function retratarPassos(passos: PassosComFilhos): PassoCongelado[] {
       reaberturaPermitida: st.reaberturaPermitida,
       reaberturaExigeJustificativa: st.reaberturaExigeJustificativa,
       reaberturaPermissao: st.reaberturaPermissao,
+      esperaExternaAoLiberar: st.esperaExternaAoLiberar,
       acoes: st.acoes.map(congelarAcao),
       campos: st.campos.map(congelarCampo),
       checkItens: st.checkItens.map(congelarItem),

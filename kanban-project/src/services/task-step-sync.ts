@@ -1285,6 +1285,17 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
               base,
             )
             if (espera.aplicado) { tAt = "BLOQUEADA"; eventos.push(...espera.eventos) }
+            // A PRIMEIRA SUBTAREFA do passo que acabou de ficar corrente também
+            // pode ser, ela mesma, espera de terceiro — mesma régua acima, um
+            // nível abaixo. NÃO aplicada aqui: `aplicarEsperaExternaDaSubtarefaSeConfigurado`
+            // usa `prisma` direto (não `tx`), e chamá-la dentro desta transação
+            // violaria a invariante transação×conexão (ver
+            // `invariante-transacao-conexao`). Ela roda no ÚNICO caminho que já
+            // dispara subtarefas hoje: depois de cada ação de subtarefa
+            // executada, em `executar-acao-cadastrada.ts` — cobre a materialização
+            // via subtarefa anterior concluída. Um passo cuja PRIMEIRA subtarefa
+            // (sem predecessora nenhuma) é espera-configurada não é coberto por
+            // este gatilho; nenhum passo cadastrado hoje está nessa situação.
           }
         }
       }

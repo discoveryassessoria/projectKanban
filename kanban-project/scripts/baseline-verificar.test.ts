@@ -348,7 +348,28 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // `0000_baseline` continuam os originais de 02/08/2026.
 //
 //   anterior : c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128
-const CHECKSUM_LEDGER = 'bfefeef373b4787228f2accd6cfa96a38e75ab2ac47ec677c6cbdababfd601a2'
+// 15/09/2026 — ESPERA EXTERNA AUTOMÁTICA NA SUBTAREFA: coluna nova
+// `StepSubtaskDefinition.esperaExternaAoLiberar` (boolean, default false) —
+// mesmo cadastro canônico de `PhaseInternalWorkflowStep.esperaExternaAoLiberar`
+// (15/09, entrada acima), um nível abaixo: uma subtarefa também pode nascer em
+// AGUARDANDO_TERCEIRO ao virar a corrente do passo, sem ação manual do
+// operador. Necessário para um passo poder se decompor em subtarefas
+// sequenciais (Emissão Documental consolidada num único passo "Solicitar
+// certidão" com 4 subtarefas) sem perder o comportamento automático que só
+// existia no nível do passo. Migration real
+// 20260915160000_espera_externa_ao_liberar_subtarefa. Diff do baseline: só ADD
+// COLUMN dentro do mesmo CREATE TABLE — zero DROP/TRUNCATE/DELETE, nenhuma
+// linha existente perde dado (toda linha nasce com o default false, igual ao
+// comportamento de sempre). Migration aplicada em produção via
+// `prisma migrate deploy` (conexão local direta, `.env`). Ledger reconciliado
+// na hora: backup de `_prisma_migrations` em
+// ~/.discovery-backups/prisma-migrations-20260915-pre-checksum-subtarefa.json
+// (66 linhas) antes do UPDATE de uma coluna só (checksum), com o checksum
+// anterior no WHERE — `started_at`/`finished_at`/`applied_steps_count` da
+// linha `0000_baseline` continuam os originais de 02/08/2026.
+//
+//   anterior : bfefeef373b4787228f2accd6cfa96a38e75ab2ac47ec677c6cbdababfd601a2
+const CHECKSUM_LEDGER = 'b431329f25ffc0153c1bcc6deb621ff5caab892ac97e89e96024b2fb228830e1'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -420,6 +441,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260912200000_notificacao_operacional_grao_processo',
   '20260913120000_regra_temporal_orgao',
   '20260914194923_espera_externa_ao_liberar',
+  '20260915160000_espera_externa_ao_liberar_subtarefa',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
