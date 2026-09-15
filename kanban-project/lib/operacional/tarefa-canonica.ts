@@ -457,6 +457,7 @@ export async function sincronizarTarefaComWorkflow(
   tx: Prisma.TransactionClient,
   tarefaId: number,
   agora: Date,
+  opts?: { permitirSairDoTerminal?: boolean },
 ): Promise<{ mudou: boolean; status: StatusTarefa; stepAtualId: number | null }> {
   const tarefa = await tx.tarefa.findUnique({
     where: { id: tarefaId },
@@ -469,14 +470,23 @@ export async function sincronizarTarefaComWorkflow(
     return { mudou: false, status: tarefa?.statusTarefa ?? 'NAO_INICIADA', stepAtualId: null }
   }
 
-  // ESTADO TERMINAL NÃO SE RECALCULA.
+  // ESTADO TERMINAL NÃO SE RECALCULA, SALVO REABERTURA EXPLÍCITA.
   //
   // Cancelar é decisão humana; concluir é fato. O estado derivado das etapas
   // não pode desfazer nenhum dos dois — sem esta guarda, cancelar uma tarefa e
   // rodar o reconciliador em seguida a devolvia para EM_ANDAMENTO, porque as
   // etapas continuavam disponíveis. A decisão de quem cancelou desaparecia sem
-  // erro e sem aviso. Para retomar existe reabertura, que é explícita.
-  if (STATUS_TERMINAIS.includes(tarefa.statusTarefa)) {
+  // erro e sem aviso. Para retomar existe reabertura, que é explícita —
+  // `permitirSairDoTerminal` É essa válvula: só `reabertura-de-execucao.ts` a
+  // liga, e só destrava os terminais de CONCLUSÃO (CONCLUIDO_RECEBIDO/
+  // CONCLUIDO_NAO_POSSUI) — nunca CANCELADA/SUPERSEDIDA, que continuam
+  // protegidas por serem decisão humana à parte. Achado real: processo 601,
+  // Tarefa 3573 (15/09/2026) — o Passo reabriu para EM_ANDAMENTO mas a Tarefa
+  // ficou presa concluída, sem apontar para nenhum passo.
+  const podeSairDoTerminal =
+    opts?.permitirSairDoTerminal === true &&
+    (tarefa.statusTarefa === 'CONCLUIDO_RECEBIDO' || tarefa.statusTarefa === 'CONCLUIDO_NAO_POSSUI')
+  if (STATUS_TERMINAIS.includes(tarefa.statusTarefa) && !podeSairDoTerminal) {
     return { mudou: false, status: tarefa.statusTarefa, stepAtualId: tarefa.workflowStepInstanceId }
   }
 
@@ -500,6 +510,10 @@ export async function sincronizarTarefaComWorkflow(
   if (!mudou) return { mudou: false, status, stepAtualId: corrente?.id ?? null }
 
   const concluiuAgora = STATUS_TERMINAIS.includes(status) && !STATUS_TERMINAIS.includes(tarefa.statusTarefa)
+  // Saiu do terminal pela válvula de reabertura: a data de conclusão anterior
+  // deixou de valer (a execução dela foi arquivada — ver `reabertura-de-execucao.ts` —
+  // e uma nova começou), então some daqui também.
+  const saiuDoTerminalAgora = podeSairDoTerminal && !STATUS_TERMINAIS.includes(status)
   await tx.tarefa.update({
     where: { id: tarefaId },
     data: {
@@ -507,6 +521,7 @@ export async function sincronizarTarefaComWorkflow(
       workflowStepInstanceId: corrente?.id ?? null,
       concluida: status === 'CONCLUIDO_RECEBIDO' || status === 'CONCLUIDO_NAO_POSSUI',
       ...(concluiuAgora && tarefa.dataConclusao == null ? { dataConclusao: agora } : {}),
+      ...(saiuDoTerminalAgora ? { dataConclusao: null } : {}),
     },
   })
   return { mudou: true, status, stepAtualId: corrente?.id ?? null }

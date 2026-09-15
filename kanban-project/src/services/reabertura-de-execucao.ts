@@ -310,7 +310,14 @@ export async function executarReabertura(p: PedidoDeReabertura): Promise<Resulta
       orderBy: { id: "asc" },
     })
     if (tarefaDaUnidade) {
-      const sinc = await sincronizarTarefaComWorkflow(tx, tarefaDaUnidade.id, new Date())
+      // `permitirSairDoTerminal`: a Tarefa desta unidade pode ter concluído
+      // normalmente (CONCLUIDO_RECEBIDO/CONCLUIDO_NAO_POSSUI) antes desta
+      // reabertura — o Passo acima acabou de sair do terminal dele, e a
+      // Tarefa precisa acompanhar, senão fica presa "concluída" sem apontar
+      // para nenhum passo. Ver o comentário desta flag em
+      // `sincronizarTarefaComWorkflow` (lib/operacional/tarefa-canonica.ts) —
+      // achado real: processo 601, Tarefa 3573 (15/09/2026).
+      const sinc = await sincronizarTarefaComWorkflow(tx, tarefaDaUnidade.id, new Date(), { permitirSairDoTerminal: true })
       // O PASSO QUE VOLTOU A SER O ATUAL PODE, ELE MESMO, SER ESPERA DE TERCEIRO
       // DESDE A LIBERAÇÃO — cadastro do passo (`esperaExternaAoLiberar`), mesma
       // régua que a conclusão natural usa. Sem isto, reabrir "Receber certidão"

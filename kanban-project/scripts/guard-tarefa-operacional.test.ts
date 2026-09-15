@@ -403,8 +403,19 @@ secao("13) Estado terminal é irreversível sem decisão explícita")
 // Cancelar é decisão humana; concluir é fato. Sem esta guarda, cancelar e
 // rodar o reconciliador devolvia a tarefa para EM_ANDAMENTO — a decisão de
 // quem cancelou sumia sem erro e sem aviso.
-ok("a sincronização não recalcula estado terminal",
-  /if \(STATUS_TERMINAIS\.includes\(tarefa\.statusTarefa\)\)/.test(canonica))
+//
+// A ÚNICA válvula é `permitirSairDoTerminal` — opt-in explícito, ligado só
+// por `reabertura-de-execucao.ts`, e mesmo assim restrito aos terminais de
+// CONCLUSÃO (CONCLUIDO_RECEBIDO/CONCLUIDO_NAO_POSSUI). CANCELADA/SUPERSEDIDA
+// continuam irreversíveis por aqui — são decisão humana à parte. Achado
+// real: processo 601, Tarefa 3573 (15/09/2026) — reabrir o Passo não fazia a
+// Tarefa acompanhar, porque esta guarda barrava até a própria reabertura.
+ok("a sincronização não recalcula estado terminal, salvo reabertura explícita",
+  /if \(STATUS_TERMINAIS\.includes\(tarefa\.statusTarefa\) && !podeSairDoTerminal\)/.test(canonica))
+ok("a válvula exige opt-in explícito da chamada",
+  /opts\?\.permitirSairDoTerminal === true/.test(canonica))
+ok("a válvula nunca alcança CANCELADA/SUPERSEDIDA — só os terminais de conclusão",
+  /tarefa\.statusTarefa === 'CONCLUIDO_RECEBIDO' \|\| tarefa\.statusTarefa === 'CONCLUIDO_NAO_POSSUI'/.test(canonica))
 ok("cancelar recusa tarefa já encerrada", /Tarefa já encerrada[\s\S]{0,120}reabra/.test(ciclo))
 ok("reabrir é o único caminho de volta", /export async function reabrirTarefa/.test(ciclo))
 ok("e a reabertura repõe a etapa corrente", /workflowStepInstanceId: etapaAtual/.test(ciclo))
