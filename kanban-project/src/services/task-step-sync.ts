@@ -646,6 +646,11 @@ export async function reabrirPassoTx(
   if (res.count === 0) return { changed: false, anterior: step.status, atual: step.status, code: "CONFLITO" as H.FailureCodeD }
   void nova
 
+  // O PRÓPRIO PASSO REABERTO TAMBÉM PROJETA — se a Tarefa (o ponteiro
+  // `workflowStepInstanceId`) já estiver sobre ESTE passo, ela precisa refletir
+  // o novo status dele, pela mesma régua de qualquer outra transição.
+  await projetarTarefaDoPasso(tx, { stepInstanceId: stepId, statusPasso: alvo as StepInstanceStatus, usuarioId: o.usuarioId ?? null }).catch(() => null)
+
   const causationId = H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
   // REABRIR UM PREDECESSOR ALCANÇA QUEM DEPENDE DELE.
   //
@@ -737,7 +742,7 @@ export async function reabrirPassoTx(
       continue
     }
 
-    await aplicarPasso(tx, desc.id, "BLOQUEADO", "PASSO_BLOQUEADO", {
+    const rDesc = await aplicarPasso(tx, desc.id, "BLOQUEADO", "PASSO_BLOQUEADO", {
       correlationId: o.correlationId,
       causationId: H.chaveComando(o.operacao, "step_instance", desc.id, "BLOQUEADO", o.ciclo, undefined),
       ciclo: info.ciclo,
@@ -745,6 +750,14 @@ export async function reabrirPassoTx(
       workflowInstanceId: step.workflowInstanceId,
       extra: { startedAt: null, motivo: null },
     })
+    // `aplicarPasso` NÃO projeta a Tarefa (é a porta genérica; quem chama decide se
+    // projeta). Sem esta chamada, o descendente EM VOO (DISPONIVEL/EM_ANDAMENTO/
+    // AGUARDANDO) que a reabertura do predecessor bloqueia ficava com o PASSO
+    // BLOQUEADO e a TAREFA presa no status anterior — produção: Tarefas 3565/3566
+    // (processo 589) ficaram "Em andamento" depois de o passo virar BLOQUEADO.
+    if (rDesc.changed) {
+      await projetarTarefaDoPasso(tx, { stepInstanceId: desc.id, statusPasso: "BLOQUEADO", agora: new Date() }).catch(() => null)
+    }
   }
 
   const chaveEvt = H.chaveEvento("PASSO_REABERTO", "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
@@ -951,7 +964,7 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
  * Idempotente: `aplicarTarefa`/`aplicarPasso` já não fazem nada quando o
  * estado atual é o alvo.
  */
-async function aplicarEsperaExternaSeConfigurado(
+export async function aplicarEsperaExternaSeConfigurado(
   tx: TX,
   args: { tarefaId: number; stepInstanceId: number; statusTarefaAtual: string },
   o: ApplyOpts,
@@ -966,10 +979,38 @@ async function aplicarEsperaExternaSeConfigurado(
     extra: { blockedPreviousStatus: args.statusTarefaAtual, motivoCodigo: "AGUARDANDO_TERCEIRO", justificativa },
     dados: { motivoCodigo: "AGUARDANDO_TERCEIRO", justificativa, automatico: true },
   })
-  if (rt.changed) eventos.push("TAREFA_BLOQUEADA")
+  if (rt.changed) {
+    eventos.push("TAREFA_BLOQUEADA")
+  } else {
+    // A TRANSIÇÃO PODE JÁ TER ACONTECIDO POR OUTRO CAMINHO (ex.: reabertura
+    // chama `sincronizarTarefaComWorkflow`, que deriva BLOQUEADA genérica a
+    // partir do passo já BLOQUEADO, ANTES de chegar aqui). `aplicarTarefa` vê
+    // `statusTarefa === alvo` e não escreve nada — e a EXPLICAÇÃO (motivoCodigo
+    // AGUARDANDO_TERCEIRO + justificativa) se perdia: a tarefa ficava
+    // "Bloqueada" genérica, sem dizer que é espera de terceiro (produção:
+    // Tarefas 3565/3566 antes deste ajuste). Aqui não é transição de estado —
+    // só o campo explicativo, então um update direto é seguro.
+    const atual = await tx.tarefa.findUnique({ where: { id: args.tarefaId }, select: { statusTarefa: true, motivoCodigo: true } })
+    if (atual?.statusTarefa === "BLOQUEADA" && atual.motivoCodigo !== "AGUARDANDO_TERCEIRO") {
+      await tx.tarefa.update({
+        where: { id: args.tarefaId },
+        data: { motivoCodigo: "AGUARDANDO_TERCEIRO", justificativa, blockedPreviousStatus: args.statusTarefaAtual },
+      })
+      eventos.push("TAREFA_BLOQUEADA")
+    }
+  }
 
-  const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: args.stepInstanceId }, select: { status: true } })
-  const rp = await aplicarPasso(tx, args.stepInstanceId, "BLOQUEADO", "PASSO_BLOQUEADO", { ...o, extra: { statusAnteriorBloqueio: step?.status } })
+  const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: args.stepInstanceId }, select: { status: true, motivo: true } })
+  // `motivo: null` aqui é DELIBERADO. Espera externa automática é explicada pela
+  // Tarefa (motivoCodigo/justificativa acima) — o campo bruto do PASSO fica limpo,
+  // igual aos irmãos que já passam por este caminho. Sem isto, um `.motivo`
+  // anterior (ex.: justificativa de uma reabertura, que grava no MESMO campo —
+  // ver `reabrirPassoTx`) sobrevivia à transição e a Central mostrava uma frase
+  // do passado como se fosse a razão do bloqueio ATUAL.
+  const rp = await aplicarPasso(tx, args.stepInstanceId, "BLOQUEADO", "PASSO_BLOQUEADO", {
+    ...o,
+    extra: { statusAnteriorBloqueio: step?.status, motivo: null },
+  })
   if (rp.changed) eventos.push("PASSO_BLOQUEADO")
 
   const politica = await politicaDeSla(o.workflowInstanceId ?? null, tx)

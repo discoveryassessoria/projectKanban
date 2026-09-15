@@ -131,7 +131,29 @@ export async function projetarTarefaDoPasso(tx: TX, input: ProjetarInput): Promi
     orderBy: { id: "asc" },
   })
   if (!tarefa) return { changed: false, tarefaId: null, de: null, para: null }
-  if (paresCoerentes(input.statusPasso, tarefa.statusTarefa)) {
+
+  // PULAR A ESCRITA SÓ NOS DOIS CASOS ONDE NÃO ESCREVER É CORRETO — não em todo
+  // par "não contraditório". `paresCoerentes` foi feita para outra pergunta ("essa
+  // transação pode ser commitada?", tolerante o bastante para não abortar em
+  // qualquer diferença) e usá-la aqui como guarda de escrita fazia a projeção
+  // silenciosamente não escrever sempre que o par não era uma contradição DURA —
+  // BLOQUEADO (passo) × EM_ANDAMENTO (tarefa) passava por "coerente" porque nenhum
+  // dos dois é estado encerrado, e a tarefa ficava presa em EM_ANDAMENTO para
+  // sempre depois de o passo ser bloqueado (produção: Tarefas 3565/3566, processo
+  // 589 — StepInstance BLOQUEADO desde 15/09, Tarefa nunca projetada).
+  //
+  // (a) idempotência real: a tarefa já está exatamente no estado projetado.
+  // (b) operador adiantado: o passo ainda não foi formalmente iniciado pelo motor
+  //     (PENDENTE/DISPONIVEL) mas a tarefa já está EM_ANDAMENTO porque alguém
+  //     começou antes de o motor saber — rebaixar aqui at a NAO_INICIADA apagaria
+  //     trabalho em curso e travaria o desbloqueio natural.
+  // Qualquer OUTRO status de passo é informação nova do motor sobre o estado real
+  // do trabalho (bloqueou, foi liberado para terceiro, falhou, foi cancelado...) e
+  // tem de ser espelhado na tarefa — é para isso que esta projeção existe.
+  const jaNoAlvo = tarefa.statusTarefa === alvo
+  const passoAindaNaoIniciado = input.statusPasso === "PENDENTE" || input.statusPasso === "DISPONIVEL"
+  const operadorAdiantado = passoAindaNaoIniciado && tarefa.statusTarefa === "EM_ANDAMENTO"
+  if (jaNoAlvo || operadorAdiantado) {
     return { changed: false, tarefaId: tarefa.id, de: tarefa.statusTarefa, para: tarefa.statusTarefa }
   }
 

@@ -99,7 +99,7 @@ function linhaDaCentral(statusDosPassos: string[], pesos?: number[]) {
     necessidadeId, documentoId: 5000, responsavelId: null, responsavelNome: null,
     prazo: null, diasParaPrazo: null, slaDays: 3, motivo: null,
     executor: 'OPERACAO_DOCUMENTO', erroAdministrativo: null, dependeDeStepKeys: [],
-    peso: pesos?.[i] ?? 1,
+    peso: pesos?.[i] ?? 1, esperaExternaAoLiberar: false,
   }))
   const alvos: AlvoBruto[] = [{
     chave: `necessidade:${necessidadeId}`, escopo: 'NECESSIDADE', necessidadeId,

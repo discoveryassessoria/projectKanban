@@ -152,6 +152,7 @@ function passosDaCena(c: Cena): PassoBruto[] {
       executor: 'OPERACAO_DOCUMENTO' as const,
       erroAdministrativo: null,
       dependeDeStepKeys: i > 0 ? [PUBLICADOS[i - 1].key] : [],
+      esperaExternaAoLiberar: false,
     }
   })
 }

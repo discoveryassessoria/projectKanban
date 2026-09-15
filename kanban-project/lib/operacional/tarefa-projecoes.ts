@@ -224,10 +224,15 @@ export interface LinhaDeFila {
   /** Quando a responsabilidade foi definida — nulo enquanto ninguém a assumiu. */
   atribuidaEm: string | null
   /**
-   * X/N — o ordinal do passo atual dentro do workflow publicado da MESMA
-   * obrigação (documento). Batched (`totalDePassos`), nunca uma consulta por
-   * linha. `null` quando a tarefa não tem step atual (fase sem workflow
-   * interno, ou passo ainda não materializado).
+   * X/N — QUANTOS PASSOS JÁ FICARAM PARA TRÁS, não o ordinal do passo atual.
+   * Mesma convenção de "concluídos/total" que a Central usa (`progresso()`
+   * em estrutura-operacional-core.ts) — mostrar o ORDINAL do passo ativo
+   * (ex.: "3/4" para quem está no 3º de 4 passos) lia como "3 concluídos",
+   * um a mais do que o real (produção: Santin, "Receber certidão" é o 3º
+   * passo com só 2 concluídos antes dele — o correto é "2/4").
+   * Batched (`totalDePassos`), nunca uma consulta por linha. `null` quando a
+   * tarefa não tem step atual (fase sem workflow interno, ou passo ainda não
+   * materializado).
    */
   passoAtual: { ordem: number; total: number } | null
 
@@ -368,7 +373,12 @@ function projetar(
     atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
     passoAtual:
       t.workflowStepInstance?.ordem != null && t.workflowInstanceId != null
-        ? { ordem: t.workflowStepInstance.ordem, total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem }
+        ? {
+            // `ordem - 1` = quantos passos anteriores (1..ordem-1) já ficaram
+            // para trás — ver o comentário do campo na interface.
+            ordem: Math.max(0, t.workflowStepInstance.ordem - 1),
+            total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem,
+          }
         : null,
     // Defaults — SEMPRE sobrescritos por `comAtencaoTemporal` logo depois.
     // `projetar` é síncrona e não tem como chamar o motor temporal (que lê

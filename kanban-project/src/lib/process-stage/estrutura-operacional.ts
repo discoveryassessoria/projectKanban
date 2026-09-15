@@ -48,6 +48,7 @@ import {
   type UnidadeDeTrabalho,
 } from "@/lib/operacional/identidade-da-tarefa"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
+import { versaoDaInstancia } from "@/src/services/versao-publicada"
 
 // ============================================================
 // RÓTULOS DE TIPO DOCUMENTAL — fonte única desta camada de leitura.
@@ -339,6 +340,20 @@ export async function getPhaseOperationalStructure(
       : Promise.resolve([]),
   ])
 
+  // `esperaExternaAoLiberar` É CADASTRO DO PASSO PUBLICADO — a mesma flag que
+  // `aplicarEsperaExternaSeConfigurado` (task-step-sync) usa para saber se um
+  // passo BLOQUEADO é espera de terceiro por desenho, não divergência.
+  //
+  // NÃO dá pra ler isso por `stepDefinitionId` (join direto em
+  // `PhaseInternalWorkflowStep`): publicar uma versão nova do workflow APAGA E
+  // RECRIA essa linha — o ponteiro fica pendurado, e a instância histórica
+  // perde a definição que a originou (mesma pendência que `definicaoHistoricaDoPasso`
+  // já resolve). `versaoDaInstancia` lê a VERSÃO CONGELADA da instância — todas as
+  // instâncias desta fase compartilham a mesma `workflowInstanceId`
+  // (`instanciaAlvo`), então é UMA consulta, não uma por passo.
+  const versaoCongelada = instanciaAlvo != null ? await versaoDaInstancia(instanciaAlvo, db) : null
+  const espExtMap = new Map(versaoCongelada?.passos.map((p) => [p.key, p.esperaExternaAoLiberar === true]) ?? [])
+
   // NECESSIDADES a carregar: as apontadas pelas instâncias MAIS as apontadas pelos
   // documentos que elas alcançam. Numa fase que opera por DOCUMENTO (a Emissão), a
   // instância só carrega `documentoId` — mas o alvo operacional continua sendo a
@@ -509,6 +524,7 @@ export async function getPhaseOperationalStructure(
       executor,
       erroAdministrativo,
       dependeDeStepKeys: dep,
+      esperaExternaAoLiberar: espExtMap.get(s.stepKey) ?? false,
       // PESO CANÔNICO, resolvido pelo mesmo lookup tolerante a alias que a aba
       // Workflow usa: a instância pode carregar a chave legada enquanto o
       // catálogo tem a publicada, e cair para 1 silenciosamente distorceria o

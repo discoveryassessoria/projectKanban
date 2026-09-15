@@ -26,12 +26,12 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
-import { reabrirPassoTx } from "@/src/services/task-step-sync"
+import { reabrirPassoTx, aplicarEsperaExternaSeConfigurado } from "@/src/services/task-step-sync"
 import { tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { historicoDaOperacaoDaUnidade } from "@/src/services/operacao-da-etapa"
 import { descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
-import { escopoDaUnidade } from "@/lib/operacional/tarefa-canonica"
+import { escopoDaUnidade, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 
 /** Quem é a unidade — em nomes, para a tela poder dizer de quem é o trabalho. */
 export interface IdentidadeDaUnidade {
@@ -273,11 +273,11 @@ export async function executarReabertura(p: PedidoDeReabertura): Promise<Resulta
   const correlationId = p.correlationId ?? `reabrir|si${p.stepInstanceId}|${plano.execucoes.length}|${p.actorId ?? 0}`
   const passo = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: p.stepInstanceId },
-    select: { ciclo: true, processoId: true, workflowInstanceId: true },
+    select: { ciclo: true, processoId: true, workflowInstanceId: true, necessidadeId: true, documentoId: true },
   })
 
-  const r = await prisma.$transaction((tx) =>
-    reabrirPassoTx(tx, p.stepInstanceId, "EM_ANDAMENTO", {
+  const r = await prisma.$transaction(async (tx) => {
+    const res = await reabrirPassoTx(tx, p.stepInstanceId, "EM_ANDAMENTO", {
       correlationId,
       operacao: "reabertura",
       ciclo: passo!.ciclo,
@@ -291,8 +291,47 @@ export async function executarReabertura(p: PedidoDeReabertura): Promise<Resulta
       // aquele trabalho continua valendo; o motor não tem como saber por ele.
       alcancarConcluidos: p.comDependentes,
       extra: { motivo: p.justificativa.slice(0, 200) },
-    }),
-  )
+    })
+    if (!res.changed || passo?.workflowInstanceId == null) return res
+
+    // O PONTEIRO DA TAREFA (workflowStepInstanceId) PRECISA VOLTAR A REFLETIR A
+    // REALIDADE. Reabrir um passo PREDECESSOR não move sozinho o "atual" da
+    // Tarefa de volta para ele — sem isto, a Tarefa ficava apontando para o
+    // descendente (agora BLOQUEADO por dependência) e nunca recuperava o passo
+    // que de fato precisa de trabalho de novo. Mesma resincronização que a
+    // conclusão natural de passo já faz (`sincronizarTarefaComWorkflow`).
+    const tarefaDaUnidade = await tx.tarefa.findFirst({
+      where: {
+        workflowInstanceId: passo.workflowInstanceId,
+        necessidadeId: passo.necessidadeId,
+        documentoId: passo.documentoId,
+      },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    })
+    if (tarefaDaUnidade) {
+      const sinc = await sincronizarTarefaComWorkflow(tx, tarefaDaUnidade.id, new Date())
+      // O PASSO QUE VOLTOU A SER O ATUAL PODE, ELE MESMO, SER ESPERA DE TERCEIRO
+      // DESDE A LIBERAÇÃO — cadastro do passo (`esperaExternaAoLiberar`), mesma
+      // régua que a conclusão natural usa. Sem isto, reabrir "Receber certidão"
+      // (que É espera por cadastro) deixava a Tarefa presa em EM_ANDAMENTO em
+      // vez de voltar para "Aguardando terceiro" — produção: Tarefas 3565/3566,
+      // processo 589 (Mary Lena Santin / Roberta Santin), depois da reabertura
+      // de "Receber certidão" por Marco.
+      if (sinc.stepAtualId != null) {
+        await aplicarEsperaExternaSeConfigurado(
+          tx,
+          { tarefaId: tarefaDaUnidade.id, stepInstanceId: sinc.stepAtualId, statusTarefaAtual: sinc.status },
+          {
+            correlationId, causationId: `reabertura-espera|${correlationId}`,
+            ciclo: passo.ciclo, processoId: passo.processoId, workflowInstanceId: passo.workflowInstanceId,
+            usuarioId: p.actorId,
+          },
+        )
+      }
+    }
+    return res
+  })
   if (!r.changed) {
     return { ok: false, code: r.code ?? "SEM_MUDANCA", mensagem: "A etapa não pôde ser reaberta." }
   }

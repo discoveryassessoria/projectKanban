@@ -104,6 +104,7 @@ function materializar(
       executor: "OPERACAO_DOCUMENTO",
       erroAdministrativo: null,
       dependeDeStepKeys: i > 0 ? [PASSOS_PUBLICADOS[i - 1].key] : [],
+      esperaExternaAoLiberar: false,
     }
   })
 }
@@ -242,6 +243,7 @@ const passoGlobal: PassoBruto = {
   pessoaId: null, necessidadeId: null, documentoId: null,
   responsavelId: null, responsavelNome: null, prazo: null, diasParaPrazo: null, slaDays: null,
   motivo: null, executor: null, erroAdministrativo: "Sem executor", dependeDeStepKeys: [], peso: 1,
+  esperaExternaAoLiberar: false,
 }
 const orfaos = materializar(99).map((p) => ({ ...p, necessidadeId: 99 }))
 const eGlobal = montarEstruturaOperacional({

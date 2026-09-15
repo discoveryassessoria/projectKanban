@@ -127,11 +127,15 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   TAREFA_INICIADA: "Tarefa iniciada",
   TAREFA_REDISTRIBUIDAS: "Redistribuída",
   TAREFA_REPRIORIZADAS: "Reprioridade em lote",
+  // `reabertura-de-execucao.ts` grava sob este código (não "TAREFA_REABERTA" —
+  // é a etapa que reabre, por instância, não a tarefa inteira). Sem entrada
+  // aqui, a timeline mostrava o código bruto como título.
+  STEP_EXECUTION_REOPENED: "Etapa reaberta",
 }
 const CATEGORIA_LOG_ACAO = (acao: string): EventoAndamento["categoria"] => {
   if (acao.includes("PRAZO")) return "prazo"
   if (acao.includes("ATRIBU") || acao.includes("TRANSFER") || acao.includes("REDISTRIB") || acao.includes("DEVOLVIDA")) return "responsabilidade"
-  if (acao.includes("CANCEL") || acao.includes("CAUSA_DECIDIDA") || acao.includes("REABERT")) return "decisao"
+  if (acao.includes("CANCEL") || acao.includes("CAUSA_DECIDIDA") || acao.includes("REABERT") || acao.includes("REOPENED")) return "decisao"
   return "execucao"
 }
 
@@ -266,7 +270,12 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       de: ehResponsabilidade ? rotuloDeValor(det.de) : (typeof det.de === "string" ? det.de : null),
       para: ehResponsabilidade ? rotuloDeValor(det.para) : (typeof det.para === "string" ? det.para : null),
       etapa: typeof det.stepKey === "string" ? det.stepKey : null,
-      motivo: typeof det.motivo === "string" ? det.motivo : null,
+      // `reabertura-de-execucao.ts` grava a justificativa sob `justificativa`,
+      // não `motivo` — nome mais preciso para "razão de reabrir" (ela nunca
+      // foi motivo de bloqueio ao vivo). Aceitar as duas chaves aqui é o que
+      // faz essa justificativa aparecer na aba Andamento, onde ela pertence —
+      // e não mais como um "motivo de bloqueio" pintado de vermelho na Central.
+      motivo: typeof det.motivo === "string" ? det.motivo : (typeof det.justificativa === "string" ? det.justificativa : null),
       referencias: { tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined },
     })
   }

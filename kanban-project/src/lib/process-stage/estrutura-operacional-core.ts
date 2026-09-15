@@ -85,6 +85,9 @@ export interface PassoBruto {
   erroAdministrativo: string | null
   /** Dependências PERSISTIDAS (por stepKey da definição), do modo de execução publicado. */
   dependeDeStepKeys: string[]
+  /** Configuração PUBLICADA do passo (`PhaseInternalWorkflowStep.esperaExternaAoLiberar`):
+   *  BLOQUEADO neste passo é espera externa esperada (cartório), não divergência. */
+  esperaExternaAoLiberar: boolean
   /**
    * PESO CANÔNICO do passo, do catálogo da fase. Não é enfeite: a Emissão
    * Documental pesa 25/10/18/15/12, e contar 1/5 para cada um diria que
@@ -155,6 +158,10 @@ export interface PassoDaEstrutura {
   pessoaId: number | null
   necessidadeId: number | null
   documentoId: number | null
+  /** Este passo, quando BLOQUEADO, é espera externa configurada (cartório) — não divergência. */
+  esperaExternaAoLiberar: boolean
+  /** Este passo, quando BLOQUEADO, é porque uma dependência do MESMO alvo ainda está aberta — não divergência. */
+  bloqueadoPorDependenciaPendente: boolean
 }
 
 export interface ProgressoEstrutura {
@@ -479,8 +486,28 @@ const STATUS_DISPONIVEIS = new Set([
 /** Estados que impedem trabalhar o passo agora (mas ele continua visível). */
 const STATUS_BLOQUEADOS = new Set(["PENDENTE", "BLOQUEADO", "FALHOU"])
 
-/** Estados que representam divergência operacional real. */
-const STATUS_DIVERGENTES = new Set(["BLOQUEADO", "FALHOU"])
+/**
+ * Passo em divergência REAL — não espera (externa OU de dependência interna
+ * ainda não cumprida). Fonte única: usada tanto no `divergente` do alvo quanto
+ * na contagem por pessoa, para as duas nunca discordarem sobre o que conta
+ * como divergência.
+ *
+ * BLOQUEADO tem DUAS causas legítimas que não são problema nenhum:
+ *   1. espera externa configurada no cadastro do passo (`esperaExternaAoLiberar`
+ *      — aguardando o cartório, por desenho);
+ *   2. dependência publicada (`dependeDeStepKeys`) do MESMO alvo ainda aberta —
+ *      ex.: "Conferir e validar certidão" bloqueado porque "Receber certidão"
+ *      foi reaberto e voltou a estar em aberto. O passo seguinte não fez nada
+ *      de errado; só não pode começar antes do anterior.
+ * Só conta como divergência quando NENHuma das duas explica o bloqueio — ou
+ * quando o passo FALHOU de verdade.
+ */
+function passoDivergente(s: { status: string; esperaExternaAoLiberar: boolean; bloqueadoPorDependenciaPendente: boolean }): boolean {
+  const st = String(s.status).toUpperCase()
+  if (st === "FALHOU") return true
+  if (st === "BLOQUEADO") return !s.esperaExternaAoLiberar && !s.bloqueadoPorDependenciaPendente
+  return false
+}
 
 /**
  * Identidade lógica do ALVO de uma instância. SEMPRE por id oficial.
@@ -562,6 +589,14 @@ function somarProgresso(partes: ProgressoEstrutura[]): ProgressoEstrutura {
   }
 }
 
+/** Dependências PUBLICADAS (dependeDeStepKeys) do MESMO alvo ainda não concluídas. */
+function dependenciasPendentes(p: PassoBruto, irmaos: PassoBruto[]): PassoBruto[] {
+  if (p.dependeDeStepKeys.length === 0) return []
+  return p.dependeDeStepKeys
+    .map((k) => irmaos.find((s) => s.stepKey === k))
+    .filter((s): s is PassoBruto => s != null && baldeDoPasso(s.status) !== "CONCLUIDA")
+}
+
 /**
  * Motivo de o passo estar parado. Duas origens, nesta ordem, ambas OFICIAIS:
  *   1. `motivo` persistido na instância (bloqueio real registrado pelo motor);
@@ -569,12 +604,15 @@ function somarProgresso(partes: ProgressoEstrutura[]): ProgressoEstrutura {
  * Nunca uma regra fixa de sequência escrita aqui.
  */
 function motivoDoBloqueio(p: PassoBruto, irmaos: PassoBruto[]): string | null {
-  if (p.motivo && p.motivo.trim()) return p.motivo.trim()
+  // O CAMPO `motivo` NÃO É SÓ "motivo de bloqueio ao vivo": a reabertura também
+  // grava ali a justificativa de QUEM reabriu (ex.: "erro interno" — o erro foi
+  // do Marco ao concluir errado antes, não um erro do sistema agora). Sem o
+  // gate de status, essa justificativa passada ficava pintada de vermelho como
+  // se fosse a razão do bloqueio ATUAL, mesmo com o passo em outro estado. A
+  // justificativa de reabertura pertence ao histórico (LogAuditoria), não aqui.
   if (!STATUS_BLOQUEADOS.has(String(p.status).toUpperCase())) return null
-  if (p.dependeDeStepKeys.length === 0) return null
-  const pendentes = p.dependeDeStepKeys
-    .map((k) => irmaos.find((s) => s.stepKey === k))
-    .filter((s): s is PassoBruto => s != null && baldeDoPasso(s.status) !== "CONCLUIDA")
+  if (p.motivo && p.motivo.trim()) return p.motivo.trim()
+  const pendentes = dependenciasPendentes(p, irmaos)
   if (pendentes.length === 0) return null
   return `Aguarda: ${pendentes.map((s) => s.titulo).join(", ")}`
 }
@@ -607,6 +645,9 @@ function montarPasso(p: PassoBruto, irmaos: PassoBruto[]): PassoDaEstrutura {
     pessoaId: p.pessoaId,
     necessidadeId: p.necessidadeId,
     documentoId: p.documentoId,
+    esperaExternaAoLiberar: p.esperaExternaAoLiberar,
+    bloqueadoPorDependenciaPendente:
+      STATUS_BLOQUEADOS.has(status) && dependenciasPendentes(p, irmaos).length > 0,
   }
 }
 
@@ -672,7 +713,12 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
       pais: meta?.pais ?? null,
       progresso: prog,
       concluido: prog.total > 0 && prog.concluidos >= prog.total,
-      divergente: passosDoAlvo.some((s) => STATUS_DIVERGENTES.has(String(s.status).toUpperCase())),
+      // FALHOU é sempre divergência real. BLOQUEADO só é divergência quando NÃO é
+      // espera externa configurada (cartório) — um passo "esperando o cartório
+      // mandar a certidão" está BLOQUEADO por desenho, não por problema; pintar
+      // isso de "Divergente" (como "Aguardar retorno do cartório"/"Receber
+      // certidão" faziam) confundia espera normal com erro real.
+      divergente: passosDoAlvo.some(passoDivergente),
       vencido: passosDoAlvo.some((s) => s.vencido),
       passos: passosDoAlvo,
     })
@@ -709,7 +755,7 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
       passosDaPessoa,
       progresso: prog,
       pendentes: todos.filter((s) => s.balde !== "CONCLUIDA").length,
-      divergentes: todos.filter((s) => STATUS_DIVERGENTES.has(String(s.status).toUpperCase())).length,
+      divergentes: todos.filter(passoDivergente).length,
       semTrabalhoAplicavel: documentos.length === 0 && passosDaPessoa.length === 0,
     }
   })
