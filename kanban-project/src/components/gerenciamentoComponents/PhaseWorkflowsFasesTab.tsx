@@ -301,8 +301,21 @@ export default function PhaseWorkflowsFasesTab() {
     putSteps(wf, arr)
   }
   function removeStep(wf: Workflow, st: Step) {
-    if (!confirm(`Remover o passo "${st.label}"?`)) return
-    putSteps(wf, wf.passos.filter(s => s.key !== st.key))
+    // QUEM DEPENDE DESTE PASSO precisa perder a referência JUNTO — senão o
+    // servidor recusa a gravação inteira (DEPENDENCIA_INEXISTENTE, em
+    // validacao-de-publicacao.ts) porque um `dependeDe` sobrevivente apontaria
+    // para uma chave que não existe mais. Sem isto, o clique "removia" o passo
+    // só na tela: o save falhava, `load()` trazia o estado real de volta do
+    // servidor, e o passo reaparecia — parecendo que excluir não fazia nada.
+    const dependentes = wf.passos.filter(s => s.key !== st.key && s.dependeDe?.includes(st.key))
+    const aviso = dependentes.length
+      ? `\n\n${dependentes.length} outro(s) passo(s) dependiam dele (${dependentes.map(s => s.label).join(", ")}) — essa dependência também será removida.`
+      : ""
+    if (!confirm(`Remover o passo "${st.label}"?${aviso}`)) return
+    const restantes = wf.passos
+      .filter(s => s.key !== st.key)
+      .map(s => s.dependeDe?.includes(st.key) ? { ...s, dependeDe: s.dependeDe!.filter(k => k !== st.key) } : s)
+    putSteps(wf, restantes)
   }
 
   // ---------- render ----------
