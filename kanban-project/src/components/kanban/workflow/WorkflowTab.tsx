@@ -445,13 +445,26 @@ function StepOuSubtarefas({
   podeIniciar: boolean
   tarefaResponsavelNome?: string | null
 }) {
-  // Só as etapas ATIVAS valem a pergunta: uma concluída ou futura não precisa
-  // saber se tem subtarefa — o StepCard de sempre já resume isso direito.
+  // Só as etapas ATIVAS/BLOQUEADAS valem a pergunta: uma concluída não
+  // precisa saber se tem subtarefa — o StepCard de sempre já resume isso
+  // direito.
+  //
+  // "bloqueada" entra INTEIRA aqui, sem exigir `motivoBloqueio` preenchido —
+  // diferente do StepCard original (que só a tratava como ativa quando tinha
+  // texto de bloqueio, senão caía no modo FUTURA/"aguarda liberação"). Isso
+  // era certo enquanto só existia bloqueio MANUAL (que sempre grava motivo).
+  // A espera externa AUTOMÁTICA (subtarefa 2/3 com `esperaExternaAoLiberar`)
+  // bloqueia a TAREFA, não escreve `PhaseWorkflowStepInstance.motivo` — e como
+  // esta arquitetura tem UM passo só (nunca dois passos em cadeia), "bloqueada"
+  // aqui NUNCA significa "esperando outro passo terminar": significa sempre
+  // uma subtarefa interna esperando. Achado real: 15/09/2026, processo Teste —
+  // a lista de subtarefas sumia (voltava pro card cinza "aguarda liberação")
+  // assim que a espera externa automática bloqueava o passo.
   const isActive =
     step.status === "em_andamento" ||
     step.status === "aguardando_terceiro" ||
     step.status === "atrasada" ||
-    (step.status === "bloqueada" && step.motivoBloqueio !== null)
+    step.status === "bloqueada"
   const { subtarefas, carregando } = useConfiguracaoDaEtapa(isActive ? step.id : null)
 
   if (!isActive || carregando || subtarefas.length === 0) {
