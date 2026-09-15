@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         dataPrazo: true,
         createdAt: true,
         processoId: true,
+        responsavelId: true,
         processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } }
       },
       orderBy: { dataPrazo: 'asc' }
@@ -87,7 +88,16 @@ export async function GET(request: NextRequest) {
         else if (prazo <= em3Dias) proximos3Dias.push(item)
       }
 
-      if (t.createdAt >= umDiaAtras) novas.push(item)
+      // "NOVA TAREFA" avisa QUEM É DONO dela. `filtroResponsavel` inclui
+      // `responsavelId: null` de propósito (comentário acima) para o admin
+      // enxergar a fila de distribuição em Tarefas e Projetos — mas isso é
+      // VISIBILIDADE, não ATRIBUIÇÃO (contrato item 14). Sem este filtro, uma
+      // tarefa recém-materializada sem responsável virava "nova tarefa para
+      // mim" no sino do admin, mesmo sem ninguém ter sido atribuído — a
+      // notificação de atribuição de verdade é a de `atribuirTarefa`
+      // (lib/operacional/tarefa-comandos.ts), disparada só quando alguém
+      // realmente vira dono.
+      if (t.createdAt >= umDiaAtras && t.responsavelId != null) novas.push(item)
     }
 
     // 🔒 Achado real: quando a Saúde do Sistema encontra um erro crítico, o
