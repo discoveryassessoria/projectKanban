@@ -39,6 +39,7 @@ import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/serv
 import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import type { PermissaoChave } from "@/src/lib/permissoes"
 import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
+import { passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
 import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
@@ -917,6 +918,25 @@ export async function aplicarTransicaoDoPassoTx(
       const r = await reabrirPassoTx(tx, p.id, novo as "PENDENTE" | "DISPONIVEL" | "EM_ANDAMENTO", { ...opts, extra: camposDocumentais })
       if (!r.changed && r.code) throw new TransicaoDePassoRecusada(r.code, p.status, novo)
     } else {
+      // ESTE É UM SEGUNDO CAMINHO PARA CONCLUIR PASSO — ao lado da porta rica
+      // de ação/subtarefa (`executarAcaoCadastrada.ts`). `transicionarPassoTx`
+      // só valida PRECEDÊNCIA de status (pode ir de X pra Y?); ela nunca
+      // soube perguntar "as subtarefas obrigatórias deste passo já foram
+      // feitas?" — essa pergunta é de `passoPodeConcluir`, e só a outra porta
+      // fazia. Um passo com `regraDeConclusao: TODAS_SUBTAREFAS_OBRIGATORIAS`
+      // completado por AQUI fechava sem nenhuma subtarefa executada — achado
+      // real: "Solicitar certidão" do processo Teste (Emissão Documental)
+      // concluído com 0 de 4 subtarefas feitas. A trava é a MESMA das duas
+      // portas: nunca reimplementada, só chamada aqui também.
+      if (liberarProximo) {
+        const gate = await passoPodeConcluir({ stepInstanceId: p.id })
+        if (!gate.pode) {
+          throw new TransicaoDePassoRecusada(
+            `SUBTAREFAS_PENDENTES: ${gate.faltando.map((f) => `${f.label} (${f.motivo})`).join("; ")}`,
+            p.status, novo,
+          )
+        }
+      }
       const r = await transicionarPassoTx(tx, p.id, novo, {
         ...opts,
         extra: camposDocumentais,
