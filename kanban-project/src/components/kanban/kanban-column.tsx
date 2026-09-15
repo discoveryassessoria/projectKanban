@@ -27,6 +27,9 @@ interface KanbanColumnProps {
   Icone?: React.ComponentType<{ className?: string }>
   /** Rótulo da nacionalidade, repassado a cada card. */
   nacionalidade?: string
+  /** Seleção em massa (IDENTIDADE BITRIX) — repassada a cada card. */
+  selecionados?: Set<number>
+  onAlternarSelecao?: (processoId: number) => void
 }
 
 export function KanbanColumn({
@@ -39,6 +42,8 @@ export function KanbanColumn({
   onProcessoClick,
   Icone,
   nacionalidade,
+  selecionados,
+  onAlternarSelecao,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `column-${faseKey}`,
@@ -59,27 +64,28 @@ export function KanbanColumn({
           : "border-[var(--border-default)] bg-[var(--surface-primary)]"
       }`}
     >
-      {/* Filete da cor da fase no topo — identifica a coluna sem tingir o fundo,
-          que é onde os cards precisam de superfície neutra para se destacarem. */}
-      <div className="h-[3px] w-full shrink-0" style={{ backgroundColor: headerColor }} />
-
-      {/* Cabeçalho: ladrilho do ícone, nome da fase e contagem. */}
-      <div className="flex shrink-0 items-center gap-2 px-3 py-3">
+      {/* IDENTIDADE BITRIX: cabeçalho é uma BARRA CHEIA da cor da fase (era um
+          filete de 3px) — cada coluna com identidade visual própria, texto
+          claro por cima. */}
+      <div
+        className="flex shrink-0 items-center gap-2 px-3 py-2.5"
+        style={{ backgroundColor: headerColor }}
+      >
         {Icone && (
           <span
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-md"
-            style={{ backgroundColor: `${headerColor}22`, color: headerColor }}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-[var(--text-inverse)]"
+            style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
             aria-hidden
           >
             <Icone className="h-3.5 w-3.5" />
           </span>
         )}
-        <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--text-primary)]">
+        <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-[var(--text-inverse)]">
           {title}
         </h3>
         <span
-          className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums"
-          style={{ backgroundColor: `${headerColor}1f`, color: headerColor }}
+          className="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--text-inverse)]"
+          style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
         >
           {processos.length}
         </span>
@@ -107,6 +113,8 @@ export function KanbanColumn({
                 corDaFase={headerColor}
                 nacionalidade={nacionalidade}
                 onClick={() => onProcessoClick?.(processo)}
+                selecionado={selecionados?.has(processo.id)}
+                onAlternarSelecao={onAlternarSelecao ? () => onAlternarSelecao(processo.id) : undefined}
               />
             ))}
           </SortableContext>

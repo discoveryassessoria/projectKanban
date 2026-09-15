@@ -12,6 +12,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { AlertCircle, MoreVertical } from "lucide-react"
 import type { Processo } from "@/src/types/kanban"
+import { CaixaDeSelecao } from "@/src/components/ui/selecao-em-massa"
 
 interface KanbanCardProps {
   processo: Processo
@@ -28,9 +29,12 @@ interface KanbanCardProps {
    * operador uma ação que ele não pode concluir.
    */
   podeArrastar?: boolean
+  /** Seleção em massa (IDENTIDADE BITRIX) — puramente de exibição/local; nenhuma ação em lote ainda existe, então não há barra de ação além de "limpar". */
+  selecionado?: boolean
+  onAlternarSelecao?: () => void
 }
 
-export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDragging: isDraggingProp, podeArrastar = true }: KanbanCardProps) {
+export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDragging: isDraggingProp, podeArrastar = true, selecionado, onAlternarSelecao }: KanbanCardProps) {
   const {
     id,
     nome,
@@ -136,6 +140,11 @@ export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDrag
         <div className="p-3.5">
           {/* Nome do processo e avatar com as iniciais */}
           <div className="mb-2.5 flex items-start justify-between gap-2">
+            {onAlternarSelecao && (
+              <span className="mt-0.5 shrink-0">
+                <CaixaDeSelecao marcada={!!selecionado} onAlternar={onAlternarSelecao} rotulo={`Selecionar ${nome}`} />
+              </span>
+            )}
             <h3 className="min-w-0 flex-1 text-[15px] font-semibold leading-tight text-[var(--text-primary)]">
               {nome}
             </h3>

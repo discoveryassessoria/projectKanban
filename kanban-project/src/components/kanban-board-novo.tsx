@@ -38,31 +38,34 @@ import {
   type Requerente,
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { useSelecaoEmMassa, BarraDeSelecao } from "@/src/components/ui/selecao-em-massa"
 
 // Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
 // cada render, e qualquer useMemo que dependesse dele recomputava sempre —
 // era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
 
 /**
- * Cor da COLUNA por posição no fluxo.
+ * Cor da COLUNA por posição no fluxo (IDENTIDADE BITRIX, 14-15/09/2026).
  *
- * A fase não guarda cor no cadastro — e inventar um campo de cor no motor para
- * resolver um problema de tela seria dado de negócio nascido de decoração. A
- * sequência é determinística pela ORDEM do workflow, então a mesma fase recebe
- * sempre a mesma cor, e a leitura da esquerda para a direita fica estável.
+ * A fase não guarda cor no cadastro — e inventar um campo de cor no motor
+ * para resolver um problema de tela seria dado de negócio nascido de
+ * decoração. A sequência é determinística pela ORDEM do workflow, então a
+ * mesma fase recebe sempre a mesma cor, e a leitura da esquerda para a
+ * direita fica estável.
  *
- * A rampa é MONOCROMÁTICA em azul: o degrau significa POSIÇÃO NO FLUXO, não
- * categoria. Seis matizes diferentes (roxo/verde/âmbar/vermelho) faziam a fase
- * parecer um estado semântico que ela não é — e vermelho numa coluna competia
- * com vermelho de atraso, que significa de verdade.
+ * Cada coluna tem sua PRÓPRIA cor (`--stage-color-*`, globals.css) — a
+ * Identidade AZUL anterior usava uma rampa monocromática de propósito
+ * (degrau = posição no fluxo, não categoria); o Bitrix faz o oposto. Nunca
+ * vermelho aqui: fica reservado ao alerta de atraso no card — coluna
+ * vermelha competindo com vermelho de atraso é o bug que a Identidade AZUL
+ * corrigiu uma vez e este re-skin não reabre.
  */
 const COR_DA_COLUNA = [
-  "#174d76", // azul profundo
-  "#1f6aaa",
-  "#2875b7", // azul active
-  "#3d84bd",
-  "#4f91c5", // azul médio
-  "#6ba6d1",
+  "var(--stage-color-1)",
+  "var(--stage-color-2)",
+  "var(--stage-color-3)",
+  "var(--stage-color-4)",
+  "var(--stage-color-5)",
 ] as const
 const corDaColuna = (i: number) => COR_DA_COLUNA[i % COR_DA_COLUNA.length]
 
@@ -201,6 +204,15 @@ export function KanbanBoard({
     }
     return map
   }, [localProcessos, fases])
+
+  // SELEÇÃO EM MASSA (IDENTIDADE BITRIX, 14-15/09/2026) — puramente de
+  // exibição por enquanto: nenhuma ação em lote existe ainda pra processo
+  // (mover fase em massa, atribuir responsável em massa etc. não são portas
+  // que o motor expõe hoje). Por isso a barra só mostra a contagem e
+  // "Limpar seleção" — sem `onExcluir`/`acoesExtras`, nunca um botão sem
+  // ação real por trás dele.
+  const idsVisiveis = useMemo(() => localProcessos.map((p) => p.id), [localProcessos])
+  const selecaoMassa = useSelecaoEmMassa(idsVisiveis, `${pais.countryKey}-${tipo?.id ?? ""}`)
 
   const handleProcessoClick = (processo: Processo) => {
     setSelectedProcesso(processo)
@@ -379,6 +391,12 @@ export function KanbanBoard({
         )}
       </div>
 
+      <BarraDeSelecao
+        quantidade={selecaoMassa.quantidade}
+        substantivo={["processo", "processos"]}
+        onLimpar={selecaoMassa.limpar}
+      />
+
       {fases.length === 0 ? (
         <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-800">
           Este tipo de processo ainda não tem fases configuradas.
@@ -416,6 +434,8 @@ export function KanbanBoard({
                       isLast={index === fases.length - 1}
                       onProcessoClick={handleProcessoClick}
                       podeArrastar={podeArrastar}
+                      selecionados={selecaoMassa.selecionados}
+                      onAlternarSelecao={selecaoMassa.alternar}
                     />
                   </div>
                 ))}

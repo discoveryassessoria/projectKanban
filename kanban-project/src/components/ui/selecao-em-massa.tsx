@@ -107,7 +107,12 @@ export async function executarEmMassa<T extends number | string>(
   return { excluidos, recusados }
 }
 
-/** A caixa de uma linha. Para no clique para não abrir/editar a linha junto. */
+/**
+ * A caixa de uma linha. Para no clique para não abrir/editar a linha junto —
+ * e para no `onPointerDown` também, porque um card arrastável (`@dnd-kit`)
+ * escuta esse evento no contêiner pai: sem isto, marcar a caixa dentro de um
+ * card do Kanban iniciava um arraste em vez de selecionar.
+ */
 export function CaixaDeSelecao({
   marcada, onAlternar, rotulo,
 }: { marcada: boolean; onAlternar: () => void; rotulo: string }) {
@@ -116,6 +121,7 @@ export function CaixaDeSelecao({
       type="checkbox"
       checked={marcada}
       aria-label={rotulo}
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => { e.stopPropagation(); onAlternar() }}
       className="h-4 w-4 cursor-pointer accent-[var(--action-primary)]"
