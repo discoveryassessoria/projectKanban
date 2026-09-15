@@ -93,11 +93,13 @@ function run() {
   // guarda continua exigindo que Home e Financeiro usem O MESMO card.
   const cardCompartilhado = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
   ok(financeiroDash.includes(cardCompartilhado) && primitivas.includes(cardCompartilhado), "mesmo token de card do Financeiro")
-  // O acento também é token. Era dourado (#D2A948, depois #a17938); na identidade
-  // azul é o azul de ação. A guarda trava o TOKEN COMPARTILHADO, não o hex, e
-  // confere que o hex do token é azul — dourado aqui é regressão.
+  // O acento também é token. Era dourado (#D2A948, depois #a17938), depois azul
+  // (#2875b7, Identidade AZUL); na IDENTIDADE BITRIX (14-15/09/2026) é o verde
+  // de ação do Bitrix24. A guarda trava o TOKEN COMPARTILHADO, não o hex, e
+  // confere que o hex do token é o verde atual — azul ou dourado aqui é
+  // regressão (volta a uma identidade anterior).
   ok(/var\(--accent-primary\)/.test(primitivas) && /var\(--accent-primary\)/.test(financeiroDash), "mesmo acento da marca (token)")
-  ok(/--accent-primary:\s*#2875b7/i.test(globais), "acento da marca é o azul de ação (#2875b7)")
+  ok(/--accent-primary:\s*#29cc5c/i.test(globais), "acento da marca é o verde Bitrix (#29cc5c)")
   ok(!/bg-slate-50|bg-white(?!\/)/.test(uiHome), "sem superfície clara (a Home é parte do mesmo sistema)")
 
   // ---- 3. Blocos obrigatórios ----

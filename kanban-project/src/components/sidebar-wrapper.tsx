@@ -1,7 +1,6 @@
 "use client"
 
 import { BitrixSidebar } from "@/src/components/bitrix-sidebar"
-import { BitrixFloatingRail } from "@/src/components/bitrix-floating-rail"
 import { SidebarProvider, useSidebarContext } from "@/src/contexts/sidebar-context"
 import { useSidebarVisibility } from "@/src/hooks/use-sidebar-visibility"
 import { usePathname } from "next/navigation"
@@ -29,7 +28,6 @@ function SidebarContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen w-full max-w-[100vw] [overflow-x:clip] bg-transparent">
       <BitrixSidebar />
-      <BitrixFloatingRail />
       <div
         className={`
           min-w-0 max-w-full [overflow-x:clip] transition-[margin] duration-300 ease-in-out

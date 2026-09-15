@@ -109,7 +109,11 @@
   --card-foreground: #10273a;
   --popover: #f2f9fd;
   --popover-foreground: #10273a;
-  --primary: #2875b7;
+  /* IDENTIDADE BITRIX (14-15/09/2026): o `Button` padrão do shadcn usa
+     `bg-primary` (este token), não `--action-primary` — sem esta troca, todo
+     botão sem cor explícita (a maioria) continuava azul mesmo com o resto do
+     sistema já verde. Ver `--action-primary` acima, mesma cor. */
+  --primary: #29cc5c;
   --primary-foreground: #ffffff;
   --secondary: #d8ecf8;
   --secondary-foreground: #174d76;
@@ -120,7 +124,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: #bfd8e8;
   --input: #a7c9de;
-  --ring: #4f91c5;
+  --ring: #29cc5c;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
