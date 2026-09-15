@@ -273,6 +273,14 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
 
   for (const e of [...workflowEventosTarefa, ...workflowEventosStep]) {
     const d = (e.dados ?? {}) as Record<string, unknown>
+    // `TAREFA_BLOQUEADA` com `motivoCodigo === "AGUARDANDO_TERCEIRO"` (escrito
+    // por `aplicarEsperaExternaSeConfigurado`/`bloquearTarefa` em
+    // task-step-sync.ts) é espera de terceiro, não bloqueio interno — mesma
+    // semântica de `ehEsperaExterna`. Sem isto, a aba Andamento mostrava
+    // "Tarefa bloqueada" sem explicação para uma transição automática de
+    // espera, ao lado do rótulo "Aguardando terceiro" que o resto da tela já
+    // usa para o mesmo par status+motivoCodigo.
+    const esperaDeTerceiro = e.tipo === "TAREFA_BLOQUEADA" && d.motivoCodigo === "AGUARDANDO_TERCEIRO"
     eventos.push({
       id: `wfevt:${e.id}`,
       tipo: e.tipo,
@@ -280,12 +288,12 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       data: e.criadoEm.toISOString(),
       // WorkflowEvento não carrega autor — é sempre o motor (task-step-sync.ts).
       autor: SISTEMA,
-      titulo: TITULO_WORKFLOW_EVENTO[e.tipo] ?? e.tipo,
+      titulo: esperaDeTerceiro ? "Aguardando terceiro" : TITULO_WORKFLOW_EVENTO[e.tipo] ?? e.tipo,
       descricao: null,
       de: typeof d.de === "string" ? d.de : null,
       para: typeof d.para === "string" ? d.para : null,
       etapa: e.stepInstanceId != null ? tituloDoStep.get(e.stepInstanceId) ?? null : null,
-      motivo: null,
+      motivo: typeof d.justificativa === "string" ? d.justificativa : null,
       referencias: {
         tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined,
         stepInstanceId: e.stepInstanceId ?? undefined,

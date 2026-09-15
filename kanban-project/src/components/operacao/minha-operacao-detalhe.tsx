@@ -13,7 +13,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, X as XIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, rotularFase } from "./kit-operacional"
+import { auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA, rotularFase } from "./kit-operacional"
+import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 
 interface Etapa {
@@ -32,7 +33,7 @@ interface Historico { id: number; acao: string; usuarioId: number | null; descri
 interface Dossie {
   taskId: number; titulo: string; processoId: number | null; processoNome: string | null
   pessoaNome: string | null; faseMacroKey: string | null; etapaAtual: string | null
-  statusTarefa: string; responsavelId: number | null; responsavelNome: string | null
+  statusTarefa: string; coluna: ColunaKanban; responsavelId: number | null; responsavelNome: string | null
   prioridade: string; dataPrazo: string | null; atrasada: boolean; rotuloDoPrazo: string
   terceiroNome: string | null; servico: string | null; requerDecisao: boolean; atribuidaEm: string | null
   passoAtual: { ordem: number; total: number } | null
@@ -148,7 +149,7 @@ export function MinhaOperacaoDetalhe({ taskId, aoFechar }: { taskId: number; aoF
                   <div className="rounded-lg border border-[var(--border-subtle)] px-3 divide-y divide-[var(--border-subtle)]">
                     <Linha rotulo="Fase" valor={rotularFase(d.tarefa.faseMacroKey) ?? "—"} />
                     <Linha rotulo="Passo atual" valor={d.tarefa.passoAtual ? `${d.tarefa.passoAtual.ordem}/${d.tarefa.passoAtual.total} — ${d.tarefa.etapaAtual ?? "—"}` : d.tarefa.etapaAtual ?? "—"} />
-                    <Linha rotulo="Estado" valor={ROTULO_STATUS[d.tarefa.statusTarefa] ?? d.tarefa.statusTarefa} />
+                    <Linha rotulo="Estado" valor={ROTULO_COLUNA[d.tarefa.coluna] ?? ROTULO_STATUS[d.tarefa.statusTarefa] ?? d.tarefa.statusTarefa} />
                     <Linha rotulo="Responsável" valor={d.tarefa.responsavelNome ?? "Sem responsável"} />
                     <Linha rotulo="Prioridade" valor={ROTULO_PRIORIDADE[d.tarefa.prioridade] ?? d.tarefa.prioridade} />
                     {d.tarefa.terceiroNome && <Linha rotulo="Terceiro" valor={d.tarefa.terceiroNome} />}

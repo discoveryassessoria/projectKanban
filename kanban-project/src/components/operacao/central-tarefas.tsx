@@ -26,7 +26,7 @@ import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 // O vocabulário visual e o seletor de responsável são COMPARTILHADOS com a
 // visão gerencial global — mesma implementação, não uma cópia parecida.
 import {
-  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS,
+  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA,
   rotularFase, SeletorResponsavel, type LinhaDeFila,
 } from "./kit-operacional"
 import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
@@ -144,7 +144,7 @@ function Linha({
   acao,
   aoAbrir,
 }: {
-  l: LinhaDeFila
+  l: LinhaOperacional
   acao?: React.ReactNode
   aoAbrir?: () => void
 }) {
@@ -186,7 +186,7 @@ function Linha({
             {dataCurta(l.dataPrazo)}
           </div>
           <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
-            {ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa} · {ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}
+            {ROTULO_COLUNA[l.coluna] ?? ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa} · {ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}
           </div>
         </div>
         {acao}
@@ -281,7 +281,7 @@ function CartaoDaFila({
 
           {/* ESTADO + ETAPA: as duas coisas que dizem onde o trabalho está. */}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
-            <span className="text-white/70">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</span>
+            <span className="text-white/70">{ROTULO_COLUNA[l.coluna] ?? ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</span>
             {l.etapaAtual && (
               <>
                 <span className="text-[var(--text-muted)]">›</span>

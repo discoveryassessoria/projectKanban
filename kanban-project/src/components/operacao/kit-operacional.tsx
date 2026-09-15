@@ -26,6 +26,7 @@ import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 // tipo canônico (import type, apagado no build do client) fecha a divergência
 // em vez de perpetuá-la numa terceira tela.
 export type { LinhaDeFila } from "@/lib/operacional/tarefa-projecoes"
+import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 
 interface Funcionario {
   id: number
@@ -77,6 +78,27 @@ export const ROTULO_STATUS: Record<string, string> = {
   SUPERSEDIDA: "Substituída",
 }
 export const ROTULO_PRIORIDADE: Record<string, string> = { URGENTE: "Urgente", ALTA: "Alta", MEDIA: "Média", BAIXA: "Baixa" }
+
+/**
+ * O RÓTULO DA COLUNA — a MESMA leitura em toda tela que mostra o estado de
+ * UMA tarefa, nunca `ROTULO_STATUS[statusTarefa]` cru.
+ *
+ * `statusTarefa` sozinho não sabe que `BLOQUEADA` com
+ * `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de terceiro — só `coluna`
+ * (derivada por `colunaDaTarefa`, mesma semântica de `ehEsperaExterna`) sabe.
+ * Usar o rótulo cru aqui fazia a MESMA tarefa dizer "Bloqueada" numa tela e
+ * "Aguardando terceiro" na tela ao lado, para o idêntico par
+ * status+motivoCodigo.
+ */
+export const ROTULO_COLUNA: Record<ColunaKanban, string> = {
+  SEM_RESPONSAVEL: "Sem responsável",
+  A_FAZER: "A fazer",
+  EM_ANDAMENTO: "Em andamento",
+  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  BLOQUEADA: "Bloqueada",
+  CONCLUIDA: "Concluída",
+  CANCELADA: "Cancelada",
+}
 
 /**
  * A fase vem como chave técnica; a tela mostra gente, não `faseMacroKey`.

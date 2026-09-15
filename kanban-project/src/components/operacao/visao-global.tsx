@@ -53,7 +53,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ProcessoExpandido } from "./processo-expandido"
 import type { FamiliaAgrupada, ProcessoAgrupado, ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 import {
-  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS,
+  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA,
   rotularFase, SeletorResponsavel, type LinhaDeFila,
 } from "./kit-operacional"
 
@@ -83,17 +83,10 @@ const COLUNAS: Array<{ chave: ColunaKanban; rotulo: string; nota?: string }> = [
   { chave: "CONCLUIDA", rotulo: "Concluída" },
 ]
 
-/**
- * A COLUNA DA LISTA É A MESMA DO KANBAN, NA MESMA TELA — nunca o
- * `statusTarefa` cru. `ROTULO_STATUS[l.statusTarefa]` não sabe que
- * `BLOQUEADA` com `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de
- * terceiro (`colunaDaTarefa` já resolve isso — ver `ehEsperaExterna`); usar
- * o rótulo cru aqui fazia a MESMA tarefa dizer "Bloqueada" na Lista e
- * aparecer na coluna "Aguardando terceiro" no Kanban, ao lado.
- */
-const ROTULO_COLUNA: Record<ColunaKanban, string> = Object.fromEntries(
-  COLUNAS.map((c) => [c.chave, c.rotulo]),
-) as Record<ColunaKanban, string>
+// `ROTULO_COLUNA` é IMPORTADO de `kit-operacional.tsx` (uma segunda cópia
+// aqui divergiria assim que uma tela ganhasse uma coluna e a outra não) —
+// ver o comentário lá: a Lista precisa da MESMA leitura do Kanban, nunca
+// `ROTULO_STATUS[l.statusTarefa]` cru.
 
 interface Facetas {
   fases: Array<{ faseMacroKey: string; tarefas: number }>

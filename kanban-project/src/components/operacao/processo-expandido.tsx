@@ -24,8 +24,8 @@ import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { auth, dataCurta, Estado, Etiqueta, rotularFase, ROTULO_STATUS, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
-import type { ProcessoAgrupado } from "@/lib/operacional/tarefa-projecoes"
+import { auth, dataCurta, Estado, Etiqueta, rotularFase, ROTULO_STATUS, ROTULO_COLUNA, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
+import type { ProcessoAgrupado, LinhaGerencial } from "@/lib/operacional/tarefa-projecoes"
 
 type Aba = "visao" | "tarefas" | "documentos" | "historico" | "observacoes" | "dados"
 
@@ -101,7 +101,7 @@ export function ProcessoExpandido({
   const { userId: usuarioAtualId, pode } = usePermissoes()
   const podeIniciar = pode("tarefas.iniciar_concluir")
   const [aba, setAba] = useState<Aba>("visao")
-  const [tarefas, setTarefas] = useState<{ chave: number; d: LinhaDeFila[] | null } | null>(null)
+  const [tarefas, setTarefas] = useState<{ chave: number; d: LinhaGerencial[] | null } | null>(null)
   const [faseProjecao, setFaseProjecao] = useState<FaseProjecao | null>(null)
   const [documentos, setDocumentos] = useState<{ chave: number; d: DocumentosDoProcesso | null } | null>(null)
   const [atividades, setAtividades] = useState<{ chave: number; d: Atividade[] | null } | null>(null)
@@ -114,7 +114,7 @@ export function ProcessoExpandido({
   // comando`), a mesma que Lista e Kanban chamam. Nunca um endpoint exclusivo
   // desta aba: atribuir uma tarefa aqui precisa ser IDÊNTICO a atribuir na
   // Lista — mesmo ownership canônico, mesmo histórico, mesma notificação.
-  const [alvoIndividual, setAlvoIndividual] = useState<LinhaDeFila | null>(null)
+  const [alvoIndividual, setAlvoIndividual] = useState<LinhaGerencial | null>(null)
   const comandarTarefaIndividual = async (tarefaId: number, corpo: Record<string, unknown>, sucesso: string) => {
     setOcupado(true); setErro(null)
     try {
@@ -148,7 +148,7 @@ export function ProcessoExpandido({
     const chave = recarga
     fetch(`/api/operacao/visao-global?processo=${processo.processoId}&porPagina=500&incluirEncerradas=1`, { headers: auth() })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: { linhas: LinhaDeFila[] }) => { if (vivo) setTarefas({ chave, d: d.linhas }) })
+      .then((d: { linhas: LinhaGerencial[] }) => { if (vivo) setTarefas({ chave, d: d.linhas }) })
       .catch(() => { if (vivo) setTarefas({ chave, d: null }) })
     fetch(`/api/processos/${processo.processoId}/phase`, { headers: auth() })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
@@ -407,7 +407,7 @@ const ESTADOS_TERMINAIS: string[] = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI
 function AcaoExecucao({
   t, usuarioAtualId, podeIniciar, aoAbrir,
 }: {
-  t: LinhaDeFila
+  t: LinhaGerencial
   usuarioAtualId: number | null
   podeIniciar: boolean
   aoAbrir: () => void
@@ -427,7 +427,7 @@ function AcaoExecucao({
     return <Button variant="link" size="sm" className="h-auto p-0 text-[12px]" onClick={aoAbrir}>Atribuída a {t.responsavelNome ?? "—"}</Button>
   }
   if (!podeIniciar) {
-    return <span className="text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</span>
+    return <span className="text-[12px] text-[var(--text-secondary)]">{ROTULO_COLUNA[t.coluna] ?? ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</span>
   }
   const rotulo = t.statusTarefa === "NAO_INICIADA" ? "Iniciar" : t.executavelAgora ? "Continuar" : "Abrir"
   return <Button size="sm" onClick={aoAbrir}>{rotulo}</Button>
@@ -436,12 +436,12 @@ function AcaoExecucao({
 function AbaTarefas({
   linhas, usuarioAtualId, podeIniciar, podeAtribuir, aoAbrir, aoAtribuir,
 }: {
-  linhas: LinhaDeFila[] | null
+  linhas: LinhaGerencial[] | null
   usuarioAtualId: number | null
   podeIniciar: boolean
   podeAtribuir: boolean
   aoAbrir: (id: number) => void
-  aoAtribuir: (t: LinhaDeFila) => void
+  aoAtribuir: (t: LinhaGerencial) => void
 }) {
   if (linhas == null) return <Estado tipo="carregando" mensagem="Carregando tarefas…" />
   if (linhas.length === 0) return <Estado tipo="vazio" mensagem="Nenhuma tarefa neste processo." />
@@ -463,7 +463,7 @@ function AbaTarefas({
                   <button onClick={() => aoAbrir(t.taskId)} className="truncate text-left hover:underline">{t.titulo}</button>
                 </td>
                 <td className="text-[12px] text-[var(--text-secondary)]">{rotularFase(t.faseMacroKey) ?? "—"}</td>
-                <td className="text-[12px] text-[var(--text-secondary)]">{ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</td>
+                <td className="text-[12px] text-[var(--text-secondary)]">{ROTULO_COLUNA[t.coluna] ?? ROTULO_STATUS[t.statusTarefa] ?? t.statusTarefa}</td>
                 <td className="text-[12px] text-[var(--text-secondary)]">{t.responsavelNome ?? "Sem responsável"}</td>
                 <td className={`text-[12px] tabular-nums ${t.atrasada ? "font-medium text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{dataCurta(t.dataPrazo)}</td>
                 <td className="text-[12px] tabular-nums text-[var(--text-muted)]">

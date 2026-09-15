@@ -501,15 +501,14 @@ export async function minhaFila(
  * É a tela do gestor: tudo aqui está esperando uma decisão de distribuição, e
  * não uma execução. Tarefa com responsável sai daqui e aparece na fila dele.
  */
-export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promise<LinhaDeFila[]> {
+export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promise<LinhaGerencial[]> {
   const linhas = await prisma.tarefa.findMany({
     where: { equipeKey, responsavelId: null, statusTarefa: { in: STATUS_ATIVOS } },
-    select: SELECT,
+    select: SELECT_GERENCIAL,
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
-  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas), totalDePassos(linhas)])
-  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos, totais)), agora)
-  return ordenarFila(projetadas)
+  const enriquecidas = await enriquecerLinhas(linhas, agora)
+  return ordenarFila(enriquecidas) as LinhaGerencial[]
 }
 
 /**
@@ -562,27 +561,32 @@ export { ordenarPorAtencaoOperacional, categoriasDaLinha, rotuloDeAtencao, type 
  * não existir cadastro de equipe, exigir a chave esconderia da gestão
  * exatamente as tarefas que ninguém reivindicou.
  */
-export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: string | null } = {}): Promise<LinhaDeFila[]> {
+export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: string | null } = {}): Promise<LinhaGerencial[]> {
   const linhas = await prisma.tarefa.findMany({
     where: {
       responsavelId: null,
       statusTarefa: { in: STATUS_ATIVOS },
       ...(filtro.equipeKey ? { equipeKey: filtro.equipeKey } : {}),
     },
-    select: SELECT,
+    select: SELECT_GERENCIAL,
   })
-  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas), totalDePassos(linhas)])
-  const projetadas = await comAtencaoTemporal(linhas.map((t) => projetar(t, agora, nomes, rotulos, totais)), agora)
-  return ordenarFila(projetadas)
+  const enriquecidas = await enriquecerLinhas(linhas, agora)
+  return ordenarFila(enriquecidas) as LinhaGerencial[]
 }
 
-/** Os recortes que a fila mostra separados — sem virar estados novos. */
-export function agruparFila(linhas: LinhaDeFila[]) {
+/**
+ * Os recortes que a fila mostra separados — sem virar estados novos.
+ *
+ * Lê `coluna`, nunca `statusTarefa` cru: `BLOQUEADA` com
+ * `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de terceiro (mesma
+ * semântica de `ehEsperaExterna`), e `coluna` já resolve essa distinção.
+ */
+export function agruparFila(linhas: LinhaGerencial[]) {
   return {
     atrasadas: linhas.filter((l) => l.atrasada),
-    emAndamento: linhas.filter((l) => l.statusTarefa === 'EM_ANDAMENTO' && !l.atrasada),
-    aguardandoTerceiro: linhas.filter((l) => l.statusTarefa === 'AGUARDANDO_TERCEIRO'),
-    bloqueadas: linhas.filter((l) => l.statusTarefa === 'BLOQUEADA'),
+    emAndamento: linhas.filter((l) => l.coluna === 'EM_ANDAMENTO' && !l.atrasada),
+    aguardandoTerceiro: linhas.filter((l) => l.coluna === 'AGUARDANDO_TERCEIRO'),
+    bloqueadas: linhas.filter((l) => l.coluna === 'BLOQUEADA'),
     aguardandoDependencia: linhas.filter((l) => l.aguardandoDependencia),
     proximas: linhas.filter((l) => l.statusTarefa === 'NAO_INICIADA' && !l.atrasada),
   }
@@ -817,8 +821,20 @@ export async function dossieDaTarefa(tarefaId: number) {
     [projetar(t as unknown as Bruta, agoraDossie, await nomesDasPessoas([t]))],
     agoraDossie,
   )
+  // MESMO ENRIQUECIMENTO DE `visaoGerencial`/`enriquecerLinhas` — sem isto o
+  // dossiê (e quem lê `d.tarefa.statusTarefa` cru na tela, por não ter
+  // `coluna` para ler) dizia "Bloqueada" para uma Tarefa em espera de
+  // terceiro (`BLOQUEADA` + `motivoCodigo === "AGUARDANDO_TERCEIRO"`).
+  const paradaDossie = (await contextoDeParada([tarefaId])).get(tarefaId)
+  const esperaDossie = paradaDossie?.esperandoDesde ?? null
+  const esperandoDossie = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
   return {
     ...linha,
+    coluna: colunaDaTarefa(t) ?? 'CANCELADA',
+    esperandoDe: esperandoDossie ? (t.statusTarefa === 'AGUARDANDO_CLIENTE' ? 'cliente' as const : 'terceiro' as const) : null,
+    esperandoDesde: esperandoDossie ? esperaDossie?.toISOString() ?? null : null,
+    esperandoHaDias: esperandoDossie && esperaDossie ? Math.floor((agoraDossie.getTime() - esperaDossie.getTime()) / 86400000) : null,
+    motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? paradaDossie?.motivo ?? null : null,
     passoAtual: linha.passoAtual ? { ordem: linha.passoAtual.ordem, total: etapasDaUnidade.length || linha.passoAtual.total } : null,
     // PROVENANCE: a cadeia inteira do "por quê", por IDs canônicos.
     porQueExisto: {
@@ -1555,6 +1571,47 @@ const SELECT_GERENCIAL = {
   motivoCodigo: true,
 } satisfies Prisma.TarefaSelect
 
+type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL }>
+
+/**
+ * A MESMA ENRIQUECEDORA PARA TODA FILA GERENCIAL — `coluna`/`esperandoDe`/
+ * `esperandoDesde`/`esperandoHaDias`/`motivoBloqueio` nascem AQUI, uma vez só.
+ *
+ * `visaoGerencial`, `filaDaEquipe` e `semResponsavel` liam a Tarefa com o
+ * mesmo `statusTarefa`+`motivoCodigo`, mas só `visaoGerencial` calculava
+ * `coluna` — as outras duas devolviam `LinhaDeFila` crua, e uma tela que
+ * confiasse em `coluna` (em vez de `statusTarefa`) via `undefined` para
+ * "Sem responsável"/"Fila da equipe". `BLOQUEADA` com
+ * `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de terceiro em QUALQUER
+ * fila — nunca só na visão gerencial.
+ */
+async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leitor = prisma): Promise<LinhaGerencial[]> {
+  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db)])
+  const paradas = await contextoDeParada(
+    brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
+    db,
+  )
+  const hoje = diaOperacional(agora)
+
+  const linhas = brutas.map((t): LinhaGerencial => {
+    const base = projetar(t, agora, nomes, rotulos, totais)
+    const parada = paradas.get(t.id)
+    const espera = parada?.esperandoDesde ?? null
+    const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
+    return {
+      ...base,
+      venceHoje: t.dataPrazo != null && diaOperacional(t.dataPrazo) === hoje,
+      coluna: colunaDaTarefa(t) ?? 'CANCELADA',
+      esperandoDe: esperando ? (t.statusTarefa === 'AGUARDANDO_CLIENTE' ? 'cliente' : 'terceiro') : null,
+      esperandoDesde: esperando ? espera?.toISOString() ?? null : null,
+      esperandoHaDias: esperando && espera ? Math.floor((agora.getTime() - espera.getTime()) / 86400000) : null,
+      motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? parada?.motivo ?? null : null,
+      concluidaEm: t.dataConclusao?.toISOString() ?? null,
+    }
+  })
+  return await comAtencaoTemporal(linhas, agora, db) as LinhaGerencial[]
+}
+
 /**
  * A VISÃO GLOBAL — Lista e Kanban leem ESTA função, e só ela.
  *
@@ -1586,43 +1643,11 @@ export async function visaoGerencial(
   // uma contagem, uma página de tarefas, os nomes das pessoas, os rótulos dos
   // passos e o contexto de parada. Cinco idas ao banco para 10 tarefas e cinco
   // para 500.
-  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db)])
-  const paradas = await contextoDeParada(
-    brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
-    db,
-  )
-  const hoje = diaOperacional(agora)
-
-  const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes, rotulos, totais)
-    const parada = paradas.get(t.id)
-    const espera = parada?.esperandoDesde ?? null
-    // MESMA SEMÂNTICA DE `ehEsperaExterna`: `BLOQUEADA` com
-    // `motivoCodigo === "AGUARDANDO_TERCEIRO"` também é espera de terceiro —
-    // não só os valores literais legados do enum.
-    const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
-    return {
-      ...base,
-      // Vence hoje é o DIA no fuso operacional — não "menos de 24 horas".
-      venceHoje: t.dataPrazo != null && diaOperacional(t.dataPrazo) === hoje,
-      // `colunaDaTarefa` devolve `null` para CANCELADA/SUPERSEDIDA de propósito
-      // ("ficam FORA do quadro" — comentário da própria função, testado em
-      // visao-gerencial-global.test.ts). Etapa 5 (item 7, CASO 8): o fallback
-      // aqui NÃO pode ser 'CONCLUIDA' — nada foi entregue. Só aparece quando
-      // `incluirEncerradas` pede explicitamente, e cai na sua própria coluna.
-      coluna: colunaDaTarefa(t) ?? 'CANCELADA',
-      esperandoDe: esperando ? (t.statusTarefa === 'AGUARDANDO_CLIENTE' ? 'cliente' : 'terceiro') : null,
-      esperandoDesde: esperando ? espera?.toISOString() ?? null : null,
-      esperandoHaDias: esperando && espera ? Math.floor((agora.getTime() - espera.getTime()) / 86400000) : null,
-      motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? parada?.motivo ?? null : null,
-      concluidaEm: t.dataConclusao?.toISOString() ?? null,
-    }
-  })
-
+  //
   // `coluna` já entrou no `where` (ver `whereGerencial`) — total/página/lista
   // batem sobre o MESMO universo lógico, sem recorte pós-paginação.
-  const enriquecidas = await comAtencaoTemporal(linhas, agora, db)
-  return { linhas: ordenarFila(enriquecidas) as LinhaGerencial[], total, pagina, porPagina }
+  const linhas = await enriquecerLinhas(brutas, agora, db)
+  return { linhas: ordenarFila(linhas) as LinhaGerencial[], total, pagina, porPagina }
 }
 
 /**
