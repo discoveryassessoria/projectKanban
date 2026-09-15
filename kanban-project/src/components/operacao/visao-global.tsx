@@ -736,9 +736,15 @@ export function VisaoGlobal() {
       )}
 
       {modo !== "visaoGeral" && modo !== "calendario" && selecionados.size > 0 && (
-        <div className="mx-6 mt-3 flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3.5 py-2">
-          <span className="text-[12px] font-medium text-[var(--text-primary)]">{selecionados.size} selecionada{selecionados.size === 1 ? "" : "s"}</span>
-          <Button size="sm" variant="outline" onClick={() => setAlvoLote({ linhas: linhas.filter((l) => selecionados.has(l.taskId)) })}>Atribuir para…</Button>
+        <div className="mx-6 mt-3 flex items-center gap-3 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-secondary)] px-3.5 py-2 shadow-[var(--elev-1)]">
+          <span className="text-[12px] font-semibold text-[var(--text-primary)]">{selecionados.size} selecionada{selecionados.size === 1 ? "" : "s"}</span>
+          <Button
+            size="sm"
+            onClick={() => setAlvoLote({ linhas: linhas.filter((l) => selecionados.has(l.taskId)) })}
+            className="bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)]"
+          >
+            Atribuir para…
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelecionados(new Set())}>Limpar seleção</Button>
         </div>
       )}

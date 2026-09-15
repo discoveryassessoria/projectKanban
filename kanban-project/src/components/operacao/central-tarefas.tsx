@@ -620,13 +620,13 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
               <button
                 key={f.id}
                 onClick={() => setFiltro(f.id)}
-                className={`rounded border px-2 py-1 text-[11px] transition-colors ${
+                className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
                   filtro === f.id
-                    ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85"
-                    : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/75"
+                    ? "border-[var(--action-primary)] bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
+                    : "border-[var(--border-default)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-white/75"
                 }`}
               >
-                {f.rotulo} <span className="tabular-nums text-[var(--text-muted)]">{n}</span>
+                {f.rotulo} <span className={`tabular-nums ${filtro === f.id ? "opacity-80" : "text-[var(--text-muted)]"}`}>{n}</span>
               </button>
             )
           })}
