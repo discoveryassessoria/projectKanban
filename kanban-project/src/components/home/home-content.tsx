@@ -118,7 +118,13 @@ function MinhaAtencaoBloco({ data }: { data: HomeData }) {
         </div>
       </div>
       <Link
-        href="/operacao/central"
+        // Reconciliação de rotas (16/09/2026): apontava pra Central Operacional
+        // (/operacao/central — família inteira; pra admin, a empresa toda). O
+        // bloco é pessoal ("sua atenção"), e a tela que o usuário chama de
+        // "Operação" em todo o resto da conversa é /operacao ("Minha
+        // Operação"), pessoal pra qualquer tipo de usuário — mesmo destino
+        // conceitual do card, agora com a rota certa.
+        href="/operacao"
         className="inline-flex shrink-0 items-center gap-1.5 self-start text-[13px] font-semibold text-[var(--action-primary)] transition hover:opacity-80 sm:self-auto"
       >
         Abrir Operação <ArrowRight className="h-3.5 w-3.5" />
