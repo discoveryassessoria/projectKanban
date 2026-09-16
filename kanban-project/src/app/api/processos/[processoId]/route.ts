@@ -8,6 +8,7 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 import { removerFamiliaSeOrfa } from "@/src/services/familia"
 import { excluirProcesso } from "@/src/services/processo-ciclo-vida"
+import { limparArvoreOrfaAposExclusaoDeProcesso } from "@/src/services/pessoa-ciclo-vida"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -245,11 +246,12 @@ export async function PUT(
 // `pessoa-ciclo-vida.ts` já usa para Pessoa, aqui aplicada direto por
 // `processoId` (ver docs/architecture/26-delete-processo-lifecycle-seguro.md).
 //
-// TAMBÉM NÃO apaga a Árvore. A versão anterior chamava `prisma.arvore.delete()`
-// direto quando este era o último processo dela — sem `analisarExclusaoArvore`,
-// sem frase de confirmação, contornando o guard que `DELETE /api/arvore/[id]`
-// já paga o preço de ter. Uma árvore que fica sem processo depois desta rota
-// permanece para os mecanismos canônicos JÁ EXISTENTES cuidarem dela.
+// SE A ÁRVORE FICAR ÓRFÃ (sem nenhum processo restante), ela sai junto — pelo
+// MESMO guard de `DELETE /api/arvore/[id]` (`analisarExclusaoArvore` +
+// `removerPessoaDaArvore`), nunca por `prisma.arvore.delete()` cru. Com fato
+// protegido (arquivo oficial, protocolo, pagamento…) ou outro processo ainda
+// vivo na árvore, ela continua intacta — "exclusão não deixa órfão" não é
+// "exclusão ignora proteção".
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
@@ -295,18 +297,28 @@ export async function DELETE(
 
     const plano = resultado.plano!
 
+    // A ÁRVORE NÃO PODE FICAR PARA TRÁS. Se este era o último processo dela,
+    // ela só existia por causa dele — mesmo guard de `DELETE /api/arvore/[id]`,
+    // nunca um cascade cru. Fato protegido ou outro processo vivo na árvore:
+    // ela continua intacta, e a resposta diz por quê.
+    const limpezaArvore = plano.arvoreId != null
+      ? await limparArvoreOrfaAposExclusaoDeProcesso(plano.arvoreId, usuario?.userId ?? null)
+      : null
+
     // A FAMÍLIA NÃO PODE FICAR PARA TRÁS. Sem processo e sem árvore, ela não é
     // mais alcançável por porta nenhuma — é resíduo. `removerFamiliaSeOrfa` já
-    // rechecha a contagem antes de apagar; comportamento preexistente, não
-    // alterado por esta correção (ver docs/architecture/25, ND/portas de
-    // exclusão — classificado como guardado).
+    // rechecha a contagem antes de apagar (por isso vem DEPOIS da árvore: com
+    // a árvore ainda viva, ele sempre recusaria).
     const familiaRemovida = await removerFamiliaSeOrfa(plano.familiaId)
 
     return NextResponse.json({
       message: [
         "Processo excluído com sucesso",
+        limpezaArvore?.removida ? "árvore órfã removida" : null,
         familiaRemovida ? "família órfã removida" : null,
       ].filter(Boolean).join(" · "),
+      arvoreRemovida: limpezaArvore?.removida ?? false,
+      arvoreNaoRemovidaPorque: limpezaArvore?.removida === false ? limpezaArvore.motivoNaoRemovida : undefined,
       familiaRemovida,
     })
   } catch (error) {

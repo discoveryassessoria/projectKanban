@@ -760,6 +760,65 @@ export async function reconciliarAposRemocao(
   return { arvore: args.arvoreId != null, processos: reconciliados, erros }
 }
 
+export interface ResultadoLimpezaArvoreOrfa {
+  arvoreId: number
+  removida: boolean
+  pessoasRemovidas: number
+  motivoNaoRemovida?: "TEM_PROCESSO" | "FATO_PROTEGIDO" | "FALHA_NA_REMOCAO"
+  fatosProtegidos?: PessoaImpedidaExclusaoArvore[]
+}
+
+/**
+ * EXCLUSÃO NÃO DEIXA ÓRFÃO — quando o Processo que apontava para esta Árvore
+ * era o ÚLTIMO, ela só existia por causa dele; apagá-lo tem que levá-la junto.
+ *
+ * Achado real (15/09/2026): `excluirProcesso` documentava, de propósito, NÃO
+ * tocar a Árvore — para nunca reintroduzir o bug antigo de `prisma.arvore.
+ * delete()` cru, sem guard, na mesma rota. Isso resolveu o risco errado: a
+ * Árvore ficava órfã (0 processos) e ninguém a limpava — a régua "quem só
+ * existia por causa do que foi apagado sai junto" parou no Processo.
+ *
+ * O caminho aqui é o MESMO de sempre (`analisarExclusaoArvore` →
+ * `removerPessoaDaArvore` HARD por pessoa → `arvore.delete`) — nenhuma lógica
+ * nova, só chamado no momento certo. Se sobrar OUTRO processo apontando para
+ * a árvore, ou se houver fato histórico protegido (arquivo oficial, protocolo,
+ * pagamento…), ela fica exatamente como fica hoje: intacta, e quem decide o
+ * próximo passo é uma pessoa, não este serviço.
+ */
+export async function limparArvoreOrfaAposExclusaoDeProcesso(
+  arvoreId: number,
+  actorUserId: number | null,
+): Promise<ResultadoLimpezaArvoreOrfa | null> {
+  const arvore = await prisma.arvore.findUnique({
+    where: { id: arvoreId },
+    select: { id: true, _count: { select: { processos: true } } },
+  })
+  if (!arvore) return null
+  if (arvore._count.processos > 0) {
+    return { arvoreId, removida: false, pessoasRemovidas: 0, motivoNaoRemovida: "TEM_PROCESSO" }
+  }
+
+  const plano = await analisarExclusaoArvore(arvoreId)
+  if (!plano) return null
+  if (plano.impedidas.length > 0) {
+    return {
+      arvoreId, removida: false, pessoasRemovidas: 0,
+      motivoNaoRemovida: "FATO_PROTEGIDO", fatosProtegidos: plano.impedidas,
+    }
+  }
+
+  const pessoas = await prisma.pessoa.findMany({ where: { arvoreId }, select: { id: true } })
+  for (const p of pessoas) {
+    const r = await removerPessoaDaArvore({ pessoaId: p.id, actorUserId, modo: "HARD" })
+    if (!r.ok) {
+      console.error(`[limparArvoreOrfaAposExclusaoDeProcesso] árvore ${arvoreId}, pessoa ${p.id}: ${r.erro}`)
+      return { arvoreId, removida: false, pessoasRemovidas: 0, motivoNaoRemovida: "FALHA_NA_REMOCAO" }
+    }
+  }
+  await prisma.arvore.delete({ where: { id: arvoreId } })
+  return { arvoreId, removida: true, pessoasRemovidas: pessoas.length }
+}
+
 /**
  * HARD — a cadeia derivada inteira sai, das folhas para a raiz.
  * A ordem não é estética: cada passo remove quem aponta para o próximo.

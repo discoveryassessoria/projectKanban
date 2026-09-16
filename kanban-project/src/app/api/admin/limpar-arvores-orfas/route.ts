@@ -3,8 +3,9 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { exigirPermissao } from "@/src/lib/verificar-permissao"
+import { exigirPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { FRASE_CONFIRMACAO } from "@/src/services/exclusao-definitiva"
+import { limparArvoreOrfaAposExclusaoDeProcesso } from "@/src/services/pessoa-ciclo-vida"
 
 // GET - Listar árvores órfãs (preview antes de deletar)
 export async function GET(request: NextRequest) {
@@ -44,10 +45,13 @@ export async function GET(request: NextRequest) {
 
 // DELETE - Deletar todas as árvores órfãs
 export async function DELETE(request: NextRequest) {
-  // 🔒 Achado real: esta rota apagava em massa (cascade em pessoas, uniões e
-  // documentos) sem NENHUMA verificação — o próprio comentário confessava que
-  // faltava. Mesma trava do resto do sistema para exclusão definitiva:
-  // permissão exclusiva + frase de confirmação, nunca "clicou, apagou".
+  // 🔒 Achado real (corrigido 15/09/2026): esta rota apagava em massa via
+  // `prisma.arvore.deleteMany()` cru — cascade de pessoas, uniões e documentos
+  // SEM `analisarExclusaoArvore`, ou seja, SEM checar fato histórico protegido
+  // (arquivo oficial, protocolo, pagamento…). A permissão exclusiva e a frase
+  // de confirmação abaixo continuam valendo, mas não são o guard que falta: o
+  // guard é por-árvore, o mesmo de sempre, aplicado árvore por árvore — nunca
+  // um `deleteMany` que passa por cima de todas de uma vez.
   const { erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
   if (erro) return erro
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -55,40 +59,33 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: `Confirmação inválida. Envie { "confirmacao": "${FRASE_CONFIRMACAO}" } no corpo.` }, { status: 400 })
   }
   try {
-    // 1. Buscar IDs de todas as árvores órfãs
     const arvoresOrfas = await prisma.arvore.findMany({
-      where: {
-        processos: {
-          none: {},
-        },
-      },
+      where: { processos: { none: {} } },
       select: { id: true, nome: true },
     })
 
     if (arvoresOrfas.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: "Nenhuma árvore órfã encontrada",
-        deletadas: 0,
-      })
+      return NextResponse.json({ success: true, message: "Nenhuma árvore órfã encontrada", deletadas: 0 })
     }
 
-    const idsParaDeletar = arvoresOrfas.map((a) => a.id)
+    const actorUserId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
+    const removidas: { id: number; nome: string }[] = []
+    const bloqueadas: { id: number; nome: string; motivo: string | undefined; fatos?: unknown }[] = []
+    for (const a of arvoresOrfas) {
+      const r = await limparArvoreOrfaAposExclusaoDeProcesso(a.id, actorUserId)
+      if (r?.removida) removidas.push({ id: a.id, nome: a.nome })
+      else bloqueadas.push({ id: a.id, nome: a.nome, motivo: r?.motivoNaoRemovida, fatos: r?.fatosProtegidos })
+    }
 
-    // 2. Deletar todas as árvores órfãs (cascade vai deletar pessoas, uniões, documentos)
-    const resultado = await prisma.arvore.deleteMany({
-      where: {
-        id: { in: idsParaDeletar },
-      },
-    })
-
-    console.log(`Limpeza: ${resultado.count} árvores órfãs deletadas`)
+    console.log(`Limpeza de árvores órfãs: ${removidas.length} removida(s), ${bloqueadas.length} bloqueada(s) por fato protegido`)
 
     return NextResponse.json({
       success: true,
-      message: `${resultado.count} árvore(s) órfã(s) deletada(s) com sucesso`,
-      deletadas: resultado.count,
-      arvoresRemovidas: arvoresOrfas.map((a) => ({ id: a.id, nome: a.nome })),
+      message: `${removidas.length} árvore(s) órfã(s) removida(s)` +
+        (bloqueadas.length ? ` · ${bloqueadas.length} com fato histórico protegido (não removidas)` : ""),
+      deletadas: removidas.length,
+      arvoresRemovidas: removidas,
+      arvoresBloqueadas: bloqueadas,
     })
   } catch (error) {
     console.error("Erro ao limpar árvores órfãs:", error)

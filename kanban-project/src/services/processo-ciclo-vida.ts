@@ -20,15 +20,19 @@
 // fato → bloqueado (aqui não existe um modo DESATIVAR para Processo; fora de
 // escopo desta correção criar um).
 //
-// ─── FORA DE ESCOPO (docs/architecture/23-25) ───────────────────────────────
-// Lifecycle de Árvore/Pessoa/Requerente/Família em si — este serviço nunca
-// decide o destino deles. Se o Processo excluído era o último da Árvore, a
-// Árvore fica órfã (sem processo) e permanece para os mecanismos canônicos
-// JÁ EXISTENTES e já guardados cuidarem dela: `DELETE /api/arvore/[arvoreid]`
-// (exige `analisarExclusaoArvore` + frase de confirmação) ou o job
-// `limpar-arvores-orfas`. Este serviço PAROU de chamar `prisma.arvore.delete()`
-// diretamente — essa chamada, sem nenhum guard, era o próprio bug que
-// contornava a proteção que a rota de árvore já paga o preço de ter.
+// ─── ÁRVORE ÓRFÃ (revisado 15/09/2026) ──────────────────────────────────────
+// Este serviço não decide o LIFECYCLE de Árvore/Pessoa/Requerente/Família —
+// quem decide continua sendo `pessoa-ciclo-vida.ts` (`analisarExclusaoArvore`
+// + `removerPessoaDaArvore`, o MESMO guard de `DELETE /api/arvore/[id]`).
+// Mas "exclusão não deixa órfão": se este Processo era o ÚLTIMO apontando
+// para a Árvore, ela só existia por causa dele, e a rota que chama
+// `excluirProcesso` chama, em seguida,
+// `limparArvoreOrfaAposExclusaoDeProcesso` — mesmo guard, sem lógica nova.
+// Com fato protegido (arquivo oficial, protocolo, pagamento…) ou outro
+// processo ainda vivo na mesma árvore, ela continua intacta; do contrário,
+// sai junto. Achado real: a versão anterior documentava isto como "fora de
+// escopo de propósito" e a árvore ficava órfã para sempre — não existia
+// nenhum job nem rotina que realmente a buscasse.
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
