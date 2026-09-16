@@ -22,9 +22,6 @@ import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { CentralTarefas } from "@/src/components/operacao/central-tarefas"
 import { MinhaOperacao } from "@/src/components/operacao/minha-operacao"
 
-const FUNDO =
-  "var(--landscape-veil)"
-
 export default function OperacaoPage() {
   const router = useRouter()
   const { pode, carregando } = usePermissoes()
@@ -50,13 +47,12 @@ export default function OperacaoPage() {
 
   if (!mounted || carregando || !autorizado) {
     return (
-      <div className="relative min-h-screen [overflow-x:clip] text-white">
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-        <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: FUNDO }} />
+      <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--app-background)]" />
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[var(--border-default)] border-t-transparent" />
-            <p className="text-white/70">Carregando operação…</p>
+            <p className="text-[var(--text-secondary)]">Carregando operação…</p>
           </div>
         </div>
       </div>
@@ -64,13 +60,16 @@ export default function OperacaoPage() {
   }
 
   return (
-    <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-white">
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: FUNDO }} />
+    <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-[var(--text-primary)]">
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--app-background)]" />
 
+      {/* Cabeçalho extremamente limpo (decisão do usuário, 16/09/2026): só o
+          nome da tela e o que ela promete — sem métrica nem informação
+          decorativa aqui. Os elementos globais (busca, câmbio, data,
+          notificações, usuário, sair) são os mesmos do resto do sistema. */}
       <HeaderBar
-        title="Operação"
-        subtitle="Tarefas, distribuição e minha fila"
+        title="Minha Operação"
+        subtitle="Tudo que precisa da sua atenção agora."
         userName={user.nome}
         userRole={user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"}
         onLogout={() => void encerrarSessao("manual")}
@@ -81,8 +80,8 @@ export default function OperacaoPage() {
           <div className="flex gap-1">
             <button
               onClick={() => setAba("minha_operacao")}
-              className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
-                aba === "minha_operacao" ? "border-[var(--border-default)] text-white/90" : "border-transparent text-[var(--text-muted)] hover:text-white/70"
+              className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                aba === "minha_operacao" ? "border-[var(--action-primary)] text-[var(--text-primary)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
               Minha Operação
@@ -90,8 +89,8 @@ export default function OperacaoPage() {
             {podeDistribuir && (
               <button
                 onClick={() => setAba("distribuicao")}
-                className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
-                  aba === "distribuicao" ? "border-[var(--border-default)] text-white/90" : "border-transparent text-[var(--text-muted)] hover:text-white/70"
+                className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                  aba === "distribuicao" ? "border-[var(--action-primary)] text-[var(--text-primary)]" : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 }`}
               >
                 Distribuição
@@ -100,7 +99,7 @@ export default function OperacaoPage() {
           </div>
           <Link
             href="/operacao/central"
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-1.5 text-[12px] font-medium text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
+            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
           >
             Abrir Central Operacional →
           </Link>

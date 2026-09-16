@@ -234,8 +234,25 @@ export function MinhaOperacao() {
       <div className="min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div className="flex h-full min-h-0 gap-4">
           <div className={`flex min-h-0 min-w-0 flex-1 flex-col gap-3 ${selecionado != null ? "hidden lg:flex" : ""}`}>
-            {/* ── KPIs — item 8/9 do mandato ── */}
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+            {/* ── ESTADOS OPERACIONAIS — navegação única (redesign 16/09/2026).
+                Antes eram DOIS controles pro MESMO estado: uma grade de 8
+                tiles (KPI) e, embaixo, uma fileira de chips com o mesmo
+                rótulo e a mesma contagem — a mesma decisão duplicada em dois
+                lugares. Agora é uma barra só, compacta, com "Todas" incluída
+                nela mesma; a categoria ativa fica evidente por sublinhado +
+                cor, sem card pesado. ── */}
+            <div className="flex flex-wrap items-center gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-2 py-1.5">
+              <button
+                onClick={() => { setCategoria("todas"); setPagina(1) }}
+                className={`flex items-center gap-1.5 rounded-md border-b-2 px-2.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                  categoria === "todas"
+                    ? "border-[var(--action-primary)] text-[var(--text-primary)]"
+                    : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                }`}
+              >
+                Todas <span className="tabular-nums text-[var(--text-muted)]">{linhas?.length ?? 0}</span>
+              </button>
+              <span className="h-4 w-px shrink-0 bg-[var(--border-subtle)]" />
               {CATEGORIAS_ATENCAO.map((c) => {
                 const Icone = ICONE_CATEGORIA[c.chave]
                 const n = porCategoria.get(c.chave)?.length ?? 0
@@ -245,15 +262,14 @@ export function MinhaOperacao() {
                     key={c.chave}
                     title={c.tooltip}
                     onClick={() => { setCategoria(ativo ? "todas" : c.chave); setPagina(1) }}
-                    className={`flex flex-col items-start gap-1.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                      ativo ? "border-[var(--border-strong)] bg-[var(--surface-secondary)]" : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-secondary)]"
+                    className={`flex items-center gap-1.5 rounded-md border-b-2 px-2.5 py-1.5 text-[12.5px] font-medium transition-colors ${
+                      ativo
+                        ? "border-[var(--action-primary)] text-[var(--text-primary)]"
+                        : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     }`}
                   >
-                    <span className={`grid h-6 w-6 place-items-center rounded-full ${TOM_CATEGORIA[c.chave]}`}>
-                      <Icone className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="text-[17px] font-semibold tabular-nums text-[var(--text-primary)]">{n}</span>
-                    <span className="text-[10.5px] leading-tight text-[var(--text-secondary)]">{c.rotulo}</span>
+                    <Icone className={`h-3.5 w-3.5 ${ativo ? "" : "opacity-70"}`} />
+                    {c.rotulo} <span className="tabular-nums text-[var(--text-muted)]">{n}</span>
                   </button>
                 )
               })}
@@ -303,29 +319,6 @@ export function MinhaOperacao() {
               )}
             </div>
 
-            {/* ── CHIPS/ABAS DE ATENÇÃO — item 11 ── */}
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => { setCategoria("todas"); setPagina(1) }}
-                className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
-                  categoria === "todas" ? "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-[var(--text-primary)]" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                Todas <span className="tabular-nums text-[var(--text-muted)]">{linhas?.length ?? 0}</span>
-              </button>
-              {CATEGORIAS_ATENCAO.map((c) => (
-                <button
-                  key={c.chave}
-                  onClick={() => { setCategoria(categoria === c.chave ? "todas" : c.chave); setPagina(1) }}
-                  className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
-                    categoria === c.chave ? "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-[var(--text-primary)]" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {c.rotulo} <span className="tabular-nums text-[var(--text-muted)]">{porCategoria.get(c.chave)?.length ?? 0}</span>
-                </button>
-              ))}
-            </div>
-
             {/* ── TABELA — item 13 ── */}
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
               {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar sua operação." aoTentar={() => setRecarga((n) => n + 1)} />}
@@ -360,7 +353,15 @@ export function MinhaOperacao() {
                               <Etiqueta tom={atencaoLinha.tom === "critico" ? "critico" : atencaoLinha.tom === "alerta" ? "alerta" : "neutro"}>{atencaoLinha.rotulo}</Etiqueta>
                             </td>
                             <td className="max-w-[220px] px-3 py-2.5">
-                              <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{l.titulo}</div>
+                              <div className="flex items-center gap-1.5">
+                                {l.emRisco && (
+                                  <span
+                                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--danger)]"
+                                    title={l.motivosRisco.length ? l.motivosRisco.join(" · ") : "Em risco"}
+                                  />
+                                )}
+                                <span className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{l.titulo}</span>
+                              </div>
                               <div className="truncate text-[10.5px] text-[var(--text-muted)]">{[l.pessoaNome, l.processoNome].filter(Boolean).join(" · ") || "—"}</div>
                             </td>
                             <td className="px-3 py-2.5">
@@ -370,6 +371,9 @@ export function MinhaOperacao() {
                             <td className="max-w-[260px] px-3 py-2.5">
                               <div className="text-[11.5px] text-[var(--text-secondary)]">{textoDaSituacao(l)}</div>
                               <div className="truncate text-[10.5px] text-[var(--text-muted)]">{textoDaProximaAcao(l)}</div>
+                              {l.terceiroNome && (
+                                <div className="mt-0.5 truncate text-[10px] text-[var(--info-text)]">Terceiro: {l.terceiroNome}</div>
+                              )}
                             </td>
                             <td className="px-3 py-2.5">
                               <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
