@@ -201,6 +201,12 @@ export function WorkflowTab({
 
   // ✅ NOVO: stepId aberto na Central da Etapa (drawer empilhado)
   const [centralStepId, setCentralStepId] = useState<number | null>(null)
+  // QUAL SUBTAREFA foi clicada — quando o passo se decompõe em subtarefas, é
+  // ela (não "a primeira pendente") que decide qual editor abre. Achado real:
+  // 15/09/2026 — clicar em "2. Aguardar retorno do cartório" abria sempre o
+  // editor de "Solicitar certidão" porque nada identificava QUAL das 4 linhas
+  // foi clicada; a Central da Etapa recebia só o stepId (o mesmo para as 4).
+  const [centralSubtarefaKey, setCentralSubtarefaKey] = useState<string | null>(null)
 
   // OPERAÇÃO ANTECIPADA deste ALVO. Vive AQUI, no modal do documento — nunca na
   // listagem principal da Central, que é índice e não executor.
@@ -371,7 +377,10 @@ export function WorkflowTab({
           <StepOuSubtarefas
             key={step.id}
             step={step}
-            onOpenCentral={() => setCentralStepId(step.id)}
+            onOpenCentral={(subtarefaKey) => {
+              setCentralStepId(step.id)
+              setCentralSubtarefaKey(subtarefaKey ?? null)
+            }}
             refDoAtual={(el) => { if (el) passoAtual.current = el }}
             podeIniciar={podeIniciarEtapas}
             tarefaResponsavelNome={tarefaResponsavelNome}
@@ -434,8 +443,12 @@ export function WorkflowTab({
       <CentralDaEtapaDrawer
         documentoId={documentoId}
         stepId={centralStepId}
+        subtarefaKey={centralSubtarefaKey}
         isOpen={centralStepId !== null}
-        onClose={() => setCentralStepId(null)}
+        onClose={() => {
+          setCentralStepId(null)
+          setCentralSubtarefaKey(null)
+        }}
         onUpdate={() => {
           carregar()
           onChange?.()
@@ -463,7 +476,7 @@ function StepOuSubtarefas({
   step, onOpenCentral, refDoAtual, podeIniciar, tarefaResponsavelNome,
 }: {
   step: WorkflowStep
-  onOpenCentral: () => void
+  onOpenCentral: (subtarefaKey?: string) => void
   refDoAtual?: (el: HTMLDivElement | null) => void
   podeIniciar: boolean
   tarefaResponsavelNome?: string | null
@@ -541,7 +554,7 @@ function SubtarefaRow({
     status: string; bloqueioTexto: string | null; slaDays: number | null
   }
   ordem: number
-  onOpenCentral: () => void
+  onOpenCentral: (subtarefaKey?: string) => void
   podeIniciar: boolean
   tarefaResponsavelNome?: string | null
 }) {
@@ -617,7 +630,7 @@ function SubtarefaRow({
         </div>
         {podeAgir ? (
           <button
-            onClick={onOpenCentral}
+            onClick={() => onOpenCentral(s.key)}
             className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
           >
             Iniciar →

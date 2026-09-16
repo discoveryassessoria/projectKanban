@@ -33,6 +33,7 @@ import {
 } from "lucide-react"
 import { EditorRegistralModal } from "./EditorRegistralModal"
 import { StepEditorRouter } from "./StepEditors"
+import type { SubtarefaProjetada } from "./useConfiguracaoDaEtapa"
 import ReabrirEtapaModal from "./ReabrirEtapaModal"
 import {
   resolveWorkflowStepEditor,
@@ -110,6 +111,9 @@ interface WorkflowStep {
   editor?: { kind: StepEditorKind; especifico: boolean; stepKeyCanonico: string } | null
   /** Ações que o SERVIDOR autoriza para o usuário desta sessão. */
   acoesPermitidas?: AcaoEtapa[] | null
+  /** Quando o passo se decompõe em subtarefas, "etapa" pro operador é ELAS —
+   *  mesma resposta que `WorkflowTab` já usa para "N etapas · M concluídas". */
+  subtarefas?: SubtarefaProjetada[]
 }
 
 interface Workflow {
@@ -134,6 +138,9 @@ type TabId = "anexos" | "comentarios" | "timeline"
 export interface CentralDaEtapaDrawerProps {
   documentoId: number
   stepId: number | null
+  /** A subtarefa cuja linha foi clicada (quando o passo tem subtarefas) — decide
+   *  qual editor abre em vez de "a primeira subtarefa pendente". */
+  subtarefaKey?: string | null
   isOpen: boolean
   onClose: () => void
   onUpdate?: () => void
@@ -251,12 +258,18 @@ function TrilhaDeEtapas({ steps, atualId }: { steps: WorkflowStep[]; atualId: nu
  */
 export function CentralDaEtapaDrawer(props: CentralDaEtapaDrawerProps) {
   if (!props.isOpen) return null
-  return <ConteudoDrawer key={`${props.documentoId ?? 'sem-doc'}-${props.stepId ?? 'sem-step'}`} {...props} />
+  return (
+    <ConteudoDrawer
+      key={`${props.documentoId ?? 'sem-doc'}-${props.stepId ?? 'sem-step'}-${props.subtarefaKey ?? 'sem-subtarefa'}`}
+      {...props}
+    />
+  )
 }
 
 function ConteudoDrawer({
   documentoId,
   stepId,
+  subtarefaKey,
   isOpen,
   onClose,
   onUpdate,
@@ -429,6 +442,18 @@ function ConteudoDrawer({
   const step = workflow?.steps.find((s) => s.id === stepId) || null
   const totalSteps = workflow?.steps.length || 0
 
+  // "ETAPA X DE Y" — quando o passo tem subtarefas cadastradas, a subtarefa
+  // CLICADA (não a primeira pendente) é quem manda o número. Sem subtarefas,
+  // cai no passo/total de sempre. Achado real: 15/09/2026 — clicar em
+  // "2. Aguardar retorno do cartório" sempre mostrava "Etapa 1 de 1", porque
+  // etapa/total vinham do Step único que as contém, nunca da subtarefa.
+  const subtarefasDoStep = step?.subtarefas ?? []
+  const subtarefaAtual = subtarefaKey
+    ? subtarefasDoStep.find((s) => s.key === subtarefaKey) ?? null
+    : null
+  const etapaOrdem = subtarefaAtual ? subtarefaAtual.ordem : step?.ordem ?? 1
+  const etapaTotal = subtarefasDoStep.length > 0 ? subtarefasDoStep.length : totalSteps
+
   // A "TELA DE TRÁS" (status + Anexos/Observações/Timeline) SÓ EXISTE quando
   // tem algo que o editor da etapa não oferece: uma etapa cancelada (dizer
   // isso), uma concluída com permissão de reabrir, ou uma ação de GESTÃO
@@ -566,7 +591,7 @@ function ConteudoDrawer({
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
-                  Etapa {step.ordem} de {totalSteps} · Workflow Documental
+                  Etapa {etapaOrdem} de {etapaTotal} · Workflow Documental
                 </div>
                 <button
                   onClick={onClose}
@@ -578,11 +603,11 @@ function ConteudoDrawer({
               </div>
 
               <div className="text-[20px] font-bold tracking-tight leading-tight text-white mb-1">
-                {step.title}
+                {subtarefaAtual ? subtarefaAtual.label : step.title}
               </div>
-              {step.description && (
+              {(subtarefaAtual ? subtarefaAtual.descricao : step.description) && (
                 <div className="text-[13px] text-white/65 leading-relaxed mb-3 max-w-[680px]">
-                  {step.description}
+                  {subtarefaAtual ? subtarefaAtual.descricao : step.description}
                 </div>
               )}
 
@@ -970,6 +995,7 @@ function ConteudoDrawer({
           stepKey={step.stepKey}
           editorKind={kindDoEditor(step)}
           stepTitle={step.title}
+          subtarefaKeyClicada={subtarefaKey ?? null}
           documentoId={documentoId}
           stepId={step.id}
           stepStatus={step.status}

@@ -416,6 +416,9 @@ export interface StepEditorRouterProps {
   /** Resolução do editor vinda do servidor. Ausente = resolve localmente pelo mesmo registry. */
   editorKind?: StepEditorKind | null
   stepTitle?: string
+  /** A subtarefa cuja linha foi CLICADA (quando o passo tem subtarefas) — decide
+   *  qual editor abre. Sem ela, cai no fallback de "primeira pendente". */
+  subtarefaKeyClicada?: string | null
   documentoId: number
   stepId: number
   stepStatus: string
@@ -520,23 +523,31 @@ function EditorDoKind({
  * comportamento de sempre, intocado.
  */
 function EditorPorSubtarefaCorrente({
-  kindPadrao, stepTitle, rest,
-}: { kindPadrao: StepEditorKind; stepTitle?: string; rest: EditorEspecificoProps }) {
+  kindPadrao, stepTitle, subtarefaKeyClicada, rest,
+}: { kindPadrao: StepEditorKind; stepTitle?: string; subtarefaKeyClicada?: string | null; rest: EditorEspecificoProps }) {
   const { subtarefas, carregando } = useConfiguracaoDaEtapa(rest.isOpen ? rest.stepId : null)
   if (!rest.isOpen) return null
   if (carregando) return null
   if (subtarefas.length === 0) return <EditorDoKind kind={kindPadrao} stepTitle={stepTitle} rest={rest} />
 
-  const corrente = subtarefas.find((s) => !s.concluida)
-  // Todas concluídas: o passo já deveria ter fechado sozinho (a última subtarefa
-  // obrigatória conclui ele). Se chegou aqui, é uma fresta entre a subtarefa
-  // fechar e a tela recarregar — mostrar a última é mais seguro que travar.
-  const kindDaSubtarefa = ((corrente ?? subtarefas[subtarefas.length - 1]).executorKey as StepEditorKind | null) ?? "padrao"
+  // A LINHA CLICADA manda — nunca "a primeira pendente". Achado real:
+  // 15/09/2026 — clicar em "2. Aguardar retorno do cartório" sempre abria o
+  // editor da subtarefa 1 ("Solicitar certidão"), porque nada aqui sabia QUAL
+  // subtarefa o operador tinha clicado; a "corrente" (primeira não concluída)
+  // era usada mesmo quando a etapa clicada era outra, mais à frente.
+  const clicada = subtarefaKeyClicada
+    ? subtarefas.find((s) => s.key === subtarefaKeyClicada)
+    : null
+  // Sem clique identificado (abertura direta pelo stepId, sem subtarefa) ou
+  // subtarefa clicada não encontrada (config mudou sob o pé): cai na corrente
+  // de sempre — primeira pendente, ou a última se todas concluíram.
+  const corrente = clicada ?? subtarefas.find((s) => !s.concluida) ?? subtarefas[subtarefas.length - 1]
+  const kindDaSubtarefa = (corrente.executorKey as StepEditorKind | null) ?? "padrao"
   return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={rest} />
 }
 
 export function StepEditorRouter(props: StepEditorRouterProps) {
-  const { stepKey, phaseKey, editorKind, stepTitle, ...rest } = props
+  const { stepKey, phaseKey, editorKind, stepTitle, subtarefaKeyClicada, ...rest } = props
   const kind: StepEditorKind =
     editorKind ?? resolveWorkflowStepEditor({ stepKey, phaseKey }).kind
 
@@ -545,7 +556,14 @@ export function StepEditorRouter(props: StepEditorRouterProps) {
   // toa para um `kind` que sempre devolve null.
   if (kind === "registral") return null
 
-  return <EditorPorSubtarefaCorrente kindPadrao={kind} stepTitle={stepTitle} rest={rest} />
+  return (
+    <EditorPorSubtarefaCorrente
+      kindPadrao={kind}
+      stepTitle={stepTitle}
+      subtarefaKeyClicada={subtarefaKeyClicada}
+      rest={rest}
+    />
+  )
 }
 
 // ============================================================
