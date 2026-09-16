@@ -60,7 +60,7 @@ export default function DashboardPage() {
 
   if (!autorizado) {
     return (
-      <HomeShell>
+      <HomeShell variante="claro">
         <HomeSkeleton />
       </HomeShell>
     )
@@ -75,7 +75,7 @@ export default function DashboardPage() {
     : "O que precisa ser feito agora"
 
   return (
-    <HomeShell titulo={titulo} subtitulo={subtitulo}>
+    <HomeShell titulo={titulo} subtitulo={subtitulo} variante="claro">
       {isLoading && !data ? (
         <HomeSkeleton />
       ) : error && !data ? (

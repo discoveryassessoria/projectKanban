@@ -7,6 +7,15 @@
 // fundo arquitetônico europeu desfocado + overlay escuro + HeaderBar padrão.
 // A Home e o drill-down das filas compartilham este shell — mesma iluminação,
 // mesma tipografia, mesma barra lateral, mesmos componentes.
+//
+// VARIANTE "claro" (16/09/2026) — redesign da Página Inicial, só dela: a Home
+// pediu superfície clara/premium (ivory-azul, igual ao resto do DS de tema
+// claro), sem a cidade escurecida por trás. O drill-down de fila
+// (`/dashboard/fila/[key]`) não pediu nada disso e continua na variante
+// "escuro" (o default, sem tocar em nenhuma linha do comportamento antigo).
+// `HeaderBar` (câmbio, busca, notificações, usuário, sair) é o MESMO
+// componente nas duas variantes — só a busca liga, porque a Home pediu
+// explicitamente "manter os elementos globais já existentes".
 // ============================================================================
 
 import * as React from "react"
@@ -18,10 +27,13 @@ import { useJsonLocalStorage } from "@/src/lib/cliente"
 export function HomeShell({
   titulo = "Centro Operacional",
   subtitulo = "O que precisa ser feito agora",
+  variante = "escuro",
   children,
 }: {
   titulo?: string
   subtitulo?: string
+  /** "escuro" (default, inalterado) = cidade + véu. "claro" = ivory-azul do DS, sem imagem. */
+  variante?: "escuro" | "claro"
   children: React.ReactNode
 }) {
   const router = useRouter()
@@ -33,19 +45,30 @@ export function HomeShell({
 
   function sair() { void encerrarSessao("manual") }
 
+  const claro = variante === "claro"
+
   return (
-    <div className="relative min-h-screen [overflow-x:clip] text-white">
-      {/* AMBIENTE — receita única do sistema: imagem fixa nítida + degradê escuro.
-          O degradê é quase opaco onde o conteúdo vive e abre na base, então a
-          cidade aparece nítida embaixo — decisão de composição, não sobra. */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{
-          background:
-            "var(--landscape-veil)",
-        }}
-      />
+    <div className={`relative min-h-screen [overflow-x:clip] ${claro ? "text-[var(--text-primary)]" : "text-white"}`}>
+      {claro ? (
+        // Sem imagem, sem véu: o `body` (globals.css) já pinta o mesmo ivory-azul
+        // que o resto do sistema usa — esta camada só existe pra cobrir o fixed
+        // do próprio body atrás do header sticky, mesma técnica, cor lisa.
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--app-background)]" />
+      ) : (
+        <>
+          {/* AMBIENTE — receita única do sistema: imagem fixa nítida + degradê escuro.
+              O degradê é quase opaco onde o conteúdo vive e abre na base, então a
+              cidade aparece nítida embaixo — decisão de composição, não sobra. */}
+          <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+          <div
+            className="pointer-events-none fixed inset-0 -z-10"
+            style={{
+              background:
+                "var(--landscape-veil)",
+            }}
+          />
+        </>
+      )}
 
       <HeaderBar
         title={titulo}
@@ -53,7 +76,7 @@ export function HomeShell({
         userName={user?.nome || "Usuário"}
         userRole={user?.tipo === "admin" ? "Administrador" : user?.tipo || "Usuário"}
         userEmail={user?.email || ""}
-        ocultarBusca
+        ocultarBusca={!claro}
         onLogout={sair}
       />
 

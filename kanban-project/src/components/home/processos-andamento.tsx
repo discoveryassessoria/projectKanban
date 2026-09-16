@@ -10,7 +10,7 @@
 
 import useSWR from "swr"
 import Link from "next/link"
-import { ChevronRight, Search, SlidersHorizontal } from "lucide-react"
+import { ArrowRight, ChevronRight } from "lucide-react"
 import { BlocoCard, BlocoHeader, EmptyState } from "@/src/components/home/home-primitives"
 import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
 import type { SlaProcesso } from "@/src/types/sla"
@@ -67,21 +67,19 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
           titulo={data ? `${titulo} · ${data.total}` : titulo}
           descricao="Situação de cada processo aberto"
         />
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)]">
-            <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-[12px] text-[var(--text-muted)]">
-            <Search className="h-3.5 w-3.5" /> Buscar processo…
-          </span>
-        </div>
+        <Link
+          href="/kanban"
+          className="inline-flex shrink-0 items-center gap-1 text-[12.5px] font-medium text-[var(--action-primary)] transition hover:opacity-80"
+        >
+          Ver todos os processos <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
 
       {/* Quatro estados, como manda a Central: carregando, erro, vazio, conteúdo. */}
       {isLoading ? (
         <div className="space-y-2 px-5 pb-5">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-secondary)]" />
+            <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-secondary)]/60" />
           ))}
         </div>
       ) : error ? (
@@ -98,7 +96,7 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] border-collapse text-left">
             <thead>
-              <tr className="border-y border-[var(--border-subtle)] bg-[var(--surface-secondary)]">
+              <tr className="border-b border-[var(--border-subtle)]">
                 {["Processo", "Fase atual", "Progresso", "Responsável", "Pendências", "SLA", "Prioridade"].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                     {h}
@@ -106,15 +104,15 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[var(--border-subtle)]">
               {linhas.map((p) => {
                 const prio = p.prioridade ? PRIORIDADE[p.prioridade] : null
                 const faixa = p.sla?.faixa ? ESTILO_FAIXA_SLA[p.sla.faixa] : null
                 return (
-                  <tr key={p.id} className="border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-hover)]">
-                    <td className="px-4 py-3">
+                  <tr key={p.id} className="transition-colors hover:bg-[var(--surface-secondary)]/40">
+                    <td className="px-4 py-3.5">
                       <Link href={`/processos/${p.id}`} className="flex items-center gap-2.5">
-                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-semibold text-[var(--text-secondary)]">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--info-tile)] text-[10px] font-semibold text-[var(--info)]">
                           {iniciais(p.nome)}
                         </span>
                         <span className="min-w-0">
@@ -123,30 +121,33 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
                         </span>
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-[12.5px] text-[var(--text-secondary)]">{rotuloFase(p.faseAtualKey)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5 text-[12.5px] text-[var(--text-secondary)]">{rotuloFase(p.faseAtualKey)}</td>
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
                         <span className="w-9 shrink-0 text-[12.5px] font-semibold tabular-nums text-[var(--text-primary)]">{p.progresso}%</span>
-                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--surface-tertiary)]">
-                          <div className="h-full rounded-full bg-[var(--accent-primary)]" style={{ width: `${p.progresso}%` }} />
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+                          <div className="h-full rounded-full bg-[var(--action-primary)]" style={{ width: `${p.progresso}%` }} />
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[12.5px] text-[var(--text-secondary)]">
+                    <td className="px-4 py-3.5 text-[12.5px] text-[var(--text-secondary)]">
                       {p.responsavel ? p.responsavel.nome : <span className="text-[var(--text-muted)]">Sem responsável</span>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{p.pendencias}</span>
                       <span className="ml-1 text-[11px] text-[var(--text-muted)]">{p.pendencias === 1 ? "ação" : "ações"}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       {faixa ? (
-                        <span className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold `}>{p.sla?.rotuloStatus}</span>
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${faixa.chip}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${faixa.ponto}`} />
+                          {p.sla?.rotuloStatus}
+                        </span>
                       ) : (
                         <span className="text-[11px] text-[var(--text-muted)]">Sem prazo</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3.5">
                       {prio ? (
                         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--text-secondary)]">
                           <span className="h-2 w-2 rounded-full" style={{ background: prio.cor }} aria-hidden />
@@ -164,7 +165,7 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
           {data && data.total > linhas.length && (
             <div className="flex items-center justify-between px-5 py-3 text-[12px] text-[var(--text-muted)]">
               <span>Mostrando {linhas.length} de {data.total} processos</span>
-              <Link href="/kanban" className="inline-flex items-center gap-1 font-medium text-[var(--accent-text)] hover:underline">
+              <Link href="/kanban" className="inline-flex items-center gap-1 font-medium text-[var(--action-primary)] hover:underline">
                 Ver todos os processos <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
