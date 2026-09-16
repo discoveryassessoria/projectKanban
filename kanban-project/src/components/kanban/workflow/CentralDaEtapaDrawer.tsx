@@ -494,11 +494,20 @@ function ConteudoDrawer({
   // Um efeito só decide uma coisa de cada vez: abre nesta etapa nova, ou (só
   // numa passada seguinte, com editorAberto já refletido) fecha se não sobrou
   // nada pra mostrar.
-  const autoAbertoParaStep = useRef<number | null>(null)
+  // A CHAVE é (stepId, subtarefaKey) — NUNCA só stepId. Achado real
+  // (16/09/2026): as 4 subtarefas de "Solicitar certidão" compartilham o
+  // MESMO stepId físico (1 Step, 4 subtarefas). Com a trava só por `step.id`,
+  // concluir a subtarefa 1 e clicar "Iniciar" na 2 (mesmo stepId) caía direto
+  // na "rede de segurança" — `autoAbertoParaStep.current` já batia com
+  // `step.id` de antes — e o editor nunca reabria para a subtarefa nova; a
+  // Central da Etapa ficava travada mostrando a última coisa que tinha
+  // aberto (o editor da subtarefa 1, "Solicitar certidão").
+  const autoAbertoPara = useRef<string | null>(null)
+  const chaveDeAbertura = step ? `${step.id}::${subtarefaKey ?? ""}` : null
   useEffect(() => {
-    if (!isOpen || loading || !step) return
-    if (autoAbertoParaStep.current !== step.id) {
-      autoAbertoParaStep.current = step.id
+    if (!isOpen || loading || !step || !chaveDeAbertura) return
+    if (autoAbertoPara.current !== chaveDeAbertura) {
+      autoAbertoPara.current = chaveDeAbertura
       setEditorAberto(true)
       return
     }
@@ -508,7 +517,7 @@ function ConteudoDrawer({
     // além do editor, fecha a Central da Etapa inteira — nunca deixa a "tela de
     // trás" aparecer por uma fresta.
     if (!editorAberto && !temAcoesExtras) onClose()
-  }, [isOpen, loading, step, editorAberto, temAcoesExtras, onClose])
+  }, [isOpen, loading, step, chaveDeAbertura, editorAberto, temAcoesExtras, onClose])
 
   // Sem NADA além do editor: fechar o editor fecha a Central da Etapa inteira
   // — não há painel de trás para revelar.
@@ -519,7 +528,7 @@ function ConteudoDrawer({
   // Fechado: esquece o que já abriu sozinho — reabrir (mesma etapa ou outra)
   // deve ir direto ao editor de novo, não lembrar que "já abriu uma vez".
   useEffect(() => {
-    if (!isOpen) autoAbertoParaStep.current = null
+    if (!isOpen) autoAbertoPara.current = null
   }, [isOpen])
 
   // ✅ Se o drawer está aberto, já terminou de carregar, tem um workflow
