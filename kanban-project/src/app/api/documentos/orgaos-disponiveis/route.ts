@@ -9,7 +9,8 @@
 // escolher o órgão emissor.
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { resolverOrganizacao } from "@/src/services/organizacao-identidade"
 
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, "arvore.editar_documento")
@@ -28,5 +29,63 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     console.error("GET orgaos-disponiveis", e)
     return NextResponse.json({ error: "Erro ao carregar órgãos." }, { status: 500 })
+  }
+}
+
+/**
+ * CRIAÇÃO RÁPIDA de cartório — não confundir com o cadastro completo de
+ * Órgãos e Organizações (consulados, tribunais, comuni), que é curado por um
+ * admin e tem ficha inteira (financeiro, identificação fiscal, categorias).
+ *
+ * Achado real (15/09/2026): o Brasil tem milhares de cartórios de registro
+ * civil — pedir que um admin pré-cadastre cada um antes de qualquer operador
+ * conseguir pedir uma certidão não escala. Aqui é o quick-add operacional:
+ * nome + cidade/país, `type: "cartorio"` fixo, e a MESMA identidade única
+ * (`resolverOrganizacao` — nome oficial + país) que o cadastro completo usa,
+ * pra não duplicar o mesmo cartório real sob dois registros.
+ */
+export async function POST(request: NextRequest) {
+  const erro = await verificarPermissao(request, "arvore.editar_documento")
+  if (erro) return erro
+  try {
+    const b = await request.json().catch(() => ({} as Record<string, unknown>))
+    const name = typeof b.name === "string" ? b.name.trim().slice(0, 200) : ""
+    if (!name) return NextResponse.json({ error: "Informe o nome do cartório." }, { status: 400 })
+    const city = typeof b.city === "string" && b.city.trim() ? b.city.trim().slice(0, 100) : null
+    const state = typeof b.state === "string" && b.state.trim() ? b.state.trim().slice(0, 60) : null
+    const paisIdRaw = Number(b.paisId)
+    const paisId = Number.isInteger(paisIdRaw) && paisIdRaw > 0 ? paisIdRaw : null
+    if (paisId != null) {
+      const existe = await prisma.catalogoPais.findUnique({ where: { id: paisId }, select: { id: true } })
+      if (!existe) return NextResponse.json({ error: "País não encontrado no Cadastro Mestre." }, { status: 400 })
+    }
+
+    // MESMA ENTIDADE, mesmo registro — não cria um segundo cartório com o
+    // mesmo nome oficial no mesmo país.
+    const resolucao = await resolverOrganizacao(prisma, { name, paisId })
+    if (resolucao.id) {
+      const orgao = await prisma.orgaoProtocolo.findUnique({
+        where: { id: resolucao.id },
+        select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { id: true, countryLabel: true } } },
+      })
+      return NextResponse.json({ orgao, jaExistia: true })
+    }
+
+    const usuario = await extrairUsuarioComPermissoes(request)
+    const criado = await prisma.orgaoProtocolo.create({
+      data: { name, city, state, paisId, type: "cartorio", funcoes: ["ORGAO"], ativo: true },
+      select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { id: true, countryLabel: true } } },
+    })
+    await prisma.logAuditoria.create({
+      data: {
+        acao: "ORGAO_CARTORIO_CRIADO_RAPIDO", entidade: "OrgaoProtocolo", entidadeId: criado.id,
+        descricao: `Cartório "${name}" criado pelo quick-add (fora do cadastro admin).`,
+        usuarioId: usuario?.userId ?? null,
+      },
+    }).catch(() => null)
+    return NextResponse.json({ orgao: criado, jaExistia: false }, { status: 201 })
+  } catch (e) {
+    console.error("POST orgaos-disponiveis", e)
+    return NextResponse.json({ error: "Erro ao criar cartório." }, { status: 500 })
   }
 }

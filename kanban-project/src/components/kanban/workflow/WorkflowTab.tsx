@@ -384,6 +384,8 @@ export function WorkflowTab({
             refDoAtual={(el) => { if (el) passoAtual.current = el }}
             podeIniciar={podeIniciarEtapas}
             tarefaResponsavelNome={tarefaResponsavelNome}
+            isAdmin={isAdmin}
+            onRecarregar={carregar}
           />
         ))}
       </div>
@@ -473,34 +475,16 @@ export function WorkflowTab({
 // cadastradas (passo anterior à consolidação), cai no StepCard de sempre.
 
 function StepOuSubtarefas({
-  step, onOpenCentral, refDoAtual, podeIniciar, tarefaResponsavelNome,
+  step, onOpenCentral, refDoAtual, podeIniciar, tarefaResponsavelNome, isAdmin, onRecarregar,
 }: {
   step: WorkflowStep
   onOpenCentral: (subtarefaKey?: string) => void
   refDoAtual?: (el: HTMLDivElement | null) => void
   podeIniciar: boolean
   tarefaResponsavelNome?: string | null
+  isAdmin: boolean
+  onRecarregar: () => void
 }) {
-  // Só as etapas ATIVAS/BLOQUEADAS valem a pergunta: uma concluída não
-  // precisa saber se tem subtarefa — o StepCard de sempre já resume isso
-  // direito.
-  //
-  // "bloqueada" entra INTEIRA aqui, sem exigir `motivoBloqueio` preenchido —
-  // diferente do StepCard original (que só a tratava como ativa quando tinha
-  // texto de bloqueio, senão caía no modo FUTURA/"aguarda liberação"). Isso
-  // era certo enquanto só existia bloqueio MANUAL (que sempre grava motivo).
-  // A espera externa AUTOMÁTICA (subtarefa 2/3 com `esperaExternaAoLiberar`)
-  // bloqueia a TAREFA, não escreve `PhaseWorkflowStepInstance.motivo` — e como
-  // esta arquitetura tem UM passo só (nunca dois passos em cadeia), "bloqueada"
-  // aqui NUNCA significa "esperando outro passo terminar": significa sempre
-  // uma subtarefa interna esperando. Achado real: 15/09/2026, processo Teste —
-  // a lista de subtarefas sumia (voltava pro card cinza "aguarda liberação")
-  // assim que a espera externa automática bloqueava o passo.
-  const isActive =
-    step.status === "em_andamento" ||
-    step.status === "aguardando_terceiro" ||
-    step.status === "atrasada" ||
-    step.status === "bloqueada"
   // SEM FETCH PRÓPRIO — `step.subtarefas` já chega pronto na MESMA resposta
   // de `/api/documentos/[id]/workflow` (ver montarWorkflowV2). Antes disto
   // havia uma segunda chamada aqui (`useConfiguracaoDaEtapa`), e a corrida
@@ -509,7 +493,13 @@ function StepOuSubtarefas({
   // não tinha voltado. Sem segunda chamada, sem corrida.
   const subtarefas = step.subtarefas ?? []
 
-  if (!isActive || subtarefas.length === 0) {
+  // Achado real (16/09/2026): esconder as subtarefas de um passo CONCLUÍDO
+  // (o `!isActive` original) deixava "ver o que aconteceu" impossível sem
+  // adivinhar — o passo virava uma linha cinza sem nada clicável, mesmo tendo
+  // 4 subtarefas com autor/data/resultado cada uma. `isActive` continua
+  // decidindo o VISUAL (card rico vs. linha compacta), nunca se as subtarefas
+  // aparecem: história concluída é história, não silêncio.
+  if (subtarefas.length === 0) {
     return (
       <StepCard
         step={step} onOpenCentral={onOpenCentral} refDoAtual={refDoAtual}
@@ -528,6 +518,9 @@ function StepOuSubtarefas({
           onOpenCentral={onOpenCentral}
           podeIniciar={podeIniciar}
           tarefaResponsavelNome={tarefaResponsavelNome}
+          isAdmin={isAdmin}
+          stepInstanceId={step.id}
+          onRecarregar={onRecarregar}
         />
       ))}
     </div>
@@ -547,7 +540,7 @@ const SUBTAREFA_STATUS_LABEL: Record<string, string> = {
 }
 
 function SubtarefaRow({
-  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome,
+  subtarefa, ordem, onOpenCentral, podeIniciar, tarefaResponsavelNome, isAdmin, stepInstanceId, onRecarregar,
 }: {
   subtarefa: {
     key: string; label: string; descricao: string | null; concluida: boolean; disponivel: boolean
@@ -557,16 +550,36 @@ function SubtarefaRow({
   onOpenCentral: (subtarefaKey?: string) => void
   podeIniciar: boolean
   tarefaResponsavelNome?: string | null
+  isAdmin: boolean
+  stepInstanceId: number
+  onRecarregar: () => void
 }) {
   const s = subtarefa
-  // MODO CONCLUÍDA — compacto, mesmo padrão visual do StepCard concluído.
+  // MODO CONCLUÍDA — compacto, mesmo padrão visual do StepCard concluído, mas
+  // clicável: "concluída" é história, não é motivo pra esconder o que
+  // aconteceu. Decisão do usuário (16/09/2026): todo mundo vê e abre em modo
+  // leitura; só o admin reabre (RegruaReabrirSubtarefa, botão à parte).
   if (s.concluida) {
     return (
       <div className="bg-[var(--surface-secondary)]/30 border border-green-900/60 rounded-md px-3 py-2 flex items-center gap-3">
-        <div className="w-6 h-6 rounded-full bg-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
-          <Check className="w-3.5 h-3.5 text-white" />
-        </div>
-        <div className="flex-1 min-w-0 text-[12.5px] font-semibold text-green-800">{ordem}. {s.label}</div>
+        <button
+          type="button"
+          onClick={() => onOpenCentral(s.key)}
+          className="flex-1 min-w-0 flex items-center gap-3 text-left"
+        >
+          <div className="w-6 h-6 rounded-full bg-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
+            <Check className="w-3.5 h-3.5 text-white" />
+          </div>
+          <div className="flex-1 min-w-0 text-[12.5px] font-semibold text-green-800 hover:underline">{ordem}. {s.label}</div>
+        </button>
+        {isAdmin && (
+          <BotaoReabrirSubtarefa
+            stepInstanceId={stepInstanceId}
+            subtaskKey={s.key}
+            label={s.label}
+            onReaberto={onRecarregar}
+          />
+        )}
       </div>
     )
   }
@@ -645,6 +658,71 @@ function SubtarefaRow({
         ) : null}
       </div>
     </div>
+  )
+}
+
+/**
+ * REABRIR SUBTAREFA — SÓ ADMIN.
+ *
+ * Sem plano/modal cheio (diferente de `ReabrirEtapaModal`, que reabre o PASSO
+ * inteiro e por isso precisa mostrar dependentes/outras unidades): reabrir UMA
+ * subtarefa nunca alcança outra subtarefa do mesmo passo nem outro passo — o
+ * único efeito colateral possível é o PASSO voltar a ficar aberto quando ele
+ * já estava CONCLUÍDO, e a API já avisa isso na resposta (`passoReaberto`).
+ */
+function BotaoReabrirSubtarefa({
+  stepInstanceId, subtaskKey, label, onReaberto,
+}: {
+  stepInstanceId: number
+  subtaskKey: string
+  label: string
+  onReaberto: () => void
+}) {
+  const [enviando, setEnviando] = useState(false)
+
+  const reabrir = async () => {
+    const justificativa = window.prompt(
+      `Reabrir "${label}"? Explique o motivo (mínimo 5 caracteres) — isso vira uma nova tentativa, o que já aconteceu continua no histórico.`,
+    )
+    if (justificativa == null) return
+    if (justificativa.trim().length < 5) {
+      alert("Justificativa muito curta — explique o motivo com pelo menos 5 caracteres.")
+      return
+    }
+    setEnviando(true)
+    try {
+      const token = localStorage.getItem("token") ?? localStorage.getItem("authToken")
+      const res = await fetch(
+        `/api/workflow-step-instances/${stepInstanceId}/subtarefas/${encodeURIComponent(subtaskKey)}/reabrir`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ justificativa: justificativa.trim() }),
+        },
+      )
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok || !j.ok) {
+        alert(j.mensagem ?? "Não foi possível reabrir esta subtarefa.")
+        return
+      }
+      onReaberto()
+    } catch {
+      alert("Falha de rede ao reabrir a subtarefa.")
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={reabrir}
+      disabled={enviando}
+      className="shrink-0 text-[10.5px] font-semibold text-[var(--accent-text)] hover:underline disabled:opacity-50"
+      title="Reabrir esta subtarefa (admin)"
+    >
+      {enviando ? "Reabrindo…" : "Reabrir"}
+    </button>
   )
 }
 

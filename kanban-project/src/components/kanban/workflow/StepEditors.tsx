@@ -543,7 +543,17 @@ function EditorPorSubtarefaCorrente({
   // de sempre — primeira pendente, ou a última se todas concluíram.
   const corrente = clicada ?? subtarefas.find((s) => !s.concluida) ?? subtarefas[subtarefas.length - 1]
   const kindDaSubtarefa = (corrente.executorKey as StepEditorKind | null) ?? "padrao"
-  return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={rest} />
+  // SOMENTE LEITURA POR SUBTAREFA, NÃO SÓ POR PASSO. Achado real (16/09/2026):
+  // um passo consolidado (1 Passo → N subtarefas) pode ter a subtarefa 1
+  // concluída enquanto o passo inteiro continua "em_andamento" (subtarefas
+  // 2-4 ainda em aberto) — `rest.stepStatus` reflete o PASSO, então abrir a
+  // subtarefa já concluída caía em modo de EDIÇÃO, com os botões de salvar
+  // ativos, quando deveria ser histórico read-only. A subtarefa CLICADA manda
+  // sobre o próprio somente-leitura, igual já manda sobre qual editor abrir.
+  const restEfetivo = corrente.concluida && rest.stepStatus !== "concluida"
+    ? { ...rest, stepStatus: "concluida" }
+    : rest
+  return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={restEfetivo} />
 }
 
 export function StepEditorRouter(props: StepEditorRouterProps) {
@@ -1371,10 +1381,41 @@ function OrgaoDoRequerimentoField({
   const [editando, setEditando] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+  const [criandoNovo, setCriandoNovo] = useState(false)
+  const [novoNome, setNovoNome] = useState("")
+  const [novaCidade, setNovaCidade] = useState("")
   const opcoesReq = useApi<{ orgaos: OrgaoOpcaoResumo[] }>(
     editando ? "/api/documentos/orgaos-disponiveis" : null,
   )
   const opcoes = opcoesReq.dados?.orgaos ?? []
+
+  // CRIAÇÃO RÁPIDA DE CARTÓRIO — não confundir com o cadastro completo de
+  // Órgãos e Organizações (admin, ficha inteira). O Brasil tem milhares de
+  // cartórios de registro civil; pedir pré-cadastro admin de cada um antes de
+  // qualquer requerimento não escala. Nome + cidade bastam pra identificar; o
+  // servidor (`resolverOrganizacao`) já deduplica por nome+país.
+  const criarCartorioRapido = async () => {
+    if (!novoNome.trim()) { setErro("Informe o nome do cartório."); return }
+    setSalvando(true)
+    setErro(null)
+    try {
+      const res = await fetch("/api/documentos/orgaos-disponiveis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ name: novoNome.trim(), city: novaCidade.trim() || undefined }),
+      })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) { setErro(j?.error ?? "Não foi possível criar o cartório."); return }
+      setCriandoNovo(false)
+      setNovoNome("")
+      setNovaCidade("")
+      await salvar(j.orgao.id)
+    } catch {
+      setErro("Falha de rede ao criar o cartório.")
+    } finally {
+      setSalvando(false)
+    }
+  }
 
   const salvar = async (novoOrgaoId: number | null) => {
     setSalvando(true)
@@ -1418,13 +1459,58 @@ function OrgaoDoRequerimentoField({
     )
   }
 
+  if (criandoNovo) {
+    return (
+      <div className="space-y-1.5">
+        <input
+          autoFocus
+          type="text"
+          value={novoNome}
+          onChange={(e) => setNovoNome(e.target.value)}
+          placeholder="Nome do cartório"
+          disabled={salvando}
+          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none disabled:opacity-50"
+        />
+        <input
+          type="text"
+          value={novaCidade}
+          onChange={(e) => setNovaCidade(e.target.value)}
+          placeholder="Cidade (opcional)"
+          disabled={salvando}
+          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none disabled:opacity-50"
+        />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={criarCartorioRapido}
+            disabled={salvando || !novoNome.trim()}
+            className="text-[10.5px] font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 rounded px-2 py-1"
+          >
+            {salvando ? "Criando…" : "Criar e usar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCriandoNovo(false); setErro(null) }}
+            className="text-[10px] text-[var(--text-secondary)] hover:underline"
+          >
+            cancelar
+          </button>
+        </div>
+        {erro && <div className="text-[10.5px] text-red-700">{erro}</div>}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-1.5">
       <select
         autoFocus
         disabled={salvando || opcoesReq.carregando}
         defaultValue={orgaoId ?? ""}
-        onChange={(e) => salvar(e.target.value ? Number(e.target.value) : null)}
+        onChange={(e) => {
+          if (e.target.value === "__novo__") { setCriandoNovo(true); return }
+          salvar(e.target.value ? Number(e.target.value) : null)
+        }}
         className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none disabled:opacity-50"
       >
         <option value="">— selecione —</option>
@@ -1433,6 +1519,7 @@ function OrgaoDoRequerimentoField({
             {(o.nomeFantasia || o.name)}{o.pais ? ` · ${o.pais.countryLabel}` : ""}
           </option>
         ))}
+        <option value="__novo__">+ Criar cartório rápido…</option>
       </select>
       <button type="button" onClick={() => { setEditando(false); setErro(null) }} className="text-[10px] text-[var(--text-secondary)] hover:underline">
         cancelar

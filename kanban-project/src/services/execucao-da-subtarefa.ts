@@ -235,6 +235,90 @@ export async function abrirExecucao(
   return { execucao: nova, substituiu: vigente?.id ?? null, criada: true }
 }
 
+export interface ResultadoReaberturaSubtarefa {
+  ok: boolean
+  code?: "SUBTAREFA_NAO_ENCONTRADA" | "SUBTAREFA_NAO_CONCLUIDA" | "PASSO_NAO_ENCONTRADO"
+  mensagem?: string
+  passoReaberto?: boolean
+}
+
+/**
+ * REABRE UMA SUBTAREFA — admin, por instância, sem tocar nas outras subtarefas
+ * do mesmo passo.
+ *
+ * Achado real (16/09/2026): o passo consolidado (1 Tarefa → 1 Passo → N
+ * subtarefas) só tinha reabertura no nível do PASSO inteiro
+ * (`executarReabertura`, CONGELADO — 68 invariantes). Reabrir "Solicitar
+ * certidão" reabria as 4 subtarefas juntas; não havia como corrigir só
+ * "Enviar requerimento" sem desfazer "Conferir e validar" também.
+ *
+ * NÃO modifica o mecanismo congelado: quando o passo já está CONCLUIDO, esta
+ * função CHAMA `executarReabertura` (inalterada) pra trazer o passo de volta
+ * — a mesma porta que qualquer reabertura de passo usa, com os mesmos 68
+ * invariantes protegendo. A parte NOVA é só a granularidade abaixo dele:
+ * `abrirExecucao` substitui a execução da SUBTAREFA pedida (mantendo o que
+ * já aconteceu nela como fato histórico, por trás de `supersededAt`) sem
+ * tocar nas execuções vigentes das demais — que continuam CONCLUIDO.
+ */
+export async function reabrirSubtarefa(args: {
+  stepInstanceId: number
+  subtaskKey: string
+  actorId: number | null
+  justificativa: string
+  correlationId?: string
+}): Promise<ResultadoReaberturaSubtarefa> {
+  const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
+  if (!vigente) return { ok: false, code: "SUBTAREFA_NAO_ENCONTRADA", mensagem: "Esta subtarefa não tem execução registrada." }
+  if (vigente.status !== "CONCLUIDO") {
+    return { ok: false, code: "SUBTAREFA_NAO_CONCLUIDA", mensagem: "Só uma subtarefa concluída pode ser reaberta." }
+  }
+
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: args.stepInstanceId }, select: { status: true },
+  })
+  if (!passo) return { ok: false, code: "PASSO_NAO_ENCONTRADO", mensagem: "Etapa não encontrada." }
+
+  let passoReaberto = false
+  if (passo.status === "CONCLUIDO") {
+    const { executarReabertura } = await import("@/src/services/reabertura-de-execucao")
+    const r = await executarReabertura({
+      stepInstanceId: args.stepInstanceId,
+      motivoCodigo: "ERRO_OPERACIONAL",
+      justificativa: args.justificativa,
+      comDependentes: false,
+      actorId: args.actorId,
+      correlationId: args.correlationId,
+    })
+    if (!r.ok) return { ok: false, mensagem: r.mensagem ?? "Não foi possível reabrir a etapa." }
+    passoReaberto = true
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await abrirExecucao({
+      stepInstanceId: args.stepInstanceId,
+      subtaskKey: args.subtaskKey,
+      subtaskDefinitionId: vigente.subtaskDefinitionId,
+      workflowVersao: vigente.workflowVersao,
+      motivo: MOTIVOS_DE_EXECUCAO.REABERTURA_MANUAL,
+      status: ESTADOS_DA_SUBTAREFA.DISPONIVEL,
+      responsavelId: vigente.responsavelId,
+      correlationId: args.correlationId ?? null,
+    }, tx)
+    await tx.logAuditoria.create({
+      data: {
+        acao: "SUBTAREFA_REABERTA",
+        entidade: "SubtaskExecution",
+        entidadeId: vigente.id,
+        usuarioId: args.actorId,
+        descricao: `Subtarefa "${args.subtaskKey}" (passo ${args.stepInstanceId}) reaberta${passoReaberto ? " — passo também reaberto" : ""}: ${args.justificativa}`,
+        detalhes: { stepInstanceId: args.stepInstanceId, subtaskKey: args.subtaskKey, passoReaberto } as never,
+      },
+    }).catch(() => null)
+  })
+
+  return { ok: true, passoReaberto }
+}
+
 /**
  * REGISTRA NA EXECUÇÃO VIGENTE o que acabou de acontecer.
  *
