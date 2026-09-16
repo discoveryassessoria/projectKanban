@@ -486,6 +486,18 @@ export async function executarAcaoCadastrada(
     if (!r.success) {
       return { ok: false, codigo: r.code, mensagem: "O efeito foi aplicado, mas a etapa não pôde ser concluída.", efeito: acao.effectKey, detalhes }
     }
+    // O GANCHO ÚNICO DO AUTO-AVANÇO (auto-avanco.ts) — achado real (16/09/2026):
+    // "por que foi concluído e não andou de fase?" O passo concluía certinho,
+    // mas esta porta (a que "Registrar conferência"/"Validado — enviar para a
+    // Análise" e toda ação cadastrada passam) nunca chamava o gancho que o
+    // próprio auto-avanco.ts documenta como obrigatório em TODA conclusão de
+    // passo. `concluirPasso` (via /api/tarefas/[id]/concluir) já chamava;
+    // `executarAcaoCadastrada` — o caminho canônico de hoje — não. Best-effort
+    // e não lança (o próprio hook garante isso).
+    if (concluiu) {
+      const { tentarAvancoAutomaticoSeFaseAtual } = await import("@/src/lib/motor/auto-avanco")
+      await tentarAvancoAutomaticoSeFaseAtual(passo.processoId, passo.faseMacroKey, "executar-acao-cadastrada")
+    }
   }
 
   await prisma.logAuditoria.create({
