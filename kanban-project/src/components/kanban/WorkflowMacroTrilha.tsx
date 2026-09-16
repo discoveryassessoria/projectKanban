@@ -196,7 +196,7 @@ export function WorkflowMacroTrilha({
             : st === "atual" ? { backgroundColor: "var(--stepper-current-bg)" }
             : undefined
           const badgeTxt =
-            st === "concluida" ? (ehFaseFinal ? "Concluída" : "Passada")
+            st === "concluida" ? "Concluída"
             : st === "atual" ? "Atual"
             : st === "pulada" ? "Pulada"
             : st === "condicional" ? "Condicional"
