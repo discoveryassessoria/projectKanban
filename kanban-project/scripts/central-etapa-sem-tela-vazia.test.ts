@@ -95,13 +95,20 @@ check("2c) sem temAcoesExtras, fechar o editor fecha a Central inteira (fecharEd
 // abertura para este passo já foi tentada — nunca no commit em que acabou de
 // ser agendada.
 check("2d) rede de segurança: existe, e o gatilho de abertura automática e o de fechar vivem no MESMO useEffect (nunca corre contra editorAberto desatualizado)",
-  drawer.includes("if (autoAbertoParaStep.current !== step.id) {") &&
+  // Achado real (16/09/2026): a trava de abertura era só por `step.id` — as 4
+  // subtarefas de um passo consolidado compartilham o MESMO step.id físico,
+  // então trocar de subtarefa (mesmo step, chave diferente) nunca reabria o
+  // editor. A chave passou a ser (stepId, subtarefaKey) via `chaveDeAbertura`;
+  // a garantia que este teste protege — as duas decisões (abrir/fechar) no
+  // MESMO useEffect, nunca em dois efeitos correndo contra `editorAberto`
+  // desatualizado — continua valendo, só a variável de trava mudou de nome.
+  drawer.includes("if (autoAbertoPara.current !== chaveDeAbertura) {") &&
   drawer.includes("if (!editorAberto && !temAcoesExtras) onClose()") &&
   // As DUAS decisões (abrir / fechar) precisam estar dentro do MESMO bloco de
   // efeito — nunca em dois `useEffect` distintos reagindo a `step` ao mesmo
   // tempo, que foi exatamente a race que reabriu este achado.
   (() => {
-    const iAbre = drawer.indexOf("if (autoAbertoParaStep.current !== step.id) {")
+    const iAbre = drawer.indexOf("if (autoAbertoPara.current !== chaveDeAbertura) {")
     const iFecha = drawer.indexOf("if (!editorAberto && !temAcoesExtras) onClose()")
     const iUseEffectAntesDoAbre = drawer.lastIndexOf("useEffect(", iAbre)
     const iFimDoEfeito = drawer.indexOf("}, [", iFecha)
