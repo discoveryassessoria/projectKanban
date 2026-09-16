@@ -2728,13 +2728,27 @@ function FormConferirCertidao({
   )
   const [observacao, setObservacao] = useState(() => texto(etapa?.stepObservation))
 
+  // CAMPO DINÂMICO DO CADASTRO — este painel tinha campos fixos (nome/pai/mãe/
+  // datas/checklist/observação); o que o cadastro declara ALÉM disso (ex.:
+  // "Parecer", obrigatório na subtarefa "Conferir e validar certidão") não
+  // tinha input nenhum na tela. Achado real (16/09/2026): a ação recusava com
+  // "Preencha antes de continuar: Parecer" e não havia onde digitar — o
+  // cadastro (Gerenciamento) estava certo, faltava o painel ler dele. Lido por
+  // KEY (não hardcoded "sempre existe"): se o cadastro um dia deixar de exigir
+  // ou remover este campo, o painel para de pedir, sem precisar de outro deploy.
+  const campoParecer = subConferencia?.definicao.campos.find((c) => c.key === "parecer") ?? null
+  const [parecer, setParecer] = useState("")
+
   const [saving, setSaving] = useState(false)
   const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const readOnly = stepStatus === "concluida"
 
   const ehCasamento = isCasamento(docTipo)
-  const podeConcluir = nomeRegistrado.trim().length > 0 && resultado !== null
+  const podeConcluir =
+    nomeRegistrado.trim().length > 0 &&
+    resultado !== null &&
+    (!campoParecer?.obrigatorio || parecer.trim().length > 0)
 
   const handleSalvar = async () => {
     if (readOnly) return
@@ -2744,6 +2758,10 @@ function FormConferirCertidao({
     }
     if (!resultado) {
       alert("Escolha o resultado da conferência.")
+      return
+    }
+    if (campoParecer?.obrigatorio && !parecer.trim()) {
+      alert(`Preencha "${campoParecer.label}" antes de continuar.`)
       return
     }
 
@@ -2789,6 +2807,7 @@ function FormConferirCertidao({
           checklist,
           observacao: observacao.trim() || null,
           motivo: observacao.trim() || null,
+          parecer: parecer.trim() || null,
         })
         if (!r.ok) { setErroServidor(r.mensagem ?? "A conferência não pôde ser registrada."); return }
         onClose()
@@ -3115,6 +3134,21 @@ function FormConferirCertidao({
                 )}
             </div>
           </div>
+
+          {/* Campo do cadastro — ver comentário de `campoParecer` acima. */}
+          {campoParecer && (
+            <div>
+              <Label required={campoParecer.obrigatorio}>{campoParecer.label}</Label>
+              <textarea
+                rows={3}
+                value={parecer}
+                onChange={(e) => setParecer(e.target.value)}
+                placeholder="Parecer sobre o resultado da conferência..."
+                disabled={readOnly}
+                className={`${campoParecer.obrigatorio && !parecer.trim() ? inputClsInvalid : inputCls} resize-none`}
+              />
+            </div>
+          )}
 
           {/* ═══════════════════════════════════════════════════════
               4. OBSERVAÇÃO

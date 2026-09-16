@@ -82,8 +82,9 @@ export async function aprovarParaAnalise(a: AlvoDoEfeito) {
   // está ATENDIDA/NAO_LOCALIZADA) — código morto para todo documento que passa pela
   // Emissão V2, porque nada a tinha marcado ATENDIDA antes.
   const mudou = await status(a, "EM_ANALISE")
+  const parecer = texto(a.valores.parecer)
   await observar(a, "aprovado-analise",
-    `Conferência operacional aprovada; documento liberado para a Análise Documental.${texto(a.valores.observacao) ? ` ${texto(a.valores.observacao)}` : ""}`)
+    `Conferência operacional aprovada; documento liberado para a Análise Documental.${parecer ? ` Parecer: ${parecer}` : ""}${texto(a.valores.observacao) ? ` ${texto(a.valores.observacao)}` : ""}`)
   if (a.documentoId != null) {
     const doc = await prisma.documento.findUnique({ where: { id: a.documentoId }, select: { necessidadeId: true } })
     if (doc?.necessidadeId != null) await atenderNecessidade(doc.necessidadeId)
