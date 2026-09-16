@@ -5,7 +5,9 @@
 // sem HTTP) duas vezes e prova que:
 //   - a 1ª chamada cria UMA Pessoa e grava Requerente.personId;
 //   - a 2ª chamada REUSA a MESMA Pessoa (não cria uma segunda);
-//   - uma Pessoa já vinculada a OUTRA árvore não é movida à força (409 lógico).
+//   - um Requerente com Pessoa em OUTRA árvore, ao vincular numa árvore nova,
+//     NASCE uma 2ª Pessoa só nessa árvore nova (linhagem própria — duas
+//     cidadanias/dois processos), sem tocar a Pessoa original da 1ª árvore.
 //
 // Integração real contra o banco de TESTE (kanban_test). Cria dados marcados e os
 // REMOVE ao fim. Rodar:
@@ -124,14 +126,21 @@ async function main() {
     const reqApos2 = await prisma.requerente.findUnique({ where: { id: requerente.id } })
     ok(reqApos2?.personId === pessoaId1, "personId inalterado após reuso", reqApos2?.personId)
 
-    // ── Guarda: Pessoa já em OUTRA árvore não é movida ───────────────────────
-    console.log("\n3) Requerente já vinculado a Pessoa de OUTRA árvore → 409 lógico")
+    // ── Duas linhagens reais: Requerente com Pessoa em OUTRA árvore ganha uma
+    //    2ª Pessoa, só nessa árvore nova — a 1ª Pessoa/árvore fica intacta ──────
+    console.log("\n3) Requerente já vinculado a Pessoa de OUTRA árvore → cria 2ª Pessoa nesta árvore")
     const arvore2 = await prisma.arvore.create({ data: { nome: `${MARK} 2` } })
     ctx.arvoreIds.push(arvore2.id)
     const r3 = await vincularRequerente({ arvoreId: arvore2.id, requerenteId: requerente.id })
-    ok(!r3.ok && r3.code === "PESSOA_EM_OUTRA_ARVORE", "não move Pessoa entre árvores (PESSOA_EM_OUTRA_ARVORE)", r3)
+    ok(r3.ok && r3.criada === true, "cria uma 2ª Pessoa na árvore nova (não recusa)", r3)
+    const pessoaId3 = r3.ok ? r3.pessoaId : -1
+    ok(pessoaId3 !== pessoaId1, "a 2ª Pessoa é uma linha NOVA, diferente da 1ª", { pessoaId1, pessoaId3 })
     const countOutra = await prisma.pessoa.count({ where: { arvoreId: arvore2.id } })
-    ok(countOutra === 0, "nenhuma Pessoa criada na 2ª árvore", countOutra)
+    ok(countOutra === 1, "exatamente 1 Pessoa nasceu na 2ª árvore", countOutra)
+    const pessoa1Intacta = await prisma.pessoa.findUnique({ where: { id: pessoaId1 } })
+    ok(pessoa1Intacta?.arvoreId === arvore.id, "a Pessoa original permanece intacta na 1ª árvore", pessoa1Intacta?.arvoreId)
+    const reqApos3 = await prisma.requerente.findUnique({ where: { id: requerente.id } })
+    ok(reqApos3?.personId === pessoaId3, "Requerente.personId passa a apontar para a Pessoa da árvore nova", reqApos3?.personId)
 
     // ── 4) vincularPessoaExistenteAoRequerente — a pessoa JÁ existe (ex.: árvore
     //      importada), quem opera escolhe a qual requerente ela corresponde ──────
