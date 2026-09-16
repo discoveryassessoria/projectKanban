@@ -819,6 +819,7 @@ function ConteudoDrawer({
                   contextoAntecipada={contextoAntecipada}
                   tarefaResponsavelId={tarefa?.responsavelId ?? null}
                   tarefaResponsavelNome={tarefa?.responsavelNome ?? null}
+                  faseInstanciaId={faseInstanciaId}
                   onChange={() => {
                     onSave?.()
                     carregar()

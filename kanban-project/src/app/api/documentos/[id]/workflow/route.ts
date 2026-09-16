@@ -24,10 +24,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const documentoId = parseInt(id)
     if (isNaN(documentoId)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     const usuario = await extrairUsuarioComPermissoes(request)
-    const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(documentoId, {
-      usuarioId: usuario?.userId ?? null,
-      permissoes: usuario?.permissoes ?? null,
-    })
+    // ESCOPO EXPLÍCITO DE FASE — mesma correção do drawer (782f9024): quem já sabe
+    // qual instância de fase está consultando pede por ela direto, em vez de
+    // sempre herdar "onde o trabalho está agora". Sem isto, a aba Workflow (que
+    // lê ESTA rota, não a de projeção) continuava mostrando a fase mais recente
+    // mesmo consultando uma fase passada — a metade do bug que ainda faltava.
+    const { searchParams } = new URL(request.url)
+    const workflowInstanceIdParam = searchParams.get("workflowInstanceId")
+    const workflowInstanceId = workflowInstanceIdParam ? parseInt(workflowInstanceIdParam) : null
+    const escopoOverride =
+      workflowInstanceId != null && !isNaN(workflowInstanceId) ? { workflowInstanceId } : undefined
+    const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(
+      documentoId,
+      { usuarioId: usuario?.userId ?? null, permissoes: usuario?.permissoes ?? null },
+      escopoOverride,
+    )
     return NextResponse.json({ workflow, semWorkflowInterno: semWorkflowInterno ?? false })
   } catch (error) {
     console.error("[GET /api/documentos/[id]/workflow]", error)

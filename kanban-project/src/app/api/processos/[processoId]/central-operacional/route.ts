@@ -769,6 +769,14 @@ export async function GET(
     // ============================================================
     let genealogiaV2: { matrix: MatrixResponse; queue: QueueRow[]; faseProgress: FaseProgress } | null = null
     if (faseAtualCode === "GENEALOGIA") {
+      // NOME DO PASSO — do CADASTRO (Gerenciamento), nunca escrito aqui. Era texto
+      // fixo ("Localizar registro da certidão") that never leu o cadastro: renomear
+      // o passo em Gerenciamento não mudava nada nesta tela. Achado real, 16/09/2026.
+      const passoCadastrado = await prisma.phaseInternalWorkflow.findFirst({
+        where: { phaseKey: "genealogia", active: true },
+        select: { passos: { where: { key: "localizar_registro" }, select: { label: true } } },
+      })
+      const labelLocalizarRegistro = passoCadastrado?.passos[0]?.label ?? "Localizar registro"
       const certItens = await itemCatalogosDeCertidao(prisma)
       const necsRaw = await prisma.necessidadeDocumental.findMany({
         where: { processoId: id, supersedePorId: null }, // ignora superseded (reabertura)
@@ -893,7 +901,7 @@ export async function GET(
           noOwner: tarefa != null ? tarefa.responsavelId == null : !s?.responsavelId,
           // NÃO usar "normal" (o front mapeia "normal"→"Solicitar certidão", que é ação da
           // Emissão). Na Genealogia a ação é localizar; localizado → "Concluído".
-          proximoPasso: ok ? "Concluído" : "Localizar registro",
+          proximoPasso: ok ? "Concluído" : labelLocalizarRegistro,
           generation: n.pessoaId != null ? generationOf(n.pessoaId) : 99,
           isLinhaReta: pessoa?.linhaReta ?? false,
           necessidadeId: n.id,
@@ -914,7 +922,7 @@ export async function GET(
           steps: [{
             ordem: 1,
             stepKey: "localizar_registro",
-            title: "Localizar registro da certidão",
+            title: labelLocalizarRegistro,
             status: totalObrig === 0 ? "pendente" : obrigDone >= totalObrig ? "concluida" : "em_andamento",
             concluidos: obrigDone,
             total: totalObrig,

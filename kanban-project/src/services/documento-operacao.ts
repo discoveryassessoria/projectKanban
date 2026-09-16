@@ -545,7 +545,16 @@ export async function montarWorkflowV2(
   // CANCELADO/SUPERSEDIDO também são terminais aqui — só entram na lista quando
   // `incluirEncerrados`, e não são "a próxima etapa" de coisa nenhuma.
   const atual = passos.find((p) => !["CONCLUIDO", "DISPENSADO", "CANCELADO", "SUPERSEDIDO"].includes(p.status)) ?? null
-  const visita = await visitaAtualDoDocumento(documentoId)
+  // MESMO ESCOPO dos passos acima — nunca "onde o trabalho está agora" quando o
+  // chamador já pediu uma instância específica. Era aqui que a bug ficava: os
+  // `steps` vinham corretos (escopados), mas este `workflowInstanceId`/`ciclo`
+  // de metadado recaía sempre na visita mais recente, sem override nenhum.
+  const visita = escopoOverride
+    ? await prisma.phaseWorkflowInstance.findUnique({
+        where: { id: escopoOverride.workflowInstanceId },
+        select: { id: true, ciclo: true },
+      }).then((i) => (i ? { workflowInstanceId: i.id, ciclo: i.ciclo } : null))
+    : await visitaAtualDoDocumento(documentoId)
   return {
     id: `v2-${documentoId}-${faseMacroKey}${visita ? `-c${visita.ciclo}` : ""}`,
     documentoId, faseCode,

@@ -121,6 +121,15 @@ interface WorkflowTabProps {
    */
   tarefaResponsavelId?: number | null
   tarefaResponsavelNome?: string | null
+  /**
+   * A INSTÂNCIA DA FASE sendo exibida (ativa ou "Somente leitura" de uma fase
+   * passada) — mesmo contrato do `faseInstanciaId` do DocumentoOperationalDrawer.
+   * Sem isto, esta aba (que busca por conta própria, em `/documentos/[id]/workflow`)
+   * sempre mostrava "onde o trabalho está agora", mesmo consultando uma fase
+   * passada — a causa real do drawer mostrando Emissão Documental dentro da
+   * consulta de Genealogia (achado real, 16/09/2026).
+   */
+  faseInstanciaId?: number | null
 }
 
 // ============================================================
@@ -184,6 +193,7 @@ export function WorkflowTab({
   contextoAntecipada,
   tarefaResponsavelId = null,
   tarefaResponsavelNome = null,
+  faseInstanciaId = null,
 }: WorkflowTabProps) {
   // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
 
@@ -238,7 +248,9 @@ export function WorkflowTab({
   // -- Carrega o workflow
   // Leitura pela camada oficial: o token e o tratamento de erro deixam de ser
   // montados aqui à mão. A mensagem exibida continua a mesma de antes.
-  const consulta = useApi<{ workflow?: Workflow | null; semWorkflowInterno?: boolean }>(`/api/documentos/${documentoId}/workflow`)
+  const consulta = useApi<{ workflow?: Workflow | null; semWorkflowInterno?: boolean }>(
+    `/api/documentos/${documentoId}/workflow${faseInstanciaId != null ? `?workflowInstanceId=${faseInstanciaId}` : ""}`,
+  )
   const workflow = consulta.dados?.workflow ?? null
   const semWorkflowInterno = consulta.dados?.semWorkflowInterno === true
   const loading = consulta.carregando
