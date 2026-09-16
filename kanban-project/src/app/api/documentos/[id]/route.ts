@@ -73,6 +73,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         },
         responsavel: {
           select: { id: true, nome: true, email: true }
+        },
+        orgao: {
+          select: { id: true, name: true, nomeFantasia: true }
         }
       },
     })
@@ -162,6 +165,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       dataToUpdate.status = body.status
     }
     if (body.descricao !== undefined) dataToUpdate.descricao = body.descricao
+
+    // ÓRGÃO/CARTÓRIO EMISSOR (estruturado) — `orgaoId`, não `cartorio`.
+    //
+    // `cartorio` (abaixo) é texto livre e nunca respondeu "por onde pedir este
+    // documento"; quem responde é o vínculo com `OrgaoProtocolo`. Achado real
+    // (15/09/2026): nenhuma rota de escrita de Documento aceitava `orgaoId` — a
+    // aba "Dados Registrais" só editava o texto livre, e a subtarefa "Enviar
+    // requerimento ao cartório" ficava bloqueada (FORNECEDOR_AUSENTE) para
+    // SEMPRE em qualquer documento que chegasse à Emissão Documental sem
+    // `orgaoId` já resolvido por uma fase anterior — sem UI nenhuma pra corrigir.
+    if (body.orgaoId !== undefined) {
+      if (body.orgaoId === null) {
+        dataToUpdate.orgao = { disconnect: true }
+      } else {
+        const org = await prisma.orgaoProtocolo.findUnique({ where: { id: Number(body.orgaoId) }, select: { id: true } })
+        if (!org) return NextResponse.json({ error: "orgaoId inválido (órgão não cadastrado)" }, { status: 400 })
+        dataToUpdate.orgao = { connect: { id: org.id } }
+      }
+    }
 
     // Dados do registro
     if (body.cartorio !== undefined) dataToUpdate.cartorio = body.cartorio

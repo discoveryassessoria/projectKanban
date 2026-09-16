@@ -115,6 +115,7 @@ export async function resolveDocumentOperationalProjection(
         },
       },
       responsavel: { select: { id: true, nome: true, email: true } },
+      orgao: { select: { id: true, name: true, nomeFantasia: true } },
     },
   })
 

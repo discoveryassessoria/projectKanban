@@ -95,6 +95,8 @@ interface Documento {
   descricao: string | null
 
   cartorio: string | null
+  orgaoId: number | null
+  orgao: { id: number; name: string; nomeFantasia: string | null } | null
   livro: string | null
   folha: string | null
   termo: string | null
@@ -784,7 +786,9 @@ function ConteudoDrawer({
                   )}
                 </div>
               )}
-              {activeTab === "registry" && <TabRegistry doc={doc} tipoLabel={tipoLabel} />}
+              {activeTab === "registry" && (
+                <TabRegistry doc={doc} tipoLabel={tipoLabel} onSaved={() => { carregar(); onSave?.() }} />
+              )}
               {activeTab === "history" && <TabAndamento documentoId={doc.id} />}
               {activeTab === "workflow" && (
                 <WorkflowTab
@@ -834,7 +838,7 @@ function ConteudoDrawer({
 // ============================================================
 // ABA: DADOS REGISTRAIS
 // ============================================================
-function TabRegistry({ doc, tipoLabel }: { doc: Documento; tipoLabel: string }) {
+function TabRegistry({ doc, tipoLabel, onSaved }: { doc: Documento; tipoLabel: string; onSaved?: () => void }) {
   const isCertidao = doc.tipo.startsWith("CERTIDAO")
 
   if (isCertidao) {
@@ -858,8 +862,11 @@ function TabRegistry({ doc, tipoLabel }: { doc: Documento; tipoLabel: string }) 
             ["País", doc.pais_registro],
             ["Estado/Província", doc.estado_registro],
             ["Cidade", doc.cidade_registro],
-            ["Cartório", doc.cartorio],
+            ["Cartório (texto livre)", doc.cartorio],
           ]}/>
+        </Section>
+        <Section title="Órgão emissor (cadastro)">
+          <OrgaoEmissorField documentoId={doc.id} orgaoId={doc.orgaoId} orgao={doc.orgao} paisId={null} onSaved={onSaved} />
         </Section>
         <Section title="Referência registral">
           <GridFields fields={[
@@ -900,6 +907,124 @@ function TabRegistry({ doc, tipoLabel }: { doc: Documento; tipoLabel: string }) 
           <div className="text-sm text-white/80 whitespace-pre-wrap">{doc.observacoes}</div>
         </Section>
       )}
+    </div>
+  )
+}
+
+// ============================================================
+// ÓRGÃO EMISSOR (estruturado) — Documento.orgaoId
+// ============================================================
+//
+// Achado real (15/09/2026): "Cartório" na aba Dados Registrais sempre foi
+// texto livre (`Documento.cartorio`) — nunca alimentou o motor. A subtarefa
+// "Enviar requerimento ao cartório" lê `Documento.orgaoId` (vínculo com o
+// cadastro de Órgãos e Organizações) para saber os canais disponíveis; sem
+// ele, fica bloqueada (FORNECEDOR_AUSENTE) e não existia NENHUMA tela para
+// preenchê-lo — um documento criado sem órgão travava a Emissão Documental
+// para sempre. Este campo fecha essa lacuna, escolhendo do MESMO cadastro
+// mestre (nunca texto novo).
+interface OrgaoOpcao {
+  id: number
+  name: string
+  nomeFantasia: string | null
+  type: string | null
+  city: string | null
+  state: string | null
+  pais: { id: number; countryLabel: string } | null
+}
+
+function OrgaoEmissorField({
+  documentoId, orgaoId, orgao, paisId, onSaved,
+}: {
+  documentoId: number
+  orgaoId: number | null
+  orgao: { id: number; name: string; nomeFantasia: string | null } | null
+  paisId: number | null
+  onSaved?: () => void
+}) {
+  const [editando, setEditando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const opcoesReq = useApi<{ orgaos: OrgaoOpcao[] }>(
+    editando ? `/api/documentos/orgaos-disponiveis${paisId ? `?paisId=${paisId}` : ""}` : null,
+  )
+  const opcoes = opcoesReq.dados?.orgaos ?? []
+
+  const salvar = async (novoOrgaoId: number | null) => {
+    setSalvando(true)
+    setErro(null)
+    try {
+      const res = await fetch(`/api/documentos/${documentoId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ orgaoId: novoOrgaoId }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setErro(j?.error ?? "Não foi possível salvar o órgão.")
+        return
+      }
+      setEditando(false)
+      onSaved?.()
+    } catch {
+      setErro("Falha de rede ao salvar o órgão.")
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  if (!editando) {
+    return (
+      <div className="flex items-center gap-3 flex-wrap">
+        {orgao ? (
+          <span className="text-sm text-white/90">{orgao.nomeFantasia || orgao.name}</span>
+        ) : (
+          <span className="text-sm text-[var(--accent-text)]">
+            Não vinculado — a Emissão Documental fica bloqueada até definir o órgão.
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setEditando(true)}
+          className="text-[11px] text-[var(--text-secondary)] hover:underline"
+        >
+          {orgao ? "alterar" : "vincular órgão"}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <select
+        autoFocus
+        disabled={salvando || opcoesReq.carregando}
+        defaultValue={orgaoId ?? ""}
+        onChange={(e) => salvar(e.target.value ? Number(e.target.value) : null)}
+        className="w-full max-w-md rounded border border-[var(--border-default)] bg-[var(--app-background)] px-2 py-1.5 text-[12.5px] text-white/85 focus:outline-none disabled:opacity-50"
+      >
+        <option value="">— selecione o órgão —</option>
+        {opcoes.map((o) => (
+          <option key={o.id} value={o.id}>
+            {(o.nomeFantasia || o.name)}{o.pais ? ` · ${o.pais.countryLabel}` : ""}{o.city ? ` · ${o.city}` : ""}
+          </option>
+        ))}
+      </select>
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={() => { setEditando(false); setErro(null) }} className="text-[11px] text-[var(--text-secondary)] hover:underline">
+          cancelar
+        </button>
+        {opcoesReq.carregando && <span className="text-[11px] text-[var(--text-secondary)]">carregando órgãos…</span>}
+        {opcoes.length === 0 && !opcoesReq.carregando && (
+          <span className="text-[11px] text-[var(--accent-text)]">
+            Nenhum órgão cadastrado — cadastre em Gerenciamento → Órgãos e Organizações.
+          </span>
+        )}
+      </div>
+      {erro && <div className="text-[11px] text-red-700">{erro}</div>}
     </div>
   )
 }
