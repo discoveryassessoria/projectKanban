@@ -49,6 +49,7 @@ import {
 } from "@/lib/operacional/identidade-da-tarefa"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 import { versaoDaInstancia } from "@/src/services/versao-publicada"
+import { subtarefasDaEtapa } from "@/src/services/subtarefas-da-etapa"
 
 // ============================================================
 // RÓTULOS DE TIPO DOCUMENTAL — fonte única desta camada de leitura.
@@ -480,7 +481,7 @@ export async function getPhaseOperationalStructure(
   // ------------------------------------------------------------
   // 5) INSTÂNCIAS → PassoBruto (rótulos resolvidos, alvo intacto).
   // ------------------------------------------------------------
-  const passos: PassoBruto[] = instancias.map((s) => {
+  const passos: PassoBruto[] = await Promise.all(instancias.map(async (s) => {
     const escopo = escopoDoAlvo(s)
     // EXECUTOR: qual tela oficial abre este passo. Hoje há UM — a operação por
     // documento/necessidade. Passo sem entidade não tem executor: continua VISÍVEL e
@@ -502,6 +503,23 @@ export async function getPhaseOperationalStructure(
     const dep = Array.isArray(s.dependeDeStepKeys)
       ? (s.dependeDeStepKeys as unknown[]).filter((x): x is string => typeof x === "string")
       : []
+
+    // QUANDO O PASSO SE DECOMPÕE EM SUBTAREFAS (Emissão Documental: 1 passo, 4
+    // subtarefas), "progresso" e "etapa atual" desta linha ficavam presos no
+    // passo inteiro — 0/1 e sempre o título do passo, mesmo com 3 das 4
+    // subtarefas já concluídas. Achado real (16/09/2026, tela "Resumo" da
+    // fase). `subtarefasDaEtapa` é a MESMA leitura que a aba Workflow do
+    // documento já usa; sem fornecedorId porque aqui não é preciso saber os
+    // canais, só o estado. Lista vazia = passo sem subtarefas (arquitetura
+    // antiga), comportamento intocado.
+    const subtarefasBrutas = await subtarefasDaEtapa({ stepInstanceId: s.id, fornecedorId: null }).catch(() => [])
+    const subtarefas: PassoBruto["subtarefas"] = subtarefasBrutas.length > 0
+      ? subtarefasBrutas.map((st) => ({
+          key: st.key, label: st.label, ordem: st.ordem, obrigatoria: st.obrigatoria,
+          concluida: st.concluida, disponivel: st.disponivel, status: st.status,
+          bloqueioTexto: st.bloqueioTexto,
+        }))
+      : undefined
 
     return {
       stepInstanceId: s.id,
@@ -530,8 +548,9 @@ export async function getPhaseOperationalStructure(
       // catálogo tem a publicada, e cair para 1 silenciosamente distorceria o
       // progresso de todos os documentos da fase.
       peso: getStepDef(faseCode, s.stepKey)?.weight ?? 1,
+      subtarefas,
     }
-  })
+  }))
 
   // DUPLICIDADE: a mesma definição de passo, no mesmo alvo e no mesmo ciclo, não pode
   // ter duas instâncias. A trava real é o índice único de chaveIdempotencia; esta

@@ -95,6 +95,14 @@ export interface PassoBruto {
    * Ausente ⇒ 1, que é a contagem simples — nunca zero, que apagaria o passo.
    */
   peso: number
+  /** Quando o passo se decompõe em subtarefas (Emissão Documental: 1 passo, N
+   *  subtarefas), é ISSO que progresso/etapa-atual devem contar — nunca o
+   *  passo inteiro como uma unidade só. `undefined` = passo sem subtarefas
+   *  (arquitetura anterior à consolidação), nada muda. */
+  subtarefas?: {
+    key: string; label: string; ordem: number; obrigatoria: boolean
+    concluida: boolean; disponivel: boolean; status: string; bloqueioTexto: string | null
+  }[]
 }
 
 /** O alvo concreto sobre o qual o workflow opera, com a identidade já resolvida. */
@@ -617,6 +625,51 @@ function motivoDoBloqueio(p: PassoBruto, irmaos: PassoBruto[]): string | null {
   return `Aguarda: ${pendentes.map((s) => s.titulo).join(", ")}`
 }
 
+/**
+ * QUANDO UM PASSO SE DECOMPÕE EM SUBTAREFAS, ELAS SÃO A UNIDADE DE CONTAGEM —
+ * nunca o passo inteiro. Achado real (16/09/2026): a linha do documento na
+ * aba Resumo da fase mostrava "0% · 0/1" e "Etapa atual: Solicitar certidão"
+ * para um documento com 3 das 4 subtarefas já concluídas — porque
+ * `progresso()`/`passoCorrente()` sempre contaram por `PassoBruto` (1 linha =
+ * 1 passo publicado), e a Emissão Documental consolidou 4 passos antigos num
+ * só, com 4 subtarefas dentro. A aba Workflow do documento já resolvia isso
+ * (WorkflowTab.tsx); aqui não.
+ *
+ * Substitui, na lista de passos do alvo, cada passo COM subtarefas cadastradas
+ * por N pseudo-passos — um por subtarefa, peso igual (1 cada, subtarefa não
+ * tem peso canônico próprio) — preservando os outros passos (sem subtarefas,
+ * arquitetura anterior) intocados.
+ */
+function expandirComSubtarefas(brutosOrdenados: PassoBruto[], montados: PassoDaEstrutura[]): PassoDaEstrutura[] {
+  const resultado: PassoDaEstrutura[] = []
+  for (let i = 0; i < montados.length; i++) {
+    const bruto = brutosOrdenados[i]
+    const montado = montados[i]
+    if (!bruto?.subtarefas || bruto.subtarefas.length === 0) {
+      resultado.push(montado)
+      continue
+    }
+    for (const sub of bruto.subtarefas) {
+      const status = sub.concluida ? "CONCLUIDO" : sub.status
+      resultado.push({
+        ...montado,
+        titulo: sub.label,
+        ordem: sub.ordem,
+        obrigatorio: sub.obrigatoria,
+        status,
+        statusLabel: rotuloStatusPasso(status),
+        balde: baldeDoPasso(status),
+        disponivel: sub.disponivel,
+        bloqueado: !sub.disponivel && !sub.concluida,
+        peso: 1,
+        motivoBloqueio: sub.bloqueioTexto,
+        bloqueadoPorDependenciaPendente: !sub.disponivel && !sub.concluida && sub.bloqueioTexto != null,
+      })
+    }
+  }
+  return resultado
+}
+
 function montarPasso(p: PassoBruto, irmaos: PassoBruto[]): PassoDaEstrutura {
   const status = String(p.status).toUpperCase()
   const balde = baldeDoPasso(p.status)
@@ -677,8 +730,11 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
   }
 
   // 2) Passos de escopo PROCESSO — pertencem à fase, não a uma pessoa.
-  const brutosGlobais = porAlvo.get("processo") ?? []
-  const globais = ordenar(brutosGlobais).map((p) => montarPasso(p, brutosGlobais))
+  const brutosGlobaisOrdenados = ordenar(porAlvo.get("processo") ?? [])
+  const globais = expandirComSubtarefas(
+    brutosGlobaisOrdenados,
+    brutosGlobaisOrdenados.map((p) => montarPasso(p, brutosGlobaisOrdenados)),
+  )
   porAlvo.delete("processo")
 
   // 3) Cada alvo restante vira um bloco com o workflow completo DELE.
@@ -694,7 +750,7 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
     }
 
     const ordenados = ordenar(brutos)
-    const passosDoAlvo = ordenados.map((p) => montarPasso(p, brutos))
+    const passosDoAlvo = expandirComSubtarefas(ordenados, ordenados.map((p) => montarPasso(p, brutos)))
     const prog = progresso(passosDoAlvo)
     const meta = alvoPorChave.get(chave)
     const primeiro = ordenados[0]
@@ -746,7 +802,11 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
   const linhas: PessoaDaEstrutura[] = pessoas.map((pessoa) => {
     const documentos = blocosPorPessoa.get(pessoa.pessoaId) ?? []
     const brutosPessoa = passosPorPessoa.get(pessoa.pessoaId) ?? []
-    const passosDaPessoa = ordenar(brutosPessoa).map((p) => montarPasso(p, brutosPessoa))
+    const brutosPessoaOrdenados = ordenar(brutosPessoa)
+    const passosDaPessoa = expandirComSubtarefas(
+      brutosPessoaOrdenados,
+      brutosPessoaOrdenados.map((p) => montarPasso(p, brutosPessoa)),
+    )
     const prog = somarProgresso([...documentos.map((d) => d.progresso), progresso(passosDaPessoa)])
     const todos = [...documentos.flatMap((d) => d.passos), ...passosDaPessoa]
     return {
