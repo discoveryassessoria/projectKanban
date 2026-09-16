@@ -57,12 +57,14 @@ ok(semEspecifico.kind === "padrao" && semEspecifico.especifico === false,
   "1. etapa sem editor específico usa editor padrão")
 
 // 2. etapa com editor específico continua usando o específico
+// "conferir_certidao"/"validar_certidao" (etapas 5/6 de antes da unificação)
+// saíram daqui em 16/09/2026 — código morto removido (zero definição/instância
+// em toda a produção); "conferir_e_validar_certidao" é o passo 4/4 canônico.
 const especificos: Array<[string, StepEditorKind]> = [
   ["localizar_registro", "registral"],
   ["solicitar_certidao", "solicitacao_cartorio"],
   ["receber_certidao", "recebimento_documento"],
-  ["conferir_certidao", "conferencia_documento"],
-  ["validar_certidao", "validacao_juridica"],
+  ["conferir_e_validar_certidao", "conferencia_e_validacao"],
 ]
 ok(especificos.every(([k, kind]) => resolveWorkflowStepEditor({ stepKey: k }).kind === kind),
   "2. etapas com editor específico continuam no editor específico")

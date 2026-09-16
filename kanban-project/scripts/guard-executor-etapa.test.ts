@@ -71,8 +71,12 @@ for (const [kind, editor] of [
   ["solicitacao_cartorio", "EditorSolicitarCertidao"],
   ["acompanhamento_retorno", "EditorAguardarRetorno"],
   ["recebimento_documento", "EditorReceberCertidao"],
-  ["conferencia_documento", "EditorConferirCertidao"],
-  ["validacao_juridica", "EditorValidarCertidao"],
+  // "conferencia_documento"/EditorConferirCertidao e
+  // "validacao_juridica"/EditorValidarCertidao (etapas 5/6 de antes da
+  // unificação) foram removidos em 16/09/2026 — código morto confirmado por
+  // varredura no banco (zero definição/instância em qualquer ciclo).
+  // "conferencia_e_validacao" é o passo 4/4 canônico que os substituiu.
+  ["conferencia_e_validacao", "EditorConferirEValidarCertidao"],
 ] as const) {
   ok(`${kind} monta ${editor}`, new RegExp(`case "${kind}":[\\s\\S]{0,120}${editor}`).test(router))
 }

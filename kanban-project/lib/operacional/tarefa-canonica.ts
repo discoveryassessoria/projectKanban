@@ -518,6 +518,19 @@ export async function sincronizarTarefaComWorkflow(
     where: { id: tarefaId },
     data: {
       statusTarefa: status,
+      // MESMA REGRA de `aplicarTarefa` (task-step-sync.ts) e de
+      // `projetarTarefaDoPasso` (corrigida em 16/09/2026): toda escrita de
+      // `statusTarefa` incrementa `lockVersion`. Achado real (varredura de
+      // bugs, mesma classe): esta é a TERCEIRA porta que escreve
+      // `statusTarefa` — `documento-operacao.ts` monta `chaveEvento(...,
+      // lockVersion)` logo depois de chamar esta função, pra registrar
+      // TAREFA_CONCLUIDA em `workflowEvento.createMany({skipDuplicates:true})`.
+      // Sem o incremento, uma tarefa que reabre e reconclui por ESTE caminho
+      // gera a MESMA chave da conclusão anterior — o `skipDuplicates` engole
+      // o evento novo em silêncio, e o relatório de produtividade/auditoria
+      // perde o fato (não trava a transação como no bug do passo, mas apaga
+      // histórico).
+      lockVersion: { increment: 1 },
       workflowStepInstanceId: corrente?.id ?? null,
       concluida: status === 'CONCLUIDO_RECEBIDO' || status === 'CONCLUIDO_NAO_POSSUI',
       ...(concluiuAgora && tarefa.dataConclusao == null ? { dataConclusao: agora } : {}),

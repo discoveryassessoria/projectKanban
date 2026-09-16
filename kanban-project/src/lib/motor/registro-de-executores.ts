@@ -117,42 +117,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     suportaEsperaExterna: true,
     suportaCondicoes: true,
   },
-  conferencia_documento: {
-    key: "conferencia_documento",
-    label: "Conferência operacional",
-    campos: ["texto", "textarea", "checkbox", "select", "radio", "upload"],
-    // A CONFERÊNCIA NÃO DECIDE RETIFICAÇÃO. Ela aprova para a análise ou pede outra
-    // via — as duas coisas são operacionais. `GO_RETIFICATION` não está aqui, e a
-    // competência da fase de Emissão também não o permite: são duas travas, e é de
-    // propósito, porque foi por esse caminho que a decisão jurídica vazou.
-    efeitos: ["APPROVE_FOR_ANALYSIS", "REQUEST_NEW_COPY", "COMPLETE_STEP", "REGISTER_ONLY"],
-    acoesCadastradas: true,
-    checklistCadastrado: true,
-    suportaCanais: false,
-    suportaEvidencia: true,
-    suportaEsperaExterna: false,
-    suportaCondicoes: true,
-  },
-  validacao_juridica: {
-    key: "validacao_juridica",
-    label: "Validação jurídica",
-    campos: ["texto", "textarea", "select", "radio", "checkbox", "upload"],
-    // APPROVE_FOR_ANALYSIS está aqui porque esta MESMA tela é usada em duas fases com
-    // competências diferentes: na Emissão ela valida para ENTREGAR à Análise; na
-    // Análise ela decide. Quem separa as duas não é o executor — é a competência da
-    // fase, que só na Análise inclui GO_RETIFICATION. O executor declara o que sabe
-    // desenhar e disparar; o que ele PODE, ali, quem diz é o cadastro.
-    efeitos: [
-      "APPROVE_FOR_ANALYSIS", "COMPLETE_DOCUMENT", "REGISTER_DIVERGENCE", "GO_RETIFICATION",
-      "INVALIDATE_DOCUMENT", "REQUEST_NEW_COPY", "COMPLETE_STEP", "REGISTER_ONLY",
-    ],
-    acoesCadastradas: true,
-    checklistCadastrado: true,
-    suportaCanais: false,
-    suportaEvidencia: true,
-    suportaEsperaExterna: false,
-    suportaCondicoes: true,
-  },
+  // "conferencia_documento" e "validacao_juridica" (etapas 5/6 de antes da
+  // unificação, ver step-editor-registry.ts) foram removidas em 16/09/2026:
+  // zero definição/subtarefa com essa key OU esse executorKey, em qualquer
+  // ciclo, em toda a produção — confirmado no banco, não presumido.
   conferencia_e_validacao: {
     key: "conferencia_e_validacao",
     label: "Conferir e validar certidão",

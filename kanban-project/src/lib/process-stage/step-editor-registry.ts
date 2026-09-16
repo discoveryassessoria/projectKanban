@@ -49,11 +49,13 @@ export type StepEditorKind =
   | "solicitacao_cartorio"
   | "acompanhamento_retorno"
   | "recebimento_documento"
-  | "conferencia_documento"
-  | "validacao_juridica"
   /** CORREÇÃO FINAL (14/09/2026): conferência + validação jurídica unificadas
    *  num único passo operacional (4/4), com as duas como SUBTAREFAS do mesmo
-   *  Step — nunca um quinto Step. Ver docs/architecture/29. */
+   *  Step — nunca um quinto Step. Ver docs/architecture/29.
+   *  "conferencia_documento" e "validacao_juridica" (os dois passos que
+   *  existiam ANTES dessa unificação) foram removidos em 16/09/2026: zero
+   *  definição e zero instância, em qualquer ciclo, em toda a produção —
+   *  código morto confirmado por varredura, não presunção. */
   | "conferencia_e_validacao"
   | "padrao"
 
@@ -65,8 +67,6 @@ const EDITOR_POR_STEP_KEY: Record<string, Exclude<StepEditorKind, "padrao">> = {
   // A chave legada "aguardar_retorno" chega aqui já canonizada por resolveStepKeyCompat.
   aguardar_retorno_do_cartorio: "acompanhamento_retorno",
   receber_certidao: "recebimento_documento",
-  conferir_certidao: "conferencia_documento",
-  validar_certidao: "validacao_juridica",
   // CORREÇÃO FINAL (14/09/2026): conferir_certidao + validar_certidao saíram
   // do cadastro vivo — conferir_e_validar_certidao é o passo 4/4 canônico.
   conferir_e_validar_certidao: "conferencia_e_validacao",
@@ -127,16 +127,6 @@ export const APRESENTACAO_EDITOR: Record<StepEditorKind, { titulo: string; descr
   recebimento_documento: {
     titulo: "Recebimento da certidão",
     descricao: "Anexe o link do PDF da certidão recebida + observações do recebimento.",
-  },
-  conferencia_documento: {
-    titulo: "Conferência operacional",
-    descricao:
-      "Checklist: legibilidade, integridade, dados mínimos, apostila, tradução. Resultado: aprovar / pedir retificação / reprovar.",
-  },
-  validacao_juridica: {
-    titulo: "Validação jurídica",
-    descricao:
-      "Decisão jurídica final: validar, marcar como divergente ou inválido. Parecer obrigatório.",
   },
   conferencia_e_validacao: {
     titulo: "Conferir e validar certidão",
