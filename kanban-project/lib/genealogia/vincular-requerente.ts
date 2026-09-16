@@ -1,13 +1,26 @@
 // lib/genealogia/vincular-requerente.ts
 // ============================================================================
 // CORE do DEDUP: vincular um Requerente (participante oficial do Processo) como
-// nó da Árvore Genealógica REUSANDO a Pessoa existente — nunca criando duplicata.
+// nó da Árvore Genealógica REUSANDO a Pessoa existente — nunca criando duplicata
+// DENTRO DA MESMA árvore.
 //
-// Invariante: um Requerente com `personId` setado NUNCA gera uma segunda Pessoa.
-//   - Se o Requerente já tem `personId` → REUSA essa Pessoa (adota na árvore se
-//     estiver solta; 409 se pertence a OUTRA árvore; idempotente se já é nó desta).
+// Invariante: um Requerente com `personId` setado NUNCA gera uma segunda Pessoa
+// NA MESMA ÁRVORE.
+//   - Se o Requerente já tem `personId` e a Pessoa É nó DESTA árvore → idempotente,
+//     reusa (reativa se tinha sido removida com histórico preservado).
+//   - Se a Pessoa está SOLTA (`arvoreId` null) → adota nesta árvore, sem criar nova.
+//   - Se a Pessoa já é nó de OUTRA árvore → cria uma Pessoa NOVA aqui e reatribui
+//     `Requerente.personId` pra ela — sem tocar na Pessoa antiga, que continua
+//     exatamente onde estava. Achado real (16/09/2026): um REQUERENTE é uma
+//     identidade de CLIENTE (CPF), reaproveitada entre processos por desenho
+//     (`ProcessoRequerente` é N:N) — mas uma pessoa real pode estar em DUAS
+//     linhagens genealógicas de verdade (cidadania italiana pelo lado da mãe E
+//     espanhola pelo lado do pai, por exemplo), cada uma com sua própria árvore.
+//     Bloquear aqui ("não é possível mover automaticamente") tratava "mesmo
+//     requerente" como "mesmo nó de árvore" — são coisas diferentes.
 //   - Se o Requerente NÃO tem `personId` → cria UMA Pessoa a partir dos dados-mestre
-//     e IMEDIATAMENTE grava `Requerente.personId` (o vínculo impede 2ª criação).
+//     e IMEDIATAMENTE grava `Requerente.personId` (o vínculo impede 2ª criação
+//     nesta mesma árvore).
 //
 // Este é o ÚNICO ponto que cria Pessoa para um requerente.
 //
@@ -44,7 +57,8 @@ import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/mater
 export type VincularRequerenteErro =
   | "ARVORE_NAO_ENCONTRADA"
   | "REQUERENTE_NAO_ENCONTRADO"
-  | "PESSOA_EM_OUTRA_ARVORE"
+  // "PESSOA_EM_OUTRA_ARVORE" saiu em 16/09/2026: pertencer a outra árvore deixou
+  // de ser erro — vira Pessoa nova nesta árvore (ver comentário de cabeçalho).
 
 export interface VincularRequerenteInput {
   arvoreId: number
@@ -154,32 +168,30 @@ async function aplicarVinculoNaArvore(
         return { ok: true, pessoaId: pessoa.id, criada: false }
       }
 
-      if (pessoa.arvoreId != null) {
-        // Pertence a OUTRA árvore — não movemos à força.
-        return {
-          ok: false,
-          code: "PESSOA_EM_OUTRA_ARVORE",
-          message:
-            "Esta pessoa já é nó de outra árvore genealógica; não é possível movê-la automaticamente.",
-        }
-      }
-
       // Pessoa solta (arvoreId null) → adota nesta árvore, sem criar nova.
-      await tx.pessoa.update({
-        where: { id: pessoa.id },
-        data: {
-          arvoreId, requerente: flagRequerente, ...patchPosicao,
-          removidaEm: null, removidaPorId: null, motivoRemocao: null,
-        },
-      })
-      await tx.processoRequerente.updateMany({
-        where: { requerenteId, removidoEm: { not: null } },
-        data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
-      })
-      if (arvore.pessoaPrincipalId == null) {
-        await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: pessoa.id } })
+      if (pessoa.arvoreId == null) {
+        await tx.pessoa.update({
+          where: { id: pessoa.id },
+          data: {
+            arvoreId, requerente: flagRequerente, ...patchPosicao,
+            removidaEm: null, removidaPorId: null, motivoRemocao: null,
+          },
+        })
+        await tx.processoRequerente.updateMany({
+          where: { requerenteId, removidoEm: { not: null } },
+          data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
+        })
+        if (arvore.pessoaPrincipalId == null) {
+          await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: pessoa.id } })
+        }
+        return { ok: true, pessoaId: pessoa.id, criada: false }
       }
-      return { ok: true, pessoaId: pessoa.id, criada: false }
+      // Pertence a OUTRA árvore, com nó lá: NÃO movemos à força (destruiria a
+      // posição/vínculos dela naquela linhagem) e NÃO bloqueamos mais — o
+      // requerente pode genuinamente ter duas linhagens genealógicas reais
+      // (duas cidadanias, dois processos). Cai no caminho de CRIAÇÃO abaixo:
+      // nasce uma Pessoa nova, só NESTA árvore, e `Requerente.personId` passa
+      // a apontar pra ela — a Pessoa antiga continua intacta na árvore dela.
     }
     // personId aponta para Pessoa inexistente (dado órfão) → cai no caminho de criação
     // abaixo e re-vincula, ainda garantindo no máximo UMA Pessoa viva por requerente.
