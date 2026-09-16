@@ -855,6 +855,10 @@ function StepCard({
     ? "Aguardando docs"
     : STATUS_LABEL[step.status]
 
+  // `ownerName(null)` devolve "—" (placeholder visual) — truthy, mas não é um
+  // responsável de verdade. O gate de exibição precisa saber a diferença
+  // (achado real, 16/09/2026: a linha "executa — · SLA" continuava aparecendo).
+  const temResponsavel = !!step.assignee?.nome || !!step.ownerKey
   const responsibleName = step.assignee?.nome || ownerName(step.ownerKey)
   const dotColor = ownerColor(step.ownerKey)
 
@@ -885,7 +889,7 @@ function StepCard({
 
           {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem
               sentido) ou se ainda não há responsável (nada pra dizer "executa"). */}
-          {!isLockStepWait && !!responsibleName && (
+          {!isLockStepWait && temResponsavel && (
             <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
               {/* QUEM EXECUTA ESTA ETAPA — não "o responsável".
                   O responsável pelo trabalho é o da TAREFA, e ele aparece uma

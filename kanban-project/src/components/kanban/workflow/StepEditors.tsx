@@ -1125,44 +1125,41 @@ function FormSolicitarCertidao({
                 </div>
               </ResumoCard>
 
-              {/* Card CARTÓRIO/ÓRGÃO — escolhido AQUI, não em outra tela. Achado
-                  real (15/09/2026): o vínculo estruturado com o órgão
-                  (Documento.orgaoId) não tinha NENHUMA tela pra ser definido,
-                  e travava esta mesma subtarefa antes de ela poder abrir. */}
-              <ResumoCard label="Cartório / órgão emissor">
+              {/* Card único CARTÓRIO + REGISTRO — unificado (achado real,
+                  16/09/2026): eram dois cards separados dizendo a mesma coisa
+                  ("cartório" aqui, "onde foi localizado" ali) sobre a MESMA
+                  visita de Genealogia. O vínculo estruturado com o órgão
+                  (Documento.orgaoId) não tinha tela pra ser definido antes
+                  (15/09/2026) — agora nasce espelhado, sem pedir de novo. */}
+              <ResumoCard label="Cartório e registro localizado" colSpan={2}>
                 <OrgaoDoRequerimentoField
                   documentoId={doc.id}
                   orgaoId={doc.orgaoId}
                   orgao={doc.orgao}
+                  cartorioDaGenealogia={doc.cartorio}
                   onSalvo={onOrgaoAlterado}
                 />
                 <div className="text-[11px] text-[var(--text-secondary)] mt-1">
                   SLA típico: <strong className="text-white/85">~30d</strong>
                 </div>
-              </ResumoCard>
-
-              {/* Card DADOS REGISTRAIS */}
-              <ResumoCard
-                label={
-                  temDadosRegistrais ? "Dados registrais (já localizados)" : "Dados registrais"
-                }
-              >
-                {temDadosRegistrais ? (
-                  <>
-                    <div className="text-[13px] font-semibold text-white leading-tight">
-                      {refTxt}
-                    </div>
-                    {doc.nome_registrado && (
-                      <div className="text-[10.5px] text-[var(--text-secondary)] mt-1 truncate">
-                        Nome registrado: {doc.nome_registrado}
+                <div className="mt-2.5 pt-2.5 border-t border-[var(--border-default)]">
+                  {temDadosRegistrais ? (
+                    <>
+                      <div className="text-[13px] font-semibold text-white leading-tight">
+                        {refTxt}
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-[12px] text-[var(--accent-text)]/85 italic">
-                    Não localizados na etapa anterior
-                  </div>
-                )}
+                      {doc.nome_registrado && (
+                        <div className="text-[10.5px] text-[var(--text-secondary)] mt-1 truncate">
+                          Nome registrado: {doc.nome_registrado}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-[12px] text-[var(--accent-text)]/85 italic">
+                      Dados registrais não localizados na etapa anterior
+                    </div>
+                  )}
+                </div>
               </ResumoCard>
             </div>
 
@@ -1369,11 +1366,15 @@ interface OrgaoOpcaoResumo {
 }
 
 function OrgaoDoRequerimentoField({
-  documentoId, orgaoId, orgao, onSalvo,
+  documentoId, orgaoId, orgao, cartorioDaGenealogia, onSalvo,
 }: {
   documentoId: number
   orgaoId: number | null
   orgao: { id: number; name: string; nomeFantasia: string | null } | null
+  /** `Documento.cartorio` — o nome já capturado em "Localizar registro"
+   *  (Genealogia). Achado real, 16/09/2026: pedir escolha de novo aqui
+   *  repetia um dado que o mesmo documento já tinha. */
+  cartorioDaGenealogia: string | null
   onSalvo: () => void
 }) {
   const [editando, setEditando] = useState(false)
@@ -1382,6 +1383,37 @@ function OrgaoDoRequerimentoField({
   const [criandoNovo, setCriandoNovo] = useState(false)
   const [novoNome, setNovoNome] = useState("")
   const [novaCidade, setNovaCidade] = useState("")
+  const espelhandoDaGenealogia = useRef(false)
+
+  // ESPELHA da Genealogia: sem órgão vinculado ainda, mas o cartório já foi
+  // identificado em "Localizar registro" — resolve/cria automaticamente pela
+  // MESMA porta idempotente do "criar cartório rápido" (dedupe por nome+país
+  // no servidor), sem pedir pra escolher de novo. Continua alterável ("alterar
+  // órgão") se o operador discordar.
+  useEffect(() => {
+    if (orgaoId != null || !cartorioDaGenealogia?.trim() || espelhandoDaGenealogia.current) return
+    espelhandoDaGenealogia.current = true
+    ;(async () => {
+      try {
+        const res = await fetch("/api/documentos/orgaos-disponiveis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ name: cartorioDaGenealogia.trim() }),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok || !j?.orgao?.id) return
+        await fetch(`/api/documentos/${documentoId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ orgaoId: j.orgao.id }),
+        })
+        onSalvo()
+      } catch {
+        // Falha silenciosa: o operador ainda pode escolher manualmente.
+      }
+    })()
+  }, [orgaoId, cartorioDaGenealogia, documentoId, onSalvo])
+
   const opcoesReq = useApi<{ orgaos: OrgaoOpcaoResumo[] }>(
     editando ? "/api/documentos/orgaos-disponiveis" : null,
   )
@@ -1530,12 +1562,14 @@ function OrgaoDoRequerimentoField({
 function ResumoCard({
   label,
   children,
+  colSpan,
 }: {
   label: string
   children: React.ReactNode
+  colSpan?: 2
 }) {
   return (
-    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3">
+    <div className={`rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 ${colSpan === 2 ? "col-span-2" : ""}`}>
       <div className="text-[9.5px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1.5">
         {label}
       </div>
