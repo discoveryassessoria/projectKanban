@@ -134,7 +134,7 @@ export default function ConfiguracaoDoPassoModal({
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
-    const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
     fetch(`/api/gerenciamento/catalogo-execucao?phaseKey=${encodeURIComponent(phaseKey)}`, {
       headers: t ? { Authorization: `Bearer ${t}` } : {},
     })

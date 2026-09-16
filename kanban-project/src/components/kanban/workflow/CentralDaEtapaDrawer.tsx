@@ -999,7 +999,7 @@ function ConteudoDrawer({
         />
       )}
 
-      {step && kindDoEditor(step) !== "registral" && (typeof window !== "undefined" && console.log("[DEBUG central]", JSON.stringify({ subtarefaKey, editorAberto, stepId: step.id, chaveDeAbertura })), true) && (
+      {step && kindDoEditor(step) !== "registral" && (
         <StepEditorRouter
           stepKey={step.stepKey}
           editorKind={kindDoEditor(step)}

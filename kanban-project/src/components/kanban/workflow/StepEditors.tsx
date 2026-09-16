@@ -438,7 +438,7 @@ function PainelDeclarativoComFallback({
 }: { stepInstanceId: number; onExecutado?: () => void; fallback: React.ReactNode }) {
   const [temConfig, setTemConfig] = React.useState<boolean | null>(null)
   React.useEffect(() => {
-    const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
     fetch(`/api/workflow-step-instances/${stepInstanceId}/execucao`, { headers: t ? { Authorization: `Bearer ${t}` } : {} })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => setTemConfig(Boolean(j?.configuracao?.acoes?.length || j?.configuracao?.campos?.length)))
@@ -543,14 +543,6 @@ function EditorPorSubtarefaCorrente({
   // de sempre — primeira pendente, ou a última se todas concluíram.
   const corrente = clicada ?? subtarefas.find((s) => !s.concluida) ?? subtarefas[subtarefas.length - 1]
   const kindDaSubtarefa = (corrente.executorKey as StepEditorKind | null) ?? "padrao"
-  // DEBUG TEMP (16/09/2026) — remover depois de achar a causa do editor errado.
-  if (typeof window !== "undefined") {
-    console.log("[DEBUG subtarefa]", JSON.stringify({
-      subtarefaKeyClicada, clicadaKey: clicada?.key ?? null,
-      correnteKey: corrente.key, kindDaSubtarefa,
-      todasAsKeys: subtarefas.map((s) => s.key),
-    }))
-  }
   return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={rest} />
 }
 

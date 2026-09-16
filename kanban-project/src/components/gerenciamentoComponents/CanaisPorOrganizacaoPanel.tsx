@@ -40,7 +40,7 @@ interface Organizacao {
 const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--border-default)]"
 
 function headers(): HeadersInit {
-  const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
   return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }
 }
 

@@ -30,7 +30,7 @@ const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--s
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 
 function headers(): HeadersInit {
-  const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
   return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }
 }
 

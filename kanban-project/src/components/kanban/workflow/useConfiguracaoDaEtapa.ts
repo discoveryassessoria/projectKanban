@@ -122,7 +122,7 @@ export interface ConfiguracaoDaEtapa {
 }
 
 function headers(): HeadersInit {
-  const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
   return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }
 }
 

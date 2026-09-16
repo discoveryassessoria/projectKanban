@@ -75,7 +75,7 @@ export default function CatalogoFasesTab() {
   // competências que o motor não conhece — o mesmo erro, noutro lugar.
   const [efeitos, setEfeitos] = useState<EfeitoCat[]>([])
   useEffect(() => {
-    const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
     fetch("/api/gerenciamento/catalogo-execucao", { headers: t ? { Authorization: `Bearer ${t}` } : {} })
       .then(r => (r.ok ? r.json() : null))
       .then(d => d?.efeitos && setEfeitos(d.efeitos))
