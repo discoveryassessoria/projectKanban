@@ -708,6 +708,8 @@ interface DocSnapshot {
   id: number
   tipo: string
   cartorio: string | null
+  orgaoId: number | null
+  orgao: { id: number; name: string; nomeFantasia: string | null } | null
   livro: string | null
   folha: string | null
   termo: string | null
@@ -799,6 +801,14 @@ function lerDocSnapshot(bruto: Record<string, unknown> | null): DocSnapshot | nu
     id: Number(bruto.id),
     tipo: texto(bruto.tipo),
     cartorio: textoOuNulo(bruto.cartorio),
+    orgaoId: typeof bruto.orgaoId === "number" ? bruto.orgaoId : null,
+    orgao: bruto.orgao && typeof bruto.orgao === "object"
+      ? {
+          id: Number((bruto.orgao as Record<string, unknown>).id),
+          name: texto((bruto.orgao as Record<string, unknown>).name),
+          nomeFantasia: textoOuNulo((bruto.orgao as Record<string, unknown>).nomeFantasia),
+        }
+      : null,
     livro: textoOuNulo(bruto.livro),
     folha: textoOuNulo(bruto.folha),
     termo: textoOuNulo(bruto.termo),
@@ -815,7 +825,7 @@ function lerDocSnapshot(bruto: Record<string, unknown> | null): DocSnapshot | nu
 
 /** Casca: carrega, e monta o formulário com a semente já em mãos. */
 export function EditorSolicitarCertidao(props: StepEditorBaseProps) {
-  const { doc: bruto, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  const { doc: bruto, etapa, carregando, recarregar } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
   const doc = useMemo(() => lerDocSnapshot(bruto), [bruto])
   if (!props.isOpen) return null
   return (
@@ -825,6 +835,7 @@ export function EditorSolicitarCertidao(props: StepEditorBaseProps) {
       doc={doc}
       etapa={etapa}
       loading={carregando}
+      onOrgaoAlterado={recarregar}
     />
   )
 }
@@ -839,7 +850,8 @@ function FormSolicitarCertidao({
   doc,
   etapa,
   loading,
-}: StepEditorBaseProps & { doc: DocSnapshot | null; etapa: EtapaCarregada | null; loading: boolean }) {
+  onOrgaoAlterado,
+}: StepEditorBaseProps & { doc: DocSnapshot | null; etapa: EtapaCarregada | null; loading: boolean; onOrgaoAlterado: () => void }) {
   // O formulário nasce do que está gravado. A PRÉ-SELEÇÃO do canal continua igual: se
   // não há canal salvo, vale o recomendado — é isso que faz as seções "Evidências" e
   // "Detalhes do envio" já aparecerem ao abrir.
@@ -1105,11 +1117,17 @@ function FormSolicitarCertidao({
                 </div>
               </ResumoCard>
 
-              {/* Card CARTÓRIO */}
-              <ResumoCard label="Cartório">
-                <div className="text-[13px] font-semibold text-white leading-tight">
-                  {doc.cartorio || "—"}
-                </div>
+              {/* Card CARTÓRIO/ÓRGÃO — escolhido AQUI, não em outra tela. Achado
+                  real (15/09/2026): o vínculo estruturado com o órgão
+                  (Documento.orgaoId) não tinha NENHUMA tela pra ser definido,
+                  e travava esta mesma subtarefa antes de ela poder abrir. */}
+              <ResumoCard label="Cartório / órgão emissor">
+                <OrgaoDoRequerimentoField
+                  documentoId={doc.id}
+                  orgaoId={doc.orgaoId}
+                  orgao={doc.orgao}
+                  onSalvo={onOrgaoAlterado}
+                />
                 <div className="text-[11px] text-[var(--text-secondary)] mt-1">
                   SLA típico: <strong className="text-white/85">~30d</strong>
                 </div>
@@ -1324,6 +1342,106 @@ function FormSolicitarCertidao({
 }
 
 // --- helper local ao editor: card do Resumo do Pedido
+// ============================================================
+// ÓRGÃO EMISSOR — escolhido DENTRO do drawer de "Solicitar certidão"
+// ============================================================
+//
+// Achado real (15/09/2026): o vínculo estruturado com o órgão
+// (Documento.orgaoId) não tinha nenhuma tela para ser definido, e a
+// subtarefa que ABRE este drawer ficava bloqueada antes de o operador
+// conseguir chegar aqui. É esta subtarefa — "Enviar requerimento ao
+// cartório" — que estabelece o contato pela primeira vez; ela é quem
+// resolve o próprio órgão, não uma tela cadastral separada.
+interface OrgaoOpcaoResumo {
+  id: number
+  name: string
+  nomeFantasia: string | null
+  city: string | null
+  pais: { id: number; countryLabel: string } | null
+}
+
+function OrgaoDoRequerimentoField({
+  documentoId, orgaoId, orgao, onSalvo,
+}: {
+  documentoId: number
+  orgaoId: number | null
+  orgao: { id: number; name: string; nomeFantasia: string | null } | null
+  onSalvo: () => void
+}) {
+  const [editando, setEditando] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const opcoesReq = useApi<{ orgaos: OrgaoOpcaoResumo[] }>(
+    editando ? "/api/documentos/orgaos-disponiveis" : null,
+  )
+  const opcoes = opcoesReq.dados?.orgaos ?? []
+
+  const salvar = async (novoOrgaoId: number | null) => {
+    setSalvando(true)
+    setErro(null)
+    try {
+      const res = await fetch(`/api/documentos/${documentoId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ orgaoId: novoOrgaoId }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setErro(j?.error ?? "Não foi possível salvar o órgão.")
+        return
+      }
+      setEditando(false)
+      onSalvo()
+    } catch {
+      setErro("Falha de rede ao salvar o órgão.")
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  if (!editando) {
+    return (
+      <div>
+        <div className="text-[13px] font-semibold text-white leading-tight">
+          {orgao ? (orgao.nomeFantasia || orgao.name) : (
+            <span className="text-[var(--accent-text)]">Nenhum — escolha abaixo</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditando(true)}
+          className="text-[10.5px] text-[var(--text-secondary)] hover:underline mt-0.5"
+        >
+          {orgao ? "alterar órgão" : "escolher órgão"}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <select
+        autoFocus
+        disabled={salvando || opcoesReq.carregando}
+        defaultValue={orgaoId ?? ""}
+        onChange={(e) => salvar(e.target.value ? Number(e.target.value) : null)}
+        className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none disabled:opacity-50"
+      >
+        <option value="">— selecione —</option>
+        {opcoes.map((o) => (
+          <option key={o.id} value={o.id}>
+            {(o.nomeFantasia || o.name)}{o.pais ? ` · ${o.pais.countryLabel}` : ""}
+          </option>
+        ))}
+      </select>
+      <button type="button" onClick={() => { setEditando(false); setErro(null) }} className="text-[10px] text-[var(--text-secondary)] hover:underline">
+        cancelar
+      </button>
+      {erro && <div className="text-[10.5px] text-red-700">{erro}</div>}
+    </div>
+  )
+}
+
 function ResumoCard({
   label,
   children,

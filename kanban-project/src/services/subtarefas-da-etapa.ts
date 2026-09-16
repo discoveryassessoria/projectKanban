@@ -136,8 +136,21 @@ export async function subtarefasDaEtapa(args: {
     }
 
     // ── OS CANAIS, quando ela envia algo para fora ─────────────────────────
+    //
+    // SEM DEPENDÊNCIA DECLARADA (ponto de entrada do passo) — é ELA quem
+    // estabelece o contato com o órgão pela primeira vez; travar "Iniciar" por
+    // falta do próprio dado que essa subtarefa existe para capturar inverte a
+    // ordem do trabalho. Achado real (15/09/2026): a subtarefa "Enviar
+    // requerimento ao cartório" ficava bloqueada (FORNECEDOR_AUSENTE) para
+    // SEMPRE em documento novo, e o editor dela nem usa `fornecedorId` — o
+    // vínculo com o órgão (Documento.orgaoId) e o cadastro de canais por
+    // fornecedor (OrganizacaoCanal) são uma camada mais nova, ainda não citada
+    // por este formulário específico. Só quem TEM uma dependência (2ª
+    // subtarefa em diante) pode presumir que o órgão já foi resolvido por
+    // quem veio antes — para essas, o bloqueio continua valendo.
+    const podeResolverProprioFornecedor = (d.dependeDe ?? []).length === 0
     let canais: CanalDisponivel[] = []
-    if (d.fonteDeCanais !== "NENHUMA") {
+    if (d.fonteDeCanais !== "NENHUMA" && !podeResolverProprioFornecedor) {
       if (!args.fornecedorId) {
         if (!bloqueioCodigo) {
           bloqueioCodigo = CAUSAS_DE_BLOQUEIO.FORNECEDOR_AUSENTE
