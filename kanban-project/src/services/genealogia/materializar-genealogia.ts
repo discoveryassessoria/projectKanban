@@ -126,8 +126,15 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
   // ausência de cadastro publicado cai no default do domínio (5d), nunca
   // trava a materialização por um problema de configuração que não é dela.
   const wfGenealogia = await resolverWorkflowAplicavel(processo.tipoProcessoMotorId ?? null, FASE_GENEALOGIA, db)
-  const slaDaysLocalizarRegistro =
-    ("steps" in wfGenealogia ? wfGenealogia.steps.find((s) => s.key === STEP_LOCALIZAR)?.slaDays : null) ?? 5
+  const passoLocalizarRegistroCadastrado =
+    "steps" in wfGenealogia ? wfGenealogia.steps.find((s) => s.key === STEP_LOCALIZAR) : null
+  const slaDaysLocalizarRegistro = passoLocalizarRegistroCadastrado?.slaDays ?? 5
+  // MESMO PRINCÍPIO DO PRAZO ACIMA, agora pro NOME: `STEP_LABEL` era a mesma
+  // segunda fonte de verdade — texto fixo aqui, nunca lido do cadastro. Renomear
+  // o passo em Gerenciamento não mudava nada do que já tinha sido materializado
+  // (achado real, 16/09/2026: "Localizar registro da certidão" continuava
+  // aparecendo mesmo depois de o cadastro dizer só "Localizar registro").
+  const labelLocalizarRegistro = passoLocalizarRegistroCadastrado?.label ?? STEP_LABEL
 
   // Pessoa REMOVIDA com histórico preservado não volta a materializar: seria
   // recriar necessidade, passo e tarefa para quem já saiu da operação.
@@ -333,7 +340,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
                 obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
                 status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: slaDaysLocalizarRegistro,
                 chaveIdempotencia: chave,
-                snapshot: { stepKey: STEP_LOCALIZAR, label: STEP_LABEL, requisito: snapshot } as Prisma.InputJsonValue,
+                snapshot: { stepKey: STEP_LOCALIZAR, label: labelLocalizarRegistro, requisito: snapshot } as Prisma.InputJsonValue,
                 snapshotSchemaVersion: 1,
               },
             })
