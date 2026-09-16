@@ -103,6 +103,20 @@ export const PERMISSOES = {
   'arvore.editar_documento': 'Editar documentos na árvore',
   'arvore.excluir_documento': 'Excluir documentos na árvore',
 
+  // Achado real (16/09/2026): `src/lib/motor/catalogo-de-efeitos.ts` cobra a
+  // permissão "documentos.editar" em 6 efeitos do motor operacional
+  // (MARK_DOCUMENT_RECEIVED, APPROVE_FOR_ANALYSIS, COMPLETE_DOCUMENT,
+  // REQUEST_NEW_COPY, INVALIDATE_DOCUMENT, REGISTER_DIVERGENCE — o coração do
+  // fluxo "Solicitar certidão"/Emissão Documental) desde a criação do
+  // catálogo, mas a chave nunca existiu aqui. `calcularPermissoes` só grava
+  // chaves que estão em `PERMISSOES`: para QUALQUER usuário não-admin, o
+  // efeito recusava sempre com "Esta ação exige a permissão
+  // 'documentos.editar'" — nenhum cadastro de perfil podia conceder o que não
+  // existia. Diferente de `arvore.editar_documento` (edição direta na tela da
+  // Árvore Genealógica): esta é a permissão da PORTA operacional
+  // (executarAcaoCadastrada), mesmo modelo Documento, superfície diferente.
+  'documentos.editar': 'Decidir sobre documento operacional pela porta do motor (aprovar para análise, marcar recebido, solicitar nova via, invalidar, registrar divergência)',
+
   // Motor Registral Genealógico (MRG) — revisão registral da Árvore.
   // Segregação de funções: VER evidência ≠ REVISAR divergência ≠ APROVAR correção
   // ≠ ALTERAR FILIAÇÃO ≠ MESCLAR pessoas ≠ REVERTER ≠ REPROCESSAR ≠ ADMINISTRAR.
