@@ -2502,54 +2502,29 @@ function fullName(p: { nome: string | null; sobrenome: string | null } | null): 
 
 /** Casca: carrega, e monta o formulário com a semente já em mãos. */
 /**
- * CORREÇÃO FINAL (14/09/2026) — mandato Emissão Documental: 1 Tarefa, EXATAMENTE
- * 4 passos operacionais. "Conferir certidão" e "Validar certidão" deixaram de
- * ser dois Steps para virar DUAS SUBTAREFAS ("conferencia"/"validacao_juridica")
- * do MESMO passo "conferir_e_validar_certidao" — progresso continua 4/4, nunca
- * 5/5.
+ * CORREÇÃO (15/09/2026) — o cadastro REALMENTE publicado (workflow 12, versão 9)
+ * tem UMA ÚNICA subtarefa `conferir_e_validar_certidao` (não duas — "conferencia"
+ * e "validacao_juridica" nunca existiram como chaves cadastradas). Ela já carrega
+ * sozinha o checklist operacional, os dados literais e as duas ações terminais
+ * (`aprovado` → segue para a Análise, `nova_via` → volta pro cartório): é
+ * `FormConferirCertidao` — que já lê essas ações do cadastro quando presentes —
+ * que cobre o passo inteiro, não `FormValidarCertidao` (essa segue servindo só
+ * `EditorValidarCertidao`, o caminho de um "Validar certidão" publicado como
+ * STEP PRÓPRIO, de versões anteriores à unificação).
  *
- * O PASSO 4 É INTEGRALMENTE DA DANIELA (ou de quem for a dona da Tarefa): ela
- * confere E decide VALIDADA/NÃO VALIDADA, sem handoff automático para
- * Marco/Admin — este roteador nunca olha QUEM está logado, só o estado das
- * duas subtarefas. Reatribuir a Tarefa continua sendo uma capacidade GENÉRICA
- * do motor (via atribuirTarefa/transferirTarefa, para uma exceção configurada
- * à parte), mas não faz parte do fluxo padrão e nada aqui a aciona.
- *
- * Este roteador decide, pelo estado real das duas subtarefas (nunca por
- * suposição de tela), qual formulário mostrar: a conferência primeiro; a
- * validação jurídica só depois dela concluída (a própria dependência
- * declarada no cadastro — `dependeDe: ["conferencia"]` — já garante isso).
- * As DUAS telas continuam sendo as mesmas de sempre (FormConferirCertidao/
- * FormValidarCertidao) — só a decisão de qual mostrar mudou de "duas rotas
- * de Step" para "duas subtarefas do mesmo Step".
+ * Antes deste fix, a busca pelas chaves erradas nunca encontrava a subtarefa:
+ * o roteador sempre caía no ramo "sem subtarefa" (comportamento correto por
+ * acidente), MAS `FormConferirCertidao` também procurava "conferencia" para
+ * decidir o `subtaskKey` da ação — e, não achando, executava a ação contra o
+ * PASSO (`subtaskKey: null`) em vez da subtarefa. A subtarefa nunca era
+ * marcada concluída, o gate `TODAS_SUBTAREFAS_OBRIGATORIAS` nunca fechava, e o
+ * passo ficava para sempre "em andamento" mesmo com as 4 linhas parecendo
+ * feitas na tela.
  */
 export function EditorConferirEValidarCertidao(props: StepEditorBaseProps) {
-  const { subtarefas, carregando: carregandoCfg } = useConfiguracaoDaEtapa(props.isOpen ? props.stepId : null)
   const { doc, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
   if (!props.isOpen) return null
-  if (carregandoCfg) return null
-
-  const conferencia = subtarefas.find((s) => s.key === "conferencia")
-  const validacao = subtarefas.find((s) => s.key === "validacao_juridica")
-
-  // ETAPA PUBLICADA ANTES DA UNIFICAÇÃO (ainda não reconciliada) — sem
-  // subtarefas cadastradas, cai no comportamento antigo (Step único =
-  // conferência), preservando o que já funcionava para dado histórico.
-  if (!conferencia && !validacao) {
-    return <FormConferirCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} loading={carregando} />
-  }
-
-  // Conferência ainda não concluída (ou não existe — defensivo) → é ela que
-  // aparece. Só depois que ela concluir é que a validação fica disponível
-  // (dependência declarada no cadastro, não decisão desta tela).
-  if (!conferencia?.concluida) {
-    return <FormConferirCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} loading={carregando} />
-  }
-  // NO PASSO UNIFICADO, conferência e validação são a MESMA etapa (mesmo
-  // stepInstanceId) — não há uma "etapa anterior" separada para ler; o que
-  // a conferência decidiu está nesta própria etapa (SubtaskExecution da
-  // subtarefa "conferencia", já refletido em `etapa` pelo carregador).
-  return <FormValidarCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} conferenciaEtapa={etapa} loading={carregando} />
+  return <FormConferirCertidao key={versaoDe(doc, etapa)} {...props} doc={doc} etapa={etapa} loading={carregando} />
 }
 
 export function EditorConferirCertidao(props: StepEditorBaseProps) {
@@ -2611,14 +2586,15 @@ function FormConferirCertidao({
   // Checklist + resultado. O padrão só vale quando a etapa ainda não tem checklist
   // gravado — era o `if (step.reviewChecklist)` do carregador.
   const { cfg: cfgConferencia, opcoesDe: _opcoesConf, executarAcao: executarAcaoConferenciaBase } = useConfiguracaoDaEtapa(stepId)
-  // CORREÇÃO FINAL (14/09/2026): conferir_certidao virou a subtarefa "conferencia"
-  // dentro do passo unificado "conferir_e_validar_certidao". Quando essa subtarefa
-  // existe, checklist/ações vêm DELA (ela tem seu próprio cadastro, igual o passo
-  // tinha); sem ela (etapas antigas ainda não reconciliadas), cai no cadastro do
-  // passo como sempre foi — nenhum comportamento antigo quebra.
-  const subConferencia = cfgConferencia?.subtarefas.find((s) => s.key === "conferencia") ?? null
+  // CORREÇÃO (15/09/2026): a subtarefa REALMENTE cadastrada é
+  // "conferir_e_validar_certidao" (não "conferencia" — essa chave nunca existiu
+  // no cadastro publicado). Achado real: com a chave errada, `subConferencia`
+  // dava sempre null e a ação executava com `subtaskKey: null` — contra o
+  // PASSO, nunca contra a subtarefa —, então ela nunca fechava e o passo
+  // (regra TODAS_SUBTAREFAS_OBRIGATORIAS) nunca concluía sozinho.
+  const subConferencia = cfgConferencia?.subtarefas.find((s) => s.key === "conferir_e_validar_certidao") ?? null
   const executarAcaoConferencia = (acaoKey: string, valores: Record<string, unknown>) =>
-    executarAcaoConferenciaBase(acaoKey, valores, subConferencia ? "conferencia" : null)
+    executarAcaoConferenciaBase(acaoKey, valores, subConferencia ? "conferir_e_validar_certidao" : null)
   const checklistCadastrado = subConferencia ? subConferencia.definicao.checkItens : (cfgConferencia?.checklist ?? [])
   const CHECKLIST_ITEMS = checklistCadastrado.length > 0
     ? checklistCadastrado.map((i) => ({ id: i.key as keyof ReviewChecklist, label: i.label, desc: i.descricao ?? "" }))
