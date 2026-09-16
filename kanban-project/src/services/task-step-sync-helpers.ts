@@ -54,10 +54,19 @@ const ESPECIAIS_PASSO: [string, string][] = [
   ["EXECUTADO", "AGUARDANDO_APROVACAO"],
   ["AGUARDANDO_APROVACAO", "CONCLUIDO"],
   ["BLOQUEADO", "DISPONIVEL"], ["BLOQUEADO", "EM_ANDAMENTO"], ["BLOQUEADO", "AGUARDANDO"],
+  // Espera externa (aplicarEsperaExternaDaSubtarefaSeConfigurado/bloquearTarefa
+  // com motivoCodigo AGUARDANDO_TERCEIRO) pode alcançar a subtarefa corrente com
+  // o passo já em EM_ANDAMENTO (mesma precedência de AGUARDANDO — sem isto a
+  // transição lateral cairia em TRANSICAO_INVALIDA e o passo ficava preso em
+  // EM_ANDAMENTO em vez de refletir a espera).
+  ["EM_ANDAMENTO", "AGUARDANDO"],
 ]
 const ESPECIAIS_TAREFA: [string, string][] = [
   ["BLOQUEADA", "NAO_INICIADA"], ["BLOQUEADA", "EM_ANDAMENTO"],
   ["BLOQUEADA", "AGUARDANDO_CLIENTE"], ["BLOQUEADA", "AGUARDANDO_TERCEIRO"],
+  // Mesmo motivo do par acima, do lado da Tarefa (AGUARDANDO_TERCEIRO tem a
+  // MESMA precedência de EM_ANDAMENTO — ver PRECEDENCIA_TAREFA).
+  ["EM_ANDAMENTO", "AGUARDANDO_TERCEIRO"],
 ]
 
 export function podeAplicarPasso(atual: string, alvo: string): boolean {

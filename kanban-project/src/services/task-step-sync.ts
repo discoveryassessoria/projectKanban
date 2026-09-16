@@ -1054,15 +1054,28 @@ export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promi
   // interno como se fosse falta de ação, quando na verdade era espera legítima
   // sem o relógio pausado. Ver `scripts/mandato-pausa-relogios.test.ts`.
   const espera = ctx.motivoCodigo === "AGUARDANDO_TERCEIRO"
+  // ESPERA EXTERNA ≠ BLOQUEIO. `STATUS_TAREFA_POR_PASSO` (passo-tarefa-projecao.ts,
+  // a tabela ÚNICA passo→tarefa) já mapeia AGUARDANDO→AGUARDANDO_TERCEIRO como par
+  // distinto de BLOQUEADO→BLOQUEADA. Esta porta, a única que escreve os dois lados
+  // de uma espera de terceiro, gravava sempre BLOQUEADO/BLOQUEADA — contradizendo a
+  // própria tabela e, pior, fazendo `acoesPermitidasDaEtapa` tratar "aguardando
+  // retorno do cartório" (rotina, todo requerimento passa por aqui) como um
+  // bloqueio operacional real: sem "concluir" nem "salvar_andamento" disponíveis,
+  // só "desbloquear" — que exigia um clique a mais e escondia o SLA de espera
+  // atrás do rótulo de bloqueio. Achado real 16/09/2026: a Daniela não conseguia
+  // confirmar o retorno do cartório e concluir "Aguardar retorno do cartório"
+  // porque o passo tinha sido automaticamente marcado BLOQUEADO nesse instante.
+  const alvoTarefa = espera ? "AGUARDANDO_TERCEIRO" : "BLOQUEADA"
+  const alvoPasso = espera ? "AGUARDANDO" : "BLOQUEADO"
   try {
     const resultado = await prisma.$transaction(async (tx) => {
-      const rt = await aplicarTarefa(tx, tarefaId, "BLOQUEADA", "TAREFA_BLOQUEADA", { ...base, extra: { blockedPreviousStatus: t.statusTarefa, motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa } })
+      const rt = await aplicarTarefa(tx, tarefaId, alvoTarefa, "TAREFA_BLOQUEADA", { ...base, extra: { blockedPreviousStatus: t.statusTarefa, motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa } })
       if (rt.code) return ko(rt.code, correlationId)
       const eventos = ["TAREFA_BLOQUEADA"]
       let passoAnt: string | undefined, passoAt: string | undefined
       if (t.workflowStepInstanceId) {
         const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: t.workflowStepInstanceId }, select: { status: true } })
-        const rp = await aplicarPasso(tx, t.workflowStepInstanceId, "BLOQUEADO", "PASSO_BLOQUEADO", { ...base, extra: { statusAnteriorBloqueio: step?.status } })
+        const rp = await aplicarPasso(tx, t.workflowStepInstanceId, alvoPasso, "PASSO_BLOQUEADO", { ...base, extra: { statusAnteriorBloqueio: step?.status } })
         passoAnt = rp.anterior; passoAt = rp.atual
         if (rp.changed) eventos.push("PASSO_BLOQUEADO")
       }
