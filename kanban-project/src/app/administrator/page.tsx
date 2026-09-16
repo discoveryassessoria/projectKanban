@@ -110,6 +110,7 @@ const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerencia
 const ModelosDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RuntimeWorkflowDiagnostics = dynamic(() => import("@/src/components/gerenciamentoComponents/RuntimeWorkflowDiagnostics"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const BaseCartoriosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/BaseCartoriosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AssistenteParametrizacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AssistenteParametrizacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -193,6 +194,7 @@ const TELAS: Record<string, React.ComponentType> = {
   taxes: ImpostosTab,
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
+  cartorios_base: BaseCartoriosTab,
   suppliers: FornecedoresTab,
   profissionais: ProfissionaisTab,
   // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela

@@ -23,6 +23,10 @@
     {
       "path": "/api/cron/outbox",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cartorios",
+      "schedule": "0 6 * * *"
     }
   ]
 }

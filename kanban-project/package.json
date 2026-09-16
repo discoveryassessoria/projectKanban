@@ -393,7 +393,8 @@
     "test:mandato-sla-cartorio-override": "tsx scripts/mandato-sla-cartorio-override.test.ts",
     "test:mandato-rascunho-publicacao": "tsx scripts/mandato-rascunho-publicacao.test.ts",
     "test:mandato-rbac-matriz": "tsx scripts/mandato-rbac-matriz.test.ts",
-    "test:mandato-financeiro-cartorio-isolado": "tsx scripts/mandato-financeiro-cartorio-isolado.test.ts"
+    "test:mandato-financeiro-cartorio-isolado": "tsx scripts/mandato-financeiro-cartorio-isolado.test.ts",
+    "test:cartorios-sync": "tsx scripts/cartorios-sync.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

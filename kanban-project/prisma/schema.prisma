@@ -8251,3 +8251,84 @@ model RelatorioVisao {
   @@index([usuarioId, favorita])
   @@index([usuarioId, usadaEm])
 }
+
+/// BASE NACIONAL DE CARTÓRIOS DE REGISTRO CIVIL — sincronizada automaticamente da
+/// fonte pública oficial (Portal da Transparência do Registro Civil,
+/// transparencia.registrocivil.org.br/api/notary). NÃO é `OrgaoProtocolo`: aquele é
+/// cadastro mestre admin-curado (1 registro por organização real, N funções,
+/// referenciado por Documento/Protocolo/financeiro) — misturar aqui os 7000+
+/// cartórios sincronizados quebraria a tela de Órgãos e a semântica "curado à mão".
+/// Este é o inverso: alimentado só pela sincronização, nunca editado manualmente
+/// (achado real, 16/09/2026 — investigação completa em
+/// src/services/cartorios/cartorio-sync-service.ts).
+model Cartorio {
+  id Int @id @default(autoincrement())
+
+  /// IDENTIDADE ESTÁVEL da fonte — `cartorio_id`, nunca o nome (nome pode mudar).
+  /// Único ponto de verdade pra saber "já existe" numa nova sincronização.
+  sourceId String @unique @db.VarChar(40)
+  /// De onde veio — hoje só "REGISTRO_CIVIL_TRANSPARENCIA", campo existe pra
+  /// permitir uma segunda fonte um dia sem migração.
+  source   String @default("REGISTRO_CIVIL_TRANSPARENCIA") @db.VarChar(40)
+  /// `num_cnj` da fonte — código oficial (CNJ), quando fornecido. Não é chave
+  /// primária de identidade porque a fonte já dá um `sourceId` mais estável.
+  cns      String? @db.VarChar(20)
+
+  nome           String @db.VarChar(300)
+  /// Normalizado (minúsculo, sem acento) só para busca textual — nunca exibido.
+  nomeNormalizado String @db.VarChar(300)
+  uf             String @db.VarChar(2)
+  municipio      String @db.VarChar(150)
+  endereco       String? @db.VarChar(400)
+  telefone       String? @db.VarChar(60)
+  email          String? @db.VarChar(200)
+  responsavel    String? @db.VarChar(200)
+  regiao         String? @db.VarChar(20)
+  entidade       String? @db.VarChar(60)
+
+  /// Espelha `flag_ativo` da fonte — nunca inferido por ausência isolada
+  /// (ver `missingSince`/`consecutiveMissingSyncs` abaixo).
+  ativo Boolean @default(true)
+
+  /// Visto pela 1ª vez / pela última vez numa sincronização — nunca sobrescritos
+  /// um pelo outro.
+  firstSeenAt  DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
+  lastSyncedAt DateTime  @default(now())
+  /// Desde quando este cartório PAROU de aparecer na fonte (`null` = está vindo
+  /// normalmente). Não inativa sozinho: só depois de N sincronizações COMPLETAS
+  /// consecutivas confirmando a ausência (ver CartorioSyncService).
+  missingSince            DateTime?
+  consecutiveMissingSyncs Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([uf, municipio])
+  @@index([nomeNormalizado])
+  @@index([ativo])
+  @@index([cns])
+}
+
+/// AUDITORIA de cada execução da sincronização de cartórios — cron e "Sincronizar
+/// agora" gravam aqui, pela mesma porta (CartorioSyncService).
+model CartorioSyncRun {
+  id           Int       @id @default(autoincrement())
+  startedAt    DateTime  @default(now())
+  finishedAt   DateTime?
+  /// EXECUTANDO | SUCESSO | FALHA | BLOQUEADO_CONCORRENCIA | ABORTADO_INCOMPLETO
+  status       String    @db.VarChar(30)
+  source       String    @default("REGISTRO_CIVIL_TRANSPARENCIA") @db.VarChar(40)
+  gatilho      String    @db.VarChar(30) // cron | manual_sincronizar_agora
+  fetched      Int       @default(0)
+  inserted     Int       @default(0)
+  updated      Int       @default(0)
+  unchanged    Int       @default(0)
+  missing      Int       @default(0)
+  inactivated  Int       @default(0)
+  errors       Int       @default(0)
+  errorMessage String?   @db.Text
+
+  @@index([startedAt])
+  @@index([status])
+}

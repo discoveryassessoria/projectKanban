@@ -369,7 +369,13 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // linha `0000_baseline` continuam os originais de 02/08/2026.
 //
 //   anterior : bfefeef373b4787228f2accd6cfa96a38e75ab2ac47ec677c6cbdababfd601a2
-const CHECKSUM_LEDGER = 'b431329f25ffc0153c1bcc6deb621ff5caab892ac97e89e96024b2fb228830e1'
+// 16/09/2026 — atualizado por causa das 2 tabelas novas da Base de Cartórios
+// (Cartorio/CartorioSyncRun). Procedimento seguido à risca: 1) schema.prisma
+// mudou de propósito (não bloco-manual.sql); 2) ledger de produção
+// (_prisma_migrations) consultado ANTES de escrever; 3) checksum da linha
+// 0000_baseline atualizado explicitamente em produção, sem tocar schema/dados;
+// 4) só então esta constante. Checksum anterior: b431329f25ffc0153c1bcc6deb621ff5caab892ac97e89e96024b2fb228830e1
+const CHECKSUM_LEDGER = '61107de94e85709a0de86a7548eab33205cf1886056aadccb93658c8ab9777f7'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -442,6 +448,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260913120000_regra_temporal_orgao',
   '20260914194923_espera_externa_ao_liberar',
   '20260915160000_espera_externa_ao_liberar_subtarefa',
+  '20260916220000_cartorios_base_nacional',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

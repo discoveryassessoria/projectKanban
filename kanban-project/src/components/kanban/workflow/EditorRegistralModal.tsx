@@ -295,25 +295,13 @@ function ConteudoModal({
       .catch(() => setMunicipios([]))
   }, [form.estado_registro, ufs])
   const ufSigla = ufs.find((u) => u.nome === form.estado_registro)?.sigla ?? null
-  const orgaosReq = useApi<{ orgaos?: Array<{ name: string; city: string | null }> }>(
-    "/api/documentos/orgaos-disponiveis",
+  // BASE NACIONAL DE CARTÓRIOS (Registro Civil, sincronizada — ver
+  // CartorioSyncService/16-09-2026): sempre disponível, sem apikey, sem
+  // depender de nenhum serviço externo em tempo real — busca é na base LOCAL.
+  const cartoriosReq = useApi<{ cartorios?: Array<{ id: number; nome: string; municipio: string; endereco: string | null }> }>(
+    ufSigla ? `/api/cartorios?uf=${encodeURIComponent(ufSigla)}${form.cidade_registro ? `&municipio=${encodeURIComponent(form.cidade_registro)}` : ""}&limit=100` : null,
   )
-  // Fonte REAL (API oficial ARPEN/Registro Civil, por estado+cidade, com bairro) — só
-  // dispara quando cidade já foi escolhida. Sem apikey configurada, `configurado: false`
-  // e a tela cai no cadastro próprio (datalist abaixo) sem quebrar.
-  const cartoriosApiReq = useApi<{
-    configurado: boolean
-    cartorios?: Array<{ id: number; nome: string; bairro: string | null; endereco: string | null }>
-  }>(
-    ufSigla && form.cidade_registro
-      ? `/api/documentos/cartorios-registro-civil?estado=${encodeURIComponent(ufSigla)}&cidade=${encodeURIComponent(form.cidade_registro)}`
-      : null,
-  )
-  const cartoriosDaApi = cartoriosApiReq.dados?.cartorios ?? []
-  const apiConfigurada = cartoriosApiReq.dados?.configurado === true
-  const cartoriosDaCidade = (orgaosReq.dados?.orgaos ?? [])
-    .filter((o) => !form.cidade_registro || o.city === form.cidade_registro)
-    .map((o) => o.name)
+  const cartoriosDaApi = cartoriosReq.dados?.cartorios ?? []
 
   // -- Trava scroll body e ESC
   useEffect(() => {
@@ -624,15 +612,12 @@ function ConteudoModal({
                     />
                     <datalist id="cartorios-sugeridos">
                       {cartoriosDaApi.map((c) => (
-                        <option key={`api-${c.id}`} value={c.bairro ? `${c.nome} — ${c.bairro}` : c.nome} />
-                      ))}
-                      {cartoriosDaCidade.map((nome) => (
-                        <option key={`cad-${nome}`} value={nome} />
+                        <option key={c.id} value={c.nome} />
                       ))}
                     </datalist>
-                    {form.cidade_registro && !apiConfigurada && (
+                    {ufSigla && cartoriosDaApi.length === 0 && (
                       <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
-                        Busca automática de cartórios por bairro (API Registro Civil) não está configurada — sugestões vêm só do cadastro de Órgãos já usado neste sistema.
+                        {form.cidade_registro ? "Nenhum cartório sincronizado para esta cidade ainda." : "Selecione a cidade para ver os cartórios dessa região."}
                       </div>
                     )}
                     {!isModoBuscar && (

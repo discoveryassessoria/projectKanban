@@ -82,6 +82,8 @@ const API_PUBLICA: string[] = [
   "/api/cron/avisos-prazo",
   "/api/cron/reconciliar-fases",
   "/api/cron/outbox",
+  // Auto-verifica (x-vercel-cron ou CRON_SECRET) — mesma régua dos três acima.
+  "/api/cron/cartorios",
 ]
 
 function isApiPublica(pathname: string): boolean {

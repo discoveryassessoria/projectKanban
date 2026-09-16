@@ -320,6 +320,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     description: "Entidades e pessoas externas que participam dos processos: órgãos, fornecedores e profissionais.",
     children: [
       a(10, "organs", "Cartórios e Órgãos", ["cartorio", "cartório", "orgao", "órgão", "consulado", "tribunal", "prefeitura", "comune", "protocolo", "organizacao", "organização"], "Organizações"),
+      // BASE NACIONAL sincronizada (Registro Civil) — NÃO é o mesmo cadastro do
+      // item acima (curado à mão). Ver comentário do model `Cartorio`.
+      a(15, "cartorios_base", "Base de Cartórios", ["cartorio", "cartório", "registro civil", "sincronizar", "base nacional", "transparencia"], "Organizações"),
       a(20, "suppliers", "Fornecedores", ["fornecedor", "parceiro", "tradutor", "advogado", "escritorio", "banco", "empresa", "organizacao"], "Organizações"),
       // OS CANAIS SÃO DA ORGANIZAÇÃO, não do workflow.
       //

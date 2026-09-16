@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-15
+-- Gerado em : 2026-09-16
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -4608,6 +4608,54 @@ CREATE TABLE "RelatorioVisao" (
 );
 
 -- CreateTable
+CREATE TABLE "Cartorio" (
+    "id" SERIAL NOT NULL,
+    "sourceId" VARCHAR(40) NOT NULL,
+    "source" VARCHAR(40) NOT NULL DEFAULT 'REGISTRO_CIVIL_TRANSPARENCIA',
+    "cns" VARCHAR(20),
+    "nome" VARCHAR(300) NOT NULL,
+    "nomeNormalizado" VARCHAR(300) NOT NULL,
+    "uf" VARCHAR(2) NOT NULL,
+    "municipio" VARCHAR(150) NOT NULL,
+    "endereco" VARCHAR(400),
+    "telefone" VARCHAR(60),
+    "email" VARCHAR(200),
+    "responsavel" VARCHAR(200),
+    "regiao" VARCHAR(20),
+    "entidade" VARCHAR(60),
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "firstSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastSyncedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "missingSince" TIMESTAMP(3),
+    "consecutiveMissingSyncs" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Cartorio_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CartorioSyncRun" (
+    "id" SERIAL NOT NULL,
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" TIMESTAMP(3),
+    "status" VARCHAR(30) NOT NULL,
+    "source" VARCHAR(40) NOT NULL DEFAULT 'REGISTRO_CIVIL_TRANSPARENCIA',
+    "gatilho" VARCHAR(30) NOT NULL,
+    "fetched" INTEGER NOT NULL DEFAULT 0,
+    "inserted" INTEGER NOT NULL DEFAULT 0,
+    "updated" INTEGER NOT NULL DEFAULT 0,
+    "unchanged" INTEGER NOT NULL DEFAULT 0,
+    "missing" INTEGER NOT NULL DEFAULT 0,
+    "inactivated" INTEGER NOT NULL DEFAULT 0,
+    "errors" INTEGER NOT NULL DEFAULT 0,
+    "errorMessage" TEXT,
+
+    CONSTRAINT "CartorioSyncRun_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -6497,6 +6545,27 @@ CREATE INDEX "RelatorioVisao_usuarioId_usadaEm_idx" ON "RelatorioVisao"("usuario
 
 -- CreateIndex
 CREATE UNIQUE INDEX "RelatorioVisao_usuarioId_dominio_nome_key" ON "RelatorioVisao"("usuarioId", "dominio", "nome");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Cartorio_sourceId_key" ON "Cartorio"("sourceId");
+
+-- CreateIndex
+CREATE INDEX "Cartorio_uf_municipio_idx" ON "Cartorio"("uf", "municipio");
+
+-- CreateIndex
+CREATE INDEX "Cartorio_nomeNormalizado_idx" ON "Cartorio"("nomeNormalizado");
+
+-- CreateIndex
+CREATE INDEX "Cartorio_ativo_idx" ON "Cartorio"("ativo");
+
+-- CreateIndex
+CREATE INDEX "Cartorio_cns_idx" ON "Cartorio"("cns");
+
+-- CreateIndex
+CREATE INDEX "CartorioSyncRun_startedAt_idx" ON "CartorioSyncRun"("startedAt");
+
+-- CreateIndex
+CREATE INDEX "CartorioSyncRun_status_idx" ON "CartorioSyncRun"("status");
 
 -- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
