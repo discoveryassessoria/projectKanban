@@ -127,6 +127,17 @@ export interface RemocaoInput {
   actorUserId?: number | null
   modo?: ModoRemocao
   motivo?: string | null
+  /**
+   * Ignora fato histórico protegido e força o HARD delete mesmo assim.
+   * Uso RESTRITO: só `limparArvoreOrfaAposExclusaoDeProcesso` passa `true`,
+   * porque quem decidiu "apague tudo" ali foi o usuário explicitamente, para
+   * a árvore que ficou órfã de processo — nunca o default de rota alguma.
+   * `executarHard` já é seguro sob força: os fatos que existem aqui são
+   * exclusivos da Pessoa/seus Documentos (arquivo, solicitação, protocolo de
+   * documento, obrigação/ledger) — cascade do schema ou delete explícito, sem
+   * tocar Requerente (que sobrevive por design) nem fato de OUTRO processo.
+   */
+  forcar?: boolean
 }
 
 export interface ResultadoRemocao {
@@ -646,7 +657,8 @@ export async function removerPessoaDaArvore(input: RemocaoInput): Promise<Result
 
     // Hard delete pedido explicitamente contra fato protegido: recusa, não degrada
     // em silêncio. Quem pediu hard delete precisa saber que não foi hard delete.
-    if (efetivo === "HARD" && !plano.podeHardDelete) {
+    // `forcar` é a única exceção — ver doc de `RemocaoInput.forcar`.
+    if (efetivo === "HARD" && !plano.podeHardDelete && !input.forcar) {
       return {
         ok: false, modoExecutado: null, plano, removidos: vazio(), processosAfetados: [],
         erro: "Há fatos históricos protegidos — a exclusão definitiva não é permitida.",
@@ -764,13 +776,18 @@ export interface ResultadoLimpezaArvoreOrfa {
   arvoreId: number
   removida: boolean
   pessoasRemovidas: number
-  motivoNaoRemovida?: "TEM_PROCESSO" | "FATO_PROTEGIDO" | "FALHA_NA_REMOCAO"
-  fatosProtegidos?: PessoaImpedidaExclusaoArvore[]
+  motivoNaoRemovida?: "TEM_PROCESSO" | "FALHA_NA_REMOCAO"
 }
 
 /**
  * EXCLUSÃO NÃO DEIXA ÓRFÃO — quando o Processo que apontava para esta Árvore
  * era o ÚLTIMO, ela só existia por causa dele; apagá-lo tem que levá-la junto.
+ * SEM EXCEÇÃO: decisão explícita do usuário (16/09/2026) — "quando eu deleto
+ * um processo, precisa apagar literalmente tudo, tudo mesmo, não pode sobrar
+ * nada". Antes disso, fato histórico protegido (arquivo, protocolo,
+ * solicitação, pagamento…) numa ÚNICA pessoa bloqueava a árvore INTEIRA para
+ * sempre — resíduo visível em Pesquisa Genealógica mesmo com o Processo já
+ * excluído, e nenhuma tela oferecia um jeito de resolver isso.
  *
  * Achado real (15/09/2026): `excluirProcesso` documentava, de propósito, NÃO
  * tocar a Árvore — para nunca reintroduzir o bug antigo de `prisma.arvore.
@@ -778,12 +795,14 @@ export interface ResultadoLimpezaArvoreOrfa {
  * Árvore ficava órfã (0 processos) e ninguém a limpava — a régua "quem só
  * existia por causa do que foi apagado sai junto" parou no Processo.
  *
- * O caminho aqui é o MESMO de sempre (`analisarExclusaoArvore` →
- * `removerPessoaDaArvore` HARD por pessoa → `arvore.delete`) — nenhuma lógica
- * nova, só chamado no momento certo. Se sobrar OUTRO processo apontando para
- * a árvore, ou se houver fato histórico protegido (arquivo oficial, protocolo,
- * pagamento…), ela fica exatamente como fica hoje: intacta, e quem decide o
- * próximo passo é uma pessoa, não este serviço.
+ * O caminho aqui continua o MESMO de sempre (`removerPessoaDaArvore` HARD por
+ * pessoa → `arvore.delete`), agora com `forcar: true`: nenhuma pessoa deste
+ * serviço decide "deixa ficar" no lugar do usuário. Seguro porque o único
+ * outro dono de fato protegido — `Requerente` (fatura, recibo, protocolo,
+ * anexo do CLIENTE) — nunca é apagado aqui: só perde o ponteiro `personId`
+ * (ver `executarHard`), então nada que pertence a outro processo do mesmo
+ * cliente é tocado. Só sobrevive um Processo com processo próprio: aí a
+ * árvore continua intacta (motivo `TEM_PROCESSO`).
  */
 export async function limparArvoreOrfaAposExclusaoDeProcesso(
   arvoreId: number,
@@ -798,18 +817,9 @@ export async function limparArvoreOrfaAposExclusaoDeProcesso(
     return { arvoreId, removida: false, pessoasRemovidas: 0, motivoNaoRemovida: "TEM_PROCESSO" }
   }
 
-  const plano = await analisarExclusaoArvore(arvoreId)
-  if (!plano) return null
-  if (plano.impedidas.length > 0) {
-    return {
-      arvoreId, removida: false, pessoasRemovidas: 0,
-      motivoNaoRemovida: "FATO_PROTEGIDO", fatosProtegidos: plano.impedidas,
-    }
-  }
-
   const pessoas = await prisma.pessoa.findMany({ where: { arvoreId }, select: { id: true } })
   for (const p of pessoas) {
-    const r = await removerPessoaDaArvore({ pessoaId: p.id, actorUserId, modo: "HARD" })
+    const r = await removerPessoaDaArvore({ pessoaId: p.id, actorUserId, modo: "HARD", forcar: true })
     if (!r.ok) {
       console.error(`[limparArvoreOrfaAposExclusaoDeProcesso] árvore ${arvoreId}, pessoa ${p.id}: ${r.erro}`)
       return { arvoreId, removida: false, pessoasRemovidas: 0, motivoNaoRemovida: "FALHA_NA_REMOCAO" }

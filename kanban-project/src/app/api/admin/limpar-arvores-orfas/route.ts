@@ -47,11 +47,14 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   // 🔒 Achado real (corrigido 15/09/2026): esta rota apagava em massa via
   // `prisma.arvore.deleteMany()` cru — cascade de pessoas, uniões e documentos
-  // SEM `analisarExclusaoArvore`, ou seja, SEM checar fato histórico protegido
-  // (arquivo oficial, protocolo, pagamento…). A permissão exclusiva e a frase
-  // de confirmação abaixo continuam valendo, mas não são o guard que falta: o
-  // guard é por-árvore, o mesmo de sempre, aplicado árvore por árvore — nunca
-  // um `deleteMany` que passa por cima de todas de uma vez.
+  // sem nenhuma cadeia canônica por trás. A permissão exclusiva e a frase de
+  // confirmação abaixo continuam valendo; o guard real é `limparArvoreOrfaApos
+  // ExclusaoDeProcesso`, o MESMO usado por `DELETE /api/processos/[id]` —
+  // aplicado árvore por árvore, nunca um `deleteMany` cru.
+  //
+  // Desde 16/09/2026 essa função força o HARD delete mesmo com fato histórico
+  // protegido (decisão explícita do usuário: "apaga tudo, não pode sobrar
+  // nada") — só fica de fora árvore com processo ainda vivo apontando pra ela.
   const { erro } = await exigirPermissao(request, "sistema.exclusaoDefinitiva")
   if (erro) return erro
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
@@ -70,19 +73,19 @@ export async function DELETE(request: NextRequest) {
 
     const actorUserId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
     const removidas: { id: number; nome: string }[] = []
-    const bloqueadas: { id: number; nome: string; motivo: string | undefined; fatos?: unknown }[] = []
+    const bloqueadas: { id: number; nome: string; motivo: string | undefined }[] = []
     for (const a of arvoresOrfas) {
       const r = await limparArvoreOrfaAposExclusaoDeProcesso(a.id, actorUserId)
       if (r?.removida) removidas.push({ id: a.id, nome: a.nome })
-      else bloqueadas.push({ id: a.id, nome: a.nome, motivo: r?.motivoNaoRemovida, fatos: r?.fatosProtegidos })
+      else bloqueadas.push({ id: a.id, nome: a.nome, motivo: r?.motivoNaoRemovida })
     }
 
-    console.log(`Limpeza de árvores órfãs: ${removidas.length} removida(s), ${bloqueadas.length} bloqueada(s) por fato protegido`)
+    console.log(`Limpeza de árvores órfãs: ${removidas.length} removida(s), ${bloqueadas.length} bloqueada(s)`)
 
     return NextResponse.json({
       success: true,
       message: `${removidas.length} árvore(s) órfã(s) removida(s)` +
-        (bloqueadas.length ? ` · ${bloqueadas.length} com fato histórico protegido (não removidas)` : ""),
+        (bloqueadas.length ? ` · ${bloqueadas.length} ainda com processo vivo ou falha na remoção (não removidas)` : ""),
       deletadas: removidas.length,
       arvoresRemovidas: removidas,
       arvoresBloqueadas: bloqueadas,

@@ -246,12 +246,12 @@ export async function PUT(
 // `pessoa-ciclo-vida.ts` já usa para Pessoa, aqui aplicada direto por
 // `processoId` (ver docs/architecture/26-delete-processo-lifecycle-seguro.md).
 //
-// SE A ÁRVORE FICAR ÓRFÃ (sem nenhum processo restante), ela sai junto — pelo
-// MESMO guard de `DELETE /api/arvore/[id]` (`analisarExclusaoArvore` +
-// `removerPessoaDaArvore`), nunca por `prisma.arvore.delete()` cru. Com fato
-// protegido (arquivo oficial, protocolo, pagamento…) ou outro processo ainda
-// vivo na árvore, ela continua intacta — "exclusão não deixa órfão" não é
-// "exclusão ignora proteção".
+// SE A ÁRVORE FICAR ÓRFÃ (sem nenhum processo restante), ela sai junto — pela
+// mesma cadeia canônica (`removerPessoaDaArvore` HARD por pessoa, forçado),
+// nunca por `prisma.arvore.delete()` cru. Decisão explícita do usuário
+// (16/09/2026): ao apagar o Processo, NADA da árvore pode sobrar — nem fato
+// histórico protegido (arquivo, protocolo, solicitação…) impede mais isso.
+// Só outro processo ainda vivo apontando para a mesma árvore a mantém intacta.
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }

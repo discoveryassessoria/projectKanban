@@ -20,19 +20,21 @@
 // fato → bloqueado (aqui não existe um modo DESATIVAR para Processo; fora de
 // escopo desta correção criar um).
 //
-// ─── ÁRVORE ÓRFÃ (revisado 15/09/2026) ──────────────────────────────────────
+// ─── ÁRVORE ÓRFÃ (revisado 16/09/2026) ──────────────────────────────────────
 // Este serviço não decide o LIFECYCLE de Árvore/Pessoa/Requerente/Família —
-// quem decide continua sendo `pessoa-ciclo-vida.ts` (`analisarExclusaoArvore`
-// + `removerPessoaDaArvore`, o MESMO guard de `DELETE /api/arvore/[id]`).
-// Mas "exclusão não deixa órfão": se este Processo era o ÚLTIMO apontando
-// para a Árvore, ela só existia por causa dele, e a rota que chama
-// `excluirProcesso` chama, em seguida,
-// `limparArvoreOrfaAposExclusaoDeProcesso` — mesmo guard, sem lógica nova.
-// Com fato protegido (arquivo oficial, protocolo, pagamento…) ou outro
-// processo ainda vivo na mesma árvore, ela continua intacta; do contrário,
-// sai junto. Achado real: a versão anterior documentava isto como "fora de
-// escopo de propósito" e a árvore ficava órfã para sempre — não existia
-// nenhum job nem rotina que realmente a buscasse.
+// quem decide continua sendo `pessoa-ciclo-vida.ts`
+// (`limparArvoreOrfaAposExclusaoDeProcesso` → `removerPessoaDaArvore`).
+// "Exclusão não deixa órfão": se este Processo era o ÚLTIMO apontando para a
+// Árvore, ela só existia por causa dele, e a rota que chama `excluirProcesso`
+// chama, em seguida, `limparArvoreOrfaAposExclusaoDeProcesso`, que agora
+// (decisão explícita do usuário) FORÇA a remoção mesmo com fato histórico
+// protegido — a árvore só sobrevive se outro processo ainda apontar pra ela.
+// Achado real anterior: a versão original documentava "não tocar a Árvore"
+// como fora de escopo e ela ficava órfã para sempre; a correção seguinte
+// (15/09/2026) adicionou a limpeza mas ainda respeitava fato protegido, o que
+// deixava a árvore visível em Pesquisa Genealógica mesmo com o Processo já
+// excluído sempre que uma única pessoa tinha um arquivo/protocolo/solicitação
+// anexado — o caso real que motivou esta segunda correção.
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
