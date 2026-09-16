@@ -24,7 +24,16 @@ export async function GET(
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    const res = await resolveDocumentOperationalProjection(documentId)
+    // ESCOPO EXPLÍCITO DE FASE — a Central Operacional manda a instância da fase que
+    // está exibindo (ativa ou "Somente leitura" de uma fase passada) para que o
+    // drawer mostre A OPERAÇÃO DAQUELA FASE, não sempre "onde o trabalho está agora".
+    const { searchParams } = new URL(request.url)
+    const workflowInstanceIdParam = searchParams.get("workflowInstanceId")
+    const workflowInstanceId = workflowInstanceIdParam ? parseInt(workflowInstanceIdParam) : null
+    const escopoOverride =
+      workflowInstanceId != null && !isNaN(workflowInstanceId) ? { workflowInstanceId } : undefined
+
+    const res = await resolveDocumentOperationalProjection(documentId, { escopoOverride })
     if (!res.found) {
       return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
     }

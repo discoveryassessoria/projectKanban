@@ -103,6 +103,7 @@ export interface DocumentProjectionResult {
  */
 export async function resolveDocumentOperationalProjection(
   documentId: number,
+  opts?: { escopoOverride?: { workflowInstanceId: number } },
 ): Promise<DocumentProjectionResult> {
   // Cabeçalho do documento (mesmo shape do GET /api/documentos/[id]).
   const document = await prisma.documento.findUnique({
@@ -141,8 +142,14 @@ export async function resolveDocumentOperationalProjection(
   const faseCode = (phaseKeyToFaseCode(faseAtualKey) ?? null) as FaseCode | null
   const faseDef = faseCode ? getFase(faseCode) : null
 
-  // Estado operacional oficial — materialização idempotente escopada à fase ativa.
-  const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(documentId)
+  // Estado operacional oficial — materialização idempotente escopada à fase ativa, ou à
+  // instância explícita de `opts.escopoOverride` quando o chamador está consultando uma
+  // fase específica (ativa ou passada) em vez de "onde o trabalho está agora".
+  const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(
+    documentId,
+    undefined,
+    opts?.escopoOverride,
+  )
   const wf = (workflow as unknown as WfShape | null) ?? null
   const temOperacao = !!wf && Array.isArray(wf.steps) && wf.steps.length > 0
 

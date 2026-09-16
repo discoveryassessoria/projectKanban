@@ -271,7 +271,31 @@ async function faseAtualKeyDoDoc(documentoId: number): Promise<string | null> {
  * instância vigente (fase + visita) → fase atual → nada. O último caso é o documento
  * sem processo: aí não há visita para escopar, e ler tudo é o comportamento honesto.
  */
-async function escopoDaVisita(documentoId: number): Promise<{ where: Record<string, unknown>; visita: VisitaDoDocumento | null }> {
+async function escopoDaVisita(
+  documentoId: number,
+  escopoOverride?: { workflowInstanceId: number },
+): Promise<{ where: Record<string, unknown>; visita: VisitaDoDocumento | null }> {
+  // OVERRIDE EXPLÍCITO: quem já sabe QUAL fase/instância está consultando (a
+  // Central Operacional, ao mostrar uma fase — ativa ou passada, via "Somente
+  // leitura") pede por ela diretamente, em vez de herdar "onde o trabalho está
+  // AGORA". Sem isto, um documento cuja Genealogia já concluiu e cuja Emissão
+  // Documental já avançou fica IMPOSSÍVEL de consultar pela própria tela da
+  // Genealogia: a visita mais recente (Emissão) sempre vencia, mesmo quando o
+  // pedido era explicitamente "mostra a Genealogia deste documento".
+  if (escopoOverride) {
+    const inst = await prisma.phaseWorkflowInstance.findUnique({
+      where: { id: escopoOverride.workflowInstanceId },
+      select: { id: true, processoId: true, faseMacroKey: true, ciclo: true },
+    })
+    if (inst) {
+      return {
+        where: { workflowInstanceId: inst.id },
+        visita: { processoId: inst.processoId, faseMacroKey: inst.faseMacroKey, workflowInstanceId: inst.id, ciclo: inst.ciclo },
+      }
+    }
+    // Instância pedida não existe (ID inválido/de outro processo): cai no
+    // comportamento padrão abaixo em vez de mentir um escopo vazio.
+  }
   const visita = await visitaAtualDoDocumento(documentoId)
   if (visita) return { where: { workflowInstanceId: visita.workflowInstanceId }, visita }
   const faseAtualKey = await faseAtualKeyDoDoc(documentoId)
@@ -288,8 +312,11 @@ async function escopoDaVisita(documentoId: number): Promise<{ where: Record<stri
  * sobra sozinho — o que já tinha sido concluído ANTES do cancelamento — vira
  * "100% concluído" por engano. Ver achado real: documento 2131.
  */
-export async function passosOperacaoV2(documentoId: number, opts?: { incluirEncerrados?: boolean }): Promise<PassoOperacaoV2[]> {
-  const { where: escopo } = await escopoDaVisita(documentoId)
+export async function passosOperacaoV2(
+  documentoId: number,
+  opts?: { incluirEncerrados?: boolean; escopoOverride?: { workflowInstanceId: number } },
+): Promise<PassoOperacaoV2[]> {
+  const { where: escopo } = await escopoDaVisita(documentoId, opts?.escopoOverride)
   const rows = await prisma.phaseWorkflowStepInstance.findMany({
     // Escopo à VISITA ATUAL (instância da fase), não só à fase: passos de fases
     // anteriores E de ciclos anteriores da mesma fase são histórico, não trabalho a
@@ -419,6 +446,7 @@ export const PERMISSAO_DO_CONTROLE: Record<string, PermissaoChave> = {
 export async function montarWorkflowV2(
   documentoId: number,
   ctx?: ContextoLeituraWorkflow,
+  escopoOverride?: { workflowInstanceId: number },
 ): Promise<WorkflowV2Shape | null> {
   // CANCELADA != CONCLUÍDA — achado real (documento 2131, "Certidão de óbito"):
   // `passosOperacaoV2` sem opções só devolve os passos ATIVOS (`notIn INATIVOS`,
@@ -436,7 +464,7 @@ export async function montarWorkflowV2(
   const cancelado = documento?.status === "CANCELADO"
   // Cancelada: lê TODOS os passos da visita (inclusive os cancelados) — é o que
   // permite mostrar o que realmente aconteceu, não só o que sobrou do filtro.
-  const passos = await passosOperacaoV2(documentoId, cancelado ? { incluirEncerrados: true } : undefined)
+  const passos = await passosOperacaoV2(documentoId, { incluirEncerrados: cancelado, escopoOverride })
   if (passos.length === 0) return null
   const faseMacroKey = passos[0].faseMacroKey
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
@@ -629,10 +657,18 @@ export async function iniciarOperacaoDocumentoV2(
 export async function garantirOperacaoDocumentoV2(
   documentoId: number,
   ctx?: ContextoLeituraWorkflow,
+  escopoOverride?: { workflowInstanceId: number },
 ): Promise<{ workflow: WorkflowV2Shape | null; semWorkflowInterno?: boolean }> {
-  // 1) já existe operação na fase atual? (montarWorkflowV2 já é escopado à fase atual)
-  const existente = await montarWorkflowV2(documentoId, ctx)
+  // 1) já existe operação na fase atual? (montarWorkflowV2 já é escopado à fase atual,
+  //    ou à instância explícita de `escopoOverride` quando o chamador pede uma fase
+  //    específica — ex.: a Central Operacional consultando a Genealogia já concluída
+  //    de um documento cuja última visita real foi outra fase).
+  const existente = await montarWorkflowV2(documentoId, ctx, escopoOverride)
   if (existente) return { workflow: existente }
+
+  // Com escopo explícito, a leitura É a resposta final: nunca materializa (isso só faz
+  // sentido para a fase ATIVA) e nunca cai no workflow de outra visita.
+  if (escopoOverride) return { workflow: null, semWorkflowInterno: true }
 
   // 2) materializa (idempotente). iniciarOperacaoDocumentoV2 valida fase/instância/catálogo.
   const r = await iniciarOperacaoDocumentoV2(documentoId, {}, ctx)

@@ -160,6 +160,17 @@ interface DocumentoOperationalDrawerProps {
    * só encaminha, sem resolver nada por texto.
    */
   contextoAntecipada?: ContextoAntecipada
+  /**
+   * A INSTÂNCIA DA FASE que o chamador está exibindo (ativa ou "Somente leitura"
+   * de uma fase passada) — normalmente `phaseContext.workflowInstanceId` da Central
+   * Operacional. Sem isto, o drawer sempre mostra "onde o trabalho está AGORA"
+   * (última visita real do documento, em qualquer fase) — correto para quem abre o
+   * documento sem contexto de fase, mas errado para quem está deliberadamente
+   * consultando uma fase específica: um documento cuja Genealogia já concluiu e cuja
+   * Emissão Documental já avançou ficava IMPOSSÍVEL de consultar pela própria tela
+   * da Genealogia, porque a visita mais recente (Emissão) sempre vencia.
+   */
+  faseInstanciaId?: number | null
 }
 
 import {
@@ -350,6 +361,7 @@ function ConteudoDrawer({
   backLabel,
   bannerAntecipada,
   contextoAntecipada,
+  faseInstanciaId,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [delegandoResp, setDelegandoResp] = useState(false)
@@ -373,7 +385,11 @@ function ConteudoDrawer({
     document?: Documento | null
     workflow?: WorkflowDoDrawer | null
     projection?: DocumentOperationalProjection | null
-  }>(documentoId ? `/api/documentos/${documentoId}/operational-projection` : null)
+  }>(
+    documentoId
+      ? `/api/documentos/${documentoId}/operational-projection${faseInstanciaId != null ? `?workflowInstanceId=${faseInstanciaId}` : ""}`
+      : null,
+  )
   const doc = consulta.dados?.document ?? null
   const workflow = consulta.dados?.workflow ?? null
   const projection = consulta.dados?.projection ?? null

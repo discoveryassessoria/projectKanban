@@ -1200,6 +1200,10 @@ export function ProcessoCentralOperacional({
             key={`${faseCodeData ?? "?"}-${drawerDocId ?? "none"}`}
             documentoId={drawerDocId}
             isOpen={drawerDocId !== null}
+            // A INSTÂNCIA DA FASE sendo exibida aqui (ativa ou "Somente leitura" de uma
+            // fase passada) — nunca "onde o trabalho está agora". Ver comentário na prop
+            // no DocumentoOperationalDrawer.
+            faseInstanciaId={bodyData?.phaseContext?.workflowInstanceId ?? null}
             bannerAntecipada={bannerAntecipada}
             // CONTEXTO DA OPERAÇÃO ANTECIPADA — o ALVO do documento aberto. Ela vive
             // na aba Workflow do modal; a Central só diz sobre QUE alvo se trata.
