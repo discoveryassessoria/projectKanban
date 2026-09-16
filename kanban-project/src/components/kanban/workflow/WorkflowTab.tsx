@@ -612,13 +612,13 @@ function SubtarefaRow({
           )}
           {bloqueadaPorDependencia ? (
             <div className="mt-2 text-[11px] text-[var(--text-secondary)]">Aguardando subtarefa anterior</div>
-          ) : (
+          ) : !tarefaResponsavelNome ? null : (
             <>
               <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
                   <span className="text-[var(--text-secondary)]">executa</span>
-                  {tarefaResponsavelNome || "—"}
+                  {tarefaResponsavelNome}
                 </span>
                 {s.slaDays != null && (
                   <>
@@ -871,8 +871,9 @@ function StepCard({
             <div className="text-[11px] text-[var(--text-secondary)] mt-1">{step.description}</div>
           )}
 
-          {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem sentido) */}
-          {!isLockStepWait && (
+          {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem
+              sentido) ou se ainda não há responsável (nada pra dizer "executa"). */}
+          {!isLockStepWait && !!responsibleName && (
             <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
               {/* QUEM EXECUTA ESTA ETAPA — não "o responsável".
                   O responsável pelo trabalho é o da TAREFA, e ele aparece uma

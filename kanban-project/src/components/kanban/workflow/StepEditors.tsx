@@ -1670,6 +1670,12 @@ function FormAguardarRetorno({
   const [previsao, setPrevisao] = useState(andamento.previsaoRetorno ?? "")
   const [proximo, setProximo] = useState(andamento.proximoAcompanhamento ?? "")
   const [semRetorno, setSemRetorno] = useState<boolean>(andamento.semRetornoDesde != null)
+  // Retorno do cartório (protocolo/custo/forma de pagamento) — digitado aqui,
+  // salvo junto com o resto da tela (Salvar andamento / Confirmar retorno),
+  // nunca com um botão de submit próprio (decisão do usuário, 16/09/2026).
+  const [numeroProtocolo, setNumeroProtocolo] = useState("")
+  const [custoProtocolo, setCustoProtocolo] = useState("")
+  const [formaPagamentoProtocolo, setFormaPagamentoProtocolo] = useState("")
   const [concluindo, setConcluindo] = useState(false)
   const [falha, setFalha] = useState<string | null>(null)
 
@@ -1709,9 +1715,40 @@ function FormAguardarRetorno({
     return ok
   }
 
+  // Registra o retorno do cartório (protocolo/custo/forma de pagamento) se algum
+  // dos três campos foi preenchido. Chamado pelos DOIS botões (Salvar andamento
+  // e Confirmar retorno) — não existe um terceiro botão só pra isso.
+  const registrarProtocoloSeNecessario = async (): Promise<boolean> => {
+    if (!solicitacao) return true
+    const n = numeroProtocolo.trim()
+    const custoNum = custoProtocolo.trim() ? parseFloat(custoProtocolo.replace(",", ".")) : NaN
+    if (!n && isNaN(custoNum) && !formaPagamentoProtocolo) return true
+    try {
+      const res = await fetch(`/api/documentos/${documentoId}/solicitacoes/${solicitacao.id}/protocolos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          numeroProtocolo: n || null,
+          custoPago: !isNaN(custoNum) ? custoNum : null,
+          formaPagamento: formaPagamentoProtocolo || null,
+        }),
+      })
+      if (!res.ok) {
+        setFalha(res.status === 403 ? "Você não tem permissão para registrar o retorno do cartório." : "Não foi possível registrar o retorno do cartório agora.")
+        return false
+      }
+      setNumeroProtocolo(""); setCustoProtocolo(""); setFormaPagamentoProtocolo("")
+      return true
+    } catch {
+      setFalha("Não foi possível registrar o retorno do cartório agora.")
+      return false
+    }
+  }
+
   const salvarAndamento = async () => {
     if (!podeSalvar) return
     setFalha(null)
+    if (!(await registrarProtocoloSeNecessario())) return
     // Só CAMPOS. Nada aqui conclui a etapa nem exige formulário completo.
     const ok = await registrar({
       campos: {
@@ -1730,6 +1767,7 @@ function FormAguardarRetorno({
     if (!podeConcluir || concluindo) return
     setConcluindo(true)
     setFalha(null)
+    if (!(await registrarProtocoloSeNecessario())) { setConcluindo(false); return }
     const r = await patchStepComErro(documentoId, stepId, { status: "concluida" })
     setConcluindo(false)
     if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
@@ -1922,46 +1960,26 @@ function FormAguardarRetorno({
                 reenvia o requerimento, não sobrescreve o protocolo anterior. */}
             {solicitacao && (
               <InformarProtocoloInline
-                documentoId={documentoId}
-                solicitacaoId={solicitacao.id}
                 jaTemProtocolo={solicitacao.protocolos.length > 0}
-                onRegistrado={() => { recarregar(); onSaved?.() }}
+                numero={numeroProtocolo} setNumero={setNumeroProtocolo}
+                custo={custoProtocolo} setCusto={setCustoProtocolo}
+                formaPagamento={formaPagamentoProtocolo} setFormaPagamento={setFormaPagamentoProtocolo}
               />
             )}
           </div>
 
-          {/* 3. ACOMPANHAMENTO — campos editáveis, todos opcionais */}
+          {/* Ausência de retorno — "Previsão de retorno"/"Próximo acompanhamento" saíram
+              (16/09/2026): redundantes com o prazo do cadastro. */}
           {podeSalvar && (
-            <div>
-              <TituloAcompanhamento />
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label>Previsão de retorno</Label>
-                  <CampoData
-                    value={previsao}
-                    onChange={(v) => setPrevisao((v ?? ""))}
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <Label>Próximo acompanhamento</Label>
-                  <CampoData
-                    value={proximo}
-                    onChange={(v) => setProximo((v ?? ""))}
-                    className={inputCls}
-                  />
-                </div>
-                <label className="col-span-3 flex items-center gap-2 text-[12px] text-white/80 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={semRetorno}
-                    onChange={(e) => setSemRetorno(e.target.checked)}
-                    className="accent-[var(--accent-primary)]"
-                  />
-                  Registrar AUSÊNCIA de retorno (cartório não respondeu no prazo informado)
-                </label>
-              </div>
-            </div>
+            <label className="flex items-center gap-2 text-[12px] text-white/80 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={semRetorno}
+                onChange={(e) => setSemRetorno(e.target.checked)}
+                className="accent-[var(--accent-primary)]"
+              />
+              Registrar AUSÊNCIA de retorno (cartório não respondeu no prazo informado)
+            </label>
           )}
 
           {/* 4. HISTÓRICO DE CONTATOS */}
@@ -2012,54 +2030,23 @@ function FormAguardarRetorno({
  * duplicado e nada é sobrescrito — os três campos são independentes: dá pra
  * registrar só o custo hoje e o protocolo depois.
  */
+/**
+ * Só os CAMPOS — sem botão/POST próprio. O que é digitado aqui sai junto com o
+ * "Salvar andamento"/"Confirmar retorno" do editor (decisão do usuário,
+ * 16/09/2026: "deve ser digitado e salvar junto com a tela", nunca um segundo
+ * clique de submit dentro do primeiro). Estado é do PAI (`FormAguardarRetorno`).
+ */
 function InformarProtocoloInline({
-  documentoId,
-  solicitacaoId,
   jaTemProtocolo,
-  onRegistrado,
+  numero, setNumero,
+  custo, setCusto,
+  formaPagamento, setFormaPagamento,
 }: {
-  documentoId: number
-  solicitacaoId: number
   jaTemProtocolo: boolean
-  onRegistrado: () => void
+  numero: string; setNumero: (v: string) => void
+  custo: string; setCusto: (v: string) => void
+  formaPagamento: string; setFormaPagamento: (v: string) => void
 }) {
-  const [numero, setNumero] = useState("")
-  const [custo, setCusto] = useState("")
-  const [formaPagamento, setFormaPagamento] = useState("")
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-
-  const registrar = async () => {
-    const n = numero.trim()
-    const custoNum = custo.trim() ? parseFloat(custo.replace(",", ".")) : NaN
-    if ((!n && isNaN(custoNum) && !formaPagamento) || salvando) return
-    setSalvando(true)
-    setErro(null)
-    try {
-      const res = await fetch(`/api/documentos/${documentoId}/solicitacoes/${solicitacaoId}/protocolos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({
-          numeroProtocolo: n || null,
-          custoPago: !isNaN(custoNum) ? custoNum : null,
-          formaPagamento: formaPagamento || null,
-        }),
-      })
-      if (!res.ok) {
-        setErro(res.status === 403 ? "Você não tem permissão para registrar isso." : "Não foi possível registrar agora.")
-        return
-      }
-      setNumero("")
-      setCusto("")
-      setFormaPagamento("")
-      onRegistrado()
-    } catch {
-      setErro("Não foi possível registrar agora.")
-    } finally {
-      setSalvando(false)
-    }
-  }
-
   return (
     <div className="px-3.5 py-2.5 border-t border-[var(--border-default)]">
       <div className="space-y-2">
@@ -2107,24 +2094,7 @@ function InformarProtocoloInline({
               </select>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={registrar}
-              disabled={salvando || (!numero.trim() && !custo.trim() && !formaPagamento)}
-              className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 text-[var(--action-primary-ink)] rounded inline-flex items-center gap-1.5"
-            >
-              {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
-              Registrar
-            </button>
-            <button
-              onClick={() => { setNumero(""); setCusto(""); setFormaPagamento(""); setErro(null) }}
-              className="px-2 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white"
-            >
-              Limpar
-            </button>
-          </div>
       </div>
-      {erro && <div className="mt-1.5 text-[11px] text-red-700">{erro}</div>}
     </div>
   )
 }

@@ -187,7 +187,11 @@ const emptyForm = (): FormState => ({
 })
 
 const docToForm = (doc: Documento): FormState => ({
-  nome_registrado: doc.nome_registrado || "",
+  // Nasce com o nome da ÁRVORE (mesmo mostrado em "Nome base na árvore" acima) —
+  // não pede pra redigitar o que o sistema já sabe. Continua editável: o texto
+  // literal da certidão pode divergir da árvore, e é exatamente essa divergência
+  // que o fluxo de validação jurídica existe para tratar.
+  nome_registrado: doc.nome_registrado || nomeCompleto(doc.pessoa) || "",
   pai_registrado: doc.pai_registrado || "",
   mae_registrada: doc.mae_registrada || "",
   conjuge_registrado: doc.conjuge_registrado || "",
