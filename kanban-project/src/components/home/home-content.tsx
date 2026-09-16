@@ -298,6 +298,25 @@ function PainelSlaBloco({ data }: { data: HomeData }) {
   )
 }
 
+/**
+ * Prazo de TAREFA (dataPrazo) — grain diferente do SLA de Processo acima.
+ * Nunca junta os dois num mesmo card (misturaria grain — ver CLAUDE.md §5/§18).
+ */
+function PainelPrazosTarefasBloco({ data }: { data: HomeData }) {
+  const cards = data.prazosTarefas
+  if (!cards || cards.length === 0) return null
+  return (
+    <BlocoCard id="prazos-tarefas">
+      <BlocoHeader titulo="Minhas tarefas por prazo" descricao="Prazo (dataPrazo) das suas tarefas abertas" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {cards.map((c) => (
+          <CardSla key={c.key} fila={c} />
+        ))}
+      </div>
+    </BlocoCard>
+  )
+}
+
 // ===========================================================================
 // 3. AGENDA — hoje, amanhã, próximos dias. Nada além disso.
 // ===========================================================================
@@ -561,6 +580,7 @@ export function HomeContent({ data }: { data: HomeData }) {
           </div>
 
           <PainelSlaBloco data={data} />
+          <PainelPrazosTarefasBloco data={data} />
 
           <ResumoDoDia data={data} />
         </>

@@ -23,6 +23,7 @@ import {
   STATUS_PASSO_VIVO,
   STATUS_TAREFA_TERMINAL,
   acharFila,
+  diasEntre,
   ehPassoDeEspera,
   estaAtrasado,
   filaDoStepKey,
@@ -439,6 +440,44 @@ export function montarSla(base: BaseOperacional, ctx: ContextoHome): PainelSla |
   })
 
   return { cards, resumo: resumirSla([...base.sla.values()]) }
+}
+
+// ---------------------------------------------------------------------------
+// PRAZOS DE TAREFA — grain TAREFA, nunca somado ao SLA de Processo acima.
+//
+// Achado real (16/09/2026): a Daniela tinha uma Tarefa com prazo amanhã e o
+// usuário esperava vê-la refletida num card de prazo — mas o único painel de
+// prazo da Home (`montarSla`) é 100% Processo (SLA por fase, configurado no
+// Workflow Macro). Tarefa tem seu PRÓPRIO prazo (`Tarefa.dataPrazo`), uma
+// obrigação diferente — misturar as duas contagens no mesmo card violaria
+// pureza de grain (CLAUDE.md §5/§18). Este painel é o equivalente, só que
+// para Tarefa: mesma base já carregada (`base.tarefas`, já escopada por
+// responsável e por "aberta" — ver `carregarBase`), sem query nova.
+// ---------------------------------------------------------------------------
+export function montarPrazosDeTarefas(base: BaseOperacional, ctx: ContextoHome): FilaOperacional[] | null {
+  if (!ctx.permissoes.verTarefas) return null
+
+  const comPrazo = base.tarefas.filter((t) => t.dataPrazo != null)
+  const dias = (t: TarefaBase) => diasEntre(t.dataPrazo as Date, ctx.agora)
+
+  const amanha = comPrazo.filter((t) => dias(t) === 1).length
+  const em3Dias = comPrazo.filter((t) => dias(t) === 3).length
+  const proximos7 = comPrazo.filter((t) => { const d = dias(t); return d >= 0 && d <= 7 }).length
+
+  // `/tarefas` ainda não lê filtro de prazo por querystring — o card leva pra
+  // lista real (não é link morto), só não chega pré-filtrado.
+  const card = (key: string, titulo: string, descricao: string, quantidade: number): FilaOperacional => ({
+    key, titulo, descricao, quantidade,
+    nivel: quantidade > 0 ? "alto" : "baixo",
+    modulo: "tarefas",
+    href: "/tarefas",
+  })
+
+  return [
+    card("tarefa-amanha", "Tarefas — vencem amanhã", "Prazo da tarefa é amanhã", amanha),
+    card("tarefa-3-dias", "Tarefas — vencem em 3 dias", "Prazo da tarefa é em 3 dias", em3Dias),
+    card("tarefa-7-dias", "Tarefas — vencem em 7 dias", "Prazo da tarefa nos próximos 7 dias", proximos7),
+  ]
 }
 
 // ---------------------------------------------------------------------------

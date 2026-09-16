@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
-import { carregarBase, contarTrabalhoPendenteDistinto, montarAgenda, montarAlertas, montarFilas, montarPrazosResumo, montarResumoDia, montarSla, type ContextoHome } from "@/src/lib/home/coleta"
+import { carregarBase, contarTrabalhoPendenteDistinto, montarAgenda, montarAlertas, montarFilas, montarPrazosDeTarefas, montarPrazosResumo, montarResumoDia, montarSla, type ContextoHome } from "@/src/lib/home/coleta"
 import { montarStatus } from "@/src/lib/home/home-logic"
 import type { HomeData, HomePermissions } from "@/src/types/home"
 import { agregacaoPorFamilia, indicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
       filas,
       sla: montarSla(base, ctx),
       prazosResumo: montarPrazosResumo(base, ctx),
+      prazosTarefas: montarPrazosDeTarefas(base, ctx),
       agenda,
       alertas,
       resumoDia,
