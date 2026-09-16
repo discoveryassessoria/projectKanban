@@ -4,6 +4,62 @@ import { Prisma } from '@prisma/client'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { validarWorkflowParaPublicar } from '@/src/services/validacao-de-publicacao'
 import { marcarRascunho, publicarWorkflow, preverPublicacao } from '@/src/services/publicacao-de-workflow'
+import { cancelarPasso } from '@/src/services/task-step-sync'
+
+/**
+ * RECONCILIA INSTÂNCIAS ÓRFÃS depois que um passo some do cadastro salvo.
+ *
+ * Escopo deliberadamente estreito: só cancela quem NUNCA foi iniciado
+ * (`startedAt: null`, status PENDENTE/DISPONIVEL) — o mesmo corte de "fato
+ * histórico" usado em `pessoa-ciclo-vida.ts`/`processo-ciclo-vida.ts`, um
+ * nível abaixo (passo, não pessoa/processo inteiro). Instância já iniciada
+ * NUNCA é tocada aqui — best-effort, nunca lança (não pode derrubar o save).
+ *
+ * Escopada por `faseMacroKey` (não por `stepDefinitionId`, que é coluna solta
+ * e não sobrevive ao `deleteMany`): a chave do passo é reaproveitável entre
+ * workflows de fases diferentes, mas dentro da MESMA fase corresponde sempre
+ * ao mesmo cadastro — é o mesmo corte que a materialização usa.
+ */
+async function reconciliarPassosRemovidosDoCadastro(args: {
+  faseMacroKey: string
+  chavesRemovidas: string[]
+  actorId: number | null
+  workflowId: number
+}): Promise<void> {
+  try {
+    const orfaos = await prisma.phaseWorkflowStepInstance.findMany({
+      where: {
+        faseMacroKey: args.faseMacroKey,
+        stepKey: { in: args.chavesRemovidas },
+        status: { in: ['PENDENTE', 'DISPONIVEL'] },
+        startedAt: null,
+      },
+      select: { id: true },
+    })
+    if (orfaos.length === 0) return
+
+    let canceladas = 0
+    for (const o of orfaos) {
+      const r = await cancelarPasso(o.id, {
+        origem: 'SYSTEM',
+        usuarioId: args.actorId ?? undefined,
+        motivoCodigo: 'CADASTRO_REMOVIDO',
+        justificativa: `Passo removido do cadastro do workflow "${args.faseMacroKey}" (id ${args.workflowId}) antes de a instância ser iniciada — sem fato histórico.`,
+      })
+      if (r.success) canceladas++
+    }
+    await prisma.logAuditoria.create({
+      data: {
+        acao: 'PASSOS_ORFAOS_CANCELADOS', entidade: 'PhaseInternalWorkflow', entidadeId: args.workflowId,
+        descricao: `${canceladas} instância(s) não iniciada(s) de passo removido do cadastro foram canceladas (fase "${args.faseMacroKey}").`,
+        detalhes: { chavesRemovidas: args.chavesRemovidas, candidatas: orfaos.length, canceladas } as never,
+        usuarioId: args.actorId,
+      },
+    }).catch(() => null)
+  } catch (e) {
+    console.error('[reconciliarPassosRemovidosDoCadastro]', e)
+  }
+}
 
 function slug(s: string) {
   return String(s || '')
@@ -249,6 +305,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const usuario = await extrairUsuarioComPermissoes(request)
     const mudouDefinicao = Array.isArray(body.steps) || Object.keys(dataBase).length > 0
     let versaoNova: number | null = null
+    // CHAVES REMOVIDAS DESTA EDIÇÃO — para reconciliar instâncias órfãs
+    // DEPOIS que a transação de salvar commitar (ver comentário mais abaixo).
+    let chavesRemovidas: string[] = []
 
     if (mudouDefinicao) {
       await prisma.$transaction(async (tx) => {
@@ -260,6 +319,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
         if (Array.isArray(body.steps)) {
           const stepData = buildSteps(body.steps, id)
+          const antigos = await tx.phaseInternalWorkflowStep.findMany({ where: { workflowId: id }, select: { key: true } })
+          const chavesNovas = new Set(stepData.map((s) => s.key))
+          chavesRemovidas = antigos.map((a) => a.key).filter((k) => !chavesNovas.has(k))
           await tx.phaseInternalWorkflowStep.deleteMany({ where: { workflowId: id } })
           for (let i = 0; i < stepData.length; i++) {
             // UM A UM porque cada passo tem filhos que precisam do id dele. A versão
@@ -377,6 +439,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           usuarioId: usuario?.userId ?? null,
         },
       }).catch(() => null)
+
+      // EXCLUSÃO NÃO DEIXA ÓRFÃO, agora também aqui. Achado real (16/09/2026):
+      // remover um passo do cadastro não tocava as instâncias JÁ MATERIALIZADAS
+      // dele em processos que passaram por essa fase antes da edição —
+      // `PhaseWorkflowStepInstance.stepDefinitionId` é coluna solta (sem FK),
+      // então a linha ficava viva, notificando, sem nenhum passo correspondente
+      // no cadastro atual. Cancela (nunca deleta — preserva o rastro) só as que
+      // NÃO têm fato histórico: nunca iniciadas (`startedAt: null`), em
+      // DISPONIVEL/PENDENTE. Uma instância já iniciada é história real —
+      // continua viva, e aparece no relatório pra alguém decidir.
+      if (chavesRemovidas.length > 0) {
+        await reconciliarPassosRemovidosDoCadastro({
+          faseMacroKey: atual.phaseKey, chavesRemovidas, actorId: usuario?.userId ?? null, workflowId: id,
+        })
+      }
     }
 
     const wf = await prisma.phaseInternalWorkflow.findUnique({
