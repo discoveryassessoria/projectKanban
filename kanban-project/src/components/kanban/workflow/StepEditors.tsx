@@ -55,7 +55,6 @@ import {
   useAndamento,
   mensagemDoErro,
   BlocoContatos,
-  LABEL_CANAL,
   fmtData,
   campoCls,
   Rotulo,
@@ -68,7 +67,6 @@ import {
   AbaObservacoesDocumentais,
   type SolicitacaoView,
 } from "../documento/AbasDocumentais"
-import { CANAIS_CONTATO, type CanalContato } from "@/src/lib/process-stage/andamento-etapa"
 import {
   canalDoTexto,
   faltamCamposDoCanal,
@@ -1663,17 +1661,15 @@ function FormAguardarRetorno({
 
   // Rascunho dos campos de acompanhamento. Nasce do gravado (a `key` do
   // componente reinicia quando o servidor devolve conteúdo novo).
-  const [prazoDias, setPrazoDias] = useState(
-    andamento.prazoEstimadoDias != null ? String(andamento.prazoEstimadoDias) : "",
-  )
+  //
+  // "Prazo estimado", "Cartório/destinatário", "Canal preferencial" e "Código
+  // de rastreio" saíram: prazo é o do CADASTRO (Gerenciamento), nunca
+  // redigitado por instância; destinatário/canal duplicavam o Cartório e a
+  // Solicitação já registrados; código de rastreio não se aplicava a este
+  // fluxo (decisão do usuário, 16/09/2026).
   const [previsao, setPrevisao] = useState(andamento.previsaoRetorno ?? "")
   const [proximo, setProximo] = useState(andamento.proximoAcompanhamento ?? "")
-  const [destinatario, setDestinatario] = useState(
-    andamento.destinatario ?? textoOuNulo(doc?.cartorio) ?? "",
-  )
-  const [canalPref, setCanalPref] = useState<CanalContato | "">(andamento.canalPreferencial ?? "")
   const [semRetorno, setSemRetorno] = useState<boolean>(andamento.semRetornoDesde != null)
-  const [trackingCode, setTrackingCode] = useState(() => texto(etapa?.trackingCode))
   const [concluindo, setConcluindo] = useState(false)
   const [falha, setFalha] = useState<string | null>(null)
 
@@ -1719,22 +1715,14 @@ function FormAguardarRetorno({
     // Só CAMPOS. Nada aqui conclui a etapa nem exige formulário completo.
     const ok = await registrar({
       campos: {
-        prazoEstimadoDias: prazoDias.trim() === "" ? null : Number(prazoDias),
         previsaoRetorno: previsao || null,
         proximoAcompanhamento: proximo || null,
-        destinatario: destinatario.trim() || null,
-        canalPreferencial: canalPref || null,
         semRetornoDesde: semRetorno
           ? andamento.semRetornoDesde ?? new Date().toISOString().slice(0, 10)
           : null,
       },
     })
     if (!ok) return
-    // O código de rastreio é campo do PASSO (não do andamento) e continua indo pelo PATCH.
-    if (trackingCode.trim() !== texto(etapa?.trackingCode)) {
-      const r = await patchStepComErro(documentoId, stepId, { trackingCode: trackingCode.trim() || null })
-      if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
-    }
     void apos(true)
   }
 
@@ -1742,10 +1730,7 @@ function FormAguardarRetorno({
     if (!podeConcluir || concluindo) return
     setConcluindo(true)
     setFalha(null)
-    const r = await patchStepComErro(documentoId, stepId, {
-      status: "concluida",
-      trackingCode: trackingCode.trim() || null,
-    })
+    const r = await patchStepComErro(documentoId, stepId, { status: "concluida" })
     setConcluindo(false)
     if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
     void celebrar()
@@ -1951,17 +1936,6 @@ function FormAguardarRetorno({
               <TituloAcompanhamento />
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label>Prazo estimado (dias)</Label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={prazoDias}
-                    onChange={(e) => setPrazoDias(e.target.value)}
-                    placeholder="15"
-                    className={inputCls}
-                  />
-                </div>
-                <div>
                   <Label>Previsão de retorno</Label>
                   <CampoData
                     value={previsao}
@@ -1975,41 +1949,6 @@ function FormAguardarRetorno({
                     value={proximo}
                     onChange={(v) => setProximo((v ?? ""))}
                     className={inputCls}
-                  />
-                </div>
-                <div className="col-span-2">
-                  <Label>Cartório / destinatário do acompanhamento</Label>
-                  <input
-                    type="text"
-                    value={destinatario}
-                    onChange={(e) => setDestinatario(e.target.value)}
-                    placeholder="Nome do cartório, setor ou e-mail"
-                    className={inputCls}
-                  />
-                </div>
-                <div>
-                  <Label>Canal preferencial</Label>
-                  <select
-                    value={canalPref}
-                    onChange={(e) => setCanalPref(e.target.value as CanalContato | "")}
-                    className={inputCls}
-                  >
-                    <option value="" className="bg-[var(--surface-secondary)]">—</option>
-                    {CANAIS_CONTATO.map((c) => (
-                      <option key={c} value={c} className="bg-[var(--surface-secondary)]">
-                        {LABEL_CANAL[c]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-3">
-                  <Label>Código de rastreio (Correios, Sedex, motoboy)</Label>
-                  <input
-                    type="text"
-                    value={trackingCode}
-                    onChange={(e) => setTrackingCode(e.target.value)}
-                    placeholder="ex: BR123456789BR"
-                    className={`${inputCls} font-mono`}
                   />
                 </div>
                 <label className="col-span-3 flex items-center gap-2 text-[12px] text-white/80 cursor-pointer">
@@ -2084,7 +2023,6 @@ function InformarProtocoloInline({
   jaTemProtocolo: boolean
   onRegistrado: () => void
 }) {
-  const [aberto, setAberto] = useState(false)
   const [numero, setNumero] = useState("")
   const [custo, setCusto] = useState("")
   const [formaPagamento, setFormaPagamento] = useState("")
@@ -2114,7 +2052,6 @@ function InformarProtocoloInline({
       setNumero("")
       setCusto("")
       setFormaPagamento("")
-      setAberto(false)
       onRegistrado()
     } catch {
       setErro("Não foi possível registrar agora.")
@@ -2125,15 +2062,10 @@ function InformarProtocoloInline({
 
   return (
     <div className="px-3.5 py-2.5 border-t border-[var(--border-default)]">
-      {!aberto ? (
-        <button
-          onClick={() => setAberto(true)}
-          className="px-2.5 py-1 text-[11px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-white/85 rounded"
-        >
-          {jaTemProtocolo ? "+ Informar novo retorno" : "+ Informar retorno do cartório"}
-        </button>
-      ) : (
-        <div className="space-y-2">
+      <div className="space-y-2">
+          <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
+            {jaTemProtocolo ? "Informar novo retorno" : "Informar retorno do cartório"}
+          </div>
           <div>
             <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1 block">
               Número do protocolo
@@ -2143,7 +2075,6 @@ function InformarProtocoloInline({
               value={numero}
               onChange={(e) => setNumero(e.target.value)}
               placeholder="Número devolvido pelo cartório"
-              autoFocus
               className="w-full px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] font-mono"
             />
           </div>
@@ -2186,14 +2117,13 @@ function InformarProtocoloInline({
               Registrar
             </button>
             <button
-              onClick={() => { setAberto(false); setNumero(""); setCusto(""); setFormaPagamento(""); setErro(null) }}
+              onClick={() => { setNumero(""); setCusto(""); setFormaPagamento(""); setErro(null) }}
               className="px-2 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white"
             >
-              Cancelar
+              Limpar
             </button>
           </div>
-        </div>
-      )}
+      </div>
       {erro && <div className="mt-1.5 text-[11px] text-red-700">{erro}</div>}
     </div>
   )
@@ -2335,8 +2265,7 @@ function FormReceberCertidao({
   etapa,
   loading,
 }: StepEditorBaseProps & { doc: Record<string, unknown> | null; etapa: EtapaCarregada | null; loading: boolean }) {
-  // Os valores iniciais SÃO os do servidor. A ordem de precedência é a mesma de antes:
-  // a etapa sobrepõe o documento em `physicalLocation` quando tem valor próprio.
+  // Os valores iniciais SÃO os do servidor.
   const [arquivoUrl, setArquivoUrl] = useState(() => texto(doc?.arquivo_url))
   const [arquivoNome, setArquivoNome] = useState(() => texto(doc?.arquivo_nome))
   const [arquivoTamanho, setArquivoTamanho] = useState<number | null>(() => numeroOuNulo(doc?.arquivo_tamanho))
@@ -2356,16 +2285,12 @@ function FormReceberCertidao({
   const [medium, setMedium] = useState<DocumentMedium | null>(
     () => (etapa?.documentMedium as DocumentMedium) || null,
   )
-  const [physicalLocation, setPhysicalLocation] = useState(
-    () => texto(etapa?.physicalLocation) || texto(doc?.localizacao_fisica),
-  )
   const [observacao, setObservacao] = useState(() => texto(etapa?.stepObservation))
   const [saving, setSaving] = useState(false)
   const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const readOnly = stepStatus === "concluida"
 
-  const showPhysicalLocation = medium === "fisico" || medium === "ambos"
   const podeConcluir =
     arquivoUrl.trim().length > 0 &&
     medium !== null
@@ -2392,7 +2317,6 @@ function FormReceberCertidao({
         arquivo_nome: arquivoNome.trim() || "certidao.pdf",
         arquivo_tamanho: arquivoTamanho,
         arquivo_mime_type: arquivoMime,
-        localizacao_fisica: showPhysicalLocation ? (physicalLocation.trim() || null) : null,
         status: "RECEBIDO",
       })
       if (!okDoc) throw new Error("PUT doc falhou")
@@ -2402,7 +2326,6 @@ function FormReceberCertidao({
         status: "concluida",
         completedById: getUserId(),
         documentMedium: medium,
-        physicalLocation: showPhysicalLocation ? (physicalLocation.trim() || null) : null,
         stepObservation: observacao.trim() || null,
       })
       if (!r.ok) {
@@ -2567,26 +2490,6 @@ function FormReceberCertidao({
           </div>
 
           {/* ═══════════════════════════════════════════════════════
-              3. LOCALIZAÇÃO FÍSICA (condicional)
-             ═══════════════════════════════════════════════════════ */}
-          {showPhysicalLocation && (
-            <div className="p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)]">
-              <Label>📍 Localização física do papel</Label>
-              <input
-                type="text"
-                value={physicalLocation}
-                onChange={(e) => setPhysicalLocation(e.target.value)}
-                placeholder="ex: Pasta 23 · Arquivo Discovery · prateleira 4"
-                disabled={readOnly}
-                className={inputCls}
-              />
-              <div className="text-[10.5px] text-[var(--text-secondary)] mt-1.5 italic leading-snug">
-                Onde o documento físico está guardado fisicamente no escritório? Essencial pra recuperação futura.
-              </div>
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════════════════════
               4. OBSERVAÇÃO
              ═══════════════════════════════════════════════════════ */}
           <div>
@@ -2676,16 +2579,9 @@ const CHECKLIST_SEMENTE: Array<{
     label: "Dados mínimos presentes",
     desc: "Nome, data, cartório, livro/folha/termo visíveis.",
   },
-  {
-    id: "apostila_ok",
-    label: "Apostila de Haia (se exigida)",
-    desc: "Caso o destino exija apostila, ela está presente e legível. Marque também se NÃO for exigida.",
-  },
-  {
-    id: "traducao_ok",
-    label: "Tradução juramentada (se exigida)",
-    desc: "Caso o destino exija tradução, ela está presente. Marque também se NÃO for exigida.",
-  },
+  // "Apostila de Haia" e "Tradução juramentada" saíram (16/09/2026): não são
+  // desta fase — pertencem às fases próprias de Apostilamento e Tradução
+  // juramentada, mais adiante no processo.
 ]
 
 type ConferirResultado = "aprovado" | "divergente" | "nova_via"
@@ -3039,42 +2935,6 @@ function FormConferirCertidao({
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <Label required>Nome do titular (como aparece no documento)</Label>
-                <input
-                  type="text"
-                  value={nomeRegistrado}
-                  onChange={(e) => setNomeRegistrado(e.target.value)}
-                  placeholder={fullName(pessoa) || "Ex: João Silva da Costa"}
-                  disabled={readOnly}
-                  className={nomeRegistrado.trim() ? inputCls : inputClsInvalid}
-                />
-              </div>
-
-              <div>
-                <Label>Pai (como aparece no documento)</Label>
-                <input
-                  type="text"
-                  value={paiRegistrado}
-                  onChange={(e) => setPaiRegistrado(e.target.value)}
-                  placeholder={fullName(pessoa?.pai ?? null) || "—"}
-                  disabled={readOnly}
-                  className={inputCls}
-                />
-              </div>
-
-              <div>
-                <Label>Mãe (como aparece no documento)</Label>
-                <input
-                  type="text"
-                  value={maeRegistrada}
-                  onChange={(e) => setMaeRegistrada(e.target.value)}
-                  placeholder={fullName(pessoa?.mae ?? null) || "—"}
-                  disabled={readOnly}
-                  className={inputCls}
-                />
-              </div>
-
               {ehCasamento && (
                 <div className="col-span-2">
                   <Label>Cônjuge (como aparece no documento)</Label>
@@ -3088,26 +2948,6 @@ function FormConferirCertidao({
                   />
                 </div>
               )}
-
-              <div>
-                <Label>Data do evento (do documento)</Label>
-                <CampoData
-                  value={dataEventoDoc}
-                  onChange={(v) => setDataEventoDoc((v ?? ""))}
-                  className={inputCls}
-                  disabled={readOnly}
-                />
-              </div>
-
-              <div>
-                <Label>Data do registro (do documento)</Label>
-                <CampoData
-                  value={dataRegistroDoc}
-                  onChange={(v) => setDataRegistroDoc((v ?? ""))}
-                  className={inputCls}
-                  disabled={readOnly}
-                />
-              </div>
             </div>
           </div>
 

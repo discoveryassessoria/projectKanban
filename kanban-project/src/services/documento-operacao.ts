@@ -473,6 +473,20 @@ export async function montarWorkflowV2(
   // "aguardar_retorno" do catálogo: a etapa aparecia na tela com a CHAVE como título,
   // peso 1 e sem descrição. Um ponto de resolução só, no catálogo.
   const catOf = (k: string) => getStepDef(faseCode, k)
+  // SEGUNDO NÍVEL DE FALLBACK: o CADASTRO VIVO (Gerenciamento), nunca uma cópia
+  // congelada. Fases como Genealogia não têm catálogo estático de propósito (ver
+  // comentário em `fases-catalog.ts`) — sem isto, `catOf` sempre falha pra elas e
+  // o título cai na CHAVE crua (`localizar_registro`, achado real 16/09/2026).
+  // Ler do cadastro em vez de "congelar" o nome na criação também é o único jeito
+  // de renomear um passo em Gerenciamento refletir aqui sem migração de dado.
+  const cadastroLabels = new Map<string, { label: string; slaDays: number }>()
+  {
+    const wf = await prisma.phaseInternalWorkflow.findFirst({
+      where: { phaseKey: faseMacroKey, active: true },
+      select: { passos: { select: { key: true, label: true, slaDays: true } } },
+    })
+    for (const s of wf?.passos ?? []) cadastroLabels.set(s.key, { label: s.label, slaDays: s.slaDays })
+  }
   const ids = [...new Set(passos.map((p) => p.responsavelId).filter((x): x is number => x != null))]
   const usuarios = ids.length
     ? await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, email: true } })
@@ -491,6 +505,7 @@ export async function montarWorkflowV2(
   // mais janela de "ainda não sei se tem subtarefa".
   const steps = await Promise.all(passos.map(async (p) => {
     const c = catOf(p.stepKey)
+    const doCadastro = cadastroLabels.get(p.stepKey)
     const w = c?.weight ?? 1
     totalW += w
     if (p.status === "CONCLUIDO" || p.status === "DISPENSADO") doneW += w
@@ -504,9 +519,9 @@ export async function montarWorkflowV2(
     return {
       ...op,
       id: p.id, ordem: p.ordem, stepKey: p.stepKey,
-      title: c?.title ?? p.stepKey, description: c?.description ?? null,
+      title: c?.title ?? doCadastro?.label ?? p.stepKey, description: c?.description ?? null,
       status: stepInstanceStatusToLegacy(p.status), weight: w, ownerKey: c?.ownerKey ?? null,
-      slaDays: c?.slaDays ?? null,
+      slaDays: c?.slaDays ?? doCadastro?.slaDays ?? null,
       assigneeId: p.responsavelId, assignee: p.responsavelId ? uMap.get(p.responsavelId) ?? null : null,
       startedAt: p.startedAt, dueAt: p.prazo, completedAt: p.completedAt,
       notes: (op.notes as string) ?? null, motivoBloqueio: p.motivo,

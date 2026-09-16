@@ -738,15 +738,22 @@ function ConteudoDrawer({
 
             {/* CONTROLES DO WORKFLOW (barra de progresso + botões pausar/cancelar/invalidar) —
                 a MESMA permissão que o servidor confere (PERMISSAO_DO_CONTROLE); esconder o
-                botão aqui é desenho, o servidor é quem trava de verdade. */}
-            <WorkflowControls
-              documentoId={documentoId}
-              workflow={workflow}
-              onChange={() => { carregar(); onSave?.() }}
-              podeBloquear={pode("tarefas.bloquear")}
-              podeExcluir={pode("tarefas.excluir")}
-              titulo={workflow?.steps?.[0]?.title}
-            />
+                botão aqui é desenho, o servidor é quem trava de verdade.
+                NA ABA WORKFLOW este card some daqui: a própria aba já renderiza a
+                versão fundida (progresso + etapas/pontos + botões num card só —
+                achado real 16/09/2026, dois cards diziam a mesma coisa). Nas outras
+                abas (Dados Registrais, Andamento...) ele continua aqui, único lugar
+                onde pausar/cancelar/invalidar fica visível fora da aba Workflow. */}
+            {activeTab !== "workflow" && (
+              <WorkflowControls
+                documentoId={documentoId}
+                workflow={workflow}
+                onChange={() => { carregar(); onSave?.() }}
+                podeBloquear={pode("tarefas.bloquear")}
+                podeExcluir={pode("tarefas.excluir")}
+                titulo={workflow?.steps?.[0]?.title}
+              />
+            )}
 
             {/* TABS */}
             <div

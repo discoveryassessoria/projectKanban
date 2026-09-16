@@ -270,6 +270,47 @@ function ConteudoModal({
     setRascunho({ versao: versaoDoc, form: valor })
   }
 
+  // -- Estado → Cidade em cascata, direto do IBGE (fonte pública oficial, sem
+  //    chave/custo). "Cartório" continua texto livre — nem todo cartório tem
+  //    cadastro prévio — mas passa a sugerir (via <datalist>) os já cadastrados
+  //    na cidade escolhida, reaproveitando o cadastro de Órgãos existente.
+  const [ufs, setUfs] = useState<{ sigla: string; nome: string }[]>([])
+  const [municipios, setMunicipios] = useState<string[]>([])
+  useEffect(() => {
+    fetch("https://servicodados.ibge.gov.br/api/v1/localidades/estados?orderBy=nome")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((lista: Array<{ sigla: string; nome: string }>) => setUfs(Array.isArray(lista) ? lista : []))
+      .catch(() => setUfs([]))
+  }, [])
+  useEffect(() => {
+    const uf = ufs.find((u) => u.nome === form.estado_registro)?.sigla
+    if (!uf) { setMunicipios([]); return }
+    fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios?orderBy=nome`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((lista: Array<{ nome: string }>) => setMunicipios(Array.isArray(lista) ? lista.map((m) => m.nome) : []))
+      .catch(() => setMunicipios([]))
+  }, [form.estado_registro, ufs])
+  const ufSigla = ufs.find((u) => u.nome === form.estado_registro)?.sigla ?? null
+  const orgaosReq = useApi<{ orgaos?: Array<{ name: string; city: string | null }> }>(
+    "/api/documentos/orgaos-disponiveis",
+  )
+  // Fonte REAL (API oficial ARPEN/Registro Civil, por estado+cidade, com bairro) — só
+  // dispara quando cidade já foi escolhida. Sem apikey configurada, `configurado: false`
+  // e a tela cai no cadastro próprio (datalist abaixo) sem quebrar.
+  const cartoriosApiReq = useApi<{
+    configurado: boolean
+    cartorios?: Array<{ id: number; nome: string; bairro: string | null; endereco: string | null }>
+  }>(
+    ufSigla && form.cidade_registro
+      ? `/api/documentos/cartorios-registro-civil?estado=${encodeURIComponent(ufSigla)}&cidade=${encodeURIComponent(form.cidade_registro)}`
+      : null,
+  )
+  const cartoriosDaApi = cartoriosApiReq.dados?.cartorios ?? []
+  const apiConfigurada = cartoriosApiReq.dados?.configurado === true
+  const cartoriosDaCidade = (orgaosReq.dados?.orgaos ?? [])
+    .filter((o) => !form.cidade_registro || o.city === form.cidade_registro)
+    .map((o) => o.name)
+
   // -- Trava scroll body e ESC
   useEffect(() => {
     if (!isOpen) return
@@ -554,29 +595,48 @@ function ConteudoModal({
                   onToggle={() => toggleSection("localidade")}
                 >
                   <div className="grid grid-cols-2 gap-3">
+                    <SelectField
+                      label="Estado"
+                      value={form.estado_registro}
+                      onChange={(v) => setForm({ ...form, estado_registro: v, cidade_registro: "" })}
+                      options={ufs.map((u) => u.nome)}
+                      placeholder={ufs.length ? "Selecione o estado" : "Carregando…"}
+                    />
+                    <SelectField
+                      label="Cidade"
+                      value={form.cidade_registro}
+                      onChange={(v) => setForm({ ...form, cidade_registro: v })}
+                      options={municipios}
+                      placeholder={!form.estado_registro ? "Escolha o estado primeiro" : municipios.length ? "Selecione a cidade" : "Carregando…"}
+                      disabled={!form.estado_registro}
+                    />
                     <Field
                       label="Cartório"
                       requiredToComplete={isModoBuscar}
                       value={form.cartorio}
                       onChange={(v) => setForm({ ...form, cartorio: v })}
                       colSpan={2}
+                      list="cartorios-sugeridos"
                     />
+                    <datalist id="cartorios-sugeridos">
+                      {cartoriosDaApi.map((c) => (
+                        <option key={`api-${c.id}`} value={c.bairro ? `${c.nome} — ${c.bairro}` : c.nome} />
+                      ))}
+                      {cartoriosDaCidade.map((nome) => (
+                        <option key={`cad-${nome}`} value={nome} />
+                      ))}
+                    </datalist>
+                    {form.cidade_registro && !apiConfigurada && (
+                      <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
+                        Busca automática de cartórios por bairro (API Registro Civil) não está configurada — sugestões vêm só do cadastro de Órgãos já usado neste sistema.
+                      </div>
+                    )}
                     {!isModoBuscar && (
                       <>
                         <Field
                           label="País"
                           value={form.pais_registro}
                           onChange={(v) => setForm({ ...form, pais_registro: v })}
-                        />
-                        <Field
-                          label="Estado/Província"
-                          value={form.estado_registro}
-                          onChange={(v) => setForm({ ...form, estado_registro: v })}
-                        />
-                        <Field
-                          label="Cidade"
-                          value={form.cidade_registro}
-                          onChange={(v) => setForm({ ...form, cidade_registro: v })}
                         />
                         <Field
                           label="Comune"
@@ -830,6 +890,7 @@ function Field({
   requiredToComplete,
   requiredAlt,
   colSpan = 1,
+  list,
 }: {
   label: string
   value: string
@@ -839,6 +900,8 @@ function Field({
   requiredToComplete?: boolean
   requiredAlt?: boolean
   colSpan?: 1 | 2
+  /** id de um <datalist> com sugestões (autocomplete nativo, sem travar texto livre). */
+  list?: string
 }) {
   const isEmpty = !value.trim()
   const requiredEmpty = requiredToComplete && isEmpty
@@ -895,6 +958,7 @@ function Field({
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          list={list}
           className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
             requiredEmpty || requiredAltEmpty
               ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
@@ -902,6 +966,44 @@ function Field({
           }`}
         />
       )}
+    </div>
+  )
+}
+
+/** Mesma casca visual do `Field`, mas `<select>` — usado para Estado/Cidade em cascata. */
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: string[]
+  placeholder?: string
+  disabled?: boolean
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-1">
+        <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
+          {label}
+        </label>
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="w-full px-3 py-2 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] focus:outline-none focus:ring-1 focus:border-[var(--border-default)] disabled:opacity-50"
+      >
+        <option value="">{placeholder ?? "Selecione"}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
     </div>
   )
 }

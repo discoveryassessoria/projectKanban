@@ -12,6 +12,7 @@ import {
   Lock,
 } from "lucide-react"
 import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
+import { WorkflowControls } from "../WorkflowControls"
 import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAvaliacaoUI } from "./OperacaoAntecipadaPainel"
 import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -154,11 +155,6 @@ const fmtDateTime = (iso: string | null): string => {
   return d.toLocaleDateString("pt-BR") + " " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
-const fmtDate = (iso: string | null): string => {
-  if (!iso) return "—"
-  return new Date(iso).toLocaleDateString("pt-BR")
-}
-
 const fmtSla = (dueAt: string | null) => {
   if (!dueAt) return { label: "no prazo", cls: "text-green-800 bg-[var(--surface-secondary)]" }
   const diff = (new Date(dueAt).getTime() - Date.now()) / 86400000
@@ -191,7 +187,7 @@ export function WorkflowTab({
 }: WorkflowTabProps) {
   // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
 
-  const { isAdmin } = usePermissoes()
+  const { isAdmin, pode } = usePermissoes()
   const currentUserId = getUserId()
   // A MESMA regra que o servidor aplica em `carregarPassoAutorizado`, só que
   // antes do clique: sem tarefa atribuída a alguém, ou atribuída a outra
@@ -347,25 +343,22 @@ export function WorkflowTab({
   return (
     <div className="space-y-4">
 
-      {/* ============== HEADER ============== */}
-      <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <div className="text-[13px] font-bold text-white">{workflow.templateName}</div>
-          <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-            {etapasTotal} etapas · {etapasConcluidas} concluídas · iniciado em {fmtDate(workflow.startedAt)}
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-1 min-w-[160px]">
-          <div className="text-[18px] font-bold text-white leading-none">{pctExibido}%</div>
-          <div className="w-40 h-1.5 bg-[var(--text-muted)] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
-              style={{ width: `${pctExibido}%` }}
-            />
-          </div>
-          <div className="text-[10px] text-[var(--text-secondary)] font-mono">{doneWeight}/{totalWeight} pontos</div>
-        </div>
-      </div>
+      {/* ============== HEADER — progresso + ações (pausar/cancelar/invalidar) num
+          card só. Era dois cards empilhados dizendo a mesma coisa (achado real,
+          16/09/2026): este aqui (etapas/pontos) e o WorkflowControls do drawer
+          (título/%/iniciado em/botões). Fundidos num único componente. ============== */}
+      <WorkflowControls
+        documentoId={workflow.documentoId}
+        workflow={{ id: workflow.id, status: workflow.status, progress: pctExibido, startedAt: workflow.startedAt }}
+        onChange={() => { void carregar() }}
+        podeBloquear={pode("tarefas.bloquear")}
+        podeExcluir={pode("tarefas.excluir")}
+        titulo={workflow.templateName}
+        etapasTotal={etapasTotal}
+        etapasConcluidas={etapasConcluidas}
+        pontosFeitos={doneWeight}
+        pontosTotal={totalWeight}
+      />
 
       {/* ============== LISTA DE STEPS ==============
           TODOS os passos do workflow deste documento, na ordem publicada. O filtro
@@ -617,28 +610,34 @@ function SubtarefaRow({
           {s.descricao && (
             <div className="text-[11px] text-[var(--text-secondary)] mt-1">{s.descricao}</div>
           )}
-          <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
-              <span className="text-[var(--text-secondary)]">executa</span>
-              {tarefaResponsavelNome || "—"}
-            </span>
-            {s.slaDays != null && (
-              <>
-                <span className="text-[var(--text-secondary)]">·</span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="text-[var(--text-secondary)]">SLA</span>
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-green-800 bg-[var(--surface-secondary)]">
-                    {s.slaDays} dia(s)
-                  </span>
+          {bloqueadaPorDependencia ? (
+            <div className="mt-2 text-[11px] text-[var(--text-secondary)]">Aguardando subtarefa anterior</div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+                  <span className="text-[var(--text-secondary)]">executa</span>
+                  {tarefaResponsavelNome || "—"}
                 </span>
-              </>
-            )}
-          </div>
-          {s.bloqueioTexto && (
-            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-800">
-              {s.bloqueioTexto}
-            </div>
+                {s.slaDays != null && (
+                  <>
+                    <span className="text-[var(--text-secondary)]">·</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)]">SLA</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-green-800 bg-[var(--surface-secondary)]">
+                        {s.slaDays} dia(s)
+                      </span>
+                    </span>
+                  </>
+                )}
+              </div>
+              {s.bloqueioTexto && (
+                <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-800">
+                  {s.bloqueioTexto}
+                </div>
+              )}
+            </>
           )}
         </div>
         {podeAgir ? (

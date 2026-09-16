@@ -50,6 +50,16 @@ interface WorkflowControlsProps {
   /** Nome da Tarefa/passo que este workflow conduz — ex.: "Solicitar certidão".
    *  Sem isto, o bloco de progresso não dizia DO QUÊ era o 0%. */
   titulo?: string | null
+  /**
+   * Detalhe "X etapas · Y concluídas" + "W/T pontos" — o card que a aba Workflow
+   * mostrava ela mesma, LOGO ABAIXO deste, como um segundo card de progresso
+   * duplicado (achado real, 16/09/2026). Opcionais: sem eles, o card mostra só
+   * título + % + iniciado em, como sempre mostrou.
+   */
+  etapasTotal?: number
+  etapasConcluidas?: number
+  pontosFeitos?: number
+  pontosTotal?: number
 }
 
 type ActionKey = "pausar" | "retomar" | "cancelar" | "invalidar"
@@ -79,6 +89,10 @@ export function WorkflowControls({
   podeBloquear = true,
   podeExcluir = true,
   titulo,
+  etapasTotal,
+  etapasConcluidas,
+  pontosFeitos,
+  pontosTotal,
 }: WorkflowControlsProps) {
   const [actionLoading, setActionLoading] = useState<ActionKey | null>(null)
   const [confirmAction, setConfirmAction] = useState<ActionKey | null>(null)
@@ -170,10 +184,20 @@ export function WorkflowControls({
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                 Progresso operacional
               </span>
+              {etapasTotal != null && etapasConcluidas != null && (
+                <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  {etapasTotal} etapa{etapasTotal === 1 ? "" : "s"} · {etapasConcluidas} concluída{etapasConcluidas === 1 ? "" : "s"}
+                </div>
+              )}
             </div>
-            <span className="text-[11px] font-mono text-[var(--text-secondary)]">
-              {progress}% · Iniciado em {startedAt}
-            </span>
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-[11px] font-mono text-[var(--text-secondary)]">
+                {progress}% · Iniciado em {startedAt}
+              </span>
+              {pontosFeitos != null && pontosTotal != null && (
+                <span className="text-[10px] font-mono text-[var(--text-muted)]">{pontosFeitos}/{pontosTotal} pontos</span>
+              )}
+            </div>
           </div>
         )}
         {isCancelado ? (
