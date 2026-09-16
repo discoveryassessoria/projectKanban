@@ -2293,10 +2293,9 @@ function FormReceberCertidao({
       alert("Marque se o documento é físico, digital ou ambos.")
       return
     }
-    // ⚡ fecha o modal e comemora NA HORA; salva em 2º plano
-    onClose()
-    void celebrar()
-
+    // O FECHAMENTO SÓ ACONTECE DEPOIS DO SUCESSO CONFIRMADO — mesmo achado real
+    // de `FormConferirCertidao` (16/09/2026): fechar/comemorar ANTES de salvar
+    // fazia o banner de erro atualizar um modal que já não estava mais na tela.
     setSaving(true)
     setErroServidor(null)
     try {
@@ -2326,6 +2325,8 @@ function FormReceberCertidao({
         return
       }
 
+      onClose()
+      void celebrar()
       onSaved?.()
     } catch (e) {
       console.error("[EditorReceberCertidao] salvar:", e)
@@ -2746,10 +2747,15 @@ function FormConferirCertidao({
       return
     }
 
-    // ⚡ fecha o modal e comemora NA HORA; salva em 2º plano
-    onClose()
-    void celebrar()
-
+    // O FECHAMENTO SÓ ACONTECE DEPOIS DO SUCESSO CONFIRMADO.
+    //
+    // Achado real (16/09/2026): esta função fechava o modal e disparava a
+    // comemoração ANTES de salvar ("otimista", por percepção de velocidade).
+    // Quando o salvamento falhava, `setErroServidor` rodava sobre um
+    // componente cujo drawer já estava fechado (e frequentemente desmontado
+    // pelo pai) — o banner de erro existia no código mas NINGUÉM o via. A
+    // etapa ficava "permanentemente aberta" sem nenhuma explicação, porque o
+    // próprio mecanismo que deveria mostrar o motivo já tinha sumido da tela.
     setSaving(true)
     setErroServidor(null)
     try {
@@ -2785,6 +2791,8 @@ function FormConferirCertidao({
           motivo: observacao.trim() || null,
         })
         if (!r.ok) { setErroServidor(r.mensagem ?? "A conferência não pôde ser registrada."); return }
+        onClose()
+        void celebrar()
         onSaved?.()
         return
       }
@@ -2804,6 +2812,8 @@ function FormConferirCertidao({
         return
       }
 
+      onClose()
+      void celebrar()
       onSaved?.()
     } catch (e) {
       console.error("[EditorConferirCertidao] salvar:", e)
