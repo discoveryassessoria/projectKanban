@@ -172,7 +172,20 @@ export async function executarAcaoCadastrada(
       mensagem: `"${def.label}" é competência de ${def.competencia}, e a fase atual não a tem. Quem decide isso é outra fase.` }
   }
 
-  const exec = executorEfetivo({ key: passo.stepKey, executorKey: hist.passo.executorKey }, passo.faseMacroKey)
+  // O EXECUTOR É DA SUBTAREFA QUANDO A AÇÃO É DELA — mesma régua do comentário em
+  // `ContextoDaAcao.subtaskKey` (linhas 58-64): tudo se resolve DENTRO da subtarefa.
+  // Achado real (16/09/2026): esta checagem usava sempre `hist.passo.executorKey` —
+  // o executor do PASSO inteiro ("solicitacao_cartorio", dono da subtarefa 1) — mesmo
+  // quando a ação pertencia a outra subtarefa do mesmo passo consolidado
+  // ("conferencia_e_validacao", subtarefa 4, cadastrada corretamente com o efeito
+  // APPROVE_FOR_ANALYSIS). O cadastro (Gerenciamento) já declarava o executor certo
+  // por subtarefa; só esta leitura ignorava o campo e comparava contra o executor
+  // errado — recusando "Validado — enviar para a Análise" com "o painel desta etapa
+  // não sabe executar", mesmo a subtarefa sabendo.
+  const exec = executorEfetivo(
+    { key: passo.stepKey, executorKey: subtarefa?.executorKey ?? hist.passo.executorKey },
+    passo.faseMacroKey,
+  )
   if (!executorSuportaEfeito(exec, acao.effectKey)) {
     return { ok: false, codigo: "EFEITO_SEM_SUPORTE",
       mensagem: `O painel desta etapa não sabe executar "${def.label}".` }
