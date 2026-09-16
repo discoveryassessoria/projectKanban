@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useApi } from "@/src/lib/dados"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { Loader2, Eye, ArrowLeft } from "lucide-react"
@@ -500,6 +501,30 @@ export function ProcessoCentralOperacional({
   const carregar = useCallback((_modoSilencioso = false) => { void centralReq.recarregar() }, [centralReq])
 
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
+
+  // O DRAWER SOBREVIVE AO REFRESH — decisão do usuário (16/09/2026): atualizar
+  // a tela não pode voltar pro início. O documento aberto entra na URL (?doc=);
+  // ao recarregar, a mesma URL reabre o mesmo drawer. Só a IDENTIDADE do
+  // documento vai pra URL — abas internas do drawer (Workflow/Dados
+  // Registrais/…) continuam com o próprio estado local dele.
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const docRestauradoDaUrl = useRef(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    const atual = params.get("doc")
+    const alvo = drawerDocId != null ? String(drawerDocId) : null
+    if (atual === alvo) return
+    if (alvo) params.set("doc", alvo); else params.delete("doc")
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+    // `atual === alvo` acima é a guarda: o replace só dispara quando o VALOR
+    // muda, então incluir `searchParams`/`router`/`pathname` nas deps não
+    // gera laço (o re-disparo seguinte já entra igual e sai no early-return).
+  }, [drawerDocId, searchParams, router, pathname])
+
   const [initModalDocId, setInitModalDocId] = useState<number | null>(null)
   const [abrindoOperacao, setAbrindoOperacao] = useState(false)
   const [erroOperacao, setErroOperacao] = useState<string | null>(null)
@@ -781,6 +806,25 @@ export function ProcessoCentralOperacional({
     // efeito é o que a regra do React existe para evitar.
     queueMicrotask(() => abrirDetalhes(doc))
   }, [alvo, data, viewData, abrirDetalhes])
+
+  // RESTAURA O DRAWER DA URL (?doc=) — mesma mecânica do alvo acima, só que a
+  // origem é a URL de um refresh, não um deep-link de tarefa. `docRestauradoDaUrl`
+  // garante uma única tentativa: se o documento não existir mais no índice (foi
+  // concluído/removido de fase), a tela não fica tentando reabrir pra sempre.
+  useEffect(() => {
+    if (docRestauradoDaUrl.current) return
+    const docParam = searchParams.get("doc")
+    if (!docParam) return
+    const docId = Number(docParam)
+    if (!Number.isFinite(docId)) { docRestauradoDaUrl.current = true; return }
+    const indice = (viewData ?? data)?.indice
+    if (!indice) return
+    const todas = [...indice.linhaPrincipal, ...indice.foraDaLinha, ...indice.pendenteClassificacao]
+    const doc = todas.flatMap((p) => p.documentos).find((d) => d.documentoId === docId)
+    docRestauradoDaUrl.current = true
+    if (!doc) return
+    queueMicrotask(() => abrirDetalhes(doc))
+  }, [searchParams, data, viewData, abrirDetalhes])
   const viewLoading = Boolean(chaveView) && viewReq.carregando
   const viewErro = chaveView && viewReq.erro ? "Não foi possível carregar os dados desta fase." : null
 

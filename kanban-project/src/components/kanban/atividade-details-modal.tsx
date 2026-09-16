@@ -4,6 +4,7 @@
 
 import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState, useEffect, useRef, useCallback } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -139,9 +140,24 @@ function ConteudoModal({
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
+  // A ABA SOBREVIVE AO REFRESH — decisão do usuário (16/09/2026): atualizar a
+  // tela não pode voltar pro início. `initialTab` (deep-link explícito de quem
+  // abriu o modal) tem prioridade; na ausência dele, a própria URL (?tab=) é a
+  // segunda fonte — é o que permite um F5 simples restaurar a aba sem que o
+  // caller precise saber nada sobre isso.
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<AbaProcesso>(
-    () => abaInicial(initialTab, ehItalia(processo)),
+    () => abaInicial(initialTab ?? searchParams.get("tab") ?? undefined, ehItalia(processo)),
   )
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (params.get("tab") === activeTab) return
+    params.set("tab", activeTab)
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [activeTab, searchParams, router, pathname])
   // Financeiro V3 no processo: quando a flag posicaoRead está ativa, a aba usa a
   // tela V3 (Ledger); senão, o legado como fallback temporário.
   const [financeiroV3Ativo, setFinanceiroV3Ativo] = useState<boolean | null>(null)

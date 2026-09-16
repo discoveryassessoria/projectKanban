@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { 
@@ -56,17 +57,40 @@ export function ProcessosLista({
   const [selectedProcesso, setSelectedProcesso] = useState<ProcessoWithStatus | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { pode } = usePermissoes()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // O MODAL SOBREVIVE AO REFRESH — decisão do usuário (16/09/2026): atualizar
+  // a tela não pode voltar pro início. Qual processo estava aberto vai pra
+  // URL (?processo=); a aba e o drawer internos (?tab=/?doc=) são gravados
+  // pelo próprio modal (atividade-details-modal.tsx/ProcessoCentralOperacional),
+  // então restaurar só o `processo` aqui já deixa a URL completa pronta pra
+  // eles lerem assim que montam.
+  useEffect(() => {
+    const idParam = searchParams.get("processo")
+    if (!idParam || isModalOpen) return
+    const id = Number(idParam)
+    const encontrado = processos.find((p) => p.id === id)
+    if (encontrado) { setSelectedProcesso(encontrado); setIsModalOpen(true) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processos])
 
   // Função para abrir modal de edição
   const handleEdit = (processo: ProcessoWithStatus) => {
     setSelectedProcesso(processo)
     setIsModalOpen(true)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("processo", String(processo.id))
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }
 
   // Função para fechar modal
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedProcesso(null)
+    // Fecha limpo: processo/aba/drawer não ficam pendurados na URL da lista.
+    router.replace(pathname, { scroll: false })
   }
 
   // Filtrar processos (texto + situação de SLA — o status vem pronto da engine)
