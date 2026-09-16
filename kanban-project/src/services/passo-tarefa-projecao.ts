@@ -161,6 +161,18 @@ export async function projetarTarefaDoPasso(tx: TX, input: ProjetarInput): Promi
   const concluiu = TAREFA_CONCLUIDA.has(alvo)
   const data: Prisma.TarefaUpdateInput = {
     statusTarefa: alvo,
+    // MESMA REGRA de `aplicarTarefa` (task-step-sync.ts): toda escrita de
+    // `statusTarefa` incrementa `lockVersion`. Achado real (16/09/2026,
+    // processo Rovatti): esta era a ÚNICA gravação de `statusTarefa` do
+    // sistema que não incrementava — reabrir um passo concluído (via
+    // `reabrirPassoTx` → aqui) rebaixava a tarefa para EM_ANDAMENTO com o
+    // MESMO lockVersion de quando ela tinha concluído. Na reconclusão
+    // seguinte, `aplicarTarefa` recalcula `chaveEvento(...,lockVersion)` —
+    // a MESMA chave do evento TAREFA_CONCLUIDA já gravado na primeira vez —
+    // e o INSERT único falha, derrubando a transação inteira de
+    // `concluirPasso` (o passo nunca fechava, mesmo com as 4 subtarefas
+    // concluídas e o gate liberado).
+    lockVersion: { increment: 1 },
     // As datas acompanham o estado do PASSO — não podem ficar só de um lado.
     concluida: concluiu,
     dataConclusao: concluiu ? (tarefa.dataConclusao ?? agora) : null,
