@@ -716,6 +716,8 @@ interface DocSnapshot {
   id: number
   tipo: string
   cartorio: string | null
+  cidade_registro: string | null
+  estado_registro: string | null
   orgaoId: number | null
   orgao: { id: number; name: string; nomeFantasia: string | null } | null
   livro: string | null
@@ -809,6 +811,8 @@ function lerDocSnapshot(bruto: Record<string, unknown> | null): DocSnapshot | nu
     id: Number(bruto.id),
     tipo: texto(bruto.tipo),
     cartorio: textoOuNulo(bruto.cartorio),
+    cidade_registro: textoOuNulo(bruto.cidade_registro),
+    estado_registro: textoOuNulo(bruto.estado_registro),
     orgaoId: typeof bruto.orgaoId === "number" ? bruto.orgaoId : null,
     orgao: bruto.orgao && typeof bruto.orgao === "object"
       ? {
@@ -1137,6 +1141,8 @@ function FormSolicitarCertidao({
                   orgaoId={doc.orgaoId}
                   orgao={doc.orgao}
                   cartorioDaGenealogia={doc.cartorio}
+                  cidadeDaGenealogia={doc.cidade_registro}
+                  estadoDaGenealogia={doc.estado_registro}
                   onSalvo={onOrgaoAlterado}
                 />
                 <div className="text-[11px] text-[var(--text-secondary)] mt-1">
@@ -1366,15 +1372,17 @@ interface OrgaoOpcaoResumo {
 }
 
 function OrgaoDoRequerimentoField({
-  documentoId, orgaoId, orgao, cartorioDaGenealogia, onSalvo,
+  documentoId, orgaoId, orgao, cartorioDaGenealogia, cidadeDaGenealogia, estadoDaGenealogia, onSalvo,
 }: {
   documentoId: number
   orgaoId: number | null
   orgao: { id: number; name: string; nomeFantasia: string | null } | null
-  /** `Documento.cartorio` — o nome já capturado em "Localizar registro"
-   *  (Genealogia). Achado real, 16/09/2026: pedir escolha de novo aqui
-   *  repetia um dado que o mesmo documento já tinha. */
+  /** `Documento.cartorio`/`cidade_registro`/`estado_registro` — já capturados
+   *  em "Localizar registro" (Genealogia). Achado real, 16/09/2026: pedir
+   *  escolha de novo aqui repetia um dado que o mesmo documento já tinha. */
   cartorioDaGenealogia: string | null
+  cidadeDaGenealogia: string | null
+  estadoDaGenealogia: string | null
   onSalvo: () => void
 }) {
   const [editando, setEditando] = useState(false)
@@ -1390,15 +1398,36 @@ function OrgaoDoRequerimentoField({
   // MESMA porta idempotente do "criar cartório rápido" (dedupe por nome+país
   // no servidor), sem pedir pra escolher de novo. Continua alterável ("alterar
   // órgão") se o operador discordar.
+  //
+  // FICHA COMPLETA, não só nome: procura primeiro na base nacional de
+  // Cartórios (sincronizada, com endereço/telefone) por nome+cidade — achado
+  // real, 16/09/2026: sem isto, o cartório nascia com a ficha vazia
+  // (endereço/telefone nulos) pra sempre.
   useEffect(() => {
     if (orgaoId != null || !cartorioDaGenealogia?.trim() || espelhandoDaGenealogia.current) return
     espelhandoDaGenealogia.current = true
     ;(async () => {
       try {
+        let dados: { name: string; city?: string; state?: string; endereco?: string; telefone?: string; email?: string } = {
+          name: cartorioDaGenealogia.trim(),
+        }
+        if (cidadeDaGenealogia?.trim()) {
+          const q = new URLSearchParams({ q: cartorioDaGenealogia.trim(), municipio: cidadeDaGenealogia.trim(), limit: "5" })
+          const busca = await fetch(`/api/cartorios?${q.toString()}`, { headers: authHeader() }).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+          const match = busca?.cartorios?.[0] as { nome: string; municipio: string; endereco: string | null; telefone: string | null; email: string | null } | undefined
+          if (match) {
+            dados = {
+              name: match.nome, city: match.municipio,
+              endereco: match.endereco ?? undefined, telefone: match.telefone ?? undefined, email: match.email ?? undefined,
+            }
+          } else if (estadoDaGenealogia?.trim()) {
+            dados = { name: cartorioDaGenealogia.trim(), city: cidadeDaGenealogia.trim() }
+          }
+        }
         const res = await fetch("/api/documentos/orgaos-disponiveis", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({ name: cartorioDaGenealogia.trim() }),
+          body: JSON.stringify(dados),
         })
         const j = await res.json().catch(() => ({}))
         if (!res.ok || !j?.orgao?.id) return
@@ -1412,7 +1441,7 @@ function OrgaoDoRequerimentoField({
         // Falha silenciosa: o operador ainda pode escolher manualmente.
       }
     })()
-  }, [orgaoId, cartorioDaGenealogia, documentoId, onSalvo])
+  }, [orgaoId, cartorioDaGenealogia, cidadeDaGenealogia, estadoDaGenealogia, documentoId, onSalvo])
 
   const opcoesReq = useApi<{ orgaos: OrgaoOpcaoResumo[] }>(
     editando ? "/api/documentos/orgaos-disponiveis" : null,

@@ -53,6 +53,12 @@ export async function POST(request: NextRequest) {
     if (!name) return NextResponse.json({ error: "Informe o nome do cartório." }, { status: 400 })
     const city = typeof b.city === "string" && b.city.trim() ? b.city.trim().slice(0, 100) : null
     const state = typeof b.state === "string" && b.state.trim() ? b.state.trim().slice(0, 60) : null
+    // Endereço/telefone/email são opcionais — quando quem chama já os sabe (ex.:
+    // espelhado da base nacional de Cartórios sincronizada), evita nascer com
+    // ficha vazia só porque a criação rápida sempre pediu só nome+cidade.
+    const endereco = typeof b.endereco === "string" && b.endereco.trim() ? b.endereco.trim().slice(0, 300) : null
+    const telefone = typeof b.telefone === "string" && b.telefone.trim() ? b.telefone.trim().slice(0, 60) : null
+    const email = typeof b.email === "string" && b.email.trim() ? b.email.trim().slice(0, 200) : null
     const paisIdRaw = Number(b.paisId)
     const paisId = Number.isInteger(paisIdRaw) && paisIdRaw > 0 ? paisIdRaw : null
     if (paisId != null) {
@@ -64,17 +70,32 @@ export async function POST(request: NextRequest) {
     // mesmo nome oficial no mesmo país.
     const resolucao = await resolverOrganizacao(prisma, { name, paisId })
     if (resolucao.id) {
-      const orgao = await prisma.orgaoProtocolo.findUnique({
+      const atual = await prisma.orgaoProtocolo.findUnique({
         where: { id: resolucao.id },
-        select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { id: true, countryLabel: true } } },
+        select: { city: true, state: true, endereco: true, telefone: true, email: true },
+      })
+      // SÓ PREENCHE LACUNA — nunca sobrescreve o que já existe (pode ter sido
+      // digitado por um admin). Achado real, 16/09/2026: cartório criado só com
+      // nome ficava com ficha vazia pra sempre; ao espelhar de novo com dados
+      // completos (base nacional de Cartórios), completa o que faltava.
+      const preencher: Record<string, string> = {}
+      if (!atual?.city && city) preencher.city = city
+      if (!atual?.state && state) preencher.state = state
+      if (!atual?.endereco && endereco) preencher.endereco = endereco
+      if (!atual?.telefone && telefone) preencher.telefone = telefone
+      if (!atual?.email && email) preencher.email = email
+      const orgao = await prisma.orgaoProtocolo.update({
+        where: { id: resolucao.id },
+        data: preencher,
+        select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, endereco: true, telefone: true, email: true, pais: { select: { id: true, countryLabel: true } } },
       })
       return NextResponse.json({ orgao, jaExistia: true })
     }
 
     const usuario = await extrairUsuarioComPermissoes(request)
     const criado = await prisma.orgaoProtocolo.create({
-      data: { name, city, state, paisId, type: "cartorio", funcoes: ["ORGAO"], ativo: true },
-      select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { id: true, countryLabel: true } } },
+      data: { name, city, state, endereco, telefone, email, paisId, type: "cartorio", funcoes: ["ORGAO"], ativo: true },
+      select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, endereco: true, telefone: true, email: true, pais: { select: { id: true, countryLabel: true } } },
     })
     await prisma.logAuditoria.create({
       data: {

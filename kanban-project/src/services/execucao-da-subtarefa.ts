@@ -28,6 +28,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
+import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -293,6 +294,48 @@ export async function reabrirSubtarefa(args: {
     passoReaberto = true
   }
 
+  // AS DEPENDENTES CONCLUÍDAS — quem já tinha sido dado por feito DEPOIS desta
+  // subtarefa, na mesma execução que agora volta pra trás. Achado real,
+  // 16/09/2026: "Enviar requerimento" reabria e "Aguardar retorno"/"Receber
+  // certidão"/"Conferir e validar" continuavam CONCLUÍDO — um estado
+  // impossível (a certidão "conferida" de um requerimento que nem foi
+  // reenviado ainda). Reabertura não deixa órfão nem pra baixo (dependente
+  // que devia acompanhar) nem pra cima (histórico, já preservado acima).
+  const dependentesConcluidas = await (async () => {
+    // A definição HISTÓRICA (congelada na versão que esta instância rodou) —
+    // não `StepSubtaskDefinition` pelo `subtaskDefinitionId` da execução: esse
+    // campo é null em execuções legadas (achado real, 16/09/2026, processo
+    // 613 stepInstance 2498 — TODAS as execuções tinham `subtaskDefinitionId:
+    // null`), e é exatamente a mesma fonte que `subtarefasDaEtapa` já usa pra
+    // saber "quem depende de quem" nesta instância.
+    const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+    const todas = hist?.passo.subtarefas ?? []
+    if (todas.length === 0) return []
+    // BFS pelo grafo de dependência (declarada, nunca por ordem) a partir da
+    // chave reaberta, achando quem depende dela direta ou transitivamente.
+    const afetadas = new Set<string>()
+    let fronteira = [args.subtaskKey]
+    while (fronteira.length > 0) {
+      const proxima: string[] = []
+      for (const d of todas) {
+        const deps = Array.isArray(d.dependeDe) ? d.dependeDe.map(String) : []
+        if (fronteira.some((k) => deps.includes(k)) && !afetadas.has(d.key)) {
+          afetadas.add(d.key)
+          proxima.push(d.key)
+        }
+      }
+      fronteira = proxima
+    }
+    const resultado: Array<{ key: string; workflowVersao: number | null; execucaoId: number }> = []
+    for (const key of afetadas) {
+      const exec = await execucaoVigente(args.stepInstanceId, key)
+      if (exec && exec.status === "CONCLUIDO") {
+        resultado.push({ key, workflowVersao: exec.workflowVersao, execucaoId: exec.id })
+      }
+    }
+    return resultado
+  })()
+
   await prisma.$transaction(async (tx) => {
     await abrirExecucao({
       stepInstanceId: args.stepInstanceId,
@@ -304,14 +347,29 @@ export async function reabrirSubtarefa(args: {
       responsavelId: vigente.responsavelId,
       correlationId: args.correlationId ?? null,
     }, tx)
+
+    for (const dep of dependentesConcluidas) {
+      await abrirExecucao({
+        stepInstanceId: args.stepInstanceId,
+        subtaskKey: dep.key,
+        subtaskDefinitionId: null,
+        workflowVersao: dep.workflowVersao,
+        motivo: MOTIVOS_DE_EXECUCAO.REABERTURA_MANUAL,
+        status: ESTADOS_DA_SUBTAREFA.BLOQUEADO,
+        bloqueioCodigo: CAUSAS_DE_BLOQUEIO.DEPENDENCIA_PENDENTE,
+        bloqueioAlvo: args.subtaskKey,
+        correlationId: args.correlationId ?? null,
+      }, tx)
+    }
+
     await tx.logAuditoria.create({
       data: {
         acao: "SUBTAREFA_REABERTA",
         entidade: "SubtaskExecution",
         entidadeId: vigente.id,
         usuarioId: args.actorId,
-        descricao: `Subtarefa "${args.subtaskKey}" (passo ${args.stepInstanceId}) reaberta${passoReaberto ? " — passo também reaberto" : ""}: ${args.justificativa}`,
-        detalhes: { stepInstanceId: args.stepInstanceId, subtaskKey: args.subtaskKey, passoReaberto } as never,
+        descricao: `Subtarefa "${args.subtaskKey}" (passo ${args.stepInstanceId}) reaberta${passoReaberto ? " — passo também reaberto" : ""}${dependentesConcluidas.length > 0 ? ` — ${dependentesConcluidas.length} subtarefa(s) dependente(s) voltaram a bloqueada: ${dependentesConcluidas.map((d) => d.key).join(", ")}` : ""}: ${args.justificativa}`,
+        detalhes: { stepInstanceId: args.stepInstanceId, subtaskKey: args.subtaskKey, passoReaberto, dependentesBloqueadas: dependentesConcluidas.map((d) => d.key) } as never,
       },
     }).catch(() => null)
   })
