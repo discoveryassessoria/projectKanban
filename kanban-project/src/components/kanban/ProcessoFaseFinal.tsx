@@ -112,7 +112,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                     <button type="button" disabled={!active} onClick={() => active && setModalStep(s.id)}
                       className={`flex flex-col items-center text-center w-[120px] shrink-0 ${active ? "cursor-pointer" : "cursor-default"}`}>
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isDone ? "bg-[var(--surface-secondary)] text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
+                        isDone ? "bg-[var(--surface-secondary)] text-white" : active ? "bg-[var(--action-primary)] text-[var(--color-pure)]" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
                         {isDone ? <Check className="w-4 h-4" /> : i + 1}
                       </div>
                       <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{s.title}</div>
@@ -158,7 +158,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                 return (
                   <div key={s.id} className="flex items-center gap-3 px-4 py-3">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                      isDone ? "bg-[var(--surface-secondary)] text-green-800" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{i + 1}</span>
+                      isDone ? "bg-[var(--surface-secondary)] text-green-800" : active ? "bg-[var(--action-primary)] text-[var(--color-pure)]" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-white/95">{s.title}</div>
                       <div className="text-[11px] text-[var(--text-secondary)]">{meta}</div>

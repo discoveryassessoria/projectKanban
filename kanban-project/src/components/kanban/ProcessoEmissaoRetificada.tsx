@@ -259,7 +259,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                   return (
                     <div key={s.id} className={`flex items-start ${i < foco.workflow.length - 1 ? "flex-1" : ""}`}>
                       <div className="flex flex-col items-center text-center w-[100px] shrink-0">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[var(--surface-secondary)] text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[var(--surface-secondary)] text-white" : active ? "bg-[var(--action-primary)] text-[var(--color-pure)]" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
                         <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{RE_SHORT[i]}</div>
                         <div className={`text-[10px] ${done ? "text-green-800" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
                       </div>
@@ -484,7 +484,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 const meta = isDone ? `concluída${s.doneAt ? " em " + s.doneAt : ""}` : active ? "etapa atual" : "bloqueada · conclua a anterior"
                 return (
                   <div key={s.id} className="flex items-center gap-3 border border-[var(--border-default)] rounded-lg px-3 py-2.5">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[var(--surface-secondary)] text-green-800" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{isDone ? "✓" : i + 1}</span>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[var(--surface-secondary)] text-green-800" : active ? "bg-[var(--action-primary)] text-[var(--color-pure)]" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{isDone ? "✓" : i + 1}</span>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium text-white/95">{i + 1}. {s.title}</div><div className="text-[11px] text-[var(--text-secondary)]">{meta}</div></div>
                     {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] rounded-md px-2.5 py-1.5">Central da etapa</button>}
                   </div>

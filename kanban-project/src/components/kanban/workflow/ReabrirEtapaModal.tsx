@@ -245,7 +245,7 @@ export default function ReabrirEtapaModal({
             Cancelar
           </button>
           <button onClick={() => void confirmar()} disabled={!podeConfirmar}
-            className="rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-[12.5px] font-bold text-[#1b2027] hover:bg-[#e0bd6a] disabled:opacity-40">
+            className="rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-[12.5px] font-bold text-[var(--color-pure)] hover:bg-[var(--action-primary-hover)] disabled:opacity-40">
             {enviando ? "Reabrindo…" : "Confirmar reabertura"}
           </button>
         </div>

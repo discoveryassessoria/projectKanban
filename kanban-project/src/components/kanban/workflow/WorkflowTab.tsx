@@ -633,17 +633,6 @@ function SubtarefaRow({
                   <span className="text-[var(--text-secondary)]">executa</span>
                   {tarefaResponsavelNome}
                 </span>
-                {s.slaDays != null && (
-                  <>
-                    <span className="text-[var(--text-secondary)]">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="text-[var(--text-secondary)]">SLA</span>
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded text-green-800 bg-[var(--surface-secondary)]">
-                        {s.slaDays} dia(s)
-                      </span>
-                    </span>
-                  </>
-                )}
               </div>
               {s.bloqueioTexto && (
                 <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-800">

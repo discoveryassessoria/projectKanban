@@ -334,7 +334,7 @@ function ConteudoModal({
                       {(
                         [
                           { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
-                          { key: "urgente", label: "Urgente", bgActive: "bg-amber-600 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "urgente", label: "Urgente", bgActive: "bg-amber-600 text-[var(--color-pure)]", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                           { key: "critica", label: "⚠ Crítica", bgActive: "bg-[var(--surface-secondary)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {

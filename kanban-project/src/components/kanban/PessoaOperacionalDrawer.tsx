@@ -380,7 +380,7 @@ function ConteudoDrawer({
                     onClick={handleDeleteClick}
                     className={`ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
                       confirmDelete
-                        ? "bg-[var(--surface-secondary)] text-white hover:bg-red-600"
+                        ? "bg-[var(--surface-secondary)] text-[var(--text-primary)] hover:bg-red-600 hover:text-[var(--color-pure)]"
                         : "bg-[var(--surface-secondary)] text-red-700 hover:bg-[var(--surface-secondary)]"
                     }`}
                   >

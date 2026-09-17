@@ -232,7 +232,7 @@ export function ProcessoTraducao({ processoId, onConcluido }: Props) {
                     >
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                         done ? "bg-[var(--surface-secondary)] text-white"
-                          : active ? "bg-[var(--action-primary)] text-white"
+                          : active ? "bg-[var(--action-primary)] text-[var(--color-pure)]"
                             : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
                         {done ? <Check className="w-4 h-4" /> : i + 1}
                       </div>

@@ -524,7 +524,7 @@ function DetalhePedidoConteudo({ detalhe, onAbrirPasso, onClose }: {
                     : concluida ? "border-[var(--border-default)] text-[var(--text-secondary)]"
                     : "border-[var(--border-default)] opacity-50 cursor-not-allowed"}`}>
                   <span className="flex items-center gap-2">
-                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${concluida ? "bg-green-700 text-white" : ativa ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-white/60"}`}>
+                    <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold ${concluida ? "bg-green-700 text-[var(--color-pure)]" : ativa ? "bg-[var(--action-primary)] text-[var(--color-pure)]" : "bg-[var(--surface-tertiary)] text-white/60"}`}>
                       {concluida ? "✓" : p.ordem}
                     </span>
                     <span className="text-white/90">{rotuloPasso(p.stepKey)}</span>

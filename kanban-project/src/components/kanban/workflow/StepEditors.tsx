@@ -2911,7 +2911,7 @@ function FormConferirCertidao({
           <button
             onClick={handleSalvar}
             disabled={saving || readOnly || !podeConcluir}
-            className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
+            className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-2 ${
               resultado === "aprovado"
                 ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : resultado === "divergente"
