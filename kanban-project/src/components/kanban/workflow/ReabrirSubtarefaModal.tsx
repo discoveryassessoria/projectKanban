@@ -53,6 +53,7 @@ export default function ReabrirSubtarefaModal({
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [justificativa, setJustificativa] = useState("")
+  const [comDependentes, setComDependentes] = useState(false)
   const [enviando, setEnviando] = useState(false)
 
   const carregar = useCallback(async () => {
@@ -63,7 +64,12 @@ export default function ReabrirSubtarefaModal({
       )
       const j = await r.json().catch(() => ({}))
       if (!r.ok || !j?.plano) { setErro(j?.error ?? j?.mensagem ?? "Não foi possível carregar esta subtarefa."); return }
-      setPlano(j.plano as Plano)
+      const p = j.plano as Plano
+      setPlano(p)
+      // SUGESTÃO, não imposição: se há dependentes já concluídas, o estado
+      // consistente por padrão é bloqueá-las junto — mas quem confirma pode
+      // decidir mexer só nesta.
+      setComDependentes(p.dependentes.length > 0)
     } catch { setErro("Erro de conexão ao carregar esta subtarefa.") }
     finally { setCarregando(false) }
   }, [stepInstanceId, subtaskKey])
@@ -83,6 +89,7 @@ export default function ReabrirSubtarefaModal({
           method: "POST", headers: headers(),
           body: JSON.stringify({
             justificativa,
+            comDependentes,
             correlationId: `reabrir-sub|si${stepInstanceId}|${subtaskKey}|${plano?.execucoes.length ?? 0}`,
           }),
         },
@@ -156,6 +163,28 @@ export default function ReabrirSubtarefaModal({
 
               {plano.podeReabrir && (
                 <>
+                  {plano.dependentes.length > 0 && (
+                    <div>
+                      <div className={rot}>O que reabrir</div>
+                      <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2">
+                        <input type="radio" className="mt-0.5" checked={!comDependentes} onChange={() => setComDependentes(false)} />
+                        <span className="text-[12.5px] text-white/85">
+                          Reabrir somente esta subtarefa
+                          <span className="block text-[11px] text-[var(--text-muted)]">
+                            As {plano.dependentes.length} que dependem dela continuam concluídas como estão.
+                          </span>
+                        </span>
+                      </label>
+                      <label className="mt-1.5 flex cursor-pointer items-start gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2">
+                        <input type="radio" className="mt-0.5" checked={comDependentes} onChange={() => setComDependentes(true)} />
+                        <span className="text-[12.5px] text-white/85">
+                          Reabrir esta subtarefa e as que dependem dela
+                          <span className="block text-[11px] text-[var(--text-muted)]">Elas voltam para bloqueada — nada é apagado.</span>
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
                   {/* PREVIEW EXATO — o que a confirmação vai fazer. */}
                   <div className="rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 px-3 py-3 text-[12px]">
                     <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">Vai voltar a disponível</div>
@@ -170,7 +199,7 @@ export default function ReabrirSubtarefaModal({
                         O passo <strong>{plano.identidade.stepTitulo}</strong> já estava concluído — ele também volta a ficar aberto.
                       </div>
                     )}
-                    {plano.dependentes.length > 0 && (
+                    {comDependentes && plano.dependentes.length > 0 && (
                       <>
                         <div className="mt-2 text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
                           Também bloqueadas (dependiam desta e já estavam concluídas)
@@ -182,7 +211,14 @@ export default function ReabrirSubtarefaModal({
                         </div>
                       </>
                     )}
-                    <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{plano.aviso}</p>
+                    {!comDependentes && plano.dependentes.length > 0 && (
+                      <div className="mt-2 text-[11.5px] text-amber-800">
+                        Atenção: {plano.dependentes.length} subtarefa(s) que dependem desta continuam concluídas — a cadeia fica com uma etapa em aberto atrás de uma já dada como feita.
+                      </div>
+                    )}
+                    {plano.dependentes.length === 0 && (
+                      <p className="mt-2 text-[11px] text-[var(--text-secondary)]">{plano.aviso}</p>
+                    )}
                   </div>
 
                   <label className="block">

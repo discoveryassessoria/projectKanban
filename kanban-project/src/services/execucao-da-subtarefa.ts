@@ -241,6 +241,7 @@ export interface ResultadoReaberturaSubtarefa {
   code?: "SUBTAREFA_NAO_ENCONTRADA" | "SUBTAREFA_NAO_CONCLUIDA" | "PASSO_NAO_ENCONTRADO"
   mensagem?: string
   passoReaberto?: boolean
+  dependentesBloqueadas?: string[]
 }
 
 /**
@@ -402,6 +403,13 @@ export async function reabrirSubtarefa(args: {
   subtaskKey: string
   actorId: number | null
   justificativa: string
+  /**
+   * A ESCOLHA fica com quem confirma — mesma régua do `ReabrirEtapaModal`
+   * (`comDependentes` do passo). `false` reabre só esta, mesmo que existam
+   * dependentes concluídas (o admin decidiu que aquilo está certo do jeito
+   * que está); `true` bloqueia em cascata quem dependia dela.
+   */
+  comDependentes: boolean
   correlationId?: string
 }): Promise<ResultadoReaberturaSubtarefa> {
   const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
@@ -437,7 +445,7 @@ export async function reabrirSubtarefa(args: {
   // impossível (a certidão "conferida" de um requerimento que nem foi
   // reenviado ainda). Reabertura não deixa órfão nem pra baixo (dependente
   // que devia acompanhar) nem pra cima (histórico, já preservado acima).
-  const dependentesConcluidas = await (async () => {
+  const dependentesConcluidas = !args.comDependentes ? [] : await (async () => {
     // A definição HISTÓRICA (congelada na versão que esta instância rodou) —
     // não `StepSubtaskDefinition` pelo `subtaskDefinitionId` da execução: esse
     // campo é null em execuções legadas (achado real, 16/09/2026, processo
@@ -510,7 +518,7 @@ export async function reabrirSubtarefa(args: {
     }).catch(() => null)
   })
 
-  return { ok: true, passoReaberto }
+  return { ok: true, passoReaberto, dependentesBloqueadas: dependentesConcluidas.map((d) => d.key) }
 }
 
 /**

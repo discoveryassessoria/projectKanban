@@ -69,6 +69,7 @@ export async function POST(
     subtaskKey: key,
     actorId: usuario.userId,
     justificativa,
+    comDependentes: body.comDependentes === true,
     correlationId: typeof body.correlationId === "string" ? body.correlationId.slice(0, 120) : undefined,
   })
   return NextResponse.json(r, { status: r.ok ? 200 : 422 })
