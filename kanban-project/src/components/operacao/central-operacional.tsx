@@ -166,6 +166,91 @@ export function CentralOperacional() {
   const [loteOcupado, setLoteOcupado] = useState(false)
   const [loteAviso, setLoteAviso] = useState<string | null>(null)
 
+  // ── PENDÊNCIA CONSOLIDADA "SEM RESPONSÁVEL" ─────────────────────────────
+  // Nenhuma tabela nova, nenhuma notificação persistida: é a MESMA leitura
+  // gerencial (`/api/operacao/visao-global?familia=…&semResponsavel=1`) que
+  // `executarLote` já usa, só que aberta direto no recorte "sem responsável"
+  // da família clicada, com seleção parcial — em vez de "todas as tarefas do
+  // filtro ativo da tela". `agregacaoPorFamilia` continua sendo a ÚNICA fonte
+  // do contador (`f.semResponsavel`); este painel só lê o detalhe por trás.
+  const [pendenciaAlvo, setPendenciaAlvo] = useState<FamiliaAgrupada | null>(null)
+  const [pendenciaCarregando, setPendenciaCarregando] = useState(false)
+  const [pendenciaLinhas, setPendenciaLinhas] = useState<LinhaGerencial[] | null>(null)
+  const [pendenciaSelecionadas, setPendenciaSelecionadas] = useState<Set<number>>(new Set())
+  const [pendenciaSeletorAberto, setPendenciaSeletorAberto] = useState(false)
+  const [pendenciaOcupado, setPendenciaOcupado] = useState(false)
+  const [pendenciaAviso, setPendenciaAviso] = useState<string | null>(null)
+
+  const carregarPendenciaSemResponsavel = useCallback((familia: FamiliaAgrupada) => {
+    setPendenciaCarregando(true)
+    setPendenciaLinhas(null)
+    const p = new URLSearchParams({ semResponsavel: "1", porPagina: "500" })
+    if (familia.familiaId != null) p.set("familia", String(familia.familiaId))
+    else p.set("processo", String(familia.processos[0]?.processoId ?? ""))
+    fetch(`/api/operacao/visao-global?${p.toString()}`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { linhas: LinhaGerencial[] }) => { setPendenciaLinhas(d.linhas); setPendenciaCarregando(false) })
+      .catch(() => { setPendenciaLinhas(null); setPendenciaCarregando(false) })
+  }, [])
+
+  const abrirPendenciaSemResponsavel = useCallback((familia: FamiliaAgrupada) => {
+    setPendenciaAlvo(familia)
+    setPendenciaSelecionadas(new Set())
+    setPendenciaAviso(null)
+    setPendenciaSeletorAberto(false)
+    carregarPendenciaSemResponsavel(familia)
+  }, [carregarPendenciaSemResponsavel])
+
+  const fecharPendencia = useCallback(() => {
+    setPendenciaAlvo(null)
+    setPendenciaLinhas(null)
+    setPendenciaSelecionadas(new Set())
+  }, [])
+
+  const alternarSelecaoTarefa = (taskId: number) => setPendenciaSelecionadas((prev) => {
+    const novo = new Set(prev)
+    if (novo.has(taskId)) novo.delete(taskId); else novo.add(taskId)
+    return novo
+  })
+
+  const alternarSelecaoTodas = () => setPendenciaSelecionadas((prev) => {
+    if (!pendenciaLinhas) return prev
+    if (prev.size === pendenciaLinhas.length) return new Set()
+    return new Set(pendenciaLinhas.map((l) => l.taskId))
+  })
+
+  // ATRIBUI SÓ AS SELECIONADAS — mesma porta (`redistribuirTarefas`, item a
+  // item, auditado) que `executarLote` já usa; a diferença é o CONJUNTO de
+  // IDs, nunca "tudo que bate no filtro". Depois de escrever, relê o estado
+  // real (nunca assume localmente quem sobrou) e recarrega a lista de fora
+  // para o contador da família convergir sozinho.
+  const atribuirSelecionadas = async (novoResponsavelId: number) => {
+    if (!pendenciaAlvo || pendenciaSelecionadas.size === 0) return
+    setPendenciaOcupado(true)
+    setPendenciaAviso(null)
+    try {
+      const resp = await fetch("/api/tarefas/redistribuir", {
+        method: "POST",
+        headers: auth(),
+        body: JSON.stringify({
+          tarefaIds: [...pendenciaSelecionadas],
+          novoResponsavelId,
+          motivo: "Atribuição a partir da pendência 'sem responsável' da Central Operacional",
+        }),
+      })
+      const res: { total: number; sucesso: number; falha: number } = await resp.json()
+      setPendenciaAviso(`${res.sucesso} de ${res.total} tarefa(s) atribuída(s).${res.falha > 0 ? ` ${res.falha} não puderam mudar.` : ""}`)
+      setPendenciaSeletorAberto(false)
+      setPendenciaSelecionadas(new Set())
+      carregarPendenciaSemResponsavel(pendenciaAlvo)
+      recarregar()
+    } catch {
+      setPendenciaAviso("Não foi possível concluir a atribuição.")
+    } finally {
+      setPendenciaOcupado(false)
+    }
+  }
+
   useEffect(() => {
     try { setIsAdmin(JSON.parse(localStorage.getItem("user") ?? "{}")?.tipo === "admin") } catch { /* ignora */ }
   }, [])
@@ -500,6 +585,20 @@ export function CentralOperacional() {
                     {f.executavelAgora > 0 && <span className="text-white/70">{f.executavelAgora} executáveis</span>}
                     {f.atrasadas > 0 && <span className="text-red-700/90">{f.atrasadas} atrasadas</span>}
                     {f.bloqueadas > 0 && <span className="text-red-700/90">{f.bloqueadas} bloqueadas</span>}
+                    {/* PENDÊNCIA ADMINISTRATIVA CONSOLIDADA — 1 chip por família,
+                        nunca 1 por tarefa. Clique abre direto as tarefas sem
+                        responsável DESTA família, já prontas para atribuição em
+                        lote (total ou parcial). Destaque de cor (não só texto)
+                        porque isto pede ação, não é mais uma estatística. */}
+                    {f.semResponsavel > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); abrirPendenciaSemResponsavel(f) }}
+                        title="Abrir e atribuir as tarefas sem responsável desta família"
+                        className="rounded-full bg-[var(--warning-tile)] px-2.5 py-1 font-semibold text-[var(--warning-text)] transition-colors hover:brightness-110"
+                      >
+                        {f.semResponsavel} sem responsável
+                      </button>
+                    )}
                     <span className="hidden text-[var(--text-secondary)] sm:inline">
                       {f.responsavelPrincipal?.nome ?? "Vários"}
                     </span>
@@ -619,6 +718,105 @@ export function CentralOperacional() {
             </button>
           </div>
         </div>
+      )}
+
+      {pendenciaAlvo && (
+        <>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={fecharPendencia}>
+            <div
+              className="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-white/[0.08] px-4 py-3">
+                <h2 className="text-[13px] font-medium text-white/90">{pendenciaAlvo.nomeFamilia} · Tarefas sem responsável</h2>
+                <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
+                  {pendenciaLinhas ? `${pendenciaLinhas.length} tarefa(s) aguardando atribuição` : "Carregando…"}
+                </p>
+              </div>
+
+              {pendenciaAviso && (
+                <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2 text-[11px] text-[var(--text-secondary)]">
+                  {pendenciaAviso}
+                </div>
+              )}
+
+              {/* Selecionar todas OU só algumas — a mesma porta de atribuição
+                  atende os dois casos; a diferença é só o conjunto de IDs. */}
+              <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-2">
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
+                  <input
+                    type="checkbox"
+                    checked={!!pendenciaLinhas && pendenciaLinhas.length > 0 && pendenciaSelecionadas.size === pendenciaLinhas.length}
+                    onChange={alternarSelecaoTodas}
+                    disabled={pendenciaCarregando || !pendenciaLinhas || pendenciaLinhas.length === 0}
+                    className="h-3.5 w-3.5 accent-blue-500"
+                  />
+                  Selecionar todas
+                </label>
+                <button
+                  disabled={pendenciaSelecionadas.size === 0 || pendenciaOcupado}
+                  onClick={() => setPendenciaSeletorAberto(true)}
+                  className="rounded border border-[var(--action-primary)] bg-[var(--action-primary)]/15 px-2.5 py-1 text-[11px] font-medium text-white/90 transition-colors hover:bg-[var(--action-primary)]/25 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Atribuir responsável ({pendenciaSelecionadas.size})
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {pendenciaCarregando && <Estado tipo="carregando" mensagem="Carregando tarefas sem responsável…" />}
+                {!pendenciaCarregando && pendenciaLinhas == null && (
+                  <Estado tipo="erro" mensagem="Não foi possível carregar as tarefas." aoTentar={() => carregarPendenciaSemResponsavel(pendenciaAlvo)} />
+                )}
+                {!pendenciaCarregando && pendenciaLinhas?.length === 0 && (
+                  <Estado tipo="vazio" mensagem="Nenhuma tarefa sem responsável nesta família — tudo atribuído." />
+                )}
+                {pendenciaLinhas?.map((l) => (
+                  <label
+                    key={l.taskId}
+                    className="flex w-full items-center gap-2 border-b border-white/[0.04] px-4 py-2 last:border-b-0 hover:bg-[var(--surface-primary)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pendenciaSelecionadas.has(l.taskId)}
+                      onChange={() => alternarSelecaoTarefa(l.taskId)}
+                      className="h-3.5 w-3.5 shrink-0 accent-blue-500"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[11px] text-white/85">{l.etapaAtual ?? l.titulo}</span>
+                      <span className="block truncate text-[9px] text-[var(--text-muted)]">
+                        {l.pessoaNome ?? "—"} · {l.processoNome ?? "—"}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      {l.atrasada && <Etiqueta tom="critico">Atrasada</Etiqueta>}
+                      <span className="text-[9px] text-[var(--text-muted)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-white/[0.08] px-4 py-2.5">
+                <span className="text-[10px] text-[var(--text-muted)]">
+                  {pendenciaSelecionadas.size} de {pendenciaLinhas?.length ?? 0} selecionada(s)
+                </span>
+                <button onClick={fecharPendencia} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white/80">
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {pendenciaSeletorAberto && (
+            <SeletorResponsavel
+              titulo={`Atribuir ${pendenciaSelecionadas.size} tarefa(s) sem responsável — ${pendenciaAlvo.nomeFamilia}`}
+              atual={null}
+              ocupado={pendenciaOcupado}
+              erro={pendenciaAviso}
+              aoEscolher={(id) => { void atribuirSelecionadas(id) }}
+              aoFechar={() => setPendenciaSeletorAberto(false)}
+            />
+          )}
+        </>
       )}
 
       {loteAlvo && (
