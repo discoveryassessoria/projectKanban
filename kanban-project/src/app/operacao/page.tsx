@@ -12,9 +12,9 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
@@ -22,8 +22,33 @@ import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { CentralTarefas } from "@/src/components/operacao/central-tarefas"
 import { MinhaOperacao } from "@/src/components/operacao/minha-operacao"
 
+const CARREGANDO = (
+  <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
+    <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--app-background)]" />
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-center">
+        <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[var(--border-default)] border-t-transparent" />
+        <p className="text-[var(--text-secondary)]">Carregando operação…</p>
+      </div>
+    </div>
+  </div>
+)
+
+// `useSearchParams()` exige um limite de Suspense — sem isto o build estático
+// falha ("should be wrapped in a suspense boundary") na hora de prerenderizar
+// a página. `OperacaoPageConteudo` é quem lê `?aba=`; a casca só monta o
+// limite, com o MESMO visual de carregamento de sempre como fallback.
 export default function OperacaoPage() {
+  return (
+    <Suspense fallback={CARREGANDO}>
+      <OperacaoPageConteudo />
+    </Suspense>
+  )
+}
+
+function OperacaoPageConteudo() {
   const router = useRouter()
+  const paramsIniciais = useSearchParams()
   const { pode, carregando } = usePermissoes()
   const mounted = useIsClient()
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
@@ -39,25 +64,17 @@ export default function OperacaoPage() {
   // `CentralTarefas` inteira vira, para quem distribui, uma segunda aba: a
   // distribuição ("Sem responsável") continua exatamente como estava, sem
   // nenhuma mudança de comportamento — só deixou de ser a única vista.
-  const [aba, setAba] = useState<"minha_operacao" | "distribuicao">("minha_operacao")
+  // DEEP-LINK — a tarefa administrativa "Atribuir tarefas" (dentro de Minha
+  // Operação) manda pra cá com `?aba=distribuicao`, lido só uma vez, no mount.
+  const [aba, setAba] = useState<"minha_operacao" | "distribuicao">(() =>
+    paramsIniciais.get("aba") === "distribuicao" ? "distribuicao" : "minha_operacao",
+  )
 
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/")
   }, [mounted, carregando, autorizado, router])
 
-  if (!mounted || carregando || !autorizado) {
-    return (
-      <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--app-background)]" />
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[var(--border-default)] border-t-transparent" />
-            <p className="text-[var(--text-secondary)]">Carregando operação…</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (!mounted || carregando || !autorizado) return CARREGANDO
 
   return (
     <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-[var(--text-primary)]">

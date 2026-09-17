@@ -21,7 +21,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 // O vocabulário visual e o seletor de responsável são COMPARTILHADOS com a
 // visão gerencial global — mesma implementação, não uma cópia parecida.
@@ -365,6 +365,15 @@ const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional)
 ]
 
 export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) {
+  // DEEP-LINK — a tarefa administrativa "Atribuir tarefas" (Minha Operação)
+  // manda pra cá com `?processo=<id>`, lido só uma vez, no mount. `visao` e
+  // `modo` já nascem em "sem_responsavel"/"agrupada" por padrão para quem
+  // distribui — o deep-link só precisa dizer QUAL família abrir.
+  const paramsIniciais = useSearchParams()
+  const [processoAlvoId] = useState<number | null>(() => {
+    const n = Number(paramsIniciais.get("processo"))
+    return Number.isInteger(n) && n > 0 ? n : null
+  })
   const [visao, setVisao] = useState<Visao>(podeDistribuir ? "sem_responsavel" : "minha_fila")
   const [resultado, setResultado] = useState<{ chave: string; lista: LinhaOperacional[] | null } | null>(null)
   const [filtro, setFiltro] = useState("todas")
@@ -412,6 +421,16 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const carregandoFamilias = resultadoFamilias?.chave !== chave
   const dadosFamilias = carregandoFamilias ? null : resultadoFamilias?.d ?? null
   const falhouFamilias = !carregandoFamilias && dadosFamilias == null
+
+  // A FAMÍLIA DO DEEP-LINK, já expandida — nunca "caia aqui e procure vocẽ
+  // mesmo". Calculado do MESMO `dadosFamilias` que a tabela já usa, nunca
+  // uma segunda consulta.
+  const familiaAlvoChave = useMemo(() => {
+    if (processoAlvoId == null || !dadosFamilias) return null
+    const f = dadosFamilias.familias.find((fam) => fam.processos.some((p) => p.processoId === processoAlvoId))
+    if (!f) return null
+    return f.familiaId != null ? `f:${f.familiaId}` : `p:${f.processos[0]?.processoId}`
+  }, [processoAlvoId, dadosFamilias])
 
   /** Do resumo por família direto para a lista de sempre, já filtrada — o mesmo `taskId` do sempre. */
   const abrirFaseDaFamilia = useCallback(
@@ -680,6 +699,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             aoMudarPagina={setPaginaFamilias}
             aoAbrirFase={abrirFaseDaFamilia}
             mostrarResponsavel={visao === "sem_responsavel"}
+            familiaAlvoChave={familiaAlvoChave}
           />
         )}
 
@@ -789,7 +809,7 @@ const POR_PAGINA_FAMILIAS = 6
  * até a fase; clicar numa fase leva à Lista de sempre, já filtrada.
  */
 function AgrupadaOperacao({
-  familias, pagina, aoMudarPagina, aoAbrirFase, mostrarResponsavel,
+  familias, pagina, aoMudarPagina, aoAbrirFase, mostrarResponsavel, familiaAlvoChave,
 }: {
   familias: FamiliaAgrupada[]
   pagina: number
@@ -797,8 +817,10 @@ function AgrupadaOperacao({
   aoAbrirFase: (nomeFamilia: string, faseLabel: string, processoId: number, faseMacroKey: string) => void
   /** "Sem responsável" mostraria só "Sem responsável" em toda linha — redundante, some daqui. */
   mostrarResponsavel: boolean
+  /** A família do deep-link — já nasce expandida, sem clique extra. */
+  familiaAlvoChave?: string | null
 }) {
-  const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
+  const [expandidas, setExpandidas] = useState<Set<string>>(() => (familiaAlvoChave ? new Set([familiaAlvoChave]) : new Set()))
   const alternar = (chave: string) => setExpandidas((prev) => {
     const novo = new Set(prev)
     if (novo.has(chave)) novo.delete(chave); else novo.add(chave)

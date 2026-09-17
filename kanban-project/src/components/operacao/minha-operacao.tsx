@@ -29,7 +29,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Search, Play, CalendarClock, AlertTriangle, Clock3, Hourglass,
-  SlidersHorizontal, X as XIcon, ArrowUpRight,
+  SlidersHorizontal, X as XIcon, ArrowUpRight, UserPlus,
   ChevronLeft, ChevronRight,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -42,8 +42,72 @@ import {
   CATEGORIAS_ATENCAO, categoriasDaLinha, ordenarPorAtencaoOperacional, rotuloDeAtencao,
   type CategoriaAtencao,
 } from "@/lib/operacional/atencao-operacional"
-import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
+import { urlOperacionalDaTarefa, urlDistribuicaoDoProcesso } from "@/lib/operacional/navegacao"
 import { MinhaOperacaoDetalhe } from "./minha-operacao-detalhe"
+
+// `obrigacao-atribuicao.ts` importa o Prisma client em tempo de execução —
+// não pode ser importado por um componente "use client". O literal aqui só
+// precisa continuar igual ao `ORIGEM_OBRIGACAO_ATRIBUICAO` daquele arquivo.
+const ORIGEM_OBRIGACAO_ATRIBUICAO = "obrigacao-atribuicao"
+
+/**
+ * O CARTÃO DA OBRIGAÇÃO ADMINISTRATIVA — "O QUE / ONDE / SITUAÇÃO / AÇÃO"
+ * em vez de uma linha de tabela genérica. A natureza da tarefa (distribuir,
+ * nunca executar uma certidão) muda a apresentação, nunca o fato de que é
+ * trabalho real do usuário logado — por isso vive DENTRO de Minha Operação,
+ * nunca numa tela separada.
+ *
+ * A CONTAGEM "N aguardando responsável" é lida agora (nunca guardada na
+ * linha, de propósito — ver obrigacao-atribuicao.ts) pela MESMA leitura que
+ * o chip "sem responsável" da Central usa.
+ */
+function CartaoObrigacaoAdministrativa({ l }: { l: LinhaOperacional }) {
+  const router = useRouter()
+  const [semResponsavel, setSemResponsavel] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (l.processoId == null) return
+    let vivo = true
+    const p = new URLSearchParams({ processo: String(l.processoId), semResponsavel: "1", porPagina: "1" })
+    p.append("tipoTarefa", "NORMAL")
+    fetch(`/api/operacao/visao-global?${p.toString()}`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { total: number }) => { if (vivo) setSemResponsavel(d.total) })
+      .catch(() => { if (vivo) setSemResponsavel(null) })
+    return () => { vivo = false }
+  }, [l.processoId])
+
+  const contexto = l.familiaNome ? `${l.familiaNome} · ${l.processoNome ?? "—"}` : l.processoNome ?? "—"
+  const abrirDistribuicao = () => { if (l.processoId != null) router.push(urlDistribuicaoDoProcesso(l.processoId)) }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={abrirDistribuicao}
+      onKeyDown={(e) => { if (e.key === "Enter") abrirDistribuicao() }}
+      className="flex cursor-pointer flex-wrap items-center gap-3 rounded-lg border border-[var(--info-tile)] bg-[var(--info-tile)]/25 px-4 py-3 transition-colors hover:bg-[var(--info-tile)]/40"
+    >
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--info-tile)] text-[var(--info-text)]">
+        <UserPlus className="h-4.5 w-4.5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-semibold text-[var(--text-primary)]">Atribuir tarefas</p>
+        <p className="truncate text-[11.5px] text-[var(--text-secondary)]">{contexto}</p>
+      </div>
+      <p className="shrink-0 text-[12.5px] text-[var(--text-secondary)]">
+        {semResponsavel == null ? "…" : `${semResponsavel} tarefa${semResponsavel === 1 ? "" : "s"} aguardando responsável`}
+      </p>
+      <span className="shrink-0 text-[11.5px] text-[var(--text-secondary)]">Responsável: {l.responsavelNome ?? "—"}</span>
+      <button
+        onClick={(e) => { e.stopPropagation(); abrirDistribuicao() }}
+        className="flex shrink-0 items-center gap-1 rounded-md border border-[var(--action-primary)] bg-[var(--action-primary)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90"
+      >
+        Distribuir tarefas <ArrowUpRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
+}
 
 const ICONE_CATEGORIA: Record<CategoriaAtencao, React.ComponentType<{ className?: string }>> = {
   paraAgirAgora: Play,
@@ -158,6 +222,16 @@ export function MinhaOperacao() {
   const linhas = carregando ? null : resultado?.lista ?? null
   const falhou = !carregando && linhas == null
 
+  // A NATUREZA da tarefa muda a APRESENTAÇÃO, nunca o fato de que é trabalho
+  // real do usuário: a obrigação administrativa vira CARTÃO próprio (O QUE/
+  // ONDE/SITUAÇÃO/AÇÃO), nunca uma linha genérica da tabela operacional —
+  // por isso sai do pipeline de categoria/tabela/paginação abaixo, mas
+  // continua vindo da MESMA `linhas` (mesma `/api/operacao/tarefas`).
+  const linhasAdministrativas = useMemo(() => linhas?.filter((l) => l.origem === ORIGEM_OBRIGACAO_ATRIBUICAO) ?? [], [linhas])
+  // `null` preservado (nunca `[]`) — o pipeline de categoria/tabela abaixo
+  // distingue "ainda carregando" de "carregou e está vazio" por isto.
+  const linhasNormais = useMemo(() => (linhas ? linhas.filter((l) => l.origem !== ORIGEM_OBRIGACAO_ATRIBUICAO) : null), [linhas])
+
   // ── OPÇÕES DOS FILTROS — de um universo ESTÁVEL (fetch próprio, sem
   // filtro), nunca do resultado já filtrado — senão escolher uma fase faria
   // as outras fases desaparecerem do próprio seletor de fase.
@@ -187,15 +261,15 @@ export function MinhaOperacao() {
   // pode pertencer a várias categorias.
   const porCategoria = useMemo(() => {
     const mapa = new Map<CategoriaAtencao, LinhaOperacional[]>(CATEGORIAS_ATENCAO.map((c) => [c.chave, []]))
-    for (const l of linhas ?? []) for (const c of categoriasDaLinha(l)) mapa.get(c)?.push(l)
+    for (const l of linhasNormais ?? []) for (const c of categoriasDaLinha(l)) mapa.get(c)?.push(l)
     return mapa
-  }, [linhas])
+  }, [linhasNormais])
 
   const filtradas = useMemo(() => {
-    if (!linhas) return null
-    if (categoria === "todas") return linhas
-    return linhas.filter((l) => categoriasDaLinha(l).includes(categoria))
-  }, [linhas, categoria])
+    if (!linhasNormais) return null
+    if (categoria === "todas") return linhasNormais
+    return linhasNormais.filter((l) => categoriasDaLinha(l).includes(categoria))
+  }, [linhasNormais, categoria])
 
   const ordenadas = useMemo(() => (filtradas ? ordenarPorAtencaoOperacional(filtradas) : null), [filtradas])
 
@@ -234,6 +308,17 @@ export function MinhaOperacao() {
       <div className="min-h-0 flex-1 overflow-hidden px-6 py-4">
         <div className="flex h-full min-h-0 gap-4">
           <div className={`flex min-h-0 min-w-0 flex-1 flex-col gap-3 ${selecionado != null ? "hidden lg:flex" : ""}`}>
+            {/* ── OBRIGAÇÕES ADMINISTRATIVAS — cartão próprio, sempre visível
+                independente da categoria/filtro ativo na tabela abaixo (a
+                tabela é só para tarefas NORMAL/TRANSVERSAL). "Se existe uma
+                tarefa canônica ativa atribuída a mim que exige uma ação
+                minha, eu preciso encontrá-la em Minha Operação." ── */}
+            {linhasAdministrativas.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {linhasAdministrativas.map((l) => <CartaoObrigacaoAdministrativa key={l.taskId} l={l} />)}
+              </div>
+            )}
+
             {/* ── ESTADOS OPERACIONAIS — navegação única (redesign 16/09/2026).
                 Antes eram DOIS controles pro MESMO estado: uma grade de 8
                 tiles (KPI) e, embaixo, uma fileira de chips com o mesmo
@@ -250,7 +335,7 @@ export function MinhaOperacao() {
                     : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                 }`}
               >
-                Todas <span className="tabular-nums text-[var(--text-muted)]">{linhas?.length ?? 0}</span>
+                Todas <span className="tabular-nums text-[var(--text-muted)]">{linhasNormais?.length ?? 0}</span>
               </button>
               <span className="h-4 w-px shrink-0 bg-[var(--border-subtle)]" />
               {CATEGORIAS_ATENCAO.map((c) => {
@@ -324,7 +409,16 @@ export function MinhaOperacao() {
               {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar sua operação." aoTentar={() => setRecarga((n) => n + 1)} />}
               {carregando && <Estado tipo="carregando" mensagem="Carregando sua operação…" />}
               {!carregando && !falhou && visiveis?.length === 0 && (
-                <Estado tipo="vazio" mensagem={temFiltro ? "Nenhuma operação corresponde aos filtros selecionados." : "Nenhuma operação exige sua atenção agora."} />
+                <Estado
+                  tipo="vazio"
+                  mensagem={
+                    temFiltro
+                      ? "Nenhuma operação corresponde aos filtros selecionados."
+                      : linhasAdministrativas.length > 0
+                        ? "Nenhuma tarefa operacional pendente — veja a obrigação administrativa acima."
+                        : "Nenhuma operação exige sua atenção agora."
+                  }
+                />
               )}
               {visiveis != null && visiveis.length > 0 && (
                 <div className="min-h-0 flex-1 overflow-auto">

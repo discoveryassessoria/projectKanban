@@ -124,15 +124,15 @@ async function main() {
     vazamento.length === 0,
     `vazadas: ${vazamento.length}`,
   )
-  // Escopado ao LINK desta obrigação (contém `processoId=<proc.id>`) — nunca
+  // Escopado ao LINK desta obrigação (contém `processo=<proc.id>`) — nunca
   // uma contagem global: o banco de teste é compartilhado entre suítes, e o
   // mesmo Admin pode ter notificações de OUTRO processo/outra suíte ainda
   // não lidas. "Exatamente 1" precisa ser "exatamente 1 PARA ESTE processo".
   const distribuicaoNotifDesteProcesso = sinoAdminAntes.acontecimentos.filter(
-    (a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processoId=${proc.id}`),
+    (a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processo=${proc.id}`),
   )
   ok("4) exatamente 1 notificação da obrigação de distribuir DESTE processo no sino do Admin", distribuicaoNotifDesteProcesso.length === 1, String(distribuicaoNotifDesteProcesso.length))
-  ok("4) a notificação leva direto para o contexto de execução da distribuição", (distribuicaoNotifDesteProcesso[0]?.link ?? "").includes("/operacao/central"))
+  ok("4) a notificação leva direto para o contexto de execução da distribuição", (distribuicaoNotifDesteProcesso[0]?.link ?? "").includes("/operacao?") && (distribuicaoNotifDesteProcesso[0]?.link ?? "").includes("aba=distribuicao"))
 
   // ══════════════════════════════════════════════════════════════════════
   secao("5) Admin atribui as 15 para Daniela")
@@ -145,7 +145,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   const sinoAdminDepois = await bucketsDoSino(admin.id, admin.email, admin.tipo)
   const aindaPendenteDesteProcesso = sinoAdminDepois.acontecimentos.filter(
-    (a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processoId=${proc.id}`),
+    (a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processo=${proc.id}`),
   )
   ok("6) a notificação de distribuição DESTE processo não fica mais pendente no sino do Admin", aindaPendenteDesteProcesso.length === 0, String(aindaPendenteDesteProcesso.length))
   const obrigacaoDepois = await prisma.tarefa.findUnique({ where: { id: obrigacao!.id }, select: { concluida: true } })
