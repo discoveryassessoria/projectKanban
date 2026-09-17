@@ -629,7 +629,7 @@ function SubtarefaRow({
             <>
               <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-pink-500" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-primary)]" />
                   <span className="text-[var(--text-secondary)]">executa</span>
                   {tarefaResponsavelNome}
                 </span>

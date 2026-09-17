@@ -113,7 +113,7 @@
      `bg-primary` (este token), não `--action-primary` — sem esta troca, todo
      botão sem cor explícita (a maioria) continuava azul mesmo com o resto do
      sistema já verde. Ver `--action-primary` acima, mesma cor. */
-  --primary: #29cc5c;
+  --primary: #0d2c58;
   --primary-foreground: #ffffff;
   --secondary: #d8ecf8;
   --secondary-foreground: #174d76;
@@ -124,7 +124,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: #bfd8e8;
   --input: #a7c9de;
-  --ring: #29cc5c;
+  --ring: #4f91c5;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -135,10 +135,10 @@
      texto claro: sem ele o menu inteiro vira bege e perde a hierarquia. */
   --sidebar: #e4f1fb;
   --sidebar-foreground: #10273a;
-  --sidebar-primary: #2875b7;
+  --sidebar-primary: #0d2c58;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #cde6f6;
-  --sidebar-accent-foreground: #174d76;
+  --sidebar-accent-foreground: #134972;
   --sidebar-border: #bfd8e8;
   --sidebar-ring: #4f91c5;
 }
@@ -214,66 +214,68 @@
 
      Suave de propósito: a tela de origem precisa continuar sendo percebida. Uma
      cortina quase opaca faz o sistema parecer que apagou. */
-  /* ── A HIERARQUIA DE AÇÃO ─────────────────────────────────────────────────
-     Dez cores diferentes disputavam o papel de "botão primário" no produto —
-     azul, âmbar, verde, dourado, turquesa, roxo. Sem regra, cada tela escolhia,
-     e o operador perdia o sinal: se tudo é destaque, nada é.
-
-     Agora há uma: PRIMÁRIO é graphite. As semânticas continuam intactas e
-     continuam significando o que sempre significaram — verde é sucesso, âmbar é
-     atenção, vermelho é bloqueio, azul é andamento. O champagne é identidade, e
-     por isso aparece em seleção e detalhe, não como fundo de qualquer ação. */
   /* ============================================================
-     IDENTIDADE BITRIX — sobrepõe a Identidade AZUL por instrução
-     direta do usuário (14-15/09/2026): "o layout do meu sistema
-     idêntico ao Bitrix, literalmente idêntico". Ver plano em
-     ~/.claude/plans/dapper-plotting-barto.md.
+     IDENTIDADE REBRANDING OFICIAL — GRUPO DISCOVERY (17/09/2026)
+     ------------------------------------------------------------
+     Fonte: manual de rebranding oficial (PDF, Formula Group,
+     março/2026) — hex extraídos diretamente do documento, página
+     "Nova Paleta", não estimados. Esta camada SUBSTITUI a
+     "IDENTIDADE BITRIX" (14-15/09) que fazia verde a cor de ação
+     primária do produto inteiro e pintava cada coluna do Kanban de
+     uma cor diferente — precisamente o "carro alegórico" que o
+     manual oficial e o usuário (17/09) pediram para eliminar.
 
-     Sem os arquivos-fonte do Bitrix (SVG/fonte/hex exatos) — os
-     valores abaixo são amostrados visualmente de uma gravação de
-     tela real do Bitrix24 do usuário (conta "Discovery 24"), de
-     melhor esforço, não cópia exata de ativo. Cada bloco cita a
-     tela de origem.
+     Regra do manual: branco/neutro + AZUL INSTITUCIONAL dominante +
+     DOURADO em pequenas doses (detalhe, nunca preenchimento grande).
+     Verde/âmbar/vermelho continuam existindo, mas só como ESTADO
+     (sucesso/atenção/erro) — nunca como identidade de botão ou de
+     coluna. Ver [[contrato-da-paleta]]: 5 significados, nada além.
+
+     Navy   #0D2C58  Pantone 2757 C — ação primária, marca, sidebar
+     Azul   #134972  Pantone 7693 C — hover, degrau intermediário
+     Azul   #19668B  Pantone 7699 C — degrau claro
+     Ouro   #F8C874  Pantone 1345 C — acento claro (fundo pequeno)
+     Ouro   #B98C48  Pantone 7563 C — acento escuro (texto/ícone/borda)
      ============================================================ */
-  /* Botão "Criar"/"Comprar agora" do Bitrix é VERDE — a cor de ação
-     primária inteira do produto, não azul. */
-  --action-primary: #29cc5c;
-  --action-primary-hover: #1f9e48;
+  --action-primary: #0d2c58;
+  --action-primary-hover: #134972;
   --action-primary-ink: #ffffff;
   --action-secondary: #d8ecf8;
-  --action-secondary-ink: #174d76;
+  --action-secondary-ink: #134972;
 
-  /* Sidebar de DOIS ESTADOS (gravação: trilho de ícones colapsado,
-     claro; painel expandido, azul-marinho, com texto claro). */
+  /* Sidebar de DOIS ESTADOS — âncora institucional da marca: navy
+     oficial, não um azul-marinho aproximado. */
   --sidebar-rail-background: #f4f8fc;
   --sidebar-rail-text: #45516b;
-  --sidebar-rail-icon-active-bg: #29cc5c;
-  --sidebar-expanded-background: #1a2540;
+  --sidebar-rail-icon-active-bg: #0d2c58;
+  --sidebar-expanded-background: #0d2c58;
   --sidebar-expanded-text: rgba(255, 255, 255, 0.86);
   --sidebar-expanded-item-hover: rgba(255, 255, 255, 0.06);
-  --sidebar-expanded-item-active-bg: rgba(255, 255, 255, 0.1);
+  /* Item ativo leva um toque de dourado — a "joia no terno", não uma
+     superfície inteira dourada. */
+  --sidebar-expanded-item-active-bg: rgba(248, 200, 116, 0.16);
   --sidebar-expanded-item-active-text: #ffffff;
 
-  /* Paleta FIXA de coluna do Kanban (gravação: "Negócios") — nunca
-     vermelho aqui: vermelho fica reservado ao alerta de atraso no
-     card (ver identidade-azul-discovery: coluna vermelha competia
-     com o vermelho de atraso). */
-  --stage-color-1: #2a7de1; /* ex.: "Em Desenvolvimento" */
-  --stage-color-2: #17b6c9; /* ex.: "Criar documentos" */
-  --stage-color-3: #14b8a6; /* ex.: "Fatura" */
-  --stage-color-4: #29cc5c; /* ex.: "Em andamento" */
-  --stage-color-5: #f5a524; /* ex.: "Fatura final" */
+  /* Coluna do Kanban: UMA rampa monocromática (degrau = posição no
+     fluxo, nunca categoria) — nunca mais 5 cores competindo. Nunca
+     vermelho aqui: vermelho é o alerta de atraso no card. */
+  --stage-color-1: #0d2c58;
+  --stage-color-2: #134972;
+  --stage-color-3: #19668b;
+  --stage-color-4: #4f91c5;
+  --stage-color-5: #7faecc;
 
-  /* Stepper horizontal de etapas (gravação: detalhe do negócio) —
-     futura cinza, passada âmbar, atual azul, etapa final de sucesso
-     verde. */
+  /* Stepper horizontal — a etapa ATUAL domina (navy sólido); a
+     concluída é reconhecível sem competir (tinta verde, o único
+     verde que sobra, e é ESTADO, não decoração); a já percorrida é
+     um traço azul claro, não um bloco pintado. */
   --stepper-future-bg: #e7edf3;
   --stepper-future-text: #7a8aa0;
-  --stepper-passed-bg: #f5a524;
-  --stepper-passed-text: #ffffff;
-  --stepper-current-bg: #2a7de1;
+  --stepper-passed-bg: #cde6f6;
+  --stepper-passed-text: #134972;
+  --stepper-current-bg: #0d2c58;
   --stepper-current-text: #ffffff;
-  --stepper-success-bg: #29cc5c;
+  --stepper-success-bg: #319639;
   --stepper-success-text: #ffffff;
 
   /* Cortina azulada leve: a tela de origem continua reconhecível (§17). */
@@ -298,20 +300,28 @@
   --text-disabled: #8fa6b5;
   --text-inverse: #ffffff;
 
-  /* ── ACENTO DA MARCA — IDENTIDADE BITRIX ─────────────────────────────────
+  /* ── ACENTO DA MARCA — IDENTIDADE REBRANDING OFICIAL ─────────────────────
      `--accent-primary`/`--brand` alimentam PrimaryButton, item ativo da
-     sidebar e barra de progresso em quase toda tela do sistema — por isso
-     viram verde Bitrix aqui, e não só em `--action-primary`. Ver bloco
-     "IDENTIDADE BITRIX" acima. */
-  --brand-light: #a8ecc0;
-  --brand: #29cc5c;
-  --brand-hover: #1f9e48;
-  --brand-active: #1f9e48;
-  --brand-dark: #146530;
-  --accent-primary: #29cc5c;
-  --accent-hover: #1f9e48;
-  --accent-soft: #d3f5df;      /* realce de seleção / superfície verde suave */
+     sidebar e barra de progresso em quase toda tela do sistema — voltam a
+     ser o navy oficial, não verde. */
+  --brand-light: #cde6f6;
+  --brand: #0d2c58;
+  --brand-hover: #134972;
+  --brand-active: #134972;
+  --brand-dark: #081c38;
+  --accent-primary: #0d2c58;
+  --accent-hover: #134972;
+  --accent-soft: #cde6f6;      /* realce de seleção / superfície azul suave */
   --accent-ink: #ffffff;
+
+  /* ── DOURADO — MICROASSINATURA DA MARCA ──────────────────────────────────
+     Do manual oficial. Uso disciplinado: detalhe selecionado, microdivider,
+     ícone especial, 2px de acento — NUNCA fundo de botão nem superfície
+     grande. "A pessoa deve perceber que existe algo sofisticado antes de
+     perceber conscientemente que é dourado." */
+  --brand-accent: #b98c48;         /* tinta — texto/ícone/borda de detalhe */
+  --brand-accent-subtle: #f8c874;  /* fundo pequeno — chip, indicador, traço */
+
   /* Vermelho SÓLIDO: só ação destrutiva confirmada. Tinta branca real. */
   --danger-solid: #b91c1c;
   --danger-solid-ink: #ffffff;
@@ -334,9 +344,9 @@
   --warning-text: #8f4a0c;
   --info-text: #174d76;
   --pessoa-text: #5c4490;
-  /* Acompanha `--accent-primary`/`--accent-soft` (verde Bitrix) — texto sobre
+  /* Acompanha `--accent-primary`/`--accent-soft` (navy oficial) — texto sobre
      ladrilho de seleção precisa do mesmo matiz escurecido até AA. */
-  --accent-text: #146530;
+  --accent-text: #0d2c58;
   --danger-text: #b30001;
   --pessoa: #6d51a8;
   --pessoa-tile: #d1bfea;

@@ -231,7 +231,7 @@ function TrilhaDeEtapas({ steps, atualId }: { steps: WorkflowStep[]; atualId: nu
         const ehAtual = s.id === atualId
         const concluida = s.status === "concluida"
         const Icone = concluida ? CheckCircle2 : ehAtual ? CircleDot : Circle
-        const cor = concluida ? "text-emerald-400" : ehAtual ? "text-[var(--accent-text)]" : "text-white/30"
+        const cor = concluida ? "text-[var(--success-text)]" : ehAtual ? "text-[var(--accent-text)]" : "text-white/30"
         return (
           <div key={s.id} className="flex items-center gap-1">
             <span className={`flex items-center gap-1 text-[11px] ${ehAtual ? "font-semibold text-white/90" : cor}`}>

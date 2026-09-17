@@ -18,7 +18,6 @@ export function ComprovanteModal({ url, nome, onClose }: Props) {
       title="Comprovante de Pagamento"
       subtitle={nome}
       icon="📎"
-      color="green"
       size="xl"
       onClose={onClose}
       footer={

@@ -309,14 +309,14 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-blue-500 to-blue-600">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-default)] bg-[var(--action-primary)]">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[var(--surface-secondary)] rounded-lg">
+            <div className="p-2 bg-white/10 rounded-lg">
               <FileDown className="h-5 w-5 text-white" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white">Exportar Faturas</h2>
-              <p className="text-sm text-[var(--text-secondary)]">Selecione o destinatário</p>
+              <p className="text-sm text-white/70">Selecione o destinatário</p>
             </div>
           </div>
           <button 

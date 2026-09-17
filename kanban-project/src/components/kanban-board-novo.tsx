@@ -45,7 +45,7 @@ import { useSelecaoEmMassa, BarraDeSelecao } from "@/src/components/ui/selecao-e
 // era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
 
 /**
- * Cor da COLUNA por posição no fluxo (IDENTIDADE BITRIX, 14-15/09/2026).
+ * Cor da COLUNA por posição no fluxo (IDENTIDADE REBRANDING OFICIAL, 17/09/2026).
  *
  * A fase não guarda cor no cadastro — e inventar um campo de cor no motor
  * para resolver um problema de tela seria dado de negócio nascido de
@@ -53,12 +53,13 @@ import { useSelecaoEmMassa, BarraDeSelecao } from "@/src/components/ui/selecao-e
  * mesma fase recebe sempre a mesma cor, e a leitura da esquerda para a
  * direita fica estável.
  *
- * Cada coluna tem sua PRÓPRIA cor (`--stage-color-*`, globals.css) — a
- * Identidade AZUL anterior usava uma rampa monocromática de propósito
- * (degrau = posição no fluxo, não categoria); o Bitrix faz o oposto. Nunca
- * vermelho aqui: fica reservado ao alerta de atraso no card — coluna
- * vermelha competindo com vermelho de atraso é o bug que a Identidade AZUL
- * corrigiu uma vez e este re-skin não reabre.
+ * Cada coluna lê `--stage-color-*` (globals.css) — hoje uma rampa
+ * MONOCROMÁTICA em navy oficial (degrau = posição no fluxo, nunca
+ * categoria). O interstício "IDENTIDADE BITRIX" (14-15/09) tinha pintado
+ * cada coluna de uma cor arbitrária diferente — exatamente o "carro
+ * alegórico" que o manual de rebranding oficial pediu para eliminar; a
+ * troca ficou só no token, este arquivo não mudou. Nunca vermelho aqui:
+ * fica reservado ao alerta de atraso no card.
  */
 const COR_DA_COLUNA = [
   "var(--stage-color-1)",

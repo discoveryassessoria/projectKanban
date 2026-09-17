@@ -561,7 +561,7 @@ export default function TabelaValoresTab() {
                   <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeVenda) ? 'cursor-not-allowed text-[var(--text-muted)]' : 'text-white/80'}`}>
                     <input type="checkbox" checked={form.precoVenda}
                       disabled={!itemVinculado || !!editando || !podeVenda}
-                      onChange={(e) => set('precoVenda', e.target.checked)} className="h-4 w-4 accent-emerald-500" />
+                      onChange={(e) => set('precoVenda', e.target.checked)} className="h-4 w-4 accent-[var(--success)]" />
                     Preço de Venda
                   </label>
                 </div>

@@ -65,21 +65,21 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
         onClick={handleClose}
       />
 
-      <Card className="relative z-10 w-full max-w-md mx-4 shadow-[var(--elev-3)] animate-in fade-in-0 zoom-in-95 duration-300 bg-zinc-900 border-zinc-800">
-        <CardHeader className="pb-4 border-b border-zinc-800">
+      <Card className="relative z-10 w-full max-w-md mx-4 shadow-[var(--elev-3)] animate-in fade-in-0 zoom-in-95 duration-300 bg-[var(--surface-overlay)] border-[var(--border-default)]">
+        <CardHeader className="pb-4 border-b border-[var(--border-default)]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-indigo-500 to-slate-600 rounded-lg">
+              <div className="p-2 bg-[var(--action-primary)] rounded-lg">
                 <FolderPlus className="h-5 w-5 text-white" />
               </div>
-              <CardTitle className="text-xl text-zinc-100">Novo Projeto</CardTitle>
+              <CardTitle className="text-xl text-[var(--text-primary)]">Novo Projeto</CardTitle>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleClose}
               disabled={loading}
-              className="h-8 w-8 p-0 hover:bg-zinc-800 text-[var(--text-muted)]"
+              className="h-8 w-8 p-0 hover:bg-[var(--surface-hover)] text-[var(--text-muted)]"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -101,9 +101,9 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
                 onChange={(e) => setNome(e.target.value)}
                 disabled={loading}
                 maxLength={50}
-                className="w-full bg-zinc-950 border-zinc-800 text-zinc-100 placeholder:text-zinc-600"
+                className="w-full bg-[var(--surface-input)] border-[var(--border-default)] text-[var(--text-primary)] placeholder:text-[var(--text-disabled)]"
               />
-              <p className="text-xs text-zinc-500">Máximo 50 caracteres</p>
+              <p className="text-xs text-[var(--text-muted)]">Máximo 50 caracteres</p>
             </div>
 
             <div className="space-y-2">
@@ -118,14 +118,14 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
                 disabled={loading}
                 maxLength={200}
                 rows={3}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-sm text-zinc-100 placeholder:text-zinc-600 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:border-transparent"
+                className="w-full px-3 py-2 bg-[var(--surface-input)] border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--border-focus)] focus:border-transparent"
               />
-              <p className="text-xs text-zinc-500">Máximo 200 caracteres ({descricao.length}/200)</p>
+              <p className="text-xs text-[var(--text-muted)]">Máximo 200 caracteres ({descricao.length}/200)</p>
             </div>
 
             {erro && (
-              <div className="p-3 bg-red-950 border border-red-900 rounded-md">
-                <p className="text-sm text-red-700">{erro}</p>
+              <div className="p-3 bg-[var(--danger-tile)] border border-[var(--danger)]/30 rounded-md">
+                <p className="text-sm text-[var(--danger-text)]">{erro}</p>
               </div>
             )}
 
@@ -135,14 +135,14 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
                 variant="outline"
                 onClick={handleClose}
                 disabled={loading}
-                className="flex-1 border-zinc-800 hover:bg-zinc-800 text-[var(--text-muted)] bg-transparent"
+                className="flex-1 border-[var(--border-default)] hover:bg-[var(--surface-hover)] text-[var(--text-muted)] bg-transparent"
               >
                 Cancelar
               </Button>
               <Button
                 type="submit"
                 disabled={loading || !nome.trim()}
-                className="flex-1 bg-[var(--text-muted)] hover:bg-[var(--surface-secondary)]"
+                className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">

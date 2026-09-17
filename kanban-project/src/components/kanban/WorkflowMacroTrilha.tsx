@@ -205,10 +205,10 @@ export function WorkflowMacroTrilha({
           const badgeFinalCls = badgeCls
 
           const barColor =
-            st === "concluida" ? (ehFaseFinal ? "#29cc5c" : "#f5a524")
-            : st === "atual" ? "#2a7de1"
-            : st === "pulada" ? "#a7c9de"
-            : "#d1d5db"
+            st === "concluida" ? (ehFaseFinal ? "var(--stepper-success-bg)" : "var(--stepper-passed-bg)")
+            : st === "atual" ? "var(--stepper-current-bg)"
+            : st === "pulada" ? "var(--border-strong)"
+            : "var(--stepper-future-text)"
           const pctColor =
             st === "concluida" ? (ehFaseFinal ? "text-[var(--stepper-success-bg)]" : "text-[var(--stepper-passed-bg)]")
             : st === "atual" ? "text-[var(--stepper-current-bg)]"
