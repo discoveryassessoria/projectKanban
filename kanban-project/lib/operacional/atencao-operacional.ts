@@ -27,9 +27,9 @@ export type CategoriaAtencao =
   | 'terceirosAtrasados' | 'aguardandoTerceiros'
 
 export const CATEGORIAS_ATENCAO: Array<{ chave: CategoriaAtencao; rotulo: string; tooltip: string }> = [
-  { chave: 'paraAgirAgora', rotulo: 'Para agir agora', tooltip: 'A operação está executável e é sua vez de agir.' },
+  { chave: 'paraAgirAgora', rotulo: 'Para fazer', tooltip: 'Existe uma ação interna executável por você agora.' },
   { chave: 'acompanharHoje', rotulo: 'Acompanhar hoje', tooltip: 'O próximo acompanhamento programado já venceu.' },
-  { chave: 'atrasoInterno', rotulo: 'Atraso interno', tooltip: 'O prazo interno (seu) já passou — não é atraso de terceiro.' },
+  { chave: 'atrasoInterno', rotulo: 'Atrasadas', tooltip: 'O prazo interno (seu) já passou — não é atraso de terceiro.' },
   { chave: 'terceirosAtrasados', rotulo: 'Terceiros atrasados', tooltip: 'A previsão do terceiro (cartório/tradutor/etc.) já venceu; não é atraso seu.' },
   { chave: 'aguardandoTerceiros', rotulo: 'Aguardando terceiros', tooltip: 'A operação está aberta, esperando uma resposta externa.' },
 ]
@@ -52,7 +52,31 @@ export interface LinhaComAtencao {
 
 const JANELA_NOVA_ATRIBUICAO_MS = 48 * 3600_000
 
-/** As categorias que esta linha pertence — NÃO exclusivas (uma linha pode estar em risco E com terceiro atrasado). */
+/**
+ * A CLASSIFICAÇÃO OPERACIONAL PRINCIPAL — UMA fila por tarefa, nunca duas
+ * (mandato "Minha Operação como fila real", 17/09/2026). `categoriasDaLinha`
+ * (abaixo) continua servindo os badges da linha (não-exclusivos, "em risco E
+ * terceiro atrasado" cabem os dois) — mas para abrir a tela num número
+ * confiável ("Para fazer: 12") e paginar por fila sem contador contraditório,
+ * cada tarefa precisa de UMA resposta só, pela mesma precedência que já
+ * ordena a atenção (`degrauDeAtencao`, abaixo): atraso interno → terceiro
+ * atrasado → acompanhamento devido → ação interna executável agora →
+ * aguardando terceiro → demais estados legítimos (concluída, bloqueada por
+ * outro motivo etc. — fora das 5 filas nomeadas, mas nunca invisível: entram
+ * em "Todas").
+ */
+export type CategoriaPrincipal = CategoriaAtencao | 'outras'
+
+export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrincipal {
+  if (l.atrasoInterno) return 'atrasoInterno'
+  if (l.atrasoTerceiro) return 'terceirosAtrasados'
+  if (l.acompanhamentoVencido) return 'acompanharHoje'
+  if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) return 'paraAgirAgora'
+  if (l.coluna === 'AGUARDANDO_TERCEIRO') return 'aguardandoTerceiros'
+  return 'outras'
+}
+
+/** As categorias que esta linha pertence — NÃO exclusivas (uma linha pode estar em risco E com terceiro atrasado). Uso: badges da linha, nunca contador de fila. */
 export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
   const cats: CategoriaAtencao[] = []
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) cats.push('paraAgirAgora')

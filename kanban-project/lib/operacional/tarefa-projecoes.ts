@@ -21,6 +21,7 @@ import {
   estadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
 import { estadosTemporaisDasOperacoes, ehEsperaExterna } from '@/lib/operacional/proximo-acontecimento'
+import { lerVersaoPublicada } from '@/src/services/versao-publicada'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoTarefa } from '@prisma/client'
 
 /**
@@ -290,7 +291,7 @@ const SELECT = {
   pessoaId: true,
   createdAt: true, dataAtribuicao: true,
   necessidade: { select: { itemCatalogo: { select: { name: true } } } },
-  workflowStepInstance: { select: { stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true } },
+  workflowStepInstance: { select: { id: true, stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true } },
   // Par que identifica a CADEIA de passos da obrigação — várias Tarefas
   // (documentos distintos) podem compartilhar a mesma `workflowInstanceId`
   // (fato real de produção, achado na reconciliação da Emissão Documental),
@@ -311,6 +312,7 @@ function projetar(
   nomes?: Map<number, string>,
   rotulosDePasso?: Map<number, string>,
   totaisDePassos?: Map<string, number>,
+  progressoSubtarefa?: Map<number, { concluidas: number; total: number }>,
 ): LinhaDeFila {
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
@@ -381,15 +383,21 @@ function projetar(
     servico: t.necessidade?.itemCatalogo?.name ?? null,
     criadaEm: t.createdAt?.toISOString() ?? null,
     atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
-    passoAtual:
-      t.workflowStepInstance?.ordem != null && t.workflowInstanceId != null
-        ? {
-            // `ordem - 1` = quantos passos anteriores (1..ordem-1) já ficaram
-            // para trás — ver o comentário do campo na interface.
-            ordem: Math.max(0, t.workflowStepInstance.ordem - 1),
-            total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem,
-          }
-        : null,
+    // SUBTAREFA VENCE STEP quando o passo corrente tem mais de 1 subtarefa
+    // congelada (Emissão Documental: 1 Step, 4 subtarefas) — "0/1"/"1/1" por
+    // Step é verdade, mas não diz nada; "1/4" (concluídas/subtarefas ativas)
+    // é a granularidade que quem executa realmente lê.
+    passoAtual: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      if (porSubtarefa) return { ordem: porSubtarefa.concluidas, total: porSubtarefa.total }
+      if (t.workflowStepInstance?.ordem == null || t.workflowInstanceId == null) return null
+      return {
+        // `ordem - 1` = quantos passos anteriores (1..ordem-1) já ficaram
+        // para trás — ver o comentário do campo na interface.
+        ordem: Math.max(0, t.workflowStepInstance.ordem - 1),
+        total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem,
+      }
+    })(),
     // Defaults — SEMPRE sobrescritos por `comAtencaoTemporal` logo depois.
     // `projetar` é síncrona e não tem como chamar o motor temporal (que lê
     // passo/solicitação em lote); ficar sem chamar `comAtencaoTemporal` depois
@@ -476,6 +484,71 @@ async function totalDePassos(
     totais.set(chave, (totais.get(chave) ?? 0) + 1)
   }
   return totais
+}
+
+/**
+ * O PROGRESSO POR SUBTAREFA — quando o passo corrente tem SUBTAREFAS
+ * congeladas (Emissão Documental: 1 Step só, "Solicitar certidão", com 4
+ * subtarefas — enviar requerimento/aguardar retorno/receber certidão/
+ * conferir e validar), "X/N" por STEP sempre mostra 0/1 ou 1/1: verdade, mas
+ * inútil pra quem executa. Aqui o "N" é a quantidade de subtarefas ATIVAS da
+ * definição CONGELADA daquele passo (nunca a de hoje — mesma leitura de
+ * `subtarefasDaEtapa`/`definicaoHistoricaDoPasso`), e o "X" é quantas já têm
+ * `SubtaskExecution` CONCLUIDO. Em LOTE (por instância de workflow distinta,
+ * nunca uma consulta por linha) — achado real 17/09/2026, três certidões da
+ * Grisotto compartilhando a mesma `PhaseWorkflowInstance`.
+ *
+ * Só substitui o X/N por Step quando há MAIS de 1 subtarefa: um passo comum
+ * (sem subtarefas) continua contando por Step, como sempre.
+ */
+async function progressoPorSubtarefa(
+  linhas: Array<{ workflowStepInstance: { id: number; stepKey: string } | null; workflowInstanceId: number | null }>,
+  db: Leitor = prisma,
+): Promise<Map<number, { concluidas: number; total: number }>> {
+  const instanciaIds = [...new Set(linhas.map((l) => l.workflowInstanceId).filter((x): x is number => x != null))]
+  if (instanciaIds.length === 0) return new Map()
+
+  const instancias = await db.phaseWorkflowInstance.findMany({
+    where: { id: { in: instanciaIds } },
+    select: { id: true, workflowDefinitionId: true, workflowVersion: true },
+  })
+  const instanciaPorId = new Map(instancias.map((i) => [i.id, i]))
+
+  const paresUnicos = new Map<string, { workflowDefinitionId: number; workflowVersion: number }>()
+  for (const i of instancias) {
+    if (i.workflowDefinitionId == null || i.workflowVersion == null) continue
+    paresUnicos.set(`${i.workflowDefinitionId}:${i.workflowVersion}`, { workflowDefinitionId: i.workflowDefinitionId, workflowVersion: i.workflowVersion })
+  }
+  const versoes = await Promise.all(
+    [...paresUnicos.entries()].map(async ([chave, p]) => [chave, await lerVersaoPublicada(p.workflowDefinitionId, p.workflowVersion, db)] as const),
+  )
+  const versaoPorChave = new Map(versoes)
+
+  const totalPorStepInstance = new Map<number, number>()
+  for (const l of linhas) {
+    const si = l.workflowStepInstance
+    if (!si || l.workflowInstanceId == null) continue
+    const inst = instanciaPorId.get(l.workflowInstanceId)
+    if (!inst?.workflowDefinitionId || inst.workflowVersion == null) continue
+    const versao = versaoPorChave.get(`${inst.workflowDefinitionId}:${inst.workflowVersion}`)
+    const passo = versao?.passos.find((p) => p.key === si.stepKey)
+    const totalSubtarefas = passo?.subtarefas?.filter((s) => s.ativo !== false).length ?? 0
+    if (totalSubtarefas > 1) totalPorStepInstance.set(si.id, totalSubtarefas)
+  }
+  if (totalPorStepInstance.size === 0) return new Map()
+
+  const concluidasRaw = await db.subtaskExecution.groupBy({
+    by: ['stepInstanceId'],
+    where: { stepInstanceId: { in: [...totalPorStepInstance.keys()] }, status: 'CONCLUIDO' },
+    _count: { _all: true },
+  })
+  const concluidasPorStepInstance = new Map(concluidasRaw.map((c) => [c.stepInstanceId, c._count._all]))
+
+  const resultado = new Map<number, { concluidas: number; total: number }>()
+  for (const [stepInstanceId, total] of totalPorStepInstance) {
+    resultado.set(stepInstanceId, { concluidas: concluidasPorStepInstance.get(stepInstanceId) ?? 0, total })
+  }
+  return resultado
 }
 
 /** Os nomes das pessoas das linhas — UMA consulta, nunca uma por tarefa. */
@@ -1606,7 +1679,9 @@ type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL 
  * fila — nunca só na visão gerencial.
  */
 async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leitor = prisma): Promise<LinhaGerencial[]> {
-  const [nomes, rotulos, totais] = await Promise.all([nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db)])
+  const [nomes, rotulos, totais, subtarefas] = await Promise.all([
+    nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db), progressoPorSubtarefa(brutas, db),
+  ])
   const paradas = await contextoDeParada(
     brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
     db,
@@ -1614,7 +1689,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
   const hoje = diaOperacional(agora)
 
   const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes, rotulos, totais)
+    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas)
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)

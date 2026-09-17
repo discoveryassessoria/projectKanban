@@ -39,7 +39,7 @@ import {
 } from "./kit-operacional"
 import type { LinhaOperacional } from "./central-tarefas"
 import {
-  CATEGORIAS_ATENCAO, categoriasDaLinha, ordenarPorAtencaoOperacional, rotuloDeAtencao,
+  CATEGORIAS_ATENCAO, classificarAtencaoOperacional, ordenarPorAtencaoOperacional, rotuloDeAtencao,
   type CategoriaAtencao,
 } from "@/lib/operacional/atencao-operacional"
 import { urlOperacionalDaTarefa, urlDistribuicaoDoProcesso } from "@/lib/operacional/navegacao"
@@ -247,7 +247,11 @@ export function MinhaOperacao() {
   const [expandidos, setExpandidos] = useState<Set<string>>(() => (processoAlvoId != null ? new Set([String(processoAlvoId)]) : new Set()))
   const [resultado, setResultado] = useState<{ chave: string; lista: LinhaOperacional[] | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
-  const [categoria, setCategoria] = useState<CategoriaAtencao | "todas">("todas")
+  // ABRE EM "PARA FAZER", NUNCA EM "TODAS" (mandato 17/09/2026, item 1): quem
+  // tem 300 tarefas abertas não deve precisar procurar dentro das 300 pra
+  // achar as 12 que exigem ação agora. "Todas" continua existindo — só não é
+  // mais a porta de entrada.
+  const [categoria, setCategoria] = useState<CategoriaAtencao | "todas">("paraAgirAgora")
   const [filtros, setFiltros] = useState<Filtros>(SEM_FILTRO)
   const [maisFiltros, setMaisFiltros] = useState(false)
   const [pagina, setPagina] = useState(1)
@@ -330,20 +334,25 @@ export function MinhaOperacao() {
     return [...vistos].sort((a, b) => a.localeCompare(b))
   }, [universo])
 
-  // ── AS 8 CONTAGENS DE ATENÇÃO — MESMO UNIVERSO da tabela (mandato §43: KPI e
-  // filtro nunca podem divergir): sobre o resultado JÁ FILTRADO pelo servidor
-  // (fase/terceiro/prazo/busca), nunca sobre o universo total. Cada linha
-  // pode pertencer a várias categorias.
+  // ── AS CONTAGENS DE FILA — MESMO UNIVERSO da tabela (mandato "fila real de
+  // trabalho", 17/09/2026): sobre o resultado JÁ FILTRADO pelo servidor
+  // (fase/terceiro/prazo/busca), nunca sobre o universo total. EXCLUSIVA —
+  // `classificarAtencaoOperacional` devolve UMA fila por tarefa (nunca
+  // "Para fazer" E "Aguardando terceiros" ao mesmo tempo), porque o
+  // contador de cada fila PRECISA fechar com o que a própria fila lista.
   const porCategoria = useMemo(() => {
     const mapa = new Map<CategoriaAtencao, LinhaOperacional[]>(CATEGORIAS_ATENCAO.map((c) => [c.chave, []]))
-    for (const l of linhasNormais ?? []) for (const c of categoriasDaLinha(l)) mapa.get(c)?.push(l)
+    for (const l of linhasNormais ?? []) {
+      const c = classificarAtencaoOperacional(l)
+      if (c !== "outras") mapa.get(c)?.push(l)
+    }
     return mapa
   }, [linhasNormais])
 
   const filtradas = useMemo(() => {
     if (!linhasNormais) return null
     if (categoria === "todas") return linhasNormais
-    return linhasNormais.filter((l) => categoriasDaLinha(l).includes(categoria))
+    return linhasNormais.filter((l) => classificarAtencaoOperacional(l) === categoria)
   }, [linhasNormais, categoria])
 
   const ordenadas = useMemo(() => (filtradas ? ordenarPorAtencaoOperacional(filtradas) : null), [filtradas])
@@ -393,8 +402,14 @@ export function MinhaOperacao() {
   const paginaValida = Math.min(Math.max(pagina, 1), totalPaginas)
   const gruposVisiveis = grupos?.slice((paginaValida - 1) * POR_PAGINA_GRUPOS, paginaValida * POR_PAGINA_GRUPOS) ?? null
 
-  const temFiltro = filtros.busca.trim() !== "" || filtros.fase != null || filtros.terceiro != null || filtros.prazo !== "todos" || categoria !== "todas"
-  const limparFiltros = () => { setFiltros(SEM_FILTRO); setBuscaDigitada(""); setCategoria("todas"); setPagina(1) }
+  // O rótulo da fila ATIVA no cabeçalho do grupo — "N tarefas · Aguardando
+  // terceiros", nunca hardcoded "a fazer" pra QUALQUER fila (era o defeito
+  // real da Grisotto: 3 tarefas aguardando cartório anunciadas como "3
+  // tarefas a fazer" só porque o rótulo do cabeçalho nunca olhava a fila).
+  const rotuloFilaAtiva = categoria === "todas" ? null : CATEGORIAS_ATENCAO.find((c) => c.chave === categoria)?.rotulo ?? null
+
+  const temFiltro = filtros.busca.trim() !== "" || filtros.fase != null || filtros.terceiro != null || filtros.prazo !== "todos" || categoria !== "paraAgirAgora"
+  const limparFiltros = () => { setFiltros(SEM_FILTRO); setBuscaDigitada(""); setCategoria("paraAgirAgora"); setPagina(1) }
 
   const abrirNoProcesso = (l: LinhaOperacional) => router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
 
@@ -554,7 +569,7 @@ export function MinhaOperacao() {
                             </div>
                           </div>
                           <div className="flex shrink-0 items-center gap-3 text-[11.5px] text-[var(--text-secondary)]">
-                            <span className="tabular-nums">{g.linhas.length} tarefa{g.linhas.length === 1 ? "" : "s"} a fazer</span>
+                            <span className="tabular-nums">{g.linhas.length} tarefa{g.linhas.length === 1 ? "" : "s"}{rotuloFilaAtiva ? ` · ${rotuloFilaAtiva}` : ""}</span>
                             {g.proximoPrazo && <span className="tabular-nums">Próximo prazo: {dataCurta(g.proximoPrazo)}</span>}
                             <span className={`tabular-nums ${g.atrasadas > 0 ? "font-medium text-[var(--danger-text)]" : ""}`}>
                               {g.atrasadas} atrasada{g.atrasadas === 1 ? "" : "s"}
