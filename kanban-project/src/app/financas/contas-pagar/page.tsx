@@ -158,7 +158,7 @@ export default function ContasPagarPage() {
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-red-600 hover:bg-red-700">
+            <Button className="bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]">
               <Plus className="h-4 w-4 mr-2" />
               Nova Despesa
             </Button>
@@ -224,7 +224,7 @@ export default function ContasPagarPage() {
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-red-600 hover:bg-red-700">
+                <Button type="submit" className="bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]">
                   Salvar
                 </Button>
               </DialogFooter>

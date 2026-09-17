@@ -102,11 +102,15 @@ const DECISOES: Array<[string, string]> = [
 ]
 const SEV_LABEL: Record<string, string> = { baixa: "Leve", media: "Média", critica: "Alta" }
 const SEV_STYLE: Record<string, string> = {
-  baixa: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
-  media: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
+  baixa: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
+  media: "bg-amber-600/12 text-amber-800",
   critica: "bg-[var(--surface-secondary)] text-red-700",
 }
-const SEV_DOT: Record<string, string> = { baixa: "bg-amber-600", media: "bg-[var(--accent-primary)]", critica: "bg-[var(--surface-secondary)]" }
+// RAMPA DE SEVERIDADE — a mais grave precisa ser a mais visível, não o
+// contrário. Achado real (17/09/2026): "critica" tinha um ponto cinza neutro
+// (nenhum sinal) enquanto "baixa" era âmbar — quem escaneasse pela cor via a
+// leve como a que precisava de atenção.
+const SEV_DOT: Record<string, string> = { baixa: "bg-[var(--surface-secondary)]", media: "bg-amber-600", critica: "bg-red-600" }
 const DATA_STATUS_LABEL: Record<string, string> = {
   not_filled: "Não preenchido", ai_extracted: "Extraído automaticamente (não revisado)",
   manual_filled: "Rascunho salvo", reviewed: "Revisado",

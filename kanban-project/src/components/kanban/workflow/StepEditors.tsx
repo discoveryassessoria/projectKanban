@@ -2908,7 +2908,7 @@ function FormConferirCertidao({
                 ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 disabled:bg-[var(--accent-primary)]/15"
                 : resultado === "nova_via"
                 ? "bg-red-600 hover:bg-red-600 disabled:bg-red-900"
-                : "bg-[var(--surface-secondary)]0 disabled:bg-[var(--surface-secondary)]"
+                : "bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)]"
             }`}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck className="w-3.5 h-3.5" />}

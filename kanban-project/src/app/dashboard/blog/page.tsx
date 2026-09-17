@@ -326,7 +326,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'todos' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('todos')}
-                    className={filtroStatus === 'todos' ? 'bg-amber-600 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
+                    className={filtroStatus === 'todos' ? 'bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)]' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Todos
                   </Button>
@@ -334,7 +334,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'PUBLICADO' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('PUBLICADO')}
-                    className={filtroStatus === 'PUBLICADO' ? 'bg-green-600 text-white' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
+                    className={filtroStatus === 'PUBLICADO' ? 'bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)]' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Publicados
                   </Button>
@@ -342,7 +342,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'RASCUNHO' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('RASCUNHO')}
-                    className={filtroStatus === 'RASCUNHO' ? 'bg-amber-600 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
+                    className={filtroStatus === 'RASCUNHO' ? 'bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)]' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Rascunhos
                   </Button>
