@@ -46,7 +46,7 @@ import { prisma } from "@/lib/prisma"
 import { STATUS_ATIVOS, STATUS_TERMINAIS } from "./tarefa-canonica"
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from "@/src/lib/permissoes"
 import { notificarAcontecimento } from "./notificacao-canonica"
-import { urlOperacionalDaTarefa } from "./navegacao"
+import { urlDistribuicaoDoProcesso } from "./navegacao"
 import { criarTarefaAdministrativa, concluirTarefaAdministrativa } from "./tarefa-ciclo"
 
 type DB = Prisma.TransactionClient | typeof prisma
@@ -176,7 +176,11 @@ async function abrirObrigacaoDeAtribuicao(db: DB, processoId: number, quantidade
     tarefaId,
     titulo: `${nomeProcesso} — tarefas aguardando atribuição`,
     mensagem: `${quantidadeAgora} tarefa${quantidadeAgora === 1 ? "" : "s"} precisa${quantidadeAgora === 1 ? "" : "m"} de responsável.`,
-    link: urlOperacionalDaTarefa({ taskId: tarefaId, processoId }),
+    // `urlOperacionalDaTarefa` levaria ao Kanban do processo (pessoa/documento/
+    // passo) — esta obrigação não tem nenhum dos três. O lugar onde ela se
+    // executa é a Central Operacional gerencial, com o painel de distribuição
+    // desta família já aberto.
+    link: urlDistribuicaoDoProcesso(processoId),
     chaveIdempotencia: `notif::${chave}`,
   })
 

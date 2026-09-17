@@ -188,7 +188,11 @@ export interface LinhaDeFila {
   titulo: string
   processoId: number | null
   processoNome: string | null
+  /** Família do processo — agrupamento visual, nunca dono da tarefa. */
+  familiaNome: string | null
   pessoaNome: string | null
+  /** Marca a NATUREZA da tarefa (ex.: "obrigacao-atribuicao") — `null` para uma tarefa comum. */
+  origem: string | null
   faseMacroKey: string | null
   etapaAtual: string | null
   statusTarefa: StatusTarefa
@@ -275,8 +279,12 @@ const SELECT = {
   // O ESTADO TEMPORAL precisa destes: conclusão congela o atraso, e a pausa de
   // SLA é o que separa "parado esperando o cartório" de "parado devendo".
   dataConclusao: true, slaPausadoEm: true, slaPausaAcumuladaMin: true,
-  processo: { select: { nome: true } },
+  processo: { select: { nome: true, familia: { select: { nome: true } } } },
   responsavel: { select: { nome: true } },
+  // Discrimina a NATUREZA da tarefa ADMINISTRATIVA (ex.: "obrigacao-atribuicao")
+  // — quem projeta essa tarefa genericamente (Tarefas Administrativas) precisa
+  // saber qual catálogo de apresentação usar, sem reimplementar o motor.
+  origem: true,
   // `pessoaId` é ref SOLTA a Pessoa (sem relation no modelo) — o nome é
   // resolvido em lote por quem projeta, nunca com uma consulta por linha.
   pessoaId: true,
@@ -323,6 +331,8 @@ function projetar(
     titulo: t.titulo,
     processoId: t.processoId,
     processoNome: t.processo?.nome ?? null,
+    familiaNome: t.processo?.familia?.nome ?? null,
+    origem: t.origem ?? null,
     pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
     faseMacroKey: t.faseMacroKey,
     // O NOME DO PASSO, na ordem da fonte mais próxima do que foi publicado:

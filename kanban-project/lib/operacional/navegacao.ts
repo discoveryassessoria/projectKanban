@@ -62,6 +62,22 @@ export function urlOperacionalDoProcesso(processoId: number): string {
 }
 
 /**
+ * A URL DE EXECUÇÃO DE UMA OBRIGAÇÃO ADMINISTRATIVA DE DISTRIBUIÇÃO.
+ *
+ * `urlOperacionalDaTarefa` leva ao Kanban DO PROCESSO — certo para uma
+ * certidão (pessoa/documento/passo), sem sentido para "distribuir 15 tarefas
+ * sem responsável" (essa obrigação não tem pessoa nem documento). O lugar
+ * onde essa obrigação se executa é a Central Operacional GERENCIAL
+ * (`/operacao/central`), já no recorte "sem responsável" e com o painel de
+ * atribuição desta família aberto direto — nunca uma tela genérica que o
+ * usuário precise procurar por dentro.
+ */
+export function urlDistribuicaoDoProcesso(processoId: number): string {
+  const p = new URLSearchParams({ escopo: 'sem_responsavel', abrirDistribuicao: '1', processoId: String(processoId) })
+  return `/operacao/central?${p.toString()}`
+}
+
+/**
  * O QUE A CENTRAL PRECISA PARA SE POSICIONAR.
  *
  * Resolvido no servidor a partir do `taskId`, com permissão conferida lá — a

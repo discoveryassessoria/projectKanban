@@ -18,7 +18,7 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { gravarLocal, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -207,6 +207,16 @@ export function CentralOperacional() {
     setPendenciaSelecionadas(new Set())
   }, [])
 
+  // DEEP-LINK DA OBRIGAÇÃO ADMINISTRATIVA — `urlDistribuicaoDoProcesso`
+  // (lib/operacional/navegacao.ts) manda pra cá com `abrirDistribuicao=1` +
+  // `processoId`. Lido só uma vez, no mount, como `filtros` acima.
+  const [abrirDistribuicaoProcessoId] = useState<number | null>(() => {
+    if (paramsIniciais.get("abrirDistribuicao") !== "1") return null
+    const n = Number(paramsIniciais.get("processoId"))
+    return Number.isInteger(n) && n > 0 ? n : null
+  })
+  const deepLinkTentado = useRef(false)
+
   const alternarSelecaoTarefa = (taskId: number) => setPendenciaSelecionadas((prev) => {
     const novo = new Set(prev)
     if (novo.has(taskId)) novo.delete(taskId); else novo.add(taskId)
@@ -280,6 +290,17 @@ export function CentralOperacional() {
   const dados = carregando ? null : resultado?.d ?? null
   const falhou = !carregando && dados == null
   const recarregar = useCallback(() => setRecarga((n) => n + 1), [])
+
+  // Assim que a família daquele processo aparece na primeira leitura, abre o
+  // MESMO painel que o clique manual no chip "sem responsável" abriria — sem
+  // isso, o link da tarefa/notificação administrativa aterrissava aqui e não
+  // executava nada.
+  useEffect(() => {
+    if (deepLinkTentado.current || abrirDistribuicaoProcessoId == null || !dados) return
+    deepLinkTentado.current = true
+    const familia = dados.familias.find((f) => f.processos.some((p) => p.processoId === abrirDistribuicaoProcessoId))
+    if (familia) abrirPendenciaSemResponsavel(familia)
+  }, [abrirDistribuicaoProcessoId, dados, abrirPendenciaSemResponsavel])
 
   const vistas = useJsonLocalStorage<VistaSalva[]>(CHAVE_VISTAS) ?? []
 

@@ -23,14 +23,19 @@ export async function GET(request: NextRequest) {
     const umDiaAtras = new Date()
     umDiaAtras.setDate(umDiaAtras.getDate() - 1)
 
-    // 🔒 HIERARQUIA: "sem responsável" é fila de DISTRIBUIÇÃO — só admin gere
-    // o que ainda não é de ninguém. Sem isto, todo mundo era notificado de
-    // toda tarefa sem dono do sistema inteiro, e o sino virava um segundo
-    // "Tarefas e Projetos" para quem não devia nem ver essa tela.
+    // 🔒 OWNERSHIP: notificação PESSOAL de prazo (vencida/hoje/próximos 3
+    // dias) respeita SEMPRE o responsável ATUAL da tarefa — inclusive para
+    // o Admin. Achado real 17/09/2026: o `OR` com `responsavelId: null` que
+    // existia aqui fazia TODA tarefa sem dono do sistema (ex.: 15 certidões
+    // da Grisotto ainda não distribuídas) aparecer como prazo pessoal do
+    // Admin no sino — "PRÓXIMOS 3 DIAS (15)" para um trabalho que ainda não
+    // era dele. "Sem responsável" é fila de DISTRIBUIÇÃO: visibilidade
+    // administrativa/gerencial, resolvida em Tarefas e Projetos, na Central
+    // Operacional e pela obrigação administrativa ATRIBUIR_TAREFAS (que já
+    // chega ao Admin pelo canal certo — `acontecimentos`, tipo
+    // `DISTRIBUICAO_NECESSARIA`, com responsável definido). Nunca aqui.
     const ehAdmin = usuario.tipo === 'admin'
-    const filtroResponsavel = ehAdmin
-      ? { OR: [{ responsavelId: usuario.userId }, { responsavelId: null }] }
-      : { responsavelId: usuario.userId }
+    const filtroResponsavel = { responsavelId: usuario.userId }
 
     const tarefas = await prisma.tarefa.findMany({
       where: {
@@ -88,15 +93,10 @@ export async function GET(request: NextRequest) {
         else if (prazo <= em3Dias) proximos3Dias.push(item)
       }
 
-      // "NOVA TAREFA" avisa QUEM É DONO dela. `filtroResponsavel` inclui
-      // `responsavelId: null` de propósito (comentário acima) para o admin
-      // enxergar a fila de distribuição em Tarefas e Projetos — mas isso é
-      // VISIBILIDADE, não ATRIBUIÇÃO (contrato item 14). Sem este filtro, uma
-      // tarefa recém-materializada sem responsável virava "nova tarefa para
-      // mim" no sino do admin, mesmo sem ninguém ter sido atribuído — a
-      // notificação de atribuição de verdade é a de `atribuirTarefa`
-      // (lib/operacional/tarefa-comandos.ts), disparada só quando alguém
-      // realmente vira dono.
+      // "NOVA TAREFA" avisa QUEM É DONO dela. Depois do fix de ownership
+      // acima, `filtroResponsavel` já garante `responsavelId === usuario.
+      // userId` para toda linha de `tarefas` — este `!= null` é só reforço
+      // defensivo (nunca deveria ser falso aqui), não a barreira real.
       if (t.createdAt >= umDiaAtras && t.responsavelId != null) novas.push(item)
     }
 

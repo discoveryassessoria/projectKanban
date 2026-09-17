@@ -61,6 +61,20 @@ const menuItems = [
     soAdmin: true,
   },
   {
+    // TAREFAS ADMINISTRATIVAS — visão gerencial das obrigações administrativas
+    // canônicas (tipo: ADMINISTRATIVA — ex.: distribuir tarefas sem
+    // responsável). Mesma matéria de "Tarefas e Projetos", recortada por
+    // NATUREZA em vez de alcance: aqui só a tarefa de GERIR a operação, nunca
+    // a tarefa de executá-la. Mesma exigência de admin, pelo mesmo motivo.
+    title: "Tarefas Administrativas",
+    url: "/operacao/administrativas",
+    icon: ShieldIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "tarefas.editar",
+    soAdmin: true,
+  },
+  {
     title: "Eventos",
     url: "/events",
     icon: CalendarIcon,
