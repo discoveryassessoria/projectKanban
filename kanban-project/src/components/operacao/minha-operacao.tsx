@@ -39,8 +39,8 @@ import {
 } from "./kit-operacional"
 import type { LinhaOperacional } from "./central-tarefas"
 import {
-  CATEGORIAS_ATENCAO, classificarAtencaoOperacional, ordenarPorAtencaoOperacional, rotuloDeAtencao,
-  type CategoriaAtencao,
+  CATEGORIAS_ATENCAO, classificarAtencaoOperacional, motivosAtivos, ordenarPorAtencaoOperacional, rotuloDeAtencao,
+  ROTULO_MOTIVO, type CategoriaAtencao,
 } from "@/lib/operacional/atencao-operacional"
 import { urlOperacionalDaTarefa, urlDistribuicaoDoProcesso } from "@/lib/operacional/navegacao"
 import { MinhaOperacaoDetalhe } from "./minha-operacao-detalhe"
@@ -176,10 +176,29 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoAbrir }: {
         <div className="text-[11.5px] text-[var(--text-secondary)]">{textoDaSituacao(l)}</div>
         <div className="truncate text-[10.5px] text-[var(--text-muted)]">{textoDaProximaAcao(l)}</div>
         {l.terceiroNome && <div className="mt-0.5 truncate text-[10px] text-[var(--info-text)]">Terceiro: {l.terceiroNome}</div>}
+        {/* MOTIVOS CONCORRENTES — vários relógios podem tocar ao mesmo tempo
+            pra MESMA tarefa (mandato "motor de atenção operacional",
+            17/09/2026): nunca vira segunda linha, só um rodapé informativo. */}
+        {motivosAtivos(l).length > 1 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {motivosAtivos(l).map((m) => (
+              <span key={m} className="rounded-full bg-[var(--warning-tile)] px-1.5 py-0.5 text-[9.5px] font-medium text-[var(--warning-text)]">
+                {ROTULO_MOTIVO[m]}
+              </span>
+            ))}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2.5">
         <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
         {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
+        {/* PRAZO DO PASSO — o relógio irmão do prazo final, só quando existe
+            (subtarefa corrente com ação interna, nunca inventado). */}
+        {l.prazoPasso && !l.prazoPasso.semPrazo && (
+          <div className={`mt-0.5 text-[10px] ${l.prazoPasso.atrasado ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>
+            Passo: {l.prazoPasso.rotulo.toLowerCase()}
+          </div>
+        )}
       </td>
       <td className="px-3 py-2.5 text-[11.5px] tabular-nums text-[var(--text-secondary)]">
         {l.esperandoHaDias != null ? `${l.esperandoHaDias} dia${l.esperandoHaDias === 1 ? "" : "s"}` : "—"}

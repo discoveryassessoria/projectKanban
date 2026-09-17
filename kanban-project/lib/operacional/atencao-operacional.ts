@@ -48,6 +48,16 @@ export interface LinhaComAtencao {
   atrasoTerceiro: boolean
   retornoRecebido: boolean
   emRisco: boolean
+  /**
+   * O RELÓGIO DA SUBTAREFA CORRENTE — irmão do prazo macro (`atrasada`
+   * acima), nunca o mesmo (mandato "motor de atenção operacional",
+   * 17/09/2026). `undefined`/`null` = sem subtarefa corrente com prazo
+   * ancorado (passo sem subtarefas, ou a corrente nasceu em espera externa
+   * — sem ação interna, sem relógio interno). Subconjunto estrutural de
+   * `EstadoTemporal` (`tempo-operacional.ts`) — só os dois campos que a
+   * classificação usa.
+   */
+  prazoPasso?: { atrasado: boolean; venceHoje: boolean } | null
 }
 
 const JANELA_NOVA_ATRIBUICAO_MS = 48 * 3600_000
@@ -67,8 +77,66 @@ const JANELA_NOVA_ATRIBUICAO_MS = 48 * 3600_000
  */
 export type CategoriaPrincipal = CategoriaAtencao | 'outras'
 
+/**
+ * MOTIVOS — os FATOS concorrentes, sempre preservados mesmo quando só UM
+ * deles vira a categoria principal (mandato "motor de atenção operacional",
+ * 17/09/2026, itens 14/38): "prazo macro venceu" e "prazo do passo venceu"
+ * podem ser SIMULTANEAMENTE verdadeiros para a MESMA tarefa — isso nunca é
+ * dois trabalhos, é uma tarefa com dois relógios tocando. A categoria
+ * principal (abaixo) resolve UMA prioridade pra UI decidir onde a linha
+ * mora; `motivos` é o que a linha pode mostrar por baixo, sem inventar uma
+ * segunda tarefa nem uma segunda notificação.
+ */
+export type MotivoAtencao = 'PRAZO_TAREFA_VENCIDO' | 'PRAZO_PASSO_VENCIDO' | 'ACOMPANHAMENTO_DEVIDO' | 'TERCEIRO_ATRASADO'
+
+/** O rótulo de cada motivo — em linguagem de gente, um lugar só (nunca reescrito por tela). */
+export const ROTULO_MOTIVO: Record<MotivoAtencao, string> = {
+  PRAZO_TAREFA_VENCIDO: 'Prazo final também vencido',
+  PRAZO_PASSO_VENCIDO: 'Prazo do passo vencido',
+  ACOMPANHAMENTO_DEVIDO: 'Acompanhamento devido',
+  TERCEIRO_ATRASADO: 'Terceiro atrasado',
+}
+
+export function motivosAtivos(l: LinhaComAtencao): MotivoAtencao[] {
+  const motivos: MotivoAtencao[] = []
+  // FATO CRU (nunca o `atrasoInterno` refinado): o prazo macro pode ter
+  // passado mesmo durante uma espera de terceiro legítima — isso é
+  // informação, não motivo pra reclassificar a tarefa como "minha culpa".
+  if (l.atrasada) motivos.push('PRAZO_TAREFA_VENCIDO')
+  if (l.prazoPasso?.atrasado) motivos.push('PRAZO_PASSO_VENCIDO')
+  if (l.acompanhamentoVencido) motivos.push('ACOMPANHAMENTO_DEVIDO')
+  if (l.atrasoTerceiro) motivos.push('TERCEIRO_ATRASADO')
+  return motivos
+}
+
+export interface AtencaoOperacional {
+  categoriaPrincipal: CategoriaPrincipal
+  motivos: MotivoAtencao[]
+}
+
+/**
+ * A CLASSIFICAÇÃO CENTRAL — RELÓGIOS → CLASSIFICAÇÃO → UMA ATENÇÃO
+ * OPERACIONAL. `calcularAtencaoOperacional` é o nome pedido pelo mandato;
+ * `classificarAtencaoOperacional` (abaixo) continua existindo porque a
+ * maior parte do código só precisa da categoria — a fonte da verdade é a
+ * MESMA precedência nos dois.
+ */
+export function calcularAtencaoOperacional(l: LinhaComAtencao): AtencaoOperacional {
+  return { categoriaPrincipal: classificarAtencaoOperacional(l), motivos: motivosAtivos(l) }
+}
+
+/**
+ * PRECEDÊNCIA (mandato item 13): atraso interno (macro OU do passo corrente
+ * — os dois são "eu deveria ter agido e não agi") → terceiro atrasado →
+ * acompanhamento devido → ação interna executável agora → aguardando
+ * terceiro → demais estados legítimos. `prazoPasso.atrasado` entra como
+ * MAIS UM jeito de virar atraso interno, nunca um degrau à parte — uma
+ * subtarefa corrente com SLA próprio vencido é exatamente "existia uma ação
+ * que dependia do responsável e o prazo foi ultrapassado" (item 10), só que
+ * medido pelo relógio mais fino em vez do macro.
+ */
 export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrincipal {
-  if (l.atrasoInterno) return 'atrasoInterno'
+  if (l.atrasoInterno || l.prazoPasso?.atrasado) return 'atrasoInterno'
   if (l.atrasoTerceiro) return 'terceirosAtrasados'
   if (l.acompanhamentoVencido) return 'acompanharHoje'
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) return 'paraAgirAgora'

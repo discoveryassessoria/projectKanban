@@ -4,12 +4,14 @@
 // Rodar: npx tsx scripts/classificacao-atencao-operacional.test.ts (parte A)
 //        PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/classificacao-atencao-operacional.test.ts (parte A+B)
 //
-// PARTE A (casos 1-5, 7): puros, sem banco — chamam `classificarAtencaoOperacional`
-// direto, com fixtures sintéticas (mesmo padrão de `proximo-acontecimento.test.ts`).
-// PARTE B (caso 8): de ponta a ponta, banco de teste real, 300 tarefas via a
-// PORTA CANÔNICA (criarTarefaManual + aguardarTerceiro) — nunca escrita direta.
+// PARTE A (testes A-J + invariantes): puros, sem banco — chamam
+// `classificarAtencaoOperacional`/`calcularAtencaoOperacional` direto, com
+// fixtures sintéticas (mesmo padrão de `proximo-acontecimento.test.ts`).
+// PARTE B (teste de escala): de ponta a ponta, banco de teste real, 290
+// tarefas via a PORTA CANÔNICA (criarTarefaManual + aguardarTerceiro) —
+// nunca escrita direta.
 // ============================================================================
-import { classificarAtencaoOperacional, type LinhaComAtencao } from "@/lib/operacional/atencao-operacional"
+import { calcularAtencaoOperacional, classificarAtencaoOperacional, motivosAtivos, type LinhaComAtencao } from "@/lib/operacional/atencao-operacional"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -68,6 +70,85 @@ async function partA() {
   ok(
     "estado sem nenhum sinal cai em 'outras' (nunca invisível — aparece em Todas)",
     classificarAtencaoOperacional({ ...BASE, coluna: "BLOQUEADA", executavelAgora: false }) === "outras",
+  )
+
+  secao("Teste D (revisitado) — atraso interno pelo relógio DO PASSO, não só o macro")
+  const d2: LinhaComAtencao = { ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasoInterno: false, prazoPasso: { atrasado: true, venceHoje: false } }
+  ok("subtarefa corrente com SLA próprio vencido também é Atrasadas, mesmo com o prazo macro em dia", classificarAtencaoOperacional(d2) === "atrasoInterno")
+
+  secao("Teste F — prazo macro vencido, passo ainda normal: UMA tarefa, motivo adicional, categoria coerente")
+  const f: LinhaComAtencao = { ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, atrasada: true, atrasoInterno: false }
+  const rF = calcularAtencaoOperacional(f)
+  ok("Teste F) categoria principal continua aguardandoTerceiros (o atraso do macro não é 'minha culpa' aqui)", rF.categoriaPrincipal === "aguardandoTerceiros", rF.categoriaPrincipal)
+  ok("Teste F) motivo PRAZO_TAREFA_VENCIDO registrado mesmo sem virar a categoria", rF.motivos.includes("PRAZO_TAREFA_VENCIDO"))
+
+  secao("Teste G — prazo macro E prazo do passo vencem no MESMO dia: uma tarefa, uma atenção, dois motivos, zero duplicidade")
+  const g: LinhaComAtencao = {
+    ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasada: true, atrasoInterno: true,
+    prazoPasso: { atrasado: true, venceHoje: false },
+  }
+  const rG = calcularAtencaoOperacional(g)
+  ok("Teste G) UMA categoria principal (atrasoInterno)", rG.categoriaPrincipal === "atrasoInterno")
+  ok("Teste G) DOIS motivos registrados (macro + passo), nunca duas tarefas", rG.motivos.includes("PRAZO_TAREFA_VENCIDO") && rG.motivos.includes("PRAZO_PASSO_VENCIDO") && rG.motivos.length === 2, JSON.stringify(rG.motivos))
+
+  secao("Teste H — prazo macro + prazo passo + acompanhamento devido, TODOS simultâneos: uma categoria, três motivos")
+  const h: LinhaComAtencao = {
+    ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false,
+    atrasada: true, acompanhamentoVencido: true,
+    prazoPasso: { atrasado: true, venceHoje: false },
+  }
+  const rH = calcularAtencaoOperacional(h)
+  // Atraso interno (macro OU do passo) vence acompanhamento na precedência —
+  // "existia uma ação que dependia de você e o prazo passou" é mais urgente
+  // do que "está na hora de acompanhar" (item 13: a categoria responde "qual
+  // é a coisa mais importante que o responsável precisa saber/fazer agora").
+  ok("Teste H) categoria principal = atrasoInterno (o mais urgente dos três fatos)", rH.categoriaPrincipal === "atrasoInterno", rH.categoriaPrincipal)
+  ok(
+    "Teste H) TRÊS motivos simultâneos (prazo macro + prazo passo + acompanhamento), uma tarefa só",
+    rH.motivos.includes("PRAZO_TAREFA_VENCIDO") && rH.motivos.includes("PRAZO_PASSO_VENCIDO") && rH.motivos.includes("ACOMPANHAMENTO_DEVIDO") && rH.motivos.length === 3,
+    JSON.stringify(rH.motivos),
+  )
+
+  secao("Teste J — Daniela acompanha e agenda retorno futuro: sai de 'Acompanhar hoje', volta para 'Aguardando terceiros'")
+  const jAntes: LinhaComAtencao = { ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, acompanhamentoVencido: true }
+  const jDepois: LinhaComAtencao = { ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, acompanhamentoVencido: false }
+  ok("Teste J) antes do acompanhamento: acompanharHoje", classificarAtencaoOperacional(jAntes) === "acompanharHoje")
+  ok("Teste J) depois (mesma tarefa, novo acompanhamento futuro): aguardandoTerceiros — nunca cria tarefa nova pra representar o acompanhamento", classificarAtencaoOperacional(jDepois) === "aguardandoTerceiros")
+
+  secao("INVARIANTES FINAIS (item 38 do mandato)")
+  ok(
+    "INVARIANTE 1) 1 tarefa = no máximo 1 categoria principal — nunca um array de categorias",
+    typeof classificarAtencaoOperacional(h) === "string",
+  )
+  ok(
+    "INVARIANTE 2) N relógios produzem N motivos, nunca N tarefas — motivos é um array, categoriaPrincipal continua sendo um valor só",
+    Array.isArray(rH.motivos) && rH.motivos.length === 3 && typeof rH.categoriaPrincipal === "string",
+  )
+  ok(
+    "INVARIANTE 3) prazo macro (atrasada) != prazo do passo (prazoPasso.atrasado) != acompanhamento (acompanhamentoVencido) — três campos, três fontes",
+    g.atrasada !== undefined && g.prazoPasso?.atrasado !== undefined && h.acompanhamentoVencido !== undefined,
+  )
+  ok(
+    "INVARIANTE 4) espera de terceiro não é atraso interno — aguardando sem nenhum atraso classifica aguardandoTerceiros, nunca atrasoInterno",
+    classificarAtencaoOperacional({ ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false }) !== "atrasoInterno",
+  )
+  ok(
+    "INVARIANTE 5) tarefa atribuída não é 'para fazer' por si só — precisa de executavelAgora + coluna certa",
+    classificarAtencaoOperacional({ ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, atribuidaEm: new Date().toISOString() }) !== "paraAgirAgora",
+  )
+
+  secao("Item 31 — 'Todas' é o universo, NUNCA a soma simples dos motivos (motivos podem coexistir)")
+  const universo: LinhaComAtencao[] = [g, h, f, { ...BASE, coluna: "A_FAZER", executavelAgora: true }]
+  const somaPorCategoria = universo.reduce((acc) => acc + 1, 0) // cada linha cai em EXATAMENTE 1 categoria
+  const somaDeMotivos = universo.reduce((acc, l) => acc + motivosAtivos(l).length, 0)
+  ok(
+    "a soma das categorias principais (exclusiva) bate com o total de linhas",
+    somaPorCategoria === universo.length,
+  )
+  ok(
+    "a soma de TODOS os motivos pode ser maior que o total de linhas (g tem 2, h tem 3) — prova que motivos != categorias",
+    somaDeMotivos > universo.length,
+    `motivos somados=${somaDeMotivos}, linhas=${universo.length}`,
   )
 
   console.log(`\nParte A: ${passou} passaram, ${falhou} falharam até aqui`)

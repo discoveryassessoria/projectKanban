@@ -19,6 +19,8 @@ import {
   janelaDoDiaOperacionalDe,
   inicioDoDiaOperacional,
   estadoTemporal,
+  estadoTemporalSubtarefa,
+  type EstadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
 import { estadosTemporaisDasOperacoes, ehEsperaExterna } from '@/lib/operacional/proximo-acontecimento'
 import { lerVersaoPublicada } from '@/src/services/versao-publicada'
@@ -241,6 +243,18 @@ export interface LinhaDeFila {
    */
   passoAtual: { ordem: number; total: number } | null
 
+  /**
+   * O PRAZO OPERACIONAL DA SUBTAREFA CORRENTE — o relógio IRMÃO do prazo
+   * macro (`dataPrazo`/`atrasada` acima), nunca o mesmo (mandato "motor de
+   * atenção operacional", 17/09/2026). Fonte: `SubtaskExecution.prazo` da
+   * subtarefa corrente, passado por `estadoTemporalSubtarefa`
+   * (`tempo-operacional.ts` — engine única, a mesma que computa o prazo
+   * macro). `null` quando o passo não tem subtarefas, quando a corrente
+   * ainda não tem prazo ancorado (ex.: nasceu direto em espera externa — sem
+   * ação interna, sem relógio interno) ou quando a tarefa está encerrada.
+   */
+  prazoPasso: EstadoTemporal | null
+
   // ── ETAPA 5 — LEITURA TEMPORAL COMPLETA (Etapa 3), NUNCA RECALCULADA AQUI ──
   //
   // `atrasada` acima é só a dimensão A (prazo vs. agora) — a mesma régua desde
@@ -312,7 +326,7 @@ function projetar(
   nomes?: Map<number, string>,
   rotulosDePasso?: Map<number, string>,
   totaisDePassos?: Map<string, number>,
-  progressoSubtarefa?: Map<number, { concluidas: number; total: number }>,
+  progressoSubtarefa?: Map<number, ResumoSubtarefasDoPasso>,
 ): LinhaDeFila {
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
@@ -389,7 +403,7 @@ function projetar(
     // é a granularidade que quem executa realmente lê.
     passoAtual: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
-      if (porSubtarefa) return { ordem: porSubtarefa.concluidas, total: porSubtarefa.total }
+      if (porSubtarefa && porSubtarefa.total > 1) return { ordem: porSubtarefa.concluidas, total: porSubtarefa.total }
       if (t.workflowStepInstance?.ordem == null || t.workflowInstanceId == null) return null
       return {
         // `ordem - 1` = quantos passos anteriores (1..ordem-1) já ficaram
@@ -397,6 +411,18 @@ function projetar(
         ordem: Math.max(0, t.workflowStepInstance.ordem - 1),
         total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem,
       }
+    })(),
+    // O RELÓGIO DA SUBTAREFA CORRENTE — engine única (`estadoTemporalSubtarefa`,
+    // a mesma matemática de `estadoTemporal` acima, vocabulário próprio de
+    // `SubtaskExecution.status`). `null` sem subtarefa corrente (passo sem
+    // subtarefas, ou todas encerradas) — nunca inventa prazo.
+    prazoPasso: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      const atual = porSubtarefa?.atual
+      if (!atual) return null
+      return estadoTemporalSubtarefa({
+        dataPrazo: atual.prazo, status: atual.status, criadaEm: atual.criadoEm, agora,
+      })
     })(),
     // Defaults — SEMPRE sobrescritos por `comAtencaoTemporal` logo depois.
     // `projetar` é síncrona e não tem como chamar o motor temporal (que lê
@@ -501,10 +527,17 @@ async function totalDePassos(
  * Só substitui o X/N por Step quando há MAIS de 1 subtarefa: um passo comum
  * (sem subtarefas) continua contando por Step, como sempre.
  */
+export interface ResumoSubtarefasDoPasso {
+  concluidas: number
+  total: number
+  /** A subtarefa CORRENTE (não encerrada), pela ordem da definição — nunca por `sequencia` (retry count por subtarefa, não ordem entre subtarefas). */
+  atual: { subtaskKey: string; status: string; prazo: Date | null; criadoEm: Date; startedAt: Date | null } | null
+}
+
 async function progressoPorSubtarefa(
   linhas: Array<{ workflowStepInstance: { id: number; stepKey: string } | null; workflowInstanceId: number | null }>,
   db: Leitor = prisma,
-): Promise<Map<number, { concluidas: number; total: number }>> {
+): Promise<Map<number, ResumoSubtarefasDoPasso>> {
   const instanciaIds = [...new Set(linhas.map((l) => l.workflowInstanceId).filter((x): x is number => x != null))]
   if (instanciaIds.length === 0) return new Map()
 
@@ -524,29 +557,49 @@ async function progressoPorSubtarefa(
   )
   const versaoPorChave = new Map(versoes)
 
+  // total de subtarefas ATIVAS + a ORDEM de cada uma (pela definição congelada) — por stepInstance.
   const totalPorStepInstance = new Map<number, number>()
+  const ordemPorStepInstance = new Map<number, Map<string, number>>()
+  const stepInstanceIds: number[] = []
   for (const l of linhas) {
     const si = l.workflowStepInstance
     if (!si || l.workflowInstanceId == null) continue
+    stepInstanceIds.push(si.id)
     const inst = instanciaPorId.get(l.workflowInstanceId)
     if (!inst?.workflowDefinitionId || inst.workflowVersion == null) continue
     const versao = versaoPorChave.get(`${inst.workflowDefinitionId}:${inst.workflowVersion}`)
     const passo = versao?.passos.find((p) => p.key === si.stepKey)
-    const totalSubtarefas = passo?.subtarefas?.filter((s) => s.ativo !== false).length ?? 0
-    if (totalSubtarefas > 1) totalPorStepInstance.set(si.id, totalSubtarefas)
+    const subtarefasAtivas = passo?.subtarefas?.filter((s) => s.ativo !== false) ?? []
+    if (subtarefasAtivas.length > 0) {
+      totalPorStepInstance.set(si.id, subtarefasAtivas.length)
+      ordemPorStepInstance.set(si.id, new Map(subtarefasAtivas.map((s) => [s.key, s.ordem])))
+    }
   }
-  if (totalPorStepInstance.size === 0) return new Map()
+  if (stepInstanceIds.length === 0) return new Map()
 
-  const concluidasRaw = await db.subtaskExecution.groupBy({
-    by: ['stepInstanceId'],
-    where: { stepInstanceId: { in: [...totalPorStepInstance.keys()] }, status: 'CONCLUIDO' },
-    _count: { _all: true },
+  // TODAS as execuções vigentes (não substituídas) — uma consulta, nunca uma
+  // por linha. Dá o "X/Y" (CONCLUIDO) e a subtarefa CORRENTE (a primeira não
+  // encerrada, pela ordem da definição — não pela ordem de criação da linha).
+  const ENCERRADOS = new Set(['CONCLUIDO', 'CANCELADO', 'INVALIDADO', 'FALHOU'])
+  const execucoes = await db.subtaskExecution.findMany({
+    where: { stepInstanceId: { in: stepInstanceIds }, supersededAt: null },
+    select: { stepInstanceId: true, subtaskKey: true, status: true, prazo: true, criadoEm: true, startedAt: true },
   })
-  const concluidasPorStepInstance = new Map(concluidasRaw.map((c) => [c.stepInstanceId, c._count._all]))
+  const execucoesPorStepInstance = new Map<number, typeof execucoes>()
+  for (const e of execucoes) execucoesPorStepInstance.set(e.stepInstanceId, [...(execucoesPorStepInstance.get(e.stepInstanceId) ?? []), e])
 
-  const resultado = new Map<number, { concluidas: number; total: number }>()
-  for (const [stepInstanceId, total] of totalPorStepInstance) {
-    resultado.set(stepInstanceId, { concluidas: concluidasPorStepInstance.get(stepInstanceId) ?? 0, total })
+  const resultado = new Map<number, ResumoSubtarefasDoPasso>()
+  for (const [stepInstanceId, execs] of execucoesPorStepInstance) {
+    const total = totalPorStepInstance.get(stepInstanceId) ?? execs.length
+    const ordens = ordemPorStepInstance.get(stepInstanceId)
+    const concluidas = execs.filter((e) => e.status === 'CONCLUIDO').length
+    const atual = execs
+      .filter((e) => !ENCERRADOS.has(e.status))
+      .sort((a, b) => (ordens?.get(a.subtaskKey) ?? 0) - (ordens?.get(b.subtaskKey) ?? 0))[0] ?? null
+    resultado.set(stepInstanceId, {
+      concluidas, total,
+      atual: atual ? { subtaskKey: atual.subtaskKey, status: atual.status, prazo: atual.prazo, criadoEm: atual.criadoEm, startedAt: atual.startedAt } : null,
+    })
   }
   return resultado
 }
