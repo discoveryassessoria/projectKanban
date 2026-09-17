@@ -29,6 +29,7 @@
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -445,14 +446,16 @@ export async function reabrirSubtarefa(args: {
   // impossível (a certidão "conferida" de um requerimento que nem foi
   // reenviado ainda). Reabertura não deixa órfão nem pra baixo (dependente
   // que devia acompanhar) nem pra cima (histórico, já preservado acima).
+  // A definição HISTÓRICA (congelada na versão que esta instância rodou) —
+  // não `StepSubtaskDefinition` pelo `subtaskDefinitionId` da execução: esse
+  // campo é null em execuções legadas (achado real, 16/09/2026, processo
+  // 613 stepInstance 2498 — TODAS as execuções tinham `subtaskDefinitionId:
+  // null`), e é exatamente a mesma fonte que `subtarefasDaEtapa` já usa pra
+  // saber "quem depende de quem" nesta instância — e, agora, o SLA efetivo
+  // pra ligar o relógio de novo.
+  const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+
   const dependentesConcluidas = !args.comDependentes ? [] : await (async () => {
-    // A definição HISTÓRICA (congelada na versão que esta instância rodou) —
-    // não `StepSubtaskDefinition` pelo `subtaskDefinitionId` da execução: esse
-    // campo é null em execuções legadas (achado real, 16/09/2026, processo
-    // 613 stepInstance 2498 — TODAS as execuções tinham `subtaskDefinitionId:
-    // null`), e é exatamente a mesma fonte que `subtarefasDaEtapa` já usa pra
-    // saber "quem depende de quem" nesta instância.
-    const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
     const todas = hist?.passo.subtarefas ?? []
     if (todas.length === 0) return []
     // BFS pelo grafo de dependência (declarada, nunca por ordem) a partir da
@@ -480,6 +483,13 @@ export async function reabrirSubtarefa(args: {
     return resultado
   })()
 
+  // NOVA TENTATIVA, NOVO RELÓGIO: reabrir é uma execução nova (sequência
+  // seguinte, ver cabeçalho do arquivo) — o prazo antigo pertence à execução
+  // substituída, que fica preservada como histórico. Mesmo SLA efetivo
+  // (própria ou herdada do passo) que `materializarSubtarefas` usa.
+  const defReaberta = hist?.passo.subtarefas.find((d) => d.key === args.subtaskKey)
+  const prazoReaberta = prazoOperacional(defReaberta?.slaDays ?? hist?.passo.slaDays ?? 0, new Date())
+
   await prisma.$transaction(async (tx) => {
     await abrirExecucao({
       stepInstanceId: args.stepInstanceId,
@@ -489,6 +499,7 @@ export async function reabrirSubtarefa(args: {
       motivo: MOTIVOS_DE_EXECUCAO.REABERTURA_MANUAL,
       status: ESTADOS_DA_SUBTAREFA.DISPONIVEL,
       responsavelId: vigente.responsavelId,
+      prazo: prazoReaberta,
       correlationId: args.correlationId ?? null,
     }, tx)
 

@@ -131,8 +131,8 @@ function run() {
   for (const key of ["sla-atrasados", "sla-vencem-hoje", "sla-proximos-7", "sla-no-prazo"]) {
     ok(logic.includes(`"${key}"`), `faixa "${key}" declarada`)
   }
-  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_SLA\]/.test(logic),
-    "as filas de SLA entram no catálogo (drill-down funciona)")
+  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_SLA, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_PRAZO_SUBTAREFA\]/.test(logic),
+    "as filas de SLA (e as de prazo Tarefa/Subtarefa, 17/09/2026) entram no catálogo (drill-down funciona)")
   ok(
     /for \(const def of \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO\]\)/.test(coleta),
     "SLA não polui a lista de trabalho executável da Central",

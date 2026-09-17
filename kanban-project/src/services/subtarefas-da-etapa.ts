@@ -25,6 +25,17 @@ import {
   type ExecucaoDeSubtarefa, type EstadoDaSubtarefa, type CausaDeBloqueio,
 } from "@/src/services/execucao-da-subtarefa"
 import { canaisDaSubtarefa, type CanalDisponivel } from "@/src/lib/motor/canais-do-fornecedor"
+import { prazoOperacional, estadoTemporalSubtarefa, type EstadoTemporal } from "@/lib/operacional/tempo-operacional"
+
+/**
+ * O SLA EFETIVO DE UMA SUBTAREFA — dela mesma, ou herdado do passo quando
+ * vazio ("SLA PRÓPRIO (DIAS, vazio = herda)" no cadastro). Uma pergunta, um
+ * lugar — mesma régua do `temPrazoProprio`/`PRAZO_HERDADO` do passo, um nível
+ * abaixo.
+ */
+function slaEfetivoDaSubtarefa(slaProprio: number | null, slaDoPasso: number): number | null {
+  return slaProprio ?? slaDoPasso
+}
 
 export interface SubtarefaProjetada {
   key: string
@@ -66,6 +77,11 @@ export interface SubtarefaProjetada {
 
   /// A configuração congelada dela, para o executor desenhar.
   definicao: SubtarefaCongelada
+
+  /// O PRAZO OPERACIONAL DELA — já resolvido (`estadoTemporalSubtarefa`), pra
+  /// nenhuma tela precisar calcular de novo. `null` enquanto ela ainda não
+  /// ficou DISPONÍVEL (relógio parado — ver `execucao.prazo`).
+  situacaoTemporal: EstadoTemporal | null
 }
 
 const vazio = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "")
@@ -190,6 +206,12 @@ export async function subtarefasDaEtapa(args: {
           ? ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO
           : ESTADOS_DA_SUBTAREFA.DISPONIVEL
 
+    const situacaoTemporal = execucao?.prazo != null
+      ? estadoTemporalSubtarefa({
+          dataPrazo: execucao.prazo, dataConclusao: execucao.completedAt, status: execucao.status,
+        })
+      : null
+
     projetadas.push({
       key: d.key, label: d.label, descricao: d.descricao, ordem: d.ordem,
       obrigatoria: d.obrigatoria, repetivel: d.repetivel, maxOcorrencias: d.maxOcorrencias,
@@ -201,6 +223,7 @@ export async function subtarefasDaEtapa(args: {
       podeRepetir: d.repetivel && (d.maxOcorrencias == null || ocorrencias < d.maxOcorrencias),
       canais,
       definicao: d,
+      situacaoTemporal,
     })
   }
 
@@ -267,6 +290,16 @@ export async function materializarSubtarefas(args: {
   let jaExistiam = 0
   for (const s of subs) {
     if (s.execucao) { jaExistiam++; continue }
+    // O RELÓGIO DA SUBTAREFA — liga SOMENTE se ela já nasce DISPONÍVEL (achado
+    // real, 17/09/2026: `SubtaskExecution.prazo` existia no schema desde
+    // sempre, mas nada gravava nele — subtarefa nunca teve prazo de verdade).
+    // A que nasce BLOQUEADO fica com `prazo: null`: ela ainda não começou a
+    // consumir SLA nenhum, e `reconciliarSubtarefas` liga o relógio dela
+    // quando a dependência libera.
+    const slaEfetivo = slaEfetivoDaSubtarefa(s.definicao.slaDays, hist?.passo.slaDays ?? 0)
+    const prazo = s.status === ESTADOS_DA_SUBTAREFA.DISPONIVEL
+      ? prazoOperacional(slaEfetivo, new Date())
+      : null
     await garantirExecucao({
       stepInstanceId: args.stepInstanceId,
       subtaskKey: s.key,
@@ -274,6 +307,7 @@ export async function materializarSubtarefas(args: {
       status: s.status,
       bloqueioCodigo: s.bloqueioCodigo,
       bloqueioAlvo: s.bloqueioAlvo,
+      prazo,
     })
     criadas++
   }
@@ -304,6 +338,7 @@ export async function reconciliarSubtarefas(args: {
     ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO,
   ])
   let ajustadas = 0
+  let hist: Awaited<ReturnType<typeof definicaoHistoricaDoPasso>> | undefined
   for (const s of subs) {
     if (!s.execucao) continue
     if (IMUTAVEIS.has(s.execucao.status)) continue
@@ -312,8 +347,18 @@ export async function reconciliarSubtarefas(args: {
     const mesmaCausa = (s.execucao.bloqueioCodigo ?? null) === (s.bloqueioCodigo ?? null)
       && (s.execucao.bloqueioAlvo ?? null) === (s.bloqueioAlvo ?? null)
     if (mesmoEstado && mesmaCausa) continue
+    // LIGA O RELÓGIO NA HORA CERTA: só quando ela está de fato virando
+    // DISPONÍVEL agora e ainda não tinha prazo (nunca reescreve um prazo já
+    // ancorado — isso seria mover a meta retroativamente).
+    let prazo: Date | null | undefined
+    if (alvo === ESTADOS_DA_SUBTAREFA.DISPONIVEL && s.execucao.prazo == null) {
+      if (hist === undefined) hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+      const slaEfetivo = slaEfetivoDaSubtarefa(s.definicao.slaDays, hist?.passo.slaDays ?? 0)
+      prazo = prazoOperacional(slaEfetivo, new Date())
+    }
     await registrarNaExecucao(args.stepInstanceId, s.key, {
       status: alvo, bloqueioCodigo: s.bloqueioCodigo, bloqueioAlvo: s.bloqueioAlvo,
+      ...(prazo !== undefined ? { prazo } : {}),
     })
     ajustadas++
   }

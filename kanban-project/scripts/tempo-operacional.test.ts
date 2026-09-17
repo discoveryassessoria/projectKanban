@@ -15,6 +15,7 @@
 // ============================================================================
 import {
   estadoTemporal,
+  estadoTemporalSubtarefa,
   prazoOperacional,
   diasEntreDiasOperacionais,
   diaOperacional,
@@ -250,6 +251,55 @@ function main() {
   // medido no instante — cobre DST automaticamente, sem tabela).
   ok('§96) FUSO_OPERACIONAL é America/Sao_Paulo (fixo, por desenho — SLA é do escritório, não do país do processo)',
     /FUSO_OPERACIONAL = 'America\/Sao_Paulo'/.test(ler('lib/operacional/tempo-operacional.ts')))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§97) DOIS RELÓGIOS — Tarefa (macro) e Subtarefa (operacional), 17/09/2026')
+  // ══════════════════════════════════════════════════════════════════════════
+  // MESMA matemática (o núcleo é um só), vocabulário de status DIFERENTE —
+  // `estadoTemporalSubtarefa` não pode aceitar StatusTarefa nem o contrário.
+  const prazoSub = emSaoPaulo('2026-08-15T12:00:00')
+  const subAntes = estadoTemporalSubtarefa({ dataPrazo: prazoSub, status: 'DISPONIVEL', agora: emSaoPaulo('2026-08-10T09:00:00') })
+  ok('§97) subtarefa disponível, antes do prazo: mesma frase da Tarefa',
+    subAntes.rotulo === 'Vence em 5 dias', subAntes.rotulo)
+  const subDepois = estadoTemporalSubtarefa({ dataPrazo: prazoSub, status: 'EM_ANDAMENTO', agora: emSaoPaulo('2026-08-18T10:00:00') })
+  ok('§97) subtarefa em andamento, depois do prazo: atrasada',
+    subDepois.atrasado && subDepois.rotulo === 'Atrasada há 3 dias', subDepois.rotulo)
+  ok('§97) AGUARDANDO_EXTERNO vira aguardandoTerceiro=true (sem estar em ENCERRADOS de Tarefa)',
+    estadoTemporalSubtarefa({ dataPrazo: prazoSub, status: 'AGUARDANDO_EXTERNO', agora: emSaoPaulo('2026-08-10T09:00:00') }).aguardandoTerceiro)
+  const subConcluidaComAtraso = estadoTemporalSubtarefa({
+    dataPrazo: prazoSub, status: 'CONCLUIDO', dataConclusao: emSaoPaulo('2026-08-17T09:00:00'), agora: emSaoPaulo('2026-08-20T09:00:00'),
+  })
+  ok('§97) concluída CONGELA — mesma regra da Tarefa, vocabulário de subtarefa',
+    subConcluidaComAtraso.concluidoComAtraso && subConcluidaComAtraso.concluidoComAtrasoDeDias === 2,
+    subConcluidaComAtraso.rotulo)
+  ok('§97) sem prazo (ainda BLOQUEADA, relógio não ligou): "Sem prazo", nunca atrasada',
+    estadoTemporalSubtarefa({ dataPrazo: null, status: 'BLOQUEADO', agora: emSaoPaulo('2026-08-20T09:00:00') }).semPrazo)
+  ok('§97) CANCELADO/INVALIDADO/FALHOU encerram o relógio, igual CONCLUIDO',
+    !estadoTemporalSubtarefa({ dataPrazo: prazoSub, status: 'CANCELADO', agora: emSaoPaulo('2026-08-20T09:00:00') }).atrasado)
+
+  // O NÚCLEO É UM SÓ — Tarefa e Subtarefa não podem divergir na matemática,
+  // só no vocabulário de status. Mesmo prazo, mesmo instante, mesma resposta.
+  const tarefaEquivalente = estadoTemporal({ dataPrazo: prazoSub, agora: emSaoPaulo('2026-08-18T10:00:00') })
+  ok('§97) mesmo núcleo: Tarefa e Subtarefa concordam byte a byte quando o status não distingue',
+    tarefaEquivalente.rotulo === subDepois.rotulo && tarefaEquivalente.diasParaPrazo === subDepois.diasParaPrazo)
+
+  // O RELÓGIO DA SUBTAREFA PRECISA ESTAR LIGADO EM PRODUÇÃO — não só existir
+  // na engine. Prova que os 3 pontos que ligam o relógio (materialização,
+  // reconciliação, reabertura) de fato chamam `prazoOperacional`.
+  ok('§97) materializarSubtarefas liga o relógio da subtarefa que nasce disponível',
+    /prazoOperacional\(slaEfetivo, new Date\(\)\)/.test(semComentarios(ler('src/services/subtarefas-da-etapa.ts'))))
+  ok('§97) reabrirSubtarefa liga um relógio NOVO (nova tentativa, novo prazo)',
+    /prazoOperacional\(defReaberta\?\.slaDays/.test(semComentarios(ler('src/services/execucao-da-subtarefa.ts'))))
+  ok('§97) a projeção (subtarefasDaEtapa) expõe o estado já calculado — nenhuma tela recalcula',
+    /estadoTemporalSubtarefa\(\{/.test(semComentarios(ler('src/services/subtarefas-da-etapa.ts'))))
+
+  // A HOME PAROU DE TER RÉGUA PRÓPRIA — achado real, 17/09/2026: `estaAtrasado`/
+  // `venceHoje` reimplementavam a conta com o fuso LOCAL DA MÁQUINA.
+  const homeLogic = semComentarios(ler('src/lib/home/home-logic.ts'))
+  ok('§97) Home delega estaAtrasado/venceHoje pra engine única — parou de reimplementar',
+    /estaAtrasado[^}]*estadoTemporal\(\{ dataPrazo: prazo/.test(homeLogic)
+    && /venceHoje[^}]*estadoTemporal\(\{ dataPrazo: prazo/.test(homeLogic)
+    && !/setHours\(0,\s*0,\s*0,\s*0\)/.test(homeLogic.split('estaAtrasado')[1]?.split('export function venceHoje')[0] ?? ''))
 
   console.log(`\n${'═'.repeat(70)}`)
   console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)

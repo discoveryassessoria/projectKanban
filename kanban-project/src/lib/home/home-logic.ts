@@ -19,6 +19,7 @@ import type {
   StatusOperacional,
 } from "@/src/types/home"
 import type { FaixaSla } from "@/src/types/sla"
+import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 
 // ---- Datas -----------------------------------------------------------------
 export function inicioDoDia(d: Date): Date {
@@ -41,20 +42,22 @@ export function diasEntre(a: Date, b: Date): number {
   return Math.round((inicioDoDia(a).getTime() - inicioDoDia(b).getTime()) / 86_400_000)
 }
 
-/** Prazo já vencido (dia civil anterior a hoje). */
+/**
+ * Prazo já vencido — delega para a ENGINE ÚNICA (`estadoTemporal`,
+ * `lib/operacional/tempo-operacional.ts`), fuso `America/Sao_Paulo`.
+ *
+ * Achado real (17/09/2026): esta função reimplementava a própria conta com
+ * `setHours(0,0,0,0)` no fuso LOCAL DA MÁQUINA, não no operacional — a mesma
+ * classe de bug que a engine única já corrigiu uma vez para outras telas
+ * (duas leituras discordando perto da meia-noite). Nunca migrada até agora.
+ */
 export function estaAtrasado(prazo: Date | string | null | undefined, hoje: Date): boolean {
-  if (!prazo) return false
-  const d = new Date(prazo)
-  if (isNaN(d.getTime())) return false
-  return inicioDoDia(d).getTime() < inicioDoDia(hoje).getTime()
+  return estadoTemporal({ dataPrazo: prazo ?? null, agora: hoje }).atrasado
 }
 
-/** Prazo é hoje. */
+/** Prazo é hoje — mesma engine única. */
 export function venceHoje(prazo: Date | string | null | undefined, hoje: Date): boolean {
-  if (!prazo) return false
-  const d = new Date(prazo)
-  if (isNaN(d.getTime())) return false
-  return inicioDoDia(d).getTime() === inicioDoDia(hoje).getTime()
+  return estadoTemporal({ dataPrazo: prazo ?? null, agora: hoje }).venceHoje
 }
 
 // ---- Estados lidos do motor ------------------------------------------------
@@ -295,7 +298,51 @@ export function faixaDaFilaSla(key: string): FaixaSla | null {
   return FILAS_SLA.find((f) => f.key === key)?.faixa ?? null
 }
 
-export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_SLA]
+// ---------------------------------------------------------------------------
+// FILAS DE PRAZO — Tarefa (macro) e Subtarefa (operacional), os DOIS
+// controles independentes que a Home mostra lado a lado. NUNCA a mesma coisa
+// que `FILAS_SLA` acima (que é FaseMacro — Processo, um terceiro relógio que
+// não é apresentado como prazo operacional em lugar nenhum).
+// ---------------------------------------------------------------------------
+export type FaixaPrazo = "atrasadas" | "vencem-hoje" | "proximos-3" | "proximos-7" | "no-prazo"
+
+export interface FilaPrazoDef extends FilaDef {
+  faixa: FaixaPrazo
+  grain: "tarefa" | "subtarefa"
+}
+
+export const FILAS_PRAZO_TAREFA: FilaPrazoDef[] = [
+  { key: "tarefa-atrasadas", faixa: "atrasadas", grain: "tarefa", titulo: "Tarefas atrasadas", descricao: "Prazo macro da tarefa já vencido", modulo: "tarefas", nivelBase: "critico" },
+  { key: "tarefa-vencem-hoje", faixa: "vencem-hoje", grain: "tarefa", titulo: "Tarefas — vencem hoje", descricao: "Prazo macro da tarefa termina hoje", modulo: "tarefas", nivelBase: "alto" },
+  { key: "tarefa-proximos-3", faixa: "proximos-3", grain: "tarefa", titulo: "Tarefas — próximos 3 dias", descricao: "Prazo macro da tarefa nos próximos 3 dias", modulo: "tarefas", nivelBase: "medio" },
+  { key: "tarefa-proximos-7", faixa: "proximos-7", grain: "tarefa", titulo: "Tarefas — próximos 7 dias", descricao: "Prazo macro da tarefa nos próximos 7 dias", modulo: "tarefas", nivelBase: "baixo" },
+  { key: "tarefa-no-prazo", faixa: "no-prazo", grain: "tarefa", titulo: "Tarefas no prazo", descricao: "Dentro do prazo macro de conclusão", modulo: "tarefas", nivelBase: "baixo" },
+]
+
+export const FILAS_PRAZO_SUBTAREFA: FilaPrazoDef[] = [
+  { key: "subtarefa-atrasadas", faixa: "atrasadas", grain: "subtarefa", titulo: "Subtarefas atrasadas", descricao: "SLA da ação atual já vencido", modulo: "tarefas", nivelBase: "critico" },
+  { key: "subtarefa-vencem-hoje", faixa: "vencem-hoje", grain: "subtarefa", titulo: "Subtarefas — vencem hoje", descricao: "SLA da ação atual termina hoje", modulo: "tarefas", nivelBase: "alto" },
+  { key: "subtarefa-proximos-3", faixa: "proximos-3", grain: "subtarefa", titulo: "Subtarefas — próximos 3 dias", descricao: "SLA da ação atual nos próximos 3 dias", modulo: "tarefas", nivelBase: "medio" },
+  { key: "subtarefa-proximos-7", faixa: "proximos-7", grain: "subtarefa", titulo: "Subtarefas — próximos 7 dias", descricao: "SLA da ação atual nos próximos 7 dias", modulo: "tarefas", nivelBase: "baixo" },
+  { key: "subtarefa-no-prazo", faixa: "no-prazo", grain: "subtarefa", titulo: "Subtarefas no prazo", descricao: "Dentro do SLA da ação atual", modulo: "tarefas", nivelBase: "baixo" },
+]
+
+/** A faixa/grain de prazo de uma fila; null quando a fila não é de prazo Tarefa/Subtarefa. */
+export function faixaDaFilaPrazo(key: string): FilaPrazoDef | null {
+  return [...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA].find((f) => f.key === key) ?? null
+}
+
+/** Classifica um `EstadoTemporal` já calculado numa das 5 faixas de prazo. */
+export function faixaPrazoDoEstado(diasParaPrazo: number | null, atrasado: boolean): FaixaPrazo | null {
+  if (diasParaPrazo == null) return null
+  if (atrasado) return "atrasadas"
+  if (diasParaPrazo === 0) return "vencem-hoje"
+  if (diasParaPrazo <= 3) return "proximos-3"
+  if (diasParaPrazo <= 7) return "proximos-7"
+  return "no-prazo"
+}
+
+export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_SLA, ...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA]
 
 const FILA_POR_VERBO = new Map<string, string>()
 for (const f of FILAS_PASSO) for (const v of f.verbos ?? []) FILA_POR_VERBO.set(v, f.key)

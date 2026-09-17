@@ -14,16 +14,20 @@
 import { prisma } from "@/lib/prisma"
 import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
 import { resolveSlaProjectionBatch, resumirSla } from "@/src/lib/process-stage/sla-projection"
+import { estadoTemporal, estadoTemporalSubtarefa } from "@/lib/operacional/tempo-operacional"
 import {
   FILAS_PASSO,
   FILAS_ESTADO,
   FILAS_SLA,
+  FILAS_PRAZO_TAREFA,
+  FILAS_PRAZO_SUBTAREFA,
   faixaDaFilaSla,
+  faixaDaFilaPrazo,
+  faixaPrazoDoEstado,
   STATUS_PASSO_ACIONAVEL,
   STATUS_PASSO_VIVO,
   STATUS_TAREFA_TERMINAL,
   acharFila,
-  diasEntre,
   ehPassoDeEspera,
   estaAtrasado,
   filaDoStepKey,
@@ -106,12 +110,26 @@ interface PendenciaBase {
   phaseKey: string
   criadoEm: Date
 }
+/** Subtarefa ATIVA (DISPONIVEL/EM_ANDAMENTO/AGUARDANDO_EXTERNO) — grain próprio, nunca somado à Tarefa. */
+interface SubtarefaBase {
+  id: number
+  stepInstanceId: number
+  subtaskKey: string
+  status: string
+  prazo: Date | null
+  processoId: number
+  documentoId: number | null
+  necessidadeId: number | null
+  responsavelId: number | null
+}
 
 export interface BaseOperacional {
   processos: Map<number, ProcessoBase>
   /** passos vivos JÁ filtrados para a fase atual do processo */
   passos: PassoBase[]
   tarefas: TarefaBase[]
+  /** subtarefas ATIVAS — prazo OPERACIONAL, nunca o mesmo relógio da Tarefa. */
+  subtarefas: SubtarefaBase[]
   pendencias: PendenciaBase[]
   /** processos cuja fase atual está concluída no motor (prontos para avançar) */
   prontosParaAvancar: number[]
@@ -135,7 +153,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
   const escopoDoPasso = escopoPasso(usuarioEscopo)
   const escopoDoProcesso = escopoProcesso(usuarioEscopo)
 
-  const [processosRaw, passosRaw, tarefasRaw, pendenciasRaw, instanciasRaw] = await Promise.all([
+  const [processosRaw, passosRaw, tarefasRaw, subtarefasRaw, pendenciasRaw, instanciasRaw] = await Promise.all([
     p.verProcessos
       ? prisma.processo.findMany({
           where: escopoDoProcesso,
@@ -179,6 +197,28 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
           },
         })
       : Promise.resolve([] as any[]),
+    // SUBTAREFAS ATIVAS — mesmo escopo do passo (o responsável do STEP, não
+    // um campo próprio na subtarefa). DISPONIVEL/EM_ANDAMENTO/AGUARDANDO_EXTERNO
+    // são as únicas com relógio correndo; BLOQUEADO/PENDENTE não têm prazo
+    // ainda (`prazo: null`) e CONCLUIDO/CANCELADO/INVALIDADO/FALHOU já
+    // encerraram o delas.
+    p.verTarefas
+      ? prisma.subtaskExecution.findMany({
+          where: {
+            supersededAt: null,
+            status: { in: ["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO_EXTERNO"] },
+            stepInstance: { ...(escopoDoPasso as any) },
+          },
+          select: {
+            id: true, stepInstanceId: true, subtaskKey: true, status: true, prazo: true,
+            stepInstance: { select: { processoId: true, documentoId: true, necessidadeId: true, responsavelId: true } },
+          },
+        }).then((rows) => rows.map((r) => ({
+          id: r.id, stepInstanceId: r.stepInstanceId, subtaskKey: r.subtaskKey, status: r.status, prazo: r.prazo,
+          processoId: r.stepInstance.processoId, documentoId: r.stepInstance.documentoId,
+          necessidadeId: r.stepInstance.necessidadeId, responsavelId: r.stepInstance.responsavelId,
+        })))
+      : Promise.resolve([] as SubtarefaBase[]),
     // Financeiro: módulo (`verFinanceiro`) E escopo — as duas coisas, não uma
     // no lugar da outra. Sem `processo`, a pendência não tem como ser filtrada.
     p.verFinanceiro
@@ -229,6 +269,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
     processos,
     passos,
     tarefas: tarefasRaw as TarefaBase[],
+    subtarefas: subtarefasRaw as SubtarefaBase[],
     pendencias: pendenciasRaw as PendenciaBase[],
     prontosParaAvancar: [...prontos],
     parados,
@@ -242,6 +283,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
 type Membro =
   | { tipo: "passo"; passo: PassoBase }
   | { tipo: "tarefa"; tarefa: TarefaBase }
+  | { tipo: "subtarefa"; subtarefa: SubtarefaBase }
   | { tipo: "processo"; processo: ProcessoBase }
   | { tipo: "processo-sla"; processo: ProcessoBase; sla: SlaProcesso }
   | { tipo: "pendencia"; pendencia: PendenciaBase }
@@ -258,6 +300,25 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
       membros.push({ tipo: "processo-sla", processo, sla })
     }
     return membros
+  }
+
+  // --- filas de prazo Tarefa/Subtarefa (os dois relógios independentes) ---
+  const filaPrazo = faixaDaFilaPrazo(key)
+  if (filaPrazo) {
+    if (filaPrazo.grain === "tarefa") {
+      return base.tarefas
+        .filter((t) => {
+          const est = estadoTemporal({ dataPrazo: t.dataPrazo, statusTarefa: t.statusTarefa, agora })
+          return faixaPrazoDoEstado(est.diasParaPrazo, est.atrasado) === filaPrazo.faixa
+        })
+        .map((tarefa) => ({ tipo: "tarefa" as const, tarefa }))
+    }
+    return base.subtarefas
+      .filter((s) => {
+        const est = estadoTemporalSubtarefa({ dataPrazo: s.prazo, status: s.status, agora })
+        return faixaPrazoDoEstado(est.diasParaPrazo, est.atrasado) === filaPrazo.faixa
+      })
+      .map((subtarefa) => ({ tipo: "subtarefa" as const, subtarefa }))
   }
 
   // --- filas de passo (trabalho do Workflow) ---
@@ -339,6 +400,7 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
 function prazoDoMembro(m: Membro): Date | null {
   if (m.tipo === "passo") return m.passo.prazo
   if (m.tipo === "tarefa") return m.tarefa.dataPrazo
+  if (m.tipo === "subtarefa") return m.subtarefa.prazo
   if (m.tipo === "processo-sla") return m.sla.prazoPrevisto ? new Date(m.sla.prazoPrevisto) : null
   return null
 }
@@ -361,6 +423,7 @@ function permissaoDaFila(key: string, p: HomePermissions): boolean {
 function identidadeDoMembro(m: Membro): string {
   if (m.tipo === "passo") return `passo:${m.passo.id}`
   if (m.tipo === "tarefa") return `tarefa:${m.tarefa.id}`
+  if (m.tipo === "subtarefa") return `subtarefa:${m.subtarefa.id}`
   if (m.tipo === "processo" || m.tipo === "processo-sla") return `processo:${m.processo.id}`
   return `pendencia:${m.pendencia.id}`
 }
@@ -443,41 +506,56 @@ export function montarSla(base: BaseOperacional, ctx: ContextoHome): PainelSla |
 }
 
 // ---------------------------------------------------------------------------
-// PRAZOS DE TAREFA — grain TAREFA, nunca somado ao SLA de Processo acima.
+// PRAZOS DE TAREFA — o relógio MACRO, grain TAREFA. Nunca somado ao SLA de
+// Processo (FaseMacro, acima) nem ao de Subtarefa (abaixo) — os três são
+// obrigações diferentes (CLAUDE.md §5/§18).
 //
 // Achado real (16/09/2026): a Daniela tinha uma Tarefa com prazo amanhã e o
 // usuário esperava vê-la refletida num card de prazo — mas o único painel de
-// prazo da Home (`montarSla`) é 100% Processo (SLA por fase, configurado no
-// Workflow Macro). Tarefa tem seu PRÓPRIO prazo (`Tarefa.dataPrazo`), uma
-// obrigação diferente — misturar as duas contagens no mesmo card violaria
-// pureza de grain (CLAUDE.md §5/§18). Este painel é o equivalente, só que
-// para Tarefa: mesma base já carregada (`base.tarefas`, já escopada por
-// responsável e por "aberta" — ver `carregarBase`), sem query nova.
+// prazo da Home (`montarSla`) é 100% Processo. Este painel é o equivalente
+// pra Tarefa: mesma base já carregada (`base.tarefas`), sem query nova.
+//
+// Achado real (17/09/2026): a versão anterior desta função recalculava
+// "amanhã"/"3 dias"/"7 dias" com a própria conta (`diasEntre`, sem fuso
+// operacional) e não tinha os baldes "atrasadas"/"hoje"/"no prazo" — regra de
+// negócio definitiva do usuário: os DOIS relógios (Tarefa + Subtarefa) usam
+// a MESMA engine (`estadoTemporal`/`estadoTemporalSubtarefa`) e os MESMOS 5
+// baldes, lado a lado, cada contador levando pra fila filtrada de verdade
+// (`/dashboard/fila/[key]`, o mesmo drill-down genérico que o SLA já usa).
 // ---------------------------------------------------------------------------
+function montarPainelDePrazo(
+  defs: typeof FILAS_PRAZO_TAREFA,
+  base: BaseOperacional,
+  ctx: ContextoHome,
+): FilaOperacional[] {
+  return defs.map((def) => {
+    const quantidade = membrosDaFila(def.key, base, ctx.agora).length
+    return {
+      key: def.key,
+      titulo: def.titulo,
+      descricao: def.descricao,
+      quantidade,
+      nivel: quantidade > 0 ? def.nivelBase : "baixo",
+      modulo: def.modulo,
+      href: `/dashboard/fila/${def.key}`,
+    }
+  })
+}
+
 export function montarPrazosDeTarefas(base: BaseOperacional, ctx: ContextoHome): FilaOperacional[] | null {
   if (!ctx.permissoes.verTarefas) return null
+  return montarPainelDePrazo(FILAS_PRAZO_TAREFA, base, ctx)
+}
 
-  const comPrazo = base.tarefas.filter((t) => t.dataPrazo != null)
-  const dias = (t: TarefaBase) => diasEntre(t.dataPrazo as Date, ctx.agora)
-
-  const amanha = comPrazo.filter((t) => dias(t) === 1).length
-  const em3Dias = comPrazo.filter((t) => dias(t) === 3).length
-  const proximos7 = comPrazo.filter((t) => { const d = dias(t); return d >= 0 && d <= 7 }).length
-
-  // `/tarefas` ainda não lê filtro de prazo por querystring — o card leva pra
-  // lista real (não é link morto), só não chega pré-filtrado.
-  const card = (key: string, titulo: string, descricao: string, quantidade: number): FilaOperacional => ({
-    key, titulo, descricao, quantidade,
-    nivel: quantidade > 0 ? "alto" : "baixo",
-    modulo: "tarefas",
-    href: "/tarefas",
-  })
-
-  return [
-    card("tarefa-amanha", "Tarefas — vencem amanhã", "Prazo da tarefa é amanhã", amanha),
-    card("tarefa-3-dias", "Tarefas — vencem em 3 dias", "Prazo da tarefa é em 3 dias", em3Dias),
-    card("tarefa-7-dias", "Tarefas — vencem em 7 dias", "Prazo da tarefa nos próximos 7 dias", proximos7),
-  ]
+// ---------------------------------------------------------------------------
+// PRAZOS DE SUBTAREFA — o relógio OPERACIONAL, grain SUBTAREFA. A ação que
+// está correndo AGORA, nunca o compromisso macro da Tarefa (acima). Uma pode
+// estar atrasada enquanto a outra está no prazo — os dois painéis convivem,
+// lado a lado, na Home (decisão explícita do usuário, 17/09/2026).
+// ---------------------------------------------------------------------------
+export function montarPrazosDeSubtarefas(base: BaseOperacional, ctx: ContextoHome): FilaOperacional[] | null {
+  if (!ctx.permissoes.verTarefas) return null
+  return montarPainelDePrazo(FILAS_PRAZO_SUBTAREFA, base, ctx)
 }
 
 // ---------------------------------------------------------------------------
@@ -530,8 +608,16 @@ export async function listarFila(
   const pagina = ordenados.slice(0, LIMITE_ITENS)
 
   // Hidratação dos rótulos SÓ da página exibida (evita N+1 sobre a fila inteira).
-  const docIds = pagina.flatMap((m) => (m.tipo === "passo" && m.passo.documentoId ? [m.passo.documentoId] : []))
-  const necIds = pagina.flatMap((m) => (m.tipo === "passo" && m.passo.necessidadeId ? [m.passo.necessidadeId] : []))
+  const docIds = pagina.flatMap((m) =>
+    m.tipo === "passo" && m.passo.documentoId ? [m.passo.documentoId]
+    : m.tipo === "subtarefa" && m.subtarefa.documentoId ? [m.subtarefa.documentoId]
+    : [],
+  )
+  const necIds = pagina.flatMap((m) =>
+    m.tipo === "passo" && m.passo.necessidadeId ? [m.passo.necessidadeId]
+    : m.tipo === "subtarefa" && m.subtarefa.necessidadeId ? [m.subtarefa.necessidadeId]
+    : [],
+  )
   const respIds = [
     ...new Set(
       pagina.flatMap((m) =>
@@ -539,7 +625,9 @@ export async function listarFila(
           ? [m.passo.responsavelId]
           : m.tipo === "tarefa" && m.tarefa.responsavelId
             ? [m.tarefa.responsavelId]
-            : [],
+            : m.tipo === "subtarefa" && m.subtarefa.responsavelId
+              ? [m.subtarefa.responsavelId]
+              : [],
       ),
     ),
   ]
@@ -621,6 +709,31 @@ export async function listarFila(
         prazo: t.dataPrazo ? t.dataPrazo.toISOString() : null,
         atrasado: estaAtrasado(t.dataPrazo, ctx.agora),
         href: pr ? hrefProcesso(pr, `&tab=tarefas&atividadeId=${t.id}`) : "/operacao",
+      }
+    }
+    if (m.tipo === "subtarefa") {
+      const s = m.subtarefa
+      const pr = base.processos.get(s.processoId)
+      const doc = s.documentoId ? docPorId.get(s.documentoId) : null
+      const nec = s.necessidadeId ? necPorId.get(s.necessidadeId) : null
+      const pessoa = nomePessoa(doc?.pessoa) ?? nomePessoa(nec?.pessoa)
+      const responsavel = s.responsavelId ? respPorId.get(s.responsavelId) : null
+      return {
+        id: `subtarefa-${s.id}`,
+        // Rótulo pelo cadastro exigiria buscar a definição histórica por
+        // instância — custo real de N+1 numa fila que pode ter dezenas de
+        // linhas. A chave prettificada é o MESMO fallback que a fila de
+        // passo já usa quando falta um rótulo melhor (ver branch "passo"
+        // acima) — não é um padrão novo.
+        titulo: s.subtaskKey.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()),
+        subtitulo: [pessoa, responsavel ?? "Sem responsável"].filter(Boolean).join(" · "),
+        processoId: s.processoId,
+        processoCodigo: pr?.codigo ?? null,
+        processoNome: pr?.nome ?? null,
+        pais: pr?.pais ?? null,
+        prazo: s.prazo ? s.prazo.toISOString() : null,
+        atrasado: estaAtrasado(s.prazo, ctx.agora),
+        href: hrefProcesso(pr, s.documentoId ? `&sidebarTab=documentos` : ""),
       }
     }
     if (m.tipo === "processo-sla") {

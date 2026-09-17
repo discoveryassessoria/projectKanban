@@ -31,8 +31,24 @@ import {
   saudacao,
 } from "@/src/components/home/home-primitives"
 import { ProcessosEmAndamento } from "@/src/components/home/processos-andamento"
-import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
-import { faixaDaFilaSla } from "@/src/lib/home/home-logic"
+import { CORES_SLA, ESTILO_FAIXA_SLA, type CorSla } from "@/src/components/sla/sla-ui"
+import { faixaDaFilaSla, faixaDaFilaPrazo, type FaixaPrazo } from "@/src/lib/home/home-logic"
+
+/**
+ * Mesmo tom visual do SLA de Processo (`ESTILO_FAIXA_SLA`), só que para as 5
+ * faixas de prazo de Tarefa/Subtarefa — "atrasadas"/"proximos-3" não existem
+ * no vocabulário de `FaixaSla` (4 valores, Processo). `proximos-3` e
+ * `proximos-7` dividem o mesmo tom de atenção — a engine de SLA também só
+ * tem 3 cores (🟢🟡🔴); os 5 baldes são um recorte mais fino do MESMO
+ * semáforo, não uma paleta nova.
+ */
+const ESTILO_FAIXA_PRAZO: Record<FaixaPrazo, CorSla> = {
+  atrasadas: CORES_SLA.atrasado,
+  "vencem-hoje": CORES_SLA.hoje,
+  "proximos-3": CORES_SLA.atencao,
+  "proximos-7": CORES_SLA.atencao,
+  "no-prazo": CORES_SLA.ok,
+}
 
 // ===========================================================================
 // 1. CABEÇALHO — saudação, data, estado geral. Sem card: a Home pediu
@@ -138,7 +154,9 @@ function MinhaAtencaoBloco({ data }: { data: HomeData }) {
 //    utilização operacional detalhada continua em Operação.
 // ===========================================================================
 function LinhaDeChip({ fila }: { fila: FilaOperacional }) {
-  const st = ESTILO_FAIXA_SLA[faixaDaFilaSla(fila.key) ?? "no-prazo"]
+  const faixaSla = faixaDaFilaSla(fila.key)
+  const faixaPrazo = faixaDaFilaPrazo(fila.key)?.faixa ?? null
+  const st = faixaSla ? ESTILO_FAIXA_SLA[faixaSla] : ESTILO_FAIXA_PRAZO[faixaPrazo ?? "no-prazo"]
   return (
     <Link
       href={fila.href}
@@ -148,12 +166,19 @@ function LinhaDeChip({ fila }: { fila: FilaOperacional }) {
       <span className={`text-lg font-semibold tabular-nums ${fila.quantidade > 0 ? st.texto : "text-[var(--text-muted)]"}`}>
         {fila.quantidade}
       </span>
-      <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--text-secondary)]">{fila.titulo.replace(/^Tarefas\s*[—-]\s*/, "")}</span>
+      <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--text-secondary)]">{fila.titulo.replace(/^(Tarefas|Subtarefas)\s*[—-]?\s*/, "").replace(/^\w/, (c) => c.toUpperCase())}</span>
     </Link>
   )
 }
 
-function LinhaDePrazo({
+/**
+ * UM PAINEL DE PRAZO — Tarefa (compromisso de entrega) OU Subtarefa (ação
+ * corrente). Os dois convivem lado a lado na Home, NUNCA um substituindo o
+ * outro: uma tarefa pode estar no prazo enquanto a subtarefa que está
+ * rodando agora já está atrasada, e as duas leituras são verdadeiras ao
+ * mesmo tempo (regra definitiva do usuário, 17/09/2026).
+ */
+function PainelDePrazo({
   icone: Icone,
   titulo,
   descricao,
@@ -165,8 +190,8 @@ function LinhaDePrazo({
   cards: FilaOperacional[]
 }) {
   return (
-    <div className="flex flex-col gap-2.5 py-3.5 sm:flex-row sm:items-center sm:gap-5">
-      <div className="flex shrink-0 items-center gap-2.5 sm:w-[168px]">
+    <div className="rounded-xl border border-[var(--border-subtle)] p-3.5">
+      <div className="flex items-center gap-2.5 pb-2">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--info-tile)] text-[var(--info)]" aria-hidden>
           <Icone className="h-4 w-4" />
         </span>
@@ -175,7 +200,7 @@ function LinhaDePrazo({
           <p className="truncate text-[11px] text-[var(--text-muted)]">{descricao}</p>
         </div>
       </div>
-      <div className="grid flex-1 grid-cols-2 gap-1 sm:grid-cols-4 sm:divide-x sm:divide-[var(--border-subtle)]">
+      <div className="divide-y divide-[var(--border-subtle)]">
         {cards.map((c) => (
           <LinhaDeChip key={c.key} fila={c} />
         ))}
@@ -185,28 +210,28 @@ function LinhaDePrazo({
 }
 
 function PrazosBloco({ data }: { data: HomeData }) {
-  const processos = data.sla?.cards ?? null
   const tarefas = data.prazosTarefas ?? null
-  if (!processos && !tarefas) return null
+  const subtarefas = data.prazosSubtarefas ?? null
+  if (!tarefas && !subtarefas) return null
 
   return (
     <BlocoCard id="prazos">
-      <BlocoHeader titulo="Prazos" descricao="Visão consolidada dos prazos de processos e tarefas" />
-      <div className="divide-y divide-[var(--border-subtle)]">
-        {processos && (
-          <LinhaDePrazo
+      <BlocoHeader titulo="Prazos" descricao="Os dois controles de prazo da operação, lado a lado" />
+      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+        {tarefas && (
+          <PainelDePrazo
             icone={CheckCircle2}
-            titulo="Processos"
-            descricao="Prazo previsto de conclusão"
-            cards={processos}
+            titulo="Tarefas"
+            descricao="Prazo de conclusão — o compromisso macro"
+            cards={tarefas}
           />
         )}
-        {tarefas && tarefas.length > 0 && (
-          <LinhaDePrazo
+        {subtarefas && (
+          <PainelDePrazo
             icone={ChevronRight}
-            titulo="Tarefas"
-            descricao="Prazo das suas tarefas abertas"
-            cards={tarefas}
+            titulo="Subtarefas ativas"
+            descricao="Prazo da ação atual — o relógio operacional"
+            cards={subtarefas}
           />
         )}
       </div>

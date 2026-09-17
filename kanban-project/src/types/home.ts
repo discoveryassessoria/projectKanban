@@ -180,8 +180,10 @@ export interface HomeData {
   sla: PainelSla | null
   /** null quando o usuário não vê processos */
   prazosResumo: PrazosResumo | null
-  /** grain TAREFA (dataPrazo) — nunca somado ao `sla` acima (grain Processo). null quando o usuário não vê tarefas. */
+  /** grain TAREFA (dataPrazo, prazo MACRO) — nunca somado ao `sla` acima (grain Processo) nem ao de subtarefa abaixo. null quando o usuário não vê tarefas. */
   prazosTarefas: FilaOperacional[] | null
+  /** grain SUBTAREFA (prazo OPERACIONAL, ação corrente) — o relógio mais fino, convive com `prazosTarefas` sem substituí-lo. null quando o usuário não vê tarefas. */
+  prazosSubtarefas: FilaOperacional[] | null
   agenda: Agenda
   /** vazio = o bloco de alertas não é renderizado */
   alertas: AlertaOperacional[]

@@ -226,36 +226,33 @@ const paraData = (v: Date | string | null | undefined): Date | null => {
 }
 
 /**
- * O ESTADO TEMPORAL DE UMA UNIDADE DE TRABALHO — a função que todas consomem.
+ * O NÚCLEO — a mesma conta, qualquer que seja a unidade de trabalho.
  *
- * Pura: recebe o que já foi lido, devolve o que a tela mostra. Não consulta,
- * não escreve, não decide permissão. É por ser pura que ela pode ser a mesma na
- * Minha Fila, na Central, no Kanban e na notificação — e é por serem a mesma
- * que os quatro finalmente concordam.
- *
- * CONCLUÍDA CONGELA. Depois de `dataConclusao`, o atraso não cresce mais: o que
- * aconteceu tem um tamanho, e ele não aumenta porque o calendário andou.
+ * `estadoTemporal` (Tarefa) e `estadoTemporalSubtarefa` (Subtarefa) só diferem
+ * em COMO decidem "encerrada" e "aguardando terceiro" — cada uma lê o
+ * vocabulário de status da sua própria tabela (`StatusTarefa` vs
+ * `SubtaskExecution.status`, que não têm os mesmos valores). A partir daí a
+ * matemática é uma só, e mora aqui — nunca duplicada entre as duas.
  */
-export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
-  const agora = e.agora ?? new Date()
-  const prazo = paraData(e.dataPrazo)
-  const concluida = paraData(e.dataConclusao)
-  // QUEM DIZ QUE ACABOU É O STATUS, não a data de conclusão.
-  //
-  // `dataConclusao` é HISTÓRIA e sobrevive à reabertura de propósito: apagar a
-  // data em que o trabalho foi dado por pronto na primeira vez seria reescrever
-  // o passado. Tratá-la como "acabou" fazia a tarefa REABERTA nunca mais
-  // aparecer em aviso nenhum — encerrada para o relógio, aberta para as pessoas.
-  //
-  // Sem status informado (chamadas que só têm a data), a data volta a valer.
-  const encerrada = e.statusTarefa != null
-    ? ENCERRADOS.has(e.statusTarefa)
-    : concluida != null
-  const previsao = paraData(e.previsaoExterna)
-  const criada = paraData(e.criadaEm)
+function nucleoTemporal(n: {
+  dataPrazo: Date | string | null
+  dataConclusao?: Date | string | null
+  encerrada: boolean
+  aguardandoTerceiro: boolean
+  previsaoExterna?: Date | string | null
+  slaPausadoEm?: Date | string | null
+  criadaEm?: Date | string | null
+  agora?: Date
+}): EstadoTemporal {
+  const agora = n.agora ?? new Date()
+  const prazo = paraData(n.dataPrazo)
+  const concluida = paraData(n.dataConclusao)
+  const encerrada = n.encerrada
+  const previsao = paraData(n.previsaoExterna)
+  const criada = paraData(n.criadaEm)
 
   const agingDias = criada ? Math.max(0, diasEntreDiasOperacionais(agora, criada)) : null
-  const slaPausado = paraData(e.slaPausadoEm) != null
+  const slaPausado = paraData(n.slaPausadoEm) != null
 
   // ── ENCERRADA: o relógio parou ────────────────────────────────────────────
   if (encerrada) {
@@ -289,7 +286,7 @@ export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
       dueAt: null, diasParaPrazo: null, atrasado: false, atrasadoHaDias: null,
       venceHoje: false, venceAmanha: false, semPrazo: true,
       concluidoComAtraso: false, concluidoComAtrasoDeDias: null, concluidoEm: null,
-      aguardandoTerceiro: e.aguardandoTerceiro === true,
+      aguardandoTerceiro: n.aguardandoTerceiro,
       previsaoExterna: previsao?.toISOString() ?? null,
       slaPausado, agingDias,
       rotulo: 'Sem prazo', tom: 'neutro',
@@ -318,7 +315,7 @@ export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
     concluidoComAtraso: false,
     concluidoComAtrasoDeDias: null,
     concluidoEm: null,
-    aguardandoTerceiro: e.aguardandoTerceiro === true,
+    aguardandoTerceiro: n.aguardandoTerceiro,
     previsaoExterna: previsao?.toISOString() ?? null,
     slaPausado,
     agingDias,
@@ -326,6 +323,129 @@ export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
     tom: atrasado ? 'critico' : venceHoje || venceAmanha ? 'alerta' : 'neutro',
   }
 }
+
+/**
+ * O ESTADO TEMPORAL DE UMA TAREFA — o prazo MACRO, fixado na materialização.
+ *
+ * Pura: recebe o que já foi lido, devolve o que a tela mostra. Não consulta,
+ * não escreve, não decide permissão. É por ser pura que ela pode ser a mesma na
+ * Minha Fila, na Central, no Kanban e na notificação — e é por serem a mesma
+ * que os quatro finalmente concordam.
+ *
+ * CONCLUÍDA CONGELA. Depois de `dataConclusao`, o atraso não cresce mais: o que
+ * aconteceu tem um tamanho, e ele não aumenta porque o calendário andou.
+ *
+ * Este prazo NÃO se move quando a subtarefa corrente avança — ver
+ * `estadoTemporalSubtarefa` para o relógio operacional, mais fino.
+ */
+export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
+  const concluida = paraData(e.dataConclusao)
+  // QUEM DIZ QUE ACABOU É O STATUS, não a data de conclusão.
+  //
+  // `dataConclusao` é HISTÓRIA e sobrevive à reabertura de propósito: apagar a
+  // data em que o trabalho foi dado por pronto na primeira vez seria reescrever
+  // o passado. Tratá-la como "acabou" fazia a tarefa REABERTA nunca mais
+  // aparecer em aviso nenhum — encerrada para o relógio, aberta para as pessoas.
+  //
+  // Sem status informado (chamadas que só têm a data), a data volta a valer.
+  const encerrada = e.statusTarefa != null
+    ? ENCERRADOS.has(e.statusTarefa)
+    : concluida != null
+  return nucleoTemporal({
+    dataPrazo: e.dataPrazo,
+    dataConclusao: e.dataConclusao,
+    encerrada,
+    aguardandoTerceiro: e.aguardandoTerceiro === true,
+    previsaoExterna: e.previsaoExterna,
+    slaPausadoEm: e.slaPausadoEm,
+    criadaEm: e.criadaEm,
+    agora: e.agora,
+  })
+}
+
+/** Estados de `SubtaskExecution` em que o relógio da subtarefa já não corre. */
+const SUBTAREFA_ENCERRADA = new Set(['CONCLUIDO', 'CANCELADO', 'INVALIDADO', 'FALHOU'])
+
+/**
+ * O QUE A OPERAÇÃO PRECISA SABER SOBRE O TEMPO DE UMA SUBTAREFA.
+ *
+ * `dataPrazo` vem de `SubtaskExecution.prazo` — ancorado no instante em que
+ * ELA (não o passo, não a Tarefa) ficou `DISPONIVEL`, com o SLA efetivo dela
+ * (próprio, ou herdado do passo quando vazio). `null` enquanto ela ainda está
+ * `BLOQUEADO`/`PENDENTE`: subtarefa futura não tem relógio correndo.
+ */
+export interface EntradaTemporalSubtarefa {
+  dataPrazo: Date | string | null
+  dataConclusao?: Date | string | null
+  /** status vigente da SubtaskExecution — vocabulário próprio, não o de Tarefa. */
+  status?: string | null
+  criadaEm?: Date | string | null
+  agora?: Date
+}
+
+/**
+ * O ESTADO TEMPORAL DE UMA SUBTAREFA — o prazo OPERACIONAL, da ação corrente.
+ *
+ * Mesma matemática de `estadoTemporal` (um só núcleo, `nucleoTemporal`), só
+ * que lida com o vocabulário de status de `SubtaskExecution`
+ * (PENDENTE/DISPONIVEL/EM_ANDAMENTO/AGUARDANDO_EXTERNO/BLOQUEADO/CONCLUIDO/
+ * CANCELADO/INVALIDADO/FALHOU) em vez do de `Tarefa` — os dois vocabulários
+ * não têm os mesmos valores, por isso não dá para chamar `estadoTemporal`
+ * direto com o status de uma subtarefa.
+ *
+ * NUNCA substitui `estadoTemporal` da Tarefa: os dois convivem, cada um
+ * respondendo sua própria pergunta (ver cabeçalho do arquivo).
+ */
+export function estadoTemporalSubtarefa(e: EntradaTemporalSubtarefa): EstadoTemporal {
+  const encerrada = e.status != null
+    ? SUBTAREFA_ENCERRADA.has(e.status)
+    : paraData(e.dataConclusao) != null
+  return nucleoTemporal({
+    dataPrazo: e.dataPrazo,
+    dataConclusao: e.dataConclusao,
+    encerrada,
+    aguardandoTerceiro: e.status === 'AGUARDANDO_EXTERNO',
+    previsaoExterna: null,
+    slaPausadoEm: null,
+    criadaEm: e.criadaEm,
+    agora: e.agora,
+  })
+}
+
+// ============================================================================
+// EM RISCO — PROPOSTA DOCUMENTADA, AINDA NÃO LIGADA (17/09/2026)
+// ----------------------------------------------------------------------------
+// Decisão explícita do usuário: implementar os dois relógios (Tarefa +
+// Subtarefa) primeiro, calibrar depois. Esta seção documenta a regra
+// tecnicamente correta já desenhada e aprovada em conversa, para não se
+// perder — mas NENHUMA tela ou API deve chamar isto ainda. Quando for a hora
+// de ligar, o algoritmo é:
+//
+//   1. Pegar todas as subtarefas do passo ainda NÃO concluídas.
+//   2. Para a subtarefa ATIVA agora: custo restante =
+//        max(0, slaDaysEfetivo − dias úteis já decorridos desde que ficou
+//        disponível)
+//      Para as ainda BLOQUEADAS/PENDENTES: custo restante = slaDaysEfetivo
+//      cheio (elas ainda não começaram a consumir nada).
+//   3. Montar o grafo de dependência restante (`dependeDe`, o mesmo DAG que
+//      `subtarefasDaEtapa` já usa) e achar o CAMINHO MAIS LONGO (caminho
+//      crítico) somando o custo restante de cada nó no caminho — nunca a
+//      soma de TODAS as subtarefas, que superestima quando há ramos
+//      paralelos independentes.
+//   4. dataConclusaoProjetada = hoje (dia operacional) + caminho mais longo,
+//      em dias úteis (mesma `prazoOperacional`/`isDiaUtil` desta régua).
+//   5. Se `agora > Tarefa.dataPrazo` → já é ATRASADO — EM RISCO não se
+//      aplica mais (atraso tem precedência).
+//   6. Senão, se `dataConclusaoProjetada > Tarefa.dataPrazo` → EM RISCO.
+//   7. Senão → dentro do previsto.
+//
+// POR QUE NÃO LIGAR AINDA: assumir que toda subtarefa futura vai consumir
+// 100% do seu SLA (passo 2, ramo "bloqueada") gera falso alerta sistemático
+// em qualquer processo saudável que está adiantado — a maioria. Calibrar
+// significa decidir, com dado real de produção, se o custo restante de uma
+// subtarefa futura deve ser o SLA cheio, uma média histórica, ou outra
+// régua — e isso exige volume de execuções concluídas que ainda não existe.
+// ============================================================================
 
 /**
  * A PREVISÃO DO TERCEIRO, dita como informação.
