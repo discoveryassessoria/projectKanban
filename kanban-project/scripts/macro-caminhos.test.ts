@@ -99,10 +99,10 @@ async function main() {
   // ── PARTE 15 — criação de macro a partir do CatalogoFase (seedDefaults) ────
   console.log("\nCriação de macro com seedDefaults — nasce canônico ou não nasce")
   for (const f of [
-    { phaseKey: "genealogia", label: "Genealogia", ordemPadrao: 1, requiredPadrao: true, conditionalPadrao: false, slaDiasPadrao: 30 },
-    { phaseKey: "analise_documental", label: "Análise Documental", ordemPadrao: 3, requiredPadrao: true, conditionalPadrao: false, slaDiasPadrao: 30 },
-    { phaseKey: "retificacao_registros", label: "Retificação de Registros", ordemPadrao: 4, requiredPadrao: false, conditionalPadrao: true, slaDiasPadrao: 30 },
-    { phaseKey: "traducao_juramentada", label: "Tradução Juramentada", ordemPadrao: 6, requiredPadrao: true, conditionalPadrao: false, slaDiasPadrao: 30 },
+    { phaseKey: "genealogia", label: "Genealogia", ordemPadrao: 1, requiredPadrao: true, conditionalPadrao: false },
+    { phaseKey: "analise_documental", label: "Análise Documental", ordemPadrao: 3, requiredPadrao: true, conditionalPadrao: false },
+    { phaseKey: "retificacao_registros", label: "Retificação de Registros", ordemPadrao: 4, requiredPadrao: false, conditionalPadrao: true },
+    { phaseKey: "traducao_juramentada", label: "Tradução Juramentada", ordemPadrao: 6, requiredPadrao: true, conditionalPadrao: false },
   ]) {
     await prisma.catalogoFase.upsert({ where: { phaseKey: f.phaseKey }, update: f, create: f })
   }
@@ -129,7 +129,7 @@ async function main() {
   const macroNovo = await prisma.macroWorkflow.create({
     data: {
       tipoProcessoId: tipoNovo.id, name: "Macro novo", ativo: true,
-      fases: { create: catAtivo.map((f, i) => ({ phaseKey: f.phaseKey, label: f.label, ordem: i + 1, required: f.requiredPadrao, conditional: f.conditionalPadrao, entryRule: i === 0 ? "process_created" : "previous_phase_completed", slaDays: f.slaDiasPadrao, showInKanban: true })) },
+      fases: { create: catAtivo.map((f, i) => ({ phaseKey: f.phaseKey, label: f.label, ordem: i + 1, required: f.requiredPadrao, conditional: f.conditionalPadrao, entryRule: i === 0 ? "process_created" : "previous_phase_completed", showInKanban: true })) },
     },
     include: { fases: true },
   })

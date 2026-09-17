@@ -23,7 +23,6 @@ interface Fase {
   ordemPadrao: number
   requiredPadrao: boolean
   conditionalPadrao: boolean
-  slaDiasPadrao: number
   ativo: boolean
   usos: number
 }
@@ -61,13 +60,12 @@ type Form = {
   ordemPadrao: number
   requiredPadrao: boolean
   conditionalPadrao: boolean
-  slaDiasPadrao: number
   ativo: boolean
 }
 
 const vazio = (ordem: number): Form => ({
   phaseKey: "", label: "", descricao: "", escopo: "", efeitosPermitidos: null, ordemPadrao: ordem, requiredPadrao: true,
-  conditionalPadrao: false, slaDiasPadrao: 30, ativo: true,
+  conditionalPadrao: false, ativo: true,
 })
 
 export default function CatalogoFasesTab() {
@@ -181,7 +179,6 @@ export default function CatalogoFasesTab() {
               <th className="px-4 py-3 font-medium">Fase</th>
               <th className="px-4 py-3 font-medium">Chave</th>
               <th className="px-4 py-3 font-medium">Padrões</th>
-              <th className="px-4 py-3 font-medium">SLA</th>
               <th className="px-4 py-3 font-medium">Usada em</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 text-right font-medium">Ações</th>
@@ -189,7 +186,7 @@ export default function CatalogoFasesTab() {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhuma fase no catálogo. Cadastre a primeira em “+ Nova fase”.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhuma fase no catálogo. Cadastre a primeira em “+ Nova fase”.</td></tr>
             ) : rows.map(f => (
               <tr key={f.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordemPadrao}</td>
@@ -202,7 +199,6 @@ export default function CatalogoFasesTab() {
                     {!f.requiredPadrao && !f.conditionalPadrao && <span className="text-[var(--text-muted)]">—</span>}
                   </div>
                 </td>
-                <td className="px-4 py-2.5 text-white/70">{f.slaDiasPadrao} d</td>
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.usos ? `${f.usos} fluxo(s)` : "—"}</td>
                 <td className="px-4 py-2.5">
                   <button
@@ -222,7 +218,7 @@ export default function CatalogoFasesTab() {
                         descricao: f.descricao ?? "", escopo: f.escopo ?? "",
                         efeitosPermitidos: f.efeitosPermitidos ?? null,
                         requiredPadrao: f.requiredPadrao, conditionalPadrao: f.conditionalPadrao,
-                        slaDiasPadrao: f.slaDiasPadrao, ativo: f.ativo,
+                        ativo: f.ativo,
                       })}
                       className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"
                     ><IEdit /></button>
@@ -332,15 +328,9 @@ export default function CatalogoFasesTab() {
                 </p>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Ordem padrão <span className="text-[var(--text-muted)]">(só sugestão ao criar fluxo novo)</span></label>
-                  <input type="number" value={form.ordemPadrao} onChange={e => setForm(f => f && { ...f, ordemPadrao: Number(e.target.value) })} className={inputCls} />
-                </div>
-                <div>
-                  <label className={labelCls}>SLA padrão (dias)</label>
-                  <input type="number" min="0" value={form.slaDiasPadrao} onChange={e => setForm(f => f && { ...f, slaDiasPadrao: Number(e.target.value) })} className={inputCls} />
-                </div>
+              <div className="mt-3">
+                <label className={labelCls}>Ordem padrão <span className="text-[var(--text-muted)]">(só sugestão ao criar fluxo novo)</span></label>
+                <input type="number" value={form.ordemPadrao} onChange={e => setForm(f => f && { ...f, ordemPadrao: Number(e.target.value) })} className={inputCls} />
               </div>
               <div className="space-y-1.5 border-t border-[var(--border-default)] pt-3">
                 <label className="flex items-center gap-2 text-sm text-white/70">

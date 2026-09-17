@@ -90,7 +90,6 @@ for (const [arquivo, marca] of [
 const PERMITIDOS_MS = new Set([
   canonico,
   'lib/operacional/tarefa-ciclo.ts',   // pausa de SLA, contada em minutos
-  'src/lib/motor/sla-core.ts',         // SLA do PROCESSO — outra camada, declarada
   'src/lib/date-utils.ts',
 ])
 const somadores = RUNTIME.filter((f) => {

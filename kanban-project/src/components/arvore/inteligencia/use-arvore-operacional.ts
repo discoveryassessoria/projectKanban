@@ -67,7 +67,6 @@ import {
   resumirLinhagem,
   type DossiePessoa,
   type FatosOperacionais,
-  type PrazoDoProcesso,
   type ResumoLinhagem,
 } from "@/src/lib/genealogia/operacional/dossie"
 import type { ContextoAuditor } from "@/src/lib/genealogia/operacional/auditor"
@@ -75,9 +74,11 @@ import { calcularParentesco } from "@/src/lib/genealogia/motor/parentesco"
 import type { ContextoPerguntas } from "@/src/lib/genealogia/operacional/perguntas"
 import type { SinaisPessoa } from "../react-flow-tree"
 
-interface RespostaOperacional extends FatosOperacionais {
-  prazo: PrazoDoProcesso | null
-}
+// A Árvore Genealógica NÃO tem prazo/SLA (decisão do usuário, 17/09/2026):
+// `RespostaOperacional` era `FatosOperacionais` + `prazo` vindo da engine de
+// SLA de FaseMacro/Processo (removida) — o campo foi eliminado, sem
+// substituto, junto com toda a fiação abaixo que o carregava até a tela.
+type RespostaOperacional = FatosOperacionais
 
 export interface ArvoreOperacional {
   /** Linhagens de todos os requerentes, prontas para o seletor. */
@@ -296,18 +297,16 @@ export function useArvoreOperacional(params: {
     return m
   }, [dossies])
 
-  const prazo = req.dados?.prazo ?? null
-
   const resumo = useMemo<ResumoLinhagem | null>(
-    () => (linhagem ? resumirLinhagem(linhagem, dossies, prazo, agora) : null),
-    [linhagem, dossies, prazo, agora],
+    () => (linhagem ? resumirLinhagem(linhagem, dossies, agora) : null),
+    [linhagem, dossies, agora],
   )
 
   // Comparação: um resumo por requerente. É o mesmo `resumirLinhagem` — nenhuma
   // segunda contagem, e por isso a comparação nunca discorda do resumo do topo.
   const comparacao = useMemo<ResumoLinhagem[]>(
-    () => mapa.linhagens.map((l) => resumirLinhagem(l, dossies, prazo, agora)),
-    [mapa, dossies, prazo, agora],
+    () => mapa.linhagens.map((l) => resumirLinhagem(l, dossies, agora)),
+    [mapa, dossies, agora],
   )
 
   // O canvas só desenha slot "+pai/+mãe" para a pessoa RAIZ (profundidade 0);
@@ -334,7 +333,6 @@ export function useArvoreOperacional(params: {
             // O diagnóstico segue o escopo da tela: no modo linhagem fala da
             // linha; na vista completa fala da árvore.
             linhagem: modo === "linhagem" ? linhagem : null,
-            prazo,
             agora,
           })
         : {
@@ -346,7 +344,7 @@ export function useArvoreOperacional(params: {
             atencao: 0,
             semExigenciaMaterializada: true,
           },
-    [analise, mapa, dossies, modo, linhagem, prazo, agora],
+    [analise, mapa, dossies, modo, linhagem, agora],
   )
 
   // O Auditor come exatamente o mesmo contexto do diagnóstico — nenhuma

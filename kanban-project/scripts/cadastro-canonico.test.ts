@@ -186,7 +186,7 @@ async function main() {
   const fase = await prisma.catalogoFase.create({
     data: {
       phaseKey: "cc_teste_dinamico", label: "Teste Dinâmico", escopo: "PROCESSO",
-      ordemPadrao: 90, slaDiasPadrao: 5,
+      ordemPadrao: 90,
       // A fase declara a própria competência — é o cadastro dizendo o que ela pode.
       efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME"],
     },

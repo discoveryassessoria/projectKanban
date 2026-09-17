@@ -136,7 +136,7 @@ async function main() {
   const fase = await prisma.catalogoFase.create({
     data: {
       phaseKey: "fase_de_teste_universal", label: "Fase de Teste Universal", escopo: "PROCESSO",
-      ordemPadrao: 97, slaDiasPadrao: 5,
+      ordemPadrao: 97,
       efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME"],
     },
     select: { phaseKey: true },

@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-16
+-- Gerado em : 2026-09-17
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2363,7 +2363,6 @@ CREATE TABLE "CatalogoFase" (
     "ordemPadrao" INTEGER NOT NULL DEFAULT 0,
     "requiredPadrao" BOOLEAN NOT NULL DEFAULT true,
     "conditionalPadrao" BOOLEAN NOT NULL DEFAULT false,
-    "slaDiasPadrao" INTEGER NOT NULL DEFAULT 30,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "efeitosPermitidos" JSONB,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -2397,7 +2396,6 @@ CREATE TABLE "FaseMacro" (
     "conditional" BOOLEAN NOT NULL DEFAULT false,
     "entryRule" VARCHAR(40) NOT NULL DEFAULT 'previous_phase_completed',
     "exitRule" VARCHAR(120),
-    "slaDays" INTEGER NOT NULL DEFAULT 30,
     "showInKanban" BOOLEAN NOT NULL DEFAULT true,
     "versao" INTEGER NOT NULL DEFAULT 1,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,

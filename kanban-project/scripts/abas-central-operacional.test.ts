@@ -122,9 +122,9 @@ ok(editores.includes("InformarProtocoloInline") &&
 ok(editores.includes("Requerimento enviado ao cartório") && editores.includes("requerimentoUrl"),
   "21. \"Aguardar retorno\" exibe o requerimento já registrado, sem pedir reenvio")
 
-// SLA / dependências / automações continuam no motor
-ok(existsSync(join(ROOT, "src/lib/process-stage/sla-projection.ts")),
-  "22. o motor de SLA continua intacto (a aba era vitrine, não a regra)")
+// dependências / automações continuam no motor
+// (item 22 testava o motor de SLA de FaseMacro/Processo — eliminado por
+// completo em 17/09/2026, sem substituto; ver [[prazo-tarefa-subtarefa-dois-relogios]])
 ok(ler("src/services/documento-operacao.ts").includes("aplicarTransicaoDoPassoTx"),
   "23. a sequência/liberação de passos continua no motor")
 ok(existsSync(join(ROOT, "src/lib/motor/executor.ts")),

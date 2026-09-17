@@ -239,7 +239,7 @@ async function main() {
   const escopo = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   await prisma.catalogoFase.create({
     data: { phaseKey: `${M.toLowerCase()}_ret`, label: "Retificação (teste)", escopo: "PROCESSO",
-      ordemPadrao: 97, slaDiasPadrao: 30, efeitosPermitidos: escopo as never },
+      ordemPadrao: 97, efeitosPermitidos: escopo as never },
   })
   const wf = await prisma.phaseInternalWorkflow.create({
     data: {

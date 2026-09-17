@@ -25,7 +25,7 @@ interface Passo {
 interface Interno { name: string; versao: number; global: boolean; passos: Passo[] }
 interface Fase {
   phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean
-  entryRule: string; slaDays: number; showInKanban: boolean; versao: number; interno: Interno | null
+  entryRule: string; showInKanban: boolean; versao: number; interno: Interno | null
 }
 interface Contagens {
   fases: number; fasesNoKanban: number; fasesComInterno: number; passos: number
@@ -160,17 +160,22 @@ const ENTRY_LABEL: Record<string, string> = {
 }
 const entryLabel = (k: string) => ENTRY_LABEL[k] ?? k
 
+// SLA da FASE MACRO (FaseMacro.slaDays) ELIMINADO (17/09/2026, decisão do
+// usuário): a Fase Macro não tem prazo — ela representa posição do Processo,
+// não uma unidade operacional de execução. O prazo canônico vive em Tarefa
+// (macro da entrega) e Subtarefa (execução), nunca em Fase/Processo — ver
+// [[prazo-tarefa-subtarefa-dois-relogios]]. Esta tela continua mostrando o
+// SLA do PASSO (Workflow Interno), que alimenta esses dois relógios.
 export function SLAConfiguracaoTab() {
   return (
     <Consulta
       titulo="SLA"
-      descricao="Prazos configurados em cada fase do processo e nos passos do Workflow Interno. O acumulado é a soma dos prazos das fases obrigatórias, na ordem do fluxo."
+      descricao="Prazos configurados nos passos do Workflow Interno de cada fase — a fonte do prazo de Tarefa e Subtarefa. A Fase Macro e o Processo não têm prazo próprio."
       onde="Workflow › Fluxos"
     >
       {({ tipo }) => {
         if (!tipo) return null
         if (!tipo.macro || tipo.fases.length === 0) return <SemFluxo nome={tipo.name} />
-        let acumulado = 0
         return (
           <div className={`overflow-x-auto ${CARD}`}>
             <table className="w-full text-sm">
@@ -178,8 +183,6 @@ export function SLAConfiguracaoTab() {
                 <tr>
                   <th className={TH}>#</th>
                   <th className={TH}>Fase</th>
-                  <th className={TH}>SLA da fase</th>
-                  <th className={TH}>Acumulado</th>
                   <th className={TH}>Passos</th>
                   <th className={TH}>Maior SLA de passo</th>
                   <th className={TH}>Regime</th>
@@ -187,15 +190,12 @@ export function SLAConfiguracaoTab() {
               </thead>
               <tbody>
                 {tipo.fases.map((f) => {
-                  if (f.required) acumulado += f.slaDays
                   const passos = f.interno?.passos ?? []
                   const maiorPasso = passos.reduce((m, p) => Math.max(m, p.slaDays), 0)
                   return (
                     <tr key={f.phaseKey} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordem}</td>
                       <td className="px-4 py-2.5 text-white">{f.label}</td>
-                      <td className="px-4 py-2.5 text-white/80">{f.slaDays} d</td>
-                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.required ? `${acumulado} d` : "—"}</td>
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">{passos.length || "—"}</td>
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">{maiorPasso ? `${maiorPasso} d` : "—"}</td>
                       <td className="px-4 py-2.5">
@@ -209,15 +209,6 @@ export function SLAConfiguracaoTab() {
                     </tr>
                   )
                 })}
-                <tr className="bg-[var(--surface-primary)]">
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 font-medium text-white">Prazo total (fases obrigatórias)</td>
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3 font-semibold text-white">{acumulado} d</td>
-                  <td className="px-4 py-3 text-[var(--text-secondary)]">{tipo.contagens.passos}</td>
-                  <td className="px-4 py-3" />
-                  <td className="px-4 py-3" />
-                </tr>
               </tbody>
             </table>
           </div>
@@ -368,7 +359,6 @@ export function TransicoesTab() {
                   <th className={TH}>Para</th>
                   <th className={TH}>Regra de entrada</th>
                   <th className={TH}>Natureza</th>
-                  <th className={TH}>SLA</th>
                   <th className={TH}>Kanban</th>
                 </tr>
               </thead>
@@ -389,7 +379,6 @@ export function TransicoesTab() {
                           {f.conditional && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800">condicional</span>}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.slaDays} d</td>
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.showInKanban ? "sim" : "não"}</td>
                     </tr>
                   )

@@ -3404,7 +3404,6 @@ model CatalogoFase {
   ordemPadrao       Int             @default(0)
   requiredPadrao    Boolean         @default(true)
   conditionalPadrao Boolean         @default(false)
-  slaDiasPadrao     Int             @default(30)
   ativo             Boolean         @default(true)
   /// COMPETÊNCIA DA FASE — quais efeitos os passos desta fase podem executar.
   ///
@@ -3460,7 +3459,6 @@ model FaseMacro {
   conditional     Boolean       @default(false)
   entryRule       String        @default("previous_phase_completed") @db.VarChar(40)
   exitRule        String?       @db.VarChar(120)
-  slaDays         Int           @default(30)
   showInKanban    Boolean       @default(true)
   versao          Int           @default(1) // CP-4A â versionamento
   criadoEm        DateTime      @default(now())

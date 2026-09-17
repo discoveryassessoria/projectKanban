@@ -10,9 +10,11 @@
 //   3. DOSSIÊ — projeção por pessoa das exigências, divergências, tarefas e
 //      valores, com a próxima ação e a urgência ponderada por dependentes.
 //
-// Também trava três INVARIANTES que, se caírem, quebram a promessa feita ao
-// usuário: o foco não muda topologia; a árvore não converte moeda; e sem SLA
-// configurado ela não inventa prazo.
+// Também trava duas INVARIANTES que, se caírem, quebram a promessa feita ao
+// usuário: o foco não muda topologia; a árvore não converte moeda.
+//
+// A Árvore Genealógica NÃO tem prazo/SLA (decisão do usuário, 17/09/2026) —
+// removido daqui junto com a engine de FaseMacro/Processo.
 //
 // Rodar: npx tsx scripts/arvore-motor-operacional.test.ts
 // ============================================================================
@@ -370,24 +372,12 @@ ok(limpo === null, "sem pendência, a próxima ação é ausência de ação", l
 // ── 4. RESUMO DA LINHAGEM ───────────────────────────────────────────────────
 secao("4) resumo da linhagem")
 
-const resumo = resumirLinhagem(lMarcos, dossies, null)
+const resumo = resumirLinhagem(lMarcos, dossies)
 ok(resumo.requerenteId === 4, "o resumo é da linhagem pedida")
 ok(resumo.pessoas === lMarcos.visivel.size, "conta as pessoas visíveis da linha")
 ok(resumo.documental.necessarias > 0, "consolida as exigências da linha inteira")
 ok(resumo.focoId === 1, "aponta a pessoa mais urgente da linha", resumo.focoId)
 ok(resumo.proximaAcao?.startsWith("Giuseppe") === true, "a próxima ação nomeia a pessoa", resumo.proximaAcao)
-
-// INVARIANTE: sem SLA configurado, a árvore NÃO inventa prazo.
-ok(resumo.prazo === null, "sem projeção de SLA o prazo é nulo, não estimado")
-const comPrazo = resumirLinhagem(lMarcos, dossies, {
-  rotuloDias: "Vence em 3 dias",
-  rotuloStatus: "Próximo do vencimento",
-  status: "ATENCAO",
-  diasParaVencimento: 3,
-  prazoPrevisto: "2026-08-10T00:00:00.000Z",
-  configurado: true,
-})
-ok(comPrazo.prazo?.rotuloDias === "Vence em 3 dias", "quando há SLA, o prazo vem dele intacto")
 
 // ── 5. PERGUNTAS ────────────────────────────────────────────────────────────
 secao("5) perguntas determinísticas")
@@ -565,7 +555,6 @@ const diag = diagnosticar({
   mapa,
   dossies,
   linhagem: lMarcos,
-  prazo: null,
   agora: HOJE,
 })
 ok(diag.saude === "critico", "documento não localizado torna o processo CRÍTICO", diag.saude)
@@ -638,7 +627,6 @@ const diagSao = diagnosticar({
   mapa: mapaSao,
   dossies: dossiesSaos,
   linhagem: mapaSao.porRequerente.get(3)!,
-  prazo: null,
   agora: HOJE,
 })
 ok(diagSao.problemas.length === 0, "árvore sem pendência não gera problema", diagSao.problemas.map((p) => p.id))
@@ -669,7 +657,7 @@ const comVencida = projetarDossies({
   },
 })
 const diagVencida = diagnosticar({
-  grafo, analise, mapa, dossies: comVencida, linhagem: lMarcos, prazo: null, agora: HOJE,
+  grafo, analise, mapa, dossies: comVencida, linhagem: lMarcos, agora: HOJE,
 })
 ok(
   diagVencida.problemas.some((p) => p.categoria === "tarefa_vencida"),
@@ -694,20 +682,6 @@ const semBloqueio = {
 }
 const acaoVencida = resolveNextGenealogyAction(semBloqueio)
 ok(acaoVencida.prioridade === 4, "tarefa vencida é prioridade 4", acaoVencida.prioridade)
-
-// SLA vencido entra no diagnóstico; sem SLA configurado, não.
-const diagSla = diagnosticar({
-  grafo, analise, mapa, dossies, linhagem: lMarcos, agora: HOJE,
-  prazo: {
-    rotuloDias: "12 dias atrasado", rotuloStatus: "Atrasado", status: "ATRASADO",
-    diasParaVencimento: -12, prazoPrevisto: "2026-07-01T00:00:00.000Z", configurado: true,
-  },
-})
-ok(diagSla.problemas.some((p) => p.categoria === "sla"), "SLA vencido vira pendência")
-ok(
-  !diag.problemas.some((p) => p.categoria === "sla"),
-  "sem projeção de SLA, nenhum problema de prazo é inventado",
-)
 
 // ── 5e. DELTA DE LINHAGEM (base do preview) ─────────────────────────────────
 secao("5e) delta de linhagem")

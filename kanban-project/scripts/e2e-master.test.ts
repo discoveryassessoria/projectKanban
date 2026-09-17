@@ -76,14 +76,14 @@ async function main() {
 
   const fEmissao = await prisma.catalogoFase.create({
     data: {
-      phaseKey: "e2e_emissao", label: "Emissão (E2E)", escopo: "DOCUMENTO", ordemPadrao: 10, slaDiasPadrao: 10,
+      phaseKey: "e2e_emissao", label: "Emissão (E2E)", escopo: "DOCUMENTO", ordemPadrao: 10,
       efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME", "MARK_DOCUMENT_RECEIVED", "APPROVE_FOR_ANALYSIS", "REQUEST_NEW_COPY"],
     },
     select: { phaseKey: true },
   })
   const fAnalise = await prisma.catalogoFase.create({
     data: {
-      phaseKey: "e2e_analise", label: "Análise (E2E)", escopo: "DOCUMENTO", ordemPadrao: 20, slaDiasPadrao: 5,
+      phaseKey: "e2e_analise", label: "Análise (E2E)", escopo: "DOCUMENTO", ordemPadrao: 20,
       efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "REGISTER_DIVERGENCE", "GO_RETIFICATION", "COMPLETE_DOCUMENT", "INVALIDATE_DOCUMENT"],
     },
     select: { phaseKey: true },

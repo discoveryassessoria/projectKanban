@@ -84,7 +84,7 @@ async function main() {
       await prisma.catalogoFase.update({ where: { id: antiga.id }, data: { phaseKey: para } })
       await auditar('PHASE_CANONICALIZED', 'CatalogoFase', antiga.id,
         `Chave da fase "${antiga.label}" reconciliada de "${de}" para "${para}". Mesma fase, mesmo id — só a identidade de domínio foi normalizada.`,
-        { antes: { phaseKey: de }, depois: { phaseKey: para }, campos_preservados: ['id', 'label', 'ordemPadrao', 'requiredPadrao', 'conditionalPadrao', 'slaDiasPadrao', 'ativo', 'escopo'] })
+        { antes: { phaseKey: de }, depois: { phaseKey: para }, campos_preservados: ['id', 'label', 'ordemPadrao', 'requiredPadrao', 'conditionalPadrao', 'ativo', 'escopo'] })
     }
   }
 
@@ -111,16 +111,16 @@ async function main() {
       console.log(`  ⚠ CONFLITO #${f.id} (${f.macroWorkflow.name}): o fluxo já tem "${para}"`)
       continue
     }
-    console.log(`  ${EXECUTAR ? '✔' : '→'} #${f.id} ${f.macroWorkflow.name} · ordem ${f.ordem} · ${f.phaseKey} → ${para} (ordem/SLA/obrigatória/condicional/kanban preservados)`)
+    console.log(`  ${EXECUTAR ? '✔' : '→'} #${f.id} ${f.macroWorkflow.name} · ordem ${f.ordem} · ${f.phaseKey} → ${para} (ordem/obrigatória/condicional/kanban preservados)`)
     alteracoes.push({ tabela: 'FaseMacro', id: f.id, de: f.phaseKey, para, detalhe: `${f.macroWorkflow.name} · ordem ${f.ordem}` })
     if (EXECUTAR) {
       await prisma.faseMacro.update({ where: { id: f.id }, data: { phaseKey: para } })
       await auditar('WORKFLOW_PHASE_CANONICALIZED', 'FaseMacro', f.id,
-        `Fase "${f.label}" do fluxo "${f.macroWorkflow.name}" passou a referenciar a chave canônica "${para}" (era "${f.phaseKey}"). Ordem, SLA, obrigatoriedade, condicionalidade e exibição no Kanban preservados.`,
+        `Fase "${f.label}" do fluxo "${f.macroWorkflow.name}" passou a referenciar a chave canônica "${para}" (era "${f.phaseKey}"). Ordem, obrigatoriedade, condicionalidade e exibição no Kanban preservados.`,
         {
           macroWorkflowId: f.macroWorkflowId, tipoProcessoId: f.macroWorkflow.tipoProcessoId,
-          antes: { phaseKey: f.phaseKey, ordem: f.ordem, required: f.required, conditional: f.conditional, slaDays: f.slaDays, showInKanban: f.showInKanban },
-          depois: { phaseKey: para, ordem: f.ordem, required: f.required, conditional: f.conditional, slaDays: f.slaDays, showInKanban: f.showInKanban },
+          antes: { phaseKey: f.phaseKey, ordem: f.ordem, required: f.required, conditional: f.conditional, showInKanban: f.showInKanban },
+          depois: { phaseKey: para, ordem: f.ordem, required: f.required, conditional: f.conditional, showInKanban: f.showInKanban },
         })
     }
   }

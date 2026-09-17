@@ -87,7 +87,6 @@ export async function GET(request: NextRequest) {
         required: f.required,
         conditional: f.conditional,
         entryRule: f.entryRule,
-        slaDays: f.slaDays,
         showInKanban: f.showInKanban,
         versao: f.versao,
         // workflow interno que atende esta fase (específico do tipo vence o global)

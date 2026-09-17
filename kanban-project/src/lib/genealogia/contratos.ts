@@ -91,19 +91,11 @@ export interface GenealogyOperationalProjection {
     necessidadeId?: number | null
     pessoaId: number | null
   }[]
-  /**
-   * Prazo do processo pela engine ÚNICA de SLA. `null` quando não há SLA
-   * configurado — e nesse caso a árvore diz isso, em vez de estimar.
-   */
-  prazo: {
-    rotuloDias: string
-    rotuloStatus: string
-    status: string
-    diasParaVencimento: number | null
-    prazoPrevisto: string | null
-    configurado: boolean
-  } | null
 }
+// Existia aqui um campo `prazo` (engine de SLA de FaseMacro/Processo).
+// REMOVIDO (17/09/2026, decisão do usuário): a Árvore Genealógica não tem
+// prazo/SLA — ela representa estrutura familiar/linhagem, não é unidade
+// operacional de execução. Ver [[prazo-tarefa-subtarefa-dois-relogios]].
 
 // ── 4. FINANCEIRO ───────────────────────────────────────────────────────────
 

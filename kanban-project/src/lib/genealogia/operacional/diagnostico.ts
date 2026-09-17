@@ -32,7 +32,7 @@ import type { GrafoGenealogico } from "../motor/grafo"
 import type { AnaliseArvore, Insight, Severidade } from "../motor/tipos"
 import type { Linhagem, MapaLinhagens } from "../motor/linhagens"
 import { nomeCompleto } from "../motor/texto"
-import type { DossiePessoa, PrazoDoProcesso, TarefaDaPessoa } from "./dossie"
+import type { DossiePessoa, TarefaDaPessoa } from "./dossie"
 
 export type NivelSaude = "saudavel" | "atencao" | "critico"
 
@@ -51,7 +51,6 @@ export type CategoriaProblema =
   | "divergencia"
   | "duplicidade"
   | "relacao"
-  | "sla"
 
 export const ROTULO_CATEGORIA: Record<CategoriaProblema, string> = {
   bloqueio_documental: "Documento não localizado",
@@ -62,7 +61,6 @@ export const ROTULO_CATEGORIA: Record<CategoriaProblema, string> = {
   divergencia: "Divergência de dados",
   duplicidade: "Possível duplicidade",
   relacao: "Relação incompleta",
-  sla: "Prazo",
 }
 
 export interface Problema {
@@ -109,7 +107,6 @@ export interface ContextoDiagnostico {
   dossies: Map<number, DossiePessoa>
   /** Escopo: uma linhagem, ou a árvore inteira quando null. */
   linhagem: Linhagem | null
-  prazo: PrazoDoProcesso | null
   /** Data de referência para vencimento. Injetada — o módulo não lê relógio. */
   agora: Date
 }
@@ -117,7 +114,6 @@ export interface ContextoDiagnostico {
 const FONTE_DOCUMENTAL = "NecessidadeDocumental (Sistema Documental)"
 const FONTE_TAREFA = "Tarefa do processo"
 const FONTE_MOTOR = "Motor genealógico (regra determinística)"
-const FONTE_SLA = "Projeção de SLA do processo"
 
 /** Uma tarefa está vencida quando tem prazo e o prazo já passou. */
 export function tarefaVencida(t: TarefaDaPessoa, agora: Date): boolean {
@@ -127,7 +123,7 @@ export function tarefaVencida(t: TarefaDaPessoa, agora: Date): boolean {
 }
 
 export function diagnosticar(ctx: ContextoDiagnostico): Diagnostico {
-  const { grafo, analise, mapa, dossies, linhagem, prazo, agora } = ctx
+  const { grafo, analise, mapa, dossies, linhagem, agora } = ctx
   const problemas: Problema[] = []
 
   const escopo = linhagem ? [...linhagem.visivel] : grafo.pessoas.map((p) => p.id)
@@ -263,43 +259,9 @@ export function diagnosticar(ctx: ContextoDiagnostico): Diagnostico {
     })
   }
 
-  // ── 4. SLA (fonte: engine única) ──────────────────────────────────────────
-  // Só entra quando há projeção configurada e o prazo já venceu ou está por
-  // vencer. Sem SLA configurado não há prazo a cobrar — e não se inventa um.
-  if (prazo?.configurado && prazo.diasParaVencimento != null) {
-    const dias = prazo.diasParaVencimento
-    if (dias < 0) {
-      problemas.push({
-        id: "diag-sla-vencido",
-        categoria: "sla",
-        severidade: "alto",
-        impeditivo: false,
-        pessoaId: null,
-        pessoaNome: null,
-        titulo: `Prazo do processo vencido — ${prazo.rotuloDias}`,
-        motivo: `O SLA do processo indica ${prazo.rotuloStatus.toLowerCase()}.`,
-        impacto: "Afeta o processo inteiro, não uma pessoa isolada.",
-        fonte: FONTE_SLA,
-        acao: "Verificar a fase responsável pelo atraso na Central Operacional.",
-        peso: 750,
-      })
-    } else if (dias <= 7) {
-      problemas.push({
-        id: "diag-sla-risco",
-        categoria: "sla",
-        severidade: "medio",
-        impeditivo: false,
-        pessoaId: null,
-        pessoaNome: null,
-        titulo: `Prazo do processo em risco — ${prazo.rotuloDias}`,
-        motivo: "O prazo vence em até 7 dias.",
-        impacto: "Afeta o processo inteiro, não uma pessoa isolada.",
-        fonte: FONTE_SLA,
-        acao: "Priorizar as pendências desta linha antes do vencimento.",
-        peso: 350,
-      })
-    }
-  }
+  // A Árvore Genealógica NÃO tem prazo/SLA (decisão do usuário, 17/09/2026):
+  // existiu aqui uma categoria "sla" alimentada pela engine de SLA de
+  // FaseMacro/Processo (removida) — eliminada por completo, sem substituto.
 
   // Ordem determinística: peso, depois id. Duas leituras da mesma árvore
   // produzem a mesma lista, na mesma ordem.

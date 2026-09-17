@@ -72,7 +72,7 @@ async function main() {
   console.log(`  molde: ${molde.name} (${molde.modalidade.modalityKey})`)
   console.log(`  ${molde.macroWorkflow.fases.length} fases:\n`)
   for (const f of molde.macroWorkflow.fases) {
-    console.log(`     ${String(f.ordem).padStart(2)}. ${f.phaseKey.padEnd(32)} ${f.required ? "obrigatória" : "opcional   "} · SLA ${f.slaDays}d · kanban=${f.showInKanban}`)
+    console.log(`     ${String(f.ordem).padStart(2)}. ${f.phaseKey.padEnd(32)} ${f.required ? "obrigatória" : "opcional   "} · kanban=${f.showInKanban}`)
   }
 
   if (!APLICAR) { console.log("\nDRY-RUN: nada foi escrito."); return }
@@ -92,7 +92,7 @@ async function main() {
           phaseKey: f.phaseKey, label: f.label, ordem: f.ordem,
           required: f.required, conditional: f.conditional,
           entryRule: f.entryRule, exitRule: f.exitRule,
-          slaDays: f.slaDays, showInKanban: f.showInKanban, versao: 1,
+          showInKanban: f.showInKanban, versao: 1,
         })),
       },
     },

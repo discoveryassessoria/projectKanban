@@ -18,9 +18,13 @@
 //  2. A ÁRVORE NÃO É DONA DO DOCUMENTO. Ela consome NecessidadeDocumental e
 //     nunca decide obrigatoriedade, status ou ciclo de vida documental.
 //
-//  3. A ÁRVORE NÃO INVENTA PRAZO NEM CONVERTE MOEDA. Prazo vem da engine única
-//     de SLA; valor fica na moeda do lançamento. Uma segunda engine de prazo ou
-//     uma taxa embutida seriam duas verdades na mesma tela.
+//  3. A ÁRVORE NÃO TEM PRAZO NEM CONVERTE MOEDA. Não existe regra de negócio
+//     que justifique prazo na Árvore Genealógica — ela representa estrutura
+//     familiar/linhagem, não é unidade operacional de execução (decisão do
+//     usuário, 17/09/2026: a engine de SLA de FaseMacro/Processo que antes
+//     alimentava esta tela foi eliminada, sem substituto). Valor fica na
+//     moeda do lançamento — uma taxa embutida seria uma segunda verdade na
+//     mesma tela.
 //
 //  4. A INTELIGÊNCIA É DETERMINÍSTICA E LOCAL. Nenhuma resposta da árvore sai
 //     de um modelo de linguagem nem envia a genealogia do cliente para fora.
@@ -153,10 +157,10 @@ if (/temPermissao\(usuario\.permissoes,\s*["']financeiro\.ver["']\)/.test(rota))
   falhar("o gate financeiro sumiu do servidor", "ver a árvore não é ver o dinheiro")
 }
 
-// ── 4) Sem prazo inventado, sem moeda convertida ────────────────────────────
+// ── 4) Sem prazo, sem moeda convertida ──────────────────────────────────────
 console.log("\n4) prazo e moeda")
-if (/resolveSlaProjection/.test(rota)) ok("o prazo vem da engine única de SLA")
-else falhar("o prazo deixou de vir do SLA", "estimativa própria seria uma segunda engine de prazo")
+if (!/resolveSlaProjection|sla-projection|\bprazo\b/i.test(rota)) ok("a rota não tem prazo — a Árvore não é unidade operacional de execução")
+else falhar("a rota voltou a ter prazo", "decisão do usuário (17/09/2026): Árvore Genealógica não tem prazo/SLA")
 
 if (/somarPorMoeda/.test(dossie) && !/(taxa|fx|cambio|conversao)\s*[*=]/i.test(dossie)) {
   ok("os valores somam por moeda, sem conversão embutida")
@@ -250,7 +254,10 @@ else falhar("as respostas perderam a fonte", "resposta sem fonte não é respost
 // ── 6) A tela continua sendo a mesma ────────────────────────────────────────
 console.log("\n6) identidade da tela")
 const barra = ler("src/components/arvore/inteligencia/barra-linhagem.tsx")
-if (/border-gray-200 bg-white/.test(barra)) {
+// `bg-white` virou `bg-[var(--surface-primary)]` no rebranding de tokens de
+// cor (commit 9167b47e, "Cor deixa de ser decoração e passa a ter contrato")
+// — a casca continua a mesma, só o valor do token mudou de nome.
+if (/border-gray-200 bg-\[var\(--surface-primary\)\]/.test(barra)) {
   ok("a barra de linhagem usa a casca dos botões que já existiam")
 } else {
   falhar("a barra de linhagem inventou estilo próprio", "os controles novos usam a casca antiga")

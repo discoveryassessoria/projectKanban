@@ -107,7 +107,6 @@ export async function POST(request: NextRequest) {
           required: f.requiredPadrao,
           conditional: f.conditionalPadrao,
           entryRule: i === 0 ? 'process_created' : 'previous_phase_completed',
-          slaDays: f.slaDiasPadrao,
           showInKanban: true,
         })),
       }

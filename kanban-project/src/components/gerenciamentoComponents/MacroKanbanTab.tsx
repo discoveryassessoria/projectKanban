@@ -10,10 +10,13 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useApi } from '@/src/lib/dados'
 
 type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; modalityLabel: string; ativo: boolean; temWorkflow: boolean }
-type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean; slaDiasPadrao: number }
+type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean }
 // exitRule DESCONTINUADO: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
 // A tela não lê, não exibe, não edita e não reenvia o campo — o backend também não grava mais.
-type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; slaDays: number; showInKanban: boolean }
+// slaDays (SLA de FaseMacro/Processo) ELIMINADO (17/09/2026, decisão do
+// usuário): a Fase Macro não tem prazo. O prazo canônico vive em Tarefa e
+// Subtarefa — ver [[prazo-tarefa-subtarefa-dois-relogios]].
+type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; showInKanban: boolean }
 type MacroWf = { id: number; tipoProcessoId: number; name: string; ativo: boolean; fases: Fase[] }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -117,7 +120,7 @@ export default function MacroKanbanTab() {
       required: c.requiredPadrao, conditional: c.conditionalPadrao,
       entryRule: prev.length === 0 ? 'process_created' : 'previous_phase_completed',
       // sem exitRule: a condição de conclusão vem do Workflow Interno, não desta tela.
-      slaDays: c.slaDiasPadrao, showInKanban: true,
+      showInKanban: true,
     }])
     setAddKey(''); setDirty(true)
   }
@@ -150,7 +153,7 @@ export default function MacroKanbanTab() {
       const fasesPayload = fases.map((f) => ({
         phaseKey: f.phaseKey, label: f.label, ordem: f.ordem,
         required: f.required, conditional: f.conditional,
-        entryRule: f.entryRule, slaDays: f.slaDays, showInKanban: f.showInKanban,
+        entryRule: f.entryRule, showInKanban: f.showInKanban,
       }))
       await jsonFetch(`/api/gerenciamento/workflow-macro/${tipoId}`, { method: 'PUT', body: JSON.stringify({ fases: fasesPayload }) })
       // salvou → fecha o editor e volta pro seletor, com aviso de confirmação
@@ -288,11 +291,6 @@ export default function MacroKanbanTab() {
                         <input type="checkbox" checked={f.conditional} onChange={(e) => patch(idx, { conditional: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
                         Condicional
                       </label>
-                      <span className="flex items-center gap-1.5">
-                        SLA
-                        <input type="number" min="0" value={f.slaDays} onChange={(e) => patch(idx, { slaDays: Number(e.target.value) })} className="w-16 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-white outline-none focus:border-white/20" />
-                        dias
-                      </span>
                     </div>
                   </div>
                 ))}

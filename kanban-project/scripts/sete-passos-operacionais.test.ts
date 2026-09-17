@@ -74,8 +74,7 @@ async function montarRetificacao(phaseKey: string) {
   const efeitos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   await prisma.catalogoFase.create({
     data: {
-      phaseKey, label: "Retificação (espelho de teste)", escopo: "PROCESSO", ordemPadrao: 95,
-      slaDiasPadrao: 30, efeitosPermitidos: efeitos as never,
+      phaseKey, label: "Retificação (espelho de teste)", escopo: "PROCESSO", ordemPadrao: 95, efeitosPermitidos: efeitos as never,
     },
   })
   const chaves = Object.keys(CONFIGURACAO)

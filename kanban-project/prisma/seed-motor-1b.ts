@@ -11,16 +11,16 @@ const prisma = new PrismaClient()
 // por três macrofluxos; o guard `npm run test:phasekeys` trava se voltar.
 // required=false + conditional=true nas duas fases condicionais (retificação).
 const FASES = [
-  { phaseKey: 'genealogia',                    label: 'Genealogia',                     ordemPadrao: 1,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'emissao_documental',            label: 'Emissão Documental',             ordemPadrao: 2,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'analise_documental',            label: 'Análise Documental',             ordemPadrao: 3,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'retificacao_registros',         label: 'Retificação de Registros',       ordemPadrao: 4,  requiredPadrao: false, conditionalPadrao: true,  slaDiasPadrao: 30 },
-  { phaseKey: 'emissao_documental_retificada', label: 'Emissão Documental Retificada',  ordemPadrao: 5,  requiredPadrao: false, conditionalPadrao: true,  slaDiasPadrao: 30 },
-  { phaseKey: 'traducao_juramentada',          label: 'Tradução Juramentada',           ordemPadrao: 6,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'apostilamento',                 label: 'Apostilamento',                  ordemPadrao: 7,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'aguardando_protocolo',          label: 'Aguardando Protocolo',           ordemPadrao: 8,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'protocolado',                   label: 'Protocolado',                    ordemPadrao: 9,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'finalizado',                    label: 'Finalizado',                     ordemPadrao: 10, requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
+  { phaseKey: 'genealogia',                    label: 'Genealogia',                     ordemPadrao: 1,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'emissao_documental',            label: 'Emissão Documental',             ordemPadrao: 2,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'analise_documental',            label: 'Análise Documental',             ordemPadrao: 3,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'retificacao_registros',         label: 'Retificação de Registros',       ordemPadrao: 4,  requiredPadrao: false, conditionalPadrao: true },
+  { phaseKey: 'emissao_documental_retificada', label: 'Emissão Documental Retificada',  ordemPadrao: 5,  requiredPadrao: false, conditionalPadrao: true },
+  { phaseKey: 'traducao_juramentada',          label: 'Tradução Juramentada',           ordemPadrao: 6,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'apostilamento',                 label: 'Apostilamento',                  ordemPadrao: 7,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'aguardando_protocolo',          label: 'Aguardando Protocolo',           ordemPadrao: 8,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'protocolado',                   label: 'Protocolado',                    ordemPadrao: 9,  requiredPadrao: true,  conditionalPadrao: false },
+  { phaseKey: 'finalizado',                    label: 'Finalizado',                     ordemPadrao: 10, requiredPadrao: true,  conditionalPadrao: false },
 ]
 
 async function main() {

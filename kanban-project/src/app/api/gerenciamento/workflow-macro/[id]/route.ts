@@ -78,7 +78,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           required: f.required !== false,
           conditional: !!f.conditional,
           entryRule: i === 0 ? 'process_created' : 'previous_phase_completed',
-          slaDays: Number.isFinite(Number(f.slaDays)) ? Math.trunc(Number(f.slaDays)) : 30,
           showInKanban: f.showInKanban !== false,
         }
         await tx.faseMacro.upsert({

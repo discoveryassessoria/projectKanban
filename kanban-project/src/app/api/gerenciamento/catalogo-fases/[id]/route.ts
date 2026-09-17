@@ -56,7 +56,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ordemPadrao: b?.ordemPadrao !== undefined && Number.isFinite(Number(b.ordemPadrao)) ? Number(b.ordemPadrao) : atual.ordemPadrao,
         requiredPadrao: b?.requiredPadrao !== undefined ? !!b.requiredPadrao : atual.requiredPadrao,
         conditionalPadrao: b?.conditionalPadrao !== undefined ? !!b.conditionalPadrao : atual.conditionalPadrao,
-        slaDiasPadrao: b?.slaDiasPadrao !== undefined && Number.isFinite(Number(b.slaDiasPadrao)) ? Number(b.slaDiasPadrao) : atual.slaDiasPadrao,
         descricao: b?.descricao !== undefined ? (String(b.descricao).trim() || null) : atual.descricao,
         escopo: escopoPedido ? (escopoPedido as never) : atual.escopo,
         // COMPETÊNCIA DA FASE — quais efeitos os passos dela podem executar. Recusa

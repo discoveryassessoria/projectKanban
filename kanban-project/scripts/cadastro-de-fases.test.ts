@@ -138,7 +138,7 @@ async function main() {
       phaseKey: CHAVE, label: "Teste de Fase",
       descricao: "Fase criada para teste de integração.",
       escopo: "PROCESSO", ordemPadrao: 99, requiredPadrao: true,
-      conditionalPadrao: false, slaDiasPadrao: 10, ativo: true,
+      conditionalPadrao: false, ativo: true,
     },
   })
   check("a fase existe no cadastro", fase.id > 0)
@@ -198,7 +198,7 @@ async function main() {
     // A MESMA fase em posições diferentes: é o que prova que a ordem não é dela.
     await prisma.faseMacro.create({ data: { macroWorkflowId: macroWf.id, phaseKey: "genealogia", label: "Genealogia", ordem: 1, versao: 1 } })
     const ref = await prisma.faseMacro.create({
-      data: { macroWorkflowId: macroWf.id, phaseKey: CHAVE, label: editada.label, ordem: 2, versao: 1, required: true, conditional: false, slaDays: 10, showInKanban: true },
+      data: { macroWorkflowId: macroWf.id, phaseKey: CHAVE, label: editada.label, ordem: 2, versao: 1, required: true, conditional: false, showInKanban: true },
     })
     check("a fase entrou no fluxo por referência", ref.phaseKey === CHAVE)
     check("a ordem está na referência, não no cadastro", ref.ordem === 2 && editada.ordemPadrao === 99)

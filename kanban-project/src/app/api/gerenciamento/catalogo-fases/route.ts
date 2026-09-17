@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
         ordemPadrao: Number.isFinite(Number(b?.ordemPadrao)) ? Number(b.ordemPadrao) : 0,
         requiredPadrao: b?.requiredPadrao !== false,
         conditionalPadrao: !!b?.conditionalPadrao,
-        slaDiasPadrao: Number.isFinite(Number(b?.slaDiasPadrao)) ? Number(b.slaDiasPadrao) : 30,
         ativo: b?.ativo !== false,
       },
     })

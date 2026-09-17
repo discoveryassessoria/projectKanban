@@ -87,7 +87,7 @@ async function main() {
   console.log("\n(3) O administrador cadastra um passo inteiro — pela rota")
   const fase = await prisma.catalogoFase.create({
     data: {
-      phaseKey: "e2ehttp_fase", label: "Fase E2E HTTP", escopo: "PROCESSO", ordemPadrao: 95, slaDiasPadrao: 3,
+      phaseKey: "e2ehttp_fase", label: "Fase E2E HTTP", escopo: "PROCESSO", ordemPadrao: 95,
       efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME"],
     },
     select: { phaseKey: true },
@@ -267,7 +267,7 @@ async function main() {
   ] as const) {
     await prisma.catalogoFase.create({
       data: {
-        phaseKey, label: rotulo, escopo: "PROCESSO", ordemPadrao: 96, slaDiasPadrao: 3,
+        phaseKey, label: rotulo, escopo: "PROCESSO", ordemPadrao: 96,
         efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME"],
       },
     })

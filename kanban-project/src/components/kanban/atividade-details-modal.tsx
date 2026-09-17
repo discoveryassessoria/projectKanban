@@ -20,7 +20,6 @@ import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoHistorico } from "./ProcessoHistorico"
-// SLA operacional do processo (engine única — src/lib/motor/sla-core.ts)
 import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/ProcessoFinanceiroShell"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"

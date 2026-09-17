@@ -83,7 +83,7 @@ async function main() {
           registro: {
             id: registro.id, phaseKey: registro.phaseKey, label: registro.label,
             ordemPadrao: registro.ordemPadrao, requiredPadrao: registro.requiredPadrao,
-            conditionalPadrao: registro.conditionalPadrao, slaDiasPadrao: registro.slaDiasPadrao,
+            conditionalPadrao: registro.conditionalPadrao,
             ativo: registro.ativo, criadoEm: registro.criadoEm.toISOString(),
           },
           referenciasEncontradas: Object.fromEntries(referencias),

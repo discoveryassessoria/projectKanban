@@ -25,7 +25,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
-import { resolveSlaProjection } from "@/src/lib/process-stage/sla-projection"
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +45,7 @@ export async function GET(
       usuario && temPermissao(usuario.permissoes, "financeiro.ver"),
     )
 
-    const [necessidadesRaw, tarefasRaw, lancamentosRaw, sla] = await Promise.all([
+    const [necessidadesRaw, tarefasRaw, lancamentosRaw] = await Promise.all([
       prisma.necessidadeDocumental.findMany({
         where: { processoId: id },
         select: {
@@ -99,10 +98,6 @@ export async function GET(
             orderBy: { id: "asc" },
           })
         : Promise.resolve([]),
-      // PRAZO: vem da engine ÚNICA de SLA, derivado na leitura. A árvore não
-      // estima prazo por contagem de documento — seria uma segunda engine de
-      // prazo dizendo outro número na mesma tela.
-      resolveSlaProjection(id),
     ])
 
     const necessidades = necessidadesRaw.map((n) => ({
@@ -141,18 +136,7 @@ export async function GET(
       pessoaId: o.personId,
     }))
 
-    const prazo = sla.configurado
-      ? {
-          rotuloDias: sla.rotuloDias,
-          rotuloStatus: sla.rotuloStatus,
-          status: sla.status,
-          diasParaVencimento: sla.diasParaVencimento,
-          prazoPrevisto: sla.prazoPrevisto,
-          configurado: true,
-        }
-      : null
-
-    return NextResponse.json({ necessidades, tarefas, lancamentos, financeiroVisivel, prazo })
+    return NextResponse.json({ necessidades, tarefas, lancamentos, financeiroVisivel })
   } catch (error) {
     console.error("GET genealogia/operacional", error)
     return NextResponse.json({ error: "Erro ao ler os fatos operacionais da árvore." }, { status: 500 })

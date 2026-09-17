@@ -438,17 +438,6 @@ export function BarraLinhagem(props: Props) {
                   <Linha rotulo="Tarefas vencidas" texto={String(resumo.tarefasVencidas)} />
                 </dl>
 
-                <div className="mt-3 border-t border-gray-100 pt-2 text-[12px]">
-                  <span className="text-gray-500">Prazo do processo: </span>
-                  {resumo.prazo ? (
-                    <span className="font-medium text-gray-800">
-                      {resumo.prazo.rotuloDias} ({resumo.prazo.rotuloStatus})
-                    </span>
-                  ) : (
-                    <span className="text-[var(--text-muted)]">sem SLA configurado</span>
-                  )}
-                </div>
-
                 <div className="mt-3 rounded-md bg-gray-50 p-2.5">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                     Próxima ação

@@ -267,16 +267,13 @@ export function calcularUrgencia(d: DossiePessoa): number {
 }
 
 // ── RESUMO DA LINHAGEM ──────────────────────────────────────────────────────
-
-export interface PrazoDoProcesso {
-  /** Vem da engine ÚNICA de SLA. A árvore não estima prazo por conta própria. */
-  rotuloDias: string
-  rotuloStatus: string
-  status: string
-  diasParaVencimento: number | null
-  prazoPrevisto: string | null
-  configurado: boolean
-}
+//
+// A Árvore Genealógica NÃO tem prazo/SLA (decisão do usuário, 17/09/2026): ela
+// representa estrutura familiar/linhagem, não é uma unidade operacional de
+// execução. Existiu aqui um campo `prazo` alimentado pela engine de SLA de
+// FaseMacro/Processo (removida — ver [[prazo-tarefa-subtarefa-dois-relogios]])
+// — eliminado por completo, sem substituto. Os dois relógios oficiais
+// continuam sendo só Tarefa (macro) e Subtarefa (operacional).
 
 export interface ResumoLinhagem {
   requerenteId: number
@@ -296,18 +293,11 @@ export interface ResumoLinhagem {
   /** Pessoa mais urgente da linha — para onde o operador deve olhar primeiro. */
   focoId: number | null
   proximaAcao: string | null
-  /**
-   * Prazo do PROCESSO segundo o SLA oficial. `null` quando não há projeção —
-   * a árvore diz "sem prazo configurado" em vez de inventar uma estimativa por
-   * contagem de documento, que seria uma segunda engine de prazo.
-   */
-  prazo: PrazoDoProcesso | null
 }
 
 export function resumirLinhagem(
   linhagem: Linhagem,
   dossies: Map<number, DossiePessoa>,
-  prazo: PrazoDoProcesso | null = null,
   /** Data de referência para "tarefa vencida". Injetada — nada lê o relógio. */
   agora: Date = new Date(0),
 ): ResumoLinhagem {
@@ -381,7 +371,6 @@ export function resumirLinhagem(
     tarefasAbertas,
     focoId,
     proximaAcao: foco ? (foco.proximaAcao ? `${foco.nome}: ${foco.proximaAcao}` : null) : null,
-    prazo,
   }
 }
 

@@ -57,7 +57,7 @@ async function main() {
   if (!wf) { console.log(`nenhum workflow para a fase ${FASE}`); return }
 
   const fase = await prisma.catalogoFase.findFirst({
-    where: { phaseKey: FASE }, select: { escopo: true, slaDiasPadrao: true, efeitosPermitidos: true },
+    where: { phaseKey: FASE }, select: { escopo: true, efeitosPermitidos: true },
   })
   const p = await preverPublicacao(wf.id)
   // `preverPublicacao` devolve `null` quando o workflow sumiu entre uma leitura e
@@ -66,7 +66,7 @@ async function main() {
 
   console.log(`\n${"═".repeat(78)}`)
   console.log(`PRÉVIA — ${wf.name}`)
-  console.log(`fase ${FASE} · escopo ${fase?.escopo ?? "?"} · prazo da fase ${fase?.slaDiasPadrao ?? "?"} dia(s)`)
+  console.log(`fase ${FASE} · escopo ${fase?.escopo ?? "?"}`)
   console.log(`v${wf.versao} → v${wf.versao + 1} · execução ${wf.execucao} · rascunho pendente: ${!!wf.rascunhoAlteradoEm}`)
   console.log(`podePublicar=${p.podePublicar} · problemas=${p.problemas.length} · alterações=${p.mudancas.length}`)
   for (const pr of p.problemas) console.log(`  ✗ [${pr.codigo}] ${pr.stepKey ?? "-"}: ${pr.mensagem}`)

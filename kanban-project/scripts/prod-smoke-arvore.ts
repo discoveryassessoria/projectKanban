@@ -11,7 +11,7 @@
 // `scripts/arvore-preview-impacto.test.ts`, medindo o banco inteiro.
 //
 // Cobre, sobre PROCESSO REAL:
-//   1. a leitura operacional (necessidades, tarefas, lançamentos, SLA);
+//   1. a leitura operacional (necessidades, tarefas, lançamentos);
 //   2. o mapa de linhagens e a cadeia de cada requerente;
 //   3. o dossiê por pessoa e o resumo da linhagem;
 //   4. o diagnóstico e a próxima melhor ação;
@@ -174,7 +174,7 @@ async function main() {
   const agora = new Date()
   const linhagem = mapa.linhagens[0] ?? null
   const t5 = Date.now()
-  const diag = diagnosticar({ grafo, analise, mapa, dossies, linhagem, prazo: null, agora })
+  const diag = diagnosticar({ grafo, analise, mapa, dossies, linhagem, agora })
   const msDiag = Date.now() - t5
   ok(["saudavel", "atencao", "critico"].includes(diag.saude), `saúde: ${diag.rotuloSaude} (${msDiag}ms)`)
   console.log(`     ${diag.resumo} · ${diag.criticos} impeditivo(s) · ${diag.atencao} de atenção`)
@@ -189,7 +189,7 @@ async function main() {
   console.log(`       fonte: ${acao.fonte}`)
 
   if (linhagem) {
-    const resumo = resumirLinhagem(linhagem, dossies, null, agora)
+    const resumo = resumirLinhagem(linhagem, dossies, agora)
     const trilha = trilhaDaLinhagem(grafo, linhagem, mapa)
     ok(trilha.length === linhagem.cadeia.length, "trilha da linhagem coerente com a cadeia")
     console.log(
