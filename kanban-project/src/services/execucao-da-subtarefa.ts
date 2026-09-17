@@ -261,6 +261,142 @@ export interface ResultadoReaberturaSubtarefa {
  * já aconteceu nela como fato histórico, por trás de `supersededAt`) sem
  * tocar nas execuções vigentes das demais — que continuam CONCLUIDO.
  */
+export interface ExecucaoAnteriorDeSubtarefa {
+  sequencia: number
+  status: string
+  motivo: string
+  startedAt: Date | null
+  completedAt: Date | null
+  executadoPorId: number | null
+  executadoPorNome: string | null
+  resultado: string | null
+}
+
+export interface DependenteDeSubtarefa {
+  key: string
+  label: string
+  status: string
+}
+
+export interface PlanoDeReaberturaDeSubtarefa {
+  identidade: {
+    faseLabel: string
+    pessoaNome: string | null
+    documentoTitulo: string | null
+    documentoId: number | null
+    stepTitulo: string
+    stepKey: string
+    subtaskLabel: string
+    subtaskKey: string
+  }
+  podeReabrir: boolean
+  motivoNaoPode: string | null
+  /** Se o PASSO já estava concluído, reabrir a subtarefa reabre o passo junto. */
+  passoSeraReaberto: boolean
+  execucoes: ExecucaoAnteriorDeSubtarefa[]
+  /** Quem depende, direta ou transitivamente, e hoje está CONCLUÍDO — volta a BLOQUEADO. */
+  dependentes: DependenteDeSubtarefa[]
+  aviso: string
+}
+
+/**
+ * O PLANO DE REABERTURA DE UMA SUBTAREFA — mesma régua do `planejarReabertura`
+ * (passo), um nível abaixo: mostrar ANTES de confirmar quem é a unidade, o que
+ * já houve, e o que a cascata de dependência alcança. Somente leitura.
+ *
+ * Achado real (16/09/2026): a tela pedia justificativa num `window.prompt` nu
+ * — sem mostrar a quem pertence a subtarefa, o histórico, nem (desde que a
+ * reabertura passou a cascatear dependentes) o que mais seria afetado.
+ */
+export async function planejarReaberturaDeSubtarefa(
+  stepInstanceId: number,
+  subtaskKey: string,
+): Promise<PlanoDeReaberturaDeSubtarefa | null> {
+  const { planejarReabertura } = await import("@/src/services/reabertura-de-execucao")
+  const passoPlano = await planejarReabertura(stepInstanceId)
+  if (!passoPlano) return null
+
+  const hist = await definicaoHistoricaDoPasso(stepInstanceId)
+  const defs = hist?.passo.subtarefas ?? []
+  const def = defs.find((d) => d.key === subtaskKey)
+  if (!def) return null
+
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: stepInstanceId }, select: { status: true },
+  })
+
+  const todasExecucoes = await execucoesDaSubtarefa(stepInstanceId, subtaskKey)
+  const executorIds = [...new Set(todasExecucoes.map((e) => e.executadoPorId).filter((x): x is number => x != null))]
+  const executores = executorIds.length
+    ? await prisma.usuario.findMany({ where: { id: { in: executorIds } }, select: { id: true, nome: true } })
+    : []
+  const nomePorId = new Map(executores.map((u) => [u.id, u.nome]))
+
+  const execucoes: ExecucaoAnteriorDeSubtarefa[] = todasExecucoes.map((e) => ({
+    sequencia: e.sequencia,
+    status: e.status,
+    motivo: e.motivo,
+    startedAt: e.startedAt,
+    completedAt: e.completedAt,
+    executadoPorId: e.executadoPorId,
+    executadoPorNome: e.executadoPorId ? (nomePorId.get(e.executadoPorId) ?? null) : null,
+    resultado: e.resultado,
+  }))
+
+  const vigente = todasExecucoes.find((e) => e.supersededAt == null) ?? null
+  const podeReabrir = vigente?.status === "CONCLUIDO"
+  const motivoNaoPode = podeReabrir
+    ? null
+    : !vigente
+      ? "Esta subtarefa não tem execução registrada."
+      : "Só uma subtarefa concluída pode ser reaberta."
+
+  // MESMO BFS de `reabrirSubtarefa` — o plano precisa prever exatamente o que
+  // a confirmação vai fazer, não uma aproximação.
+  const afetadas = new Set<string>()
+  let fronteira = [subtaskKey]
+  while (fronteira.length > 0) {
+    const proxima: string[] = []
+    for (const d of defs) {
+      const deps = Array.isArray(d.dependeDe) ? d.dependeDe.map(String) : []
+      if (fronteira.some((k) => deps.includes(k)) && !afetadas.has(d.key)) {
+        afetadas.add(d.key)
+        proxima.push(d.key)
+      }
+    }
+    fronteira = proxima
+  }
+  const dependentes: DependenteDeSubtarefa[] = []
+  for (const key of afetadas) {
+    const exec = await execucaoVigente(stepInstanceId, key)
+    if (exec && exec.status === "CONCLUIDO") {
+      const d = defs.find((x) => x.key === key)
+      dependentes.push({ key, label: d?.label ?? key, status: exec.status })
+    }
+  }
+
+  return {
+    identidade: {
+      faseLabel: passoPlano.identidade.faseLabel,
+      pessoaNome: passoPlano.identidade.pessoaNome,
+      documentoTitulo: passoPlano.identidade.documentoTitulo,
+      documentoId: passoPlano.identidade.documentoId,
+      stepTitulo: passoPlano.identidade.stepTitulo,
+      stepKey: passoPlano.identidade.stepKey,
+      subtaskLabel: def.label,
+      subtaskKey,
+    },
+    podeReabrir,
+    motivoNaoPode,
+    passoSeraReaberto: passo?.status === "CONCLUIDO",
+    execucoes,
+    dependentes,
+    aviso: dependentes.length > 0
+      ? `${dependentes.length} subtarefa(s) que dependem desta voltam para bloqueada — nada é apagado, o que já aconteceu fica no histórico.`
+      : "Nada mais é afetado — nenhuma outra subtarefa depende desta.",
+  }
+}
+
 export async function reabrirSubtarefa(args: {
   stepInstanceId: number
   subtaskKey: string

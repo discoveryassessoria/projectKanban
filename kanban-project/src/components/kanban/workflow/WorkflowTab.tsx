@@ -12,6 +12,7 @@ import {
   Lock,
 } from "lucide-react"
 import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
+import ReabrirSubtarefaModal from "./ReabrirSubtarefaModal"
 import { WorkflowControls } from "../WorkflowControls"
 import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAvaliacaoUI } from "./OperacaoAntecipadaPainel"
 import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
@@ -675,65 +676,41 @@ function SubtarefaRow({
 /**
  * REABRIR SUBTAREFA — SÓ ADMIN.
  *
- * Sem plano/modal cheio (diferente de `ReabrirEtapaModal`, que reabre o PASSO
- * inteiro e por isso precisa mostrar dependentes/outras unidades): reabrir UMA
- * subtarefa nunca alcança outra subtarefa do mesmo passo nem outro passo — o
- * único efeito colateral possível é o PASSO voltar a ficar aberto quando ele
- * já estava CONCLUÍDO, e a API já avisa isso na resposta (`passoReaberto`).
+ * Mesmo drawer completo do `ReabrirEtapaModal` (identidade, histórico,
+ * preview do que vai acontecer), um nível abaixo: desde que a reabertura
+ * passou a cascatear (bloquear dependentes já concluídas — achado real,
+ * 16/09/2026), um `window.prompt` nu deixou de bastar — o administrador
+ * precisa ver o que mais vai ser afetado antes de confirmar.
  */
 function BotaoReabrirSubtarefa({
-  stepInstanceId, subtaskKey, label, onReaberto,
+  stepInstanceId, subtaskKey, onReaberto,
 }: {
   stepInstanceId: number
   subtaskKey: string
   label: string
   onReaberto: () => void
 }) {
-  const [enviando, setEnviando] = useState(false)
-
-  const reabrir = async () => {
-    const justificativa = window.prompt(
-      `Reabrir "${label}"? Explique o motivo (mínimo 5 caracteres) — isso vira uma nova tentativa, o que já aconteceu continua no histórico.`,
-    )
-    if (justificativa == null) return
-    if (justificativa.trim().length < 5) {
-      alert("Justificativa muito curta — explique o motivo com pelo menos 5 caracteres.")
-      return
-    }
-    setEnviando(true)
-    try {
-      const token = localStorage.getItem("token") ?? localStorage.getItem("authToken")
-      const res = await fetch(
-        `/api/workflow-step-instances/${stepInstanceId}/subtarefas/${encodeURIComponent(subtaskKey)}/reabrir`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ justificativa: justificativa.trim() }),
-        },
-      )
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || !j.ok) {
-        alert(j.mensagem ?? "Não foi possível reabrir esta subtarefa.")
-        return
-      }
-      onReaberto()
-    } catch {
-      alert("Falha de rede ao reabrir a subtarefa.")
-    } finally {
-      setEnviando(false)
-    }
-  }
+  const [aberto, setAberto] = useState(false)
 
   return (
-    <button
-      type="button"
-      onClick={reabrir}
-      disabled={enviando}
-      className="shrink-0 text-[10.5px] font-semibold text-[var(--accent-text)] hover:underline disabled:opacity-50"
-      title="Reabrir esta subtarefa (admin)"
-    >
-      {enviando ? "Reabrindo…" : "Reabrir"}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => setAberto(true)}
+        className="shrink-0 text-[10.5px] font-semibold text-[var(--accent-text)] hover:underline"
+        title="Reabrir esta subtarefa (admin)"
+      >
+        Reabrir
+      </button>
+      {aberto && (
+        <ReabrirSubtarefaModal
+          stepInstanceId={stepInstanceId}
+          subtaskKey={subtaskKey}
+          onFechar={() => setAberto(false)}
+          onReaberto={() => { setAberto(false); onReaberto() }}
+        />
+      )}
+    </>
   )
 }
 

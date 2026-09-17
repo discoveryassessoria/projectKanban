@@ -10,7 +10,31 @@
 // de propósito: ninguém deveria poder conceder isso a si mesmo via perfil.
 import { NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
-import { reabrirSubtarefa } from "@/src/services/execucao-da-subtarefa"
+import { reabrirSubtarefa, planejarReaberturaDeSubtarefa } from "@/src/services/execucao-da-subtarefa"
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; key: string }> },
+) {
+  const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
+  if (usuario.tipo !== "admin") {
+    return NextResponse.json(
+      { ok: false, code: "SOMENTE_ADMIN", mensagem: "Reabrir uma subtarefa é ação exclusiva do administrador." },
+      { status: 403 },
+    )
+  }
+
+  const { id: idParam, key } = await params
+  const stepInstanceId = Number(idParam)
+  if (!Number.isFinite(stepInstanceId) || !key) {
+    return NextResponse.json({ error: "Parâmetros inválidos." }, { status: 400 })
+  }
+
+  const plano = await planejarReaberturaDeSubtarefa(stepInstanceId, key)
+  if (!plano) return NextResponse.json({ error: "Subtarefa não encontrada." }, { status: 404 })
+  return NextResponse.json({ ok: true, plano })
+}
 
 export async function POST(
   request: NextRequest,
