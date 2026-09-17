@@ -18,7 +18,6 @@
 // Documento, PendenciaFinanceira, Evento, DomainOutbox).
 // ============================================================================
 
-import type { ResumoSla } from "@/src/types/sla"
 import type { FamiliaAgrupada, IndicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
 
 // ---- Central Operacional real (mesmo motor de /operacao/central) ----------
@@ -86,16 +85,10 @@ export interface FilaDetalhe {
   truncado: boolean
 }
 
-// ---- 2b. SLA dos processos (bloco de prazo) -------------------------------
-// Mesma forma de FilaOperacional (card + drill-down por /dashboard/fila/[key]),
-// mas fora da lista de trabalho executável: prazo não é "ação da fila", é
-// situação do processo. As quatro faixas aparecem SEMPRE, inclusive zeradas.
-export interface PainelSla {
-  /** cards clicáveis: atrasados, vencem hoje, próximos 7 dias, no prazo */
-  cards: FilaOperacional[]
-  /** contagem crua da mesma leitura que gerou os cards */
-  resumo: ResumoSla
-}
+// ---- 2b. SLA de FaseMacro/Processo — REMOVIDO (17/09/2026) ----------------
+// Existia aqui `PainelSla` (cards de prazo do PROCESSO, engine sla-core.ts).
+// Era um terceiro relógio de prazo concorrente com os dois oficiais — Tarefa
+// (macro) e Subtarefa (operacional). Ver [[prazo-tarefa-subtarefa-dois-relogios]].
 
 // ---- 2c. Resumo de prazos (aba "Prazos" da Central de Notificações) -------
 // Mesma leitura de `membrosDaFila("prazos-vencendo", ...)`, só que quebrada
@@ -177,10 +170,8 @@ export interface HomeData {
   status: StatusOperacional
   filas: FilaOperacional[]
   /** null quando o usuário não vê processos */
-  sla: PainelSla | null
-  /** null quando o usuário não vê processos */
   prazosResumo: PrazosResumo | null
-  /** grain TAREFA (dataPrazo, prazo MACRO) — nunca somado ao `sla` acima (grain Processo) nem ao de subtarefa abaixo. null quando o usuário não vê tarefas. */
+  /** grain TAREFA (dataPrazo, prazo MACRO) — nunca somado ao de subtarefa abaixo. Os DOIS relógios operacionais canônicos, ver [[prazo-tarefa-subtarefa-dois-relogios]]. null quando o usuário não vê tarefas. */
   prazosTarefas: FilaOperacional[] | null
   /** grain SUBTAREFA (prazo OPERACIONAL, ação corrente) — o relógio mais fino, convive com `prazosTarefas` sem substituí-lo. null quando o usuário não vê tarefas. */
   prazosSubtarefas: FilaOperacional[] | null

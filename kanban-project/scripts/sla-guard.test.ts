@@ -1,18 +1,24 @@
 /**
- * SLA OPERACIONAL — guarda estática de arquitetura (sem banco).
+ * SLA DE FASEMACRO/PROCESSO — guarda estática de arquitetura (sem banco).
  * Rodar: tsx scripts/sla-guard.test.ts
  *
- * Protege as regras que a entrega assumiu:
- *  - ENGINE ÚNICA: um núcleo puro (sla-core) + um resolver de I/O
- *    (sla-projection). Ninguém mais calcula prazo, dias ou cor;
- *  - a CONFIGURAÇÃO de SLA não é tocada: a camada operacional só LÊ
- *    (nada de create/update/delete sobre FaseMacro/CatalogoFase);
- *  - Central Operacional, listagem e detalhe do processo consomem a MESMA
- *    projeção — nenhum recálculo em tela;
- *  - o limiar de 7 dias existe em UM lugar só;
- *  - as quatro faixas de SLA são clicáveis e abrem a lista filtrada;
- *  - a listagem tem coluna de status, coluna de dias e filtro;
- *  - o card do detalhe mostra os oito campos exigidos.
+ * Reescrito em 17/09/2026: o conceito de "prazo do processo" (FaseMacro,
+ * `sla-core.ts`) foi REMOVIDO de toda tela operacional — era um terceiro
+ * relógio de prazo concorrente com os dois oficiais do Discovery, Tarefa
+ * (macro) e Subtarefa (operacional) — ver
+ * `lib/operacional/tempo-operacional.ts` e a memória
+ * [[prazo-tarefa-subtarefa-dois-relogios]].
+ *
+ * A engine em si (sla-core.ts/sla-projection.ts) FICOU: tem um consumidor
+ * legítimo restante, o painel de inteligência da Árvore Genealógica
+ * (congelada — [[arvore-layout-definitivo]]). Este guard agora protege DUAS
+ * coisas ao mesmo tempo:
+ *
+ *  1. A engine continua correta e isolada (núcleo puro, config intocada,
+ *     sem coluna derivada, batch sem N+1) — pro único consumidor que sobrou.
+ *  2. NENHUMA tela operacional (Home, Kanban, Lista, detalhe do processo)
+ *     voltou a apresentar "prazo do processo" — essa é a regressão que mais
+ *     importa impedir, porque foi exatamente o que motivou a remoção.
  */
 import { readFileSync, existsSync, readdirSync, statSync } from "fs"
 import { fileURLToPath } from "url"
@@ -48,19 +54,24 @@ function arquivosDeCodigo(): string[] {
 }
 
 function run() {
-  console.log("SLA OPERACIONAL — guarda estática\n")
+  console.log("SLA DE FASEMACRO/PROCESSO — guarda estática\n")
 
   const CORE = "src/lib/motor/sla-core.ts"
   const RESOLVER = "src/lib/process-stage/sla-projection.ts"
   const TIPOS = "src/types/sla.ts"
   const UI = "src/components/sla/sla-ui.tsx"
-  const CARD = "src/components/kanban/ProcessoSlaCard.tsx"
-  const ROTA = "src/app/api/processos/[processoId]/sla/route.ts"
+  const CARD_REMOVIDO = "src/components/kanban/ProcessoSlaCard.tsx"
+  const ROTA_REMOVIDA = "src/app/api/processos/[processoId]/sla/route.ts"
+  const ARVORE_CONSUMIDOR = "src/components/arvore/inteligencia/barra-linhagem.tsx"
 
-  console.log("Camadas:")
-  for (const f of [CORE, RESOLVER, TIPOS, UI, CARD, ROTA]) {
+  console.log("Camadas da engine (mantida — consumidor da Árvore):")
+  for (const f of [CORE, RESOLVER, TIPOS, UI]) {
     ok(existsSync(join(ROOT, f)), `existe ${f}`)
   }
+
+  console.log("\nRemovido das telas operacionais (17/09/2026):")
+  ok(!existsSync(join(ROOT, CARD_REMOVIDO)), `NÃO existe mais ${CARD_REMOVIDO}`)
+  ok(!existsSync(join(ROOT, ROTA_REMOVIDA)), `NÃO existe mais ${ROTA_REMOVIDA}`)
 
   const core = ler(CORE)
   const resolver = ler(RESOLVER)
@@ -72,8 +83,8 @@ function run() {
   ok(/export function buildSlaProjection/.test(core), "buildSlaProjection é a função-base exportada")
   ok(/export const DIAS_ATENCAO_SLA = 7/.test(core), "limiar de atenção (7 dias) declarado no núcleo")
 
-  // ---- Engine única ----
-  console.log("\nEngine única:")
+  // ---- Engine única, agora com UM consumidor operacional (a Árvore) ----
+  console.log("\nEngine única — só a Árvore (congelada) consome:")
   const codigo = arquivosDeCodigo()
   const importamCore = codigo.filter(
     (f) => f !== CORE && /from ["'][^"']*motor\/sla-core["']/.test(ler(f)),
@@ -81,6 +92,13 @@ function run() {
   ok(
     importamCore.every((f) => f === RESOLVER || f.startsWith("scripts/")),
     `só o resolver (e testes) usa o núcleo — encontrados: ${importamCore.join(", ") || "nenhum"}`,
+  )
+  const importamResolver = codigo.filter(
+    (f) => f !== RESOLVER && /from ["'][^"']*process-stage\/sla-projection["']/.test(ler(f)),
+  )
+  ok(
+    importamResolver.every((f) => f.startsWith("scripts/") || f.startsWith("src/components/arvore/") || f.startsWith("src/app/api/processos/[processoId]/genealogia/")),
+    `quem chama o resolver é só a Árvore (congelada) ou teste — encontrados: ${importamResolver.join(", ") || "nenhum"}`,
   )
   const declaramPrazo = codigo.filter(
     (f) =>
@@ -121,74 +139,67 @@ function run() {
   const queries = (resolver.match(/await prisma\./g) ?? []).length
   ok(queries <= 3, `o batch usa no máximo 3 queries agregadas (usa ${queries})`)
 
-  // ---- Central Operacional ----
-  console.log("\nCentral Operacional:")
+  // ---- Home: nem cálculo, nem apresentação ----
+  console.log("\nHome — SLA de FaseMacro fora do bloco Prazos:")
   const logic = ler("src/lib/home/home-logic.ts")
   const coleta = ler("src/lib/home/coleta.ts")
   const apiHome = ler("src/app/api/home/route.ts")
   const homeContent = ler("src/components/home/home-content.tsx")
+  const apiHomeProcessos = ler("src/app/api/home/processos/route.ts")
+  const processosAndamento = ler("src/components/home/processos-andamento.tsx")
 
-  for (const key of ["sla-atrasados", "sla-vencem-hoje", "sla-proximos-7", "sla-no-prazo"]) {
-    ok(logic.includes(`"${key}"`), `faixa "${key}" declarada`)
-  }
-  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_SLA, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_PRAZO_SUBTAREFA\]/.test(logic),
-    "as filas de SLA (e as de prazo Tarefa/Subtarefa, 17/09/2026) entram no catálogo (drill-down funciona)")
-  ok(
-    /for \(const def of \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO\]\)/.test(coleta),
-    "SLA não polui a lista de trabalho executável da Central",
-  )
-  ok(/resolveSlaProjectionBatch/.test(coleta), "a Home consome a engine — não recalcula prazo")
-  ok(/montarSla/.test(apiHome), "a resposta de /api/home entrega o painel de SLA")
+  // semComentarios: as próprias explicações desta reescrita citam os nomes
+  // removidos ("FILAS_SLA foi removido") — sem tirar comentário, o guard
+  // acharia a si mesmo.
+  ok(!/FILAS_SLA/.test(semComentarios(logic)), "FILAS_SLA não existe mais no catálogo de filas")
+  ok(!/faixaDaFilaSla/.test(semComentarios(logic)) && !/faixaDaFilaSla/.test(semComentarios(coleta)) && !/faixaDaFilaSla/.test(semComentarios(homeContent)),
+    "faixaDaFilaSla não existe mais em lugar nenhum")
+  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_PRAZO_SUBTAREFA\]/.test(logic),
+    "o catálogo de filas tem só passo/estado/prazo-Tarefa/prazo-Subtarefa — sem FaseMacro")
+  ok(!/montarSla/.test(semComentarios(coleta)) && !/montarSla/.test(semComentarios(apiHome)), "montarSla não existe mais — Home não monta painel de SLA de processo")
+  ok(!/resolveSlaProjectionBatch/.test(coleta), "coleta.ts da Home não chama mais a engine de FaseMacro")
+  ok(!/\bsla:\s*Map</.test(coleta), "BaseOperacional não carrega mais Map de SLA por processo")
+  ok(!/"processo-sla"/.test(coleta), "o tipo Membro não tem mais variante processo-sla")
+  ok(!/data\.sla\b/.test(homeContent) && !/PainelSla/.test(homeContent), "a Home não renderiza mais painel de SLA de processo")
+  ok(!/resolveSlaProjectionBatch/.test(apiHomeProcessos), "a tabela 'Processos em andamento' não busca mais SLA de FaseMacro")
+  ok(!processosAndamento.includes(">SLA<"), "a tabela 'Processos em andamento' não tem mais coluna SLA")
   ok(
     /membrosDaFila\(def\.key, base, ctx\.agora\)\.length/.test(coleta),
-    "a contagem do card sai da MESMA definição de membros do drill-down",
+    "a contagem dos cards de prazo (Tarefa/Subtarefa) sai da MESMA definição de membros do drill-down",
   )
-  ok(/href={fila\.href}/.test(homeContent) && /CardSla/.test(homeContent), "os quatro cards são clicáveis")
+  ok(/href={fila\.href}/.test(homeContent) && /function LinhaDeChip/.test(homeContent), "os cards de prazo (Tarefa/Subtarefa) continuam clicáveis")
   ok(/\/dashboard\/fila\/\$\{def\.key\}/.test(coleta), "o clique abre a lista já filtrada daquela faixa")
 
-  // ---- Listagem de processos ----
-  console.log("\nListagem de processos:")
+  // ---- Listagem e Kanban de processos ----
+  console.log("\nListagem e Kanban de processos — sem SLA de FaseMacro:")
   const lista = ler("src/components/processos-lista.tsx")
   const apiProcessos = ler("src/app/api/processos/route.ts")
-  ok(/resolveSlaProjectionBatch/.test(apiProcessos), "a listagem recebe o SLA em lote da engine")
-  ok(/sla: slaByProc\.get\(p\.id\) \?\? null/.test(apiProcessos), "cada processo carrega sua projeção de SLA")
-  ok(lista.includes(">Status SLA<"), "coluna Status SLA")
-  ok(lista.includes(">Dias<"), "coluna Dias")
-  ok(/FILTROS_SLA/.test(lista) && /setFiltroSla/.test(lista), "filtro por status de SLA")
-  ok(
-    /no_prazo/.test(lista) && /proximo_vencimento/.test(lista) && /atrasado/.test(lista),
-    "os três status do conceito estão no filtro",
-  )
-  ok(/processo\.sla\?\.rotuloDias/.test(lista), "a coluna Dias exibe o rótulo da engine (não recalcula)")
-  ok(!/86_400_000|86400000/.test(lista), "a listagem não faz aritmética de data")
+  const kanbanCard = ler("src/components/kanban/kanban-card.tsx")
+  ok(!/resolveSlaProjectionBatch/.test(apiProcessos), "GET /api/processos não busca mais SLA de FaseMacro")
+  ok(!/\bsla:\s*slaByProc/.test(apiProcessos), "cada processo não carrega mais projeção de SLA de FaseMacro")
+  ok(!lista.includes(">Status SLA<") && !lista.includes(">Dias<"), "a listagem não tem mais coluna Status SLA / Dias")
+  ok(!/FILTROS_SLA/.test(lista) && !/setFiltroSla/.test(lista), "a listagem não tem mais filtro por status de SLA")
+  ok(!/\.sla\b/.test(semComentarios(kanbanCard)), "o card do Kanban não lê mais .sla do processo")
 
   // ---- Detalhe do processo ----
-  console.log("\nDetalhe do processo:")
-  const card = ler(CARD)
+  console.log("\nDetalhe do processo — card SLA removido:")
   const modal = ler("src/components/kanban/atividade-details-modal.tsx")
-  ok(/ProcessoSlaCard/.test(modal), "o card SLA está montado no detalhe do processo")
-  for (const campo of [
-    "Prazo previsto",
-    "Tempo decorrido",
-    "Dias restantes",
-    "Dias em atraso",
-    "Fase atual",
-    "Fase responsável pelo atraso",
-    "Próximo vencimento",
-  ]) {
-    ok(card.includes(campo), `card exibe "${campo}"`)
-  }
-  ok(/SlaBadge/.test(card), "card exibe o status (selo)")
-  ok(!/86_400_000|86400000/.test(card), "o card não faz aritmética de data")
-  ok(/Tentar novamente/.test(card), "o card tem estado de erro com nova tentativa")
+  ok(!/ProcessoSlaCard/.test(modal), "o modal de detalhe do processo não monta mais o card de SLA")
 
-  // ---- Semáforo único ----
-  console.log("\nSemáforo único:")
+  // ---- Único consumidor legítimo restante: a Árvore (congelada) ----
+  console.log("\nÚnico consumidor operacional restante — Árvore Genealógica (congelada):")
+  ok(existsSync(join(ROOT, ARVORE_CONSUMIDOR)), `existe ${ARVORE_CONSUMIDOR}`)
+  const arvoreRota = ler("src/app/api/processos/[processoId]/genealogia/operacional/route.ts")
+  ok(/resolveSlaProjection\(/.test(arvoreRota), "a rota de inteligência da Árvore ainda lê a engine de FaseMacro (consumidor legítimo, congelado)")
+
+  // ---- Paleta compartilhada (mantida — reaproveitada pelos 2 relógios oficiais) ----
+  console.log("\nPaleta de tom — CORES_SLA sobrevive, reaproveitada pelos relógios oficiais:")
   const ui = ler(UI)
-  ok(/ESTILO_STATUS_SLA/.test(ui) && /ESTILO_FAIXA_SLA/.test(ui), "uma paleta serve status e faixa")
-  const primitivas = ler("src/components/home/home-primitives.tsx")
-  ok(!/SLA_STYLE\s*[:=]/.test(primitivas), "a Home não mantém cópia da paleta de SLA")
-  ok(/ESTILO_FAIXA_SLA/.test(homeContent), "a Home importa a paleta compartilhada")
+  ok(/export const CORES_SLA/.test(ui), "CORES_SLA continua existindo — é a paleta que Tarefa/Subtarefa reaproveitam")
+  ok(!/ESTILO_STATUS_SLA/.test(semComentarios(ui)) && !/ESTILO_FAIXA_SLA/.test(semComentarios(ui)) && !/function SlaBadge/.test(semComentarios(ui)),
+    "ESTILO_STATUS_SLA/ESTILO_FAIXA_SLA/SlaBadge (específicos do SLA de FaseMacro) foram removidos")
+  ok(/CORES_SLA/.test(homeContent) && /ESTILO_FAIXA_PRAZO/.test(homeContent),
+    "a Home monta o semáforo de Tarefa/Subtarefa a partir de CORES_SLA — uma paleta só")
 
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log("FALHAS: " + falhas.join("; ")); process.exit(1) }

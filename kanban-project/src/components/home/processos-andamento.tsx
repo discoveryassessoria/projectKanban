@@ -1,10 +1,14 @@
 // ============================================================================
 // PROCESSOS EM ANDAMENTO — a tabela do mockup da Home.
 //
-// Consome /api/home/processos, que combina os motores canônicos (projeção
-// operacional e engine de SLA) com três derivações declaradas a partir da
-// TAREFA — pendências, prioridade e responsável, que o Processo não guarda.
-// Esta tela só EXIBE: não recalcula progresso, prazo nem prioridade.
+// Consome /api/home/processos, que combina o motor canônico de projeção
+// operacional com três derivações declaradas a partir da TAREFA —
+// pendências, prioridade e responsável, que o Processo não guarda. Esta tela
+// só EXIBE: não recalcula progresso nem prioridade.
+//
+// Achado real (17/09/2026): a coluna "SLA" aqui era o relógio de FaseMacro —
+// um terceiro controle de prazo concorrente com os dois oficiais (Tarefa
+// macro / Subtarefa operacional). Removida — ver [[prazo-tarefa-subtarefa-dois-relogios]].
 // ============================================================================
 "use client"
 
@@ -12,8 +16,6 @@ import useSWR from "swr"
 import Link from "next/link"
 import { ArrowRight, ChevronRight } from "lucide-react"
 import { BlocoCard, BlocoHeader, EmptyState } from "@/src/components/home/home-primitives"
-import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
-import type { SlaProcesso } from "@/src/types/sla"
 
 interface LinhaProcesso {
   id: number
@@ -22,7 +24,6 @@ interface LinhaProcesso {
   pais: string | null
   faseAtualKey: string | null
   progresso: number
-  sla: SlaProcesso | null
   pendencias: number
   prioridade: "URGENTE" | "ALTA" | "MEDIA" | "BAIXA" | null
   responsavel: { id: number; nome: string } | null
@@ -97,7 +98,7 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
           <table className="w-full min-w-[860px] border-collapse text-left">
             <thead>
               <tr className="border-b border-[var(--border-subtle)]">
-                {["Processo", "Fase atual", "Progresso", "Responsável", "Pendências", "SLA", "Prioridade"].map((h) => (
+                {["Processo", "Fase atual", "Progresso", "Responsável", "Pendências", "Prioridade"].map((h) => (
                   <th key={h} className="px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">
                     {h}
                   </th>
@@ -107,7 +108,6 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
             <tbody className="divide-y divide-[var(--border-subtle)]">
               {linhas.map((p) => {
                 const prio = p.prioridade ? PRIORIDADE[p.prioridade] : null
-                const faixa = p.sla?.faixa ? ESTILO_FAIXA_SLA[p.sla.faixa] : null
                 return (
                   <tr key={p.id} className="transition-colors hover:bg-[var(--surface-secondary)]/40">
                     <td className="px-4 py-3.5">
@@ -136,16 +136,6 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
                     <td className="px-4 py-3.5">
                       <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{p.pendencias}</span>
                       <span className="ml-1 text-[11px] text-[var(--text-muted)]">{p.pendencias === 1 ? "ação" : "ações"}</span>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {faixa ? (
-                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${faixa.chip}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${faixa.ponto}`} />
-                          {p.sla?.rotuloStatus}
-                        </span>
-                      ) : (
-                        <span className="text-[11px] text-[var(--text-muted)]">Sem prazo</span>
-                      )}
                     </td>
                     <td className="px-4 py-3.5">
                       {prio ? (

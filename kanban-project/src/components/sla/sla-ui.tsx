@@ -1,18 +1,20 @@
 "use client"
 
 // ============================================================================
-// APRESENTAÇÃO DO SLA — semáforo único de toda a aplicação
+// PALETA DE TOM — semáforo único de prazo/SLA de toda a aplicação
 // ----------------------------------------------------------------------------
-// Aqui NÃO se calcula nada: status, faixa, dias e rótulos já vêm prontos da
-// engine (src/lib/motor/sla-core.ts). Este módulo existe só para que a Central
-// Operacional, a listagem de processos e o detalhe do processo pintem o MESMO
-// estado com a MESMA cor e o MESMO vocabulário — uma paleta, um lugar.
+// Aqui NÃO se calcula nada: quem chama já resolveu status/faixa/dias/rótulo
+// na engine canônica correspondente (Tarefa/Subtarefa: `estadoTemporal`/
+// `estadoTemporalSubtarefa`, `lib/operacional/tempo-operacional.ts`). Este
+// módulo guarda só a PALETRA — as cores do semáforo — pra ninguém pintar de
+// um jeito na Home e de outro em Tarefas e Projetos.
 //
-// Cores no vocabulário do Discovery Design System (mesmas classes dos chips de
-// nível da Home), sem CSS próprio e sem token local.
+// Achado real (17/09/2026): existia aqui também `ESTILO_STATUS_SLA`/
+// `ESTILO_FAIXA_SLA`/`SlaBadge`, específicos do SLA de FaseMacro/Processo —
+// removidos junto com o conceito (ver [[prazo-tarefa-subtarefa-dois-relogios]]).
+// A paleta (`CORES_SLA`) ficou — é reaproveitada pelos dois relógios oficiais
+// (ver `ESTILO_FAIXA_PRAZO` em `src/components/home/home-content.tsx`).
 // ============================================================================
-
-import type { FaixaSla, StatusSla } from "@/src/types/sla"
 
 export interface CorSla {
   chip: string
@@ -54,40 +56,3 @@ export const CORES_SLA = {
     aro: "ring-white/10",
   },
 } satisfies Record<string, CorSla>
-
-/** Cor por STATUS (semáforo de 3 estados + ausência de configuração). */
-export const ESTILO_STATUS_SLA: Record<StatusSla, CorSla> = {
-  atrasado: CORES_SLA.atrasado,
-  proximo_vencimento: CORES_SLA.hoje,
-  no_prazo: CORES_SLA.ok,
-  sem_prazo: CORES_SLA.neutro,
-}
-
-/** Cor por FAIXA (mesmo semáforo, com "vence hoje" separado de "próximos 7"). */
-export const ESTILO_FAIXA_SLA: Record<FaixaSla, CorSla> = {
-  atrasados: CORES_SLA.atrasado,
-  "vencem-hoje": CORES_SLA.hoje,
-  "proximos-7": CORES_SLA.atencao,
-  "no-prazo": CORES_SLA.ok,
-}
-
-/** Selo de status do SLA. O texto vem da engine (`sla.rotuloStatus`). */
-export function SlaBadge({
-  status,
-  rotulo,
-  className = "",
-}: {
-  status: StatusSla
-  rotulo: string
-  className?: string
-}) {
-  const st = ESTILO_STATUS_SLA[status]
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${st.chip} ${className}`}
-    >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.ponto}`} />
-      {rotulo}
-    </span>
-  )
-}

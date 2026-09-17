@@ -1,11 +1,15 @@
 // ============================================================================
 // PROCESSOS EM ANDAMENTO — a tabela da Home.
 //
-// NADA aqui é calculado do zero. As duas grandezas que já têm motor próprio
-// chegam pelas MESMAS portas em lote que o Kanban usa:
-//   • progresso → resolveOperationalProjectionBatch (projeção operacional canônica)
-//   • SLA       → resolveSlaProjectionBatch (engine única de prazo)
-// Recalcular qualquer uma delas aqui criaria uma segunda fonte de verdade.
+// NADA aqui é calculado do zero. O progresso chega pela MESMA porta em lote
+// que o Kanban usa (resolveOperationalProjectionBatch, projeção operacional
+// canônica) — recalculá-lo aqui criaria uma segunda fonte de verdade.
+//
+// Achado real (17/09/2026): este endpoint também devolvia `sla` (engine de
+// FaseMacro) — um terceiro relógio de prazo concorrente com os dois oficiais
+// (Tarefa macro / Subtarefa operacional). Removido — ver
+// [[prazo-tarefa-subtarefa-dois-relogios]]. Prazo de processo não existe
+// mais como conceito operacional apresentado nesta tabela.
 //
 // O que ESTE endpoint acrescenta são três derivações que o mockup pede e que
 // o Processo não guarda como campo — porque quem as guarda é a TAREFA:
@@ -24,7 +28,6 @@ import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
 import { resolveOperationalProjectionBatch } from "@/src/lib/process-stage/operational-projection"
-import { resolveSlaProjectionBatch } from "@/src/lib/process-stage/sla-projection"
 import { escopoProcesso, escopoTarefa } from "@/src/lib/autorizacao/escopo-operacional"
 
 /** Ordem de severidade — a maior vence ao agregar as tarefas do processo. */
@@ -92,10 +95,7 @@ export async function GET(request: NextRequest) {
     },
   })
 
-  const [projecoes, slas] = await Promise.all([
-    resolveOperationalProjectionBatch(ids),
-    resolveSlaProjectionBatch(ids),
-  ])
+  const projecoes = await resolveOperationalProjectionBatch(ids)
 
   // Agrega por processo: contagem, maior prioridade e o responsável dela.
   const agregado = new Map<number, { pendencias: number; prioridade: Prioridade | null; responsavel: { id: number; nome: string } | null; prazo: Date | null }>()
@@ -118,7 +118,6 @@ export async function GET(request: NextRequest) {
   }
 
   const projPorProc = new Map(projecoes.map((pr) => [Number(pr.processId), pr]))
-  const slaPorProc = new Map(slas.map((s) => [Number(s.processoId), s]))
 
   return NextResponse.json({
     total,
@@ -130,9 +129,8 @@ export async function GET(request: NextRequest) {
         codigo: p.codigo,
         pais: p.paisCanonico?.countryKey,
         faseAtualKey: p.faseAtualKey,
-        // Vêm dos motores canônicos, intactos.
+        // Vem do motor canônico, intacto.
         progresso: projPorProc.get(p.id)?.progress.percentage ?? 0,
-        sla: slaPorProc.get(p.id) ?? null,
         // Derivações declaradas acima.
         pendencias: ag?.pendencias ?? 0,
         prioridade: ag?.prioridade ?? null,

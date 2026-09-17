@@ -21,9 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
-import { SlaBadge } from "@/src/components/sla/sla-ui"
 import type { ProcessoWithStatus, Contratante } from "@/src/types/kanban"
-import type { StatusSla } from "@/src/types/sla"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { confirmarExclusaoProcesso } from "@/src/lib/confirmar-exclusao-processo"
 
@@ -33,23 +31,12 @@ interface ProcessosListaProps {
   onRefresh: () => void
 }
 
-// Filtro de SLA. Os rótulos e a classificação vêm da ENGINE (processo.sla) —
-// a lista só compara o status já calculado, nunca recalcula prazo.
-const FILTROS_SLA: { valor: StatusSla | "todos"; rotulo: string }[] = [
-  { valor: "todos", rotulo: "SLA: todos" },
-  { valor: "no_prazo", rotulo: "No prazo" },
-  { valor: "proximo_vencimento", rotulo: "Próximo do vencimento" },
-  { valor: "atrasado", rotulo: "Atrasado" },
-  { valor: "sem_prazo", rotulo: "Sem prazo definido" },
-]
-
 export function ProcessosLista({
   processos,
   contratantes,
   onRefresh
 }: ProcessosListaProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filtroSla, setFiltroSla] = useState<StatusSla | "todos">("todos")
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
@@ -93,15 +80,13 @@ export function ProcessosLista({
     router.replace(pathname, { scroll: false })
   }
 
-  // Filtrar processos (texto + situação de SLA — o status vem pronto da engine)
+  // Filtrar processos (texto)
   const filteredProcessos = processos.filter(p => {
     const casaTexto =
       p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.contratantes?.some(c => c.nome?.toLowerCase().includes(searchTerm.toLowerCase()))
-    if (!casaTexto) return false
-    if (filtroSla === "todos") return true
-    return (p.sla?.status ?? "sem_prazo") === filtroSla
+    return casaTexto
   })
 
   // Paginação — a página é limitada ao total atual: mudar busca ou filtro nunca
@@ -146,16 +131,6 @@ export function ProcessosLista({
             className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
           />
         </div>
-        <select
-          value={filtroSla}
-          onChange={(e) => setFiltroSla(e.target.value as StatusSla | "todos")}
-          aria-label="Filtrar por status de SLA"
-          className="rounded-md border border-[var(--border-strong)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-white/40 [&>option]:bg-[var(--surface-popover)]"
-        >
-          {FILTROS_SLA.map((f) => (
-            <option key={f.valor} value={f.valor}>{f.rotulo}</option>
-          ))}
-        </select>
         <div className="text-sm text-[var(--text-secondary)]">
           {filteredProcessos.length} processo(s) encontrado(s)
         </div>
@@ -168,8 +143,6 @@ export function ProcessosLista({
             <tr className="border-b border-[var(--border-default)]">
               <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Processo</th>
               <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Fase</th>
-              <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Status SLA</th>
-              <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Dias</th>
               <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Contratante</th>
               <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Requerentes</th>
               <th className="text-left py-3 px-4 text-[var(--text-secondary)] font-medium text-sm">Tarefas</th>
@@ -205,26 +178,6 @@ export function ProcessosLista({
                       <div className="h-2 w-2 rounded-full bg-[var(--surface-secondary)]" />
                       <span className="text-white/80 text-sm">{processo.faseAtualKey ?? "—"}</span>
                     </div>
-                  </td>
-                  {/* Status SLA e Dias: exibição pura do que a engine calculou. */}
-                  <td className="py-3 px-4">
-                    <SlaBadge
-                      status={processo.sla?.status ?? "sem_prazo"}
-                      rotulo={processo.sla?.rotuloStatus ?? "Sem prazo definido"}
-                    />
-                  </td>
-                  <td className="py-3 px-4">
-                    <span
-                      className={`text-sm ${
-                        processo.sla?.status === "atrasado"
-                          ? "text-red-700"
-                          : processo.sla?.status === "proximo_vencimento"
-                            ? "text-amber-800"
-                            : "text-white/70"
-                      }`}
-                    >
-                      {processo.sla?.rotuloDias ?? "—"}
-                    </span>
                   </td>
                   <td className="py-3 px-4">
                     {primeiroContratante ? (
@@ -301,8 +254,8 @@ export function ProcessosLista({
             {/* Mensagem quando não há resultados */}
             {paginatedProcessos.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-[var(--text-muted)]">
-                  {searchTerm || filtroSla !== "todos"
+                <td colSpan={7} className="py-12 text-center text-[var(--text-muted)]">
+                  {searchTerm
                     ? "Nenhum processo encontrado"
                     : "Nenhum processo cadastrado"}
                 </td>

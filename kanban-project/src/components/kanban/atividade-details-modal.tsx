@@ -21,7 +21,6 @@ import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoHistorico } from "./ProcessoHistorico"
 // SLA operacional do processo (engine única — src/lib/motor/sla-core.ts)
-import { ProcessoSlaCard } from "./ProcessoSlaCard"
 import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/ProcessoFinanceiroShell"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
@@ -682,11 +681,6 @@ function ConteudoModal({
                       cancelar
                     </button>
                   )}
-                </div>
-
-                {/* ===== SLA — prazo do processo (engine única, só leitura) ===== */}
-                <div className="mb-6">
-                  <ProcessoSlaCard processoId={processo.id} />
                 </div>
 
                 {/* ===== MODO VISUALIZAÇÃO ===== */}

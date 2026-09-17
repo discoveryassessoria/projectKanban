@@ -1,23 +1,28 @@
 // ============================================================================
-// CAMADA DE I/O DA ENGINE DE SLA
+// CAMADA DE I/O DA ENGINE DE SLA DE FASEMACRO/PROCESSO
 // ----------------------------------------------------------------------------
 // Carrega o snapshot do banco e delega TODO o cálculo ao núcleo puro
 // (src/lib/motor/sla-core.ts). Duas entradas:
 //
-//   • resolveSlaProjection(processId)        — 1 processo (detalhe do processo).
+//   • resolveSlaProjection(processId)        — 1 processo.
 //   • resolveSlaProjectionBatch(processIds)  — N processos, POUCAS queries
-//     agregadas (custo CONSTANTE em nº de queries, sem N+1). Usado pela Central
-//     Operacional e pela listagem de processos.
+//     agregadas (custo CONSTANTE em nº de queries, sem N+1).
 //
-// O single delega ao batch (mesma carga/mesma lógica) para eliminar qualquer
-// divergência entre as duas formas — mesmo desenho do resolver da Projeção
-// Operacional Canônica (operational-projection.ts).
+// ⚠ NÃO É MAIS APRESENTADO COMO "PRAZO DO PROCESSO" EM NENHUMA TELA
+// OPERACIONAL (17/09/2026) — Home, Kanban, Lista e detalhe do processo
+// pararam de consumir isto: era um terceiro relógio de prazo concorrente com
+// os dois oficiais (Tarefa macro / Subtarefa operacional, ver
+// [[prazo-tarefa-subtarefa-dois-relogios]]). O ÚNICO consumidor legítimo
+// restante é o painel de inteligência da Árvore Genealógica
+// (`src/components/arvore/inteligencia/barra-linhagem.tsx`, via GET
+// .../genealogia/operacional) — mantido porque a Árvore está sob
+// congelamento de UI (ver [[arvore-layout-definitivo]]) e não foi tocada.
+// Não adicionar um NOVO consumidor operacional a isto sem reabrir a decisão
+// que removeu o conceito.
 //
 // SOMENTE LEITURA: não escreve, não persiste, não cria campo derivado no banco.
 // A configuração de SLA (FaseMacro.slaDays) continua sendo a única fonte de
-// verdade, e a projeção é recalculada a cada leitura — por isso já nasce certa
-// na criação do processo, na mudança de fase, na alteração do Workflow Macro,
-// na listagem e na abertura do processo, sem cache a invalidar.
+// verdade, e a projeção é recalculada a cada leitura.
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"

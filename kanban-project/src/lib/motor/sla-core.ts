@@ -1,12 +1,18 @@
 // ============================================================================
-// NÚCLEO PURO DA ENGINE DE SLA (sem I/O)
+// NÚCLEO PURO DA ENGINE DE SLA DE FASEMACRO/PROCESSO (sem I/O)
 // ----------------------------------------------------------------------------
-// ÚNICA fonte de cálculo de prazo do Discovery. Recebe um snapshot já carregado
-// (SlaInput) e devolve a SlaProcesso. Não toca no banco, não formata tela, não
-// decide permissão. As duas camadas de I/O — resolveSlaProjection (1) e
-// resolveSlaProjectionBatch (N), em src/lib/process-stage/sla-projection.ts —
-// apenas carregam o snapshot e chamam este núcleo, garantindo contrato e lógica
-// IDÊNTICOS na Central Operacional, na listagem e no detalhe do processo.
+// Recebe um snapshot já carregado (SlaInput) e devolve a SlaProcesso. Não
+// toca no banco, não formata tela, não decide permissão.
+//
+// ⚠ Este é o relógio de FASE MACRO — NÃO é mais um dos relógios de prazo
+// oficiais do Discovery (17/09/2026). Os dois oficiais são Tarefa (macro,
+// `Tarefa.dataPrazo`) e Subtarefa (operacional, `SubtaskExecution.prazo`) —
+// ver `lib/operacional/tempo-operacional.ts` e
+// [[prazo-tarefa-subtarefa-dois-relogios]]. Nenhuma tela operacional
+// apresenta mais isto como "prazo do processo"; o único consumidor
+// legítimo restante é o painel de inteligência da Árvore Genealógica
+// (congelado — ver [[arvore-layout-definitivo]]). Ver
+// src/lib/process-stage/sla-projection.ts para o detalhe completo.
 //
 // O QUE ESTA CAMADA **NÃO** FAZ: não escreve, não altera e não reinterpreta a
 // CONFIGURAÇÃO de SLA. O cadastro (FaseMacro.slaDays do Workflow Macro do Tipo

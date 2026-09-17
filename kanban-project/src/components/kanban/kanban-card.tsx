@@ -10,7 +10,7 @@ import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import type React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { AlertCircle, MoreVertical } from "lucide-react"
+import { MoreVertical } from "lucide-react"
 import type { Processo } from "@/src/types/kanban"
 import { CaixaDeSelecao } from "@/src/components/ui/selecao-em-massa"
 
@@ -41,7 +41,6 @@ export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDrag
     contratantes = [], // Array de contratantes
     requerentes = [],
     projection,
-    sla,
   } = processo
 
   /** Iniciais para o avatar: duas letras, sem inventar quando o nome é curto. */
@@ -202,14 +201,11 @@ export function KanbanCard({ processo, onClick, corDaFase, nacionalidade, isDrag
             </div>
           )}
 
-          {/* Rodapé: alerta de SLA (só quando há) e o menu do card. */}
-          <div className="mt-2.5 flex items-center justify-between">
-            {sla && sla.status === "atrasado" ? (
-              <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--danger-text)]">
-                <AlertCircle className="h-3.5 w-3.5" />
-                {sla.diasAtraso}
-              </span>
-            ) : <span />}
+          {/* Rodapé: o menu do card. Achado real (17/09/2026): o alerta aqui era
+              o relógio de FaseMacro (SLA do processo) — removido junto com o
+              conceito; prazo agora vive só em Tarefa/Subtarefa, ver
+              [[prazo-tarefa-subtarefa-dois-relogios]]. */}
+          <div className="mt-2.5 flex items-center justify-end">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onClick?.() }}

@@ -31,16 +31,16 @@ import {
   saudacao,
 } from "@/src/components/home/home-primitives"
 import { ProcessosEmAndamento } from "@/src/components/home/processos-andamento"
-import { CORES_SLA, ESTILO_FAIXA_SLA, type CorSla } from "@/src/components/sla/sla-ui"
-import { faixaDaFilaSla, faixaDaFilaPrazo, type FaixaPrazo } from "@/src/lib/home/home-logic"
+import { CORES_SLA, type CorSla } from "@/src/components/sla/sla-ui"
+import { faixaDaFilaPrazo, type FaixaPrazo } from "@/src/lib/home/home-logic"
 
 /**
- * Mesmo tom visual do SLA de Processo (`ESTILO_FAIXA_SLA`), só que para as 5
- * faixas de prazo de Tarefa/Subtarefa — "atrasadas"/"proximos-3" não existem
- * no vocabulário de `FaixaSla` (4 valores, Processo). `proximos-3` e
- * `proximos-7` dividem o mesmo tom de atenção — a engine de SLA também só
- * tem 3 cores (🟢🟡🔴); os 5 baldes são um recorte mais fino do MESMO
- * semáforo, não uma paleta nova.
+ * Semáforo dos DOIS relógios operacionais canônicos — Tarefa e Subtarefa
+ * (o SLA de FaseMacro/Processo foi removido, 17/09/2026 — ver
+ * [[prazo-tarefa-subtarefa-dois-relogios]]). `proximos-3` e `proximos-7`
+ * dividem o mesmo tom de atenção — a engine de SLA sempre teve só 3 cores
+ * (🟢🟡🔴); os 5 baldes são um recorte mais fino do MESMO semáforo, não uma
+ * paleta nova.
  */
 const ESTILO_FAIXA_PRAZO: Record<FaixaPrazo, CorSla> = {
   atrasadas: CORES_SLA.atrasado,
@@ -154,9 +154,8 @@ function MinhaAtencaoBloco({ data }: { data: HomeData }) {
 //    utilização operacional detalhada continua em Operação.
 // ===========================================================================
 function LinhaDeChip({ fila }: { fila: FilaOperacional }) {
-  const faixaSla = faixaDaFilaSla(fila.key)
-  const faixaPrazo = faixaDaFilaPrazo(fila.key)?.faixa ?? null
-  const st = faixaSla ? ESTILO_FAIXA_SLA[faixaSla] : ESTILO_FAIXA_PRAZO[faixaPrazo ?? "no-prazo"]
+  const faixaPrazo = faixaDaFilaPrazo(fila.key)?.faixa ?? "no-prazo"
+  const st = ESTILO_FAIXA_PRAZO[faixaPrazo]
   return (
     <Link
       href={fila.href}

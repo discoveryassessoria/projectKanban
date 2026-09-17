@@ -13,15 +13,12 @@
 
 import { prisma } from "@/lib/prisma"
 import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
-import { resolveSlaProjectionBatch, resumirSla } from "@/src/lib/process-stage/sla-projection"
 import { estadoTemporal, estadoTemporalSubtarefa } from "@/lib/operacional/tempo-operacional"
 import {
   FILAS_PASSO,
   FILAS_ESTADO,
-  FILAS_SLA,
   FILAS_PRAZO_TAREFA,
   FILAS_PRAZO_SUBTAREFA,
-  faixaDaFilaSla,
   faixaDaFilaPrazo,
   faixaPrazoDoEstado,
   STATUS_PASSO_ACIONAVEL,
@@ -48,11 +45,9 @@ import type {
   FilaItem,
   FilaOperacional,
   HomePermissions,
-  PainelSla,
   PrazosResumo,
   ResumoDia,
 } from "@/src/types/home"
-import type { SlaProcesso } from "@/src/types/sla"
 import { escopoTarefa, escopoPasso, escopoProcesso, escopoDocumento, escopoEvento } from "@/src/lib/autorizacao/escopo-operacional"
 
 /** Dias sem movimentação a partir dos quais o processo entra na fila "parados". */
@@ -134,11 +129,6 @@ export interface BaseOperacional {
   /** processos cuja fase atual está concluída no motor (prontos para avançar) */
   prontosParaAvancar: number[]
   parados: ProcessoBase[]
-  /**
-   * SLA por processo, vindo da ENGINE ÚNICA (resolveSlaProjectionBatch). A Home
-   * não calcula prazo: consome a mesma projeção da listagem e do detalhe.
-   */
-  sla: Map<number, SlaProcesso>
 }
 
 export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> {
@@ -257,14 +247,6 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
     (pr) => pr.faseAtualKey !== FASE_FINAL && pr.updatedAt < limiteParado,
   )
 
-  // SLA: uma chamada à engine oficial para TODOS os processos visíveis (3 queries
-  // agregadas, sem N+1). O card e o drill-down leem daqui — nunca recalculam.
-  const idsProcessos = [...processos.keys()]
-  const slaLista = p.verProcessos && idsProcessos.length > 0
-    ? await resolveSlaProjectionBatch(idsProcessos, agora)
-    : []
-  const sla = new Map<number, SlaProcesso>(slaLista.map((s) => [s.processoId, s]))
-
   return {
     processos,
     passos,
@@ -273,7 +255,6 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
     pendencias: pendenciasRaw as PendenciaBase[],
     prontosParaAvancar: [...prontos],
     parados,
-    sla,
   }
 }
 
@@ -285,24 +266,10 @@ type Membro =
   | { tipo: "tarefa"; tarefa: TarefaBase }
   | { tipo: "subtarefa"; subtarefa: SubtarefaBase }
   | { tipo: "processo"; processo: ProcessoBase }
-  | { tipo: "processo-sla"; processo: ProcessoBase; sla: SlaProcesso }
   | { tipo: "pendencia"; pendencia: PendenciaBase }
 
 function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[] {
-  // --- filas de SLA (faixa de prazo do processo) ---
-  const faixa = faixaDaFilaSla(key)
-  if (faixa) {
-    const membros: Membro[] = []
-    for (const sla of base.sla.values()) {
-      if (sla.faixa !== faixa) continue
-      const processo = base.processos.get(sla.processoId)
-      if (!processo) continue
-      membros.push({ tipo: "processo-sla", processo, sla })
-    }
-    return membros
-  }
-
-  // --- filas de prazo Tarefa/Subtarefa (os dois relógios independentes) ---
+  // --- filas de prazo Tarefa/Subtarefa (os dois relógios operacionais canônicos) ---
   const filaPrazo = faixaDaFilaPrazo(key)
   if (filaPrazo) {
     if (filaPrazo.grain === "tarefa") {
@@ -401,7 +368,6 @@ function prazoDoMembro(m: Membro): Date | null {
   if (m.tipo === "passo") return m.passo.prazo
   if (m.tipo === "tarefa") return m.tarefa.dataPrazo
   if (m.tipo === "subtarefa") return m.subtarefa.prazo
-  if (m.tipo === "processo-sla") return m.sla.prazoPrevisto ? new Date(m.sla.prazoPrevisto) : null
   return null
 }
 
@@ -424,7 +390,7 @@ function identidadeDoMembro(m: Membro): string {
   if (m.tipo === "passo") return `passo:${m.passo.id}`
   if (m.tipo === "tarefa") return `tarefa:${m.tarefa.id}`
   if (m.tipo === "subtarefa") return `subtarefa:${m.subtarefa.id}`
-  if (m.tipo === "processo" || m.tipo === "processo-sla") return `processo:${m.processo.id}`
+  if (m.tipo === "processo") return `processo:${m.processo.id}`
   return `pendencia:${m.pendencia.id}`
 }
 
@@ -478,33 +444,19 @@ export function montarFilas(base: BaseOperacional, ctx: ContextoHome): FilaOpera
 }
 
 // ---------------------------------------------------------------------------
-// SLA — bloco de prazo da Central Operacional
-// ---------------------------------------------------------------------------
-/**
- * Os quatro cards de prazo. A contagem sai da MESMA definição de membros usada
- * pelo drill-down (`membrosDaFila`), então o número do card e o tamanho da lista
- * são o mesmo cálculo. Faixa zerada continua aparecendo — "0 atrasados" é
- * resultado operacional, não ausência de bloco.
- */
-export function montarSla(base: BaseOperacional, ctx: ContextoHome): PainelSla | null {
-  if (!ctx.permissoes.verProcessos) return null
-
-  const cards: FilaOperacional[] = FILAS_SLA.map((def) => {
-    const quantidade = membrosDaFila(def.key, base, ctx.agora).length
-    return {
-      key: def.key,
-      titulo: def.titulo,
-      descricao: def.descricao,
-      quantidade,
-      nivel: quantidade > 0 ? def.nivelBase : "baixo",
-      modulo: def.modulo,
-      href: `/dashboard/fila/${def.key}`,
-    }
-  })
-
-  return { cards, resumo: resumirSla([...base.sla.values()]) }
-}
-
+// SLA de FaseMacro/Processo — REMOVIDO (17/09/2026).
+//
+// Existia aqui um terceiro relógio de prazo (`montarSla`, engine
+// `sla-core.ts`/FaseMacro), concorrente com os dois oficiais: Tarefa (macro)
+// e Subtarefa (operacional) — ver [[prazo-tarefa-subtarefa-dois-relogios]].
+// A engine (`lib/motor/sla-core.ts`, `src/lib/process-stage/sla-projection.ts`)
+// continua existindo porque tem UM consumidor legítimo restante — o painel de
+// inteligência da Árvore Genealógica (`src/components/arvore/inteligencia/
+// barra-linhagem.tsx`, via GET .../genealogia/operacional), que está sob
+// congelamento de UI (ver [[arvore-layout-definitivo]]) e não foi tocado. Mas
+// ela não é mais apresentada como "prazo do processo" em Home, Kanban, Lista
+// ou detalhe do processo — quem já foi lá é `deleted` ali, não uma nova
+// fonte de verdade em disputa.
 // ---------------------------------------------------------------------------
 // PRAZOS DE TAREFA — o relógio MACRO, grain TAREFA. Nunca somado ao SLA de
 // Processo (FaseMacro, acima) nem ao de Subtarefa (abaixo) — os três são
@@ -734,24 +686,6 @@ export async function listarFila(
         prazo: s.prazo ? s.prazo.toISOString() : null,
         atrasado: estaAtrasado(s.prazo, ctx.agora),
         href: hrefProcesso(pr, s.documentoId ? `&sidebarTab=documentos` : ""),
-      }
-    }
-    if (m.tipo === "processo-sla") {
-      const pr = m.processo
-      const s = m.sla
-      return {
-        id: `sla-${pr.id}`,
-        titulo: pr.nome,
-        subtitulo: [s.rotuloDias, s.faseAtual?.label ?? pr.faseAtualKey?.replace(/_/g, " ") ?? null]
-          .filter(Boolean)
-          .join(" · "),
-        processoId: pr.id,
-        processoCodigo: pr.codigo,
-        processoNome: pr.nome,
-        pais: pr.pais,
-        prazo: s.prazoPrevisto,
-        atrasado: s.status === "atrasado",
-        href: hrefProcesso(pr),
       }
     }
     if (m.tipo === "processo") {
