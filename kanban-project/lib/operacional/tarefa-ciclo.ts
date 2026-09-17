@@ -26,6 +26,7 @@ import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonic
 import { reabrirPassoTx } from '@/src/services/task-step-sync'
 import { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 import { marcarAtribuicaoComoLidaAoProgredir } from './notificacao-canonica'
+import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
 export { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 
 export type Falha =
@@ -215,6 +216,61 @@ export async function criarTarefaManual(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// OBRIGAÇÃO ADMINISTRATIVA (17/09/2026) — a ESCRITA mora aqui, dono único de
+// estado operacional de Tarefa. A DECISÃO (quando abrir/concluir, quem
+// recebe, notificação) mora em lib/operacional/obrigacao-atribuicao.ts — este
+// arquivo só grava o que o chamador já decidiu, como toda porta acima. Fica
+// perto de `criarTarefaManual`, de propósito: é a MESMA família — trabalho
+// novo, com identidade própria — nunca reabertura.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * CRIA a Tarefa que representa "distribuir as tarefas sem responsável deste
+ * processo" — sem workflow, sem etapa: ela não pertence ao Workflow Interno
+ * de nenhuma certidão. Idempotente pela `chaveIdempotencia` do chamador —
+ * uma corrida que perde recebe `null`, nunca uma cópia.
+ */
+export async function criarTarefaAdministrativa(
+  db: Prisma.TransactionClient | typeof prisma,
+  args: { processoId: number; titulo: string; responsavelId: number; chaveIdempotencia: string; origem: string },
+): Promise<{ tarefaId: number } | null> {
+  try {
+    const criada = await db.tarefa.create({
+      data: {
+        titulo: args.titulo.slice(0, 200),
+        processoId: args.processoId,
+        tipo: 'ADMINISTRATIVA',
+        statusTarefa: 'NAO_INICIADA',
+        concluida: false,
+        prioridade: 'ALTA',
+        responsavelId: args.responsavelId,
+        dataAtribuicao: new Date(),
+        origem: args.origem,
+        chaveIdempotencia: args.chaveIdempotencia,
+      },
+      select: { id: true },
+    })
+    return { tarefaId: criada.id }
+  } catch (e) {
+    if ((e as { code?: string })?.code === 'P2002') return null
+    throw e
+  }
+}
+
+/** CONCLUI a obrigação administrativa — o trabalho de distribuir foi feito. */
+export async function concluirTarefaAdministrativa(db: Prisma.TransactionClient | typeof prisma, tarefaId: number): Promise<void> {
+  await db.tarefa.update({
+    where: { id: tarefaId },
+    data: {
+      statusTarefa: 'CONCLUIDO_RECEBIDO',
+      concluida: true,
+      dataConclusao: new Date(),
+      motivoConclusao: 'distribuicao_concluida',
+    },
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // REABERTURA
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -397,7 +453,7 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
-      select: { id: true, titulo: true, responsavelId: true, equipeKey: true, statusTarefa: true },
+      select: { id: true, titulo: true, responsavelId: true, equipeKey: true, statusTarefa: true, processoId: true },
     })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
@@ -414,6 +470,9 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
       `Tarefa "${t.titulo}" devolvida à fila${t.equipeKey ? ` da ${t.equipeKey}` : ''} (era do usuário ${t.responsavelId}).` +
       (args.motivo ? ` Motivo: ${args.motivo}` : ''),
       { tarefaId: t.id, de: t.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null })
+    // OBRIGAÇÃO ADMINISTRATIVA — devolver à fila pode ter feito o processo
+    // voltar a ter tarefa sem responsável. Ver lib/operacional/obrigacao-atribuicao.ts.
+    if (t.processoId != null) await reconciliarObrigacaoDeAtribuicao(tx, t.processoId)
     return { ok: true as const, tarefaId: t.id }
   })
 }

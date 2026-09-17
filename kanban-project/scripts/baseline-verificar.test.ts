@@ -390,7 +390,21 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // só, checksum anterior no WHERE, 1 linha afetada) — `started_at`/
 // `finished_at`/`applied_steps_count` continuam os originais de 02/08/2026;
 // 5) só então esta constante. Checksum anterior: 61107de94e85709a0de86a7548eab33205cf1886056aadccb93658c8ab9777f7
-const CHECKSUM_LEDGER = '7f0347f1828003ac29a60395c965ac70e2db230a2fb58f8d42911c232244389e'
+//
+// 17/09/2026 — OBRIGAÇÃO ADMINISTRATIVA ATRIBUIR_RESPONSAVEL: novo valor
+// `ADMINISTRATIVA` em `TipoTarefa` (ver lib/operacional/obrigacao-
+// atribuicao.ts). Migration real 20260917181305_tarefa_tipo_administrativa —
+// só ADD VALUE no enum, nenhuma coluna/tabela tocada. Procedimento seguido à
+// risca: 1) schema.prisma mudou; 2) migration aplicada em produção via
+// `prisma migrate deploy` (conexão local direta, `.env`); 3) ledger de
+// produção consultado e backupeado ANTES de escrever (~/.discovery-backups/
+// prisma-migrations-20260917-pre-checksum-obrigacao.json, 68 linhas);
+// 4) checksum da linha 0000_baseline atualizado explicitamente em produção
+// (UPDATE de uma coluna só, checksum anterior no WHERE, 1 linha afetada) —
+// `started_at`/`finished_at`/`applied_steps_count` continuam os originais de
+// 02/08/2026; 5) só então esta constante. Checksum anterior:
+// 7f0347f1828003ac29a60395c965ac70e2db230a2fb58f8d42911c232244389e
+const CHECKSUM_LEDGER = 'e32e117adc967f3ac0bf503dca277278f5c3de2b2291149b2f5dd95403de6022'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -465,6 +479,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260915160000_espera_externa_ao_liberar_subtarefa',
   '20260916220000_cartorios_base_nacional',
   '20260917161750_remove_fasemacro_sla',
+  '20260917181305_tarefa_tipo_administrativa',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

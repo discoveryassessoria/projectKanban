@@ -125,8 +125,12 @@ async function main() {
   // O motor carimba a origem exata (RECONCILIADOR); o que importa é que NÃO é
   // manual — tarefa manual não pode nascer sem alguém tê-la pedido.
   ok("4) nasceu do MOTOR, não à mão", t0.origem !== "MANUAL" && t0.origem != null, String(t0.origem))
+  // `tipo: "NORMAL"` — a tarefa nasce sem responsável, e isso pode ter aberto
+  // a obrigação administrativa de distribuí-la (Tarefa própria, `tipo:
+  // "ADMINISTRATIVA"`, ver lib/operacional/obrigacao-atribuicao.ts). A
+  // invariante "etapa não é tarefa" é sobre a tarefa OPERACIONAL.
   ok("11) uma tarefa para as 4 etapas — etapa não é tarefa",
-    (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
+    (await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: "NORMAL" } })) === 1)
 
   const sem0 = await semResponsavel()
   ok("5) aparece em SEM RESPONSÁVEL", naFila(sem0, X))
@@ -169,7 +173,10 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   const rr = await atribuirTarefa({ tarefaId: X, responsavelId: daniela.id, autorId: gestor.id })
   ok("retry é recusado sem efeito", rr.ok === false && rr.codigo === "MESMO_RESPONSAVEL", rr.ok ? "aceitou!" : rr.codigo)
-  ok("nenhuma tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
+  // `tipo: "NORMAL"` — mesma nota do item 11: a obrigação administrativa
+  // (aberta quando X nasceu sem responsável, já concluída quando X foi
+  // atribuído) é histórico legítimo, não uma tarefa operacional nova.
+  ok("nenhuma tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: "NORMAL" } })) === 1)
   ok("nenhuma notificação nova", (await notificacoes(X)).length === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -211,8 +218,13 @@ async function main() {
   ok("e a marca de atribuição foi limpa junto", t2.dataAtribuicao === null)
   ok("saiu da fila da Maria", !naFila(await minhaFila(maria.id), X))
   ok("voltou para SEM RESPONSÁVEL", naFila(await semResponsavel(), X))
+  // `tipo: "NORMAL"` — devolver à fila abre a obrigação administrativa de
+  // distribuir (Tarefa própria, `tipo: "ADMINISTRATIVA"`, ver
+  // lib/operacional/obrigacao-atribuicao.ts). Ela NÃO é uma cópia de X: é
+  // outro trabalho, de outra natureza. A invariante que este teste protege
+  // ("nenhuma cópia da tarefa OPERACIONAL foi criada") continua de pé.
   ok("§15) do começo ao fim foi SEMPRE a mesma tarefa",
-    (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1, "nenhuma cópia foi criada")
+    (await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: "NORMAL" } })) === 1, "nenhuma cópia foi criada")
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("§10) A ordem é operacional, não cronológica")

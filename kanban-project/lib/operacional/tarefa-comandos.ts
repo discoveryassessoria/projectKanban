@@ -28,6 +28,7 @@ import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
 import { notificarAcontecimento, marcarAtribuicaoComoLidaAoProgredir } from './notificacao-canonica'
 import { estadosTemporaisDasOperacoes } from './proximo-acontecimento'
+import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
 
 export type ResultadoComando =
   /** `jaEstavaIniciada` distingue "fiz agora" de "já estava feito" sem virar erro. */
@@ -168,6 +169,12 @@ export async function atribuirTarefa(args: {
         : `Tarefa "${t.titulo}" atribuída ao usuário ${args.responsavelId} (estava na fila${t.equipeKey ? ` da ${t.equipeKey}` : ''}).`,
       { tarefaId: t.id, de: anterior, para: args.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null },
     )
+
+    // OBRIGAÇÃO ADMINISTRATIVA — esta atribuição pode ter zerado o "sem
+    // responsável" do processo (a última das N), ou pode ter sido a própria
+    // obrigação sendo reatribuída — nos dois casos, reconciliar contra o
+    // estado real agora. Ver lib/operacional/obrigacao-atribuicao.ts.
+    if (t.processoId != null) await reconciliarObrigacaoDeAtribuicao(tx, t.processoId)
 
     // LOTE: a notificação individual é suprimida — quem orquestra o lote
     // (`redistribuirTarefas`) consolida em UM aviso, depois que o laço todo

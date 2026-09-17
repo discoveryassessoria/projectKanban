@@ -97,6 +97,12 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "cancela a Tarefa correspondente via reconciliarTarefas — monta e derruba os PRÓPRIOS " +
     "processos/necessidades (marca DISPTASK) só no banco de teste; a dispensa passa por " +
     "dispensarNecessidade (o dono canônico), só o `deleteMany` de limpeza é direto",
+  "scripts/obrigacao-atribuicao.test.ts":
+    "obrigação administrativa ATRIBUIR_RESPONSAVEL (17/09/2026, mandato Grisotto): monta e " +
+    "derruba os PRÓPRIOS processos/necessidades (marca OBRIG) só no banco de teste — o " +
+    "cenário precisa de tarefas reais sem responsável, materializadas por reconciliarTarefas " +
+    "(o caminho oficial), para provar que N tarefas sem dono virem UMA obrigação " +
+    "administrativa; só o `deleteMany` de limpeza é direto",
   "scripts/cancelamento-operacao-documento.test.ts":
     "CANCELADA != CONCLUÍDA (11/09/2026, achado real: documento 2131): monta e derruba o " +
     "PRÓPRIO palco por TRUNCATE (fixture completa: tipo/macro/fase/workflow/processo/" +

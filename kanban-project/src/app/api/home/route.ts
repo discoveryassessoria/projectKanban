@@ -58,13 +58,25 @@ export async function GET(request: NextRequest) {
     // MESMO card, porque as duas consultas tinham escopos de status
     // diferentes. As duas leituras de UM card precisam concordar.
     const filtroFamiliasCentral = { ...filtroCentral, status: STATUS_ATIVOS }
+    // "MINHA ATENÇÃO" (bloco do topo, "N operações exigem SUA atenção") é
+    // PESSOAL por natureza — sempre `responsavelId: usuario.userId`, mesmo
+    // para admin. Achado real (17/09/2026, mandato Grisotto): usar
+    // `filtroCentral` aqui (global para admin) somava `executavelAgora`
+    // (contava as tarefas sem responsável, que são "executáveis" pelo motor
+    // independente de dono) + `semResponsavel` (as MESMAS tarefas) — 15+15
+    // virava "30 operações exigem sua atenção" para a mesma obrigação. Com o
+    // filtro pessoal, uma tarefa sem responsável nunca é "minha" (ela ainda
+    // não tem dono) — e a obrigação administrativa de distribuí-las
+    // (lib/operacional/obrigacao-atribuicao.ts) é que aparece aqui, contada
+    // uma vez, para quem de fato precisa agir.
+    const filtroAtencaoPessoal = { responsavelId: usuario.userId }
     const [filas, agenda, resumoDia, alertas, familiasCentral, indicadoresCentral] = await Promise.all([
       Promise.resolve(montarFilas(base, ctx)),
       montarAgenda(ctx),
       montarResumoDia(base, ctx),
       montarAlertas(base, ctx),
       permissoes.verTarefas ? agregacaoPorFamilia(ctx.agora, filtroFamiliasCentral) : Promise.resolve([]),
-      permissoes.verTarefas ? indicadoresGerenciais(filtroCentral, ctx.agora) : Promise.resolve(null),
+      permissoes.verTarefas ? indicadoresGerenciais(filtroAtencaoPessoal, ctx.agora) : Promise.resolve(null),
     ])
 
     // Métrica COMPOSTA e deduplicada — não é Σ fila.quantidade (isso contava o

@@ -25,6 +25,7 @@ import { nomeDaTarefa } from './nome-da-tarefa'
 import {
   materializarTarefaOperacional, sincronizarTarefaComWorkflow, STATUS_TERMINAIS,
 } from './tarefa-canonica'
+import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
 
 export interface ResultadoReconciliacao {
   instanciasAvaliadas: number
@@ -218,6 +219,11 @@ export async function reconciliarTarefas(
         origem: 'RECONCILIADOR',
       }, agora)
       await sincronizarTarefaComWorkflow(tx, r.tarefaId, agora)
+      // OBRIGAÇÃO ADMINISTRATIVA — este é UM dos DOIS pontos de criação de
+      // Tarefa do sistema (o outro é garantirTarefaDePasso, já hookado nele
+      // mesmo). Achado real: a tarefa pode ter nascido sem responsável
+      // (`responsavelId` acima). Ver lib/operacional/obrigacao-atribuicao.ts.
+      await reconciliarObrigacaoDeAtribuicao(tx, inst.processoId)
       return r
     })
 

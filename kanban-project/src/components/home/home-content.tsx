@@ -101,15 +101,20 @@ function Cabecalho({ data }: { data: HomeData }) {
 function MinhaAtencaoBloco({ data }: { data: HomeData }) {
   const central = data.centralOperacional
   if (!central) return null
-  const isAdmin = data.usuario.tipo === "admin"
-  const { executavelAgora, atrasadas, bloqueadas, semResponsavel } = central.indicadores
-  const precisaAtencao = executavelAgora + atrasadas + bloqueadas + (isAdmin ? semResponsavel : 0)
+  // PESSOAL, não a operação inteira (achado real 17/09/2026, mandato
+  // Grisotto): `central.indicadores` já vem calculado com `responsavelId: eu`
+  // — inclusive para admin (ver src/app/api/home/route.ts). Por isso
+  // `semResponsavel` não entra aqui: uma tarefa sem dono nunca é "minha", e a
+  // obrigação administrativa de distribuí-la (Tarefa própria, tipo
+  // ADMINISTRATIVA) é que aparece nestes números quando o usuário logado é
+  // quem a recebeu — contada uma vez, nunca somada de novo por fora.
+  const { executavelAgora, atrasadas, bloqueadas } = central.indicadores
+  const precisaAtencao = executavelAgora + atrasadas + bloqueadas
 
   const partes: string[] = []
   if (executavelAgora > 0) partes.push(`${executavelAgora} pronta${executavelAgora === 1 ? "" : "s"} para avançar`)
   if (atrasadas > 0) partes.push(`${atrasadas} atrasada${atrasadas === 1 ? "" : "s"}`)
   if (bloqueadas > 0) partes.push(`${bloqueadas} bloqueada${bloqueadas === 1 ? "" : "s"}`)
-  if (isAdmin && semResponsavel > 0) partes.push(`${semResponsavel} sem responsável`)
 
   return (
     <section className="flex flex-col gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

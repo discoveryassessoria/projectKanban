@@ -13,6 +13,15 @@ export const PERMISSOES = {
   'tarefas.excluir': 'Excluir tarefas',
   'tarefas.iniciar_concluir': 'Iniciar e concluir tarefas',
   'tarefas.bloquear': 'Bloquear e desbloquear tarefas', // CP-4D
+  // COMPETÊNCIA para ser resolvido como responsável pela obrigação
+  // administrativa ATRIBUIR_RESPONSAVEL (distribuir tarefas sem responsável —
+  // ver lib/operacional/obrigacao-atribuicao.ts). NÃO-exclusiva: hoje só o
+  // Administrador a recebe por padrão (base de `calcularPermissoes`), mas é
+  // permissão de cadastro (perfil/custom) — um Gerente pode ganhá-la por
+  // configuração, sem alterar código. `usuarioResponsavelPelaDistribuicao()`
+  // é o ÚNICO lugar que lê esta chave para decidir quem recebe a tarefa;
+  // nunca checar `tipo === 'admin'` em outro lugar para esta decisão.
+  'operacao.distribuirTarefas': 'Ser responsável por distribuir tarefas sem responsável (obrigação administrativa)',
 
   // Processos
   'processos.ver': 'Ver processos',

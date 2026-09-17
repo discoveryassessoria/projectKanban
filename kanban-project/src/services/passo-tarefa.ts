@@ -23,6 +23,7 @@ import {
 import { identidadeDaUnidade, tarefaVivaDaUnidade, TERMINAIS_DA_UNIDADE } from "@/lib/operacional/identidade-da-tarefa"
 import { reancorarTarefaNaUnidade } from "@/lib/operacional/tarefa-canonica"
 import { nomeDaTarefa } from "@/lib/operacional/nome-da-tarefa"
+import { reconciliarObrigacaoDeAtribuicao } from "@/lib/operacional/obrigacao-atribuicao"
 
 /**
  * Pré-condições do processo, iguais para TODOS os passos de uma mesma rodada.
@@ -299,6 +300,13 @@ export async function garantirTarefaDePasso(
         }],
         skipDuplicates: true,
       })
+
+      // OBRIGAÇÃO ADMINISTRATIVA — a Tarefa pode ter nascido sem responsável
+      // (`resp.responsavelId` nulo). Reconcilia AGORA, na mesma transação: se
+      // é a primeira sem dono deste processo, abre "Atribuir tarefas — X"; se
+      // já havia obrigação aberta, o contador dela é lido na apresentação, sem
+      // escrita aqui. Ver lib/operacional/obrigacao-atribuicao.ts.
+      await reconciliarObrigacaoDeAtribuicao(tx, step.processoId)
 
       return { success: true, created: true, tarefa, warnings, correlationId }
   }

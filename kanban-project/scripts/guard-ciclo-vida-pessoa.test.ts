@@ -325,6 +325,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "só no banco de teste — reproduz o caso em que a mesma certidão virou duas tarefas vivas",
   "scripts/fluxo-distribuicao.test.ts":
     "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
+  "scripts/obrigacao-atribuicao.test.ts":
+    "obrigação administrativa ATRIBUIR_RESPONSAVEL (17/09/2026, mandato Grisotto): monta e derruba os PRÓPRIOS processos/árvores/pessoas (marca OBRIG), só no banco de teste — o cenário precisa de tarefas reais sem responsável, materializadas por reconciliarTarefas (o caminho oficial), para provar que N tarefas sem dono virem UMA obrigação administrativa; só o `deleteMany` de limpeza é direto",
   "scripts/palco-distribuicao.ts":
     "palco visual da Operação: monta e derruba os PRÓPRIOS processos (marca PALCO), só no banco de teste, para a captura de tela com dados realistas — não roda em produção",
   "scripts/navegacao-operacional.test.ts":

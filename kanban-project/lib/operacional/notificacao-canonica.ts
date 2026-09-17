@@ -59,6 +59,10 @@ export const TIPOS_NOTIFICACAO = [
   "ACOMPANHAMENTO_VENCIDO",
   "EM_RISCO",
   "FASE_CONCLUIDA",
+  // OBRIGAÇÃO ADMINISTRATIVA (17/09/2026) — "N tarefas sem responsável" é UMA
+  // necessidade de distribuir, nunca N notificações. Ver
+  // lib/operacional/obrigacao-atribuicao.ts.
+  "DISTRIBUICAO_NECESSARIA",
 ] as const
 export type TipoNotificacao = (typeof TIPOS_NOTIFICACAO)[number]
 

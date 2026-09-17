@@ -4993,6 +4993,12 @@ enum OutboxStatus {
 enum TipoTarefa {
   NORMAL
   TRANSVERSAL
+  // OBRIGAÇÃO ADMINISTRATIVA (17/09/2026) — trabalho de GERIR a operação
+  // (ex.: distribuir tarefas sem responsável), nunca do Workflow Interno da
+  // certidão. Ver lib/operacional/obrigacao-atribuicao.ts. Nasce sempre com
+  // responsavelId preenchido — nunca entra no mecanismo de "sem responsável"
+  // que ela própria existe para resolver.
+  ADMINISTRATIVA
 }
 
 enum WorkflowEventoTipo {

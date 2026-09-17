@@ -165,7 +165,14 @@ async function main() {
     const { linhas } = await visaoGerencial({ processoId: p.processoId, incluirEncerradas: true }, new Date())
     const linha = naLista(linhas, p.tarefaId)
     ok("CASO 8) a coluna NÃO é CONCLUIDA — é a própria coluna CANCELADA", linha?.coluna === "CANCELADA", linha?.coluna)
-    const card = await indicadoresGerenciais({ processoId: p.processoId }, new Date())
+    // `tipoTarefa: ["NORMAL"]` — escopa ao que este caso testa (a tarefa
+    // OPERACIONAL cancelada não conta como concluída). Atribuir p.tarefaId
+    // acima já zerou o "sem responsável" do processo e concluiu, à parte, a
+    // obrigação administrativa correspondente (Tarefa própria, `tipo:
+    // "ADMINISTRATIVA"`, legitimamente CONCLUIDO_RECEBIDO — ver
+    // lib/operacional/obrigacao-atribuicao.ts) — outro fato, não o que este
+    // caso verifica.
+    const card = await indicadoresGerenciais({ processoId: p.processoId, tipoTarefa: ["NORMAL"] }, new Date())
     ok("CASO 8) não conta em 'concluidas'", card.concluidas === 0, String(card.concluidas))
     ok("CASO 8) não conta em 'total' (abertas)", card.total === 0, String(card.total))
   }
