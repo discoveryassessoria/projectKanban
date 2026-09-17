@@ -37,6 +37,39 @@ export async function GET(request: NextRequest) {
     const ehAdmin = usuario.tipo === 'admin'
     const filtroResponsavel = { responsavelId: usuario.userId }
 
+    // 🔒 Etapa 4 (item 15) — o SINO REAL passa a consumir a porta canônica de
+    // notificação (`notificarAcontecimento`). Só NÃO LIDAS: uma notificação
+    // arquivada/lida sai do sino sozinha, sem precisar de um segundo estado.
+    // RBAC embutido na própria query: cada usuário só vê o que É destinatário
+    // dele — nunca por vazamento de acesso ao processo/tarefa (item 17).
+    //
+    // Lida ANTES das janelas de prazo/"novas" de propósito (achado real
+    // 17/09/2026): quando a MESMA atribuição já gerou um aviso específico
+    // (`ATRIBUICAO`/`TRANSFERENCIA`/`ATRIBUICAO_LOTE`, ainda não lido), as
+    // tarefas que ele cobre não podem TAMBÉM explodir como N entradas de
+    // prazo/"nova tarefa" — o mesmo acontecimento não é três avisos. A
+    // supressão vale só enquanto o aviso da atribuição estiver pendente:
+    // marcá-lo como lido (ou ele nunca ter existido) libera a tarefa para as
+    // janelas de prazo normais — nenhum dado de prazo/SLA é alterado, só
+    // QUAIS tarefas aparecem soltas aqui.
+    const acontecimentosRaw = await prisma.notificacaoOperacional.findMany({
+      where: { destinatarioId: usuario.userId, lidaEm: null },
+      select: { id: true, tipo: true, titulo: true, mensagem: true, link: true, criadoEm: true, tarefaId: true, processoId: true },
+      orderBy: { criadoEm: 'desc' },
+      take: 30,
+    })
+    const tarefasCobertasPorAtribuicao = new Set<number>()
+    const processosCobertosPorAtribuicaoLote = new Set<number>()
+    for (const a of acontecimentosRaw) {
+      if (a.tipo !== 'ATRIBUICAO' && a.tipo !== 'TRANSFERENCIA' && a.tipo !== 'ATRIBUICAO_LOTE') continue
+      if (a.tarefaId != null) tarefasCobertasPorAtribuicao.add(a.tarefaId)
+      if (a.processoId != null) processosCobertosPorAtribuicaoLote.add(a.processoId)
+    }
+    const acontecimentos = acontecimentosRaw.map((n) => ({
+      id: n.id, tipo: n.tipo, titulo: n.titulo, mensagem: n.mensagem, link: n.link,
+      criadoEm: n.criadoEm.toISOString(),
+    }))
+
     const tarefas = await prisma.tarefa.findMany({
       where: {
         concluida: false,
@@ -59,6 +92,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         titulo: true,
+        tipo: true,
         dataPrazo: true,
         createdAt: true,
         processoId: true,
@@ -72,8 +106,14 @@ export async function GET(request: NextRequest) {
     const hojeList: any[] = []
     const proximos3Dias: any[] = []
     const novas: any[] = []
+    let suprimidasPorAtribuicaoPendente = 0
 
     for (const t of tarefas) {
+      // JÁ COBERTA por um aviso de atribuição pendente — não duplica o
+      // acontecimento em mais um bucket (item C, 17/09/2026).
+      const jaAvisada = tarefasCobertasPorAtribuicao.has(t.id) || (t.processoId != null && processosCobertosPorAtribuicaoLote.has(t.processoId))
+      if (jaAvisada) { suprimidasPorAtribuicaoPendente++; continue }
+
       const item = {
         id: t.id,
         titulo: t.titulo,
@@ -97,7 +137,12 @@ export async function GET(request: NextRequest) {
       // acima, `filtroResponsavel` já garante `responsavelId === usuario.
       // userId` para toda linha de `tarefas` — este `!= null` é só reforço
       // defensivo (nunca deveria ser falso aqui), não a barreira real.
-      if (t.createdAt >= umDiaAtras && t.responsavelId != null) novas.push(item)
+      //
+      // ADMINISTRATIVA nunca entra aqui (achado real 17/09/2026): essa
+      // Tarefa já tem aviso PRÓPRIO e mais específico (`DISTRIBUICAO_
+      // NECESSARIA`, em `acontecimentos`) — empurrá-la também como "nova
+      // tarefa" genérica duplicava o mesmo fato pra o mesmo destinatário.
+      if (t.createdAt >= umDiaAtras && t.responsavelId != null && t.tipo !== 'ADMINISTRATIVA') novas.push(item)
     }
 
     // 🔒 Achado real: quando a Saúde do Sistema encontra um erro crítico, o
@@ -127,22 +172,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 🔒 Etapa 4 (item 15) — o SINO REAL passa a consumir a porta canônica de
-    // notificação (`notificarAcontecimento`). Só NÃO LIDAS: uma notificação
-    // arquivada/lida sai do sino sozinha, sem precisar de um segundo estado.
-    // RBAC embutido na própria query: cada usuário só vê o que É destinatário
-    // dele — nunca por vazamento de acesso ao processo/tarefa (item 17).
-    const acontecimentosRaw = await prisma.notificacaoOperacional.findMany({
-      where: { destinatarioId: usuario.userId, lidaEm: null },
-      select: { id: true, tipo: true, titulo: true, mensagem: true, link: true, criadoEm: true },
-      orderBy: { criadoEm: 'desc' },
-      take: 30,
-    })
-    const acontecimentos = acontecimentosRaw.map((n) => ({
-      id: n.id, tipo: n.tipo, titulo: n.titulo, mensagem: n.mensagem, link: n.link,
-      criadoEm: n.criadoEm.toISOString(),
-    }))
-
     return NextResponse.json({
       vencidas,
       hoje: hojeList,
@@ -159,7 +188,7 @@ export async function GET(request: NextRequest) {
       // única vez (achado real da auditoria de 10/09/2026). `acontecimentos` é
       // grão NOTIFICAÇÃO — nunca TAREFA — e soma à parte, de propósito (item 19
       // do contrato: "Notification NÃO é Tarefa").
-      total: tarefas.length + (saudeCritica ? 1 : 0) + acontecimentos.length
+      total: (tarefas.length - suprimidasPorAtribuicaoPendente) + (saudeCritica ? 1 : 0) + acontecimentos.length
     })
   } catch (error) {
     console.error('Erro ao buscar notificações:', error)

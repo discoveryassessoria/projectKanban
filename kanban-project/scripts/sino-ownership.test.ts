@@ -20,6 +20,7 @@ import { signAuthToken } from "@/lib/auth-jwt"
 import { criarTarefaManual } from "@/lib/operacional/tarefa-ciclo"
 import { redistribuirTarefas } from "@/lib/operacional/tarefa-comandos"
 import { reconciliarObrigacaoDeAtribuicao, usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
+import { marcarNotificacaoComoLida } from "@/lib/operacional/notificacao-canonica"
 import { GET as getNotificacoes } from "@/src/app/api/notificacoes/route"
 
 const MARCA = "SINOOWN"
@@ -152,12 +153,23 @@ async function main() {
   ok("6) a obrigação administrativa foi concluída", obrigacaoDepois?.concluida === true)
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("7/8) SINO da Daniela — agora projeta as 15, sem duplicar")
+  secao("7/8) SINO da Daniela — consolidada primeiro, prazo individual só depois de lida")
   // ══════════════════════════════════════════════════════════════════════
+  const sinoDanielaAntesDeLer = await bucketsDoSino(daniela.id, daniela.email, daniela.tipo)
+  const idsNoSinoDanielaAntes = [...sinoDanielaAntesDeLer.vencidas, ...sinoDanielaAntesDeLer.hoje, ...sinoDanielaAntesDeLer.proximos3Dias].map((x) => x.id)
+  ok(
+    "7) enquanto a notificação consolidada está pendente, as 15 NÃO explodem em prazo individual (correção 17/09/2026)",
+    tarefaIds.every((id) => !idsNoSinoDanielaAntes.includes(id)),
+  )
+  const consolidada = sinoDanielaAntesDeLer.acontecimentos.find((a) => a.tipo === "ATRIBUICAO_LOTE")
+  ok("7) existe a notificação consolidada da atribuição", consolidada != null)
+
+  // Marcar como lida libera a projeção de prazo normal — notificação lida ≠ tarefa concluída.
+  if (consolidada) await marcarNotificacaoComoLida(prisma, { notificacaoId: consolidada.id, usuarioId: daniela.id })
   const sinoDaniela = await bucketsDoSino(daniela.id, daniela.email, daniela.tipo)
   const idsNoSinoDaniela = [...sinoDaniela.vencidas, ...sinoDaniela.hoje, ...sinoDaniela.proximos3Dias].map((x) => x.id)
   const achadasDaniela = tarefaIds.filter((id) => idsNoSinoDaniela.includes(id))
-  ok("7) as 15 tarefas agora projetam notificação de prazo para Daniela", achadasDaniela.length === 15, String(achadasDaniela.length))
+  ok("7) depois de lida, as 15 tarefas voltam a projetar prazo individual normalmente", achadasDaniela.length === 15, String(achadasDaniela.length))
   ok("8) nenhuma duplicação — 15 ids distintos, nunca mais", new Set(idsNoSinoDaniela).size === idsNoSinoDaniela.length)
   ok("8) o sino do Admin não continua mostrando as 15 (ownership migrou de verdade)", tarefaIds.every((id) => !idsNoSinoAdminDepois(sinoAdminDepois, id)))
 

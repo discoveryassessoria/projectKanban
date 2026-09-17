@@ -26,7 +26,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Search, Play, CalendarClock, AlertTriangle, Clock3, Hourglass,
   SlidersHorizontal, X as XIcon, ArrowUpRight, UserPlus,
@@ -127,6 +127,74 @@ const TOM_CATEGORIA: Record<CategoriaAtencao, string> = {
 
 const TODOS = "todos"
 const Z_POPOVER = "z-[10060]"
+const POR_PAGINA_GRUPOS = 8
+
+interface GrupoOperacional {
+  chave: string
+  rotuloPrincipal: string
+  rotuloSecundario: string | null
+  linhas: LinhaOperacional[]
+  atrasadas: number
+  proximoPrazo: string | null
+}
+
+/**
+ * A LINHA DENTRO DE UM GRUPO — mesma tabela de sempre, agora escopada a UMA
+ * família/processo por vez. Extraída para não repetir a marcação ao renderizar
+ * N grupos — a TAREFA continua sendo a mesma linha canônica, só o container
+ * visual mudou (item 13 do mandato: agrupamento é projeção, não motor).
+ */
+function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoAbrir }: {
+  l: LinhaOperacional
+  selecionado: boolean
+  aoSelecionar: () => void
+  aoAbrir: () => void
+}) {
+  const atencaoLinha = rotuloDeAtencao(l)
+  return (
+    <tr
+      onClick={aoSelecionar}
+      className={`cursor-pointer border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-secondary)] last:border-b-0 ${selecionado ? "bg-[var(--surface-secondary)]" : ""}`}
+    >
+      <td className="px-3 py-2.5">
+        <Etiqueta tom={atencaoLinha.tom === "critico" ? "critico" : atencaoLinha.tom === "alerta" ? "alerta" : "neutro"}>{atencaoLinha.rotulo}</Etiqueta>
+      </td>
+      <td className="max-w-[220px] px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          {l.emRisco && (
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--danger)]" title={l.motivosRisco.length ? l.motivosRisco.join(" · ") : "Em risco"} />
+          )}
+          <span className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{l.titulo}</span>
+        </div>
+        <div className="truncate text-[10.5px] text-[var(--text-muted)]">{[l.pessoaNome, l.processoNome].filter(Boolean).join(" · ") || "—"}</div>
+      </td>
+      <td className="px-3 py-2.5">
+        <div className="text-[11.5px] tabular-nums text-[var(--text-primary)]">{l.passoAtual ? `${l.passoAtual.ordem}/${l.passoAtual.total}` : "—"}</div>
+        <div className="truncate text-[10.5px] text-[var(--text-muted)]">{rotularFase(l.faseMacroKey) ?? "—"}</div>
+      </td>
+      <td className="max-w-[260px] px-3 py-2.5">
+        <div className="text-[11.5px] text-[var(--text-secondary)]">{textoDaSituacao(l)}</div>
+        <div className="truncate text-[10.5px] text-[var(--text-muted)]">{textoDaProximaAcao(l)}</div>
+        {l.terceiroNome && <div className="mt-0.5 truncate text-[10px] text-[var(--info-text)]">Terceiro: {l.terceiroNome}</div>}
+      </td>
+      <td className="px-3 py-2.5">
+        <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
+        {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
+      </td>
+      <td className="px-3 py-2.5 text-[11.5px] tabular-nums text-[var(--text-secondary)]">
+        {l.esperandoHaDias != null ? `${l.esperandoHaDias} dia${l.esperandoHaDias === 1 ? "" : "s"}` : "—"}
+      </td>
+      <td className="px-3 py-2.5">
+        <button
+          onClick={(e) => { e.stopPropagation(); aoAbrir() }}
+          className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 py-1 text-[10.5px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+        >
+          Abrir <ArrowUpRight className="h-3 w-3" />
+        </button>
+      </td>
+    </tr>
+  )
+}
 
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -166,10 +234,17 @@ interface Filtros {
 }
 const SEM_FILTRO: Filtros = { busca: "", fase: null, terceiro: null, prazo: "todos" }
 
-const POR_PAGINA = 10
-
 export function MinhaOperacao() {
   const router = useRouter()
+  // DEEP-LINK — a notificação de "nova atribuição em lote" (Sino) e o
+  // cartão da obrigação administrativa mandam pra cá com `?processo=<id>`,
+  // lido só uma vez, no mount, pra abrir aquele contexto já expandido.
+  const paramsIniciais = useSearchParams()
+  const [processoAlvoId] = useState<number | null>(() => {
+    const n = Number(paramsIniciais.get("processo"))
+    return Number.isInteger(n) && n > 0 ? n : null
+  })
+  const [expandidos, setExpandidos] = useState<Set<string>>(() => (processoAlvoId != null ? new Set([String(processoAlvoId)]) : new Set()))
   const [resultado, setResultado] = useState<{ chave: string; lista: LinhaOperacional[] | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
   const [categoria, setCategoria] = useState<CategoriaAtencao | "todas">("todas")
@@ -273,9 +348,50 @@ export function MinhaOperacao() {
 
   const ordenadas = useMemo(() => (filtradas ? ordenarPorAtencaoOperacional(filtradas) : null), [filtradas])
 
-  const totalPaginas = Math.max(1, Math.ceil((ordenadas?.length ?? 0) / POR_PAGINA))
+  // ── AGRUPAMENTO POR FAMÍLIA/PROCESSO — item 11/13 do mandato 17/09/2026:
+  // "não quero uma experiência interminável" quando o usuário tem várias
+  // famílias com muitas tarefas cada. Projeção VISUAL sobre a MESMA lista já
+  // filtrada/ordenada — as tarefas continuam individuais e canônicas; só a
+  // apresentação principal passa a ser por contexto, com a família do
+  // deep-link já expandida.
+  const grupos = useMemo<GrupoOperacional[] | null>(() => {
+    if (!ordenadas) return null
+    const mapa = new Map<string, GrupoOperacional>()
+    for (const l of ordenadas) {
+      const chave = l.processoId != null ? String(l.processoId) : "sem-processo"
+      let g = mapa.get(chave)
+      if (!g) {
+        g = {
+          chave,
+          rotuloPrincipal: l.familiaNome ?? l.processoNome ?? "Sem processo vinculado",
+          rotuloSecundario: l.familiaNome && l.processoNome ? l.processoNome : null,
+          linhas: [], atrasadas: 0, proximoPrazo: null,
+        }
+        mapa.set(chave, g)
+      }
+      g.linhas.push(l)
+      if (l.atrasada) g.atrasadas++
+      if (l.dataPrazo && (g.proximoPrazo == null || l.dataPrazo < g.proximoPrazo)) g.proximoPrazo = l.dataPrazo
+    }
+    // O pior sinal primeiro — mesmo princípio do ranking de atenção, agora
+    // agregado: quem tem atraso aparece antes de quem só tem prazo distante.
+    return [...mapa.values()].sort((a, b) => {
+      if (a.atrasadas !== b.atrasadas) return b.atrasadas - a.atrasadas
+      const pa = a.proximoPrazo ? Date.parse(a.proximoPrazo) : Number.POSITIVE_INFINITY
+      const pb = b.proximoPrazo ? Date.parse(b.proximoPrazo) : Number.POSITIVE_INFINITY
+      return pa - pb
+    })
+  }, [ordenadas])
+
+  const alternarGrupo = (chave: string) => setExpandidos((prev) => {
+    const novo = new Set(prev)
+    if (novo.has(chave)) novo.delete(chave); else novo.add(chave)
+    return novo
+  })
+
+  const totalPaginas = Math.max(1, Math.ceil((grupos?.length ?? 0) / POR_PAGINA_GRUPOS))
   const paginaValida = Math.min(Math.max(pagina, 1), totalPaginas)
-  const visiveis = ordenadas?.slice((paginaValida - 1) * POR_PAGINA, paginaValida * POR_PAGINA) ?? null
+  const gruposVisiveis = grupos?.slice((paginaValida - 1) * POR_PAGINA_GRUPOS, paginaValida * POR_PAGINA_GRUPOS) ?? null
 
   const temFiltro = filtros.busca.trim() !== "" || filtros.fase != null || filtros.terceiro != null || filtros.prazo !== "todos" || categoria !== "todas"
   const limparFiltros = () => { setFiltros(SEM_FILTRO); setBuscaDigitada(""); setCategoria("todas"); setPagina(1) }
@@ -408,7 +524,7 @@ export function MinhaOperacao() {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
               {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar sua operação." aoTentar={() => setRecarga((n) => n + 1)} />}
               {carregando && <Estado tipo="carregando" mensagem="Carregando sua operação…" />}
-              {!carregando && !falhou && visiveis?.length === 0 && (
+              {!carregando && !falhou && gruposVisiveis?.length === 0 && (
                 <Estado
                   tipo="vazio"
                   mensagem={
@@ -420,80 +536,65 @@ export function MinhaOperacao() {
                   }
                 />
               )}
-              {visiveis != null && visiveis.length > 0 && (
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <table className="w-full border-collapse text-left">
-                    <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
-                      <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
-                        <th>Atenção</th>
-                        <th>Operação</th>
-                        <th>Passo</th>
-                        <th>Situação / próxima ação</th>
-                        <th>Prazo</th>
-                        <th>Esperando há</th>
-                        <th className="w-24">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visiveis.map((l) => {
-                        const atencaoLinha = rotuloDeAtencao(l)
-                        return (
-                          <tr
-                            key={l.taskId}
-                            onClick={() => setSelecionado(l.taskId)}
-                            className={`cursor-pointer border-b border-[var(--border-subtle)] transition-colors hover:bg-[var(--surface-secondary)] ${selecionado === l.taskId ? "bg-[var(--surface-secondary)]" : ""}`}
-                          >
-                            <td className="px-3 py-2.5">
-                              <Etiqueta tom={atencaoLinha.tom === "critico" ? "critico" : atencaoLinha.tom === "alerta" ? "alerta" : "neutro"}>{atencaoLinha.rotulo}</Etiqueta>
-                            </td>
-                            <td className="max-w-[220px] px-3 py-2.5">
-                              <div className="flex items-center gap-1.5">
-                                {l.emRisco && (
-                                  <span
-                                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--danger)]"
-                                    title={l.motivosRisco.length ? l.motivosRisco.join(" · ") : "Em risco"}
-                                  />
-                                )}
-                                <span className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{l.titulo}</span>
-                              </div>
-                              <div className="truncate text-[10.5px] text-[var(--text-muted)]">{[l.pessoaNome, l.processoNome].filter(Boolean).join(" · ") || "—"}</div>
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <div className="text-[11.5px] tabular-nums text-[var(--text-primary)]">{l.passoAtual ? `${l.passoAtual.ordem}/${l.passoAtual.total}` : "—"}</div>
-                              <div className="truncate text-[10.5px] text-[var(--text-muted)]">{rotularFase(l.faseMacroKey) ?? "—"}</div>
-                            </td>
-                            <td className="max-w-[260px] px-3 py-2.5">
-                              <div className="text-[11.5px] text-[var(--text-secondary)]">{textoDaSituacao(l)}</div>
-                              <div className="truncate text-[10.5px] text-[var(--text-muted)]">{textoDaProximaAcao(l)}</div>
-                              {l.terceiroNome && (
-                                <div className="mt-0.5 truncate text-[10px] text-[var(--info-text)]">Terceiro: {l.terceiroNome}</div>
-                              )}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
-                              {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
-                            </td>
-                            <td className="px-3 py-2.5 text-[11.5px] tabular-nums text-[var(--text-secondary)]">
-                              {l.esperandoHaDias != null ? `${l.esperandoHaDias} dia${l.esperandoHaDias === 1 ? "" : "s"}` : "—"}
-                            </td>
-                            <td className="px-3 py-2.5">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); abrirNoProcesso(l) }}
-                                className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 py-1 text-[10.5px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-                              >
-                                Abrir <ArrowUpRight className="h-3 w-3" />
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
+              {gruposVisiveis != null && gruposVisiveis.length > 0 && (
+                <div className="min-h-0 flex-1 overflow-auto divide-y divide-[var(--border-subtle)]">
+                  {gruposVisiveis.map((g) => {
+                    const aberto = expandidos.has(g.chave)
+                    return (
+                      <div key={g.chave}>
+                        <button
+                          onClick={() => alternarGrupo(g.chave)}
+                          className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-secondary)]"
+                        >
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <span className="w-3 shrink-0 text-[10px] text-[var(--text-muted)]">{aberto ? "▾" : "▸"}</span>
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{g.rotuloPrincipal}</div>
+                              {g.rotuloSecundario && <div className="truncate text-[10.5px] text-[var(--text-muted)]">{g.rotuloSecundario}</div>}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-3 text-[11.5px] text-[var(--text-secondary)]">
+                            <span className="tabular-nums">{g.linhas.length} tarefa{g.linhas.length === 1 ? "" : "s"} a fazer</span>
+                            {g.proximoPrazo && <span className="tabular-nums">Próximo prazo: {dataCurta(g.proximoPrazo)}</span>}
+                            <span className={`tabular-nums ${g.atrasadas > 0 ? "font-medium text-[var(--danger-text)]" : ""}`}>
+                              {g.atrasadas} atrasada{g.atrasadas === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                        </button>
+                        {aberto && (
+                          <table className="w-full border-collapse text-left">
+                            <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
+                              <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
+                                <th>Atenção</th>
+                                <th>Operação</th>
+                                <th>Passo</th>
+                                <th>Situação / próxima ação</th>
+                                <th>Prazo</th>
+                                <th>Esperando há</th>
+                                <th className="w-24">Ação</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.linhas.map((l) => (
+                                <LinhaOperacaoTabela
+                                  key={l.taskId}
+                                  l={l}
+                                  selecionado={selecionado === l.taskId}
+                                  aoSelecionar={() => setSelecionado(l.taskId)}
+                                  aoAbrir={() => abrirNoProcesso(l)}
+                                />
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
-              {ordenadas != null && ordenadas.length > 0 && (
+              {grupos != null && grupos.length > 0 && (
                 <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-3 py-2">
-                  <span className="text-[11px] text-[var(--text-muted)]">Mostrando {visiveis?.length ?? 0} de {ordenadas.length} operações</span>
+                  <span className="text-[11px] text-[var(--text-muted)]">Mostrando {gruposVisiveis?.length ?? 0} de {grupos.length} contextos ({ordenadas?.length ?? 0} tarefas)</span>
                   {totalPaginas > 1 && (
                     <div className="flex items-center gap-2">
                       <button disabled={paginaValida <= 1} onClick={() => setPagina(paginaValida - 1)} className="rounded border border-[var(--border-default)] p-1 text-[var(--text-secondary)] disabled:opacity-40">

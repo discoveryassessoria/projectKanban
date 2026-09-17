@@ -78,6 +78,19 @@ export function urlDistribuicaoDoProcesso(processoId: number): string {
 }
 
 /**
+ * A URL DA MESA DE TRABALHO DE QUEM RECEBEU O LOTE.
+ *
+ * Diferente de `urlDistribuicaoDoProcesso` (destino de QUEM DISTRIBUI):
+ * quem RECEBE uma atribuição em lote vai para a própria fila — Operação →
+ * Minha Operação — já no contexto do processo/família recém-atribuída, sem
+ * precisar procurar. Nunca a Home, nunca o Kanban genérico.
+ */
+export function urlMinhaOperacaoDoProcesso(processoId: number): string {
+  const p = new URLSearchParams({ processo: String(processoId) })
+  return `/operacao?${p.toString()}`
+}
+
+/**
  * O QUE A CENTRAL PRECISA PARA SE POSICIONAR.
  *
  * Resolvido no servidor a partir do `taskId`, com permissão conferida lá — a

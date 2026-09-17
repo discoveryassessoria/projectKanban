@@ -143,14 +143,18 @@ function Linha({
   l,
   acao,
   aoAbrir,
+  selecao,
 }: {
   l: LinhaOperacional
   acao?: React.ReactNode
   aoAbrir?: () => void
+  /** Checkbox de seleção em lote — só em "Sem responsável". */
+  selecao?: React.ReactNode
 }) {
   const contexto = [l.processoNome, l.pessoaNome, l.servico].filter(Boolean).join(" · ")
   return (
-    <div className="group grid grid-cols-[1fr_auto] items-start gap-4 border-b border-white/[0.06] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-primary)]">
+    <div className={`group grid items-start gap-4 border-b border-white/[0.06] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-primary)] ${selecao ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]"}`}>
+      {selecao && <div className="pt-1">{selecao}</div>}
       {/* Clicar na linha abre a TAREFA — é o gesto natural, e é por ele que o
           funcionário chega ao workflow interno sem passar pelo processo. */}
       <button type="button" onClick={aoAbrir} className="min-w-0 cursor-pointer text-left">
@@ -557,12 +561,69 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
 
   const contagem = useMemo(() => linhas?.length ?? 0, [linhas])
 
-  /** O recorte do drill-down família → fase, sobre a MESMA lista já carregada — sem round-trip novo. */
+  /** O recorte do drill-down família → fase, ou do deep-link por processo — sobre a MESMA lista já carregada, sem round-trip novo. */
   const linhasFiltradas = useMemo(() => {
     if (!linhas) return linhas
-    if (!drillDown) return linhas
-    return linhas.filter((l) => l.processoId === drillDown.processoId && l.faseMacroKey === drillDown.faseMacroKey)
-  }, [linhas, drillDown])
+    if (drillDown) return linhas.filter((l) => l.processoId === drillDown.processoId && l.faseMacroKey === drillDown.faseMacroKey)
+    if (visao === "sem_responsavel" && processoAlvoId != null) return linhas.filter((l) => l.processoId === processoAlvoId)
+    return linhas
+  }, [linhas, drillDown, visao, processoAlvoId])
+
+  // ── SELEÇÃO EM LOTE — só em "Sem responsável": nenhuma tarefa nova nasce
+  // aqui, e a atribuição sai pela MESMA porta canônica de sempre
+  // (`redistribuirTarefas`, item a item, auditada, notificação consolidada)
+  // — só o gesto de escolher várias de uma vez é novo. `elegiveisParaLote` é
+  // a lista JÁ carregada por completo (sem paginação client-side em "lista"),
+  // então "selecionar todas" é TODAS as elegíveis do recorte atual, nunca só
+  // as visíveis na tela.
+  const [selecionadas, setSelecionadas] = useState<Set<number>>(new Set())
+  useEffect(() => { setSelecionadas(new Set()) }, [visao, modo, drillDown, processoAlvoId])
+  const elegiveisParaLote = visao === "sem_responsavel" ? (linhasFiltradas ?? []) : []
+  const todasSelecionadas = elegiveisParaLote.length > 0 && elegiveisParaLote.every((l) => selecionadas.has(l.taskId))
+  const alternarSelecao = (taskId: number) => setSelecionadas((prev) => {
+    const novo = new Set(prev)
+    if (novo.has(taskId)) novo.delete(taskId); else novo.add(taskId)
+    return novo
+  })
+  const alternarSelecaoTodas = () => setSelecionadas(todasSelecionadas ? new Set() : new Set(elegiveisParaLote.map((l) => l.taskId)))
+
+  const [loteResponsavelAberto, setLoteResponsavelAberto] = useState(false)
+  const [loteOcupado, setLoteOcupado] = useState(false)
+  const [loteAviso, setLoteAviso] = useState<string | null>(null)
+
+  /**
+   * ATRIBUIR O LOTE SELECIONADO — uma única confirmação do usuário, uma
+   * chamada a `/api/tarefas/redistribuir` (que já delega a `redistribuirTarefas`:
+   * cada tarefa passa pela MESMA `atribuirTarefa` — CAS, auditoria,
+   * reconciliação da obrigação administrativa, indisponibilidade — item a
+   * item, e o que falhar (ex.: alguém já atribuiu no meio do caminho) não
+   * derruba as demais; a notificação final é UMA só para o destinatário).
+   */
+  const atribuirLote = async (novoResponsavelId: number) => {
+    if (selecionadas.size === 0) return
+    setLoteOcupado(true)
+    setLoteAviso(null)
+    try {
+      const resp = await fetch("/api/tarefas/redistribuir", {
+        method: "POST",
+        headers: auth(),
+        body: JSON.stringify({
+          tarefaIds: [...selecionadas],
+          novoResponsavelId,
+          motivo: "Atribuição em lote — Operação → Distribuição",
+        }),
+      })
+      const res: { total: number; sucesso: number; falha: number } = await resp.json()
+      setAviso(`${res.sucesso} de ${res.total} tarefa(s) atribuída(s).${res.falha > 0 ? ` ${res.falha} não puderam mudar — recarregue e confira.` : ""}`)
+      setLoteResponsavelAberto(false)
+      setSelecionadas(new Set())
+      carregar()
+    } catch {
+      setLoteAviso("Não foi possível concluir a atribuição em lote.")
+    } finally {
+      setLoteOcupado(false)
+    }
+  }
 
   const abas: Array<{ id: Visao; rotulo: string }> = [
     ...(podeDistribuir ? [{ id: "sem_responsavel" as const, rotulo: "Sem responsável" }] : []),
@@ -742,11 +803,47 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           />
         ))}
 
+        {modo === "lista" && visao === "sem_responsavel" && podeDistribuir && elegiveisParaLote.length > 0 && (
+          <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] bg-[var(--surface-primary)]/60 px-4 py-2">
+            <label className="flex items-center gap-2 text-[11.5px] text-white/80">
+              <input type="checkbox" checked={todasSelecionadas} onChange={alternarSelecaoTodas} className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
+              {selecionadas.size > 0 ? `${selecionadas.size} selecionada${selecionadas.size === 1 ? "" : "s"}` : `Selecionar todas (${elegiveisParaLote.length})`}
+            </label>
+            {selecionadas.size > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelecionadas(new Set())}
+                  className="text-[11px] text-[var(--text-muted)] transition-colors hover:text-white/75"
+                >
+                  Limpar seleção
+                </button>
+                <button
+                  onClick={() => { setLoteAviso(null); setLoteResponsavelAberto(true) }}
+                  className="rounded border border-[var(--action-primary)] bg-[var(--action-primary)] px-3 py-1.5 text-[11px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90"
+                >
+                  Atribuir responsável
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {modo === "lista" && visao === "sem_responsavel" && linhasFiltradas?.map((l) => (
           <Linha
             key={l.taskId}
             l={l}
             aoAbrir={() => abrirOTrabalho(l)}
+            selecao={
+              podeDistribuir ? (
+                <input
+                  type="checkbox"
+                  checked={selecionadas.has(l.taskId)}
+                  onChange={() => alternarSelecao(l.taskId)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-3.5 w-3.5 accent-[var(--action-primary)]"
+                />
+              ) : undefined
+            }
             acao={
               podeDistribuir ? (
                 <div className="flex items-center gap-1.5">
@@ -797,6 +894,16 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         />
       )}
 
+      {loteResponsavelAberto && (
+        <SeletorResponsavel
+          titulo={`Atribuir ${selecionadas.size} tarefa${selecionadas.size === 1 ? "" : "s"}`}
+          atual={null}
+          ocupado={loteOcupado}
+          erro={loteAviso}
+          aoFechar={() => { setLoteResponsavelAberto(false); setLoteAviso(null) }}
+          aoEscolher={(responsavelId) => void atribuirLote(responsavelId)}
+        />
+      )}
     </div>
   )
 }

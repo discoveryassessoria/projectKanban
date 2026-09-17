@@ -20,7 +20,7 @@
 // silêncio o que o outro acabou de decidir.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
-import { urlOperacionalDaTarefa } from './navegacao'
+import { urlOperacionalDaTarefa, urlMinhaOperacaoDoProcesso } from './navegacao'
 import { estadoTemporal, diaOperacional, janelaDoDiaOperacional, FUSO_OPERACIONAL } from './tempo-operacional'
 import type { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
@@ -704,13 +704,35 @@ export async function redistribuirTarefas(args: {
   // MESMO lote, no mesmo dia, produzem a MESMA chave — a segunda não duplica.
   if (sucesso > 0 && args.novoResponsavelId != null) {
     const idsComSucesso = itens.filter((i) => i.ok).map((i) => i.tarefaId).sort((a, b) => a - b)
+
+    // CONTEXTO DO LOTE — item 5/9 do mandato (17/09/2026): "a unidade de
+    // consolidação deve usar o contexto canônico apropriado (destinatário +
+    // processo/família + evento)". Quando TODO o lote pertence ao MESMO
+    // processo (o caso comum — Central/Distribuição agem sobre UMA família
+    // por vez), a notificação carrega esse processo como âncora e o nome
+    // dele no título: quem recebe sabe imediatamente ONDE, sem abrir nada.
+    // Lote misto (processos diferentes) cai no título genérico de sempre —
+    // nunca hardcoded a um nome específico.
+    const tarefasDoLote = await prisma.tarefa.findMany({
+      where: { id: { in: idsComSucesso } },
+      select: { processoId: true, processo: { select: { nome: true } } },
+    })
+    const processoIdsUnicos = new Set(tarefasDoLote.map((t) => t.processoId).filter((id): id is number => id != null))
+    const processoUnico = processoIdsUnicos.size === 1 ? [...processoIdsUnicos][0] : null
+    const nomeProcessoUnico = processoUnico != null
+      ? tarefasDoLote.find((t) => t.processoId === processoUnico)?.processo?.nome ?? null
+      : null
+
     await notificarAcontecimento(prisma, {
       tipo: 'ATRIBUICAO_LOTE',
       destinatarioId: args.novoResponsavelId,
+      processoId: processoUnico,
       autorId: args.autorId,
-      titulo: `${sucesso} nova${sucesso === 1 ? '' : 's'} operaç${sucesso === 1 ? 'ão' : 'ões'} atribuída${sucesso === 1 ? '' : 's'}`,
+      titulo: nomeProcessoUnico
+        ? `${nomeProcessoUnico} — ${sucesso} tarefa${sucesso === 1 ? '' : 's'} atribuída${sucesso === 1 ? '' : 's'} a você`
+        : `${sucesso} nova${sucesso === 1 ? '' : 's'} operaç${sucesso === 1 ? 'ão' : 'ões'} atribuída${sucesso === 1 ? '' : 's'}`,
       mensagem: args.motivo ? `Redistribuição em lote. Motivo: ${args.motivo}` : 'Redistribuição em lote.',
-      link: `/tarefas?responsavel=${args.novoResponsavelId}`,
+      link: processoUnico != null ? urlMinhaOperacaoDoProcesso(processoUnico) : `/operacao?responsavel=${args.novoResponsavelId}`,
       chaveIdempotencia: `notif::atribuicao_lote::u${args.novoResponsavelId}::${diaOperacional(new Date())}::${idsComSucesso.join('-')}`,
     })
   }
