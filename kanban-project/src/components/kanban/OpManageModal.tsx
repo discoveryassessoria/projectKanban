@@ -299,7 +299,7 @@ function ConteudoModal({
           <button
             onClick={onClose}
             disabled={saving}
-            className="h-[34px] px-[18px] text-[12px] font-bold rounded-[7px] disabled:opacity-50"
+            className="h-[34px] px-[18px] text-[12px] font-bold rounded-[var(--radius-sm)] disabled:opacity-50"
             style={{
               background: "rgba(255,255,255,0.08)",
               color: "var(--text-primary)",
@@ -311,7 +311,7 @@ function ConteudoModal({
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="h-[34px] px-[18px] text-[12px] font-bold rounded-[7px] inline-flex items-center gap-1.5 disabled:opacity-50"
+            className="h-[34px] px-[18px] text-[12px] font-bold rounded-[var(--radius-sm)] inline-flex items-center gap-1.5 disabled:opacity-50"
             style={{
               background: "var(--danger-solid)",
               color: "var(--text-primary)",

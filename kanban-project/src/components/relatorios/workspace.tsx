@@ -39,8 +39,8 @@ interface Resultado {
 interface Visao { id: number; dominio: string; nome: string; spec: QuerySpec; favorita: boolean; usadaEm: string | null }
 
 const BOTAO =
-  "rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] hover:border-[var(--action-primary)]"
-const PAINEL = "rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-primary)]"
+  "rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] hover:border-[var(--action-primary)]"
+const PAINEL = "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)]"
 
 export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: string; nacionalidade?: string | null }) {
   const [meta, setMeta] = useState<Meta | null>(null)
@@ -203,14 +203,14 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
       {/* CONTEXTO + ABAS */}
       <div className="flex flex-wrap items-center gap-2">
         {!meta.dominio.aceitaNacionalidade && spec.nacionalidade && (
-          <span className="rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] text-[var(--text-secondary)]">
+          <span className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] text-[var(--text-secondary)]">
             Este domínio é do sistema inteiro — a nacionalidade não o recorta.
           </span>
         )}
-        <div className="flex items-center gap-1 rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-0.5">
+        <div className="flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-0.5">
           {(["explorar", "visoes", "favoritos"] as const).map((a) => (
             <button key={a} type="button" onClick={() => setAba(a)}
-              className={`rounded-[8px] px-2.5 py-1 text-[13px] ${aba === a ? "bg-[var(--action-primary)] text-[var(--text-inverse)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+              className={`rounded-[var(--radius-sm)] px-2.5 py-1 text-[13px] ${aba === a ? "bg-[var(--action-primary)] text-[var(--text-inverse)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
               {a === "explorar" ? "Explorar" : a === "visoes" ? "Visões salvas" : "Favoritos"}
             </button>
           ))}
@@ -315,7 +315,7 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
               <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[var(--border-subtle)] pt-2.5">
                 <span className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Consulta atual</span>
                 {res.aplicados.map((a) => (
-                  <span key={a.key} className="inline-flex items-center gap-1 rounded-[8px] bg-[var(--surface-secondary)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]">
+                  <span key={a.key} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] px-2 py-0.5 text-[12px] text-[var(--text-primary)]">
                     {a.rotulo}: {a.key === "__nacionalidade"
                       // A chave do cadastro é identidade; quem lê a tela lê o nome.
                       ? meta.nacionalidades.find((n) => n.valor === a.descricao)?.rotulo ?? a.descricao
@@ -354,7 +354,7 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
                 {exportando ? `Exportando ${exportando.toUpperCase()}…` : "Exportar ▾"}
               </button>
               {menuExport && (
-                <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]">
+                <div className="absolute right-0 z-20 mt-1 w-56 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]">
                   {([
                     ["xlsx", "Excel (.xlsx)", "abre no Excel com filtro e números somáveis"],
                     ["csv", "CSV (.csv)", "texto puro, para importar em outro sistema"],
@@ -372,7 +372,7 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
           </div>
 
           {erroExport && (
-            <div className="mt-2 flex items-start justify-between gap-3 rounded-[10px] border border-[var(--border-strong)] bg-[var(--surface-elevated)] px-3 py-2">
+            <div className="mt-2 flex items-start justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-elevated)] px-3 py-2">
               <span className="text-[12.5px] text-[var(--text-primary)]">{erroExport}</span>
               <button type="button" onClick={() => setErroExport(null)}
                 className="shrink-0 text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">

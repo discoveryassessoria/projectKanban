@@ -243,7 +243,7 @@ export function PainelDaFase({
                 <>
                   {lad && (
                     <span
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px]"
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-sm)]"
                       style={{ background: lad.tile, color: lad.ink }}
                       aria-hidden
                     >

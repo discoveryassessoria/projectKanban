@@ -21,7 +21,7 @@ export interface Opcao { valor: string; rotulo: string; detalhe?: string | null 
 const auth = () => ({ Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") ?? "" : ""}` })
 
 const CAMPO =
-  "rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+  "rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
@@ -119,7 +119,7 @@ export function FiltroControle({
               {ATALHOS.map((a) => (
                 <button key={a.rotulo} type="button"
                   onClick={() => { const p = a.calcular(); onChange({ tipo: "intervalo_data", de: p.de, ate: p.ate }) }}
-                  className="rounded-[7px] border border-[var(--border-subtle)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)] hover:border-[var(--action-primary)] hover:text-[var(--text-primary)]">
+                  className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)] hover:border-[var(--action-primary)] hover:text-[var(--text-primary)]">
                   {a.rotulo}
                 </button>
               ))}
@@ -163,7 +163,7 @@ export function FiltroControle({
               )}
             </div>
             {aberto && (busca || carregando || erro) && (
-              <div className="absolute z-30 mt-1 max-h-56 w-full min-w-[14rem] overflow-auto rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-lg">
+              <div className="absolute z-30 mt-1 max-h-56 w-full min-w-[14rem] overflow-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]">
                 {carregando && <p className="px-2.5 py-1.5 text-[11px] text-[var(--text-muted)]">Carregando…</p>}
                 {erro && (
                   <p className="px-2.5 py-1.5 text-[11px] text-[var(--text-muted)]">
@@ -215,7 +215,7 @@ export function FiltroControle({
               </span>
             </button>
             {aberto && (
-              <div className="absolute z-30 mt-1 max-h-56 w-full min-w-[13rem] overflow-auto rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1 shadow-lg">
+              <div className="absolute z-30 mt-1 max-h-56 w-full min-w-[13rem] overflow-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1 shadow-[var(--elev-3)]">
                 {carregando && <p className="px-1.5 py-1 text-[11px] text-[var(--text-muted)]">Carregando…</p>}
                 {erro && (
                   <p className="px-1.5 py-1 text-[11px] text-[var(--text-muted)]">

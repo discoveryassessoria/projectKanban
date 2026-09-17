@@ -1143,7 +1143,17 @@ function FormSolicitarCertidao({
                   cartorioDaGenealogia={doc.cartorio}
                   cidadeDaGenealogia={doc.cidade_registro}
                   estadoDaGenealogia={doc.estado_registro}
-                  onSalvo={onOrgaoAlterado}
+                  onSalvo={() => {
+                    // Achado real (17/09/2026): o espelhamento salvava o
+                    // órgão e só recarregava o snapshot LOCAL deste
+                    // formulário — o drawer inteiro (aba "Dados Registrais",
+                    // que lê seu próprio fetch) nunca era avisado, e
+                    // continuava mostrando "Não vinculado" com o vínculo já
+                    // gravado no banco. `onSaved` é o que sobe até
+                    // CentralDaEtapaDrawer→WorkflowTab→DocumentoOperationalDrawer.
+                    onOrgaoAlterado()
+                    onSaved?.()
+                  }}
                 />
                 <div className="text-[11px] text-[var(--text-secondary)] mt-1">
                   SLA típico: <strong className="text-white/85">~30d</strong>

@@ -143,7 +143,7 @@ export function SelectPaisCanonico({
       </button>
 
       {aberto && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]">
           <input
             autoFocus
             value={busca}

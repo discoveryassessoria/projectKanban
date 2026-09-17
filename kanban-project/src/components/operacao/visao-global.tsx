@@ -573,11 +573,11 @@ export function VisaoGlobal() {
             <div className="flex flex-col gap-1">
               <CampoData
                 value={rascunho.dataInicio} onChange={(v) => mudarRascunho({ dataInicio: v })} placeholder="De"
-                className="w-full rounded-[8px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+                className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
               />
               <CampoData
                 value={rascunho.dataFim} onChange={(v) => mudarRascunho({ dataFim: v })} placeholder="Até"
-                className="w-full rounded-[8px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+                className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 py-1 text-[12px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
               />
             </div>
           </Campo>

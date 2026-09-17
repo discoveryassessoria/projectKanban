@@ -99,7 +99,7 @@ export function CampoData({
   }, [anoMinimo, anoMaximo])
 
   const base =
-    "w-full rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+    "w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
 
   const total = diasNoMes(anoVisivel, mesVisivel)
   const vazios = primeiroDiaSemana(anoVisivel, mesVisivel)
@@ -137,25 +137,25 @@ export function CampoData({
       </button>
 
       {aberto && !disabled && (
-        <div className="absolute z-40 mt-1 w-[17rem] rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-2.5 shadow-lg">
+        <div className="absolute z-40 mt-1 w-[17rem] rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-2.5 shadow-[var(--elev-3)]">
           {/* MÊS E ANO SÃO SELETORES, não setas. É o ponto todo do componente. */}
           <div className="mb-2 flex items-center gap-1.5">
             <button type="button" onClick={() => passo(-1)} aria-label="Mês anterior"
-              className="rounded-[8px] px-1.5 py-1 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">‹</button>
+              className="rounded-[var(--radius-sm)] px-1.5 py-1 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">‹</button>
             <select
               value={mesVisivel} onChange={(e) => setMesVisivel(Number(e.target.value))} aria-label="Mês"
-              className="flex-1 rounded-[8px] border border-[var(--border-subtle)] bg-transparent px-1.5 py-1 text-[13px] text-[var(--text-primary)] outline-none"
+              className="flex-1 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-transparent px-1.5 py-1 text-[13px] text-[var(--text-primary)] outline-none"
             >
               {MESES.map((m, i) => <option key={m} value={i}>{m}</option>)}
             </select>
             <select
               value={anoVisivel} onChange={(e) => setAnoVisivel(Number(e.target.value))} aria-label="Ano"
-              className="w-[5.2rem] rounded-[8px] border border-[var(--border-subtle)] bg-transparent px-1.5 py-1 text-[13px] text-[var(--text-primary)] outline-none"
+              className="w-[5.2rem] rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-transparent px-1.5 py-1 text-[13px] text-[var(--text-primary)] outline-none"
             >
               {anos.map((a) => <option key={a} value={a}>{a}</option>)}
             </select>
             <button type="button" onClick={() => passo(1)} aria-label="Próximo mês"
-              className="rounded-[8px] px-1.5 py-1 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">›</button>
+              className="rounded-[var(--radius-sm)] px-1.5 py-1 text-[13px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">›</button>
           </div>
 
           <div className="grid grid-cols-7 gap-0.5 text-center">
@@ -170,7 +170,7 @@ export function CampoData({
                 <button
                   key={d} type="button"
                   onClick={() => { onChange(paraIso(anoVisivel, mesVisivel, d)); setAberto(false) }}
-                  className={`rounded-[7px] py-1 text-[12.5px] ${
+                  className={`rounded-[var(--radius-sm)] py-1 text-[12.5px] ${
                     sim ? "bg-[var(--action-primary)] font-medium text-[var(--text-inverse)]"
                     : ehHoje(d) ? "border border-[var(--action-primary)] text-[var(--text-primary)]"
                     : "text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]"}`}

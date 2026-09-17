@@ -259,7 +259,7 @@ export default function AuthComponent({
         w-full max-w-md mx-auto
         bg-[var(--surface-primary)]
         text-[var(--text-secondary)]
-        rounded-[20px] 
+        rounded-[var(--radius-lg)] 
         shadow-[var(--elev-3)] 
         border border-[var(--border-default)]
         p-8

@@ -52,7 +52,7 @@ interface VisaoResumo { id: number; dominio: string; nome: string; favorita: boo
 /** Três estados distintos. Confundi-los foi o que derrubou a tela anterior. */
 type Estado = "carregando" | "pronto" | "erro"
 
-const CARTAO = "rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-primary)]"
+const CARTAO = "rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)]"
 
 function Conteudo() {
   const router = useRouter()
@@ -130,7 +130,7 @@ function Conteudo() {
             O catálogo de domínios não respondeu. Nada foi perdido — é só tentar de novo.
           </p>
           <button type="button" onClick={() => void carregar()}
-            className="mt-4 rounded-[10px] bg-[var(--action-primary)] px-4 py-2 text-[13px] font-medium text-[var(--text-inverse)]">
+            className="mt-4 rounded-[var(--radius-sm)] bg-[var(--action-primary)] px-4 py-2 text-[13px] font-medium text-[var(--text-inverse)]">
             Tentar novamente
           </button>
         </div>
@@ -189,14 +189,14 @@ function Conteudo() {
             Nacionalidade
           </span>
           <button type="button" onClick={() => ir(null, dominioKey)}
-            className={`rounded-[10px] border px-2.5 py-1.5 text-[13px] ${
+            className={`rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-[13px] ${
               !pais ? "border-[var(--action-primary)] bg-[var(--action-primary)] text-[var(--text-inverse)]"
                     : "border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:border-[var(--action-primary)]"}`}>
             Todas
           </button>
           {nacionalidades.map((n) => (
             <button key={n.valor} type="button" onClick={() => ir(n.valor, dominioKey)}
-              className={`rounded-[10px] border px-2.5 py-1.5 text-[13px] ${
+              className={`rounded-[var(--radius-sm)] border px-2.5 py-1.5 text-[13px] ${
                 pais === n.valor ? "border-[var(--action-primary)] bg-[var(--action-primary)] text-[var(--text-inverse)]"
                                  : "border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--text-primary)] hover:border-[var(--action-primary)]"}`}>
               {n.detalhe ? `${n.detalhe} ` : ""}{n.rotulo}
@@ -217,7 +217,7 @@ function Conteudo() {
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar um domínio…"
-              className="w-full max-w-sm rounded-[10px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
+              className="w-full max-w-sm rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--action-primary)]"
             />
 
             {filtrados.length === 0 ? (

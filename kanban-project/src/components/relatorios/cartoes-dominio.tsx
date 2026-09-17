@@ -58,10 +58,10 @@ export function CartoesDominio({
             key={d.key}
             type="button"
             onClick={() => aoAbrir(d.key)}
-            className="group flex h-full items-start gap-3 rounded-[14px] border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 text-left shadow-[var(--elev-1)] transition-all hover:-translate-y-px hover:border-[var(--action-primary)] hover:shadow-[var(--elev-2)]"
+            className="group flex h-full items-start gap-3 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 text-left shadow-[var(--elev-1)] transition-all hover:-translate-y-px hover:border-[var(--action-primary)] hover:shadow-[var(--elev-2)]"
           >
             <span
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-md)]"
               style={{ background: `rgb(${cor} / 0.12)`, color: `rgb(${cor})` }}
             >
               <Icone className="h-5 w-5" strokeWidth={2} />
