@@ -1155,9 +1155,6 @@ function FormSolicitarCertidao({
                     onSaved?.()
                   }}
                 />
-                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
-                  SLA típico: <strong className="text-white/85">~30d</strong>
-                </div>
                 <div className="mt-2.5 pt-2.5 border-t border-[var(--border-default)]">
                   {temDadosRegistrais ? (
                     <>

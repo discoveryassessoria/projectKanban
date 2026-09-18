@@ -61,6 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const r = await registrarSolicitacaoDocumento(documentoId, stepInstanceId, body, {
       usuarioId: usuario.userId,
       permissoes: usuario.permissoes,
+      isAdmin: usuario.tipo === "admin",
     })
     if (!r.ok) {
       const codigo = r.error.split(":")[0]

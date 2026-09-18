@@ -319,11 +319,21 @@ function ConteudoModal({
   }, [isOpen, onClose])
 
   // -- Validação pra "Localizar registro"
-  // Marco define: cartório obrigatório + pelo menos um de livro/folha/termo
+  // Todos os campos desta tela são obrigatórios para concluir a etapa, com
+  // UMA exceção: Data do registro (nem toda certidão tem essa data anotada
+  // no momento em que o registro é localizado).
+  const nomeRegistradoOk = form.nome_registrado.trim().length > 0
+  const estadoOk = form.estado_registro.trim().length > 0
+  const cidadeOk = form.cidade_registro.trim().length > 0
   const cartorioOk = form.cartorio.trim().length > 0
-  const referenciaOk =
-    form.livro.trim().length > 0 || form.folha.trim().length > 0 || form.termo.trim().length > 0
-  const podeConcluirEtapa = cartorioOk && referenciaOk
+  const livroOk = form.livro.trim().length > 0
+  const folhaOk = form.folha.trim().length > 0
+  const termoOk = form.termo.trim().length > 0
+  const numeroRegistroOk = form.numero_registro.trim().length > 0
+  const dataEventoOk = form.data_evento.trim().length > 0
+  const podeConcluirEtapa =
+    nomeRegistradoOk && estadoOk && cidadeOk && cartorioOk &&
+    livroOk && folhaOk && termoOk && numeroRegistroOk && dataEventoOk
 
   // -- Salvar (e opcionalmente concluir etapa)
   const handleSalvar = async () => {
@@ -331,10 +341,20 @@ function ConteudoModal({
 
     // Em modo buscar, valida antes
     if (isModoBuscar && !podeConcluirEtapa) {
+      const faltando = [
+        !nomeRegistradoOk && "Nome registrado",
+        !estadoOk && "Estado",
+        !cidadeOk && "Cidade",
+        !cartorioOk && "Cartório",
+        !livroOk && "Livro",
+        !folhaOk && "Folha",
+        !termoOk && "Termo",
+        !numeroRegistroOk && "Nº registro",
+        !dataEventoOk && labelDataEvento(doc.tipo),
+      ].filter((x): x is string => Boolean(x))
       alert(
         "Para concluir a etapa Localizar registro da certidão, preencha:\n" +
-          "• Cartório\n" +
-          "• Pelo menos um de: Livro, Folha ou Termo",
+          faltando.map((f) => `• ${f}`).join("\n"),
       )
       return
     }
@@ -528,14 +548,30 @@ function ConteudoModal({
                     </div>
                     <div className="text-[11.5px] text-white/75 leading-relaxed">
                       preencha{" "}
+                      <strong className={nomeRegistradoOk ? "text-green-800" : "text-[var(--accent-text)]"}>
+                        Nome registrado
+                      </strong>
+                      ,{" "}
+                      <strong className={estadoOk && cidadeOk ? "text-green-800" : "text-[var(--accent-text)]"}>
+                        Estado / Cidade
+                      </strong>
+                      ,{" "}
                       <strong className={cartorioOk ? "text-green-800" : "text-[var(--accent-text)]"}>
                         Cartório
-                      </strong>{" "}
-                      + pelo menos um de{" "}
-                      <strong className={referenciaOk ? "text-green-800" : "text-[var(--accent-text)]"}>
-                        Livro / Folha / Termo
                       </strong>
-                      . Os demais campos são opcionais aqui.
+                      ,{" "}
+                      <strong className={livroOk && folhaOk && termoOk ? "text-green-800" : "text-[var(--accent-text)]"}>
+                        Livro, Folha e Termo
+                      </strong>
+                      ,{" "}
+                      <strong className={numeroRegistroOk ? "text-green-800" : "text-[var(--accent-text)]"}>
+                        Nº registro
+                      </strong>{" "}
+                      e{" "}
+                      <strong className={dataEventoOk ? "text-green-800" : "text-[var(--accent-text)]"}>
+                        {labelDataEvento(doc.tipo)}
+                      </strong>
+                      . Só a Data do registro continua opcional.
                     </div>
                   </div>
                 )}
@@ -552,6 +588,7 @@ function ConteudoModal({
                     <Field
                       label="Nome registrado"
                       critical
+                      requiredToComplete={isModoBuscar}
                       value={form.nome_registrado}
                       onChange={(v) => setForm({ ...form, nome_registrado: v })}
                     />
@@ -589,6 +626,7 @@ function ConteudoModal({
                   <div className="grid grid-cols-2 gap-3">
                     <SelectField
                       label="Estado"
+                      requiredToComplete={isModoBuscar}
                       value={form.estado_registro}
                       onChange={(v) => setForm({ ...form, estado_registro: v, cidade_registro: "" })}
                       options={ufs.map((u) => u.nome)}
@@ -596,6 +634,7 @@ function ConteudoModal({
                     />
                     <SelectField
                       label="Cidade"
+                      requiredToComplete={isModoBuscar}
                       value={form.cidade_registro}
                       onChange={(v) => setForm({ ...form, cidade_registro: v })}
                       options={municipios}
@@ -649,7 +688,7 @@ function ConteudoModal({
                   title="Referência registral"
                   intro={
                     isModoBuscar
-                      ? "Pelo menos um destes (Livro, Folha ou Termo) é obrigatório para concluir a etapa."
+                      ? "Livro, Folha e Termo são obrigatórios para concluir a etapa."
                       : undefined
                   }
                   open={openSections.referencia}
@@ -658,24 +697,25 @@ function ConteudoModal({
                   <div className="grid grid-cols-2 gap-3">
                     <Field
                       label="Livro"
-                      requiredAlt={isModoBuscar}
+                      requiredToComplete={isModoBuscar}
                       value={form.livro}
                       onChange={(v) => setForm({ ...form, livro: v })}
                     />
                     <Field
                       label="Folha"
-                      requiredAlt={isModoBuscar}
+                      requiredToComplete={isModoBuscar}
                       value={form.folha}
                       onChange={(v) => setForm({ ...form, folha: v })}
                     />
                     <Field
                       label="Termo"
-                      requiredAlt={isModoBuscar}
+                      requiredToComplete={isModoBuscar}
                       value={form.termo}
                       onChange={(v) => setForm({ ...form, termo: v })}
                     />
                     <Field
                       label="Nº registro"
+                      requiredToComplete={isModoBuscar}
                       value={form.numero_registro}
                       onChange={(v) => setForm({ ...form, numero_registro: v })}
                     />
@@ -713,6 +753,7 @@ function ConteudoModal({
                     <Field
                       label={labelDataEvento(doc.tipo)}
                       type="date"
+                      requiredToComplete={isModoBuscar}
                       value={form.data_evento}
                       onChange={(v) => setForm({ ...form, data_evento: v })}
                     />
@@ -967,6 +1008,7 @@ function SelectField({
   options,
   placeholder,
   disabled,
+  requiredToComplete,
 }: {
   label: string
   value: string
@@ -974,13 +1016,26 @@ function SelectField({
   options: string[]
   placeholder?: string
   disabled?: boolean
+  requiredToComplete?: boolean
 }) {
+  const isEmpty = !value.trim()
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-1">
         <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
           {label}
         </label>
+        {requiredToComplete && (
+          <span
+            className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+              isEmpty
+                ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
+                : "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
+            }`}
+          >
+            obrigatório p/ concluir
+          </span>
+        )}
       </div>
       <select
         value={value}

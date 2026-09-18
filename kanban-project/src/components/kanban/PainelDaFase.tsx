@@ -40,7 +40,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useMemo } from "react"
-import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronRight, Clock, ExternalLink, FileText, Layers, Search, Star, Users } from "lucide-react"
+import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, Layers, Search, Star, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type {
   DocumentoDoIndice,
@@ -121,7 +121,6 @@ export interface PainelDaFaseProps {
   usuarios?: Array<{ id: number; nome: string }>
   /** taskId em gravação — trava só a linha que está mudando. */
   salvandoResponsavel?: number | null
-  onAbrirPainelCompleto?: () => void
   /** Consulta de fase passada: mesmo layout, sem ações de mutação. */
   readOnly?: boolean
   /**
@@ -155,7 +154,6 @@ export function PainelDaFase({
   indice,
   chaveExpansao,
   onAbrirDetalhes,
-  onAbrirPainelCompleto,
   onAtribuirResponsavel,
   onRetirarResponsavel,
   usuarios,
@@ -174,17 +172,8 @@ export function PainelDaFase({
     <div>
       {/* ============== CABEÇALHO DA FASE ============== */}
       <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] border-b-0 rounded-t-2xl px-5 pt-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-[19px] font-extrabold text-white/95">{faseNome}</h2>
-          </div>
-          <button
-            onClick={onAbrirPainelCompleto}
-            className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Abrir painel da fase
-          </button>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-[19px] font-extrabold text-white/95">{faseNome}</h2>
         </div>
         <div className="text-[13px] text-[var(--text-secondary)] mt-1.5">{faseSub}</div>
 
