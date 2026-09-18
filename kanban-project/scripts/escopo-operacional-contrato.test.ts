@@ -107,7 +107,12 @@ async function main() {
   ok("1a) escopoTarefa(admin) é {} — sem filtro", JSON.stringify(escopoTarefa(admEscopo)) === "{}")
   ok("1b) escopoTarefa(operacional) é só responsavelId dela", JSON.stringify(escopoTarefa(danEscopo)) === JSON.stringify({ responsavelId: daniela.id }))
   ok("1c) escopoTarefa(operacional) NÃO inclui responsavelId:null", !JSON.stringify(escopoTarefa(danEscopo)).includes("null"))
-  ok("1d) escopoPasso segue a mesma regra", JSON.stringify(escopoPasso(danEscopo)) === JSON.stringify({ responsavelId: daniela.id }))
+  // Achado real (18/09/2026): escopoPasso NÃO filtra mais por
+  // `PhaseWorkflowStepInstance.responsavelId` (campo snapshot que nenhum
+  // caminho do motor escreve, 0/30 em produção) — usa a MESMA fonte de
+  // ownership que `escopoTarefa`, via a relação inversa `tarefas`.
+  ok("1d) escopoPasso usa a MESMA fonte de ownership de escopoTarefa (Tarefa.responsavelId, via a relação inversa)",
+    JSON.stringify(escopoPasso(danEscopo)) === JSON.stringify({ tarefas: { some: { responsavelId: daniela.id } } }))
   ok("1e) escopoProcesso(admin) é {} — sem filtro", JSON.stringify(escopoProcesso(admEscopo)) === "{}")
   ok("1f) escopoProcesso(operacional) TAMBÉM é {} — Processo segue permissão de módulo, não tarefa", JSON.stringify(escopoProcesso(danEscopo)) === "{}")
   ok("1g) escopoDocumento(operacional) TAMBÉM é {} — mesma regra de Processo", JSON.stringify(escopoDocumento(danEscopo)) === "{}")
