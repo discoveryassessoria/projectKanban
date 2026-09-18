@@ -154,6 +154,7 @@ export async function abrirExecucao(
     bloqueioAlvo?: string | null
     responsavelId?: number | null
     prazo?: Date | null
+    previstoPara?: Date | null
     payload?: Prisma.InputJsonValue | null
     correlationId?: string | null
     chaveIdempotencia?: string
@@ -210,6 +211,7 @@ export async function abrirExecucao(
       completedAt: nasceCumprida ? agora : null,
       responsavelId: args.responsavelId ?? null,
       prazo: args.prazo ?? null,
+      previstoPara: args.previstoPara ?? null,
       payload: args.payload ?? undefined,
       correlationId: args.correlationId ?? null,
       chaveIdempotencia: chave,
@@ -618,6 +620,7 @@ export async function garantirExecucao(
     bloqueioAlvo?: string | null
     responsavelId?: number | null
     prazo?: Date | null
+    previstoPara?: Date | null
   },
   db: DB = prisma,
 ): Promise<ExecucaoDeSubtarefa> {

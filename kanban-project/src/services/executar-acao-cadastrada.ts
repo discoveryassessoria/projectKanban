@@ -33,7 +33,7 @@ import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
 import { registrarNaTentativa, tentativaVigente } from "@/src/services/execucao-do-passo"
 import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { validarReferencia } from "@/src/services/referencia-canonica"
-import { subtarefasDaEtapa, passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
+import { subtarefasDaEtapa, passoPodeConcluir, relogioDeNascimentoDaSubtarefa } from "@/src/services/subtarefas-da-etapa"
 import { canaisDaSubtarefa } from "@/src/lib/motor/canais-do-fornecedor"
 import { registrarNaExecucao, garantirExecucao, ESTADOS_DA_SUBTAREFA } from "@/src/services/execucao-da-subtarefa"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
@@ -370,9 +370,17 @@ export async function executarAcaoCadastrada(
   // na tentativa do passo devolveria o problema ao ponto de partida: três coisas
   // acontecendo dentro de um passo e um único lugar para registrar as três.
   if (subtarefa) {
+    // MESMO RELÓGIO de qualquer subtarefa que nasce com ação correndo — achado
+    // real (18/09/2026): este ramo (execução síncrona de uma ação) nunca
+    // passava pelo ramo DISPONIVEL de `materializarSubtarefas`, então o
+    // `slaDays` cadastrado nela nunca virava `prazo`.
+    const relogioDeNascimento = relogioDeNascimentoDaSubtarefa(
+      ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO, subtarefa.slaDays, hist.passo.slaDays, new Date(),
+    )
     await garantirExecucao({
       stepInstanceId, subtaskKey: subtarefa.key, workflowVersao: hist.versao,
       status: ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO,
+      prazo: relogioDeNascimento.prazo,
     })
     // ── EXECUTAR UMA AÇÃO CONCLUI A SUBTAREFA ─────────────────────────────
     //
@@ -415,6 +423,12 @@ export async function executarAcaoCadastrada(
         ? { protocoloId: protocoloRegistrado.id, protocolo: protocoloRegistrado.numero }
         : {}),
       ...(ctx.fornecedorId ? { fornecedorId: ctx.fornecedorId } : {}),
+      // Virou espera de terceiro NESTA mesma chamada (`PAUSE_FOR_EXTERNAL_WAIT`,
+      // ação manual) — mesma previsão que a espera AUTOMÁTICA já calcula, nunca
+      // uma fórmula nova.
+      ...(estadoDaSubtarefa === ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO
+        ? { previstoPara: relogioDeNascimento.prazo }
+        : {}),
     })
     // CONCLUIR A SUBTAREFA MUDA O ESTADO DAS QUE DEPENDIAM DELA. Sem reconciliar, elas
     // continuariam BLOQUEADO no banco enquanto a projeção já as considera disponíveis.

@@ -46,9 +46,17 @@ export function escopoTarefa(usuario: UsuarioEscopo): Prisma.TarefaWhereInput {
   return ehAdmin(usuario) ? {} : { responsavelId: usuario.userId }
 }
 
-/** Passo do workflow interno: mesma regra da tarefa. */
+/**
+ * Passo do workflow interno: ownership vem da TAREFA que o passo referencia —
+ * a MESMA fonte de `escopoTarefa` — nunca de `PhaseWorkflowStepInstance.
+ * responsavelId`. Achado real (18/09/2026): esse campo é um snapshot solto que
+ * nenhum caminho do motor escreve (0 de 30 linhas preenchidas em produção) —
+ * filtrar por ele deixava toda fila de passo/subtarefa da Home estruturalmente
+ * vazia para qualquer usuário não-admin, mesmo com a Tarefa corretamente
+ * atribuída. `tarefas` é a relação inversa (`Tarefa.workflowStepInstanceId`).
+ */
 export function escopoPasso(usuario: UsuarioEscopo): Prisma.PhaseWorkflowStepInstanceWhereInput {
-  return ehAdmin(usuario) ? {} : { responsavelId: usuario.userId }
+  return ehAdmin(usuario) ? {} : { tarefas: { some: { responsavelId: usuario.userId } } }
 }
 
 /**

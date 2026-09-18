@@ -159,15 +159,20 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
             status: true,
             processoId: true,
             faseMacroKey: true,
-            responsavelId: true,
             prazo: true,
             documentoId: true,
             necessidadeId: true,
             // MESMA SEMÂNTICA DE `ehEsperaExterna` — BLOQUEADO por espera de
             // terceiro (motivoCodigo da Tarefa dele) não é bloqueio genérico.
-            tarefas: { select: { motivoCodigo: true }, take: 1 },
+            // `responsavelId` vem DAQUI (da Tarefa), nunca do campo solto do
+            // próprio passo — ver `escopoPasso`.
+            tarefas: { select: { motivoCodigo: true, responsavelId: true }, take: 1 },
           },
-        }).then((rows) => rows.map((r) => ({ ...r, motivoCodigoDaTarefa: r.tarefas[0]?.motivoCodigo ?? null })))
+        }).then((rows) => rows.map((r) => ({
+          ...r,
+          responsavelId: r.tarefas[0]?.responsavelId ?? null,
+          motivoCodigoDaTarefa: r.tarefas[0]?.motivoCodigo ?? null,
+        })))
       : Promise.resolve([] as any[]),
     p.verTarefas
       ? prisma.tarefa.findMany({
@@ -201,12 +206,20 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
           },
           select: {
             id: true, stepInstanceId: true, subtaskKey: true, status: true, prazo: true,
-            stepInstance: { select: { processoId: true, documentoId: true, necessidadeId: true, responsavelId: true } },
+            stepInstance: {
+              select: {
+                processoId: true, documentoId: true, necessidadeId: true,
+                // `responsavelId` vem da TAREFA do passo, nunca do campo solto
+                // do próprio `PhaseWorkflowStepInstance` — mesma correção de
+                // `escopoPasso`.
+                tarefas: { select: { responsavelId: true }, take: 1 },
+              },
+            },
           },
         }).then((rows) => rows.map((r) => ({
           id: r.id, stepInstanceId: r.stepInstanceId, subtaskKey: r.subtaskKey, status: r.status, prazo: r.prazo,
           processoId: r.stepInstance.processoId, documentoId: r.stepInstance.documentoId,
-          necessidadeId: r.stepInstance.necessidadeId, responsavelId: r.stepInstance.responsavelId,
+          necessidadeId: r.stepInstance.necessidadeId, responsavelId: r.stepInstance.tarefas[0]?.responsavelId ?? null,
         })))
       : Promise.resolve([] as SubtarefaBase[]),
     // Financeiro: módulo (`verFinanceiro`) E escopo — as duas coisas, não uma

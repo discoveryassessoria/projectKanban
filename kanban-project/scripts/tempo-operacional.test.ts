@@ -284,10 +284,23 @@ function main() {
     tarefaEquivalente.rotulo === subDepois.rotulo && tarefaEquivalente.diasParaPrazo === subDepois.diasParaPrazo)
 
   // O RELÓGIO DA SUBTAREFA PRECISA ESTAR LIGADO EM PRODUÇÃO — não só existir
-  // na engine. Prova que os 3 pontos que ligam o relógio (materialização,
-  // reconciliação, reabertura) de fato chamam `prazoOperacional`.
-  ok('§97) materializarSubtarefas liga o relógio da subtarefa que nasce disponível',
-    /prazoOperacional\(slaEfetivo, new Date\(\)\)/.test(semComentarios(ler('src/services/subtarefas-da-etapa.ts'))))
+  // na engine. Achado real (18/09/2026): só o ramo DISPONIVEL chamava
+  // `prazoOperacional` — EM_ANDAMENTO síncrono e AGUARDANDO_EXTERNO
+  // automático ficavam com o relógio desligado, mesmo com `slaDays`
+  // cadastrado. `relogioDeNascimentoDaSubtarefa` é agora o ÚNICO lugar que
+  // decide isso — prova que ELA chama `prazoOperacional` (nunca uma fórmula
+  // duplicada) e que os ramos reais (materialização e execução síncrona da
+  // ação) chamam ELA, não `prazoOperacional` direto.
+  const subtarefasDaEtapaSrc = semComentarios(ler('src/services/subtarefas-da-etapa.ts'))
+  ok('§97) relogioDeNascimentoDaSubtarefa é o único lugar que liga o relógio de nascimento, e chama prazoOperacional',
+    /function relogioDeNascimentoDaSubtarefa/.test(subtarefasDaEtapaSrc)
+    && /relogioDeNascimentoDaSubtarefa[\s\S]*?prazoOperacional\(slaEfetivoDaSubtarefa/.test(subtarefasDaEtapaSrc))
+  ok('§97) materializarSubtarefas liga o relógio via relogioDeNascimentoDaSubtarefa (DISPONIVEL e AGUARDANDO_EXTERNO de nascença)',
+    /materializarSubtarefas[\s\S]*?relogioDeNascimentoDaSubtarefa\(s\.status/.test(subtarefasDaEtapaSrc))
+  ok('§97) a espera externa automática liga prazo E previstoPara pela MESMA função, nunca uma fórmula própria',
+    /aplicarEsperaExternaDaSubtarefaSeConfigurado[\s\S]*?relogioDeNascimentoDaSubtarefa\(/.test(subtarefasDaEtapaSrc))
+  ok('§97) a execução síncrona da ação (EM_ANDAMENTO) também liga o relógio pela MESMA função — nunca ficava null antes desta correção',
+    /relogioDeNascimentoDaSubtarefa\(/.test(semComentarios(ler('src/services/executar-acao-cadastrada.ts'))))
   ok('§97) reabrirSubtarefa liga um relógio NOVO (nova tentativa, novo prazo)',
     /prazoOperacional\(defReaberta\?\.slaDays/.test(semComentarios(ler('src/services/execucao-da-subtarefa.ts'))))
   ok('§97) a projeção (subtarefasDaEtapa) expõe o estado já calculado — nenhuma tela recalcula',

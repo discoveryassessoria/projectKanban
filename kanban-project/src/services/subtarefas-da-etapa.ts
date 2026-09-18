@@ -33,8 +33,55 @@ import { prazoOperacional, estadoTemporalSubtarefa, type EstadoTemporal } from "
  * lugar — mesma régua do `temPrazoProprio`/`PRAZO_HERDADO` do passo, um nível
  * abaixo.
  */
-function slaEfetivoDaSubtarefa(slaProprio: number | null, slaDoPasso: number): number | null {
+export function slaEfetivoDaSubtarefa(slaProprio: number | null, slaDoPasso: number): number | null {
   return slaProprio ?? slaDoPasso
+}
+
+/**
+ * ESTADOS EM QUE A EXECUÇÃO NASCE COM O RELÓGIO JÁ CORRENDO — o SLA começa a
+ * contar do instante em que ela passa a existir, qualquer que seja o estado
+ * inicial. `PENDENTE`/`BLOQUEADO` ficam de fora de propósito: a subtarefa
+ * ainda não começou a consumir prazo nenhum.
+ */
+const NASCE_COM_RELOGIO = new Set<EstadoDaSubtarefa>([
+  ESTADOS_DA_SUBTAREFA.DISPONIVEL, ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO, ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO,
+])
+
+export interface RelogioDeNascimento {
+  prazo: Date | null
+  previstoPara: Date | null
+}
+
+/**
+ * O RELÓGIO DE NASCIMENTO DE UMA SUBTAREFA — mesma fórmula (`slaEfetivoDaSubtarefa`
+ * + `prazoOperacional`) em QUALQUER ramo pelo qual ela vem à vida. Achado real
+ * (18/09/2026): só o ramo DISPONIVEL de `materializarSubtarefas`/`reconciliarSubtarefas`
+ * calculava `prazo` — uma subtarefa que nascia direto EM_ANDAMENTO (ação síncrona) ou
+ * AGUARDANDO_EXTERNO (espera automática) ficava com o relógio para sempre desligado,
+ * mesmo tendo `slaDays` cadastrado. Esta função é o único lugar que decide isso —
+ * ninguém mais reimplementa a conta.
+ *
+ * `dataBase` é o instante REAL de liberação: `new Date()` para quem está nascendo
+ * agora (a chamada síncrona É o instante), e a `criadoEm`/`startedAt` já registrada
+ * de uma execução existente para quem está reconciliando dado histórico — nunca
+ * "hoje" fingindo ser o passado.
+ *
+ * `previstoPara` só é preenchido quando o estado é `AGUARDANDO_EXTERNO` (é aí que
+ * existe, de fato, uma previsão de TERCEIRO) — `prazo` continua sendo o relógio
+ * geral, sempre que a execução está viva. Os dois campos preservam a semântica que
+ * já existiam no schema (`prazo` = execução; `previstoPara` = operação externa);
+ * eles não viram alias um do outro — uma reconciliação futura que descubra o
+ * protocolo/canal real pode sobrescrever só `previstoPara`, sem mexer em `prazo`.
+ */
+export function relogioDeNascimentoDaSubtarefa(
+  status: EstadoDaSubtarefa,
+  slaProprio: number | null,
+  slaDoPasso: number,
+  dataBase: Date,
+): RelogioDeNascimento {
+  if (!NASCE_COM_RELOGIO.has(status)) return { prazo: null, previstoPara: null }
+  const prazo = prazoOperacional(slaEfetivoDaSubtarefa(slaProprio, slaDoPasso), dataBase)
+  return { prazo, previstoPara: status === ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO ? prazo : null }
 }
 
 export interface SubtarefaProjetada {
@@ -290,16 +337,12 @@ export async function materializarSubtarefas(args: {
   let jaExistiam = 0
   for (const s of subs) {
     if (s.execucao) { jaExistiam++; continue }
-    // O RELÓGIO DA SUBTAREFA — liga SOMENTE se ela já nasce DISPONÍVEL (achado
-    // real, 17/09/2026: `SubtaskExecution.prazo` existia no schema desde
-    // sempre, mas nada gravava nele — subtarefa nunca teve prazo de verdade).
-    // A que nasce BLOQUEADO fica com `prazo: null`: ela ainda não começou a
-    // consumir SLA nenhum, e `reconciliarSubtarefas` liga o relógio dela
-    // quando a dependência libera.
-    const slaEfetivo = slaEfetivoDaSubtarefa(s.definicao.slaDays, hist?.passo.slaDays ?? 0)
-    const prazo = s.status === ESTADOS_DA_SUBTAREFA.DISPONIVEL
-      ? prazoOperacional(slaEfetivo, new Date())
-      : null
+    // O RELÓGIO DA SUBTAREFA — liga em QUALQUER estado que já nasce com ação
+    // correndo (DISPONIVEL, EM_ANDAMENTO, AGUARDANDO_EXTERNO — ver
+    // `relogioDeNascimentoDaSubtarefa`). A que nasce BLOQUEADO fica com
+    // `prazo: null`: ela ainda não começou a consumir SLA nenhum, e
+    // `reconciliarSubtarefas` liga o relógio dela quando a dependência libera.
+    const relogio = relogioDeNascimentoDaSubtarefa(s.status, s.definicao.slaDays, hist?.passo.slaDays ?? 0, new Date())
     await garantirExecucao({
       stepInstanceId: args.stepInstanceId,
       subtaskKey: s.key,
@@ -307,7 +350,8 @@ export async function materializarSubtarefas(args: {
       status: s.status,
       bloqueioCodigo: s.bloqueioCodigo,
       bloqueioAlvo: s.bloqueioAlvo,
-      prazo,
+      prazo: relogio.prazo,
+      previstoPara: relogio.previstoPara,
     })
     criadas++
   }
@@ -349,12 +393,14 @@ export async function reconciliarSubtarefas(args: {
     if (mesmoEstado && mesmaCausa) continue
     // LIGA O RELÓGIO NA HORA CERTA: só quando ela está de fato virando
     // DISPONÍVEL agora e ainda não tinha prazo (nunca reescreve um prazo já
-    // ancorado — isso seria mover a meta retroativamente).
+    // ancorado — isso seria mover a meta retroativamente). Mesma fórmula de
+    // `relogioDeNascimentoDaSubtarefa` — este laço só transiciona para
+    // DISPONIVEL/BLOQUEADO (EM_ANDAMENTO/AGUARDANDO_EXTERNO já saem por
+    // IMUTAVEIS acima), então só o ramo DISPONIVEL dela se aplica aqui.
     let prazo: Date | null | undefined
     if (alvo === ESTADOS_DA_SUBTAREFA.DISPONIVEL && s.execucao.prazo == null) {
       if (hist === undefined) hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
-      const slaEfetivo = slaEfetivoDaSubtarefa(s.definicao.slaDays, hist?.passo.slaDays ?? 0)
-      prazo = prazoOperacional(slaEfetivo, new Date())
+      prazo = relogioDeNascimentoDaSubtarefa(alvo, s.definicao.slaDays, hist?.passo.slaDays ?? 0, new Date()).prazo
     }
     await registrarNaExecucao(args.stepInstanceId, s.key, {
       status: alvo, bloqueioCodigo: s.bloqueioCodigo, bloqueioAlvo: s.bloqueioAlvo,
@@ -400,11 +446,22 @@ export async function aplicarEsperaExternaDaSubtarefaSeConfigurado(args: {
   if (!tarefa) return { aplicado: false }
 
   const { garantirExecucao } = await import("@/src/services/execucao-da-subtarefa")
+  const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+  // MESMO RELÓGIO que qualquer outra subtarefa que nasce com ação correndo —
+  // achado real (18/09/2026): esta era a lacuna concreta por trás de "Home
+  // mostra 0/0/0/0/0" e "prazo do passo vazio" para toda subtarefa que espera
+  // terceiro automaticamente: o SLA dela (`corrente.definicao.slaDays`) já
+  // estava cadastrado e congelado, só nunca era lido aqui.
+  const relogio = relogioDeNascimentoDaSubtarefa(
+    ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO, corrente.definicao.slaDays, hist?.passo.slaDays ?? 0, new Date(),
+  )
   await garantirExecucao({
     stepInstanceId: args.stepInstanceId,
     subtaskKey: corrente.key,
-    workflowVersao: (await definicaoHistoricaDoPasso(args.stepInstanceId))?.versao ?? null,
+    workflowVersao: hist?.versao ?? null,
     status: ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO,
+    prazo: relogio.prazo,
+    previstoPara: relogio.previstoPara,
   })
 
   const { bloquearTarefa } = await import("@/src/services/task-step-sync")
@@ -477,9 +534,13 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
 
   const { garantirExecucao, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
   const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+  const relogio = relogioDeNascimentoDaSubtarefa(
+    ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO, corrente.definicao.slaDays, hist?.passo.slaDays ?? 0, new Date(),
+  )
   await garantirExecucao({
     stepInstanceId: args.stepInstanceId, subtaskKey: corrente.key,
     workflowVersao: hist?.versao ?? null, status: ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO,
+    prazo: relogio.prazo,
   })
   await registrarNaExecucao(args.stepInstanceId, corrente.key, {
     status: ESTADOS_DA_SUBTAREFA.CONCLUIDO,

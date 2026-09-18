@@ -42,28 +42,54 @@ export async function GET(request: NextRequest) {
     // arquivada/lida sai do sino sozinha, sem precisar de um segundo estado.
     // RBAC embutido na própria query: cada usuário só vê o que É destinatário
     // dele — nunca por vazamento de acesso ao processo/tarefa (item 17).
-    //
-    // Lida ANTES das janelas de prazo/"novas" de propósito (achado real
-    // 17/09/2026): quando a MESMA atribuição já gerou um aviso específico
-    // (`ATRIBUICAO`/`TRANSFERENCIA`/`ATRIBUICAO_LOTE`, ainda não lido), as
-    // tarefas que ele cobre não podem TAMBÉM explodir como N entradas de
-    // prazo/"nova tarefa" — o mesmo acontecimento não é três avisos. A
-    // supressão vale só enquanto o aviso da atribuição estiver pendente:
-    // marcá-lo como lido (ou ele nunca ter existido) libera a tarefa para as
-    // janelas de prazo normais — nenhum dado de prazo/SLA é alterado, só
-    // QUAIS tarefas aparecem soltas aqui.
     const acontecimentosRaw = await prisma.notificacaoOperacional.findMany({
       where: { destinatarioId: usuario.userId, lidaEm: null },
       select: { id: true, tipo: true, titulo: true, mensagem: true, link: true, criadoEm: true, tarefaId: true, processoId: true },
       orderBy: { criadoEm: 'desc' },
       take: 30,
     })
+    // Lida ANTES das janelas de prazo/"novas" de propósito (achado real
+    // 17/09/2026): quando a MESMA atribuição já gerou um aviso específico
+    // (`ATRIBUICAO`/`TRANSFERENCIA`/`ATRIBUICAO_LOTE`), as tarefas que ele
+    // cobre não podem TAMBÉM explodir como N entradas de prazo/"nova tarefa"
+    // — o mesmo acontecimento não é dois avisos.
+    //
+    // DOIS RECORTES, de propósito (achado real 18/09/2026 — auditoria da
+    // Grisotto): a supressão de PRAZO (vencidas/hoje/próximos 3 dias) vale só
+    // enquanto o aviso está PENDENTE — ler a notificação libera a tarefa para
+    // as janelas de prazo normais, e isso é intencional (a Daniela continua
+    // precisando ver "vence amanhã" depois de já ter lido "foi atribuída a
+    // você"; `sino-ownership.test.ts` prova isso). Mas a supressão de "NOVAS
+    // TAREFAS" tem que ser mais larga que isso: ela existe para não deixar o
+    // MESMO acontecimento de atribuição virar N entradas soltas — e isso
+    // continua sendo o mesmo acontecimento MESMO DEPOIS de lido. Usar só
+    // `lidaEm: null` aqui foi o bug real: assim que a notificação consolidada
+    // da Grisotto foi lida, as 3 tarefas (criadas há menos de 24h) voltaram a
+    // cair, uma por uma, em `novas` — nenhuma delas tinha outra notificação
+    // pendente cobrindo. `atribuicoesRecentes` cobre a MESMA janela de 24h que
+    // `novas` usa (lida ou não) — o suficiente para nunca duplicar o
+    // acontecimento, sem nunca esconder um acontecimento novo e genuinamente
+    // diferente (chave de idempotência do lote muda a cada conjunto de ids).
     const tarefasCobertasPorAtribuicao = new Set<number>()
     const processosCobertosPorAtribuicaoLote = new Set<number>()
     for (const a of acontecimentosRaw) {
       if (a.tipo !== 'ATRIBUICAO' && a.tipo !== 'TRANSFERENCIA' && a.tipo !== 'ATRIBUICAO_LOTE') continue
       if (a.tarefaId != null) tarefasCobertasPorAtribuicao.add(a.tarefaId)
       if (a.processoId != null) processosCobertosPorAtribuicaoLote.add(a.processoId)
+    }
+    const atribuicoesRecentesRaw = await prisma.notificacaoOperacional.findMany({
+      where: {
+        destinatarioId: usuario.userId,
+        tipo: { in: ['ATRIBUICAO', 'TRANSFERENCIA', 'ATRIBUICAO_LOTE'] },
+        criadoEm: { gte: umDiaAtras },
+      },
+      select: { tarefaId: true, processoId: true },
+    })
+    const tarefasJaComunicadas = new Set<number>()
+    const processosJaComunicadosPorLote = new Set<number>()
+    for (const a of atribuicoesRecentesRaw) {
+      if (a.tarefaId != null) tarefasJaComunicadas.add(a.tarefaId)
+      if (a.processoId != null) processosJaComunicadosPorLote.add(a.processoId)
     }
     const acontecimentos = acontecimentosRaw.map((n) => ({
       id: n.id, tipo: n.tipo, titulo: n.titulo, mensagem: n.mensagem, link: n.link,
@@ -106,13 +132,19 @@ export async function GET(request: NextRequest) {
     const hojeList: any[] = []
     const proximos3Dias: any[] = []
     const novas: any[] = []
-    let suprimidasPorAtribuicaoPendente = 0
+    // GRAIN = TAREFA, contado por ID VISÍVEL — não por linha somada (uma
+    // tarefa pode legitimamente aparecer em um balde de prazo E em "novas" ao
+    // mesmo tempo, dois fatos independentes; contar seria dobrar essa mesma
+    // tarefa no total). Substitui o antigo contador de "suprimidas": agora há
+    // dois recortes de supressão diferentes (pendente vs. já comunicada), e o
+    // que realmente importa para o total é só "apareceu em algum balde?".
+    const idsVisiveis = new Set<number>()
 
     for (const t of tarefas) {
       // JÁ COBERTA por um aviso de atribuição pendente — não duplica o
-      // acontecimento em mais um bucket (item C, 17/09/2026).
+      // acontecimento em mais um bucket de PRAZO (item C, 17/09/2026).
       const jaAvisada = tarefasCobertasPorAtribuicao.has(t.id) || (t.processoId != null && processosCobertosPorAtribuicaoLote.has(t.processoId))
-      if (jaAvisada) { suprimidasPorAtribuicaoPendente++; continue }
+      if (jaAvisada) continue
 
       const item = {
         id: t.id,
@@ -128,9 +160,9 @@ export async function GET(request: NextRequest) {
       if (t.dataPrazo) {
         const prazo = new Date(t.dataPrazo)
         prazo.setHours(0, 0, 0, 0)
-        if (prazo < hoje) vencidas.push(item)
-        else if (prazo.getTime() === hoje.getTime()) hojeList.push(item)
-        else if (prazo <= em3Dias) proximos3Dias.push(item)
+        if (prazo < hoje) { vencidas.push(item); idsVisiveis.add(t.id) }
+        else if (prazo.getTime() === hoje.getTime()) { hojeList.push(item); idsVisiveis.add(t.id) }
+        else if (prazo <= em3Dias) { proximos3Dias.push(item); idsVisiveis.add(t.id) }
       }
 
       // "NOVA TAREFA" avisa QUEM É DONO dela. Depois do fix de ownership
@@ -142,7 +174,17 @@ export async function GET(request: NextRequest) {
       // Tarefa já tem aviso PRÓPRIO e mais específico (`DISTRIBUICAO_
       // NECESSARIA`, em `acontecimentos`) — empurrá-la também como "nova
       // tarefa" genérica duplicava o mesmo fato pra o mesmo destinatário.
-      if (t.createdAt >= umDiaAtras && t.responsavelId != null && t.tipo !== 'ADMINISTRATIVA') novas.push(item)
+      //
+      // JÁ COMUNICADA por uma atribuição recente (lida ou não — achado real
+      // 18/09/2026, ver comentário acima da query `atribuicoesRecentesRaw`):
+      // essa tarefa já tem UM acontecimento de atribuição que a representa —
+      // "novas" não pode ser um segundo, ungrupado, por tarefa.
+      const jaComunicadaComoAtribuicao =
+        tarefasJaComunicadas.has(t.id) || (t.processoId != null && processosJaComunicadosPorLote.has(t.processoId))
+      if (t.createdAt >= umDiaAtras && t.responsavelId != null && t.tipo !== 'ADMINISTRATIVA' && !jaComunicadaComoAtribuicao) {
+        novas.push(item)
+        idsVisiveis.add(t.id)
+      }
     }
 
     // 🔒 Achado real: quando a Saúde do Sistema encontra um erro crítico, o
@@ -184,11 +226,18 @@ export async function GET(request: NextRequest) {
       // (`novas` + a janela de prazo correspondente — `novas` é um `if` à parte,
       // não `else if`, de propósito, porque os dois fatos são independentes e a
       // tela mostra os dois). O TOTAL não pode somar os buckets (contaria essa
-      // tarefa 2x) — é sempre `tarefas.length`, a query já traz cada Tarefa uma
-      // única vez (achado real da auditoria de 10/09/2026). `acontecimentos` é
-      // grão NOTIFICAÇÃO — nunca TAREFA — e soma à parte, de propósito (item 19
-      // do contrato: "Notification NÃO é Tarefa").
-      total: (tarefas.length - suprimidasPorAtribuicaoPendente) + (saudeCritica ? 1 : 0) + acontecimentos.length
+      // tarefa 2x) — é `idsVisiveis.size`: quantas Tarefas DISTINTAS apareceram
+      // em pelo menos um balde depois de toda supressão (achado real da
+      // auditoria de 10/09/2026, refinado em 18/09/2026 — antes era
+      // `tarefas.length - suprimidas`, que contava uma tarefa suprimida SÓ de
+      // "novas" como se ainda estivesse visível em algum balde, inflando o
+      // badge para acontecimentos que na prática não aparecem em lugar
+      // nenhum). `acontecimentos` é grão NOTIFICAÇÃO — nunca TAREFA — e soma à
+      // parte, de propósito (item 19 do contrato: "Notification NÃO é
+      // Tarefa"; e item 21 do mandato de 18/09/2026: o badge conta
+      // acontecimentos não lidos, nunca as tarefas que um acontecimento
+      // consolidado carrega dentro dele).
+      total: idsVisiveis.size + (saudeCritica ? 1 : 0) + acontecimentos.length
     })
   } catch (error) {
     console.error('Erro ao buscar notificações:', error)
