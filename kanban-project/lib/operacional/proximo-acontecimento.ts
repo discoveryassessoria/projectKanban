@@ -183,7 +183,18 @@ export interface EntradaOperacao {
 }
 
 const dataBR = (d: Date): string => d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
-const isoDoDia = (ymd: string): Date => new Date(`${ymd}T00:00:00.000Z`)
+// MEIO-DIA UTC, não meia-noite — achado real (19/09/2026, ao corrigir a
+// semântica de "Acompanhar hoje" para dia-calendário): meia-noite UTC de um
+// dia D é 21h de São Paulo do dia ANTERIOR (D-1) — `diaOperacional` (que
+// sempre lê no fuso operacional) devolvia D-1 para uma data que este helper
+// dizia representar D, um desvio de um dia inteiro. Instant-comparisons
+// antigas (`.getTime() <`) nunca expunham o defeito porque não recalculavam
+// o dia; comparações POR DIA (`diasEntreDiasOperacionais`, que reconverte via
+// `diaOperacional`) expõem imediatamente. Meio-dia UTC = 09h em São Paulo
+// (UTC-3, sem horário de verão) — sempre dentro do MESMO dia operacional,
+// qualquer que seja o campo (`proximoAcompanhamento`/`previsaoEfetiva`) que
+// alimentar este helper.
+const isoDoDia = (ymd: string): Date => new Date(`${ymd}T12:00:00.000Z`)
 
 /**
  * O NÚCLEO — PURO, sem I/O. Recebe o que já foi lido, devolve a leitura
@@ -279,7 +290,18 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
   // automaticamente significar atraso interno".
   const atrasoInterno = !encerrada && !aguardando && tempo.atrasado
   const atrasoTerceiro = !encerrada && !!previsaoTerceiro && previsaoTerceiro.getTime() < e.agora.getTime() && !retornoRecebido
-  const acompanhamentoVencido = !encerrada && !!proximoAcompanhamentoData && proximoAcompanhamentoData.getTime() < e.agora.getTime()
+  // POR DIA (fuso operacional), não por instante — achado real (19/09/2026,
+  // mandato "correção definitiva do modelo temporal"): a categoria de Minha
+  // Operação alimentada por este sinal se CHAMA "Acompanhar hoje". Um
+  // acompanhamento cuja data-calendário é HOJE precisa contar como vencido
+  // pra esse propósito mesmo que o horário exato do dia ainda não tenha
+  // chegado — "atrasado" (dia anterior a hoje) e "hoje" são as DUAS
+  // situações que essa única categoria cobre (não existe uma categoria
+  // "acompanhamento atrasado" separada de "acompanhar hoje" em Minha
+  // Operação). O horário em si continua preservado em `proximoAcompanhamentoData`
+  // pra quem ordena/exibe — só a CLASSIFICAÇÃO passou a ser por dia.
+  const acompanhamentoVencido = !encerrada && !!proximoAcompanhamentoData
+    && diasEntreDiasOperacionais(proximoAcompanhamentoData, e.agora) <= 0
 
   // ── DETERMINAÇÃO DO PRÓXIMO ACONTECIMENTO ────────────────────────────────
   let proximoAcontecimento: ProximoAcontecimento

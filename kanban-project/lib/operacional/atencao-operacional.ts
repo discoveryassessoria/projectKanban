@@ -84,9 +84,18 @@ export interface LinhaComAtencao {
   /**
    * ACOMPANHAMENTO DA ESPERA CORRENTE (dimensão D própria da subtarefa) —
    * irmã de `acompanhamentoVencido` (dimensão D da Tarefa, hoje só manual),
-   * nunca a mesma fonte. Vencido ⇒ acompanhar hoje, mesmo OR simples.
+   * nunca a mesma fonte. Vencido OU vence hoje ⇒ acompanhar hoje, mesmo OR
+   * simples.
+   *
+   * `venceHoje` entra aqui de propósito (achado real, 19/09/2026 — mandato
+   * "correção definitiva do modelo temporal"): a categoria se CHAMA
+   * "Acompanhar hoje" — um acompanhamento cuja DATA-CALENDÁRIO é hoje
+   * precisa cair nela mesmo que o horário exato ainda não tenha passado.
+   * `venceHoje`/`atrasado` já vêm calculados por dia (não por instante) da
+   * régua única (`nucleoTemporal`/`diasEntreDiasOperacionais`, no fuso
+   * operacional) — nenhuma conta nova aqui, só os dois lidos juntos.
    */
-  acompanhamentoPasso?: { atrasado: boolean } | null
+  acompanhamentoPasso?: { atrasado: boolean; venceHoje: boolean } | null
 }
 
 const JANELA_NOVA_ATRIBUICAO_MS = 48 * 3600_000
@@ -137,7 +146,7 @@ export function motivosAtivos(l: LinhaComAtencao): MotivoAtencao[] {
   // não é um prazo de ação interna — é (no máximo) acompanhamento, tratado
   // à parte por `acompanhamentoVencido`.
   if (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro) motivos.push('PRAZO_PASSO_VENCIDO')
-  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) motivos.push('ACOMPANHAMENTO_DEVIDO')
+  if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) motivos.push('ACOMPANHAMENTO_DEVIDO')
   if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) motivos.push('TERCEIRO_ATRASADO')
   return motivos
 }
@@ -183,7 +192,7 @@ export function calcularAtencaoOperacional(l: LinhaComAtencao): AtencaoOperacion
 export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrincipal {
   if (l.atrasoInterno || (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro)) return 'atrasoInterno'
   if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) return 'terceirosAtrasados'
-  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) return 'acompanharHoje'
+  if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) return 'acompanharHoje'
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) return 'paraAgirAgora'
   if (l.coluna === 'AGUARDANDO_TERCEIRO') return 'aguardandoTerceiros'
   return 'outras'
@@ -193,7 +202,7 @@ export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrin
 export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
   const cats: CategoriaAtencao[] = []
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) cats.push('paraAgirAgora')
-  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) cats.push('acompanharHoje')
+  if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) cats.push('acompanharHoje')
   if (l.atrasoInterno || (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro)) cats.push('atrasoInterno')
   if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) cats.push('terceirosAtrasados')
   if (l.coluna === 'AGUARDANDO_TERCEIRO') cats.push('aguardandoTerceiros')
@@ -213,7 +222,7 @@ function degrauDeAtencao(l: LinhaComAtencao): number {
   const atrasoInternoPasso = l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro
   if (l.atrasada && (l.atrasoInterno || atrasoInternoPasso)) return 0
   if (l.atrasoInterno || atrasoInternoPasso) return 1
-  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) return 2
+  if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) return 2
   if (l.retornoRecebido) return 3
   if (l.venceHoje && l.executavelAgora) return 4
   if (l.coluna === 'A_FAZER' && l.atribuidaEm != null && Date.now() - new Date(l.atribuidaEm).getTime() <= JANELA_NOVA_ATRIBUICAO_MS) return 5
@@ -232,7 +241,7 @@ export function rotuloDeAtencao(l: LinhaComAtencao & { prioridade: string }): { 
   const atrasoInternoPasso = l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro
   if (l.atrasada && (l.atrasoInterno || atrasoInternoPasso)) return { rotulo: 'Crítico', tom: 'critico' }
   if (l.atrasoInterno || atrasoInternoPasso) return { rotulo: 'Atrasado', tom: 'critico' }
-  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado || l.retornoRecebido) return { rotulo: 'Atenção', tom: 'alerta' }
+  if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje) || l.retornoRecebido) return { rotulo: 'Atenção', tom: 'alerta' }
   if (l.venceHoje && l.executavelAgora) return { rotulo: 'Hoje', tom: 'alerta' }
   if (l.prioridade === 'URGENTE') return { rotulo: 'Urgente', tom: 'alerta' }
   if (l.coluna === 'AGUARDANDO_TERCEIRO') return { rotulo: 'Aguardando', tom: 'neutro' }

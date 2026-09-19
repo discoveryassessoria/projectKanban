@@ -89,9 +89,15 @@ async function main() {
     ok("4) atrasoTerceiro=true", r.atrasoTerceiro === true)
     ok("4) atrasoInterno=false (nunca vira atraso da Daniela)", r.atrasoInterno === false)
     ok("4) próximo acontecimento é o acompanhamento futuro, não a previsão vencida", r.proximoAcontecimento.tipo === "aguardando_terceiro_acompanhamento")
-    // `proximoAcompanhamento` é uma data (YYYY-MM-DD), reconstruída à meia-noite
-    // UTC pelo núcleo — comparar contra o MESMO arredondamento, não contra o
-    // instante exato de `dias(2)` (que carrega a hora de `AGORA`).
+    // `proximoAcompanhamento` é uma data (YYYY-MM-DD), reconstruída ao MEIO-DIA
+    // UTC pelo núcleo (`isoDoDia`) — comparar contra o MESMO arredondamento,
+    // não contra o instante exato de `dias(2)` (que carrega a hora de `AGORA`).
+    // Meio-dia, não meia-noite: achado real 19/09/2026 — meia-noite UTC de um
+    // dia D é 21h de São Paulo do dia ANTERIOR, um desvio de um dia inteiro
+    // assim que qualquer leitura reconverte pelo fuso operacional
+    // (`diaOperacional`/`diasEntreDiasOperacionais`, usadas por
+    // `acompanhamentoVencido`). Meio-dia UTC = 09h em São Paulo, sempre no
+    // mesmo dia operacional.
     ok("4) data do próximo acontecimento é a do acompanhamento (+2d)", r.proximoAcontecimento.data === iso2(dias(2)))
   }
 
@@ -246,7 +252,7 @@ async function main() {
 
 function iso(d: Date): string { return d.toISOString().slice(0, 10) }
 /** O mesmo arredondamento que o núcleo faz ao reconstruir `previsaoEfetiva`/`proximoAcompanhamento` (YYYY-MM-DD → meia-noite UTC). */
-function iso2(d: Date): string { return new Date(`${iso(d)}T00:00:00.000Z`).toISOString() }
+function iso2(d: Date): string { return new Date(`${iso(d)}T12:00:00.000Z`).toISOString() }
 
 // ── palco da parte B ─────────────────────────────────────────────────────────
 const MARCA = "PROCACONT"
