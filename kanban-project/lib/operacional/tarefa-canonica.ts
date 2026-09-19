@@ -109,6 +109,31 @@ export async function reancorarTarefaNaUnidade(
     chaveAnterior?: string | null
   },
 ) {
+  // O ESTADO ATUAL, para decidir se `statusTarefa` precisa ser restaurado —
+  // achado real (19/09/2026): `supersederPassosDaInstanciaTx` (chamado DENTRO
+  // da MESMA transição de fase, antes desta função, ver `movePhaseManual`)
+  // marca SUPERSEDIDA qualquer tarefa ainda viva presa à instância da fase de
+  // ORIGEM — inclusive a que está prestes a ser reancorada aqui, porque a
+  // reancoragem só roda DEPOIS do commit (ela escala com o nº de alvos da
+  // fase). O resultado: a tarefa era reancorada para o passo novo mas ficava
+  // PARA SEMPRE com `statusTarefa: SUPERSEDIDA` — "0/4, Disponível, Iniciar" ao
+  // lado de "STATUS: SUPERSEDIDA", uma contradição visível na Central
+  // Operacional.
+  const atual = await tx.tarefa.findUniqueOrThrow({ where: { id: args.tarefaId }, select: { statusTarefa: true } })
+  // SUPERSEDIDA NUNCA é um status operacional legítimo para quem está sendo
+  // reancorada — ela está, por definição, seguindo o trabalho para o roteiro
+  // que agora vale. Restaura como NAO_INICIADA: o MESMO estado que uma tarefa
+  // nasceria com, para este passo, se estivesse sendo materializada agora pela
+  // primeira vez (ver `garantirTarefaDePasso`, ramo de criação). O que já foi
+  // iniciado antes (`dataInicio`/`responsavelId`) continua preservado — é
+  // história, não um estado operacional corrente, e não é isto que está errado.
+  //
+  // QUALQUER OUTRO status (EM_ANDAMENTO, BLOQUEADA, AGUARDANDO_TERCEIRO...) é
+  // preservado sem alteração: reancorar dentro da MESMA fase (workflow
+  // republicado, por exemplo) não pode apagar trabalho em andamento — só o
+  // status impossível-de-legitimar (SUPERSEDIDA) é corrigido aqui.
+  const restaurarStatus = atual.statusTarefa === 'SUPERSEDIDA'
+
   const tarefa = await tx.tarefa.update({
     where: { id: args.tarefaId },
     data: {
@@ -122,6 +147,7 @@ export async function reancorarTarefaNaUnidade(
       necessidadeId: args.necessidadeId ?? undefined,
       documentoId: args.documentoId ?? undefined,
       pessoaId: args.pessoaId ?? undefined,
+      ...(restaurarStatus ? { statusTarefa: 'NAO_INICIADA' as const } : {}),
       lockVersion: { increment: 1 },
     },
   })
@@ -132,7 +158,8 @@ export async function reancorarTarefaNaUnidade(
       entidadeId: tarefa.id,
       descricao:
         `Tarefa "${tarefa.titulo}" seguiu o trabalho para a fase ${args.faseMacroKey ?? '—'}: ` +
-        `o mesmo documento não vira uma segunda tarefa quando a fase muda.`,
+        `o mesmo documento não vira uma segunda tarefa quando a fase muda.` +
+        (restaurarStatus ? ' Status restaurado de SUPERSEDIDA (supersessão da instância de origem) para NAO_INICIADA.' : ''),
       detalhes: {
         tarefaId: tarefa.id,
         stepInstanceId: args.workflowStepInstanceId,
@@ -140,6 +167,7 @@ export async function reancorarTarefaNaUnidade(
         paraInstancia: args.workflowInstanceId,
         chaveAnterior: args.chaveAnterior ?? null,
         chaveAtual: args.chaveIdempotencia,
+        statusRestaurado: restaurarStatus,
       },
     },
   })

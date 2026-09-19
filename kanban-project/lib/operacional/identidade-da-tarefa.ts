@@ -132,8 +132,32 @@ export async function identidadeDaUnidade(
   return { chave: chaveDaUnidade(unidade), unidade }
 }
 
-/** Estados em que a tarefa já não representa trabalho aberto. */
+/**
+ * Estados em que a tarefa já não representa trabalho aberto — e por isso, se a
+ * MESMA unidade precisar de novo, a resposta é uma REEXECUÇÃO (chave própria),
+ * nunca reancorar a antiga. `SUPERSEDIDA` DELIBERADAMENTE NÃO entra aqui: ela
+ * significa "esta instância/ciclo deixou de ser o roteiro vigente" — o oposto
+ * de concluído/cancelado —, e é exatamente o status que `garantirTarefaDePasso`
+ * precisa poder REANCORAR (não reexecutar) quando a mesma obrigação continua na
+ * fase seguinte. Ver `SELECIONAVEL_COMO_VIVA`, abaixo, para a pergunta
+ * diferente ("qual é a tarefa canônica agora?") que SUPERSEDIDA responde "não".
+ */
 export const TERMINAIS_DA_UNIDADE = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA'] as const
+
+/**
+ * Estados em que a tarefa NÃO pode ser apresentada como a canônica/atual da
+ * unidade — usado só pela SELEÇÃO de "qual é a tarefa viva" (`tarefaVivaDaUnidade`/
+ * `tarefasVivasDasUnidades`), nunca por `garantirTarefaDePasso` (que precisa
+ * continuar reancorando uma `SUPERSEDIDA`, não recusá-la).
+ *
+ * Achado real (19/09/2026): sem excluir `SUPERSEDIDA` aqui, uma tarefa cuja
+ * fase anterior foi supersedida — e que ainda não terminou de ser reancorada
+ * na fase nova (ou cuja reancoragem falhou) — continuava sendo devolvida como
+ * "a tarefa viva da unidade", e a Central Operacional mostrava STATUS:
+ * SUPERSEDIDA ao lado de "0/4, Iniciar" — uma execução histórica apresentada
+ * como se fosse a corrente da Daniela.
+ */
+const SELECIONAVEL_COMO_VIVA = [...TERMINAIS_DA_UNIDADE, 'SUPERSEDIDA'] as const
 
 /**
  * O QUE UMA TAREFA VIVA CARREGA — tudo o que uma PROJEÇÃO precisa dela.
@@ -253,7 +277,7 @@ export async function tarefasVivasDasUnidades(
   const candidatas = await db.tarefa.findMany({
     where: {
       processoId: { in: processos },
-      statusTarefa: { notIn: [...TERMINAIS_DA_UNIDADE] },
+      statusTarefa: { notIn: [...SELECIONAVEL_COMO_VIVA] },
       OR: porObrigacao,
     },
     orderBy: { id: 'asc' },

@@ -138,10 +138,21 @@ async function main() {
   const rel1 = await materializarExecucaoDaFase({ processoId: processo.id, fonte: 'PROCESSO_CRIADO' })
   ok('a fase materializou', rel1.passosTotais > 0, `${rel1.estado} · ${rel1.passosTotais} passo(s)`)
 
+  // GRAIN: "vivas" aqui é sobre a OBRIGAÇÃO DOCUMENTAL (a certidão do Ademir),
+  // nunca sobre toda Tarefa do processo. `origem: 'obrigacao-atribuicao'` é
+  // outro grain por construção (lib/operacional/obrigacao-atribuicao.ts) — uma
+  // tarefa ADMINISTRATIVA ("Atribuir tarefas — X"), sem necessidadeId nem
+  // documentoId, que nasce automaticamente quando alguma tarefa do processo
+  // fica sem responsável. Contá-la aqui seria exatamente o erro que CLAUDE.md
+  // (Bug de contador) veta: somar grains diferentes como se fossem a mesma
+  // unidade. Achado real (19/09/2026): sem este filtro, a suíte acusava
+  // duplicação numa materialização de UMA obrigação só, porque a tarefa
+  // administrativa (nascida junto, legitimamente) também batia no `where`.
   const vivas = async () => prisma.tarefa.findMany({
     where: {
       processoId: processo.id,
       statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA'] },
+      origem: { not: 'obrigacao-atribuicao' },
     },
     orderBy: { id: 'asc' },
     select: {
@@ -210,6 +221,29 @@ async function main() {
   ok('com o MESMO taskId do começo', t[0]?.id === taskIdOriginal, `#${t[0]?.id} (era #${taskIdOriginal})`)
   ok('e sem reset do que já tinha sido feito',
     t[0]?.statusTarefa === 'EM_ANDAMENTO' && t[0]?.dataInicio != null)
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('3b) SUPERSEDIDA nunca é a execução canônica — e reconciliar de novo não duplica')
+  // ══════════════════════════════════════════════════════════════════════════
+  // A instância de origem (genealogia) foi supersedida DUAS vezes nesta corrida
+  // (item 2 e a volta do item 3) — exatamente o cenário em que, antes desta
+  // correção, `tarefaVivaDaUnidade` podia devolver a supersedida como se fosse
+  // a corrente (achado real 19/09/2026).
+  const canonica = await tarefaVivaDaUnidade(prisma, { processoId: processo.id, necessidadeId: nec.id, ciclo: 1 })
+  ok('a canônica é a viva, nunca uma supersedida', canonica?.id === taskIdOriginal, `#${canonica?.id ?? '—'}`)
+  ok('e o status dela não é SUPERSEDIDA', canonica?.statusTarefa !== 'SUPERSEDIDA', canonica?.statusTarefa ?? '—')
+
+  for (let i = 0; i < 5; i++) await materializarExecucaoDaFase({ processoId: processo.id, fonte: 'RECONCILIACAO' })
+  t = await vivas()
+  ok('reconciliar 5 vezes seguidas não cria segunda tarefa (idempotência)', t.length === 1, `${t.length}`)
+  ok('e o taskId continua o mesmo', t[0]?.id === taskIdOriginal, `#${t[0]?.id}`)
+
+  const historicas = await prisma.tarefa.findMany({
+    where: { processoId: processo.id, statusTarefa: 'SUPERSEDIDA' },
+    select: { id: true },
+  })
+  ok('as tarefas SUPERSEDIDA que restaram (se houver) são só HISTÓRICO — nenhuma é a #taskIdOriginal',
+    !historicas.some((h) => h.id === taskIdOriginal), historicas.map((h) => `#${h.id}`).join(',') || '(nenhuma)')
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('4) A busca pela unidade acha a tarefa por QUALQUER lado')
