@@ -15,7 +15,7 @@
 import { Suspense, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -84,7 +84,7 @@ function OperacaoPageConteudo() {
           nome da tela e o que ela promete — sem métrica nem informação
           decorativa aqui. Os elementos globais (busca, câmbio, data,
           notificações, usuário, sair) são os mesmos do resto do sistema. */}
-      <HeaderBar
+      <HeaderBarApp
         title="Minha Operação"
         subtitle="Tudo que precisa da sua atenção agora."
         userName={user.nome}
@@ -92,7 +92,11 @@ function OperacaoPageConteudo() {
         onLogout={() => void encerrarSessao("manual")}
       />
 
-      <main className={`px-6 pb-16 pt-6 ${aba === "minha_operacao" ? "flex h-[calc(100vh-80px)] flex-col" : ""}`}>
+      {/* `max-h` (não `h`): a lista pode PRECISAR do teto para rolar quando
+          tem muita coisa, mas com poucos resultados o contêiner deve encolher
+          para o conteúdo — não esticar até a viewport e deixar um vazio
+          enorme embaixo (achado do mandato "modernização visual", 19/09/2026). */}
+      <main className={`px-6 pb-16 pt-6 ${aba === "minha_operacao" ? "flex max-h-[calc(100vh-80px)] flex-col" : ""}`}>
         <div className="mb-4 flex items-center justify-between gap-3">
           <div className="flex gap-1">
             <button

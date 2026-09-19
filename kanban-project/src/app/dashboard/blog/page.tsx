@@ -5,7 +5,7 @@ import { useApi } from "@/src/lib/dados"
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -250,7 +250,7 @@ export default function BlogAdminPage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
 
       {/* HeaderBar igual às outras páginas */}
-      <HeaderBar
+      <HeaderBarApp
         title="Blog"
         subtitle="Gerencie os posts do blog da landing page"
         userName={usuario.nome}

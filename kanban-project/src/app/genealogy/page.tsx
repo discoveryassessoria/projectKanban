@@ -17,7 +17,7 @@ import {
   ChevronDown,
   ChevronUp
 } from "lucide-react"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { gravarLocal, useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
 import { useApi } from "@/src/lib/dados"
@@ -319,7 +319,7 @@ export default function GenealogyPage() {
         }}
       />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Pesquisa Genealógica"
         subtitle="Encontre pessoas e documentos em todas as árvores"
         userName={usuario.nome}

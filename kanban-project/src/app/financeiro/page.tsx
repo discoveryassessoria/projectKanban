@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Loader2, FileText } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -160,7 +160,7 @@ export default function FinanceiroPage() {
         }}
       />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Financeiro Geral"
         subtitle="Visão financeira corporativa do escritório"
         userName={user.nome}

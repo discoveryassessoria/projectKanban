@@ -627,7 +627,7 @@ function ConteudoModal({
               variant="ghost"
               size="icon"
               onClick={handleClose}
-              aria-label="Fechar processo"
+              aria-label="Fechar painel do processo"
               className="text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
             >
               <X className="h-5 w-5" />

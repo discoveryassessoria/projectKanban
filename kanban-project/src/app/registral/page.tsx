@@ -11,9 +11,9 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -32,7 +32,18 @@ const SEM_PROCESSOS: ProcessoWithStatus[] = []
 const SEM_ARVORES: ItemNomeado[] = []
 
 export default function RegistralPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegistralPageConteudo />
+    </Suspense>
+  )
+}
+
+/** `useSearchParams` (contexto de `?processoId=`) exige um limite de Suspense
+ *  no build estático do App Router — a página em si continua igual. */
+function RegistralPageConteudo() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { pode, carregando } = usePermissoes()
   const mounted = useIsClient()
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
@@ -47,10 +58,15 @@ export default function RegistralPage() {
   const processos = processosReq.dados?.processos ?? SEM_PROCESSOS
   const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : SEM_ARVORES
 
-  // O primeiro processo da lista é o padrão — a tela sem processo não mostra nada
-  // útil. Isso é DERIVAÇÃO: como estado escrito por efeito, a tela aparecia vazia
-  // por um render antes de escolher sozinha.
-  const processoId = processoEscolhido ?? (processos.length ? Number(processos[0].id) : null)
+  // NUNCA escolhe o primeiro processo da lista sozinha (mandato "modernização
+  // visual", 19/09/2026) — abrir a tela direto num processo arbitrário (que
+  // podia ser um processo de teste) sem o usuário ter pedido é pior do que
+  // mostrar "Selecione o processo". Só herda contexto de quem chegou com
+  // `?processoId=` na URL (navegação vinda de um processo específico); sem
+  // isso, fica null até o usuário escolher — `CentralRegistral` já sabe
+  // mostrar o estado "Selecione o processo" para `processoId == null`.
+  const processoIdDaUrl = searchParams.get("processoId")
+  const processoId = processoEscolhido ?? (processoIdDaUrl ? Number(processoIdDaUrl) : null)
 
   // Ver evidência é o piso: quem não tem isso não entra na tela.
   const autorizado = pode("registral.ver_evidencias") || pode("registral.revisar")
@@ -101,7 +117,7 @@ export default function RegistralPage() {
         }}
       />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Revisão Registral"
         subtitle="Certidões, evidências e decisões da árvore"
         userName={user.nome}

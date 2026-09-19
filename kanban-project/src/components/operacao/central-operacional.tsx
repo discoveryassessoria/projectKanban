@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { gravarLocal, useJsonLocalStorage } from "@/src/lib/cliente"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, rotularFase,
   SeletorResponsavel, type LinhaDeFila,
@@ -129,9 +130,16 @@ function queryDe(f: FiltrosCentral, pagina: number): string {
   return p.toString()
 }
 
+/** Primeira + ÚLTIMA palavra (não a segunda) — um nome entre colchetes como
+ *  "[TESTE VISUAL] [TESTE F]" não vira "[V": a segunda palavra de um nome
+ *  raramente é quem identifica a pessoa/família, a última costuma ser
+ *  (sobrenome). Mesmo critério de `visao-global.tsx`/`central-tarefas.tsx`. */
 function iniciais(nome: string): string {
-  const partes = nome.trim().split(/\s+/)
-  return ((partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "")).toUpperCase() || "?"
+  const partes = nome.trim().split(/\s+/).filter((p) => /[a-zA-ZÀ-ÿ0-9]/.test(p))
+  if (partes.length === 0) return "?"
+  const primeira = partes[0]?.match(/[a-zA-ZÀ-ÿ0-9]/)?.[0] ?? ""
+  const ultima = partes.length > 1 ? partes[partes.length - 1]?.match(/[a-zA-ZÀ-ÿ0-9]/)?.[0] ?? "" : ""
+  return (primeira + ultima).toUpperCase() || "?"
 }
 
 const PONTO_TOM: Record<string, string> = {
@@ -142,6 +150,12 @@ const PONTO_TOM: Record<string, string> = {
 export function CentralOperacional() {
   const router = useRouter()
   const paramsIniciais = useSearchParams()
+  // MESMA permissão que a porta canônica exige no backend (`tarefas.editar`,
+  // /api/tarefas/redistribuir e /api/tarefas/repriorizar) — esconder o botão
+  // sem repetir a checagem aqui seria confiar só na UI; a rota já barra quem
+  // não tem a permissão, isto só evita mostrar um controle que vai falhar.
+  const { pode } = usePermissoes()
+  const podeRedistribuirOuRepriorizar = pode("tarefas.editar")
   // DEEP-LINK — a Home ("Trabalho para distribuir", famílias) linka pra cá já
   // com o recorte pronto. Lido só uma vez, no mount: depois disso quem manda
   // é o estado local, como em qualquer filtro desta tela.
@@ -594,7 +608,12 @@ export function CentralOperacional() {
                     <span className="min-w-0">
                       <span className="block truncate text-[12px] font-medium text-white/90">{f.nomeFamilia}</span>
                       <span className="block text-[10px] text-[var(--text-muted)]">
-                        {umSoProcesso ? f.processos[0].nomeProcesso : `${f.processos.length} processos`}
+                        {/* Família com 1 só processo homônimo (nome do processo ==
+                            nome da família): repetir seria título e subtítulo
+                            idênticos, sem informação nova. */}
+                        {umSoProcesso
+                          ? (f.processos[0].nomeProcesso !== f.nomeFamilia ? f.processos[0].nomeProcesso : null)
+                          : `${f.processos.length} processos`}
                         {f.pendenciasFaseAnterior > 0 && (
                           <span className="text-amber-800/90"> · {f.pendenciasFaseAnterior} pendência(s) de fase anterior</span>
                         )}
@@ -625,20 +644,22 @@ export function CentralOperacional() {
                     </span>
                     <span className="hidden text-[var(--text-muted)] md:inline">{dataCurta(f.ultimaAtividade)}</span>
                   </div>
-                  <div className="relative shrink-0">
-                    <button
-                      onClick={() => setLoteAlvo({ familia: f, acao: "atribuir" })}
-                      className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
-                    >
-                      Atribuir
-                    </button>
-                    <button
-                      onClick={() => setLoteAlvo({ familia: f, acao: "repriorizar" })}
-                      className="ml-1 rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
-                    >
-                      Repriorizar
-                    </button>
-                  </div>
+                  {podeRedistribuirOuRepriorizar && (
+                    <div className="relative shrink-0">
+                      <button
+                        onClick={() => setLoteAlvo({ familia: f, acao: "atribuir" })}
+                        className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
+                      >
+                        Atribuir
+                      </button>
+                      <button
+                        onClick={() => setLoteAlvo({ familia: f, acao: "repriorizar" })}
+                        className="ml-1 rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
+                      >
+                        Repriorizar
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {aberta && f.processos.map((p) => (

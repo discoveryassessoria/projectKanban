@@ -58,6 +58,9 @@ interface Estatisticas {
   protocolo: {
     apto: boolean
     impeditivos: number
+    /** Segundo critério de `apto` (Análise Documental concluída) — sem isto a
+     *  tela não sabe explicar "Não apto" quando `impeditivos === 0`. */
+    analiseConcluida?: boolean
   }
   alertas: Array<{ sev: AlertaSev; label: string }>
 }
@@ -195,7 +198,14 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
             {protocolo.apto ? 'Apto' : 'Não apto'}
           </div>
           <div className={subCls}>
-            {protocolo.impeditivos} impeditivo(s)
+            {/* "Não apto" com 0 impeditivo(s) sozinho parecia contradição —
+                o outro critério (Análise Documental concluída) é o que falta;
+                dizer isso em vez de deixar a usuária adivinhar. */}
+            {protocolo.impeditivos > 0
+              ? `${protocolo.impeditivos} impeditivo(s)`
+              : protocolo.analiseConcluida === false
+                ? 'Aguardando conclusão da Análise Documental'
+                : '0 impeditivo(s)'}
           </div>
         </div>
 
@@ -246,9 +256,8 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
         <Button
           variant="outline"
           size="sm"
-          disabled
-          title="Aba ainda não implementada"
           className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]"
+          onClick={() => onNavigate?.('central')}
         >
           → Central Operacional
         </Button>

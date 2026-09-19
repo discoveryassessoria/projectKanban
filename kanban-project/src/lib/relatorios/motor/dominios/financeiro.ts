@@ -35,7 +35,7 @@ const INCLUDE = { fornecedor: { select: { id: true, nome: true } } } as const
 export const DOMINIO_FINANCEIRO: DominioDef = {
   key: "financeiro",
   rotulo: "Financeiro",
-  descricao: "Custos e receitas por processo, família, serviço e período — leitura do motor V3.",
+  descricao: "Custos e receitas por processo, família, serviço e período — dados financeiros consolidados.",
   grain: "1 linha = 1 obrigação econômica (agregável por processo, família ou período)",
   permissao: "financeiro.ver",
   ordem: 11,

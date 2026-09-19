@@ -20,7 +20,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 
@@ -70,7 +70,7 @@ export function HomeShell({
         </>
       )}
 
-      <HeaderBar
+      <HeaderBarApp
         title={titulo}
         subtitle={subtitulo}
         userName={user?.nome || "Usuário"}

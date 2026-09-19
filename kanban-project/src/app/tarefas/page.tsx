@@ -18,7 +18,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -65,7 +65,7 @@ export default function TarefasEProjetosPage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: FUNDO }} />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Tarefas e Projetos"
         subtitle="Toda a operação: o que existe, com quem está e o que já estourou"
         userName={user.nome}

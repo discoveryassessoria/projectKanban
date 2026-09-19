@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react"
 import { AlertTriangle, Loader2, CheckCircle2 } from "lucide-react"
 import { authToken } from "@/src/lib/financeiro/http"
+import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 
 interface Pendencia {
   id: number; processoId: number; processoNome: string | null; phaseKey: string
@@ -41,7 +42,7 @@ export default function PendenciasFinanceirasPanel({ processoId, compact = false
                 <span className="text-[11px] font-semibold text-amber-800">{p.motivo}{p.natureza ? ` · ${p.natureza}` : ""}</span>
                 <span className="text-[10px] text-[var(--text-muted)]">{new Date(p.criadoEm).toLocaleDateString("pt-BR")}</span>
               </div>
-              <div className="text-[11px] text-white/70 mt-0.5">{p.processoNome ?? `Processo ${p.processoId}`} · {p.phaseKey}</div>
+              <div className="text-[11px] text-white/70 mt-0.5">{p.processoNome ?? `Processo ${p.processoId}`} · {labelDaFasePorPhaseKey(p.phaseKey) ?? p.phaseKey}</div>
               <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{p.detalhe}</div>
               <div className="text-[10px] text-[var(--text-secondary)] mt-1">→ {p.acaoSugerida}</div>
             </li>

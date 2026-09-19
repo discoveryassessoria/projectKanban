@@ -31,7 +31,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -151,7 +151,7 @@ function Conteudo() {
 
   return (
     <>
-      <HeaderBar
+      <HeaderBarApp
         title="Relatórios"
         subtitle={atual ? atual.descricao : "Escolha a nacionalidade e o domínio"}
         userName={user.nome}

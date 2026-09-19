@@ -22,7 +22,7 @@ const INCLUDE = {
 export const DOMINIO_SERVICOS: DominioDef = {
   key: "servicos",
   rotulo: "Serviços e Preços",
-  descricao: "O que a operação usa e quanto custa: item, modalidade, vigência, fornecedor e overrides.",
+  descricao: "O que a operação usa e quanto custa: item, modalidade, fornecedor e valores personalizados por processo.",
   grain: "1 linha = 1 preço cadastrado (override de processo aparece como linha própria)",
   permissao: "financeiro.ver",
   ordem: 13,
@@ -109,7 +109,7 @@ export const DOMINIO_SERVICOS: DominioDef = {
   visoesDoSistema: [
     { key: "vigentes", nome: "Vigentes (não arquivados)",
       spec: { filtros: [{ key: "arquivado", valor: { tipo: "booleano", valor: false } }] } },
-    { key: "overrides", nome: "Overrides de processo",
+    { key: "overrides", nome: "Valores personalizados por processo",
       spec: { filtros: [{ key: "override", valor: { tipo: "booleano", valor: true } }] } },
     { key: "sem-item", nome: "Sem item canônico — cadastro incompleto",
       spec: { filtros: [{ key: "sem_item", valor: { tipo: "booleano", valor: true } }] } },

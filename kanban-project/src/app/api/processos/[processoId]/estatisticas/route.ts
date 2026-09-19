@@ -158,7 +158,11 @@ export async function GET(
     // Documental estar de fato concluída. Fixo em `false` dizia "Não apto"
     // mesmo com 0 impeditivo(s) — contradição visível no card. Sem regra
     // formal completa no schema ainda, mas isto já é um critério real.
-    const protocolo = { apto: impeditivos === 0 && analiseConcluida, impeditivos }
+    // `analiseConcluida` sai no payload para a tela poder dizer POR QUE não
+    // está apto quando `impeditivos === 0` — sem isto "Não apto" ao lado de
+    // "0 impeditivo(s)" parece contradição; com isto, sabe-se que falta
+    // concluir a Análise Documental (mandato "modernização visual", 19/09/2026).
+    const protocolo = { apto: impeditivos === 0 && analiseConcluida, impeditivos, analiseConcluida }
 
     // 6) Alertas executivos — derivados dos contadores acima
     const alertas: Array<{ sev: AlertaSev; label: string }> = []

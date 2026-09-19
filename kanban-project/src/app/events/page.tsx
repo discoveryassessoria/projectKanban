@@ -7,7 +7,7 @@ import { X, Check } from "lucide-react"
 import { Edit2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +38,8 @@ import { Search, ChevronDown } from "lucide-react"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
 import { useApi } from "@/src/lib/dados"
+import { pluralizar } from "@/src/lib/ui/pluralizar"
+import { NAO_INFORMADO } from "@/src/lib/ui/valor-vazio"
 
 interface Usuario {
   id: number
@@ -373,7 +375,7 @@ const handleSubmit = async () => {
         }}
       />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Eventos"
         subtitle="Gerencie seus eventos e compromissos"
         userName={usuario.nome}
@@ -418,9 +420,9 @@ const handleSubmit = async () => {
 
           {/* Cards de resumo (fiel ao oficial) — valor branco, ícone preenchido à direita */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KpiCard iconRight iconVariant="filled" iconTone="success" icon={<Calendar className="h-5 w-5" />} label="Eventos Hoje" value={eventosHoje.length} sub={`${eventosHoje.length} eventos agendados`} />
-            <KpiCard iconRight iconVariant="filled" iconTone="info" icon={<CalendarDays className="h-5 w-5" />} label="Esta Semana" value={eventosSemana.length} sub={`${eventosSemana.length} eventos agendados`} />
-            <KpiCard iconRight iconVariant="filled" iconTone="warning" icon={<CalendarClock className="h-5 w-5" />} label="Este Mês" value={eventosMes.length} sub={`${eventosMes.length} eventos no total`} />
+            <KpiCard iconRight iconVariant="filled" iconTone="success" icon={<Calendar className="h-5 w-5" />} label="Eventos Hoje" value={eventosHoje.length} sub={pluralizar(eventosHoje.length, "evento agendado", "eventos agendados")} />
+            <KpiCard iconRight iconVariant="filled" iconTone="info" icon={<CalendarDays className="h-5 w-5" />} label="Esta Semana" value={eventosSemana.length} sub={pluralizar(eventosSemana.length, "evento agendado", "eventos agendados")} />
+            <KpiCard iconRight iconVariant="filled" iconTone="warning" icon={<CalendarClock className="h-5 w-5" />} label="Este Mês" value={eventosMes.length} sub={pluralizar(eventosMes.length, "evento no total", "eventos no total")} />
           </section>
 
 {/* Formulário de Novo Evento */}
@@ -664,7 +666,7 @@ const handleSubmit = async () => {
                                 <td className="py-2.5 px-2">
                                   <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium" style={{ background: `color-mix(in srgb, ${tc.cor} 14%, transparent)`, borderColor: `color-mix(in srgb, ${tc.cor} 35%, transparent)`, color: tc.cor }}>{tc.label}</span>
                                 </td>
-                                <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.local || "-"}</td>
+                                <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.local || NAO_INFORMADO}</td>
                                 <td className="py-2.5 px-2 text-center"><StatusBadge tone={stb.tone}>{stb.label}</StatusBadge></td>
                                 <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{evento.responsavel?.nome ?? "—"}</td>
                                 <td className="py-2.5 px-2 text-right" onClick={(e) => e.stopPropagation()}><ActionMenu onClick={() => { if (pode('eventos.editar')) handleEdit(evento) }} /></td>

@@ -8,7 +8,7 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -49,7 +49,7 @@ export default function CentralOperacionalPage() {
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: FUNDO }} />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Central Operacional"
         subtitle="O que a empresa precisa fazer agora — agrupado por família"
         userName={user.nome}

@@ -15,6 +15,7 @@ import { Wallet, TrendingUp, AlertTriangle, Clock, Landmark, Coins, ArrowRight, 
 import { PageHeader, KpiCard, SectionCard, Thead, Th, Tr, StatusBadge, EmptyState, PrimaryButton, SecondaryButton, LinkAction, FilterChip } from "@/src/components/financeiroComponents/ui/kit"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
+import { pluralizar } from "@/src/lib/ui/pluralizar"
 
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const diasAte = (s?: string | null) => (s ? Math.ceil((new Date(s).getTime() - Date.now()) / 86400000) : null)
@@ -93,7 +94,7 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
       <PageHeader
         icon={<Wallet className="h-5 w-5" />}
         title="Central Financeira"
-        subtitle="Visão geral, priorização e acesso rápido — leitura consolidada do motor financeiro."
+        subtitle="Visão geral, priorização e acesso rápido — dados financeiros consolidados."
         actions={
           <div className="flex items-center gap-2">
             <SecondaryButton icon={<Receipt className="h-4 w-4" />} onClick={() => ir("cobrancas")}>Cobranças</SecondaryButton>
@@ -106,8 +107,8 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KpiCard icon={<TrendingUp className="h-4 w-4" />} label="Total a receber" value={loading ? "…" : brl(totalReceber)} sub={`${emAberto.length} em aberto`} />
         <KpiCard icon={<Wallet className="h-4 w-4" />} label="Total recebido" value={loading ? "…" : brl(totalRecebido)} iconTone="success" />
-        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Total vencido" value={loading ? "…" : brl(totalVencido)} sub={`${vencidas.length} cobrança(s)`} iconTone="danger" />
-        <KpiCard icon={<Clock className="h-4 w-4" />} label={`A vencer (${horizonte}d)`} value={loading ? "…" : brl(totalPrevisto)} sub={`${vencendo.length} cobrança(s)`} iconTone="warning" />
+        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Total vencido" value={loading ? "…" : brl(totalVencido)} sub={pluralizar(vencidas.length, "cobrança")} iconTone="danger" />
+        <KpiCard icon={<Clock className="h-4 w-4" />} label={`A vencer (${horizonte}d)`} value={loading ? "…" : brl(totalPrevisto)} sub={pluralizar(vencendo.length, "cobrança")} iconTone="warning" />
         <KpiCard icon={<Coins className="h-4 w-4" />} label="Créditos disponíveis" value={creditoDisp == null ? "—" : brl(creditoDisp)} iconTone="info" />
         <KpiCard icon={<Landmark className="h-4 w-4" />} label="Saldo em contas" value="—" sub="ver Tesouraria" footer={<LinkAction onClick={() => ir("tesouraria")}>Abrir Tesouraria</LinkAction>} />
       </div>
@@ -136,9 +137,9 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
         {/* Divergências (conferência do razão) */}
         <SectionCard icon={<RefreshCw className="h-4 w-4" />} title="Divergências do razão" right={divergencias.length > 0 ? <StatusBadge tone="danger">{divergencias.length}</StatusBadge> : <StatusBadge tone="success">0</StatusBadge>}>
           {loading ? <EmptyState compact icon={<Clock className="h-5 w-5" />} title="Carregando…" /> : divergencias.length === 0 ? (
-            <EmptyState compact icon={<RefreshCw className="h-5 w-5" />} title="Razão consistente." subtitle="Projeção e replay batem em todas as obrigações." />
+            <EmptyState compact icon={<RefreshCw className="h-5 w-5" />} title="Razão consistente." subtitle="Os valores previstos e os valores registrados batem em todas as obrigações." />
           ) : (
-            <div className="overflow-x-auto"><table className="w-full"><Thead><Th>Obrigação</Th><Th align="right">Projeção</Th><Th align="right">Replay</Th><Th align="right">Δ</Th></Thead><tbody>{divergencias.slice(0, 8).map((d: any) => (
+            <div className="overflow-x-auto"><table className="w-full"><Thead><Th>Obrigação</Th><Th align="right">Previsto</Th><Th align="right">Registrado</Th><Th align="right">Diferença</Th></Thead><tbody>{divergencias.slice(0, 8).map((d: any) => (
               <Tr key={d.obrigacaoId}>
                 <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-primary)" }}>{d.codigoOperacional ?? `OBR-${d.obrigacaoId}`}</td>
                 <td className="py-2.5 px-2 text-sm text-right tabular-nums" style={{ color: "var(--text-secondary)" }}>{brl(Number(d.saldoProjecao ?? 0))}</td>
@@ -159,7 +160,7 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
             <SecondaryButton icon={<FileText className="h-4 w-4" />} onClick={() => ir("fluxo")} className="justify-start">Fluxo de caixa</SecondaryButton>
             <SecondaryButton icon={<TrendingUp className="h-4 w-4" />} onClick={() => ir("dre")} className="justify-start">DRE</SecondaryButton>
           </div>
-          <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>Registrar pagamento e estornar são feitos no fluxo canônico, dentro do Financeiro do processo → Receita. Esta Central é somente leitura e navegação.</p>
+          <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>Registrar pagamento e estornar são feitos dentro do Financeiro do processo → Receita. Esta Central é somente leitura e navegação — os botões abaixo levam até lá, não registram nada por conta própria.</p>
         </SectionCard>
       </div>
     </div>

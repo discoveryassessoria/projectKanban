@@ -4,7 +4,7 @@
 "use client"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/ProcessoFinanceiroShell"
 
 function Inner() {
@@ -12,7 +12,7 @@ function Inner() {
   const processoId = Number(sp.get("processoId") || 0)
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <HeaderBar title="Financeiro do Processo · V3" subtitle="Motor Financeiro · Ledger" />
+      <HeaderBarApp title="Financeiro do Processo · V3" subtitle="Motor Financeiro · Ledger" />
       <div className="mx-auto max-w-5xl px-6 py-8">
         {processoId ? <ProcessoFinanceiroShell processoId={processoId} /> : <div className="text-sm text-[var(--text-muted)]">Informe ?processoId=&lt;id&gt; na URL.</div>}
       </div>

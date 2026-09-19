@@ -16,6 +16,8 @@ import useSWR from "swr"
 import Link from "next/link"
 import { ArrowRight, ChevronRight } from "lucide-react"
 import { BlocoCard, BlocoHeader, EmptyState } from "@/src/components/home/home-primitives"
+import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
+import { pluralizar } from "@/src/lib/ui/pluralizar"
 
 interface LinhaProcesso {
   id: number
@@ -40,9 +42,11 @@ const PRIORIDADE = {
 const iniciais = (v: string) =>
   v.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("")
 
-/** phaseKey → rótulo legível, sem inventar tradução: troca _ por espaço. */
+/** phaseKey → rótulo legível. Catálogo canônico primeiro (mesma fonte do
+ *  Kanban/Gerenciamento — nunca uma segunda tradução ad hoc); troca `_` por
+ *  espaço só como rede de segurança para uma chave que o catálogo não conhece. */
 const rotuloFase = (k: string | null) =>
-  k ? k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()) : "—"
+  k ? (labelDaFasePorPhaseKey(k) ?? k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())) : "—"
 
 const buscar = (url: string) => {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -94,7 +98,47 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
           <EmptyState icon={ChevronRight}>Nenhum processo em andamento.</EmptyState>
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div>
+          {/* ABAIXO DE md: cards empilhados — a tabela de 6 colunas não cabe
+              numa tela estreita sem cortar dado ou forçar rolagem lateral. */}
+          <div className="space-y-2 px-5 pb-5 md:hidden">
+            {linhas.map((p) => {
+              const prio = p.prioridade ? PRIORIDADE[p.prioridade] : null
+              return (
+                <Link
+                  key={p.id}
+                  href={`/processos/${p.id}`}
+                  className="block rounded-lg border border-[var(--border-subtle)] p-3 transition-colors hover:bg-[var(--surface-secondary)]/40"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--info-tile)] text-[10px] font-semibold text-[var(--info)]">
+                      {iniciais(p.nome)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">{p.nome}</span>
+                      <span className="block truncate text-[11px] text-[var(--text-muted)]">{rotuloFase(p.faseAtualKey)}</span>
+                    </span>
+                    {prio && (
+                      <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: prio.cor }} aria-hidden />
+                    )}
+                  </div>
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <span className="w-8 shrink-0 text-[12px] font-semibold tabular-nums text-[var(--text-primary)]">{p.progresso}%</span>
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+                      <div className="h-full rounded-full bg-[var(--action-primary)]" style={{ width: `${p.progresso}%` }} />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-[var(--text-secondary)]">
+                    <span>{p.responsavel ? p.responsavel.nome : <span className="text-[var(--text-muted)]">Sem responsável</span>}</span>
+                    <span className="text-[var(--text-muted)]">{pluralizar(p.pendencias, "ação", "ações")}</span>
+                    {prio && <span>{prio.rotulo}</span>}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] border-collapse text-left">
             <thead>
               <tr className="border-b border-[var(--border-subtle)]">
@@ -134,8 +178,8 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
                       {p.responsavel ? p.responsavel.nome : <span className="text-[var(--text-muted)]">Sem responsável</span>}
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{p.pendencias}</span>
-                      <span className="ml-1 text-[11px] text-[var(--text-muted)]">{p.pendencias === 1 ? "ação" : "ações"}</span>
+                      <span className="text-[13px] font-semibold tabular-nums text-[var(--text-primary)]">{p.pendencias}</span>{" "}
+                      <span className="text-[11px] text-[var(--text-muted)]">{p.pendencias === 1 ? "ação" : "ações"}</span>
                     </td>
                     <td className="px-4 py-3.5">
                       {prio ? (
@@ -152,6 +196,7 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
               })}
             </tbody>
           </table>
+          </div>
           {data && data.total > linhas.length && (
             <div className="flex items-center justify-between px-5 py-3 text-[12px] text-[var(--text-muted)]">
               <span>Mostrando {linhas.length} de {data.total} processos</span>

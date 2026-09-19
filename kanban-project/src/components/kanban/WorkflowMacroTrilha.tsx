@@ -200,7 +200,14 @@ export function WorkflowMacroTrilha({
             : st === "atual" ? "Atual"
             : st === "pulada" ? "Pulada"
             : st === "condicional" ? "Condicional"
-            : st === "bloqueada" ? "Bloqueada"
+            // "Bloqueada" soava como um impedimento ativo (a mesma leitura
+            // errada que já saiu de outras telas) — o que este status
+            // realmente representa é uma fase anterior à atual sem marca
+            // explícita de conclusão registrada. Sem inventar "concluída"
+            // (não é o que o dado diz): só um rótulo que não contradiz o
+            // progresso que aparece ao lado (mandato "modernização visual",
+            // 19/09/2026).
+            : st === "bloqueada" ? "Não confirmada"
             : "Futura"
           const badgeFinalCls = badgeCls
 
@@ -290,6 +297,7 @@ export function WorkflowMacroTrilha({
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-popover)]" />Futura</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-secondary)] text-[var(--text-secondary)] grid place-items-center text-[8px]">?</span>Condicional</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-tertiary)] text-[var(--text-muted)] grid place-items-center text-[8px]">⤳</span>Pulada</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--accent-primary)]/15 text-[var(--accent-text)] grid place-items-center text-[8px]">!</span>Não confirmada (anterior à atual, sem conclusão registrada)</span>
       </div>
     </div>
   )

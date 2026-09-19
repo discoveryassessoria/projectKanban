@@ -23,7 +23,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { HeaderBar } from "@/src/components/header-bar"
+import { HeaderBarApp } from "@/src/components/header-bar-app"
 import {
   Search, Loader2, Settings2, ChevronRight, Home,
   Menu, X, PanelLeftClose, PanelLeftOpen,
@@ -595,7 +595,7 @@ export default function GerenciamentoPage() {
         }}
       />
 
-      <HeaderBar
+      <HeaderBarApp
         title="Gerenciamento Geral"
         subtitle="Cadastros, regras, valores, automações, permissões e configurações"
         userName={user.nome} userRole={user.tipo || "Usuário"} userEmail={user.email || ""}
