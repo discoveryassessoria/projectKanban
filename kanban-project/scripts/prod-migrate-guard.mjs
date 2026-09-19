@@ -157,24 +157,21 @@ try {
     console.log(`[migrate-guard] AVISO: não consegui montar o plano (${String(e?.message ?? e).slice(0, 150)}). Seguindo — o Prisma loga cada migration aplicada.`)
   }
 
-  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (mandato Emissão Documental, Bloco 2, 13/09/2026) --
+  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (mandato "correção definitiva do modelo temporal", 19-20/09/2026) --
   // `prisma/migrations/0000_baseline/migration.sql` foi regenerado por
-  // `npm run baseline:gerar` depois da tabela nova `RegraTemporalOrgao` (regra
-  // temporal por cartório/terceiro — diff conferido manualmente: SÓ
-  // CREATE TABLE + 2 índices + 1 FK, zero DROP/TRUNCATE/DELETE). Isso muda o
-  // sha256 do arquivo, e `migrate deploy` recusa aplicar quando o checksum
-  // registrado diverge do arquivo ("migration modificada depois de
-  // aplicada"). Sem acesso local ao banco real (Sensitive), a reconciliação
-  // roda aqui, no build, onde a conexão de produção existe de verdade — mesmo
-  // procedimento das 7 reconciliações anteriores (ver
-  // scripts/baseline-verificar.test.ts): backup da linha no log > diff já
-  // conferido como aditivo > UPDATE de UMA coluna, com o checksum ANTIGO no
-  // WHERE (nunca sobrescreve um checksum que não seja exatamente o esperado —
-  // qualquer outro valor aborta o build). A tabela em si nasce na migration
-  // real `20260913120000_regra_temporal_orgao`, aplicada normalmente por este
-  // mesmo `migrate deploy` logo abaixo.
-  const CHECKSUM_BASELINE_ANTERIOR = 'ff688975f397ec316fe5df485bb9cc022f3ad71a3f25bf5e66abdbc61e3ecee6'
-  const CHECKSUM_BASELINE_ATUAL = 'c17f5d6287d8bf538d521f8cf5a0ab7e4a8e03e7fb840dc0368a9234514db128'
+  // `npm run baseline:gerar` depois dos 6 campos novos do controle temporal
+  // por subtarefa (acompanhamento/regra temporal/gatilho) — diff conferido
+  // manualmente: só ADD COLUMN, zero DROP/TRUNCATE/DELETE. Desta vez a
+  // reconciliação já foi feita ANTES do deploy, fora do build
+  // (scripts/reconciliar-ledger-baseline.ts --execute, rodado localmente
+  // contra produção, com EU_CONFIRMO_ESCRITA_EM_PRODUCAO=1 — LogAuditoria
+  // `LEDGER_BASELINE_RECONCILIADO` guarda o valor anterior). Este bloco só
+  // precisa RECONHECER o estado já reconciliado (`CHECKSUM_BASELINE_ATUAL`)
+  // — o ramo "ainda está no anterior" continua aqui como rede de segurança
+  // caso o build rode antes de uma reconciliação manual futura ter
+  // acontecido, mesmo procedimento das reconciliações anteriores.
+  const CHECKSUM_BASELINE_ANTERIOR = 'e32e117adc967f3ac0bf503dca277278f5c3de2b2291149b2f5dd95403de6022'
+  const CHECKSUM_BASELINE_ATUAL = '396e601ba2333547fbefd7384a4bf56588d0f0df3659abd9c69dac64ba0c9fc8'
   const linhaBaseline = (
     await prisma.$queryRawUnsafe(
       `SELECT migration_name, checksum, finished_at, applied_steps_count FROM _prisma_migrations WHERE migration_name = '0000_baseline'`,
