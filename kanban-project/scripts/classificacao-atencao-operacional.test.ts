@@ -73,8 +73,20 @@ async function partA() {
   )
 
   secao("Teste D (revisitado) — atraso interno pelo relógio DO PASSO, não só o macro")
-  const d2: LinhaComAtencao = { ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasoInterno: false, prazoPasso: { atrasado: true, venceHoje: false } }
+  const d2: LinhaComAtencao = { ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasoInterno: false, prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: false } }
   ok("subtarefa corrente com SLA próprio vencido também é Atrasadas, mesmo com o prazo macro em dia", classificarAtencaoOperacional(d2) === "atrasoInterno")
+
+  secao("Teste D2 (achado real 19/09/2026) — subtarefa AGUARDANDO_EXTERNO com relógio 'vencido' NUNCA é atraso interno")
+  const d3: LinhaComAtencao = {
+    ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, atrasoInterno: false,
+    prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: true },
+  }
+  const rD3 = calcularAtencaoOperacional(d3)
+  ok(
+    "o relógio do passo 'vencido' enquanto aguarda terceiro NÃO vira atrasoInterno (é cadência de acompanhamento, não prazo)",
+    rD3.categoriaPrincipal === "aguardandoTerceiros", rD3.categoriaPrincipal,
+  )
+  ok("e também não gera o motivo PRAZO_PASSO_VENCIDO", !rD3.motivos.includes("PRAZO_PASSO_VENCIDO"), JSON.stringify(rD3.motivos))
 
   secao("Teste F — prazo macro vencido, passo ainda normal: UMA tarefa, motivo adicional, categoria coerente")
   const f: LinhaComAtencao = { ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, atrasada: true, atrasoInterno: false }
@@ -85,7 +97,7 @@ async function partA() {
   secao("Teste G — prazo macro E prazo do passo vencem no MESMO dia: uma tarefa, uma atenção, dois motivos, zero duplicidade")
   const g: LinhaComAtencao = {
     ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasada: true, atrasoInterno: true,
-    prazoPasso: { atrasado: true, venceHoje: false },
+    prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: false },
   }
   const rG = calcularAtencaoOperacional(g)
   ok("Teste G) UMA categoria principal (atrasoInterno)", rG.categoriaPrincipal === "atrasoInterno")
@@ -95,7 +107,7 @@ async function partA() {
   const h: LinhaComAtencao = {
     ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false,
     atrasada: true, acompanhamentoVencido: true,
-    prazoPasso: { atrasado: true, venceHoje: false },
+    prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: false },
   }
   const rH = calcularAtencaoOperacional(h)
   // Atraso interno (macro OU do passo) vence acompanhamento na precedência —

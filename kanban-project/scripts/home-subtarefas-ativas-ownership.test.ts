@@ -11,10 +11,18 @@
 // `Tarefa.responsavelId`, via `PhaseWorkflowStepInstance.tarefas`) — a MESMA
 // fonte que `escopoTarefa`/Minha Operação já usavam.
 //
-// Este teste prova: Daniela tem 3 tarefas, cada uma com uma subtarefa ativa
-// com prazo — "Subtarefas ativas" tem que contar as 3, no balde certo — e
-// "Tarefas" continua contando pelo `Task.dataPrazo` macro, sem os dois
-// relógios se fundirem.
+// Este teste prova: Daniela tem 3 tarefas com subtarefa corrente de AÇÃO
+// INTERNA (DISPONIVEL) com prazo — "Subtarefas ativas" tem que contar as 3,
+// no balde certo — e "Tarefas" continua contando pelo `Task.dataPrazo`
+// macro, sem os dois relógios se fundirem.
+//
+// Achado real (19/09/2026 — mandato "correção definitiva do modelo
+// temporal"): 3 OUTRAS tarefas, com subtarefa corrente AGUARDANDO_EXTERNO
+// (mesmo com um `prazo` fisicamente gravado, herdado do SLA da subtarefa),
+// NÃO podem contar em NENHUM balde de prazo — esse relógio, enquanto espera
+// terceiro, é cadência de acompanhamento, não prazo exigível. Antes desta
+// correção elas apareciam em "próximos 3 dias"/"atrasadas" da Home,
+// confundindo espera legítima de terceiro com vencimento.
 //
 //   node scripts/mrg-banco-teste.mjs up
 //   PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/home-subtarefas-ativas-ownership.test.ts
@@ -61,6 +69,8 @@ async function main() {
   const prazoPasso = new Date()
   prazoPasso.setDate(prazoPasso.getDate() + 1) // "vence amanhã" — dentro de "próximos 3 dias" de Subtarefa
 
+  // 3 tarefas com subtarefa corrente de AÇÃO INTERNA (DISPONIVEL) — devem
+  // contar em "Subtarefas ativas" normalmente.
   for (let i = 0; i < 3; i++) {
     const inst = await prisma.phaseWorkflowInstance.create({
       data: { processoId: proc.id, faseMacroKey: "emissao_documental", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i${i}` },
@@ -77,13 +87,43 @@ async function main() {
     await prisma.tarefa.create({
       data: {
         titulo: `${MARCA} certidão ${i}`, processoId: proc.id, workflowStepInstanceId: si.id, workflowInstanceId: inst.id,
-        chaveIdempotencia: `${MARCA}-t${i}`, statusTarefa: "AGUARDANDO_TERCEIRO", responsavelId: daniela.id, dataPrazo: prazoMacro,
+        chaveIdempotencia: `${MARCA}-t${i}`, statusTarefa: "NAO_INICIADA", responsavelId: daniela.id, dataPrazo: prazoMacro,
+      },
+    })
+    await prisma.subtaskExecution.create({
+      data: {
+        stepInstanceId: si.id, subtaskKey: "enviar_requerimento", sequencia: 1, status: "DISPONIVEL",
+        motivo: "ABERTURA", prazo: prazoPasso, chaveIdempotencia: `${MARCA}-sub${i}`,
+      },
+    })
+  }
+
+  // 3 tarefas com subtarefa corrente AGUARDANDO_EXTERNO — mesmo com `prazo`
+  // fisicamente gravado (herdado do SLA da subtarefa), NÃO podem contar em
+  // nenhum balde de prazo da Home (achado real, 19/09/2026).
+  for (let i = 0; i < 3; i++) {
+    const inst = await prisma.phaseWorkflowInstance.create({
+      data: { processoId: proc.id, faseMacroKey: "emissao_documental", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-wi${i}` },
+      select: { id: true },
+    })
+    const si = await prisma.phaseWorkflowStepInstance.create({
+      data: {
+        workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: "emissao_documental", ciclo: 1,
+        stepKey: "solicitar_certidao", ordem: 1, tipo: "HUMANO", obrigatorio: true, geraTarefa: true,
+        status: "AGUARDANDO", dependeDeStepKeys: [] as never, chaveIdempotencia: `${MARCA}-wp${i}`,
+      },
+      select: { id: true },
+    })
+    await prisma.tarefa.create({
+      data: {
+        titulo: `${MARCA} certidão aguardando ${i}`, processoId: proc.id, workflowStepInstanceId: si.id, workflowInstanceId: inst.id,
+        chaveIdempotencia: `${MARCA}-wt${i}`, statusTarefa: "AGUARDANDO_TERCEIRO", responsavelId: daniela.id, dataPrazo: prazoMacro,
       },
     })
     await prisma.subtaskExecution.create({
       data: {
         stepInstanceId: si.id, subtaskKey: "aguardar_retorno", sequencia: 1, status: "AGUARDANDO_EXTERNO",
-        motivo: "ABERTURA", prazo: prazoPasso, previstoPara: prazoPasso, chaveIdempotencia: `${MARCA}-sub${i}`,
+        motivo: "ABERTURA", prazo: prazoPasso, previstoPara: prazoPasso, chaveIdempotencia: `${MARCA}-wsub${i}`,
       },
     })
   }
@@ -94,19 +134,24 @@ async function main() {
   }
   const base = await carregarBase(ctx)
 
-  ok("as 3 subtarefas ativas chegaram em base.subtarefas (escopo por Tarefa, não pelo campo morto do passo)",
-    base.subtarefas.length === 3, String(base.subtarefas.length))
+  ok("as 6 subtarefas ativas chegaram em base.subtarefas (escopo por Tarefa, não pelo campo morto do passo)",
+    base.subtarefas.length === 6, String(base.subtarefas.length))
 
   const painelSubtarefas = montarPrazosDeSubtarefas(base, ctx)!
   const proximos3 = painelSubtarefas.find((f) => f.key === "subtarefa-proximos-3")
-  ok("Home/Subtarefas ativas: 'próximos 3 dias' conta as 3 (prazo do PASSO, amanhã)", proximos3?.quantidade === 3, String(proximos3?.quantidade))
+  ok("Home/Subtarefas ativas: 'próximos 3 dias' conta só as 3 de AÇÃO INTERNA (prazo do PASSO, amanhã)", proximos3?.quantidade === 3, String(proximos3?.quantidade))
+  const totalNosBaldes = painelSubtarefas.reduce((soma, f) => soma + f.quantidade, 0)
+  ok(
+    "as 3 AGUARDANDO_EXTERNO NÃO aparecem em NENHUM balde (achado real 19/09/2026 — relógio de espera não é prazo)",
+    totalNosBaldes === 3, `soma de todos os baldes = ${totalNosBaldes}, esperado 3`,
+  )
   const semPrazoSubOutros = painelSubtarefas.filter((f) => f.key !== "subtarefa-proximos-3").every((f) => f.quantidade === 0)
   ok("nenhum outro balde de subtarefa inflado", semPrazoSubOutros)
 
   const painelTarefas = montarPrazosDeTarefas(base, ctx)!
   const noPrazo = painelTarefas.find((f) => f.key === "tarefa-no-prazo")
-  ok("Home/Tarefas: 'no prazo' conta as 3 (prazo MACRO, 12 dias) — o relógio macro continua separado do do passo",
-    noPrazo?.quantidade === 3, String(noPrazo?.quantidade))
+  ok("Home/Tarefas: 'no prazo' conta as 6 (prazo MACRO, 12 dias — inclusive as que aguardam terceiro) — o relógio macro continua separado do do passo",
+    noPrazo?.quantidade === 6, String(noPrazo?.quantidade))
   ok("Home/Tarefas não conta em 'próximos 3 dias' (isso seria confundir o prazo do passo com o macro)",
     painelTarefas.find((f) => f.key === "tarefa-proximos-3")?.quantidade === 0)
 

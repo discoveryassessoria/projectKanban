@@ -647,7 +647,12 @@ function SubtarefaRow({
             onClick={() => onOpenCentral(s.key)}
             className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
           >
-            Iniciar →
+            {/* "Iniciar" contradiz o badge "Aguardando terceiro" — ela já
+                está ativa, esperando o terceiro. O clique continua abrindo o
+                MESMO editor (é assim que o retorno é registrado quando
+                chega); só o rótulo muda para não prometer um início que já
+                aconteceu (achado real, 19/09/2026). */}
+            {esperandoTerceiro ? "Registrar retorno →" : "Iniciar →"}
           </button>
         ) : s.disponivel ? (
           <span

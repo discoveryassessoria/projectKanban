@@ -103,6 +103,7 @@ export interface ExecucaoDeSubtarefa {
   protocoloId: number | null
   enviadoEm: Date | null
   previstoPara: Date | null
+  proximoAcompanhamentoEm: Date | null
   supersededAt: Date | null
   supersededPorId: number | null
   criadoEm: Date
@@ -155,6 +156,7 @@ export async function abrirExecucao(
     responsavelId?: number | null
     prazo?: Date | null
     previstoPara?: Date | null
+    proximoAcompanhamentoEm?: Date | null
     payload?: Prisma.InputJsonValue | null
     correlationId?: string | null
     chaveIdempotencia?: string
@@ -212,6 +214,7 @@ export async function abrirExecucao(
       responsavelId: args.responsavelId ?? null,
       prazo: args.prazo ?? null,
       previstoPara: args.previstoPara ?? null,
+      proximoAcompanhamentoEm: args.proximoAcompanhamentoEm ?? null,
       payload: args.payload ?? undefined,
       correlationId: args.correlationId ?? null,
       chaveIdempotencia: chave,
@@ -566,6 +569,7 @@ export async function registrarNaExecucao(
     protocoloId?: number | null
     enviadoEm?: Date | null
     previstoPara?: Date | null
+    proximoAcompanhamentoEm?: Date | null
   },
   db: DB = prisma,
 ): Promise<ExecucaoDeSubtarefa | null> {
@@ -598,6 +602,7 @@ export async function registrarNaExecucao(
       ...(dados.protocoloId !== undefined ? { protocoloId: dados.protocoloId } : {}),
       ...(dados.enviadoEm !== undefined ? { enviadoEm: dados.enviadoEm } : {}),
       ...(dados.previstoPara !== undefined ? { previstoPara: dados.previstoPara } : {}),
+      ...(dados.proximoAcompanhamentoEm !== undefined ? { proximoAcompanhamentoEm: dados.proximoAcompanhamentoEm } : {}),
     },
   })
   return atualizada as ExecucaoDeSubtarefa
@@ -621,6 +626,7 @@ export async function garantirExecucao(
     responsavelId?: number | null
     prazo?: Date | null
     previstoPara?: Date | null
+    proximoAcompanhamentoEm?: Date | null
   },
   db: DB = prisma,
 ): Promise<ExecucaoDeSubtarefa> {

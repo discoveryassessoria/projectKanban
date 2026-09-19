@@ -108,6 +108,15 @@ export interface SubtarefaCongelada {
   /// o cadastro hoje não muda o que valia para uma execução já materializada.
   /// Ver `aplicarEsperaExternaDaSubtarefaSeConfigurado` (subtarefas-da-etapa.ts).
   esperaExternaAoLiberar: boolean
+  /// CONTROLE TEMPORAL DA ESPERA — dois relógios independentes, nenhum dos
+  /// dois é o prazo oficial da Tarefa nem reaproveita `slaDays` (que
+  /// continua sendo só o SLA de ação interna). Ver comentário completo no
+  /// schema (`StepSubtaskDefinition`).
+  acompanhamentoAtivo: boolean
+  acompanhamentoPrimeiroDias: number | null
+  regraTemporalAtiva: boolean
+  regraTemporalDias: number | null
+  regraTemporalGatilhoChave: string | null
   /// Os filhos DELA — os que o passo tem para si ficam no passo.
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
@@ -380,6 +389,11 @@ export function retratarPassos(passos: PassosComFilhos): PassoCongelado[] {
       reaberturaExigeJustificativa: st.reaberturaExigeJustificativa,
       reaberturaPermissao: st.reaberturaPermissao,
       esperaExternaAoLiberar: st.esperaExternaAoLiberar,
+      acompanhamentoAtivo: st.acompanhamentoAtivo,
+      acompanhamentoPrimeiroDias: st.acompanhamentoPrimeiroDias,
+      regraTemporalAtiva: st.regraTemporalAtiva,
+      regraTemporalDias: st.regraTemporalDias,
+      regraTemporalGatilhoChave: st.regraTemporalGatilhoChave,
       acoes: st.acoes.map(congelarAcao),
       campos: st.campos.map(congelarCampo),
       checkItens: st.checkItens.map(congelarItem),

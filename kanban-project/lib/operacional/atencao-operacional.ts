@@ -54,10 +54,39 @@ export interface LinhaComAtencao {
    * 17/09/2026). `undefined`/`null` = sem subtarefa corrente com prazo
    * ancorado (passo sem subtarefas, ou a corrente nasceu em espera externa
    * — sem ação interna, sem relógio interno). Subconjunto estrutural de
-   * `EstadoTemporal` (`tempo-operacional.ts`) — só os dois campos que a
+   * `EstadoTemporal` (`tempo-operacional.ts`) — os campos que a
    * classificação usa.
+   *
+   * `aguardandoTerceiro` (achado real, 19/09/2026 — mandato "correção
+   * definitiva do modelo temporal"): uma subtarefa corrente pode estar
+   * `AGUARDANDO_EXTERNO` com `prazo` preenchido a partir do SLA próprio dela
+   * — mas para esse status, `slaDays` não representa um prazo/deadline
+   * exigível, representa a cadência de ACOMPANHAMENTO (quando volta à
+   * atenção se o terceiro ainda não respondeu). `estadoTemporalSubtarefa`
+   * continua calculando `atrasado` de forma pura (é só aritmética de data);
+   * quem decide se isso é uma dívida INTERNA é este classificador — e a
+   * mesma regra que já vale para o prazo macro (`proximo-acontecimento.ts`:
+   * "atrasoInterno = !encerrada && !aguardando && tempo.atrasado") precisa
+   * valer aqui, no relógio mais fino, ou "aguardando terceiro" vira
+   * silenciosamente "atraso meu" só porque o relógio errado foi consultado.
    */
-  prazoPasso?: { atrasado: boolean; venceHoje: boolean } | null
+  prazoPasso?: { atrasado: boolean; venceHoje: boolean; aguardandoTerceiro: boolean } | null
+
+  /**
+   * REGRA TEMPORAL DA ESPERA CORRENTE (dimensão C própria da subtarefa,
+   * mandato "correção definitiva do modelo temporal", 19-20/09/2026) — irmã
+   * de `atrasoTerceiro` (dimensão C da Tarefa/solicitação), nunca a mesma
+   * fonte. Vencida ⇒ terceiro atrasado, exatamente como a dimensão C de
+   * Tarefa já faz — os dois convivem, OR simples.
+   */
+  regraTemporalPasso?: { atrasado: boolean } | null
+
+  /**
+   * ACOMPANHAMENTO DA ESPERA CORRENTE (dimensão D própria da subtarefa) —
+   * irmã de `acompanhamentoVencido` (dimensão D da Tarefa, hoje só manual),
+   * nunca a mesma fonte. Vencido ⇒ acompanhar hoje, mesmo OR simples.
+   */
+  acompanhamentoPasso?: { atrasado: boolean } | null
 }
 
 const JANELA_NOVA_ATRIBUICAO_MS = 48 * 3600_000
@@ -103,9 +132,13 @@ export function motivosAtivos(l: LinhaComAtencao): MotivoAtencao[] {
   // passado mesmo durante uma espera de terceiro legítima — isso é
   // informação, não motivo pra reclassificar a tarefa como "minha culpa".
   if (l.atrasada) motivos.push('PRAZO_TAREFA_VENCIDO')
-  if (l.prazoPasso?.atrasado) motivos.push('PRAZO_PASSO_VENCIDO')
-  if (l.acompanhamentoVencido) motivos.push('ACOMPANHAMENTO_DEVIDO')
-  if (l.atrasoTerceiro) motivos.push('TERCEIRO_ATRASADO')
+  // MESMA GUARDA de `atrasoInterno` (dimensão B, `proximo-acontecimento.ts`):
+  // um relógio de subtarefa "vencido" enquanto ela está AGUARDANDO_EXTERNO
+  // não é um prazo de ação interna — é (no máximo) acompanhamento, tratado
+  // à parte por `acompanhamentoVencido`.
+  if (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro) motivos.push('PRAZO_PASSO_VENCIDO')
+  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) motivos.push('ACOMPANHAMENTO_DEVIDO')
+  if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) motivos.push('TERCEIRO_ATRASADO')
   return motivos
 }
 
@@ -134,11 +167,23 @@ export function calcularAtencaoOperacional(l: LinhaComAtencao): AtencaoOperacion
  * subtarefa corrente com SLA próprio vencido é exatamente "existia uma ação
  * que dependia do responsável e o prazo foi ultrapassado" (item 10), só que
  * medido pelo relógio mais fino em vez do macro.
+ *
+ * MAS SÓ QUANDO A SUBTAREFA É AÇÃO INTERNA (achado real, 19/09/2026): se a
+ * subtarefa corrente está `AGUARDANDO_EXTERNO`, o relógio dela não é um
+ * prazo exigível — é, no máximo, cadência de acompanhamento. Aplicar aqui a
+ * MESMA regra que `proximo-acontecimento.ts` já aplica no prazo macro
+ * (`atrasoInterno = !encerrada && !aguardando && tempo.atrasado`) —
+ * "aguardando terceiro" nunca vira "atraso meu" só porque o relógio mais
+ * fino também está com uma data no passado.
+ *
+ * `regraTemporalPasso`/`acompanhamentoPasso` (19-20/09/2026): dimensões C/D
+ * PRÓPRIAS da subtarefa corrente entram nos MESMOS degraus que as dimensões
+ * C/D da Tarefa já ocupavam — nunca um degrau novo, só mais uma fonte.
  */
 export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrincipal {
-  if (l.atrasoInterno || l.prazoPasso?.atrasado) return 'atrasoInterno'
-  if (l.atrasoTerceiro) return 'terceirosAtrasados'
-  if (l.acompanhamentoVencido) return 'acompanharHoje'
+  if (l.atrasoInterno || (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro)) return 'atrasoInterno'
+  if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) return 'terceirosAtrasados'
+  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) return 'acompanharHoje'
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) return 'paraAgirAgora'
   if (l.coluna === 'AGUARDANDO_TERCEIRO') return 'aguardandoTerceiros'
   return 'outras'
@@ -148,9 +193,9 @@ export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrin
 export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
   const cats: CategoriaAtencao[] = []
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) cats.push('paraAgirAgora')
-  if (l.acompanhamentoVencido) cats.push('acompanharHoje')
-  if (l.atrasoInterno) cats.push('atrasoInterno')
-  if (l.atrasoTerceiro) cats.push('terceirosAtrasados')
+  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) cats.push('acompanharHoje')
+  if (l.atrasoInterno || (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro)) cats.push('atrasoInterno')
+  if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) cats.push('terceirosAtrasados')
   if (l.coluna === 'AGUARDANDO_TERCEIRO') cats.push('aguardandoTerceiros')
   return cats
 }
@@ -165,9 +210,10 @@ export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
  * Daniela, é sinal de configuração (Saúde do Sistema, EMI-022).
  */
 function degrauDeAtencao(l: LinhaComAtencao): number {
-  if (l.atrasada && l.atrasoInterno) return 0
-  if (l.atrasoInterno) return 1
-  if (l.acompanhamentoVencido) return 2
+  const atrasoInternoPasso = l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro
+  if (l.atrasada && (l.atrasoInterno || atrasoInternoPasso)) return 0
+  if (l.atrasoInterno || atrasoInternoPasso) return 1
+  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado) return 2
   if (l.retornoRecebido) return 3
   if (l.venceHoje && l.executavelAgora) return 4
   if (l.coluna === 'A_FAZER' && l.atribuidaEm != null && Date.now() - new Date(l.atribuidaEm).getTime() <= JANELA_NOVA_ATRIBUICAO_MS) return 5
@@ -183,9 +229,10 @@ function degrauDeAtencao(l: LinhaComAtencao): number {
  * não um segundo campo de prioridade inventado pela UI.
  */
 export function rotuloDeAtencao(l: LinhaComAtencao & { prioridade: string }): { rotulo: string; tom: 'critico' | 'alerta' | 'neutro' } {
-  if (l.atrasada && l.atrasoInterno) return { rotulo: 'Crítico', tom: 'critico' }
-  if (l.atrasoInterno) return { rotulo: 'Atrasado', tom: 'critico' }
-  if (l.acompanhamentoVencido || l.retornoRecebido) return { rotulo: 'Atenção', tom: 'alerta' }
+  const atrasoInternoPasso = l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro
+  if (l.atrasada && (l.atrasoInterno || atrasoInternoPasso)) return { rotulo: 'Crítico', tom: 'critico' }
+  if (l.atrasoInterno || atrasoInternoPasso) return { rotulo: 'Atrasado', tom: 'critico' }
+  if (l.acompanhamentoVencido || l.acompanhamentoPasso?.atrasado || l.retornoRecebido) return { rotulo: 'Atenção', tom: 'alerta' }
   if (l.venceHoje && l.executavelAgora) return { rotulo: 'Hoje', tom: 'alerta' }
   if (l.prioridade === 'URGENTE') return { rotulo: 'Urgente', tom: 'alerta' }
   if (l.coluna === 'AGUARDANDO_TERCEIRO') return { rotulo: 'Aguardando', tom: 'neutro' }

@@ -325,8 +325,14 @@ export async function passosOperacaoV2(
     orderBy: { ordem: "asc" },
     select: {
       id: true, processoId: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
-      responsavelId: true, prazo: true, startedAt: true, completedAt: true, motivo: true, metadata: true,
+      prazo: true, startedAt: true, completedAt: true, motivo: true, metadata: true,
       lockVersion: true,
+      // `responsavelId` vem da TAREFA do passo, nunca do campo solto do
+      // próprio `PhaseWorkflowStepInstance` (snapshot morto — nenhum
+      // caminho do motor escreve nele, achado real 18/09/2026, mesma
+      // correção de `escopoPasso`). "Responsável" na Central mostrava
+      // "Não atribuído" com ownership canônico já existente.
+      tarefas: { select: { responsavelId: true }, take: 1 },
     },
   })
   // A OPERAÇÃO VEM DA TENTATIVA VIGENTE, não do blob da linha do passo.
@@ -339,7 +345,7 @@ export async function passosOperacaoV2(
     const { payload } = await lerOperacao(r.id)
     return {
       id: r.id, processoId: r.processoId, stepKey: r.stepKey, status: r.status, faseMacroKey: r.faseMacroKey, ordem: r.ordem,
-      responsavelId: r.responsavelId, prazo: r.prazo, startedAt: r.startedAt, completedAt: r.completedAt,
+      responsavelId: r.tarefas[0]?.responsavelId ?? null, prazo: r.prazo, startedAt: r.startedAt, completedAt: r.completedAt,
       motivo: r.motivo, lockVersion: r.lockVersion, operacao: payload,
     }
   }))

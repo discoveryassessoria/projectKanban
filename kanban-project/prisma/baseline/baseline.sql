@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-09-17
+-- Gerado em : 2026-09-19
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2510,6 +2510,11 @@ CREATE TABLE "StepSubtaskDefinition" (
     "reaberturaExigeJustificativa" BOOLEAN,
     "reaberturaPermissao" VARCHAR(60),
     "esperaExternaAoLiberar" BOOLEAN NOT NULL DEFAULT false,
+    "acompanhamentoAtivo" BOOLEAN NOT NULL DEFAULT false,
+    "acompanhamentoPrimeiroDias" INTEGER,
+    "regraTemporalAtiva" BOOLEAN NOT NULL DEFAULT false,
+    "regraTemporalDias" INTEGER,
+    "regraTemporalGatilhoChave" VARCHAR(60),
     "metadata" JSONB,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
@@ -3165,6 +3170,7 @@ CREATE TABLE "SubtaskExecution" (
     "protocoloId" INTEGER,
     "enviadoEm" TIMESTAMP(3),
     "previstoPara" TIMESTAMP(3),
+    "proximoAcompanhamentoEm" TIMESTAMP(3),
     "supersededAt" TIMESTAMP(3),
     "supersededPorId" INTEGER,
     "correlationId" VARCHAR(60),

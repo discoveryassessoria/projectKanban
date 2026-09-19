@@ -67,6 +67,20 @@ const ESPECIAIS_TAREFA: [string, string][] = [
   // Mesmo motivo do par acima, do lado da Tarefa (AGUARDANDO_TERCEIRO tem a
   // MESMA precedência de EM_ANDAMENTO — ver PRECEDENCIA_TAREFA).
   ["EM_ANDAMENTO", "AGUARDANDO_TERCEIRO"],
+  // A ESPERA DE TERCEIRO/CLIENTE TAMBÉM PRECISA RESTAURAR — achado real
+  // (19/09/2026, teste ponta-a-ponta do mandato "correção definitiva do
+  // modelo temporal"): `desbloquearTarefa` sempre soube restaurar a partir de
+  // `BLOQUEADA`, nunca a partir de `AGUARDANDO_TERCEIRO`/`AGUARDANDO_CLIENTE`
+  // — o estado que a PRÓPRIA espera de terceiro grava (`bloquearTarefa`,
+  // `alvoTarefa = espera ? "AGUARDANDO_TERCEIRO" : "BLOQUEADA"`). Sem este
+  // par, tanto o efeito manual `RESUME` quanto a espera automática por
+  // subtarefa (`resumirTarefaSeEsperaSubtarefaEncerrada`,
+  // subtarefas-da-etapa.ts) recusavam a transição em silêncio
+  // (`TRANSICAO_INVALIDA`, nunca verificado por quem chamava) sempre que
+  // tentavam voltar de uma espera de terceiro/cliente — a Tarefa ficava presa
+  // em "Aguardando terceiro" para sempre, mesmo com ação real disponível.
+  ["AGUARDANDO_TERCEIRO", "NAO_INICIADA"], ["AGUARDANDO_TERCEIRO", "EM_ANDAMENTO"], ["AGUARDANDO_TERCEIRO", "AGUARDANDO_CLIENTE"],
+  ["AGUARDANDO_CLIENTE", "NAO_INICIADA"], ["AGUARDANDO_CLIENTE", "EM_ANDAMENTO"], ["AGUARDANDO_CLIENTE", "AGUARDANDO_TERCEIRO"],
 ]
 
 export function podeAplicarPasso(atual: string, alvo: string): boolean {

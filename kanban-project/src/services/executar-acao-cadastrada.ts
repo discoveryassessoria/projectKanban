@@ -33,7 +33,10 @@ import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
 import { registrarNaTentativa, tentativaVigente } from "@/src/services/execucao-do-passo"
 import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { validarReferencia } from "@/src/services/referencia-canonica"
-import { subtarefasDaEtapa, passoPodeConcluir, relogioDeNascimentoDaSubtarefa } from "@/src/services/subtarefas-da-etapa"
+import {
+  subtarefasDaEtapa, passoPodeConcluir, relogioDeNascimentoDaSubtarefa,
+  relogioDeEsperaExternaDaSubtarefa, dataDoGatilhoDaRegraTemporal,
+} from "@/src/services/subtarefas-da-etapa"
 import { canaisDaSubtarefa } from "@/src/lib/motor/canais-do-fornecedor"
 import { registrarNaExecucao, garantirExecucao, ESTADOS_DA_SUBTAREFA } from "@/src/services/execucao-da-subtarefa"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
@@ -402,6 +405,25 @@ export async function executarAcaoCadastrada(
       : condicaoOk
         ? ESTADOS_DA_SUBTAREFA.CONCLUIDO
         : ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO
+    // OS DOIS RELÓGIOS DA ESPERA — só quando esta ação, manualmente, virou
+    // espera de terceiro (PAUSE_FOR_EXTERNAL_WAIT). NUNCA a fórmula de
+    // `slaDays`/ação interna — mesma regra de
+    // `aplicarEsperaExternaDaSubtarefaSeConfigurado`, a espera automática.
+    const relogioDeEspera = estadoDaSubtarefa === ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO
+      ? await (async () => {
+          const dataGatilho = await dataDoGatilhoDaRegraTemporal(
+            stepInstanceId, subtarefa.regraTemporalGatilhoChave, new Date(),
+          )
+          return relogioDeEsperaExternaDaSubtarefa({
+            acompanhamentoAtivo: subtarefa.acompanhamentoAtivo,
+            acompanhamentoPrimeiroDias: subtarefa.acompanhamentoPrimeiroDias,
+            regraTemporalAtiva: subtarefa.regraTemporalAtiva,
+            regraTemporalDias: subtarefa.regraTemporalDias,
+            dataGatilhoRegraTemporal: dataGatilho,
+            dataBase: new Date(),
+          })
+        })()
+      : null
     await registrarNaExecucao(stepInstanceId, subtarefa.key, {
       status: estadoDaSubtarefa,
       resultado: acao.key,
@@ -424,15 +446,16 @@ export async function executarAcaoCadastrada(
         : {}),
       ...(ctx.fornecedorId ? { fornecedorId: ctx.fornecedorId } : {}),
       // Virou espera de terceiro NESTA mesma chamada (`PAUSE_FOR_EXTERNAL_WAIT`,
-      // ação manual) — mesma previsão que a espera AUTOMÁTICA já calcula, nunca
-      // uma fórmula nova.
-      ...(estadoDaSubtarefa === ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO
-        ? { previstoPara: relogioDeNascimento.prazo }
+      // ação manual) — os DOIS relógios da espera, mesmo cálculo que a espera
+      // AUTOMÁTICA já usa (`relogioDeEsperaExternaDaSubtarefa`), nunca uma
+      // fórmula nova nem `slaDays` reaproveitado.
+      ...(relogioDeEspera
+        ? { previstoPara: relogioDeEspera.previstoPara, proximoAcompanhamentoEm: relogioDeEspera.proximoAcompanhamentoEm }
         : {}),
     })
     // CONCLUIR A SUBTAREFA MUDA O ESTADO DAS QUE DEPENDIAM DELA. Sem reconciliar, elas
     // continuariam BLOQUEADO no banco enquanto a projeção já as considera disponíveis.
-    const { reconciliarSubtarefas, aplicarEsperaExternaDaSubtarefaSeConfigurado } =
+    const { reconciliarSubtarefas, aplicarEsperaExternaDaSubtarefaSeConfigurado, resumirTarefaSeEsperaSubtarefaEncerrada } =
       await import("@/src/services/subtarefas-da-etapa")
     await reconciliarSubtarefas({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
     // A SUBTAREFA QUE ACABOU DE FICAR CORRENTE PODE, ELA MESMA, SER ESPERA DE
@@ -440,6 +463,13 @@ export async function executarAcaoCadastrada(
     // nunca `subtaskKey` hardcoded. Mesma régua do passo, ver
     // `aplicarEsperaExternaSeConfigurado` (task-step-sync.ts).
     await aplicarEsperaExternaDaSubtarefaSeConfigurado({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
+    // O PAR SIMÉTRICO — achado real (19/09/2026, teste ponta-a-ponta): sem
+    // isto, concluir a espera automática (ex.: "confirmação recebida") não
+    // desbloqueava a Tarefa quando a próxima subtarefa era ação interna, e a
+    // Daniela ficava travada em "Aguardando terceiro" com uma ação real
+    // esperando por ela. Só desfaz o bloqueio que ESTE mecanismo criou (ver
+    // guarda dentro da função).
+    await resumirTarefaSeEsperaSubtarefaEncerrada({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
   }
 
   // ── O QUE O EFEITO CONSUMIU SAI DA EXECUÇÃO ─────────────────────────────

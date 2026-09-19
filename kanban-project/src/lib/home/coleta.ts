@@ -296,6 +296,14 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
     return base.subtarefas
       .filter((s) => {
         const est = estadoTemporalSubtarefa({ dataPrazo: s.prazo, status: s.status, agora })
+        // AGUARDANDO_EXTERNO não entra em NENHUM balde de prazo (achado real,
+        // 19/09/2026 — mandato "correção definitiva do modelo temporal"): o
+        // relógio dela, quando existe, é cadência de acompanhamento — não um
+        // prazo exigível. Misturar as duas coisas faz uma espera legítima de
+        // terceiro aparecer como "atrasada"/"vence hoje" na Home. O lugar
+        // certo pra essa informação é um painel de Acompanhamentos próprio
+        // (ainda não construído — ver relatório), nunca este.
+        if (est.aguardandoTerceiro) return false
         return faixaPrazoDoEstado(est.diasParaPrazo, est.atrasado) === filaPrazo.faixa
       })
       .map((subtarefa) => ({ tipo: "subtarefa" as const, subtarefa }))

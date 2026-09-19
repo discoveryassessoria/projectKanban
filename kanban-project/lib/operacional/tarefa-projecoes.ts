@@ -255,6 +255,24 @@ export interface LinhaDeFila {
    */
   prazoPasso: EstadoTemporal | null
 
+  /**
+   * REGRA TEMPORAL DA ESPERA DA SUBTAREFA CORRENTE — dimensão C, própria da
+   * execução (mandato "correção definitiva do modelo temporal", 19-20/09/2026).
+   * Fonte: `SubtaskExecution.previstoPara`. NUNCA o prazo macro, nunca
+   * acompanhamento, nunca o mesmo relógio de `prazoPasso` (aquele é SLA de
+   * AÇÃO INTERNA; este é limite de TERCEIRO). `null` = sem regra temporal
+   * configurada/aplicável para a espera corrente.
+   */
+  regraTemporalPasso: EstadoTemporal | null
+
+  /**
+   * ACOMPANHAMENTO DA SUBTAREFA CORRENTE — dimensão D, própria da execução.
+   * Fonte: `SubtaskExecution.proximoAcompanhamentoEm`. Nunca vencimento —
+   * só "quando esta espera volta à atenção". `null` = sem acompanhamento
+   * configurado/aplicável para a espera corrente.
+   */
+  acompanhamentoPasso: EstadoTemporal | null
+
   // ── ETAPA 5 — LEITURA TEMPORAL COMPLETA (Etapa 3), NUNCA RECALCULADA AQUI ──
   //
   // `atrasada` acima é só a dimensão A (prazo vs. agora) — a mesma régua desde
@@ -424,6 +442,26 @@ function projetar(
         dataPrazo: atual.prazo, status: atual.status, criadaEm: atual.criadoEm, agora,
       })
     })(),
+    // MESMA RÉGUA (`estadoTemporalSubtarefa`), aplicada aos DOIS OUTROS
+    // relógios da subtarefa corrente — regra temporal (dimensão C) e
+    // acompanhamento (dimensão D). Nenhum dos dois reaproveita `prazoPasso`
+    // acima (SLA de ação interna) nem um o outro.
+    regraTemporalPasso: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      const atual = porSubtarefa?.atual
+      if (!atual) return null
+      return estadoTemporalSubtarefa({
+        dataPrazo: atual.previstoPara, status: atual.status, criadaEm: atual.criadoEm, agora,
+      })
+    })(),
+    acompanhamentoPasso: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      const atual = porSubtarefa?.atual
+      if (!atual) return null
+      return estadoTemporalSubtarefa({
+        dataPrazo: atual.proximoAcompanhamentoEm, status: atual.status, criadaEm: atual.criadoEm, agora,
+      })
+    })(),
     // Defaults — SEMPRE sobrescritos por `comAtencaoTemporal` logo depois.
     // `projetar` é síncrona e não tem como chamar o motor temporal (que lê
     // passo/solicitação em lote); ficar sem chamar `comAtencaoTemporal` depois
@@ -531,7 +569,13 @@ export interface ResumoSubtarefasDoPasso {
   concluidas: number
   total: number
   /** A subtarefa CORRENTE (não encerrada), pela ordem da definição — nunca por `sequencia` (retry count por subtarefa, não ordem entre subtarefas). */
-  atual: { subtaskKey: string; status: string; prazo: Date | null; criadoEm: Date; startedAt: Date | null } | null
+  atual: {
+    subtaskKey: string; status: string; prazo: Date | null; criadoEm: Date; startedAt: Date | null
+    /** Dimensão C (regra temporal do terceiro) — nunca prazo, nunca acompanhamento. */
+    previstoPara: Date | null
+    /** Dimensão D (acompanhamento) — quando esta espera volta à atenção. */
+    proximoAcompanhamentoEm: Date | null
+  } | null
 }
 
 async function progressoPorSubtarefa(
@@ -583,7 +627,10 @@ async function progressoPorSubtarefa(
   const ENCERRADOS = new Set(['CONCLUIDO', 'CANCELADO', 'INVALIDADO', 'FALHOU'])
   const execucoes = await db.subtaskExecution.findMany({
     where: { stepInstanceId: { in: stepInstanceIds }, supersededAt: null },
-    select: { stepInstanceId: true, subtaskKey: true, status: true, prazo: true, criadoEm: true, startedAt: true },
+    select: {
+      stepInstanceId: true, subtaskKey: true, status: true, prazo: true, criadoEm: true, startedAt: true,
+      previstoPara: true, proximoAcompanhamentoEm: true,
+    },
   })
   const execucoesPorStepInstance = new Map<number, typeof execucoes>()
   for (const e of execucoes) execucoesPorStepInstance.set(e.stepInstanceId, [...(execucoesPorStepInstance.get(e.stepInstanceId) ?? []), e])
@@ -598,7 +645,10 @@ async function progressoPorSubtarefa(
       .sort((a, b) => (ordens?.get(a.subtaskKey) ?? 0) - (ordens?.get(b.subtaskKey) ?? 0))[0] ?? null
     resultado.set(stepInstanceId, {
       concluidas, total,
-      atual: atual ? { subtaskKey: atual.subtaskKey, status: atual.status, prazo: atual.prazo, criadoEm: atual.criadoEm, startedAt: atual.startedAt } : null,
+      atual: atual ? {
+        subtaskKey: atual.subtaskKey, status: atual.status, prazo: atual.prazo, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
+        previstoPara: atual.previstoPara, proximoAcompanhamentoEm: atual.proximoAcompanhamentoEm,
+      } : null,
     })
   }
   return resultado

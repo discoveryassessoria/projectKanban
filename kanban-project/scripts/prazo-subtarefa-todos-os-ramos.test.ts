@@ -11,11 +11,23 @@
 // (não existe, e este teste não inventa um), mas porque a materialização não
 // cobria todos os ramos de nascimento.
 //
-// Testa os itens A-E do mandato de 18/09/2026:
+// Testa os itens A-E do mandato de 18/09/2026 — e a ATUALIZAÇÃO do item C pelo
+// mandato de 19-20/09/2026 ("correção definitiva do modelo temporal"):
 //   A) DISPONIVEL → prazo materializado
 //   B) EM_ANDAMENTO síncrono → prazo materializado
-//   C) AGUARDANDO_EXTERNO automático → prazo E previstoPara materializados
-//   D) os três ramos usam A MESMA função (`prazoOperacional`) — sem fórmula duplicada
+//   C) AGUARDANDO_EXTERNO automático → `prazo` (dimensão B, SLA de AÇÃO
+//      INTERNA) fica `null` — a versão original deste item (18/09) esperava
+//      `prazo` preenchido E `previstoPara` igual a ele, e era exatamente a
+//      confusão que o mandato seguinte (19-20/09) mandou eliminar: uma espera
+//      de terceiro NUNCA tem prazo de ação interna, e `previstoPara`
+//      (dimensão C, regra temporal do terceiro) tem campos PRÓPRIOS
+//      (`regraTemporalAtiva`/`regraTemporalDias`) — nunca um alias de
+//      `slaDays`. Sem essa configuração (este cadastro não a liga), os dois
+//      ficam `null`, corretamente — o caso POSITIVO (regra temporal
+//      configurada → `previstoPara` materializado a partir do gatilho
+//      genérico) está provado em `controle-temporal-espera-e2e.test.ts`.
+//   D) os dois ramos de AÇÃO INTERNA (A, B) usam A MESMA função (`prazoOperacional`)
+//      — sem fórmula duplicada
 //   E) reconciliação de legado, rodada duas vezes, não altera de novo os mesmos dados
 //
 //   node scripts/mrg-banco-teste.mjs up
@@ -194,7 +206,7 @@ async function main() {
   check("B) prazo bate com prazoOperacional(1, criadoEm) — mesma função", diaOperacional(execA1!.prazo!) === diaOperacional(esperadoB!))
 
   // ══════════════════════════════════════════════════════════════
-  console.log("\nC) AGUARDANDO_EXTERNO automático — aplicarEsperaExternaDaSubtarefaSeConfigurado liga prazo E previstoPara")
+  console.log("\nC) AGUARDANDO_EXTERNO automático — `prazo` (SLA de ação interna) NUNCA liga aqui")
   // ══════════════════════════════════════════════════════════════
   // MESMA instância de B, de propósito: "aguardar" só existe depois que
   // "enviar" (a dependência dela) concluiu — e é exatamente o
@@ -204,21 +216,27 @@ async function main() {
   check("B (aguardar) ficou corrente, liberada pela dependência", projC.find((s) => s.key === "aguardar")?.status === "AGUARDANDO_EXTERNO")
   const execB = await execucaoVigente(siB.id, "aguardar")
   check("C) nasceu AGUARDANDO_EXTERNO de verdade", execB?.status === "AGUARDANDO_EXTERNO")
-  check("C) prazo materializado (não null) — antes desta correção ficava null para sempre", execB?.prazo != null, String(execB?.prazo))
-  check("C) previstoPara TAMBÉM materializado — é aqui que existe previsão de terceiro", execB?.previstoPara != null, String(execB?.previstoPara))
-  const esperadoC = prazoOperacional(1, execB!.criadoEm)
-  check("C) prazo bate com prazoOperacional(1, criadoEm) — mesma função dos ramos A e B",
-    diaOperacional(execB!.prazo!) === diaOperacional(esperadoC!))
-  check("C) previstoPara é o MESMO valor que prazo neste caso (mesma fórmula, campos distintos, não alias cego no schema)",
-    execB!.previstoPara!.getTime() === execB!.prazo!.getTime())
+  // MANDATO 19-20/09/2026: `prazo` é EXCLUSIVAMENTE SLA de ação interna
+  // (`NASCE_COM_RELOGIO_INTERNO` = DISPONIVEL/EM_ANDAMENTO, nunca
+  // AGUARDANDO_EXTERNO). Ficar `null` aqui é o comportamento CORRETO — era
+  // exatamente o oposto (herdar `slaDays` como se fosse prazo de espera) que
+  // causou o bug real de produção (19/09/2026: 3 tarefas da Grisotto
+  // classificadas como "Atrasada" por uma espera de terceiro sem deadline).
+  check("C) `prazo` fica null — espera de terceiro não é deadline de ação interna", execB?.prazo == null, String(execB?.prazo))
+  // `previstoPara`/`proximoAcompanhamentoEm` (dimensões C/D, campos PRÓPRIOS:
+  // `regraTemporalAtiva`/`acompanhamentoAtivo`) também ficam null — este
+  // cadastro não os liga. O caso em que eles SÃO materializados (regra
+  // temporal configurada, gatilho genérico) está provado em
+  // `controle-temporal-espera-e2e.test.ts`, ponta a ponta.
+  check("C) `previstoPara` fica null — regra temporal não configurada neste cadastro, nunca inventada", execB?.previstoPara == null, String(execB?.previstoPara))
+  check("C) `proximoAcompanhamentoEm` fica null pelo mesmo motivo", execB?.proximoAcompanhamentoEm == null, String(execB?.proximoAcompanhamentoEm))
 
   // ══════════════════════════════════════════════════════════════
-  console.log("\nD) Os três ramos concordam: dias úteis, uma função só")
+  console.log("\nD) Os dois ramos de AÇÃO INTERNA concordam: dias úteis, uma função só")
   // ══════════════════════════════════════════════════════════════
-  check("A, B (execução) e C usam prazoOperacional — os três resultados batem com a MESMA fórmula aplicada fora do motor",
+  check("A e B (execução) usam prazoOperacional — batem com a MESMA fórmula aplicada fora do motor",
     diaOperacional(execA0!.prazo!) === diaOperacional(prazoOperacional(1, execA0!.criadoEm)!) &&
-    diaOperacional(execA1!.prazo!) === diaOperacional(prazoOperacional(1, execA1!.criadoEm)!) &&
-    diaOperacional(execB!.prazo!) === diaOperacional(prazoOperacional(1, execB!.criadoEm)!))
+    diaOperacional(execA1!.prazo!) === diaOperacional(prazoOperacional(1, execA1!.criadoEm)!))
 
   // ══════════════════════════════════════════════════════════════
   console.log("\nE) Legado — reconciliação idempotente, rodada duas vezes")

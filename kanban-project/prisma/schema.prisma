@@ -3758,6 +3758,38 @@ model StepSubtaskDefinition {
   /// já usa. Ver `aplicarEsperaExternaDaSubtarefaSeConfigurado` (subtarefas-da-etapa.ts).
   esperaExternaAoLiberar Boolean @default(false)
 
+  /// ═══ CONTROLE TEMPORAL DA ESPERA (mandato "correção definitiva do modelo
+  /// temporal", 19-20/09/2026) — DOIS RELÓGIOS INDEPENDENTES da mesma espera,
+  /// nenhum dos dois é o prazo oficial da Tarefa (esse é `Tarefa.dataPrazo`,
+  /// intocado) e nenhum dos dois reaproveita `slaDays` (que continua sendo,
+  /// exclusivamente, o SLA de AÇÃO INTERNA desta subtarefa — nunca os dois
+  /// papéis no mesmo campo). Uma subtarefa pode ter acompanhamento sem regra
+  /// temporal, regra temporal sem acompanhamento, os dois, ou nenhum.
+  ///
+  /// ACOMPANHAMENTO — "quando esta espera volta à atenção de quem é dono da
+  /// tarefa". NÃO é vencimento: só materializa `SubtaskExecution.
+  /// proximoAcompanhamentoEm`, nunca `prazo`.
+  acompanhamentoAtivo         Boolean @default(false)
+  /// Dias úteis, contados da liberação desta espera, até o primeiro
+  /// acompanhamento. `null` enquanto `acompanhamentoAtivo` não tiver essa
+  /// decisão de negócio definida — nunca inventado pelo motor.
+  acompanhamentoPrimeiroDias  Int?
+  ///
+  /// REGRA TEMPORAL — "limite/expectativa temporal desta espera". Materializa
+  /// `SubtaskExecution.previstoPara`. Vencida ⇒ TERCEIRO_ATRASADO — que
+  /// nunca é, por si só, a Tarefa atrasada (essa comparação é sempre contra
+  /// `Tarefa.dataPrazo`, à parte).
+  regraTemporalAtiva          Boolean @default(false)
+  /// Duração em dias úteis da regra temporal, a partir do gatilho.
+  regraTemporalDias           Int?
+  /// GATILHO — a `key` de OUTRA subtarefa do MESMO passo cuja CONCLUSÃO
+  /// inicia a contagem (lida em `SubtaskExecution.completedAt` dela — nenhum
+  /// evento novo, reaproveita o que a execução já grava). `null` = o gatilho
+  /// é a própria liberação desta subtarefa (ela mesma virando corrente).
+  /// Genérico de propósito — nunca "confirmação de cartório" no motor, só
+  /// "conclusão da subtarefa X", seja X o que o cadastro apontar.
+  regraTemporalGatilhoChave   String? @db.VarChar(60)
+
   metadata Json?
 
   criadoEm     DateTime @default(now())
@@ -5229,7 +5261,17 @@ model SubtaskExecution {
   protocoloId  Int?
   protocoloRef Protocolo?      @relation("ProtocoloDaSubtarefa", fields: [protocoloId], references: [id], onDelete: SetNull)
   enviadoEm    DateTime?
+  /// LIMITE/EXPECTATIVA da REGRA TEMPORAL desta espera (StepSubtaskDefinition.
+  /// regraTemporalDias, a partir do gatilho configurado) — nunca o prazo
+  /// oficial da Tarefa, nunca acompanhamento. `null` = sem regra temporal
+  /// aplicável a esta execução.
   previstoPara DateTime?
+  /// PRÓXIMO ACOMPANHAMENTO desta execução — quando ela volta à atenção de
+  /// quem é dono da tarefa, se a espera continuar. Materializado a partir de
+  /// StepSubtaskDefinition.acompanhamentoPrimeiroDias; nunca um prazo, nunca
+  /// a regra temporal. `null` = sem acompanhamento configurado, ou a espera
+  /// já terminou.
+  proximoAcompanhamentoEm DateTime?
 
   supersededAt      DateTime?
   supersededPorId   Int?
