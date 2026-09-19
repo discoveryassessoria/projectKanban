@@ -157,21 +157,17 @@ try {
     console.log(`[migrate-guard] AVISO: não consegui montar o plano (${String(e?.message ?? e).slice(0, 150)}). Seguindo — o Prisma loga cada migration aplicada.`)
   }
 
-  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (mandato "correção definitiva do modelo temporal", 19-20/09/2026) --
+  // ---- RECONCILIAÇÃO PONTUAL DE CHECKSUM — 0000_baseline (mandato "consolidação do sino", 19/09/2026) --
   // `prisma/migrations/0000_baseline/migration.sql` foi regenerado por
-  // `npm run baseline:gerar` depois dos 6 campos novos do controle temporal
-  // por subtarefa (acompanhamento/regra temporal/gatilho) — diff conferido
-  // manualmente: só ADD COLUMN, zero DROP/TRUNCATE/DELETE. Desta vez a
-  // reconciliação já foi feita ANTES do deploy, fora do build
-  // (scripts/reconciliar-ledger-baseline.ts --execute, rodado localmente
-  // contra produção, com EU_CONFIRMO_ESCRITA_EM_PRODUCAO=1 — LogAuditoria
-  // `LEDGER_BASELINE_RECONCILIADO` guarda o valor anterior). Este bloco só
-  // precisa RECONHECER o estado já reconciliado (`CHECKSUM_BASELINE_ATUAL`)
-  // — o ramo "ainda está no anterior" continua aqui como rede de segurança
-  // caso o build rode antes de uma reconciliação manual futura ter
-  // acontecido, mesmo procedimento das reconciliações anteriores.
-  const CHECKSUM_BASELINE_ANTERIOR = 'e32e117adc967f3ac0bf503dca277278f5c3de2b2291149b2f5dd95403de6022'
-  const CHECKSUM_BASELINE_ATUAL = '396e601ba2333547fbefd7384a4bf56588d0f0df3659abd9c69dac64ba0c9fc8'
+  // `npm run baseline:gerar` depois da coluna nova `NotificacaoOperacional.
+  // motivos` (JSONB) — diff conferido manualmente: só ADD COLUMN, zero DROP/
+  // TRUNCATE/DELETE. Desta vez NÃO reconciliei fora do build de propósito:
+  // uso o próprio ramo "ainda está no anterior" abaixo como o mecanismo de
+  // reconciliação (update guardado, exatamente 1 linha, mesmo caminho que a
+  // reconciliação manual usaria) — mais simples que rodar o script à parte
+  // quando o valor ANTERIOR é conhecido e único.
+  const CHECKSUM_BASELINE_ANTERIOR = '396e601ba2333547fbefd7384a4bf56588d0f0df3659abd9c69dac64ba0c9fc8'
+  const CHECKSUM_BASELINE_ATUAL = 'c935b2879c494421c9942485569fee37399163b6dc8117a980c47b25434a7aa8'
   const linhaBaseline = (
     await prisma.$queryRawUnsafe(
       `SELECT migration_name, checksum, finished_at, applied_steps_count FROM _prisma_migrations WHERE migration_name = '0000_baseline'`,

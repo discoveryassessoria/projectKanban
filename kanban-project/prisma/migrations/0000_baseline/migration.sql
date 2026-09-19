@@ -4540,6 +4540,7 @@ CREATE TABLE "NotificacaoOperacional" (
     "titulo" VARCHAR(200) NOT NULL,
     "mensagem" TEXT,
     "link" VARCHAR(300),
+    "motivos" JSONB,
     "autorId" INTEGER,
     "chaveIdempotencia" VARCHAR(220) NOT NULL,
     "lidaEm" TIMESTAMP(3),
