@@ -15,7 +15,8 @@ import {
   Filter,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  AlertTriangle
 } from "lucide-react"
 import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
@@ -124,6 +125,7 @@ export default function GenealogyPage() {
   const [resultadosDocumentos, setResultadosDocumentos] = useState<DocumentoResultado[]>([])
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
+  const [erroPesquisa, setErroPesquisa] = useState<string | null>(null)
   
   // As três leituras de apoio da tela, pela camada oficial. Eram sequenciais
   // dentro de um `fetchData` — agora são paralelas por construção, cada uma com o
@@ -164,10 +166,11 @@ export default function GenealogyPage() {
   const pesquisarPessoas = async () => {
     setLoading(true)
     setSearched(true)
-    
+    setErroPesquisa(null)
+
     const termo = `${nome} ${sobrenome}`.trim()
     if (termo) savePesquisaRecente(termo)
-    
+
     try {
       const params = new URLSearchParams()
       if (nome) params.append('nome', nome)
@@ -177,36 +180,43 @@ export default function GenealogyPage() {
       if (anoFalecimento) params.append('anoObito', anoFalecimento)
       if (nacionalidade) params.append('nacionalidade', nacionalidade)
       if (sexo) params.append('sexo', sexo)
-      
+
       const response = await fetch(`/api/genealogy/pesquisar/pessoas?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setResultadosPessoas(data)
+      } else {
+        setErroPesquisa("Não foi possível pesquisar agora. Tente novamente.")
       }
     } catch (error) {
       console.error("Erro na pesquisa:", error)
+      setErroPesquisa("Não foi possível pesquisar agora. Tente novamente.")
     } finally {
       setLoading(false)
     }
   }
-  
+
   const pesquisarDocumentos = async () => {
     setLoading(true)
     setSearched(true)
-    
+    setErroPesquisa(null)
+
     try {
       const params = new URLSearchParams()
       if (tipoDocumento) params.append('tipo', tipoDocumento)
       if (statusDocumento) params.append('status', statusDocumento)
       if (pessoaDocumento) params.append('pessoa', pessoaDocumento)
-      
+
       const response = await fetch(`/api/genealogy/pesquisar/documentos?${params.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setResultadosDocumentos(data)
+      } else {
+        setErroPesquisa("Não foi possível pesquisar agora. Tente novamente.")
       }
     } catch (error) {
       console.error("Erro na pesquisa:", error)
+      setErroPesquisa("Não foi possível pesquisar agora. Tente novamente.")
     } finally {
       setLoading(false)
     }
@@ -499,9 +509,10 @@ export default function GenealogyPage() {
                       {searched && (
                         <button
                           onClick={limparPesquisa}
+                          aria-label="Limpar pesquisa"
                           className="px-3 py-2.5 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--surface-hover)] transition"
                         >
-                          <X className="h-4 w-4 text-white/70" />
+                          <X className="h-4 w-4 text-white/70" aria-hidden="true" />
                         </button>
                       )}
                     </div>
@@ -568,9 +579,10 @@ export default function GenealogyPage() {
                       {searched && (
                         <button
                           onClick={limparPesquisa}
+                          aria-label="Limpar pesquisa"
                           className="px-3 py-2.5 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-lg hover:bg-[var(--surface-hover)] transition"
                         >
-                          <X className="h-4 w-4 text-white/70" />
+                          <X className="h-4 w-4 text-white/70" aria-hidden="true" />
                         </button>
                       )}
                     </div>
@@ -586,6 +598,11 @@ export default function GenealogyPage() {
               {loading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="animate-spin h-10 w-10 border-4 border-[var(--border-default)] border-t-transparent rounded-full" />
+                </div>
+              ) : erroPesquisa ? (
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-amber-800 mx-auto mb-3" />
+                  <p className="text-white/70">{erroPesquisa}</p>
                 </div>
               ) : (
                 <>

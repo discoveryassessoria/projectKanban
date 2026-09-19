@@ -33,10 +33,14 @@ export default function AuthPage() {
 
       {/* Conteúdo */}
       {mounted && (
-        <div className="absolute inset-0 flex items-center justify-between px-8 md:px-20 lg:px-32">
-          {/* Logo grande à esquerda */}
-          <motion.div 
-            className="flex-1 flex items-center justify-center" 
+        // ABAIXO DE md: empilhado (logo pequeno em cima, formulário embaixo) —
+        // lado a lado num viewport de 390px espremia os dois flex-1 até o
+        // logo virar decoração ilegível (mandato "modernização visual",
+        // 19/09/2026). A partir de md, volta ao layout lado a lado original.
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 overflow-y-auto px-6 py-10 md:flex-row md:items-center md:justify-between md:gap-0 md:overflow-visible md:px-20 md:py-0 lg:px-32">
+          {/* Logo — pequeno e no topo em mobile; grande à esquerda a partir de md */}
+          <motion.div
+            className="flex shrink-0 items-center justify-center md:flex-1"
             initial={{ x: -80, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
@@ -46,18 +50,18 @@ export default function AuthPage() {
               alt="Logo Discovery"
               width={560}
               height={200}
-              className="drop-shadow-[var(--elev-3)]"
+              className="h-auto w-40 drop-shadow-[var(--elev-3)] md:w-auto"
               priority
             />
           </motion.div>
 
           {/* Caixa de login */}
-          <motion.div 
-            className="flex-1 flex items-center justify-center"
+          <motion.div
+            className="flex w-full flex-1 items-center justify-center md:flex-1"
             initial={{ x: 80, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-          > 
+          >
             <div className="w-full max-w-md">
               <AuthComponent />
             </div>

@@ -104,8 +104,8 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
                 {context?.lineage ? ` · ${context.lineage}` : ""}
               </div>
             </div>
-            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 flex-none">
-              <X className="w-[22px] h-[22px]" />
+            <button onClick={onClose} aria-label="Fechar detalhes do documento" className="text-[var(--text-muted)] hover:text-white/80 flex-none">
+              <X className="w-[22px] h-[22px]" aria-hidden="true" />
             </button>
           </div>
 

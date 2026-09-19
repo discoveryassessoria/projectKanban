@@ -74,17 +74,24 @@ type ChaveCondicao =
   | "executavelAgora" | "atrasadas" | "venceHoje" | "proximos7Dias" | "semResponsavel"
   | "bloqueada" | "aguardandoTerceiro" | "semMovimentacao" | "pendenciasFasesAnteriores"
 
-const CONDICOES: Array<{ chave: ChaveCondicao; rotulo: string }> = [
+// SITUAÇÃO — os 5 recortes mais usados no dia a dia, sempre visíveis.
+// PRAZO/RESPONSÁVEL secundários entram em "Mais filtros": nenhum some da
+// tela, só param de competir visualmente com os resultados quando ninguém
+// pediu por eles (mandato "modernização visual", 19/09/2026).
+const CONDICOES_PRINCIPAIS: Array<{ chave: ChaveCondicao; rotulo: string }> = [
   { chave: "executavelAgora", rotulo: "Executável agora" },
   { chave: "atrasadas", rotulo: "Atrasadas" },
   { chave: "venceHoje", rotulo: "Vence hoje" },
-  { chave: "proximos7Dias", rotulo: "Próximos 7 dias" },
-  { chave: "semResponsavel", rotulo: "Sem responsável" },
-  { chave: "bloqueada", rotulo: "Bloqueadas" },
   { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiro" },
+  { chave: "semResponsavel", rotulo: "Sem responsável" },
+]
+const CONDICOES_SECUNDARIAS: Array<{ chave: ChaveCondicao; rotulo: string }> = [
+  { chave: "proximos7Dias", rotulo: "Próximos 7 dias" },
+  { chave: "bloqueada", rotulo: "Bloqueadas" },
   { chave: "semMovimentacao", rotulo: "Sem movimentação (7d)" },
   { chave: "pendenciasFasesAnteriores", rotulo: "Pendências de fases anteriores" },
 ]
+const CONDICOES: Array<{ chave: ChaveCondicao; rotulo: string }> = [...CONDICOES_PRINCIPAIS, ...CONDICOES_SECUNDARIAS]
 
 interface FiltrosCentral {
   escopo: "minha_fila" | "sem_responsavel" | "tudo"
@@ -174,6 +181,7 @@ export function CentralOperacional() {
   const [resultado, setResultado] = useState<{ chave: string; d: RespostaCentral | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
+  const [maisFiltrosAberto, setMaisFiltrosAberto] = useState(false)
   const [fasesAbertas, setFasesAbertas] = useState<Set<string>>(new Set())
   const [tarefasPorFase, setTarefasPorFase] = useState<Map<string, { carregando: boolean; linhas: LinhaGerencial[] | null }>>(new Map())
   const [loteAlvo, setLoteAlvo] = useState<{ familia: FamiliaAgrupada; acao: "atribuir" | "repriorizar" } | null>(null)
@@ -475,9 +483,12 @@ export function CentralOperacional() {
         )}
       </div>
 
-      {/* ── CONDIÇÕES COMPOSTAS — cada chip é um filtro real, combinável ── */}
-      <div className="flex flex-wrap gap-1.5">
-        {CONDICOES.map((c) => {
+      {/* ── SITUAÇÃO — os recortes mais usados, sempre visíveis. O resto (Prazo/
+          Responsável mais específicos) fica atrás de "Mais filtros": nada
+          desaparece, só para de competir com os resultados sem ter sido
+          pedido (mandato "modernização visual", 19/09/2026). ── */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {CONDICOES_PRINCIPAIS.map((c) => {
           const ativo = filtros.condicoes.has(c.chave)
           return (
             <button
@@ -493,6 +504,22 @@ export function CentralOperacional() {
             </button>
           )
         })}
+        {(() => {
+          const ativasEscondidas = CONDICOES_SECUNDARIAS.filter((c) => filtros.condicoes.has(c.chave)).length
+          return (
+            <button
+              onClick={() => setMaisFiltrosAberto((v) => !v)}
+              aria-expanded={maisFiltrosAberto}
+              className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                ativasEscondidas > 0
+                  ? "border-[var(--action-primary)] bg-[var(--action-primary)]/15 text-white/90"
+                  : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/75"
+              }`}
+            >
+              Mais filtros{ativasEscondidas > 0 ? ` (${ativasEscondidas})` : ""} {maisFiltrosAberto ? "▲" : "▼"}
+            </button>
+          )
+        })()}
         {filtros.condicoes.size > 0 && (
           <button onClick={() => setFiltros((f) => ({ ...f, condicoes: new Set() }))} className="text-[10px] text-[var(--text-muted)] hover:text-white/70">
             limpar condições
@@ -530,6 +557,28 @@ export function CentralOperacional() {
           </select>
         </span>
       </div>
+
+      {/* ── MAIS FILTROS — Prazo/Responsável mais específicos, escondidos até pedidos ── */}
+      {maisFiltrosAberto && (
+        <div className="flex flex-wrap gap-1.5 rounded-md border border-white/[0.06] bg-white/[0.02] px-2.5 py-2">
+          {CONDICOES_SECUNDARIAS.map((c) => {
+            const ativo = filtros.condicoes.has(c.chave)
+            return (
+              <button
+                key={c.chave}
+                onClick={() => alternarCondicao(c.chave)}
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+                  ativo
+                    ? "border-[var(--action-primary)] bg-[var(--action-primary)]/15 text-white/90"
+                    : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/75"
+                }`}
+              >
+                {c.rotulo}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── FASES — do catálogo canônico, nunca hardcoded ── */}
       {dados && dados.fases.length > 0 && (

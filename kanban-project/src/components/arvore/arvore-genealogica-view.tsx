@@ -1041,9 +1041,10 @@ export function ArvoreGenealogicaView({
     <button
       onClick={() => setImportarAberto(true)}
       title="Importar árvore a partir de um print"
+      aria-label="Importar árvore a partir de um print"
       className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
     >
-      <ImagePlus className="h-4 w-4" />
+      <ImagePlus className="h-4 w-4" aria-hidden="true" />
       <span className="hidden sm:inline">Importar Árvore</span>
     </button>
   ) : null
@@ -1209,8 +1210,9 @@ export function ArvoreGenealogicaView({
             className="p-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors"
             onClick={handleToggleFullscreen}
             title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+            aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isFullscreen ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
           </button>
 
           {/* Excluir árvore inteira — ação rara e irreversível, por isso separada
@@ -1221,8 +1223,9 @@ export function ArvoreGenealogicaView({
               className="p-2 rounded transition-colors text-red-300 hover:bg-red-950/40 hover:text-red-200"
               onClick={() => setMostrarExclusaoArvore(true)}
               title="Excluir árvore inteira"
+              aria-label="Excluir árvore inteira"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -1354,9 +1357,10 @@ export function ArvoreGenealogicaView({
             <button
               onClick={() => setPaletaAberta(true)}
               title="Buscar pessoa (⌘K)"
+              aria-label="Buscar pessoa"
               className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
             >
-              <Search className="h-4 w-4" />
+              <Search className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Buscar</span>
               <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-[var(--text-muted)] sm:inline">⌘K</kbd>
             </button>
@@ -1373,9 +1377,10 @@ export function ArvoreGenealogicaView({
             <button
               onClick={() => setPainelAberto(true)}
               title="Inteligência da árvore"
+              aria-label="Inteligência da árvore"
               className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
             >
-              <Sparkles className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Análise</span>
               {/* Contagem só dos achados que exigem ação — número no botão que não
                   significa urgência vira ruído e o usuário para de olhar. */}

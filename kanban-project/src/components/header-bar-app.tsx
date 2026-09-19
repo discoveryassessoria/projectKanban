@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { formatDateBR } from "@/src/lib/date-utils"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { CambioMini } from "@/src/components/cambio/cambio-mini"
+import { CambioMiniApp } from "@/src/components/cambio/cambio-mini-app"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { pluralizar } from "@/src/lib/ui/pluralizar"
 import useSWR from 'swr'
@@ -330,7 +330,7 @@ export function HeaderBarApp({
 
         {/* Lado direito - Ações */}
         <div className="flex shrink-0 items-center gap-2 xl:gap-3">
-          <CambioMini />
+          <CambioMiniApp />
 
           <div className="hidden lg:flex flex-col items-end">
             <span className="text-sm font-medium text-white">{currentTime}</span>

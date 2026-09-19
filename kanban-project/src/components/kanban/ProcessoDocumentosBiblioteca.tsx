@@ -138,10 +138,10 @@ export function ProcessoDocumentosBiblioteca({
 
   return (
     <div className="h-full overflow-y-auto bg-[var(--surface-popover)]">
-      <div
-        className="grid gap-[18px] items-start p-6"
-        style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}
-      >
+      {/* ABAIXO DE lg: 1 coluna (a barra de 300px cai para baixo do conteúdo
+          principal, em vez de espremer os dois lado a lado numa tela
+          estreita) — mandato "modernização visual", 19/09/2026. */}
+      <div className="grid grid-cols-1 items-start gap-[18px] p-6 lg:[grid-template-columns:minmax(0,1fr)_300px]">
         {/* ============== COLUNA PRINCIPAL ============== */}
         <div className="min-w-0">
           {/* Título */}
@@ -155,8 +155,8 @@ export function ProcessoDocumentosBiblioteca({
             </div>
           </div>
 
-          {/* 8 KPIs */}
-          <div className="grid gap-2.5 mb-[18px]" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
+          {/* 8 KPIs — 2 colunas em mobile, cresce até 8 num desktop largo */}
+          <div className="grid grid-cols-2 gap-2.5 mb-[18px] sm:grid-cols-4 xl:grid-cols-8">
             {kpiCards.map(([label, val, ic, tone], i) => (
               <div key={i} className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[13px]">
                 <span className="text-[10.5px] text-[var(--text-secondary)] block leading-tight min-h-[28px]">{label}</span>
@@ -320,25 +320,30 @@ function PersonGroup({
               Nenhum documento aplicável — exigência dispensada.
             </div>
           ) : (
-            <>
-              {/* Cabeçalho de colunas */}
-              <div
-                className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[var(--surface-secondary)] text-[var(--text-muted)] text-[10px] font-bold tracking-wider"
-                style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
-              >
-                <span>DOCUMENTO</span>
-                <span>TIPO</span>
-                <span>CERTIDÃO</span>
-                <span>CERT. RETIFICADA</span>
-                <span>TRADUÇÃO</span>
-                <span>APOSTILA</span>
-                <span>STATUS FINAL</span>
-                <span>AÇÕES</span>
+            // 8 colunas não cabem numa tela estreita sem cortar dado — rolagem
+            // horizontal PRÓPRIA desta tabela (nunca a página inteira), com a
+            // largura mínima preservando as proporções originais das colunas.
+            <div className="overflow-x-auto">
+              <div className="min-w-[900px]">
+                {/* Cabeçalho de colunas */}
+                <div
+                  className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[var(--surface-secondary)] text-[var(--text-muted)] text-[10px] font-bold tracking-wider"
+                  style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
+                >
+                  <span>DOCUMENTO</span>
+                  <span>TIPO</span>
+                  <span>CERTIDÃO</span>
+                  <span>CERT. RETIFICADA</span>
+                  <span>TRADUÇÃO</span>
+                  <span>APOSTILA</span>
+                  <span>STATUS FINAL</span>
+                  <span>AÇÕES</span>
+                </div>
+                {docs.map((it) => (
+                  <DocRow key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} />
+                ))}
               </div>
-              {docs.map((it) => (
-                <DocRow key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} />
-              ))}
-            </>
+            </div>
           )}
         </div>
       )}

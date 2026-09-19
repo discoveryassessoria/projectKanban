@@ -467,6 +467,7 @@ function DocumentoCard({
                   : 'hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-red-500'
               }`}
               title={confirmDelete ? 'Clique para confirmar' : 'Excluir documento'}
+              aria-label={confirmDelete ? 'Clique para confirmar a exclusão do documento' : 'Excluir documento'}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -650,14 +651,17 @@ function ConteudoSidebar({
   // rótulos "Adicionar Pai/Mãe/cônjuge/filho(a)" — sai branco sobre `bg-[var(--surface-primary)]`,
   // isto é, invisível.
   return (
-    <div className="fixed right-0 top-0 h-full w-[420px] bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)] z-[10001] flex flex-col border-l border-[var(--border-default)]">
+    // ABAIXO DE sm: largura total (420px fixo estourava a tela num viewport de
+    // 390px) — mandato "modernização visual", 19/09/2026.
+    <div className="fixed right-0 top-0 h-full w-full sm:w-[420px] bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)] z-[10001] flex flex-col border-l border-[var(--border-default)]">
       {/* Header */}
       <div className="p-5 border-b border-[var(--border-default)] bg-gradient-to-r from-slate-50 to-white">
-        <button 
+        <button
           onClick={onClose}
+          aria-label="Fechar detalhes da pessoa"
           className="absolute top-4 right-4 p-1.5 hover:bg-[var(--surface-secondary)] rounded-lg transition-colors"
         >
-          <X className="h-5 w-5 text-[var(--text-secondary)]" />
+          <X className="h-5 w-5 text-[var(--text-secondary)]" aria-hidden="true" />
         </button>
         
         <div className="flex items-start gap-4">

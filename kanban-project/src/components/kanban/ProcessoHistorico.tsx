@@ -175,7 +175,12 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                   <div className="relative">
                     {g.itens.map((l, i) => {
                       const t = TIPO_POR_KEY[tipoDoLog(l)]
-                      const sub = l.detalhes && typeof l.detalhes === "object" ? Object.entries(l.detalhes).slice(0, 2).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ") : ""
+                      // `l.descricao` JÁ é a frase pensada pra gente (todo
+                      // LogAuditoria nasce com uma) — `l.detalhes` é payload
+                      // técnico (chaves internas, JSON cru) pra auditoria/
+                      // depuração, nunca pra tela. Renderizar `detalhes` aqui
+                      // vazava nome de campo interno pro usuário (mandato
+                      // "modernização visual", 19/09/2026).
                       return (
                         <div key={l.id} className="flex gap-3">
                           <div className="flex w-14 shrink-0 flex-col items-end pt-2 text-right"><span className="text-[12px] tabular-nums text-[var(--text-secondary)]">{horaBR(l.criadoEm)}</span></div>
@@ -186,7 +191,6 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                               <div className="min-w-0 flex-1">
                                 <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: `${t.cor}22`, color: t.cor }}>{t.label}</span>
                                 <div className="mt-1 text-sm font-medium text-white/90">{l.descricao}</div>
-                                {sub && <div className="mt-0.5 truncate text-[12px] text-[var(--text-secondary)]">{sub}</div>}
                               </div>
                               <div className="flex shrink-0 items-center gap-2.5">
                                 {l.usuario && <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--surface-tertiary)] text-[10px] font-semibold text-white/70">{iniciais(l.usuario.nome)}</span><div className="text-right leading-tight"><div className="text-[12px] text-white/80">{l.usuario.nome}</div><div className="text-[10px] text-[var(--text-muted)]">Usuário</div></div></div>}
