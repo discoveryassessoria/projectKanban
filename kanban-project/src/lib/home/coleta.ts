@@ -19,7 +19,9 @@ import {
   FILAS_ESTADO,
   FILAS_PRAZO_TAREFA,
   FILAS_PRAZO_SUBTAREFA,
+  FILAS_ACOMPANHAMENTO,
   faixaDaFilaPrazo,
+  faixaDaFilaAcompanhamento,
   faixaPrazoDoEstado,
   STATUS_PASSO_ACIONAVEL,
   STATUS_PASSO_VIVO,
@@ -112,6 +114,8 @@ interface SubtarefaBase {
   subtaskKey: string
   status: string
   prazo: Date | null
+  /** Dimensão D — quando esta espera volta à atenção. Nunca prazo/SLA. */
+  proximoAcompanhamentoEm: Date | null
   processoId: number
   documentoId: number | null
   necessidadeId: number | null
@@ -205,7 +209,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
             stepInstance: { ...(escopoDoPasso as any) },
           },
           select: {
-            id: true, stepInstanceId: true, subtaskKey: true, status: true, prazo: true,
+            id: true, stepInstanceId: true, subtaskKey: true, status: true, prazo: true, proximoAcompanhamentoEm: true,
             stepInstance: {
               select: {
                 processoId: true, documentoId: true, necessidadeId: true,
@@ -218,6 +222,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
           },
         }).then((rows) => rows.map((r) => ({
           id: r.id, stepInstanceId: r.stepInstanceId, subtaskKey: r.subtaskKey, status: r.status, prazo: r.prazo,
+          proximoAcompanhamentoEm: r.proximoAcompanhamentoEm,
           processoId: r.stepInstance.processoId, documentoId: r.stepInstance.documentoId,
           necessidadeId: r.stepInstance.necessidadeId, responsavelId: r.stepInstance.tarefas[0]?.responsavelId ?? null,
         })))
@@ -309,6 +314,23 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
       .map((subtarefa) => ({ tipo: "subtarefa" as const, subtarefa }))
   }
 
+  // --- filas de ACOMPANHAMENTO (dimensão D, própria da espera de terceiro) ---
+  const filaAcompanhamento = faixaDaFilaAcompanhamento(key)
+  if (filaAcompanhamento) {
+    return base.subtarefas
+      .filter((s) => {
+        // SÓ espera de terceiro tem acompanhamento — ação interna (DISPONIVEL/
+        // EM_ANDAMENTO) não entra aqui, ela já mora no painel de PRAZO.
+        if (s.status !== "AGUARDANDO_EXTERNO") return false
+        // Sem `proximoAcompanhamentoEm` configurado, não há o que mostrar —
+        // nunca inventa uma data pra encaixar num balde.
+        if (s.proximoAcompanhamentoEm == null) return false
+        const est = estadoTemporalSubtarefa({ dataPrazo: s.proximoAcompanhamentoEm, status: s.status, agora })
+        return faixaPrazoDoEstado(est.diasParaPrazo, est.atrasado) === filaAcompanhamento.faixa
+      })
+      .map((subtarefa) => ({ tipo: "subtarefa" as const, subtarefa }))
+  }
+
   // --- filas de passo (trabalho do Workflow) ---
   if (FILAS_PASSO.some((f) => f.key === key)) {
     return base.passos
@@ -390,6 +412,17 @@ function prazoDoMembro(m: Membro): Date | null {
   if (m.tipo === "tarefa") return m.tarefa.dataPrazo
   if (m.tipo === "subtarefa") return m.subtarefa.prazo
   return null
+}
+
+/**
+ * A DATA QUE IMPORTA NESTA FILA — `prazo` na maioria, mas
+ * `proximoAcompanhamentoEm` nas filas de Acompanhamento (dimensão D). Nunca
+ * confundir os dois campos: um vira "atrasada"/"vence hoje" na tela errada
+ * se olhar o relógio errado.
+ */
+function dataDoMembroNaFila(m: Membro, ehAcompanhamento: boolean): Date | null {
+  if (ehAcompanhamento && m.tipo === "subtarefa") return m.subtarefa.proximoAcompanhamentoEm
+  return prazoDoMembro(m)
 }
 
 function permissaoDaFila(key: string, p: HomePermissions): boolean {
@@ -532,6 +565,19 @@ export function montarPrazosDeSubtarefas(base: BaseOperacional, ctx: ContextoHom
 }
 
 // ---------------------------------------------------------------------------
+// ACOMPANHAMENTOS — painel PRÓPRIO, nunca fundido com PRAZOS. Mandato
+// "correção definitiva do modelo temporal" (19-20/09/2026), seção 5: "a Home
+// NÃO deve continuar comunicando dois 'prazos' concorrentes" — acompanhamento
+// não é prazo, não é SLA, não é "subtarefa vencida"; é "quando esta espera
+// volta à atenção". Mesma engine (`estadoTemporalSubtarefa`) dos painéis de
+// prazo, alimentada com `proximoAcompanhamentoEm` em vez de `prazo`.
+// ---------------------------------------------------------------------------
+export function montarAcompanhamentos(base: BaseOperacional, ctx: ContextoHome): FilaOperacional[] | null {
+  if (!ctx.permissoes.verTarefas) return null
+  return montarPainelDePrazo(FILAS_ACOMPANHAMENTO, base, ctx)
+}
+
+// ---------------------------------------------------------------------------
 // PRAZOS — resumo por status pra aba "Prazos" da Central de Notificações.
 // MESMOS membros de `membrosDaFila("prazos-vencendo", ...)` — só que já
 // quebrados em atrasadas/hoje/futuro, pra Home mostrar a prévia sem baixar a
@@ -569,13 +615,14 @@ export async function listarFila(
   const def = acharFila(key)
   if (!def || !permissaoDaFila(key, ctx.permissoes)) return null
 
+  const ehAcompanhamento = faixaDaFilaAcompanhamento(key) != null
   const membros = membrosDaFila(key, base, ctx.agora)
-  const atrasados = membros.filter((m) => estaAtrasado(prazoDoMembro(m), ctx.agora)).length
+  const atrasados = membros.filter((m) => estaAtrasado(dataDoMembroNaFila(m, ehAcompanhamento), ctx.agora)).length
 
-  // Atrasado primeiro, depois prazo mais próximo, depois sem prazo.
+  // Atrasado primeiro, depois prazo/acompanhamento mais próximo, depois sem data.
   const ordenados = [...membros].sort((a, b) => {
-    const pa = prazoDoMembro(a)?.getTime() ?? Number.MAX_SAFE_INTEGER
-    const pb = prazoDoMembro(b)?.getTime() ?? Number.MAX_SAFE_INTEGER
+    const pa = dataDoMembroNaFila(a, ehAcompanhamento)?.getTime() ?? Number.MAX_SAFE_INTEGER
+    const pb = dataDoMembroNaFila(b, ehAcompanhamento)?.getTime() ?? Number.MAX_SAFE_INTEGER
     return pa - pb
   })
   const pagina = ordenados.slice(0, LIMITE_ITENS)
@@ -686,6 +733,7 @@ export async function listarFila(
     }
     if (m.tipo === "subtarefa") {
       const s = m.subtarefa
+      const dataNaFila = dataDoMembroNaFila(m, ehAcompanhamento)
       const pr = base.processos.get(s.processoId)
       const doc = s.documentoId ? docPorId.get(s.documentoId) : null
       const nec = s.necessidadeId ? necPorId.get(s.necessidadeId) : null
@@ -704,8 +752,8 @@ export async function listarFila(
         processoCodigo: pr?.codigo ?? null,
         processoNome: pr?.nome ?? null,
         pais: pr?.pais ?? null,
-        prazo: s.prazo ? s.prazo.toISOString() : null,
-        atrasado: estaAtrasado(s.prazo, ctx.agora),
+        prazo: dataNaFila ? dataNaFila.toISOString() : null,
+        atrasado: estaAtrasado(dataNaFila, ctx.agora),
         href: hrefProcesso(pr, s.documentoId ? `&sidebarTab=documentos` : ""),
       }
     }

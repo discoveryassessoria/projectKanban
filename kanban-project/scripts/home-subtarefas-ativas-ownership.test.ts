@@ -24,12 +24,16 @@
 // correção elas apareciam em "próximos 3 dias"/"atrasadas" da Home,
 // confundindo espera legítima de terceiro com vencimento.
 //
+// Continuação (19/09/2026, mesmo mandato, seção 5): as 3 AGUARDANDO_EXTERNO
+// também provam o painel de ACOMPANHAMENTOS — separado de "Prazos", nunca
+// fundido — usando `proximoAcompanhamentoEm` (dimensão D).
+//
 //   node scripts/mrg-banco-teste.mjs up
 //   PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/home-subtarefas-ativas-ownership.test.ts
 // ============================================================================
 import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
-import { carregarBase, montarPrazosDeSubtarefas, montarPrazosDeTarefas, type ContextoHome } from "@/src/lib/home/coleta"
+import { carregarBase, montarPrazosDeSubtarefas, montarPrazosDeTarefas, montarAcompanhamentos, type ContextoHome } from "@/src/lib/home/coleta"
 
 const MARCA = "HOMESUBAT"
 
@@ -120,10 +124,17 @@ async function main() {
         chaveIdempotencia: `${MARCA}-wt${i}`, statusTarefa: "AGUARDANDO_TERCEIRO", responsavelId: daniela.id, dataPrazo: prazoMacro,
       },
     })
+    // Acompanhamento (dimensão D) — misto de propósito: #0 vencido (ontem),
+    // #1 futuro (amanhã), #2 sem acompanhamento configurado (null) — prova
+    // que o painel só mostra quem TEM a data, nunca inventa uma.
+    const ontem = new Date(); ontem.setDate(ontem.getDate() - 1)
+    const amanha = new Date(); amanha.setDate(amanha.getDate() + 1)
+    const proximoAcompanhamentoEm = i === 0 ? ontem : i === 1 ? amanha : null
     await prisma.subtaskExecution.create({
       data: {
         stepInstanceId: si.id, subtaskKey: "aguardar_retorno", sequencia: 1, status: "AGUARDANDO_EXTERNO",
-        motivo: "ABERTURA", prazo: prazoPasso, previstoPara: prazoPasso, chaveIdempotencia: `${MARCA}-wsub${i}`,
+        motivo: "ABERTURA", prazo: prazoPasso, previstoPara: prazoPasso, proximoAcompanhamentoEm,
+        chaveIdempotencia: `${MARCA}-wsub${i}`,
       },
     })
   }
@@ -154,6 +165,18 @@ async function main() {
     noPrazo?.quantidade === 6, String(noPrazo?.quantidade))
   ok("Home/Tarefas não conta em 'próximos 3 dias' (isso seria confundir o prazo do passo com o macro)",
     painelTarefas.find((f) => f.key === "tarefa-proximos-3")?.quantidade === 0)
+
+  // ── ACOMPANHAMENTOS — painel PRÓPRIO (dimensão D), nunca fundido com prazo ──
+  const painelAcompanhamento = montarAcompanhamentos(base, ctx)!
+  const totalAcompanhamento = painelAcompanhamento.reduce((soma, f) => soma + f.quantidade, 0)
+  ok("Acompanhamentos conta só as 2 com data configurada (das 3 AGUARDANDO_EXTERNO — 1 está sem acompanhamento)",
+    totalAcompanhamento === 2, `soma = ${totalAcompanhamento}`)
+  ok("'Acompanhamentos atrasados' conta a #0 (ontem)",
+    painelAcompanhamento.find((f) => f.key === "acompanhamento-atrasados")?.quantidade === 1)
+  ok("'Acompanhamento — próximos 3 dias' conta a #1 (amanhã)",
+    painelAcompanhamento.find((f) => f.key === "acompanhamento-proximos-3")?.quantidade === 1)
+  ok("as 3 de AÇÃO INTERNA (DISPONIVEL) não entram em acompanhamento nenhum — só espera de terceiro tem",
+    painelAcompanhamento.every((f) => f.quantidade <= 2))
 
   console.log(`\n${passou} passaram, ${falhou} falharam`)
   if (falhou > 0) { console.log("Falhas:", falhas.join(" | ")); process.exitCode = 1 }

@@ -283,6 +283,27 @@ export function faixaDaFilaPrazo(key: string): FilaPrazoDef | null {
   return [...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA].find((f) => f.key === key) ?? null
 }
 
+// ---------------------------------------------------------------------------
+// FILAS DE ACOMPANHAMENTO — dimensão D, PRÓPRIA da espera de terceiro
+// (`SubtaskExecution.proximoAcompanhamentoEm`), nunca prazo/SLA (mandato
+// "correção definitiva do modelo temporal", 19-20/09/2026, seção 5/8). Uma
+// subtarefa AGUARDANDO_EXTERNO nunca entra nos baldes de PRAZO
+// (`FILAS_PRAZO_SUBTAREFA`, acima) — é aqui, e só aqui, que ela aparece
+// quando tem acompanhamento configurado.
+// ---------------------------------------------------------------------------
+export const FILAS_ACOMPANHAMENTO: FilaPrazoDef[] = [
+  { key: "acompanhamento-atrasados", faixa: "atrasadas", grain: "subtarefa", titulo: "Acompanhamentos atrasados", descricao: "O próximo acompanhamento já venceu", modulo: "tarefas", nivelBase: "critico" },
+  { key: "acompanhamento-hoje", faixa: "vencem-hoje", grain: "subtarefa", titulo: "Acompanhar hoje", descricao: "Próximo acompanhamento programado para hoje", modulo: "tarefas", nivelBase: "alto" },
+  { key: "acompanhamento-proximos-3", faixa: "proximos-3", grain: "subtarefa", titulo: "Acompanhamento — próximos 3 dias", descricao: "Próximo acompanhamento nos próximos 3 dias", modulo: "tarefas", nivelBase: "medio" },
+  { key: "acompanhamento-proximos-7", faixa: "proximos-7", grain: "subtarefa", titulo: "Acompanhamento — próximos 7 dias", descricao: "Próximo acompanhamento nos próximos 7 dias", modulo: "tarefas", nivelBase: "baixo" },
+  { key: "acompanhamento-aguardando", faixa: "no-prazo", grain: "subtarefa", titulo: "Aguardando — sem acompanhamento devido", descricao: "Espera de terceiro dentro do previsto", modulo: "tarefas", nivelBase: "baixo" },
+]
+
+/** A faixa/grain de acompanhamento de uma fila; null quando a fila não é de acompanhamento. */
+export function faixaDaFilaAcompanhamento(key: string): FilaPrazoDef | null {
+  return FILAS_ACOMPANHAMENTO.find((f) => f.key === key) ?? null
+}
+
 /** Classifica um `EstadoTemporal` já calculado numa das 5 faixas de prazo. */
 export function faixaPrazoDoEstado(diasParaPrazo: number | null, atrasado: boolean): FaixaPrazo | null {
   if (diasParaPrazo == null) return null
@@ -293,7 +314,7 @@ export function faixaPrazoDoEstado(diasParaPrazo: number | null, atrasado: boole
   return "no-prazo"
 }
 
-export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA]
+export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA, ...FILAS_ACOMPANHAMENTO]
 
 const FILA_POR_VERBO = new Map<string, string>()
 for (const f of FILAS_PASSO) for (const v of f.verbos ?? []) FILA_POR_VERBO.set(v, f.key)

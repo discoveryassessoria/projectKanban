@@ -86,7 +86,13 @@ export interface SubtarefaProjetada {
   bloqueioAlvo: string | null
   /// O motivo em português, pronto para a tela. Quem o escreve é o servidor.
   bloqueioTexto: string | null
-  execucao: { id: number; sequencia: number; resultado: string | null; completedAt: string | null } | null
+  execucao: {
+    id: number; sequencia: number; resultado: string | null; completedAt: string | null
+    /// Dimensão C (regra temporal do terceiro) — nunca prazo, nunca acompanhamento.
+    previstoPara: string | null
+    /// Dimensão D (acompanhamento) — quando esta espera volta à atenção.
+    proximoAcompanhamentoEm: string | null
+  } | null
   ocorrencias: number
   podeRepetir: boolean
   canais: Array<{ key: string; label: string; exigeProtocolo: boolean; exigeAnexo: boolean; exigeRastreio: boolean; exigeObservacao: boolean; endereco: string | null }>

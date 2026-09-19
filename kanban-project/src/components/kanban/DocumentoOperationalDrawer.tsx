@@ -678,10 +678,13 @@ function ConteudoDrawer({
                     </button>
                   ) : null}
                 </div>
-                {/* SLA */}
+                {/* PRAZO DA TAREFA — dimensão A (prazo oficial), nunca "SLA": rótulo
+                    genérico demais e ambíguo com o que hoje é acompanhamento/regra
+                    temporal da espera corrente. Mandato "correção definitiva do
+                    modelo temporal" (19-20/09/2026), seção 11. */}
                 <div className="flex flex-col gap-1.5">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    SLA
+                    Prazo da tarefa
                   </div>
                   <div className={`flex items-center gap-1.5 text-[13px] font-semibold ${sla.cls || "text-white/85"}`}>
                     <Clock className="w-4 h-4 flex-shrink-0" />

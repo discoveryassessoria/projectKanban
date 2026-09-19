@@ -551,6 +551,7 @@ function SubtarefaRow({
   subtarefa: {
     key: string; label: string; descricao: string | null; concluida: boolean; disponivel: boolean
     status: string; bloqueioTexto: string | null; slaDays: number | null
+    execucao?: { previstoPara: string | null; proximoAcompanhamentoEm: string | null } | null
   }
   ordem: number
   onOpenCentral: (subtarefaKey?: string) => void
@@ -637,6 +638,31 @@ function SubtarefaRow({
               {s.bloqueioTexto && (
                 <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-800">
                   {s.bloqueioTexto}
+                </div>
+              )}
+              {/* REGRA TEMPORAL (dimensão C) e ACOMPANHAMENTO (dimensão D) desta
+                  espera — dois relógios PRÓPRIOS, nunca o prazo oficial da
+                  Tarefa nem o "Prazo do passo" (SLA de ação interna) acima.
+                  Só aparecem quando o cadastro os liga (mandato "correção
+                  definitiva do modelo temporal", 19-20/09/2026, seção 6). */}
+              {esperandoTerceiro && (s.execucao?.previstoPara || s.execucao?.proximoAcompanhamentoEm) && (
+                <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
+                  {s.execucao?.previstoPara && (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)]">Regra temporal</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${fmtSla(s.execucao.previstoPara).cls}`}>
+                        {fmtSla(s.execucao.previstoPara).label}
+                      </span>
+                    </span>
+                  )}
+                  {s.execucao?.proximoAcompanhamentoEm && (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="text-[var(--text-secondary)]">Acompanhamento</span>
+                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${fmtSla(s.execucao.proximoAcompanhamentoEm).cls}`}>
+                        {fmtSla(s.execucao.proximoAcompanhamentoEm).label}
+                      </span>
+                    </span>
+                  )}
                 </div>
               )}
             </>
@@ -874,7 +900,11 @@ function StepCard({
               </span>
               <span className="text-[var(--text-secondary)]">·</span>
               <span className="inline-flex items-center gap-1">
-                <span className="text-[var(--text-secondary)]">SLA</span>
+                {/* "Prazo do passo", nunca "SLA" — termo genérico que o mandato
+                    "correção definitiva do modelo temporal" (19-20/09/2026)
+                    mandou parar de usar; é a dimensão B (ação interna deste
+                    passo), nunca o prazo oficial da Tarefa. */}
+                <span className="text-[var(--text-secondary)]">Prazo do passo</span>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${sla.cls}`}>
                   {sla.label}
                 </span>

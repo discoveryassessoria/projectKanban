@@ -19,7 +19,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { ArrowRight, CheckCircle2, ChevronRight } from "lucide-react"
+import { ArrowRight, CheckCircle2, ChevronRight, Eye } from "lucide-react"
 import type { AgendaItem, FilaOperacional, HomeData } from "@/src/types/home"
 import { CommandPalette } from "@/src/components/home/command-palette"
 import {
@@ -243,6 +243,33 @@ function PrazosBloco({ data }: { data: HomeData }) {
   )
 }
 
+/**
+ * ACOMPANHAMENTOS — bloco PRÓPRIO, deliberadamente SEPARADO de "Prazos"
+ * acima. Mandato "correção definitiva do modelo temporal" (19-20/09/2026),
+ * seção 5: "a Home NÃO deve continuar comunicando dois 'prazos'
+ * concorrentes." Acompanhamento não é prazo nem SLA — é "quando esta espera
+ * de terceiro volta à atenção". Reaproveita o MESMO `PainelDePrazo` genérico
+ * (mesma UI, dado diferente), nunca um componente novo pra mesma vitrine.
+ */
+function AcompanhamentosBloco({ data }: { data: HomeData }) {
+  const acompanhamentos = data.acompanhamentos ?? null
+  if (!acompanhamentos) return null
+
+  return (
+    <BlocoCard id="acompanhamentos">
+      <BlocoHeader titulo="Acompanhamentos" descricao="Esperas de terceiro que voltam à atenção — nunca um prazo" />
+      <div className="grid grid-cols-1 gap-3.5">
+        <PainelDePrazo
+          icone={Eye}
+          titulo="Acompanhamento das esperas"
+          descricao="Quando cada espera de terceiro volta a pedir atenção"
+          cards={acompanhamentos}
+        />
+      </div>
+    </BlocoCard>
+  )
+}
+
 // ===========================================================================
 // 4. AGENDA — hoje, amanhã, próximos dias.
 // ===========================================================================
@@ -351,6 +378,7 @@ export function HomeContent({ data }: { data: HomeData }) {
           </div>
 
           <PrazosBloco data={data} />
+          <AcompanhamentosBloco data={data} />
         </>
       )}
     </div>

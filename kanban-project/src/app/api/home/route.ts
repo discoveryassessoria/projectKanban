@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
-import { carregarBase, contarTrabalhoPendenteDistinto, montarAgenda, montarAlertas, montarFilas, montarPrazosDeTarefas, montarPrazosDeSubtarefas, montarPrazosResumo, montarResumoDia, type ContextoHome } from "@/src/lib/home/coleta"
+import { carregarBase, contarTrabalhoPendenteDistinto, montarAgenda, montarAlertas, montarFilas, montarPrazosDeTarefas, montarPrazosDeSubtarefas, montarAcompanhamentos, montarPrazosResumo, montarResumoDia, type ContextoHome } from "@/src/lib/home/coleta"
 import { montarStatus } from "@/src/lib/home/home-logic"
 import type { HomeData, HomePermissions } from "@/src/types/home"
 import { agregacaoPorFamilia, indicadoresGerenciais } from "@/lib/operacional/tarefa-projecoes"
@@ -100,6 +100,9 @@ export async function GET(request: NextRequest) {
       prazosResumo: montarPrazosResumo(base, ctx),
       prazosTarefas: montarPrazosDeTarefas(base, ctx),
       prazosSubtarefas: montarPrazosDeSubtarefas(base, ctx),
+      // ACOMPANHAMENTOS — painel PRÓPRIO, nunca fundido com prazos (mandato
+      // "correção definitiva do modelo temporal", 19-20/09/2026, seção 5).
+      acompanhamentos: montarAcompanhamentos(base, ctx),
       agenda,
       alertas,
       resumoDia,

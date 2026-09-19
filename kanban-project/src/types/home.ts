@@ -175,6 +175,14 @@ export interface HomeData {
   prazosTarefas: FilaOperacional[] | null
   /** grain SUBTAREFA (prazo OPERACIONAL, ação corrente) — o relógio mais fino, convive com `prazosTarefas` sem substituí-lo. null quando o usuário não vê tarefas. */
   prazosSubtarefas: FilaOperacional[] | null
+  /**
+   * ACOMPANHAMENTOS — dimensão D, PRÓPRIA (`SubtaskExecution.proximoAcompanhamentoEm`),
+   * NUNCA um terceiro "prazo": diz quando uma espera de terceiro volta à
+   * atenção, não quando algo vence. Convive com `prazosTarefas`/`prazosSubtarefas`
+   * sem se misturar a nenhum dos dois (mandato "correção definitiva do modelo
+   * temporal", 19-20/09/2026). null quando o usuário não vê tarefas.
+   */
+  acompanhamentos: FilaOperacional[] | null
   agenda: Agenda
   /** vazio = o bloco de alertas não é renderizado */
   alertas: AlertaOperacional[]
