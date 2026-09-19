@@ -241,7 +241,19 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
          { nome: "tipos de canal", ler: (x) => x.tiposDeCanal },
          { nome: "reabertura permitida", ler: (x) => x.reaberturaPermitida },
          { nome: "reabertura exige justificativa", ler: (x) => x.reaberturaExigeJustificativa },
-         { nome: "permissão de reabertura", ler: (x) => x.reaberturaPermissao }]),
+         { nome: "permissão de reabertura", ler: (x) => x.reaberturaPermissao },
+         // CONTROLE TEMPORAL DA ESPERA (mandato "correção definitiva do
+         // modelo temporal", 19-20/09/2026) — faltavam aqui: o conteúdo
+         // congelado sempre esteve correto (`retratarPassos`), só esta tela
+         // de prévia não nomeava a mudança. Achado real da auditoria pós-
+         // deploy de 19/09/2026, publicação do workflow #12 v14: o diff não
+         // mostrou nenhuma linha para "regra temporal ativada".
+         { nome: "espera de terceiro ao liberar", ler: (x) => x.esperaExternaAoLiberar },
+         { nome: "acompanhamento ativo", ler: (x) => x.acompanhamentoAtivo },
+         { nome: "acompanhamento — primeiro em (dias)", ler: (x) => x.acompanhamentoPrimeiroDias },
+         { nome: "regra temporal ativa", ler: (x) => x.regraTemporalAtiva },
+         { nome: "regra temporal (dias)", ler: (x) => x.regraTemporalDias },
+         { nome: "regra temporal — gatilho", ler: (x) => x.regraTemporalGatilhoChave }]),
     )
     // OS FILHOS DE CADA SUBTAREFA — o passo é nomeado como "Passo › Subtarefa", para
     // a linha do diff dizer onde a mudança está sem obrigar a caçar.

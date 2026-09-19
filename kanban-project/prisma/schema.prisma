@@ -8124,6 +8124,17 @@ model NotificacaoOperacional {
   mensagem String? @db.Text
   link     String? @db.VarChar(300)
 
+  /// OS MOTIVOS CONSOLIDADOS DESTE ACONTECIMENTO (mandato "consolidação do
+  /// sino", 19/09/2026) — `MotivoAtencao[]` (`atencao-operacional.ts`), ex.:
+  /// `["PRAZO_TAREFA_VENCIDO","ACOMPANHAMENTO_DEVIDO","TERCEIRO_ATRASADO"]`.
+  /// `tipo` continua sendo o rótulo PRINCIPAL (compatibilidade com quem já lê
+  /// `tipo`, ex. Saúde do Sistema); `motivos` é o payload completo, para a
+  /// mesma tarefa nunca gerar duas notificações quando dois relógios vencem
+  /// juntos — um FATO consolidado, motivos múltiplos preservados. `null` nas
+  /// notificações que não passam por este caminho (ATRIBUICAO, TRANSFERENCIA,
+  /// RETORNO_TERCEIRO, FASE_CONCLUIDA — nunca inventado para elas).
+  motivos Json?
+
   /// Quem provocou o marco (quem atribuiu, quem transferiu). Nulo quando o
   /// marco é do relógio (prazo, atraso, acompanhamento, risco, fase).
   autorId Int?

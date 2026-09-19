@@ -57,6 +57,11 @@ export const TIPOS_NOTIFICACAO = [
   "ATRASO",
   "RETORNO_TERCEIRO",
   "ACOMPANHAMENTO_VENCIDO",
+  // REGRA TEMPORAL DA ESPERA VENCIDA (mandato "consolidação do sino",
+  // 19/09/2026) — irmão de ACOMPANHAMENTO_VENCIDO, nunca a mesma fonte: um é
+  // "quando volta à atenção", o outro é "limite da espera do terceiro". Ver
+  // `MotivoAtencao.TERCEIRO_ATRASADO` (atencao-operacional.ts).
+  "TERCEIRO_ATRASADO",
   "EM_RISCO",
   "FASE_CONCLUIDA",
   // OBRIGAÇÃO ADMINISTRATIVA (17/09/2026) — "N tarefas sem responsável" é UMA
@@ -78,6 +83,16 @@ export interface AcontecimentoNotificavel {
   titulo: string
   mensagem?: string | null
   link?: string | null
+  /**
+   * OS MOTIVOS CONSOLIDADOS (mandato "consolidação do sino", 19/09/2026) —
+   * `MotivoAtencao[]` quando este acontecimento vem da mesma leitura
+   * operacional da Minha Operação (`motivosAtivos`). `tipo` continua sendo o
+   * rótulo principal; isto é o payload completo, para a MESMA Tarefa nunca
+   * gerar duas notificações quando dois relógios vencem juntos. `null`/
+   * omitido para os tipos que não passam por essa leitura (ATRIBUICAO,
+   * TRANSFERENCIA, RETORNO_TERCEIRO, FASE_CONCLUIDA...).
+   */
+  motivos?: string[] | null
   /**
    * A CHAVE COMPLETA — montada pelo chamador, que é quem conhece o FATO que
    * não pode se repetir. Esta porta não deriva nada dela; só garante unicidade.
@@ -128,6 +143,7 @@ export async function notificarAcontecimento(
         mensagem: e.mensagem ?? null,
         link: e.link ?? null,
         autorId: e.autorId ?? null,
+        motivos: e.motivos ?? undefined,
         chaveIdempotencia: e.chaveIdempotencia,
       },
       select: { id: true },

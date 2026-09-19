@@ -28,6 +28,8 @@ import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
 import { notificarAcontecimento, marcarAtribuicaoComoLidaAoProgredir } from './notificacao-canonica'
 import { estadosTemporaisDasOperacoes } from './proximo-acontecimento'
+import { motivosAtivos, ROTULO_MOTIVO, type MotivoAtencao } from './atencao-operacional'
+import { visaoGerencial } from './tarefa-projecoes'
 import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
 
 export type ResultadoComando =
@@ -371,7 +373,7 @@ export interface RelatorioDaVarredura {
  * "Sem responsável", que é onde essa pendência se resolve.
  */
 export async function avisarPrazosEAtrasos(
-  opts: { agora?: Date; ensaio?: boolean } = {},
+  opts: { agora?: Date; ensaio?: boolean; excluirTarefaIds?: number[] } = {},
 ): Promise<RelatorioDaVarredura> {
   const agora = opts.agora ?? new Date()
   const ensaio = opts.ensaio === true
@@ -384,6 +386,13 @@ export async function avisarPrazosEAtrasos(
     where: {
       statusTarefa: { notIn: STATUS_TERMINAIS },
       dataPrazo: { not: null, lte: fimDeAmanha },
+      // EXCLUSÃO OPCIONAL (mandato "consolidação do sino", 19/09/2026) —
+      // vazio/omitido não muda nada (todo chamador existente continua
+      // exatamente como estava). Só o cron novo passa a lista de tarefas
+      // que `avisarAtencaoConsolidada` já notificou nesta mesma varredura
+      // (2+ relógios vencendo juntos): sem isto, a MESMA tarefa receberia o
+      // aviso consolidado E o aviso isolado de ATRASO no mesmo instante.
+      ...(opts.excluirTarefaIds?.length ? { id: { notIn: opts.excluirTarefaIds } } : {}),
     },
     select: {
       id: true, titulo: true, responsavelId: true, dataPrazo: true,
@@ -525,14 +534,19 @@ export interface RelatorioDeAtencao {
  * frágil que o item 5 proíbe por analogia; registrado como dívida (item T).
  */
 export async function avisarAcontecimentosOperacionais(
-  opts: { agora?: Date; ensaio?: boolean } = {},
+  opts: { agora?: Date; ensaio?: boolean; excluirTarefaIds?: number[] } = {},
 ): Promise<RelatorioDeAtencao> {
   const agora = opts.agora ?? new Date()
   const ensaio = opts.ensaio === true
   const inicio = new Date()
 
   const abertas = await prisma.tarefa.findMany({
-    where: { statusTarefa: { notIn: STATUS_TERMINAIS } },
+    where: {
+      statusTarefa: { notIn: STATUS_TERMINAIS },
+      // Mesma exclusão opcional de `avisarPrazosEAtrasos` — ver o comentário
+      // lá. Vazio/omitido não muda nada para nenhum chamador existente.
+      ...(opts.excluirTarefaIds?.length ? { id: { notIn: opts.excluirTarefaIds } } : {}),
+    },
     select: { id: true, titulo: true, processoId: true },
   })
   const tituloPorTarefa = new Map(abertas.map((t) => [t.id, t.titulo]))
@@ -634,6 +648,148 @@ export async function avisarAcontecimentosOperacionais(
         console.error(`[atencao] falha ao notificar tarefa ${tarefaId} (${a.tipo}):`, e)
       }
     }
+  }
+
+  r.fim = new Date().toISOString()
+  return r
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ATENÇÃO CONSOLIDADA — a mesma verdade da Minha Operação, uma notificação
+// por colisão (mandato "consolidação do sino", 19/09/2026)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * O TIPO PRINCIPAL de uma notificação consolidada — a mesma precedência que
+ * `classificarAtencaoOperacional` já usa para decidir a fila principal da
+ * Minha Operação (atraso interno → terceiro atrasado → acompanhamento). Não
+ * é uma segunda regra: é a mesma lida a partir do conjunto de `motivos`.
+ */
+export type TipoAtencaoConsolidada = 'ATRASO' | 'ACOMPANHAMENTO_VENCIDO' | 'TERCEIRO_ATRASADO'
+
+export function tipoPrincipalDeAtencao(motivos: MotivoAtencao[]): TipoAtencaoConsolidada | null {
+  if (motivos.includes('PRAZO_TAREFA_VENCIDO') || motivos.includes('PRAZO_PASSO_VENCIDO')) return 'ATRASO'
+  if (motivos.includes('ACOMPANHAMENTO_DEVIDO')) return 'ACOMPANHAMENTO_VENCIDO'
+  if (motivos.includes('TERCEIRO_ATRASADO')) return 'TERCEIRO_ATRASADO'
+  return null
+}
+
+/**
+ * A CHAVE DO ACONTECIMENTO CONSOLIDADO — tarefa + destinatário + o CONJUNTO
+ * de motivos ativos, ordenado. Mesmo desenho de `EM_RISCO` (o único marco
+ * que já precisava de "chave por conjunto de motivos" antes desta rodada):
+ * sem componente de dia, então permanecer com o MESMO conjunto de motivos
+ * nunca renotifica — é o mesmo fato, ainda válido. O conjunto MUDAR (um
+ * motivo a mais, ou a menos) é um fato novo, com chave nova. O sino continua
+ * notificando acontecimentos, nunca virando espelho permanente dos relógios.
+ */
+export function chaveDeAtencaoConsolidada(tarefaId: number, motivos: MotivoAtencao[], destinatarioId: number): string {
+  return `notif::atencao::t${tarefaId}::${[...motivos].sort().join('+')}::u${destinatarioId}`
+}
+
+export interface RelatorioDeAtencaoConsolidada {
+  inicio: string
+  fim: string
+  avaliadas: number
+  consolidadas: number
+  deduplicadas: number
+  semDestinatario: number
+  erros: number
+  ensaio: boolean
+  /** Os taskIds que esta varredura já notificou — os OUTROS dois crons devem
+   *  excluí-los (`excluirTarefaIds`) para a MESMA tarefa nunca receber um
+   *  segundo aviso isolado (ATRASO/ACOMPANHAMENTO_VENCIDO) no mesmo instante. */
+  tarefasConsolidadas: number[]
+  previa: Array<{ tarefaId: number; tipo: TipoAtencaoConsolidada; motivos: MotivoAtencao[]; destinatarioId: number }>
+}
+
+/**
+ * A VARREDURA CONSOLIDADA — lê a MESMA projeção da Minha Operação
+ * (`visaoGerencial`, os mesmos `LinhaGerencial` que alimentam a fila real) e
+ * usa a MESMA função pura de motivos (`motivosAtivos`, `atencao-operacional.
+ * ts`) — nunca uma segunda leitura do relógio com semântica própria.
+ *
+ * ─── QUANDO ESTA VARREDURA ASSUME A TAREFA ──────────────────────────────────
+ * Só quando NINGUÉM mais seria o dono natural do aviso:
+ *   • 2+ motivos ativos ao mesmo tempo (a colisão que este mandato pede para
+ *     nunca virar 2-3 notificações);
+ *   • `TERCEIRO_ATRASADO` sozinho — dimensão nova (regra temporal da espera),
+ *     `avisarPrazosEAtrasos`/`avisarAcontecimentosOperacionais` nunca a
+ *     notificavam;
+ *   • `ACOMPANHAMENTO_DEVIDO` sozinho, quando vem SÓ do relógio novo da
+ *     subtarefa (`acompanhamentoPasso`) — `avisarAcontecimentosOperacionais`
+ *     só sabe ler o relógio antigo da Tarefa (`estado.acompanhamentoVencido`);
+ *     sem esta cláusula, a dimensão nova desta sessão nunca notificaria
+ *     ninguém quando agisse sozinha.
+ * Um único motivo com dono já existente (prazo isolado, acompanhamento
+ * isolado do relógio antigo) continua sendo aviso DO DONO DE SEMPRE — os
+ * formatos de chave testados há meses não mudam.
+ */
+export async function avisarAtencaoConsolidada(
+  opts: { agora?: Date; ensaio?: boolean } = {},
+): Promise<RelatorioDeAtencaoConsolidada> {
+  const agora = opts.agora ?? new Date()
+  const ensaio = opts.ensaio === true
+  const inicio = new Date()
+
+  const r: RelatorioDeAtencaoConsolidada = {
+    inicio: inicio.toISOString(), fim: inicio.toISOString(),
+    avaliadas: 0, consolidadas: 0, deduplicadas: 0, semDestinatario: 0, erros: 0,
+    ensaio, tarefasConsolidadas: [], previa: [],
+  }
+
+  const porPagina = 500
+  let pagina = 1
+  for (;;) {
+    const { linhas, total } = await visaoGerencial({ pagina, porPagina }, agora)
+    r.avaliadas += linhas.length
+
+    for (const l of linhas) {
+      const motivos = motivosAtivos(l)
+      const acompanhamentoSoViaSubtarefa =
+        motivos.includes('ACOMPANHAMENTO_DEVIDO') && !l.acompanhamentoVencido &&
+        (l.acompanhamentoPasso?.atrasado === true || l.acompanhamentoPasso?.venceHoje === true)
+      const precisaConsolidar =
+        motivos.length >= 2 || motivos.includes('TERCEIRO_ATRASADO') || acompanhamentoSoViaSubtarefa
+      if (!precisaConsolidar) continue
+
+      const tipo = tipoPrincipalDeAtencao(motivos)
+      if (tipo == null) continue
+      if (l.responsavelId == null) { r.semDestinatario++; continue }
+
+      const chave = chaveDeAtencaoConsolidada(l.taskId, motivos, l.responsavelId)
+
+      if (ensaio) {
+        const ja = await prisma.notificacaoOperacional.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
+        r.tarefasConsolidadas.push(l.taskId)
+        if (ja) { r.deduplicadas++; continue }
+        r.previa.push({ tarefaId: l.taskId, tipo, motivos, destinatarioId: l.responsavelId })
+        r.consolidadas++
+        continue
+      }
+
+      try {
+        const criada = await prisma.$transaction((tx) => notificarAcontecimento(tx, {
+          tipo,
+          destinatarioId: l.responsavelId!,
+          tarefaId: l.taskId,
+          titulo: motivos.length > 1 ? 'Atenção necessária — múltiplos motivos' : ROTULO_MOTIVO[motivos[0]],
+          mensagem: `${l.titulo} — ${motivos.map((m) => ROTULO_MOTIVO[m]).join('; ')}.`,
+          link: linkDaTarefa(l.taskId, l.processoId),
+          motivos,
+          chaveIdempotencia: chave,
+        }))
+        r.tarefasConsolidadas.push(l.taskId)
+        if (criada.criada) r.consolidadas++
+        else r.deduplicadas++
+      } catch (e) {
+        r.erros++
+        console.error(`[atencao-consolidada] falha ao notificar tarefa ${l.taskId}:`, e)
+      }
+    }
+
+    if (pagina * porPagina >= total) break
+    pagina++
   }
 
   r.fim = new Date().toISOString()

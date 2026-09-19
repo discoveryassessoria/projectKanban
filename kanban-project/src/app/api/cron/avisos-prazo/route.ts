@@ -32,7 +32,7 @@
 // CRON_SECRET ou operador autenticado com permissão de gerenciamento).
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
-import { avisarPrazosEAtrasos, avisarAcontecimentosOperacionais } from '@/lib/operacional/tarefa-comandos'
+import { avisarPrazosEAtrasos, avisarAcontecimentosOperacionais, avisarAtencaoConsolidada } from '@/lib/operacional/tarefa-comandos'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 
@@ -58,13 +58,25 @@ async function executar(req: NextRequest) {
   const ensaio = new URL(req.url).searchParams.get('ensaio') === '1'
 
   try {
+    // A CONSOLIDADA VAI PRIMEIRO, e sozinha — ela decide quais tarefas têm
+    // 2+ relógios vencendo juntos (ou a dimensão nova, TERCEIRO_ATRASADO/
+    // acompanhamento só da subtarefa) e as duas varreduras de sempre
+    // recebem essa lista para EXCLUIR: a mesma tarefa nunca recebe o aviso
+    // consolidado E o aviso isolado no mesmo instante (mandato "consolidação
+    // do sino", 19/09/2026).
+    const consolidada = await avisarAtencaoConsolidada({ ensaio })
     const [prazos, atencao] = await Promise.all([
-      avisarPrazosEAtrasos({ ensaio }),
-      avisarAcontecimentosOperacionais({ ensaio }),
+      avisarPrazosEAtrasos({ ensaio, excluirTarefaIds: consolidada.tarefasConsolidadas }),
+      avisarAcontecimentosOperacionais({ ensaio, excluirTarefaIds: consolidada.tarefasConsolidadas }),
     ])
     // O log da EXECUÇÃO, não da tarefa: registrar "verifiquei a tarefa 3358"
     // uma vez por hora encheria o histórico de cada tarefa com o fato de nada
     // ter acontecido.
+    console.log(
+      `[cron/atencao-consolidada]${ensaio ? ' ENSAIO' : ''} avaliadas=${consolidada.avaliadas} ` +
+      `consolidadas=${consolidada.consolidadas} dedup=${consolidada.deduplicadas} ` +
+      `semDestinatario=${consolidada.semDestinatario} erros=${consolidada.erros}`,
+    )
     console.log(
       `[cron/avisos-prazo]${ensaio ? ' ENSAIO' : ''} avaliadas=${prazos.avaliadas} ` +
       `prazo=${prazos.prazo} atraso=${prazos.atraso} dedup=${prazos.deduplicados} ` +
@@ -76,8 +88,8 @@ async function executar(req: NextRequest) {
       `dedup=${atencao.deduplicados} semDestinatario=${atencao.semDestinatario} erros=${atencao.erros}`,
     )
     // Erro em tarefa isolada não é sucesso: o agendador precisa enxergar.
-    const erros = prazos.erros + atencao.erros
-    return NextResponse.json({ prazos, atencao }, { status: erros > 0 ? 207 : 200 })
+    const erros = consolidada.erros + prazos.erros + atencao.erros
+    return NextResponse.json({ consolidada, prazos, atencao }, { status: erros > 0 ? 207 : 200 })
   } catch (e) {
     console.error('[cron/avisos-prazo] falha na varredura:', e)
     return NextResponse.json(

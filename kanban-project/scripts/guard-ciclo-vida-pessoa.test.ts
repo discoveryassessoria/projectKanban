@@ -354,6 +354,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "mandato \"correção definitiva do modelo temporal\" (19-20/09/2026): monta e derruba a PRÓPRIA " +
     "árvore/pessoa/processo (marca CENTDIV) só no banco de teste, para reproduzir e provar ausente " +
     "o cenário de Tarefa concluída aparecendo junto de workflow em progresso parcial",
+  "scripts/sino-consolidacao-atencao.test.ts":
+    "prova a consolidação do sino (mandato \"consolidação do sino\", 19/09/2026): monta e derruba " +
+    "as PRÓPRIAS 4 árvores/pessoas de teste (marca SINOCONS) só no banco de teste, para provar 1 " +
+    "notificação por colisão de motivos (prazo+acompanhamento+terceiro) em vez de 3",
   "scripts/dados-controlados-teste-visual.ts":
     "dados controlados para validação visual manual (mandato \"correção definitiva do modelo " +
     "temporal\", 19-20/09/2026, seção 18): cria/remove os PRÓPRIOS 6 processos/árvores/pessoas de " +
