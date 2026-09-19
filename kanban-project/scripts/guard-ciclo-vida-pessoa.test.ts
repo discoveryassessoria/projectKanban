@@ -350,6 +350,17 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/palco-planilha-referencia.ts":
     "palco de comparação visual da Planilha Documental: monta e derruba a PRÓPRIA árvore fictícia, " +
     "só no banco de teste (exigirBancoDeTeste) — nunca remove pessoa de árvore real",
+  "scripts/central-tarefa-concluida-vs-workflow-aberto.test.ts":
+    "mandato \"correção definitiva do modelo temporal\" (19-20/09/2026): monta e derruba a PRÓPRIA " +
+    "árvore/pessoa/processo (marca CENTDIV) só no banco de teste, para reproduzir e provar ausente " +
+    "o cenário de Tarefa concluída aparecendo junto de workflow em progresso parcial",
+  "scripts/dados-controlados-teste-visual.ts":
+    "dados controlados para validação visual manual (mandato \"correção definitiva do modelo " +
+    "temporal\", 19-20/09/2026, seção 18): cria/remove os PRÓPRIOS 6 processos/árvores/pessoas de " +
+    "teste, sempre com o prefixo \"[TESTE VISUAL]\" no nome — seco por padrão, só escreve com " +
+    "--aplicar e só depois de autorização explícita; `--limpar` remove exatamente o que criou. " +
+    "Roda no ambiente que for apontado (inclusive produção, quando autorizado) — nunca toca " +
+    "processo/pessoa que não tenha essa marca",
 }
 
 const RUNTIME = ["src", "lib"]
