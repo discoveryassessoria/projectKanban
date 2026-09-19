@@ -43,6 +43,7 @@
 //   npx tsx scripts/dados-controlados-teste-visual.ts --limpar    (remove tudo que este script criou)
 
 import { prisma } from "@/lib/prisma"
+import { diaOperacional } from "@/lib/operacional/tempo-operacional"
 
 const MARCA = "TESTEVIS"
 
@@ -77,9 +78,9 @@ async function main() {
     return
   }
 
-  const daniela = await prisma.usuario.findFirst({ where: { tipo: { in: ["assistente", "operacional"] } }, orderBy: { id: "asc" }, select: { id: true, nome: true } })
-  if (!daniela) {
-    console.error("ABORTADO: nenhum usuário operacional encontrado para ser o responsável dos testes.")
+  const daniela = await prisma.usuario.findUnique({ where: { id: 12 }, select: { id: true, nome: true } })
+  if (!daniela || daniela.nome !== "Daniela Brait") {
+    console.error("ABORTADO: usuário #12 não é a Daniela esperada — verifique antes de prosseguir.")
     await prisma.$disconnect()
     process.exit(1)
   }
@@ -87,19 +88,25 @@ async function main() {
 
   const hoje = new Date()
   const dias = (n: number) => { const d = new Date(hoje); d.setDate(d.getDate() + n); return d }
+  // Hoje, MAIS TARDE (não "ontem"): é exatamente o caso que o mandato
+  // 19-20/09/2026 corrigiu — mesma data-calendário, horário ainda não
+  // chegado, e ainda assim deve entrar em "Acompanhar hoje" (classificação
+  // por DIA no fuso operacional, não por instante). Usar "ontem" aqui não
+  // provaria nada que o comportamento antigo (quebrado) também não passasse.
+  // Construído a partir do DIA operacional (não `agora + Nh`): um offset fixo
+  // de horas cruzaria pra amanhã dependendo de que horas são agora em SP —
+  // exatamente o bug de fronteira que este cenário existe para não repetir.
+  const hojeOperacionalYmd = diaOperacional(hoje)
+  const candidato23h = new Date(`${hojeOperacionalYmd}T23:00:00.000-03:00`)
+  const maisTardeHoje = candidato23h > hoje ? candidato23h : new Date(hoje.getTime() + 5 * 60_000)
 
   const cenarios = [
-    { letra: "A", nome: "Prazo oficial vencido", prazoOficial: dias(-1), acompanhamento: null as Date | null, regraTemporal: null as Date | null, esperando: false, esperado: "ATRASADA" },
-    // "Acompanhar hoje" dispara quando o acompanhamento já passou do instante
-    // atual (mesma régua de `acompanhamentoVencido` em proximo-acontecimento.ts,
-    // dimensão D da Tarefa — checado, não presumido). Um horário "mais tarde
-    // hoje" ainda não dispara a categoria; "ontem" é o valor que demonstra o
-    // comportamento real sem ambiguidade de fuso/hora.
-    { letra: "B", nome: "Acompanhar hoje (vencido ontem, prazo futuro)", prazoOficial: dias(30), acompanhamento: dias(-1), regraTemporal: null, esperando: true, esperado: "ACOMPANHAR HOJE, tarefa NÃO atrasada" },
-    { letra: "C", nome: "Terceiro atrasado (prazo futuro)", prazoOficial: dias(30), acompanhamento: null, regraTemporal: dias(-1), esperando: true, esperado: "TERCEIRO ATRASADO, tarefa NÃO atrasada" },
-    { letra: "D", nome: "Aguardando terceiro, acompanhamento futuro", prazoOficial: dias(30), acompanhamento: dias(5), regraTemporal: dias(10), esperando: true, esperado: "AGUARDANDO TERCEIRO" },
-    { letra: "E", nome: "Ação interna disponível", prazoOficial: dias(30), acompanhamento: null, regraTemporal: null, esperando: false, esperado: "PARA AGIR AGORA" },
-    { letra: "F", nome: "Colisão — prazo + acompanhamento + terceiro, tudo vencido", prazoOficial: dias(-1), acompanhamento: dias(-1), regraTemporal: dias(-2), esperando: true, esperado: "UMA Tarefa, motivos múltiplos, nunca 3 tarefas" },
+    { letra: "A", nome: "Prazo oficial vencido", nomeCurto: "Prazo vencido", prazoOficial: dias(-1), acompanhamento: null as Date | null, regraTemporal: null as Date | null, esperando: false, esperado: "ATRASADA" },
+    { letra: "B", nome: "Acompanhar hoje (mesma data-calendário, horário ainda não chegado, prazo futuro)", nomeCurto: "Acompanhar hoje", prazoOficial: dias(30), acompanhamento: maisTardeHoje, regraTemporal: null, esperando: true, esperado: "ACOMPANHAR HOJE, tarefa NÃO atrasada — mesmo com horário à frente do agora" },
+    { letra: "C", nome: "Terceiro atrasado (prazo futuro)", nomeCurto: "Terceiro atrasado", prazoOficial: dias(30), acompanhamento: null, regraTemporal: dias(-1), esperando: true, esperado: "TERCEIRO ATRASADO, tarefa NÃO atrasada" },
+    { letra: "D", nome: "Aguardando terceiro, acompanhamento futuro", nomeCurto: "Aguardando terceiro", prazoOficial: dias(30), acompanhamento: dias(5), regraTemporal: dias(10), esperando: true, esperado: "AGUARDANDO TERCEIRO" },
+    { letra: "E", nome: "Ação interna disponível", nomeCurto: "Ação disponível", prazoOficial: dias(30), acompanhamento: null, regraTemporal: null, esperando: false, esperado: "PARA AGIR AGORA" },
+    { letra: "F", nome: "Colisão — prazo + acompanhamento + terceiro, tudo vencido", nomeCurto: "Colisão de motivos", prazoOficial: dias(-1), acompanhamento: dias(-1), regraTemporal: dias(-2), esperando: true, esperado: "UMA Tarefa, motivos múltiplos, nunca 3 tarefas" },
   ]
 
   console.log("O QUE SERÁ CRIADO (6 processos, 1 por letra):")
@@ -148,7 +155,7 @@ async function main() {
     const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore ${c.letra}` }, select: { id: true } })
     const pessoa = await prisma.pessoa.create({ data: { nome: "Fulano de Teste Visual", sobrenome: c.letra, arvoreId: arv.id }, select: { id: true } })
     const proc = await prisma.processo.create({
-      data: { nome: `[TESTE VISUAL] Cenário ${c.letra} — ${c.nome}`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: fase.phaseKey },
+      data: { nome: `[TESTE VISUAL] [TESTE ${c.letra}] — ${c.nomeCurto}`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: fase.phaseKey },
       select: { id: true },
     })
     const inst = await prisma.phaseWorkflowInstance.create({
@@ -166,7 +173,7 @@ async function main() {
     })
     const tarefa = await prisma.tarefa.create({
       data: {
-        titulo: `[TESTE VISUAL] ${c.nome}`, processoId: proc.id, workflowStepInstanceId: si.id, workflowInstanceId: inst.id,
+        titulo: `[TESTE ${c.letra}] ${c.nome}`, processoId: proc.id, workflowStepInstanceId: si.id, workflowInstanceId: inst.id,
         chaveIdempotencia: `${MARCA}-${c.letra}-t1`, statusTarefa: c.esperando ? "AGUARDANDO_TERCEIRO" : "NAO_INICIADA",
         responsavelId: daniela.id, dataPrazo: c.prazoOficial, pessoaId: pessoa.id,
       },
