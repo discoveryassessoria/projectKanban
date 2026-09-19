@@ -88,6 +88,13 @@ export interface SubtarefaParaValidar {
   campos?: PassoParaValidar["campos"]
   checkItens?: PassoParaValidar["checkItens"]
   requisitos?: PassoParaValidar["requisitos"]
+  /// Nasce em AGUARDANDO_TERCEIRO automaticamente ao ser liberada.
+  esperaExternaAoLiberar?: boolean | null
+  regraTemporalAtiva?: boolean | null
+  regraTemporalDias?: number | null
+  /// A KEY de outra subtarefa do MESMO passo cujo evento dispara a regra.
+  /// `null` = a própria liberação desta subtarefa.
+  regraTemporalGatilhoChave?: string | null
 }
 
 /** O executor efetivo do passo: o declarado, ou o que o registro resolve pela chave. */
@@ -382,6 +389,23 @@ export function validarSubtarefas(
         mensagem: `A subtarefa "${st.label}" repete a mesma dependência mais de uma vez.` })
     }
 
+    // ── GATILHO DA REGRA TEMPORAL — mesma régua da dependência, um nível
+    // abaixo: só pode apontar para outra subtarefa DESTE passo, nunca para
+    // si mesma (nula/vazia já significa "a própria liberação").
+    if (st.regraTemporalAtiva === true && st.regraTemporalGatilhoChave) {
+      if (st.regraTemporalGatilhoChave === st.key) {
+        problemas.push({ codigo: "GATILHO_REFLEXIVO", stepKey: p.key,
+          mensagem: `A regra temporal de "${st.label}" usa ela mesma como gatilho — deixe o gatilho vazio para "a própria liberação".` })
+      } else if (!chaves.has(st.regraTemporalGatilhoChave)) {
+        problemas.push({ codigo: "GATILHO_INEXISTENTE", stepKey: p.key,
+          mensagem: `A regra temporal de "${st.label}" usa "${st.regraTemporalGatilhoChave}" como gatilho, que não é subtarefa de "${p.label}".` })
+      }
+    }
+    if (st.regraTemporalAtiva === true && !(Number(st.regraTemporalDias) > 0)) {
+      problemas.push({ codigo: "REGRA_TEMPORAL_SEM_DURACAO", stepKey: p.key,
+        mensagem: `A regra temporal de "${st.label}" está ativa mas sem duração em dias.` })
+    }
+
     // ── EXECUTOR E EFEITOS ──────────────────────────────────────────────
     const exec = st.executorKey ?? executorEfetivo({ key: p.key, executorKey: p.executorKey }, null)
     const cap = capacidadeDoExecutor(exec)
@@ -596,6 +620,10 @@ export async function validarWorkflowParaPublicar(workflowId: number, db: DB = p
         condicaoEntrada: st.condicaoEntrada,
         condicaoConclusao: st.condicaoConclusao,
         condicaoVisibilidade: st.condicaoVisibilidade,
+        esperaExternaAoLiberar: st.esperaExternaAoLiberar,
+        regraTemporalAtiva: st.regraTemporalAtiva,
+        regraTemporalDias: st.regraTemporalDias,
+        regraTemporalGatilhoChave: st.regraTemporalGatilhoChave,
         acoes: st.acoes.map(paraValidarAcao),
         campos: st.campos.map(paraValidarCampo),
         checkItens: st.checkItens.map((c) => ({ key: c.key, ativo: c.ativo })),

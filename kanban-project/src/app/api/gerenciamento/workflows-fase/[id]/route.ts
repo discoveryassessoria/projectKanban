@@ -265,6 +265,22 @@ function buildFilhos(s: any, stepId: number) {
       // ESPERA DE TERCEIRO AO LIBERAR — mesmo cadastro do passo, um nível
       // abaixo. Ver PhaseInternalWorkflowStep.esperaExternaAoLiberar acima.
       esperaExternaAoLiberar: t?.esperaExternaAoLiberar === true,
+      // CONTROLE TEMPORAL DA ESPERA — dois relógios independentes
+      // (mandato "correção definitiva do modelo temporal", 19-20/09/2026).
+      // NUNCA reaproveita `slaDays` (SLA de ação interna, acima) nem o
+      // prazo oficial da Tarefa — campos próprios, cada um só grava quando
+      // o respectivo interruptor está ligado.
+      acompanhamentoAtivo: t?.acompanhamentoAtivo === true,
+      acompanhamentoPrimeiroDias: t?.acompanhamentoAtivo === true && Number(t?.acompanhamentoPrimeiroDias) > 0
+        ? Number(t.acompanhamentoPrimeiroDias) : null,
+      regraTemporalAtiva: t?.regraTemporalAtiva === true,
+      regraTemporalDias: t?.regraTemporalAtiva === true && Number(t?.regraTemporalDias) > 0
+        ? Number(t.regraTemporalDias) : null,
+      // O GATILHO só faz sentido com a regra ligada, e só aponta para outra
+      // subtarefa — a validação de publicação confere que a key existe e não
+      // é a própria (validacao-de-publicacao.ts).
+      regraTemporalGatilhoChave: t?.regraTemporalAtiva === true && t?.regraTemporalGatilhoChave
+        ? String(t.regraTemporalGatilhoChave) : null,
       _filhos: buildFilhosSimples(t),
     })),
   }

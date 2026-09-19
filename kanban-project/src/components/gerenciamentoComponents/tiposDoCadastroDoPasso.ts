@@ -74,6 +74,24 @@ export interface SubtarefaCfg {
   reaberturaPermitida?: boolean | null
   reaberturaExigeJustificativa?: boolean | null
   reaberturaPermissao?: string | null
+  /// Esta subtarefa nasce em espera de terceiro (AGUARDANDO_TERCEIRO)
+  /// automaticamente ao ser liberada — sem exigir ação manual do operador.
+  esperaExternaAoLiberar?: boolean
+  /// CONTROLE TEMPORAL DA ESPERA — dois relógios independentes, nenhum dos
+  /// dois é `slaDays` (que continua sendo, exclusivamente, o SLA de AÇÃO
+  /// INTERNA) nem o prazo oficial da Tarefa. Ver `lib/operacional/tempo-operacional.ts`
+  /// e o mandato "correção definitiva do modelo temporal" (19-20/09/2026).
+  /// ACOMPANHAMENTO — quando esta espera volta à atenção do responsável.
+  acompanhamentoAtivo?: boolean
+  acompanhamentoPrimeiroDias?: number | null
+  /// REGRA TEMPORAL — limite/expectativa temporal desta espera, contada a
+  /// partir do gatilho abaixo.
+  regraTemporalAtiva?: boolean
+  regraTemporalDias?: number | null
+  /// GATILHO — a `key` de outra subtarefa do MESMO passo cuja CONCLUSÃO
+  /// dispara o relógio da regra temporal. `null`/vazio = a própria liberação
+  /// desta subtarefa.
+  regraTemporalGatilhoChave?: string | null
   acoes?: AcaoCfg[]
   campos?: CampoCfg[]
   checkItens?: ItemCfg[]

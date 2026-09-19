@@ -481,6 +481,44 @@ async function main() {
   check("subtarefa manual sem ação é recusada",
     probsMuda.some((p) => p.codigo === "SUBTAREFA_SEM_ACAO"), JSON.stringify(probsMuda.map((p) => p.codigo)))
 
+  // ── GATILHO DA REGRA TEMPORAL (mandato "correção definitiva do modelo
+  // temporal", 19-20/09/2026) — mesma régua da dependência entre subtarefas,
+  // um nível abaixo: gatilho reflexivo, gatilho inexistente e regra ligada
+  // sem duração são todos recusados na publicação, nunca silenciosamente
+  // aceitos.
+  await prisma.stepSubtaskDefinition.updateMany({
+    where: { stepId: passo.id, key: "medir_elemento_z" },
+    data: { regraTemporalAtiva: true, regraTemporalDias: 5, regraTemporalGatilhoChave: "medir_elemento_z" },
+  })
+  const probsGatilhoReflexivo = await validarWorkflowParaPublicar(wf.id)
+  check("gatilho da regra temporal apontando pra própria subtarefa é recusado",
+    probsGatilhoReflexivo.some((p) => p.codigo === "GATILHO_REFLEXIVO"), JSON.stringify(probsGatilhoReflexivo.map((p) => p.codigo)))
+
+  await prisma.stepSubtaskDefinition.updateMany({
+    where: { stepId: passo.id, key: "medir_elemento_z" },
+    data: { regraTemporalGatilhoChave: "nao_existe" },
+  })
+  const probsGatilhoInexistente = await validarWorkflowParaPublicar(wf.id)
+  check("gatilho da regra temporal para subtarefa que não existe é recusado",
+    probsGatilhoInexistente.some((p) => p.codigo === "GATILHO_INEXISTENTE"), JSON.stringify(probsGatilhoInexistente.map((p) => p.codigo)))
+
+  await prisma.stepSubtaskDefinition.updateMany({
+    where: { stepId: passo.id, key: "medir_elemento_z" },
+    data: { regraTemporalGatilhoChave: "conferir_elemento_y", regraTemporalDias: null },
+  })
+  const probsSemDuracao = await validarWorkflowParaPublicar(wf.id)
+  check("regra temporal ativa sem duração em dias é recusada",
+    probsSemDuracao.some((p) => p.codigo === "REGRA_TEMPORAL_SEM_DURACAO"), JSON.stringify(probsSemDuracao.map((p) => p.codigo)))
+
+  await prisma.stepSubtaskDefinition.updateMany({
+    where: { stepId: passo.id, key: "medir_elemento_z" },
+    data: { regraTemporalAtiva: false, regraTemporalDias: null, regraTemporalGatilhoChave: null },
+  })
+  const probsLimpos = await validarWorkflowParaPublicar(wf.id)
+  check("desligar a regra temporal volta a publicar limpo",
+    !probsLimpos.some((p) => p.codigo?.startsWith("GATILHO_") || p.codigo === "REGRA_TEMPORAL_SEM_DURACAO"),
+    JSON.stringify(probsLimpos.map((p) => p.codigo)))
+
   await limpar()
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
   if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exitCode = 1 }

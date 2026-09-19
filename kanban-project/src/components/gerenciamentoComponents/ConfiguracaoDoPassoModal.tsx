@@ -421,6 +421,9 @@ export default function ConfiguracaoDoPassoModal({
                     {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
                     {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">depende de {st.dependeDe!.length}</span>}
                     {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">canais do fornecedor</span>}
+                    {st.esperaExternaAoLiberar === true && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">espera de terceiro</span>}
+                    {st.acompanhamentoAtivo === true && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">acompanhamento {st.acompanhamentoPrimeiroDias ?? "?"}d</span>}
+                    {st.regraTemporalAtiva === true && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">regra temporal {st.regraTemporalDias ?? "?"}d</span>}
                     {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{st.acoes!.length} ações</span>}
                     {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{st.campos!.length} campos</span>}
                   </div>
@@ -451,9 +454,15 @@ export default function ConfiguracaoDoPassoModal({
                                 </select>
                               </div>
                               <div>
-                                <label className={lbl}>SLA próprio (dias, vazio = herda)</label>
+                                <label className={lbl}>SLA de ação interna (dias, vazio = herda)</label>
                                 <input className={inp} type="number" min={0} value={st.slaDays ?? ""}
-                                  onChange={(e) => setSub(i, { slaDays: Number(e.target.value) || null })} />
+                                  onChange={(e) => setSub(i, { slaDays: Number(e.target.value) || null })}
+                                  disabled={st.esperaExternaAoLiberar === true} />
+                                {st.esperaExternaAoLiberar === true && (
+                                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                    Não se aplica: esta subtarefa é espera de terceiro — o prazo dela é configurado em Controle temporal, abaixo, nunca aqui.
+                                  </p>
+                                )}
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-4">
@@ -479,7 +488,70 @@ export default function ConfiguracaoDoPassoModal({
                                 <input type="checkbox" checked={st.ativo !== false} onChange={(e) => setSub(i, { ativo: e.target.checked })} />
                                 Ativa
                               </label>
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                <input type="checkbox" checked={st.esperaExternaAoLiberar === true}
+                                  onChange={(e) => setSub(i, { esperaExternaAoLiberar: e.target.checked })} />
+                                Espera de terceiro ao liberar (nasce AGUARDANDO_TERCEIRO automaticamente)
+                              </label>
                             </div>
+
+                            {st.esperaExternaAoLiberar === true && (
+                              <div className={card}>
+                                <label className={lbl}>Controle temporal da espera</label>
+                                <p className="mb-3 text-[11px] text-[var(--text-muted)]">
+                                  Dois relógios independentes desta espera — nenhum dos dois é o prazo oficial da Tarefa, nem o SLA de ação interna acima. Uma subtarefa pode ter nenhum, um ou os dois.
+                                </p>
+
+                                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+                                  <label className="flex items-center gap-2 text-xs text-white/85">
+                                    <input type="checkbox" checked={st.acompanhamentoAtivo === true}
+                                      onChange={(e) => setSub(i, { acompanhamentoAtivo: e.target.checked, acompanhamentoPrimeiroDias: e.target.checked ? st.acompanhamentoPrimeiroDias ?? null : null })} />
+                                    Acompanhamento
+                                  </label>
+                                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                    Define quando esta execução deve voltar à atenção do responsável caso o evento esperado ainda não tenha ocorrido. Não é vencimento da tarefa.
+                                  </p>
+                                  {st.acompanhamentoAtivo === true && (
+                                    <div className="mt-2 max-w-xs">
+                                      <label className={lbl}>Primeiro acompanhamento após (dias)</label>
+                                      <input className={inp} type="number" min={1} value={st.acompanhamentoPrimeiroDias ?? ""}
+                                        onChange={(e) => setSub(i, { acompanhamentoPrimeiroDias: Number(e.target.value) || null })} />
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="mt-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+                                  <label className="flex items-center gap-2 text-xs text-white/85">
+                                    <input type="checkbox" checked={st.regraTemporalAtiva === true}
+                                      onChange={(e) => setSub(i, { regraTemporalAtiva: e.target.checked, regraTemporalDias: e.target.checked ? st.regraTemporalDias ?? null : null, regraTemporalGatilhoChave: e.target.checked ? st.regraTemporalGatilhoChave ?? null : null })} />
+                                    Regra temporal
+                                  </label>
+                                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                    Define o limite ou expectativa temporal desta espera, contado a partir do evento configurado abaixo.
+                                  </p>
+                                  {st.regraTemporalAtiva === true && (
+                                    <div className="mt-2 grid grid-cols-2 gap-2">
+                                      <div>
+                                        <label className={lbl}>Duração (dias)</label>
+                                        <input className={inp} type="number" min={1} value={st.regraTemporalDias ?? ""}
+                                          onChange={(e) => setSub(i, { regraTemporalDias: Number(e.target.value) || null })} />
+                                      </div>
+                                      <div>
+                                        <label className={lbl}>Gatilho (contagem começa quando)</label>
+                                        <select className={inp} value={st.regraTemporalGatilhoChave ?? ""}
+                                          onChange={(e) => setSub(i, { regraTemporalGatilhoChave: e.target.value || null })}>
+                                          <option value="">Esta subtarefa ficar disponível</option>
+                                          {subs.filter((_, j) => j !== i).map((outra) => {
+                                            const chave = outra.key ?? chaveDe(outra.label)
+                                            return <option key={chave} value={chave}>Conclusão de: {outra.label}</option>
+                                          })}
+                                        </select>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
 
                             <div>
                               <label className={lbl}>Depende de (subtarefas deste passo)</label>
