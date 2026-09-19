@@ -404,7 +404,7 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // `started_at`/`finished_at`/`applied_steps_count` continuam os originais de
 // 02/08/2026; 5) só então esta constante. Checksum anterior:
 // 7f0347f1828003ac29a60395c965ac70e2db230a2fb58f8d42911c232244389e
-const CHECKSUM_LEDGER = 'e32e117adc967f3ac0bf503dca277278f5c3de2b2291149b2f5dd95403de6022'
+const CHECKSUM_LEDGER = '396e601ba2333547fbefd7384a4bf56588d0f0df3659abd9c69dac64ba0c9fc8'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -480,6 +480,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260916220000_cartorios_base_nacional',
   '20260917161750_remove_fasemacro_sla',
   '20260917181305_tarefa_tipo_administrativa',
+  '20260920000000_controle_temporal_espera_subtarefa',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
