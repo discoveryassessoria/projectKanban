@@ -46,6 +46,11 @@ export type AdvanceFailureCode =
   | "AVANCO_MANUAL_OBRIGATORIO"
   // A transição alteraria obrigação de outra fase — trava de domínio, rollback integral.
   | "INVARIANTE_OBRIGACOES"
+  // Uma fase obrigatória (nova ou já existente) anterior à posição atual do
+  // processo nunca foi materializada nem concluída — "posição atual" e
+  // "obrigação cumprida" não são a mesma coisa. Bloqueia especificamente a
+  // entrada em `finalizado` (mandato "Catálogo de Fases", 20/09/2026).
+  | "OBRIGACAO_RETROATIVA_PENDENTE"
 
 /** Resultado de sucesso esperado para cada operação (quando há mutação de fato). */
 export function resultadoDaOperacao(op: AdvanceOperacao): Exclude<AdvanceResultadoStr, "BLOQUEADO" | "IDEMPOTENTE" | "CONFLITO"> {
@@ -110,6 +115,9 @@ export interface FaseOrdenada {
   /** Fase CONDICIONAL (FaseMacro.conditional): só entra no caminho quando sua condição
    *  se aplica (ex.: retificação). Quando não se aplica, é PULADA no avanço. */
   conditional?: boolean
+  /** FaseMacro.required — usado pelo gate de obrigação retroativa (só fase
+   *  obrigatória e não-condicional pode travar a entrada em `finalizado`). */
+  required?: boolean
 }
 
 /** Primeira fase pela ORDEM do Workflow Macro (menor ordem), nunca por label/nome.

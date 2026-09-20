@@ -37,7 +37,12 @@ check("resolveProgressoFaseDocumento aceita contexto de fase", progLib.includes(
 
 const central = read("src/components/kanban/ProcessoCentralOperacional.tsx")
 check("Central tem viewData/bodyData/readOnly (mesma tela, só leitura)", central.includes("viewData") && central.includes("bodyData") && central.includes("readOnly"))
-check("trilha segue a fase ATIVA (faseAtivaNome), corpo a consultada", central.includes("faseAtivaNome") && central.includes("currentPhase={faseAtivaNome}"))
+// Mandato "Catálogo de Fases" (20/09/2026): a trilha passou a receber a
+// IDENTIDADE CANÔNICA (activePhaseKey), não mais o rótulo (faseAtivaNome) —
+// telas não podem identificar fase por nome de exibição. O corpo (painéis,
+// FASE_META) continua por faseAtivaNome/label, que é onde já era certo estar.
+check("trilha segue a fase ATIVA por phaseKey canônico (não por rótulo), corpo a consultada",
+  central.includes("faseAtivaNome") && central.includes("currentPhase={activePhaseKey"))
 check("painéis bespoke só no modo ACTIVE (não vazam fase ativa na consulta)", central.includes("!isView && ehAnalise") && central.includes("!isView && faseCodeGenerica"))
 check("cabeçalho de consulta: Somente leitura + Retornar (fluxo oficial)", central.includes("Somente leitura") && central.includes("RetornarFaseButton"))
 

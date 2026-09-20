@@ -183,7 +183,7 @@ export function CentralOperacional() {
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
   const [maisFiltrosAberto, setMaisFiltrosAberto] = useState(false)
   const [fasesAbertas, setFasesAbertas] = useState<Set<string>>(new Set())
-  const [tarefasPorFase, setTarefasPorFase] = useState<Map<string, { carregando: boolean; linhas: LinhaGerencial[] | null }>>(new Map())
+  const [tarefasPorFase, setTarefasPorFase] = useState<Map<string, { carregando: boolean; linhas: LinhaGerencial[] | null; erro: string | null }>>(new Map())
   const [loteAlvo, setLoteAlvo] = useState<{ familia: FamiliaAgrupada; acao: "atribuir" | "repriorizar" } | null>(null)
   const [loteOcupado, setLoteOcupado] = useState(false)
   const [loteAviso, setLoteAviso] = useState<string | null>(null)
@@ -344,14 +344,28 @@ export function CentralOperacional() {
       if (novo.has(chaveFase)) novo.delete(chaveFase); else novo.add(chaveFase)
       return novo
     })
-    if (tarefasPorFase.has(chaveFase)) return
-    setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: true, linhas: null }))
+    // Já carregada com SUCESSO (linhas não-nula): não refaz. Uma tentativa anterior
+    // que terminou em ERRO tem `linhas === null` e cai adiante, refazendo o fetch —
+    // sem isso, um 403/timeout deixava a fase presa para sempre no estado de erro,
+    // sem qualquer forma de tentar de novo (mandato "Catálogo de Fases", item 7).
+    const existente = tarefasPorFase.get(chaveFase)
+    if (existente && (existente.carregando || existente.linhas !== null)) return
+    setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: true, linhas: null, erro: null }))
     const p = new URLSearchParams({ processo: String(processoId), fase: faseMacroKey, incluirEncerradas: "1", porPagina: "200" })
     if (familiaId != null) p.set("familia", String(familiaId))
     fetch(`/api/operacao/visao-global?${p.toString()}`, { headers: auth() })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { linhas: LinhaGerencial[] }) => setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: false, linhas: d.linhas })))
-      .catch(() => setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: false, linhas: null })))
+      .then(async (r) => {
+        if (!r.ok) {
+          const corpo = await r.json().catch(() => null)
+          throw new Error(corpo?.error ?? `Falha ao carregar (HTTP ${r.status})`)
+        }
+        return r.json() as Promise<{ linhas: LinhaGerencial[] }>
+      })
+      .then((d) => setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: false, linhas: d.linhas, erro: null })))
+      // ERRO É OBSERVÁVEL, nunca mascarado como "nenhuma tarefa" (Regra 12 do
+      // protocolo): `linhas` permanece null especificamente para diferenciar de
+      // uma fase genuinamente vazia (`linhas: []`), que é um resultado válido.
+      .catch((e: Error) => setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: false, linhas: null, erro: e.message || "Falha ao carregar etapas." })))
   }, [tarefasPorFase])
 
   const irParaOProcesso = useCallback((l: LinhaGerencial) => {
@@ -744,7 +758,25 @@ export function CentralOperacional() {
                           {faseAberta && (
                             <div className="pb-1 pl-16 pr-3">
                               {carga?.carregando && <div className="py-2 text-[10px] text-[var(--text-muted)]">Carregando etapas…</div>}
-                              {carga && !carga.carregando && (carga.linhas?.length ?? 0) === 0 && (
+                              {carga?.erro && (
+                                <div className="flex items-center gap-2 py-2 text-[10px] text-red-700/90">
+                                  <span className="min-w-0 flex-1 truncate">{carga.erro}</span>
+                                  <button
+                                    onClick={() => {
+                                      setTarefasPorFase((m) => {
+                                        const n = new Map(m)
+                                        n.delete(chaveFase)
+                                        return n
+                                      })
+                                      alternarFase(chaveFase, f.familiaId, p.processoId, fa.faseMacroKey)
+                                    }}
+                                    className="shrink-0 rounded border border-red-700/30 px-2 py-0.5 text-[9px] text-red-700/90 hover:bg-red-700/10"
+                                  >
+                                    Tentar de novo
+                                  </button>
+                                </div>
+                              )}
+                              {carga && !carga.carregando && !carga.erro && (carga.linhas?.length ?? 0) === 0 && (
                                 <div className="py-2 text-[10px] text-[var(--text-muted)]">Nenhuma tarefa nesta fase.</div>
                               )}
                               {carga?.linhas?.map((l) => (

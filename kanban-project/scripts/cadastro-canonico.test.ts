@@ -15,7 +15,7 @@ import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { PrismaClient } from "@prisma/client"
 import { validarConfiguracao, detectarCiclo, executorEfetivo, validarWorkflowParaPublicar } from "../src/services/validacao-de-publicacao"
-import { CATALOGO_DE_EFEITOS, efeito, efeitosDaFase, COMPETENCIAS } from "../src/lib/motor/catalogo-de-efeitos"
+import { CATALOGO_DE_EFEITOS, efeito, efeitosDaFase, efeitosPorCompetenciaPadrao, COMPETENCIAS } from "../src/lib/motor/catalogo-de-efeitos"
 import { REGISTRO_DE_EXECUTORES, executorSuportaEfeito } from "../src/lib/motor/registro-de-executores"
 import { liberadosPor, descendentes, impactoDaReabertura, type PassoComDependencia } from "../src/services/dependencias-do-passo"
 import { congelarVersaoVigente, publicarNovaVersao, lerVersaoPublicada, definicaoHistoricaDoPasso } from "../src/services/versao-publicada"
@@ -93,7 +93,7 @@ const problemas = validarConfiguracao([
   { key: "d", label: "D", executorKey: "conferencia_documento", acoes: [{ key: "r", effectKey: "GO_RETIFICATION" }] },
   { key: "e", label: "E", executorKey: "padrao", campos: [{ key: "f", tipo: "holograma" }] },
   { key: "f", label: "F", executorKey: "padrao", acoes: [{ key: "y", effectKey: "COMPLETE_STEP", requerCampos: ["inexistente"] }] },
-], { phaseKey: "analise_documental", efeitosPermitidosDaFase: efeitosDaFase("analise_documental", null) })
+], { phaseKey: "analise_documental", efeitosPermitidosDaFase: efeitosPorCompetenciaPadrao("analise_documental") })
 const cods = new Set(problemas.map((p) => p.codigo))
 check("dependência inexistente é recusada", cods.has("DEPENDENCIA_INEXISTENTE"))
 check("auto-dependência é recusada", cods.has("DEPENDENCIA_REFLEXIVA"))
@@ -104,7 +104,7 @@ check("ação que exige campo inexistente é recusada", cods.has("ACAO_EXIGE_CAM
 
 const foraDeCompetencia = validarConfiguracao(
   [{ key: "conferir", label: "Conferir", executorKey: "validacao_juridica", campos: [{ key: "justificativa", tipo: "textarea" }], acoes: [{ key: "r", effectKey: "GO_RETIFICATION", requerCampos: [] }] }],
-  { phaseKey: "emissao_documental", efeitosPermitidosDaFase: efeitosDaFase("emissao_documental", null) },
+  { phaseKey: "emissao_documental", efeitosPermitidosDaFase: efeitosPorCompetenciaPadrao("emissao_documental") },
 )
 check("A EMISSÃO NÃO PODE PUBLICAR A DECISÃO DE RETIFICAR",
   foraDeCompetencia.some((p) => p.codigo === "EFEITO_FORA_DE_COMPETENCIA"),
@@ -112,7 +112,7 @@ check("A EMISSÃO NÃO PODE PUBLICAR A DECISÃO DE RETIFICAR",
 check("e a mesma configuração na ANÁLISE é aceita",
   validarConfiguracao(
     [{ key: "validar", label: "Validar", executorKey: "validacao_juridica", campos: [{ key: "justificativa", tipo: "textarea" }], acoes: [{ key: "r", effectKey: "GO_RETIFICATION" }] }],
-    { phaseKey: "analise_documental", efeitosPermitidosDaFase: efeitosDaFase("analise_documental", null) },
+    { phaseKey: "analise_documental", efeitosPermitidosDaFase: efeitosPorCompetenciaPadrao("analise_documental") },
   ).length === 0)
 
 const grafo: PassoComDependencia[] = [
@@ -343,7 +343,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════
   const faseEmissao = await prisma.catalogoFase.upsert({
     where: { phaseKey: "cc_emissao" },
-    update: {}, create: { phaseKey: "cc_emissao", label: "Emissão (teste)", escopo: "DOCUMENTO", efeitosPermitidos: efeitosDaFase("emissao_documental", null) },
+    update: {}, create: { phaseKey: "cc_emissao", label: "Emissão (teste)", escopo: "DOCUMENTO", efeitosPermitidos: efeitosPorCompetenciaPadrao("emissao_documental") },
     select: { phaseKey: true, efeitosPermitidos: true },
   })
   check("a Emissão NÃO tem GO_RETIFICATION entre os efeitos permitidos",
@@ -351,7 +351,7 @@ async function main() {
   check("mas tem APPROVE_FOR_ANALYSIS — ela entrega a quem decide",
     (faseEmissao.efeitosPermitidos as string[]).includes("APPROVE_FOR_ANALYSIS"))
   check("a Análise tem GO_RETIFICATION",
-    efeitosDaFase("analise_documental", null).includes("GO_RETIFICATION"))
+    efeitosPorCompetenciaPadrao("analise_documental").includes("GO_RETIFICATION"))
 
   // ══════════════════════════════════════════════════════════════
   console.log("\n(G) Nova via preserva o documento anterior")

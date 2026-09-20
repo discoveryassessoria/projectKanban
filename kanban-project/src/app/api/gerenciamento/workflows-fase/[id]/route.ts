@@ -61,7 +61,7 @@ async function reconciliarPassosRemovidosDoCadastro(args: {
   }
 }
 
-function slug(s: string) {
+export function slug(s: string) {
   return String(s || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim()
@@ -69,7 +69,7 @@ function slug(s: string) {
 }
 
 // monta as linhas de passo já com workflowId e CHAVES ÚNICAS dentro do workflow
-function buildSteps(raw: any[], workflowId: number) {
+export function buildSteps(raw: any[], workflowId: number) {
   const seen = new Set<string>()
   return (raw || []).map((s: any, i: number) => {
     let base = s?.key ? slug(String(s.key)) : slug(String(s?.label || ''))
@@ -130,7 +130,7 @@ function buildSteps(raw: any[], workflowId: number) {
  * NÃO tem subtarefa (não é um segundo motor escondido) nem canal próprio (os canais
  * vêm do fornecedor), e por isso esta função para aqui em vez de se chamar de novo.
  */
-function buildFilhosSimples(s: any) {
+export function buildFilhosSimples(s: any) {
   const lista = (v: unknown) => (Array.isArray(v) ? v : [])
   return {
     acoes: lista(s?.acoes).map((a: any, i: number) => ({
@@ -200,7 +200,7 @@ function buildFilhosSimples(s: any) {
  * Filhos cadastrados de um passo: as peças comuns, mais o que só o PASSO tem —
  * os canais herdados (legado) e as subtarefas.
  */
-function buildFilhos(s: any, stepId: number) {
+export function buildFilhos(s: any, stepId: number) {
   const lista = (v: unknown) => (Array.isArray(v) ? v : [])
   const comuns = buildFilhosSimples(s)
   return {

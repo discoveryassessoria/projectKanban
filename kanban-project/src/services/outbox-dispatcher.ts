@@ -22,6 +22,16 @@ import { reconciliarDocumentalDoProcesso } from "@/src/services/registral/reconc
 import { recalcularLinhagem, registrarRecalculo } from "@/src/services/registral/consultas"
 // Projeção financeira documental — registro localizado vira custo previsto.
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
+// Catálogo de Fases — reconciliação retroativa de publicação de Workflow Macro.
+import {
+  processarReconciliacaoFaseMacro,
+  TIPO_OUTBOX_RECONCILIACAO_FASE_MACRO,
+  type ReconciliacaoFaseMacroPayload,
+} from "@/src/lib/motor/reconciliar-fase-macro"
+// Reconciliação disparada pela EDIÇÃO de uma fase no Catálogo (não pela
+// publicação do Workflow Macro) — mesmo payload/efeito, tipo de outbox
+// próprio para rastrear a origem no log. Ver reconciliar-fase-macro.ts.
+const TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE = "catalogo.fase.reconciliar"
 
 const MAX_TENTATIVAS = 5
 // Reserva "presa" há mais que isto (worker morreu no meio) volta a ser reivindicável.
@@ -105,6 +115,15 @@ export const TIPOS_DRENADOS = [
   // do documento nunca era projetado. O filtro de "qual passo importa" é do
   // consumidor (identidade estrutural do passo), não da fila.
   "step.concluido",
+  // Catálogo de Fases — reconciliação retroativa (mandato 20/09/2026). Literal,
+  // não a constante importada: usar o binding aqui (avaliação de módulo, no
+  // topo do arquivo) expôs um ciclo de import já existente entre
+  // outbox-dispatcher → reconciliar-fase-macro → materializar-fase → …→
+  // task-step-sync → outbox-dispatcher ("Cannot access before initialization"
+  // no build). A comparação em tempo de execução, abaixo, usa a constante —
+  // só a avaliação no TOPO do módulo precisa ser o literal.
+  "fase.macro.reconciliar",
+  "catalogo.fase.reconciliar",
 ] as const
 
 export interface OutboxProcessResumo {
@@ -248,6 +267,16 @@ export async function processarOutbox(opts?: {
         if (p.stepId) {
           await projetarCustosDocumentaisDoPasso(p.stepId, { correlationId: evt.correlationId })
         }
+      } else if (evt.tipo === TIPO_OUTBOX_RECONCILIACAO_FASE_MACRO || evt.tipo === TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE) {
+        // EFEITO: reconciliação retroativa do Catálogo de Fases — materializa a
+        // fase nova/alterada num processo em andamento pelo mesmo materializador
+        // canônico (RECONCILIACAO). Idempotente; falha PROPAGA e não afeta os
+        // outros processos (cada um é uma linha própria de outbox). Mesmo efeito
+        // para os dois tipos — só a ORIGEM do disparo difere (Workflow Macro
+        // publicado vs. fase do Catálogo editada), e `processarReconciliacaoFaseMacro`
+        // já ramifica internamente por `payload.escopoMudou`.
+        const p = evt.payload as unknown as ReconciliacaoFaseMacroPayload
+        await processarReconciliacaoFaseMacro(p, evt.correlationId ?? undefined)
       } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
         // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).
       }

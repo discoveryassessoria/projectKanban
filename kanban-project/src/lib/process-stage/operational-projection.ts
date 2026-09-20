@@ -159,13 +159,16 @@ async function resolveOperationalProjectionParaFase(
 
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
   const faseDef = faseCode ? getFase(faseCode) : null
+  // RÓTULO CANÔNICO — código primeiro, cadastro depois (mesma precedência de
+  // `resolverRotuloDaFase`; ver comentário gêmeo em resolveOperationalProjectionBatch).
+  const rotuloCadastro = !faseDef ? (await prisma.catalogoFase.findUnique({ where: { phaseKey: faseMacroKey }, select: { label: true } }))?.label ?? null : null
   const steps: GateStepData[] = (inst?.steps ?? []).map(mapStepToGate)
 
   return buildOperationalProjection({
     processId,
     faseCode,
     faseMacroKey,
-    phaseName: faseDef?.label ?? faseMacroKey,
+    phaseName: faseDef?.label ?? rotuloCadastro ?? `⚠ Fase não cadastrada (${faseMacroKey})`,
     scope: faseDef?.scope ?? null,
     processoExists: true,
     hasActiveInstance: !!inst,
@@ -196,6 +199,18 @@ export async function resolveOperationalProjectionBatch(
   })
   const procById = new Map(processos.map((p) => [p.id, p]))
   const arvoreIds = [...new Set(processos.map((p) => p.arvoreId).filter((x): x is number => x != null))]
+
+  // RÓTULO CANÔNICO em lote — mesma precedência de `resolverRotuloDaFase`
+  // (código primeiro, cadastro depois), mas UMA query para todas as phaseKeys
+  // que o catálogo em código não cobre, nunca N+1 (mandato "Catálogo de Fases",
+  // correção 20/09/2026: sem isto, qualquer fase fora das 10 canônicas — ex.:
+  // TESTEVIS_fase — caía na chave técnica crua em toda tela que lê progresso).
+  const chavesForaDoCodigo = [...new Set(
+    processos.map((p) => p.faseAtualKey).filter((k): k is string => !!k && !phaseKeyToFaseCode(k)),
+  )]
+  const rotuloCadastroPorChave = chavesForaDoCodigo.length > 0
+    ? new Map((await prisma.catalogoFase.findMany({ where: { phaseKey: { in: chavesForaDoCodigo } }, select: { phaseKey: true, label: true } })).map((f) => [f.phaseKey, f.label]))
+    : new Map<string, string>()
 
   // (2) Instâncias ATIVAS + passos (+ tarefas idempotentes) de TODAS de uma vez.
   const instancias = await prisma.phaseWorkflowInstance.findMany({
@@ -288,7 +303,10 @@ export async function resolveOperationalProjectionBatch(
       processId: pid,
       faseCode,
       faseMacroKey: proc.faseAtualKey ?? null,
-      phaseName: faseDef?.label ?? proc.faseAtualKey ?? null,
+      phaseName: faseDef?.label
+        ?? (proc.faseAtualKey ? rotuloCadastroPorChave.get(proc.faseAtualKey) : null)
+        // Erro CONTROLADO — nunca a chave crua como se fosse nome válido.
+        ?? (proc.faseAtualKey ? `⚠ Fase não cadastrada (${proc.faseAtualKey})` : null),
       scope: faseDef?.scope ?? null,
       processoExists: true,
       hasActiveInstance: !!inst,

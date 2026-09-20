@@ -12,73 +12,53 @@
 import { Check } from "lucide-react"
 
 // ============================================================
-// AS 10 FASES NA ORDEM DO MOCKUP (PROCESS_PHASES)
+// IDENTIDADE CANÔNICA DA FASE — phaseKey, fornecida pelo backend
+// (MacroWorkflow.fases real, GET /api/processos/[id]/phases). NENHUMA lista
+// fixa de fase aqui: uma fase publicada pelo Catálogo de Fases (mandato
+// 20/09/2026) aparece na trilha assim que o backend a devolver — sem alterar
+// este arquivo. Identidade é `phaseKey`; `label` é só o que a tela mostra.
 // ============================================================
 
-export const PROCESS_PHASES = [
-  "Genealogia",
-  "Emissão documental",
-  "Análise Documental",
-  "Retificação de registros",
-  "Emissão documental retificada",
-  "Tradução juramentada",
-  "Apostilamento",
-  "Aguardando protocolo",
-  "Protocolado",
-  "Finalizado",
-] as const
-
-export type PhaseName = (typeof PROCESS_PHASES)[number]
-
-// Fases condicionais (só entram no caminho se houver retificação)
-const RETIF_PHASES: PhaseName[] = [
-  "Retificação de registros",
-  "Emissão documental retificada",
-]
+export interface FaseTrilha {
+  phaseKey: string
+  label: string
+  /** Só entra no caminho ativo condicionalmente (ex.: Retificação). */
+  conditional?: boolean
+}
 
 type PhaseStatus = "concluida" | "atual" | "futura" | "pulada" | "bloqueada" | "condicional"
 
 export interface WorkflowMacroProps {
-  /** Fase atual do processo (nome exato, ex: "Emissão documental") */
-  currentPhase: PhaseName | string
-  /** Fases já concluídas */
+  /** As fases do Workflow Macro deste processo, na ordem real (phaseKey + label). */
+  fases: FaseTrilha[]
+  /** phaseKey da fase atual do processo. */
+  currentPhase: string
+  /** phaseKeys já concluídas */
   completedPhases?: string[]
-  /** Progresso por fase: { "Genealogia": 100, "Emissão documental": 0, ... } */
+  /** Progresso por fase, chaveado por phaseKey: { genealogia: 100, ... } */
   phaseProgress?: Record<string, number>
-  /** Houve decisão de retificação? (controla se as 2 fases condicionais entram) */
+  /** Houve decisão de retificação? (controla se as fases condicionais entram) */
   needsRectification?: boolean | null
-  /** Fase selecionada para visualização (clique). Default = currentPhase */
+  /** phaseKey selecionada para visualização (clique). Default = currentPhase */
   selectedPhase?: string
-  /** Callback ao clicar numa fase */
-  onSelectPhase?: (phase: string) => void
+  /** Callback ao clicar numa fase — recebe o phaseKey */
+  onSelectPhase?: (phaseKey: string) => void
 }
 
 // ============================================================
-// LÓGICA DE CAMINHO E STATUS (espelho do mockup)
+// LÓGICA DE CAMINHO E STATUS — dirigida pelos dados recebidos, nunca por lista fixa
 // ============================================================
 
-function getActivePath(needsRectification: boolean | null | undefined): PhaseName[] {
-  const baseStart: PhaseName[] = ["Genealogia", "Emissão documental", "Análise Documental"]
-  const retif: PhaseName[] = ["Retificação de registros", "Emissão documental retificada"]
-  const baseEnd: PhaseName[] = [
-    "Tradução juramentada",
-    "Apostilamento",
-    "Aguardando protocolo",
-    "Protocolado",
-    "Finalizado",
-  ]
-  return needsRectification ? [...baseStart, ...retif, ...baseEnd] : [...baseStart, ...baseEnd]
+export function getActivePath(fases: FaseTrilha[], needsRectification: boolean | null | undefined): string[] {
+  return fases.filter((f) => !f.conditional || needsRectification).map((f) => f.phaseKey)
 }
 
-function phaseIndex(phase: string): number {
-  return PROCESS_PHASES.indexOf(phase as PhaseName)
-}
-
-function getPhaseStatus(
-  title: PhaseName,
+export function getPhaseStatus(
+  fases: FaseTrilha[],
+  phaseKey: string,
   currentPhase: string,
   completedPhases: string[],
-  path: PhaseName[],
+  path: string[],
   needsRectification: boolean | null | undefined
 ): PhaseStatus {
   // A fase em que o processo REALMENTE está vence qualquer heurística de
@@ -86,30 +66,30 @@ function getPhaseStatus(
   // sem a Decisão da Análise Documental registrada (ex.: chegou lá por
   // movimentação manual) ficava com a fase atual marcada "Condicional" — o
   // operador não conseguia nem ver em que fase o processo estava.
-  if (title === currentPhase) return "atual"
-  if (!path.includes(title)) {
+  if (phaseKey === currentPhase) return "atual"
+  if (!path.includes(phaseKey)) {
     // Fase fora do caminho ativo. Se é condicional E a Análise ainda NÃO
     // decidiu (null), ela é "condicional" (pode entrar). Só vira "pulada"
     // quando a decisão foi tomada e ela ficou de fora.
-    const ehCondicional = RETIF_PHASES.includes(title)
-    if (ehCondicional && (needsRectification === null || needsRectification === undefined)) {
+    const def = fases.find((f) => f.phaseKey === phaseKey)
+    if (def?.conditional && (needsRectification === null || needsRectification === undefined)) {
       return "condicional"
     }
     return "pulada"
   }
-  if (completedPhases.includes(title)) return "concluida"
+  if (completedPhases.includes(phaseKey)) return "concluida"
   // Ordem GLOBAL (não a do `path`) — a fase atual pode estar fora do `path`
   // pela mesma razão do bloco acima (condicional sem decisão registrada), e
   // `path.indexOf` devolveria -1, jogando toda fase anterior para "futura".
-  const ci = phaseIndex(currentPhase)
-  const pi = phaseIndex(title)
+  const ci = fases.findIndex((f) => f.phaseKey === currentPhase)
+  const pi = fases.findIndex((f) => f.phaseKey === phaseKey)
   if (pi > ci) return "futura"
   return "bloqueada"
 }
 
 // Resumo curto de cada fase (texto da coluna lateral). Genérico — sem dados de
 // procState. Quando o backend fornecer contadores por fase, dá pra enriquecer.
-function phaseSummary(title: PhaseName, status: PhaseStatus, progress: number): string {
+function phaseSummary(status: PhaseStatus, progress: number): string {
   if (status === "pulada") return "Fase fora do caminho ativo deste processo."
   if (status === "concluida") return "Fase concluída."
   if (status === "atual") return `Fase em andamento · ${progress}% concluído.`
@@ -121,6 +101,7 @@ function phaseSummary(title: PhaseName, status: PhaseStatus, progress: number): 
 // ============================================================
 
 export function WorkflowMacroTrilha({
+  fases,
   currentPhase,
   completedPhases = [],
   phaseProgress = {},
@@ -128,12 +109,12 @@ export function WorkflowMacroTrilha({
   selectedPhase,
   onSelectPhase,
 }: WorkflowMacroProps) {
-  const path = getActivePath(needsRectification)
+  const path = getActivePath(fases, needsRectification)
 
-  const progressOf = (title: PhaseName): number => {
-    if (completedPhases.includes(title)) return 100
-    if (!path.includes(title)) return 0
-    return phaseProgress[title] ?? 0
+  const progressOf = (phaseKey: string): number => {
+    if (completedPhases.includes(phaseKey)) return 100
+    if (!path.includes(phaseKey)) return 0
+    return phaseProgress[phaseKey] ?? 0
   }
 
   const decLabel = (() => {
@@ -162,16 +143,16 @@ export function WorkflowMacroTrilha({
 
       {/* Timeline */}
       <div className="flex gap-0 overflow-x-auto pb-1">
-        {PROCESS_PHASES.map((title, i) => {
-          const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
-          const prog = progressOf(title)
-          const conditional = RETIF_PHASES.includes(title)
+        {fases.map((f, i) => {
+          const title = f.label
+          const st = getPhaseStatus(fases, f.phaseKey, currentPhase, completedPhases, path, needsRectification)
+          const prog = progressOf(f.phaseKey)
 
           // IDENTIDADE BITRIX (14-15/09/2026): a fase ATUAL é azul, uma fase
           // já PASSADA é âmbar, e só a ÚLTIMA fase (o processo de verdade
           // encerrado) é verde — nunca "concluída" genérica em verde, que era
           // a leitura da Identidade AZUL. Ver `--stepper-*` em globals.css.
-          const ehFaseFinal = title === PROCESS_PHASES[PROCESS_PHASES.length - 1]
+          const ehFaseFinal = f.phaseKey === fases[fases.length - 1]?.phaseKey
           const dotCls =
             st === "concluida" ? (ehFaseFinal ? "text-[var(--stepper-success-text)]" : "text-[var(--stepper-passed-text)]")
             : st === "atual" ? "text-[var(--stepper-current-text)]"
@@ -222,20 +203,20 @@ export function WorkflowMacroTrilha({
             : "text-[var(--text-muted)]"
 
           // conector pra próxima fase
-          const nextDone = i < PROCESS_PHASES.length - 1
-            ? (getPhaseStatus(PROCESS_PHASES[i + 1], currentPhase, completedPhases, path, needsRectification) === "concluida" || st === "concluida")
+          const nextDone = i < fases.length - 1
+            ? (getPhaseStatus(fases, fases[i + 1].phaseKey, currentPhase, completedPhases, path, needsRectification) === "concluida" || st === "concluida")
             : false
 
           const clicavel = !!onSelectPhase
-          const consultando = !!selectedPhase && selectedPhase === title && selectedPhase !== currentPhase
+          const consultando = !!selectedPhase && selectedPhase === f.phaseKey && selectedPhase !== currentPhase
 
           return (
             <div
-              key={title}
+              key={f.phaseKey}
               className="flex-1 min-w-[92px] relative z-10"
             >
               <button
-                onClick={() => onSelectPhase?.(title)}
+                onClick={() => onSelectPhase?.(f.phaseKey)}
                 disabled={!clicavel}
                 title={clicavel ? "Ver esta fase" : undefined}
                 className={`flex flex-col items-center gap-1 w-full py-1.5 px-1 rounded-xl border transition-colors ${
@@ -256,7 +237,7 @@ export function WorkflowMacroTrilha({
                       : st === "atual" ? <b>{i + 1}</b>
                       : st === "pulada" ? "⤳" : ""}
                   </span>
-                  {i < PROCESS_PHASES.length - 1 && (
+                  {i < fases.length - 1 && (
                     <div
                       className="absolute left-1/2 w-full h-0.5 top-1/2 -translate-y-1/2 z-20"
                       style={{ background: nextDone ? "#f5a524" : "#bfd8e8" }}
@@ -314,17 +295,18 @@ function LegendItem({ cls, children }: { cls: string; children: React.ReactNode 
 // ============================================================
 
 export function ResumoDoProcesso({
+  fases,
   currentPhase,
   completedPhases = [],
   phaseProgress = {},
   needsRectification = null,
 }: WorkflowMacroProps) {
-  const path = getActivePath(needsRectification)
+  const path = getActivePath(fases, needsRectification)
 
-  const progressOf = (title: PhaseName): number => {
-    if (completedPhases.includes(title)) return 100
-    if (!path.includes(title)) return 0
-    return phaseProgress[title] ?? 0
+  const progressOf = (phaseKey: string): number => {
+    if (completedPhases.includes(phaseKey)) return 100
+    if (!path.includes(phaseKey)) return 0
+    return phaseProgress[phaseKey] ?? 0
   }
 
   const overall = Math.round(
@@ -332,11 +314,12 @@ export function ResumoDoProcesso({
   )
   const concluidas = completedPhases.length
   const futuras = path.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "futura"
+    (p) => getPhaseStatus(fases, p, currentPhase, completedPhases, path, needsRectification) === "futura"
   ).length
-  const puladas = PROCESS_PHASES.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "pulada"
+  const puladas = fases.filter(
+    (f) => getPhaseStatus(fases, f.phaseKey, currentPhase, completedPhases, path, needsRectification) === "pulada"
   ).length
+  const currentLabel = fases.find((f) => f.phaseKey === currentPhase)?.label ?? (currentPhase ? `⚠ Fase não cadastrada (${currentPhase})` : "—")
 
   const item = (label: string, value: string, destaque?: boolean) => (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
@@ -351,7 +334,7 @@ export function ResumoDoProcesso({
       <span className="text-[var(--border-default)]">·</span>
       {item("Concluídas", String(concluidas))}
       <span className="text-[var(--border-default)]">·</span>
-      {item("Fase atual", currentPhase, true)}
+      {item("Fase atual", currentLabel, true)}
       <span className="text-[var(--border-default)]">·</span>
       {item("Futuras", String(futuras))}
       <span className="text-[var(--border-default)]">·</span>
@@ -370,6 +353,7 @@ export function ResumoDoProcesso({
 // ============================================================
 
 export function MacroSidebar({
+  fases,
   currentPhase,
   completedPhases = [],
   phaseProgress = {},
@@ -377,13 +361,13 @@ export function MacroSidebar({
   selectedPhase,
   onSelectPhase,
 }: WorkflowMacroProps) {
-  const path = getActivePath(needsRectification)
+  const path = getActivePath(fases, needsRectification)
   const sel = selectedPhase || currentPhase
 
-  const progressOf = (title: PhaseName): number => {
-    if (completedPhases.includes(title)) return 100
-    if (!path.includes(title)) return 0
-    return phaseProgress[title] ?? 0
+  const progressOf = (phaseKey: string): number => {
+    if (completedPhases.includes(phaseKey)) return 100
+    if (!path.includes(phaseKey)) return 0
+    return phaseProgress[phaseKey] ?? 0
   }
 
   const overall = Math.round(
@@ -391,11 +375,12 @@ export function MacroSidebar({
   )
   const concluidas = completedPhases.length
   const futuras = path.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "futura"
+    (p) => getPhaseStatus(fases, p, currentPhase, completedPhases, path, needsRectification) === "futura"
   ).length
-  const puladas = PROCESS_PHASES.filter(
-    (p) => getPhaseStatus(p, currentPhase, completedPhases, path, needsRectification) === "pulada"
+  const puladas = fases.filter(
+    (f) => getPhaseStatus(fases, f.phaseKey, currentPhase, completedPhases, path, needsRectification) === "pulada"
   ).length
+  const currentLabel = fases.find((f) => f.phaseKey === currentPhase)?.label ?? (currentPhase ? `⚠ Fase não cadastrada (${currentPhase})` : "—")
 
   return (
     <div className="w-[290px] flex-shrink-0 space-y-3.5">
@@ -404,7 +389,7 @@ export function MacroSidebar({
         <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo do processo</h3>
         <StatRow label="Caminho ativo" value={`${path.length} fases`} />
         <StatRow label="Fases concluídas" value={String(concluidas)} />
-        <StatRow label="Fase atual" value={currentPhase} />
+        <StatRow label="Fase atual" value={currentLabel} />
         <StatRow label="Fases futuras" value={String(futuras)} />
         <StatRow label="Fases puladas" value={String(puladas)} />
         <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-1 border-t-2 border-[var(--border-default)]">
@@ -417,9 +402,9 @@ export function MacroSidebar({
       <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-4">
         <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo por fase</h3>
         <div className="flex flex-col gap-0.5">
-          {PROCESS_PHASES.map((title, i) => {
-            const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
-            const prog = progressOf(title)
+          {fases.map((f, i) => {
+            const st = getPhaseStatus(fases, f.phaseKey, currentPhase, completedPhases, path, needsRectification)
+            const prog = progressOf(f.phaseKey)
             const icCls =
               st === "concluida" ? "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
               : st === "atual" ? "bg-[var(--surface-secondary)]"
@@ -431,10 +416,10 @@ export function MacroSidebar({
               : "text-[var(--text-muted)]"
             return (
               <button
-                key={title}
-                onClick={() => onSelectPhase?.(title)}
+                key={f.phaseKey}
+                onClick={() => onSelectPhase?.(f.phaseKey)}
                 className={`flex gap-2 items-start w-full text-left p-2 rounded-lg cursor-pointer transition-colors ${
-                  title === sel ? "bg-[var(--surface-secondary)]" : "hover:bg-[var(--surface-secondary)]"
+                  f.phaseKey === sel ? "bg-[var(--surface-secondary)]" : "hover:bg-[var(--surface-secondary)]"
                 }`}
               >
                 <span className={`w-4 h-4 rounded-full grid place-items-center text-[9px] font-bold flex-none mt-0.5 ${icCls}`}>
@@ -442,11 +427,11 @@ export function MacroSidebar({
                 </span>
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-baseline gap-1.5">
-                    <b className="text-[12px] text-white/95">{i + 1}. {title}</b>
+                    <b className="text-[12px] text-white/95">{i + 1}. {f.label}</b>
                     <span className={`text-[12px] font-extrabold flex-none ${pctCls}`}>{prog}%</span>
                   </div>
                   <span className="text-[10.5px] text-[var(--text-muted)] block mt-0.5 leading-snug">
-                    {phaseSummary(title, st, prog)}
+                    {phaseSummary(st, prog)}
                   </span>
                 </div>
               </button>

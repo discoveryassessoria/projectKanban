@@ -26,6 +26,7 @@ import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
 import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/services/phase-workflow"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/services/materializar-fase"
+import { calcularObrigacoesRetroativasPendentes } from "@/src/lib/motor/reconciliar-fase-macro"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { notificarAcontecimento } from "@/lib/operacional/notificacao-canonica"
 import { urlOperacionalDoProcesso } from "@/lib/operacional/navegacao"
@@ -152,7 +153,7 @@ export type AdvanceResult = AdvanceOk | AdvanceErr
 
 interface Contexto {
   processo: { id: number; faseAtual: string; lockVersion: number; tipoProcessoMotorId: number | null }
-  fases: { phaseKey: string; ordem: number; conditional?: boolean }[]
+  fases: FaseOrdenada[]
   runtime: "legacy" | "v2"
   v2Global: boolean
 }
@@ -178,7 +179,7 @@ async function carregarContexto(processoId: number): Promise<Contexto | AdvanceE
 
   const wf = await prisma.macroWorkflow.findUnique({
     where: { tipoProcessoId: processo.tipoProcessoMotorId },
-    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true, conditional: true } } },
+    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true, conditional: true, required: true } } },
   })
   if (!wf) return rejeitar("SEM_TIPO_MOTOR", "Tipo do motor sem Workflow Macro")
 
@@ -191,7 +192,9 @@ async function carregarContexto(processoId: number): Promise<Contexto | AdvanceE
   }
 }
 
-async function proximoCiclo(processoId: number, faseMacroKey: string): Promise<number> {
+/** Exportado para reconciliações fora do funil normal (ex.: mudança de escopo
+ *  retroativa) que precisam do MESMO cálculo de próximo ciclo, sem duplicar. */
+export async function proximoCiclo(processoId: number, faseMacroKey: string): Promise<number> {
   const ultima = await prisma.phaseWorkflowInstance.findFirst({
     where: { processoId, faseMacroKey },
     orderBy: { ciclo: "desc" }, select: { ciclo: true },
@@ -223,6 +226,9 @@ interface Plano {
   lockVersion: number
   faseDestino: string
   novaFaseAtualKey: string
+  /** Fases ORDENADAS do macro deste processo — único uso: o gate de obrigação
+   * retroativa em `executarPlano`, que precisa saber a posição de cada uma. */
+  fases: FaseOrdenada[]
   cicloAlvo: number
   origemInstancia: OrigemInstanciaStr
   /** Fonte declarada para o materializador oficial — a MESMA para todas as origens. */
@@ -252,6 +258,31 @@ interface Plano {
 }
 
 async function executarPlano(p: Plano): Promise<AdvanceResult> {
+  // OBRIGAÇÃO RETROATIVA — GATE ÚNICO, para TODO caminho que escreve
+  // `Processo.faseAtualKey` (mandato "Catálogo de Fases", continuação 20/09/2026).
+  // `executarPlano` é o funil comum de avanço normal, forçado, reabertura, retorno
+  // e movimentação manual — é o ÚNICO lugar por onde este código pode ser
+  // alcançado, então é o único lugar onde a regra precisa existir. "Posição
+  // atual" e "obrigação cumprida" não são a mesma coisa: uma fase obrigatória
+  // publicada DEPOIS que o processo já passou da posição dela não pode ser
+  // contornada só porque `faseAtualKey` já foi além — nem por avanço normal, nem
+  // por avanço FORÇADO, nem por MOVIMENTAÇÃO MANUAL do Administrador. Ser
+  // Administrador autoriza mover a fase; não autoriza ignorar silenciosamente uma
+  // obrigação obrigatória pendente — isso seria uma exceção administrativa
+  // silenciosa, que o mandato proíbe explicitamente. Nenhuma exceção aqui: se um
+  // dia for necessária, é ação SEPARADA, explícita, confirmada, justificada e
+  // auditada — não um desvio deste gate.
+  if (p.novaFaseAtualKey === "finalizado") {
+    const pendentes = await calcularObrigacoesRetroativasPendentes(p.processoId, p.fases, p.faseAtual)
+    if (pendentes.length > 0) {
+      return {
+        success: false, resultado: "REJEITADO", code: "OBRIGACAO_RETROATIVA_PENDENTE",
+        message: `O processo não pode ser finalizado: ${pendentes.length} fase(s) obrigatória(s) anterior(es) à posição atual ainda não foi(ram) concluída(s) — ${pendentes.map((x) => x.phaseKey).join(", ")}.`,
+        faseAtual: p.faseAtual, correlationId: p.correlationId,
+      }
+    }
+  }
+
   const resultadoEnum = resultadoDaOperacao(p.operacao)
   const chave = montarChaveAdvance({
     processoId: p.processoId, operacao: p.operacao,
@@ -723,6 +754,12 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     }
   }
 
+  // OBRIGAÇÃO RETROATIVA — o gate mora em `executarPlano` (único ponto de escrita
+  // de todas as operações: avanço, forçado, reabertura, retorno, movimentação
+  // manual — mandato "Catálogo de Fases", continuação 20/09/2026: "mesmo gate a
+  // todos os caminhos possíveis"). Nada é checado aqui para não duplicar a regra
+  // em dois lugares — ver `executarPlano`.
+
   // GATE canônico: decide pelo `canAdvance` da FUNÇÃO-BASE ÚNICA (computeGate), a MESMA
   // consumida pela OperationalProjection. Sem cálculo paralelo — calcularPendencias é só
   // o adaptador que carrega o snapshot e delega ao gate compartilhado; `blocking` é usado
@@ -764,7 +801,7 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
   // devolve 1 na 1ª passagem e o próximo ciclo após reabertura/retorno — igual a reopen/return.
   const cicloAlvo = await proximoCiclo(processoId, proxima)
   return executarPlano({
-    operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
+    operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
     fonteMaterializacao: "AVANCO_AUTOMATICO",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA", correlationId,
@@ -800,7 +837,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
   // CONCLUÍDA de ciclo anterior após retorno de fase.
   const cicloAlvo = await proximoCiclo(processoId, proxima)
   return executarPlano({
-    operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
+    operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
     fonteMaterializacao: "AVANCO_FORCADO",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA_FORCADO", correlationId,
@@ -829,7 +866,7 @@ export async function reopenPhase(processoId: number, input: ReopenInput): Promi
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
 
   return executarPlano({
-    operacao: "REABRIR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
+    operacao: "REABRIR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: c.processo.faseAtual, novaFaseAtualKey: c.processo.faseAtual, cicloAlvo,
     origemInstancia: "REABERTURA", fonteMaterializacao: "REABERTURA",
     // A ÚNICA operação que refaz: reabrir é pedir o trabalho de novo.
@@ -870,7 +907,7 @@ export async function returnPhase(processoId: number, input: ReturnInput): Promi
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
 
   return executarPlano({
-    operacao: "RETORNAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
+    operacao: "RETORNAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: input.faseAlvo, novaFaseAtualKey: input.faseAlvo, cicloAlvo,
     origemInstancia: "REABERTURA", fonteMaterializacao: "RETORNO_CONTROLADO",
     encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_RETORNADA",
@@ -943,16 +980,23 @@ export async function movePhaseManual(processoId: number, input: MoveInput): Pro
   const faseOrigem = c.processo.faseAtual
 
   const resultado = await executarPlano({
-    operacao: "MOVER", processoId, faseAtual: faseOrigem, lockVersion: c.processo.lockVersion,
+    operacao: "MOVER", processoId, faseAtual: faseOrigem, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: faseAlvo, novaFaseAtualKey: faseAlvo, cicloAlvo,
     origemInstancia: "MANUAL", fonteMaterializacao: "MOVIMENTACAO_MANUAL",
-    // SUPERSEDER, nunca CONCLUIR: mover não conclui a fase de origem. Marcá-la como
-    // concluída faria o histórico afirmar um trabalho que não aconteceu.
+    // Mover não FORJA conclusão nem a NEGA: usa o MESMO gate canônico de `advance`
+    // (snap.pend.canAdvance, calculado acima pela função-base única) para decidir se
+    // a fase de origem estava de fato com as obrigações satisfeitas no momento da
+    // movimentação. Antes disto o resultado era sempre SUPERSEDER (exceto
+    // preservarHistorico), então uma fase 100% concluída atravessada por
+    // movimentação manual do Admin nunca ganhava `PhaseWorkflowInstance.status =
+    // CONCLUIDO` — Workflow Macro/progresso geral mostravam "Não confirmada" para
+    // sempre, mesmo com Tarefas e Projetos mostrando 100% (mandato "Catálogo de
+    // Fases", correção 20/09/2026, item 8 — consistência de progresso).
     //
-    // Com `preservarHistorico`, nem SUPERSEDER: a instância de origem fica intocada
-    // (modo NENHUM, já suportado pelo motor) — as tarefas dela continuam abertas e
-    // concluíveis, em vez de encerradas num estado terminal sem volta.
-    encerramento: preservarHistorico ? "NENHUM" : "SUPERSEDER", eventoFaseTipo: "FASE_MOVIDA",
+    // Com `preservarHistorico`, nem SUPERSEDER nem CONCLUIR: a instância de origem
+    // fica intocada (modo NENHUM, já suportado pelo motor) — as tarefas dela
+    // continuam abertas e concluíveis, em vez de encerradas num estado terminal.
+    encerramento: preservarHistorico ? "NENHUM" : (snap.pend.canAdvance ? "CONCLUIR" : "SUPERSEDER"), eventoFaseTipo: "FASE_MOVIDA",
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     // `forcado` continua sendo especificamente "o gate barrou e foi sobreposto".
     // Aqui o gate nem foi consultado — o fato é outro, e quem o nomeia é `resultado`.

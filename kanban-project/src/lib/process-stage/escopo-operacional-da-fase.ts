@@ -25,7 +25,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
-import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { FASES, phaseKeyToFaseCode, labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import { EQUIVALENCIA_LEGADA } from "@/src/lib/process-stage/verificar-phasekeys"
 
 export type EscopoOperacional = "PROCESSO" | "PESSOA" | "NECESSIDADE" | "DOCUMENTO"
@@ -59,6 +59,34 @@ export async function resolverEscopoDaFase(
 }
 
 /**
+ * O RÓTULO CANÔNICO da fase, pela MESMA precedência de `resolverEscopoDaFase`
+ * (catálogo em código primeiro, cadastro depois) — resolvedor único
+ * compartilhado por toda projeção do Processo (mandato "Catálogo de Fases",
+ * correção 20/09/2026, bug 1).
+ *
+ * NUNCA filtra por `status`/`ativo`: uma fase INATIVA (ex.: "TESTEVIS_fase" →
+ * "Fase de Teste Visual") continua tendo rótulo legível para processos
+ * históricos — só deixa de ser OFERTADA em fluxo novo, o que é decisão de
+ * `avaliarAptidaoDaFase`, não deste resolvedor. `phaseKey` nunca é usado como
+ * rótulo: quando nem o código nem o cadastro conhecem a chave, devolve `null`
+ * — quem chama decide como sinalizar "sem rótulo", nunca inventa um a partir
+ * do texto técnico.
+ */
+export async function resolverRotuloDaFase(
+  phaseKey: string | null | undefined,
+  db: DB = prisma,
+): Promise<string | null> {
+  if (!phaseKey) return null
+  const doCodigo = labelDaFasePorPhaseKey(phaseKey)
+  if (doCodigo) return doCodigo
+  const cadastro = await db.catalogoFase.findUnique({
+    where: { phaseKey },
+    select: { label: true },
+  })
+  return cadastro?.label ?? null
+}
+
+/**
  * A fase é UTILIZÁVEL num workflow? Devolve o motivo quando não é — o operador
  * precisa saber o que falta, não receber um seletor que aceita e um fluxo que trava.
  */
@@ -66,7 +94,7 @@ export interface AptidaoDaFase {
   apta: boolean
   escopo: EscopoOperacional | null
   motivo: string | null
-  code: "OK" | "SEM_ESCOPO" | "CHAVE_LEGADA" | "INEXISTENTE"
+  code: "OK" | "SEM_ESCOPO" | "CHAVE_LEGADA" | "INEXISTENTE" | "INATIVA" | "RASCUNHO"
   /** Quando a chave é legada: a canônica que deve ser usada no lugar. */
   canonica?: string
 }
@@ -98,9 +126,25 @@ export async function avaliarAptidaoDaFase(phaseKey: string, db: DB = prisma): P
   const doCodigo = escopoCanonicoDaFase(phaseKey)
   if (doCodigo) return { apta: true, escopo: doCodigo, motivo: null, code: "OK" }
 
-  const cadastro = await db.catalogoFase.findUnique({ where: { phaseKey }, select: { escopo: true, label: true } })
+  const cadastro = await db.catalogoFase.findUnique({ where: { phaseKey }, select: { escopo: true, label: true, status: true } })
   if (!cadastro) {
     return { apta: false, escopo: null, code: "INEXISTENTE", motivo: `Não existe fase com a chave "${phaseKey}" no cadastro.` }
+  }
+  // INATIVA/RASCUNHO nunca são ofertadas como opção operacional (mandato "Catálogo
+  // de Fases", 20/09/2026) — preserva a linha e toda referência histórica, só sai
+  // da composição de fluxo NOVO. Fase de teste/legado ("Teste Fase", "Fase de
+  // Teste Visual", "Transcrições") é inativada, nunca excluída, e cai aqui.
+  if (cadastro.status === "INATIVA") {
+    return {
+      apta: false, escopo: null, code: "INATIVA",
+      motivo: `A fase "${cadastro.label}" está inativada e não pode compor um fluxo novo. Reative-a em Processos › Estrutura › Fases se isto for intencional.`,
+    }
+  }
+  if (cadastro.status === "RASCUNHO") {
+    return {
+      apta: false, escopo: null, code: "RASCUNHO",
+      motivo: `A fase "${cadastro.label}" ainda está em rascunho — publique-a em Processos › Estrutura › Fases antes de usá-la num fluxo.`,
+    }
   }
   if (!cadastro.escopo) {
     return {

@@ -264,32 +264,70 @@ export function efeitoExiste(key: string): boolean {
 }
 
 /**
- * COMPETÊNCIA PADRÃO DE UMA FASE — o que ela pode fazer quando o cadastro ainda não
- * declarou nada.
+ * COMPETÊNCIA DE REFERÊNCIA DAS FASES CANÔNICAS — documentação de onde veio o
+ * `efeitosPermitidos` semeado em `CatalogoFase` para as 10 fases canônicas
+ * (`scripts/backfill-catalogo-fase-revisao.mjs`). NÃO é mais consultado em
+ * runtime por `efeitosDaFase` — ver a correção abaixo.
  *
- * Este mapa NÃO é a fonte da competência: a fonte é `CatalogoFase.efeitosPermitidos`,
- * que o administrador edita. Ele existe para que as fases que já estão em produção
- * tenham competência declarada desde o primeiro instante, em vez de "sem restrição"
- * — que é como a decisão de retificação vazou para a Emissão. Uma fase nova criada
- * pelo administrador declara a sua na tela.
+ * ACHADO (mandato "Catálogo de Fases", 20/09/2026): esta chave tinha um erro de
+ * digitação — `emissao_retificada` em vez do phaseKey real
+ * `emissao_documental_retificada` — e por isso NUNCA batia. Toda fase cuja chave
+ * não constasse aqui caía no ramo "sem competência declarada", que devolvia
+ * TODOS os efeitos não-`exigeAutorizacaoExplicita`, inclusive `GO_RETIFICATION`
+ * — exclusivo da Análise por comentário do próprio arquivo. Isto é exatamente
+ * como a decisão de retificação vazava para a Emissão Documental Retificada, e
+ * o mesmo buraco alcançava `genealogia`, `traducao_juramentada`, `apostilamento`,
+ * `aguardando_protocolo`, `protocolado` e `finalizado` — nenhuma delas constava
+ * aqui nem tinha `efeitosPermitidos` gravado.
  */
 export const COMPETENCIA_PADRAO_DA_FASE: Record<string, Competencia[]> = {
+  // emissao_documental NUNCA ganha ANALISE — "a Emissão não decide retificação"
+  // (ver registro-de-executores.ts, executor "conferencia_e_validacao": INVALIDATE_
+  // DOCUMENT/GO_RETIFICATION ficam de fora DE PROPÓSITO). O passo final de
+  // conferência ("Conferir e validar certidão") usa REQUEST_NEW_COPY para
+  // "inválida" — já é competência EMISSAO, nenhuma ampliação necessária.
   emissao_documental: [COMPETENCIAS.EMISSAO, COMPETENCIAS.GERAL],
-  emissao_retificada: [COMPETENCIAS.EMISSAO, COMPETENCIAS.GERAL],
+  // emissao_documental_retificada É a fase de retificação — ANALISE entrou em
+  // 20/09/2026 (mandato "Catálogo de Fases", correção do conteúdo do workflow,
+  // item 2) porque o passo final ("Conferir e Validar certidão retificada")
+  // decide VÁLIDA/INVÁLIDA sobre o próprio pedido de retificação, e "inválida"
+  // (INVALIDATE_DOCUMENT — preserva a certidão recebida, mantém a obrigação
+  // aberta para retrabalho) é competência ANALISE.
+  emissao_documental_retificada: [COMPETENCIAS.EMISSAO, COMPETENCIAS.GERAL, COMPETENCIAS.ANALISE],
   analise_documental: [COMPETENCIAS.ANALISE, COMPETENCIAS.GERAL],
   retificacao_registros: [COMPETENCIAS.RETIFICACAO, COMPETENCIAS.GERAL],
 }
 
-/** Os efeitos que uma fase pode usar, dada a lista declarada (ou o padrão). */
-export function efeitosDaFase(phaseKey: string, declarados: unknown): string[] {
+/**
+ * Os efeitos que uma fase pode usar — SOMENTE os declarados em
+ * `CatalogoFase.efeitosPermitidos`.
+ *
+ * CORREÇÃO (mandato "Catálogo de Fases", 20/09/2026): antes, uma fase sem lista
+ * declarada herdava TODOS os efeitos da competência presumida — e, pior, uma
+ * fase cuja chave não batesse com nada herdava TODOS os efeitos do sistema. A
+ * REGRA MASTER exige o oposto: ausência de efeito declarado significa efeito
+ * NÃO autorizado. Nenhuma fase "pode tudo" por omissão — nem por herança de
+ * competência, nem por chave não reconhecida. Uma fase nova, criada pelo
+ * administrador sem declarar `efeitosPermitidos`, nasce SEM NENHUM efeito
+ * liberado, e precisa que alguém explicitamente marque os que ela pode usar.
+ */
+export function efeitosDaFase(_phaseKey: string, declarados: unknown): string[] {
   if (Array.isArray(declarados) && declarados.every((x) => typeof x === "string")) {
     return declarados as string[]
   }
-  // A HERANÇA POR COMPETÊNCIA NÃO ALCANÇA QUEM EXIGE AUTORIZAÇÃO NOMINAL. Uma fase
-  // que não gravou lista recebe o que a competência dela permite — menos os efeitos
-  // que só entram por decisão explícita de quem administra.
-  const herdaveis = CATALOGO_DE_EFEITOS.filter((e) => !e.exigeAutorizacaoExplicita)
+  return []
+}
+
+/**
+ * Os efeitos herdáveis (não-`exigeAutorizacaoExplicita`) da COMPETÊNCIA PADRÃO de
+ * uma fase canônica — uso EXCLUSIVO de migração/backfill/teste, para computar o
+ * `efeitosPermitidos` a gravar no cadastro. NUNCA chamado pelo runtime (esse é
+ * `efeitosDaFase`, que só lê o cadastro). Uma fase sem entrada aqui devolve `[]`
+ * — mesma regra de "ausência não autoriza", só que na fonte de referência em vez
+ * de no fallback de execução.
+ */
+export function efeitosPorCompetenciaPadrao(phaseKey: string): string[] {
   const comps = COMPETENCIA_PADRAO_DA_FASE[phaseKey]
-  if (!comps) return herdaveis.map((e) => e.key) // fase sem competência declarada
-  return herdaveis.filter((e) => comps.includes(e.competencia)).map((e) => e.key)
+  if (!comps) return []
+  return CATALOGO_DE_EFEITOS.filter((e) => !e.exigeAutorizacaoExplicita && comps.includes(e.competencia)).map((e) => e.key)
 }

@@ -9,6 +9,7 @@ import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
 import { removerFamiliaSeOrfa } from "@/src/services/familia"
 import { excluirProcesso } from "@/src/services/processo-ciclo-vida"
 import { limparArvoreOrfaAposExclusaoDeProcesso } from "@/src/services/pessoa-ciclo-vida"
+import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -70,9 +71,16 @@ export async function GET(
       )
     }
 
+    // RÓTULO CANÔNICO DA FASE — resolvedor único compartilhado (mandato
+    // "Catálogo de Fases", correção 20/09/2026, bug 1). `faseAtualKey`
+    // continua no objeto como dado técnico; `faseAtualLabel` é o que a
+    // interface deve exibir. Resolve mesmo para fase INATIVA (histórico).
+    const faseAtualLabel = await resolverRotuloDaFase(processo.faseAtualKey)
+
     // Formatar resposta
     const processoFormatado = {
       ...processo,
+      faseAtualLabel,
       contratantes: processo.contratantes.map(c => c.contratante),
       requerentes: processo.requerentes.map(r => r.requerente)
     }
@@ -221,9 +229,13 @@ export async function PUT(
       }
     })
 
+    // RÓTULO CANÔNICO DA FASE — mesmo resolvedor do GET (ver bug 1, correção 20/09/2026).
+    const faseAtualLabelPut = await resolverRotuloDaFase(processoAtualizado?.faseAtualKey ?? null)
+
     // Formatar resposta
     const processoFormatado = {
       ...processoAtualizado,
+      faseAtualLabel: faseAtualLabelPut,
       contratantes: processoAtualizado?.contratantes.map(c => c.contratante) || [],
       requerentes: processoAtualizado?.requerentes.map(r => r.requerente) || []
     }

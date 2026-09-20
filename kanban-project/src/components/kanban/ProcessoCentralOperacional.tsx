@@ -12,7 +12,7 @@ import { useAmbiente } from "@/src/contexts/ambiente-context"
 import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/types/kanban"
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
-import { WorkflowMacroTrilha, ResumoDoProcesso, PROCESS_PHASES } from "./WorkflowMacroTrilha"
+import { WorkflowMacroTrilha, ResumoDoProcesso, type FaseTrilha } from "./WorkflowMacroTrilha"
 import { PainelDaFase, type FaseKpi } from "./PainelDaFase"
 // ESTRUTURA OPERACIONAL — contrato oficial da Central (pessoa → documento →
 // workflow do documento → passos). Vem pronta do backend; a tela não reagrupa.
@@ -54,6 +54,8 @@ export interface PhaseMeta {
   faseCode: FaseCode | null
   label: string
   ordem: number
+  /** Só entra no caminho ativo condicionalmente (ex.: Retificação). */
+  conditional?: boolean
   /** OPEN = já materializada, mas sem concluir de fato (não é a atual). */
   state: "ACTIVE" | "COMPLETED" | "OPEN" | "FUTURE"
   /** Progresso REAL da fase (0-100) — mesma projeção do Kanban/Header, por fase. */
@@ -64,11 +66,6 @@ export interface PhaseMeta {
   status: string | null
 }
 import { FASES, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
-
-// Mapa label → phaseKey (a trilha emite o LABEL exato do catálogo).
-const LABEL_TO_PHASEKEY: Record<string, string> = Object.fromEntries(
-  Object.values(FASES).map((f) => [f.label, f.phaseKey]),
-)
 
 // ============================================================
 // TIPOS (espelho do endpoint)
@@ -157,6 +154,7 @@ interface CentralOpData {
     missing: MatrixMissing[]
   }
   cards: {
+    // grain = Tarefa (CLAUDE.md §16) — ver central-operacional/route.ts
     all: number
     pending: number
     overdue: number
@@ -166,6 +164,8 @@ interface CentralOpData {
     noOwner: number
     followup: number
     stale: number
+    /** Documento é entidade relacionada, contada à parte — nunca somada à Tarefa. */
+    documentos: number
   }
   queue: Array<{
     docId: number
@@ -909,25 +909,48 @@ export function ProcessoCentralOperacional({
     faseCodeAtiva ??
     phaseKeyToFaseCode((processo as { faseAtualKey?: string | null }).faseAtualKey) ??
     undefined
-  const faseAtivaNome = (faseKeyAtiva ? FASES[faseKeyAtiva]?.label : undefined) ?? "Genealogia"
+  // IDENTIDADE CANÔNICA DA FASE ATIVA — nunca por label, nunca só pelo enum FaseCode
+  // (que só cobre as 10 fases canônicas). `data.faseProgress.faseCode` é a fonte
+  // FRESCA, mas só existe para essas 10; uma fase nova publicada pelo Catálogo de
+  // Fases (mandato 20/09/2026) cai direto no phaseKey bruto do processo — ainda
+  // correto, só sem a garantia extra de "acabou de mudar" que o FaseCode fresco dá.
+  const activePhaseKey =
+    (faseKeyAtiva ? faseCodeToPhaseKey(faseKeyAtiva) : null) ??
+    (processo as { faseAtualKey?: string | null }).faseAtualKey ??
+    null
+  // Rótulo de exibição: primeiro `phases` (GET .../phases, fonte canônica real —
+  // cobre qualquer phaseKey, inclusive fase nova sem FaseCode), depois o catálogo
+  // em código como fallback (só cobre as 10 canônicas), nunca um nome fixo.
+  const faseAtivaNome =
+    phases.find((p) => p.phaseKey === activePhaseKey)?.label ??
+    (faseKeyAtiva ? FASES[faseKeyAtiva]?.label : undefined) ??
+    // RESOLVEDOR CANÔNICO (Catálogo de Fases, correção 20/09/2026): quando a fase
+    // não está em nenhum Workflow Macro composto (ex.: TESTEVIS_fase — sintética,
+    // sem tipoProcessoMotorId) nem no catálogo em código, `phases`/`FASES` acima
+    // não a alcançam. `faseAtualLabel` vem de `resolverRotuloDaFase` no servidor
+    // (GET /api/processos/[id]) — mesma fonte única, nunca inventada aqui. Só cai
+    // na chave técnica crua se NEM o resolvedor souber o rótulo (erro de
+    // configuração real, não bug de projeção).
+    (processo as { faseAtualLabel?: string | null }).faseAtualLabel ??
+    activePhaseKey ??
+    "—"
   // Percentual da fase ATIVA = projeção oficial (mesmo % do Kanban/Header). Nenhum
   // recálculo local.
   const pctFaseAtual = data.projection?.progress.percentage ?? data.matrix?.percentage ?? 0
   // "Concluída" e o progresso de TODA fase (inclusive as anteriores) vêm de
-  // `GET .../phases` — a MESMA projeção oficial, calculada por fase. Antes disto,
-  // "toda fase anterior à atual" era pintada de 100% só pela posição: mover o
-  // processo manualmente preservando histórico (a pedido, para nenhuma tarefa
-  // sumir) deixava a fase de origem sem o trabalho real feito, e a tela mesmo
-  // assim dizia "Concluída". Sem `/phases` carregado ainda, cai em 0 (nunca 100
-  // por suposição) — a fase ativa usa `pctFaseAtual` acima, que chega antes.
+  // `GET .../phases` — a MESMA projeção oficial, calculada por fase, já chaveada
+  // por phaseKey (identidade canônica — nunca rótulo). Antes disto, "toda fase
+  // anterior à atual" era pintada de 100% só pela posição: mover o processo
+  // manualmente preservando histórico (a pedido, para nenhuma tarefa sumir) deixava
+  // a fase de origem sem o trabalho real feito, e a tela mesmo assim dizia
+  // "Concluída". Sem `/phases` carregado ainda, cai em 0 (nunca 100 por suposição)
+  // — a fase ativa usa `pctFaseAtual` acima, que chega antes.
+  const fasesTrilha: FaseTrilha[] = phases.map((p) => ({ phaseKey: p.phaseKey, label: p.label, conditional: p.conditional }))
   const progressoPorFase: Record<string, number> = {}
-  PROCESS_PHASES.forEach((ph) => { progressoPorFase[ph] = ph === faseAtivaNome ? pctFaseAtual : 0 })
   for (const p of phases) {
-    if (p.label === faseAtivaNome) continue
-    progressoPorFase[p.label] = p.progress
+    progressoPorFase[p.phaseKey] = p.phaseKey === activePhaseKey ? pctFaseAtual : p.progress
   }
-  const fasesConcluidas = phases.filter((p) => p.state === "COMPLETED").map((p) => p.label)
-  const activePhaseKey = faseKeyAtiva ? faseCodeToPhaseKey(faseKeyAtiva) : null
+  const fasesConcluidas = phases.filter((p) => p.state === "COMPLETED").map((p) => p.phaseKey)
 
   // FASE CONSULTADA (corpo) — `viewData` (passada) ou `data` (ativa). MESMO layout;
   // PAST_READ_ONLY só bloqueia mutações. Dados VIVOS da instância/ciclo (nunca snapshot).
@@ -999,7 +1022,7 @@ export function ProcessoCentralOperacional({
           // "OPEN" (nunca "COMPLETED") \u2014 sem a resposta real ainda n\u00e3o d\u00e1 pra
           // afirmar que a fase terminou; supor conclus\u00e3o pela posi\u00e7\u00e3o foi exatamente
           // o bug que este acerto corrige.
-          phaseKey: selectedKey, faseCode: selectedFaseCode, label: selectedLabel ?? selectedKey,
+          phaseKey: selectedKey, faseCode: selectedFaseCode, label: selectedLabel ?? `⚠ Fase não cadastrada (${selectedKey})`,
           ordem: selectedFaseCode ? FASES[selectedFaseCode].ordem : 0,
           state: "OPEN" as PhaseMeta["state"],
           progress: 0,
@@ -1007,11 +1030,9 @@ export function ProcessoCentralOperacional({
         })
       : null
 
-  const onSelectPhase = (label: string) => {
-    const pk = LABEL_TO_PHASEKEY[label]
-    if (!pk) return
+  const onSelectPhase = (phaseKey: string) => {
     // Selecionar a fase ativa volta para OPERATE; qualquer outra entra em consulta (VIEW).
-    setSelectedPhaseKey(pk === activePhaseKey ? null : pk)
+    setSelectedPhaseKey(phaseKey === activePhaseKey ? null : phaseKey)
   }
 
   return (
@@ -1022,15 +1043,17 @@ export function ProcessoCentralOperacional({
         <div className="flex flex-col gap-4 mb-4">
           <div className="min-w-0">
             <WorkflowMacroTrilha
-              currentPhase={faseAtivaNome}
+              fases={fasesTrilha}
+              currentPhase={activePhaseKey ?? ""}
               completedPhases={fasesConcluidas}
               phaseProgress={progressoPorFase}
-              selectedPhase={selectedLabel}
+              selectedPhase={selectedKey ?? undefined}
               onSelectPhase={onSelectPhase}
             />
           </div>
           <ResumoDoProcesso
-            currentPhase={faseAtivaNome}
+            fases={fasesTrilha}
+            currentPhase={activePhaseKey ?? ""}
             completedPhases={fasesConcluidas}
             phaseProgress={progressoPorFase}
           />

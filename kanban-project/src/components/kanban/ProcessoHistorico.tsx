@@ -51,7 +51,11 @@ function tipoDoLog(l: LogItem): TipoKey {
   if (e === "EVENTO") return "eventos"
   if (e === "ARQUIVO" || e === "ANEXO") return "arquivos"
   if (e === "COMUNICACAO" || e === "EMAIL" || e === "MENSAGEM") return "comunicacao"
-  if (e === "PROCESSO" && (a === "AVANCAR" || a === "RETROCEDER" || a === "MOVER" || a.includes("FASE"))) return "workflow"
+  // RECONCILIACAO_* e FASE_* — publicação/ativação/inativação/reconciliação/
+  // materialização de fase (mandato "Catálogo de Fases", correção 20/09/2026,
+  // bug 2 do checklist de auditoria: estes eventos caíam em "Alterações" por
+  // não bater em nenhuma regra acima, mesmo sendo Workflow por natureza).
+  if (e === "PROCESSO" && (a === "AVANCAR" || a === "RETROCEDER" || a === "MOVER" || a.includes("FASE") || a.includes("RECONCILIACAO") || a.includes("MATERIALIZ"))) return "workflow"
   if (e === "WORKFLOW" || e === "FASE" || e === "OPERACAO") return "workflow"
   return "alteracoes"
 }

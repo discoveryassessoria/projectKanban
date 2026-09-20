@@ -3415,7 +3415,21 @@ model CatalogoFase {
   criadoEm          DateTime        @default(now())
   atualizadoEm      DateTime        @updatedAt
 
+  /// ESTADO DE PUBLICAÇÃO — RASCUNHO nunca é ofertado como opção operacional (não
+  /// entra no seletor de composição do Workflow Macro nem é elegível para
+  /// reconciliação); PUBLICADA é a única elegível a compor fluxo novo; INATIVA
+  /// preserva a linha e toda referência histórica, mas sai da oferta operacional.
+  /// Substitui `ativo` como fonte de decisão a partir desta revisão — `ativo`
+  /// permanece por compatibilidade de leitura e é mantido em sincronia
+  /// (`ativo = status !== INATIVA`) por quem escreve `status`.
+  status        CatalogoFaseStatus @default(PUBLICADA)
+  /// Número da última revisão CONGELADA em `CatalogoFaseRevisao`. Incrementa a
+  /// cada publicação; não confundir com `ordemPadrao` (posição), que nunca é
+  /// chave funcional.
+  revisaoAtual  Int                @default(1)
+
   naturezasPermitidas FaseNaturezaPermitida[]
+  revisoes            CatalogoFaseRevisao[]
 
   /// QUEM CONDUZ ESTA FASE: o Workflow Interno, ou a tela anterior a ele.
   ///
@@ -3434,6 +3448,45 @@ model CatalogoFase {
   conduzidaPeloWorkflowInterno Boolean @default(false)
 }
 
+enum CatalogoFaseStatus {
+  RASCUNHO
+  PUBLICADA
+  INATIVA
+}
+
+/// REVISÃO CONGELADA de uma fase do catálogo — mesmo padrão de
+/// `PhaseInternalWorkflowVersao`: a definição (`CatalogoFase`) é o rascunho
+/// editável; esta tabela é o conteúdo imutável de cada publicação. Existe para
+/// histórico/auditoria/comparação/rollback — NUNCA para travar processo em
+/// andamento na versão antiga (isso é o oposto da REGRA MASTER: o processo em
+/// andamento sempre lê a definição VIGENTE; esta tabela só registra o que
+/// vigorou em cada momento).
+model CatalogoFaseRevisao {
+  id             Int          @id @default(autoincrement())
+  catalogoFaseId Int
+  catalogoFase   CatalogoFase @relation(fields: [catalogoFaseId], references: [id], onDelete: Cascade)
+  revisao        Int
+
+  // Cópia fiel do que a definição dizia quando esta revisão passou a valer.
+  phaseKey          String             @db.VarChar(60)
+  label             String             @db.VarChar(120)
+  descricao         String?            @db.Text
+  escopo            EscopoExecucao?
+  ordemPadrao       Int
+  requiredPadrao    Boolean
+  conditionalPadrao Boolean
+  status            CatalogoFaseStatus
+  efeitosPermitidos Json?
+
+  congeladoEm    DateTime @default(now())
+  congeladoPorId Int?
+  /// Por que esta revisão nasceu: CRIACAO, PUBLICACAO, INATIVACAO, BACKFILL.
+  origem         String   @db.VarChar(20)
+
+  @@unique([catalogoFaseId, revisao])
+  @@index([catalogoFaseId])
+}
+
 // Workflow Macro â 1:1 com o tipo de processo
 model MacroWorkflow {
   id             Int                       @id @default(autoincrement())
@@ -3445,6 +3498,35 @@ model MacroWorkflow {
   criadoEm       DateTime                  @default(now())
   atualizadoEm   DateTime                  @updatedAt
   fases          FaseMacro[]
+  versoes        MacroWorkflowVersao[]
+}
+
+/// REVISÃO CONGELADA da composição do Workflow Macro (a lista ordenada de
+/// `FaseMacro`) — mesmo padrão de `PhaseInternalWorkflowVersao` e
+/// `CatalogoFaseRevisao`. Cada publicação de uma alteração de composição
+/// (fase adicionada/removida/reordenada) congela aqui o ANTES de aplicar, e
+/// incrementa `MacroWorkflow.versao`. É o gatilho da reconciliação: comparar
+/// a revisão N-1 com a N é o que decide quais fases são NOVAS e precisam
+/// alcançar os processos em andamento.
+model MacroWorkflowVersao {
+  id              Int           @id @default(autoincrement())
+  macroWorkflowId Int
+  macroWorkflow   MacroWorkflow @relation(fields: [macroWorkflowId], references: [id], onDelete: Cascade)
+  versao          Int
+
+  tipoProcessoId Int
+  name           String @db.VarChar(200)
+  /// Fases como estavam nesta versão: phaseKey, ordem, required, conditional,
+  /// showInKanban, entryRule. Lido como conjunto, sempre inteiro.
+  fases          Json
+
+  congeladoEm    DateTime @default(now())
+  congeladoPorId Int?
+  /// CRIACAO, PUBLICACAO, BACKFILL.
+  origem         String   @db.VarChar(20)
+
+  @@unique([macroWorkflowId, versao])
+  @@index([macroWorkflowId])
 }
 
 // Fases do workflow (a coluna variÃ¡vel)

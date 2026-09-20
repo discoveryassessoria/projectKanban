@@ -63,9 +63,13 @@ type Form = {
   ativo: boolean
 }
 
+// AUSÊNCIA DE EFEITO NUNCA SIGNIFICA "PODE TUDO" — significa [] (nenhum efeito
+// autorizado). Fase nova nasce SEM nenhum efeito marcado e SEM ativar: "Ativa"
+// é o gesto de PUBLICAR, e publicar sem nenhum efeito selecionado é recusado
+// (mandato "Catálogo de Fases", correção 20/09/2026, bug 3).
 const vazio = (ordem: number): Form => ({
-  phaseKey: "", label: "", descricao: "", escopo: "", efeitosPermitidos: null, ordemPadrao: ordem, requiredPadrao: true,
-  conditionalPadrao: false, ativo: true,
+  phaseKey: "", label: "", descricao: "", escopo: "", efeitosPermitidos: [], ordemPadrao: ordem, requiredPadrao: true,
+  conditionalPadrao: false, ativo: false,
 })
 
 export default function CatalogoFasesTab() {
@@ -106,6 +110,11 @@ export default function CatalogoFasesTab() {
   async function save() {
     if (!form) return
     if (!form.label.trim()) { showFlash("Informe o nome da fase."); return }
+    if (!form.escopo) { showFlash("Escolha sobre o que a fase opera."); return }
+    if (form.ativo && (form.efeitosPermitidos ?? []).length === 0) {
+      showFlash("Publicar exige pelo menos um efeito marcado — nenhum efeito nunca é autorizado por omissão.")
+      return
+    }
     setBusy(true)
     try {
       const url = form.id ? `/api/gerenciamento/catalogo-fases/${form.id}` : "/api/gerenciamento/catalogo-fases"
@@ -216,7 +225,7 @@ export default function CatalogoFasesTab() {
                       onClick={() => setForm({
                         id: f.id, phaseKey: f.phaseKey, label: f.label, ordemPadrao: f.ordemPadrao,
                         descricao: f.descricao ?? "", escopo: f.escopo ?? "",
-                        efeitosPermitidos: f.efeitosPermitidos ?? null,
+                        efeitosPermitidos: f.efeitosPermitidos ?? [],
                         requiredPadrao: f.requiredPadrao, conditionalPadrao: f.conditionalPadrao,
                         ativo: f.ativo,
                       })}
@@ -299,8 +308,11 @@ export default function CatalogoFasesTab() {
                 {efeitos.length === 0 && <p className="text-[11px] text-[var(--text-muted)]">Carregando o catálogo de efeitos…</p>}
                 <div className="mt-1 max-h-52 space-y-1 overflow-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-2">
                   {efeitos.map(ef => {
-                    const lista = form.efeitosPermitidos
-                    const marcado = lista === null ? true : lista.includes(ef.key)
+                    // NUNCA "null = tudo marcado": a lista é sempre um array explícito
+                    // (vazio = nenhum efeito autorizado), e o checkbox reflete
+                    // EXATAMENTE o que está persistido, nunca uma suposição.
+                    const lista = form.efeitosPermitidos ?? []
+                    const marcado = lista.includes(ef.key)
                     return (
                       <label key={ef.key} className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-[var(--surface-hover)]">
                         <input
@@ -308,8 +320,7 @@ export default function CatalogoFasesTab() {
                           className="mt-1"
                           checked={marcado}
                           onChange={() => {
-                            const base = lista === null ? efeitos.map(e => e.key) : lista
-                            const nova = marcado ? base.filter(k => k !== ef.key) : [...base, ef.key]
+                            const nova = marcado ? lista.filter(k => k !== ef.key) : [...lista, ef.key]
                             setForm(f => f && { ...f, efeitosPermitidos: nova })
                           }}
                         />
@@ -324,7 +335,7 @@ export default function CatalogoFasesTab() {
                 </div>
                 <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   A publicação de um workflow desta fase recusa qualquer resultado cujo efeito não esteja marcado aqui.
-                  {form.efeitosPermitidos === null && " Hoje esta fase não declara nada — ela pode tudo."}
+                  {(form.efeitosPermitidos ?? []).length === 0 && " Nenhum efeito selecionado — esta fase NÃO pode disparar efeito nenhum até que pelo menos um seja marcado. Ausência de seleção nunca significa \"todos\"."}
                 </p>
               </div>
 
@@ -343,8 +354,9 @@ export default function CatalogoFasesTab() {
                 </label>
                 <label className="flex items-center gap-2 text-sm text-white/70">
                   <input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
-                  Ativa (aparece no seletor de fases dos fluxos)
+                  Publicar (ativa, aparece no seletor de fases dos fluxos — exige pelo menos um efeito marcado acima)
                 </label>
+                {!form.ativo && <p className="text-[11px] text-[var(--text-muted)]">Sem marcar, a fase fica como RASCUNHO: existe no cadastro, mas não é ofertada em fluxo novo.</p>}
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">

@@ -26,8 +26,9 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import { FASES, phaseKeyToFaseCode, getOrdemFase } from "@/src/lib/process-stage/fases-catalog"
+import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import type { FaseCode } from "@prisma/client"
 
 type PhaseState = "ACTIVE" | "COMPLETED" | "OPEN" | "FUTURE"
@@ -46,6 +47,8 @@ interface PhaseListItem {
   faseCode: FaseCode | null
   label: string
   ordem: number
+  /** Entra no caminho ativo condicionalmente (ex.: Retificação — só se decidida). */
+  conditional: boolean
   state: PhaseState
   /** Progresso REAL da fase (0-100) — mesma projeção usada pelo Kanban/Header/consulta. */
   progress: number
@@ -72,13 +75,54 @@ export async function GET(
   try {
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, faseAtualKey: true },
+      select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
     const faseAtualKey = processo.faseAtualKey ?? null
-    const faseAtualCode = phaseKeyToFaseCode(faseAtualKey)
-    const ordemAtual = faseAtualCode != null ? getOrdemFase(faseAtualCode) : -1
+
+    // FONTE CANÔNICA — o Workflow Macro REAL do tipo de processo (MacroWorkflow.fases),
+    // não o catálogo hardcoded. Uma fase publicada pelo Catálogo de Fases (mandato
+    // 20/09/2026) só aparece aqui se a fonte for esta: o catálogo em código nunca
+    // vai saber que ela existe. `faseCode` continua preenchido para as 10 fases
+    // canônicas (compat com quem ainda lê por FaseCode) e nasce `null` para fase
+    // nova — identidade real é `phaseKey`, nunca o code nem o label.
+    const macroWorkflow = processo.tipoProcessoMotorId != null
+      ? await prisma.macroWorkflow.findUnique({
+          where: { tipoProcessoId: processo.tipoProcessoMotorId },
+          include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, label: true, ordem: true, conditional: true } } },
+        })
+      : null
+
+    // FALLBACK — processo sem tipo do motor (legado) ou sem Workflow Macro
+    // cadastrado: mantém o comportamento anterior (catálogo em código) em vez de
+    // devolver uma lista vazia. `conditional` aqui usa a mesma dupla canônica que
+    // já era hardcoded na trilha (Retificação/Emissão Retificada) — o catálogo em
+    // código não declara isso, e este é só o caminho de compatibilidade legado.
+    const CONDICIONAIS_CANONICAS = new Set(["retificacao_registros", "emissao_documental_retificada"])
+    let fasesOrdenadas = macroWorkflow
+      ? macroWorkflow.fases.map((f) => ({ phaseKey: f.phaseKey, label: f.label, ordem: f.ordem, code: phaseKeyToFaseCode(f.phaseKey), conditional: f.conditional }))
+      : Object.values(FASES).sort((a, b) => a.ordem - b.ordem).map((f) => ({ ...f, conditional: CONDICIONAIS_CANONICAS.has(f.phaseKey) }))
+
+    // A FASE ATUAL DO PROCESSO SEMPRE APARECE NA TRILHA — mesmo quando não está em
+    // nenhum Workflow Macro composto (processo sem tipoProcessoMotorId, ex.: cenário
+    // sintético/legado) nem no catálogo em código (mandato "Catálogo de Fases",
+    // correção 20/09/2026, bug 1: sem isto, a trilha ficava sem NENHUMA fase ACTIVE
+    // e o rótulo caía para a chave técnica crua em quem consumisse esta lista).
+    // Rótulo pelo MESMO resolvedor canônico usado no resto do sistema — nunca
+    // inventado aqui, nunca por casamento de texto.
+    if (faseAtualKey && !fasesOrdenadas.some((f) => f.phaseKey === faseAtualKey)) {
+      const rotulo = await resolverRotuloDaFase(faseAtualKey)
+      // Erro CONTROLADO de configuração — nunca a chave crua apresentada como se
+      // fosse um nome válido: nem o código nem o cadastro conhecem esta fase.
+      const label = rotulo ?? `⚠ Fase não cadastrada (${faseAtualKey})`
+      fasesOrdenadas = [
+        ...fasesOrdenadas,
+        { phaseKey: faseAtualKey, label, ordem: fasesOrdenadas.length, code: phaseKeyToFaseCode(faseAtualKey), conditional: false },
+      ]
+    }
+
+    const ordemAtual = fasesOrdenadas.find((f) => f.phaseKey === faseAtualKey)?.ordem ?? -1
 
     const instancias = await prisma.phaseWorkflowInstance.findMany({
       where: { processoId: id },
@@ -102,8 +146,6 @@ export async function GET(
       })
       porFase.set(inst.faseMacroKey, arr)
     }
-
-    const fasesOrdenadas = Object.values(FASES).sort((a, b) => a.ordem - b.ordem)
 
     // Progresso REAL só é consultado para fase JÁ ALCANÇADA (ordem <= atual) que tem
     // instância — o escopo explicado no cabeçalho. Fora disso, 0% sem perguntar nada.
@@ -133,6 +175,7 @@ export async function GET(
       return {
         phaseKey: f.phaseKey,
         faseCode: f.code,
+        conditional: f.conditional,
         label: f.label,
         ordem: f.ordem,
         state,

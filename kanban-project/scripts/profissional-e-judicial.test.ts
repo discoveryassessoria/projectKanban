@@ -17,7 +17,7 @@ import { join } from "path"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { CONFIGURACAO } from "./_configuracao-retificacao"
 import { validarConfiguracao } from "../src/services/validacao-de-publicacao"
-import { efeitosDaFase, efeito } from "../src/lib/motor/catalogo-de-efeitos"
+import { efeitosPorCompetenciaPadrao, efeito } from "../src/lib/motor/catalogo-de-efeitos"
 import { ALVOS_DE_REFERENCIA, alvoDoCampo } from "../src/lib/motor/fontes-de-campo"
 import { listarAlvo, resolverReferencia, validarReferencia } from "../src/services/referencia-canonica"
 import { abrirPacoteDeRetificacao, pacotesAbertos } from "../src/services/retificacao-canonica"
@@ -236,7 +236,7 @@ async function main() {
     (await prisma.retificacaoPacote.findUnique({ where: { id: pacA.pacoteId }, select: { tipo: true } }))?.tipo === null)
 
   const chaves = Object.keys(CONFIGURACAO)
-  const escopo = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
+  const escopo = [...efeitosPorCompetenciaPadrao(FASE), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   await prisma.catalogoFase.create({
     data: { phaseKey: `${M.toLowerCase()}_ret`, label: "Retificação (teste)", escopo: "PROCESSO",
       ordemPadrao: 97, efeitosPermitidos: escopo as never },

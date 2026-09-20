@@ -22,6 +22,7 @@ import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { computeGate, type ProjectionInput, type NecessidadeData, type DocumentoData } from "@/src/lib/motor/operational-projection-core"
 import { getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { mapStepToGate } from "@/src/lib/process-stage/operational-projection"
+import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import { requerentesAtivosDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 
 export interface PhaseBlockingResult {
@@ -127,7 +128,7 @@ export async function calcularPendencias(
     processId: processoId,
     faseCode,
     faseMacroKey,
-    phaseName: faseDef?.label ?? faseMacroKey,
+    phaseName: faseDef?.label ?? (await resolverRotuloDaFase(faseMacroKey)) ?? `⚠ Fase não cadastrada (${faseMacroKey})`,
     scope: faseDef?.scope ?? null,
     processoExists: true,
     hasActiveInstance: instancias.length > 0,

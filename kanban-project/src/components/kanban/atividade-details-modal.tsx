@@ -689,7 +689,7 @@ function ConteudoModal({
                     <div className="mb-6">
                       <label className="text-xs text-[var(--text-muted)] uppercase">Etapa</label>
                       <p className="text-white/95 font-medium">
-                        {processo.faseAtualKey ?? "—"}
+                        {processo.faseAtualLabel ?? (processo.faseAtualKey ? `⚠ Fase não cadastrada (${processo.faseAtualKey})` : "—")}
                       </p>
                     </div>
 

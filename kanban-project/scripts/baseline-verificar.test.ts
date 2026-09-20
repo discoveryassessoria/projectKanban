@@ -1,14 +1,29 @@
 /**
- * GUARDA — prisma/baseline/baseline.sql em dia com o prisma/schema.prisma.
- * Rodar: npm run test:baseline   (roda tambem no build)
+ * GUARDA — integridade do baseline HISTÓRICO + registro das migrations aditivas
+ * posteriores. Rodar: npm run test:baseline (roda também no build).
  *
- * O defeito que este teste trava: alguem altera o schema.prisma, o baseline
- * nao e regenerado, e a divergencia so aparece num desastre — quando o
- * baseline for a unica forma de reconstruir o banco e produzir um schema
- * diferente do real.
+ * REDESENHO 20/09/2026 (mandato "Catálogo de Fases", decisão definitiva do
+ * usuário): baseline e migrations já aplicadas são IMUTÁVEIS. Nunca mais este
+ * guard exige regenerar `baseline.sql` nem reconciliar checksum em produção — o
+ * baseline não precisa representar sozinho o schema atual; ele é o ponto
+ * histórico sobre o qual as migrations posteriores (`MIGRATIONS_POS_BASELINE`)
+ * se aplicam. O que o guard efetivamente trava, os dois só ofline (sem banco):
  *
- * NAO abre conexao com banco. Compara texto: regenera o corpo a partir do
- * schema.prisma (offline) + o bloco manual, e confere contra o commitado.
+ *   1) `0000_baseline/migration.sql` não foi editado à mão — checksum contra
+ *      CHECKSUM_LEDGER (o que produção tem registrado).
+ *   2) TODA pasta em prisma/migrations/ está contabilizada — ou é o baseline,
+ *      ou está declarada em MIGRATIONS_POS_BASELINE. Migration esquecida (não
+ *      declarada) ou migration histórica que voltou por engano são pegas aqui.
+ *   3) O manifesto `prisma/baseline/migrations-absorvidas.json` (gerado por
+ *      `baseline-gerar.mjs`) é consistente: só referencia migrations que
+ *      realmente existem e que estão declaradas.
+ *
+ * "baseline.sql != schema.prisma regenerado agora" deixou de ser falha — é
+ * ESPERADO sempre que houver migration aditiva desde a última regeneração real
+ * do baseline. Isso vira aviso informativo, nunca reprova o build. A PROVA
+ * completa de que baseline + as migrations aditivas reconstroem o schema atual
+ * é feita à parte, COM banco, em `scripts/baseline-integridade-real.test.ts`
+ * (não roda automaticamente no build — precisa de Postgres local).
  */
 import { createHash } from 'node:crypto'
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
@@ -482,7 +497,17 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260917181305_tarefa_tipo_administrativa',
   '20260920000000_controle_temporal_espera_subtarefa',
   '20260920010000_sino_motivos_consolidados',
+  // DECISÃO 20/09/2026 (mandato "Catálogo de Fases"): o baseline e as migrations
+  // já aplicadas ficam IMUTÁVEIS — nenhuma reconciliação de checksum em produção
+  // por decisão. Esta e qualquer migration futura entram aqui como sempre
+  // entraram; o que mudou é que "baseline.sql != schema.prisma atual" deixou de
+  // ser motivo de falha (ver MANIFESTO_ABSORVIDAS e main() abaixo) — o baseline
+  // histórico + as migrations aditivas registradas aqui são a prova, não um
+  // baseline sempre-atualizado.
+  '20260920020000_catalogo_fase_revisao_macro_workflow_versao',
 ]
+
+const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
 
@@ -572,6 +597,58 @@ function verificarMigrationOficial() {
 
   const extra = MIGRATIONS_POS_BASELINE.length
   console.log(`  ✅ 0000_baseline integro (sha256 ${checksum.slice(0, 12)}…)${extra ? ` + ${extra} migration(s) pos-baseline declarada(s)` : ' e unica migration do repositorio'}`)
+
+  verificarManifestoAbsorvidas(checksum)
+}
+
+/**
+ * O manifesto (prisma/baseline/migrations-absorvidas.json) e' o que permite
+ * `baseline-integridade-real.test.ts` provar "baseline + migrations = schema
+ * atual" sem adivinhar quais migrations ja estao dentro do baseline. Reprovar
+ * aqui, offline, um manifesto inconsistente e' mais barato que descobrir isso
+ * no meio de uma reconstrucao de desastre.
+ */
+function verificarManifestoAbsorvidas(checksumBaseline: string) {
+  if (!existsSync(CAMINHO_MANIFESTO)) {
+    falhar([
+      '  FALTA prisma/baseline/migrations-absorvidas.json',
+      '',
+      '  Sem ele, baseline-integridade-real.test.ts nao sabe quais migrations ja',
+      '  estao dentro do baseline atual e quais sao aditivas de verdade.',
+      '  Rode: npm run baseline:gerar (regenera o manifesto tambem) — ou, se o',
+      '  baseline atual e historico/imutavel por decisao, reconstrua o manifesto',
+      '  manualmente para ESTE checksum.',
+    ])
+  }
+  const manifesto = JSON.parse(readFileSync(CAMINHO_MANIFESTO, 'utf8')) as {
+    baselineChecksum: string
+    migrationsAbsorvidas: string[]
+  }
+  if (manifesto.baselineChecksum !== checksumBaseline) {
+    falhar([
+      '  MANIFESTO DE MIGRATIONS ABSORVIDAS NAO E DESTE BASELINE',
+      '',
+      `  manifesto aponta para checksum : ${manifesto.baselineChecksum}`,
+      `  baseline atual                 : ${checksumBaseline}`,
+      '',
+      '  O manifesto descreve um baseline diferente do que esta commitado hoje.',
+      '  Regenere-o (npm run baseline:gerar) ou reconstrua-o para este checksum.',
+    ])
+  }
+  const desconhecidas = manifesto.migrationsAbsorvidas.filter(
+    (n) => n !== '0000_baseline' && !MIGRATIONS_POS_BASELINE.includes(n),
+  )
+  if (desconhecidas.length > 0) {
+    falhar([
+      '  MANIFESTO CITA MIGRATION QUE NAO EXISTE/NAO ESTA DECLARADA',
+      '',
+      `  ${desconhecidas.join(', ')}`,
+      '',
+      '  Toda entrada de migrationsAbsorvidas precisa estar em',
+      '  MIGRATIONS_POS_BASELINE (ou ser o proprio 0000_baseline).',
+    ])
+  }
+  console.log(`  ✅ manifesto de migrations absorvidas consistente (${manifesto.migrationsAbsorvidas.length} migration(s))`)
 }
 
 /** Inicio deterministico do corpo gerado pelo Prisma — separa o cabecalho. */
@@ -621,64 +698,25 @@ if (atual.trim() === esperado.trim()) {
   process.exit(0)
 }
 
-// ── divergencia: monta uma mensagem que se explica sozinha ──────────────────
+// ── DIVERGÊNCIA: informativo, NUNCA reprova o build ──────────────────────────
+//
+// "baseline.sql != schema.prisma regenerado agora" é o estado NORMAL sempre
+// que existe migration aditiva desde a última regeneração real do baseline —
+// e, por decisão (20/09/2026), o baseline não é regenerado/reconciliado a cada
+// mudança de schema. O que continua sendo travado, e travado de verdade, é
+// `verificarMigrationOficial()` abaixo: baseline não editado à mão, e toda
+// migration registrada. Divergência de conteúdo vira só um aviso — a prova
+// real de que baseline + migrations reconstroem o schema atual é
+// `baseline-integridade-real.test.ts` (com banco, sob demanda).
 const versaoBaseline = versaoDoCabecalho(commitado)
 const versaoAtual = gerador.versaoPrisma()
 const mudouPrisma = versaoBaseline !== 'desconhecida' && versaoBaseline !== versaoAtual
 
-const linhasAtual = atual.trim().split('\n')
-const linhasEsper = esperado.trim().split('\n')
-const primeira = linhasAtual.findIndex((l, i) => l !== linhasEsper[i])
-const amostra: string[] = []
-if (primeira >= 0) {
-  amostra.push('', 'PRIMEIRA DIFERENCA (linha ' + (primeira + 1) + ' do corpo):', '')
-  amostra.push('  no baseline commitado : ' + (linhasAtual[primeira] ?? '(fim do arquivo)').slice(0, 100))
-  amostra.push('  gerado do schema      : ' + (linhasEsper[primeira] ?? '(fim do arquivo)').slice(0, 100))
-}
-
-falhar([
-  '════════════════════════════════════════════════════════════════════════',
-  '  O BASELINE ESTA DESATUALIZADO',
-  '════════════════════════════════════════════════════════════════════════',
-  '',
-  'O QUE ACONTECEU',
-  '  O prisma/schema.prisma mudou, mas o prisma/baseline/baseline.sql nao foi',
-  '  regenerado. Os dois deixaram de descrever o mesmo banco.',
-  '',
-  'POR QUE ISSO IMPORTA',
-  '  O baseline.sql e a UNICA forma de reconstruir este banco do zero. O',
-  '  historico de migrations nao faz isso: o replay quebra na 7a migration,',
-  '  porque metade das tabelas de producao nunca teve CREATE TABLE versionado.',
-  '  Baseline velho = restore de desastre recria um banco diferente do real.',
-  '',
-  'COMO RESOLVER — copie e cole:',
-  '',
-  '    npm run baseline:gerar',
-  '',
-  '  Depois confira o diff e commite JUNTO com a sua mudanca de schema:',
-  '',
-  '    git diff prisma/baseline/baseline.sql',
-  '',
-  ...(mudouPrisma
-    ? [
-        'ATENCAO — A VERSAO DO PRISMA MUDOU',
-        `  O baseline foi gerado com Prisma ${versaoBaseline}; voce esta com ${versaoAtual}.`,
-        '  Versoes diferentes podem gerar o mesmo schema com formatacao diferente.',
-        '  Se voce NAO mexeu no schema.prisma, e provavelmente so isso: rode o',
-        '  mesmo comando acima, confira que o diff e apenas cosmetico, e commite.',
-        '',
-      ]
-    : [
-        'SE VOCE NAO MEXEU NO SCHEMA.PRISMA',
-        '  Confira se alguem alterou prisma/baseline/bloco-manual.sql sem',
-        '  regenerar. Esse arquivo tambem entra no baseline.',
-        '',
-      ]),
-  'NAO ARRANQUE ESTE TESTE PARA DESTRAVAR O BUILD.',
-  '  Ele custa um comando. O que ele protege custa um banco.',
-  '  Contexto completo: prisma/baseline/README.md',
-  ...amostra,
-])
+console.log('  ℹ baseline.sql é histórico — não reflete sozinho o schema.prisma atual (esperado).')
+console.log(`    ${MIGRATIONS_POS_BASELINE.length} migration(s) aditiva(s) registrada(s) desde a consolidação.`)
+if (mudouPrisma) console.log(`    (também: baseline gerado com Prisma ${versaoBaseline}, ambiente atual ${versaoAtual})`)
+console.log('    Prova com banco: npx tsx scripts/baseline-integridade-real.test.ts')
+verificarMigrationOficial()
 }
 
 main().catch((e) => {

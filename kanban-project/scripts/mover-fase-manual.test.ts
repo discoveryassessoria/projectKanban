@@ -98,13 +98,16 @@ check("a rota não decide regra de negócio: delega ao motor", rota.includes("mo
 check("justificativa e motivo ausentes viram 422", /MISSING_JUSTIFICATION: 422/.test(rota) && /MISSING_REASON: 422/.test(rota))
 
 check("o motor expõe movePhaseManual", motor.includes("export async function movePhaseManual"))
-// A fase de origem NUNCA é concluída ao mover (CONCLUIR nunca aparece nesta operação):
-// por padrão é SUPERSEDIDA; com `preservarHistorico` (a Movimentação Manual do admin,
-// para preservar tarefas de fases anteriores regularizáveis depois) fica intocada
-// (NENHUM) — a escolha é explícita, nunca um terceiro modo inventado.
+// A fase de origem NUNCA é forjada nem negada ao mover: o `encerramento` usa o
+// MESMO gate canônico de `advance` (snap.pend.canAdvance) para decidir se as
+// obrigações da fase de origem estavam de fato satisfeitas — CONCLUIR quando
+// estavam, SUPERSEDER quando não; com `preservarHistorico` (a Movimentação Manual
+// do admin, para preservar tarefas de fases anteriores regularizáveis depois) fica
+// intocada (NENHUM) em qualquer caso — a escolha é explícita, nunca um terceiro
+// modo inventado (mandato "Catálogo de Fases", correção 20/09/2026, item 8).
 check(
-  "a fase de origem nunca é CONCLUÍDA ao mover — SUPERSEDIDA por padrão, preservada (NENHUM) com preservarHistorico",
-  /operacao: "MOVER"[\s\S]{0,800}encerramento: preservarHistorico \? "NENHUM" : "SUPERSEDER"/.test(semComentarios(motor)),
+  "a fase de origem só é CONCLUÍDA ao mover quando o gate canônico confirma obrigação satisfeita — nunca forjada, nunca negada indevidamente",
+  /operacao: "MOVER"[\s\S]{0,800}encerramento: preservarHistorico \? "NENHUM" : \(snap\.pend\.canAdvance \? "CONCLUIR" : "SUPERSEDER"\)/.test(semComentarios(motor)),
 )
 check("o evento de fase é próprio (FASE_MOVIDA)", motor.includes('eventoFaseTipo: "FASE_MOVIDA"'))
 check("`forcado` NÃO é usado para marcar a movimentação manual", /operacao: "MOVER"[\s\S]{0,800}forcado: false/.test(semComentarios(motor)))

@@ -18,18 +18,32 @@
 // garantir que, se algum dia o comando tentar conectar, ele falhe alto.
 // ============================================================================
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join } from 'node:path'
 
 const RAIZ = join(import.meta.dirname, '..')
 const SCHEMA = join(RAIZ, 'prisma', 'schema.prisma')
 const BLOCO = join(RAIZ, 'prisma', 'baseline', 'bloco-manual.sql')
 const SAIDA = join(RAIZ, 'prisma', 'baseline', 'baseline.sql')
+const DIR_MIGRATIONS = join(RAIZ, 'prisma', 'migrations')
 // A migration OFICIAL é o mesmo arquivo, byte a byte. Ela está registrada em
 // _prisma_migrations de produção pelo checksum do conteúdo: se as duas cópias
 // divergirem, o Prisma passa a acusar "migration modificada depois de aplicada".
 // Por isso o gerador escreve as DUAS — nunca uma só.
 const SAIDA_MIGRATION = join(RAIZ, 'prisma', 'migrations', '0000_baseline', 'migration.sql')
+/**
+ * MANIFESTO DAS MIGRATIONS ABSORVIDAS — a peça que falta pra provar "baseline +
+ * migrations posteriores = schema final" sem replay ingênuo. `baseline.sql` é
+ * gerado do schema.prisma ATUAL, que já é o efeito CUMULATIVO de toda migration
+ * hoje existente — então, no instante em que este script roda, toda pasta em
+ * `prisma/migrations/` (exceto `0000_baseline`) já está, por definição,
+ * integralmente refletida no baseline novo. Registrar isso aqui é o que permite
+ * ao verificador (`baseline-verificar.test.ts`/`baseline-integridade-real.test.ts`)
+ * saber quais migrations pular (`resolve --applied`, sem reexecutar SQL) e quais
+ * são genuinamente novas — sem precisar adivinhar nem tocar em produção.
+ */
+const SAIDA_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
 
 /** Início determinístico do corpo — separa cabeçalho (data/versão) do conteúdo. */
 const MARCO_CORPO = '-- CreateSchema'
@@ -130,6 +144,14 @@ function dataPreservada(corpoNovo) {
   return atual.match(/^-- Gerado em\s+:\s*(.+)$/m)?.[1]?.trim() ?? null
 }
 
+/** Toda pasta de migration hoje existente, exceto `0000_baseline` — ver comentário de SAIDA_MANIFESTO. */
+export function migracoesAbsorvidasAgora() {
+  return readdirSync(DIR_MIGRATIONS, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name !== '0000_baseline')
+    .map((d) => d.name)
+    .sort()
+}
+
 if (import.meta.filename === process.argv[1]) {
   const versao = versaoPrisma()
   const corpo = conteudoSemCabecalho()
@@ -138,6 +160,14 @@ if (import.meta.filename === process.argv[1]) {
   writeFileSync(SAIDA, conteudo)
   mkdirSync(dirname(SAIDA_MIGRATION), { recursive: true })
   writeFileSync(SAIDA_MIGRATION, conteudo)
+  const checksum = createHash('sha256').update(conteudo).digest('hex')
+  const absorvidas = migracoesAbsorvidasAgora()
+  writeFileSync(SAIDA_MANIFESTO, JSON.stringify({
+    _comentario: 'Migrations cujo DDL já está integralmente refletido em 0000_baseline/migration.sql. Gerado por scripts/baseline-gerar.mjs — não editar à mão. Ver comentário de SAIDA_MANIFESTO no gerador.',
+    baselineChecksum: checksum,
+    geradoEm: data,
+    migrationsAbsorvidas: absorvidas,
+  }, null, 2) + '\n')
   const linhas = conteudo.split('\n').length
   const tabelas = (conteudo.match(/^CREATE TABLE/gm) ?? []).length
   const fks = (conteudo.match(/FOREIGN KEY/g) ?? []).length
@@ -145,6 +175,11 @@ if (import.meta.filename === process.argv[1]) {
   console.log(`[baseline]   ${linhas} linhas · ${tabelas} tabelas · ${fks} foreign keys · Prisma ${versao}`)
   console.log(`[baseline]   bloco manual reanexado de prisma/baseline/bloco-manual.sql`)
   console.log(`[baseline] prisma/migrations/0000_baseline/migration.sql regravado (mesmo conteúdo)`)
+  console.log(`[baseline]   ${absorvidas.length} migration(s) absorvida(s) registrada(s) em prisma/baseline/migrations-absorvidas.json`)
   console.log(`[baseline] Confira o diff antes de commitar: git diff prisma/baseline prisma/migrations`)
-  console.log(`[baseline] Se o checksum mudar, o ledger de produção precisa ser reconciliado EXPLICITAMENTE.`)
+  console.log(`[baseline] Se o checksum mudar, o ledger de produção NÃO precisa ser reconciliado para o baseline continuar íntegro: rode`)
+  console.log(`[baseline]   npx tsx scripts/baseline-integridade-real.test.ts`)
+  console.log(`[baseline] para provar que o baseline anterior (imutável) + as migrations novas constroem o schema atual. Reconciliar o`)
+  console.log(`[baseline] ledger de produção só é necessário quando você decide ADOTAR este novo baseline como o oficial — decisão`)
+  console.log(`[baseline] separada, explícita, nunca automática.`)
 }

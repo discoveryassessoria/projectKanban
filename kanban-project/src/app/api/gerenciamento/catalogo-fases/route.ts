@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { EQUIVALENCIA_LEGADA } from '@/src/lib/process-stage/verificar-phasekeys'
+import { efeitoExiste } from '@/src/lib/motor/catalogo-de-efeitos'
 
 /** Sobre o que uma fase pode operar. Mesmo vocabulário do enum EscopoExecucao. */
 const ESCOPOS_VALIDOS = ['PROCESSO', 'PESSOA', 'NECESSIDADE', 'DOCUMENTO'] as const as readonly string[]
@@ -57,7 +58,11 @@ export async function POST(request: NextRequest) {
     const label = String(b?.label || '').trim()
     if (!label) return NextResponse.json({ error: 'Informe o nome da fase.' }, { status: 400 })
 
-    const phaseKey = (String(b?.phaseKey || '').trim() || slug(label)).slice(0, 60)
+    // NORMALIZADA SEMPRE — mesmo quando o admin informa a chave manualmente. É a
+    // brecha exata que deixou "TESTEVIS_fase" (maiúsculas inconsistentes) nascer:
+    // só o caminho automático (a partir do label) passava por `slug()`. Nenhuma
+    // chave nova nasce com dependência de caixa daqui em diante.
+    const phaseKey = (slug(String(b?.phaseKey || '').trim()) || slug(label)).slice(0, 60)
     if (!phaseKey) return NextResponse.json({ error: 'Não foi possível gerar a chave da fase.' }, { status: 400 })
 
     const jaExiste = await prisma.catalogoFase.findUnique({ where: { phaseKey } })
@@ -83,23 +88,60 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const fase = await prisma.catalogoFase.create({
-      data: {
-        phaseKey,
-        label,
-        descricao: b?.descricao ? String(b.descricao).trim() : null,
-        escopo: escopo as never,
-        ordemPadrao: Number.isFinite(Number(b?.ordemPadrao)) ? Number(b.ordemPadrao) : 0,
-        requiredPadrao: b?.requiredPadrao !== false,
-        conditionalPadrao: !!b?.conditionalPadrao,
-        ativo: b?.ativo !== false,
-      },
-    })
+    // EFEITOS PERMITIDOS EXPLICITAMENTE — ausência de declaração significa [],
+    // nunca "todos". Chave que não existe no catálogo é erro do admin, recusado,
+    // nunca filtrado em silêncio (mesma regra do PUT).
+    let efeitosPermitidos: string[] = []
+    if (b?.efeitosPermitidos !== undefined) {
+      if (!Array.isArray(b.efeitosPermitidos)) {
+        return NextResponse.json({ error: 'Efeitos permitidos precisa ser uma lista.', code: 'EFEITOS_INVALIDOS' }, { status: 400 })
+      }
+      const desconhecidos = b.efeitosPermitidos.filter((k: unknown) => typeof k !== 'string' || !efeitoExiste(k))
+      if (desconhecidos.length > 0) {
+        return NextResponse.json(
+          { error: `Efeito(s) inexistente(s) no catálogo: ${desconhecidos.join(', ')}.`, code: 'EFEITOS_INVALIDOS' },
+          { status: 400 },
+        )
+      }
+      efeitosPermitidos = b.efeitosPermitidos
+    }
+
+    // NOVA FASE NASCE SEMPRE RASCUNHO (mandato "Catálogo de Fases", correção
+    // 20/09/2026, bug 3) — nunca publicada diretamente na criação, mesmo que o
+    // corpo peça `ativo:true`. Publicar é a edição seguinte (PUT), que exige
+    // pelo menos um efeito explicitamente selecionado.
     const usuario = await extrairUsuarioComPermissoes(request)
+    const fase = await prisma.$transaction(async (tx) => {
+      const criada = await tx.catalogoFase.create({
+        data: {
+          phaseKey,
+          label,
+          descricao: b?.descricao ? String(b.descricao).trim() : null,
+          escopo: escopo as never,
+          ordemPadrao: Number.isFinite(Number(b?.ordemPadrao)) ? Number(b.ordemPadrao) : 0,
+          requiredPadrao: b?.requiredPadrao !== false,
+          conditionalPadrao: !!b?.conditionalPadrao,
+          efeitosPermitidos: efeitosPermitidos as never,
+          ativo: false,
+          status: 'RASCUNHO' as never,
+          revisaoAtual: 1,
+        },
+      })
+      await tx.catalogoFaseRevisao.create({
+        data: {
+          catalogoFaseId: criada.id, revisao: 1, phaseKey: criada.phaseKey, label: criada.label,
+          descricao: criada.descricao, escopo: criada.escopo, ordemPadrao: criada.ordemPadrao,
+          requiredPadrao: criada.requiredPadrao, conditionalPadrao: criada.conditionalPadrao,
+          status: criada.status, efeitosPermitidos: criada.efeitosPermitidos as never,
+          congeladoPorId: usuario?.userId ?? null, origem: 'CRIACAO',
+        },
+      })
+      return criada
+    })
     await prisma.logAuditoria.create({
       data: {
         acao: 'PHASE_CREATED', entidade: 'CatalogoFase', entidadeId: fase.id,
-        descricao: `Fase "${fase.label}" criada (chave ${fase.phaseKey}, opera sobre ${escopo}).`,
+        descricao: `Fase "${fase.label}" criada como RASCUNHO (chave ${fase.phaseKey}, opera sobre ${escopo}, ${efeitosPermitidos.length} efeito(s) selecionado(s)). Publique-a para oferecê-la em fluxo novo.`,
         detalhes: { depois: fase } as never, usuarioId: usuario?.userId ?? null,
       },
     }).catch(() => null)

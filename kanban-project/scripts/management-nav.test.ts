@@ -90,7 +90,11 @@ console.log("\n2) Estrutura interna obrigatória de cada módulo")
 const ARVORE_OFICIAL: Record<string, string[]> = {
   grp_visao: [],
   grp_processos: ["Cadastros", "Estrutura", "Configurações"],
-  grp_workflow: ["Fluxos", "Transições", "Configurações"],
+  // "Transições" e "Configurações" saíram da árvore VISÍVEL em 20/09/2026 (mandato
+  // "Catálogo de Fases", item 10): os 4 itens que as compunham (Transições,
+  // Executor do Motor, Diagnóstico de Runtime, Migração do Motor) são motor legado
+  // pré-Catálogo de Fases e viraram `h()` — ocultos do menu, rota preservada.
+  grp_workflow: ["Fluxos"],
   grp_automacoes: ["Financeiras", "Eventos", "Configurações"],
   grp_documentos: ["Documentos", "Protocolos", "Regras"],
   grp_servicos: ["Catálogo de Serviços", "Categorias"],
@@ -219,10 +223,14 @@ ok(ALIAS_KEYS.has("certtypes"), "alias preservado: ?screen=certtypes → Tipos d
 ok(ALIAS_KEYS.has("opauto"), "alias criado: ?screen=opauto (Automações por Fase) → Automações › Financeiras")
 ok(/ALIAS_MODULOS[\s\S]{0,160}grp_pessoas: "grp_orgaos"/.test(pageSrc), "alias de módulo: ?module=grp_pessoas → Órgãos e Organizações")
 
-// telas que eram órfãs (sem item de menu) e ganharam casa oficial
-ok(moduloDe("execmotor") === "grp_workflow" && itemDe("execmotor")?.status === "active", "Executor do Motor deixou de ser órfão (Workflow › Configurações)")
-ok(moduloDe("runtimediag") === "grp_workflow" && itemDe("runtimediag")?.status === "active", "Diagnóstico de Runtime deixou de ser órfão (Workflow › Configurações)")
-ok(moduloDe("migmotor") === "grp_workflow" && TELAS_KEYS.has("migmotor"), "Migração do Motor deixou de ser órfã (registrada + no menu)")
+// telas que eram órfãs (sem item de menu) ganharam casa oficial — e depois, no
+// mandato "Catálogo de Fases" (item 10, 20/09/2026), saíram da navegação NORMAL
+// (motor legado pré-Catálogo de Fases) sem perder rota/dado histórico: continuam
+// resolvendo por ?screen=, só não aparecem mais no menu (status "hidden").
+ok(moduloDe("execmotor") === "grp_workflow" && itemDe("execmotor")?.status === "hidden", "Executor do Motor: legado, oculto do menu, sem perder rota (Workflow)")
+ok(moduloDe("runtimediag") === "grp_workflow" && itemDe("runtimediag")?.status === "hidden", "Diagnóstico de Runtime: legado, oculto do menu, sem perder rota (Workflow)")
+ok(moduloDe("migmotor") === "grp_workflow" && itemDe("migmotor")?.status === "hidden" && TELAS_KEYS.has("migmotor"), "Migração do Motor: legado, oculto do menu, registrada e resolvendo")
+ok(moduloDe("transicoes") === "grp_workflow" && itemDe("transicoes")?.status === "hidden", "Transições: legado, oculto do menu, sem perder rota (Workflow)")
 ok(moduloDe("permmotor") === "grp_usuarios" && TELAS_KEYS.has("permmotor"), "Perfis de Permissão do Motor deixou de ser órfão (Usuários › Permissões)")
 // Catálogo Mestre: a tela técnica SAIU da navegação (o cadastro mestre virou
 // estrutura interna). A key antiga não é mais item de menu e resolve por alias

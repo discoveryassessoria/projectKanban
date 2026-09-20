@@ -199,7 +199,9 @@ export interface Processo {
   descricao?: string | null
   observacoes?: string | null
   pais: string                        // countryKey ("italia")
-  faseAtualKey?: string | null        // fase do motor = coluna atual
+  faseAtualKey?: string | null        // fase do motor = coluna atual — dado TÉCNICO, nunca rótulo de interface
+  /** Rótulo canônico resolvido (código→cadastro, inclusive fase inativa) — é isto que a interface exibe. */
+  faseAtualLabel?: string | null
   tipoProcessoMotorId?: number | null // vínculo com o tipo do motor
   contratantes?: Contratante[]
   arvoreId?: number | null

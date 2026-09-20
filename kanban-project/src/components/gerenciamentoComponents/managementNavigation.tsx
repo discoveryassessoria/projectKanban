@@ -193,11 +193,14 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
 
-      a(30, "transicoes", "Transições", ["transicao", "transição", "caminho", "entrada", "avanco", "avanço", "regra"]),
-
-      a(40, "execmotor", "Executor do Motor", ["executor", "motor", "execucao", "execução", "gatilho"], "Configurações"),
-      a(50, "runtimediag", "Diagnóstico de Runtime", ["runtime", "diagnostico", "diagnóstico", "v2", "motor"], "Configurações"),
-      a(60, "migmotor", "Migração do Motor", ["migracao", "migração", "motor", "runtime"], "Configurações"),
+      // OCULTOS da navegação normal (mandato "Catálogo de Fases", item 10,
+      // 20/09/2026): módulos legados do motor pré-Catálogo de Fases, substituídos
+      // pelo motor canônico atual (CatalogoFase/PhaseInternalWorkflow/executarPlano).
+      // Telas e dado histórico continuam intactos e acessíveis por ?screen=.
+      h(30, "transicoes", "Transições"),
+      h(40, "execmotor", "Executor do Motor"),
+      h(50, "runtimediag", "Diagnóstico de Runtime"),
+      h(60, "migmotor", "Migração do Motor"),
     ],
   },
 

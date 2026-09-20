@@ -107,7 +107,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   RETIFICACAO_REGISTROS: {
-    code: "RETIFICACAO_REGISTROS", phaseKey: "retificacao_registros", ordem: 3, label: "Retificação de registros", kind: "processo", scope: "PROCESSO",
+    code: "RETIFICACAO_REGISTROS", phaseKey: "retificacao_registros", ordem: 3, label: "Retificação de registros", kind: "processo", scope: "DOCUMENTO",
     next: "EMISSAO_DOCUMENTAL_RETIFICADA", steps: [],
     processSteps: [
       { stepKey: "definir_estrategia", title: "Definir estratégia", description: "Definir a via (judicial ou administrativa) e a estratégia da retificação." },
@@ -120,7 +120,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   EMISSAO_DOCUMENTAL_RETIFICADA: {
-    code: "EMISSAO_DOCUMENTAL_RETIFICADA", phaseKey: "emissao_documental_retificada", ordem: 4, label: "Emissão documental retificada", kind: "processo", scope: "PROCESSO",
+    code: "EMISSAO_DOCUMENTAL_RETIFICADA", phaseKey: "emissao_documental_retificada", ordem: 4, label: "Emissão documental retificada", kind: "processo", scope: "DOCUMENTO",
     next: "TRADUCAO_JURAMENTADA", steps: [],
     processSteps: [
       { stepKey: "enviar_pedido_averbacao", title: "Enviar pedido de averbação ao cartório", description: "Enviar ao cartório a decisão/mandado para lançar a averbação no registro." },
@@ -133,7 +133,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   TRADUCAO_JURAMENTADA: {
-    code: "TRADUCAO_JURAMENTADA", phaseKey: "traducao_juramentada", ordem: 5, label: "Tradução juramentada", kind: "processo", scope: "PROCESSO",
+    code: "TRADUCAO_JURAMENTADA", phaseKey: "traducao_juramentada", ordem: 5, label: "Tradução juramentada", kind: "processo", scope: "DOCUMENTO",
     next: "APOSTILAMENTO", steps: [],
     processSteps: [
       { stepKey: "montar_pasta_traducao", title: "Montar pasta de tradução", description: "Reunir os documentos que vão para tradução numa pasta única." },
@@ -146,7 +146,7 @@ export const FASES: Record<FaseCode, FaseDef> = {
   },
 
   APOSTILAMENTO: {
-    code: "APOSTILAMENTO", phaseKey: "apostilamento", ordem: 6, label: "Apostilamento", kind: "processo", scope: "PROCESSO",
+    code: "APOSTILAMENTO", phaseKey: "apostilamento", ordem: 6, label: "Apostilamento", kind: "processo", scope: "DOCUMENTO",
     next: "AGUARDANDO_PROTOCOLO", steps: [],
     processSteps: [
       { stepKey: "montar_pasta_apostilamento", title: "Montar pasta de apostilamento", description: "Reunir os documentos finais numa pasta para apostila." },

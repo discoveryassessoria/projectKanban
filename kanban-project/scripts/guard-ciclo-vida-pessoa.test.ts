@@ -139,6 +139,15 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/performance-escala.test.ts":
     "performance em escala: cria e apaga até 50.000 tarefas e 500 documentos próprios " +
     "(marca PERF) só no banco de teste",
+  "scripts/catalogo-fases-gerenciamento-completo.test.ts":
+    "Gerenciamento → Fases completo (correção 20/09/2026, entrega isolada): monta e derruba " +
+    "a PRÓPRIA árvore e pessoa (marca CFGC) só no banco de teste",
+  "scripts/reconciliacao-escopo-documento.test.ts":
+    "reconciliação de escopo PROCESSO→DOCUMENTO (correção 20/09/2026, item 1): monta e derruba " +
+    "a PRÓPRIA árvore e pessoa (marca RECESCDOC) só no banco de teste",
+  "scripts/central-operacional-tarefa-canonica.test.ts":
+    "unificação de projeções por Tarefa canônica (correção 20/09/2026, item 3): monta e derruba " +
+    "a PRÓPRIA árvore e pessoa (marca COTC) só no banco de teste",
   "scripts/cadastro-canonico.test.ts":
     "cadastro canônico de execução: monta e derruba a PRÓPRIA árvore e pessoa (marca CC) " +
     "só no banco de teste, para provar que nova via preserva o documento anterior",

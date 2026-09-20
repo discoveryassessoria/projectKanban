@@ -126,6 +126,7 @@ const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoCom
 // scaffold sem persistência (países). Mesmas rotas, mesmo contrato, mesmas regras.
 const CanaisOperacionaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CanaisOperacionaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogoFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const CatalogoFaseRevisoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoFaseRevisoesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ModalidadesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModalidadesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PaisesRegioesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PaisesRegioesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const IntegracoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/IntegracoesTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -133,7 +134,6 @@ const IntegracoesTab = dynamic(() => import("@/src/components/gerenciamentoCompo
 // read-model (/api/gerenciamento/configuracao-processo). Só leitura: a edição segue
 // nas telas donas (Fluxos, Tipos de Processo, Automações...).
 const SLAConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.SLAConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
-const VersoesConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.VersoesConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
 const ConfiguracoesGeraisProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.ConfiguracoesGeraisProcessoTab), { ssr: false, loading: () => <CarregandoTela /> })
 const TransicoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.TransicoesTab), { ssr: false, loading: () => <CarregandoTela /> })
 const DiagnosticoConfiguracaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ConfiguracaoProcessoViews").then(m => m.DiagnosticoConfiguracaoTab), { ssr: false, loading: () => <CarregandoTela /> })
@@ -279,9 +279,10 @@ const TELAS: Record<string, React.ComponentType> = {
   docmatrix: MatrizDocumentalTab,
   // Assistente de Parametrização — orquestra as telas oficiais; não as substitui.
   paramwizard: AssistenteParametrizacaoTab,
-  // Versões e Diagnóstico de Configuração passam a ser telas REAIS sobre o
-  // read-model.
-  cfgversions: VersoesConfiguracaoTab,
+  // "Versões" é revisão do CATÁLOGO DE FASES (CatalogoFaseRevisao) — nunca
+  // Workflow Macro/Interno (mandato "Catálogo de Fases", correção 20/09/2026,
+  // bug 2: a tela abria errado, mostrando Workflow Interno).
+  cfgversions: CatalogoFaseRevisoesTab,
   cfgdiagnosis: DiagnosticoConfiguracaoTab,
   execmatrix: HistoricoExecucoesTab,
   syshealth: SaudeSistemaTab,

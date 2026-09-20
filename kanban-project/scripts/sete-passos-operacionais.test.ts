@@ -23,7 +23,7 @@ import { CONFIGURACAO } from "./_configuracao-retificacao"
 import { validarConfiguracao, executorEfetivo } from "../src/services/validacao-de-publicacao"
 import { alvoDoCampo } from "../src/lib/motor/fontes-de-campo"
 import { REGISTRO_DE_EXECUTORES } from "../src/lib/motor/registro-de-executores"
-import { efeitosDaFase } from "../src/lib/motor/catalogo-de-efeitos"
+import { efeitosDaFase, efeitosPorCompetenciaPadrao } from "../src/lib/motor/catalogo-de-efeitos"
 import { publicarWorkflow, preverPublicacao } from "../src/services/publicacao-de-workflow"
 import { definicaoHistoricaDoPasso } from "../src/services/versao-publicada"
 import { executarAcaoCadastrada } from "../src/services/executar-acao-cadastrada"
@@ -71,7 +71,7 @@ async function limpar() {
 
 /** Monta a fase da Retificação com EXATAMENTE o conteúdo que a produção recebeu. */
 async function montarRetificacao(phaseKey: string) {
-  const efeitos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
+  const efeitos = [...efeitosPorCompetenciaPadrao(FASE), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   await prisma.catalogoFase.create({
     data: {
       phaseKey, label: "Retificação (espelho de teste)", escopo: "PROCESSO", ordemPadrao: 95, efeitosPermitidos: efeitos as never,
@@ -204,7 +204,7 @@ async function main() {
     campos: p.campos.map((c) => ({ ...c, opcoes: c.opcoesCadastradas, opcoesLegado: c.opcoes })),
   }))
   const problemas = validarConfiguracao(paraValidarNormalizado as never, {
-    phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"],
+    phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosPorCompetenciaPadrao(FASE), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"],
   })
   // (B) O cadastro é publicável: nenhum efeito fora da competência da fase, nenhum
   // requisito órfão, nenhuma opção vazia.
@@ -215,7 +215,7 @@ async function main() {
   const efeitos = efeitosDaFase(FASE, null)
   check("(C) a fase não tem competência para decidir retificação", !efeitos.includes("GO_RETIFICATION"), efeitos.join(","))
   const usados = new Set(paraValidar.flatMap((p) => p.acoes.map((a) => a.effectKey)))
-  const permitidos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
+  const permitidos = [...efeitosPorCompetenciaPadrao(FASE), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   check("(D) e nenhuma ação cadastrada tenta um efeito fora da competência",
     [...usados].every((e) => permitidos.includes(e)), [...usados].join(","))
 

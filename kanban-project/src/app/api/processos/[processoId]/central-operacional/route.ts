@@ -21,6 +21,7 @@ import {
 import { DOCUMENTO_STATUS_LABELS, getPhaseOperationalSummary, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
 import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
 import { materializarExecucaoDaFase, motivosAcionaveis } from "@/src/services/materializar-fase"
+import { indicadoresGerenciais, visaoGerencial } from "@/lib/operacional/tarefa-projecoes"
 import type { IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
@@ -66,6 +67,10 @@ interface MatrixResponse {
 }
 
 interface CardCounts {
+  // GRAIN = TAREFA (CLAUDE.md §16/§17), via `indicadoresGerenciais` canônico
+  // (lib/operacional/tarefa-projecoes.ts — a MESMA fonte de Minha Operação e
+  // Tarefas e Projetos, escopada por processoId) — nunca `Documento.status`
+  // (mandato "Catálogo de Fases", correção 20/09/2026, item 3).
   all: number
   pending: number
   overdue: number
@@ -75,6 +80,9 @@ interface CardCounts {
   noOwner: number
   followup: number
   stale: number
+  /** Contagem SEPARADA de Documento — entidade relacionada, nunca somada a
+   *  nem confundida com a contagem de Tarefa acima. */
+  documentos: number
 }
 
 interface QueueRow {
@@ -512,18 +520,25 @@ export async function GET(
       d.responsavelId === userId
 
     // ============================================================
-    // 4) Cards
+    // 4) Cards — GRAIN = TAREFA (CLAUDE.md §16/§17)
     // ============================================================
+    // Fonte ÚNICA e canônica — a MESMA que Minha Operação e Tarefas e Projetos
+    // consomem (lib/operacional/tarefa-projecoes.ts), só escopada a este
+    // processo. Documento nunca mais entra na contagem: ele é entidade
+    // relacionada (exibida na linha da fila), nunca substituto de Tarefa.
+    const indicadores = await indicadoresGerenciais({ processoId: id }, now)
+    const linhasTarefa = (await visaoGerencial({ processoId: id, porPagina: 500 }, now)).linhas
     const cards: CardCounts = {
-      all: docs.filter(isAtivo).length,
-      pending: docs.filter(isPendente).length,
-      overdue: docs.filter(isOverdue).length,
-      critical: docs.filter(isCritical).length,
-      waiting: docs.filter((d) => isAtivo(d) && isWaitingExternal(d)).length,
-      blocked: docs.filter(isBlocked).length,
-      noOwner: docs.filter(isNoOwner).length,
+      all: indicadores.total,
+      pending: linhasTarefa.filter((l) => l.coluna === "A_FAZER").length,
+      overdue: indicadores.atrasadas,
+      critical: linhasTarefa.filter((l) => l.emRisco === true).length,
+      waiting: indicadores.aguardandoTerceiro,
+      blocked: indicadores.bloqueadas,
+      noOwner: indicadores.semResponsavel,
       followup: 0,
-      stale: docs.filter(isStale).length,
+      stale: linhasTarefa.filter((l) => l.coluna !== "CONCLUIDA" && l.coluna !== "CANCELADA" && l.esperandoHaDias != null && l.esperandoHaDias >= 3).length,
+      documentos: docs.filter(isAtivo).length,
     }
 
     // ============================================================
