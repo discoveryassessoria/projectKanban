@@ -23,7 +23,7 @@
 //   3. Nome acessível no sino (antes: botão de ícone sem `aria-label`).
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Bell, LogOut } from "lucide-react"
+import { Search, Bell, LogOut, Menu } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
@@ -32,6 +32,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { CambioMiniApp } from "@/src/components/cambio/cambio-mini-app"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { pluralizar } from "@/src/lib/ui/pluralizar"
+import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import useSWR from 'swr'
 
 interface HeaderBarAppProps {
@@ -182,6 +183,7 @@ export function HeaderBarApp({
   const { pode } = usePermissoes()
 
   const router = useRouter()
+  const { setMobileAberto } = useSidebarContext()
   const notificacoesRef = useRef<HTMLDivElement>(null)
 
   const notificacoesFetcher = async (url: string) => {
@@ -316,6 +318,17 @@ export function HeaderBarApp({
           ações somem sem aviso (sino, avatar, Sair). Quem cede espaço é o
           título — ele trunca; as ações nunca encolhem. */}
       <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+        {/* Botão do drawer mobile — só existe fora do Kanban, e só abaixo de
+            md (mesmo corte de useIsMobile). O drawer some, mas a navegação
+            continua a um toque: é ele que reabre (mandato "modernização
+            visual — sidebar mobile", 19/09/2026). */}
+        <button
+          onClick={() => setMobileAberto(true)}
+          aria-label="Abrir menu de navegação"
+          className="shrink-0 rounded-lg p-2 text-white transition hover:bg-[var(--surface-hover)] md:hidden"
+        >
+          <Menu className="h-5 w-5" aria-hidden="true" />
+        </button>
         {/* Lado esquerdo - Título e Subtítulo. Sem prefixo "Grupo Discovery ·":
             a barra lateral já mostra a marca; repeti-la aqui era o que
             sobrava espaço demais ao título e o fazia truncar cedo. */}

@@ -14,6 +14,7 @@ import { CheckIcon } from "@/src/components/icons/check-icon"
 import { TreeIcon } from "@/src/components/icons/tree-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
 import { DollarIcon } from "@/src/components/icons/dollar-icon"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -125,14 +126,45 @@ const adminMenuItems = [
 
 export function BitrixSidebar() {
   const { pode, isAdmin, carregando } = usePermissoes()
-  const { isCollapsed, setIsCollapsed } = useSidebarContext()
+  const { isCollapsed, setIsCollapsed, mobileAberto, setMobileAberto } = useSidebarContext()
   const [isHovered, setIsHovered] = useState(false)
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pathname = usePathname()
+  const isMobile = useIsMobile()
 
-  const isExpanded = !isCollapsed || isHovered
+  // FRONTEIRA ABSOLUTA (mandato "modernização visual — sidebar mobile",
+  // 19/09/2026): o Kanban NUNCA entra no modo drawer, em NENHUM viewport —
+  // continua exatamente como sempre foi (trilho fixo, `isCollapsed`/hover,
+  // sem `translate-x`, sem backdrop). Só telas fora do Kanban, abaixo de
+  // 768px, usam o drawer novo.
+  const isKanban = pathname.startsWith("/kanban")
+  const usarDrawerMobile = isMobile && !isKanban
+
+  // No drawer mobile o menu é binário — aberto (rótulos à mostra, como o
+  // painel expandido do desktop) ou fechado (fora da tela). Não existe
+  // "trilho só-ícone" no mobile: não há hover pra reabrir por engano, e um
+  // ícone sem rótulo é pior alvo de toque.
+  const isExpanded = usarDrawerMobile ? true : (!isCollapsed || isHovered)
+
+  // Fechar o drawer sozinho ao trocar de rota — abrir o menu, tocar num
+  // item e continuar vendo o menu por cima seria o mesmo defeito que
+  // motivou este mandato, só que depois de navegar em vez de antes.
+  useEffect(() => {
+    if (usarDrawerMobile) setMobileAberto(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
+
+  // Esc fecha o drawer — mesma expectativa de teclado de qualquer overlay
+  // (modal, sheet, dropdown) já usado no resto do sistema.
+  useEffect(() => {
+    if (!usarDrawerMobile || !mobileAberto) return
+    const aoTeclar = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileAberto(false) }
+    document.addEventListener("keydown", aoTeclar)
+    return () => document.removeEventListener("keydown", aoTeclar)
+  }, [usarDrawerMobile, mobileAberto, setMobileAberto])
 
   const handleMouseEnter = () => {
+    if (usarDrawerMobile) return
     if (isCollapsed) {
       hoverTimeoutRef.current = setTimeout(() => {
         setIsHovered(true)
@@ -141,6 +173,7 @@ export function BitrixSidebar() {
   }
 
   const handleMouseLeave = () => {
+    if (usarDrawerMobile) return
     if (hoverTimeoutRef.current) {
       clearTimeout(hoverTimeoutRef.current)
       hoverTimeoutRef.current = null
@@ -180,22 +213,41 @@ export function BitrixSidebar() {
   }
 
   return (
-    <aside
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      className={`
-        ${isExpanded ? "w-64" : "w-16"}
+    <>
+      {/* BACKDROP — só existe no drawer mobile, só quando aberto. Kanban e
+          desktop nunca renderizam isto (usarDrawerMobile é sempre false lá). */}
+      {usarDrawerMobile && mobileAberto && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50"
+          onClick={() => setMobileAberto(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        role={usarDrawerMobile ? "dialog" : undefined}
+        aria-modal={usarDrawerMobile ? mobileAberto : undefined}
+        aria-label={usarDrawerMobile ? "Menu de navegação" : undefined}
+        className={`
+        ${usarDrawerMobile ? "w-64" : (isExpanded ? "w-64" : "w-16")}
         ${isExpanded ? "bg-[var(--sidebar-expanded-background)]" : "bg-[var(--sidebar-rail-background)]"}
         border-r border-[var(--border-default)] shadow-[var(--elev-3)]
-        transition-[width,background-color] duration-300 ease-in-out
-        flex flex-col h-screen fixed left-0 top-0 z-50
+        ${usarDrawerMobile
+          ? `transition-transform duration-300 ease-in-out z-50 ${mobileAberto ? "translate-x-0" : "-translate-x-full"}`
+          : "transition-[width,background-color] duration-300 ease-in-out z-50"}
+        flex flex-col h-screen fixed left-0 top-0
         overflow-hidden
       `}
-    >
+      >
       {/* Header com botão toggle */}
       <div className="py-4 px-3 flex items-center">
         <button
           onClick={() => {
+            if (usarDrawerMobile) {
+              setMobileAberto(false)
+              return
+            }
             if (hoverTimeoutRef.current) {
               clearTimeout(hoverTimeoutRef.current)
               hoverTimeoutRef.current = null
@@ -204,9 +256,9 @@ export function BitrixSidebar() {
             setIsHovered(false)
           }}
           className={`${corHover} rounded-lg p-2 transition-colors flex items-center justify-center flex-shrink-0`}
-          aria-label="Toggle sidebar"
+          aria-label={usarDrawerMobile ? "Fechar menu de navegação" : "Recolher ou expandir a barra lateral"}
         >
-          <Menu className={`h-6 w-6 ${corTextoInativo}`} />
+          <Menu className={`h-6 w-6 ${corTextoInativo}`} aria-hidden="true" />
         </button>
 
         {isExpanded && (
@@ -314,6 +366,7 @@ export function BitrixSidebar() {
           </div>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   )
 }

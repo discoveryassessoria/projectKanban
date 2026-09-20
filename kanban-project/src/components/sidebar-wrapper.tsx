@@ -5,9 +5,17 @@ import { SidebarProvider, useSidebarContext } from "@/src/contexts/sidebar-conte
 import { useSidebarVisibility } from "@/src/hooks/use-sidebar-visibility"
 import { usePathname } from "next/navigation"
 import { AmbienteRaiz } from "@/src/components/ambiente/AmbienteRaiz"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 function SidebarContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebarContext()
+  const pathname = usePathname()
+  const isMobile = useIsMobile()
+  // MESMA fronteira de bitrix-sidebar.tsx: Kanban nunca perde a margem
+  // reservada, em nenhum viewport — o drawer mobile (que flutua POR CIMA do
+  // conteúdo, sem empurrá-lo) só existe fora do Kanban.
+  const isKanban = pathname.startsWith("/kanban")
+  const usarDrawerMobile = isMobile && !isKanban
 
   // ─── POR QUE ESTE SHELL NÃO É FLEX ─────────────────────────────────────────
   // Era `flex` + `w-full` + filho `flex-1`. Nesse arranjo um descendente largo
@@ -31,7 +39,7 @@ function SidebarContent({ children }: { children: React.ReactNode }) {
       <div
         className={`
           min-w-0 max-w-full [overflow-x:clip] transition-[margin] duration-300 ease-in-out
-          ${isCollapsed ? "ml-16" : "ml-64"}
+          ${usarDrawerMobile ? "ml-0" : (isCollapsed ? "ml-16" : "ml-64")}
         `}
       >
         {children}
