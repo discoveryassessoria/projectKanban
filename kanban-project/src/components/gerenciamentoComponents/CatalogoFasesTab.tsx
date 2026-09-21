@@ -9,6 +9,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
+import { LAYER } from "@/src/lib/ui/layers"
 
 interface EfeitoCat { key: string; label: string; descricao: string; competencia: string }
 
@@ -85,7 +86,7 @@ export default function CatalogoFasesTab() {
   }, [])
 
   const [busy, setBusy] = useState(false)
-  const [flash, setFlash] = useState("")
+  const [flash, setFlash] = useState<{ msg: string; kind: "ok" | "erro" } | null>(null)
   // Erro de ESCRITA continua em estado; o de LEITURA vem da consulta.
   const [erroEscrita, setErroEscrita] = useState<string | null>(null)
   const [form, setForm] = useState<Form | null>(null)
@@ -105,14 +106,17 @@ export default function CatalogoFasesTab() {
   // na hora e não fica divergindo do banco.
   const atualizarLista = (fn: (rs: Fase[]) => Fase[]) => { void consulta.recarregar({ fases: fn(rows) }) }
 
-  const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
+  const showFlash = (msg: string, kind: "ok" | "erro" = "ok") => {
+    setFlash({ msg, kind })
+    setTimeout(() => setFlash((f) => (f?.msg === msg ? null : f)), kind === "erro" ? 6000 : 3000)
+  }
 
   async function save() {
     if (!form) return
-    if (!form.label.trim()) { showFlash("Informe o nome da fase."); return }
-    if (!form.escopo) { showFlash("Escolha sobre o que a fase opera."); return }
+    if (!form.label.trim()) { showFlash("Informe o nome da fase.", "erro"); return }
+    if (!form.escopo) { showFlash("Escolha sobre o que a fase opera.", "erro"); return }
     if (form.ativo && (form.efeitosPermitidos ?? []).length === 0) {
-      showFlash("Publicar exige pelo menos um efeito marcado — nenhum efeito nunca é autorizado por omissão.")
+      showFlash("Publicar exige pelo menos um efeito marcado — nenhum efeito nunca é autorizado por omissão.", "erro")
       return
     }
     setBusy(true)
@@ -127,17 +131,22 @@ export default function CatalogoFasesTab() {
           return next.sort((x, y) => x.ordemPadrao - y.ordemPadrao || x.label.localeCompare(y.label))
         })
         setForm(null); showFlash("Fase salva.")
-      } else showFlash(j.error || "Erro ao salvar a fase.")
+      } else showFlash(j.error || `Erro ao salvar a fase (HTTP ${res.status}).`, "erro")
+    } catch {
+      // Falha de rede/CORS: fetch rejeita antes de chegar a `res`. Sem este catch
+      // o erro só aparecia no console — o formulário ficava aberto e parado, sem
+      // nenhum sinal pro usuário (o próprio bug relatado: "não mostra o erro").
+      showFlash("Não foi possível conectar ao servidor. Tente novamente.", "erro")
     } finally { setBusy(false) }
   }
 
   async function del(f: Fase) {
-    if (f.usos > 0) { showFlash(`"${f.label}" é usada em ${f.usos} fluxo(s). Inative em vez de excluir.`); return }
+    if (f.usos > 0) { showFlash(`"${f.label}" é usada em ${f.usos} fluxo(s). Inative em vez de excluir.`, "erro"); return }
     if (!confirm(`Excluir a fase "${f.label}" do catálogo? Só é possível porque nenhum fluxo a utiliza.`)) return
     const res = await fetch(`/api/gerenciamento/catalogo-fases/${f.id}`, { method: "DELETE", headers: authHeaders() })
     const j = await res.json().catch(() => ({}))
     if (res.ok) { atualizarLista(rs => rs.filter(x => x.id !== f.id)); showFlash("Fase excluída.") }
-    else showFlash(j.error || "Erro ao excluir a fase.")
+    else showFlash(j.error || "Erro ao excluir a fase.", "erro")
   }
 
   async function toggleAtivo(f: Fase) {
@@ -146,7 +155,7 @@ export default function CatalogoFasesTab() {
     })
     const j = await res.json().catch(() => ({}))
     if (res.ok && j.fase) { atualizarLista(rs => rs.map(x => (x.id === f.id ? j.fase : x))); showFlash(j.fase.ativo ? "Fase ativada." : "Fase inativada.") }
-    else showFlash(j.error || "Erro ao alterar a fase.")
+    else showFlash(j.error || "Erro ao alterar a fase.", "erro")
   }
 
   const proximaOrdem = rows.length ? Math.max(...rows.map(r => r.ordemPadrao)) + 10 : 10
@@ -155,7 +164,22 @@ export default function CatalogoFasesTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
+      {/* Toast fixo, acima do modal (LAYER.toast) — o formulário "Nova/Editar fase"
+          é overlay fixed inset-0 z-50; um flash renderizado no fluxo normal da
+          página fica ESCONDIDO atrás dele. Erro de validação/salvamento com o
+          formulário aberto parecia "botão não faz nada" (bug real, 20/09/2026). */}
+      {flash && (
+        <div
+          className={`fixed left-1/2 top-4 w-[min(90vw,28rem)] -translate-x-1/2 rounded-xl border px-4 py-3 text-center text-sm font-medium shadow-[var(--elev-3)] ${
+            flash.kind === "erro"
+              ? "border-red-300 bg-red-50 text-red-800"
+              : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800"
+          }`}
+          style={{ zIndex: LAYER.toast }}
+        >
+          {flash.msg}
+        </div>
+      )}
       {erro && (
         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
