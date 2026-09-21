@@ -153,6 +153,11 @@ export default function CatalogoFasesTab() {
     if (f.usos > 0) { showFlash(`"${f.label}" é usada em ${f.usos} fluxo(s). Inative em vez de excluir.`, "erro"); return }
     if (!confirm(`Excluir a fase "${f.label}" do catálogo? Só é possível porque nenhum fluxo a utiliza.`)) return
     setExcluindoIds((s) => new Set(s).add(f.id))
+    // Toast FIXO, sem timeout automático (só some no finally) — a viagem real
+    // até o banco pode passar de 3s; um sinal só na linha (fora da área
+    // visível, ou fácil de não notar) era o que fazia parecer "a página
+    // travou" (achado real, mandato "Módulo de Fases", 21/09/2026).
+    setFlash({ msg: `Excluindo "${f.label}"…`, kind: "ok" })
     try {
       const res = await fetch(`/api/gerenciamento/catalogo-fases/${f.id}`, { method: "DELETE", headers: authHeaders() })
       const j = await res.json().catch(() => ({}))

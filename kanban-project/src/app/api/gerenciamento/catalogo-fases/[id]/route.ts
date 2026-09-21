@@ -13,6 +13,7 @@ import { efeitoExiste } from '@/src/lib/motor/catalogo-de-efeitos'
 import { publicarRevisaoCatalogoFase, statusDeAtivo } from '@/src/lib/motor/catalogo-fase-revisao'
 import { enqueueReconciliacaoCatalogoFase, type EnqueueResultadoCatalogoFase } from '@/src/lib/motor/reconciliar-fase-macro'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { temPermissao } from '@/src/lib/permissoes'
 
 /** Sobre o que uma fase pode operar. Mesmo vocabulário do enum EscopoExecucao. */
 const ESCOPOS_VALIDOS = ['PROCESSO', 'PESSOA', 'NECESSIDADE', 'DOCUMENTO'] as const as readonly string[]
@@ -168,10 +169,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const erro = await verificarPermissao(request, 'usuarios.gerenciar')
-  if (erro) return erro
+  // UMA extração de usuário, não duas — `verificarPermissao` fazia a MESMA
+  // consulta e descartava o resultado; a rota consultava de novo, mais
+  // tarde, só pra pegar o userId do log de auditoria. Uma viagem inteira ao
+  // banco (round-trip real medido: ~1s) desperdiçada em toda exclusão —
+  // achado real, mandato "Módulo de Fases", 21/09/2026: o "trava a página"
+  // relatado era o total de 4 round-trips sequenciais (3+ segundos, sem
+  // nenhum indicador visual — corrigido à parte na UI) somado a esta
+  // redundância evitável.
+  const [usuario, { id: idStr }] = await Promise.all([extrairUsuarioComPermissoes(request), params])
+  if (!usuario) return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+  if (!temPermissao(usuario.permissoes, 'usuarios.gerenciar')) {
+    return NextResponse.json({ error: 'Sem permissão para esta ação', permissao: 'usuarios.gerenciar' }, { status: 403 })
+  }
   try {
-    const { id: idStr } = await params
     const id = Number(idStr)
     const atual = await prisma.catalogoFase.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Fase não encontrada.' }, { status: 404 })
@@ -184,12 +195,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
     await prisma.catalogoFase.delete({ where: { id } })
-    const usuario = await extrairUsuarioComPermissoes(request)
     await prisma.logAuditoria.create({
       data: {
         acao: 'PHASE_DELETED', entidade: 'CatalogoFase', entidadeId: id,
         descricao: `Fase "${atual.label}" (chave ${atual.phaseKey}) excluída do cadastro. Nenhum fluxo a usava.`,
-        detalhes: { antes: atual } as never, usuarioId: usuario?.userId ?? null,
+        detalhes: { antes: atual } as never, usuarioId: usuario.userId ?? null,
       },
     }).catch(() => null)
     return NextResponse.json({ ok: true })
