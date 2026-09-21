@@ -56,7 +56,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // A MESMA PERGUNTA DA CRIAÇÃO, na composição: a fase é utilizável? Sem isto, o
     // seletor aceitaria uma fase sem escopo — e o processo travaria nela depois, longe
     // daqui, sem ninguém ligar uma coisa à outra.
-    const aptidoes = await Promise.all(incomingKeys.map(async (k) => ({ k, a: await avaliarAptidaoDaFase(k) })))
+    //
+    // SÓ PRA CHAVE NOVA — nunca pra uma que JÁ compunha este macro. "Salvar" reenvia
+    // a lista INTEIRA sempre (é a semântica "lista completa = verdade" desta rota), e
+    // sem esta distinção qualquer edição — reordenar, adicionar outra fase, marcar
+    // "no kanban" — ficava bloqueada assim que UMA fase já composta virasse INATIVA
+    // depois de publicada, mesmo sem ninguém estar tentando reintroduzi-la (achado
+    // real, mandato "Módulo de Fases", 21/09/2026: TESTEVIS_fase INATIVA em repouso
+    // travava qualquer resync do macro que a já continha). Config ≠ fato histórico —
+    // inativar não apaga retroativamente o que já estava composto.
+    const chavesJaNaComposicao = new Set(mw.fases.map((f) => f.phaseKey))
+    const chavesNovas = incomingKeys.filter((k) => !chavesJaNaComposicao.has(k))
+    const aptidoes = await Promise.all(chavesNovas.map(async (k) => ({ k, a: await avaliarAptidaoDaFase(k) })))
     const inaptas = aptidoes.filter((x) => !x.a.apta)
     if (inaptas.length > 0) {
       return NextResponse.json(
