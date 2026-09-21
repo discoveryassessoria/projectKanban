@@ -119,7 +119,7 @@ export default function CatalogoFasesTab() {
     setTimeout(() => setFlash((f) => (f?.msg === msg ? null : f)), kind === "erro" ? 6000 : 3000)
   }
 
-  async function save() {
+  async function save(confirmarMudancaEscopo = false) {
     if (!form) return
     if (!form.label.trim()) { showFlash("Informe o nome da fase.", "erro"); return }
     if (!form.escopo) { showFlash("Escolha sobre o que a fase opera.", "erro"); return }
@@ -130,7 +130,8 @@ export default function CatalogoFasesTab() {
     setBusy(true)
     try {
       const url = form.id ? `/api/gerenciamento/catalogo-fases/${form.id}` : "/api/gerenciamento/catalogo-fases"
-      const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body: JSON.stringify(form) })
+      const body = confirmarMudancaEscopo ? { ...form, confirmarMudancaEscopo: true } : form
+      const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body: JSON.stringify(body) })
       const j = await res.json().catch(() => ({}))
       if (res.ok && j.fase) {
         atualizarLista(rs => {
@@ -139,7 +140,26 @@ export default function CatalogoFasesTab() {
           return next.sort((x, y) => x.ordemPadrao - y.ordemPadrao || x.label.localeCompare(y.label))
         })
         setForm(null); showFlash("Fase salva.")
-      } else showFlash(j.error || `Erro ao salvar a fase (HTTP ${res.status}).`, "erro")
+        return
+      }
+      // FASE EM USO + ESCOPO MUDOU — o servidor recusa de propósito (409
+      // ESCOPO_EM_USO) até o admin confirmar o impacto: mudar "Opera sobre" de
+      // uma fase em uso NÃO é bloqueado (a fase segue evolutiva), mas também
+      // não pode ser um clique sem querer — a reconciliação automática do
+      // servidor preserva 100% do histórico e materializa só o que falta, e é
+      // isso que o diálogo abaixo explica antes de reenviar com confirmação
+      // (achado real, mandato "Módulo de Fases" Defeito 2, 21/09/2026: o
+      // seletor ficava editável dizendo "imutável" e Salvar não dava
+      // nenhum sinal — nem sucesso nem erro — porque nada tratava este 409).
+      if (res.status === 409 && j.code === "ESCOPO_EM_USO" && !confirmarMudancaEscopo) {
+        const prosseguir = confirm(
+          `${j.error}\n\nConfirmar e publicar a nova revisão agora?`,
+        )
+        if (prosseguir) { setBusy(false); await save(true); return }
+        showFlash("Alteração de escopo cancelada — nada foi salvo.", "erro")
+        return
+      }
+      showFlash(j.error || `Erro ao salvar a fase (HTTP ${res.status}).`, "erro")
     } catch {
       // Falha de rede/CORS: fetch rejeita antes de chegar a `res`. Sem este catch
       // o erro só aparecia no console — o formulário ficava aberto e parado, sem
@@ -344,7 +364,7 @@ export default function CatalogoFasesTab() {
               {/* ESCOPO — a escolha que torna a fase utilizável. Fica junto do nome
                   de propósito: é decisão estrutural, não configuração fina. */}
               <div className="mt-3">
-                <label className={labelCls}>Opera sobre *{form.id ? " (imutável enquanto a fase estiver em uso)" : ""}</label>
+                <label className={labelCls}>Opera sobre *</label>
                 <select
                   value={form.escopo}
                   onChange={e => setForm(f => f && { ...f, escopo: e.target.value as Escopo })}
@@ -357,6 +377,7 @@ export default function CatalogoFasesTab() {
                 </select>
                 <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   Decide quantos roteiros a fase cria: um por documento, por pessoa, por registro — ou um só para o processo.
+                  {form.id ? " Pode ser mudado mesmo com a fase em uso — quem já está em andamento preserva 100% do histórico, e só pede confirmação antes de publicar." : ""}
                 </p>
               </div>
 

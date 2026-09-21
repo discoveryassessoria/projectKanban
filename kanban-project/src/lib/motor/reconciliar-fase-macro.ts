@@ -153,6 +153,8 @@ export interface ReconciliacaoFaseMacroPayload {
   /** Mudança de ESCOPO (cardinalidade) — exige o caminho seguro de ciclo novo
    *  (ver processarReconciliacaoEscopoDeFase). Ausente/false = caminho comum. */
   escopoMudou?: boolean
+  /** Só para o histórico dizer QUE publicação disparou este evento. */
+  origem?: string
 }
 
 /**
@@ -193,12 +195,13 @@ export async function processarReconciliacaoFaseMacro(
       acao: "RECONCILIACAO_FASE_MACRO",
       entidade: "PROCESSO",
       entidadeId: payload.processoId,
-      descricao: `Reconciliação da fase "${payload.phaseKey}" (publicação de Workflow Macro) — ${relatorio.estado}.`,
+      descricao: `Reconciliação da fase "${payload.phaseKey}" (${payload.origem === "WORKFLOW_INTERNO" ? "publicação de Workflow Interno" : "publicação de Workflow Macro"}) — ${relatorio.estado}.`,
       detalhes: {
         phaseKey: payload.phaseKey, estado: relatorio.estado, passosCriados: relatorio.passosCriados,
         tarefasCriadas: relatorio.tarefasCriadas,
         motivos: relatorio.motivos.map((m) => ({ code: m.code, message: m.message })),
         correlationId: relatorio.correlationId,
+        origem: payload.origem ?? null,
       } as Prisma.InputJsonValue,
     },
   }).catch(() => null)
@@ -291,6 +294,28 @@ interface EnqueueCatalogoFaseInput {
   escopoMudou: boolean
   publicadoPorId: number | null
   correlationId?: string
+  /**
+   * DE ONDE VEIO O GATILHO — parte da CHAVE DE IDEMPOTÊNCIA, nunca da
+   * mecânica: os dois caminhos alcançam os MESMOS processos pela MESMA
+   * query e processam pelo MESMO efeito único (`processarReconciliacaoFaseMacro`
+   * → `materializarExecucaoDaFase`). Existe porque duas publicações
+   * INDEPENDENTES — editar/publicar a fase no Catálogo × publicar o Workflow
+   * Interno dela — podem contar versões em eixos diferentes, e uma delas pode
+   * repetir um número que a outra já usou; sem o namespace as duas colidiriam
+   * na mesma `chaveIdempotencia` e a segunda viraria no-op.
+   *
+   * Achado real (mandato "Módulo de Fases", Defeito 1, 21/09/2026): uma fase
+   * inserida no Workflow Macro ANTES de seu Workflow Interno ser publicado já
+   * enfileira aqui (origem CATALOGO_FASE ou fase-macro) — mas
+   * `processarReconciliacaoFaseMacro` chama `materializarExecucaoDaFase`, que
+   * devolve SEM_WORKFLOW_PUBLICADO sem lançar exceção, e o outbox-dispatcher
+   * marca ENVIADO qualquer despacho que não lança — permanentemente, sem
+   * retry. Publicar o Workflow Interno depois PRECISA reconciliar de novo, e
+   * só consegue se sua chamada tiver uma chave própria (default
+   * "CATALOGO_FASE" preserva exatamente o formato/comportamento anterior
+   * desta função para quem já a chamava).
+   */
+  origem?: "CATALOGO_FASE" | "WORKFLOW_INTERNO"
 }
 
 export interface EnqueueResultadoCatalogoFase {
@@ -306,10 +331,14 @@ export interface EnqueueResultadoCatalogoFase {
  * andamento em QUALQUER macro que a componha — por isso varre TODOS os
  * FaseMacro com esta phaseKey, não um macroWorkflowId só.
  *
- * IDEMPOTENTE pela chave `{tipo}::{processoId}::{phaseKey}::rev{revisaoNova}`:
- * reenfileirar a mesma revisão não duplica outbox.
+ * IDEMPOTENTE pela chave `{tipo}::{processoId}::{phaseKey}::{origem}::rev{revisaoNova}`:
+ * reenfileirar a mesma revisão não duplica outbox. `origem` (default
+ * "CATALOGO_FASE") namespacia a chave por quem disparou — ver
+ * `EnqueueCatalogoFaseInput.origem` para o porquê (também chamada por
+ * `publicarWorkflow` com origem "WORKFLOW_INTERNO").
  */
 export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFaseInput): Promise<EnqueueResultadoCatalogoFase> {
+  const origem = input.origem ?? "CATALOGO_FASE"
   const composicoes = await prisma.faseMacro.findMany({
     where: { phaseKey: input.phaseKey },
     select: { macroWorkflow: { select: { id: true, tipoProcessoId: true } } },
@@ -336,14 +365,23 @@ export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFas
   })
   if (processos.length === 0) return { processosAlcancados: 0, outboxRegistrados: 0 }
 
-  const chaveDe = (processoId: number) => `${TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE}::${processoId}::${input.phaseKey}::rev${input.revisaoNova}`
+  const chaveDe = (processoId: number) => `${TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE}::${processoId}::${input.phaseKey}::${origem}::rev${input.revisaoNova}`
   const linhas: Prisma.DomainOutboxCreateManyInput[] = processos.map((p) => ({
     tipo: TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE,
     aggregateType: "Processo",
     aggregateId: p.id,
     payload: {
-      processoId: p.id, phaseKey: input.phaseKey, versaoNova: input.revisaoNova, escopoMudou: input.escopoMudou,
+      processoId: p.id, phaseKey: input.phaseKey,
+      // `macroWorkflowVersion` (bookkeeping em processarReconciliacaoFaseMacro)
+      // rastreia a versão do WORKFLOW MACRO do processo — nunca a do Catálogo
+      // de Fase nem a do Workflow Interno. Só CATALOGO_FASE já gravava aqui
+      // (comportamento preexistente, fora do escopo deste defeito); a origem
+      // WORKFLOW_INTERNO propositalmente NÃO escreve nesse campo, pra não
+      // confundir eixos de versionamento diferentes.
+      versaoNova: origem === "CATALOGO_FASE" ? input.revisaoNova : undefined,
+      escopoMudou: input.escopoMudou,
       catalogoFaseId: input.catalogoFaseId, revisaoAnterior: input.revisaoAnterior, publicadoPorId: input.publicadoPorId,
+      origem,
     },
     correlationId: input.correlationId ?? null,
     chaveIdempotencia: chaveDe(p.id),
@@ -368,13 +406,16 @@ export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFas
   // diferentes; os dois precisam ficar visíveis (mandato "Catálogo de Fases",
   // correção 20/09/2026, bug 4).
   if (novosProcessos.length > 0) {
+    const rotuloOrigem = origem === "WORKFLOW_INTERNO"
+      ? `Workflow Interno da fase "${input.phaseKey}" publicou a versão ${input.revisaoNova} (anterior: ${input.revisaoAnterior})`
+      : `Fase "${input.phaseKey}" publicou revisão ${input.revisaoNova} (anterior: ${input.revisaoAnterior})`
     await prisma.logAuditoria.createMany({
       data: novosProcessos.map((p) => ({
         acao: "RECONCILIACAO_SOLICITADA",
         entidade: "PROCESSO",
         entidadeId: p.id,
-        descricao: `Fase "${input.phaseKey}" publicou revisão ${input.revisaoNova} (anterior: ${input.revisaoAnterior}) — este processo foi alcançado. Resultado da reconciliação será registrado quando o evento for processado.`,
-        detalhes: { phaseKey: input.phaseKey, catalogoFaseId: input.catalogoFaseId, revisaoAnterior: input.revisaoAnterior, revisaoNova: input.revisaoNova, escopoMudou: input.escopoMudou } as Prisma.InputJsonValue,
+        descricao: `${rotuloOrigem} — este processo foi alcançado. Resultado da reconciliação será registrado quando o evento for processado.`,
+        detalhes: { phaseKey: input.phaseKey, catalogoFaseId: input.catalogoFaseId, revisaoAnterior: input.revisaoAnterior, revisaoNova: input.revisaoNova, escopoMudou: input.escopoMudou, origem } as Prisma.InputJsonValue,
         usuarioId: input.publicadoPorId,
       })),
     }).catch(() => null)

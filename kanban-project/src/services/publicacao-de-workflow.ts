@@ -26,6 +26,7 @@ import {
   type ItemChecklistCongelado, type RequisitoCongelado, type OpcaoCongelada,
 } from "@/src/services/versao-publicada"
 import { validarWorkflowParaPublicar, type ProblemaDePublicacao } from "@/src/services/validacao-de-publicacao"
+import { enqueueReconciliacaoCatalogoFase } from "@/src/lib/motor/reconciliar-fase-macro"
 
 type TX = Prisma.TransactionClient
 
@@ -393,6 +394,45 @@ export async function publicarWorkflow(args: {
       usuarioId: args.actorId,
     },
   }).catch(() => null)
+
+  // REGRA MASTER: publicar o Workflow Interno também reconcilia os processos em
+  // andamento aplicáveis — não só publicar/alterar a composição do Workflow Macro
+  // ou editar a fase no Catálogo. Achado real (mandato "Módulo de Fases", Defeito
+  // 1, 21/09/2026): quando a fase JÁ estava composta no Macro antes deste Workflow
+  // Interno existir publicado, a reconciliação daquela publicação anterior morreu
+  // com SEM_WORKFLOW_PUBLICADO e o outbox-dispatcher a marcou ENVIADO para sempre
+  // (não lançou exceção — dispatcher não distingue "nada a fazer" de "sucesso").
+  // Sem este gatilho aqui, nada jamais tentava de novo. Mesmo mecanismo canônico
+  // de sempre (`enqueueReconciliacaoCatalogoFase` → outbox →
+  // `processarReconciliacaoFaseMacro` → `materializarExecucaoDaFase`), só com
+  // origem própria (`WORKFLOW_INTERNO`) para não colidir, pela chave de
+  // idempotência, com o evento morto da publicação anterior. Fire-and-forget:
+  // já publicamos de verdade acima, e uma falha aqui não pode transformar uma
+  // publicação bem-sucedida numa resposta de erro genérica pro admin.
+  try {
+    const wfAtual = await prisma.phaseInternalWorkflow.findUnique({
+      where: { id: args.workflowId }, select: { phaseKey: true },
+    })
+    const catalogoFase = wfAtual
+      ? await prisma.catalogoFase.findUnique({ where: { phaseKey: wfAtual.phaseKey }, select: { id: true } })
+      : null
+    if (wfAtual && catalogoFase) {
+      // `revisaoAnterior`/`revisaoNova` aqui são a versão do PRÓPRIO Workflow
+      // Interno (não a `revisaoAtual` do Catálogo — eixo diferente, ver
+      // comentário em `EnqueueCatalogoFaseInput.origem`).
+      await enqueueReconciliacaoCatalogoFase({
+        phaseKey: wfAtual.phaseKey,
+        catalogoFaseId: catalogoFase.id,
+        revisaoAnterior: preview.versaoAtual,
+        revisaoNova: nova,
+        escopoMudou: false,
+        publicadoPorId: args.actorId,
+        origem: "WORKFLOW_INTERNO",
+      })
+    }
+  } catch (e) {
+    console.error("publicarWorkflow: falha ao enfileirar reconciliação (Workflow Interno)", e)
+  }
 
   return { ok: true, versaoAnterior: preview.versaoAtual, versaoNova: nova, mudancas: preview.mudancas }
 }
