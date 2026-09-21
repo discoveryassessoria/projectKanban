@@ -382,21 +382,33 @@ export function KanbanContent() {
             {/* ✅ Seletor de TIPO do país (só quando tem mais de um) */}
             {tabPrincipal === "processos" && pode('processos.ver') && tiposDoPais.length > 1 && (
               <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-[var(--border-default)] pt-3">
-                {tiposDoPais.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTipoSelecionadoId(t.id)}
-                    className={`
-                      px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
-                      ${tipoSelecionado?.id === t.id
-                        ? "bg-[var(--surface-secondary)] text-white"
-                        : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]"
-                      }
-                    `}
-                  >
-                    {t.modalityLabel || t.name}
-                  </button>
-                ))}
+                {tiposDoPais.map((t) => {
+                  // DESAMBIGUAÇÃO POR COMPOSIÇÃO, nunca por nome fixo: se mais de um
+                  // tipo do país compartilha a mesma modalidade, o rótulo sozinho
+                  // ("Administrativa") não distingue — acrescenta o nome do TIPO.
+                  // Com modalidade única no país, mostra só a modalidade (comportamento
+                  // anterior preservado). Achado real, mandato "Módulo de Fases",
+                  // 21/09/2026 — dois tipos "Administrativa" em Portugal.
+                  const modalidadeDuplicada = tiposDoPais.filter((x) => x.modalityLabel === t.modalityLabel).length > 1
+                  const rotulo = t.modalityLabel && modalidadeDuplicada ? `${t.modalityLabel} · ${t.name}` : (t.modalityLabel || t.name)
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTipoSelecionadoId(t.id)}
+                      aria-label={rotulo}
+                      title={rotulo}
+                      className={`
+                        px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
+                        ${tipoSelecionado?.id === t.id
+                          ? "bg-[var(--surface-secondary)] text-white"
+                          : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]"
+                        }
+                      `}
+                    >
+                      {rotulo}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

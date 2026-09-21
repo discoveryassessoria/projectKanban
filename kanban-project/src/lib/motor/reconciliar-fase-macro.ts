@@ -74,13 +74,23 @@ export interface EnqueueResultado {
 }
 
 /**
- * "Em andamento" = tem fase operacional de referência e não está na fase
- * terminal do PRÓPRIO workflow (`finalizado` é o phaseKey canônico e estável
- * do catálogo — usar a chave, nunca o rótulo, é o que a Regra 6 exige).
+ * "Em andamento" = tem fase operacional de referência e não está FINALIZADO.
+ *
+ * `dataConclusao: null` é o campo CANÔNICO de encerramento (setado
+ * atomicamente por `executarPlano`, phase-advance.ts, ao entrar na fase
+ * terminal DA COMPOSIÇÃO — nunca por nome/chave) — é ele quem decide,
+ * nunca a string da chave. `faseAtualKey !== "finalizado"` fica como reforço
+ * defensivo para dado legado que possa ter chegado à fase terminal antes
+ * desta escrita atômica existir (achado real, mandato "Módulo de Fases",
+ * 21/09/2026).
  */
 async function processosEmAndamento(tipoProcessoId: number): Promise<number[]> {
   const rows = await prisma.processo.findMany({
-    where: { tipoProcessoMotorId: tipoProcessoId, faseAtualKey: { not: null, notIn: ["finalizado"] } },
+    where: {
+      tipoProcessoMotorId: tipoProcessoId,
+      faseAtualKey: { not: null, notIn: ["finalizado"] },
+      dataConclusao: null,
+    },
     select: { id: true },
   })
   return rows.map((r) => r.id)
@@ -316,6 +326,7 @@ export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFas
   const processos = await prisma.processo.findMany({
     where: {
       faseAtualKey: { not: null, notIn: ["finalizado"] },
+      dataConclusao: null,
       OR: [
         ...(tipoProcessoIds.length > 0 ? [{ tipoProcessoMotorId: { in: tipoProcessoIds } }] : []),
         { faseAtualKey: input.phaseKey },

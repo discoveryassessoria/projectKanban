@@ -176,7 +176,9 @@ export function ProcessosLista({
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 rounded-full bg-[var(--surface-secondary)]" />
-                      <span className="text-white/80 text-sm">{processo.faseAtualKey ?? "—"}</span>
+                      <span className="text-white/80 text-sm">
+                        {processo.faseAtualLabel ?? (processo.faseAtualKey ? `⚠ Fase não cadastrada (${processo.faseAtualKey})` : "—")}
+                      </span>
                     </div>
                   </td>
                   <td className="py-3 px-4">

@@ -115,6 +115,11 @@ export async function GET(request: Request) {
       contratantes: p.contratantes.map(c => c.contratante),
       requerentes: p.requerentes.map(r => r.requerente),
       projection: projByProc.get(p.id) ?? null,
+      // Rótulo canônico — MESMO resolvedor da projeção em lote (código →
+      // cadastro), nunca a phaseKey crua. A Lista renderizava faseAtualKey
+      // direto por não ter este campo — achado real, mandato "Módulo de
+      // Fases", continuação 21/09/2026.
+      faseAtualLabel: projByProc.get(p.id)?.activePhase?.name ?? null,
     }))
 
     return NextResponse.json({ processos: processosFormatados })

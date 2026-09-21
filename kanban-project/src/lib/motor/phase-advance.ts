@@ -354,9 +354,26 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
       }
 
       // 2) CAS na fase do Processo — ÚNICO ponto de escrita de faseAtualKey no v2.
+      //
+      // ESTADO CANÔNICO ATÔMICO — entrar na fase TERMINAL da composição (a de
+      // maior `ordem` no Workflow Macro DESTE processo — nunca por nome,
+      // rótulo ou chave hardcoded como "finalizado") marca o processo como
+      // FINALIZADO (`dataConclusao`) na MESMA escrita que move a fase. Sem
+      // isto, um processo podia estar posicionado na última fase da
+      // composição e continuar contado como "em andamento" em qualquer
+      // projeção que filtra pelo campo canônico (achado real, mandato
+      // "Módulo de Fases", 21/09/2026 — processo sintético 634).
+      const faseTerminalDaComposicao =
+        p.fases.length > 0 ? p.fases.reduce((max, f) => (f.ordem > max.ordem ? f : max)).phaseKey : null
+      const entrouNaFaseTerminal = faseTerminalDaComposicao != null && p.novaFaseAtualKey === faseTerminalDaComposicao
+
       const cas = await tx.processo.updateMany({
         where: { id: p.processoId, faseAtualKey: p.faseAtual, lockVersion: p.lockVersion },
-        data: { faseAtualKey: p.novaFaseAtualKey, lockVersion: { increment: 1 } },
+        data: {
+          faseAtualKey: p.novaFaseAtualKey,
+          lockVersion: { increment: 1 },
+          ...(entrouNaFaseTerminal ? { dataConclusao: new Date() } : {}),
+        },
       })
       if (cas.count === 0) {
         const err = new Error("CAS_CONFLITO") as Error & { __conflito?: boolean }
