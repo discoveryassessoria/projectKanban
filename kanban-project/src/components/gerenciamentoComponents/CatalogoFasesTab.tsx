@@ -262,9 +262,15 @@ export default function CatalogoFasesTab() {
                       type="button"
                       title={f.usos > 0 ? `Em uso em ${f.usos} fluxo(s) — inative em vez de excluir` : "Excluir"}
                       aria-label="Excluir"
-                      disabled={f.usos > 0}
+                      // NUNCA desabilitado — um botão disabled não dispara clique
+                      // nenhum (comportamento nativo do browser): quem clicava numa
+                      // fase em uso via NADA acontecer, sem diálogo, sem mensagem,
+                      // parecendo "travado" (achado real, mandato "Módulo de Fases",
+                      // 21/09/2026 — a própria fase recém-inserida no teste, já em
+                      // uso no macro). `del()` já mostra o motivo em toast visível;
+                      // é o clique em si que precisa sempre acontecer.
                       onClick={() => del(f)}
-                      className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
+                      className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"
                     ><ITrash /></button>
                   </div>
                 </td>

@@ -666,6 +666,57 @@ export async function GET(
       }
     })
 
+    // TAREFA SEM DOCUMENTO — a fila acima é toda construída a partir de
+    // `docs` (Documento), mas nem toda fase materializa documento: uma fase
+    // de escopo PROCESSO (ex.: "Somente registrar") gera uma Tarefa pura,
+    // sem `documentoId`/`necessidadeId`. Essa Tarefa contava certo em `cards`
+    // (grain=TAREFA, CLAUDE.md §16/17, fonte `linhasTarefa`) mas nunca
+    // aparecia aqui — a Central dizia "1 tarefa" e a fila mostrava "nenhuma
+    // tarefa", sem ação possível pra concluir (achado real, mandato "Módulo
+    // de Fases", 21/09/2026: processo sintético 635, fase de teste
+    // REGISTER_ONLY). Só entra na visão "Todas as tarefas ativas" (queueFilter
+    // padrão) pra não reinterpretar as regras dos outros filtros document-cêntricos.
+    if (queueFilter === "all" || !queueFilter) {
+      const jaNaFila = new Set(queue.map((q) => q.necessidadeId ?? -q.docId))
+      const tarefasOrfas = await prisma.tarefa.findMany({
+        where: { processoId: id, documentoId: null, necessidadeId: null, concluida: false },
+        select: {
+          id: true, titulo: true, statusTarefa: true, responsavelId: true, dataPrazo: true,
+          faseMacroKey: true, pessoaId: true, updatedAt: true,
+          responsavel: { select: { nome: true } },
+        },
+      })
+      for (const t of tarefasOrfas) {
+        const chave = -(1_000_000_000 + t.id) // nunca colide com necessidadeId/docId reais
+        if (jaNaFila.has(chave)) continue
+        const dias = t.dataPrazo ? diffDays(t.dataPrazo, now) : null
+        const pessoa = t.pessoaId != null ? pessoasMap.get(t.pessoaId) : undefined
+        queue.push({
+          docId: 0,
+          necessidadeId: -(1_000_000_000 + t.id),
+          pessoaId: t.pessoaId ?? 0,
+          pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
+          docType: "processo",
+          docTypeLabel: t.titulo,
+          status: t.statusTarefa,
+          statusRaw: t.statusTarefa,
+          responsavelNome: t.responsavel?.nome ?? null,
+          responsavelId: t.responsavelId ?? null,
+          prazo: t.dataPrazo?.toISOString() ?? null,
+          diasParaPrazo: dias,
+          motivoBloqueio: null,
+          ultimaMovimentacao: t.updatedAt.toISOString(),
+          isCritical: false,
+          isOverdue: dias != null && dias < 0,
+          isBlocked: t.statusTarefa === "BLOQUEADA",
+          noOwner: t.responsavelId == null,
+          proximoPasso: t.titulo,
+          generation: t.pessoaId != null ? generationOf(t.pessoaId) : 99,
+          isLinhaReta: pessoa?.linhaReta ?? true,
+        })
+      }
+    }
+
     // ============================================================
     // 8) Matriz de completude
     // ============================================================
