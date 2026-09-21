@@ -86,6 +86,14 @@ export default function CatalogoFasesTab() {
   }, [])
 
   const [busy, setBusy] = useState(false)
+  // IDs em exclusão — sem isto o clique em Excluir não dava NENHUM sinal
+  // visual durante a viagem real até o banco (medido em produção: ~3s por
+  // round-trip real, sem transação nenhuma envolvida — é distância pura).
+  // Parado clicar de novo durante a espera e navegar por 3s sem feedback
+  // nenhum parecia "a página travou" (achado real, mandato "Módulo de
+  // Fases", 21/09/2026). Também trava clique duplo: reenviar a mesma
+  // exclusão enquanto a primeira ainda está em voo.
+  const [excluindoIds, setExcluindoIds] = useState<Set<number>>(new Set())
   const [flash, setFlash] = useState<{ msg: string; kind: "ok" | "erro" } | null>(null)
   // Erro de ESCRITA continua em estado; o de LEITURA vem da consulta.
   const [erroEscrita, setErroEscrita] = useState<string | null>(null)
@@ -141,12 +149,20 @@ export default function CatalogoFasesTab() {
   }
 
   async function del(f: Fase) {
+    if (excluindoIds.has(f.id)) return // já em voo — ignora clique duplo
     if (f.usos > 0) { showFlash(`"${f.label}" é usada em ${f.usos} fluxo(s). Inative em vez de excluir.`, "erro"); return }
     if (!confirm(`Excluir a fase "${f.label}" do catálogo? Só é possível porque nenhum fluxo a utiliza.`)) return
-    const res = await fetch(`/api/gerenciamento/catalogo-fases/${f.id}`, { method: "DELETE", headers: authHeaders() })
-    const j = await res.json().catch(() => ({}))
-    if (res.ok) { atualizarLista(rs => rs.filter(x => x.id !== f.id)); showFlash("Fase excluída.") }
-    else showFlash(j.error || "Erro ao excluir a fase.", "erro")
+    setExcluindoIds((s) => new Set(s).add(f.id))
+    try {
+      const res = await fetch(`/api/gerenciamento/catalogo-fases/${f.id}`, { method: "DELETE", headers: authHeaders() })
+      const j = await res.json().catch(() => ({}))
+      if (res.ok) { atualizarLista(rs => rs.filter(x => x.id !== f.id)); showFlash("Fase excluída.") }
+      else showFlash(j.error || "Erro ao excluir a fase.", "erro")
+    } catch {
+      showFlash("Não foi possível conectar ao servidor. Tente novamente.", "erro")
+    } finally {
+      setExcluindoIds((s) => { const n = new Set(s); n.delete(f.id); return n })
+    }
   }
 
   async function toggleAtivo(f: Fase) {
@@ -270,8 +286,8 @@ export default function CatalogoFasesTab() {
                       // uso no macro). `del()` já mostra o motivo em toast visível;
                       // é o clique em si que precisa sempre acontecer.
                       onClick={() => del(f)}
-                      className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"
-                    ><ITrash /></button>
+                      className={`rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700 ${excluindoIds.has(f.id) ? "animate-pulse opacity-50" : ""}`}
+                    >{excluindoIds.has(f.id) ? "…" : <ITrash />}</button>
                   </div>
                 </td>
               </tr>

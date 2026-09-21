@@ -1492,6 +1492,16 @@ export interface FiltrosGerenciais {
  * memória é só o que é DERIVADO (atrasada, vence hoje, coluna) — e mesmo esses
  * viram condição de data no `where` quando dá.
  */
+// Tarefa sem `faseMacroKey` (nenhuma fase associada — estado legítimo, não
+// erro) agrupa/filtra sob esta chave sintética na Central por família. NUNCA
+// é phaseKey real — nem de cadastro, nem de código. Sem tratar como caso
+// especial em `whereGerencial`, o drill-down mandava `fase=—` pro filtro,
+// que buscava a STRING "—" no banco (nunca encontrando nada, já que a coluna
+// real é NULL) — a Central contava certo mas o "expandir" sempre vinha
+// vazio (achado real, mandato "Módulo de Fases", 21/09/2026, processo
+// sintético 635/"TESTE D").
+export const SEM_FASE_SENTINELA = '—'
+
 function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereInput {
   const where: Prisma.TarefaWhereInput = {}
   const e: Prisma.TarefaWhereInput[] = []
@@ -1503,7 +1513,8 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   if (f.semResponsavel) where.responsavelId = null
   else if (f.responsavelId != null) where.responsavelId = f.responsavelId
 
-  if (f.faseMacroKey) where.faseMacroKey = f.faseMacroKey
+  if (f.faseMacroKey === SEM_FASE_SENTINELA) where.faseMacroKey = null
+  else if (f.faseMacroKey) where.faseMacroKey = f.faseMacroKey
   if (f.prioridade?.length) where.prioridade = { in: f.prioridade }
   if (f.processoId != null) where.processoId = f.processoId
   if (f.pessoaId != null) where.pessoaId = f.pessoaId
@@ -2171,10 +2182,6 @@ const somar = (a: ContagensAgrupadas, b: ContagensAgrupadas) => {
  * processo×fase e outro por responsável, para um ganho que não existe nesta
  * escala.
  */
-// Tarefa sem `faseMacroKey` (nenhuma fase associada — estado legítimo, não
-// erro) agrupa sob esta chave sintética. NUNCA tratar como phaseKey real:
-// não é chave de cadastro nem de código, é só o rótulo de agrupamento.
-const SEM_FASE_SENTINELA = '—'
 
 export async function agregacaoPorFamilia(
   agora = new Date(),
