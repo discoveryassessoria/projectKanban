@@ -25,6 +25,7 @@ interface LinhaProcesso {
   codigo: string | null
   pais: string | null
   faseAtualKey: string | null
+  faseAtualLabel: string | null
   progresso: number
   pendencias: number
   prioridade: "URGENTE" | "ALTA" | "MEDIA" | "BAIXA" | null
@@ -42,11 +43,13 @@ const PRIORIDADE = {
 const iniciais = (v: string) =>
   v.trim().split(/\s+/).slice(0, 2).map((s) => s[0]?.toUpperCase() ?? "").join("")
 
-/** phaseKey → rótulo legível. Catálogo canônico primeiro (mesma fonte do
- *  Kanban/Gerenciamento — nunca uma segunda tradução ad hoc); troca `_` por
- *  espaço só como rede de segurança para uma chave que o catálogo não conhece. */
-const rotuloFase = (k: string | null) =>
-  k ? (labelDaFasePorPhaseKey(k) ?? k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())) : "—"
+/** Rótulo canônico — vem da API (mesma resolução do cabeçalho do processo:
+ *  catálogo de código primeiro, cadastro do Gerenciamento depois, inclusive
+ *  fase inativa). "Trocar `_` por espaço" já foi o bug real (20/09/2026):
+ *  TESTEVIS_fase virava "TESTEVIS fase" no painel enquanto o processo já
+ *  mostrava "Fase de Teste Visual" — nunca inventar rótulo aqui de novo. */
+const rotuloFase = (label: string | null, k: string | null) =>
+  label ?? (k ? labelDaFasePorPhaseKey(k) ?? `⚠ Fase não cadastrada (${k})` : "—")
 
 const buscar = (url: string) => {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -116,7 +119,7 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold text-[var(--text-primary)]">{p.nome}</span>
-                      <span className="block truncate text-[11px] text-[var(--text-muted)]">{rotuloFase(p.faseAtualKey)}</span>
+                      <span className="block truncate text-[11px] text-[var(--text-muted)]">{rotuloFase(p.faseAtualLabel, p.faseAtualKey)}</span>
                     </span>
                     {prio && (
                       <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: prio.cor }} aria-hidden />
@@ -165,7 +168,7 @@ export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { ti
                         </span>
                       </Link>
                     </td>
-                    <td className="px-4 py-3.5 text-[12.5px] text-[var(--text-secondary)]">{rotuloFase(p.faseAtualKey)}</td>
+                    <td className="px-4 py-3.5 text-[12.5px] text-[var(--text-secondary)]">{rotuloFase(p.faseAtualLabel, p.faseAtualKey)}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
                         <span className="w-9 shrink-0 text-[12.5px] font-semibold tabular-nums text-[var(--text-primary)]">{p.progresso}%</span>

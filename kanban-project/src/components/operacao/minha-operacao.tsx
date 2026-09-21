@@ -35,7 +35,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  auth, dataCurta, Estado, Etiqueta, ROTULO_STATUS, rotularFase, type LinhaDeFila,
+  auth, dataCurta, Estado, Etiqueta, ROTULO_STATUS, rotularFase, useRotulosDeFaseProntos, type LinhaDeFila,
 } from "./kit-operacional"
 import type { LinhaOperacional } from "./central-tarefas"
 import {
@@ -257,6 +257,7 @@ interface Filtros {
 const SEM_FILTRO: Filtros = { busca: "", fase: null, terceiro: null, prazo: "todos" }
 
 export function MinhaOperacao() {
+  useRotulosDeFaseProntos()
   const router = useRouter()
   // DEEP-LINK — a notificação de "nova atribuição em lote" (Sino) e o
   // cartão da obrigação administrativa mandam pra cá com `?processo=<id>`,

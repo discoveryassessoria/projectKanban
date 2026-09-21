@@ -32,6 +32,7 @@ import { historicoDaOperacaoDaUnidade } from "@/src/services/operacao-da-etapa"
 import { descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 import { escopoDaUnidade, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
+import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 
 /** Quem é a unidade — em nomes, para a tela poder dizer de quem é o trabalho. */
 export interface IdentidadeDaUnidade {
@@ -131,7 +132,7 @@ export async function planejarReabertura(stepInstanceId: number): Promise<PlanoD
       : null,
   }))
 
-  const [pessoa, documento, fase] = await Promise.all([
+  const [pessoa, documento, faseLabel] = await Promise.all([
     passo.pessoaId
       ? prisma.pessoa.findUnique({ where: { id: passo.pessoaId }, select: { nome: true, sobrenome: true } })
       : null,
@@ -141,7 +142,10 @@ export async function planejarReabertura(stepInstanceId: number): Promise<PlanoD
           select: { tipo: true, descricao: true, publicCode: true, pessoa: { select: { nome: true, sobrenome: true } } },
         })
       : null,
-    prisma.catalogoFase.findUnique({ where: { phaseKey: passo.faseMacroKey }, select: { label: true } }),
+    // Catálogo de código primeiro, cadastro depois (mesma precedência do
+    // resolvedor canônico) — antes só consultava o cadastro, invertendo a
+    // prioridade das 10 fases canônicas (achado real, 20/09/2026).
+    resolverRotuloDaFase(passo.faseMacroKey, prisma),
   ])
 
   const tentativas = await tentativasDoPasso(stepInstanceId)
@@ -177,7 +181,7 @@ export async function planejarReabertura(stepInstanceId: number): Promise<PlanoD
     identidade: {
       processoId: passo.processoId,
       faseMacroKey: passo.faseMacroKey,
-      faseLabel: fase?.label ?? rotulo(passo.faseMacroKey),
+      faseLabel: faseLabel ?? rotulo(passo.faseMacroKey),
       ciclo: passo.ciclo,
       pessoaId: passo.pessoaId,
       pessoaNome: nomePessoa,

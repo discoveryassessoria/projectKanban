@@ -65,8 +65,14 @@ export async function POST(request: NextRequest) {
     const phaseKey = (slug(String(b?.phaseKey || '').trim()) || slug(label)).slice(0, 60)
     if (!phaseKey) return NextResponse.json({ error: 'Não foi possível gerar a chave da fase.' }, { status: 400 })
 
-    const jaExiste = await prisma.catalogoFase.findUnique({ where: { phaseKey } })
-    if (jaExiste) return NextResponse.json({ error: `Já existe uma fase com a chave "${phaseKey}".` }, { status: 409 })
+    // CASE-INSENSITIVE — mesmo já slugificado, `phaseKey` pode colidir por
+    // maiúscula/minúscula com uma chave ANTIGA que nasceu antes desta
+    // normalização existir (TESTEVIS_fase é o próprio exemplo real). Um
+    // `findUnique` exato deixava "testevis_fase" nascer como fase NOVA,
+    // duplicando em espírito a "TESTEVIS_fase" já existente (achado real,
+    // mandato "Módulo de Fases", 20/09/2026).
+    const jaExiste = await prisma.catalogoFase.findFirst({ where: { phaseKey: { equals: phaseKey, mode: 'insensitive' } } })
+    if (jaExiste) return NextResponse.json({ error: `Já existe uma fase com a chave "${jaExiste.phaseKey}".` }, { status: 409 })
 
     // CHAVE LEGADA: `retificacao` é o nome antigo de `retificacao_registros`. Deixar
     // criar de novo é reabrir o defeito que custou três macrofluxos.

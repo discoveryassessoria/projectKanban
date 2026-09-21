@@ -13,7 +13,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowUpRight, X as XIcon } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA, rotularFase } from "./kit-operacional"
+import { auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA, rotularFase, useRotulosDeFaseProntos } from "./kit-operacional"
 import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 
@@ -77,6 +77,7 @@ function EtiquetaEtapa({ e }: { e: Etapa }) {
 }
 
 export function MinhaOperacaoDetalhe({ taskId, aoFechar }: { taskId: number; aoFechar: () => void }) {
+  useRotulosDeFaseProntos()
   const router = useRouter()
   const [resultado, setResultado] = useState<{ chave: number; d: RespostaDossie | null } | null>(null)
 

@@ -27,7 +27,7 @@ import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 // visão gerencial global — mesma implementação, não uma cópia parecida.
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA,
-  rotularFase, SeletorResponsavel, type LinhaDeFila,
+  rotularFase, useRotulosDeFaseProntos, SeletorResponsavel, type LinhaDeFila,
 } from "./kit-operacional"
 import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 
@@ -369,6 +369,7 @@ const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional)
 ]
 
 export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) {
+  useRotulosDeFaseProntos()
   // DEEP-LINK — a tarefa administrativa "Atribuir tarefas" (Minha Operação)
   // manda pra cá com `?processo=<id>`, lido só uma vez, no mount. `visao` e
   // `modo` já nascem em "sem_responsavel"/"agrupada" por padrão para quem

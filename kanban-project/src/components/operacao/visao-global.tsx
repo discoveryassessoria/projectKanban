@@ -54,7 +54,7 @@ import { ProcessoExpandido } from "./processo-expandido"
 import type { FamiliaAgrupada, ProcessoAgrupado, ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS, ROTULO_COLUNA,
-  rotularFase, SeletorResponsavel, type LinhaDeFila,
+  rotularFase, useRotulosDeFaseProntos, SeletorResponsavel, type LinhaDeFila,
 } from "./kit-operacional"
 
 export interface LinhaGerencial extends LinhaDeFila {
@@ -234,6 +234,7 @@ const TILES: Array<{
 interface VisaoSalva { id: number; nome: string; spec: { filtros: Filtros; modo: string } }
 
 export function VisaoGlobal() {
+  useRotulosDeFaseProntos()
   const { pode } = usePermissoes()
   const podeAtribuir = pode("tarefas.editar")
   const [modo, setModo] = useState<"visaoGeral" | "lista" | "kanban" | "calendario">("visaoGeral")

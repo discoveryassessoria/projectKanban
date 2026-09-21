@@ -182,7 +182,7 @@ export default function CatalogoFasesTab() {
       )}
       {erro && (
         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
-          {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button type="button" onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
@@ -196,6 +196,7 @@ export default function CatalogoFasesTab() {
             </p>
           </div>
           <button
+            type="button"
             onClick={() => setForm(vazio(proximaOrdem))}
             className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]"
           >
@@ -235,6 +236,7 @@ export default function CatalogoFasesTab() {
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.usos ? `${f.usos} fluxo(s)` : "—"}</td>
                 <td className="px-4 py-2.5">
                   <button
+                    type="button"
                     onClick={() => toggleAtivo(f)}
                     title={f.ativo ? "Inativar (some do seletor de fases, sem apagar)" : "Ativar"}
                     className={`rounded-full px-2 py-0.5 text-[10px] ${f.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
@@ -245,6 +247,7 @@ export default function CatalogoFasesTab() {
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button
+                      type="button"
                       title="Editar" aria-label="Editar"
                       onClick={() => setForm({
                         id: f.id, phaseKey: f.phaseKey, label: f.label, ordemPadrao: f.ordemPadrao,
@@ -256,6 +259,7 @@ export default function CatalogoFasesTab() {
                       className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"
                     ><IEdit /></button>
                     <button
+                      type="button"
                       title={f.usos > 0 ? `Em uso em ${f.usos} fluxo(s) — inative em vez de excluir` : "Excluir"}
                       aria-label="Excluir"
                       disabled={f.usos > 0}
@@ -272,7 +276,13 @@ export default function CatalogoFasesTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
+          {/* max-h + overflow-y-auto — SEM ISSO o modal ficava mais alto que a
+              viewport (16 efeitos + demais campos) e o rodapé (Cancelar/Salvar)
+              saía cortado, sem nenhuma barra de rolagem pra alcançar: o mouse
+              não tinha como clicar, mas Tab+Enter ainda focava o botão fora da
+              tela e disparava — é exatamente o bug relatado ("só Enter
+              funciona"), achado real por reprodução em navegador, 20/09/2026. */}
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">{form.id ? "Editar fase" : "Nova fase"}</h3>
               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Os padrões abaixo são sugeridos ao adicionar a fase a um fluxo — cada fluxo pode ajustá-los.</p>
@@ -376,16 +386,29 @@ export default function CatalogoFasesTab() {
                   <input type="checkbox" checked={form.conditionalPadrao} onChange={e => setForm(f => f && { ...f, conditionalPadrao: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
                   Condicional por padrão
                 </label>
-                <label className="flex items-center gap-2 text-sm text-white/70">
-                  <input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
-                  Publicar (ativa, aparece no seletor de fases dos fluxos — exige pelo menos um efeito marcado acima)
-                </label>
-                {!form.ativo && <p className="text-[11px] text-[var(--text-muted)]">Sem marcar, a fase fica como RASCUNHO: existe no cadastro, mas não é ofertada em fluxo novo.</p>}
+                {form.id ? (
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-white/70">
+                      <input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
+                      Publicar (ativa, aparece no seletor de fases dos fluxos — exige pelo menos um efeito marcado acima)
+                    </label>
+                    {!form.ativo && <p className="text-[11px] text-[var(--text-muted)]">Sem marcar, a fase fica como RASCUNHO: existe no cadastro, mas não é ofertada em fluxo novo.</p>}
+                  </>
+                ) : (
+                  // CRIAÇÃO nasce sempre RASCUNHO, mesmo que o corpo peça ativo:true
+                  // (mandato "Catálogo de Fases", 20/09/2026) — publicar é passo
+                  // seguinte, na EDIÇÃO. Esconder o checkbox aqui evita a confusão
+                  // real já relatada: "marquei Publicar e a fase nasceu Inativa
+                  // mesmo assim" (achado real, mandato "Módulo de Fases").
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Esta fase nasce como <strong>RASCUNHO</strong> — depois de salvar, abra-a em <strong>Editar</strong> pra marcar os efeitos e publicá-la.
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={save} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
+              <button type="button" onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
+              <button type="button" disabled={busy} onClick={() => { void save() }} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

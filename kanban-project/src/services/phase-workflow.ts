@@ -783,7 +783,11 @@ export async function instanciarWorkflowDaFase(
       return { success: true, created: true, workflowInstance: instancia, stepInstances, warnings: avisos, correlationId }
   }
   try {
-    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo)
+    // timeout maior que o padrão (5s) — a distância real até o banco pooled já
+    // fez esta transação estourar por RTT puro, sem nada de errado no trabalho
+    // em si (achado real, recorrente nesta sessão: P2028 "Transaction already
+    // closed" contra o banco remoto).
+    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo, { timeout: 15_000 })
   } catch (e) {
     // Concorrência: unique da chave do workflow → converge (só no modo standalone;
     // sob txExterno, propaga para o chamador tratar como conflito e dar rollback).

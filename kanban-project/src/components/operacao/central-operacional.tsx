@@ -24,7 +24,7 @@ import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { gravarLocal, useJsonLocalStorage } from "@/src/lib/cliente"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
-  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, rotularFase,
+  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, rotularFase, useRotulosDeFaseProntos,
   SeletorResponsavel, type LinhaDeFila,
 } from "./kit-operacional"
 
@@ -155,6 +155,7 @@ const PONTO_TOM: Record<string, string> = {
 }
 
 export function CentralOperacional() {
+  useRotulosDeFaseProntos()
   const router = useRouter()
   const paramsIniciais = useSearchParams()
   // MESMA permissão que a porta canônica exige no backend (`tarefas.editar`,

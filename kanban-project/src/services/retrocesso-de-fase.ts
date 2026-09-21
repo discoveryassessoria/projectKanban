@@ -29,6 +29,7 @@ import type { Prisma } from "@prisma/client"
 import { movePhaseManual } from "@/src/lib/motor/phase-advance"
 import { ESTADOS_CUMPRIDOS } from "@/src/services/dependencias-do-passo"
 import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
+import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 
 type TX = Prisma.TransactionClient
 
@@ -81,7 +82,11 @@ export async function planejarRetrocesso(
     orderBy: { ordem: "asc" },
   })
   const ordemDe = (k: string | null) => fases.find((f) => f.phaseKey === k)?.ordem ?? -1
-  const labelDe = (k: string | null) => fases.find((f) => f.phaseKey === k)?.label ?? rotulo(k ?? "—")
+  // Composição do macro primeiro (é a fonte mais específica: rótulo QUE ESTE
+  // processo usa); catálogo/cadastro depois — nunca mais "desenrolar underscore"
+  // (achado real, 20/09/2026: mandato "Módulo de Fases").
+  const labelDe = async (k: string | null) =>
+    fases.find((f) => f.phaseKey === k)?.label ?? (k ? await resolverRotuloDaFase(k, db as typeof prisma) : null) ?? rotulo(k ?? "—")
   const ehRetrocesso = ordemDe(faseDestino) >= 0 && ordemDe(processo.faseAtualKey) > ordemDe(faseDestino)
 
   const instancia = await resolverInstanciaVigente(processoId, faseDestino, db as typeof prisma)
@@ -116,9 +121,9 @@ export async function planejarRetrocesso(
   return {
     processoId,
     faseAtual: processo.faseAtualKey,
-    faseAtualLabel: labelDe(processo.faseAtualKey),
+    faseAtualLabel: await labelDe(processo.faseAtualKey),
     faseDestino,
-    faseDestinoLabel: labelDe(faseDestino),
+    faseDestinoLabel: await labelDe(faseDestino),
     ehRetrocesso,
     retrato: {
       unidades: new Set(passos.map(chaveDaUnidade)).size,

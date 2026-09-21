@@ -129,6 +129,12 @@ export async function GET(request: NextRequest) {
         codigo: p.codigo,
         pais: p.paisCanonico?.countryKey,
         faseAtualKey: p.faseAtualKey,
+        // Rótulo canônico — MESMA fonte que resolve o cabeçalho do processo
+        // (activePhase.name já passa por resolverRotuloDaFase dentro da
+        // projeção em lote). Sem isto a tela caía num "troca _ por espaço"
+        // manual, que é como TESTEVIS_fase virava "TESTEVIS fase" no painel
+        // (achado real, 20/09/2026).
+        faseAtualLabel: projPorProc.get(p.id)?.activePhase?.name ?? null,
         // Vem do motor canônico, intacto.
         progresso: projPorProc.get(p.id)?.progress.percentage ?? 0,
         // Derivações declaradas acima.

@@ -11,6 +11,12 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { CambioMini } from "@/src/components/cambio/cambio-mini"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import useSWR from 'swr'
+import { buscarGlobal } from "@/src/components/home/use-home"
+import type { SearchResult } from "@/src/app/api/home/search/route"
+
+const ROTULO_TIPO_BUSCA: Record<SearchResult["tipo"], string> = {
+  processo: "Processo", familia: "Família", requerente: "Requerente", cliente: "Cliente",
+}
 
 // Mapeamento de bandeiras por país
 // Sem mapa fixo de bandeiras: a bandeira é atributo do Cadastro Mestre e chega
@@ -167,9 +173,12 @@ export function HeaderBar({
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
-  const [searchResults, setSearchResults] = useState<{
-    processos: ProcessoWithStatus[]
-  }>({ processos: [] })
+  // Busca via API (/api/home/search) — mesma correção de header-bar-app.tsx: a
+  // prop local `processos` pode não cobrir tudo que a tela mostra (ex.: processo
+  // sem país cai fora do filtro por país do Kanban, mas ainda deve ser achável
+  // pela busca). Achado real, 20/09/2026, mandato "Módulo de Fases".
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const buscaSeq = useRef(0)
 
   const { pode } = usePermissoes()
 
@@ -270,30 +279,26 @@ export function HeaderBar({
   const handleSearch = (query: string) => {
     setSearchQuery(query)
 
-    if (query.trim() === "") {
+    if (query.trim().length < 2) {
       setShowSearchResults(false)
-      setSearchResults({ processos: [] })
+      setSearchResults([])
       return
     }
 
-    const queryLower = query.toLowerCase()
-
-    const processosFiltrados = processos.filter(p => 
-      p.nome.toLowerCase().includes(queryLower) ||
-      p.descricao?.toLowerCase().includes(queryLower) ||
-      p.contratantes?.some(c => c.publicCode?.toLowerCase().includes(queryLower) || c.nome?.toLowerCase().includes(queryLower))
-    )
-
-    setSearchResults({
-      processos: processosFiltrados.slice(0, 5)
+    const minhaSeq = ++buscaSeq.current
+    buscarGlobal(query).then((resultados) => {
+      if (minhaSeq !== buscaSeq.current) return
+      setSearchResults(resultados)
+      setShowSearchResults(true)
+    }).catch(() => {
+      if (minhaSeq !== buscaSeq.current) return
+      setSearchResults([])
+      setShowSearchResults(true)
     })
-
-    setShowSearchResults(true)
   }
 
-  const handleProcessoClick = (processo: ProcessoWithStatus) => {
-    const url = `/kanban?pais=${processo.pais}&processoId=${processo.id}`
-    router.push(url)
+  const handleResultadoClick = (r: SearchResult) => {
+    router.push(r.href)
     setShowSearchResults(false)
     setSearchQuery("")
   }
@@ -314,7 +319,7 @@ export function HeaderBar({
     setShowNotifications(false)
   }
 
-  const totalResults = searchResults.processos.length
+  const totalResults = searchResults.length
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-[var(--elev-2)]">
@@ -366,28 +371,26 @@ export function HeaderBar({
                 {totalResults === 0 ? (
                   <div className="px-4 py-6 text-center text-[var(--text-muted)]">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm text-gray-600">Nenhum processo encontrado</p>
+                    <p className="text-sm text-gray-600">Nenhum resultado encontrado</p>
                     <p className="text-xs mt-1 text-[var(--text-muted)]">Tente buscar por outro termo</p>
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto">
                     <div className="px-3 py-2 bg-gray-50 text-[10px] uppercase tracking-wide text-gray-500 font-medium">
-                      Processos
+                      Resultados
                     </div>
-                    {searchResults.processos.map(processo => (
+                    {searchResults.map(r => (
                       <button
-                        key={`processo-${processo.id}`}
+                        key={`${r.tipo}-${r.id}`}
                         className="w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-100 transition text-left"
-                        onClick={() => handleProcessoClick(processo)}
+                        onClick={() => handleResultadoClick(r)}
                       >
-                        <span className="text-lg flex-shrink-0">
-                          {(processo as { paisFlag?: string | null }).paisFlag ?? "🏳️"}
+                        <span className="text-lg flex-shrink-0" aria-hidden="true">
+                          {r.tipo === "processo" ? "📁" : r.tipo === "familia" ? "👪" : r.tipo === "requerente" ? "👤" : "🏢"}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 truncate font-medium">{processo.nome}</p>
-                          <p className="text-[10px] text-[var(--text-muted)] truncate">
-                            {processo.contratantes?.[0] ? (processo.contratantes[0].publicCode ? processo.contratantes[0].publicCode + ' — ' : '') + processo.contratantes[0].nome : "Sem contratante"}
-                          </p>
+                          <p className="text-sm text-gray-800 truncate font-medium">{r.label}</p>
+                          <p className="text-[10px] text-[var(--text-muted)] truncate">{r.sub ?? ROTULO_TIPO_BUSCA[r.tipo]}</p>
                         </div>
                         <span className="text-[10px] text-[var(--text-secondary)] flex-shrink-0">
                           Clique para abrir →

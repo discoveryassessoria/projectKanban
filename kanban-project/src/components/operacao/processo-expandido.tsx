@@ -24,7 +24,7 @@ import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { auth, dataCurta, Estado, Etiqueta, rotularFase, ROTULO_STATUS, ROTULO_COLUNA, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
+import { auth, dataCurta, Estado, Etiqueta, rotularFase, useRotulosDeFaseProntos, ROTULO_STATUS, ROTULO_COLUNA, SeletorResponsavel, type LinhaDeFila } from "./kit-operacional"
 import type { ProcessoAgrupado, LinhaGerencial } from "@/lib/operacional/tarefa-projecoes"
 
 type Aba = "visao" | "tarefas" | "documentos" | "historico" | "observacoes" | "dados"
@@ -98,6 +98,7 @@ export function ProcessoExpandido({
   podeAtribuir: boolean
   aoAbrirTarefa: (taskId: number, processoId: number) => void
 }) {
+  useRotulosDeFaseProntos()
   const { userId: usuarioAtualId, pode } = usePermissoes()
   const podeIniciar = pode("tarefas.iniciar_concluir")
   const [aba, setAba] = useState<Aba>("visao")

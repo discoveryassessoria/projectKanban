@@ -51,6 +51,7 @@ import type {
   ResumoDia,
 } from "@/src/types/home"
 import { escopoTarefa, escopoPasso, escopoProcesso, escopoDocumento, escopoEvento } from "@/src/lib/autorizacao/escopo-operacional"
+import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 
 /** Dias sem movimentação a partir dos quais o processo entra na fila "parados". */
 export const DIAS_PROCESSO_PARADO = 15
@@ -652,6 +653,28 @@ export async function listarFila(
     ),
   ]
 
+  // Rótulo canônico da fase — catálogo de código primeiro (10 fases), cadastro
+  // do Gerenciamento em lote depois (mesma precedência de resolverRotuloDaFase).
+  // Sem isto, "processo"/"pendência" na fila caíam no "troca `_` por espaço":
+  // TESTEVIS_fase virava "TESTEVIS fase" nas notificações enquanto o processo
+  // já mostrava "Fase de Teste Visual" (achado real, 20/09/2026).
+  const chavesFaseForaDoCodigo = [
+    ...new Set(
+      pagina.flatMap((m) => {
+        const chave = m.tipo === "processo" ? m.processo.faseAtualKey : m.tipo === "pendencia" ? m.pendencia.phaseKey : null
+        return chave && !labelDaFasePorPhaseKey(chave) ? [chave] : []
+      }),
+    ),
+  ]
+  const rotuloCadastroPorChave = chavesFaseForaDoCodigo.length
+    ? new Map(
+        (await prisma.catalogoFase.findMany({ where: { phaseKey: { in: chavesFaseForaDoCodigo } }, select: { phaseKey: true, label: true } }))
+          .map((f) => [f.phaseKey, f.label]),
+      )
+    : new Map<string, string>()
+  const rotuloFase = (k: string | null | undefined) =>
+    k ? (labelDaFasePorPhaseKey(k) ?? rotuloCadastroPorChave.get(k) ?? `⚠ Fase não cadastrada (${k})`) : null
+
   const [documentos, necessidades, responsaveis] = await Promise.all([
     docIds.length
       ? prisma.documento.findMany({
@@ -762,7 +785,7 @@ export async function listarFila(
       return {
         id: `processo-${pr.id}`,
         titulo: pr.nome,
-        subtitulo: pr.faseAtualKey ? pr.faseAtualKey.replace(/_/g, " ") : "sem fase",
+        subtitulo: rotuloFase(pr.faseAtualKey) ?? "sem fase",
         processoId: pr.id,
         processoCodigo: pr.codigo,
         processoNome: pr.nome,
@@ -777,7 +800,7 @@ export async function listarFila(
     return {
       id: `pendencia-${pe.id}`,
       titulo: pe.detalhe,
-      subtitulo: `${pe.motivo.replace(/_/g, " ").toLowerCase()} · ${pe.phaseKey.replace(/_/g, " ")}`,
+      subtitulo: `${pe.motivo.replace(/_/g, " ").toLowerCase()} · ${rotuloFase(pe.phaseKey) ?? pe.phaseKey}`,
       processoId: pe.processoId,
       processoCodigo: pr?.codigo ?? null,
       processoNome: pr?.nome ?? null,

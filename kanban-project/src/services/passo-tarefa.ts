@@ -311,7 +311,9 @@ export async function garantirTarefaDePasso(
       return { success: true, created: true, tarefa, warnings, correlationId }
   }
   try {
-    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo)
+    // timeout maior que o padrão (5s) — mesma causa real de phase-workflow.ts:
+    // RTT até o banco pooled já estourou esta transação por distância pura.
+    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo, { timeout: 15_000 })
   } catch (e) {
     // Convergência só no modo standalone; sob txExterno, propaga p/ rollback do chamador.
     if (!txExterno && (e as { code?: string })?.code === "P2002") {

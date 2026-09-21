@@ -17,7 +17,7 @@
 // ============================================================================
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useSyncExternalStore } from "react"
 import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 // O CONTRATO DE LEITURA É UM SÓ — antes esta interface era uma SEGUNDA
 // declaração (mesmo nome, campos DIVERGENTES: sem `proximoAcontecimento`, sem
@@ -100,17 +100,55 @@ export const ROTULO_COLUNA: Record<ColunaKanban, string> = {
   CANCELADA: "Cancelada",
 }
 
+// CADASTRO DO GERENCIAMENTO, em cache compartilhado — mesma precedência do
+// resolvedor canônico do servidor (resolverRotuloDaFase): catálogo de código
+// primeiro, cadastro depois. Sem isto, qualquer fase cadastrada fora das 10
+// canônicas (ex.: TESTEVIS_fase) caía no "troca `_` por espaço" — é como
+// virava "TESTEVIS fase" na Operação enquanto o processo já mostrava "Fase de
+// Teste Visual" via /api/processos/[id] (achado real, 20/09/2026). Módulo
+// carrega uma vez (fetch de GET /api/fases/rotulos) e todo consumidor de
+// `rotularFase` num componente que chame `useRotulosDeFaseProntos()` reage
+// quando o cadastro chega.
+let mapaFasesCadastro: Record<string, string> = {}
+let statusMapaFasesCadastro: "idle" | "carregando" | "pronto" = "idle"
+const ouvintesMapaFasesCadastro = new Set<() => void>()
+function notificarOuvintesMapaFasesCadastro() { ouvintesMapaFasesCadastro.forEach((fn) => fn()) }
+function carregarMapaFasesCadastroUmaVez() {
+  if (statusMapaFasesCadastro !== "idle") return
+  statusMapaFasesCadastro = "carregando"
+  const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+  fetch("/api/fases/rotulos", { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => { if (j?.rotulos) mapaFasesCadastro = j.rotulos })
+    .catch(() => {})
+    .finally(() => { statusMapaFasesCadastro = "pronto"; notificarOuvintesMapaFasesCadastro() })
+}
+/** Chamar uma vez no componente de topo de cada tela que usa `rotularFase`,
+ *  para a tela re-renderizar quando o cadastro terminar de carregar (o valor
+ *  de retorno não importa — é só o gatilho de reatividade). */
+export function useRotulosDeFaseProntos(): boolean {
+  const status = useSyncExternalStore(
+    (cb) => { ouvintesMapaFasesCadastro.add(cb); return () => ouvintesMapaFasesCadastro.delete(cb) },
+    () => statusMapaFasesCadastro,
+    () => "idle" as const,
+  )
+  useEffect(() => { carregarMapaFasesCadastroUmaVez() }, [])
+  return status === "pronto"
+}
+
 /**
  * A fase vem como chave técnica; a tela mostra gente, não `faseMacroKey`.
  *
- * O nome vem do CATÁLOGO publicado — é lá que a fase se chama "Emissão
- * documental", com acento. Desenrolar o underscore é o último recurso, para
- * uma chave que o catálogo não conheça: melhor um nome imperfeito do que uma
- * célula vazia onde deveria estar a fase.
+ * O nome vem do CATÁLOGO publicado (10 fases canônicas) ou, se a fase foi
+ * cadastrada no Gerenciamento fora dele, do cadastro em si — NUNCA mais
+ * "desenrolar o underscore": isso inventava rótulo em vez de mostrar o
+ * cadastrado. Sem nenhuma das duas fontes, mostra erro controlado — nunca a
+ * chave técnica crua disfarçada de nome.
  */
 export function rotularFase(k: string | null): string | null {
   if (!k) return null
-  return labelDaFasePorPhaseKey(k) ?? k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase())
+  carregarMapaFasesCadastroUmaVez()
+  return labelDaFasePorPhaseKey(k) ?? mapaFasesCadastro[k] ?? `⚠ Fase não cadastrada (${k})`
 }
 
 /**

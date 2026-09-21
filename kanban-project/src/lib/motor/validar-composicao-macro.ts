@@ -97,17 +97,33 @@ export function validarTipoProcesso(tipo: TipoProcessoValidavel | null): Problem
   return null
 }
 
-/** Roda todas as validações de composição e devolve a lista completa de problemas (nunca lança, nunca para na primeira). */
+/**
+ * Roda todas as validações de composição e devolve a lista completa de problemas
+ * (nunca lança, nunca para na primeira).
+ *
+ * `chavesJaCadastradas` — fases que JÁ EXISTEM no Catálogo, informadas por quem
+ * chama (esta função é pura, não lê banco). O formato normalizado
+ * (`validarFormatoPhaseKey`) só se aplica a chave NOVA: barrar toda chave já
+ * cadastrada tornaria `TESTEVIS_fase` — citada acima como o próprio exemplo
+ * histórico do problema — permanentemente impossível de compor em qualquer
+ * fluxo, mesmo já publicada, com revisões e processos reais apontando pra ela.
+ * O validador existe para not deixar NASCER outra inconsistência dessas, não
+ * para apagar retroativamente a que já existe (achado real, mandato "Módulo de
+ * Fases", 20/09/2026).
+ */
 export function validarComposicaoMacro(
   fases: FaseComposicaoInput[],
   tipo: TipoProcessoValidavel | null,
+  chavesJaCadastradas: ReadonlySet<string> = new Set(),
 ): ProblemaComposicao[] {
   const problemas: ProblemaComposicao[] = []
   const pTipo = validarTipoProcesso(tipo)
   if (pTipo) problemas.push(pTipo)
   for (const f of fases) {
-    const pFormato = validarFormatoPhaseKey(f.phaseKey)
-    if (pFormato) problemas.push(pFormato)
+    if (!chavesJaCadastradas.has(f.phaseKey)) {
+      const pFormato = validarFormatoPhaseKey(f.phaseKey)
+      if (pFormato) problemas.push(pFormato)
+    }
     const pCondicao = validarCondicaoValida(f)
     if (pCondicao) problemas.push(pCondicao)
   }

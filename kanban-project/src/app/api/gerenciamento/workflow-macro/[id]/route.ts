@@ -71,9 +71,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // BLOQUEIOS DE PUBLICAÇÃO — formato de código, contradição obrigatória×condicional,
     // tipo de processo ausente/incompatível, fim de fluxo sem desfecho garantido.
+    // Chave já cadastrada (ex.: TESTEVIS_fase, o próprio exemplo histórico do
+    // formato inconsistente) fica isenta da checagem de FORMATO — barrar
+    // nascimento de chave nova ruim é o objetivo; apagar retroativamente o uso
+    // de uma já existente, publicada e referenciada não é.
+    const jaCadastradas = new Set(
+      (await prisma.catalogoFase.findMany({ where: { phaseKey: { in: incomingKeys } }, select: { phaseKey: true } })).map((f) => f.phaseKey),
+    )
     const problemas = validarComposicaoMacro(
       incoming.map((f) => ({ phaseKey: String(f.phaseKey), required: f.required !== false, conditional: !!f.conditional })),
       mw.tipoProcesso,
+      jaCadastradas,
     )
     if (problemas.length > 0) {
       return NextResponse.json(
