@@ -2042,6 +2042,23 @@ export async function marcosGerenciaisPorProcesso(
     : []
   const materializadaSet = new Set(materializacaoNova.map((m) => `${m.processoId}::${m.faseMacroKey}`))
 
+  // RÓTULO CANÔNICO EM LOTE — mesmo achado do agrupamento por família: uma
+  // fase fora do catálogo de código (publicada pelo Catálogo de Fases)
+  // aparecia com a chave técnica crua no marco gerencial ("TESTEVIS_fase"
+  // em vez de "Fase de Teste Visual"). Mandato "Módulo de Fases", 21/09/2026.
+  const chavesDoMarcoForaDoCatalogo = [
+    ...new Set(
+      entradas.flatMap((l) => [l.faseAtual, l.fasePretendida].filter((k): k is string => !!k && !labelDaFasePorPhaseKey(k))),
+    ),
+  ]
+  const rotuloCadastroDoMarco = chavesDoMarcoForaDoCatalogo.length
+    ? new Map(
+        (await db.catalogoFase.findMany({ where: { phaseKey: { in: chavesDoMarcoForaDoCatalogo } }, select: { phaseKey: true, label: true } }))
+          .map((f) => [f.phaseKey, f.label]),
+      )
+    : new Map<string, string>()
+  const rotuloDoMarco = (k: string) => labelDaFasePorPhaseKey(k) ?? rotuloCadastroDoMarco.get(k) ?? `⚠ Fase não cadastrada (${k})`
+
   for (const l of entradas) {
     const chaveAnterior = `${l.processoId}::${l.faseAtual}`
     const chaveNova = l.fasePretendida ? `${l.processoId}::${l.fasePretendida}` : null
@@ -2050,9 +2067,9 @@ export async function marcosGerenciaisPorProcesso(
       processoId: l.processoId,
       resultado: l.resultado,
       faseAnteriorKey: l.faseAtual,
-      faseAnteriorLabel: labelDaFasePorPhaseKey(l.faseAtual) ?? l.faseAtual,
+      faseAnteriorLabel: rotuloDoMarco(l.faseAtual),
       faseNovaKey: l.fasePretendida,
-      faseNovaLabel: l.fasePretendida ? labelDaFasePorPhaseKey(l.fasePretendida) ?? l.fasePretendida : null,
+      faseNovaLabel: l.fasePretendida ? rotuloDoMarco(l.fasePretendida) : null,
       em: l.criadoEm.toISOString(),
       totalNaFaseAnterior: c.total,
       concluidasNaFaseAnterior: c.concluidas,
@@ -2154,6 +2171,11 @@ const somar = (a: ContagensAgrupadas, b: ContagensAgrupadas) => {
  * processo×fase e outro por responsável, para um ganho que não existe nesta
  * escala.
  */
+// Tarefa sem `faseMacroKey` (nenhuma fase associada — estado legítimo, não
+// erro) agrupa sob esta chave sintética. NUNCA tratar como phaseKey real:
+// não é chave de cadastro nem de código, é só o rótulo de agrupamento.
+const SEM_FASE_SENTINELA = '—'
+
 export async function agregacaoPorFamilia(
   agora = new Date(),
   filtro: FiltrosGerenciais = {},
@@ -2211,7 +2233,7 @@ export async function agregacaoPorFamilia(
     const p = processoDe.get(processoId)
     if (!p) continue // processo apagado/inacessível — não inventa família para ele
     const chaveFamilia = p.familiaId != null ? `f:${p.familiaId}` : `p:${processoId}`
-    const fase = r.faseMacroKey ?? '—'
+    const fase = r.faseMacroKey ?? SEM_FASE_SENTINELA
 
     let porFase = porProcessoFase.get(processoId)
     if (!porFase) { porFase = new Map(); porProcessoFase.set(processoId, porFase) }
@@ -2254,6 +2276,24 @@ export async function agregacaoPorFamilia(
     }
   }
 
+  // RÓTULO CANÔNICO EM LOTE — catálogo de código primeiro (10 fases), cadastro
+  // do Gerenciamento depois (mesma precedência de resolverRotuloDaFase). Sem
+  // isto, uma fase publicada pelo Catálogo de Fases fora das 10 canônicas
+  // (ex.: escopo PROCESSO, efeito "Somente registrar") aparecia com a chave
+  // técnica crua na Central Operacional agrupada por família — achado real,
+  // mandato "Módulo de Fases", 21/09/2026, processo sintético 635.
+  const chavesForaDoCatalogo = [
+    ...new Set(
+      [...porProcessoFase.values()].flatMap((porFase) => [...porFase.keys()]).filter((k) => k !== SEM_FASE_SENTINELA && !labelDaFasePorPhaseKey(k)),
+    ),
+  ]
+  const rotuloCadastroPorChave = chavesForaDoCatalogo.length
+    ? new Map(
+        (await prisma.catalogoFase.findMany({ where: { phaseKey: { in: chavesForaDoCatalogo } }, select: { phaseKey: true, label: true } }))
+          .map((f) => [f.phaseKey, f.label]),
+      )
+    : new Map<string, string>()
+
   const familias = new Map<string, FamiliaAgrupada>()
   for (const [processoId, porFase] of porProcessoFase) {
     const p = processoDe.get(processoId)!
@@ -2265,7 +2305,9 @@ export async function agregacaoPorFamilia(
         return {
           ...contagens,
           faseMacroKey,
-          label: labelDaFasePorPhaseKey(faseMacroKey) ?? faseMacroKey,
+          label: faseMacroKey === SEM_FASE_SENTINELA
+            ? "Sem fase"
+            : labelDaFasePorPhaseKey(faseMacroKey) ?? rotuloCadastroPorChave.get(faseMacroKey) ?? `⚠ Fase não cadastrada (${faseMacroKey})`,
           ordem: code ? getOrdemFase(code) : 999,
         }
       })
