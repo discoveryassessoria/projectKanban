@@ -156,6 +156,24 @@ async function main() {
   check("segunda reconciliação: procB continua com exatamente 1 instância + 1 tarefa (zero duplicação)", depoisB2.instancias === 1 && depoisB2.tarefas === 1, JSON.stringify(depoisB2))
   check("segunda reconciliação: procA continua com exatamente 1 instância + 1 tarefa (zero duplicação)", depoisA2.instancias === 1 && depoisA2.tarefas === 1, JSON.stringify(depoisA2))
 
+  console.log("\n6) NOVA VERSÃO genuína do Workflow Interno (mudança real, não retry) — NÃO cria uma segunda instância/tarefa em paralelo")
+  // Achado real em produção (mandato #3, 21/09/2026): `instanciarWorkflowDaFase`
+  // inclui `workflowVersion` na chave de idempotência da instância — uma
+  // publicação nova (versão genuinamente diferente) gerava uma SEGUNDA
+  // PhaseWorkflowInstance/Tarefa em paralelo pra quem já tinha a fase, porque a
+  // chave nova nunca batia com a existente. Corrigido restringindo a origem
+  // WORKFLOW_INTERNO a processos que AINDA não têm nenhuma instância desta
+  // fase — reproduzido e corrigido em produção nos processos 632/633/635/637.
+  const step = await prisma.phaseInternalWorkflowStep.findFirstOrThrow({ where: { workflowId: wfB.id, key: "validar_fase_sintetica" } })
+  await prisma.phaseInternalWorkflowStep.update({ where: { id: step.id }, data: { slaDays: 1 } })
+  const pub2 = await publicarWorkflow({ workflowId: wfB.id, actorId: admin.id })
+  check("nova versão publicada de verdade (versaoNova > anterior)", pub2.ok === true && (pub2.versaoNova ?? 0) > (pub2.versaoAnterior ?? 0), JSON.stringify(pub2))
+  await processarOutbox({ forcar: true })
+  const depoisB3 = await contarInstanciasETarefas(procB.id)
+  const depoisA3 = await contarInstanciasETarefas(procA.id)
+  check("procB: continua com exatamente 1 instância + 1 tarefa após nova versão (zero duplicação)", depoisB3.instancias === 1 && depoisB3.tarefas === 1, JSON.stringify(depoisB3))
+  check("procA: continua com exatamente 1 instância + 1 tarefa após nova versão (zero duplicação)", depoisA3.instancias === 1 && depoisA3.tarefas === 1, JSON.stringify(depoisA3))
+
   await limpar()
   console.log(`\n=== RESULTADO: ${ok} ok, ${falhou} falhas ===`)
   if (falhou > 0) process.exitCode = 1

@@ -365,8 +365,37 @@ export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFas
   })
   if (processos.length === 0) return { processosAlcancados: 0, outboxRegistrados: 0 }
 
+  // ORIGEM WORKFLOW_INTERNO É RESTRITA A QUEM NUNCA RECEBEU A FASE.
+  //
+  // `instanciarWorkflowDaFase` inclui `workflowVersion` na chave de idempotência
+  // da PhaseWorkflowInstance — por desenho: uma operação já registrada numa
+  // versão publicada FICA nela ("processos em andamento continuam na versão
+  // que já registraram", ver `preverPublicacao`). Isso é correto para quem
+  // ainda não tem NADA desta fase (a chave nova cria a primeira instância, sem
+  // conflito) — mas achado real (mandato "Módulo de Fases" Mandato #3,
+  // 21/09/2026, produção): reconciliar por CADA publicação de nova versão,
+  // sem este filtro, materializa uma SEGUNDA PhaseWorkflowInstance/Tarefa em
+  // paralelo pra quem JÁ tinha a fase (versão antiga), porque a chave nova
+  // (com `workflowVersion` novo) nunca bate com a existente — duplicação real,
+  // reproduzida e corrigida em produção com os processos 632/633/635/637.
+  // A origem CATALOGO_FASE nunca teve este risco (revisão de CatalogoFase é um
+  // eixo totalmente independente de `PhaseInternalWorkflow.versao`, então a
+  // chave de materialização nunca muda por causa dela) — o filtro é exclusivo
+  // do gatilho novo, sem alterar o comportamento já existente.
+  let processosAlvo = processos
+  if (origem === "WORKFLOW_INTERNO") {
+    const jaMaterializados = await prisma.phaseWorkflowInstance.findMany({
+      where: { processoId: { in: processos.map((p) => p.id) }, faseMacroKey: input.phaseKey },
+      select: { processoId: true },
+      distinct: ["processoId"],
+    })
+    const jaMaterializadosIds = new Set(jaMaterializados.map((j) => j.processoId))
+    processosAlvo = processos.filter((p) => !jaMaterializadosIds.has(p.id))
+  }
+  if (processosAlvo.length === 0) return { processosAlcancados: 0, outboxRegistrados: 0 }
+
   const chaveDe = (processoId: number) => `${TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE}::${processoId}::${input.phaseKey}::${origem}::rev${input.revisaoNova}`
-  const linhas: Prisma.DomainOutboxCreateManyInput[] = processos.map((p) => ({
+  const linhas: Prisma.DomainOutboxCreateManyInput[] = processosAlvo.map((p) => ({
     tipo: TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE,
     aggregateType: "Processo",
     aggregateId: p.id,
@@ -389,14 +418,14 @@ export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFas
   }))
 
   // JÁ REGISTRADOS ANTES desta chamada (mesma revisão, mesmo processo) — a
-  // diferença entre isto e `processos` é exatamente quem é alcançado DE
+  // diferença entre isto e `processosAlvo` é exatamente quem é alcançado DE
   // VERDADE agora, e é só para ESSES que o evento "reconciliação solicitada"
   // é auditável no histórico do processo (idempotência: reenfileirar a mesma
   // revisão não duplica o evento).
-  const chaves = processos.map((p) => chaveDe(p.id))
+  const chaves = processosAlvo.map((p) => chaveDe(p.id))
   const jaExistentes = await prisma.domainOutbox.findMany({ where: { chaveIdempotencia: { in: chaves } }, select: { aggregateId: true } })
   const jaExistentesIds = new Set(jaExistentes.map((j) => j.aggregateId))
-  const novosProcessos = processos.filter((p) => !jaExistentesIds.has(p.id))
+  const novosProcessos = processosAlvo.filter((p) => !jaExistentesIds.has(p.id))
 
   const resultado = await prisma.domainOutbox.createMany({ data: linhas, skipDuplicates: true })
 
@@ -421,7 +450,7 @@ export async function enqueueReconciliacaoCatalogoFase(input: EnqueueCatalogoFas
     }).catch(() => null)
   }
 
-  return { processosAlcancados: processos.length, outboxRegistrados: resultado.count }
+  return { processosAlcancados: processosAlvo.length, outboxRegistrados: resultado.count }
 }
 
 // ----------------------------------------------------------------------------
