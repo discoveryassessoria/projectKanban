@@ -72,7 +72,7 @@ export interface CompletudeDaPessoa {
 export interface CompletudeDoProcesso {
   processoId: number
   pais: string | null
-  modalidadeLegal: string | null
+  modalidadeLabel: string | null
   pessoas: CompletudeDaPessoa[]
   totais: { aplicaveis: number; satisfeitos: number; pendentes: number; bloqueadores: number; percentual: number }
   /** Pronto = nenhum BLOQUEADOR pendente. Motivos listados quando não. */
@@ -130,9 +130,9 @@ export async function completudeDoProcesso(
   // ── REQUISITOS CADASTRAIS APLICÁVEIS ─────────────────────────────────────
   // Escopo NULO significa "qualquer". A vigência é comparada com a referência:
   // regra que ainda não começou ou já terminou não incide. O escopo por
-  // MODALIDADE LEGAL foi removido (mandato "Reconstrução da hierarquia",
-  // 22/09/2026) — zero `RequisitoCadastral` real algum dia usou
-  // `modalidadeLegalId` (confirmado: 0 linhas no cadastro inteiro antes da
+  // escopo pela antiga base jurídica removida (mandato "Reconstrução da
+  // hierarquia", 22/09/2026) — zero `RequisitoCadastral` real algum dia usou
+  // aquele campo de escopo (confirmado: 0 linhas no cadastro inteiro antes da
   // remoção), então isto não é perda de regra nenhuma, só a eliminação de um
   // filtro que nunca teve dado real.
   const requisitos = await prisma.requisitoCadastral.findMany({
@@ -253,11 +253,9 @@ export async function completudeDoProcesso(
   return {
     processoId,
     pais: paisCanonico?.countryLabel ?? null,
-    // Migrado de EnquadramentoLegal→ModalidadeLegal.nome (removidos, mandato
-    // "Reconstrução da hierarquia", 22/09/2026) para a Modalidade real do
-    // processo (ADMINISTRATIVA/JUDICIAL) — campo sem consumidor na UI hoje,
-    // mantido pela mesma finalidade informativa.
-    modalidadeLegal: processo.modalidade?.modalityLabel ?? null,
+    // Modalidade real do processo (ADMINISTRATIVA/JUDICIAL) — campo sem
+    // consumidor na UI hoje, mantido pela mesma finalidade informativa.
+    modalidadeLabel: processo.modalidade?.modalityLabel ?? null,
     pessoas,
     totais: {
       ...t,

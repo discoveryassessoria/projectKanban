@@ -110,3 +110,60 @@ jobs:
       # o Postgres descartável deste job não prova nada e arrisca falhar por
       # motivo nenhum ligado a Fases. O build de produção real é verificado no
       # próprio deploy (`vercel --prod`), que é quem de fato o executa.
+
+  hierarquia:
+    name: Hierarquia País/Tipo/Modalidade/Workflow Macro — regressão + tipos + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Mesmo motivo do job "fases" acima: exige Postgres real (persistência,
+    # unicidade de índice, permissões via rota real) — mandato "Reconstrução
+    # da hierarquia País/Região → Tipo de Processo → Modalidade → Workflow
+    # Macro" (22/09/2026). Módulo CONGELADO: qualquer regressão aqui bloqueia
+    # merge e deploy. Ver docs/architecture/31-hierarquia-pais-tipo-modalidade-workflow-macro.md.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: discovery_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PRISMA_DATABASE_URL: postgresql://postgres@localhost:55432/discovery_test
+      DIRECT_DATABASE_URL: postgresql://postgres@localhost:55432/discovery_test
+      JWT_SECRET: ci-hierarquia-nao-usar-em-producao
+      ADMIN_SEED_PASSWORD: ci-hierarquia-senha-de-teste-123
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      # ── REGRESSÃO ESSENCIAL DA HIERARQUIA — BLOQUEIA O BUILD ────────────────
+      # Tipo=só nacionalidade, Modalidade canônica (ADM/JUD), N:N real,
+      # Workflow Macro por par, isolamento, permissões, bloqueios de exclusão,
+      # ausência de ModalidadeLegal/EnquadramentoLegal, compatibilidade com
+      # processos existentes. Regressão direta do bug real de produção
+      # (índice único de MacroWorkflow) provada no teste 4.2/4.7.
+      - name: Hierarquia — suíte de regressão (Tipo, Modalidade, Workflow Macro, permissões)
+        run: npm run test:hierarquia-pais-tipo-modalidade
+
+      - name: Verificação de tipos
+        run: npx tsc --noEmit -p .
+
+      - name: Lint
+        run: npx eslint .
