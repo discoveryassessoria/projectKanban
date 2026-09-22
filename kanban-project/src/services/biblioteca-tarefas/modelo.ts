@@ -89,7 +89,11 @@ export async function criarModelo(input: CriarModeloInput): Promise<CriarModeloR
       },
     })
     return { modeloId: modelo.id, workflowId: wf.id }
-  })
+  // MESMO PADRÃO de `publicarWorkflow` (publicacao-de-workflow.ts): o default
+  // de 5s do Prisma estoura no meio desta transação contra o banco de
+  // produção (rede), achado real 22/09/2026 — a v1 (vazia) é congelada aqui
+  // dentro, e congelar lê o workflow inteiro.
+  }, { maxWait: 20_000, timeout: 120_000 })
   return { ok: true, ...resultado }
 }
 
@@ -236,7 +240,9 @@ export async function duplicarModelo(
       for (const i of st.checkItens) await tx.stepChecklistItem.create({ data: { stepId: passoNovo.id, subtaskId: subNova.id, key: i.key, label: i.label, descricao: i.descricao, obrigatorio: i.obrigatorio, ordem: i.ordem, ativo: i.ativo } })
       for (const r of st.requisitos) await tx.stepRequirement.create({ data: { stepId: passoNovo.id, subtaskId: subNova.id, key: r.key, label: r.label, descricao: r.descricao, tipo: r.tipo, alvoKey: r.alvoKey, minimo: r.minimo, obrigatorio: r.obrigatorio, condicao: r.condicao ?? undefined, acaoKey: r.acaoKey, ordem: r.ordem, ativo: r.ativo, evidenciaTipoId: r.evidenciaTipoId, mimesPermitidos: r.mimesPermitidos ?? undefined, momento: r.momento } })
     }
-  })
+  // Mesmo motivo do transaction em `criarModelo` acima — copia potencialmente
+  // muitas linhas (subtarefas × ações/campos/checklist/requisitos).
+  }, { maxWait: 20_000, timeout: 120_000 })
 
   return criado
 }
