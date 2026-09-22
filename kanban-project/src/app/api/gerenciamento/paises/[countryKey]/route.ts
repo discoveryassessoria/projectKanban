@@ -50,14 +50,33 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     const atual = await prisma.catalogoPais.findUnique({ where: { countryKey } })
     if (!atual) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
 
-    // Bloqueia se estiver em uso
-    const [tipos, processos] = await Promise.all([
+    // Bloqueia se estiver em uso — TODAS as tabelas que referenciam o país por
+    // FK, não só Tipo/Processo. Excluir sem checar as outras deixava a
+    // exclusão cair no banco e voltar como erro genérico 500, escondendo o
+    // motivo real (achado em teste real de produção, 22/09/2026).
+    const [tipos, processos, orgaos, requisitos, servicos, condicoesPagamento, taxasPagamento] = await Promise.all([
       prisma.tipoProcessoNacionalidade.count({ where: { paisId: atual.id } }),
       prisma.processo.count({ where: ondePaisEh(countryKey) }),
+      prisma.orgaoProtocolo.count({ where: { paisId: atual.id } }),
+      prisma.requisitoCadastral.count({ where: { paisId: atual.id } }),
+      prisma.servicoProdutoPais.count({ where: { paisId: atual.id } }),
+      prisma.condicaoPagamentoPais.count({ where: { paisId: atual.id } }),
+      prisma.taxaPagamentoPais.count({ where: { paisId: atual.id } }),
     ])
-    if (tipos > 0 || processos > 0) {
+    const uso = { tipos, processos, orgaos, requisitos, servicos, condicoesPagamento, taxasPagamento }
+    const total = tipos + processos + orgaos + requisitos + servicos + condicoesPagamento + taxasPagamento
+    if (total > 0) {
+      const partes = [
+        tipos > 0 && `${tipos} tipo(s) de processo`,
+        processos > 0 && `${processos} processo(s)`,
+        orgaos > 0 && `${orgaos} órgão(s) de protocolo`,
+        requisitos > 0 && `${requisitos} requisito(s) cadastral(is)`,
+        servicos > 0 && `${servicos} serviço(s)/produto(s)`,
+        condicoesPagamento > 0 && `${condicoesPagamento} condição(ões) de pagamento`,
+        taxasPagamento > 0 && `${taxasPagamento} taxa(s) de pagamento`,
+      ].filter(Boolean)
       return NextResponse.json(
-        { error: `Este país tem ${tipos} tipo(s) de processo e ${processos} processo(s). Inative-o em vez de excluir.` },
+        { error: `Este país tem ${partes.join(', ')}. Inative-o em vez de excluir.`, uso },
         { status: 409 }
       )
     }
