@@ -79,7 +79,8 @@ test.describe('Catálogo de Fases — clique em Salvar', () => {
     const chaveExistente = await linhaExistente.locator('code').innerText()
 
     await page.getByRole('button', { name: '+ Nova fase' }).click()
-    await page.getByPlaceholder('Ex.: Emissão de Certidões').fill(`${MARCA}_dup_${Date.now()}`)
+    const nomeDigitado = `${MARCA}_dup_${Date.now()}`
+    await page.getByPlaceholder('Ex.: Emissão de Certidões').fill(nomeDigitado)
     await page.getByPlaceholder('emissao_certidoes').fill(chaveExistente)
     await page.locator('select').first().selectOption('PROCESSO')
 
@@ -89,5 +90,47 @@ test.describe('Catálogo de Fases — clique em Salvar', () => {
     // 1.6: "as validações bloqueiam, mas não mostram o erro").
     await expect(page.getByRole('heading', { name: 'Nova fase' })).toBeVisible()
     await expect(page.getByText(new RegExp(`já existe uma fase`, 'i'))).toBeVisible({ timeout: 5_000 })
+
+    // Matriz de blindagem, item 7: erro real do servidor reabilita o botão
+    // (não fica travado em "salvando…") e os campos preenchidos não somem —
+    // o admin não precisa redigitar tudo de novo.
+    const botaoSalvar = page.getByRole('button', { name: 'Salvar', exact: true })
+    await expect(botaoSalvar).toBeEnabled({ timeout: 5_000 })
+    await expect(page.getByPlaceholder('Ex.: Emissão de Certidões')).toHaveValue(nomeDigitado)
+    await expect(page.getByPlaceholder('emissao_certidoes')).toHaveValue(chaveExistente)
+  })
+
+  test('matriz de blindagem item 8: duplo clique real em Salvar NÃO dispara duas requisições nem cria duas fases', async ({ page }) => {
+    await page.goto('/administrator?screen=fases', { waitUntil: 'networkidle' })
+    await page.getByRole('button', { name: '+ Nova fase' }).click()
+    const nomeUnico = `${MARCA}_duplo_clique_${Date.now()}`
+    await page.getByPlaceholder('Ex.: Emissão de Certidões').fill(nomeUnico)
+    await page.locator('select').first().selectOption('PROCESSO')
+
+    const respostasPost: number[] = []
+    page.on('response', (r) => {
+      if (r.request().method() === 'POST' && r.url().includes('/api/gerenciamento/catalogo-fases')) respostasPost.push(r.status())
+    })
+
+    const botaoSalvar = page.getByRole('button', { name: 'Salvar', exact: true })
+    await botaoSalvar.scrollIntoViewIfNeeded()
+    const caixa = await botaoSalvar.boundingBox()
+    if (!caixa) throw new Error('botão Salvar sem bounding box')
+    // DOIS cliques de mouse no MESMO ponto, sem esperar a re-checagem de
+    // "actionability" do Playwright entre eles — é o que um duplo clique real
+    // de usuário é: dois eventos de clique do sistema operacional, não duas
+    // chamadas de locator concorrentes. O segundo clique deve encontrar o
+    // botão já `disabled` (React processou o primeiro de forma síncrona),
+    // então só UMA requisição sai.
+    const x = caixa.x + caixa.width / 2, y = caixa.y + caixa.height / 2
+    await page.mouse.click(x, y)
+    await page.mouse.click(x, y)
+
+    await expect(page.getByRole('heading', { name: 'Nova fase' })).not.toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Fase salva.')).toBeVisible({ timeout: 5_000 })
+    expect(respostasPost.length, `esperava exatamente 1 POST, recebeu ${respostasPost.length}: ${JSON.stringify(respostasPost)}`).toBe(1)
+
+    const linhasComEsseNome = await page.locator('tr', { hasText: nomeUnico }).count()
+    expect(linhasComEsseNome, 'duplo clique não pode criar duas linhas na tabela').toBe(1)
   })
 })

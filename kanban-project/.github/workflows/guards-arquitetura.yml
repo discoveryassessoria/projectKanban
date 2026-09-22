@@ -47,3 +47,66 @@ jobs:
 
       - name: Guard — uma obrigação, um nome, uma linha
         run: npm run test:obrigacao-unica
+
+  fases:
+    name: Catálogo de Fases — regressão + tipos + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # ── POR QUE ESTE JOB É SEPARADO DO "guards" ACIMA ──────────────────────
+    # O job "guards" é estático de propósito (sem banco, termina em segundos).
+    # O Catálogo de Fases (mandato "Módulo de Fases", 20-22/09/2026) exige
+    # prova de persistência, publicação, versionamento e reconciliação REAIS
+    # — nunca mock — então precisa de um Postgres de verdade. Isolar num job
+    # próprio mantém o "guards" rápido e este explícito sobre o que exige.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: discovery_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      PRISMA_DATABASE_URL: postgresql://postgres@localhost:55432/discovery_test
+      DIRECT_DATABASE_URL: postgresql://postgres@localhost:55432/discovery_test
+      # Segredos de CI, isolados de produção por construção (banco é o
+      # container acima, nunca alcança pooled.db.prisma.io).
+      JWT_SECRET: ci-catalogo-fases-nao-usar-em-producao
+      ADMIN_SEED_PASSWORD: ci-catalogo-fases-senha-de-teste-123
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      # ── REGRESSÃO ESSENCIAL DO CATÁLOGO DE FASES — BLOQUEIA O BUILD ────────
+      # 16 arquivos, banco de teste real, publicação/versionamento/reconciliação
+      # sem mock nenhum. Qualquer regressão aqui impede merge e deploy.
+      - name: Catálogo de Fases — suíte de regressão (persistência, publicação, reconciliação)
+        run: npm run test:fases
+
+      - name: Verificação de tipos
+        run: npx tsc --noEmit -p .
+
+      - name: Lint
+        run: npx eslint .
+      # `npm run build` NÃO entra aqui: é o script de DEPLOY de produção (guarda
+      # env de produção, guarda migration pendente, roda outras suítes inteiras
+      # não relacionadas a Fases, e só then chama `next build`). Rodá-lo contra
+      # o Postgres descartável deste job não prova nada e arrisca falhar por
+      # motivo nenhum ligado a Fases. O build de produção real é verificado no
+      # próprio deploy (`vercel --prod`), que é quem de fato o executa.

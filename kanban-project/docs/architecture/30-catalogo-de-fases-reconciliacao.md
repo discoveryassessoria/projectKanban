@@ -101,3 +101,55 @@ Extraído `src/lib/motor/catalogo-fase-revisao.ts` (`publicarRevisaoCatalogoFase
 ## 12. O que NÃO foi feito
 
 Nenhuma migration foi aplicada em produção. Nenhum backfill foi aplicado em produção. Nenhuma configuração foi publicada em produção. Tudo foi implementado e testado contra `discovery_test` (banco local).
+
+## 13. Publicação do Workflow Interno também reconcilia (21-22/09/2026)
+
+Gap real encontrado em produção: uma fase já composta no Workflow Macro **antes** de seu Workflow Interno existir publicado nunca era reconciliada depois — `materializarExecucaoDaFase` devolve `SEM_WORKFLOW_PUBLICADO` sem lançar exceção, e o outbox-dispatcher marca `ENVIADO` (permanentemente concluído, sem retry) qualquer despacho que não lança. A ordem "fase entra no Macro antes do Workflow Interno publicado" nunca se recuperava sozinha.
+
+Fix: `enqueueReconciliacaoCatalogoFase` (mesma função de sempre — nenhum motor novo) ganhou um campo `origem?: "CATALOGO_FASE" | "WORKFLOW_INTERNO"`, usado só para *namespacear a chave de idempotência* (`...::{origem}::rev{n}`), nunca para mudar a mecânica: mesma query de alcance, mesmo materializador único, mesmo outbox. `publicarWorkflow()` (`src/services/publicacao-de-workflow.ts`) passa a chamá-la, fire-and-forget, depois de a publicação já ter comitado — uma falha na reconciliação nunca reverte uma publicação bem-sucedida.
+
+**Bug descoberto e corrigido durante a própria prova em produção**: publicar uma versão *genuinamente nova* do Workflow Interno (não um retry da mesma versão) criava uma SEGUNDA `PhaseWorkflowInstance`/Tarefa em paralelo para processos que já tinham a obrigação — porque `instanciarWorkflowDaFase` inclui `workflowVersion` na chave de idempotência da instância (por desenho: uma operação já registrada numa versão fica nela). Fix: a origem `WORKFLOW_INTERNO` só alcança processos que **ainda não têm nenhuma** `PhaseWorkflowInstance` desta fase — fecha exatamente o gap (nunca materializada), sem reabrir quem já foi corretamente reconciliado. A origem `CATALOGO_FASE` nunca teve esse risco (a revisão do Catálogo é um eixo de versionamento totalmente independente de `PhaseInternalWorkflow.versao`).
+
+Prova real em produção (fase `auditoria_final_fase_sintetica`, processos 632/633/635/637): publicação de nova versão do Workflow Interno reconcilia corretamente; segunda execução da reconciliação não duplica; 634/636 (finalizados) permanecem intocados. Testes: `scripts/retroacao-publicacao-workflow-interno-apos-macro.test.ts` (14 verificações, cobre a ordem "fase no Macro antes" E "nova versão depois").
+
+## 14. Confirmação de mudança de escopo + resiliência a falha de reconciliação (22/09/2026)
+
+Duas causas raiz distintas, as duas provadas com evidência real (resposta de API/estado de banco), nenhuma corrigida por suposição:
+
+**Cliente nunca tratava o 409 `ESCOPO_EM_USO`.** O servidor já recusava (desde §4 acima) mudar o escopo de uma fase em uso sem `confirmarMudancaEscopo: true` — mas `CatalogoFasesTab.tsx` não fazia nada com essa resposta: nem confirmação, nem erro, nem reenvio. Fix: o cliente mostra o impacto real (`j.error`, que já nomeia quantos fluxos usam a fase) num `confirm()`, e só reenvia com `confirmarMudancaEscopo: true` se o admin aceitar; cancelar mostra mensagem clara e não persiste nada.
+
+**Reconciliação transitória falhando engolia uma escrita já bem-sucedida.** A rota `PUT /api/gerenciamento/catalogo-fases/[id]` salva a revisão nova numa transação que **comita de verdade**, e só depois chama `enqueueReconciliacaoCatalogoFase` — sem proteção própria. Uma falha transitória ali (rede/timeout contra `pooled.db.prisma.io`) propagava pro catch genérico da rota (500, sem log de auditoria, sem outbox) mesmo com o campo já persistido — o admin via "nada aconteceu" para uma mudança que, na verdade, tinha ocorrido. Evidência real: `CatalogoFaseRevisao` #8 de uma fase existiu no banco sem nenhum `LogAuditoria`/`DomainOutbox` correspondente. Fix: a chamada de reconciliação isolada em seu próprio `try/catch` — uma falha ali nunca mais reverte a resposta; a rota responde 200 (a fase FOI salva) com `reconciliacaoErro` explícito na resposta e no `LogAuditoria`, e reenviar o mesmo Salvar resolve (idempotente).
+
+Testes: `scripts/escopo-fase-reconciliacao-resiliente.test.ts` (8 verificações — `reconciliacaoErro` sempre um campo explícito, nunca omitido), `scripts/catalogo-fases-rollback-transacional.test.ts` (24 verificações — rollback transacional forçado com violação real de constraint única + invariante de sincronia através de N publicações reais consecutivas), `tests/ui/mudar-escopo-fase-em-uso.smoke.ts` (clique real de mouse, diálogo de confirmação real).
+
+## 15. Permissões
+
+Toda escrita no Catálogo de Fases (`POST`/`PUT`/`DELETE /api/gerenciamento/catalogo-fases*`) exige a permissão `usuarios.gerenciar`, checada **na API**, nunca só escondendo botão na UI — um perfil operacional recebe `403` real (nunca `200` disfarçado de vazio, nunca a mutação silenciosamente ignorada). A confirmação de mudança de escopo (`confirmarMudancaEscopo: true`) **não contorna** a checagem de permissão: um perfil sem `usuarios.gerenciar` recebe `403` tanto na tentativa inicial quanto na "confirmada". A tela (`/administrator?screen=fases`) redireciona quem não é admin para `/dashboard` antes mesmo de renderizar (`administrator/page.tsx`), mas essa é só a primeira camada — a de verdade é a API. Testes: `scripts/permissoes-modulo-fases.test.ts` (11 verificações, seções 4.1–4.6, inclui o caso específico de escopo).
+
+## 16. Projeções — consistência de rótulo
+
+Para fases **novas** (criadas só pelo Catálogo de Fases, sem chave na lista legada de `fases-catalog.ts`) — o caso real que este módulo cobre — o mesmo `CatalogoFase.label` aparece, ao vivo (nunca uma cópia presa), em: Lista de processos (`/api/processos`, campo `faseAtualLabel`), painel do processo (`/api/processos/[id]/phases`), e no núcleo de projeção operacional que alimenta Central Operacional/Home/Kanban (`buildOperationalProjection`/`resolveOperationalProjectionBatch`). Renomear a fase no Catálogo propaga imediatamente às três, sem publicação adicional. Uma fase nunca cadastrada mostra `⚠ Fase não cadastrada (chave)` — nunca a chave crua sozinha — de forma consistente nessas mesmas projeções. Testado em `scripts/catalogo-fases-consistencia-projecoes.test.ts` (10 verificações, inclui renomeação ao vivo e o caso de chave desconhecida).
+
+**Caveat documentado, fora do escopo desta entrega**: as ~10 fases da lista **legada** de `fases-catalog.ts` (`genealogia`, `emissao_documental`, etc. — as que existiam antes do Catálogo de Fases) seguem uma precedência **diferente e intencional**: código primeiro, cadastro depois (comentário "RÓTULO CANÔNICO" em `operational-projection.ts`, já corrigido por este mandato especificamente para fases FORA dessa lista — ver §16 acima). Renomear uma dessas 10 fases pelo Catálogo de Fases não muda o rótulo nas projeções operacionais — não é regressão desta entrega, é comportamento pré-existente, documentado, e fora do escopo "Gerenciamento → Processos → Estrutura → Fases". Migrar essas 10 chaves para a mesma precedência cadastro-primeiro é trabalho futuro explícito, não incluído aqui.
+
+## 17. Limites entre Catálogo de Fases, Workflow Macro e Workflow Interno
+
+Três cadastros, três responsabilidades, nunca sobrepostas:
+
+- **Catálogo de Fases** (`CatalogoFase`, este documento) — a fase **existe**: chave, rótulo, escopo operacional, efeitos permitidos, estado (rascunho/publicada/inativa). Não sabe nada sobre ORDEM (isso é por composição) nem sobre QUAIS PASSOS ela executa (isso é do Workflow Interno).
+- **Workflow Macro** (`MacroWorkflow`/`FaseMacro`) — a SEQUÊNCIA: quais fases, em que ordem, obrigatórias ou condicionais, para qual `TipoProcessoNacionalidade`. Referencia fases do Catálogo por `phaseKey`; nunca cadastra fase nova por conta própria (§ "REGRA: fases são cadastradas AQUI e em nenhum outro módulo", `managementNavigation.tsx`).
+- **Workflow Interno** (`PhaseInternalWorkflow`/`PhaseInternalWorkflowStep`) — o TRABALHO: quais passos uma fase materializa quando alcançada, published/versionado independentemente do Catálogo e do Macro. Publicar uma nova versão do Workflow Interno agora também reconcilia (§13) — mas só disparar retroação, nunca redefinir a fase nem sua posição.
+
+Mudar um não reescreve o outro: editar o rótulo de uma fase no Catálogo não move sua posição no Macro; reordenar o Macro não muda quais passos o Workflow Interno executa; publicar uma nova versão do Workflow Interno não cria nem remove fase nenhuma do Catálogo ou da composição.
+
+## 18. Blindagem — suíte de regressão consolidada, CI e congelamento (22/09/2026)
+
+**Suíte**: `npm run test:fases` — 22 arquivos, 555 verificações (contadas a partir de um banco de teste genuinamente vazio, sem fixture residual), banco Postgres real, publicação/versionamento/reconciliação reais, **nenhum mock** nos testes essenciais de persistência. Autocontida: `db:push:teste` + `scripts/seed-fixture-minima-teste.ts` (país/modalidade/admin/`MotorConfig.runtimeV2Habilitado`) antes da bateria — roda igual local ou em CI, sem depender de estado deixado por execução anterior.
+
+**CI**: `.github/workflows/guards-arquitetura.yml`, job `fases` — roda em todo push/PR, com um container Postgres real (`services: postgres:16`), gera o Prisma Client, roda `test:fases` + `tsc --noEmit` + `eslint .`. Qualquer regressão bloqueia o job — não é opcional, não é best-effort.
+
+**Fora da suíte, deliberadamente**: arquivos que testam módulos ADJACENTES (motor operacional genérico de Tarefa, catálogo legado `FASES` em código, mensagens de "fase vazia" da Central Operacional) foram excluídos por serem literalmente outro módulo — `motor-operacional-fases.test.ts`, `materializacao-fase-unica.test.ts`, `motor-fases-passos.test.ts`, `fase-vazia-explica.test.ts`, `fases-catalog.test.ts` (renomeado `test:fases-catalog-legado` para não ficar escondido atrás do nome antigo). Nenhum é corrigido nem alterado por esta entrega — ficam fora do escopo "Gerenciamento → Processos → Estrutura → Fases" por desenho, não por omissão.
+
+**Sem bypass, sem lista hardcoded, sem exceção pela chave sintética**: nenhuma rota, nenhum reconciliador, nenhum teste desta suíte tem `if (phaseKey === 'TESTEVIS_fase')` nem equivalente. Toda fixture sintética usa uma MARCA própria por arquivo, criada e apagada pelo próprio teste — o comportamento provado é o comportamento real para qualquer fase, presente ou futura.
+
+> **O módulo de Fases está fechado. Nenhuma entrega posterior pode modificar sua arquitetura, contratos, cardinalidade, reconciliação ou projeções sem uma solicitação explícita de mudança e execução integral da suíte de regressão do módulo.**
