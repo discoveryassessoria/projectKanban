@@ -27,7 +27,7 @@ function calcularPascoa(ano: number): Date {
 /**
  * Retorna lista de feriados nacionais brasileiros para um ano
  */
-function getFeriadosNacionais(ano: number): Date[] {
+export function getFeriadosNacionais(ano: number): Date[] {
   const feriados: Date[] = []
   
   // Feriados fixos
@@ -74,7 +74,7 @@ function getFeriadosNacionais(ano: number): Date[] {
 /**
  * Verifica se uma data é feriado nacional
  */
-function isFeriado(data: Date): boolean {
+export function isFeriado(data: Date): boolean {
   const ano = data.getFullYear()
   const feriados = getFeriadosNacionais(ano)
   
@@ -88,7 +88,7 @@ function isFeriado(data: Date): boolean {
 /**
  * Verifica se é fim de semana (sábado ou domingo)
  */
-function isFimDeSemana(data: Date): boolean {
+export function isFimDeSemana(data: Date): boolean {
   const diaSemana = data.getDay()
   return diaSemana === 0 || diaSemana === 6 // 0 = Domingo, 6 = Sábado
 }

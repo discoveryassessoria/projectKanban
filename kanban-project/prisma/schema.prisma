@@ -731,6 +731,27 @@ model Tarefa {
   solicitacaoDocumento_tarefa SolicitacaoDocumento[] @relation("SolicitacaoDocumento_tarefaId")
   workflowEvento_tarefa       WorkflowEvento[]       @relation("WorkflowEvento_tarefaId")
 
+  // ── MÓDULO DE PRAZOS, SLA E ACOMPANHAMENTO (mandato 22/09/2026) ───────────
+  // Camada aditiva/opcional: só populada para tarefas explicitamente
+  // vinculadas a uma Política de Prazo/SLA publicada. `dataPrazo` (já
+  // existente, acima) continua sendo o prazoDaTarefa único — este módulo só
+  // pode escrevê-lo quando a tarefa tem política vinculada, nunca inventa um
+  // segundo campo de prazo.
+  politicaPrazoSlaId       Int?
+  politicaPrazoSla         PoliticaPrazoSla?        @relation("TarefaPoliticaPrazoSla", fields: [politicaPrazoSlaId], references: [id], onDelete: SetNull)
+  politicaPrazoSlaVersaoId Int?
+  politicaPrazoSlaVersao   PoliticaPrazoSlaVersao?  @relation("TarefaPoliticaPrazoSlaVersao", fields: [politicaPrazoSlaVersaoId], references: [id], onDelete: SetNull)
+  /// Instante/evento que serviu de base pro cálculo do prazo — explicabilidade
+  /// exigida pelo mandato ("por que este prazo foi calculado assim").
+  prazoBaseCalculoEm       DateTime?
+  proximoAcompanhamentoEm  DateTime?
+  aguardandoDesde          DateTime?
+  /// INTERNA | TERCEIRO — nunca inferido, sempre registrado explicitamente.
+  origemDaEspera           String?                  @db.VarChar(20)
+  terceiroResponsavelId    Int?
+  terceiroResponsavel      OrgaoProtocolo?          @relation("TarefaTerceiroResponsavelPrazoSla", fields: [terceiroResponsavelId], references: [id], onDelete: SetNull)
+  eventosPrazoSla          EventoPrazoSla[]
+
   @@index([tipo])
   @@index([pessoaId])
   @@index([processoId])
@@ -742,6 +763,10 @@ model Tarefa {
   @@index([workflowStepInstanceId])
   @@index([workflowInstanceId])
   @@index([necessidadeId])
+  @@index([politicaPrazoSlaId])
+  @@index([politicaPrazoSlaVersaoId])
+  @@index([terceiroResponsavelId])
+  @@index([proximoAcompanhamentoEm])
 }
 
 model TarefaHistorico {
@@ -4411,6 +4436,8 @@ model OrgaoProtocolo {
   solicitacaoDocumentos SolicitacaoDocumento[]
   /// Regra temporal ESPECÍFICA deste órgão, por passo — ver RegraTemporalOrgao.
   regrasTemporais       RegraTemporalOrgao[]
+  /// Tarefas que aguardam ESTE terceiro (Módulo de Prazos/SLA, 22/09/2026).
+  tarefasComoTerceiroPrazoSla Tarefa[] @relation("TarefaTerceiroResponsavelPrazoSla")
   /// Por onde ESTA organização atende. Ver `OrganizacaoCanal`.
   canais                OrganizacaoCanal[]
   execucoesDeSubtarefa  SubtaskExecution[]
@@ -4480,6 +4507,185 @@ model RegraTemporalOrgao {
 
   @@index([stepKey])
   @@index([orgaoProtocoloId])
+}
+
+// ============================================================================
+// MÓDULO DE PRAZOS, SLA E POLÍTICAS DE ACOMPANHAMENTO (mandato 22/09/2026)
+// ============================================================================
+// FUNDAÇÃO UNIVERSAL, independente do Workflow Interno/Catálogo de Fases. Não
+// substitui os "dois relógios" já existentes em StepSubtaskDefinition/
+// SubtaskExecution (SLA de ação interna + regra temporal + acompanhamento por
+// passo/subtarefa, mandato "correção definitiva do modelo temporal",
+// 19-20/09/2026) — aquele motor continua intocado, governando a execução
+// materializada de um Workflow Interno publicado. Este módulo é uma camada
+// PARALELA, aplicável diretamente à Tarefa como unidade canônica, pensada
+// para ser consumida por Emissão Documental/Genealogia na PRÓXIMA entrega —
+// nesta entrega, prova-se de ponta a ponta só com tarefas sintéticas
+// ([TESTE PRAZO]), sem tocar nenhuma tarefa real.
+//
+// "Existe somente UM prazo por tarefa/operação": `Tarefa.dataPrazo` (já
+// existente) É o `prazoDaTarefa` do mandato — não duplicado em campo novo.
+// Este módulo pode escrever nele quando uma Tarefa está vinculada a uma
+// política publicada; fora disso, o campo continua exatamente como hoje.
+
+enum StatusPoliticaPrazoSla {
+  RASCUNHO
+  PUBLICADA
+  INATIVA
+}
+
+enum UnidadePrazoSla {
+  DIAS_CORRIDOS
+  DIAS_UTEIS
+}
+
+/// Estratégia de retroação escolhida NA PUBLICAÇÃO — nunca inferida em
+/// silêncio (mandato: "não escolha uma estratégia silenciosamente").
+enum EstrategiaRetroacaoPrazoSla {
+  SOMENTE_NOVAS
+  RECALCULAR_DA_ORIGEM
+  APLICAR_DA_PUBLICACAO
+  MANTER_PRAZO_ATUALIZAR_ACOMPANHAMENTO
+}
+
+/// Cadastro raiz — a IDENTIDADE estável da política. Os parâmetros de cálculo
+/// vivem só na versão publicada (`PoliticaPrazoSlaVersao`); a política em si
+/// nunca é o que o motor lê para calcular.
+model PoliticaPrazoSla {
+  id           Int                     @id @default(autoincrement())
+  /// Chave canônica IMUTÁVEL, gerada do nome na criação (mesmo padrão de
+  /// `CatalogoFase.phaseKey`/`RequisitoCadastral.code`).
+  chave        String                  @unique @db.VarChar(80)
+  nome         String                  @db.VarChar(160)
+  descricao    String?                 @db.Text
+  status       StatusPoliticaPrazoSla  @default(RASCUNHO)
+  versaoAtual  Int                     @default(0)
+  ativo        Boolean                 @default(true)
+  criadoEm     DateTime                @default(now())
+  atualizadoEm DateTime                @updatedAt
+  criadoPorId  Int?
+
+  versoes PoliticaPrazoSlaVersao[]
+  tarefas Tarefa[]                 @relation("TarefaPoliticaPrazoSla")
+
+  @@index([status])
+  @@index([ativo])
+}
+
+/// REVISÃO CONGELADA — mesmo padrão de `CatalogoFaseRevisao`/
+/// `MacroWorkflowVersao`: cada publicação congela aqui o ANTES de aplicar.
+/// É o que o motor de cálculo lê — nunca a política "viva" diretamente — para
+/// que o prazo calculado de uma tarefa continue explicável mesmo depois da
+/// política evoluir.
+model PoliticaPrazoSlaVersao {
+  id         Int              @id @default(autoincrement())
+  politicaId Int
+  politica   PoliticaPrazoSla @relation(fields: [politicaId], references: [id], onDelete: Cascade)
+  versao     Int
+
+  // ── PRAZO GERAL DA TAREFA ────────────────────────────────────────────────
+  prazoQuantidade         Int
+  prazoUnidade             UnidadePrazoSla
+  /// Chave nomeada do evento que dispara a contagem (ex.: "tarefa_criada",
+  /// "entrada_na_fase") — resolvida pelo chamador, nunca hardcoded no motor.
+  prazoEventoInicialChave  String          @db.VarChar(60)
+  /// `null` = calendário nacional padrão (`src/lib/diasUteis.ts`).
+  calendarioChave          String?         @db.VarChar(60)
+  /// PULA (não conta o dia) | CONTA (conta normalmente).
+  tratamentoFimDeSemana    String          @db.VarChar(20)
+  tratamentoFeriado        String          @db.VarChar(20)
+  /// "HH:MM" — horário-limite do último dia do prazo, quando aplicável.
+  horarioLimite            String?         @db.VarChar(5)
+  /// PROXIMO_DIA_UTIL | DIA_UTIL_ANTERIOR — quando o prazo calculado cai num
+  /// dia não útil.
+  politicaDataNaoUtil      String          @db.VarChar(20)
+
+  // ── INDICADORES DE RISCO ─────────────────────────────────────────────────
+  riscoAntecedenciaDias         Int
+  escalonamentoAtivo            Boolean @default(false)
+  escalonamentoPapel            String? @db.VarChar(60)
+  escalonamentoDestinatarioId   Int?
+  lembreteAtrasoRecorrenciaDias Int?
+
+  // ── ACOMPANHAMENTO (NUNCA é prazo/SLA — só quando a tarefa volta à atenção) ─
+  acompanhamentoPrimeiroDias       Int
+  acompanhamentoPadraoDias         Int
+  acompanhamentoUnidade            UnidadePrazoSla
+  acompanhamentoPermiteManual      Boolean @default(true)
+  acompanhamentoExigeMotivo        Boolean @default(true)
+  acompanhamentoLimiteSemResposta  Int?
+  acompanhamentoEscalonamentoPapel String? @db.VarChar(60)
+
+  // ── ESPERA DE TERCEIRO (comportamento padrão desta política) ────────────
+  esperaTerceiroPadraoAtivo Boolean @default(false)
+
+  /// Escolhida explicitamente NA PUBLICAÇÃO — nunca um default silencioso.
+  estrategiaRetroacao EstrategiaRetroacaoPrazoSla
+  motivoAlteracao     String?                      @db.Text
+
+  publicadoEm    DateTime @default(now())
+  publicadoPorId Int?
+  criadoEm       DateTime @default(now())
+
+  tarefas Tarefa[] @relation("TarefaPoliticaPrazoSlaVersao")
+
+  @@unique([politicaId, versao])
+  @@index([politicaId])
+}
+
+/// Calendário nomeado (nacional/regional/por país de destino do processo).
+/// `null`/ausência = calendário nacional padrão embutido em `diasUteis.ts`.
+model CalendarioOficial {
+  id           Int                 @id @default(autoincrement())
+  chave        String              @unique @db.VarChar(60)
+  nome         String              @db.VarChar(120)
+  descricao    String?             @db.Text
+  ativo        Boolean             @default(true)
+  criadoEm     DateTime            @default(now())
+  atualizadoEm DateTime            @updatedAt
+  feriados     FeriadoCalendario[]
+
+  @@index([ativo])
+}
+
+model FeriadoCalendario {
+  id              Int               @id @default(autoincrement())
+  calendarioId    Int
+  calendario      CalendarioOficial @relation(fields: [calendarioId], references: [id], onDelete: Cascade)
+  data            DateTime          @db.Date
+  nome            String            @db.VarChar(120)
+  /// Repete todo ano na mesma data (ex.: Natal) — não precisa recadastrar.
+  recorrenteAnual Boolean           @default(false)
+  ativo           Boolean           @default(true)
+  criadoEm        DateTime          @default(now())
+
+  @@unique([calendarioId, data])
+  @@index([calendarioId])
+}
+
+/// LEDGER append-only dos eventos do motor de Prazo/SLA/Acompanhamento —
+/// domínio próprio, não sobrecarrega `WorkflowEvento` (que é escopado a
+/// transições de PASSO). Idempotente por `chaveIdempotencia`.
+model EventoPrazoSla {
+  id                Int      @id @default(autoincrement())
+  /// Vocabulário fechado — ver seção 11 do mandato (POLITICA_CRIADA,
+  /// VERSAO_PUBLICADA, PRAZO_CALCULADO, ACOMPANHAMENTO_REPROGRAMADO, etc.).
+  tipo              String   @db.VarChar(60)
+  tarefaId          Int?
+  tarefa            Tarefa?  @relation(fields: [tarefaId], references: [id], onDelete: SetNull)
+  processoId        Int?
+  politicaId        Int?
+  politicaVersaoId  Int?
+  usuarioId         Int?
+  valorAnterior     Json?
+  valorNovo         Json?
+  motivo            String?  @db.Text
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+
+  @@index([tarefaId])
+  @@index([tipo])
+  @@index([processoId])
 }
 
 /// Funções que uma organização exerce. Uma organização = UM registro, N funções.

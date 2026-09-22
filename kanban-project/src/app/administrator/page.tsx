@@ -130,6 +130,7 @@ const CatalogoFaseRevisoesTab = dynamic(() => import("@/src/components/gerenciam
 const ModalidadesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModalidadesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PaisesRegioesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PaisesRegioesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const IntegracoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/IntegracoesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const PrazosSlaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PrazosSlaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 // CONSULTAS CONSOLIDADAS da configuração por tipo de processo — todas sobre o MESMO
 // read-model (/api/gerenciamento/configuracao-processo). Só leitura: a edição segue
 // nas telas donas (Fluxos, Tipos de Processo, Automações...).
@@ -222,6 +223,9 @@ const TELAS: Record<string, React.ComponentType> = {
   autoevt: function AutomacoesEventos() { return <PhaseAutomationsFasesTab kindInicial="event" /> },
   // SLA consolidado (real, sobre a configuração de cada processo).
   sla: SLAConfiguracaoTab,
+  // Prazos e SLA: cadastro PRÓPRIO de políticas de prazo/acompanhamento —
+  // não confundir com `sla` acima, que continua intocada.
+  "prazo-sla": PrazosSlaTab,
   proccfg: ConfiguracoesGeraisProcessoTab,
   transicoes: TransicoesTab,
   integracoes: IntegracoesTab,

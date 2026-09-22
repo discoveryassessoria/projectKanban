@@ -519,6 +519,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // — o segundo Workflow Macro (a outra modalidade do mesmo Tipo) não
   // conseguia nascer.
   '20260922120000_macro_workflow_unique_tipo_modalidade',
+  // Mandato "Módulo de Prazos, SLA e Políticas de Acompanhamento" (22/09/2026):
+  // fundação aditiva independente — PoliticaPrazoSla/PoliticaPrazoSlaVersao/
+  // CalendarioOficial/FeriadoCalendario/EventoPrazoSla + colunas novas em
+  // Tarefa. Não altera StepSubtaskDefinition/SubtaskExecution.
+  '20260922130000_modulo_prazo_sla_acompanhamento',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

@@ -174,6 +174,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       // CONFIGURAÇÕES
       a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
+      // Cadastro PRÓPRIO das políticas de prazo/SLA/acompanhamento — distinto de
+      // "SLA" acima, que é só leitura da configuração vigente de cada processo.
+      a(75, "prazo-sla", "Prazos e SLA", ["prazo", "sla", "politica", "política", "acompanhamento", "feriado", "calendario", "calendário", "vencimento", "risco"], "Configurações"),
       a(80, "cfgversions", "Versões", ["versao", "versão", "config", "publicacao", "publicação"], "Configurações"),
       a(90, "proccfg", "Configurações Gerais", ["configuracao", "configuração", "padrao", "padrão", "identidade", "situacao"], "Configurações"),
 
