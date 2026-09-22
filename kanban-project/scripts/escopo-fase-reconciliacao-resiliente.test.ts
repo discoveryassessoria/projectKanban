@@ -51,6 +51,7 @@ async function limpar() {
     await prisma.catalogoFaseRevisao.deleteMany({ where: { catalogoFaseId: fase.id } })
     await prisma.catalogoFase.delete({ where: { id: fase.id } })
   }
+  await prisma.usuario.deleteMany({ where: { email: `admin@${MARCA.toLowerCase()}.test` } })
 }
 
 async function main() {
