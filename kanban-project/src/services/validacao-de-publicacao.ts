@@ -24,7 +24,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
-import { efeito, efeitoExiste, efeitosDaFase } from "@/src/lib/motor/catalogo-de-efeitos"
+import { efeito, efeitoExiste, efeitosDaFase, CATALOGO_DE_EFEITOS } from "@/src/lib/motor/catalogo-de-efeitos"
 import { fonteDoCampo, alvoDeReferencia, alvoDoCampo } from "@/src/lib/motor/fontes-de-campo"
 import { executorSuportaCampo, executorSuportaEfeito, capacidades, TIPOS_DE_CAMPO } from "@/src/lib/motor/registro-de-executores"
 import { resolveWorkflowStepEditor } from "@/src/lib/process-stage/step-editor-registry"
@@ -561,7 +561,27 @@ function paraValidarRequisito(r: {
 }
 
 /** Resolve competência e valida o workflow como ele está no banco. */
-export async function validarWorkflowParaPublicar(workflowId: number, db: DB = prisma): Promise<ProblemaDePublicacao[]> {
+export async function validarWorkflowParaPublicar(
+  workflowId: number,
+  db: DB = prisma,
+  opts?: {
+    /**
+     * MODELO DA BIBLIOTECA DE TAREFAS (mandato 22/09/2026) — a "casca"
+     * (`origemBiblioteca=true`) nasce com `phaseKey="biblioteca"`, que nunca
+     * tem `CatalogoFase` correspondente (deliberado: fica fora do catálogo
+     * oficial). Sem este desvio, `efeitosDaFase` sempre devolveria `[]` (ver
+     * o comentário na própria função — "ausência de efeito declarado
+     * significa NÃO autorizado") e TODO Modelo seria impublicável, mesmo com
+     * ações corretas. A competência real só existe quando o Modelo está
+     * vinculado a uma fase de verdade — por isso o cheque é ADIADO para
+     * `publicarVinculo` (biblioteca-tarefas/vinculo.ts), que valida contra o
+     * `phaseKey` REAL do Vínculo antes de publicá-lo. Aqui, com esta flag,
+     * tudo o mais (dependência, ciclo, campo, subtarefa sem ação, executor)
+     * continua validado normalmente — só a competência-por-fase é pulada.
+     */
+    pularCompetenciaDeEfeito?: boolean
+  },
+): Promise<ProblemaDePublicacao[]> {
   const wf = await db.phaseInternalWorkflow.findUnique({
     where: { id: workflowId },
     include: {
@@ -592,7 +612,9 @@ export async function validarWorkflowParaPublicar(workflowId: number, db: DB = p
   if (!wf) return [{ codigo: "WORKFLOW_INEXISTENTE", stepKey: null, mensagem: "Workflow não encontrado." }]
 
   const fase = await db.catalogoFase.findUnique({ where: { phaseKey: wf.phaseKey }, select: { efeitosPermitidos: true } })
-  const permitidos = efeitosDaFase(wf.phaseKey, fase?.efeitosPermitidos ?? null)
+  const permitidos = opts?.pularCompetenciaDeEfeito
+    ? CATALOGO_DE_EFEITOS.map((e) => e.key)
+    : efeitosDaFase(wf.phaseKey, fase?.efeitosPermitidos ?? null)
 
   return validarConfiguracao(
     wf.passos.map((p) => ({

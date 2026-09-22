@@ -174,7 +174,10 @@ function compararPorChave<T extends { key: string }>(
  * histórico: as versões publicadas continuam com o que tinham, e a linha do diff diz
  * exatamente isso — "deixa de existir nas versões novas".
  */
-export async function preverPublicacao(workflowId: number): Promise<PreviewDePublicacao | null> {
+export async function preverPublicacao(
+  workflowId: number,
+  opts?: { pularCompetenciaDeEfeito?: boolean },
+): Promise<PreviewDePublicacao | null> {
   const wf = await prisma.phaseInternalWorkflow.findUnique({
     where: { id: workflowId },
     select: { id: true, name: true, versao: true, rascunhoAlteradoEm: true },
@@ -290,7 +293,7 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
     }
   }
 
-  const problemas = await validarWorkflowParaPublicar(workflowId)
+  const problemas = await validarWorkflowParaPublicar(workflowId, prisma, opts)
 
   // CONTAGEM REAL, não estimativa: quantas instâncias não-terminais ainda
   // registram a versão ATUAL (a que vai ficar "para trás" quando a nova for
@@ -349,8 +352,10 @@ export async function publicarWorkflow(args: {
   actorId: number | null
   /** A versão que a tela tinha em mãos. Ausente = sem trava (chamadas internas). */
   versaoEsperada?: number
+  /** Ver o comentário em `validarWorkflowParaPublicar` — uso exclusivo do Modelo da Biblioteca de Tarefas. */
+  pularCompetenciaDeEfeito?: boolean
 }): Promise<ResultadoPublicacao> {
-  const preview = await preverPublicacao(args.workflowId)
+  const preview = await preverPublicacao(args.workflowId, { pularCompetenciaDeEfeito: args.pularCompetenciaDeEfeito })
   if (!preview) return { ok: false, code: "WORKFLOW_INEXISTENTE" }
 
   if (args.versaoEsperada != null && args.versaoEsperada !== preview.versaoAtual) {

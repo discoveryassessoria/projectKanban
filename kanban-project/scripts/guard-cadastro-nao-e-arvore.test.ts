@@ -162,6 +162,11 @@ const ATOS_EM_PRODUCAO: Record<string, string> = {
   "scripts/smoke-ui-setup.ts": "cenário marcado dentro do processo 513 real; exige EU_CONFIRMO_ESCRITA_EM_PRODUCAO",
   "scripts/usuario-smoke-tecnico.ts": "cria a identidade técnica de smoke; auditado; exige confirmação",
   "scripts/prod-smoke-tabela-valores.ts": "alterna o tipo do usuário técnico; auditado; exige confirmação",
+  // Achado 22/09/2026 (auditoria da entrega da Biblioteca de Tarefas): faltava
+  // desde o mandato "Prazos e SLA" (22/09/2026, commit d935fe4e) — nasceu com
+  // `exigirConfirmacaoDeEscritaEmProducao` mas nunca entrou aqui, então este
+  // guard falhava desde então sem ninguém notar (não era rodado isolado).
+  "scripts/smoke-prod-prazo-sla.ts": "smoke sintético [TESTE PRAZO] em produção, removido ao final; exige EU_CONFIRMO_ESCRITA_EM_PRODUCAO",
 }
 
 const testesQueEscrevem = arquivos.filter((f) => {

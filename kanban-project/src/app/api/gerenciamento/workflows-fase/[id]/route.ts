@@ -580,6 +580,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Ação desconhecida. Use ?acao=publicar.' }, { status: 400 })
   }
 
+  // CASCA DA BIBLIOTECA DE TAREFAS — publica exclusivamente por
+  // `/api/gerenciamento/biblioteca-tarefas/modelos/[id]/publicar`, que mantém
+  // `BibliotecaModeloTarefa.status`/`versaoPublicada` em sincronia com a
+  // publicação real. Publicar por aqui deixaria os dois fora de sincronia.
+  const casca = await prisma.phaseInternalWorkflow.findUnique({ where: { id }, select: { origemBiblioteca: true } })
+  if (casca?.origemBiblioteca) {
+    return NextResponse.json({ error: 'Este workflow é um Modelo da Biblioteca de Tarefas. Publique-o em Gerenciamento › Biblioteca de Tarefas.' }, { status: 409 })
+  }
+
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
   const usuario = await extrairUsuarioComPermissoes(request)
   const versaoEsperada = Number((body as { versaoEsperada?: unknown }).versaoEsperada)
@@ -608,6 +617,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     const atual = await prisma.phaseInternalWorkflow.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
+    if (atual.origemBiblioteca) {
+      return NextResponse.json({ error: 'Este workflow é um Modelo da Biblioteca de Tarefas. Inative-o em Gerenciamento › Biblioteca de Tarefas — excluir apagaria a definição que Vínculos publicados referenciam.' }, { status: 409 })
+    }
 
     await prisma.phaseInternalWorkflow.delete({ where: { id } })
 

@@ -17,7 +17,10 @@ export async function GET(request: NextRequest) {
         orderBy: { name: 'asc' },
       }),
       prisma.phaseInternalWorkflow.findMany({
-        where: { arquivado: false },
+        // `origemBiblioteca` fica de fora desta tela: são as "cascas" dos Modelos
+        // da Biblioteca de Tarefas (mandato 22/09/2026), phaseKey="biblioteca",
+        // nunca uma fase real — têm tela e API próprias.
+        where: { arquivado: false, origemBiblioteca: false },
         include: {
         passos: {
           orderBy: { ordem: 'asc' },

@@ -524,6 +524,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // CalendarioOficial/FeriadoCalendario/EventoPrazoSla + colunas novas em
   // Tarefa. Não altera StepSubtaskDefinition/SubtaskExecution.
   '20260922130000_modulo_prazo_sla_acompanhamento',
+  // Mandato "Biblioteca de Tarefas dos Workflows Internos" (22/09/2026):
+  // aditiva — BibliotecaModeloTarefa/BibliotecaVinculo/BibliotecaVinculoVersao
+  // + PhaseInternalWorkflow.origemBiblioteca. Não altera CatalogoFase (doc 30,
+  // congelado) nem a cardinalidade/unicidade de MacroWorkflow (doc 31).
+  '20260922170000_biblioteca_tarefas_workflow_interno',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
