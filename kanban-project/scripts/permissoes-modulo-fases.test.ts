@@ -103,6 +103,31 @@ async function main() {
     console.log("  (sem processo no banco de teste para exercitar — pulando 4.4, sem afetar o resultado)")
   }
 
+  console.log("\n── 4.6 Daniela NÃO consegue mudar o escopo de uma fase em uso (nem confirmando) ──")
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_T`, name: `[${MARCA}] tipo`, paisId: (await prisma.catalogoPais.findFirstOrThrow()).id, modalidadeId: (await prisma.modalidadePais.findFirstOrThrow()).id, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] macro`, ativo: true } })
+  const chaveFase = `${MARCA.toLowerCase()}_fase_escopo`
+  const faseEmUso = await prisma.catalogoFase.create({
+    data: { phaseKey: chaveFase, label: `[${MARCA}] Fase em uso`, escopo: "PROCESSO", ordemPadrao: 1, requiredPadrao: true, conditionalPadrao: false, ativo: true, status: "PUBLICADA", revisaoAtual: 1, efeitosPermitidos: ["REGISTER_ONLY"] },
+  })
+  await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: chaveFase, label: "Fase em uso", ordem: 1, required: true, conditional: false, entryRule: "process_created", showInKanban: true } })
+  const corpoEscopo = { phaseKey: chaveFase, label: faseEmUso.label, escopo: "DOCUMENTO", efeitosPermitidos: faseEmUso.efeitosPermitidos, ordemPadrao: faseEmUso.ordemPadrao, requiredPadrao: faseEmUso.requiredPadrao, conditionalPadrao: faseEmUso.conditionalPadrao, ativo: faseEmUso.ativo, id: faseEmUso.id }
+
+  const rOpEscopoSemConfirmar = await chamar("PUT", `/api/gerenciamento/catalogo-fases/${faseEmUso.id}`, tokenOperacional, corpoEscopo)
+  check("operacional: PUT escopo (sem confirmar) → 403, não 409 (a permissão barra ANTES da regra de negócio)", rOpEscopoSemConfirmar.status === 403)
+  const rOpEscopoConfirmando = await chamar("PUT", `/api/gerenciamento/catalogo-fases/${faseEmUso.id}`, tokenOperacional, { ...corpoEscopo, confirmarMudancaEscopo: true })
+  check("operacional: PUT escopo (confirmando) → 403 também — confirmação não contorna permissão", rOpEscopoConfirmando.status === 403)
+  const faseAposTentativas = await prisma.catalogoFase.findUniqueOrThrow({ where: { phaseKey: chaveFase }, select: { escopo: true, revisaoAtual: true } })
+  check("nada foi alterado: escopo continua PROCESSO, revisão continua 1", faseAposTentativas.escopo === "PROCESSO" && faseAposTentativas.revisaoAtual === 1)
+
+  const rAdminEscopo = await chamar("PUT", `/api/gerenciamento/catalogo-fases/${faseEmUso.id}`, tokenAdmin, { ...corpoEscopo, confirmarMudancaEscopo: true })
+  check("admin: PUT escopo (confirmando) → 200 — o mesmo fluxo funciona pra quem tem permissão", rAdminEscopo.status === 200)
+
+  await prisma.faseMacro.deleteMany({ where: { macroWorkflowId: macro.id } })
+  await prisma.macroWorkflow.delete({ where: { id: macro.id } })
+  await prisma.tipoProcessoNacionalidade.delete({ where: { id: tipo.id } })
+  await prisma.catalogoFase.delete({ where: { id: faseEmUso.id } })
+
   console.log("\n── 4.5 Guard estático da tela: Gerenciamento redireciona quem não é admin ──")
   const pageSrc = readFileSync(join(process.cwd(), "src/app/administrator/page.tsx"), "utf8")
   check(
