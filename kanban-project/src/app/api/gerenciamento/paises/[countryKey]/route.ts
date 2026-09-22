@@ -3,12 +3,15 @@
 // PUT    - edita o país (nome, bandeira, nacionalidade, prefixo, moeda, ativo).
 //          NÃO propaga nada: o rótulo vive só aqui, e quem exibe resolve pela
 //          relação. Propagar era o sintoma de que existiam cópias.
-// DELETE - exclui o país (só se NÃO tiver tipos nem processos; senão 409 →
-//          a UI sugere inativar). Apaga as modalidades junto.
+// DELETE - exclui o país (só se NÃO tiver Tipo de Processo nem Processo —
+//          fato operacional; senão 409 → a UI sugere inativar). O resto que
+//          referencia o país por FK é cadastro/configuração: desvincula
+//          (Órgão de Protocolo, Requisito Cadastral) ou remove junto
+//          (Modalidade, Serviço/Condição/Taxa por país, Status legado).
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { ondePaisEh } from "@/src/lib/identidade/canonica"
 
 export async function PUT(request: Request, { params }: { params: Promise<{ countryKey: string }> }) {
@@ -50,43 +53,50 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
     const atual = await prisma.catalogoPais.findUnique({ where: { countryKey } })
     if (!atual) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
 
-    // Bloqueia se estiver em uso — TODAS as tabelas que referenciam o país por
-    // FK, não só Tipo/Processo. Excluir sem checar as outras deixava a
-    // exclusão cair no banco e voltar como erro genérico 500, escondendo o
-    // motivo real (achado em teste real de produção, 22/09/2026).
-    const [tipos, processos, orgaos, requisitos, servicos, condicoesPagamento, taxasPagamento] = await Promise.all([
+    // SÓ FATO OPERACIONAL bloqueia exclusão (Tipo de Processo e Processo —
+    // "Configuração ≠ fato histórico", mandato REGRA MASTER). Tudo o mais que
+    // referencia o país por FK é CADASTRO/CONFIGURAÇÃO — a exclusão do país
+    // desvincula (Órgão de Protocolo, Requisito Cadastral: `paisId` é campo de
+    // ESCOPO, ficam sem país em vez de serem apagados) ou remove o que só
+    // existia por causa deste país (Serviço/Condição/Taxa por país, Status
+    // legado — junções puras, sem identidade própria fora do país).
+    const [tipos, processos] = await Promise.all([
       prisma.tipoProcessoNacionalidade.count({ where: { paisId: atual.id } }),
       prisma.processo.count({ where: ondePaisEh(countryKey) }),
-      prisma.orgaoProtocolo.count({ where: { paisId: atual.id } }),
-      prisma.requisitoCadastral.count({ where: { paisId: atual.id } }),
-      prisma.servicoProdutoPais.count({ where: { paisId: atual.id } }),
-      prisma.condicaoPagamentoPais.count({ where: { paisId: atual.id } }),
-      prisma.taxaPagamentoPais.count({ where: { paisId: atual.id } }),
     ])
-    const uso = { tipos, processos, orgaos, requisitos, servicos, condicoesPagamento, taxasPagamento }
-    const total = tipos + processos + orgaos + requisitos + servicos + condicoesPagamento + taxasPagamento
-    if (total > 0) {
-      const partes = [
-        tipos > 0 && `${tipos} tipo(s) de processo`,
-        processos > 0 && `${processos} processo(s)`,
-        orgaos > 0 && `${orgaos} órgão(s) de protocolo`,
-        requisitos > 0 && `${requisitos} requisito(s) cadastral(is)`,
-        servicos > 0 && `${servicos} serviço(s)/produto(s)`,
-        condicoesPagamento > 0 && `${condicoesPagamento} condição(ões) de pagamento`,
-        taxasPagamento > 0 && `${taxasPagamento} taxa(s) de pagamento`,
-      ].filter(Boolean)
+    if (tipos > 0 || processos > 0) {
       return NextResponse.json(
-        { error: `Este país tem ${partes.join(', ')}. Inative-o em vez de excluir.`, uso },
+        { error: `Este país tem ${tipos} tipo(s) de processo e ${processos} processo(s). Inative-o em vez de excluir.` },
         { status: 409 }
       )
     }
 
-    await prisma.$transaction(async (tx) => {
+    const desvinculados = await prisma.$transaction(async (tx) => {
+      const orgaos = await tx.orgaoProtocolo.updateMany({ where: { paisId: atual.id }, data: { paisId: null } })
+      const requisitos = await tx.requisitoCadastral.updateMany({ where: { paisId: atual.id }, data: { paisId: null } })
+      const servicos = await tx.servicoProdutoPais.deleteMany({ where: { paisId: atual.id } })
+      const condicoesPagamento = await tx.condicaoPagamentoPais.deleteMany({ where: { paisId: atual.id } })
+      const taxasPagamento = await tx.taxaPagamentoPais.deleteMany({ where: { paisId: atual.id } })
+      const status = await tx.status.deleteMany({ where: { paisId: atual.id } })
       await tx.modalidadePais.deleteMany({ where: { paisId: atual.id } })
       await tx.catalogoPais.delete({ where: { countryKey } })
+      return {
+        orgaosDesvinculados: orgaos.count, requisitosDesvinculados: requisitos.count,
+        servicosRemovidos: servicos.count, condicoesPagamentoRemovidas: condicoesPagamento.count,
+        taxasPagamentoRemovidas: taxasPagamento.count, statusRemovidos: status.count,
+      }
     })
 
-    return NextResponse.json({ ok: true })
+    const usuario = await extrairUsuarioComPermissoes(request)
+    await prisma.logAuditoria.create({
+      data: {
+        acao: 'PAIS_EXCLUIDO', entidade: 'CatalogoPais', entidadeId: atual.id,
+        descricao: `País "${atual.countryLabel}" excluído. Desvinculado: ${JSON.stringify(desvinculados)}.`,
+        detalhes: desvinculados as never, usuarioId: usuario?.userId ?? null,
+      },
+    }).catch(() => null)
+
+    return NextResponse.json({ ok: true, desvinculados })
   } catch (error) {
     console.error('Erro ao excluir país:', error)
     return NextResponse.json({ error: 'Erro ao excluir país' }, { status: 500 })
