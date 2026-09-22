@@ -140,7 +140,7 @@ ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.str
 // que importava era tirá-los do código; a segunda metade da correção é que eles nunca
 // foram do workflow. "Por onde dá para pedir" é fato do CARTÓRIO — o workflow apenas
 // declara "use os canais do fornecedor relacionado". Ver `grp_orgaos › Organizações`.
-ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
+ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf", "bibliotecatarefas"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno + Biblioteca de Tarefas")
 // Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro vive na
 // Configuração Financeira do cadastro mestre; preço, na Tabela de Valores. Sem cadastro
 // intermediário — nem categoria, nem plano de contas, nem centro de custo.

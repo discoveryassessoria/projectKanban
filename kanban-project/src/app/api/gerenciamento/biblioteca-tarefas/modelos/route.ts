@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       workflow: {
         select: {
           id: true, versao: true, rascunhoAlteradoEm: true,
-          passos: { select: { id: true, key: true, label: true } },
+          passos: { select: { id: true, key: true, label: true, regraDeConclusao: true, _count: { select: { subtarefas: true } } } },
         },
       },
       vinculos: {

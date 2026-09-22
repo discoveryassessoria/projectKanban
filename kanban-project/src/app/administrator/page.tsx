@@ -101,6 +101,11 @@ const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoCompo
 // LEGADO REMOVIDO — Biblioteca de Modelos (Workflow Interno / Variações da Fase / Automação)
 // eliminada. Fonte de verdade é o Workflow Macro/Interno + config real por fase. Ver migração.
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
+// Biblioteca de Tarefas (mandato 22/09/2026) — Modelo reutilizável (identidade +
+// versão). NÃO é a "Biblioteca de Modelos" legada removida (comentário acima):
+// aquela aplicava um template inteiro de Workflow numa fase; esta é uma tarefa
+// (passo + subtarefas) reutilizável, sem nenhum vínculo a fase nesta entrega.
+const BibliotecaTarefasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/BibliotecaTarefasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -245,6 +250,7 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 3)
   phaseiwf: PhaseWorkflowsFasesTab,
+  bibliotecatarefas: BibliotecaTarefasTab,
   canais: CanaisOperacionaisTab,
 
   // bespoke (lote 4)

@@ -195,6 +195,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
+      // Biblioteca de Tarefas (mandato 22/09/2026) — Modelo reutilizável (identidade +
+      // versão), sem Vínculo/cutover nesta entrega. Reaproveita o mesmo editor de
+      // passo/subtarefa do Workflow Interno (phaseiwf, acima) — mesma seção "Fluxos".
+      a(30, "bibliotecatarefas", "Biblioteca de Tarefas", ["biblioteca", "tarefas", "modelo", "modelos", "reutilizavel", "reutilizável"], "Fluxos"),
 
       // OCULTOS da navegação normal (mandato "Catálogo de Fases", item 10,
       // 20/09/2026): módulos legados do motor pré-Catálogo de Fases, substituídos
