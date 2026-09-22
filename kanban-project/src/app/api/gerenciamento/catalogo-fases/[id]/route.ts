@@ -129,16 +129,36 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // 20/09/2026). Só quando algo de fato mudou (revisão nova) e só DEPOIS do
     // commit da revisão — nunca antes, para não reconciliar contra uma revisão
     // que pode não ter sido publicada de verdade (transação podia falhar).
+    //
+    // A CHAMADA É ISOLADA DO COMMIT: a transação acima já gravou a revisão
+    // nova — ela é um FATO consumado antes desta linha rodar. Uma falha aqui
+    // (rede/timeout transitório contra o banco, acompanhado nesta sessão:
+    // P2028 por RTT real até pooled.db.prisma.io) NUNCA pode reverter esse
+    // fato pro admin nem virar silêncio total. Achado real em produção
+    // (mandato "Módulo de Fases" #3, 21/09/2026, fase auditoria_final_fase_
+    // sintetica): sem este guard, uma falha transitória aqui derrubava a
+    // rota inteira pro catch genérico (500 "Erro ao salvar a fase"), SEM
+    // log de auditoria e SEM outbox — a mudança de escopo persistia de
+    // verdade no banco, mas nada provava isso pro admin nem pro histórico, e
+    // a reconciliação retroativa dos processos em andamento nunca era
+    // reenfileirada. Prova: revisão 8 desta fase existe no banco sem
+    // nenhuma linha de LogAuditoria/DomainOutbox correspondente.
     let reconciliacao: EnqueueResultadoCatalogoFase | null = null
+    let reconciliacaoErro: string | null = null
     if (mudouAlgo) {
-      reconciliacao = await enqueueReconciliacaoCatalogoFase({
-        phaseKey: fase.phaseKey,
-        catalogoFaseId: fase.id,
-        revisaoAnterior: atual.revisaoAtual,
-        revisaoNova,
-        escopoMudou: escopoRealmenteMudou,
-        publicadoPorId: usuario?.userId ?? null,
-      })
+      try {
+        reconciliacao = await enqueueReconciliacaoCatalogoFase({
+          phaseKey: fase.phaseKey,
+          catalogoFaseId: fase.id,
+          revisaoAnterior: atual.revisaoAtual,
+          revisaoNova,
+          escopoMudou: escopoRealmenteMudou,
+          publicadoPorId: usuario?.userId ?? null,
+        })
+      } catch (e) {
+        console.error('PUT catalogo-fases/[id]: reconciliação falhou DEPOIS de a revisão já ter sido salva', e)
+        reconciliacaoErro = e instanceof Error ? e.message : String(e)
+      }
     }
 
     // INATIVAR é um fato diferente de EDITAR: é o que tira a fase das configurações
@@ -148,20 +168,23 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const desativou = atual.ativo && !fase.ativo
     const ativou = !atual.ativo && fase.ativo
     const acao = desativou ? 'PHASE_DISABLED' : ativou ? 'PHASE_ACTIVATED' : 'PHASE_UPDATED'
+    const sufixoReconciliacao = reconciliacaoErro
+      ? ` ⚠ A reconciliação automática dos processos em andamento falhou (${reconciliacaoErro}) — a fase foi salva, mas repita a operação (reenviar o mesmo Salvar já resolve, é idempotente) para os processos em andamento receberem a mudança.`
+      : ''
     await prisma.logAuditoria.create({
       data: {
         acao,
         entidade: 'CatalogoFase', entidadeId: fase.id,
-        descricao: desativou
+        descricao: (desativou
           ? `Fase "${fase.label}" inativada (revisão ${revisaoNova}). Continua no histórico e nos processos existentes; só não aparece para novas configurações.${usos > 0 ? ` Ainda usada em ${usos} fluxo(s) — remova-a da composição em Workflow Macro se a intenção é parar de exigi-la em processos não iniciados.` : ''}`
           : ativou
           ? `Fase "${fase.label}" publicada/ativada (revisão ${revisaoNova}, ${(fase.efeitosPermitidos as string[] | null)?.length ?? 0} efeito(s) permitido(s)). Passa a ser ofertada em fluxo novo.`
-          : `Fase "${fase.label}" alterada (chave ${fase.phaseKey}, imutável)${mudouAlgo ? `, revisão ${revisaoNova}` : ' — nenhum campo relevante mudou'}.`,
-        detalhes: { antes: atual, depois: fase, usos, revisao: revisaoNova, reconciliacao } as never,
+          : `Fase "${fase.label}" alterada (chave ${fase.phaseKey}, imutável)${mudouAlgo ? `, revisão ${revisaoNova}` : ' — nenhum campo relevante mudou'}.`) + sufixoReconciliacao,
+        detalhes: { antes: atual, depois: fase, usos, revisao: revisaoNova, reconciliacao, reconciliacaoErro } as never,
         usuarioId: usuario?.userId ?? null,
       },
     }).catch(() => null)
-    return NextResponse.json({ fase: { ...fase, usos }, reconciliacao })
+    return NextResponse.json({ fase: { ...fase, usos }, reconciliacao, reconciliacaoErro })
   } catch (e) {
     console.error('PUT catalogo-fases/[id]', e)
     return NextResponse.json({ error: 'Erro ao salvar a fase.' }, { status: 500 })

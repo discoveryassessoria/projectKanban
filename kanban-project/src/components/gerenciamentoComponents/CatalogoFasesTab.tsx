@@ -139,7 +139,19 @@ export default function CatalogoFasesTab() {
           const next = i < 0 ? [...rs, j.fase] : rs.map(x => (x.id === j.fase.id ? j.fase : x))
           return next.sort((x, y) => x.ordemPadrao - y.ordemPadrao || x.label.localeCompare(y.label))
         })
-        setForm(null); showFlash("Fase salva.")
+        setForm(null)
+        // A EDIÇÃO já está salva quando chega aqui — mas a reconciliação dos
+        // processos em andamento é um passo SEPARADO no servidor, e pode
+        // falhar por uma instabilidade transitória de rede mesmo com a fase
+        // já persistida. Dizer só "Fase salva." nesse caso seria mentir por
+        // omissão (achado real em produção, mandato "Módulo de Fases" #3,
+        // 21/09/2026: a fase salvou, mas nada avisou que reprocessar era
+        // necessário — reenviar Salvar de novo já resolve, é idempotente).
+        if (j.reconciliacaoErro) {
+          showFlash(`Fase salva, mas a reconciliação dos processos em andamento falhou (${j.reconciliacaoErro}). Reenvie Salvar para tentar de novo — não duplica nada.`, "erro")
+        } else {
+          showFlash("Fase salva.")
+        }
         return
       }
       // FASE EM USO + ESCOPO MUDOU — o servidor recusa de propósito (409
