@@ -243,7 +243,7 @@ export default function MacroKanbanTab() {
               ))}
             </select>
 
-            {tipoSel && tipoSel.modalidades.length > 1 && (
+            {tipoSel && tipoSel.modalidades.length > 0 && (
               <>
                 <label className="text-sm text-[var(--text-secondary)]">Modalidade:</label>
                 <select value={modalidadeId ?? ''} onChange={(e) => e.target.value && selecionarModalidade(Number(e.target.value))} className={selCls}>

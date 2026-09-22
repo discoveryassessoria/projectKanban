@@ -109,20 +109,19 @@ export default function TipoProcessoTab() {
   const modsDoPais = useMemo(() => modalidades.filter((m) => m.countryKey === countryKey), [modalidades, countryKey])
   // dropdown de "Novo processo" só mostra ativas (inativa some, sem apagar)
   const modsAtivasDoPais = useMemo(() => modsDoPais.filter((m) => m.ativo !== false), [modsDoPais])
-  const modsSelecionadas = useMemo(() => modsAtivasDoPais.filter((m) => modalidadesSel.has(m.modalityKey)), [modsAtivasDoPais, modalidadesSel])
 
-  // sugestões automáticas de código e nome — junta prefixo do país com o(s)
-  // sufixo(s) de TODAS as modalidades escolhidas (ex.: ITA-JUD-ADM).
+  // sugestões automáticas de código e nome — Tipo de Processo representa
+  // EXCLUSIVAMENTE a nacionalidade (mandato "Reconstrução da hierarquia",
+  // 22/09/2026): a identidade NUNCA carrega modalidade, mesmo quando várias
+  // estão marcadas — quem escolhe modalidade é o Workflow Macro, não o Tipo.
   const sugCode = useMemo(() => {
-    if (!paisSel || modsSelecionadas.length === 0) return ''
-    const pre = paisSel.codePrefix || paisSel.countryKey.slice(0, 3).toUpperCase()
-    const sufs = modsSelecionadas.map((m) => m.codeSuffix || m.modalityKey.slice(0, 4).toUpperCase())
-    return `${pre}-${sufs.join('-')}`
-  }, [paisSel, modsSelecionadas])
+    if (!paisSel) return ''
+    return paisSel.codePrefix || paisSel.countryKey.slice(0, 3).toUpperCase()
+  }, [paisSel])
   const sugName = useMemo(() => {
-    if (!paisSel || modsSelecionadas.length === 0) return ''
-    return `Nacionalidade ${paisSel.nationalityLabel} · ${modsSelecionadas.map((m) => m.modalityLabel).join(' + ')}`
-  }, [paisSel, modsSelecionadas])
+    if (!paisSel) return ''
+    return `Nacionalidade ${paisSel.nationalityLabel}`
+  }, [paisSel])
 
   // Enquanto o usuário não mexeu, vale a sugestão; depois de mexer, vale o dele.
   const code = codeTouched ? codeDigitado : sugCode
@@ -416,7 +415,7 @@ export default function TipoProcessoTab() {
                 </div>
               ) : (
                 <div>
-                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Modalidade *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Modalidades *</label>
                   <div className={'space-y-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3' + (!countryKey ? ' opacity-50' : '')}>
                     {!countryKey && <p className="text-xs text-[var(--text-muted)]">Escolha o país primeiro.</p>}
                     {countryKey && modsAtivasDoPais.length === 0 && <p className="text-xs text-[var(--text-muted)]">Este país não tem modalidade cadastrada ainda.</p>}
@@ -433,12 +432,12 @@ export default function TipoProcessoTab() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">Código *</label>
-                  <input value={code} onChange={(e) => { setCode(e.target.value); setCodeTouched(true) }} placeholder="ITA-JUD" className={inputCls + ' font-mono'} />
+                  <input value={code} onChange={(e) => { setCode(e.target.value); setCodeTouched(true) }} placeholder="ITA" className={inputCls + ' font-mono'} />
                   {!codeTouched && sugCode && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Sugerido automaticamente — pode editar.</p>}
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome *</label>
-                  <input value={name} onChange={(e) => { setName(e.target.value); setNameTouched(true) }} placeholder="Nacionalidade Italiana · Judicial" className={inputCls} />
+                  <input value={name} onChange={(e) => { setName(e.target.value); setNameTouched(true) }} placeholder="Nacionalidade Italiana" className={inputCls} />
                 </div>
               </div>
 
