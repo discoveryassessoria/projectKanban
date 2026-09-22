@@ -514,6 +514,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // dados, não schema, não entra aqui.
   '20260922100000_hierarquia_pais_tipo_modalidade_1_additive',
   '20260922110000_hierarquia_pais_tipo_modalidade_3_tighten',
+  // FIX (achado em teste real de produção, 22/09/2026): o índice único antigo
+  // de coluna única (`tipoProcessoId`) nunca tinha sido trocado pelo composto
+  // — o segundo Workflow Macro (a outra modalidade do mesmo Tipo) não
+  // conseguia nascer.
+  '20260922120000_macro_workflow_unique_tipo_modalidade',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
