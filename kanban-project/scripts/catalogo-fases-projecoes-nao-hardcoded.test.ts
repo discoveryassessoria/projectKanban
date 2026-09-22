@@ -90,8 +90,9 @@ async function main() {
   const admin = await prisma.usuario.create({ data: { nome: "Admin ProjNova", email: "admin@projnova.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const token = await signAuthToken({ userId: admin.id, email: "admin@projnova.test", tipo: "admin", sessaoInicio: Date.now() })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País ProjNova", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade ProjNova" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
 
   // Composição: fase "a" (canônica-like, mas custom) → FASE_NOVA (nunca vista) → finalizado.
   // NENHUM arquivo de código é tocado para isto existir — é só INSERT no cadastro,
@@ -106,7 +107,7 @@ async function main() {
   }
 
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} Processo`, workflowRuntime: "v2", faseAtualKey: FASE_NOVA, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 },
+    data: { nome: `${MARCA} Processo`, workflowRuntime: "v2", faseAtualKey: FASE_NOVA, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
   await materializarExecucaoDaFase({ processoId: processo.id, fonte: "PROCESSO_CRIADO" })

@@ -17,6 +17,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { resolverMacroWorkflowDoTipo } from "@/src/lib/motor/resolver-macro-workflow"
 import { resolverElegibilidadeDocumental } from "@/src/lib/motor/elegibilidade-documental"
 import { resolverPrecoPorConfigDB } from "@/src/lib/motor/resolver-preco-financeiro.prisma"
 import { NaturezaPreco } from "@prisma/client"
@@ -70,10 +71,7 @@ export async function simularParametrizacao(args: {
         select: { id: true, codigo: true, tipoProcessoMotorId: true }, orderBy: { id: "desc" },
       })
 
-  const macro = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: args.tipoProcessoId },
-    select: { fases: { select: { phaseKey: true }, orderBy: { ordem: "asc" } } },
-  })
+  const macro = await resolverMacroWorkflowDoTipo(args.tipoProcessoId)
   const fases = (macro?.fases ?? []).map((f) => f.phaseKey).filter((f) => (args.phaseKey ? f === args.phaseKey : true))
 
   const vazio: ResultadoSimulacao = {

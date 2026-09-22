@@ -11,7 +11,6 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 // TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
 exigirBancoDeTeste()
 
-const TIPO_ID = 14 // Nacionalidade Alemã · Administrativa (alemanha)
 const PAIS = "alemanha"
 const MARK = "__TEST_V2__"
 
@@ -41,6 +40,30 @@ async function limpar(processoId: number) {
 async function main() {
   console.log("\nCriação V2-nativa — testes\n")
 
+  // Resolvido pela IDENTIDADE (país + habilitação + Workflow Macro PUBLICADO),
+  // nunca por id fixo — um id hardcoded é frágil a qualquer reseed do banco de
+  // teste local, e sem exigir macro publicado o teste podia pegar um Tipo
+  // órfão (leftover de outro teste) que nunca chega a nascer processo.
+  const paisAlvo = await prisma.catalogoPais.findUnique({ where: { countryKey: PAIS }, select: { id: true } })
+  const candidatas = await prisma.tipoProcessoModalidadeHabilitada.findMany({
+    where: { ativo: true, tipoProcesso: { paisId: paisAlvo?.id, ativo: true, arquivado: false } },
+    select: { tipoProcessoId: true, modalidadeId: true },
+  })
+  let habilitacao: { tipoProcessoId: number; modalidadeId: number } | null = null
+  for (const c of candidatas) {
+    const macro = await prisma.macroWorkflow.findUnique({
+      where: { tipoProcessoId_modalidadeId: { tipoProcessoId: c.tipoProcessoId, modalidadeId: c.modalidadeId } },
+      select: { ativo: true },
+    })
+    if (macro?.ativo) { habilitacao = c; break }
+  }
+  if (!habilitacao) {
+    console.error(`❌ Nenhum Tipo de Processo com modalidade habilitada e Workflow Macro publicado para o país "${PAIS}" — seed do banco de teste desatualizado.`)
+    process.exit(1)
+  }
+  const TIPO_ID = habilitacao.tipoProcessoId
+  const MODALIDADE_ID = habilitacao.modalidadeId
+
   // ── PUROS (sem DB) ────────────────────────────────────────────────────────
   console.log("1) Helpers puros")
   ok(primeiraFasePorOrdem([{ phaseKey: "b", ordem: 2 }, { phaseKey: "a", ordem: 1 }]) === "a", "primeira fase = menor ordem (não por label)")
@@ -58,16 +81,16 @@ async function main() {
 
   // ── VALIDAÇÕES (rejeições baratas, sem mutação) ───────────────────────────
   console.log("\n2) Rejeições de configuração")
-  const r1 = await criarProcessoV2({ nome: "", pais: PAIS, tipoProcessoMotorId: TIPO_ID })
+  const r1 = await criarProcessoV2({ nome: "", pais: PAIS, tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID })
   ok(!r1.success && r1.code === "NOME_OBRIGATORIO", "nome vazio → NOME_OBRIGATORIO")
-  const r2 = await criarProcessoV2({ nome: MARK, pais: "narnia", tipoProcessoMotorId: TIPO_ID })
+  const r2 = await criarProcessoV2({ nome: MARK, pais: "narnia", tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID })
   ok(!r2.success && r2.code === "PAIS_INVALIDO", "país inexistente → PAIS_INVALIDO")
-  const r3 = await criarProcessoV2({ nome: MARK, pais: PAIS, tipoProcessoMotorId: 999999 })
+  const r3 = await criarProcessoV2({ nome: MARK, pais: PAIS, tipoProcessoMotorId: 999999, modalidadeId: MODALIDADE_ID })
   ok(!r3.success && r3.code === "TIPO_INVALIDO", "tipo inexistente → TIPO_INVALIDO")
 
   // ── HAPPY PATH (nascimento completo) ──────────────────────────────────────
   console.log("\n3) Nascimento V2 completo")
-  const res = await criarProcessoV2({ nome: `${MARK} happy`, pais: PAIS, tipoProcessoMotorId: TIPO_ID })
+  const res = await criarProcessoV2({ nome: `${MARK} happy`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID })
   if (!res.success) { ok(false, "criação bem-sucedida", res); return }
   criados.add(res.processId)
   ok(res.success && res.created, "criado (created=true)")
@@ -98,8 +121,8 @@ async function main() {
   // ── IDEMPOTÊNCIA (mesma chave ⇒ mesmo processo) ───────────────────────────
   console.log("\n4) Idempotência")
   const key = `it-${randomUUID()}`
-  const a = await criarProcessoV2({ nome: `${MARK} idem`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, idempotencyKey: key })
-  const b = await criarProcessoV2({ nome: `${MARK} idem`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, idempotencyKey: key })
+  const a = await criarProcessoV2({ nome: `${MARK} idem`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID, idempotencyKey: key })
+  const b = await criarProcessoV2({ nome: `${MARK} idem`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID, idempotencyKey: key })
   if (a.success) criados.add(a.processId)
   ok(a.success && b.success && a.processId === b.processId, "mesma idempotencyKey → mesmo processId", { a: a.success && a.processId, b: b.success && b.processId })
   ok(b.success && !b.created, "2ª chamada devolve created=false (não duplicou)")
@@ -114,8 +137,8 @@ async function main() {
   console.log("\n5) Concorrência (mesma idempotencyKey)")
   const ck = `cc-${randomUUID()}`
   const [c1, c2] = await Promise.all([
-    criarProcessoV2({ nome: `${MARK} conc`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, idempotencyKey: ck }),
-    criarProcessoV2({ nome: `${MARK} conc`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, idempotencyKey: ck }),
+    criarProcessoV2({ nome: `${MARK} conc`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID, idempotencyKey: ck }),
+    criarProcessoV2({ nome: `${MARK} conc`, pais: PAIS, tipoProcessoMotorId: TIPO_ID, modalidadeId: MODALIDADE_ID, idempotencyKey: ck }),
   ])
   if (c1.success) criados.add(c1.processId)
   if (c2.success) criados.add(c2.processId)

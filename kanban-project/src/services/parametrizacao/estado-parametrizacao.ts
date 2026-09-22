@@ -13,6 +13,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { resolverMacroWorkflowDoTipo } from "@/src/lib/motor/resolver-macro-workflow"
 import { pendenciasDaParametrizacao, impedimentosDePublicacao, type Pendencia } from "@/src/services/financeiro/pendencias-parametrizacao"
 
 /** Chaves ESTRUTURAIS das etapas — identidade, não rótulo de tela. */
@@ -96,10 +97,7 @@ export async function estadoParametrizacao(escopo: EscopoParametrizacao): Promis
   })
   if (!tipo) throw new Error(`Tipo de processo ${escopo.tipoProcessoId} não existe.`)
 
-  const macro = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: tipo.id },
-    select: { fases: { select: { phaseKey: true, label: true, ordem: true, required: true }, orderBy: { ordem: "asc" } } },
-  })
+  const macro = await resolverMacroWorkflowDoTipo(tipo.id)
   const fases = (macro?.fases ?? []).map((f) => ({ phaseKey: f.phaseKey, label: f.label, ordem: f.ordem, obrigatoria: f.required }))
   const fasesNoEscopo = escopo.phaseKey ? fases.filter((f) => f.phaseKey === escopo.phaseKey) : fases
   const chavesFase = fasesNoEscopo.map((f) => f.phaseKey)

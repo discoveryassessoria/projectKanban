@@ -18,14 +18,20 @@ export async function GET(request: NextRequest) {
       prisma.processo.findMany({ select: { id: true, nome: true, tipoProcessoMotorId: true }, orderBy: { createdAt: 'desc' }, take: 300 }),
       prisma.tipoProcessoNacionalidade.findMany({
         where: { ativo: true, arquivado: false },
-        select: { id: true, name: true, macroWorkflow: { select: { fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: 'asc' } } } } },
+        select: { id: true, name: true, macroWorkflows: { select: { fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: 'asc' } } } } },
         orderBy: { name: 'asc' },
       }),
       prisma.motorConfig.findUnique({ where: { id: 1 } }),
     ])
     return NextResponse.json({
       processos,
-      tipos: tipos.map(t => ({ id: t.id, name: t.name, fases: t.macroWorkflow?.fases ?? [] })),
+      // Picker de phaseKey por Tipo — une as fases de todos os Workflow Macro
+      // do Tipo (um por modalidade habilitada), sem repetir a mesma chave.
+      tipos: tipos.map(t => {
+        const vistas = new Set<string>()
+        const fases = t.macroWorkflows.flatMap(mw => mw.fases).filter(f => (vistas.has(f.phaseKey) ? false : (vistas.add(f.phaseKey), true)))
+        return { id: t.id, name: t.name, fases }
+      }),
       autoExecutar: cfg?.autoExecutarAoAvancar ?? false,
     })
   } catch (e) {

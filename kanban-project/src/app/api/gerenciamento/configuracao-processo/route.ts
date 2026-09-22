@@ -28,9 +28,9 @@ export async function GET(request: NextRequest) {
         // Ordena pelo rótulo DO PAÍS canônico, atravessando a relação.
         orderBy: [{ pais: { countryLabel: 'asc' } }, { name: 'asc' }],
         include: {
-          macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } },
+          macroWorkflows: { include: { fases: { orderBy: { ordem: 'asc' } } } },
           pais: { select: { countryKey: true, countryLabel: true, nationalityLabel: true } },
-          modalidade: { select: { modalityKey: true, modalityLabel: true } },
+          modalidadesHabilitadas: { where: { ativo: true }, include: { modalidade: { select: { id: true, modalityKey: true, modalityLabel: true } } } },
         },
       }),
       prisma.phaseInternalWorkflow.findMany({
@@ -77,8 +77,12 @@ export async function GET(request: NextRequest) {
     const matrizPor = contaPor(matriz)
     const configFinPor = contaPor(configsFin)
 
-    const out = tipos.map((t) => {
-      const macro = t.macroWorkflow
+    // UMA LINHA POR (Tipo × Modalidade HABILITADA) — desde que um Tipo possa ter
+    // um Workflow Macro por modalidade (mandato "Reconstrução da hierarquia",
+    // 22/09/2026), "a configuração deste tipo" deixou de ser uma coisa só:
+    // SLA/fases/versões são fatos de CADA combinação, não do Tipo sozinho.
+    const out = tipos.flatMap((t) => (t.modalidadesHabilitadas.length > 0 ? t.modalidadesHabilitadas : [null]).map((hab) => {
+      const macro = hab ? t.macroWorkflows.find((m) => m.modalidadeId === hab.modalidadeId) ?? null : (t.macroWorkflows[0] ?? null)
       const wfDoTipo = [...(internosPorTipo.get(t.id) ?? []), ...(internosPorTipo.get(null) ?? [])]
       const fases = (macro?.fases ?? []).map((f) => ({
         phaseKey: f.phaseKey,
@@ -107,14 +111,19 @@ export async function GET(request: NextRequest) {
       const auto = autoPorTipo.get(t.id) ?? {}
       return {
         id: t.id,
+        // Chave única de LINHA (um Tipo pode gerar 2 linhas, 1 por modalidade
+        // habilitada) — consumidores que precisam de key/identidade de linha
+        // usam esta, nunca `id` sozinho.
+        rowKey: hab ? `${t.id}:${hab.modalidadeId}` : `${t.id}`,
         code: t.code,
         name: t.name,
         // Apresentação derivada da relação canônica.
         countryKey: t.pais.countryKey,
         countryLabel: t.pais.countryLabel,
         nationalityLabel: t.pais.nationalityLabel,
-        modalityKey: t.modalidade.modalityKey,
-        modalityLabel: t.modalidade.modalityLabel,
+        modalidadeId: hab?.modalidadeId ?? null,
+        modalityKey: hab?.modalidade.modalityKey ?? null,
+        modalityLabel: hab?.modalidade.modalityLabel ?? null,
         processFamily: t.processFamily,
         serviceNature: t.serviceNature,
         ativo: t.ativo,
@@ -135,7 +144,7 @@ export async function GET(request: NextRequest) {
           configsFinanceiras: configFinPor.get(t.id) ?? 0,
         },
       }
-    })
+    }))
 
     return NextResponse.json({ tipos: out, catalogoFases })
   } catch (e) {

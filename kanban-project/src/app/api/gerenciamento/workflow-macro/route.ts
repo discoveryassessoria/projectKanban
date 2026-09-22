@@ -9,30 +9,39 @@ export async function GET(request: NextRequest) {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
-    const [tipos, catalogoFases, paises] = await Promise.all([
+    const [tipos, catalogoFases, paises, macros] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
         orderBy: { name: 'asc' },
         select: {
           id: true, code: true, name: true, ativo: true,
           pais: { select: { countryKey: true, countryLabel: true } },
-          modalidade: { select: { modalityLabel: true } },
+          // Um Tipo habilita 1 ou 2 modalidades (Administrativa/Judicial) —
+          // hierarquia País/Tipo/Modalidade/Workflow Macro (22/09/2026). Cada
+          // modalidade habilitada tem o SEU PRÓPRIO Workflow Macro.
+          modalidadesHabilitadas: {
+            where: { ativo: true },
+            select: { modalidade: { select: { id: true, modalityKey: true, modalityLabel: true } } },
+          },
         },
       }),
       prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: 'asc' } }),
       prisma.catalogoPais.findMany({ select: { countryKey: true, flag: true } }),
+      prisma.macroWorkflow.findMany({ select: { id: true, tipoProcessoId: true, modalidadeId: true } }),
     ])
 
-    // marca quais tipos já têm workflow
-    const comWf = await prisma.macroWorkflow.findMany({ select: { tipoProcessoId: true } })
-    const setWf = new Set(comWf.map((m) => m.tipoProcessoId))
+    // MacroWorkflow existente por (tipo, modalidade) — pra dizer QUAL id abrir,
+    // não só "existe" (o Tipo pode ter até 2, um por modalidade).
+    const macroPorChave = new Map(macros.map((m) => [`${m.tipoProcessoId}:${m.modalidadeId}`, m.id]))
     // País do tipo é APRESENTAÇÃO derivada da relação canônica.
-    const tiposOut = tipos.map(({ pais, modalidade, ...t }) => ({
+    const tiposOut = tipos.map(({ pais, modalidadesHabilitadas, ...t }) => ({
       ...t,
       countryKey: pais.countryKey,
       countryLabel: pais.countryLabel,
-      modalityLabel: modalidade.modalityLabel,
-      temWorkflow: setWf.has(t.id),
+      modalidades: modalidadesHabilitadas.map((h) => ({
+        id: h.modalidade.id, modalityKey: h.modalidade.modalityKey, modalityLabel: h.modalidade.modalityLabel,
+        macroWorkflowId: macroPorChave.get(`${t.id}:${h.modalidade.id}`) ?? null,
+      })),
     }))
 
     return NextResponse.json({ tipos: tiposOut, catalogoFases, paises })
@@ -50,12 +59,26 @@ export async function POST(request: NextRequest) {
 
     const b = await request.json()
     const tipoProcessoId = Number(b.tipoProcessoId)
+    const modalidadeId = Number(b.modalidadeId)
     if (!tipoProcessoId) return NextResponse.json({ error: 'Informe o tipo de processo.' }, { status: 400 })
+    if (!modalidadeId) return NextResponse.json({ error: 'Informe a modalidade (Administrativa ou Judicial).' }, { status: 400 })
 
     const tipo = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: tipoProcessoId } })
     if (!tipo) return NextResponse.json({ error: 'Tipo de processo não encontrado.' }, { status: 404 })
 
-    const existente = await prisma.macroWorkflow.findUnique({ where: { tipoProcessoId }, include: { fases: { orderBy: { ordem: 'asc' } } } })
+    // A modalidade PRECISA estar habilitada neste Tipo — nunca criar um
+    // Workflow Macro pra uma combinação que o cadastro não autoriza.
+    const habilitada = await prisma.tipoProcessoModalidadeHabilitada.findUnique({
+      where: { tipoProcessoId_modalidadeId: { tipoProcessoId, modalidadeId } },
+    })
+    if (!habilitada?.ativo) {
+      return NextResponse.json({ error: 'Esta modalidade não está habilitada para este tipo de processo.', code: 'MODALIDADE_NAO_HABILITADA' }, { status: 400 })
+    }
+
+    const existente = await prisma.macroWorkflow.findUnique({
+      where: { tipoProcessoId_modalidadeId: { tipoProcessoId, modalidadeId } },
+      include: { fases: { orderBy: { ordem: 'asc' } } },
+    })
     if (existente) return NextResponse.json({ macroWorkflow: existente })
 
     // monta as fases padrão a partir do catálogo, se pedido
@@ -113,7 +136,7 @@ export async function POST(request: NextRequest) {
     }
 
     const macroWorkflow = await prisma.macroWorkflow.create({
-      data: { tipoProcessoId, name: `Workflow Macro · ${tipo.name}`, ativo: true, ...(fasesCreate ? { fases: fasesCreate } : {}) },
+      data: { tipoProcessoId, modalidadeId, name: `Workflow Macro · ${tipo.name}`, ativo: true, ...(fasesCreate ? { fases: fasesCreate } : {}) },
       include: { fases: { orderBy: { ordem: 'asc' } } },
     })
 

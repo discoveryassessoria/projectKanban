@@ -67,9 +67,13 @@ async function montarPalco() {
   const oferta = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: `${MARCA}_ITA` }, update: {},
-    create: { code: `${MARCA}_ITA`, name: "Nacionalidade Italiana", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: `${MARCA}_ITA`, name: "Nacionalidade Italiana", paisId: oferta.paisId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 } })
   for (const [i, phaseKey] of FASES.entries()) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey, label: phaseKey, ordem: i, versao: 1, required: true, conditional: false } })
     const wf = await prisma.phaseInternalWorkflow.create({
@@ -92,7 +96,7 @@ async function montarPalco() {
   })
   const pessoa = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: "Lucia", sobrenome: "Teste", linhaReta: true, requerente: "nao" }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, tipoProcessoMotorId: tipo.id, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
+    data: { nome: `${MARCA} processo`, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
     select: { id: true },
   })
   const nec = await prisma.necessidadeDocumental.create({

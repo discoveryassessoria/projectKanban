@@ -192,10 +192,11 @@ async function montar(marca: string): Promise<Palco> {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_${marca}`.toUpperCase().slice(0, 40), name: `${M} ${marca}`, ativo: true,
-      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      paisId: oferta.paisId,
       },
     select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const fEmissao = await prisma.catalogoFase.upsert({
     where: { phaseKey: "retro_emissao" }, update: {},
     create: { phaseKey: "retro_emissao", label: "Emissão (retro)", escopo: "DOCUMENTO", ordemPadrao: 10 },
@@ -208,7 +209,7 @@ async function montar(marca: string): Promise<Palco> {
   })
   const macro = await prisma.macroWorkflow.create({
     data: {
-      tipoProcessoId: tipo.id, name: `${M} macro ${marca}`, versao: 1,
+      tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${M} macro ${marca}`, versao: 1,
       fases: {
         create: [
           { phaseKey: fEmissao.phaseKey, label: "Emissão (retro)", ordem: 1, required: true },
@@ -248,7 +249,7 @@ async function montar(marca: string): Promise<Palco> {
   const proc = await prisma.processo.create({
     data: {
       nome: `${M} ${marca}`, arvoreId: arv.id, workflowRuntime: "v2",
-      faseAtualKey: fAnalise.phaseKey, tipoProcessoMotorId: tipo.id,
+      faseAtualKey: fAnalise.phaseKey, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId,
     },
     select: { id: true },
   })

@@ -46,11 +46,15 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM-TEST" }, update: {},
     create: {
-      code: "ALE-ADM-TEST", name: "Alemã (teste de caminhos)", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "ALE-ADM-TEST", name: "Alemã (teste de caminhos)", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro ALE canônico", versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro ALE canônico", versao: 1 } })
   for (const f of FASES_MACRO) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: f.phaseKey, label: f.phaseKey, ordem: f.ordem, required: f.required, conditional: f.conditional, versao: 1 } })
   }
@@ -66,7 +70,7 @@ async function main() {
 
   async function processoNaAnalise(nome: string, requerRetificacao: boolean) {
     const p = await prisma.processo.create({
-      data: { nome, codigo: `T-${nome}`, faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+      data: { nome, codigo: `T-${nome}`, faseAtualKey: "analise_documental", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" },
     })
     await materializarExecucaoDaFase({ processoId: p.id, fonte: "CADASTRO_EM_ANDAMENTO" })
     await prisma.analiseDocumental.create({ data: { processoId: p.id, requerRetificacao } })
@@ -122,14 +126,18 @@ async function main() {
   const oferta2 = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipoNovo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "NOVO-SEED" }, update: {},
-    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", paisId: oferta2.paisId, modalidadeId: oferta2.modalidadeId,
+    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", paisId: oferta2.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipoNovo.id, modalidadeId: oferta2.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipoNovo.id, modalidadeId: oferta2.modalidadeId, ativo: true },
   })
   const catAtivo = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: "asc" } })
   const macroNovo = await prisma.macroWorkflow.create({
     data: {
-      tipoProcessoId: tipoNovo.id, name: "Macro novo", ativo: true,
-      fases: { create: catAtivo.map((f, i) => ({ phaseKey: f.phaseKey, label: f.label, ordem: i + 1, required: f.requiredPadrao, conditional: f.conditionalPadrao, entryRule: i === 0 ? "process_created" : "previous_phase_completed", showInKanban: true })) },
+      tipoProcessoId: tipoNovo.id, modalidadeId: oferta2.modalidadeId, name: "Macro novo", ativo: true,
+      fases: { create: catAtivo.map((f, i: number) => ({ phaseKey: f.phaseKey, label: f.label, ordem: i + 1, required: f.requiredPadrao, conditional: f.conditionalPadrao, entryRule: i === 0 ? "process_created" : "previous_phase_completed", showInKanban: true })) },
     },
     include: { fases: true },
   })

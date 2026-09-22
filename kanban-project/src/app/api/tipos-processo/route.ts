@@ -24,20 +24,25 @@ export async function GET(request: Request) {
         id: true,
         code: true,
         name: true,
-        // País e modalidade pelas relações canônicas: junções, sem N+1.
+        // País pela relação canônica: junção, sem N+1. Modalidade agora é
+        // uma LISTA — um Tipo pode habilitar Administrativa, Judicial ou
+        // ambas (mandato "Reconstrução da hierarquia", 22/09/2026); quem
+        // escolhe QUAL, na hora de criar o processo, é o seletor.
         pais: { select: { countryKey: true, countryLabel: true } },
-        modalidade: { select: { modalityKey: true, modalityLabel: true } },
+        modalidadesHabilitadas: {
+          where: { ativo: true },
+          select: { modalidade: { select: { id: true, modalityKey: true, modalityLabel: true } } },
+        },
       },
     })
     // O seletor continua recebendo `countryKey`/`countryLabel` — só que agora
     // eles são DERIVADOS da relação, e não colunas copiadas no tipo.
     return NextResponse.json({
-      tipos: tipos.map(({ pais, modalidade, ...t }) => ({
+      tipos: tipos.map(({ pais, modalidadesHabilitadas, ...t }) => ({
         ...t,
         countryKey: pais.countryKey,
         countryLabel: pais.countryLabel,
-        modalityKey: modalidade.modalityKey,
-        modalityLabel: modalidade.modalityLabel,
+        modalidades: modalidadesHabilitadas.map((h) => h.modalidade),
       })),
     })
   } catch (error) {

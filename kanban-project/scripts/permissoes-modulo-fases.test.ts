@@ -104,8 +104,10 @@ async function main() {
   }
 
   console.log("\n── 4.6 Daniela NÃO consegue mudar o escopo de uma fase em uso (nem confirmando) ──")
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_T`, name: `[${MARCA}] tipo`, paisId: (await prisma.catalogoPais.findFirstOrThrow()).id, modalidadeId: (await prisma.modalidadePais.findFirstOrThrow()).id, ativo: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] macro`, ativo: true } })
+  const pmPermissoes = await prisma.modalidadePais.findFirstOrThrow()
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_T`, name: `[${MARCA}] tipo`, paisId: (await prisma.catalogoPais.findFirstOrThrow()).id, ativo: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pmPermissoes.id, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pmPermissoes.id, name: `[${MARCA}] macro`, ativo: true } })
   const chaveFase = `${MARCA.toLowerCase()}_fase_escopo`
   const faseEmUso = await prisma.catalogoFase.create({
     data: { phaseKey: chaveFase, label: `[${MARCA}] Fase em uso`, escopo: "PROCESSO", ordemPadrao: 1, requiredPadrao: true, conditionalPadrao: false, ativo: true, status: "PUBLICADA", revisaoAtual: 1, efeitosPermitidos: ["REGISTER_ONLY"] },

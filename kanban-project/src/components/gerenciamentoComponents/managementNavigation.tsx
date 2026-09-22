@@ -159,15 +159,15 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_processos", label: "Processos", icon: GitBranch, order: 20, status: "active",
     description: "Cadastros, estrutura de fases e configurações do processo.",
     children: [
-      a(10, "proctypes", "Tipos de Processo", ["processo", "tipo", "nacionalidade", "cidadania"], "Cadastros"),
-      a(20, "modalidades", "Modalidades", ["modalidade", "judicial", "administrativo", "via"], "Cadastros"),
-      // BASE JURÍDICA da rota. Não confundir com "Modalidades" acima, que é a VIA
-      // de tramitação (ModalidadePais). A modalidade LEGAL é o fundamento sob o
-      // qual a cidadania é requerida — e é ela que declara se o requerimento é
-      // individual (um por requerente) ou coletivo (um pela família).
-      a(22, "legalmodes", "Modalidades Legais", ["modalidade", "legal", "juridica", "jurídica", "lmd", "memoria", "memória", "judicial", "requerimento", "individual", "coletivo"], "Cadastros"),
-      a(24, "legalframes", "Enquadramentos Legais", ["enquadramento", "anexo", "recorte", "legal", "rota"], "Cadastros"),
-      a(30, "countrycatalog", "Países e Regiões", ["pais", "país", "regiao", "região", "italia", "portugal", "nacionalidade"], "Cadastros"),
+      // HIERARQUIA ÚNICA (mandato "Reconstrução da hierarquia País/Tipo/
+      // Modalidade/Workflow Macro", 22/09/2026): País/Região → Tipo de
+      // Processo → Modalidade (ADMINISTRATIVA/JUDICIAL) → Workflow Macro.
+      // Modalidade Legal e Enquadramento Legal foram REMOVIDOS por completo —
+      // a cardinalidade do requerimento (individual/coletivo) agora vive em
+      // `MacroWorkflow.cardinalidadeRequerimento`, o cadastro publicado.
+      a(10, "countrycatalog", "Países e Regiões", ["pais", "país", "regiao", "região", "italia", "portugal", "nacionalidade"], "Cadastros"),
+      a(20, "proctypes", "Tipos de Processo", ["processo", "tipo", "nacionalidade", "cidadania"], "Cadastros"),
+      a(30, "modalidades", "Modalidades", ["modalidade", "judicial", "administrativo", "via"], "Cadastros"),
 
       // ESTRUTURA — o catálogo de fases é a fonte única das fases do sistema.
       a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),

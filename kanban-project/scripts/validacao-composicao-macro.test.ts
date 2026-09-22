@@ -114,19 +114,20 @@ async function integrar() {
   const admin = await prisma.usuario.create({ data: { nome: "Admin ValComp", email: "admin@valcomp.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const token = await signAuthToken({ userId: admin.id, email: "admin@valcomp.test", tipo: "admin", sessaoInicio: Date.now() })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País ValComp", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade ValComp" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
   for (const phaseKey of [`${MARCA_MINUSCULA}_a`, `${MARCA_MINUSCULA}_b`, `${MARCA_MINUSCULA}_fim`]) {
     await prisma.catalogoFase.create({ data: { phaseKey, label: phaseKey, escopo: "PROCESSO", requiredPadrao: true, conditionalPadrao: false, ativo: true, status: "PUBLICADA" } })
   }
 
   const chamar = (fases: unknown[]) => {
-    const req = new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${tipo.id}`, {
+    const req = new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${macro.id}`, {
       method: "PUT",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ fases }),
     })
-    return putWorkflowMacro(req, { params: Promise.resolve({ id: String(tipo.id) }) })
+    return putWorkflowMacro(req, { params: Promise.resolve({ id: String(macro.id) }) })
   }
 
   const rInvalida = await chamar([

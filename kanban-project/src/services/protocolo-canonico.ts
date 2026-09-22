@@ -22,6 +22,7 @@
 
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/src/lib/prisma"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 
 export const ORIGENS_DE_PROTOCOLO = {
   /** Protocolização do dossiê no órgão, pelas telas do processo. */
@@ -243,21 +244,28 @@ async function validarEscopo(
 }
 
 /**
- * A cardinalidade da rota do processo: enquadramento → modalidade legal.
+ * A cardinalidade da rota do processo: o WORKFLOW MACRO publicado que o
+ * processo segue (mandato "Reconstrução da hierarquia País/Tipo/Modalidade/
+ * Workflow Macro", 22/09/2026 — decisão do usuário: "A cardinalidade... deve
+ * ficar no Workflow Macro, porque define como aquele fluxo específico será
+ * protocolado"). Migrado de `EnquadramentoLegal → ModalidadeLegal.
+ * cardinalidadeRequerimento` (removidos) — mesmo dado, nova fonte canônica.
  *
- * Sem enquadramento declarado o sistema NÃO CHUTA: cai em INDIVIDUAL, que é a
- * regra mais restritiva. Preferir a restritiva é deliberado — um requerimento
- * coletivo criado por engano espalha o erro por N pessoas de uma vez.
+ * Sem Workflow Macro resolvível o sistema NÃO CHUTA: cai em INDIVIDUAL, que é
+ * a regra mais restritiva. Preferir a restritiva é deliberado — um
+ * requerimento coletivo criado por engano espalha o erro por N pessoas de
+ * uma vez.
  */
 export async function cardinalidadeDoProcesso(
   tx: Prisma.TransactionClient, processoId: number,
 ): Promise<Cardinalidade> {
   const p = await tx.processo.findUnique({
     where: { id: processoId },
-    select: { enquadramentoLegal: { select: { modalidadeLegal: { select: { cardinalidadeRequerimento: true } } } } },
+    select: { tipoProcessoMotorId: true, modalidadeId: true },
   })
-  const declarada = p?.enquadramentoLegal?.modalidadeLegal?.cardinalidadeRequerimento
-  return declarada === CARDINALIDADES.COLETIVO ? CARDINALIDADES.COLETIVO : CARDINALIDADES.INDIVIDUAL
+  if (p?.tipoProcessoMotorId == null || p.modalidadeId == null) return CARDINALIDADES.INDIVIDUAL
+  const wf = await resolverMacroWorkflowDoProcesso(p.tipoProcessoMotorId, p.modalidadeId, tx)
+  return wf?.cardinalidadeRequerimento === CARDINALIDADES.COLETIVO ? CARDINALIDADES.COLETIVO : CARDINALIDADES.INDIVIDUAL
 }
 
 /** Fora de transação, para quem só precisa registrar. */

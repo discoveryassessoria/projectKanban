@@ -9,6 +9,7 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
 import { calcularPendencias } from "@/src/lib/motor/blocking-engine"
 import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 
 export interface SimulateAdvanceResult {
   success: true
@@ -42,7 +43,7 @@ export async function simulateAdvance(
 
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true, workflowRuntime: true },
+    select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true, workflowRuntime: true },
   })
   if (!processo) return { success: false, code: "PROCESSO_NAO_ENCONTRADO", message: "Processo inexistente", correlationId }
 
@@ -51,7 +52,7 @@ export async function simulateAdvance(
   const runtime = resolveWorkflowRuntime(processo.workflowRuntime, v2Global)
 
   const faseAtual = processo.faseAtualKey ?? ""
-  const proximaFase = await resolverProximaFase(processo.tipoProcessoMotorId, faseAtual)
+  const proximaFase = await resolverProximaFase(processo.tipoProcessoMotorId, processo.modalidadeId, faseAtual)
 
   // Pendências (somente leitura) — sempre calculáveis
   const pend = await calcularPendencias(processoId, faseAtual, { correlationId })
@@ -106,12 +107,8 @@ export async function simulateAdvance(
 }
 
 /** Próxima fase pela ordem do Workflow Macro (definição), não por label. */
-async function resolverProximaFase(tipoProcessoMotorId: number | null, faseAtualKey: string): Promise<string | null> {
-  if (tipoProcessoMotorId == null) return null
-  const wf = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: tipoProcessoMotorId },
-    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true } } },
-  })
+async function resolverProximaFase(tipoProcessoMotorId: number | null, modalidadeId: number | null, faseAtualKey: string): Promise<string | null> {
+  const wf = await resolverMacroWorkflowDoProcesso(tipoProcessoMotorId, modalidadeId)
   if (!wf) return null
   const idx = wf.fases.findIndex((f) => f.phaseKey === faseAtualKey)
   if (idx === -1 || idx + 1 >= wf.fases.length) return null

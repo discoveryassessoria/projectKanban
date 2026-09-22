@@ -2,20 +2,22 @@
 //
 // GET  - lista TODAS as modalidades do país (ativas e inativas) + quantos
 //        tipos usam cada uma (pra saber se pode excluir)
-// POST - cria modalidade nova no país
+// POST - habilita uma das DUAS modalidades canônicas neste país
+//
+// MODALIDADE É ENUMERAÇÃO CANÔNICA, NÃO CADASTRO DE TEXTO LIVRE (mandato
+// "Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro",
+// 22/09/2026): "EXCLUSIVAMENTE duas: ADMINISTRATIVA e JUDICIAL. Não permitir
+// terceira modalidade por texto livre." O rótulo/sufixo NUNCA vêm do corpo da
+// requisição — são fixos aqui, e é isso que impede um "Recurso" ou
+// "Exigência" de nascer como se fosse modalidade.
 
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
-// "Recurso / Exigência" -> "recurso_exigencia"
-function slug(s: string) {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
+const CANONICAS: Record<string, { modalityLabel: string; codeSuffix: string; ordem: number }> = {
+  judicial: { modalityLabel: 'Judicial', codeSuffix: 'JUD', ordem: 0 },
+  administrativa: { modalityLabel: 'Administrativa', codeSuffix: 'ADM', ordem: 1 },
 }
 
 export async function GET(request: Request, { params }: { params: Promise<{ countryKey: string }> }) {
@@ -27,18 +29,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ coun
     const pais = await prisma.catalogoPais.findUnique({ where: { countryKey } })
     if (!pais) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
 
-    const [mods, tipos] = await Promise.all([
+    const [mods, habilitacoes] = await Promise.all([
       prisma.modalidadePais.findMany({ where: { paisId: pais.id }, orderBy: { ordem: 'asc' } }),
-      // Quem usa a modalidade é uma OFERTA daquele país — recorte por identidade.
-      prisma.tipoProcessoNacionalidade.findMany({ where: { paisId: pais.id }, select: { modalidadeId: true } }),
+      // Quem usa a modalidade é a HABILITAÇÃO N:N (Tipo × Modalidade), não uma
+      // cópia de FK único — um Tipo pode usar as duas.
+      prisma.tipoProcessoModalidadeHabilitada.findMany({
+        where: { ativo: true, tipoProcesso: { paisId: pais.id } },
+        select: { modalidadeId: true },
+      }),
     ])
 
-    // Contagem pela IDENTIDADE da modalidade, não pela chave copiada.
     const contagem = new Map<number, number>()
-    for (const t of tipos) contagem.set(t.modalidadeId, (contagem.get(t.modalidadeId) || 0) + 1)
+    for (const h of habilitacoes) contagem.set(h.modalidadeId, (contagem.get(h.modalidadeId) || 0) + 1)
 
     const out = mods.map((m) => ({ ...m, tiposCount: contagem.get(m.id) || 0 }))
-    return NextResponse.json({ modalidades: out })
+    return NextResponse.json({ modalidades: out, canonicas: Object.keys(CANONICAS) })
   } catch (error) {
     console.error('Erro ao listar modalidades:', error)
     return NextResponse.json({ error: 'Erro ao listar modalidades' }, { status: 500 })
@@ -55,26 +60,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ cou
     if (!pais) return NextResponse.json({ error: 'País não encontrado.' }, { status: 404 })
 
     const body = await request.json().catch(() => ({}))
-    const modalityLabel = String(body?.modalityLabel || '').trim()
-    if (!modalityLabel) return NextResponse.json({ error: 'Informe o nome da modalidade.' }, { status: 400 })
-
-    const modalityKey = String(body?.modalityKey || '').trim() || slug(modalityLabel)
-    if (!modalityKey) return NextResponse.json({ error: 'Não foi possível gerar a chave da modalidade.' }, { status: 400 })
+    const modalityKey = String(body?.modalityKey || '').trim().toLowerCase()
+    const canonica = CANONICAS[modalityKey]
+    if (!canonica) {
+      return NextResponse.json(
+        { error: 'Modalidade inválida — só existem duas: Administrativa e Judicial.', code: 'MODALIDADE_NAO_CANONICA', canonicas: Object.keys(CANONICAS) },
+        { status: 400 },
+      )
+    }
 
     const existe = await prisma.modalidadePais.findUnique({
       where: { paisId_modalityKey: { paisId: pais.id, modalityKey } },
     })
-    if (existe) return NextResponse.json({ error: `Este país já tem a modalidade "${modalityKey}".` }, { status: 409 })
-
-    const total = await prisma.modalidadePais.count({ where: { paisId: pais.id } })
+    if (existe) return NextResponse.json({ error: `Este país já tem a modalidade "${canonica.modalityLabel}".` }, { status: 409 })
 
     const modalidade = await prisma.modalidadePais.create({
       data: {
         paisId: pais.id,
         modalityKey,
-        modalityLabel,
-        codeSuffix: body?.codeSuffix ? String(body.codeSuffix).trim() : null,
-        ordem: typeof body?.ordem === 'number' ? body.ordem : total,
+        modalityLabel: canonica.modalityLabel,
+        codeSuffix: canonica.codeSuffix,
+        ordem: canonica.ordem,
         ativo: true,
       },
     })

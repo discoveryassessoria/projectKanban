@@ -4,12 +4,15 @@
 // FASE 1B do Motor — Workflow Macro + Fases variáveis por Tipo de Processo.
 // As fases são a "coluna variável": adiciona, remove, reordena e liga/desliga no kanban.
 // Edição local + botão Salvar (PUT manda a lista completa = verdade).
-// Backend: /api/gerenciamento/workflow-macro (GET bootstrap, POST criar) + /[tipoProcessoId] (GET, PUT sync, DELETE)
+// Backend: /api/gerenciamento/workflow-macro (GET bootstrap, POST criar) + /[id] (GET, PUT sync, DELETE — id é o MacroWorkflow.id)
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useApi } from '@/src/lib/dados'
 
-type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; modalityLabel: string; ativo: boolean; temWorkflow: boolean }
+// Hierarquia País/Tipo/Modalidade/Workflow Macro (22/09/2026): um Tipo
+// habilita 1 ou 2 modalidades, cada uma com o SEU PRÓPRIO Workflow Macro.
+type ModalidadeDoTipo = { id: number; modalityKey: string; modalityLabel: string; macroWorkflowId: number | null }
+type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; ativo: boolean; modalidades: ModalidadeDoTipo[] }
 type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean }
 // exitRule DESCONTINUADO: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
 // A tela não lê, não exibe, não edita e não reenvia o campo — o backend também não grava mais.
@@ -49,17 +52,20 @@ export default function MacroKanbanTab() {
   const [erroEscrita, setErroEscrita] = useState<string | null>(null)
   const erro = erroEscrita ?? (bootstrapReq.erro ? bootstrapReq.erro.message : null)
   const setErro = setErroEscrita
-  // Marcar/desmarcar "tem workflow" era um `setTipos` local depois de criar ou
-  // excluir. Continua imediato — a transformação entra no cache como dado otimista
-  // e o servidor confirma em seguida.
-  const marcarTemWorkflow = (id: number, temWorkflow: boolean) => {
+  // Ligar/soltar o macroWorkflowId de UMA modalidade específica do tipo — era
+  // um `temWorkflow` booleano no Tipo; agora é por (tipo, modalidade), porque
+  // um Tipo pode ter até 2 Workflow Macro (mandato 22/09/2026).
+  const marcarMacroWorkflowId = (tId: number, mId: number, macroWorkflowId: number | null) => {
     void bootstrapReq.recarregar({
       ...bootstrapReq.dados,
-      tipos: tipos.map((t) => (t.id === id ? { ...t, temWorkflow } : t)),
+      tipos: tipos.map((t) => t.id === tId
+        ? { ...t, modalidades: t.modalidades.map((m) => (m.id === mId ? { ...m, macroWorkflowId } : m)) }
+        : t),
     })
   }
 
   const [tipoId, setTipoId] = useState<number | null>(null)
+  const [modalidadeId, setModalidadeId] = useState<number | null>(null)
   const [wf, setWf] = useState<MacroWf | null>(null)
   const [fases, setFases] = useState<Fase[]>([])
   const [dirty, setDirty] = useState(false)
@@ -69,10 +75,10 @@ export default function MacroKanbanTab() {
   const [criando, setCriando] = useState(false)
   const [salvoMsg, setSalvoMsg] = useState<string | null>(null)
 
-  const carregarWf = useCallback(async (id: number) => {
+  const carregarWf = useCallback(async (macroWorkflowId: number) => {
     setCarregandoWf(true)
     try {
-      const d = await jsonFetch(`/api/gerenciamento/workflow-macro/${id}`, { cache: 'no-store' })
+      const d = await jsonFetch(`/api/gerenciamento/workflow-macro/${macroWorkflowId}`, { cache: 'no-store' })
       const m = (d as any).macroWorkflow as MacroWf | null
       setWf(m)
       setFases(m ? [...m.fases].sort((a, b) => a.ordem - b.ordem) : [])
@@ -82,12 +88,25 @@ export default function MacroKanbanTab() {
     } finally { setCarregandoWf(false) }
   }, [])
 
-  function selecionar(id: number) {
-    setTipoId(id); setAddKey('')
-    carregarWf(id)
+  const tipoSel = useMemo(() => tipos.find((t) => t.id === tipoId) || null, [tipos, tipoId])
+  const modalidadeSel = useMemo(() => tipoSel?.modalidades.find((m) => m.id === modalidadeId) || null, [tipoSel, modalidadeId])
+
+  function selecionarTipo(id: number) {
+    const t = tipos.find((x) => x.id === id) || null
+    setTipoId(id); setAddKey(''); setWf(null); setFases([]); setDirty(false)
+    // 1 modalidade habilitada → já entra selecionada; 2 → fica em aberto, o
+    // usuário escolhe qual Workflow Macro quer ver/editar.
+    const unica = t && t.modalidades.length === 1 ? t.modalidades[0] : null
+    setModalidadeId(unica?.id ?? null)
+    if (unica?.macroWorkflowId) carregarWf(unica.macroWorkflowId)
   }
 
-  const tipoSel = useMemo(() => tipos.find((t) => t.id === tipoId) || null, [tipos, tipoId])
+  function selecionarModalidade(mId: number) {
+    setModalidadeId(mId); setAddKey(''); setWf(null); setFases([]); setDirty(false)
+    const m = tipoSel?.modalidades.find((x) => x.id === mId)
+    if (m?.macroWorkflowId) carregarWf(m.macroWorkflowId)
+  }
+
   const flagDe = useCallback((ck: string) => paises.find((p) => p.countryKey === ck)?.flag || '', [paises])
 
   // fases ainda não usadas (p/ o seletor "adicionar fase")
@@ -100,12 +119,13 @@ export default function MacroKanbanTab() {
   const colunas = useMemo(() => fases.filter((f) => f.showInKanban).map((f) => f.label), [fases])
 
   async function criarWorkflow(seedDefaults: boolean) {
-    if (!tipoId) return
+    if (!tipoId || !modalidadeId) return
     setCriando(true)
     try {
-      await jsonFetch('/api/gerenciamento/workflow-macro', { method: 'POST', body: JSON.stringify({ tipoProcessoId: tipoId, seedDefaults }) })
-      await carregarWf(tipoId)
-      marcarTemWorkflow(tipoId, true)
+      const d = await jsonFetch('/api/gerenciamento/workflow-macro', { method: 'POST', body: JSON.stringify({ tipoProcessoId: tipoId, modalidadeId, seedDefaults }) })
+      const criado = (d as any).macroWorkflow as MacroWf
+      await carregarWf(criado.id)
+      marcarMacroWorkflowId(tipoId, modalidadeId, criado.id)
     } catch (e: any) {
       alert(e.message || 'Erro ao criar o workflow.')
     } finally { setCriando(false) }
@@ -145,7 +165,7 @@ export default function MacroKanbanTab() {
   }
 
   async function salvar() {
-    if (!tipoId) return
+    if (!wf) return
     const nome = tipoSel?.name || 'processo'
     setSalvando(true)
     try {
@@ -155,9 +175,9 @@ export default function MacroKanbanTab() {
         required: f.required, conditional: f.conditional,
         entryRule: f.entryRule, showInKanban: f.showInKanban,
       }))
-      await jsonFetch(`/api/gerenciamento/workflow-macro/${tipoId}`, { method: 'PUT', body: JSON.stringify({ fases: fasesPayload }) })
+      await jsonFetch(`/api/gerenciamento/workflow-macro/${wf.id}`, { method: 'PUT', body: JSON.stringify({ fases: fasesPayload }) })
       // salvou → fecha o editor e volta pro seletor, com aviso de confirmação
-      setTipoId(null); setWf(null); setFases([]); setDirty(false); setAddKey('')
+      setTipoId(null); setModalidadeId(null); setWf(null); setFases([]); setDirty(false); setAddKey('')
       setSalvoMsg(`Workflow de ${nome} salvo.`)
       setTimeout(() => setSalvoMsg(null), 3500)
     } catch (e: any) {
@@ -166,12 +186,12 @@ export default function MacroKanbanTab() {
   }
 
   async function excluirWorkflow() {
-    if (!tipoId) return
-    if (!confirm('Excluir o workflow inteiro deste processo? As fases serão perdidas.')) return
+    if (!wf || !tipoId || !modalidadeId) return
+    if (!confirm('Excluir o workflow inteiro desta modalidade? As fases serão perdidas.')) return
     try {
-      await jsonFetch(`/api/gerenciamento/workflow-macro/${tipoId}`, { method: 'DELETE' })
-      marcarTemWorkflow(tipoId, false)
-      await carregarWf(tipoId)
+      await jsonFetch(`/api/gerenciamento/workflow-macro/${wf.id}`, { method: 'DELETE' })
+      marcarMacroWorkflowId(tipoId, modalidadeId, null)
+      setWf(null); setFases([]); setDirty(false)
     } catch (e: any) {
       alert(e.message || 'Erro ao excluir.')
     }
@@ -211,26 +231,40 @@ export default function MacroKanbanTab() {
 
       {!loading && !erro && tipos.length > 0 && (
         <>
-          {/* Seletor de processo */}
+          {/* Seletor: Tipo → Modalidade (hierarquia País/Tipo/Modalidade/Workflow Macro) */}
           <div className="flex flex-wrap items-center gap-3">
-            <label className="text-sm text-[var(--text-secondary)]">Processo:</label>
-            <select value={tipoId ?? ''} onChange={(e) => e.target.value && selecionar(Number(e.target.value))} className={selCls + ' min-w-[260px]'}>
-              <option value="" className="bg-zinc-900">— selecione um processo —</option>
+            <label className="text-sm text-[var(--text-secondary)]">Tipo de processo:</label>
+            <select value={tipoId ?? ''} onChange={(e) => e.target.value && selecionarTipo(Number(e.target.value))} className={selCls + ' min-w-[260px]'}>
+              <option value="" className="bg-zinc-900">— selecione um tipo —</option>
               {tipos.map((t) => (
                 <option key={t.id} value={t.id} className="bg-zinc-900">
-                  {flagDe(t.countryKey)} {t.name} {t.temWorkflow ? '' : '· (sem workflow)'}
+                  {flagDe(t.countryKey)} {t.name}
                 </option>
               ))}
             </select>
+
+            {tipoSel && tipoSel.modalidades.length > 1 && (
+              <>
+                <label className="text-sm text-[var(--text-secondary)]">Modalidade:</label>
+                <select value={modalidadeId ?? ''} onChange={(e) => e.target.value && selecionarModalidade(Number(e.target.value))} className={selCls}>
+                  <option value="" className="bg-zinc-900">— selecione —</option>
+                  {tipoSel.modalidades.map((m) => (
+                    <option key={m.id} value={m.id} className="bg-zinc-900">
+                      {m.modalityLabel} {m.macroWorkflowId ? '' : '· (sem workflow)'}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
           </div>
 
-          {tipoId && carregandoWf && <div className="py-8 text-center text-sm text-[var(--text-muted)]">Carregando workflow...</div>}
+          {tipoId && modalidadeId && carregandoWf && <div className="py-8 text-center text-sm text-[var(--text-muted)]">Carregando workflow...</div>}
 
           {/* Sem workflow ainda → CTA */}
-          {tipoId && !carregandoWf && !wf && (
+          {tipoId && modalidadeId && !carregandoWf && !wf && (
             <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-6 text-center backdrop-blur">
               <p className="text-sm text-white/70">
-                <span className="font-medium text-white">{tipoSel?.name}</span> ainda não tem um Workflow Macro.
+                <span className="font-medium text-white">{tipoSel?.name} · {modalidadeSel?.modalityLabel}</span> ainda não tem um Workflow Macro.
               </p>
               <p className="mt-1 text-xs text-[var(--text-muted)]">Comece pelas 10 fases padrão (recomendado) ou monte do zero.</p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
@@ -245,7 +279,7 @@ export default function MacroKanbanTab() {
           )}
 
           {/* Editor de fases */}
-          {tipoId && !carregandoWf && wf && (
+          {tipoId && modalidadeId && !carregandoWf && wf && (
             <div className="space-y-4">
               {/* Prévia do kanban */}
               <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur">

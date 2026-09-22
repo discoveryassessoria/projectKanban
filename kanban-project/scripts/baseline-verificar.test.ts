@@ -505,6 +505,15 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // histórico + as migrations aditivas registradas aqui são a prova, não um
   // baseline sempre-atualizado.
   '20260920020000_catalogo_fase_revisao_macro_workflow_versao',
+  // Mandato "Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro"
+  // (22/09/2026): passo 1/3 (aditivo) e passo 3/3 (tighten — remove
+  // ModalidadeLegal/EnquadramentoLegal, TipoProcessoNacionalidade.modalidadeId,
+  // Processo.enquadramentoLegalId; aperta MacroWorkflow/MacroWorkflowVersao
+  // pra NOT NULL; trava ModalidadePais.modalityKey às duas canônicas). O passo
+  // 2/3 (backfill) é scripts/migrar-hierarquia-pais-tipo-modalidade.ts —
+  // dados, não schema, não entra aqui.
+  '20260922100000_hierarquia_pais_tipo_modalidade_1_additive',
+  '20260922110000_hierarquia_pais_tipo_modalidade_3_tighten',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const [tipos, workflows] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         where: { arquivado: false },
-        include: { macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
+        include: { macroWorkflows: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
         orderBy: { name: 'asc' },
       }),
       prisma.phaseInternalWorkflow.findMany({
@@ -49,13 +49,20 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
-    const tiposProcesso = tipos.map((t) => ({
-      id: t.id,
-      name: t.name,
-      fases: (t.macroWorkflow?.fases || []).map((f) => ({
-        phaseKey: f.phaseKey, label: f.label, order: f.ordem,
-      })),
-    }))
+    // Picker de phaseKey por Tipo — une as fases de todos os Workflow Macro do
+    // Tipo (um por modalidade habilitada), sem repetir a mesma chave.
+    const tiposProcesso = tipos.map((t) => {
+      const vistas = new Set<string>()
+      const fases: Array<{ phaseKey: string; label: string; order: number }> = []
+      for (const mw of t.macroWorkflows) {
+        for (const f of mw.fases) {
+          if (vistas.has(f.phaseKey)) continue
+          vistas.add(f.phaseKey)
+          fases.push({ phaseKey: f.phaseKey, label: f.label, order: f.ordem })
+        }
+      }
+      return { id: t.id, name: t.name, fases }
+    })
 
     return NextResponse.json({ tiposProcesso, workflows })
   } catch (e) {

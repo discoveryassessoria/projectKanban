@@ -16,6 +16,7 @@ import {
 } from '@prisma/client'
 import type { FaseCode } from '@prisma/client'
 import { getFase, faseCodeToPhaseKey, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
+import { resolverMacroWorkflowDoTipo } from '@/src/lib/motor/resolver-macro-workflow'
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { calcularPreco } from '@/lib/financeiro/calculo-preco'
 import { MODOS_PRIMEIRO_ADICIONAL, estrategiaDoModo } from '@/lib/financeiro/modo-calculo'
@@ -257,7 +258,11 @@ async function criarEvento(db: DbLancamento, pid: number, titulo: string, descri
 // nome/label). Robusto: não depende de regra de texto.
 // ============================================================
 export async function resolvePhaseKey(tipoProcessoId: number, faseCode: FaseCode): Promise<string | null> {
-  const mw = await prisma.macroWorkflow.findUnique({ where: { tipoProcessoId }, select: { fases: { select: { phaseKey: true, label: true } } } })
+  // MOTOR CLÁSSICO/LEGADO — só roda para processo em runtime legacy (guard em
+  // `dispararMotorNaFaseAtual`, o único chamador). Legado não carrega
+  // modalidade própria; resolução best-effort por Tipo (ver
+  // `resolverMacroWorkflowDoTipo`), nunca usada pelo motor v2 real.
+  const mw = await resolverMacroWorkflowDoTipo(tipoProcessoId)
   const fases = mw?.fases ?? []
   const norm = (s: string) => s.trim().toLowerCase()
   let label = ''

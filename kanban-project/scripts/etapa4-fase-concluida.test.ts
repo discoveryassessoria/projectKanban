@@ -32,10 +32,14 @@ async function main() {
   const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM-E4" }, update: {},
-    create: { code: "ALE-ADM-E4", name: "Alemã (Etapa 4)", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: "ALE-ADM-E4", name: "Alemã (Etapa 4)", paisId: oferta.paisId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId },
   })
   const FASES = ["fase_um", "fase_dois"]
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro E4", versao: 1 } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro E4", versao: 1 } })
   for (let i = 0; i < FASES.length; i++) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASES[i], label: FASES[i], ordem: i, versao: 1 } })
   }
@@ -53,7 +57,7 @@ async function main() {
   await prisma.pessoa.create({ data: { nome: "Joao", sobrenome: "Silva", arvoreId: arvore.id, linhaReta: true, requerente: "maior" } })
 
   async function novoProcesso(nome: string) {
-    const p = await prisma.processo.create({ data: { nome, codigo: `T-${nome}`, arvoreId: arvore.id, faseAtualKey: "fase_um", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" } })
+    const p = await prisma.processo.create({ data: { nome, codigo: `T-${nome}`, arvoreId: arvore.id, faseAtualKey: "fase_um", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" } })
     await materializarExecucaoDaFase({ processoId: p.id, fonte: "CADASTRO_EM_ANDAMENTO" })
     return p
   }

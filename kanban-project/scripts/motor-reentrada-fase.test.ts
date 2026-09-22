@@ -168,11 +168,15 @@ async function montarPalco(nome: string) {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro palco", versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro palco", versao: 1 } })
   for (let i = 0; i < FASES.length; i++) {
     await prisma.faseMacro.create({
       data: {
@@ -203,7 +207,7 @@ async function montarPalco(nome: string) {
     create: { nome: "Master", email: "motor@teste.local", senha: "x", tipo: "admin" },
   })
   const processo = await prisma.processo.create({
-    data: { nome: `Processo ${nome}`, codigo: `T-${nome}`, arvoreId: arvore.id, faseAtualKey: A, tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: `Processo ${nome}`, codigo: `T-${nome}`, arvoreId: arvore.id, faseAtualKey: A, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" },
   })
   await reconciliarFaseAtiva(processo.id)
   return { processo, usuario, tipo }

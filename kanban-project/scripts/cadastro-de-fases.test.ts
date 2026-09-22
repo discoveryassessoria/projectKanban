@@ -187,11 +187,12 @@ async function main() {
   console.log("\n(B5) A ordem pertence ao FLUXO, não à fase")
   // ══════════════════════════════════════════════════════════════════════════
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true }, select: { id: true } })
-  if (!tipo) { console.log("  (sem tipo de processo no banco de teste — parte do fluxo pulada)") }
+  const habilitacaoB5 = tipo ? await prisma.tipoProcessoModalidadeHabilitada.findFirst({ where: { tipoProcessoId: tipo.id }, select: { modalidadeId: true } }) : null
+  if (!tipo || !habilitacaoB5) { console.log("  (sem tipo de processo com modalidade habilitada no banco de teste — parte do fluxo pulada)") }
   else {
     const macroWf = await prisma.macroWorkflow.upsert({
-      where: { tipoProcessoId: tipo.id },
-      update: {}, create: { tipoProcessoId: tipo.id, name: "Macro teste fases", versao: 1 },
+      where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: habilitacaoB5.modalidadeId } },
+      update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: habilitacaoB5.modalidadeId, name: "Macro teste fases", versao: 1 },
       select: { id: true },
     })
     await prisma.faseMacro.deleteMany({ where: { macroWorkflowId: macroWf.id } })
@@ -223,7 +224,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   const tipo2 = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true }, select: { id: true } })
   if (tipo2) {
-    const mw = await prisma.macroWorkflow.findUnique({ where: { tipoProcessoId: tipo2.id }, select: { id: true } })
+    const mw = await prisma.macroWorkflow.findFirst({ where: { tipoProcessoId: tipo2.id }, select: { id: true } })
     if (mw) await prisma.faseMacro.create({ data: { macroWorkflowId: mw.id, phaseKey: CHAVE, label: "Teste", ordem: 1, versao: 1 } })
     const usos = await prisma.faseMacro.count({ where: { phaseKey: CHAVE } })
     check("a fase consta como usada", usos > 0, String(usos))

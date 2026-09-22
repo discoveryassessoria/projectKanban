@@ -152,6 +152,7 @@ export async function POST(request: Request) {
       nome: body.nome,
       pais: body.pais,
       tipoProcessoMotorId: body.tipoProcessoMotorId,
+      modalidadeId: body.modalidadeId,
       descricao: body.descricao ?? null,
       observacoes: body.observacoes ?? null,
       arvoreId: body.arvoreId ?? null,

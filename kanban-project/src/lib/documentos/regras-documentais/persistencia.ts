@@ -38,8 +38,15 @@ export async function dadosDeApoio() {
       select: {
         id: true, name: true,
         pais: { select: { countryKey: true } },
-        modalidade: { select: { modalityKey: true } },
-        macroWorkflow: { select: { versao: true, fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: "asc" } } } },
+        // Um Tipo pode habilitar Administrativa, Judicial ou ambas (mandato
+        // "Reconstrução da hierarquia", 22/09/2026) — cada modalidade habilitada
+        // tem o seu próprio Workflow Macro, então a tela recebe uma linha por
+        // combinação tipo × modalidade, não mais uma por tipo.
+        modalidadesHabilitadas: {
+          where: { ativo: true },
+          select: { modalidadeId: true, modalidade: { select: { modalityKey: true } } },
+        },
+        macroWorkflows: { select: { modalidadeId: true, versao: true, fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: "asc" } } } },
       },
       orderBy: { name: "asc" },
     }),
@@ -47,11 +54,16 @@ export async function dadosDeApoio() {
     prisma.categoriaDocumental.findMany({ where: { ativo: true }, select: { code: true, name: true }, orderBy: { ordem: "asc" } }),
     prisma.modalidadePais.findMany({ where: { ativo: true }, select: { id: true, modalityKey: true, modalityLabel: true, pais: { select: { countryKey: true } } }, orderBy: { ordem: "asc" } }),
   ])
-  const tiposProcesso = tipos.map((t) => ({
-    id: t.id, name: t.name, countryKey: t.pais.countryKey, modalityKey: t.modalidade.modalityKey,
-    versao: t.macroWorkflow?.versao ?? null,
-    fases: t.macroWorkflow?.fases ?? [],
-  }))
+  const tiposProcesso = tipos.flatMap((t) =>
+    t.modalidadesHabilitadas.map((hab) => {
+      const wf = t.macroWorkflows.find((w) => w.modalidadeId === hab.modalidadeId)
+      return {
+        id: t.id, name: t.name, countryKey: t.pais.countryKey, modalityKey: hab.modalidade.modalityKey,
+        versao: wf?.versao ?? null,
+        fases: wf?.fases ?? [],
+      }
+    }),
+  )
   // catálogo canônico de fases (para faseExigencia/faseBloqueio quando o processo não tem macro)
   const fasesCatalogo = Object.values(FASES).map((f) => ({ phaseKey: f.phaseKey, label: f.label, ordem: f.ordem }))
   // A tela filtra modalidade por país: a chave vem da relação, derivada.

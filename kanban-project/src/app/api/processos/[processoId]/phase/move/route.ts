@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
 import { movePhaseManual } from "@/src/lib/motor/phase-advance"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import {
   MOTIVOS_MOVIMENTACAO,
   motivoValido,
@@ -116,19 +117,16 @@ export async function GET(
 
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, nome: true, codigo: true, faseAtualKey: true, tipoProcessoMotorId: true },
+    select: { id: true, nome: true, codigo: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true },
   })
   if (!processo) return erro("PROCESS_NOT_FOUND", "Processo não encontrado.")
-  if (!processo.tipoProcessoMotorId) {
-    return erro("PHASE_NOT_IN_WORKFLOW", "Processo sem tipo do motor — não há workflow para posicionar.")
+  if (!processo.tipoProcessoMotorId || !processo.modalidadeId) {
+    return erro("PHASE_NOT_IN_WORKFLOW", "Processo sem tipo/modalidade do motor — não há workflow para posicionar.")
   }
 
-  // As fases vêm do MACRO DESTE PROCESSO, não de uma lista fixa: o destino válido é
-  // o que o workflow dele conhece.
-  const macro = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: processo.tipoProcessoMotorId },
-    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, label: true, ordem: true, conditional: true } } },
-  })
+  // As fases vêm do MACRO DESTE PROCESSO (tipo+modalidade), não de uma lista fixa: o
+  // destino válido é o que o workflow dele conhece.
+  const macro = await resolverMacroWorkflowDoProcesso(processo.tipoProcessoMotorId, processo.modalidadeId)
   const fases = (macro?.fases ?? []).map((f) => ({
     phaseKey: f.phaseKey,
     label: rotuloFase(f.phaseKey) || f.label,

@@ -132,7 +132,7 @@ check("limites de justificativa declarados", JUSTIFICATIVA_MIN === 10 && JUSTIFI
 check("o modal NÃO cadastra motivo no frontend", !modal.includes("PROCESSO_JA_EM_ANDAMENTO") && !modal.includes("CORRECAO_DE_FASE"))
 check("o modal lê o catálogo da API", modal.includes("/phase/move`") && modal.includes("ctx?.motivos"))
 check("a rota serve o catálogo por GET", rota.includes("export async function GET") && rota.includes("motivos: MOTIVOS_MOVIMENTACAO"))
-check("as fases do modal vêm do MACRO do processo", rota.includes("macroWorkflow.findUnique") && modal.includes("ctx?.fases"))
+check("as fases do modal vêm do MACRO do processo", rota.includes("resolverMacroWorkflowDoProcesso") && modal.includes("ctx?.fases"))
 
 console.log("\n(C3) Erros ESTRUTURADOS — a tela mostra o motivo real")
 for (const code of ["UNAUTHORIZED", "PERMISSION_REQUIRED", "INVALID_TARGET_PHASE", "SAME_PHASE", "PROCESS_NOT_FOUND", "PHASE_NOT_IN_WORKFLOW", "MISSING_REASON", "MISSING_JUSTIFICATION", "CONCURRENT_MODIFICATION", "MIGRATION_NOT_READY", "INTERNAL_ERROR"]) {
@@ -299,12 +299,16 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
+  })
 
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro ALE", versao: 1 } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro ALE", versao: 1 } })
   for (let i = 0; i < FASES_MACRO.length; i++) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASES_MACRO[i], label: FASES_MACRO[i], ordem: i, versao: 1 } })
   }
@@ -331,7 +335,7 @@ async function main() {
     create: { nome: "Master", email: "master@teste.local", senha: "x", tipo: "admin" },
   })
   const processo = await prisma.processo.create({
-    data: { nome: "Processo Mover", codigo: "T-MOV", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo Mover", codigo: "T-MOV", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" },
   })
   await reconciliarFaseAtiva(processo.id)
 
@@ -432,7 +436,7 @@ async function main() {
   // pulando emissao_documental, analise_documental E retificacao_registros — nenhuma
   // delas visitada antes, pra provar a materialização FRESCA (não o atalho idempotente).
   const processo2 = await prisma.processo.create({
-    data: { nome: "Processo Mover B6", codigo: "T-MOV-B6", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo Mover B6", codigo: "T-MOV-B6", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" },
   })
   await reconciliarFaseAtiva(processo2.id)
 

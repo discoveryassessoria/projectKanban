@@ -148,6 +148,10 @@ export function KanbanBoard({
   // Modal "Novo processo" (nasce na 1ª fase do tipo, ligado ao motor)
   const [criarModal, setCriarModal] = useState(false)
   const [criarNome, setCriarNome] = useState("")
+  // Modalidade (Administrativa/Judicial) — hierarquia País/Tipo/Modalidade/
+  // Workflow Macro (mandato 22/09/2026): obrigatória, decide QUAL Workflow
+  // Macro do tipo o processo nasce ligado a.
+  const [criarModalidadeId, setCriarModalidadeId] = useState<number | null>(null)
   const [salvandoCriar, setSalvandoCriar] = useState(false)
   const [erroCriar, setErroCriar] = useState<string | null>(null)
   // Idempotência da criação: 1 chave por abertura do modal. Retry/duplo clique/
@@ -243,11 +247,15 @@ export function KanbanBoard({
     setCriarNome("")
     setErroCriar(null)
     setCriarIdemKey(crypto.randomUUID())
+    // Só 1 modalidade habilitada nesse Tipo → já entra selecionada (nada pra
+    // escolher). Duas → fica em aberto, o formulário exige a escolha.
+    setCriarModalidadeId(tipo.modalidades.length === 1 ? tipo.modalidades[0].id : null)
     setCriarModal(true)
   }
 
   const confirmarCriarProcesso = async () => {
     if (!criarNome.trim()) { setErroCriar("Informe o nome do processo."); return }
+    if (!criarModalidadeId) { setErroCriar("Selecione a modalidade (Administrativa ou Judicial)."); return }
 
     setSalvandoCriar(true); setErroCriar(null)
     try {
@@ -262,6 +270,7 @@ export function KanbanBoard({
           nome: criarNome.trim(),
           pais: pais.countryKey,
           tipoProcessoMotorId: tipo.id,
+          modalidadeId: criarModalidadeId,
         })
       })
 
@@ -482,8 +491,32 @@ export function KanbanBoard({
                 />
               </div>
 
+              {tipo.modalidades.length > 1 && (
+                <div>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Modalidade *</label>
+                  <div className="flex gap-2">
+                    {tipo.modalidades.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setCriarModalidadeId(m.id)}
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm transition ${
+                          criarModalidadeId === m.id
+                            ? "border-[var(--action-primary)] bg-[var(--action-primary)]/15 text-white"
+                            : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white"
+                        }`}
+                      >
+                        {m.modalityLabel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-[var(--text-muted)]">
-                Tipo: <span className="text-white/70">{tipo.name}</span> — o processo nasce na primeira fase
+                Tipo: <span className="text-white/70">{tipo.name}</span>
+                {tipo.modalidades.length === 1 ? <> · Modalidade: <span className="text-white/70">{tipo.modalidades[0].modalityLabel}</span></> : null}
+                {" "}— o processo nasce na primeira fase
                 {fases[0] ? ` (${fases[0].label})` : ""} e já entra no motor.
               </p>
 
@@ -496,7 +529,7 @@ export function KanbanBoard({
               <button onClick={() => setCriarModal(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button
                 onClick={confirmarCriarProcesso}
-                disabled={salvandoCriar}
+                disabled={salvandoCriar || !criarModalidadeId}
                 className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50"
               >
                 {salvandoCriar ? "Criando..." : "Criar processo"}

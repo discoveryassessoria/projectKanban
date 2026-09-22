@@ -55,9 +55,13 @@ async function semear() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
   })
 
   // CATÁLOGO DE CERTIDÕES — espelha produção: TipoDocumentoCadastro com
@@ -117,7 +121,7 @@ async function semear() {
 
   // Macro do processo: uma FaseMacro por fase do cadastro.
   const macro = await prisma.macroWorkflow.create({
-    data: { tipoProcessoId: tipo.id, name: "Macro ALE", versao: 1 },
+    data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro ALE", versao: 1 },
   })
   for (let i = 0; i < CADASTRO.length; i++) {
     await prisma.faseMacro.create({
@@ -137,15 +141,15 @@ async function semear() {
       })),
     })
   }
-  return tipo.id
+  return { tipoId: tipo.id, modalidadeId: oferta.modalidadeId }
 }
 
-async function criarProcesso(tipoId: number, phaseKey: string, codigo: string) {
+async function criarProcesso(tipoId: number, modalidadeId: number, phaseKey: string, codigo: string) {
   const arvore = await prisma.arvore.create({ data: { nome: `Árvore ${codigo}` } })
   const pai = await prisma.pessoa.create({ data: { nome: "Joao", sobrenome: "Silva", arvoreId: arvore.id, linhaReta: true, requerente: "nao" } })
   await prisma.pessoa.create({ data: { nome: "Marco", sobrenome: "Rovatti", arvoreId: arvore.id, linhaReta: true, requerente: "maior", paiId: pai.id } })
   return prisma.processo.create({
-    data: { nome: `Teste ${codigo}`, codigo, arvoreId: arvore.id, faseAtualKey: phaseKey, tipoProcessoMotorId: tipoId, workflowRuntime: "v2" },
+    data: { nome: `Teste ${codigo}`, codigo, arvoreId: arvore.id, faseAtualKey: phaseKey, tipoProcessoMotorId: tipoId, modalidadeId, workflowRuntime: "v2" },
   })
 }
 
@@ -158,7 +162,7 @@ async function passosDa(processoId: number) {
 
 async function main() {
   await limpar()
-  const tipoId = await semear()
+  const { tipoId, modalidadeId } = await semear()
 
   // ── 1) cada fase materializa EXATAMENTE os seus passos publicados ──────────
   console.log("\n(1) Cada fase materializa somente os SEUS passos publicados")
@@ -167,7 +171,7 @@ async function main() {
     // Emissão opera por DOCUMENTO: num processo recém-criado ainda não há documento
     // materializado, então ela é exercitada no bloco (8), depois do avanço real.
     if (f.phaseKey === "emissao_documental") continue
-    const p = await criarProcesso(tipoId, f.phaseKey, `T-${f.phaseKey.slice(0, 8)}`)
+    const p = await criarProcesso(tipoId, modalidadeId, f.phaseKey, `T-${f.phaseKey.slice(0, 8)}`)
     processos[f.phaseKey] = p.id
     const r = await reconciliarFaseAtiva(p.id)
     check(`${f.phaseKey}: reconciliação sem erro`, r.erro === null, r.erro ?? undefined)

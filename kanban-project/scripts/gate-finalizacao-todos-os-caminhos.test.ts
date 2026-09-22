@@ -58,9 +58,9 @@ async function limpar() {
 }
 
 /** Monta um processo NOVO com fase_b (obrigatória) pendente, já em fase_c (passou de fase_b sem concluí-la). */
-async function montarProcessoComObrigacaoPendente(admin: { id: number }, tipoId: number, macroId: number) {
+async function montarProcessoComObrigacaoPendente(admin: { id: number }, tipoId: number, macroId: number, modalidadeId: number) {
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} Processo ${Date.now()}-${Math.random()}`, workflowRuntime: "v2", faseAtualKey: FASE_A, tipoProcessoMotorId: tipoId, macroWorkflowVersion: 1 },
+    data: { nome: `${MARCA} Processo ${Date.now()}-${Math.random()}`, workflowRuntime: "v2", faseAtualKey: FASE_A, tipoProcessoMotorId: tipoId, modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
   await materializarExecucaoDaFase({ processoId: processo.id, fonte: "PROCESSO_CRIADO" })
@@ -79,8 +79,9 @@ async function main() {
 
   const admin = await prisma.usuario.create({ data: { nome: "Admin GateFin", email: "admin@gatefin.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País GateFin", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade GateFin" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
   const composicao = [
     { phaseKey: FASE_A, ordem: 1 }, { phaseKey: FASE_B, ordem: 2 }, { phaseKey: FASE_C, ordem: 3 }, { phaseKey: "finalizado", ordem: 4 },
   ]
@@ -95,7 +96,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("1) avanço NORMAL para Finalizado é bloqueado com obrigação pendente")
   // ══════════════════════════════════════════════════════════════════════
-  const proc1 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id)
+  const proc1 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id, oferta.modalidadeId)
   const tarefasAntes1 = await prisma.tarefa.count({ where: { processoId: proc1 } })
   const r1 = await advance(proc1)
   ok("1.1) advance() para finalizado é REJEITADO", !r1.success && r1.code === "OBRIGACAO_RETROATIVA_PENDENTE", r1.success ? "aceito" : r1.code)
@@ -108,7 +109,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("2) movePhaseManual para Finalizado é bloqueado (Admin não contorna)")
   // ══════════════════════════════════════════════════════════════════════
-  const proc2 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id)
+  const proc2 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id, oferta.modalidadeId)
   const r2 = await movePhaseManual(proc2, { faseAlvo: "finalizado", justificativa: "tentando finalizar mesmo assim", motivoCodigo: "CORRECAO_OPERACIONAL", solicitadoPorId: admin.id })
   ok("2.1) movePhaseManual para finalizado é REJEITADO mesmo sendo Admin", !r2.success && r2.code === "OBRIGACAO_RETROATIVA_PENDENTE", r2.success ? "aceito" : r2.code)
   const proc2Depois = await prisma.processo.findUniqueOrThrow({ where: { id: proc2 }, select: { faseAtualKey: true } })
@@ -117,7 +118,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("3) forceAdvance para Finalizado é bloqueado (nem o avanço FORÇADO ignora)")
   // ══════════════════════════════════════════════════════════════════════
-  const proc3 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id)
+  const proc3 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id, oferta.modalidadeId)
   const r3 = await forceAdvance(proc3, { justificativa: "forçando mesmo com pendência", motivoCodigo: "CORRECAO_OPERACIONAL", solicitadoPorId: admin.id })
   ok("3.1) forceAdvance para finalizado é REJEITADO — bloqueio sobrevive ao forçado", !r3.success && r3.code === "OBRIGACAO_RETROATIVA_PENDENTE", r3.success ? "aceito" : r3.code)
   const proc3Depois = await prisma.processo.findUniqueOrThrow({ where: { id: proc3 }, select: { faseAtualKey: true } })
@@ -132,7 +133,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("5) Movimentações entre fases NÃO finais continuam permitidas")
   // ══════════════════════════════════════════════════════════════════════
-  const proc5 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id)
+  const proc5 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id, oferta.modalidadeId)
   const r5a = await movePhaseManual(proc5, { faseAlvo: FASE_B, justificativa: "regularizar fase_b", motivoCodigo: "CORRECAO_OPERACIONAL", solicitadoPorId: admin.id })
   ok("5.1) mover para fase_b (não-final) é ACEITO mesmo com a mesma obrigação 'pendente' — só Finalizado é gateado", r5a.success, r5a.success ? r5a.resultado : `${r5a.code}`)
   const r5b = await movePhaseManual(proc5, { faseAlvo: FASE_C, justificativa: "volta pra fase_c", motivoCodigo: "CORRECAO_OPERACIONAL", solicitadoPorId: admin.id })
@@ -141,7 +142,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("6) Operações paralelas continuam funcionando (materializar outra fase não é bloqueado pelo gate)")
   // ══════════════════════════════════════════════════════════════════════
-  const proc6 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id)
+  const proc6 = await montarProcessoComObrigacaoPendente(admin, tipo.id, macro.id, oferta.modalidadeId)
   const relMat = await materializarExecucaoDaFase({ processoId: proc6, faseMacroKey: FASE_B, fonte: "RECONCILIACAO" })
   ok("6.1) materializar fase_b (trabalho paralelo) funciona normalmente, mesmo com finalização bloqueada", relMat.estado === "MATERIALIZADO", relMat.estado)
 
@@ -184,7 +185,7 @@ async function main() {
     await prisma.phaseInternalWorkflowStep.create({ data: { workflowId: wf.id, key: `${phaseKey}_passo`, label: `Passo ${phaseKey}`, ordem: 1, createsTask: true, required: true, owner: null, slaDays: 0, cardinalidade: "PROCESSO" } })
   }
   const proc9 = await prisma.processo.create({
-    data: { nome: `${MARCA} Processo9 ${Date.now()}`, workflowRuntime: "v2", faseAtualKey: FASE_D, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 },
+    data: { nome: `${MARCA} Processo9 ${Date.now()}`, workflowRuntime: "v2", faseAtualKey: FASE_D, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
   await materializarExecucaoDaFase({ processoId: proc9.id, fonte: "PROCESSO_CRIADO" })

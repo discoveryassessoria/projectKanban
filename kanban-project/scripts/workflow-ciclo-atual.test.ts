@@ -125,11 +125,15 @@ async function montarPalco(nome: string, quantosDocumentos = 1) {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${nome} macro`, versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${nome} macro`, versao: 1 } })
   for (const [i, phaseKey] of [FASE_DOC, FASE_SEG].entries()) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey, label: phaseKey, ordem: i, versao: 1, required: true, conditional: false } })
   }
@@ -156,7 +160,7 @@ async function montarPalco(nome: string, quantosDocumentos = 1) {
     create: { nome: "Executor", email: "ciclo@teste.local", senha: "x", tipo: "admin" }, select: { id: true },
   })
   const proc = await prisma.processo.create({
-    data: { nome: `${nome} processo`, tipoProcessoMotorId: tipo.id, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
+    data: { nome: `${nome} processo`, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
     select: { id: true },
   })
   const docs: Array<{ documentoId: number; necessidadeId: number; pessoaId: number }> = []

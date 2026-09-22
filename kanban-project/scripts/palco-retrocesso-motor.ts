@@ -170,14 +170,24 @@ async function main() {
     select: { id: true },
   })
 
-  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true, arquivado: false }, orderBy: { id: 'asc' }, select: { id: true, pais: { select: { countryKey: true } } } })
-  if (!tipo) { console.error('❌ banco de teste sem TipoProcessoNacionalidade ativo'); process.exit(1) }
+  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({
+    where: { ativo: true, arquivado: false, modalidadesHabilitadas: { some: { ativo: true } } },
+    orderBy: { id: 'asc' },
+    select: {
+      id: true, pais: { select: { countryKey: true } },
+      modalidadesHabilitadas: { where: { ativo: true }, select: { modalidadeId: true }, take: 1 },
+    },
+  })
+  if (!tipo) { console.error('❌ banco de teste sem TipoProcessoNacionalidade ativo com modalidade habilitada'); process.exit(1) }
+  // best-effort: o palco usa QUALQUER tipo ativo do banco de teste; a modalidade
+  // usada é a primeira habilitada — o palco não distingue administrativa/judicial.
+  const modalidadeId = tipo.modalidadesHabilitadas[0].modalidadeId
 
   // O MACRO define a matriz de fases — o motor lê dele, não de lista no código.
   const macro = await prisma.macroWorkflow.upsert({
-    where: { tipoProcessoId: tipo.id },
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId } },
     update: { ativo: true },
-    create: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 },
+    create: { tipoProcessoId: tipo.id, modalidadeId, name: `${MARCA} macro`, versao: 1 },
     select: { id: true },
   })
   // O MACRO É DO PALCO. Outras suítes rodam no mesmo banco e no mesmo tipo de

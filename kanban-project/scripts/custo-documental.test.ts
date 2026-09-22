@@ -49,11 +49,12 @@ async function montarCenario() {
   const tipoProc = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `TP-${TS}`.slice(0, 40), name: `Tipo ${TAG}`,
-      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      paisId: oferta.paisId,
       },
   })
   TIPO_PROCESSO = tipoProc.id
   criado.tipoProcessoId = tipoProc.id
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipoProc.id, modalidadeId: oferta.modalidadeId } })
 
   // O tipo documental é CADASTRO próprio do cenário — o teste não altera nem
   // depende do cadastro do ambiente. `code` é a identidade que a regra da Matriz
@@ -82,7 +83,7 @@ async function montarCenario() {
   criado.documentoId = doc.id
 
   const processo = await prisma.processo.create({
-    data: { nome: `Processo ${TAG}`, arvoreId: arvore.id, tipoProcessoMotorId: TIPO_PROCESSO, faseAtualKey: FASE },
+    data: { nome: `Processo ${TAG}`, arvoreId: arvore.id, tipoProcessoMotorId: TIPO_PROCESSO, modalidadeId: oferta.modalidadeId, faseAtualKey: FASE },
   })
   criado.processoId = processo.id
 

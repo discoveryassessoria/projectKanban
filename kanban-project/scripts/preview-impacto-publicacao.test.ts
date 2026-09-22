@@ -74,6 +74,7 @@ async function main() {
   console.log("\n(2) Três processos materializam a fase na V1 — três operações ATIVAS")
   // ══════════════════════════════════════════════════════════════════════
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { ativo: true }, select: { id: true } })
+  const habilitacao = tipo ? await prisma.tipoProcessoModalidadeHabilitada.findFirst({ where: { tipoProcessoId: tipo.id, ativo: true }, select: { modalidadeId: true } }) : null
   const arv = await prisma.arvore.create({ data: { nome: "TESTE-PREVIEW-IMPACTO árvore" }, select: { id: true } })
 
   const processos = []
@@ -81,7 +82,7 @@ async function main() {
     const p = await prisma.processo.create({
       data: {
         nome: `TESTE-PREVIEW-IMPACTO P${i}`, arvoreId: arv.id, workflowRuntime: "v2",
-        faseAtualKey: "emissao_documental", tipoProcessoMotorId: tipo?.id ?? null,
+        faseAtualKey: "emissao_documental", tipoProcessoMotorId: tipo?.id ?? null, modalidadeId: habilitacao?.modalidadeId ?? null,
       },
       select: { id: true },
     })

@@ -106,8 +106,8 @@ export async function completudeDoProcesso(
     select: {
       id: true, paisId: true,
       paisCanonico: { select: { id: true, countryKey: true, countryLabel: true } },
+      modalidade: { select: { modalityLabel: true } },
       tiposServico: { select: { id: true } },
-      enquadramentoLegal: { select: { modalidadeLegalId: true, modalidadeLegal: { select: { id: true, nome: true } } } },
       requerentes: {
         select: {
           requerente: {
@@ -127,20 +127,18 @@ export async function completudeDoProcesso(
   // a coluna: o país do processo é a relação, carregada no mesmo select.
   const paisCanonico = processo.paisCanonico
 
-  const modalidadeId = processo.enquadramentoLegal?.modalidadeLegalId ?? null
-
   // ── REQUISITOS CADASTRAIS APLICÁVEIS ─────────────────────────────────────
   // Escopo NULO significa "qualquer". A vigência é comparada com a referência:
-  // regra que ainda não começou ou já terminou não incide.
+  // regra que ainda não começou ou já terminou não incide. O escopo por
+  // MODALIDADE LEGAL foi removido (mandato "Reconstrução da hierarquia",
+  // 22/09/2026) — zero `RequisitoCadastral` real algum dia usou
+  // `modalidadeLegalId` (confirmado: 0 linhas no cadastro inteiro antes da
+  // remoção), então isto não é perda de regra nenhuma, só a eliminação de um
+  // filtro que nunca teve dado real.
   const requisitos = await prisma.requisitoCadastral.findMany({
     where: {
       ativo: true,
       OR: [{ paisId: null }, ...(paisCanonico ? [{ paisId: paisCanonico.id }] : [])],
-      // Sem filtro de vigência: cadastro vale até ser inativado (regra do
-      // produto). O recorte temporal de uma pendência vem do FATO, não daqui.
-      AND: [
-        { OR: [{ modalidadeLegalId: null }, ...(modalidadeId ? [{ modalidadeLegalId: modalidadeId }] : [])] },
-      ],
     },
     orderBy: [{ ordem: "asc" }, { nome: "asc" }],
   })
@@ -255,7 +253,11 @@ export async function completudeDoProcesso(
   return {
     processoId,
     pais: paisCanonico?.countryLabel ?? null,
-    modalidadeLegal: processo.enquadramentoLegal?.modalidadeLegal?.nome ?? null,
+    // Migrado de EnquadramentoLegal→ModalidadeLegal.nome (removidos, mandato
+    // "Reconstrução da hierarquia", 22/09/2026) para a Modalidade real do
+    // processo (ADMINISTRATIVA/JUDICIAL) — campo sem consumidor na UI hoje,
+    // mantido pela mesma finalidade informativa.
+    modalidadeLegal: processo.modalidade?.modalityLabel ?? null,
     pessoas,
     totais: {
       ...t,

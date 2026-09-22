@@ -120,8 +120,9 @@ async function main() {
   })
   const token = await signAuthToken({ userId: admin.id, email: "admin@cfgretro.test", tipo: "admin", sessaoInicio: Date.now() })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGRETRO", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade CFGRETRO" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro isolado`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro isolado`, versao: 1 }, select: { id: true } })
   await prisma.catalogoFase.upsert({
     where: { phaseKey: PHASE_KEY_ANTES },
     update: {},

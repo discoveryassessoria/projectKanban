@@ -20,9 +20,11 @@ const INCLUDE = {
   paisCanonico: { select: { id: true, countryKey: true, countryLabel: true } },
   familia: { select: { id: true, nome: true } },
   tipoProcessoMotor: {
-    select: { id: true, code: true, name: true, modalidade: { select: { modalityKey: true, modalityLabel: true } } },
+    select: { id: true, code: true, name: true },
   },
-  enquadramentoLegal: { select: { nome: true, modalidadeLegal: { select: { nome: true, cardinalidadeRequerimento: true } } } },
+  // A modalidade é do PROCESSO (ADMINISTRATIVA/JUDICIAL), não do Tipo — um Tipo
+  // pode habilitar as duas (mandato "Reconstrução da hierarquia", 22/09/2026).
+  modalidade: { select: { modalityKey: true, modalityLabel: true } },
   tiposServico: { select: { id: true, nome: true } },
   requerentes: {
     where: VINCULO_PROCESSO_ATIVO,
@@ -77,7 +79,7 @@ export const DOMINIO_PROCESSOS: DominioDef = {
     porCampo("fase", "Fase atual", (l) => l.faseAtualKey),
     porCampo("familia", "Família", (l) => l.familia?.nome),
     porCampo("tipo", "Tipo de processo", (l) => l.tipoProcessoMotor?.name),
-    porCampo("modalidade", "Modalidade legal", (l) => l.enquadramentoLegal?.modalidadeLegal?.nome),
+    porCampo("modalidade", "Modalidade", (l) => l.modalidade?.modalityLabel),
     porCampo("situacao", "Situação", (l) => (l.dataConclusao ? "Concluído" : "Em andamento")),
     porMes("dataInicio", "Mês de entrada"),
   ],
@@ -87,7 +89,7 @@ export const DOMINIO_PROCESSOS: DominioDef = {
     { key: "nome", rotulo: "Processo", valor: (l) => l.nome, link: (l) => `/processos/${l.id}` },
     { key: "nacionalidade", rotulo: "Nacionalidade", valor: (l) => l.paisCanonico?.countryLabel ?? null },
     { key: "tipo", rotulo: "Tipo (oferta)", valor: (l) => l.tipoProcessoMotor?.name ?? null },
-    { key: "modalidade", rotulo: "Modalidade legal", valor: (l) => l.enquadramentoLegal?.modalidadeLegal?.nome ?? null },
+    { key: "modalidade", rotulo: "Modalidade", valor: (l) => l.modalidade?.modalityLabel ?? null },
     { key: "servicos", rotulo: "Serviços", valor: (l) => l.tiposServico?.map((s: any) => s.nome).join(" · ") || null },
     { key: "fase", rotulo: "Fase atual", valor: (l) => l.faseAtualKey ?? null },
     { key: "situacao", rotulo: "Situação", valor: (l) => (l.dataConclusao ? "Concluído" : "Em andamento") },

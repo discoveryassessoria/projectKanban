@@ -39,10 +39,14 @@ async function main() {
   const oferta = await garantirOferta(prisma, { countryKey: "alemanha", countryLabel: "Alemanha", nationalityKey: "alema", nationalityLabel: "Alemã", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM-E6" }, update: {},
-    create: { code: "ALE-ADM-E6", name: "Alemã (Etapa 6)", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: "ALE-ADM-E6", name: "Alemã (Etapa 6)", paisId: oferta.paisId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId },
   })
   const FASES = ["fase_um", "fase_dois"]
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro E6", versao: 1 } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro E6", versao: 1 } })
   for (let i = 0; i < FASES.length; i++) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASES[i], label: FASES[i], ordem: i, versao: 1 } })
   }
@@ -60,7 +64,7 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════════════
   console.log("\n12) AVANÇAR → REABRIR → RETORNAR — Tarefa nunca concluída/cancelada/recriada/resetada")
   // ═══════════════════════════════════════════════════════════════════════
-  const p1 = await prisma.processo.create({ data: { nome: "E6-P1", codigo: "T-E6-P1", arvoreId: arvore.id, faseAtualKey: "fase_um", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" } })
+  const p1 = await prisma.processo.create({ data: { nome: "E6-P1", codigo: "T-E6-P1", arvoreId: arvore.id, faseAtualKey: "fase_um", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" } })
   await materializarExecucaoDaFase({ processoId: p1.id, fonte: "CADASTRO_EM_ANDAMENTO" })
 
   const tarefaFase1Antes = await prisma.tarefa.findFirstOrThrow({ where: { processoId: p1.id, faseMacroKey: "fase_um" } })
@@ -114,7 +118,7 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════════════
   console.log("\n13) PROCESSO INICIADO EM FASE AVANÇADA — obrigações anteriores continuam completáveis")
   // ═══════════════════════════════════════════════════════════════════════
-  const p2 = await prisma.processo.create({ data: { nome: "E6-P2", codigo: "T-E6-P2", arvoreId: arvore.id, faseAtualKey: "fase_dois", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" } })
+  const p2 = await prisma.processo.create({ data: { nome: "E6-P2", codigo: "T-E6-P2", arvoreId: arvore.id, faseAtualKey: "fase_dois", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" } })
   await materializarExecucaoDaFase({ processoId: p2.id, fonte: "CADASTRO_EM_ANDAMENTO" })
   check("13a) processo nasce direto em fase_dois (fase_um nunca foi materializada)", (await prisma.phaseWorkflowInstance.count({ where: { processoId: p2.id, faseMacroKey: "fase_um" } })) === 0)
   check("13a) fase_dois tem sua Tarefa normalmente", (await prisma.tarefa.count({ where: { processoId: p2.id, faseMacroKey: "fase_dois" } })) === 1)

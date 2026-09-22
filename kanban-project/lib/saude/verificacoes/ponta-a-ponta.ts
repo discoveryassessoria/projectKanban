@@ -10,6 +10,7 @@
 import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
+import { resolverMacroWorkflowDoTipo } from '@/src/lib/motor/resolver-macro-workflow'
 
 interface Elo {
   ordem: number; nome: string; ok: boolean; detalhe: string; rota?: string
@@ -44,7 +45,7 @@ registrar({
     // 1) existe tipo de processo operável
     const tipo = await prisma.tipoProcessoNacionalidade.findFirst({
       where: { ativo: true, arquivado: false },
-      select: { id: true, name: true, macroWorkflow: { select: { id: true, ativo: true, fases: { select: { phaseKey: true, ordem: true, required: true } } } } },
+      select: { id: true, name: true },
       orderBy: { id: 'asc' },
     })
     elos.push({
@@ -53,12 +54,14 @@ registrar({
       rota: '/administrator?screen=proctypes',
     })
 
-    // 2) workflow com fases
-    const fases = tipo?.macroWorkflow?.fases ?? []
+    // 2) workflow com fases — best-effort (o Tipo pode ter até 2 workflows, um por
+    // modalidade habilitada; esta cadeia só precisa provar que EXISTE um caminho vivo).
+    const macroDoTipo = tipo ? await resolverMacroWorkflowDoTipo(tipo.id) : null
+    const fases = macroDoTipo?.fases ?? []
     elos.push({
       ordem: 2, nome: 'Workflow macro com fases',
-      ok: !!tipo?.macroWorkflow && fases.length > 0,
-      detalhe: tipo?.macroWorkflow ? `${fases.length} fase(s)` : 'tipo sem workflow macro',
+      ok: !!macroDoTipo && fases.length > 0,
+      detalhe: macroDoTipo ? `${fases.length} fase(s)` : 'tipo sem workflow macro',
       rota: '/administrator?screen=macrokanban',
     })
 

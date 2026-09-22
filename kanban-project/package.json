@@ -66,7 +66,6 @@
     "prod:migrate": "node scripts/prod-migrate-guard.mjs",
     "prod:reconciliar-sequencias": "node scripts/prod-reconciliar-sequencias.mjs",
     "prod:registral-rollout": "node scripts/prod-registral-rollout.mjs",
-    "prod:registrar-enquadramentos-lmd": "node scripts/prod-registrar-enquadramentos-lmd.mjs",
     "prod:resolver-matriz-orfas": "node scripts/prod-resolver-matriz-orfas.mjs",
     "prod:seed-adquirentes-bandeiras": "node scripts/prod-seed-adquirentes-bandeiras.mjs",
     "prod:seed-condicoes-taxas": "node scripts/prod-seed-condicoes-taxas.mjs",

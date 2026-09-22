@@ -69,19 +69,30 @@ async function main() {
       select: { id: true, modalityLabel: true },
     })
     if (!modalidade) { console.log(`⚠ Tipo ${code}: país não tem a modalidade "${nova.modalityKey}"`); continue }
-    await prisma.tipoProcessoNacionalidade.update({ where: { id: alvo.id }, data: { modalidadeId: modalidade.id } })
+    await prisma.tipoProcessoModalidadeHabilitada.upsert({
+      where: { tipoProcessoId_modalidadeId: { tipoProcessoId: alvo.id, modalidadeId: modalidade.id } },
+      update: { ativo: true },
+      create: { tipoProcessoId: alvo.id, modalidadeId: modalidade.id, ativo: true },
+    })
     console.log(`✔ Tipo ${code} → ${modalidade.modalityLabel}`)
   }
 
-  // avisa tipos órfãos
+  // avisa tipos órfãos — lista TODAS as habilitações antigas do tipo (N:N agora;
+  // um tipo pode ter mais de uma modalidade habilitada, então não assume uma só).
   const orfaos = await prisma.tipoProcessoNacionalidade.findMany({
-    where: { modalidade: { modalityKey: { notIn: ['judicial', 'administrativa'] } } },
-    select: { code: true, name: true, modalidade: { select: { modalityLabel: true } } },
+    where: { modalidadesHabilitadas: { some: { ativo: true, modalidade: { modalityKey: { notIn: ['judicial', 'administrativa'] } } } } },
+    select: {
+      code: true, name: true,
+      modalidadesHabilitadas: { where: { ativo: true }, select: { modalidade: { select: { modalityLabel: true, modalityKey: true } } } },
+    },
   })
   if (orfaos.length > 0) {
     console.log('\n⚠ Tipos ainda apontando para modalidade antiga.')
     console.log('  Edite pelo sistema ou preencha o REMAP e rode de novo:')
-    for (const t of orfaos) console.log(`  - ${t.code} · ${t.name} (${t.modalidade.modalityLabel})`)
+    for (const t of orfaos) {
+      const rotulos = t.modalidadesHabilitadas.map((h) => h.modalidade.modalityLabel).join(', ')
+      console.log(`  - ${t.code} · ${t.name} (${rotulos})`)
+    }
   } else {
     console.log('\n✔ Nenhum tipo com modalidade antiga.')
   }

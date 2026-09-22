@@ -297,10 +297,10 @@ registrar({
 })
 
 registrar({
-  id: 'saude.processos.oferta-sem-modalidade-legal',
+  id: 'saude.processos.oferta-sem-workflow-macro',
   codigo: 'PROC-901',
-  nome: 'Nacionalidade ofertada tem modalidade legal cadastrada',
-  descricao: 'Nacionalidade vendida sem base jurídica declarada — o sistema não sabe como o requerimento se organiza.',
+  nome: 'Nacionalidade ofertada tem Workflow Macro publicado para toda modalidade habilitada',
+  descricao: 'Nacionalidade vendida sem Workflow Macro publicado — o sistema não sabe como o requerimento se organiza nem qual é a cardinalidade do protocolo.',
   dominio: 'PROCESSOS',
   modulo: 'Processos',
   severidadePadrao: 'ALERTA',
@@ -309,51 +309,60 @@ registrar({
   introduzidaEm: '1.0.0',
   timeoutMs: 15_000,
   orientacao:
-    'Cadastre a modalidade legal do país e a cardinalidade do requerimento (INDIVIDUAL quando cada requerente ' +
-    'protocola o seu; COLETIVO quando um requerimento cobre a família).',
+    'Publique o Workflow Macro de cada modalidade (Administrativa/Judicial) habilitada no Tipo de Processo, com a ' +
+    'cardinalidade do requerimento correta (INDIVIDUAL quando cada requerente protocola o seu; COLETIVO quando um ' +
+    'requerimento cobre a família).',
   rotaCorrecao: '/administrator?screen=proctypes',
   responsavel: 'Cadastros',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
-    // A CARDINALIDADE DECIDE O QUE É UMA LINHA no relatório de Protocolos.
-    // Itália tem duas rotas legítimas — ricorso judicial COLETIVO (um R.G. para
-    // a família) e via administrativa INDIVIDUAL (um expediente por pessoa) — e
-    // é a modalidade do processo que resolve qual vale. Sem nenhuma cadastrada,
-    // o sistema não tem como responder, e um palpite com cara de fato é pior
-    // que a lacuna declarada.
-    const semModalidade = await prisma.catalogoPais.findMany({
-      where: {
-        ativo: true,
-        tiposDeProcesso: { some: { ativo: true, arquivado: false } },
-        modalidadesLegais: { none: { ativo: true } },
+    // A CARDINALIDADE (agora em MacroWorkflow.cardinalidadeRequerimento — mandato
+    // "Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro", 22/09/2026)
+    // DECIDE O QUE É UMA LINHA no relatório de Protocolos. Itália tem duas rotas
+    // legítimas — judicial COLETIVO (um R.G. para a família) e administrativa
+    // INDIVIDUAL (um expediente por pessoa) — e é o Workflow Macro publicado da
+    // modalidade do processo que resolve qual vale. Sem workflow publicado para
+    // alguma modalidade habilitada, o sistema não tem como responder.
+    const tipos = await prisma.tipoProcessoNacionalidade.findMany({
+      where: { ativo: true, arquivado: false },
+      select: {
+        id: true, name: true,
+        pais: { select: { countryLabel: true } },
+        modalidadesHabilitadas: { where: { ativo: true }, select: { modalidadeId: true, modalidade: { select: { modalityLabel: true } } } },
+        macroWorkflows: { select: { modalidadeId: true, ativo: true } },
       },
-      select: { id: true, countryKey: true, countryLabel: true },
-      orderBy: { countryLabel: 'asc' },
     })
-    if (!semModalidade.length) {
-      return { achados: [], metricas: { semModalidadeLegal: 0 }, resumo: 'Toda nacionalidade ofertada tem modalidade legal.' }
+    const semWorkflow: { tipoId: number; nome: string; pais: string; modalidade: string }[] = []
+    for (const t of tipos) {
+      for (const hab of t.modalidadesHabilitadas) {
+        const wf = t.macroWorkflows.find((w) => w.modalidadeId === hab.modalidadeId && w.ativo)
+        if (!wf) semWorkflow.push({ tipoId: t.id, nome: t.name, pais: t.pais.countryLabel, modalidade: hab.modalidade.modalityLabel })
+      }
+    }
+    if (!semWorkflow.length) {
+      return { achados: [], metricas: { semWorkflowMacro: 0 }, resumo: 'Toda nacionalidade ofertada tem Workflow Macro publicado para cada modalidade habilitada.' }
     }
     return {
       achados: [{
-        chave: 'oferta-sem-modalidade-legal',
+        chave: 'oferta-sem-workflow-macro',
         severidade: 'ALERTA',
-        titulo: `${semModalidade.length} nacionalidade(s) ofertada(s) sem modalidade legal`,
-        descricao: `${semModalidade.map((p) => p.countryLabel).join(', ')} — vendidas sem base jurídica cadastrada.`,
+        titulo: `${semWorkflow.length} combinação(ões) tipo × modalidade sem Workflow Macro publicado`,
+        descricao: `${semWorkflow.map((s) => `${s.nome} (${s.pais} — ${s.modalidade})`).join(', ')} — habilitadas sem workflow publicado.`,
         explicacao:
-          'A modalidade legal declara a base jurídica e a CARDINALIDADE do requerimento: se cada requerente ' +
-          'protocola o seu (individual) ou se um requerimento cobre a família (coletivo).',
+          'O Workflow Macro publicado declara as fases do fluxo e a CARDINALIDADE do requerimento: se cada ' +
+          'requerente protocola o seu (individual) ou se um requerimento cobre a família (coletivo).',
         impacto:
-          'O processo nasce sem enquadramento legal, e o relatório de Protocolos não consegue afirmar o que é ' +
-          'uma linha para esse país.',
-        entidade: 'CatalogoPais',
-        registroId: String(semModalidade[0].id),
-        registroNome: semModalidade[0].countryLabel,
-        quantidade: semModalidade.length,
+          'A modalidade fica habilitada sem workflow para operar, e o relatório de Protocolos não consegue ' +
+          'afirmar o que é uma linha para essa combinação.',
+        entidade: 'TipoProcessoNacionalidade',
+        registroId: String(semWorkflow[0].tipoId),
+        registroNome: semWorkflow[0].nome,
+        quantidade: semWorkflow.length,
         link: '/administrator?screen=proctypes',
-        recomendacao: 'Cadastre a modalidade legal de cada país listado, com a cardinalidade correta.',
-        evidencia: { total: semModalidade.length, paises: semModalidade.map((p) => p.countryLabel) },
+        recomendacao: 'Publique o Workflow Macro de cada modalidade habilitada listada, com a cardinalidade correta.',
+        evidencia: { total: semWorkflow.length, combinacoes: semWorkflow },
       }],
-      metricas: { semModalidadeLegal: semModalidade.length },
+      metricas: { semWorkflowMacro: semWorkflow.length },
     }
   },
 })

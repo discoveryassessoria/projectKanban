@@ -103,8 +103,9 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   const admin = await prisma.usuario.create({ data: { nome: 'Admin AltFase', email: 'admin@altfase.test', senha: 'x', tipo: 'admin' }, select: { id: true } })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: 'País AltFase', modalityKey: `${MARCA}_modal`, modalityLabel: 'Modalidade AltFase' })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
 
   // fase_b NASCE condicional (não gera outbox nem obrigação hoje).
   await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASE_A, label: FASE_A, ordem: 1, required: true, conditional: false } })
@@ -115,7 +116,7 @@ async function main() {
     await prisma.phaseInternalWorkflowStep.create({ data: { workflowId: wf.id, key: `${phaseKey}_passo`, label: `Passo ${phaseKey}`, ordem: 1, createsTask: true, required: false, owner: null, slaDays: 0, cardinalidade: 'PROCESSO' } })
   }
 
-  const processo = await prisma.processo.create({ data: { nome: `${MARCA} Processo`, workflowRuntime: 'v2', faseAtualKey: FASE_A, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 }, select: { id: true } })
+  const processo = await prisma.processo.create({ data: { nome: `${MARCA} Processo`, workflowRuntime: 'v2', faseAtualKey: FASE_A, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 }, select: { id: true } })
   await materializarExecucaoDaFase({ processoId: processo.id, fonte: 'PROCESSO_CRIADO' })
   await prisma.phaseWorkflowInstance.updateMany({ where: { processoId: processo.id, faseMacroKey: FASE_A }, data: { status: 'CONCLUIDO' } })
 

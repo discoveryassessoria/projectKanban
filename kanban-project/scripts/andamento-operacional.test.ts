@@ -52,9 +52,13 @@ async function montarPalco() {
   const oferta = await garantirOferta(prisma, { countryKey: "portugal", countryLabel: "Portugal", nationalityKey: "portuguesa", nationalityLabel: "Portuguesa", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "POR-ADM-AND" }, update: {},
-    create: { code: "POR-ADM-AND", name: "Nacionalidade Portuguesa", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: "POR-ADM-AND", name: "Nacionalidade Portuguesa", paisId: oferta.paisId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "macro andamento", versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "macro andamento", versao: 1 } })
   await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASE_DOC, label: FASE_DOC, ordem: 0, versao: 1, required: true, conditional: false } })
   const wfDoc = await prisma.phaseInternalWorkflow.create({
     data: { wfUid: `all::${FASE_DOC}`, phaseKey: FASE_DOC, name: "WF doc", tipoProcessoId: null, versao: 1, execucao: "SEQUENCIAL", escopoExecucao: "DOCUMENTO", exigeDocumento: true, exigePessoa: true },
@@ -68,7 +72,7 @@ async function montarPalco() {
   const daniela = await prisma.usuario.upsert({ where: { email: "daniela@andamento.test" }, update: {}, create: { nome: "Daniela", email: "daniela@andamento.test", senha: "x", tipo: "assistente" }, select: { id: true } })
   const joao = await prisma.usuario.upsert({ where: { email: "joao@andamento.test" }, update: {}, create: { nome: "João", email: "joao@andamento.test", senha: "x", tipo: "assistente" }, select: { id: true } })
   const proc = await prisma.processo.create({
-    data: { nome: "processo andamento", tipoProcessoMotorId: tipo.id, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
+    data: { nome: "processo andamento", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
     select: { id: true },
   })
   const item = await prisma.itemCatalogo.create({ data: { code: "AND_ITEM", name: "Certidão de Óbito", natureza: "DOCUMENTO" }, select: { id: true } })

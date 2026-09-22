@@ -77,8 +77,9 @@ async function main() {
 
   const admin = await prisma.usuario.create({ data: { nome: "Admin RescDoc", email: "admin@rescdoc.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País RescDoc", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade RescDoc" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
   await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASE_ALVO, label: "Retificação de registros", ordem: 1, required: true, conditional: false } })
   await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: "finalizado", label: "finalizado", ordem: 2, required: true, conditional: false } })
 
@@ -107,7 +108,7 @@ async function main() {
     const docCancelado = await prisma.documento.create({ data: { pessoaId: pessoa.id, descricao: "Certidão cancelada", status: "CANCELADO" }, select: { id: true } })
 
     const processo = await prisma.processo.create({
-      data: { nome: `${MARCA} ${nome}`, workflowRuntime: "v2", faseAtualKey: FASE_ALVO, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1, arvoreId: arvore.id },
+      data: { nome: `${MARCA} ${nome}`, workflowRuntime: "v2", faseAtualKey: FASE_ALVO, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1, arvoreId: arvore.id },
       select: { id: true },
     })
 

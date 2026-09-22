@@ -42,36 +42,49 @@ async function main() {
   const molde = await r(() => prisma.tipoProcessoNacionalidade.findUnique({
     where: { code: MOLDE },
     select: {
-      code: true, name: true, modalidade: { select: { modalityKey: true } },
-      macroWorkflow: { select: { name: true, fases: { orderBy: { ordem: "asc" } } } },
+      code: true, name: true,
+      modalidadesHabilitadas: { where: { ativo: true }, select: { modalidade: { select: { id: true, modalityKey: true } } } },
+      macroWorkflows: { select: { name: true, modalidadeId: true, fases: { orderBy: { ordem: "asc" } } } },
     },
   }))
   const alvo = await r(() => prisma.tipoProcessoNacionalidade.findUnique({
     where: { code: ALVO },
-    select: { id: true, name: true, modalidade: { select: { modalityKey: true } }, macroWorkflow: { select: { id: true } } },
+    select: {
+      id: true, name: true,
+      modalidadesHabilitadas: { where: { ativo: true }, select: { modalidade: { select: { id: true, modalityKey: true } } } },
+      macroWorkflows: { select: { id: true } },
+    },
   }))
 
-  if (!molde?.macroWorkflow) { console.error(`❌ o molde ${MOLDE} não tem macro.`); process.exit(1) }
+  // best-effort: os tipos ESP-ADM/POR-ADM só habilitam UMA modalidade
+  // (administrativa) — a primeira habilitada é a única que existe.
+  const macroMolde = molde?.macroWorkflows?.[0]
+  const modalidadeMolde = molde?.modalidadesHabilitadas[0]?.modalidade
+  const modalidadeAlvo = alvo?.modalidadesHabilitadas[0]?.modalidade
+
+  if (!macroMolde) { console.error(`❌ o molde ${MOLDE} não tem macro.`); process.exit(1) }
   if (!alvo) { console.error(`❌ tipo ${ALVO} não existe.`); process.exit(1) }
-  if (alvo.macroWorkflow) { console.log(`✅ ${alvo.name} já tem workflow macro. Nada a fazer.`); return }
+  if (alvo.macroWorkflows.length) { console.log(`✅ ${alvo.name} já tem workflow macro. Nada a fazer.`); return }
+  if (!modalidadeMolde) { console.error(`❌ o molde ${MOLDE} não tem modalidade habilitada.`); process.exit(1) }
+  if (!modalidadeAlvo) { console.error(`❌ o tipo ${ALVO} não tem modalidade habilitada.`); process.exit(1) }
 
   // A cópia só é defensável entre a MESMA modalidade: administrativa e judicial
   // têm fluxos diferentes por natureza.
-  if (molde.modalidade.modalityKey !== alvo.modalidade.modalityKey) {
-    console.error(`❌ modalidades diferentes (${molde.modalidade.modalityKey} × ${alvo.modalidade.modalityKey}) — não copio.`)
+  if (modalidadeMolde.modalityKey !== modalidadeAlvo.modalityKey) {
+    console.error(`❌ modalidades diferentes (${modalidadeMolde.modalityKey} × ${modalidadeAlvo.modalityKey}) — não copio.`)
     process.exit(1)
   }
 
   // Toda fase copiada tem de existir no catálogo canônico.
   const catalogo = new Set((await r(() => prisma.catalogoFase.findMany({ where: { ativo: true }, select: { phaseKey: true } })))
     .map((f) => f.phaseKey))
-  const fora = molde.macroWorkflow.fases.filter((f) => !catalogo.has(f.phaseKey))
+  const fora = macroMolde.fases.filter((f) => !catalogo.has(f.phaseKey))
   if (fora.length) { console.error(`❌ fases fora do catálogo: ${fora.map((f) => f.phaseKey).join(", ")}`); process.exit(1) }
 
   console.log(`WORKFLOW MACRO PARA ${alvo.name}\n`)
-  console.log(`  molde: ${molde.name} (${molde.modalidade.modalityKey})`)
-  console.log(`  ${molde.macroWorkflow.fases.length} fases:\n`)
-  for (const f of molde.macroWorkflow.fases) {
+  console.log(`  molde: ${molde.name} (${modalidadeMolde.modalityKey})`)
+  console.log(`  ${macroMolde.fases.length} fases:\n`)
+  for (const f of macroMolde.fases) {
     console.log(`     ${String(f.ordem).padStart(2)}. ${f.phaseKey.padEnd(32)} ${f.required ? "obrigatória" : "opcional   "} · kanban=${f.showInKanban}`)
   }
 
@@ -84,11 +97,12 @@ async function main() {
   const criado = await r(() => prisma.macroWorkflow.create({
     data: {
       tipoProcessoId: alvo.id,
+      modalidadeId: modalidadeAlvo.id,
       name: `Workflow Macro · ${alvo.name}`,
       ativo: true,
       versao: 1,
       fases: {
-        create: molde.macroWorkflow!.fases.map((f) => ({
+        create: macroMolde.fases.map((f) => ({
           phaseKey: f.phaseKey, label: f.label, ordem: f.ordem,
           required: f.required, conditional: f.conditional,
           entryRule: f.entryRule, exitRule: f.exitRule,

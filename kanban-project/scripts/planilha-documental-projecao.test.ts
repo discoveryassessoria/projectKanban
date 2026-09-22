@@ -126,9 +126,10 @@ async function montarPalco(): Promise<Palco> {
   const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId,
       }, select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const tipoDoc = await prisma.tipoDocumentoCadastro.create({
     data: { code: `${MARCA}-NASC`, name: `${MARCA} Certidão de Nascimento`, participaPlanilha: true, ativo: true },
     select: { id: true },
@@ -159,7 +160,7 @@ async function montarPalco(): Promise<Palco> {
 
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId },
     select: { id: true },
   })
   const req = await prisma.requerente.create({ data: { nome: `${MARCA} Valdir Teste` }, select: { id: true } })

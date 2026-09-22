@@ -101,7 +101,6 @@ export const FONTES: Record<string, {
 }> = {
   tiposProcesso: { model: "tipoProcessoNacionalidade", valor: "id", label: ["name"], where: { arquivado: false }, valorNumerico: true },
   paises: { model: "catalogoPais", valor: "id", label: ["countryLabel"], where: { ativo: true }, valorNumerico: true },
-  modalidadesLegais: { model: "modalidadeLegal", valor: "id", label: ["nome"], where: { ativo: true }, valorNumerico: true },
   itensCatalogo: { model: "itemCatalogo", valor: "id", label: ["name"], where: { ativo: true }, valorNumerico: true },
   fases: { model: "catalogoFase", valor: "phaseKey", label: ["label"], where: { ativo: true } },
   // NOME + E-MAIL: dois funcionários homônimos ficavam indistinguíveis no
@@ -196,87 +195,6 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     ],
   },
 
-  // ── Processos › Modalidades Legais ────────────────────────────────────────
-  // A BASE JURÍDICA da rota. É aqui que mora a regra que decide se o
-  // requerimento é individual ou coletivo — e ela precisava ser editável pela
-  // operação, não por deploy: a tela do processo manda "declare em Gerenciamento"
-  // quando a rota não tem modalidade, e essa frase só é honesta se a tela existir.
-  "modalidades-legais": {
-    entidade: "modalidades-legais",
-    model: "modalidadeLegal",
-    titulo: "Modalidades Legais",
-    singular: "modalidade legal",
-    descricao:
-      "A base jurídica sob a qual a cidadania é requerida (Lei da Memória Democrática, Processo Judicial…). É a modalidade que decide se o requerimento é INDIVIDUAL — um por requerente, como no consulado espanhol — ou COLETIVO — um só para a família, como no ricorso ao tribunal italiano.",
-    novoLabel: "+ Nova modalidade",
-    codeDe: "nome",
-    identidade: "nome",
-    ordenavel: true,
-    auditoria: "ModalidadeLegal",
-    // Modalidade em uso não some: os enquadramentos dela — e, por eles, os
-    // processos — ficariam sem base jurídica declarada.
-    protegerExclusao: [
-      { model: "enquadramentoLegal", campo: "modalidadeLegalId", rotulo: "enquadramentos legais" },
-    ],
-    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "nome", label: "Modalidade" },
-      { key: "code", label: "Código" },
-      { key: "cardinalidadeRequerimento", label: "Requerimento" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome da modalidade", tipo: "text", obrigatorio: true, largura: "cheia" },
-      { key: "paisId", label: "País", tipo: "select", fonte: "paises", obrigatorio: true, largura: "meia" },
-      {
-        key: "cardinalidadeRequerimento", label: "Requerimento", tipo: "select", obrigatorio: true, largura: "meia",
-        opcoes: [
-          { valor: "INDIVIDUAL", label: "Individual — um requerimento por requerente" },
-          { valor: "COLETIVO", label: "Coletivo — um requerimento para vários requerentes" },
-        ],
-        ajuda: "Define o que a aba Protocolos do processo oferece: um requerente ou a lista inteira.",
-      },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      ...CAMPOS_BASE,
-    ],
-  },
-
-  // ── Processos › Enquadramentos Legais ─────────────────────────────────────
-  // O recorte oficial dentro da modalidade (Anexo I, Anexo III…). O processo
-  // aponta para o enquadramento, e é por ele que se chega na modalidade e na
-  // regra — uma FK só carregando as três dimensões, sem campo redundante.
-  "enquadramentos-legais": {
-    entidade: "enquadramentos-legais",
-    model: "enquadramentoLegal",
-    titulo: "Enquadramentos Legais",
-    singular: "enquadramento legal",
-    descricao:
-      "O recorte oficial dentro da modalidade legal (Anexo I, Anexo III…). Quando a rota não tem recortes, o enquadramento é um só e leva o nome da própria modalidade. O processo aponta para o enquadramento — é por ele que o sistema chega na base jurídica e na regra do requerimento.",
-    novoLabel: "+ Novo enquadramento",
-    codeDe: "nome",
-    identidade: "nome",
-    ordenavel: true,
-    auditoria: "EnquadramentoLegal",
-    protegerExclusao: [
-      { model: "processo", campo: "enquadramentoLegalId", rotulo: "processos" },
-    ],
-    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "nome", label: "Enquadramento" },
-      { key: "code", label: "Código" },
-      { key: "descricao", label: "Descrição" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome do enquadramento", tipo: "text", obrigatorio: true, largura: "cheia" },
-      {
-        key: "modalidadeLegalId", label: "Modalidade legal", tipo: "select", fonte: "modalidadesLegais",
-        obrigatorio: true, largura: "cheia",
-        ajuda: "A base jurídica a que este recorte pertence. É dela que vem a regra do requerimento.",
-      },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      ...CAMPOS_BASE,
-    ],
-  },
-
   // ── Documentos e Protocolos › Requisitos Cadastrais ───────────────────────
   // A obrigatoriedade de DADO. Irmã da Regra Documental, que cuida do DOCUMENTO.
   // Aqui não se cadastra o campo — os campos são as colunas que o schema já tem,
@@ -330,8 +248,6 @@ export const CADASTROS: Record<string, CadastroSpec> = {
       },
       { key: "paisId", label: "Somente no país", tipo: "select", fonte: "paises", largura: "meia",
         ajuda: "Em branco = vale para todas as nacionalidades." },
-      { key: "modalidadeLegalId", label: "Somente na modalidade legal", tipo: "select", fonte: "modalidadesLegais", largura: "meia",
-        ajuda: "Em branco = vale para qualquer base jurídica." },
       { key: "itemCatalogoId", label: "Somente no serviço/item", tipo: "select", fonte: "itensCatalogo", largura: "cheia",
         ajuda: "Em branco = vale para qualquer serviço." },
       { key: "idadeMinima", label: "Idade mínima (anos)", tipo: "number", largura: "meia",

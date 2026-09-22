@@ -84,10 +84,18 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ select: { id: true } })
   if (!tipo) throw new Error("Banco de teste sem nenhum TipoProcessoNacionalidade — rode o seed base primeiro.")
 
+  // Modalidade habilitada para esse tipo — qualquer uma serve; cria uma se o
+  // tipo ainda não tiver nenhuma (fixture, não é uma regra de negócio).
+  let habilitacao = await prisma.tipoProcessoModalidadeHabilitada.findFirst({ where: { tipoProcessoId: tipo.id } })
+  if (!habilitacao) {
+    const modalidade = await prisma.modalidadePais.findFirstOrThrow()
+    habilitacao = await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: modalidade.id, ativo: true } })
+  }
+
   const macro = await prisma.macroWorkflow.upsert({
-    where: { tipoProcessoId: tipo.id },
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: habilitacao.modalidadeId } },
     update: {},
-    create: { tipoProcessoId: tipo.id, name: `${MARCA} macro` },
+    create: { tipoProcessoId: tipo.id, modalidadeId: habilitacao.modalidadeId, name: `${MARCA} macro` },
     select: { id: true, versao: true },
   })
   const faseMacro = await prisma.faseMacro.upsert({
@@ -123,7 +131,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   const arv1 = await prisma.arvore.create({ data: { nome: `${MARCA} arv1` }, select: { id: true } })
   const proc1 = await prisma.processo.create({
-    data: { nome: `${MARCA} proc1`, arvoreId: arv1.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} proc1`, arvoreId: arv1.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id, modalidadeId: habilitacao.modalidadeId },
     select: { id: true },
   })
   const r1 = await instanciarWorkflowDaFase({ processoId: proc1.id, faseMacroKey: PHASE_KEY })
@@ -145,7 +153,7 @@ async function main() {
 
   const arv2 = await prisma.arvore.create({ data: { nome: `${MARCA} arv2` }, select: { id: true } })
   const proc2 = await prisma.processo.create({
-    data: { nome: `${MARCA} proc2`, arvoreId: arv2.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} proc2`, arvoreId: arv2.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id, modalidadeId: habilitacao.modalidadeId },
     select: { id: true },
   })
   const r2 = await instanciarWorkflowDaFase({ processoId: proc2.id, faseMacroKey: PHASE_KEY })
@@ -173,7 +181,7 @@ async function main() {
 
   const arv3 = await prisma.arvore.create({ data: { nome: `${MARCA} arv3` }, select: { id: true } })
   const proc3 = await prisma.processo.create({
-    data: { nome: `${MARCA} proc3`, arvoreId: arv3.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} proc3`, arvoreId: arv3.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id, modalidadeId: habilitacao.modalidadeId },
     select: { id: true },
   })
   const r3 = await instanciarWorkflowDaFase({ processoId: proc3.id, faseMacroKey: PHASE_KEY })
@@ -207,7 +215,7 @@ async function main() {
 
   const arv4 = await prisma.arvore.create({ data: { nome: `${MARCA} arv4` }, select: { id: true } })
   const proc4 = await prisma.processo.create({
-    data: { nome: `${MARCA} proc4`, arvoreId: arv4.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} proc4`, arvoreId: arv4.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id, modalidadeId: habilitacao.modalidadeId },
     select: { id: true },
   })
   const r4 = await instanciarWorkflowDaFase({ processoId: proc4.id, faseMacroKey: PHASE_KEY })
@@ -227,7 +235,7 @@ async function main() {
 
   const arv5 = await prisma.arvore.create({ data: { nome: `${MARCA} arv5` }, select: { id: true } })
   const proc5 = await prisma.processo.create({
-    data: { nome: `${MARCA} proc5`, arvoreId: arv5.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} proc5`, arvoreId: arv5.id, faseAtualKey: PHASE_KEY, workflowRuntime: "v2", tipoProcessoMotorId: tipo.id, modalidadeId: habilitacao.modalidadeId },
     select: { id: true },
   })
   const r5 = await instanciarWorkflowDaFase({ processoId: proc5.id, faseMacroKey: PHASE_KEY })

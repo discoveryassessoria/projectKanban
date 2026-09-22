@@ -50,9 +50,18 @@ export async function POST(request: Request) {
   const tipoId = Number(body?.tipoProcessoMotorId) || (tiposAtivos.length === 1 ? tiposAtivos[0].id : 0)
   if (!tipoId) return NextResponse.json({ error: "tipo de processo ambíguo/ausente — informe tipoProcessoMotorId", tipos }, { status: 422 })
 
+  // MODALIDADE — auto-resolve quando o Tipo só habilita uma (caso real de
+  // Espanha hoje); senão exige `body.modalidadeId` explícito (mandato
+  // "Reconstrução da hierarquia", 22/09/2026).
+  const habilitacoes = await prisma.tipoProcessoModalidadeHabilitada.findMany({
+    where: { tipoProcessoId: tipoId, ativo: true }, select: { modalidadeId: true },
+  })
+  const modalidadeId = Number(body?.modalidadeId) || (habilitacoes.length === 1 ? habilitacoes[0].modalidadeId : 0)
+  if (!modalidadeId) return NextResponse.json({ error: "modalidade ambígua/ausente — informe modalidadeId", habilitacoes }, { status: 422 })
+
   // 3) fase inicial do Macro publicado (tem que ser genealogia)
   const macro = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: tipoId },
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipoId, modalidadeId } },
     include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true } } },
   })
   const primeiraFase = macro?.fases?.[0]?.phaseKey ?? null
@@ -93,6 +102,7 @@ export async function POST(request: Request) {
       nome,
       pais: pais.countryKey,
       tipoProcessoMotorId: tipoId,
+      modalidadeId,
       idempotencyKey: `import-familias-es|${chave}`,
     })
     if (!r.success) { erros.push({ nome, code: r.code, message: r.message }); continue }

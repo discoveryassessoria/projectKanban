@@ -55,15 +55,24 @@ export async function GET(request: NextRequest) {
     ])
 
     // configuração por tipo (para o score executivo)
-    const tipos = await prisma.tipoProcessoNacionalidade.findMany({
+    const tiposBase = await prisma.tipoProcessoNacionalidade.findMany({
       where: { arquivado: false },
-      select: {
-        id: true, name: true, ativo: true,
-        pais: { select: { countryLabel: true } },
-        macroWorkflow: { select: { id: true, versao: true, fases: { select: { phaseKey: true, showInKanban: true } } } },
-      },
+      select: { id: true, name: true, ativo: true, pais: { select: { countryLabel: true } } },
       orderBy: [{ pais: { countryLabel: 'asc' } }, { name: 'asc' }],
     })
+    // Score executivo é por TIPO (não por modalidade) — best-effort: um Tipo
+    // pode ter um Workflow Macro por modalidade habilitada; o diagnóstico usa
+    // o mais recentemente atualizado como amostra representativa (mesmo
+    // critério de `resolverMacroWorkflowDoTipo`, com o select próprio que
+    // este score precisa — `showInKanban` por fase).
+    const tipos = await Promise.all(tiposBase.map(async (t) => ({
+      ...t,
+      macroWorkflow: await prisma.macroWorkflow.findFirst({
+        where: { tipoProcessoId: t.id },
+        orderBy: { atualizadoEm: 'desc' },
+        select: { id: true, versao: true, fases: { select: { phaseKey: true, showInKanban: true } } },
+      }),
+    })))
     const autoPorTipo = await prisma.phaseAutomationRule.groupBy({
       by: ['tipoProcessoId'], where: { arquivado: false, active: true }, _count: { _all: true },
     })

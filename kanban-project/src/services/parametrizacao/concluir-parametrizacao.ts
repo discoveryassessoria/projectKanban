@@ -30,6 +30,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { resolverMacroWorkflowDoTipo } from "@/src/lib/motor/resolver-macro-workflow"
 import { publicarParametrizacao } from "./publicacao-coordenada"
 import { estadoParametrizacao } from "./estado-parametrizacao"
 import { pendenciasDaParametrizacao, impedimentosDePublicacao, type Pendencia } from "@/src/services/financeiro/pendencias-parametrizacao"
@@ -109,10 +110,7 @@ export async function* concluirParametrizacao(args: {
   const etapas: ResultadoEtapaExecucao[] = []
   const emitir = async (e: ResultadoEtapaExecucao) => { etapas.push(e); return e }
 
-  const macro = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: args.tipoProcessoId },
-    select: { fases: { select: { phaseKey: true }, orderBy: { ordem: "asc" } } },
-  })
+  const macro = await resolverMacroWorkflowDoTipo(args.tipoProcessoId)
   const fases = (macro?.fases ?? []).map((f) => f.phaseKey).filter((f) => (args.phaseKey ? f === args.phaseKey : true))
 
   const resumo: RelatorioConclusao["resumo"] = {

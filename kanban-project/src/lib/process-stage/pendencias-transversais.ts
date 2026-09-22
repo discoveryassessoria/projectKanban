@@ -13,25 +13,21 @@ import {
   type FaseOrdenadaSimples,
 } from "./pendencias-transversais-core"
 import type { FaseCode } from "@prisma/client"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 
 export type { ResumoPendenciasTransversais } from "./pendencias-transversais-core"
 
 export async function resolvePendenciasTransversais(processoId: number): Promise<ResumoPendenciasTransversais> {
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true },
+    select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true },
   })
   if (!processo) {
     return montarPendenciasTransversais([], [], null)
   }
 
   const [macro, passos] = await Promise.all([
-    processo.tipoProcessoMotorId != null
-      ? prisma.macroWorkflow.findUnique({
-          where: { tipoProcessoId: processo.tipoProcessoMotorId },
-          select: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true, label: true } } },
-        })
-      : Promise.resolve(null),
+    resolverMacroWorkflowDoProcesso(processo.tipoProcessoMotorId, processo.modalidadeId),
     // TODOS os passos do processo — sem filtro por fase, por ciclo ou por status da
     // instância. Filtrar aqui é exatamente como uma pendência real vira histórico morto.
     prisma.phaseWorkflowStepInstance.findMany({

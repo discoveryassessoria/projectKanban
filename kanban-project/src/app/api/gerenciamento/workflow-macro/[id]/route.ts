@@ -5,17 +5,19 @@ import { avaliarAptidaoDaFase } from '@/src/lib/process-stage/escopo-operacional
 import { enqueueReconciliacaoFaseMacro } from '@/src/lib/motor/reconciliar-fase-macro'
 import { validarComposicaoMacro } from '@/src/lib/motor/validar-composicao-macro'
 
-// [id] = tipoProcessoId (o workflow é 1:1 com o tipo de processo)
+// [id] = MacroWorkflow.id (PK própria — desde a hierarquia País/Tipo/
+// Modalidade/Workflow Macro, 22/09/2026, um Tipo pode ter até 2 Workflow
+// Macro, um por modalidade habilitada, então `tipoProcessoId` sozinho deixou
+// de identificar um único registro).
 
-// GET - Workflow Macro (com fases) de um tipo de processo
+// GET - Workflow Macro (com fases) por id
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
     const { id } = await params
-    const tipoProcessoId = Number(id)
     const macroWorkflow = await prisma.macroWorkflow.findUnique({
-      where: { tipoProcessoId },
+      where: { id: Number(id) },
       include: { fases: { orderBy: { ordem: 'asc' } } },
     })
     return NextResponse.json({ macroWorkflow: macroWorkflow || null })
@@ -31,13 +33,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
     const { id } = await params
-    const tipoProcessoId = Number(id)
 
     const mw = await prisma.macroWorkflow.findUnique({
-      where: { tipoProcessoId },
+      where: { id: Number(id) },
       include: { fases: true, tipoProcesso: { select: { id: true, ativo: true, arquivado: true } } },
     })
-    if (!mw) return NextResponse.json({ error: 'Workflow não encontrado para este processo.' }, { status: 404 })
+    if (!mw) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
+    const tipoProcessoId = mw.tipoProcessoId
 
     const b = await request.json()
     const incoming: any[] = Array.isArray(b.fases) ? b.fases : []
@@ -175,7 +177,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         await tx.macroWorkflow.update({ where: { id: mw.id }, data: { versao: versaoNova } })
         await tx.macroWorkflowVersao.create({
           data: {
-            macroWorkflowId: mw.id, versao: versaoNova, tipoProcessoId, name: b.name !== undefined ? String(b.name).trim() : mw.name,
+            macroWorkflowId: mw.id, versao: versaoNova, tipoProcessoId,
+            modalidadeId: mw.modalidadeId, cardinalidadeRequerimento: mw.cardinalidadeRequerimento,
+            name: b.name !== undefined ? String(b.name).trim() : mw.name,
             fases: fasesFinais.map((f) => ({
               phaseKey: f.phaseKey, label: f.label, ordem: f.ordem, required: f.required,
               conditional: f.conditional, showInKanban: f.showInKanban, entryRule: f.entryRule,
@@ -255,8 +259,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const erro = await verificarPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
     const { id } = await params
-    const tipoProcessoId = Number(id)
-    await prisma.macroWorkflow.delete({ where: { tipoProcessoId } })
+    await prisma.macroWorkflow.delete({ where: { id: Number(id) } })
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Erro ao excluir workflow macro:', error)

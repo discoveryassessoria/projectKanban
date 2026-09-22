@@ -157,11 +157,15 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "SYNC-TEST" }, update: {},
     create: {
-      code: "SYNC-TEST", name: "Sincronismo", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "SYNC-TEST", name: "Sincronismo", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro SYNC", versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro SYNC", versao: 1 } })
   for (let i = 0; i < FASES_MACRO.length; i++) {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASES_MACRO[i], label: FASES_MACRO[i], ordem: i, versao: 1 } })
   }
@@ -190,7 +194,7 @@ async function main() {
   const arvore = await prisma.arvore.create({ data: { nome: "Árvore SYNC" } })
   const ana = await prisma.pessoa.create({ data: { nome: "Ana", sobrenome: "Souza", arvoreId: arvore.id, linhaReta: true, requerente: "maior" }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: "Processo SYNC", codigo: "T-SYNC", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
+    data: { nome: "Processo SYNC", codigo: "T-SYNC", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, workflowRuntime: "v2" },
   })
   // A OBRIGAÇÃO REAL. O passo `localizar_registro` opera por NECESSIDADE: sem
   // uma certidão a localizar, o motor recusa materializar e explica por quê

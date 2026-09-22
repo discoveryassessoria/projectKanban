@@ -68,8 +68,9 @@ async function main() {
       { phaseKey: K_C, label: "Fase C", escopo: "PROCESSO", ordemPadrao: 3, requiredPadrao: true, conditionalPadrao: false, ativo: true, status: "PUBLICADA", revisaoAtual: 1, efeitosPermitidos: ["REGISTER_ONLY"] },
     ],
   })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, modalidadeId: pm.id, ativo: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] macro`, ativo: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, ativo: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, name: `[${MARCA}] macro`, ativo: true } })
   await prisma.faseMacro.createMany({
     data: [
       { macroWorkflowId: macro.id, phaseKey: K_A, label: "Fase A", ordem: 1, required: true, conditional: false, entryRule: "process_created", showInKanban: true },
@@ -87,7 +88,7 @@ async function main() {
     })
   }
 
-  const proc = await prisma.processo.create({ data: { nome: `[${MARCA}] processo`, faseAtualKey: K_A, tipoProcessoMotorId: tipo.id, paisId: pm.paisId } })
+  const proc = await prisma.processo.create({ data: { nome: `[${MARCA}] processo`, faseAtualKey: K_A, tipoProcessoMotorId: tipo.id, modalidadeId: pm.id, paisId: pm.paisId } })
   const fasesComposicao = [
     { phaseKey: K_A, ordem: 1, required: true, conditional: false },
     { phaseKey: K_B, ordem: 2, required: true, conditional: false },

@@ -36,11 +36,12 @@ const c: { tipoId?: number; macroId?: number; faseId?: number; itemId?: number; 
 async function montar() {
   const oferta = await garantirOferta(prisma, { countryKey: 'x', countryLabel: 'País X', nationalityKey: 'x', nationalityLabel: 'X', modalityKey: 'x', modalityLabel: 'X' })
   const tp = await prisma.tipoProcessoNacionalidade.create({
-    data: { code: `TPW-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+    data: { code: `TPW-${TS}`.slice(0, 40), name: `Tipo ${TAG}`, paisId: oferta.paisId,
       },
   })
   c.tipoId = tp.id
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tp.id, name: `Macro ${TAG}` } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tp.id, modalidadeId: oferta.modalidadeId } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tp.id, modalidadeId: oferta.modalidadeId, name: `Macro ${TAG}` } })
   c.macroId = macro.id
   const f = await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASE, label: `Fase ${TAG}`, ordem: 1, required: true } })
   c.faseId = f.id

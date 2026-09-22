@@ -147,8 +147,10 @@ export interface DominioDef {
    * precisa ler isso na tela.
    *
    * A diferença NÃO sai de `if (pais)`: sai de
-   * `ModalidadeLegal.cardinalidadeRequerimento`, que é cadastro. Nacionalidade
-   * nova entra com a cardinalidade dela e o texto se ajusta sozinho.
+   * `MacroWorkflow.cardinalidadeRequerimento`, que é cadastro (mandato
+   * "Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro",
+   * 22/09/2026). Nacionalidade nova entra com a cardinalidade dela e o texto
+   * se ajusta sozinho.
    */
   grainNoContexto?: (countryKey: string | null) => Promise<string>
   /** Tipada pelo catálogo de permissões: chave inventada não compila. */

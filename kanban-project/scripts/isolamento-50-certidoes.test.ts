@@ -96,10 +96,11 @@ async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_TIPO`, name: `${M} tipo`, ativo: true,
-      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      paisId: oferta.paisId,
       },
     select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const fEmissao = await prisma.catalogoFase.create({
     data: { phaseKey: "esc50_emissao", label: "Emissão (escala)", escopo: "DOCUMENTO", ordemPadrao: 10 },
     select: { phaseKey: true },
@@ -110,7 +111,7 @@ async function main() {
   })
   await prisma.macroWorkflow.create({
     data: {
-      tipoProcessoId: tipo.id, name: `${M} macro`, versao: 1,
+      tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${M} macro`, versao: 1,
       fases: {
         create: [
           { phaseKey: fEmissao.phaseKey, label: "Emissão (escala)", ordem: 1, required: true },
@@ -142,7 +143,7 @@ async function main() {
   const proc = await prisma.processo.create({
     data: {
       nome: `${M} processo`, arvoreId: arv.id, workflowRuntime: "v2",
-      faseAtualKey: fAnalise.phaseKey, tipoProcessoMotorId: tipo.id,
+      faseAtualKey: fAnalise.phaseKey, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId,
     },
     select: { id: true },
   })

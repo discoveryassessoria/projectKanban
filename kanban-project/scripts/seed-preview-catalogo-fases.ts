@@ -60,15 +60,23 @@ async function main() {
   let tipo = await prisma.tipoProcessoNacionalidade.findFirst({ where: { code: `${M}_TIPO` }, select: { id: true } })
   if (!tipo) {
     tipo = await prisma.tipoProcessoNacionalidade.create({
-      data: { code: `${M}_TIPO`, name: "Nacionalidade Preview · Catálogo de Fases", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId, ativo: true },
+      data: { code: `${M}_TIPO`, name: "Nacionalidade Preview · Catálogo de Fases", paisId: oferta.paisId, ativo: true },
       select: { id: true },
     })
   }
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: { ativo: true },
+    create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
+  })
   console.log(`[seed-preview] tipo de processo: id=${tipo.id} ("Nacionalidade Preview · Catálogo de Fases")`)
 
-  let macro = await prisma.macroWorkflow.findUnique({ where: { tipoProcessoId: tipo.id }, select: { id: true } })
+  let macro = await prisma.macroWorkflow.findUnique({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    select: { id: true },
+  })
   if (!macro) {
-    macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Workflow Macro · Preview", versao: 1 }, select: { id: true } })
+    macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Workflow Macro · Preview", versao: 1 }, select: { id: true } })
   }
   const composicaoInicial = [
     { phaseKey: "genealogia", label: "Genealogia", ordem: 1 },

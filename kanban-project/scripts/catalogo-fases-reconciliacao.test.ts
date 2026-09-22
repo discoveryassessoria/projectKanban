@@ -89,11 +89,12 @@ async function main() {
   })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: 'País RecFase', modalityKey: `${MARCA}_modal`, modalityLabel: 'Modalidade RecFase' })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
-    data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId },
+    data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId },
     select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const macro = await prisma.macroWorkflow.create({
-    data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true },
+    data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true },
   })
   // Composição INICIAL: fase_a → fase_b → finalizado. fase_x AINDA NÃO EXISTE.
   const composicaoInicial = [
@@ -105,7 +106,7 @@ async function main() {
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: f.phaseKey, label: f.phaseKey, ordem: f.ordem, required: true, conditional: false } })
   }
   await prisma.macroWorkflowVersao.create({
-    data: { macroWorkflowId: macro.id, versao: 1, tipoProcessoId: tipo.id, name: `${MARCA} macro`, fases: composicaoInicial, origem: 'CRIACAO' },
+    data: { macroWorkflowId: macro.id, versao: 1, tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, cardinalidadeRequerimento: 'INDIVIDUAL', name: `${MARCA} macro`, fases: composicaoInicial, origem: 'CRIACAO' },
   })
   // Passo único por fase, PROCESSO (1 instância/fase), OPCIONAL — isola o teste
   // do gate de conclusão de tarefa (não é o que esta suíte prova) do gate NOVO
@@ -121,7 +122,7 @@ async function main() {
   }
 
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} Processo`, workflowRuntime: 'v2', faseAtualKey: FASE_A, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 },
+    data: { nome: `${MARCA} Processo`, workflowRuntime: 'v2', faseAtualKey: FASE_A, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
 
@@ -154,7 +155,7 @@ async function main() {
     const fasesFinais = await tx.faseMacro.findMany({ where: { macroWorkflowId: macro.id }, orderBy: { ordem: 'asc' } })
     await tx.macroWorkflowVersao.create({
       data: {
-        macroWorkflowId: macro.id, versao: 2, tipoProcessoId: tipo.id, name: `${MARCA} macro`,
+        macroWorkflowId: macro.id, versao: 2, tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, cardinalidadeRequerimento: 'INDIVIDUAL', name: `${MARCA} macro`,
         fases: fasesFinais.map((f) => ({ phaseKey: f.phaseKey, ordem: f.ordem, required: f.required, conditional: f.conditional })),
         congeladoPorId: admin.id, origem: 'PUBLICACAO',
       },

@@ -76,7 +76,8 @@ export async function contratoTipoProcesso(): Promise<ResultadoContrato> {
     where: { ativo: true, arquivado: false },
     select: {
       id: true, name: true, code: true,
-      macroWorkflow: { select: { ativo: true, fases: { select: { phaseKey: true, ordem: true, required: true } } } },
+      modalidadesHabilitadas: { where: { ativo: true }, select: { modalidadeId: true, modalidade: { select: { modalityLabel: true } } } },
+      macroWorkflows: { select: { modalidadeId: true, ativo: true, fases: { select: { phaseKey: true, ordem: true, required: true } } } },
     },
   })
   const chavesCatalogo = new Set(
@@ -87,18 +88,21 @@ export async function contratoTipoProcesso(): Promise<ResultadoContrato> {
   for (const t of tipos) {
     const faltando: string[] = []
     if (!t.code?.trim()) faltando.push('código')
-    const wf = t.macroWorkflow
-    if (!wf) faltando.push('workflow macro')
-    else {
-      if (!wf.ativo) faltando.push('workflow ativo')
-      if (!wf.fases.length) faltando.push('fases do workflow')
-      else {
-        const ordenadas = [...wf.fases].sort((a, b) => a.ordem - b.ordem)
-        if (ordenadas.length < 2) faltando.push('fase final (o fluxo precisa de início e fim)')
-        if (!ordenadas.some((f) => f.required)) faltando.push('ao menos uma fase obrigatória')
-        const foraDoCatalogo = ordenadas.filter((f) => !chavesCatalogo.has(f.phaseKey))
-        if (foraDoCatalogo.length) faltando.push(`fases fora do catálogo (${foraDoCatalogo.map((f) => f.phaseKey).join(', ')})`)
-      }
+    if (!t.modalidadesHabilitadas.length) faltando.push('nenhuma modalidade habilitada')
+    // Cada modalidade habilitada (Administrativa/Judicial) precisa do seu próprio
+    // Workflow Macro publicado — mandato "Reconstrução da hierarquia" (22/09/2026):
+    // um Tipo pode ter até 2 workflows, um por modalidade.
+    for (const hab of t.modalidadesHabilitadas) {
+      const wf = t.macroWorkflows.find((w) => w.modalidadeId === hab.modalidadeId)
+      const rotuloModalidade = hab.modalidade.modalityLabel
+      if (!wf) { faltando.push(`workflow macro (${rotuloModalidade})`); continue }
+      if (!wf.ativo) faltando.push(`workflow ativo (${rotuloModalidade})`)
+      if (!wf.fases.length) { faltando.push(`fases do workflow (${rotuloModalidade})`); continue }
+      const ordenadas = [...wf.fases].sort((a, b) => a.ordem - b.ordem)
+      if (ordenadas.length < 2) faltando.push(`fase final (${rotuloModalidade} — o fluxo precisa de início e fim)`)
+      if (!ordenadas.some((f) => f.required)) faltando.push(`ao menos uma fase obrigatória (${rotuloModalidade})`)
+      const foraDoCatalogo = ordenadas.filter((f) => !chavesCatalogo.has(f.phaseKey))
+      if (foraDoCatalogo.length) faltando.push(`fases fora do catálogo (${rotuloModalidade}: ${foraDoCatalogo.map((f) => f.phaseKey).join(', ')})`)
     }
     if (faltando.length) incompletos.push({ id: t.id, rotulo: t.name, faltando })
   }

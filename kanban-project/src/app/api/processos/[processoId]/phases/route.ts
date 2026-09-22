@@ -29,6 +29,7 @@ import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import type { FaseCode } from "@prisma/client"
 
 type PhaseState = "ACTIVE" | "COMPLETED" | "OPEN" | "FUTURE"
@@ -75,23 +76,20 @@ export async function GET(
   try {
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true },
+      select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
     const faseAtualKey = processo.faseAtualKey ?? null
 
-    // FONTE CANÔNICA — o Workflow Macro REAL do tipo de processo (MacroWorkflow.fases),
-    // não o catálogo hardcoded. Uma fase publicada pelo Catálogo de Fases (mandato
-    // 20/09/2026) só aparece aqui se a fonte for esta: o catálogo em código nunca
-    // vai saber que ela existe. `faseCode` continua preenchido para as 10 fases
-    // canônicas (compat com quem ainda lê por FaseCode) e nasce `null` para fase
-    // nova — identidade real é `phaseKey`, nunca o code nem o label.
-    const macroWorkflow = processo.tipoProcessoMotorId != null
-      ? await prisma.macroWorkflow.findUnique({
-          where: { tipoProcessoId: processo.tipoProcessoMotorId },
-          include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, label: true, ordem: true, conditional: true } } },
-        })
+    // FONTE CANÔNICA — o Workflow Macro REAL deste processo (tipo+modalidade,
+    // `resolverMacroWorkflowDoProcesso`), não o catálogo hardcoded. Uma fase publicada
+    // pelo Catálogo de Fases (mandato 20/09/2026) só aparece aqui se a fonte for esta:
+    // o catálogo em código nunca vai saber que ela existe. `faseCode` continua
+    // preenchido para as 10 fases canônicas (compat com quem ainda lê por FaseCode) e
+    // nasce `null` para fase nova — identidade real é `phaseKey`, nunca o code nem o label.
+    const macroWorkflow = processo.tipoProcessoMotorId != null && processo.modalidadeId != null
+      ? await resolverMacroWorkflowDoProcesso(processo.tipoProcessoMotorId, processo.modalidadeId)
       : null
 
     // FALLBACK — processo sem tipo do motor (legado) ou sem Workflow Macro

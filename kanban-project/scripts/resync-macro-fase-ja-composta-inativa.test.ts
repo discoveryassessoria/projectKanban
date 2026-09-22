@@ -46,8 +46,9 @@ async function main() {
       { phaseKey: CHAVE_B, label: "Fase B", escopo: "PROCESSO", ordemPadrao: 2, requiredPadrao: true, conditionalPadrao: false, ativo: true, status: "PUBLICADA", revisaoAtual: 1, efeitosPermitidos: ["REGISTER_ONLY"] },
     ],
   })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, modalidadeId: pm.id, ativo: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] macro`, ativo: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, ativo: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, name: `[${MARCA}] macro`, ativo: true } })
   await prisma.faseMacro.createMany({
     data: [
       { macroWorkflowId: macro.id, phaseKey: CHAVE_A, label: "Fase A", ordem: 1, required: true, conditional: false, entryRule: "process_created", showInKanban: true },
@@ -61,22 +62,22 @@ async function main() {
   check("inativação aceita", resInativar.status === 200)
 
   console.log("\n2) Reenviar a MESMA composição (o que 'Salvar' sempre faz) — ANTES do fix, 422")
-  const resGet = await GET(new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${tipo.id}`, { headers: auth }), { params: Promise.resolve({ id: String(tipo.id) }) })
+  const resGet = await GET(new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${macro.id}`, { headers: auth }), { params: Promise.resolve({ id: String(macro.id) }) })
   const jGet = await resGet.json()
   const fasesAtuais = jGet.macroWorkflow.fases
-  const resPut = await PUT(new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${tipo.id}`, {
+  const resPut = await PUT(new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${macro.id}`, {
     method: "PUT", headers: auth,
     body: JSON.stringify({ fases: fasesAtuais.map((f: { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; showInKanban: boolean }) => ({ phaseKey: f.phaseKey, label: f.label, ordem: f.ordem, required: f.required, conditional: f.conditional, entryRule: f.entryRule, showInKanban: f.showInKanban })) }),
-  }), { params: Promise.resolve({ id: String(tipo.id) }) })
+  }), { params: Promise.resolve({ id: String(macro.id) }) })
   check("200 — resync com fase já composta inativa NÃO é bloqueado", resPut.status === 200)
 
   console.log("\n3) Adicionar chave NOVA que está inativa — continua BLOQUEADO (a regra vale pra chave nova)")
   const CHAVE_C_INATIVA = `${MARCA.toLowerCase()}_c_nova_inativa`
   await prisma.catalogoFase.create({ data: { phaseKey: CHAVE_C_INATIVA, label: "Fase C nova (inativa)", escopo: "PROCESSO", ordemPadrao: 3, requiredPadrao: true, conditionalPadrao: false, ativo: false, status: "INATIVA", revisaoAtual: 1, efeitosPermitidos: ["REGISTER_ONLY"] } })
-  const resPutNova = await PUT(new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${tipo.id}`, {
+  const resPutNova = await PUT(new NextRequest(`http://localhost/api/gerenciamento/workflow-macro/${macro.id}`, {
     method: "PUT", headers: auth,
     body: JSON.stringify({ fases: [...fasesAtuais.map((f: { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; showInKanban: boolean }) => ({ phaseKey: f.phaseKey, label: f.label, ordem: f.ordem, required: f.required, conditional: f.conditional, entryRule: f.entryRule, showInKanban: f.showInKanban })), { phaseKey: CHAVE_C_INATIVA, label: "Fase C nova (inativa)", ordem: 3, required: true, conditional: false, entryRule: "previous_phase_completed", showInKanban: true }] }),
-  }), { params: Promise.resolve({ id: String(tipo.id) }) })
+  }), { params: Promise.resolve({ id: String(macro.id) }) })
   check("422 — chave NOVA inativa continua recusada (regra preservada)", resPutNova.status === 422)
 
   await limpar()

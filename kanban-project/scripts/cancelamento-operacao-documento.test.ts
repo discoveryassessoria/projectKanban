@@ -53,9 +53,13 @@ async function montarPalco() {
   const oferta = await garantirOferta(prisma, { countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ITA-ADM-CANC" }, update: {},
-    create: { code: "ITA-ADM-CANC", name: "Nacionalidade Italiana", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+    create: { code: "ITA-ADM-CANC", name: "Nacionalidade Italiana", paisId: oferta.paisId, processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "macro cancelamento", versao: 1 } })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId },
+  })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "macro cancelamento", versao: 1 } })
   await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: FASE_DOC, label: FASE_DOC, ordem: 0, versao: 1, required: true, conditional: false } })
   const wfDoc = await prisma.phaseInternalWorkflow.create({
     data: { wfUid: `all::${FASE_DOC}`, phaseKey: FASE_DOC, name: "WF doc", tipoProcessoId: null, versao: 1, execucao: "SEQUENCIAL", escopoExecucao: "DOCUMENTO", exigeDocumento: true, exigePessoa: true },
@@ -70,7 +74,7 @@ async function montarPalco() {
     create: { nome: "Operador Teste", email: "cancelamento@teste.local", senha: "x", tipo: "admin" }, select: { id: true },
   })
   const proc = await prisma.processo.create({
-    data: { nome: "processo cancelamento", tipoProcessoMotorId: tipo.id, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
+    data: { nome: "processo cancelamento", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: FASE_DOC },
     select: { id: true },
   })
   const item = await prisma.itemCatalogo.create({ data: { code: "CANC_ITEM", name: "Certidão de Óbito", natureza: "DOCUMENTO" }, select: { id: true } })

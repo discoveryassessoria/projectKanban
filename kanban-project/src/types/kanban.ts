@@ -43,13 +43,24 @@ export interface FaseKanban {
   ordem: number
 }
 
+// Modalidade habilitada para um Tipo (Administrativa/Judicial) — hierarquia
+// País/Tipo/Modalidade/Workflow Macro (mandato 22/09/2026).
+export interface ModalidadeKanban {
+  id: number
+  modalityKey: string
+  modalityLabel: string
+}
+
 // Tipo de processo do motor + as fases dele (colunas do board)
 export interface TipoKanban {
   id: number
   code: string
   name: string              // "Cidadania Italiana · Judicial"
   countryKey: string
+  /** @deprecated best-effort (1ª modalidade habilitada) — só para rótulo de coluna. Use `modalidades` para a escolha real. */
   modalityLabel: string
+  /** Todas as modalidades habilitadas para este Tipo — 1 ou 2 (Administrativa/Judicial). */
+  modalidades: ModalidadeKanban[]
   fases: FaseKanban[]       // só as showInKanban, em ordem
 }
 
@@ -246,6 +257,7 @@ export interface CriarProcesso {
   observacoes?: string
   pais: string                   // countryKey
   tipoProcessoMotorId: number    // obrigatório — é o que liga no motor
+  modalidadeId: number           // obrigatório — Administrativa/Judicial (hierarquia País/Tipo/Modalidade/Workflow Macro)
   contratanteIds?: number[]
   requerenteIds?: number[]
   arvoreId?: number

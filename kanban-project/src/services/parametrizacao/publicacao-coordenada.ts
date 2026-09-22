@@ -17,6 +17,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { resolverMacroWorkflowDoTipo } from "@/src/lib/motor/resolver-macro-workflow"
 import { pendenciasDoComponente, impedimentosDePublicacao, type Pendencia } from "@/src/services/financeiro/pendencias-parametrizacao"
 
 export interface ResultadoPublicacao {
@@ -40,10 +41,7 @@ export async function publicarParametrizacao(args: {
   phaseKey?: string | null
   usuarioId?: number | null
 }): Promise<ResultadoPublicacao> {
-  const macro = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: args.tipoProcessoId },
-    select: { fases: { select: { phaseKey: true } } },
-  })
+  const macro = await resolverMacroWorkflowDoTipo(args.tipoProcessoId)
   const fases = (macro?.fases ?? []).map((f) => f.phaseKey).filter((f) => (args.phaseKey ? f === args.phaseKey : true))
   if (fases.length === 0) {
     return { publicou: false, impedimentos: [], regrasPublicadas: [], componentesAtivados: [] }

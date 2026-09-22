@@ -100,8 +100,9 @@ async function main() {
   const admin = await prisma.usuario.create({ data: { nome: "Admin CFGRETRO", email: "admin@cfgretro.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const token = await signAuthToken({ userId: admin.id, email: "admin@cfgretro.test", tipo: "admin", sessaoInicio: Date.now() })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGRETRO", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade CFGRETRO" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro isolado`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro isolado`, versao: 1 }, select: { id: true } })
   await prisma.catalogoFase.upsert({
     where: { phaseKey: PHASE_KEY_ANTES },
     update: {},
@@ -119,14 +120,14 @@ async function main() {
 
   secao("2) Processos sintéticos — [TESTE VISUAL] em andamento e finalizado")
   const procEmAndamento = await prisma.processo.create({
-    data: { nome: `[TESTE VISUAL] Em Andamento`, workflowRuntime: "v2", faseAtualKey: PHASE_KEY_ANTES, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 },
+    data: { nome: `[TESTE VISUAL] Em Andamento`, workflowRuntime: "v2", faseAtualKey: PHASE_KEY_ANTES, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
   const relAntes = await materializarExecucaoDaFase({ processoId: procEmAndamento.id, fonte: "PROCESSO_CRIADO" })
   ok("2.1) processo em andamento materializa a fase ANTES normalmente (fixture viva)", relAntes.estado === "MATERIALIZADO", relAntes.estado)
   const tarefaAntesId = (await prisma.tarefa.findFirstOrThrow({ where: { processoId: procEmAndamento.id } })).id
   const procFinalizado = await prisma.processo.create({
-    data: { nome: `[TESTE VISUAL] Finalizado`, workflowRuntime: "v2", faseAtualKey: "finalizado", tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 },
+    data: { nome: `[TESTE VISUAL] Finalizado`, workflowRuntime: "v2", faseAtualKey: "finalizado", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
   ok("2.2) processo finalizado sintético criado", !!procFinalizado.id)

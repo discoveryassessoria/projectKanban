@@ -48,9 +48,10 @@ async function main() {
   void cfg
 
   const tipo = await prisma.tipoProcessoNacionalidade.create({
-    data: { code: `${MARCA}_TIPO`, name: `[${MARCA}] Tipo`, paisId: pm.paisId, modalidadeId: pm.id, ativo: true },
+    data: { code: `${MARCA}_TIPO`, name: `[${MARCA}] Tipo`, paisId: pm.paisId, ativo: true },
   })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] Macro`, ativo: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, name: `[${MARCA}] Macro`, ativo: true } })
   // 3 fases genéricas, próprias deste teste — nenhuma se chama "finalizado".
   const CHAVE_A = `${MARCA.toLowerCase()}_a`, CHAVE_B = `${MARCA.toLowerCase()}_b`, CHAVE_C_TERMINAL = `${MARCA.toLowerCase()}_c_ultima`
   await prisma.faseMacro.createMany({
@@ -66,7 +67,7 @@ async function main() {
     void ordem
   }
 
-  const proc = await prisma.processo.create({ data: { nome: `[${MARCA}] processo de teste`, faseAtualKey: CHAVE_B, tipoProcessoMotorId: tipo.id, paisId: pm.paisId } })
+  const proc = await prisma.processo.create({ data: { nome: `[${MARCA}] processo de teste`, faseAtualKey: CHAVE_B, tipoProcessoMotorId: tipo.id, modalidadeId: pm.id, paisId: pm.paisId } })
 
   console.log("\n1) Processo na fase B (não-terminal): dataConclusao continua null")
   const antes = await prisma.processo.findUniqueOrThrow({ where: { id: proc.id }, select: { dataConclusao: true } })

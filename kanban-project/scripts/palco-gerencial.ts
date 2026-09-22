@@ -160,9 +160,14 @@ async function main() {
     where: { code: `${MARCA}_ESP_ADM` },
     create: {
       code: `${MARCA}_ESP_ADM`, name: 'Espanha — Administrativa (palco)',
-      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
-      },
+      paisId: oferta.paisId,
+    },
     update: { ativo: true, arquivado: false }, select: { id: true },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: { ativo: true },
+    create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
   })
 
   const criadas: Record<string, number> = {}

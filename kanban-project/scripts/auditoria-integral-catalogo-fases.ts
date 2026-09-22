@@ -88,16 +88,20 @@ async function main() {
       code: TIPO_CODE,
       name: "[TESTE VISUAL] Tipo Sintético — Auditoria Integral de Fases",
       paisId: paisModalidade.paisId,
-      modalidadeId: paisModalidade.id,
       ativo: true,
     },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: paisModalidade.id } },
+    update: { ativo: true },
+    create: { tipoProcessoId: tipo.id, modalidadeId: paisModalidade.id, ativo: true },
   })
   console.log(`  ✅ TipoProcessoNacionalidade #${tipo.id} (${tipo.code}) — país: ${paisModalidade.pais.countryLabel}`)
 
   const macro = await prisma.macroWorkflow.upsert({
-    where: { tipoProcessoId: tipo.id },
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: paisModalidade.id } },
     update: { ativo: true },
-    create: { tipoProcessoId: tipo.id, name: `Workflow Macro · ${tipo.name}`, ativo: true },
+    create: { tipoProcessoId: tipo.id, modalidadeId: paisModalidade.id, name: `Workflow Macro · ${tipo.name}`, ativo: true },
   })
   console.log(`  ✅ MacroWorkflow #${macro.id}`)
 
@@ -164,7 +168,7 @@ async function main() {
   await main2(tipo, macro, paisModalidade)
 }
 
-async function main2(tipo: { id: number }, macro: { id: number }, paisModalidade: { paisId: number }) {
+async function main2(tipo: { id: number }, macro: { id: number }, paisModalidade: { id: number; paisId: number }) {
   const estadoAntesDaInsercao = await contarEstadoGlobal(PROCESSOS_ALVO)
 
   // ── 3.1/3.2) Inserir a fase sintética no meio + publicar pelo fluxo real ──
@@ -245,7 +249,10 @@ async function main2(tipo: { id: number }, macro: { id: number }, paisModalidade
   console.log("\n── 3.4) Idempotência — repetir a reconciliação ──")
   const estadoAntes2a = await contarEstadoGlobal(PROCESSOS_ALVO)
   const { enqueueReconciliacaoFaseMacro } = await import("../src/lib/motor/reconciliar-fase-macro")
-  const macroAtual = await prisma.macroWorkflow.findUniqueOrThrow({ where: { tipoProcessoId: tipo.id }, select: { id: true, versao: true } })
+  const macroAtual = await prisma.macroWorkflow.findUniqueOrThrow({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: paisModalidade.id } },
+    select: { id: true, versao: true },
+  })
   await enqueueReconciliacaoFaseMacro({
     macroWorkflowId: macro.id, tipoProcessoId: tipo.id,
     versaoAnterior: macroAtual.versao, versaoNova: macroAtual.versao,

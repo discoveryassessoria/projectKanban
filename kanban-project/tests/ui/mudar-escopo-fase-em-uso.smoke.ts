@@ -46,8 +46,9 @@ test.describe('Catálogo de Fases — mudar escopo de fase EM USO', () => {
     await prisma.catalogoFase.create({
       data: { phaseKey: CHAVE, label: `[${MARCA}] Fase`, escopo: 'PROCESSO', ordemPadrao: 1, requiredPadrao: true, conditionalPadrao: false, ativo: true, status: 'PUBLICADA', revisaoAtual: 1, efeitosPermitidos: ['REGISTER_ONLY'] },
     })
-    const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, modalidadeId: pm.id, ativo: true } })
-    const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] macro`, ativo: true } })
+    const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, ativo: true } })
+    await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, ativo: true } })
+    const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, name: `[${MARCA}] macro`, ativo: true } })
     // COMPOSTA — é isso que torna a fase "em uso" (usos > 0).
     await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: CHAVE, label: 'Fase', ordem: 1, required: true, conditional: false, entryRule: 'process_created', showInKanban: true } })
   })

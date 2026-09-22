@@ -71,8 +71,9 @@ async function main() {
       { phaseKey: CHAVE_B, label: "[RETROWFI] Fase B — Validação Sintética", escopo: "PROCESSO", ordemPadrao: 2, requiredPadrao: true, conditionalPadrao: false, ativo: true, status: "PUBLICADA", revisaoAtual: 1, efeitosPermitidos: ["REGISTER_ONLY"] },
     ],
   })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, modalidadeId: pm.id, ativo: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `[${MARCA}] macro`, ativo: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: MARCA, name: `[${MARCA}] tipo`, paisId: pm.paisId, ativo: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, ativo: true } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: pm.id, name: `[${MARCA}] macro`, ativo: true } })
   await prisma.faseMacro.createMany({
     data: [
       { macroWorkflowId: macro.id, phaseKey: CHAVE_A, label: "Fase A", ordem: 1, required: true, conditional: false, entryRule: "process_created", showInKanban: true },
@@ -91,9 +92,9 @@ async function main() {
   // Três processos sintéticos: em andamento NA fase B (alcance direto), em
   // andamento em OUTRA fase do mesmo tipo (alcance por composição do macro), e
   // finalizado de verdade (nunca deve ser tocado).
-  const procB = await prisma.processo.create({ data: { nome: `[${MARCA}] processo na fase B`, faseAtualKey: CHAVE_B, tipoProcessoMotorId: tipo.id, paisId: pm.paisId } })
-  const procA = await prisma.processo.create({ data: { nome: `[${MARCA}] processo na fase A`, faseAtualKey: CHAVE_A, tipoProcessoMotorId: tipo.id, paisId: pm.paisId } })
-  const procFinalizado = await prisma.processo.create({ data: { nome: `[${MARCA}] processo finalizado`, faseAtualKey: "finalizado", tipoProcessoMotorId: tipo.id, paisId: pm.paisId, dataConclusao: new Date() } })
+  const procB = await prisma.processo.create({ data: { nome: `[${MARCA}] processo na fase B`, faseAtualKey: CHAVE_B, tipoProcessoMotorId: tipo.id, modalidadeId: pm.id, paisId: pm.paisId } })
+  const procA = await prisma.processo.create({ data: { nome: `[${MARCA}] processo na fase A`, faseAtualKey: CHAVE_A, tipoProcessoMotorId: tipo.id, modalidadeId: pm.id, paisId: pm.paisId } })
+  const procFinalizado = await prisma.processo.create({ data: { nome: `[${MARCA}] processo finalizado`, faseAtualKey: "finalizado", tipoProcessoMotorId: tipo.id, modalidadeId: pm.id, paisId: pm.paisId, dataConclusao: new Date() } })
 
   async function contarInstanciasETarefas(processoId: number) {
     const [instancias, tarefas] = await Promise.all([

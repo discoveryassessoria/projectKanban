@@ -9,17 +9,22 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
  * perdiam o vínculo sem ninguém ser avisado.
  */
 async function usoReal(id: number) {
-  const [processos, pendencias, workflows, versoes, regrasTransversais, regrasEconomicas] = await Promise.all([
+  const [processos, pendencias, workflows, versoes, regrasTransversais, regrasEconomicas, macroWorkflows] = await Promise.all([
     prisma.processo.count({ where: { tipoProcessoMotorId: id } }),
     prisma.pendenciaFinanceira.count({ where: { tipoProcessoId: id } }),
     prisma.phaseInternalWorkflow.count({ where: { tipoProcessoId: id } }),
     prisma.phaseInternalWorkflowVersao.count({ where: { tipoProcessoId: id } }),
     prisma.regraTarefaTransversal.count({ where: { tipoProcessoId: id } }),
     prisma.phaseEconomicRule.count({ where: { tipoProcessoId: id } }),
+    // Workflow Macro publicado é uso real — excluir o Tipo CASCATEIA a
+    // composição inteira (`onDelete: Cascade`). Sem esta checagem, um Tipo
+    // com Workflow Macro publicado mas zero processo ainda podia ser
+    // excluído, apagando a composição em silêncio.
+    prisma.macroWorkflow.count({ where: { tipoProcessoId: id } }),
   ])
   return {
-    processos, pendencias, workflows, versoes, regrasTransversais, regrasEconomicas,
-    total: processos + pendencias + workflows + versoes + regrasTransversais + regrasEconomicas,
+    processos, pendencias, workflows, versoes, regrasTransversais, regrasEconomicas, macroWorkflows,
+    total: processos + pendencias + workflows + versoes + regrasTransversais + regrasEconomicas + macroWorkflows,
   }
 }
 
@@ -36,25 +41,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const b = await request.json()
 
-    // Se mudou país/modalidade, RESOLVE A IDENTIDADE na borda: a chave textual
-    // que chega do formulário vira o vínculo canônico. Nenhum rótulo de país é
-    // gravado no tipo — só a modalidade, que é outra dívida, ainda copia label.
-    let paisFields: Record<string, unknown> = {}
-    if ((b.paisId !== undefined || b.countryKey !== undefined) && b.modalityKey !== undefined) {
-      const pais = b.paisId
-        ? await prisma.catalogoPais.findUnique({ where: { id: Number(b.paisId) } })
-        : await prisma.catalogoPais.findUnique({ where: { countryKey: String(b.countryKey) } })
-      if (!pais) return NextResponse.json({ error: 'País não encontrado no catálogo.' }, { status: 400 })
-      const modalidade = await prisma.modalidadePais.findUnique({
-        where: { paisId_modalityKey: { paisId: pais.id, modalityKey: String(b.modalityKey) } },
-      })
-      if (!modalidade) return NextResponse.json({ error: 'Modalidade não encontrada para este país.' }, { status: 400 })
-      paisFields = {
-        pais: { connect: { id: pais.id } },
-        modalityKey: modalidade.modalityKey, modalityLabel: modalidade.modalityLabel,
-      }
-    }
-
+    // PAÍS NÃO MUDA DEPOIS DE CRIADO — é a IDENTIDADE da nacionalidade
+    // ofertada (mesma regra de sempre, `paisId` obrigatório e imutável na
+    // prática). MODALIDADE também deixou de ser um campo único do Tipo
+    // (mandato "Reconstrução da hierarquia", 22/09/2026): um Tipo agora
+    // HABILITA 1 ou 2 modalidades via `TipoProcessoModalidadeHabilitada` —
+    // gerenciado por `PUT /api/gerenciamento/tipos-processo/[id]/modalidades`,
+    // não por este PUT (que só edita code/name/ativo/arquivado).
     const tipo = await prisma.tipoProcessoNacionalidade.update({
       where: { id },
       data: {
@@ -62,7 +55,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         name: b.name !== undefined ? String(b.name).trim() : atual.name,
         ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
         arquivado: b.arquivado !== undefined ? !!b.arquivado : atual.arquivado,
-        ...paisFields,
       },
     })
 
@@ -92,7 +84,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
           error:
             `Este tipo de processo está em uso (${uso.processos} processo(s), ${uso.pendencias} pendência(s) financeira(s), ` +
             `${uso.workflows} workflow(s) interno(s), ${uso.versoes} versão(ões), ${uso.regrasTransversais} regra(s) transversal(is), ` +
-            `${uso.regrasEconomicas} regra(s) econômica(s)). Arquive em vez de excluir.`,
+            `${uso.regrasEconomicas} regra(s) econômica(s), ${uso.macroWorkflows} Workflow(s) Macro publicado(s)). Arquive em vez de excluir.`,
           codigo: 'EM_USO',
           uso,
         },

@@ -55,11 +55,12 @@ async function main() {
 
   const responsavel = await prisma.usuario.create({ data: { nome: "Responsável COTC", email: "resp@cotc.test", senha: "x", tipo: "operacional" }, select: { id: true } })
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País COTC", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade COTC" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const arvore = await prisma.arvore.create({ data: { nome: `Árvore ${MARCA}` } })
   const pessoa = await prisma.pessoa.create({ data: { nome: "Grisotto", sobrenome: "Sintético", arvoreId: arvore.id, linhaReta: true, requerente: "maior" } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} Grisotto-sintético`, workflowRuntime: "v2", faseAtualKey: FASE, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1, arvoreId: arvore.id },
+    data: { nome: `${MARCA} Grisotto-sintético`, workflowRuntime: "v2", faseAtualKey: FASE, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1, arvoreId: arvore.id },
     select: { id: true },
   })
 

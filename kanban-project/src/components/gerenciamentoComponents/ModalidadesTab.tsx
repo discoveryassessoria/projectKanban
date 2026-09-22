@@ -3,11 +3,15 @@
 // src/components/gerenciamentoComponents/ModalidadesTab.tsx
 // PROCESSOS → CADASTROS → MODALIDADES.
 // Tela dedicada do cadastro ModalidadePais (modalidade é sempre POR PAÍS).
-// REUSA exatamente as mesmas rotas e o mesmo contrato do modal "Gerenciar
-// modalidades" de Tipos de Processo — nenhuma API nova, nenhuma regra nova.
 // Backend: /api/gerenciamento/paises (GET) +
 //          /api/gerenciamento/paises/[countryKey]/modalidades (GET/POST) +
 //          .../[modalityKey] (PUT/DELETE)
+//
+// MODALIDADE É ENUMERAÇÃO CANÔNICA — EXCLUSIVAMENTE Administrativa e
+// Judicial (mandato "Reconstrução da hierarquia", 22/09/2026). Por isso não
+// existe "+ Nova modalidade" com nome livre: só é possível HABILITAR a
+// canônica que este país ainda não tem, e não é possível renomear nenhuma —
+// o servidor já recusa as duas coisas; esta tela só reflete o que ele permite.
 
 import { useEffect, useState, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
@@ -36,11 +40,12 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 }
 
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
-const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
-type Form = { editando: Modalidade | null; modalityLabel: string; codeSuffix: string }
+const CANONICAS: { modalityKey: string; modalityLabel: string }[] = [
+  { modalityKey: "judicial", modalityLabel: "Judicial" },
+  { modalityKey: "administrativa", modalityLabel: "Administrativa" },
+]
 
 const SEM_PAISES: Pais[] = []
 const SEM_MODALIDADES: Modalidade[] = []
@@ -70,37 +75,31 @@ export default function ModalidadesTab() {
   const [erroLocal, setErro] = useState<string | null>(null)
   const erro = erroLocal ?? (paisesReq.erro?.message ?? modsReq.erro?.message ?? null)
   const [flash, setFlash] = useState("")
-  const [form, setForm] = useState<Form | null>(null)
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 
   function trocarPais(ck: string) {
     // Trocar o país já troca a chave da consulta de modalidades: nada a recarregar aqui.
-    setCountryKey(ck); setErro(null); setForm(null)
+    setCountryKey(ck); setErro(null)
   }
 
-  async function salvar() {
-    if (!form) return
-    const label = form.modalityLabel.trim()
-    if (!label) { setErro("Informe o nome da modalidade."); return }
+  // Faltantes = as canônicas que este país ainda não habilitou — é a ÚNICA
+  // coisa que "+ Habilitar modalidade" pode criar (nunca um nome livre).
+  const chavesExistentes = new Set(rows.map((m) => m.modalityKey))
+  const faltantes = CANONICAS.filter((c) => !chavesExistentes.has(c.modalityKey))
+
+  async function habilitar(modalityKey: string) {
     if (!countryKey) { setErro("Escolha o país."); return }
     setBusy(true); setErro(null)
     try {
-      if (form.editando) {
-        await jsonFetch(`/api/gerenciamento/paises/${countryKey}/modalidades/${form.editando.modalityKey}`, {
-          method: "PUT",
-          body: JSON.stringify({ modalityLabel: label, codeSuffix: form.codeSuffix.trim() || null }),
-        })
-      } else {
-        await jsonFetch(`/api/gerenciamento/paises/${countryKey}/modalidades`, {
-          method: "POST",
-          body: JSON.stringify({ modalityLabel: label, codeSuffix: form.codeSuffix.trim() || null }),
-        })
-      }
-      setForm(null); showFlash("Modalidade salva.")
+      await jsonFetch(`/api/gerenciamento/paises/${countryKey}/modalidades`, {
+        method: "POST",
+        body: JSON.stringify({ modalityKey }),
+      })
+      showFlash("Modalidade habilitada.")
       await carregarMods()
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível salvar a modalidade.")
+      setErro(e instanceof Error ? e.message : "Não foi possível habilitar a modalidade.")
     } finally { setBusy(false) }
   }
 
@@ -139,18 +138,26 @@ export default function ModalidadesTab() {
           <div>
             <h2 className="text-lg font-semibold text-white">Modalidades</h2>
             <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
-              Modalidades (via judicial, administrativa, recurso…) de cada país. Elas alimentam o cadastro de
-              Tipos de Processo — inativar tira do seletor sem apagar nada.
+              A via de tramitação de cada país — só existem duas: Judicial e Administrativa. Elas alimentam o
+              cadastro de Tipos de Processo — inativar tira do seletor sem apagar nada.
             </p>
           </div>
-          <button
-            onClick={() => { setErro(null); setForm({ editando: null, modalityLabel: "", codeSuffix: "" }) }}
-            disabled={!countryKey}
-            className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40"
-            title={countryKey ? "" : "Cadastre um país primeiro (Processos › Cadastros › Países e Regiões)."}
-          >
-            + Nova modalidade
-          </button>
+          <div className="flex flex-none flex-wrap gap-2">
+            {faltantes.map((c) => (
+              <button
+                key={c.modalityKey}
+                onClick={() => habilitar(c.modalityKey)}
+                disabled={!countryKey || busy}
+                className="rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40"
+                title={countryKey ? "" : "Cadastre um país primeiro (Processos › Cadastros › Países e Regiões)."}
+              >
+                + Habilitar {c.modalityLabel}
+              </button>
+            ))}
+            {countryKey && faltantes.length === 0 && (
+              <span className="self-center text-xs text-[var(--text-muted)]">Este país já tem as duas modalidades.</span>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--border-default)] pt-4">
@@ -208,11 +215,6 @@ export default function ModalidadesTab() {
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                       <button
-                        title="Editar" aria-label="Editar"
-                        onClick={() => setForm({ editando: m, modalityLabel: m.modalityLabel, codeSuffix: m.codeSuffix || "" })}
-                        className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"
-                      ><IEdit /></button>
-                      <button
                         title={(m.tiposCount ?? 0) > 0 ? `Em uso por ${m.tiposCount} tipo(s) — inative em vez de excluir` : "Excluir"}
                         aria-label="Excluir"
                         disabled={(m.tiposCount ?? 0) > 0}
@@ -225,31 +227,6 @@ export default function ModalidadesTab() {
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-[var(--border-default)] px-6 py-4">
-              <h3 className="font-semibold text-white">{form.editando ? "Editar modalidade" : "Nova modalidade"}</h3>
-              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{paises.find(p => p.countryKey === countryKey)?.countryLabel}</p>
-            </div>
-            <div className="space-y-3 px-6 py-4">
-              <div>
-                <label className={labelCls}>Nome da modalidade *</label>
-                <input value={form.modalityLabel} onChange={e => setForm(f => f && { ...f, modalityLabel: e.target.value })} className={inputCls} placeholder="Judicial" />
-              </div>
-              <div>
-                <label className={labelCls}>Sufixo de código</label>
-                <input value={form.codeSuffix} onChange={e => setForm(f => f && { ...f, codeSuffix: e.target.value })} className={inputCls} placeholder="JUD" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={salvar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
-            </div>
-          </div>
         </div>
       )}
     </div>

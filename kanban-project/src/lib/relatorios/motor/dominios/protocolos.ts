@@ -46,9 +46,7 @@ const INCLUDE = {
       id: true, codigo: true, nome: true,
       paisCanonico: { select: { id: true, countryKey: true, countryLabel: true, flag: true } },
       familia: { select: { id: true, nome: true } },
-      enquadramentoLegal: {
-        select: { nome: true, modalidadeLegal: { select: { nome: true, cardinalidadeRequerimento: true } } },
-      },
+      modalidade: { select: { modalityLabel: true } },
     },
   },
   requerentesCobertos: {
@@ -65,24 +63,26 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
   grain: "1 linha = 1 protocolo",
 
   // A UNIDADE REAL depende da cardinalidade do requerimento daquela
-  // nacionalidade — que é CADASTRO (ModalidadeLegal), não país escrito no if.
-  // Itália é judicial e COLETIVA: um ricorso, a família inteira, uma linha.
-  // Espanha é consular e INDIVIDUAL: cinco requerentes protocolados são cinco
-  // protocolos, e por isso cinco linhas. A consulta é a mesma nos dois casos;
-  // o que muda é o dado, porque o protocolo espanhol JÁ nasce por pessoa.
+  // nacionalidade — que é CADASTRO (`MacroWorkflow.cardinalidadeRequerimento`,
+  // mandato "Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro",
+  // 22/09/2026), não país escrito no if. Itália é judicial e COLETIVA: um
+  // ricorso, a família inteira, uma linha. Espanha é consular e INDIVIDUAL:
+  // cinco requerentes protocolados são cinco protocolos, e por isso cinco
+  // linhas. A consulta é a mesma nos dois casos; o que muda é o dado, porque
+  // o protocolo espanhol JÁ nasce por pessoa.
   grainNoContexto: async (countryKey) => {
     if (!countryKey) return "1 linha = 1 protocolo"
-    const modalidades = await prisma.modalidadeLegal.findMany({
-      where: { ativo: true, pais: { countryKey } },
-      select: { nome: true, cardinalidadeRequerimento: true },
-      orderBy: { ordem: "asc" },
+    const workflows = await prisma.macroWorkflow.findMany({
+      where: { ativo: true, tipoProcesso: { pais: { countryKey } } },
+      select: { cardinalidadeRequerimento: true, modalidade: { select: { modalityLabel: true } } },
+      orderBy: { modalidadeId: "asc" },
     })
-    if (modalidades.length === 0) {
-      // Sem base jurídica cadastrada não dá para afirmar a unidade. Dizer
+    if (workflows.length === 0) {
+      // Sem Workflow Macro publicado não dá para afirmar a unidade. Dizer
       // "1 protocolo" seria um palpite com cara de fato.
-      return "1 linha = 1 protocolo — este país ainda não tem modalidade legal cadastrada"
+      return "1 linha = 1 protocolo — este país ainda não tem Workflow Macro publicado"
     }
-    const cards = new Set(modalidades.map((m) => m.cardinalidadeRequerimento))
+    const cards = new Set(workflows.map((w) => w.cardinalidadeRequerimento))
     if (cards.size === 1) {
       return cards.has("COLETIVO")
         ? "1 linha = 1 protocolo do processo — cobre os requerentes, sem multiplicá-los"
@@ -92,7 +92,7 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
     // R.G. para a família) E via administrativa consular (individual, um
     // expediente por pessoa). As duas são legítimas e convivem: o que decide é a
     // modalidade DAQUELE processo, e a linha continua sendo o protocolo.
-    const porCard = (c: string) => modalidades.filter((m) => m.cardinalidadeRequerimento === c).map((m) => m.nome)
+    const porCard = (c: string) => workflows.filter((w) => w.cardinalidadeRequerimento === c).map((w) => w.modalidade.modalityLabel)
     return `1 linha = 1 protocolo · ${porCard("COLETIVO").join(", ")} cobre a família; ` +
       `${porCard("INDIVIDUAL").join(", ")} é por requerente`
   },
@@ -300,7 +300,7 @@ export const DOMINIO_PROTOCOLOS: DominioDef = {
     { key: "orgao_pais", rotulo: "País do órgão", valor: (l) => l.orgao?.pais?.countryLabel ?? null },
     { key: "orgao_cidade", rotulo: "Cidade do órgão", valor: (l) => l.orgao?.city ?? null },
     { key: "responsavel", rotulo: "Responsável", valor: (l) => l.responsavel?.nome ?? null },
-    { key: "modalidade", rotulo: "Modalidade legal", valor: (l) => l.processo?.enquadramentoLegal?.modalidadeLegal?.nome ?? null },
+    { key: "modalidade", rotulo: "Modalidade", valor: (l) => l.processo?.modalidade?.modalityLabel ?? null },
     { key: "finalidade", rotulo: "Finalidade", valor: (l) => l.finalidade },
     { key: "situacao", rotulo: "Situação", valor: (l) => l.situacao },
     { key: "situacao_em", rotulo: "Data da situação", valor: (l) => dataBR(l.situacaoEm) },

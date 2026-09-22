@@ -42,7 +42,17 @@ export async function GET(request: Request) {
         select: {
           id: true, code: true, name: true,
           pais: { select: { countryKey: true } },
-          modalidade: { select: { modalityKey: true, modalityLabel: true } },
+          // Um Tipo pode habilitar Administrativa, Judicial ou ambas (mandato
+          // "Reconstrução da hierarquia", 22/09/2026) — a lista completa vai em
+          // `modalidades` (o modal "criar processo" usa para deixar escolher);
+          // `modalityLabel` (deprecated) continua best-effort (a primeira
+          // habilitada) só para não quebrar o consumidor existente
+          // (kanban-content.tsx), que já tolera o campo estar ausente.
+          modalidadesHabilitadas: {
+            where: { ativo: true },
+            select: { modalidade: { select: { id: true, modalityKey: true, modalityLabel: true } } },
+            orderBy: { modalidadeId: "asc" },
+          },
         },
       }),
       prisma.macroWorkflow.findMany({
@@ -57,15 +67,25 @@ export async function GET(request: Request) {
       }),
     ])
 
-    // fases por tipo (junta pelo tipoProcessoId — não depende de nome de relação)
+    // fases por tipo — UNIÃO das fases de todos os Workflow Macro do Tipo (um
+    // por modalidade habilitada), sem repetir a mesma chave. `findMany` sem
+    // `where` agora devolve potencialmente MAIS de uma linha por
+    // tipoProcessoId (uma por modalidade) — um `Map.set` sequencial
+    // sobrescreveria as fases da primeira modalidade com as da última.
     const fasesPorTipo = new Map<number, { phaseKey: string; label: string; ordem: number }[]>()
-    for (const wf of workflows) fasesPorTipo.set(wf.tipoProcessoId, wf.fases)
+    for (const wf of workflows) {
+      const atuais = fasesPorTipo.get(wf.tipoProcessoId) ?? []
+      const vistas = new Set(atuais.map((f) => f.phaseKey))
+      for (const f of wf.fases) { if (!vistas.has(f.phaseKey)) { vistas.add(f.phaseKey); atuais.push(f) } }
+      fasesPorTipo.set(wf.tipoProcessoId, atuais)
+    }
 
-    const tiposOut = tipos.map(({ pais, modalidade, ...t }) => ({
+    const tiposOut = tipos.map(({ pais, modalidadesHabilitadas, ...t }) => ({
       ...t,
       // APRESENTAÇÃO derivada das relações — nunca de coluna espelhada.
       countryKey: pais.countryKey,
-      modalityLabel: modalidade.modalityLabel,
+      modalityLabel: modalidadesHabilitadas[0]?.modalidade.modalityLabel ?? null,
+      modalidades: modalidadesHabilitadas.map((h) => h.modalidade),
       fases: fasesPorTipo.get(t.id) || [],
     }))
 

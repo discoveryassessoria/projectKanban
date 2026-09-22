@@ -44,10 +44,16 @@ export async function GET(request: NextRequest) {
   try {
     const tipos = await prisma.tipoProcessoNacionalidade.findMany({
       where: { ativo: true, arquivado: false },
-      select: { id: true, name: true, macroWorkflow: { select: { fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: 'asc' } } } } },
+      select: { id: true, name: true, macroWorkflows: { select: { fases: { select: { phaseKey: true, label: true, ordem: true }, orderBy: { ordem: 'asc' } } } } },
       orderBy: { name: 'asc' },
     })
-    const tiposProcesso = tipos.map(t => ({ id: t.id, name: t.name, fases: t.macroWorkflow?.fases ?? [] }))
+    // Picker de phaseKey por Tipo — une as fases de todos os Workflow Macro do
+    // Tipo (um por modalidade habilitada), sem repetir a mesma chave.
+    const tiposProcesso = tipos.map(t => {
+      const vistas = new Set<string>()
+      const fases = t.macroWorkflows.flatMap(mw => mw.fases).filter(f => (vistas.has(f.phaseKey) ? false : (vistas.add(f.phaseKey), true)))
+      return { id: t.id, name: t.name, fases }
+    })
     return NextResponse.json({ tiposProcesso, events: EVENTS })
   } catch (e) {
     console.error('GET simulacao-fase', e)

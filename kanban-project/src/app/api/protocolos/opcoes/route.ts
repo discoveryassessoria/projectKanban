@@ -12,6 +12,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { FORMAS_ENVIO } from "@/src/services/protocolizacao"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import {
   cardinalidadeDoProcesso,
   FINALIDADES_DE_PROTOCOLO,
@@ -79,19 +80,27 @@ export async function GET(request: Request) {
       ? CARDINALIDADES.INDIVIDUAL
       : await cardinalidadeDoProcesso(prisma, processoId)
 
-    // LACUNA DE CADASTRO TEM QUE APARECER. Sem enquadramento legal declarado, a
+    // LACUNA DE CADASTRO TEM QUE APARECER. Sem Workflow Macro resolvível, a
     // regra acima é um FALLBACK restritivo, não uma resposta — e a tela precisa
     // dizer isso em vez de restringir em silêncio. Cair calado na regra mais
     // apertada faz o operador achar que o sistema sabe algo que ele não sabe.
-    const rota = isNaN(processoId) ? null : await prisma.processo.findUnique({
+    // Migrado de EnquadramentoLegal/ModalidadeLegal (removidos) para a
+    // hierarquia Tipo/Modalidade/Workflow Macro (mandato "Reconstrução da
+    // hierarquia", 22/09/2026) — mesma finalidade: mostrar de onde vem a
+    // cardinalidade, ou avisar que não há uma declarada.
+    const processoRota = isNaN(processoId) ? null : await prisma.processo.findUnique({
       where: { id: processoId },
       select: {
-        enquadramentoLegal: {
-          select: { id: true, nome: true, modalidadeLegal: { select: { id: true, nome: true, cardinalidadeRequerimento: true } } },
-        },
+        tipoProcessoMotor: { select: { name: true } },
+        modalidade: { select: { modalityLabel: true } },
+        tipoProcessoMotorId: true,
+        modalidadeId: true,
       },
     })
-    const cardinalidadeDeclarada = !!rota?.enquadramentoLegal?.modalidadeLegal
+    const macroDaRota = processoRota?.tipoProcessoMotorId != null && processoRota.modalidadeId != null
+      ? await resolverMacroWorkflowDoProcesso(processoRota.tipoProcessoMotorId, processoRota.modalidadeId)
+      : null
+    const cardinalidadeDeclarada = !!macroDaRota
 
     return NextResponse.json({
       orgaos,
@@ -100,10 +109,10 @@ export async function GET(request: Request) {
       formasEnvio: FORMAS_ENVIO,
       cardinalidade,
       cardinalidadeDeclarada,
-      rota: rota?.enquadramentoLegal
+      rota: processoRota?.tipoProcessoMotor
         ? {
-            enquadramento: rota.enquadramentoLegal.nome,
-            modalidade: rota.enquadramentoLegal.modalidadeLegal?.nome ?? null,
+            enquadramento: processoRota.tipoProcessoMotor.name,
+            modalidade: processoRota.modalidade?.modalityLabel ?? null,
           }
         : null,
       tiposCadastro,

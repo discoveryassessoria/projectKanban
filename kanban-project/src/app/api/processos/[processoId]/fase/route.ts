@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { advance } from "@/src/lib/motor/phase-advance"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 
 export async function PUT(request: Request, { params }: { params: Promise<{ processoId: string }> }) {
   // Item 1 da auditoria — alinhado ao gate canônico de avanço (antes: processos.editar_status).
@@ -28,18 +29,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ proc
 
     const processo = await prisma.processo.findUnique({
       where: { id: processoId },
-      select: { id: true, tipoProcessoMotorId: true, faseAtualKey: true, workflowRuntime: true },
+      select: { id: true, tipoProcessoMotorId: true, modalidadeId: true, faseAtualKey: true, workflowRuntime: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
-    if (!processo.tipoProcessoMotorId) {
-      return NextResponse.json({ error: "Processo sem tipo do motor — não é possível mover de fase." }, { status: 400 })
+    if (!processo.tipoProcessoMotorId || !processo.modalidadeId) {
+      return NextResponse.json({ error: "Processo sem tipo/modalidade do motor — não é possível mover de fase." }, { status: 400 })
     }
 
-    // a fase de destino tem que existir no workflow do tipo
-    const wf = await prisma.macroWorkflow.findUnique({
-      where: { tipoProcessoId: processo.tipoProcessoMotorId },
-      include: { fases: { where: { showInKanban: true }, select: { phaseKey: true } } },
-    })
+    // a fase de destino tem que existir no workflow do tipo+modalidade deste processo
+    const wf = await resolverMacroWorkflowDoProcesso(processo.tipoProcessoMotorId, processo.modalidadeId)
     const valida = wf?.fases.some((f) => f.phaseKey === faseAtualKey)
     if (!valida) {
       return NextResponse.json({ error: "Fase inválida para o tipo deste processo." }, { status: 400 })
@@ -59,11 +57,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ proc
       )
     }
 
-    const ordenadas = await prisma.macroWorkflow.findUnique({
-      where: { tipoProcessoId: processo.tipoProcessoMotorId },
-      include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true } } },
-    })
-    const fases = ordenadas?.fases ?? []
+    const fases = wf?.fases ?? []
     const idxAtual = fases.findIndex((f) => f.phaseKey === (processo.faseAtualKey ?? ""))
     const proxima = idxAtual >= 0 && idxAtual + 1 < fases.length ? fases[idxAtual + 1].phaseKey : null
     if (faseAtualKey === proxima) {

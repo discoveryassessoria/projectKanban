@@ -1,0 +1,112 @@
+{
+  "exportadoEm": "2026-09-22T16:55:15.696Z",
+  "motivo": "mandato Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro (22/09/2026), passo 3/3 (tighten) — backup antes de DROP TABLE",
+  "modalidadeLegal": [
+    {
+      "id": 8,
+      "code": "IT_ADMINISTRATIVO",
+      "nome": "Processo Administrativo",
+      "descricao": null,
+      "paisId": 1,
+      "ordem": 1,
+      "ativo": true,
+      "criadoEm": "2026-08-31T16:50:56.127Z",
+      "atualizadoEm": "2026-08-31T16:50:56.127Z",
+      "cardinalidadeRequerimento": "INDIVIDUAL"
+    },
+    {
+      "id": 7,
+      "code": "IT_JUDICIAL",
+      "nome": "Processo Judicial",
+      "descricao": null,
+      "paisId": 1,
+      "ordem": 0,
+      "ativo": true,
+      "criadoEm": "2026-08-31T16:09:09.073Z",
+      "atualizadoEm": "2026-08-31T16:50:57.165Z",
+      "cardinalidadeRequerimento": "COLETIVO"
+    },
+    {
+      "id": 1,
+      "code": "ES_LMD",
+      "nome": "Lei da Memória Democrática",
+      "descricao": null,
+      "paisId": 2,
+      "ordem": 1,
+      "ativo": true,
+      "criadoEm": "2026-07-31T17:01:18.885Z",
+      "atualizadoEm": "2026-08-31T16:50:59.261Z",
+      "cardinalidadeRequerimento": "INDIVIDUAL"
+    },
+    {
+      "id": 10,
+      "code": "PT_ADMINISTRATIVO",
+      "nome": "Processo Administrativo",
+      "descricao": null,
+      "paisId": 3,
+      "ordem": 0,
+      "ativo": true,
+      "criadoEm": "2026-09-02T16:40:57.288Z",
+      "atualizadoEm": "2026-09-02T16:40:57.288Z",
+      "cardinalidadeRequerimento": "INDIVIDUAL"
+    },
+    {
+      "id": 11,
+      "code": "DE_ADMINISTRATIVO",
+      "nome": "Processo Administrativo",
+      "descricao": null,
+      "paisId": 4,
+      "ordem": 0,
+      "ativo": true,
+      "criadoEm": "2026-09-02T16:40:57.667Z",
+      "atualizadoEm": "2026-09-02T16:40:57.667Z",
+      "cardinalidadeRequerimento": "INDIVIDUAL"
+    }
+  ],
+  "enquadramentoLegal": [
+    {
+      "id": 1,
+      "code": "ES_LMD_ANEXO_I",
+      "nome": "Anexo I",
+      "descricao": null,
+      "modalidadeLegalId": 1,
+      "ordem": 1,
+      "ativo": true,
+      "criadoEm": "2026-07-31T17:01:18.905Z",
+      "atualizadoEm": "2026-07-31T18:55:53.337Z"
+    },
+    {
+      "id": 2,
+      "code": "ES_LMD_ANEXO_III",
+      "nome": "Anexo III",
+      "descricao": null,
+      "modalidadeLegalId": 1,
+      "ordem": 3,
+      "ativo": true,
+      "criadoEm": "2026-07-31T17:01:18.925Z",
+      "atualizadoEm": "2026-07-31T18:55:53.359Z"
+    },
+    {
+      "id": 13,
+      "code": "IT_JUDICIAL",
+      "nome": "Processo Judicial",
+      "descricao": null,
+      "modalidadeLegalId": 7,
+      "ordem": 0,
+      "ativo": true,
+      "criadoEm": "2026-08-31T16:09:10.215Z",
+      "atualizadoEm": "2026-08-31T16:09:10.215Z"
+    },
+    {
+      "id": 14,
+      "code": "IT_ADMINISTRATIVO",
+      "nome": "Processo Administrativo",
+      "descricao": null,
+      "modalidadeLegalId": 8,
+      "ordem": 1,
+      "ativo": true,
+      "criadoEm": "2026-08-31T16:50:58.454Z",
+      "atualizadoEm": "2026-08-31T16:50:58.454Z"
+    }
+  ]
+}

@@ -131,8 +131,9 @@ async function main() {
   secao("7) Alteração de escopo por nova revisão RETROAGE a processo em andamento")
   // ══════════════════════════════════════════════════════════════════════
   const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGC", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade CFGC" })
-  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId }, select: { id: true } })
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
   const phaseKeyEscopo = `${MARCA.toLowerCase()}_esc`
   // efeitosPermitidos explícito na fixture — uma fase PUBLICADA de verdade nunca
   // fica sem efeito declarado (bug 3), então o fixture de teste também não.
@@ -157,13 +158,13 @@ async function main() {
   const pessoa = await prisma.pessoa.create({ data: { nome: "CFGC", sobrenome: "Pessoa", arvoreId: arvore.id, linhaReta: true, requerente: "maior" } })
   await prisma.documento.create({ data: { pessoaId: pessoa.id, descricao: "Doc CFGC" } })
   const { materializarExecucaoDaFase } = await import("../src/services/materializar-fase")
-  const processo = await prisma.processo.create({ data: { nome: `${MARCA} Processo`, workflowRuntime: "v2", faseAtualKey: phaseKeyEscopo, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1, arvoreId: arvore.id }, select: { id: true } })
+  const processo = await prisma.processo.create({ data: { nome: `${MARCA} Processo`, workflowRuntime: "v2", faseAtualKey: phaseKeyEscopo, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1, arvoreId: arvore.id }, select: { id: true } })
   await materializarExecucaoDaFase({ processoId: processo.id, fonte: "PROCESSO_CRIADO" })
   const legada = await prisma.phaseWorkflowInstance.findFirstOrThrow({ where: { processoId: processo.id, faseMacroKey: phaseKeyEscopo } })
   ok("7.1) instância legada nasceu em escopo PROCESSO (1 passo, sem documentoId)", legada.status !== null)
 
   // Processo FINALIZADO — não deve receber retroação.
-  const processoFinalizado = await prisma.processo.create({ data: { nome: `${MARCA} Processo Finalizado`, workflowRuntime: "v2", faseAtualKey: "finalizado", tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 }, select: { id: true } })
+  const processoFinalizado = await prisma.processo.create({ data: { nome: `${MARCA} Processo Finalizado`, workflowRuntime: "v2", faseAtualKey: "finalizado", tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 }, select: { id: true } })
 
   // Publica a revisão nova (escopo DOCUMENTO) — via a MESMA rota que a tela usa,
   // com confirmação explícita (fase já em uso).
@@ -245,7 +246,7 @@ async function main() {
     data: { phaseKey: phaseKeyInativaHist, label: "CFGC Fase Inativa Histórica", escopo: "PROCESSO", requiredPadrao: false, conditionalPadrao: true, ativo: false, status: "INATIVA", revisaoAtual: 1 },
   })
   const processoHistorico = await prisma.processo.create({
-    data: { nome: `${MARCA} Processo Histórico`, workflowRuntime: "v2", faseAtualKey: phaseKeyInativaHist, tipoProcessoMotorId: tipo.id, macroWorkflowVersion: 1 },
+    data: { nome: `${MARCA} Processo Histórico`, workflowRuntime: "v2", faseAtualKey: phaseKeyInativaHist, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId, macroWorkflowVersion: 1 },
     select: { id: true },
   })
   ok("12.0) processo histórico criado com a fase inativa como faseAtualKey", !!processoHistorico.id)

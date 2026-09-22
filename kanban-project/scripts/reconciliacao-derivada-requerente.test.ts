@@ -120,10 +120,11 @@ async function montarCenario(sufixo: string): Promise<Cenario> {
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${MARCA}-${sufixo}`, name: `${MARCA} tipo ${sufixo}`,
-      paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      paisId: oferta.paisId,
       },
     select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const config = await prisma.produtoFinanceiro.create({
     data: { codigo: `${MARCA.slice(0, 20)}-${sufixo}`.slice(0, 30), nome: `${MARCA} honorários ${sufixo}`, moedaPadrao: "BRL", possuiReceita: true },
     select: { id: true },
@@ -145,7 +146,7 @@ async function montarCenario(sufixo: string): Promise<Cenario> {
   })
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore ${sufixo}` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo ${sufixo}`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} processo ${sufixo}`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId },
     select: { id: true },
   })
   return { processoId: processo.id, arvoreId: arvore.id, tipoProcessoId: tipo.id, configId: config.id, ruleId: regra.id }

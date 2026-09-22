@@ -63,6 +63,8 @@ async function montarCenario() {
   const tipoProcesso = await prisma.tipoProcessoNacionalidade.findFirst({ select: { id: true } })
   if (!tipoProcesso) throw new Error("banco de teste sem TipoProcessoNacionalidade")
   criado.tipoProcessoId = tipoProcesso.id
+  const habilitacao = await prisma.tipoProcessoModalidadeHabilitada.findFirst({ where: { tipoProcessoId: tipoProcesso.id, ativo: true }, select: { modalidadeId: true } })
+  if (!habilitacao) throw new Error(`Tipo #${tipoProcesso.id} sem modalidade habilitada no banco de teste`)
 
   // fase genealogia precisa aceitar a natureza
   const fase = await prisma.catalogoFase.upsert({
@@ -126,7 +128,7 @@ async function montarCenario() {
   }
 
   const proc = await prisma.processo.create({
-    data: { codigo: `${MARCA}-1`, nome: `${MARCA} processo`, arvoreId: arvore.id, tipoProcessoMotorId: criado.tipoProcessoId, faseAtualKey: "genealogia" },
+    data: { codigo: `${MARCA}-1`, nome: `${MARCA} processo`, arvoreId: arvore.id, tipoProcessoMotorId: criado.tipoProcessoId, modalidadeId: habilitacao.modalidadeId, faseAtualKey: "genealogia" },
     select: { id: true },
   })
   criado.processoId = proc.id

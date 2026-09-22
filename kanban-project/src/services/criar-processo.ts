@@ -21,6 +21,7 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { primeiraFasePorOrdem, montarEventoEntered } from "@/src/lib/motor/phase-advance-helpers"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import { instanciarWorkflowDaFase } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { gerarCodigoPublico, modoReutilizaLacunaProcessoLigado, proximoNumeroProcessoComPossivelLacuna } from "@/lib/codigos/code-generator"
@@ -31,6 +32,8 @@ export type CriarProcessoFailureCode =
   | "PAIS_INVALIDO"
   | "TIPO_OBRIGATORIO"
   | "TIPO_INVALIDO"
+  | "MODALIDADE_OBRIGATORIA"
+  | "MODALIDADE_NAO_HABILITADA"
   | "RUNTIME_V2_DESABILITADO"
   | "SEM_MACRO_PUBLICADO"
   | "MACRO_SEM_FASE_INICIAL"
@@ -42,6 +45,12 @@ export interface CriarProcessoInput {
   nome: string
   pais: string
   tipoProcessoMotorId: number
+  /// A VIA pela qual esta nacionalidade é processada — ADMINISTRATIVA ou
+  /// JUDICIAL (mandato "Reconstrução da hierarquia", 22/09/2026). Obrigatória:
+  /// é o que desambigua QUAL Workflow Macro este processo segue quando o Tipo
+  /// habilita mais de uma. Precisa ser uma das modalidades que o
+  /// `tipoProcessoMotorId` HABILITOU (`TipoProcessoModalidadeHabilitada`).
+  modalidadeId: number
   descricao?: string | null
   observacoes?: string | null
   arvoreId?: number | null
@@ -82,6 +91,8 @@ const MSG: Record<CriarProcessoFailureCode, string> = {
   PAIS_INVALIDO: "País inválido ou inativo.",
   TIPO_OBRIGATORIO: "Escolha o tipo de processo.",
   TIPO_INVALIDO: "Tipo de processo inválido para este país.",
+  MODALIDADE_OBRIGATORIA: "Escolha a modalidade (Administrativa ou Judicial).",
+  MODALIDADE_NAO_HABILITADA: "Esta modalidade não está habilitada para o tipo de processo escolhido.",
   RUNTIME_V2_DESABILITADO: "Runtime v2 desabilitado no motor — criação indisponível.",
   SEM_MACRO_PUBLICADO: "O tipo de processo não possui Workflow Macro publicado.",
   MACRO_SEM_FASE_INICIAL: "O Workflow Macro não possui fase inicial ativa.",
@@ -100,6 +111,7 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
   if (!input.nome || !input.nome.trim()) return err("NOME_OBRIGATORIO")
   if (!input.pais || !input.pais.trim()) return err("PAIS_INVALIDO")
   if (!input.tipoProcessoMotorId) return err("TIPO_OBRIGATORIO")
+  if (!input.modalidadeId) return err("MODALIDADE_OBRIGATORIA")
 
   const paisCat = await prisma.catalogoPais.findFirst({ where: { countryKey: input.pais, ativo: true } })
   if (!paisCat) return err("PAIS_INVALIDO")
@@ -109,17 +121,23 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
   // permitia um tipo apontar para um país e o processo nascer com outro.
   if (!tipoMotor || tipoMotor.paisId !== paisCat.id) return err("TIPO_INVALIDO")
 
+  // A MODALIDADE tem que estar HABILITADA para este Tipo — não basta existir
+  // no país (mandato "Reconstrução da hierarquia", 22/09/2026: "Tipo pode
+  // habilitar somente Administrativa, somente Judicial, ou ambas").
+  const habilitacao = await prisma.tipoProcessoModalidadeHabilitada.findUnique({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipoMotor.id, modalidadeId: input.modalidadeId } },
+  })
+  if (!habilitacao || !habilitacao.ativo) return err("MODALIDADE_NAO_HABILITADA")
+
   // Kill switch global: sem v2 habilitado não há como nascer v2.
   const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
   if (resolveWorkflowRuntime("v2", cfg?.runtimeV2Habilitado ?? false) !== "v2") {
     return err("RUNTIME_V2_DESABILITADO")
   }
 
-  // Workflow Macro PUBLICADO (ativo) + fases.
-  const wf = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: tipoMotor.id },
-    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true } } },
-  })
+  // Workflow Macro PUBLICADO (ativo) + fases — resolvido pela IDENTIDADE
+  // completa Tipo+Modalidade (fonte única: resolverMacroWorkflowDoProcesso).
+  const wf = await resolverMacroWorkflowDoProcesso(tipoMotor.id, input.modalidadeId)
   if (!wf || !wf.ativo) return err("SEM_MACRO_PUBLICADO")
   if (wf.fases.length === 0) return err("MACRO_SEM_FASE_INICIAL")
 
@@ -171,6 +189,7 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
           arvoreId: input.arvoreId || null,
           previsaoTermino: input.previsaoTermino ? new Date(input.previsaoTermino) : null,
           tipoProcessoMotorId: tipoMotor.id,
+          modalidadeId: input.modalidadeId,
           workflowRuntime: "v2",
           macroWorkflowVersion: wf.versao,
           chaveIdempotenciaCriacao: chaveCriacao,

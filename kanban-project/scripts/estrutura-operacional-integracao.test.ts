@@ -64,9 +64,13 @@ async function semear() {
   const tipo = await prisma.tipoProcessoNacionalidade.upsert({
     where: { code: "ALE-ADM" }, update: {},
     create: {
-      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: "ALE-ADM", name: "Nacionalidade Alemã", paisId: oferta.paisId,
       processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.upsert({
+    where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } },
+    update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId },
   })
 
   for (const c of [
@@ -80,7 +84,7 @@ async function semear() {
     })
   }
 
-  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, name: "Macro ALE", versao: 1 } })
+  const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: "Macro ALE", versao: 1 } })
   await prisma.faseMacro.create({ data: { macroWorkflowId: macro.id, phaseKey: "emissao_documental", label: "emissao_documental", ordem: 0, versao: 1 } })
 
   // WORKFLOW INTERNO PUBLICADO da Emissão — a ÚNICA definição dos passos.
@@ -93,12 +97,12 @@ async function semear() {
       createsTask: true, required: true, owner: "equipe_documental", slaDays: 5,
     })),
   })
-  return tipo.id
+  return { tipoId: tipo.id, modalidadeId: oferta.modalidadeId }
 }
 
 async function main() {
   await limpar()
-  const tipoId = await semear()
+  const { tipoId, modalidadeId } = await semear()
 
   // ── ÁRVORE DO CENÁRIO ──────────────────────────────────────────────────────
   const arvore = await prisma.arvore.create({ data: { nome: "Árvore Teste" } })
@@ -109,7 +113,7 @@ async function main() {
   await prisma.uniao.create({ data: { pessoa1Id: tereza.id, pessoa2Id: joao.id } })
 
   const processo = await prisma.processo.create({
-    data: { nome: "Processo Teste", codigo: "T-EST", arvoreId: arvore.id, faseAtualKey: "emissao_documental", tipoProcessoMotorId: tipoId, workflowRuntime: "v2" },
+    data: { nome: "Processo Teste", codigo: "T-EST", arvoreId: arvore.id, faseAtualKey: "emissao_documental", tipoProcessoMotorId: tipoId, modalidadeId: modalidadeId, workflowRuntime: "v2" },
   })
 
   // 4 CERTIDÕES EXIGIDAS + os documentos que as atendem, exatamente como em produção:

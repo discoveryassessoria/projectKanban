@@ -80,12 +80,13 @@ async function main() {
   const oferta = await garantirOferta(prisma, { countryKey: 'espanha', countryLabel: 'Espanha', nationalityKey: 'espanhola', nationalityLabel: 'Espanhola', modalityKey: 'administrativa', modalityLabel: 'Administrativa' })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: `${MARCA}_ESP`, name: `${MARCA} Espanha`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: `${MARCA}_ESP`, name: `${MARCA} Espanha`, paisId: oferta.paisId,
       },
     select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const macro = await prisma.macroWorkflow.create({
-    data: { tipoProcessoId: tipo.id, name: `${MARCA} macro`, versao: 1 }, select: { id: true },
+    data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true },
   })
   for (const [i, phaseKey] of FASES.entries()) {
     await prisma.faseMacro.create({
@@ -120,7 +121,7 @@ async function main() {
   const processo = await prisma.processo.create({
     data: {
       nome: `${MARCA} Família`, arvoreId: arvore.id, workflowRuntime: 'v2',
-      faseAtualKey: 'genealogia', tipoProcessoMotorId: tipo.id,
+      faseAtualKey: 'genealogia', tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId,
     },
     select: { id: true },
   })

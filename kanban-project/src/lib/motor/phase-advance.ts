@@ -27,6 +27,7 @@ import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/service
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/services/materializar-fase"
 import { calcularObrigacoesRetroativasPendentes } from "@/src/lib/motor/reconciliar-fase-macro"
+import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { notificarAcontecimento } from "@/lib/operacional/notificacao-canonica"
 import { urlOperacionalDoProcesso } from "@/lib/operacional/navegacao"
@@ -166,7 +167,7 @@ async function carregarContexto(processoId: number): Promise<Contexto | AdvanceE
 
   const processo = await prisma.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, faseAtualKey: true, lockVersion: true, tipoProcessoMotorId: true, workflowRuntime: true },
+    select: { id: true, faseAtualKey: true, lockVersion: true, tipoProcessoMotorId: true, modalidadeId: true, workflowRuntime: true },
   })
   if (!processo) return rejeitar("PROCESSO_NAO_ENCONTRADO", "Processo inexistente")
 
@@ -176,12 +177,10 @@ async function carregarContexto(processoId: number): Promise<Contexto | AdvanceE
   if (!v2Global) return rejeitar("RUNTIME_V2_DESABILITADO", "Kill switch global do runtime v2 desabilitado")
   if (runtime !== "v2") return rejeitar("PROCESSO_LEGACY", "Processo em runtime legacy — avanço v2 não aplicável")
   if (processo.tipoProcessoMotorId == null) return rejeitar("SEM_TIPO_MOTOR", "Processo sem tipo do motor")
+  if (processo.modalidadeId == null) return rejeitar("SEM_TIPO_MOTOR", "Processo sem modalidade (Administrativa/Judicial)")
 
-  const wf = await prisma.macroWorkflow.findUnique({
-    where: { tipoProcessoId: processo.tipoProcessoMotorId },
-    include: { fases: { orderBy: { ordem: "asc" }, select: { phaseKey: true, ordem: true, conditional: true, required: true } } },
-  })
-  if (!wf) return rejeitar("SEM_TIPO_MOTOR", "Tipo do motor sem Workflow Macro")
+  const wf = await resolverMacroWorkflowDoProcesso(processo.tipoProcessoMotorId, processo.modalidadeId)
+  if (!wf) return rejeitar("SEM_TIPO_MOTOR", "Tipo do motor sem Workflow Macro para esta modalidade")
 
   return {
     processo: {

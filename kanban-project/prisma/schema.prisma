@@ -548,11 +548,15 @@ model Processo {
 
   tipoProcessoMotorId   Int?
   tipoProcessoMotor     TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
-  // ENQUADRAMENTO LEGAL — recorte oficial sob o qual o processo é requerido.
-  // O enquadramento já implica a modalidade legal e, por ela, o país: uma FK só
-  // carrega as três dimensões, sem campo redundante que possa divergir.
-  enquadramentoLegalId  Int?
-  enquadramentoLegal    EnquadramentoLegal?        @relation(fields: [enquadramentoLegalId], references: [id], onDelete: SetNull)
+  // MODALIDADE — a via pela qual esta nacionalidade é processada
+  // (ADMINISTRATIVA/JUDICIAL). É o que desambigua QUAL Workflow Macro este
+  // processo segue quando o Tipo tem mais de um habilitado (mandato
+  // "Reconstrução da hierarquia País/Tipo/Modalidade/Workflow Macro",
+  // 22/09/2026). Nullable só durante a migração aditiva — backfill em
+  // scripts/migrar-hierarquia-pais-tipo-modalidade.ts torna obrigatório daqui
+  // pra frente (migration seguinte aperta pra NOT NULL).
+  modalidadeId          Int?
+  modalidade            ModalidadePais?            @relation("ProcessoModalidade", fields: [modalidadeId], references: [id], onDelete: Restrict)
   motorArtefatos        MotorArtefato[]            @relation("ProcessoMotorArtefatos")
   pendenciasFinanceiras PendenciaFinanceira[]      @relation("ProcessoPendenciasFinanceiras")
 
@@ -584,7 +588,7 @@ model Processo {
   @@index([arvoreId])
   @@index([familiaId])
   @@index([tipoProcessoMotorId])
-  @@index([enquadramentoLegalId])
+  @@index([modalidadeId])
 }
 
 model ProcessoContratante {
@@ -998,8 +1002,6 @@ model RequisitoCadastral {
   // ── ESCOPO (null = qualquer) ─────────────────────────────────────────────
   paisId            Int?
   pais              CatalogoPais?    @relation(fields: [paisId], references: [id], onDelete: Restrict)
-  modalidadeLegalId Int?
-  modalidadeLegal   ModalidadeLegal? @relation(fields: [modalidadeLegalId], references: [id], onDelete: Restrict)
   itemCatalogoId    Int?
   itemCatalogo      ItemCatalogo?    @relation("RequisitoCadastralItem", fields: [itemCatalogoId], references: [id], onDelete: Restrict)
   /// Faixa etária em anos completos, calculada na LEITURA a partir da data de
@@ -1022,7 +1024,6 @@ model RequisitoCadastral {
   @@index([ativo])
   @@index([campoKey])
   @@index([paisId])
-  @@index([modalidadeLegalId])
 }
 
 /// TIPO DE PROTOCOLO — cadastro, no Gerenciamento.
@@ -3282,18 +3283,20 @@ model TipoProcessoNacionalidade {
   /// no cadastro. Sem país não existe oferta: por isso não admite nulo.
   paisId              Int
   pais                CatalogoPais        @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
-  /// IDENTIDADE da modalidade desta oferta, OBRIGATÓRIA. `ModalidadePais` é a
-  /// modalidade DE UM PAÍS: apontar para a linha resolve, de uma vez, a chave e
-  /// o rótulo. Não existe oferta sem modalidade.
-  modalidadeId        Int
-  modalidade          ModalidadePais      @relation("TipoProcessoModalidade", fields: [modalidadeId], references: [id], onDelete: Restrict)
   processFamily       String              @default("cidadania") @db.VarChar(40)
   serviceNature       String              @default("main_process") @db.VarChar(40)
   ativo               Boolean             @default(true)
   arquivado           Boolean             @default(false)
   criadoEm            DateTime            @default(now())
   atualizadoEm        DateTime            @updatedAt
-  macroWorkflow       MacroWorkflow?
+  /// QUAIS MODALIDADES este Tipo habilita — N:N de verdade (mandato
+  /// "Reconstrução da hierarquia", 22/09/2026). Um Tipo ("Nacionalidade
+  /// Italiana") pode habilitar só Administrativa, só Judicial, ou ambas; cada
+  /// combinação habilitada pode ter o seu próprio `MacroWorkflow` publicado.
+  /// Substitui o antigo FK único `modalidadeId` (uma nacionalidade só podia
+  /// ter UMA modalidade) — ver TipoProcessoModalidadeHabilitada.
+  modalidadesHabilitadas TipoProcessoModalidadeHabilitada[]
+  macroWorkflows      MacroWorkflow[]
   processosVinculados Processo[]          @relation("ProcessoTipoMotor")
   configFinanceiras   ProdutoFinanceiro[] @relation("ConfigFinTipoProcesso")
 
@@ -3330,7 +3333,6 @@ model CatalogoPais {
   condicoesPagamento   CondicaoPagamentoPais[]
   taxasPagamento       TaxaPagamentoPais[]
   servicos             ServicoProdutoPais[]
-  modalidadesLegais    ModalidadeLegal[]
 
   processos              Processo[]                  @relation("ProcessoPais")
   statusKanban           Status[]                    @relation("StatusPais")
@@ -3356,10 +3358,37 @@ model ModalidadePais {
   precos        TabelaValor[]
 
   condicoesPagamento CondicaoPagamentoModalidade[]
-  tiposDeProcesso    TipoProcessoNacionalidade[]   @relation("TipoProcessoModalidade")
+  /// Tipos de Processo que habilitaram esta modalidade (N:N — ver
+  /// TipoProcessoModalidadeHabilitada) e os Workflow Macro publicados sob ela.
+  tiposHabilitados   TipoProcessoModalidadeHabilitada[]
+  macroWorkflows     MacroWorkflow[]
+  processos          Processo[]                    @relation("ProcessoModalidade")
 
   @@unique([paisId, modalityKey])
   @@index([paisId])
+}
+
+/// HABILITAÇÃO Tipo × Modalidade — N:N de verdade (mandato "Reconstrução da
+/// hierarquia País/Tipo/Modalidade/Workflow Macro", 22/09/2026). Um Tipo de
+/// Processo ("Nacionalidade Italiana") habilita 1 ou 2 modalidades
+/// (ADMINISTRATIVA/JUDICIAL); cada combinação habilitada é o que autoriza um
+/// `MacroWorkflow` a existir para ela. Substitui o antigo
+/// `TipoProcessoNacionalidade.modalidadeId` (FK única — uma nacionalidade só
+/// podia ter UMA modalidade, contradizendo "Tipo pode habilitar Administrativa,
+/// Judicial ou ambas").
+model TipoProcessoModalidadeHabilitada {
+  id             Int                       @id @default(autoincrement())
+  tipoProcessoId Int
+  tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
+  modalidadeId   Int
+  modalidade     ModalidadePais            @relation(fields: [modalidadeId], references: [id], onDelete: Restrict)
+  ativo          Boolean                   @default(true)
+  criadoEm       DateTime                  @default(now())
+  atualizadoEm   DateTime                  @updatedAt
+
+  @@unique([tipoProcessoId, modalidadeId])
+  @@index([tipoProcessoId])
+  @@index([modalidadeId])
 }
 
 // CatÃ¡logo das fases (building blocks do workflow)
@@ -3490,15 +3519,33 @@ model CatalogoFaseRevisao {
 // Workflow Macro â 1:1 com o tipo de processo
 model MacroWorkflow {
   id             Int                       @id @default(autoincrement())
-  tipoProcessoId Int                       @unique
+  tipoProcessoId Int
   tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
+  /// A COMBINAÇÃO País/Tipo/MODALIDADE é o que identifica um Workflow Macro
+  /// (mandato "Reconstrução da hierarquia", 22/09/2026) — não mais o Tipo
+  /// sozinho. País é alcançado transitivamente via `tipoProcesso.paisId`;
+  /// aqui só a modalidade, que é o que desambigua entre os workflows do
+  /// mesmo Tipo (ex.: "Nacionalidade Italiana" tem um MacroWorkflow
+  /// Administrativo e outro Judicial, cada um com esta FK diferente).
+  modalidadeId   Int
+  modalidade     ModalidadePais            @relation(fields: [modalidadeId], references: [id], onDelete: Restrict)
   name           String                    @db.VarChar(200)
+  /// COMO O PROTOCOLO DESTE WORKFLOW É ARQUIVADO — INDIVIDUAL (um por
+  /// requerente) ou COLETIVO (um por família/processo). Migrado de
+  /// `ModalidadeLegal.cardinalidadeRequerimento` (removida): é o Workflow
+  /// Macro PUBLICADO, não uma base jurídica à parte, a fonte canônica desta
+  /// regra — decisão do usuário, mandato 22/09/2026. Lido por
+  /// `protocolo-canonico.ts` para decidir a granularidade do Protocolo.
+  cardinalidadeRequerimento String          @default("INDIVIDUAL") @db.VarChar(20)
   ativo          Boolean                   @default(true)
   versao         Int                       @default(1) // CP-4A â versionamento
   criadoEm       DateTime                  @default(now())
   atualizadoEm   DateTime                  @updatedAt
   fases          FaseMacro[]
   versoes        MacroWorkflowVersao[]
+
+  @@unique([tipoProcessoId, modalidadeId])
+  @@index([modalidadeId])
 }
 
 /// REVISÃO CONGELADA da composição do Workflow Macro (a lista ordenada de
@@ -3515,6 +3562,11 @@ model MacroWorkflowVersao {
   versao          Int
 
   tipoProcessoId Int
+  /// Modalidade e cardinalidade como estavam NESTA versão — mesmo motivo de
+  /// congelar `fases`: publicações futuras não podem reescrever o que uma
+  /// versão anterior realmente declarava.
+  modalidadeId              Int
+  cardinalidadeRequerimento String @db.VarChar(20)
   name           String @db.VarChar(200)
   /// Fases como estavam nesta versão: phaseKey, ordem, required, conditional,
   /// showInKanban, entryRule. Lido como conjunto, sempre inteiro.
@@ -6401,57 +6453,15 @@ model SaldoSnapshot {
 // Timeline/Histórico do Processo (Diário Operacional), que agrega `WorkflowEvento`,
 // `Evento` e `LogAuditoria`. Não existe cadastro paralelo de pontos de controle.
 
-/// MODALIDADE LEGAL — a base jurídica sob a qual a nacionalidade é requerida
-/// (ex.: Lei da Memória Democrática). NÃO se confunde com a VIA DE TRAMITAÇÃO
-/// (administrativa/consular/judicial), que é outra dimensão, nem com o tipo de
-/// processo, que é país + produto.
-model ModalidadeLegal {
-  id                        Int          @id @default(autoincrement())
-  /// Identidade IMUTÁVEL. Vínculo é sempre por id — o code só identifica o registro.
-  code                      String       @unique @db.VarChar(60)
-  nome                      String       @db.VarChar(200)
-  descricao                 String?      @db.Text
-  paisId                    Int
-  pais                      CatalogoPais @relation(fields: [paisId], references: [id], onDelete: Restrict)
-  /// INDIVIDUAL | COLETIVO — quantos requerentes cabem em UM requerimento.
-  ///
-  /// É a base jurídica que decide isso, não o país e não o produto: a cidadania
-  /// espanhola por LMD é pedida por pessoa, no consulado do domicílio dela; a
-  /// italiana judicial é pedida uma vez, no tribunal, pela família toda. Sendo
-  /// dado de cadastro, uma rota nova (Portugal, Alemanha) declara a sua regra
-  /// sem tocar em código — e a tela não precisa perguntar o país.
-  cardinalidadeRequerimento String       @default("INDIVIDUAL") @db.VarChar(20)
-  ordem                     Int          @default(0)
-  ativo                     Boolean      @default(true)
-  criadoEm                  DateTime     @default(now())
-  atualizadoEm              DateTime     @updatedAt
-
-  enquadramentos       EnquadramentoLegal[]
-  requisitosCadastrais RequisitoCadastral[]
-
-  @@index([paisId])
-}
-
-/// ENQUADRAMENTO LEGAL — o recorte oficial dentro de uma modalidade legal
-/// (ex.: Anexo I e Anexo III da LMD). É o que determina conjunto documental e
-/// exigências próprias. Condições de elegibilidade pertencem ao enquadramento;
-/// não viram cadastro paralelo nem modalidade.
-model EnquadramentoLegal {
-  id                Int             @id @default(autoincrement())
-  code              String          @unique @db.VarChar(60)
-  nome              String          @db.VarChar(200)
-  descricao         String?         @db.Text
-  modalidadeLegalId Int
-  modalidadeLegal   ModalidadeLegal @relation(fields: [modalidadeLegalId], references: [id], onDelete: Restrict)
-  ordem             Int             @default(0)
-  ativo             Boolean         @default(true)
-  criadoEm          DateTime        @default(now())
-  atualizadoEm      DateTime        @updatedAt
-
-  processos Processo[]
-
-  @@index([modalidadeLegalId])
-}
+// MODALIDADE LEGAL / ENQUADRAMENTO LEGAL — REMOVIDOS (mandato "Reconstrução
+// da hierarquia País/Tipo/Modalidade/Workflow Macro", 22/09/2026). A
+// hierarquia canônica única do Discovery passa a ser País/Região → Tipo de
+// Processo → Modalidade (ADMINISTRATIVA/JUDICIAL) → Workflow Macro.
+// `cardinalidadeRequerimento` (INDIVIDUAL/COLETIVO — quantos requerentes cabem
+// num requerimento) migrou para `MacroWorkflow.cardinalidadeRequerimento`: é
+// o Workflow Macro publicado, não uma base jurídica separada, que declara como
+// o protocolo é arquivado. Ver docs/architecture/31-hierarquia-pais-tipo-
+// modalidade-workflow-macro.md — migração real executada, sem dado perdido.
 
 /// Categorias que organizam o Catálogo de Serviços (não guardam preço).
 model CategoriaServico {

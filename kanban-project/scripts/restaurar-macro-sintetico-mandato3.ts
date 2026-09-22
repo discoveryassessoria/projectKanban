@@ -25,12 +25,15 @@ exigirConfirmacaoDeEscritaEmProducao(
 
 import { prisma } from "../lib/prisma"
 import { signAuthToken } from "../lib/auth-jwt"
+import { resolverMacroWorkflowDoTipo } from "../src/lib/motor/resolver-macro-workflow"
 
 async function main() {
   const tipo = await prisma.tipoProcessoNacionalidade.findUniqueOrThrow({ where: { code: "TESTEVIS_TIPO_AUDITORIA" } })
   if (!tipo.name.startsWith("[TESTE VISUAL]")) throw new Error("SEGURANÇA: tipo não é sintético — abortando")
 
-  const antes = await prisma.macroWorkflow.findUniqueOrThrow({ where: { tipoProcessoId: tipo.id }, include: { fases: { orderBy: { ordem: "asc" } } } })
+  // Script de tooling — resolução ao nível do Tipo é aceitável aqui (nunca no motor real).
+  const antes = await resolverMacroWorkflowDoTipo(tipo.id)
+  if (!antes) throw new Error(`MacroWorkflow não encontrado para o tipo ${tipo.id}`)
   console.log("ANTES:", JSON.stringify(antes.fases.map((f) => f.phaseKey)))
 
   const admin = await prisma.usuario.findFirstOrThrow({ where: { tipo: "admin" }, orderBy: { id: "asc" }, select: { id: true, email: true } })
@@ -52,7 +55,8 @@ async function main() {
   const j = await res.json()
   console.log("PUT status:", res.status, JSON.stringify(j?.macroWorkflow?.fases?.map((f: { phaseKey: string }) => f.phaseKey)))
 
-  const depois = await prisma.macroWorkflow.findUniqueOrThrow({ where: { tipoProcessoId: tipo.id }, include: { fases: { orderBy: { ordem: "asc" } } } })
+  const depois = await resolverMacroWorkflowDoTipo(tipo.id)
+  if (!depois) throw new Error(`MacroWorkflow não encontrado para o tipo ${tipo.id} (depois)`)
   console.log("DEPOIS:", JSON.stringify(depois.fases.map((f) => f.phaseKey)))
 
   const esperado = JSON.stringify(["TESTEVIS_fase", "teste_visual_auditoria_integral_fases", "finalizado"])

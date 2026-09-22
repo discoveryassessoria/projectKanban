@@ -116,10 +116,11 @@ async function main() {
 
   const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
-    data: {
-      code: MARCA, name: `${MARCA} espanhola`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
-      },
+    data: { code: MARCA, name: `${MARCA} espanhola`, paisId: oferta.paisId },
     select: { id: true },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.create({
+    data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true },
   })
 
   // A CATEGORIA que agrupa as três certidões — é ela que a coluna de etapa

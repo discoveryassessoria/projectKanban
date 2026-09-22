@@ -32,7 +32,7 @@ registrar({
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
     const tipos = await prisma.tipoProcessoNacionalidade.findMany({
-      where: { ativo: true, arquivado: false, macroWorkflow: { is: null } },
+      where: { ativo: true, arquivado: false, macroWorkflows: { none: {} } },
       select: { id: true, name: true }, take: 100,
     })
     if (!tipos.length) return { achados: [], metricas: { semWorkflow: 0 }, resumo: 'Todo tipo de processo ativo tem workflow macro.' }

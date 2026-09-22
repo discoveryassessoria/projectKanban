@@ -105,9 +105,10 @@ async function montarPalco(): Promise<Palco> {
   const oferta = await garantirOferta(prisma, { countryKey: "espanha", countryLabel: "Espanha", nationalityKey: "espanhola", nationalityLabel: "Espanhola", modalityKey: "descendencia", modalityLabel: "Descendência" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
-      code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId, modalidadeId: oferta.modalidadeId,
+      code: MARCA, name: `${MARCA} tipo`, paisId: oferta.paisId,
       }, select: { id: true },
   })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const config = await prisma.produtoFinanceiro.create({
     data: { codigo: MARCA.slice(0, 30), nome: `${MARCA} honorários`, moedaPadrao: "BRL", possuiReceita: true },
     select: { id: true },
@@ -128,7 +129,7 @@ async function montarPalco(): Promise<Palco> {
   })
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id },
+    data: { nome: `${MARCA} processo`, arvoreId: arvore.id, faseAtualKey: FASE, tipoProcessoMotorId: tipo.id, modalidadeId: oferta.modalidadeId },
     select: { id: true },
   })
   const requerentes: Record<string, number> = {}

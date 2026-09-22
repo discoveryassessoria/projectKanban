@@ -2,9 +2,9 @@
  * GUARDA — escrita em produção pelos scripts administrativos.
  * Rodar: npm run test:guarda-producao
  *
- * O defeito que este teste trava: quatro scripts de operação de dados
+ * O defeito que este teste trava: scripts de operação de dados
  * (prod-consolidar-categorias, prod-ativar-certidoes-mestre,
- * prod-registrar-enquadramentos-lmd, prod-resolver-matriz-orfas) rodavam
+ * prod-resolver-matriz-orfas) rodavam
  * dentro do `npm run build` sem NENHUMA trava de ambiente. Liam
  * `PRISMA_DATABASE_URL || DATABASE_URL` e escreviam contra o que achassem.
  * Um build local com o ambiente errado carregado escreveria em produção.
@@ -230,13 +230,12 @@ secao('7) Falha durante operação autorizada: código de saída diferente de ze
   ok('pular mantém exit code 0', codigoPulo === 0)
 }
 
-// ── 8) OS QUATRO SCRIPTS REAIS ESTÃO SOB A GUARDA ───────────────────────────
-secao('8) Os quatro scripts administrativos usam a guarda')
+// ── 8) OS SCRIPTS REAIS ESTÃO SOB A GUARDA ───────────────────────────────────
+secao('8) Os scripts administrativos usam a guarda')
 {
   const SCRIPTS: Array<[string, string]> = [
     ['scripts/prod-consolidar-categorias.mjs', 'PROD_CONSOLIDAR_CATEGORIAS'],
     ['scripts/prod-ativar-certidoes-mestre.mjs', 'PROD_ATIVAR_CERTIDOES_MESTRE'],
-    ['scripts/prod-registrar-enquadramentos-lmd.mjs', 'PROD_REGISTRAR_ENQUADRAMENTOS_LMD'],
     ['scripts/prod-resolver-matriz-orfas.mjs', 'PROD_RESOLVER_MATRIZ_ORFAS'],
   ]
   for (const [caminho, flag] of SCRIPTS) {
@@ -258,7 +257,7 @@ secao('9) O build padrão não executa operação de dados')
   const build = pkg.scripts.build ?? ''
   const PROIBIDOS = [
     'prod-consolidar-categorias', 'prod-ativar-certidoes-mestre',
-    'prod-registrar-enquadramentos-lmd', 'prod-resolver-matriz-orfas',
+    'prod-resolver-matriz-orfas',
     'prod-migrate-guard', 'prod-seed-', 'prod-apply-cadastros-aditivas',
     'prod-smoke-dual-write', 'prod-custos-rollout', 'prod-registral-rollout',
     'prod-reconciliar-sequencias', 'preview-sandbox-setup',
