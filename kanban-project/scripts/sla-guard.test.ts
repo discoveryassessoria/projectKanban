@@ -125,11 +125,13 @@ function run() {
   ok(!/slaDiasPadrao/.test(catalogoFasesRoute) && !/slaDiasPadrao/.test(catalogoFasesIdRoute),
     "as rotas do catálogo de fases não persistem mais slaDiasPadrao")
 
-  // A tela "Processos › Configurações › SLA" continua existindo — mas agora só
-  // mostra o SLA do PASSO (canônico), nunca o da fase.
+  // A tela "Processos › Configurações › SLA" foi removida por completo em
+  // 23/09/2026 (mandato "remover integralmente as abas SLA e Prazos e SLA") —
+  // o SLA do PASSO (canônico) hoje se configura na Biblioteca de Tarefas /
+  // ConfiguracaoDoPassoModal, nunca nesta tela.
   const configViews = ler("src/components/gerenciamentoComponents/ConfiguracaoProcessoViews.tsx")
   ok(!/f\.slaDays/.test(configViews), "a tela de Configurações não lê mais slaDays da FASE")
-  ok(/p\.slaDays/.test(configViews), "a tela de Configurações continua mostrando o SLA do PASSO (canônico, intocado)")
+  ok(!/SLAConfiguracaoTab/.test(configViews), "a aba SLA foi removida por completo da tela de Configurações")
   ok(!configViews.includes(">SLA da fase<") && !configViews.includes(">Acumulado<") && !configViews.includes("Prazo total (fases obrigatórias)"),
     "a aba SLA não mostra mais SLA/acumulado de fase")
   const configRoute = ler("src/app/api/gerenciamento/configuracao-processo/route.ts")
@@ -152,8 +154,8 @@ function run() {
   ok(!/FILAS_SLA/.test(semComentarios(logic)), "FILAS_SLA não existe mais no catálogo de filas")
   ok(!/faixaDaFilaSla/.test(semComentarios(logic)) && !/faixaDaFilaSla/.test(semComentarios(coleta)) && !/faixaDaFilaSla/.test(semComentarios(homeContent)),
     "faixaDaFilaSla não existe mais em lugar nenhum")
-  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_PRAZO_SUBTAREFA\]/.test(logic),
-    "o catálogo de filas tem só passo/estado/prazo-Tarefa/prazo-Subtarefa — sem FaseMacro")
+  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_PRAZO_SUBTAREFA(, \.\.\.FILAS_ACOMPANHAMENTO)?\]/.test(logic),
+    "o catálogo de filas tem só passo/estado/prazo-Tarefa/prazo-Subtarefa/acompanhamento — sem FaseMacro")
   ok(!/montarSla/.test(semComentarios(coleta)) && !/montarSla/.test(semComentarios(apiHome)), "montarSla não existe mais — Home não monta painel de SLA de processo")
   ok(!/\bsla:\s*Map</.test(coleta), "BaseOperacional não carrega mais Map de SLA por processo")
   ok(!/"processo-sla"/.test(coleta), "o tipo Membro não tem mais variante processo-sla")

@@ -316,19 +316,18 @@ export default function ConfiguracaoDoPassoModal({
                       o modelo tem UM atributo, `slaDays`, que é prazo. Não existe
                       `weight`. Corrigido o rótulo, sem tocar no dado. */}
                   <label className={lbl}>Prazo interno (dias úteis)</label>
-                  {/* HERANÇA NÃO É OVERRIDE. O campo mostrava "0", que se lê como
-                      "prazo zero" — e quem configurasse digitaria um número só para
-                      não deixar o campo esquisito, gravando um override que ninguém
-                      pediu. Vazio quer dizer herdado, e está escrito embaixo. */}
+                  {/* A FASE NÃO TEM PRAZO PRÓPRIO. Este é o ÚNICO prazo final da
+                      tarefa — a fase só organiza e exibe. Zero/vazio não é "herda
+                      da fase": é "esta tarefa não tem prazo definido". */}
                   <input
-                    className={inp} type="number" min={0} placeholder="Padrão da fase"
+                    className={inp} type="number" min={0} placeholder="Sem prazo definido"
                     value={temPrazoProprio(f.slaDays) ? String(f.slaDays) : ""}
                     onChange={(e) => set("slaDays", e.target.value === "" ? PRAZO_HERDADO : Number(e.target.value) || PRAZO_HERDADO)}
                   />
                   <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                     {temPrazoProprio(f.slaDays)
-                      ? "Prazo específico deste passo. Some ao da fase; não substitui a régua da fase."
-                      : "Prazo: padrão da fase. Deixe vazio para continuar herdando — o passo acompanha a fase quando ela mudar."}
+                      ? "Prazo final único desta tarefa. A fase não soma nem cria um segundo vencimento."
+                      : "Sem prazo definido. A fase não tem prazo próprio para herdar — deixe vazio se esta tarefa não vence em data fixa."}
                     {" "}Não se confunde com a previsão que o órgão dá.
                   </p>
                 </div>
