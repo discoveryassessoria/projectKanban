@@ -3334,7 +3334,6 @@ model TipoProcessoNacionalidade {
   phaseAutomationRule_tipoProcesso               PhaseAutomationRule[]               @relation("PhaseAutomationRule_tipoProcessoId")
   phaseEconomicRule_tipoProcesso                 PhaseEconomicRule[]                 @relation("PhaseEconomicRule_tipoProcessoId")
   phaseInternalWorkflow_tipoProcesso             PhaseInternalWorkflow[]             @relation("PhaseInternalWorkflow_tipoProcessoId")
-  bibliotecaVinculos                             BibliotecaVinculo[]
   phaseInternalWorkflowVersao_tipoProcesso       PhaseInternalWorkflowVersao[]       @relation("PhaseInternalWorkflowVersao_tipoProcessoId")
   regraTarefaTransversal_tipoProcesso            RegraTarefaTransversal[]            @relation("RegraTarefaTransversal_tipoProcessoId")
 
@@ -3389,7 +3388,6 @@ model ModalidadePais {
   tiposHabilitados   TipoProcessoModalidadeHabilitada[]
   macroWorkflows     MacroWorkflow[]
   processos          Processo[]                    @relation("ProcessoModalidade")
-  bibliotecaVinculos BibliotecaVinculo[]
 
   @@unique([paisId, modalityKey])
   @@index([paisId])
@@ -3843,7 +3841,29 @@ model PhaseInternalWorkflowStep {
   requisitos StepRequirement[]
   subtarefas StepSubtaskDefinition[]
 
+  /// TAREFA SELECIONADA DA BIBLIOTECA (mandato "separação Biblioteca ×
+  /// Workflow Interno", 22/09/2026) — quando preenchido, este passo NÃO tem
+  /// conteúdo próprio: `acoes`/`campos`/`checkItens`/`requisitos`/`subtarefas`
+  /// acima ficam SEMPRE vazios para ele, e a leitura efetiva (validação,
+  /// congelamento, diff, execução) resolve o conteúdo a partir da VERSÃO
+  /// CONGELADA do Modelo (`BibliotecaModeloTarefa.workflow`), nunca do rascunho
+  /// vivo dele — mesma disciplina de nunca ler "a mais recente" implícita. Ver
+  /// `resolverConteudoDaBiblioteca` (versao-publicada.ts). `null` = passo
+  /// autorado localmente à moda antiga (compatibilidade — nenhum cadastro
+  /// existente perde o editor que já tinha).
+  bibliotecaModeloId      Int?
+  bibliotecaModelo        BibliotecaModeloTarefa? @relation(fields: [bibliotecaModeloId], references: [id], onDelete: Restrict)
+  /// Versão do Modelo PINADA no momento da seleção — nunca implícita. Trocar
+  /// de versão é uma decisão própria (reselecionar), não uma leitura automática.
+  bibliotecaModeloVersao  Int?
+
+  /// `dependeDe` (acima) continua sendo do PASSO desta fase — é a única
+  /// configuração que o Workflow Interno mantém para um passo vinculado à
+  /// Biblioteca: em qual ordem/dependência ele entra NESTA fase, nunca o que
+  /// ele FAZ (isso é sempre do Modelo).
+
   @@unique([workflowId, key])
+  @@index([bibliotecaModeloId])
 }
 
 /// SUBTAREFA CADASTRADA DE UM PASSO — o que acontece DENTRO dele.
@@ -3983,30 +4003,40 @@ model StepSubtaskDefinition {
 }
 
 // ============================================================================
-// BIBLIOTECA DE TAREFAS DOS WORKFLOWS INTERNOS (mandato 22/09/2026)
+// BIBLIOTECA DE TAREFAS DOS WORKFLOWS INTERNOS (mandato 22/09/2026, corrigido
+// 22/09/2026 — "separação Biblioteca × Workflow Interno")
 //
-// TRÊS ENTIDADES DISTINTAS, de propósito (mandato §2 — nunca confundi-las):
-//   MODELO   — identidade estável, reutilizável, independente de qualquer fase.
-//              Armazenado como um `PhaseInternalWorkflow` "casca"
-//              (`origemBiblioteca=true`, `phaseKey="biblioteca"`) com EXATAMENTE
-//              UM `PhaseInternalWorkflowStep` — reaproveita o editor e o
-//              versionamento existentes sem alteração. Criar/editar um Modelo
-//              NUNCA cria Tarefa nem toca processo: só existe RASCUNHO/
-//              PUBLICADO/INATIVO da definição.
-//   VÍNCULO  — a decisão de usar a versão PUBLICADA X de um Modelo numa fase Y,
-//              para o par (Tipo de Processo, Modalidade) — nunca a fase
-//              sozinha, porque um Tipo habilita 1 ou 2 modalidades (mandato
-//              "Reconstrução da hierarquia", 22/09/2026) e cada uma pode
-//              precisar de uma composição própria. Publicar um Vínculo é o que
-//              de fato liga o motor canônico para aquele escopo exato — ver
-//              `motorVigenteDaFase` (motor-da-fase.ts), que só consulta esta
-//              tabela quando `CatalogoFase.conduzidaPeloWorkflowInterno` (o
-//              interruptor GLOBAL por fase, módulo congelado doc 30) ainda diz
-//              `false`. Nunca escreve nessa coluna nem em `CatalogoFase` —
-//              o cutover é uma camada de cima, aditiva, por tipo+modalidade.
-//   TAREFA   — a execução concreta (`Tarefa`/`PhaseWorkflowStepInstance`), já
-//              coberta pelo motor operacional existente; a Biblioteca não cria
-//              uma unidade nova.
+// TRÊS ENTIDADES DISTINTAS, de propósito — nunca confundi-las:
+//   MODELO    — identidade estável, reutilizável, independente de qualquer
+//               fase. Armazenado como um `PhaseInternalWorkflow` "casca"
+//               (`origemBiblioteca=true`, `phaseKey="biblioteca"`) com
+//               EXATAMENTE UM `PhaseInternalWorkflowStep` — reaproveita o
+//               editor e o versionamento existentes sem alteração. É o ÚNICO
+//               lugar onde o conteúdo (subtarefas, campos, ações, checklist,
+//               requisitos, dependências internas, regra de conclusão) é
+//               criado/editado. Criar/editar um Modelo NUNCA cria Tarefa nem
+//               toca processo: só existe RASCUNHO/PUBLICADO/INATIVO da
+//               definição.
+//   SELEÇÃO   — a decisão, dentro do Workflow Interno de UMA fase real, de que
+//               um dos seus passos É a versão PUBLICADA X de um Modelo —
+//               `PhaseInternalWorkflowStep.bibliotecaModeloId`/
+//               `bibliotecaModeloVersao` (campos no próprio passo, não uma
+//               tabela à parte: a fase JÁ tem seu Workflow Interno próprio,
+//               escopado por tipo/modalidade via `wfUid`; não precisa de uma
+//               segunda tabela para redizer "qual fase" — precisa só dizer
+//               "este passo, aqui, é aquele Modelo"). O passo NÃO tem conteúdo
+//               próprio quando selecionado — só identidade (`key`) e posição
+//               (`ordem`/`dependeDe`) dentro DESTA fase. O conteúdo efetivo é
+//               sempre lido do Modelo (`resolverConteudoDaBiblioteca`,
+//               versao-publicada.ts) — nunca duplicado.
+//   TAREFA    — a execução concreta (`Tarefa`/`PhaseWorkflowStepInstance`), já
+//               coberta pelo motor operacional existente; a Biblioteca não
+//               cria uma unidade nova.
+//
+// (A entidade "Vínculo" separada, por tipo+modalidade+fase — publicada
+// independentemente do Workflow Interno da fase —, existiu por poucas horas
+// nesta mesma data e foi removida: redundante com o Workflow Interno, que já
+// é escopado por tipo/fase. Ver git log deste arquivo.)
 // ============================================================================
 
 enum BibliotecaModeloStatus {
@@ -4039,85 +4069,12 @@ model BibliotecaModeloTarefa {
   atualizadoEm DateTime           @updatedAt
   criadoPorId  Int?
 
-  vinculos BibliotecaVinculo[]
+  /// Passos de Workflows Internos REAIS que selecionaram este Modelo — nunca
+  /// tocado por criar/editar o Modelo; só existe quando alguém, na tela do
+  /// Workflow Interno, seleciona esta tarefa para uma fase.
+  passosQueUsam PhaseInternalWorkflowStep[]
 
   @@index([status])
-}
-
-enum BibliotecaVinculoStatus {
-  RASCUNHO
-  PUBLICADO
-  INATIVO
-}
-
-/// VÍNCULO — decisão explícita de usar a versão PUBLICADA de um Modelo numa
-/// fase, escopada a (Tipo de Processo × Modalidade). É esta linha, quando
-/// `status=PUBLICADO`, que `motorVigenteDaFase` passa a enxergar para aquele
-/// escopo exato — nunca para outro Tipo, outra Modalidade, nem globalmente.
-model BibliotecaVinculo {
-  id             Int                       @id @default(autoincrement())
-  modeloId       Int
-  modelo         BibliotecaModeloTarefa    @relation(fields: [modeloId], references: [id], onDelete: Restrict)
-  /// Versão CONGELADA do Modelo que este Vínculo usa — nunca "a mais recente"
-  /// implícita. Reeditar o Modelo depois de vincular não muda o que já está
-  /// vinculado; republicar o Vínculo é decisão própria, separada.
-  modeloVersao   Int
-  tipoProcessoId Int
-  tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Restrict)
-  modalidadeId   Int
-  modalidade     ModalidadePais            @relation(fields: [modalidadeId], references: [id], onDelete: Restrict)
-  /// Fase real do catálogo (`CatalogoFase.phaseKey`) — nunca "biblioteca".
-  phaseKey       String                    @db.VarChar(60)
-  /// Posição entre outros Vínculos da MESMA fase/tipo/modalidade (a maioria
-  /// desta entrega tem exatamente um; o campo só existe para não exigir
-  /// migração de schema no dia em que uma fase precisar de mais de um).
-  ordem          Int                       @default(0)
-  status         BibliotecaVinculoStatus   @default(RASCUNHO)
-  /// Contador de publicação deste Vínculo — mesmo padrão de
-  /// `PhaseInternalWorkflow.versao`/`MacroWorkflow.versao`.
-  versao         Int                       @default(1)
-  criadoEm       DateTime                  @default(now())
-  atualizadoEm   DateTime                  @updatedAt
-  publicadoEm    DateTime?
-  publicadoPorId Int?
-  ativo          Boolean                   @default(true)
-
-  versoes BibliotecaVinculoVersao[]
-
-  // Um Vínculo por (Modelo, Tipo, Modalidade, Fase): reativar depois de
-  // inativar reaproveita a MESMA linha (nunca recria), preservando o
-  // histórico de versões congeladas.
-  @@unique([tipoProcessoId, modalidadeId, phaseKey, modeloId])
-  @@index([modeloId])
-  @@index([phaseKey])
-  @@index([tipoProcessoId, modalidadeId])
-}
-
-/// REVISÃO CONGELADA de um Vínculo — mesmo padrão de
-/// `PhaseInternalWorkflowVersao`/`MacroWorkflowVersao`: cada publicação
-/// congela aqui o que passou a valer, ANTES de a reconciliação (REGRA MESTRA,
-/// mandato §6) decidir o que é novo comparando a revisão anterior com esta.
-model BibliotecaVinculoVersao {
-  id             Int               @id @default(autoincrement())
-  vinculoId      Int
-  vinculo        BibliotecaVinculo @relation(fields: [vinculoId], references: [id], onDelete: Cascade)
-  versao         Int
-
-  modeloId       Int
-  modeloVersao   Int
-  tipoProcessoId Int
-  modalidadeId   Int
-  phaseKey       String            @db.VarChar(60)
-  ordem          Int
-  status         BibliotecaVinculoStatus
-
-  congeladoEm    DateTime @default(now())
-  congeladoPorId Int?
-  /// CRIACAO | PUBLICACAO | INATIVACAO.
-  origem         String   @db.VarChar(20)
-
-  @@unique([vinculoId, versao])
-  @@index([vinculoId])
 }
 
 /// AÇÃO CADASTRADA DE UM PASSO — o resultado que o operador escolhe.

@@ -67,6 +67,21 @@ interface Step {
   slaDays?: number
   completionRule?: string | null
   checklist?: unknown
+  /// TAREFA SELECIONADA DA BIBLIOTECA (mandato "separação Biblioteca ×
+  /// Workflow Interno", 22/09/2026). Preenchido = este passo NÃO tem
+  /// conteúdo próprio — os campos acima (acoes/campos/subtarefas/etc.) ficam
+  /// vazios de propósito; o conteúdo de verdade é `conteudoDaBiblioteca`,
+  /// resolvido pelo servidor a partir da versão pinada do Modelo.
+  bibliotecaModeloId?: number | null
+  bibliotecaModeloVersao?: number | null
+  bibliotecaModeloInfo?: { id: number; chave: string; nome: string; versaoPublicada: number | null; status: string } | null
+  conteudoDaBiblioteca?: {
+    subtarefas?: Array<Record<string, unknown>>
+    campos?: Array<Record<string, unknown>>
+    checkItens?: Array<Record<string, unknown>>
+    acoes?: Array<Record<string, unknown>>
+    requisitos?: Array<Record<string, unknown>>
+  } | null
 }
 interface Workflow {
   id: number
@@ -90,20 +105,18 @@ interface Workflow {
 }
 interface Fase { phaseKey: string; label: string; order: number }
 interface TipoProcesso { id: number; name: string; fases: Fase[] }
-interface ModeloPasso { name: string }
-interface Modelo {
-  id: number
-  name: string
-  description?: string | null
-  category?: string | null
-  recommendedPhases?: string[] | null
-  usedByCount: number
-  passos: ModeloPasso[]
-}
 interface Data {
   tiposProcesso: TipoProcesso[]
   workflows: Workflow[]
-  modelosWorkflow: Modelo[]
+}
+interface ModeloDaBiblioteca {
+  id: number
+  chave: string
+  nome: string
+  descricao: string | null
+  status: "RASCUNHO" | "PUBLICADO" | "INATIVO"
+  versaoPublicada: number | null
+  passo: { _count: { subtarefas: number } } | null
 }
 
 // ============================================================
@@ -141,9 +154,11 @@ export default function PhaseWorkflowsFasesTab() {
   const [ptId, setPtId] = useState<string>("")
   const [phaseFilter, setPhaseFilter] = useState<string[]>([]) // vazio = todas
 
-  const [applyFor, setApplyFor] = useState<{ phaseKey: string; label: string } | null>(null)
-  const [applySel, setApplySel] = useState<number | null>(null)
-  const [replaceAsk, setReplaceAsk] = useState<{ templateId: number; phaseKey: string; label: string } | null>(null)
+  // SELECIONAR TAREFA DA BIBLIOTECA (mandato "separação Biblioteca × Workflow
+  // Interno", 22/09/2026) — substitui o antigo "+ Passo em branco".
+  const [selecionando, setSelecionando] = useState<Workflow | null>(null)
+  const [modelosDaBiblioteca, setModelosDaBiblioteca] = useState<ModeloDaBiblioteca[] | null>(null)
+  const [resumoStep, setResumoStep] = useState<{ wf: Workflow; step: Step } | null>(null)
 
   const [configModal, setConfigModal] = useState<{ wf: Workflow; step: Step } | null>(null)
   const [problemas, setProblemas] = useState<Array<{ codigo: string; stepKey: string | null; mensagem: string }>>([])
@@ -201,20 +216,6 @@ export default function PhaseWorkflowsFasesTab() {
     } finally { setBusy(false) }
   }
 
-  async function aplicar(templateId: number, phaseKey: string, label: string, mode?: "replace") {
-    setBusy(true)
-    try {
-      const res = await fetch("/api/gerenciamento/workflows-fase", {
-        method: "POST", headers: authHeaders(),
-        body: JSON.stringify({ aplicar: true, templateId, phaseKey, tipoProcessoId: ptNum, mode }),
-      })
-      const j = await res.json().catch(() => ({}))
-      if (j.needsChoice) { setApplyFor(null); setReplaceAsk({ templateId, phaseKey, label }); return }
-      if (res.ok && j.workflow) { upsertWorkflowLocal(j.workflow); setApplyFor(null); setReplaceAsk(null); showFlash("Modelo aplicado.") }
-      else showFlash(j.error || "Erro ao aplicar.")
-    } finally { setBusy(false) }
-  }
-
   async function excluirWorkflow(wf: Workflow) {
     const aviso = wf.tipoProcessoId === null
       ? "Este é o workflow GLOBAL (padrão de todos os processos). Excluir?"
@@ -258,32 +259,39 @@ export default function PhaseWorkflowsFasesTab() {
   }
 
   /**
-   * CRIAR UM PASSO É CRIAR E ABRIR O CONFIGURADOR — não preencher um formulário curto.
+   * SELECIONAR TAREFA DA BIBLIOTECA (mandato "separação Biblioteca × Workflow
+   * Interno", 22/09/2026) — substitui o antigo "+ Passo", que criava um passo
+   * em branco autorado direto na fase.
    *
-   * Existia um modal "Adicionar/Editar passo" com sete atributos. Ele era um SEGUNDO
-   * editor da mesma entidade: nome, cardinalidade, SLA e condição de conclusão podiam
-   * ser mudados ali e também no configurador completo, e o modal curto não alcançava o
-   * resto (regra de conclusão em vocabulário fechado, subtarefas, campos, ações,
-   * checklist, requisitos, evidências, dependências, executor, reabertura). Duas
-   * telas para uma entidade fazem o administrador ter de saber por qual delas entrar
-   * para achar o que procura.
-   *
-   * Agora o passo nasce com o mínimo que o servidor exige — um nome e uma chave — e o
-   * configurador abre nele. Todo atributo se edita num lugar só.
+   * O passo desta fase NUNCA mais nasce com conteúdo próprio: nasce como
+   * SELEÇÃO de um Modelo PUBLICADO da Biblioteca, pinada na versão publicada
+   * no instante da seleção (nunca "a mais recente" implícita — trocar de
+   * versão é reselecionar, uma decisão própria). O conteúdo (subtarefas,
+   * campos, ações, checklist, requisitos, regra de conclusão) mora só na
+   * Biblioteca; este passo guarda apenas identidade (`key`) e posição
+   * (`ordem`/`dependeDe`) dentro DESTA fase — nunca uma cópia editável.
    */
-  async function criarPasso(wf: Workflow) {
-    let k = "novo_passo"; let n = 2
-    while (wf.passos.some((s) => s.key === k)) { k = `novo_passo_${n}`; n++ }
-    const novo: Step = {
-      key: k, label: "Novo passo", ordem: wf.passos.length + 1,
-      createsTask: true, required: true, cardinalidade: null,
-      owner: "", slaDays: 0, completionRule: "", priority: "medium",
+  async function abrirSeletorDaBiblioteca(wf: Workflow) {
+    setSelecionando(wf)
+    if (modelosDaBiblioteca == null) {
+      try {
+        const res = await fetch("/api/gerenciamento/biblioteca-tarefas/modelos", { headers: authHeaders() })
+        const j = await res.json().catch(() => ({}))
+        setModelosDaBiblioteca(res.ok ? (j.modelos ?? []) : [])
+      } catch { setModelosDaBiblioteca([]) }
     }
-    const salvo = await putSteps(wf, [...wf.passos, novo])
-    if (!salvo) return
-    // ABRE NO PASSO COMO ELE FICOU NO BANCO — mesma entidade, mesmo id, mesma versão.
-    const criado = salvo.passos.find((s) => s.key === k)
-    if (criado) setConfigModal({ wf: salvo, step: criado })
+  }
+  async function selecionarDaBiblioteca(wf: Workflow, modelo: ModeloDaBiblioteca) {
+    if (modelo.status !== "PUBLICADO" || modelo.versaoPublicada == null) return
+    let k = modelo.chave, n = 2
+    while (wf.passos.some((s) => s.key === k)) { k = `${modelo.chave}_${n}`; n++ }
+    const novo: Step = {
+      key: k, label: modelo.nome, ordem: wf.passos.length + 1,
+      createsTask: true, required: true, cardinalidade: null,
+      bibliotecaModeloId: modelo.id, bibliotecaModeloVersao: modelo.versaoPublicada,
+    }
+    setSelecionando(null)
+    await putSteps(wf, [...wf.passos, novo])
   }
   function dupStep(wf: Workflow, st: Step) {
     let k = st.key + "_copia"; let n = 2
@@ -320,15 +328,6 @@ export default function PhaseWorkflowsFasesTab() {
 
   // ---------- render ----------
   if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
-
-  const modelos = data?.modelosWorkflow || []
-  const modelosOrdenados = applyFor
-    ? modelos.slice().sort((a, b) => {
-        const ra = (a.recommendedPhases || []).includes(applyFor.phaseKey) ? 0 : 1
-        const rb = (b.recommendedPhases || []).includes(applyFor.phaseKey) ? 0 : 1
-        return ra - rb || a.name.localeCompare(b.name)
-      })
-    : []
 
   return (
     <div className="space-y-5">
@@ -453,7 +452,7 @@ export default function PhaseWorkflowsFasesTab() {
               </div>
               {wf && (
                 <div className="flex flex-none flex-wrap justify-end gap-1.5">
-                  <button onClick={() => void criarPasso(wf)} className="rounded-lg bg-[var(--action-primary)] px-2.5 py-1 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Passo</button>
+                  <button onClick={() => void abrirSeletorDaBiblioteca(wf)} className="rounded-lg bg-[var(--action-primary)] px-2.5 py-1 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">Selecionar tarefa da Biblioteca</button>
                   {/* PUBLICAR É UM ATO SEPARADO DE SALVAR. Enquanto não se clica aqui,
                       o que os processos leem continua sendo a versão anterior. */}
                   <button onClick={() => setPublicarWf(wf)}
@@ -471,13 +470,20 @@ export default function PhaseWorkflowsFasesTab() {
                 <button onClick={() => criarVazio(p.phaseKey, p.label)} disabled={busy} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">+ Criar workflow interno</button>
               </div>
             ) : wf.passos.length === 0 ? (
-              <div className="mt-3 text-xs text-[var(--text-muted)]">Nenhum passo ainda. Use “+ Passo” ou aplique um modelo.</div>
+              <div className="mt-3 text-xs text-[var(--text-muted)]">Nenhuma tarefa ainda. Use "Selecionar tarefa da Biblioteca".</div>
             ) : (
               <div className="mt-3 space-y-1.5">
                 {wf.passos.slice().sort((a, b) => a.ordem - b.ordem).map((st, idx, arr) => (
                   <div key={st.key} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
                     <div className="min-w-0">
-                      <div className="truncate text-sm text-white">{idx + 1}. {st.label}</div>
+                      <div className="truncate text-sm text-white">
+                        {idx + 1}. {st.label}
+                        {st.bibliotecaModeloId != null && (
+                          <span className="ml-1.5 rounded bg-[var(--action-primary)]/20 px-1.5 py-0.5 align-middle text-[10px] font-medium text-[var(--action-primary)]" title="Conteúdo mantido na Biblioteca de Tarefas — este passo é só a seleção.">
+                            Biblioteca{st.bibliotecaModeloInfo ? ` · ${st.bibliotecaModeloInfo.chave} v${st.bibliotecaModeloVersao}` : ""}
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                         {/* O badge dizia "gera tarefa" em cada passo — leitura do
                             modelo antigo step→tarefa. O passo não gera tarefa: ele
@@ -495,11 +501,19 @@ export default function PhaseWorkflowsFasesTab() {
                         {st.owner && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{st.owner}</span>}
                         {!st.createsTask && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]" title="Não entra no roteiro de trabalho do operador.">sem trabalho operacional</span>}
                         {(() => {
+                          // CONTEÚDO EFETIVO: de `conteudoDaBiblioteca` quando o passo é
+                          // uma seleção; dos campos do próprio passo quando é autorado
+                          // localmente à moda antiga (compatibilidade).
+                          const fonte = st.bibliotecaModeloId != null ? st.conteudoDaBiblioteca : st
+                          const subtarefas = fonte?.subtarefas?.length ?? 0
+                          const campos = fonte?.campos?.length ?? 0
+                          const checkItens = fonte?.checkItens?.length ?? 0
+                          const acoes = fonte?.acoes?.length ?? 0
                           const partes = [
-                            (st.subtarefas?.length ?? 0) > 0 ? `${st.subtarefas!.length} subtarefa${st.subtarefas!.length > 1 ? "s" : ""}` : null,
-                            (st.campos?.length ?? 0) > 0 ? `${st.campos!.length} campo${st.campos!.length > 1 ? "s" : ""}` : null,
-                            (st.checkItens?.length ?? 0) > 0 ? `checklist ${st.checkItens!.length}` : null,
-                            (st.acoes?.length ?? 0) > 0 ? `${st.acoes!.length} resultado${st.acoes!.length > 1 ? "s" : ""}` : null,
+                            subtarefas > 0 ? `${subtarefas} subtarefa${subtarefas > 1 ? "s" : ""}` : null,
+                            campos > 0 ? `${campos} campo${campos > 1 ? "s" : ""}` : null,
+                            checkItens > 0 ? `checklist ${checkItens}` : null,
+                            acoes > 0 ? `${acoes} resultado${acoes > 1 ? "s" : ""}` : null,
                             (st.dependeDe?.length ?? 0) > 0 ? `depende de ${st.dependeDe!.length}` : null,
                           ].filter(Boolean)
                           return partes.length > 0
@@ -510,9 +524,15 @@ export default function PhaseWorkflowsFasesTab() {
                       </div>
                     </div>
                     <div className="flex flex-none items-center gap-0.5 text-[var(--text-secondary)]">
-                      <button title="Configurar tudo o que acontece dentro deste passo" aria-label="Configurar"
-                        onClick={() => setConfigModal({ wf, step: st })}
-                        className="rounded px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]">Configurar</button>
+                      {st.bibliotecaModeloId != null ? (
+                        <button title="Ver resumo e a dependência desta tarefa na fase — o conteúdo se edita na Biblioteca" aria-label="Resumo"
+                          onClick={() => setResumoStep({ wf, step: st })}
+                          className="rounded px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]">Resumo</button>
+                      ) : (
+                        <button title="Configurar tudo o que acontece dentro deste passo" aria-label="Configurar"
+                          onClick={() => setConfigModal({ wf, step: st })}
+                          className="rounded px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]">Configurar</button>
+                      )}
                       {/* O LÁPIS SAIU. Ele abria um segundo editor da MESMA entidade,
                           com sete atributos que o configurador já edita — e sem
                           alcançar o resto do passo. Deixá-lo abrindo o configurador
@@ -563,54 +583,132 @@ export default function PhaseWorkflowsFasesTab() {
         />
       )}
 
-      {/* MODAL — aplicar modelo */}
-      {applyFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setApplyFor(null)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
+      {/* MODAL — selecionar tarefa da Biblioteca (mandato 22/09/2026) */}
+      {selecionando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setSelecionando(null)}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
-              <h3 className="font-semibold text-white">Aplicar modelo de workflow</h3>
-              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Fase: {applyFor.label} · os passos do modelo serão copiados para esta fase.</p>
+              <h3 className="font-semibold text-white">Selecionar tarefa da Biblioteca</h3>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                Fase: {selecionando.name} · o conteúdo continua mantido na Biblioteca de Tarefas — este passo só passa a apontar para ele, na versão publicada agora.
+              </p>
             </div>
             <div className="space-y-1.5 px-6 py-4">
-              {modelosOrdenados.length === 0 && <div className="text-sm text-[var(--text-secondary)]">Nenhum modelo na biblioteca.</div>}
-              {modelosOrdenados.map(m => {
-                const rec = (m.recommendedPhases || []).includes(applyFor.phaseKey)
-                return (
-                  <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 ${applySel === m.id ? "border-[var(--border-default)] bg-[var(--surface-secondary)]" : "border-[var(--border-default)] bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)]"}`}>
-                    <input type="radio" name="modelo" checked={applySel === m.id} onChange={() => setApplySel(m.id)} className="mt-1" />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-white">{m.name}</span>
-                        {rec && <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-green-800">recomendado</span>}
-                      </div>
-                      <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{m.passos.length} passo(s){m.description ? " · " + m.description : ""}</div>
+              {modelosDaBiblioteca == null && <div className="text-sm text-[var(--text-secondary)]">Carregando…</div>}
+              {modelosDaBiblioteca != null && modelosDaBiblioteca.filter((m) => m.status === "PUBLICADO").length === 0 && (
+                <div className="text-sm text-[var(--text-secondary)]">Nenhum modelo publicado na Biblioteca de Tarefas ainda.</div>
+              )}
+              {modelosDaBiblioteca?.filter((m) => m.status === "PUBLICADO").map((m) => (
+                <button key={m.id} onClick={() => void selecionarDaBiblioteca(selecionando, m)} disabled={busy}
+                  className="flex w-full items-start gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-left hover:bg-[var(--surface-hover)] disabled:opacity-50">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-white">{m.nome}</span>
+                      <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">v{m.versaoPublicada}</span>
                     </div>
-                  </label>
-                )
-              })}
+                    <div className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                      {m.chave} · {m.passo?._count.subtarefas ?? 0} subtarefa(s){m.descricao ? " · " + m.descricao : ""}
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setApplyFor(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={!applySel || busy} onClick={() => applySel && aplicar(applySel, applyFor.phaseKey, applyFor.label)} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Aplicar</button>
+              <button onClick={() => setSelecionando(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL — confirmar substituição */}
-      {replaceAsk && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setReplaceAsk(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold text-white">Substituir os passos?</h3>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">A fase <strong>{replaceAsk.label}</strong> já tem um workflow interno neste processo. Aplicar o modelo vai <strong>substituir os passos atuais</strong> pelos do modelo.</p>
-            <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setReplaceAsk(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={() => aplicar(replaceAsk.templateId, replaceAsk.phaseKey, replaceAsk.label, "replace")} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Substituir passos</button>
-            </div>
-          </div>
-        </div>
+      {/* MODAL — resumo de uma tarefa selecionada da Biblioteca (leitura + dependência da fase) */}
+      {resumoStep && (
+        <ResumoDaTarefaDaBiblioteca
+          wf={resumoStep.wf} step={resumoStep.step}
+          onFechar={() => setResumoStep(null)}
+          onSalvarDependencia={async (dependeDe) => {
+            const wf = resumoStep.wf
+            const steps = wf.passos.map((s) => (s.key === resumoStep.step.key ? { ...s, dependeDe } : s))
+            await putSteps(wf, steps)
+            setResumoStep(null)
+          }}
+        />
       )}
 
+    </div>
+  )
+}
+
+/**
+ * RESUMO DE UMA TAREFA SELECIONADA DA BIBLIOTECA — leitura do conteúdo
+ * (resolvido pelo servidor) + a ÚNICA configuração que continua sendo desta
+ * fase: de qual(is) outro(s) passo(s) da MESMA fase esta tarefa depende. Não
+ * é um editor de conteúdo — não duplica nenhum campo que a Biblioteca já
+ * mantém (mandato "separação Biblioteca × Workflow Interno", 22/09/2026).
+ */
+function ResumoDaTarefaDaBiblioteca({
+  wf, step, onFechar, onSalvarDependencia,
+}: {
+  wf: Workflow
+  step: Step
+  onFechar: () => void
+  onSalvarDependencia: (dependeDe: string[]) => Promise<void>
+}) {
+  const [dependeDe, setDependeDe] = useState<string[]>(step.dependeDe ?? [])
+  const [salvando, setSalvando] = useState(false)
+  const irmaos = wf.passos.filter((s) => s.key !== step.key)
+  const c = step.conteudoDaBiblioteca
+
+  function alternar(key: string) {
+    setDependeDe((prev) => prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key])
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onFechar}>
+      <div className="max-h-[90vh] w-full max-w-xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[var(--border-default)] px-6 py-4">
+          <h3 className="font-semibold text-white">{step.label}</h3>
+          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+            Modelo <code className="text-white/80">{step.bibliotecaModeloInfo?.chave ?? "—"}</code> · v{step.bibliotecaModeloVersao} da Biblioteca de Tarefas — o conteúdo abaixo é só leitura.
+          </p>
+        </div>
+        <div className="space-y-4 px-6 py-4">
+          <div>
+            <div className={labelCls}>Subtarefas ({c?.subtarefas?.length ?? 0})</div>
+            {(c?.subtarefas?.length ?? 0) === 0
+              ? <div className="text-xs text-[var(--text-muted)]">nenhuma</div>
+              : (
+                <ol className="list-decimal space-y-0.5 pl-4 text-sm text-white/80">
+                  {c!.subtarefas!.map((s, i) => <li key={i}>{String((s as { label?: string }).label ?? "")}</li>)}
+                </ol>
+              )}
+          </div>
+          <div>
+            <div className={labelCls}>Depende de (nesta fase)</div>
+            {irmaos.length === 0
+              ? <div className="text-xs text-[var(--text-muted)]">esta fase não tem outro passo ainda</div>
+              : (
+                <div className="space-y-1">
+                  {irmaos.map((s) => (
+                    <label key={s.key} className="flex items-center gap-2 text-sm text-white/80">
+                      <input type="checkbox" checked={dependeDe.includes(s.key)} onChange={() => alternar(s.key)} />
+                      {s.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+          </div>
+          <a href="/administrator?screen=bibliotecatarefas" className="inline-block text-xs text-[var(--action-primary)] hover:underline">
+            Editar o conteúdo na Biblioteca de Tarefas →
+          </a>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
+          <button onClick={onFechar} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Fechar</button>
+          <button disabled={salvando} onClick={async () => { setSalvando(true); await onSalvarDependencia(dependeDe); setSalvando(false) }}
+            className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
+            Salvar dependência
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

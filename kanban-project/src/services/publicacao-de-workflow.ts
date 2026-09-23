@@ -78,7 +78,7 @@ async function retratoDaDefinicaoViva(workflowId: number, db: typeof prisma | TX
     include: { passos: INCLUDE_DA_DEFINICAO },
   })
   if (!wf) return []
-  return retratarPassos(wf.passos)
+  return retratarPassos(wf.passos, db)
 }
 
 // ── O QUE SE COMPARA EM CADA CLASSE DE PEÇA ─────────────────────────────────

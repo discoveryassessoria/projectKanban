@@ -1,4 +1,4 @@
-// GET — lista os Modelos da Biblioteca de Tarefas, com quantos Vínculos cada um tem.
+// GET — lista os Modelos da Biblioteca de Tarefas, com quais Workflows Internos de fase os selecionaram.
 // POST — cria um Modelo novo (casca + um passo em branco), sempre RASCUNHO.
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -18,8 +18,15 @@ export async function GET(request: NextRequest) {
           passos: { select: { id: true, key: true, label: true, regraDeConclusao: true, _count: { select: { subtarefas: true } } } },
         },
       },
-      vinculos: {
-        select: { id: true, status: true, phaseKey: true, tipoProcessoId: true, modalidadeId: true, modeloVersao: true },
+      // ONDE ESTE MODELO ESTÁ SELECIONADO — passos de fases REAIS (nunca a
+      // própria casca do Modelo, que não aparece aqui por não ter
+      // `bibliotecaModeloId`). Substitui o antigo "Vínculo" (tabela à parte,
+      // removida): a fase já é o `workflow` do passo.
+      passosQueUsam: {
+        select: {
+          id: true, key: true, bibliotecaModeloVersao: true,
+          workflow: { select: { id: true, phaseKey: true, tipoProcessoId: true, name: true } },
+        },
       },
     },
   })
@@ -30,7 +37,11 @@ export async function GET(request: NextRequest) {
       status: m.status, versaoPublicada: m.versaoPublicada, ativo: m.ativo,
       workflowId: m.workflowId, temAlteracaoNaoPublicada: m.workflow.rascunhoAlteradoEm != null,
       passo: m.workflow.passos[0] ?? null,
-      vinculos: m.vinculos,
+      usadoEm: m.passosQueUsam.map((p) => ({
+        stepId: p.id, stepKey: p.key, versaoSelecionada: p.bibliotecaModeloVersao,
+        workflowId: p.workflow.id, phaseKey: p.workflow.phaseKey,
+        tipoProcessoId: p.workflow.tipoProcessoId, workflowNome: p.workflow.name,
+      })),
       criadoEm: m.criadoEm, atualizadoEm: m.atualizadoEm,
     })),
   })

@@ -124,11 +124,9 @@ async function main() {
   const modeloReativado = await prisma.bibliotecaModeloTarefa.findUniqueOrThrow({ where: { id: criado.modeloId } })
   check("5.5) volta para PUBLICADO (tinha versaoPublicada) — não RASCUNHO", modeloReativado.status === "PUBLICADO" && modeloReativado.ativo === true)
 
-  console.log("\n6) FORA DE ESCOPO — nenhum Vínculo, reconciliação ou outbox foi tocado")
-  const vinculosCriados = await prisma.bibliotecaVinculo.count()
-  const outboxBiblioteca = await prisma.domainOutbox.count({ where: { tipo: "biblioteca.vinculo.reconciliar" } })
-  check("6.1) zero BibliotecaVinculo em qualquer lugar do banco de teste (este cenário nunca cria um)", vinculosCriados === 0, vinculosCriados)
-  check("6.2) zero evento de reconciliação de Vínculo enfileirado", outboxBiblioteca === 0, outboxBiblioteca)
+  console.log("\n6) FORA DE ESCOPO — nenhum passo de fase real selecionou este Modelo")
+  const passosQueUsam = await prisma.phaseInternalWorkflowStep.count({ where: { bibliotecaModeloId: criado.modeloId } })
+  check("6.1) zero PhaseInternalWorkflowStep referenciando este Modelo (este cenário nunca seleciona em fase real)", passosQueUsam === 0, passosQueUsam)
 
   console.log(`\n=== ${ok} passaram, ${falhou} falharam ===`)
   if (falhou > 0) console.error("Falhas:", falhas)

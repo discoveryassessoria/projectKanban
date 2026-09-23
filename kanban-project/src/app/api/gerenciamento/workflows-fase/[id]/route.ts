@@ -5,6 +5,37 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { validarWorkflowParaPublicar } from '@/src/services/validacao-de-publicacao'
 import { marcarRascunho, publicarWorkflow, preverPublicacao } from '@/src/services/publicacao-de-workflow'
 import { cancelarPasso } from '@/src/services/task-step-sync'
+import { resolverConteudoDaBiblioteca } from '@/src/services/versao-publicada'
+
+/**
+ * ANEXA, por passo SELECIONADO DA BIBLIOTECA, o conteúdo efetivo resolvido
+ * (`conteudoDaBiblioteca`) e a identidade do Modelo (`bibliotecaModeloInfo`)
+ * — nunca sobrescreve os campos próprios do passo (que ficam vazios de
+ * propósito para esses casos). Uso exclusivo de EXIBIÇÃO (resumo/leitura);
+ * quem decide o conteúdo que vale de verdade continua sendo
+ * `validarWorkflowParaPublicar`/`retratarPassos`, não esta função.
+ */
+async function anexarConteudoDaBiblioteca<T extends { passos: Array<{ bibliotecaModeloId: number | null; bibliotecaModeloVersao: number | null }> }>(
+  wf: T,
+): Promise<T & { passos: Array<T['passos'][number] & { bibliotecaModeloInfo: unknown; conteudoDaBiblioteca: unknown }> }> {
+  const modeloIds = [...new Set(wf.passos.map((p) => p.bibliotecaModeloId).filter((id): id is number => id != null))]
+  const modelosInfo = modeloIds.length
+    ? await prisma.bibliotecaModeloTarefa.findMany({
+        where: { id: { in: modeloIds } },
+        select: { id: true, chave: true, nome: true, versaoPublicada: true, status: true },
+      })
+    : []
+  const infoPorId = new Map(modelosInfo.map((m) => [m.id, m]))
+
+  const passos = await Promise.all(wf.passos.map(async (p) => ({
+    ...p,
+    bibliotecaModeloInfo: p.bibliotecaModeloId != null ? (infoPorId.get(p.bibliotecaModeloId) ?? null) : null,
+    conteudoDaBiblioteca: (p.bibliotecaModeloId != null && p.bibliotecaModeloVersao != null)
+      ? await resolverConteudoDaBiblioteca(p.bibliotecaModeloId, p.bibliotecaModeloVersao)
+      : null,
+  })))
+  return { ...wf, passos }
+}
 
 /**
  * RECONCILIA INSTÂNCIAS ÓRFÃS depois que um passo some do cadastro salvo.
@@ -119,6 +150,15 @@ export function buildSteps(raw: any[], workflowId: number) {
       // ESPERA DE TERCEIRO AO LIBERAR — cadastro canônico, nunca stepKey
       // hardcoded. Ver PhaseInternalWorkflowStep.esperaExternaAoLiberar.
       esperaExternaAoLiberar: s?.esperaExternaAoLiberar === true,
+      // TAREFA SELECIONADA DA BIBLIOTECA (mandato "separação Biblioteca ×
+      // Workflow Interno", 22/09/2026). `null`/ausente = passo autorado
+      // localmente à moda antiga (compatibilidade). O conteúdo (acoes/campos/
+      // subtarefas/etc.) que porventura vier em `s` para um passo com
+      // `bibliotecaModeloId` é ignorado por `buildFilhos` — quem decide o
+      // conteúdo efetivo é a leitura (retratarPassos/validarWorkflowParaPublicar),
+      // nunca o que a tela mandou gravar aqui.
+      bibliotecaModeloId: Number.isFinite(Number(s?.bibliotecaModeloId)) ? Number(s.bibliotecaModeloId) : null,
+      bibliotecaModeloVersao: Number.isFinite(Number(s?.bibliotecaModeloVersao)) ? Number(s.bibliotecaModeloVersao) : null,
     }
   })
 }
@@ -344,7 +384,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             // congelada é quem preserva a configuração antiga; recriar as linhas vivas
             // não apaga história nenhuma.
             const criado = await tx.phaseInternalWorkflowStep.create({ data: stepData[i], select: { id: true } })
-            const filhos = buildFilhos(body.steps[i], criado.id)
+            // PASSO SELECIONADO DA BIBLIOTECA nunca grava conteúdo próprio —
+            // mesmo que a tela mande algo em `body.steps[i]` (não deveria). É
+            // a trava de dado, não só de leitura: impede uma segunda cópia
+            // editável de nascer por engano ou por um chamador futuro.
+            const filhos = stepData[i].bibliotecaModeloId != null
+              ? buildFilhos({}, criado.id)
+              : buildFilhos(body.steps[i], criado.id)
             if (filhos.acoes.length) await tx.stepAction.createMany({ data: filhos.acoes })
             if (filhos.campos.length) await tx.stepField.createMany({ data: filhos.campos })
             if (filhos.checkItens.length) await tx.stepChecklistItem.createMany({ data: filhos.checkItens })
@@ -497,7 +543,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         },
       },
     })
-    return NextResponse.json({ workflow: wf })
+    if (!wf) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
+    return NextResponse.json({ workflow: await anexarConteudoDaBiblioteca(wf) })
   } catch (e) {
     const problemas = (e as { problemas?: unknown })?.problemas
     if (Array.isArray(problemas)) {
@@ -558,7 +605,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     },
   })
   if (!wf) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
-  return NextResponse.json({ workflow: wf, temRascunho: wf.rascunhoAlteradoEm != null })
+  return NextResponse.json({ workflow: await anexarConteudoDaBiblioteca(wf), temRascunho: wf.rascunhoAlteradoEm != null })
 }
 
 // ============================================================================

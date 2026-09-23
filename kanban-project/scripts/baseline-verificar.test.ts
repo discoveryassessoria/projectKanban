@@ -529,6 +529,12 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // + PhaseInternalWorkflow.origemBiblioteca. Não altera CatalogoFase (doc 30,
   // congelado) nem a cardinalidade/unicidade de MacroWorkflow (doc 31).
   '20260922170000_biblioteca_tarefas_workflow_interno',
+  // Correção "separação Biblioteca × Workflow Interno" (22/09/2026): remove
+  // BibliotecaVinculo/BibliotecaVinculoVersao (0 linhas, nunca usadas) e
+  // acrescenta PhaseInternalWorkflowStep.bibliotecaModeloId/
+  // bibliotecaModeloVersao — o passo da fase passa a poder ser uma seleção
+  // direta de um Modelo da Biblioteca, sem tabela de vínculo à parte.
+  '20260922190000_biblioteca_selecao_no_workflow_interno',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

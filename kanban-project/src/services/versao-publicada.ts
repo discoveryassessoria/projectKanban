@@ -353,14 +353,48 @@ function congelarRequisito(r: {
 }
 
 /**
+ * O CONTEÚDO EFETIVO de um passo SELECIONADO DA BIBLIOTECA — nunca o
+ * rascunho vivo do Modelo, sempre a versão CONGELADA que a seleção pinou
+ * (`PhaseInternalWorkflowStep.bibliotecaModeloVersao`). Mesma disciplina de
+ * `lerVersaoPublicada`: "a mais recente" nunca é implícita.
+ *
+ * `null` quando o Modelo ou a versão não existem mais/não foram congelados —
+ * caso que não deveria ocorrer (só se cria a seleção apontando para uma
+ * versão PUBLICADA), mas o chamador decide o que fazer, não este módulo.
+ */
+export async function resolverConteudoDaBiblioteca(
+  bibliotecaModeloId: number,
+  bibliotecaModeloVersao: number,
+  db: DB = prisma,
+): Promise<PassoCongelado | null> {
+  const modelo = await db.bibliotecaModeloTarefa.findUnique({
+    where: { id: bibliotecaModeloId },
+    select: { workflowId: true },
+  })
+  if (!modelo) return null
+  const versao = await lerVersaoPublicada(modelo.workflowId, bibliotecaModeloVersao, db)
+  return versao?.passos[0] ?? null
+}
+
+/**
  * O RETRATO DE UMA DEFINIÇÃO — o mesmo formato do congelado, a partir do vivo.
  *
  * Exportado porque a prévia de publicação precisa comparar maçã com maçã: o congelado
  * de ontem contra o vivo de hoje. Antes cada lado montava o seu retrato, e a prévia
  * mentia exatamente nos atributos em que os dois discordavam.
+ *
+ * ASSÍNCRONA desde a correção "separação Biblioteca × Workflow Interno"
+ * (22/09/2026): um passo SELECIONADO DA BIBLIOTECA (`bibliotecaModeloId`
+ * preenchido) não tem conteúdo próprio — `acoes`/`campos`/`checkItens`/
+ * `requisitos`/`subtarefas` dele estão sempre vazios no banco — e o retrato
+ * precisa ir buscar o conteúdo de verdade na versão congelada do Modelo. É
+ * ASSIM, e só assim, que "editar o Modelo" e "olhar o Workflow Interno da
+ * fase" nunca divergem: os dois leem a MESMA fonte. `key`/`ordem`/`dependeDe`
+ * continuam sendo do PASSO desta fase — é a única configuração que não vem
+ * do Modelo.
  */
-export function retratarPassos(passos: PassosComFilhos): PassoCongelado[] {
-  return passos.map((p) => ({
+export async function retratarPassos(passos: PassosComFilhos, db: DB = prisma): Promise<PassoCongelado[]> {
+  const base = passos.map((p) => ({
     key: p.key, label: p.label, description: p.description, ordem: p.ordem,
     createsTask: p.createsTask, required: p.required, owner: p.owner,
     priority: p.priority, slaDays: p.slaDays, cardinalidade: p.cardinalidade,
@@ -407,6 +441,24 @@ export function retratarPassos(passos: PassosComFilhos): PassoCongelado[] {
     requisitos: p.requisitos.map(congelarRequisito),
     checkItens: p.checkItens.map(congelarItem),
   }))
+
+  // SUBSTITUI, para cada passo SELECIONADO DA BIBLIOTECA, o conteúdo pelo que
+  // o Modelo realmente diz — preservando key/ordem/dependeDe/versao, que são
+  // do PASSO desta fase, nunca do Modelo.
+  const resultado: PassoCongelado[] = []
+  for (let i = 0; i < passos.length; i++) {
+    const p = passos[i]
+    const local = base[i]
+    if (p.bibliotecaModeloId != null && p.bibliotecaModeloVersao != null) {
+      const doModelo = await resolverConteudoDaBiblioteca(p.bibliotecaModeloId, p.bibliotecaModeloVersao, db)
+      if (doModelo) {
+        resultado.push({ ...doModelo, key: local.key, ordem: local.ordem, dependeDe: local.dependeDe, versao: local.versao })
+        continue
+      }
+    }
+    resultado.push(local)
+  }
+  return resultado
 }
 
 /** O tipo que `INCLUDE_DA_DEFINICAO` produz. */
@@ -435,7 +487,7 @@ export async function congelarVersaoVigente(
   })
   if (jaCongelada) return false
 
-  const passos = retratarPassos(wf.passos)
+  const passos = await retratarPassos(wf.passos, db)
 
   const r = await db.phaseInternalWorkflowVersao.createMany({
     data: [{

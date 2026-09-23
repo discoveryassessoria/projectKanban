@@ -40,7 +40,7 @@ interface Modelo {
   workflowId: number
   temAlteracaoNaoPublicada: boolean
   passo: ModeloPasso | null
-  vinculos: Array<{ id: number; status: string; phaseKey: string }>
+  usadoEm: Array<{ stepId: number; stepKey: string; versaoSelecionada: number | null; workflowId: number; phaseKey: string; tipoProcessoId: number | null; workflowNome: string }>
   criadoEm: string
   atualizadoEm: string
 }
@@ -271,7 +271,7 @@ export default function BibliotecaTarefasTab() {
                 <th className="px-4 py-2">Status</th>
                 <th className="px-4 py-2">Versão publicada</th>
                 <th className="px-4 py-2">Subtarefas</th>
-                <th className="px-4 py-2">Vínculos</th>
+                <th className="px-4 py-2">Selecionado em</th>
                 <th className="px-4 py-2 text-right">Ações</th>
               </tr>
             </thead>
@@ -292,7 +292,17 @@ export default function BibliotecaTarefasTab() {
                   <td className="px-4 py-3 text-white/80">{m.versaoPublicada ?? "—"}</td>
                   <td className="px-4 py-3 text-white/80">{m.passo?._count.subtarefas ?? 0}</td>
                   <td className="px-4 py-3 text-white/80">
-                    {m.vinculos.length === 0 ? <span className="text-[var(--text-muted)]">nenhum</span> : m.vinculos.length}
+                    {m.usadoEm.length === 0
+                      ? <span className="text-[var(--text-muted)]">nenhuma fase ainda</span>
+                      : (
+                        <div className="space-y-0.5">
+                          {m.usadoEm.map((u) => (
+                            <div key={u.stepId} className="text-xs">
+                              {u.phaseKey} <span className="text-[var(--text-muted)]">(v{u.versaoSelecionada})</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">

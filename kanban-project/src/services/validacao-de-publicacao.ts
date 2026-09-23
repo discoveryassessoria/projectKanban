@@ -30,6 +30,7 @@ import { executorSuportaCampo, executorSuportaEfeito, capacidades, TIPOS_DE_CAMP
 import { resolveWorkflowStepEditor } from "@/src/lib/process-stage/step-editor-registry"
 import { validarCondicao } from "@/src/lib/motor/condicoes"
 import { capacidadeDoExecutor } from "@/src/lib/motor/registro-de-executores"
+import { resolverConteudoDaBiblioteca, type PassoCongelado } from "@/src/services/versao-publicada"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -616,44 +617,73 @@ export async function validarWorkflowParaPublicar(
     ? CATALOGO_DE_EFEITOS.map((e) => e.key)
     : efeitosDaFase(wf.phaseKey, fase?.efeitosPermitidos ?? null)
 
-  return validarConfiguracao(
-    wf.passos.map((p) => ({
-      key: p.key, label: p.label, executorKey: p.executorKey,
+  // PASSO SELECIONADO DA BIBLIOTECA (mandato "separação Biblioteca × Workflow
+  // Interno", 22/09/2026) não tem conteúdo próprio no banco — valida-se o
+  // conteúdo EFETIVO, resolvido da versão congelada do Modelo, contra a
+  // competência da fase REAL. É este o momento (publicação do Workflow da
+  // fase) em que EFEITO_FORA_DE_COMPETENCIA passa a valer para conteúdo de
+  // Biblioteca — não existe mais um passo de "publicar vínculo" separado.
+  const problemasDeBiblioteca: ProblemaDePublicacao[] = []
+  const passosParaValidar: PassoParaValidar[] = []
+  for (const p of wf.passos) {
+    let doModelo: PassoCongelado | null = null
+    if (p.bibliotecaModeloId != null && p.bibliotecaModeloVersao != null) {
+      doModelo = await resolverConteudoDaBiblioteca(p.bibliotecaModeloId, p.bibliotecaModeloVersao, db)
+      if (!doModelo) {
+        problemasDeBiblioteca.push({
+          codigo: "MODELO_DA_BIBLIOTECA_INEXISTENTE", stepKey: p.key,
+          mensagem: `"${p.label}" está selecionado para o Modelo #${p.bibliotecaModeloId} v${p.bibliotecaModeloVersao} da Biblioteca de Tarefas, que não existe ou não tem essa versão congelada.`,
+        })
+      }
+    }
+
+    const subtarefasFonte = doModelo ? doModelo.subtarefas : p.subtarefas
+    const subtarefas: SubtarefaParaValidar[] = subtarefasFonte.map((st) => ({
+      key: st.key, label: st.label, ativo: st.ativo, obrigatoria: st.obrigatoria,
+      repetivel: st.repetivel, maxOcorrencias: st.maxOcorrencias,
+      modoExecucao: st.modoExecucao, responsavelRegra: st.responsavelRegra,
+      fonteDeCanais: st.fonteDeCanais,
+      tiposDeCanal: Array.isArray(st.tiposDeCanal) ? (st.tiposDeCanal as string[]) : null,
+      executorKey: st.executorKey,
+      dependeDe: Array.isArray(st.dependeDe) ? (st.dependeDe as string[]) : null,
+      condicaoEntrada: st.condicaoEntrada,
+      condicaoConclusao: st.condicaoConclusao,
+      condicaoVisibilidade: st.condicaoVisibilidade,
+      esperaExternaAoLiberar: st.esperaExternaAoLiberar,
+      regraTemporalAtiva: st.regraTemporalAtiva,
+      regraTemporalDias: st.regraTemporalDias,
+      regraTemporalGatilhoChave: st.regraTemporalGatilhoChave,
+      acoes: st.acoes.map(paraValidarAcao),
+      campos: st.campos.map(paraValidarCampo),
+      checkItens: st.checkItens.map((c: { key: string; ativo: boolean }) => ({ key: c.key, ativo: c.ativo })),
+      requisitos: st.requisitos.map(paraValidarRequisito),
+    }))
+
+    passosParaValidar.push({
+      key: p.key, label: p.label,
+      executorKey: doModelo ? doModelo.executorKey : p.executorKey,
       dependeDe: Array.isArray(p.dependeDe) ? (p.dependeDe as string[]) : null,
-      acoes: p.acoes.map(paraValidarAcao),
-      campos: p.campos.map(paraValidarCampo),
-      checkItens: p.checkItens.map((c) => ({ key: c.key, ativo: c.ativo })),
-      canais: p.canais.map((sc) => ({
-        key: sc.canal.key, ativo: sc.ativo,
-        camposObrigatorios: Array.isArray(sc.camposObrigatorios) ? (sc.camposObrigatorios as string[]) : null,
-        condicao: sc.condicao,
-      })),
-      requisitos: p.requisitos.map(paraValidarRequisito),
-      regraDeConclusao: p.regraDeConclusao,
-      esperaExternaAoLiberar: p.esperaExternaAoLiberar,
-      subtarefas: p.subtarefas.map((st) => ({
-        key: st.key, label: st.label, ativo: st.ativo, obrigatoria: st.obrigatoria,
-        repetivel: st.repetivel, maxOcorrencias: st.maxOcorrencias,
-        modoExecucao: st.modoExecucao, responsavelRegra: st.responsavelRegra,
-        fonteDeCanais: st.fonteDeCanais,
-        tiposDeCanal: Array.isArray(st.tiposDeCanal) ? (st.tiposDeCanal as string[]) : null,
-        executorKey: st.executorKey,
-        dependeDe: Array.isArray(st.dependeDe) ? (st.dependeDe as string[]) : null,
-        condicaoEntrada: st.condicaoEntrada,
-        condicaoConclusao: st.condicaoConclusao,
-        condicaoVisibilidade: st.condicaoVisibilidade,
-        esperaExternaAoLiberar: st.esperaExternaAoLiberar,
-        regraTemporalAtiva: st.regraTemporalAtiva,
-        regraTemporalDias: st.regraTemporalDias,
-        regraTemporalGatilhoChave: st.regraTemporalGatilhoChave,
-        acoes: st.acoes.map(paraValidarAcao),
-        campos: st.campos.map(paraValidarCampo),
-        checkItens: st.checkItens.map((c) => ({ key: c.key, ativo: c.ativo })),
-        requisitos: st.requisitos.map(paraValidarRequisito),
-      })),
-    })),
-    { phaseKey: wf.phaseKey, efeitosPermitidosDaFase: permitidos },
-  )
+      acoes: (doModelo ? doModelo.acoes : p.acoes).map(paraValidarAcao),
+      campos: (doModelo ? doModelo.campos : p.campos).map(paraValidarCampo),
+      checkItens: (doModelo ? doModelo.checkItens : p.checkItens).map((c: { key: string; ativo: boolean }) => ({ key: c.key, ativo: c.ativo })),
+      canais: doModelo
+        ? doModelo.canais.map((c) => ({ key: c.key, ativo: c.ativo, camposObrigatorios: c.camposObrigatorios, condicao: c.condicao }))
+        : p.canais.map((sc) => ({
+            key: sc.canal.key, ativo: sc.ativo,
+            camposObrigatorios: Array.isArray(sc.camposObrigatorios) ? (sc.camposObrigatorios as string[]) : null,
+            condicao: sc.condicao,
+          })),
+      requisitos: (doModelo ? doModelo.requisitos : p.requisitos).map(paraValidarRequisito),
+      regraDeConclusao: doModelo ? doModelo.regraDeConclusao : p.regraDeConclusao,
+      esperaExternaAoLiberar: doModelo ? doModelo.esperaExternaAoLiberar : p.esperaExternaAoLiberar,
+      subtarefas,
+    })
+  }
+
+  return [
+    ...problemasDeBiblioteca,
+    ...validarConfiguracao(passosParaValidar, { phaseKey: wf.phaseKey, efeitosPermitidosDaFase: permitidos }),
+  ]
 }
 
 /** Só para telas: o efeito existe e é usável nesta fase? */

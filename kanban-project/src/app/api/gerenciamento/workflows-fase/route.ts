@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { congelarVersaoVigente } from '@/src/services/versao-publicada'
+import { congelarVersaoVigente, resolverConteudoDaBiblioteca } from '@/src/services/versao-publicada'
 
 // GET — dados da tela: processos+fases + workflows internos aplicados (sem biblioteca de modelos)
 export async function GET(request: NextRequest) {
@@ -52,6 +52,43 @@ export async function GET(request: NextRequest) {
       }),
     ])
 
+    // PASSO SELECIONADO DA BIBLIOTECA — resolve o conteúdo EFETIVO uma vez por
+    // (modelo, versão) distintos (nunca por passo: a mesma seleção pode
+    // aparecer em várias fases) e anexa em `conteudoDaBiblioteca`, sem tocar
+    // nos campos próprios do passo (que ficam vazios de propósito). É o que a
+    // tela usa para o resumo — nunca para editar.
+    const paresDistintos = new Map<string, { modeloId: number; versao: number }>()
+    for (const wf of workflows) {
+      for (const p of wf.passos) {
+        if (p.bibliotecaModeloId != null && p.bibliotecaModeloVersao != null) {
+          paresDistintos.set(`${p.bibliotecaModeloId}::${p.bibliotecaModeloVersao}`, { modeloId: p.bibliotecaModeloId, versao: p.bibliotecaModeloVersao })
+        }
+      }
+    }
+    const conteudoPorPar = new Map<string, Awaited<ReturnType<typeof resolverConteudoDaBiblioteca>>>()
+    for (const [chave, par] of paresDistintos) {
+      conteudoPorPar.set(chave, await resolverConteudoDaBiblioteca(par.modeloId, par.versao))
+    }
+    const modelosDistintos = [...new Set([...paresDistintos.values()].map((p) => p.modeloId))]
+    const modelosInfo = modelosDistintos.length
+      ? await prisma.bibliotecaModeloTarefa.findMany({
+          where: { id: { in: modelosDistintos } },
+          select: { id: true, chave: true, nome: true, versaoPublicada: true, status: true },
+        })
+      : []
+    const modeloInfoPorId = new Map(modelosInfo.map((m) => [m.id, m]))
+
+    const workflowsComBiblioteca = workflows.map((wf) => ({
+      ...wf,
+      passos: wf.passos.map((p) => ({
+        ...p,
+        bibliotecaModeloInfo: p.bibliotecaModeloId != null ? (modeloInfoPorId.get(p.bibliotecaModeloId) ?? null) : null,
+        conteudoDaBiblioteca: (p.bibliotecaModeloId != null && p.bibliotecaModeloVersao != null)
+          ? (conteudoPorPar.get(`${p.bibliotecaModeloId}::${p.bibliotecaModeloVersao}`) ?? null)
+          : null,
+      })),
+    }))
+
     // Picker de phaseKey por Tipo — une as fases de todos os Workflow Macro do
     // Tipo (um por modalidade habilitada), sem repetir a mesma chave.
     const tiposProcesso = tipos.map((t) => {
@@ -67,7 +104,7 @@ export async function GET(request: NextRequest) {
       return { id: t.id, name: t.name, fases }
     })
 
-    return NextResponse.json({ tiposProcesso, workflows })
+    return NextResponse.json({ tiposProcesso, workflows: workflowsComBiblioteca })
   } catch (e) {
     console.error('GET workflows-fase', e)
     return NextResponse.json({ error: 'Erro ao carregar workflows das fases.' }, { status: 500 })
