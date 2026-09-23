@@ -32,6 +32,9 @@ import {
 import { planejarMaterializacao, cardinalidadeEfetiva, type ContextoEscopo, type AlvoDePasso } from "@/src/services/phase-workflow-escopo"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
+import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
+import type { PassoCongelado } from "@/src/services/versao-publicada"
+import { supersederPasso } from "@/src/services/task-step-sync"
 
 export type OrigemInstanciaStr = "MOTOR" | "MANUAL" | "MIGRACAO" | "REABERTURA"
 
@@ -817,21 +820,58 @@ export type ReconciliarInstanciaAtualMotivo =
   | "WORKFLOW_MUDOU_DE_IDENTIDADE"
   | "VERSAO_ANTIGA_NAO_CONGELADA"
   | "SEM_TRABALHO_NOVO"
-  | "PASSO_EM_ANDAMENTO_MUDOU"
+  | "CONFLITO_DADOS_EXISTENTES"
+
+/** UM conflito nomeado — o quê, em qual passo/subtarefa, e por quê não é seguro aplicar. */
+export interface ConflitoDeReconciliacao {
+  stepKey: string
+  subtaskKey?: string
+  campo: string
+  detalhe: string
+}
 
 export type ReconciliarInstanciaAtualResultado =
   | {
       success: true; aplicado: true; workflowInstanceId: number
       versaoAnterior: number; versaoNova: number; passosCriados: number
+      passosAtualizados: number; subtarefasRetiradas: number; prazosRecalculados: number
       stepInstances: PhaseWorkflowStepInstance[]; correlationId: string
     }
-  | { success: true; aplicado: false; motivo: ReconciliarInstanciaAtualMotivo; detalhe?: string; correlationId: string }
+  | { success: true; aplicado: false; motivo: "CONFLITO_DADOS_EXISTENTES"; conflitos: ConflitoDeReconciliacao[]; detalhe: string; correlationId: string }
+  | { success: true; aplicado: false; motivo: Exclude<ReconciliarInstanciaAtualMotivo, "CONFLITO_DADOS_EXISTENTES">; detalhe?: string; correlationId: string }
   | { success: false; code: FailureCode; errors: WorkflowValidationIssue[]; correlationId: string }
+
+/** Campos do passo congelado fora de `subtarefas`/`slaDays` — os dois têm regra própria (ver função principal). */
+function semSubtarefasNemSla(p: PassoCongelado): Omit<PassoCongelado, "subtarefas" | "slaDays"> {
+  const { subtarefas: _subtarefas, slaDays: _slaDays, ...resto } = p
+  return resto
+}
+
+interface MudancaDeSla {
+  stepInstanceId: number
+  stepKey: string
+  slaAntigo: number | null
+  slaNovo: number | null
+}
+
+interface PassoAlterado {
+  stepInstanceId: number
+  stepKey: string
+  depois: PassoCongelado
+}
+
+interface SubtarefaRetirada {
+  stepInstanceId: number
+  stepKey: string
+  subtaskKey: string
+}
 
 /**
  * APLICA UMA VERSÃO NOVA de Workflow Interno à instância JÁ ABERTA da fase ATUAL
  * de um processo em andamento — mandato "regra única de prazo" (23/09/2026),
- * item "mudança precisa valer para processos em andamento".
+ * item "mudança precisa valer para processos em andamento", ampliado em
+ * 23/09/2026 (item "complete a atualização automática") para tratar EDIÇÃO e
+ * REMOÇÃO, não só ADIÇÃO.
  *
  * NÃO usa o caminho de `instanciarWorkflowDaFase` para isso: a chave de
  * idempotência dele (`montarChaveWorkflow`) inclui `workflowVersion`, então
@@ -842,24 +882,52 @@ export type ReconciliarInstanciaAtualResultado =
  * 368-384). Esta função resolve a instância pela POSIÇÃO (processo × fase,
  * status aberto), não pela chave versionada.
  *
- * SÓ APLICA quando é seguro: nenhum passo JÁ MATERIALIZADO (em andamento, não
- * SUPERSEDIDO/CANCELADO) pode ter sua definição congelada alterada por baixo —
+ * ─── A TRAVA (por que existia) ───────────────────────────────────────────
  * `definicaoHistoricaDoPasso` resolve TODOS os passos de uma instância pelo
- * MESMO `workflowVersion` dela (par instância→versão, não passo→versão), então
- * trocar essa coluna depois que um passo já tem dado preenchido mudaria, sem o
- * operador perceber, o que aquele passo em andamento lê (ações, campos,
- * canais, checklist) — a mesma classe de risco que este módulo já documenta
- * para `politicaDeSla` em `versao-publicada.ts`. Quando a publicação alterou
- * um passo já materializado (não só acrescentou passo novo), a reconciliação
- * se recusa por inteiro e o motivo fica nomeado — nunca aplica pela metade.
+ * MESMO `workflowVersion` dela (par instância→versão, não passo→versão) —
+ * bumpar essa coluna muda, de uma vez, o que TODOS os passos daquela
+ * instância leem (ações, campos, canais, checklist, subtarefas). A versão
+ * anterior desta função por isso recusava a publicação inteira sempre que
+ * qualquer passo já materializado tinha mudado — mesmo quando a mudança era
+ * inofensiva (ninguém tinha tocado o que mudou).
  *
- * Quando é seguro (a versão nova só ACRESCENTA passos, nenhum já materializado
- * mudou): ancora a instância na versão nova e materializa só o que falta —
- * mesma dedup por identidade lógica que `materializarAlvos` já usa (status,
- * responsável, dados preenchidos, histórico e `Tarefa.dataPrazo` de tudo que já
- * existia continuam exatamente como estavam; só o passo novo nasce, e só ganha
- * Tarefa quem chama `garantirTarefaDePasso` depois — ver
- * `reconciliar-fase-macro.ts`).
+ * ─── A ATUALIZAÇÃO SEGURA (o que esta versão faz) ────────────────────────
+ * Em vez de recusar por inteiro, classifica CADA passo materializado (não
+ * SUPERSEDIDO/CANCELADO) e cada subtarefa dele, campo a campo:
+ *
+ *   • SLA (`slaDays`) muda → SEMPRE seguro. A Tarefa viva ancorada naquele
+ *     passo tem `dataPrazo` recalculado com o SLA novo a partir da MESMA
+ *     origem que gerou o prazo atual (`Tarefa.createdAt` — "a origem
+ *     original da contagem", nunca "agora"). Só recalcula se o valor atual
+ *     bater exatamente com o que o SLA antigo produziria a partir dessa
+ *     origem — divergindo (um ajuste manual, hoje sem UI própria, mas a
+ *     trava já existe para quando existir), vira conflito em vez de
+ *     sobrescrever silenciosamente.
+ *   • Outro conteúdo do passo (rótulo, descrição, prioridade, ações, campos,
+ *     canais, checklist, requisitos, regra de conclusão) muda → seguro
+ *     SOMENTE se o passo nunca teve execução real iniciada (`startedAt ==
+ *     null` E nenhuma Tarefa viva ancorada nele) — inofensivo, porque nada
+ *     foi preenchido sob a definição antiga ainda.
+ *   • Subtarefa NOVA (chave só existe na versão nova) → sempre segura,
+ *     aditiva.
+ *   • Subtarefa ALTERADA ou REMOVIDA → segura SOMENTE se não existe nenhuma
+ *     `SubtaskExecution` para aquela chave (nunca foi tocada). Removida e
+ *     segura: bumpar a versão já a tira da lista — o registro histórico
+ *     (se existisse) nunca é apagado, só a versão congelada nova deixa de
+ *     oferecê-la como pendência.
+ *   • Passo REMOVIDO por inteiro → seguro SOMENTE se nunca teve execução
+ *     real E nenhuma Tarefa viva está ancorada nele (não reflui trabalho
+ *     nem fecha Tarefa sozinho) — vira SUPERSEDIDO, preservando a linha.
+ *
+ * Qualquer mudança fora dessas regras — a definição mudou sob dado já
+ * preenchido, ação já executada, ou subtarefa já tocada — é um CONFLITO
+ * nomeado (passo/subtarefa + motivo). Existindo QUALQUER conflito, a
+ * reconciliação inteira deste PROCESSO se recusa — nunca aplica pela
+ * metade (a fase futura e outros processos não são afetados por isso: cada
+ * processo é avaliado e aplicado independentemente).
+ *
+ * Concluído/Dispensado nunca é tocado (não está em `chavesMaterializadas`,
+ * que já exclui esses via `materializarAlvos`/reancoragem — CLAUDE.md §10).
  */
 export async function reconciliarNovaVersaoNaInstanciaAtual(
   input: ReconciliarInstanciaAtualInput,
@@ -868,9 +936,10 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   const fail = (code: FailureCode, errors: WorkflowValidationIssue[] = []): ReconciliarInstanciaAtualResultado => ({
     success: false, code, errors, correlationId,
   })
-  const semTrabalho = (motivo: ReconciliarInstanciaAtualMotivo, detalhe?: string): ReconciliarInstanciaAtualResultado => ({
-    success: true, aplicado: false, motivo, detalhe, correlationId,
-  })
+  const semTrabalho = (
+    motivo: Exclude<ReconciliarInstanciaAtualMotivo, "CONFLITO_DADOS_EXISTENTES">,
+    detalhe?: string,
+  ): ReconciliarInstanciaAtualResultado => ({ success: true, aplicado: false, motivo, detalhe, correlationId })
 
   const instancia = await prisma.phaseWorkflowInstance.findFirst({
     where: { processoId: input.processoId, faseMacroKey: input.faseMacroKey, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
@@ -908,20 +977,119 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   const versaoNova = await lerVersaoPublicada(workflow.id, workflow.versao, prisma)
   if (!versaoAntiga || !versaoNova) return semTrabalho("VERSAO_ANTIGA_NAO_CONGELADA")
 
+  // CONCLUIDO/DISPENSADO ficam de fora — "mantenha concluídas concluídas"
+  // (CLAUDE.md §10) não é só "não sobrescrever": é nem AVALIAR essas linhas
+  // para conflito. Um passo terminal nunca vai ler a definição nova de novo
+  // sob este ciclo — reentrar na fase (novo ciclo) já herda o certo por
+  // conta própria (ver `materializarAlvos`, bloco REENTRADA).
   const materializados = await prisma.phaseWorkflowStepInstance.findMany({
-    where: { workflowInstanceId: instancia.id, ciclo: instancia.ciclo, status: { notIn: ["SUPERSEDIDO", "CANCELADO"] } },
-    select: { stepKey: true },
+    where: { workflowInstanceId: instancia.id, ciclo: instancia.ciclo, status: { notIn: ["SUPERSEDIDO", "CANCELADO", "CONCLUIDO", "DISPENSADO"] } },
+    select: { id: true, stepKey: true, startedAt: true },
   })
-  const chavesMaterializadas = new Set(materializados.map((m) => m.stepKey))
+  const materializadoPorChave = new Map(materializados.map((m) => [m.stepKey, m]))
 
-  for (const key of chavesMaterializadas) {
+  // TOCADAS — uma Tarefa viva (não concluída) ancorada no passo é sinal de
+  // trabalho em curso, mesmo quando `startedAt` ainda é nulo (a pessoa não
+  // clicou "iniciar", mas o passo já é o trabalho corrente da unidade).
+  const tarefasVivasPorPasso = await prisma.tarefa.findMany({
+    where: { workflowStepInstanceId: { in: materializados.map((m) => m.id) }, concluida: false },
+    select: { id: true, workflowStepInstanceId: true, createdAt: true, dataPrazo: true },
+  })
+  const tarefaViva = new Map(tarefasVivasPorPasso.map((t) => [t.workflowStepInstanceId as number, t]))
+
+  const subtarefasTocadas = await prisma.subtaskExecution.findMany({
+    where: { stepInstanceId: { in: materializados.map((m) => m.id) } },
+    select: { stepInstanceId: true, subtaskKey: true },
+    distinct: ["stepInstanceId", "subtaskKey"],
+  })
+  const subtarefaFoiTocada = new Set(subtarefasTocadas.map((s) => `${s.stepInstanceId}|${s.subtaskKey}`))
+
+  const conflitos: ConflitoDeReconciliacao[] = []
+  const slaMudancas: MudancaDeSla[] = []
+  const passosAlterados: PassoAlterado[] = []
+  const passosRemovidos: { stepInstanceId: number; stepKey: string }[] = []
+  const subtarefasRetiradas: SubtarefaRetirada[] = []
+
+  for (const [key, mat] of materializadoPorChave) {
     const antes = versaoAntiga.passos.find((p) => p.key === key)
     const depois = versaoNova.passos.find((p) => p.key === key)
-    if (antes && depois && JSON.stringify(antes) !== JSON.stringify(depois)) {
-      return semTrabalho(
-        "PASSO_EM_ANDAMENTO_MUDOU",
-        `O passo "${key}" já está materializado nesta fase e sua definição mudou na versão ${workflow.versao} — a reconciliação automática não altera passo em andamento. Publique novamente só acrescentando passo novo, ou aplique manualmente.`,
-      )
+    if (!antes) continue // nunca esteve na versão anterior — nada a comparar (defensivo)
+    // EXECUÇÃO REAL, não "tem Tarefa": todo passo DISPONÍVEL já nasce com
+    // Tarefa (é o desenho do motor — ver garantirTarefaDePasso), então "tem
+    // Tarefa viva" seria verdadeiro sempre e a distinção não protegeria
+    // nada. `startedAt` é o campo que o próprio schema reserva para "alguém
+    // de fato começou a executar" (task-step-sync, clique em "iniciar").
+    const execucaoRealIniciada = mat.startedAt != null
+    // Para REMOÇÃO do passo inteiro o risco é outro: mesmo sem "iniciar"
+    // formalmente, uma Tarefa viva ancorada nele é trabalho que a fila já
+    // aponta para alguém — removê-lo por baixo deixaria essa Tarefa órfã.
+    const temTarefaViva = tarefaViva.has(mat.id)
+
+    if (!depois) {
+      // PASSO REMOVIDO por inteiro.
+      if (execucaoRealIniciada || temTarefaViva) {
+        conflitos.push({ stepKey: key, campo: "passo", detalhe: `O passo "${key}" foi removido na versão ${workflow.versao}, mas já tem execução real (ou Tarefa viva ancorada) — a reconciliação automática não remove trabalho em curso.` })
+      } else {
+        passosRemovidos.push({ stepInstanceId: mat.id, stepKey: key })
+      }
+      continue
+    }
+
+    // SLA — sempre tratado à parte (nunca bloqueia por si só).
+    if (antes.slaDays !== depois.slaDays) {
+      slaMudancas.push({ stepInstanceId: mat.id, stepKey: key, slaAntigo: antes.slaDays, slaNovo: depois.slaDays })
+    }
+
+    // SUBTAREFAS — cada chave é avaliada por si.
+    const subAntes = new Map(antes.subtarefas.map((s) => [s.key, s]))
+    const subDepois = new Map(depois.subtarefas.map((s) => [s.key, s]))
+    for (const [sk, sAntes] of subAntes) {
+      const sDepois = subDepois.get(sk)
+      const tocadaAqui = subtarefaFoiTocada.has(`${mat.id}|${sk}`)
+      if (!sDepois) {
+        if (tocadaAqui) {
+          conflitos.push({ stepKey: key, subtaskKey: sk, campo: "subtarefa", detalhe: `A subtarefa "${sk}" do passo "${key}" foi removida na versão ${workflow.versao}, mas já tem execução registrada — não é retirada automaticamente.` })
+        } else {
+          subtarefasRetiradas.push({ stepInstanceId: mat.id, stepKey: key, subtaskKey: sk })
+        }
+      } else if (JSON.stringify(sAntes) !== JSON.stringify(sDepois) && tocadaAqui) {
+        conflitos.push({ stepKey: key, subtaskKey: sk, campo: "subtarefa", detalhe: `A subtarefa "${sk}" do passo "${key}" mudou de definição na versão ${workflow.versao}, mas já tem execução registrada — a reconciliação automática não altera subtarefa em andamento.` })
+      }
+    }
+
+    // RESTO DO PASSO (fora subtarefas/slaDays) — seguro só se ainda intocado.
+    if (JSON.stringify(semSubtarefasNemSla(antes)) !== JSON.stringify(semSubtarefasNemSla(depois))) {
+      if (execucaoRealIniciada) {
+        conflitos.push({ stepKey: key, campo: "definicao-do-passo", detalhe: `O passo "${key}" já está em execução e sua definição (fora o prazo) mudou na versão ${workflow.versao} — a reconciliação automática não altera passo em andamento.` })
+      } else {
+        passosAlterados.push({ stepInstanceId: mat.id, stepKey: key, depois })
+      }
+    }
+  }
+
+  // PRAZO — divergência da Tarefa viva contra o que o SLA ANTIGO devia
+  // produzir a partir da MESMA origem é tratada como ajuste que não se sabe
+  // explicar (hoje não há UI de edição manual de `Tarefa.dataPrazo`; esta
+  // trava existe para quando existir) — vira conflito, nunca sobrescreve.
+  for (const m of slaMudancas) {
+    const t = tarefaViva.get(m.stepInstanceId)
+    if (!t) continue // SLA mudou mas nenhuma Tarefa viva está ancorada neste passo agora — nada a recalcular
+    const prazoEsperadoComSlaAntigo = m.slaAntigo != null ? prazoOperacional(m.slaAntigo, t.createdAt) : null
+    const bate =
+      (t.dataPrazo == null && prazoEsperadoComSlaAntigo == null) ||
+      (t.dataPrazo != null && prazoEsperadoComSlaAntigo != null && Math.abs(t.dataPrazo.getTime() - prazoEsperadoComSlaAntigo.getTime()) < 1000)
+    if (!bate) {
+      conflitos.push({
+        stepKey: m.stepKey, campo: "prazo",
+        detalhe: `O SLA do passo "${m.stepKey}" mudou na versão ${workflow.versao}, mas o prazo atual da Tarefa (${t.dataPrazo?.toISOString() ?? "sem prazo"}) não bate com o que o SLA anterior calcularia — pode ser um ajuste que a reconciliação automática não reconhece, e por isso não sobrescreve.`,
+      })
+    }
+  }
+
+  if (conflitos.length > 0) {
+    return {
+      success: true, aplicado: false, motivo: "CONFLITO_DADOS_EXISTENTES", conflitos, correlationId,
+      detalhe: `A publicação da versão ${workflow.versao} não foi aplicada a este processo: ${conflitos.length} conflito(s) com dado já existente. ${conflitos.map((c) => c.detalhe).join(" ")}`,
     }
   }
 
@@ -930,7 +1098,10 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   const plano = planejarMaterializacao(steps, workflow.execucao, escopoDaFase, ctxEscopo)
   const instantiatedAt = new Date().toISOString()
 
-  const criados = await prisma.$transaction(async (tx) => {
+  const houveAlgumaMudanca =
+    passosAlterados.length > 0 || passosRemovidos.length > 0 || subtarefasRetiradas.length > 0 || slaMudancas.length > 0
+
+  const resultado = await prisma.$transaction(async (tx) => {
     const r = await materializarAlvos(
       tx,
       {
@@ -941,7 +1112,8 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
       },
       plano.alvos,
     )
-    if (r.criados.length === 0) return r.criados
+
+    if (r.criados.length === 0 && !houveAlgumaMudanca) return null
 
     await tx.phaseWorkflowInstance.update({
       where: { id: instancia.id },
@@ -954,10 +1126,71 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
         }) as Prisma.InputJsonValue,
       },
     })
-    return r.criados
+
+    // PASSO ALTERADO — aplica config nova nas colunas operacionais + no
+    // snapshot (o que `garantirTarefaDePasso` lê para Tarefa nova nesse
+    // passo). IDs, responsável, dados preenchidos e histórico: intocados —
+    // só os campos de CONFIGURAÇÃO mudam.
+    for (const alt of passosAlterados) {
+      const atual = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: alt.stepInstanceId }, select: { snapshot: true } })
+      const snapshotAtual = (atual?.snapshot as Record<string, unknown> | null) ?? {}
+      await tx.phaseWorkflowStepInstance.update({
+        where: { id: alt.stepInstanceId },
+        data: {
+          obrigatorio: alt.depois.required,
+          geraTarefa: alt.depois.createsTask,
+          prioridade: alt.depois.priority,
+          papel: alt.depois.owner,
+          snapshot: {
+            ...snapshotAtual,
+            titulo: alt.depois.label,
+            descricao: alt.depois.description,
+            prioridade: alt.depois.priority,
+            obrigatorio: alt.depois.required,
+            geraTarefa: alt.depois.createsTask,
+          } as Prisma.InputJsonValue,
+        },
+      })
+    }
+
+    // PASSO REMOVIDO (nunca tocado) — a transição em si NÃO é feita aqui: a
+    // máquina de passo único (`task-step-sync.ts`) é a dona exclusiva de
+    // `PhaseWorkflowStepInstance.status` (guard-maquina-passo-unica.test.ts).
+    // `supersederPasso` é chamado logo abaixo, DEPOIS desta transação —
+    // preserva a linha (nunca apaga) e não toca Tarefa (confirmado acima:
+    // nenhuma viva estava ancorada nele).
+
+    // PRAZO — recalcula a partir da MESMA origem (Tarefa.createdAt), nunca
+    // "agora". Já confirmado acima que o valor atual bate com o cálculo
+    // original, então isto nunca reinicia nem inventa um prazo diferente do
+    // que a régua já produziria.
+    let prazosRecalculados = 0
+    for (const m of slaMudancas) {
+      const t = tarefaViva.get(m.stepInstanceId)
+      if (!t) continue
+      const novoPrazo = m.slaNovo != null ? prazoOperacional(m.slaNovo, t.createdAt) : null
+      await tx.tarefa.update({ where: { id: t.id }, data: { dataPrazo: novoPrazo } })
+      await tx.phaseWorkflowStepInstance.update({ where: { id: m.stepInstanceId }, data: { slaDays: m.slaNovo } })
+      prazosRecalculados++
+    }
+
+    return { criados: r.criados, prazosRecalculados }
   }, { maxWait: 20_000, timeout: 30_000 })
 
-  if (criados.length === 0) return semTrabalho("SEM_TRABALHO_NOVO")
+  if (!resultado) return semTrabalho("SEM_TRABALHO_NOVO")
+
+  // AGORA, fora da transação: a única porta que move status de passo. Cada
+  // chamada é sua própria transação pequena (mesmo padrão de
+  // `garantirTarefaDePasso` logo depois desta função, em
+  // reconciliar-fase-macro.ts) — idempotente (superseder o que já está
+  // SUPERSEDIDO não muda nada) e sem Tarefa para sincronizar (confirmado
+  // antes: nenhuma estava ancorada nesses passos).
+  for (const rem of passosRemovidos) {
+    await supersederPasso(rem.stepInstanceId, {
+      origem: "MOTOR", correlationId,
+      causationId: input.causationId ?? `reconciliacao-fase-atual|${instancia.id}|v${workflow.versao}`,
+    })
+  }
 
   const stepInstances = await prisma.phaseWorkflowStepInstance.findMany({
     where: { workflowInstanceId: instancia.id }, orderBy: { ordem: "asc" },
@@ -965,7 +1198,9 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   return {
     success: true, aplicado: true, workflowInstanceId: instancia.id,
     versaoAnterior: instancia.workflowVersion, versaoNova: workflow.versao,
-    passosCriados: criados.length, stepInstances, correlationId,
+    passosCriados: resultado.criados.length, passosAtualizados: passosAlterados.length + passosRemovidos.length,
+    subtarefasRetiradas: subtarefasRetiradas.length, prazosRecalculados: resultado.prazosRecalculados,
+    stepInstances, correlationId,
   }
 }
 

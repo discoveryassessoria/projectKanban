@@ -645,8 +645,10 @@ export async function processarReconciliacaoWorkflowInternoFaseAtual(
       entidadeId: payload.processoId,
       descricao: r.success
         ? (r.aplicado
-          ? `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} (anterior: ${payload.versaoAnterior}) — aplicado à instância em andamento: ${r.passosCriados} passo(s) novo(s), ${tarefasCriadas} tarefa(s) nova(s). Nada preexistente foi alterado.`
-          : `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} — não aplicado (${r.motivo}${r.detalhe ? `: ${r.detalhe}` : ""}).`)
+          ? `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} (anterior: ${payload.versaoAnterior}) — aplicado à instância em andamento: ${r.passosCriados} passo(s) novo(s), ${tarefasCriadas} tarefa(s) nova(s), ${r.passosAtualizados} passo(s) atualizado(s)/retirado(s), ${r.subtarefasRetiradas} subtarefa(s) retirada(s), ${r.prazosRecalculados} prazo(s) recalculado(s). IDs, responsáveis, dados preenchidos e histórico preservados.`
+          : r.motivo === "CONFLITO_DADOS_EXISTENTES"
+            ? `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} — NÃO aplicado a este processo por conflito com dado já existente: ${r.conflitos.map((c) => `[${c.stepKey}${c.subtaskKey ? `/${c.subtaskKey}` : ""}] ${c.detalhe}`).join(" | ")}`
+            : `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} — não aplicado (${r.motivo}${r.detalhe ? `: ${r.detalhe}` : ""}).`)
         : `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} — reconciliação recusada (${r.code}).`,
       detalhes: { payload, resultado: r } as unknown as Prisma.InputJsonValue,
       usuarioId: payload.publicadoPorId,
