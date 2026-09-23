@@ -642,9 +642,11 @@ function SubtarefaRow({
               )}
               {/* REGRA TEMPORAL (dimensão C) e ACOMPANHAMENTO (dimensão D) desta
                   espera — dois relógios PRÓPRIOS, nunca o prazo oficial da
-                  Tarefa nem o "Prazo do passo" (SLA de ação interna) acima.
-                  Só aparecem quando o cadastro os liga (mandato "correção
-                  definitiva do modelo temporal", 19-20/09/2026, seção 6). */}
+                  Tarefa nem o "Prazo do passo" (dimensão B, motor de
+                  documento-operacao.ts — preservado, dimensão separada, nunca
+                  sobreposto por estes). Só aparecem quando o cadastro os liga
+                  (mandato "correção definitiva do modelo temporal",
+                  19-20/09/2026, seção 6). */}
               {esperandoTerceiro && (s.execucao?.previstoPara || s.execucao?.proximoAcompanhamentoEm) && (
                 <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
                   {s.execucao?.previstoPara && (

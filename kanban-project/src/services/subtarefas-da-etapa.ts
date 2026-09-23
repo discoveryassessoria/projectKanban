@@ -37,10 +37,11 @@ export interface RelogioDeEsperaExterna {
 /**
  * O RELÓGIO DE UMA ESPERA EXTERNA — os DOIS relógios da espera, cada um só
  * quando o cadastro liga o respectivo interruptor. Nenhum dos dois é
- * `Tarefa.dataPrazo` (prazo oficial, intocado), nenhum reaproveita `slaDays`
- * (SLA de ação interna). Uma subtarefa pode ter só acompanhamento, só regra
- * temporal, os dois, ou nenhum — os quatro casos são legítimos e a função
- * nunca inventa o que o cadastro não configurou.
+ * `Tarefa.dataPrazo` (prazo oficial, único e final — decisão definitiva,
+ * 23/09/2026: a subtarefa não tem prazo próprio nenhum, nem "de ação
+ * interna"). Uma subtarefa pode ter só acompanhamento, só regra temporal, os
+ * dois, ou nenhum — os quatro casos são legítimos e a função nunca inventa o
+ * que o cadastro não configurou.
  *
  * `dataGatilhoRegraTemporal` já vem resolvida por quem chama (o gatilho é
  * genérico — "conclusão da subtarefa X" ou a própria liberação desta — a

@@ -97,8 +97,13 @@ async function main() {
 
   console.log("\n3) SELECIONAR A TAREFA DA BIBLIOTECA — PUT com bibliotecaModeloId, sem conteúdo próprio")
   const { PUT: putWorkflow, GET: getWorkflow, POST: postPublicar } = await import("../src/app/api/gerenciamento/workflows-fase/[id]/route")
+  // ESCOPO (cardinalidade) É DECISÃO DO VÍNCULO (mandato "separação
+  // Biblioteca × Workflow Interno", 23/09/2026, item 2) — o Modelo não
+  // declara escopo próprio; esta fase decide "por documento" aqui, na
+  // própria seleção, e outra fase que selecionasse o MESMO Modelo poderia
+  // decidir diferente.
   const rSelecionar = await chamar(putWorkflow, "PUT", `/api/gerenciamento/workflows-fase/${workflowId}`, token, {
-    steps: [{ key: modeloPublicado.chave, label: modeloPublicado.nome, ordem: 1, createsTask: true, required: true, bibliotecaModeloId: criado.modeloId, bibliotecaModeloVersao: modeloPublicado.versaoPublicada }],
+    steps: [{ key: modeloPublicado.chave, label: modeloPublicado.nome, ordem: 1, createsTask: true, required: true, cardinalidade: "DOCUMENTO", bibliotecaModeloId: criado.modeloId, bibliotecaModeloVersao: modeloPublicado.versaoPublicada }],
   }, { id: String(workflowId) })
   const jSelecionar = await rSelecionar.json()
   check("3.1) PUT aceito (não recusado por SUBTAREFA_SEM_ACAO/EFEITO_FORA_DE_COMPETENCIA — a fase sintética declara COMPLETE_STEP)", rSelecionar.status === 200, jSelecionar)
@@ -106,9 +111,16 @@ async function main() {
 
   const passoSelecionado = jSelecionar.workflow.passos[0]
   check("3.2) passo tem bibliotecaModeloId/Versao gravados", passoSelecionado.bibliotecaModeloId === criado.modeloId && passoSelecionado.bibliotecaModeloVersao === modeloPublicado.versaoPublicada)
+  check("3.2b) escopo (cardinalidade) do VÍNCULO gravado no passo da fase — não no Modelo", passoSelecionado.cardinalidade === "DOCUMENTO", passoSelecionado.cardinalidade)
   const acoesNoPasso = await prisma.stepAction.count({ where: { stepId: passoSelecionado.id } })
   const subsNoPasso = await prisma.stepSubtaskDefinition.count({ where: { stepId: passoSelecionado.id } })
   check("3.3) o passo da FASE não tem nenhuma ação/subtarefa própria gravada (zero cópia editável)", acoesNoPasso === 0 && subsNoPasso === 0, { acoesNoPasso, subsNoPasso })
+
+  // O MODELO EM SI nunca grava escopo — mesmo tendo sido selecionado com
+  // escopo "por documento" nesta fase, o passo original da Biblioteca
+  // continua sem cardinalidade própria.
+  const passoDoModelo = await prisma.phaseInternalWorkflowStep.findFirst({ where: { workflowId: criado.workflowId } })
+  check("3.2c) o passo do MODELO na Biblioteca continua sem cardinalidade própria (escopo é só do vínculo)", passoDoModelo?.cardinalidade == null, passoDoModelo?.cardinalidade)
 
   console.log("\n4) LEITURA (GET) — conteúdo EFETIVO resolvido, nunca vazio")
   const rGet = await chamar(getWorkflow, "GET", `/api/gerenciamento/workflows-fase/${workflowId}`, token, undefined, { id: String(workflowId) })
@@ -157,6 +169,13 @@ async function main() {
     resolvido.steps[0]?.slaDays === 5, resolvido.steps[0])
   check("7.3) resolverWorkflowAplicavel devolve o label REAL do Modelo ('Solicitar certidão'), não a coluna crua da seleção",
     resolvido.steps[0]?.label === "Solicitar certidão", resolvido.steps[0]?.label)
+
+  console.log("\n7b) PRESERVA VÍNCULOS EXISTENTES — regravar o mesmo vínculo sem mudar o escopo não o reseta")
+  const rRegravar = await chamar(putWorkflow, "PUT", `/api/gerenciamento/workflows-fase/${workflowId}`, token, {
+    steps: [{ key: modeloPublicado.chave, label: modeloPublicado.nome, ordem: 1, createsTask: true, required: true, cardinalidade: "DOCUMENTO", bibliotecaModeloId: criado.modeloId, bibliotecaModeloVersao: modeloPublicado.versaoPublicada }],
+  }, { id: String(workflowId) })
+  const jRegravar = await rRegravar.json()
+  check("7b.1) escopo do vínculo preservado (DOCUMENTO) após regravar", rRegravar.status === 200 && jRegravar.workflow.passos[0]?.cardinalidade === "DOCUMENTO", jRegravar.workflow?.passos?.[0]?.cardinalidade)
 
   console.log("\n8) REMOVER O PASSO — mecanismo genérico continua funcionando")
   const rRemover = await chamar(putWorkflow, "PUT", `/api/gerenciamento/workflows-fase/${workflowId}`, token, { steps: [] }, { id: String(workflowId) })

@@ -196,9 +196,15 @@ export default function ConfiguracaoDoPassoModal({
   const requisitosSimples = (f.requisitos ?? []).filter((r) => r.tipo !== "EVIDENCIA_ANEXADA")
   const evidencias = (f.requisitos ?? []).filter((r) => r.tipo === "EVIDENCIA_ANEXADA")
   const plural = (n: number, um: string, muitos: string) => `${n} ${n === 1 ? um : muitos}`
+  // MODELO DA BIBLIOTECA (mandato "separação Biblioteca × Workflow Interno",
+  // 23/09/2026): o escopo (cardinalidade) é decisão do VÍNCULO — cada fase que
+  // seleciona este modelo decide quantas unidades ele gera ali. O modelo em
+  // si nunca declara escopo próprio, então nem o campo nem o resumo entram
+  // aqui quando `phaseKey === "biblioteca"`.
+  const ehBiblioteca = phaseKey === "biblioteca"
   const RESUMO: Record<AreaDoPasso, string> = {
     geral: [f.required ? "obrigatório" : "opcional",
-      (CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.label ?? "").toLowerCase(),
+      ehBiblioteca ? "" : (CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.label ?? "").toLowerCase(),
       (f.slaDays ?? 0) > 0 ? `prazo ${f.slaDays}d` : "sem prazo"].filter(Boolean).join(" · "),
     execucao: [plural(subs.length, "subtarefa", "subtarefas"),
       plural(f.campos?.length ?? 0, "campo", "campos"),
@@ -244,7 +250,7 @@ export default function ConfiguracaoDoPassoModal({
           </div>
           <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
             As alterações ficam em rascunho e <b>não afetam processos em andamento</b>. Elas passam a valer quando
-            você publicar, na tela do workflow.
+            {ehBiblioteca ? " você publicar este modelo, aqui na Biblioteca de Tarefas." : " você publicar, na tela do workflow."}
           </p>
         </div>
 
@@ -293,17 +299,25 @@ export default function ConfiguracaoDoPassoModal({
                 <label className={lbl}>Descrição</label>
                 <input className={inp} value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} />
               </div>
-              <div>
-                <label className={lbl}>Onde este passo se aplica</label>
-                <select className={inp} value={f.cardinalidade ?? ""} onChange={(e) => set("cardinalidade", e.target.value || null)}>
-                  {CARDINALIDADES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-                </select>
-                {/* A ENUM NÃO MUDA — o que faltava era dizer o que cada valor PRODUZ.
-                    "PESSOA" não informa nada a quem configura. */}
-                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                  {CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.ajuda}
-                </p>
-              </div>
+              {/* ESCOPO (cardinalidade) — mandato "separação Biblioteca × Workflow
+                  Interno", 23/09/2026: o modelo da Biblioteca não declara onde se
+                  aplica. Quem decide é o VÍNCULO, na fase que o seleciona (tela do
+                  Workflow Interno › "Resumo" da tarefa da Biblioteca) — a mesma
+                  tarefa pode ter escopo diferente em fases diferentes. Fora da
+                  Biblioteca, o campo continua aqui, sem mudança. */}
+              {!ehBiblioteca && (
+                <div>
+                  <label className={lbl}>Onde este passo se aplica</label>
+                  <select className={inp} value={f.cardinalidade ?? ""} onChange={(e) => set("cardinalidade", e.target.value || null)}>
+                    {CARDINALIDADES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                  {/* A ENUM NÃO MUDA — o que faltava era dizer o que cada valor PRODUZ.
+                      "PESSOA" não informa nada a quem configura. */}
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                    {CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.ajuda}
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={lbl}>Prioridade</label>
@@ -315,7 +329,7 @@ export default function ConfiguracaoDoPassoModal({
                   {/* O RÓTULO DIZIA "Peso / SLA (dias)" e inventava um segundo conceito:
                       o modelo tem UM atributo, `slaDays`, que é prazo. Não existe
                       `weight`. Corrigido o rótulo, sem tocar no dado. */}
-                  <label className={lbl}>Prazo interno (dias úteis)</label>
+                  <label className={lbl}>{ehBiblioteca ? "Prazo da tarefa (dias úteis)" : "Prazo interno (dias úteis)"}</label>
                   {/* A FASE NÃO TEM PRAZO PRÓPRIO. Este é o ÚNICO prazo final da
                       tarefa — a fase só organiza e exibe. Zero/vazio não é "herda
                       da fase": é "esta tarefa não tem prazo definido". */}
@@ -485,7 +499,7 @@ export default function ConfiguracaoDoPassoModal({
                               <div className={card}>
                                 <label className={lbl}>Controle temporal da espera</label>
                                 <p className="mb-3 text-[11px] text-[var(--text-muted)]">
-                                  Dois relógios independentes desta espera — nenhum dos dois é o prazo oficial da Tarefa, nem o SLA de ação interna acima. Uma subtarefa pode ter nenhum, um ou os dois.
+                                  Dois relógios independentes desta espera — nenhum dos dois é o prazo oficial da Tarefa. Servem para acompanhar ou estimar a resposta do terceiro, nunca para criar ou somar um segundo vencimento. Uma subtarefa pode ter nenhum, um ou os dois.
                                 </p>
 
                                 <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
@@ -872,7 +886,7 @@ export default function ConfiguracaoDoPassoModal({
             {erroAoSalvar
               ? <span className="text-red-700">{erroAoSalvar}</span>
               : sujo
-                ? <span className="text-[var(--text-secondary)]">Salvar guarda o rascunho. Publicar é um passo à parte, na tela do workflow.</span>
+                ? <span className="text-[var(--text-secondary)]">Salvar guarda o rascunho. Publicar é um passo à parte, {ehBiblioteca ? "aqui na Biblioteca de Tarefas." : "na tela do workflow."}</span>
                 : <span className="text-[var(--text-muted)]">Sem alterações pendentes.</span>}
           </div>
           <div className="flex flex-none gap-2">

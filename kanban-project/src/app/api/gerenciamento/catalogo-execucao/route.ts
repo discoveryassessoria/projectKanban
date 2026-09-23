@@ -14,8 +14,16 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
   const phaseKey = request.nextUrl.searchParams.get('phaseKey')
 
+  // MODELO DA BIBLIOTECA (mesmo desvio de `validarWorkflowParaPublicar` —
+  // `pularCompetenciaDeEfeito`, ver o comentário lá): phaseKey="biblioteca" é
+  // a "casca" do Modelo, que nunca tem `CatalogoFase` correspondente por
+  // desenho. Sem este desvio, `efeitosDaFase` devolveria `[]` ("ausência não
+  // autoriza") e a tela marcaria TODO efeito — inclusive "Concluir a etapa"
+  // das subtarefas — como indisponível, mesmo sendo uma ação válida do
+  // Modelo. A competência real só se aplica quando o Modelo está vinculado a
+  // uma fase de verdade (validada na publicação daquele Workflow).
   let permitidos: string[] | null = null
-  if (phaseKey) {
+  if (phaseKey && phaseKey !== 'biblioteca') {
     const fase = await prisma.catalogoFase.findUnique({ where: { phaseKey }, select: { efeitosPermitidos: true } })
     permitidos = efeitosDaFase(phaseKey, fase?.efeitosPermitidos ?? null)
   }

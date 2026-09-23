@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import ConfiguracaoDoPassoModal, { type PassoConfiguravel } from "./ConfiguracaoDoPassoModal"
 import PublicarWorkflowModal from "./PublicarWorkflowModal"
+import { CARDINALIDADES } from "./tiposDoCadastroDoPasso"
 
 // Rótulo da CARDINALIDADE do passo (quantas instâncias, presas a qual entidade).
 // Nada a ver com "global (compartilhado)", que é o compartilhamento do WORKFLOW.
@@ -625,9 +626,9 @@ export default function PhaseWorkflowsFasesTab() {
         <ResumoDaTarefaDaBiblioteca
           wf={resumoStep.wf} step={resumoStep.step}
           onFechar={() => setResumoStep(null)}
-          onSalvarDependencia={async (dependeDe) => {
+          onSalvarVinculo={async (dependeDe, cardinalidade) => {
             const wf = resumoStep.wf
-            const steps = wf.passos.map((s) => (s.key === resumoStep.step.key ? { ...s, dependeDe } : s))
+            const steps = wf.passos.map((s) => (s.key === resumoStep.step.key ? { ...s, dependeDe, cardinalidade } : s))
             await putSteps(wf, steps)
             setResumoStep(null)
           }}
@@ -646,14 +647,21 @@ export default function PhaseWorkflowsFasesTab() {
  * mantém (mandato "separação Biblioteca × Workflow Interno", 22/09/2026).
  */
 function ResumoDaTarefaDaBiblioteca({
-  wf, step, onFechar, onSalvarDependencia,
+  wf, step, onFechar, onSalvarVinculo,
 }: {
   wf: Workflow
   step: Step
   onFechar: () => void
-  onSalvarDependencia: (dependeDe: string[]) => Promise<void>
+  onSalvarVinculo: (dependeDe: string[], cardinalidade: string | null) => Promise<void>
 }) {
   const [dependeDe, setDependeDe] = useState<string[]>(step.dependeDe ?? [])
+  // ESCOPO DO VÍNCULO (mandato "separação Biblioteca × Workflow Interno",
+  // 23/09/2026) — o modelo da Biblioteca não declara onde se aplica; cada
+  // fase que o seleciona decide isso aqui, na própria seleção. Persistido em
+  // `PhaseInternalWorkflowStep.cardinalidade`, o mesmo campo dos passos
+  // autorados localmente — só que agora só editável no vínculo, nunca no
+  // modelo. Vínculos existentes preservam o valor que já tinham.
+  const [cardinalidade, setCardinalidade] = useState<string>(step.cardinalidade ?? "")
   const [salvando, setSalvando] = useState(false)
   const irmaos = wf.passos.filter((s) => s.key !== step.key)
   const c = step.conteudoDaBiblioteca
@@ -683,6 +691,16 @@ function ResumoDaTarefaDaBiblioteca({
               )}
           </div>
           <div>
+            <div className={labelCls}>Onde esta tarefa se aplica nesta fase</div>
+            <select className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none focus:border-[var(--border-default)]"
+              value={cardinalidade} onChange={(e) => setCardinalidade(e.target.value)}>
+              {CARDINALIDADES.map((opt) => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
+            </select>
+            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+              {CARDINALIDADES.find((opt) => opt.key === cardinalidade)?.ajuda}
+            </p>
+          </div>
+          <div>
             <div className={labelCls}>Depende de (nesta fase)</div>
             {irmaos.length === 0
               ? <div className="text-xs text-[var(--text-muted)]">esta fase não tem outro passo ainda</div>
@@ -703,9 +721,9 @@ function ResumoDaTarefaDaBiblioteca({
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
           <button onClick={onFechar} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Fechar</button>
-          <button disabled={salvando} onClick={async () => { setSalvando(true); await onSalvarDependencia(dependeDe); setSalvando(false) }}
+          <button disabled={salvando} onClick={async () => { setSalvando(true); await onSalvarVinculo(dependeDe, cardinalidade || null); setSalvando(false) }}
             className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
-            Salvar dependência
+            Salvar vínculo
           </button>
         </div>
       </div>

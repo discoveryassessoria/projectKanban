@@ -306,9 +306,10 @@ export function buildFilhos(s: any, stepId: number) {
       esperaExternaAoLiberar: t?.esperaExternaAoLiberar === true,
       // CONTROLE TEMPORAL DA ESPERA — dois relógios independentes
       // (mandato "correção definitiva do modelo temporal", 19-20/09/2026).
-      // NUNCA reaproveita `slaDays` (SLA de ação interna, acima) nem o
-      // prazo oficial da Tarefa — campos próprios, cada um só grava quando
-      // o respectivo interruptor está ligado.
+      // A subtarefa não tem prazo próprio (decisão definitiva, 23/09/2026) —
+      // estes campos são acompanhamento/regra temporal do terceiro, nunca o
+      // prazo oficial da Tarefa. Campos próprios, cada um só grava quando o
+      // respectivo interruptor está ligado.
       acompanhamentoAtivo: t?.acompanhamentoAtivo === true,
       acompanhamentoPrimeiroDias: t?.acompanhamentoAtivo === true && Number(t?.acompanhamentoPrimeiroDias) > 0
         ? Number(t.acompanhamentoPrimeiroDias) : null,
@@ -473,7 +474,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         // Deixar para a publicação faria o administrador descobrir três ajustes depois
         // que o primeiro estava errado. `$transaction` desfaz tudo — um rascunho
         // inválido não fica guardado parecendo bom.
-        const problemas = await validarWorkflowParaPublicar(id, tx)
+        // MODELO DA BIBLIOTECA (mesma régua de `publicarModelo`/`validarWorkflowParaPublicar`
+        // — ver o comentário lá): a "casca" nasce com phaseKey="biblioteca", que nunca
+        // tem `CatalogoFase` correspondente, então SEM este desvio toda ação cadastrada
+        // aqui seria "fora de competência" mesmo salvando um rascunho correto. A
+        // competência real só se aplica quando o Modelo está vinculado a uma fase de
+        // verdade, e essa validação acontece na publicação do Workflow daquela fase.
+        const problemas = await validarWorkflowParaPublicar(id, tx, { pularCompetenciaDeEfeito: atual.origemBiblioteca })
         if (problemas.length) {
           throw Object.assign(new Error('PUBLICACAO_INVALIDA'), { problemas })
         }
@@ -574,7 +581,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!Number.isFinite(id)) return NextResponse.json({ error: 'Workflow inválido.' }, { status: 400 })
 
   if (request.nextUrl.searchParams.get('preview') === '1') {
-    const preview = await preverPublicacao(id)
+    // MODELO DA BIBLIOTECA — mesmo desvio do PUT acima: a "casca" (phaseKey=
+    // "biblioteca") nunca tem competência de fase real para pedir.
+    const casca = await prisma.phaseInternalWorkflow.findUnique({ where: { id }, select: { origemBiblioteca: true } })
+    const preview = await preverPublicacao(id, { pularCompetenciaDeEfeito: casca?.origemBiblioteca })
     if (!preview) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
     return NextResponse.json({ preview })
   }
