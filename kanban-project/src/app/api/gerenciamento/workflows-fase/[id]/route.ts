@@ -157,8 +157,18 @@ export function buildSteps(raw: any[], workflowId: number) {
       // `bibliotecaModeloId` é ignorado por `buildFilhos` — quem decide o
       // conteúdo efetivo é a leitura (retratarPassos/validarWorkflowParaPublicar),
       // nunca o que a tela mandou gravar aqui.
-      bibliotecaModeloId: Number.isFinite(Number(s?.bibliotecaModeloId)) ? Number(s.bibliotecaModeloId) : null,
-      bibliotecaModeloVersao: Number.isFinite(Number(s?.bibliotecaModeloVersao)) ? Number(s.bibliotecaModeloVersao) : null,
+      //
+      // ACHADO REAL (23/09/2026): `Number.isFinite(Number(s?.bibliotecaModeloId))`
+      // quebrava exatamente para o caso mais comum — `null` explícito, o valor
+      // que o GET sempre devolve para o passo da PRÓPRIA Biblioteca (que nunca
+      // seleciona outro Modelo). `Number(null)` é `0`, e `Number.isFinite(0)` é
+      // `true` — então `bibliotecaModeloId` virava `0` em vez de `null`, e
+      // `0` não é nenhum `BibliotecaModeloTarefa.id` real: todo SALVAR de um
+      // Modelo da Biblioteca (reenviando o passo tal como o GET devolveu, o
+      // que a tela sempre faz) quebrava com violação de FK — 500, silêncio na
+      // tela, e a publicação nunca via alteração nenhuma porque nada persistiu.
+      bibliotecaModeloId: s?.bibliotecaModeloId != null && Number.isFinite(Number(s.bibliotecaModeloId)) ? Number(s.bibliotecaModeloId) : null,
+      bibliotecaModeloVersao: s?.bibliotecaModeloVersao != null && Number.isFinite(Number(s.bibliotecaModeloVersao)) ? Number(s.bibliotecaModeloVersao) : null,
     }
   })
 }

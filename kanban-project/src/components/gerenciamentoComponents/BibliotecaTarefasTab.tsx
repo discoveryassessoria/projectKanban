@@ -263,8 +263,14 @@ export default function BibliotecaTarefasTab() {
           Nenhum modelo cadastrado ainda.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-[var(--border-default)]">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-xl border border-[var(--border-default)]">
+          {/* `overflow-x-auto` aqui, nunca `overflow-hidden` — a coluna de
+              ações (4 botões) é mais larga do que o espaço restante. Sem
+              rolagem própria, os botões da direita ficavam cortados/
+              invisíveis em vez de aparecerem numa barra de rolagem do
+              PRÓPRIO bloco (nunca a janela inteira — ver
+              faixa-de-topo-nao-recorta). */}
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-white/5 text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
               <tr>
                 <th className="px-4 py-2">Modelo</th>
@@ -304,15 +310,15 @@ export default function BibliotecaTarefasTab() {
                         </div>
                       )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="whitespace-nowrap px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <button className={btnSecondary} disabled={busy} onClick={() => abrirEditor(m)}>Editar conteúdo</button>
-                      <button className={btnSecondary} disabled={busy || m.status === "INATIVO"} onClick={() => abrirPublicar(m)}>Publicar</button>
-                      <button className={btnSecondary} disabled={busy}
+                      <button className={`${btnSecondary} flex-none`} disabled={busy} onClick={() => abrirEditor(m)}>Editar conteúdo</button>
+                      <button className={`${btnSecondary} flex-none`} disabled={busy || m.status === "INATIVO"} onClick={() => abrirPublicar(m)}>Publicar</button>
+                      <button className={`${btnSecondary} flex-none`} disabled={busy}
                         onClick={() => { setDuplicandoDe(m); setDupNome(`${m.nome} (cópia)`); setDupChave(`${m.chave}_copia`) }}>
                         Duplicar
                       </button>
-                      <button className={btnSecondary} disabled={busy} onClick={() => alternarAtivo(m)}>
+                      <button className={`${btnSecondary} flex-none`} disabled={busy} onClick={() => alternarAtivo(m)}>
                         {m.status === "INATIVO" ? "Reativar" : "Inativar"}
                       </button>
                     </div>

@@ -415,18 +415,29 @@ export default function ConfiguracaoDoPassoModal({
 
               {subs.map((st, i) => (
                 <div key={i} className={card}>
-                  <div className="grid grid-cols-[1fr_auto_auto] items-end gap-2">
-                    <div>
+                  <div className="flex items-end gap-2">
+                    <div className="min-w-0 flex-1">
                       <label className={lbl}>Nome da subtarefa</label>
                       <input className={inp} value={st.label}
                         onChange={(e) => setSub(i, { label: e.target.value, key: st.key ?? chaveDe(e.target.value) })} />
                     </div>
                     <button onClick={() => setSubAberta(subAberta === i ? null : i)}
-                      className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">
+                      className="flex-none rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">
                       {subAberta === i ? "Fechar" : "Configurar"}
                     </button>
+                    {/* SALVAR AQUI, sem precisar rolar até o rodapé — mesma ação do
+                        "Salvar rascunho" do modal inteiro (cada campo da subtarefa já
+                        grava no estado do passo a cada mudança, via `setSub`; este
+                        botão só dá o acesso direto ao "Salvar", pedido explícito
+                        depois de editar uma subtarefa longe do rodapé fixo). */}
+                    {subAberta === i && (
+                      <button onClick={salvar} disabled={salvando}
+                        className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
+                        {salvando ? "Salvando…" : "Salvar"}
+                      </button>
+                    )}
                     <button onClick={() => setF((x) => ({ ...x, subtarefas: (x.subtarefas ?? []).filter((_, j) => j !== i) }))}
-                      className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
+                      className="flex-none rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                     <code className="text-[var(--text-muted)]">{st.key ?? chaveDe(st.label)}</code>
