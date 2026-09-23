@@ -78,7 +78,7 @@ async function main() {
   if (!criado.ok) throw new Error("aborta — modelo não criado")
 
   const passoVivo = await prisma.phaseInternalWorkflowStep.findFirstOrThrow({ where: { workflowId: criado.workflowId } })
-  await prisma.phaseInternalWorkflowStep.update({ where: { id: passoVivo.id }, data: { label: "Solicitar certidão", regraDeConclusao: "TODAS_SUBTAREFAS_OBRIGATORIAS" } })
+  await prisma.phaseInternalWorkflowStep.update({ where: { id: passoVivo.id }, data: { label: "Solicitar certidão", slaDays: 5, regraDeConclusao: "TODAS_SUBTAREFAS_OBRIGATORIAS" } })
   const subs = await Promise.all(["enviar_requerimento_cartorio", "receber_confirmacao_pedido", "receber_certidao", "conferir_validar_certidao"].map((key, i) =>
     prisma.stepSubtaskDefinition.create({ data: { stepId: passoVivo.id, key, label: key, ordem: i, obrigatoria: true } })))
   for (const s of subs) await prisma.stepAction.create({ data: { stepId: passoVivo.id, subtaskId: s.id, key: "concluir", label: "Concluir", effectKey: "COMPLETE_STEP", ordem: 0 } })
@@ -136,9 +136,31 @@ async function main() {
   const modeloNaLista = jModelos.modelos.find((m: any) => m.id === criado.modeloId)
   check("6.1) modelo aparece com usadoEm contendo esta fase", modeloNaLista?.usadoEm?.some((u: any) => u.phaseKey === PHASE_KEY), modeloNaLista?.usadoEm)
 
-  console.log("\n7) REMOVER O PASSO — mecanismo genérico continua funcionando")
+  console.log("\n7) MATERIALIZAÇÃO SEM RASCUNHO PENDENTE — lê o Modelo, não a coluna crua do passo")
+  // Achado real (23/09/2026, produção): sem rascunho pendente NO WORKFLOW
+  // (o caminho comum — aqui, publicado no passo 5), `resolverWorkflowAplicavel`
+  // materializava com as colunas cruas do passo da FASE (slaDays=0, nunca
+  // sincronizadas após a seleção) em vez do conteúdo do Modelo (slaDays=5).
+  // `ancorarNaVersaoPublicada` só substituía quando havia rascunho — este é
+  // o caminho SEM rascunho, o que a maioria das materializações usa.
+  const { resolverWorkflowAplicavel } = await import("../src/services/phase-workflow")
+  const wfSemRascunho = await prisma.phaseInternalWorkflow.findUniqueOrThrow({ where: { id: workflowId }, select: { rascunhoAlteradoEm: true } })
+  check("7.0) sem rascunho pendente (o caminho comum de materialização)", wfSemRascunho.rascunhoAlteradoEm == null)
+  const rawStepDaFase = await prisma.phaseInternalWorkflowStep.findUniqueOrThrow({ where: { id: passoSelecionado.id }, select: { slaDays: true, label: true } })
+  const resolvido = await resolverWorkflowAplicavel(null, PHASE_KEY)
+  if ("erro" in resolvido) throw new Error(`resolverWorkflowAplicavel falhou: ${JSON.stringify(resolvido)}`)
+  check("7.1) a coluna crua do passo da FASE está desatualizada (nunca sincronizada após seleção) — slaDays!=5",
+    rawStepDaFase.slaDays !== 5, rawStepDaFase)
+  check("7.1b) a coluna crua do passo da FASE tem o label gravado na SELEÇÃO, não o do Modelo",
+    rawStepDaFase.label !== "Solicitar certidão", rawStepDaFase.label)
+  check("7.2) resolverWorkflowAplicavel devolve o slaDays REAL do Modelo (5), não a coluna crua",
+    resolvido.steps[0]?.slaDays === 5, resolvido.steps[0])
+  check("7.3) resolverWorkflowAplicavel devolve o label REAL do Modelo ('Solicitar certidão'), não a coluna crua da seleção",
+    resolvido.steps[0]?.label === "Solicitar certidão", resolvido.steps[0]?.label)
+
+  console.log("\n8) REMOVER O PASSO — mecanismo genérico continua funcionando")
   const rRemover = await chamar(putWorkflow, "PUT", `/api/gerenciamento/workflows-fase/${workflowId}`, token, { steps: [] }, { id: String(workflowId) })
-  check("7.1) remover o passo selecionado funciona (PUT com steps:[])", rRemover.status === 200, await rRemover.clone().json().catch(() => null))
+  check("8.1) remover o passo selecionado funciona (PUT com steps:[])", rRemover.status === 200, await rRemover.clone().json().catch(() => null))
 
   console.log(`\n=== ${ok} passaram, ${falhou} falharam ===`)
   if (falhou > 0) console.error("Falhas:", falhas)

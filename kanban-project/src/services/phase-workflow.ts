@@ -14,7 +14,7 @@ import { validarDefinicao } from "@/src/services/workflow-definition-validator"
 import { exigirDocumentoNoPasso } from "@/src/services/invariante-documental"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolverEscopoDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
-import { lerVersaoPublicada } from "@/src/services/versao-publicada"
+import { lerVersaoPublicada, resolverConteudoDaBiblioteca } from "@/src/services/versao-publicada"
 import {
   type DefWorkflow,
   type DefStep,
@@ -158,6 +158,37 @@ export async function resolverWorkflowAplicavel(
     executorKey: p.executorKey,
     dependeDeStepKeys: null,
   }))
+
+  // PASSO SELECIONADO DA BIBLIOTECA não tem conteúdo próprio — as colunas
+  // acima (`label`, `slaDays`, `description`...) na linha viva de
+  // `PhaseInternalWorkflowStep` NUNCA são sincronizadas depois da seleção
+  // (mandato "separação Biblioteca × Workflow Interno", 22/09/2026): "a
+  // fase e o passo são a única configuração que não vem do Modelo" — key/
+  // ordem/dependeDe são do PASSO, o resto é do MODELO. Sem esta
+  // substituição, toda materialização SEM rascunho pendente no Workflow
+  // (o caminho comum) usava as colunas cruas, obsoletas desde a seleção —
+  // achado real, produção, 23/09/2026: prazo do passo "Localizar registro"
+  // materializava 0/null em vez do 1 dia configurado no Modelo, porque
+  // `ancorarNaVersaoPublicada` só substitui quando há rascunho pendente NO
+  // WORKFLOW (eixo diferente do rascunho do Modelo). Mesma fonte que
+  // `retratarPassos` já usa para a versão congelada — aqui, para o caminho
+  // vivo (validação e materialização sem rascunho).
+  for (let i = 0; i < passos.length; i++) {
+    const p = passos[i]
+    if (p.bibliotecaModeloId == null || p.bibliotecaModeloVersao == null) continue
+    const doModelo = await resolverConteudoDaBiblioteca(p.bibliotecaModeloId, p.bibliotecaModeloVersao, db)
+    if (!doModelo) continue
+    const local = steps[i]
+    steps[i] = {
+      ...local,
+      label: doModelo.label, description: doModelo.description,
+      createsTask: doModelo.createsTask, required: doModelo.required,
+      owner: doModelo.owner, priority: doModelo.priority, slaDays: doModelo.slaDays,
+      completionRule: doModelo.completionRule, checklist: doModelo.checklist,
+      executorKey: doModelo.executorKey,
+    }
+  }
+
   return { workflow, steps }
 }
 
