@@ -101,6 +101,16 @@ interface StepEditorBaseProps {
   isOpen: boolean
   onClose: () => void
   onSaved?: () => void
+  /** O NOME/DESCRIÇÃO da SUBTAREFA clicada — quando o passo tem subtarefas
+   *  (ver `EditorPorSubtarefaCorrente`), cada uma tem sua própria identidade
+   *  cadastrada, e é ela que preenche o título/subtítulo do modal. Achado
+   *  real (23/09/2026): as quatro subtarefas de "Solicitar certidão"
+   *  compartilham o MESMO `stepId`, então um editor que buscasse o
+   *  título/descrição pela etapa (ligada ao passo, não à subtarefa) sempre
+   *  mostrava o texto da subtarefa 1 — ausente aqui, o editor cai no seu
+   *  próprio texto fixo (comportamento de sempre, para passo sem subtarefas). */
+  subtarefaLabel?: string | null
+  subtarefaDescricao?: string | null
 }
 
 interface UserBrief {
@@ -457,6 +467,8 @@ interface EditorEspecificoProps {
   documentoId: number
   stepId: number
   stepStatus: string
+  subtarefaLabel?: string | null
+  subtarefaDescricao?: string | null
   isOpen: boolean
   onClose: () => void
   onSaved?: () => void
@@ -548,9 +560,17 @@ function EditorPorSubtarefaCorrente({
   // subtarefa já concluída caía em modo de EDIÇÃO, com os botões de salvar
   // ativos, quando deveria ser histórico read-only. A subtarefa CLICADA manda
   // sobre o próprio somente-leitura, igual já manda sobre qual editor abrir.
-  const restEfetivo = corrente.concluida && rest.stepStatus !== "concluida"
-    ? { ...rest, stepStatus: "concluida" }
-    : rest
+  const restEfetivo = {
+    ...rest,
+    ...(corrente.concluida && rest.stepStatus !== "concluida" ? { stepStatus: "concluida" } : {}),
+    // O NOME/DESCRIÇÃO É DA SUBTAREFA, NUNCA DO PASSO. Achado real (23/09/2026):
+    // as quatro subtarefas de "Solicitar certidão" compartilham o mesmo
+    // `stepId`, então um editor que buscasse o texto pela ETAPA (que só sabe
+    // do passo) sempre repetia o da subtarefa 1 — a corrente aqui já É a
+    // subtarefa clicada (ver acima), então isto vale para qualquer uma.
+    subtarefaLabel: corrente.label,
+    subtarefaDescricao: corrente.descricao,
+  }
   return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={restEfetivo} />
 }
 
@@ -1703,6 +1723,8 @@ function FormAguardarRetorno({
   documentoId,
   stepId,
   stepStatus,
+  subtarefaLabel,
+  subtarefaDescricao,
   isOpen,
   onClose,
   onSaved,
@@ -1850,8 +1872,8 @@ function FormAguardarRetorno({
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
-      title="Aguardar retorno do cartório"
-      subtitle="Acompanhe o protocolo já aberto, registre os contatos e conclua quando o retorno chegar."
+      title={subtarefaLabel || "Aguardar retorno do cartório"}
+      subtitle={subtarefaDescricao || "Acompanhe o protocolo já aberto, registre os contatos e conclua quando o retorno chegar."}
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -2298,6 +2320,8 @@ function FormReceberCertidao({
   documentoId,
   stepId,
   stepStatus,
+  subtarefaLabel,
+  subtarefaDescricao,
   isOpen,
   onClose,
   onSaved,
@@ -2407,8 +2431,8 @@ function FormReceberCertidao({
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
-      title="Receber certidão"
-      subtitle="Anexe o arquivo recebido do cartório e marque se é físico, digital ou ambos."
+      title={subtarefaLabel || "Receber certidão"}
+      subtitle={subtarefaDescricao || "Anexe o arquivo recebido do cartório e marque se é físico, digital ou ambos."}
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -2692,6 +2716,8 @@ function FormConferirCertidao({
   documentoId,
   stepId,
   stepStatus,
+  subtarefaLabel,
+  subtarefaDescricao,
   isOpen,
   onClose,
   onSaved,
@@ -2894,8 +2920,8 @@ function FormConferirCertidao({
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
-      title="Conferir certidão"
-      subtitle="Capture os dados literais do documento e marque o resultado da inspeção operacional."
+      title={subtarefaLabel || "Conferir certidão"}
+      subtitle={subtarefaDescricao || "Capture os dados literais do documento e marque o resultado da inspeção operacional."}
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
@@ -3462,6 +3488,8 @@ function FormPadrao({
   stepId,
   stepStatus,
   stepTitle,
+  subtarefaLabel,
+  subtarefaDescricao,
   isOpen,
   onClose,
   onSaved,
@@ -3483,7 +3511,7 @@ function FormPadrao({
   const [concluindo, setConcluindo] = useState(false)
   const [falha, setFalha] = useState<string | null>(null)
 
-  const titulo = stepTitle || texto(etapa?.title) || "Etapa do workflow"
+  const titulo = subtarefaLabel || stepTitle || texto(etapa?.title) || "Etapa do workflow"
   const readOnly = stepStatus === "concluida"
   const podeConcluir = acoes.includes("concluir")
 
@@ -3510,6 +3538,7 @@ function FormPadrao({
       onClose={onClose}
       title={titulo}
       subtitle={
+        subtarefaDescricao ||
         texto(etapa?.description) ||
         "Registre o andamento desta etapa e conclua quando o trabalho estiver feito."
       }

@@ -251,6 +251,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "regra temporal por cartório + override local (mandato Bloco 2): cria as PRÓPRIAS " +
     "árvores/pessoas (marca SLACARTORIO-TEST) só no banco de teste — a limpeza remove só o " +
     "que o próprio teste criou",
+  "scripts/prova-solicitar-certidao-4-subtarefas-executores.test.ts":
+    "mandato 'religar os 4 editores especializados de Solicitar certidão' (23/09/2026): cria " +
+    "as PRÓPRIAS árvores/pessoas (marca SOL4SUB) só no banco de teste — a limpeza remove só o " +
+    "que o próprio teste criou (deleteMany direto, nunca via pessoa-ciclo-vida.ts, porque não " +
+    "é remoção de pessoa de um processo real: é desmontar o próprio cenário sintético)",
   "scripts/mandato-rascunho-publicacao.test.ts":
     "rascunho e publicação de Workflow Interno (mandato Bloco 3): cria as PRÓPRIAS " +
     "árvores/pessoas (marca RASCUNHOPUB-TEST) só no banco de teste — a limpeza remove só o " +
