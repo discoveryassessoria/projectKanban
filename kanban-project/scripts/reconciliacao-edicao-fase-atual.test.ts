@@ -198,11 +198,15 @@ async function main() {
     },
   })
 
-  // E) passo já em execução (edição de conteúdo deve virar conflito)
+  // E) passo já em execução (edição de conteúdo deve virar conflito) — a v2
+  // MUDA rótulo E slaDays no mesmo passo: prova que o SLA (seguro sozinho)
+  // NÃO escapa quando o processo tem outro conflito — "tudo ou nada", nunca
+  // aplica pela metade nem o pedaço isoladamente seguro.
   const procPassoTocado = await criarProcesso(tipoAId, "passo-tocado")
   await materializarNaFaseAlvo(procPassoTocado)
   const passoTocadoInst = await passoDe(procPassoTocado)
   await prisma.phaseWorkflowStepInstance.update({ where: { id: passoTocadoInst.id }, data: { startedAt: new Date() } })
+  const tarefaTocadaAntes = await tarefaDe(procPassoTocado)
 
   // F) concluída — nunca deve ser reavaliada, mesmo com mudança de conteúdo
   const procConcluido = await criarProcesso(tipoAId, "concluido")
@@ -303,6 +307,11 @@ async function main() {
   const passoTocadoDepois = await passoDe(procPassoTocado)
   ok("o rótulo deste passo continua o ORIGINAL (não foi editado sob execução em curso)",
     (passoTocadoDepois.snapshot as any)?.titulo !== "Rótulo EDITADO")
+  ok("o slaDays deste passo continua o ORIGINAL — SLA não escapa do bloqueio quando o MESMO passo tem outro conflito",
+    passoTocadoDepois.slaDays === 7, `${passoTocadoDepois.slaDays}`)
+  const tarefaTocadaDepois = await tarefaDe(procPassoTocado)
+  ok("o prazo desta tarefa continua EXATAMENTE o mesmo — nenhuma parte da mudança foi aplicada, nem a isoladamente segura",
+    tarefaTocadaDepois.dataPrazo?.getTime() === tarefaTocadaAntes.dataPrazo?.getTime())
 
   // ═══ G) preservação de concluídas ═══
   console.log("\nG) preservação de concluídas — nunca reavaliada")
