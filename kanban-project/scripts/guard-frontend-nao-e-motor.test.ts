@@ -386,7 +386,7 @@ check("a tela diz que responsável e executor são coisas diferentes",
 
 // O RÓTULO "Peso / SLA" inventava um segundo atributo: o modelo tem só `slaDays`.
 check('o rótulo "Peso / SLA" não existe mais', !modal9.includes("Peso / SLA"))
-check("o prazo é chamado de prazo", modal9.includes("Prazo interno (dias úteis)"))
+check("o prazo é chamado de prazo", modal9.includes("Prazo interno (dias corridos)"))
 check("e não existe `weight` no schema para justificar dois campos",
   !/^\s*weight\s+/m.test(ler("prisma/schema.prisma")),
   "se um dia existir, a tela precisa mostrar os dois separadamente")

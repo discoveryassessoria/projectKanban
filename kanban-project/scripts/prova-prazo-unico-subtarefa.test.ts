@@ -110,7 +110,7 @@ async function main() {
   console.log("1) UM ÚNICO PRAZO — a tarefa, mesmo com subtarefas nascendo")
   const tarefaAntes = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefaId } })
   const esperado = prazoOperacional(7, antes)
-  ok("a tarefa nasceu com o prazo do PASSO (7 dias úteis)",
+  ok("a tarefa nasceu com o prazo do PASSO (7 dias corridos)",
     tarefaAntes.dataPrazo != null && esperado != null && Math.abs(tarefaAntes.dataPrazo.getTime() - esperado.getTime()) < 60_000,
     tarefaAntes.dataPrazo?.toISOString())
 
@@ -138,7 +138,7 @@ async function main() {
   const subs2 = await subtarefasDaEtapa({ stepInstanceId: si.id })
   const espera = subs2.find((s) => s.key === "sub_espera")!
   const esperadoAcompanhamento = prazoOperacional(3, antesEspera)
-  ok("o acompanhamento foi calculado (3 dias úteis a partir da liberação)",
+  ok("o acompanhamento foi calculado (3 dias corridos a partir da liberação)",
     espera.execucao?.proximoAcompanhamentoEm != null && esperadoAcompanhamento != null
     && Math.abs(espera.execucao.proximoAcompanhamentoEm.getTime() - esperadoAcompanhamento.getTime()) < 60_000,
     espera.execucao?.proximoAcompanhamentoEm?.toISOString())

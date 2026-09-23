@@ -3,7 +3,6 @@
 // resolução de responsável e a regra normativa de geração de Tarefa.
 
 import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
-import { isDiaUtil } from "../lib/diasUteis"
 
 export type PrioridadeTarefaStr = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE"
 
@@ -35,17 +34,6 @@ export function mapearPrioridade(p: string | null | undefined): PrioridadeTarefa
     case "medium": return "MEDIA"
     default: return "MEDIA"
   }
-}
-
-/** Adiciona N dias ÚTEIS a partir de uma data base (feriados BR via diasUteis). */
-export function addDiasUteis(base: Date, n: number): Date {
-  const d = new Date(base.getTime())
-  let restantes = n
-  while (restantes > 0) {
-    d.setDate(d.getDate() + 1)
-    if (isDiaUtil(d)) restantes--
-  }
-  return d
 }
 
 /**

@@ -119,7 +119,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   const a = await palco({ pausarSlaEmEsperaExterna: true, pausarSlaEmBloqueio: false })
   await prisma.tarefa.update({ where: { id: a.tarefaId }, data: { responsavelId: marco.id } })
-  ok("A.0) prazo original existe (SLA de 5 dias úteis aplicado na materialização)", a.dataPrazoOriginal != null, String(a.dataPrazoOriginal))
+  ok("A.0) prazo original existe (SLA de 5 dias corridos aplicado na materialização)", a.dataPrazoOriginal != null, String(a.dataPrazoOriginal))
   ok("A.0) SLA NÃO está pausado antes do bloqueio", (await prisma.tarefa.findUniqueOrThrow({ where: { id: a.tarefaId }, select: { slaPausadoEm: true } })).slaPausadoEm == null)
 
   const antesBloqueio = new Date()

@@ -170,7 +170,7 @@ async function main() {
   ok("3.2) orgaoId GRAVADO estruturalmente (achado do mandato: nunca era gravado antes)", sol.orgaoId === cartorioX.id, String(sol.orgaoId))
   ok("3.3) prazoEsperadoDias resolvido pela regra do Cartório X (2, não o default do passo=5)", sol.prazoEsperadoDias === 2, String(sol.prazoEsperadoDias))
   ok("3.4) previsaoRetorno (dimensão C do motor temporal) foi PREENCHIDA — achado do mandato: nunca era escrita antes", sol.previsaoRetorno != null, String(sol.previsaoRetorno))
-  ok("3.5) previsaoRetorno é depois do envio (dias úteis à frente, nunca no passado)", sol.previsaoRetorno! > antesEnvio)
+  ok("3.5) previsaoRetorno é depois do envio (dias corridos à frente, nunca no passado)", sol.previsaoRetorno! > antesEnvio)
 
   secao("3.6) operador digita um prazo manualmente — isso VENCE a regra do cartório (o dado mais forte é a promessa desta vez)")
   const p2 = await palco()

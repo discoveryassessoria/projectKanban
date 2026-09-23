@@ -98,18 +98,74 @@ export async function criarModelo(input: CriarModeloInput): Promise<CriarModeloR
 }
 
 export type PublicarModeloResultado =
-  | { ok: true; versaoAnterior: number; versaoNova: number }
+  | { ok: true; versaoAnterior: number; versaoNova: number; fasesAtualizadas: number; fasesComErro: Array<{ workflowId: number; phaseKey: string; erro: string }> }
   | { ok: false; erro: string; mensagem: string; problemas?: unknown }
+
+/**
+ * PROPAGA a publicação do Modelo para toda fase REAL que o selecionou —
+ * decisão definitiva (23/09/2026, "regra crucial"): mudar o Modelo e
+ * publicar precisa valer para os processos em andamento, não só para quem
+ * nascer depois.
+ *
+ * NÃO reimplementa reconciliação nenhuma: bump do ponteiro de versão
+ * (`bibliotecaModeloVersao`, congelado por vínculo — nunca "sempre a mais
+ * recente" por resolução dinâmica, para que cada vínculo continue apontando
+ * para um conteúdo determinístico e auditável) + `publicarWorkflow` da fase
+ * REAL. `publicarWorkflow` já dispara, sozinho, os dois caminhos que juntos
+ * cobrem exatamente as três posições pedidas:
+ *
+ *   fase FUTURA (processo ainda não chegou lá)  → enqueueReconciliacaoCatalogoFase
+ *   fase ATUAL (instância já aberta)            → enqueueReconciliacaoWorkflowInternoFaseAtual
+ *     → reconciliarNovaVersaoNaInstanciaAtual: recalcula `Tarefa.dataPrazo`
+ *       a partir do `createdAt` ORIGINAL (nunca "agora"), aplica só o que é
+ *       seguro, e registra CONFLITO sem aplicar pela metade quando o
+ *       conteúdo mudado já tem execução real por baixo.
+ *   fase JÁ ULTRAPASSADA                        → nenhuma instância aberta
+ *     casa com os dois enqueues acima — nunca é candidata, nunca é tocada.
+ *
+ * Este é o MESMO mecanismo que já existe para quando alguém edita e publica
+ * o Workflow Interno de uma fase diretamente — aqui só é disparado por um
+ * caminho novo (a Biblioteca), nunca duplicado.
+ */
+async function republicarVinculosReais(
+  modeloId: number, versaoPublicada: number, actorId: number | null,
+): Promise<{ fasesAtualizadas: number; fasesComErro: Array<{ workflowId: number; phaseKey: string; erro: string }> }> {
+  const vinculos = await prisma.phaseInternalWorkflowStep.findMany({
+    where: { bibliotecaModeloId: modeloId, workflow: { origemBiblioteca: false } },
+    select: { workflowId: true, workflow: { select: { phaseKey: true } } },
+    distinct: ["workflowId"],
+  })
+
+  let fasesAtualizadas = 0
+  const fasesComErro: Array<{ workflowId: number; phaseKey: string; erro: string }> = []
+  for (const v of vinculos) {
+    try {
+      // Todo passo desta fase que seleciona ESTE Modelo passa a apontar para
+      // a versão recém-publicada — nunca "a mais recente" resolvida na hora
+      // (isso tornaria o conteúdo do vínculo indeterminístico e não
+      // reproduzível a partir do histórico); o ponteiro avança um degrau por
+      // vez, sempre por uma publicação explícita como esta.
+      await prisma.phaseInternalWorkflowStep.updateMany({
+        where: { workflowId: v.workflowId, bibliotecaModeloId: modeloId },
+        data: { bibliotecaModeloVersao: versaoPublicada },
+      })
+      const r = await publicarWorkflow({ workflowId: v.workflowId, actorId })
+      if (r.ok) fasesAtualizadas++
+      else fasesComErro.push({ workflowId: v.workflowId, phaseKey: v.workflow.phaseKey, erro: r.mensagem ?? r.code ?? "erro desconhecido ao publicar a fase" })
+    } catch (e) {
+      fasesComErro.push({ workflowId: v.workflowId, phaseKey: v.workflow.phaseKey, erro: e instanceof Error ? e.message : String(e) })
+    }
+  }
+  return { fasesAtualizadas, fasesComErro }
+}
 
 /**
  * PUBLICA o Modelo — delega a `publicarWorkflow` (mesma trava de conflito de
  * versão, mesmo congelamento) e SÓ ENTÃO atualiza o próprio ciclo de vida do
- * Modelo. `publicarWorkflow` não reconcilia nada sozinho aqui: `phaseKey`
- * "biblioteca" nunca casa com um `CatalogoFase` real (ver comentário em
- * `publicarWorkflow`), então o gatilho de reconciliação de fase que ele
- * dispara automaticamente é, para este workflow, sempre um no-op silencioso.
- * A reconciliação de processos reais é responsabilidade EXCLUSIVA do Vínculo
- * (vinculo.ts) — nunca do Modelo.
+ * Modelo. `publicarWorkflow` NÃO reconcilia nada sozinho para ESTE workflow
+ * (`phaseKey` "biblioteca" nunca casa com um `CatalogoFase` real) — por isso
+ * `republicarVinculosReais`, logo abaixo, propaga explicitamente para cada
+ * fase real que selecionou este Modelo.
  */
 export async function publicarModelo(modeloId: number, actorId: number | null): Promise<PublicarModeloResultado> {
   const modelo = await prisma.bibliotecaModeloTarefa.findUnique({ where: { id: modeloId } })
@@ -119,11 +175,20 @@ export async function publicarModelo(modeloId: number, actorId: number | null): 
   const r = await publicarWorkflow({ workflowId: modelo.workflowId, actorId, pularCompetenciaDeEfeito: true })
   if (!r.ok) return { ok: false, erro: r.code ?? "FALHA_PUBLICACAO", mensagem: r.mensagem ?? "Não foi possível publicar o modelo.", problemas: r.problemas }
 
+  const versaoNova = r.versaoNova ?? modelo.versaoPublicada ?? 0
   await prisma.bibliotecaModeloTarefa.update({
     where: { id: modeloId },
-    data: { status: "PUBLICADO", versaoPublicada: r.versaoNova ?? modelo.versaoPublicada },
+    data: { status: "PUBLICADO", versaoPublicada: versaoNova },
   })
-  return { ok: true, versaoAnterior: r.versaoAnterior ?? 0, versaoNova: r.versaoNova ?? 0 }
+
+  // SEM_ALTERACOES: nada novo para propagar — as fases já apontam para o que
+  // já valia. Só propaga quando uma versão de verdade nasceu.
+  const houveVersaoNova = r.code !== "SEM_ALTERACOES" && r.versaoAnterior !== r.versaoNova
+  const { fasesAtualizadas, fasesComErro } = houveVersaoNova
+    ? await republicarVinculosReais(modeloId, versaoNova, actorId)
+    : { fasesAtualizadas: 0, fasesComErro: [] }
+
+  return { ok: true, versaoAnterior: r.versaoAnterior ?? 0, versaoNova, fasesAtualizadas, fasesComErro }
 }
 
 /** INATIVA — nunca apaga. Vínculos publicados continuam lendo a versão congelada que já usavam. */

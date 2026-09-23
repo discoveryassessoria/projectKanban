@@ -227,7 +227,17 @@ export default function BibliotecaTarefasTab() {
       })
       const j = await res.json().catch(() => ({}))
       if (res.ok) {
-        showFlash(`"${publicando.nome}" publicado — v${j.versaoNova}.`)
+        // PROPAGAÇÃO AUTOMÁTICA (decisão definitiva 23/09/2026) — publicar o
+        // Modelo já atualiza toda fase real que o selecionou, aplicando o
+        // que é seguro aos processos em andamento. O admin precisa VER isso
+        // acontecer, não só confiar que aconteceu.
+        const fasesAtualizadas: number = j.fasesAtualizadas ?? 0
+        const fasesComErro: Array<{ phaseKey: string; erro: string }> = j.fasesComErro ?? []
+        const resumoFases = fasesAtualizadas > 0 ? ` Propagado para ${fasesAtualizadas} fase(s) em uso.` : ""
+        const resumoErros = fasesComErro.length > 0
+          ? ` ATENÇÃO: ${fasesComErro.length} fase(s) não puderam ser atualizadas (${fasesComErro.map((f) => f.phaseKey).join(", ")}) — confira o Workflow Interno delas.`
+          : ""
+        showFlash(`"${publicando.nome}" publicado — v${j.versaoNova}.${resumoFases}${resumoErros}`)
         setPublicando(null); setPreview(null)
         await load()
       } else showFlash(j.error || j.mensagem || "Erro ao publicar.")

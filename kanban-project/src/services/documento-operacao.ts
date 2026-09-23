@@ -630,9 +630,10 @@ export async function iniciarOperacaoDocumentoV2(
   if (!inst) return { ok: false, error: "Instância V2 da fase não encontrada (processo não migrado)", status: 422 }
   const catSteps = getFase(faseCode).steps
   const now = new Date()
-  // O prazo nasce da conta CANÔNICA (dias úteis), não de uma soma em
-  // milissegundos: era ela que dava a este caminho um prazo diferente do que a
-  // materialização de passos daria para o mesmo SLA.
+  // O prazo nasce da conta CANÔNICA (dias corridos, decisão definitiva
+  // 23/09/2026), não de uma soma em milissegundos: era ela que dava a este
+  // caminho um prazo diferente do que a materialização de passos daria para
+  // o mesmo SLA.
   const firstDue = opts.dataPrazoInicial ?? prazoOperacional(catSteps[0].slaDays, now)
   const defId = inst.workflowDefinitionId ?? 0
   await prisma.$transaction(async (tx) => {

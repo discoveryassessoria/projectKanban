@@ -329,7 +329,7 @@ export default function ConfiguracaoDoPassoModal({
                   {/* O RÓTULO DIZIA "Peso / SLA (dias)" e inventava um segundo conceito:
                       o modelo tem UM atributo, `slaDays`, que é prazo. Não existe
                       `weight`. Corrigido o rótulo, sem tocar no dado. */}
-                  <label className={lbl}>{ehBiblioteca ? "Prazo da tarefa (dias úteis)" : "Prazo interno (dias úteis)"}</label>
+                  <label className={lbl}>{ehBiblioteca ? "Prazo da tarefa (dias corridos)" : "Prazo interno (dias corridos)"}</label>
                   {/* A FASE NÃO TEM PRAZO PRÓPRIO. Este é o ÚNICO prazo final da
                       tarefa — a fase só organiza e exibe. Zero/vazio não é "herda
                       da fase": é "esta tarefa não tem prazo definido". */}

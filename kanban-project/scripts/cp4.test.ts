@@ -15,7 +15,7 @@ import {
 } from "../src/services/phase-workflow-helpers"
 import { validarDefinicao } from "../src/services/workflow-definition-validator"
 import {
-  mapearPrioridade, addDiasUteis, calcularPrazo,
+  mapearPrioridade, calcularPrazo,
   resolverResponsavel, passoGeraTarefa,
 } from "../src/services/passo-tarefa-helpers"
 import { chaveDaUnidade } from "../lib/operacional/identidade-da-tarefa"
@@ -202,14 +202,15 @@ async function run() {
   ok(mapearPrioridade("low") === "BAIXA" && mapearPrioridade("medium") === "MEDIA" && mapearPrioridade("high") === "ALTA", "prioridade low/medium/high")
   ok(mapearPrioridade(undefined) === "MEDIA" && mapearPrioridade("xyz") === "MEDIA", "prioridade default MEDIA")
 
-  // 15) Prazo por dias úteis
-  console.log("\n15) Prazo (dias úteis):")
+  // 15) Prazo por dias corridos (decisão definitiva, 23/09/2026)
+  console.log("\n15) Prazo (dias corridos):")
   ok(calcularPrazo(new Date("2026-07-17T12:00:00Z"), null) === null, "sem SLA => sem prazo")
   ok(calcularPrazo(new Date("2026-07-17T12:00:00Z"), 0) === null, "SLA 0 => sem prazo")
   const sexta = new Date("2026-07-17T12:00:00Z") // sexta-feira
-  const mais1 = addDiasUteis(sexta, 1)
-  ok(mais1.getUTCDay() !== 0 && mais1.getUTCDay() !== 6, "addDiasUteis pula fim de semana")
-  ok(mais1.getTime() > sexta.getTime(), "prazo > base")
+  const mais1 = calcularPrazo(sexta, 1)
+  // NUNCA pula fim de semana: sexta + 1 dia corrido é sábado, não segunda.
+  ok(mais1?.getUTCDay() === 6, "1 dia corrido a partir de sexta cai no sábado (não pula fim de semana)")
+  ok((mais1?.getTime() ?? 0) > sexta.getTime(), "prazo > base")
 
   // 16) Responsável (atribuição pendente)
   console.log("\n16) Responsável:")

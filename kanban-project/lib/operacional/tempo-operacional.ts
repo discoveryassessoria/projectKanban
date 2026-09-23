@@ -39,25 +39,28 @@
 // se corrige na próxima leitura — nunca o contrário.
 // ============================================================================
 
-import { isDiaUtil } from '@/src/lib/diasUteis'
-
 /**
- * O PRAZO OPERACIONAL DE UMA TAREFA — uma conta só, em DIAS ÚTEIS.
+ * O PRAZO OPERACIONAL DE UMA TAREFA — uma conta só, em DIAS CORRIDOS.
+ *
+ * DECISÃO DEFINITIVA (23/09/2026, "regra crucial"): o prazo declarado num
+ * modelo/passo ("N dias") conta dias CORRIDOS — nunca pula fim de semana ou
+ * feriado. Antes desta correção, a conta pulava fim de semana/feriado
+ * (`isDiaUtil`) mesmo com o rótulo da tela dizendo "dias úteis" — essa
+ * interpretação era exatamente o que o usuário pediu para corrigir de ponta
+ * a ponta, inclusive nos modelos já publicados e nas Tarefas já
+ * materializadas (ver `scripts/reconciliar-prazo-dias-corridos.ts`, rodado
+ * uma vez contra produção nesta mesma mudança).
  *
  * Havia DUAS funções chamadas `calcularPrazo`, com os argumentos em ordem
- * invertida e contando dias diferentes:
+ * invertida e contando dias diferentes (`tarefa-canonica` já usava corridos;
+ * `passo-tarefa-helpers` usava dias úteis, a conta que valia em produção). As
+ * duas convergiram para ESTA função, que agora é dias corridos nos dois
+ * lugares — não sobrou um segundo motor com o comportamento antigo.
  *
- *   tarefa-canonica     calcularPrazo(slaDays, inicio)   dias CORRIDOS
- *   passo-tarefa-helpers calcularPrazo(base, sla)        dias ÚTEIS
- *
- * As duas vivas, em caminhos de criação concorrentes: a mesma certidão nascia
- * com prazos diferentes conforme quem a materializasse, e trocar um import
- * mudava o prazo sem mudar uma linha de regra. Pior: os nomes iguais faziam
- * `calcularPrazo(5, hoje)` compilar nos dois — só que num deles "5" é a base.
- *
- * A conta que VALE é a que já roda em produção no materializador de passos:
- * DIAS ÚTEIS, com os feriados nacionais. Um SLA de "3 dias" que vence no
- * domingo nunca foi um compromisso que alguém pudesse cumprir.
+ * `src/lib/diasUteis.ts` (`isDiaUtil`/`gerarVencimentosParcelas`) continua
+ * existindo e é usado pelo Financeiro (vencimento de parcela/boleto, uma
+ * régua deliberadamente diferente, de convenção bancária) — só não é mais
+ * chamado por este arquivo.
  *
  * Sem SLA declarado o prazo é NULO — a tarefa fica fora da régua de atraso, o
  * que é honesto, em vez de ganhar uma data inventada.
@@ -84,11 +87,7 @@ export function temPrazoProprio(slaDays: number | null | undefined): boolean {
 export function prazoOperacional(slaDays: number | null | undefined, inicio: Date): Date | null {
   if (slaDays == null || !Number.isFinite(slaDays) || slaDays <= 0) return null
   const d = new Date(inicio.getTime())
-  let restantes = slaDays
-  while (restantes > 0) {
-    d.setDate(d.getDate() + 1)
-    if (isDiaUtil(d)) restantes--
-  }
+  d.setDate(d.getDate() + slaDays)
   return d
 }
 
@@ -423,7 +422,7 @@ export function estadoTemporalSubtarefa(e: EntradaTemporalSubtarefa): EstadoTemp
 //
 //   1. Pegar todas as subtarefas do passo ainda NÃO concluídas.
 //   2. Para a subtarefa ATIVA agora: custo restante =
-//        max(0, slaDaysEfetivo − dias úteis já decorridos desde que ficou
+//        max(0, slaDaysEfetivo − dias corridos já decorridos desde que ficou
 //        disponível)
 //      Para as ainda BLOQUEADAS/PENDENTES: custo restante = slaDaysEfetivo
 //      cheio (elas ainda não começaram a consumir nada).
@@ -433,7 +432,7 @@ export function estadoTemporalSubtarefa(e: EntradaTemporalSubtarefa): EstadoTemp
 //      soma de TODAS as subtarefas, que superestima quando há ramos
 //      paralelos independentes.
 //   4. dataConclusaoProjetada = hoje (dia operacional) + caminho mais longo,
-//      em dias úteis (mesma `prazoOperacional`/`isDiaUtil` desta régua).
+//      em dias corridos (mesma `prazoOperacional` desta régua).
 //   5. Se `agora > Tarefa.dataPrazo` → já é ATRASADO — EM RISCO não se
 //      aplica mais (atraso tem precedência).
 //   6. Senão, se `dataConclusaoProjetada > Tarefa.dataPrazo` → EM RISCO.

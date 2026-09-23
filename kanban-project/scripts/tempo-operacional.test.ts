@@ -138,16 +138,17 @@ function main() {
   ok('§10) e a espera externa é registrada como estado', comPrevisao.aguardandoTerceiro)
 
   // ══════════════════════════════════════════════════════════════════════════
-  secao('§7) O PRAZO NASCE EM DIAS ÚTEIS — uma conta só')
+  secao('§7) O PRAZO NASCE EM DIAS CORRIDOS — uma conta só (decisão definitiva, 23/09/2026)')
   // ══════════════════════════════════════════════════════════════════════════
-  // Sexta 14/08/2026 + 3 dias úteis = quarta 19/08. Contando corridos daria
-  // segunda 17/08 — dois dias de trabalho a menos, silenciosamente.
+  // Sexta 14/08/2026 + 3 dias corridos = segunda 17/08 — NUNCA pula fim de
+  // semana ou feriado. A régua antiga (dias úteis) daria quarta 19/08; é
+  // exatamente essa interpretação que foi corrigida de ponta a ponta.
   const sexta = new Date('2026-08-14T12:00:00.000Z')
-  const tresUteis = prazoOperacional(3, sexta)
-  ok('§7) 3 dias úteis a partir de sexta caem na quarta',
-    tresUteis?.toISOString().slice(0, 10) === '2026-08-19', tresUteis?.toISOString().slice(0, 10) ?? '—')
-  ok('§7) o fim de semana não conta como prazo',
-    prazoOperacional(1, sexta)?.toISOString().slice(0, 10) === '2026-08-17')
+  const tresCorridos = prazoOperacional(3, sexta)
+  ok('§7) 3 dias corridos a partir de sexta caem na segunda',
+    tresCorridos?.toISOString().slice(0, 10) === '2026-08-17', tresCorridos?.toISOString().slice(0, 10) ?? '—')
+  ok('§7) o fim de semana CONTA como prazo (dias corridos, não úteis)',
+    prazoOperacional(1, sexta)?.toISOString().slice(0, 10) === '2026-08-15')
   ok('§7) sem SLA não se inventa prazo', prazoOperacional(null, sexta) === null && prazoOperacional(0, sexta) === null)
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -159,6 +160,10 @@ function main() {
     'é por ser pura que ela pode ser a mesma em todas as telas')
   ok('§13) e nada aqui persiste estado temporal',
     !/\.(create|update|upsert)\(/.test(canonico))
+  ok('§7) prazoOperacional não chama mais isDiaUtil — dias corridos, decisão definitiva 23/09/2026',
+    !/isDiaUtil/.test(canonico) && !canonico.includes("from '@/src/lib/diasUteis'"))
+  ok('§7) addDiasUteis (a segunda conta, dias úteis) foi removida de passo-tarefa-helpers',
+    !/export function addDiasUteis/.test(semComentarios(ler('src/services/passo-tarefa-helpers.ts'))))
 
   // Havia DUAS `calcularPrazo` com argumentos invertidos: `(slaDays, inicio)` em
   // dias corridos e `(base, sla)` em dias úteis. As duas vivas, em caminhos de
@@ -217,22 +222,30 @@ function main() {
     /estadoTemporal\(\{ dataPrazo: d \}\)/.test(semComentarios(ler('src/components/home/home-primitives.tsx'))),
     'o corte era meia-noite do NAVEGADOR — um gestor em Lisboa via outro dia')
 
-  secao('§96 — Calendário operacional: feriados, virada de mês/ano (mandato Emissão Documental)')
-  // SLA de 1 dia útil a partir de uma sexta pula sábado e domingo.
+  secao('§96 — Calendário operacional: virada de mês/ano em dias corridos (mandato Emissão Documental)')
+  // SLA de 1 dia CORRIDO a partir de uma sexta cai no sábado seguinte —
+  // nunca pula fim de semana (isDiaUtil não é mais consultado aqui).
   const sextaCal = new Date('2026-09-11T12:00:00.000Z')
-  ok('§96) SLA=1 a partir de sexta cai na segunda seguinte',
-    prazoOperacional(1, sextaCal)?.toISOString().slice(0, 10) === '2026-09-14')
-  // Virada de mês: 5 dias úteis a partir de 27/08/2026 (quinta) atravessa para setembro sem quebrar.
+  ok('§96) SLA=1 a partir de sexta cai no sábado seguinte (dias corridos)',
+    prazoOperacional(1, sextaCal)?.toISOString().slice(0, 10) === '2026-09-12')
+  // Virada de mês: 5 dias corridos a partir de 27/08/2026 (quinta) atravessa para setembro sem quebrar.
   const finalDeAgosto = new Date('2026-08-27T12:00:00.000Z')
   const pMes = prazoOperacional(5, finalDeAgosto)
   ok('§96) SLA atravessa virada de mês sem quebrar', pMes !== null && pMes.getTime() > finalDeAgosto.getTime(),
     pMes?.toISOString().slice(0, 10))
-  // Virada de ano: 10 dias úteis a partir de 22/12/2026 atravessa Natal, Ano Novo e o ano civil.
+  ok('§96) 5 dias corridos a partir de 27/08 caem em 01/09, sem pular nada',
+    pMes?.toISOString().slice(0, 10) === '2026-09-01', pMes?.toISOString().slice(0, 10))
+  // Virada de ano: 10 dias corridos a partir de 22/12/2026 atravessa Natal, Ano Novo e o ano civil.
   const antesDoNatal = new Date('2026-12-22T12:00:00.000Z')
   const pAno = prazoOperacional(10, antesDoNatal)
   ok('§96) SLA atravessa virada de ano sem quebrar', pAno !== null && pAno.getUTCFullYear() === 2027,
     pAno?.toISOString().slice(0, 10))
-  // Feriados fixos não contam como dia útil.
+  ok('§96) 10 dias corridos a partir de 22/12 caem em 01/01/2027, contando Natal e Ano Novo como dias normais',
+    pAno?.toISOString().slice(0, 10) === '2027-01-01', pAno?.toISOString().slice(0, 10))
+  // `isDiaUtil` CONTINUA correto e em uso — só não é mais chamado por
+  // `prazoOperacional`. O Financeiro (vencimento de boleto/parcela) usa a
+  // mesma função, com a régua de dias úteis bancários que é dele por
+  // convenção — nunca a régua de prazo de Tarefa.
   ok('§96) 25/12 (Natal) não é dia útil', !isDiaUtil(new Date('2026-12-25T12:00:00.000Z')))
   ok('§96) 01/01 (Ano Novo) não é dia útil', !isDiaUtil(new Date('2027-01-01T12:00:00.000Z')))
   ok('§96) dia útil comum continua sendo dia útil', isDiaUtil(new Date('2026-12-23T12:00:00.000Z')))
