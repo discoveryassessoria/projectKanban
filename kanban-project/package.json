@@ -349,6 +349,7 @@
     "test:preco-generico": "tsx scripts/preco-generico-planilha.test.ts",
     "test:override-isolamento": "tsx scripts/override-isolamento.test.ts",
     "test:tarefa-operacional": "tsx scripts/tarefa-unidade-operacional.test.ts",
+    "test:reconciliacao-workflow-interno": "tsx scripts/reconciliacao-workflow-interno-fase-atual.test.ts",
     "test:guard-passo": "tsx scripts/guard-maquina-passo-unica.test.ts",
     "test:guard-tarefa": "tsx scripts/guard-tarefa-operacional.test.ts",
     "test:tarefa-atribuicao": "tsx scripts/tarefa-atribuicao.test.ts",

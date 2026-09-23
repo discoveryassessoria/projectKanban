@@ -77,8 +77,8 @@ ok(motor.includes("exigirDocumentoNoPasso("),
   "2.1 o motor cobra a invariante documental")
 ok(motor.indexOf("exigirDocumentoNoPasso(") < motor.indexOf("tx.phaseWorkflowStepInstance.create"),
   "2.2 a invariante roda ANTES do create — sem estado parcial")
-ok((motor.match(/exigeDocumento: workflow\.exigeDocumento === true/g) || []).length === 2,
-  "2.3 os dois caminhos (instância nova e convergência) passam o contrato")
+ok((motor.match(/exigeDocumento: workflow\.exigeDocumento === true/g) || []).length === 3,
+  "2.3 os três caminhos (instância nova, convergência e reconciliação da fase atual) passam o contrato")
 ok(motor.includes("chaveIdempotencia: chavePasso"),
   "2.4 a materialização continua idempotente por chave")
 

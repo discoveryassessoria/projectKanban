@@ -29,14 +29,26 @@
 // A terceira peça — bloquear a FINALIZAÇÃO enquanto uma obrigação retroativa
 // segue pendente — é `calcularObrigacoesRetroativasPendentes`, consumida por
 // `phase-advance.ts` especificamente na transição para `finalizado`.
+//
+// A QUARTA peça — mandato "regra única de prazo" (23/09/2026), item "mudança
+// precisa valer para processos em andamento" — é
+// enqueueReconciliacaoWorkflowInternoFaseAtual/processarReconciliacaoWorkflowInternoFaseAtual,
+// perto do fim deste arquivo: alcança especificamente quem está NA fase atual
+// com a instância JÁ ABERTA (as três peças acima, por desenho, pulam esse
+// caso — ver o comentário de `origem === "WORKFLOW_INTERNO"` logo abaixo,
+// que documenta por que reconciliar por cima de quem já materializou
+// duplicava PhaseWorkflowInstance/Tarefa em produção).
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma, WorkflowInstanceStatus } from "@prisma/client"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
+import { reconciliarNovaVersaoNaInstanciaAtual } from "@/src/services/phase-workflow"
+import { garantirTarefaDePasso, carregarPreCondicoes } from "@/src/services/passo-tarefa"
 
 export const TIPO_OUTBOX_RECONCILIACAO_FASE_MACRO = "fase.macro.reconciliar"
 export const TIPO_OUTBOX_RECONCILIACAO_CATALOGO_FASE = "catalogo.fase.reconciliar"
+export const TIPO_OUTBOX_RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL = "workflow-interno.fase-atual.reconciliar"
 
 // NÃO importa `proximoCiclo` de phase-advance.ts de propósito — phase-advance.ts
 // já importa DESTE arquivo (calcularObrigacoesRetroativasPendentes); importar de
@@ -508,4 +520,136 @@ export async function calcularObrigacoesRetroativasPendentes(
     }
   }
   return pendentes.sort((a, b) => a.ordem - b.ordem)
+}
+
+// ----------------------------------------------------------------------------
+// RECONCILIAÇÃO NA FASE ATUAL — quem já materializou e continua na mesma fase
+// ----------------------------------------------------------------------------
+
+interface EnqueueWorkflowInternoFaseAtualInput {
+  phaseKey: string
+  /** `null` = workflow 'all' (aplica a qualquer tipo que não tenha um específico). */
+  tipoProcessoId: number | null
+  workflowId: number
+  versaoAnterior: number
+  versaoNova: number
+  publicadoPorId: number | null
+  correlationId?: string
+}
+
+export interface EnqueueResultadoWorkflowInternoFaseAtual {
+  processosAlcancados: number
+  outboxRegistrados: number
+}
+
+/**
+ * DISPARADO PELA PUBLICAÇÃO DO WORKFLOW INTERNO (`publicarWorkflow`), ao lado
+ * de `enqueueReconciliacaoCatalogoFase(origem: "WORKFLOW_INTERNO")` — que só
+ * alcança quem NUNCA materializou esta fase (ver o comentário de `origem`
+ * nela). Esta função é o complemento: alcança quem está NA FASE ATUAL com a
+ * instância JÁ ABERTA (ATIVO/BLOQUEADO/AGUARDANDO) — os dois juntos cobrem
+ * "fase futura" e "fase atual"; "fase já ultrapassada" nunca é candidata (nem
+ * aqui, nem lá — a instância dela nunca está aberta) e "processo finalizado"
+ * é excluído pelo mesmo filtro de sempre.
+ *
+ * `tipoProcessoId: null` (workflow 'all') alcança candidatos por `phaseKey`
+ * sem filtrar por tipo — o filtro fino de "este processo realmente resolve
+ * para ESTE workflow, ou existe um específico do tipo dele que tem
+ * precedência" é feito por `reconciliarNovaVersaoNaInstanciaAtual` (via
+ * `resolverWorkflowAplicavel`, a mesma resolução de sempre) no momento em que
+ * o evento é processado — enfileirar um candidato a mais que acaba não
+ * aplicando nada é seguro (SEM_TRABALHO_NOVO), nunca duplica.
+ *
+ * IDEMPOTENTE pela chave `{tipo}::{processoId}::{phaseKey}::rev{versaoNova}`.
+ */
+export async function enqueueReconciliacaoWorkflowInternoFaseAtual(
+  input: EnqueueWorkflowInternoFaseAtualInput,
+): Promise<EnqueueResultadoWorkflowInternoFaseAtual> {
+  const candidatos = await prisma.processo.findMany({
+    where: {
+      faseAtualKey: input.phaseKey,
+      dataConclusao: null,
+      ...(input.tipoProcessoId != null ? { tipoProcessoMotorId: input.tipoProcessoId } : {}),
+      phaseWorkflowInstances: {
+        some: { faseMacroKey: input.phaseKey, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
+      },
+    },
+    select: { id: true },
+  })
+  if (candidatos.length === 0) return { processosAlcancados: 0, outboxRegistrados: 0 }
+
+  const chaveDe = (processoId: number) =>
+    `${TIPO_OUTBOX_RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL}::${processoId}::${input.phaseKey}::rev${input.versaoNova}`
+  const linhas: Prisma.DomainOutboxCreateManyInput[] = candidatos.map((p) => ({
+    tipo: TIPO_OUTBOX_RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL,
+    aggregateType: "Processo",
+    aggregateId: p.id,
+    payload: {
+      processoId: p.id, phaseKey: input.phaseKey, workflowId: input.workflowId,
+      versaoAnterior: input.versaoAnterior, versaoNova: input.versaoNova, publicadoPorId: input.publicadoPorId,
+    },
+    correlationId: input.correlationId ?? null,
+    chaveIdempotencia: chaveDe(p.id),
+    status: "PENDENTE",
+  }))
+  const resultado = await prisma.domainOutbox.createMany({ data: linhas, skipDuplicates: true })
+  return { processosAlcancados: candidatos.length, outboxRegistrados: resultado.count }
+}
+
+export interface ReconciliacaoWorkflowInternoFaseAtualPayload {
+  processoId: number
+  phaseKey: string
+  workflowId: number
+  versaoAnterior: number
+  versaoNova: number
+  publicadoPorId: number | null
+}
+
+/**
+ * O EFEITO — chamado pelo outbox-dispatcher. Delega o cálculo/aplicação
+ * inteiros a `reconciliarNovaVersaoNaInstanciaAtual` (o único que decide se é
+ * seguro aplicar — ver o comentário dela) e, só quando ela cria passo novo,
+ * garante a Tarefa dele pelo mesmo serviço canônico de sempre
+ * (`garantirTarefaDePasso`) — idempotente: passo que já tinha Tarefa não é
+ * tocado, `Tarefa.dataPrazo` de ninguém que já existia muda.
+ *
+ * Falha PROPAGA (o outbox devolve o evento a PENDENTE e reprocessa) e NÃO
+ * afeta os outros processos — cada um é uma linha própria.
+ */
+export async function processarReconciliacaoWorkflowInternoFaseAtual(
+  payload: ReconciliacaoWorkflowInternoFaseAtualPayload,
+  correlationId?: string,
+): Promise<void> {
+  if (!payload.processoId || !payload.phaseKey) return
+
+  const r = await reconciliarNovaVersaoNaInstanciaAtual({
+    processoId: payload.processoId, faseMacroKey: payload.phaseKey, correlationId,
+  })
+
+  let tarefasCriadas = 0
+  if (r.success && r.aplicado) {
+    const preCondicoes = await carregarPreCondicoes(payload.processoId)
+    for (const passo of r.stepInstances) {
+      const g = await garantirTarefaDePasso({
+        stepInstanceId: passo.id, correlationId, causationId: passo.chaveIdempotencia,
+        origem: "reconciliacao", preCondicoes,
+      })
+      if (g.success && g.created) tarefasCriadas++
+    }
+  }
+
+  await prisma.logAuditoria.create({
+    data: {
+      acao: "RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL",
+      entidade: "PROCESSO",
+      entidadeId: payload.processoId,
+      descricao: r.success
+        ? (r.aplicado
+          ? `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} (anterior: ${payload.versaoAnterior}) — aplicado à instância em andamento: ${r.passosCriados} passo(s) novo(s), ${tarefasCriadas} tarefa(s) nova(s). Nada preexistente foi alterado.`
+          : `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} — não aplicado (${r.motivo}${r.detalhe ? `: ${r.detalhe}` : ""}).`)
+        : `Workflow Interno da fase "${payload.phaseKey}" publicou a versão ${payload.versaoNova} — reconciliação recusada (${r.code}).`,
+      detalhes: { payload, resultado: r } as unknown as Prisma.InputJsonValue,
+      usuarioId: payload.publicadoPorId,
+    },
+  }).catch(() => null)
 }

@@ -26,7 +26,7 @@ import {
   type ItemChecklistCongelado, type RequisitoCongelado, type OpcaoCongelada,
 } from "@/src/services/versao-publicada"
 import { validarWorkflowParaPublicar, type ProblemaDePublicacao } from "@/src/services/validacao-de-publicacao"
-import { enqueueReconciliacaoCatalogoFase } from "@/src/lib/motor/reconciliar-fase-macro"
+import { enqueueReconciliacaoCatalogoFase, enqueueReconciliacaoWorkflowInternoFaseAtual } from "@/src/lib/motor/reconciliar-fase-macro"
 
 type TX = Prisma.TransactionClient
 
@@ -416,7 +416,7 @@ export async function publicarWorkflow(args: {
   // publicação bem-sucedida numa resposta de erro genérica pro admin.
   try {
     const wfAtual = await prisma.phaseInternalWorkflow.findUnique({
-      where: { id: args.workflowId }, select: { phaseKey: true },
+      where: { id: args.workflowId }, select: { phaseKey: true, tipoProcessoId: true },
     })
     const catalogoFase = wfAtual
       ? await prisma.catalogoFase.findUnique({ where: { phaseKey: wfAtual.phaseKey }, select: { id: true } })
@@ -433,6 +433,21 @@ export async function publicarWorkflow(args: {
         escopoMudou: false,
         publicadoPorId: args.actorId,
         origem: "WORKFLOW_INTERNO",
+      })
+    }
+    // COMPLEMENTO — mandato "regra única de prazo" (23/09/2026): o enqueue
+    // acima só alcança quem NUNCA materializou esta fase. Quem está NA FASE
+    // ATUAL com a instância já aberta precisa do caminho próprio (ver
+    // `enqueueReconciliacaoWorkflowInternoFaseAtual` para o porquê de não
+    // reusar o mesmo).
+    if (wfAtual) {
+      await enqueueReconciliacaoWorkflowInternoFaseAtual({
+        phaseKey: wfAtual.phaseKey,
+        tipoProcessoId: wfAtual.tipoProcessoId,
+        workflowId: args.workflowId,
+        versaoAnterior: preview.versaoAtual,
+        versaoNova: nova,
+        publicadoPorId: args.actorId,
       })
     }
   } catch (e) {

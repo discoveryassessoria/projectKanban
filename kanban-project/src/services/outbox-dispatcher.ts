@@ -27,6 +27,9 @@ import {
   processarReconciliacaoFaseMacro,
   TIPO_OUTBOX_RECONCILIACAO_FASE_MACRO,
   type ReconciliacaoFaseMacroPayload,
+  processarReconciliacaoWorkflowInternoFaseAtual,
+  TIPO_OUTBOX_RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL,
+  type ReconciliacaoWorkflowInternoFaseAtualPayload,
 } from "@/src/lib/motor/reconciliar-fase-macro"
 // Reconciliação disparada pela EDIÇÃO de uma fase no Catálogo (não pela
 // publicação do Workflow Macro) — mesmo payload/efeito, tipo de outbox
@@ -124,6 +127,10 @@ export const TIPOS_DRENADOS = [
   // só a avaliação no TOPO do módulo precisa ser o literal.
   "fase.macro.reconciliar",
   "catalogo.fase.reconciliar",
+  // Reconciliação de Workflow Interno na fase ATUAL (mandato "regra única de
+  // prazo", 23/09/2026) — mesmo motivo do literal acima: evitar o ciclo de
+  // import na avaliação de módulo.
+  "workflow-interno.fase-atual.reconciliar",
 ] as const
 
 export interface OutboxProcessResumo {
@@ -277,6 +284,12 @@ export async function processarOutbox(opts?: {
         // já ramifica internamente por `payload.escopoMudou`.
         const p = evt.payload as unknown as ReconciliacaoFaseMacroPayload
         await processarReconciliacaoFaseMacro(p, evt.correlationId ?? undefined)
+      } else if (evt.tipo === TIPO_OUTBOX_RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL) {
+        // EFEITO: reconciliação retroativa do Workflow Interno para quem já
+        // está NA fase atual com a instância aberta (mandato "regra única de
+        // prazo", 23/09/2026) — ver reconciliar-fase-macro.ts.
+        const p = evt.payload as unknown as ReconciliacaoWorkflowInternoFaseAtualPayload
+        await processarReconciliacaoWorkflowInternoFaseAtual(p, evt.correlationId ?? undefined)
       } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
         // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).
       }

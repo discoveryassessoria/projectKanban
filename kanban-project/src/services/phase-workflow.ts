@@ -804,6 +804,171 @@ export async function instanciarWorkflowDaFase(
   }
 }
 
+export interface ReconciliarInstanciaAtualInput {
+  processoId: number
+  faseMacroKey: string
+  correlationId?: string
+  causationId?: string
+}
+
+export type ReconciliarInstanciaAtualMotivo =
+  | "SEM_INSTANCIA_ABERTA"
+  | "SEM_VERSAO_REGISTRADA"
+  | "WORKFLOW_MUDOU_DE_IDENTIDADE"
+  | "VERSAO_ANTIGA_NAO_CONGELADA"
+  | "SEM_TRABALHO_NOVO"
+  | "PASSO_EM_ANDAMENTO_MUDOU"
+
+export type ReconciliarInstanciaAtualResultado =
+  | {
+      success: true; aplicado: true; workflowInstanceId: number
+      versaoAnterior: number; versaoNova: number; passosCriados: number
+      stepInstances: PhaseWorkflowStepInstance[]; correlationId: string
+    }
+  | { success: true; aplicado: false; motivo: ReconciliarInstanciaAtualMotivo; detalhe?: string; correlationId: string }
+  | { success: false; code: FailureCode; errors: WorkflowValidationIssue[]; correlationId: string }
+
+/**
+ * APLICA UMA VERSÃO NOVA de Workflow Interno à instância JÁ ABERTA da fase ATUAL
+ * de um processo em andamento — mandato "regra única de prazo" (23/09/2026),
+ * item "mudança precisa valer para processos em andamento".
+ *
+ * NÃO usa o caminho de `instanciarWorkflowDaFase` para isso: a chave de
+ * idempotência dele (`montarChaveWorkflow`) inclui `workflowVersion`, então
+ * publicar uma versão nova por cima de uma fase já materializada nunca bate
+ * com a instância existente e cria uma SEGUNDA `PhaseWorkflowInstance`/Tarefa
+ * em paralelo — bug real, reproduzido e corrigido em produção nos processos
+ * 632/633/635/637 (ver `src/lib/motor/reconciliar-fase-macro.ts`, linhas
+ * 368-384). Esta função resolve a instância pela POSIÇÃO (processo × fase,
+ * status aberto), não pela chave versionada.
+ *
+ * SÓ APLICA quando é seguro: nenhum passo JÁ MATERIALIZADO (em andamento, não
+ * SUPERSEDIDO/CANCELADO) pode ter sua definição congelada alterada por baixo —
+ * `definicaoHistoricaDoPasso` resolve TODOS os passos de uma instância pelo
+ * MESMO `workflowVersion` dela (par instância→versão, não passo→versão), então
+ * trocar essa coluna depois que um passo já tem dado preenchido mudaria, sem o
+ * operador perceber, o que aquele passo em andamento lê (ações, campos,
+ * canais, checklist) — a mesma classe de risco que este módulo já documenta
+ * para `politicaDeSla` em `versao-publicada.ts`. Quando a publicação alterou
+ * um passo já materializado (não só acrescentou passo novo), a reconciliação
+ * se recusa por inteiro e o motivo fica nomeado — nunca aplica pela metade.
+ *
+ * Quando é seguro (a versão nova só ACRESCENTA passos, nenhum já materializado
+ * mudou): ancora a instância na versão nova e materializa só o que falta —
+ * mesma dedup por identidade lógica que `materializarAlvos` já usa (status,
+ * responsável, dados preenchidos, histórico e `Tarefa.dataPrazo` de tudo que já
+ * existia continuam exatamente como estavam; só o passo novo nasce, e só ganha
+ * Tarefa quem chama `garantirTarefaDePasso` depois — ver
+ * `reconciliar-fase-macro.ts`).
+ */
+export async function reconciliarNovaVersaoNaInstanciaAtual(
+  input: ReconciliarInstanciaAtualInput,
+): Promise<ReconciliarInstanciaAtualResultado> {
+  const correlationId = input.correlationId ?? randomUUID()
+  const fail = (code: FailureCode, errors: WorkflowValidationIssue[] = []): ReconciliarInstanciaAtualResultado => ({
+    success: false, code, errors, correlationId,
+  })
+  const semTrabalho = (motivo: ReconciliarInstanciaAtualMotivo, detalhe?: string): ReconciliarInstanciaAtualResultado => ({
+    success: true, aplicado: false, motivo, detalhe, correlationId,
+  })
+
+  const instancia = await prisma.phaseWorkflowInstance.findFirst({
+    where: { processoId: input.processoId, faseMacroKey: input.faseMacroKey, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
+    orderBy: { ciclo: "desc" },
+  })
+  if (!instancia) return semTrabalho("SEM_INSTANCIA_ABERTA")
+  if (instancia.workflowDefinitionId == null || instancia.workflowVersion == null) {
+    return semTrabalho("SEM_VERSAO_REGISTRADA", "Instância não registra workflowDefinitionId/workflowVersion (dado anterior ao versionamento).")
+  }
+
+  const processo = await prisma.processo.findUnique({
+    where: { id: input.processoId }, select: { tipoProcessoMotorId: true },
+  })
+  const resolvido = await resolverWorkflowAplicavel(processo?.tipoProcessoMotorId ?? null, input.faseMacroKey, prisma)
+  if ("erro" in resolvido) {
+    return resolvido.detalhe
+      ? fail(resolvido.erro, [{ code: resolvido.erro, message: resolvido.detalhe, entityType: "fase", entityId: input.faseMacroKey }])
+      : fail(resolvido.erro)
+  }
+  const { workflow, steps } = await ancorarNaVersaoPublicada(resolvido, prisma)
+
+  if (workflow.id !== instancia.workflowDefinitionId) {
+    // O workflow aplicável mudou de IDENTIDADE (ex.: passou a existir um
+    // específico do tipo onde antes só havia o 'all') — não é versão nova do
+    // MESMO workflow; fora do escopo desta reconciliação. Quem nunca
+    // materializou esta fase já é alcançado pelo caminho de "fase futura"
+    // (enqueueReconciliacaoCatalogoFase, origem WORKFLOW_INTERNO).
+    return semTrabalho("WORKFLOW_MUDOU_DE_IDENTIDADE")
+  }
+  if (workflow.versao === instancia.workflowVersion) {
+    return semTrabalho("SEM_TRABALHO_NOVO")
+  }
+
+  const versaoAntiga = await lerVersaoPublicada(instancia.workflowDefinitionId, instancia.workflowVersion, prisma)
+  const versaoNova = await lerVersaoPublicada(workflow.id, workflow.versao, prisma)
+  if (!versaoAntiga || !versaoNova) return semTrabalho("VERSAO_ANTIGA_NAO_CONGELADA")
+
+  const materializados = await prisma.phaseWorkflowStepInstance.findMany({
+    where: { workflowInstanceId: instancia.id, ciclo: instancia.ciclo, status: { notIn: ["SUPERSEDIDO", "CANCELADO"] } },
+    select: { stepKey: true },
+  })
+  const chavesMaterializadas = new Set(materializados.map((m) => m.stepKey))
+
+  for (const key of chavesMaterializadas) {
+    const antes = versaoAntiga.passos.find((p) => p.key === key)
+    const depois = versaoNova.passos.find((p) => p.key === key)
+    if (antes && depois && JSON.stringify(antes) !== JSON.stringify(depois)) {
+      return semTrabalho(
+        "PASSO_EM_ANDAMENTO_MUDOU",
+        `O passo "${key}" já está materializado nesta fase e sua definição mudou na versão ${workflow.versao} — a reconciliação automática não altera passo em andamento. Publique novamente só acrescentando passo novo, ou aplique manualmente.`,
+      )
+    }
+  }
+
+  const escopoDaFase: Cardinalidade = ((await resolverEscopoDaFase(input.faseMacroKey, prisma)) as Cardinalidade | null) ?? "PROCESSO"
+  const { ctx: ctxEscopo } = await carregarContextoEscopo(input.processoId, steps, escopoDaFase, prisma)
+  const plano = planejarMaterializacao(steps, workflow.execucao, escopoDaFase, ctxEscopo)
+  const instantiatedAt = new Date().toISOString()
+
+  const criados = await prisma.$transaction(async (tx) => {
+    const r = await materializarAlvos(
+      tx,
+      {
+        instanciaId: instancia.id, processoId: input.processoId, faseMacroKey: input.faseMacroKey,
+        ciclo: instancia.ciclo, correlationId,
+        causationId: input.causationId ?? `reconciliacao-fase-atual|${instancia.id}|v${workflow.versao}`,
+        instantiatedAt, exigeDocumento: workflow.exigeDocumento === true,
+      },
+      plano.alvos,
+    )
+    if (r.criados.length === 0) return r.criados
+
+    await tx.phaseWorkflowInstance.update({
+      where: { id: instancia.id },
+      data: {
+        workflowVersion: workflow.versao,
+        snapshot: construirSnapshotWorkflow({
+          workflowDefinitionId: workflow.id, workflowVersion: workflow.versao, name: workflow.name,
+          faseMacroId: instancia.faseMacroId, faseMacroKey: input.faseMacroKey, faseMacroVersion: instancia.faseMacroVersion,
+          tipoProcessoId: workflow.tipoProcessoId, instantiatedAt,
+        }) as Prisma.InputJsonValue,
+      },
+    })
+    return r.criados
+  }, { maxWait: 20_000, timeout: 30_000 })
+
+  if (criados.length === 0) return semTrabalho("SEM_TRABALHO_NOVO")
+
+  const stepInstances = await prisma.phaseWorkflowStepInstance.findMany({
+    where: { workflowInstanceId: instancia.id }, orderBy: { ordem: "asc" },
+  })
+  return {
+    success: true, aplicado: true, workflowInstanceId: instancia.id,
+    versaoAnterior: instancia.workflowVersion, versaoNova: workflow.versao,
+    passosCriados: criados.length, stepInstances, correlationId,
+  }
+}
+
 /** Leitura: instância ativa (mais recente) da fase. */
 export async function getInstanciaAtiva(processoId: number, faseMacroKey: string) {
   return prisma.phaseWorkflowInstance.findFirst({
