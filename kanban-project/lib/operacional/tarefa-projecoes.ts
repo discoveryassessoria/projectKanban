@@ -244,24 +244,18 @@ export interface LinhaDeFila {
   passoAtual: { ordem: number; total: number } | null
 
   /**
-   * O PRAZO OPERACIONAL DA SUBTAREFA CORRENTE — o relógio IRMÃO do prazo
-   * macro (`dataPrazo`/`atrasada` acima), nunca o mesmo (mandato "motor de
-   * atenção operacional", 17/09/2026). Fonte: `SubtaskExecution.prazo` da
-   * subtarefa corrente, passado por `estadoTemporalSubtarefa`
-   * (`tempo-operacional.ts` — engine única, a mesma que computa o prazo
-   * macro). `null` quando o passo não tem subtarefas, quando a corrente
-   * ainda não tem prazo ancorado (ex.: nasceu direto em espera externa — sem
-   * ação interna, sem relógio interno) ou quando a tarefa está encerrada.
-   */
-  prazoPasso: EstadoTemporal | null
-
-  /**
    * REGRA TEMPORAL DA ESPERA DA SUBTAREFA CORRENTE — dimensão C, própria da
    * execução (mandato "correção definitiva do modelo temporal", 19-20/09/2026).
    * Fonte: `SubtaskExecution.previstoPara`. NUNCA o prazo macro, nunca
-   * acompanhamento, nunca o mesmo relógio de `prazoPasso` (aquele é SLA de
-   * AÇÃO INTERNA; este é limite de TERCEIRO). `null` = sem regra temporal
+   * acompanhamento — é limite de TERCEIRO. `null` = sem regra temporal
    * configurada/aplicável para a espera corrente.
+   *
+   * A subtarefa NÃO tem relógio de execução próprio (decisão definitiva,
+   * 23/09/2026: um único prazo final por Tarefa) — o que existia aqui como
+   * `prazoPasso` (SLA de ação interna da subtarefa) foi removido por
+   * completo, schema incluso (`StepSubtaskDefinition.slaDays`/
+   * `SubtaskExecution.prazo`). Regra temporal e acompanhamento continuam:
+   * são lembretes de terceiro, nunca um segundo vencimento da tarefa.
    */
   regraTemporalPasso: EstadoTemporal | null
 
@@ -430,22 +424,11 @@ function projetar(
         total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem,
       }
     })(),
-    // O RELÓGIO DA SUBTAREFA CORRENTE — engine única (`estadoTemporalSubtarefa`,
-    // a mesma matemática de `estadoTemporal` acima, vocabulário próprio de
-    // `SubtaskExecution.status`). `null` sem subtarefa corrente (passo sem
-    // subtarefas, ou todas encerradas) — nunca inventa prazo.
-    prazoPasso: (() => {
-      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
-      const atual = porSubtarefa?.atual
-      if (!atual) return null
-      return estadoTemporalSubtarefa({
-        dataPrazo: atual.prazo, status: atual.status, criadaEm: atual.criadoEm, agora,
-      })
-    })(),
-    // MESMA RÉGUA (`estadoTemporalSubtarefa`), aplicada aos DOIS OUTROS
-    // relógios da subtarefa corrente — regra temporal (dimensão C) e
-    // acompanhamento (dimensão D). Nenhum dos dois reaproveita `prazoPasso`
-    // acima (SLA de ação interna) nem um o outro.
+    // MESMA RÉGUA (`estadoTemporalSubtarefa`), aplicada aos DOIS relógios
+    // PRÓPRIOS da subtarefa corrente — regra temporal (dimensão C) e
+    // acompanhamento (dimensão D). Nenhum dos dois é o prazo oficial da
+    // Tarefa, nenhum cria um segundo vencimento (decisão definitiva,
+    // 23/09/2026: um único prazo final por Tarefa).
     regraTemporalPasso: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
       const atual = porSubtarefa?.atual
@@ -570,7 +553,7 @@ export interface ResumoSubtarefasDoPasso {
   total: number
   /** A subtarefa CORRENTE (não encerrada), pela ordem da definição — nunca por `sequencia` (retry count por subtarefa, não ordem entre subtarefas). */
   atual: {
-    subtaskKey: string; status: string; prazo: Date | null; criadoEm: Date; startedAt: Date | null
+    subtaskKey: string; status: string; criadoEm: Date; startedAt: Date | null
     /** Dimensão C (regra temporal do terceiro) — nunca prazo, nunca acompanhamento. */
     previstoPara: Date | null
     /** Dimensão D (acompanhamento) — quando esta espera volta à atenção. */
@@ -628,7 +611,7 @@ async function progressoPorSubtarefa(
   const execucoes = await db.subtaskExecution.findMany({
     where: { stepInstanceId: { in: stepInstanceIds }, supersededAt: null },
     select: {
-      stepInstanceId: true, subtaskKey: true, status: true, prazo: true, criadoEm: true, startedAt: true,
+      stepInstanceId: true, subtaskKey: true, status: true, criadoEm: true, startedAt: true,
       previstoPara: true, proximoAcompanhamentoEm: true,
     },
   })
@@ -646,7 +629,7 @@ async function progressoPorSubtarefa(
     resultado.set(stepInstanceId, {
       concluidas, total,
       atual: atual ? {
-        subtaskKey: atual.subtaskKey, status: atual.status, prazo: atual.prazo, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
+        subtaskKey: atual.subtaskKey, status: atual.status, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
         previstoPara: atual.previstoPara, proximoAcompanhamentoEm: atual.proximoAcompanhamentoEm,
       } : null,
     })

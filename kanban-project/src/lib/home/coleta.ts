@@ -18,7 +18,6 @@ import {
   FILAS_PASSO,
   FILAS_ESTADO,
   FILAS_PRAZO_TAREFA,
-  FILAS_PRAZO_SUBTAREFA,
   FILAS_ACOMPANHAMENTO,
   faixaDaFilaPrazo,
   faixaDaFilaAcompanhamento,
@@ -108,13 +107,12 @@ interface PendenciaBase {
   phaseKey: string
   criadoEm: Date
 }
-/** Subtarefa ATIVA (DISPONIVEL/EM_ANDAMENTO/AGUARDANDO_EXTERNO) — grain próprio, nunca somado à Tarefa. */
+/** Subtarefa ATIVA (DISPONIVEL/EM_ANDAMENTO/AGUARDANDO_EXTERNO) — sem relógio de execução próprio (decisão definitiva, 23/09/2026); só carrega acompanhamento. */
 interface SubtarefaBase {
   id: number
   stepInstanceId: number
   subtaskKey: string
   status: string
-  prazo: Date | null
   /** Dimensão D — quando esta espera volta à atenção. Nunca prazo/SLA. */
   proximoAcompanhamentoEm: Date | null
   processoId: number
@@ -199,9 +197,9 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
       : Promise.resolve([] as any[]),
     // SUBTAREFAS ATIVAS — mesmo escopo do passo (o responsável do STEP, não
     // um campo próprio na subtarefa). DISPONIVEL/EM_ANDAMENTO/AGUARDANDO_EXTERNO
-    // são as únicas com relógio correndo; BLOQUEADO/PENDENTE não têm prazo
-    // ainda (`prazo: null`) e CONCLUIDO/CANCELADO/INVALIDADO/FALHOU já
-    // encerraram o delas.
+    // são as únicas vivas; CONCLUIDO/CANCELADO/INVALIDADO/FALHOU já
+    // encerraram. Sem relógio de execução próprio (decisão definitiva,
+    // 23/09/2026) — só acompanhamento (`proximoAcompanhamentoEm`) importa aqui.
     p.verTarefas
       ? prisma.subtaskExecution.findMany({
           where: {
@@ -210,7 +208,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
             stepInstance: { ...(escopoDoPasso as any) },
           },
           select: {
-            id: true, stepInstanceId: true, subtaskKey: true, status: true, prazo: true, proximoAcompanhamentoEm: true,
+            id: true, stepInstanceId: true, subtaskKey: true, status: true, proximoAcompanhamentoEm: true,
             stepInstance: {
               select: {
                 processoId: true, documentoId: true, necessidadeId: true,
@@ -222,7 +220,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
             },
           },
         }).then((rows) => rows.map((r) => ({
-          id: r.id, stepInstanceId: r.stepInstanceId, subtaskKey: r.subtaskKey, status: r.status, prazo: r.prazo,
+          id: r.id, stepInstanceId: r.stepInstanceId, subtaskKey: r.subtaskKey, status: r.status,
           proximoAcompanhamentoEm: r.proximoAcompanhamentoEm,
           processoId: r.stepInstance.processoId, documentoId: r.stepInstance.documentoId,
           necessidadeId: r.stepInstance.necessidadeId, responsavelId: r.stepInstance.tarefas[0]?.responsavelId ?? null,
@@ -288,31 +286,15 @@ type Membro =
   | { tipo: "pendencia"; pendencia: PendenciaBase }
 
 function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[] {
-  // --- filas de prazo Tarefa/Subtarefa (os dois relógios operacionais canônicos) ---
+  // --- fila de prazo da TAREFA (único relógio de vencimento — decisão definitiva, 23/09/2026) ---
   const filaPrazo = faixaDaFilaPrazo(key)
   if (filaPrazo) {
-    if (filaPrazo.grain === "tarefa") {
-      return base.tarefas
-        .filter((t) => {
-          const est = estadoTemporal({ dataPrazo: t.dataPrazo, statusTarefa: t.statusTarefa, agora })
-          return faixaPrazoDoEstado(est.diasParaPrazo, est.atrasado) === filaPrazo.faixa
-        })
-        .map((tarefa) => ({ tipo: "tarefa" as const, tarefa }))
-    }
-    return base.subtarefas
-      .filter((s) => {
-        const est = estadoTemporalSubtarefa({ dataPrazo: s.prazo, status: s.status, agora })
-        // AGUARDANDO_EXTERNO não entra em NENHUM balde de prazo (achado real,
-        // 19/09/2026 — mandato "correção definitiva do modelo temporal"): o
-        // relógio dela, quando existe, é cadência de acompanhamento — não um
-        // prazo exigível. Misturar as duas coisas faz uma espera legítima de
-        // terceiro aparecer como "atrasada"/"vence hoje" na Home. O lugar
-        // certo pra essa informação é um painel de Acompanhamentos próprio
-        // (ainda não construído — ver relatório), nunca este.
-        if (est.aguardandoTerceiro) return false
+    return base.tarefas
+      .filter((t) => {
+        const est = estadoTemporal({ dataPrazo: t.dataPrazo, statusTarefa: t.statusTarefa, agora })
         return faixaPrazoDoEstado(est.diasParaPrazo, est.atrasado) === filaPrazo.faixa
       })
-      .map((subtarefa) => ({ tipo: "subtarefa" as const, subtarefa }))
+      .map((tarefa) => ({ tipo: "tarefa" as const, tarefa }))
   }
 
   // --- filas de ACOMPANHAMENTO (dimensão D, própria da espera de terceiro) ---
@@ -411,7 +393,9 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
 function prazoDoMembro(m: Membro): Date | null {
   if (m.tipo === "passo") return m.passo.prazo
   if (m.tipo === "tarefa") return m.tarefa.dataPrazo
-  if (m.tipo === "subtarefa") return m.subtarefa.prazo
+  // "subtarefa" só aparece na fila de acompanhamento (dataDoMembroNaFila
+  // resolve o dela via `proximoAcompanhamentoEm` antes de chegar aqui) — ela
+  // não tem relógio de execução/prazo próprio (decisão definitiva, 23/09/2026).
   return null
 }
 
@@ -554,24 +538,18 @@ export function montarPrazosDeTarefas(base: BaseOperacional, ctx: ContextoHome):
   return montarPainelDePrazo(FILAS_PRAZO_TAREFA, base, ctx)
 }
 
-// ---------------------------------------------------------------------------
-// PRAZOS DE SUBTAREFA — o relógio OPERACIONAL, grain SUBTAREFA. A ação que
-// está correndo AGORA, nunca o compromisso macro da Tarefa (acima). Uma pode
-// estar atrasada enquanto a outra está no prazo — os dois painéis convivem,
-// lado a lado, na Home (decisão explícita do usuário, 17/09/2026).
-// ---------------------------------------------------------------------------
-export function montarPrazosDeSubtarefas(base: BaseOperacional, ctx: ContextoHome): FilaOperacional[] | null {
-  if (!ctx.permissoes.verTarefas) return null
-  return montarPainelDePrazo(FILAS_PRAZO_SUBTAREFA, base, ctx)
-}
+// `montarPrazosDeSubtarefas` — REMOVIDO (23/09/2026, decisão definitiva): a
+// subtarefa não tem relógio de execução próprio. Existia aqui um segundo
+// painel de "prazo" (grain subtarefa) ao lado do prazo real da Tarefa —
+// exatamente o que a seção abaixo já dizia para nunca fazer.
 
 // ---------------------------------------------------------------------------
 // ACOMPANHAMENTOS — painel PRÓPRIO, nunca fundido com PRAZOS. Mandato
 // "correção definitiva do modelo temporal" (19-20/09/2026), seção 5: "a Home
 // NÃO deve continuar comunicando dois 'prazos' concorrentes" — acompanhamento
-// não é prazo, não é SLA, não é "subtarefa vencida"; é "quando esta espera
-// volta à atenção". Mesma engine (`estadoTemporalSubtarefa`) dos painéis de
-// prazo, alimentada com `proximoAcompanhamentoEm` em vez de `prazo`.
+// não é prazo, não é SLA; é "quando esta espera volta à atenção". Mesma
+// engine (`estadoTemporalSubtarefa`) do painel de prazo da Tarefa, alimentada
+// com `proximoAcompanhamentoEm` em vez de `dataPrazo`.
 // ---------------------------------------------------------------------------
 export function montarAcompanhamentos(base: BaseOperacional, ctx: ContextoHome): FilaOperacional[] | null {
   if (!ctx.permissoes.verTarefas) return null

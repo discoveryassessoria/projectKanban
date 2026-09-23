@@ -72,21 +72,12 @@ async function partA() {
     classificarAtencaoOperacional({ ...BASE, coluna: "BLOQUEADA", executavelAgora: false }) === "outras",
   )
 
-  secao("Teste D (revisitado) — atraso interno pelo relógio DO PASSO, não só o macro")
-  const d2: LinhaComAtencao = { ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasoInterno: false, prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: false } }
-  ok("subtarefa corrente com SLA próprio vencido também é Atrasadas, mesmo com o prazo macro em dia", classificarAtencaoOperacional(d2) === "atrasoInterno")
-
-  secao("Teste D2 (achado real 19/09/2026) — subtarefa AGUARDANDO_EXTERNO com relógio 'vencido' NUNCA é atraso interno")
-  const d3: LinhaComAtencao = {
-    ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, atrasoInterno: false,
-    prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: true },
-  }
-  const rD3 = calcularAtencaoOperacional(d3)
-  ok(
-    "o relógio do passo 'vencido' enquanto aguarda terceiro NÃO vira atrasoInterno (é cadência de acompanhamento, não prazo)",
-    rD3.categoriaPrincipal === "aguardandoTerceiros", rD3.categoriaPrincipal,
-  )
-  ok("e também não gera o motivo PRAZO_PASSO_VENCIDO", !rD3.motivos.includes("PRAZO_PASSO_VENCIDO"), JSON.stringify(rD3.motivos))
+  // Testes D/D2 (relógio próprio DO PASSO/subtarefa) foram removidos por
+  // completo — decisão definitiva, 23/09/2026: a subtarefa não tem relógio
+  // de execução próprio (`prazoPasso`/`PRAZO_PASSO_VENCIDO` não existem
+  // mais). Só a Tarefa tem prazo; `regraTemporalPasso`/`acompanhamentoPasso`
+  // continuam (são lembretes de terceiro, testados abaixo e em
+  // `acompanhar-hoje-semantica-dia-operacional.test.ts`).
 
   secao("Teste F — prazo macro vencido, passo ainda normal: UMA tarefa, motivo adicional, categoria coerente")
   const f: LinhaComAtencao = { ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false, atrasada: true, atrasoInterno: false }
@@ -94,30 +85,26 @@ async function partA() {
   ok("Teste F) categoria principal continua aguardandoTerceiros (o atraso do macro não é 'minha culpa' aqui)", rF.categoriaPrincipal === "aguardandoTerceiros", rF.categoriaPrincipal)
   ok("Teste F) motivo PRAZO_TAREFA_VENCIDO registrado mesmo sem virar a categoria", rF.motivos.includes("PRAZO_TAREFA_VENCIDO"))
 
-  secao("Teste G — prazo macro E prazo do passo vencem no MESMO dia: uma tarefa, uma atenção, dois motivos, zero duplicidade")
-  const g: LinhaComAtencao = {
-    ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasada: true, atrasoInterno: true,
-    prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: false },
-  }
+  secao("Teste G — prazo macro vencido: UMA tarefa, UM motivo, zero duplicidade")
+  const g: LinhaComAtencao = { ...BASE, coluna: "A_FAZER", executavelAgora: true, atrasada: true, atrasoInterno: true }
   const rG = calcularAtencaoOperacional(g)
   ok("Teste G) UMA categoria principal (atrasoInterno)", rG.categoriaPrincipal === "atrasoInterno")
-  ok("Teste G) DOIS motivos registrados (macro + passo), nunca duas tarefas", rG.motivos.includes("PRAZO_TAREFA_VENCIDO") && rG.motivos.includes("PRAZO_PASSO_VENCIDO") && rG.motivos.length === 2, JSON.stringify(rG.motivos))
+  ok("Teste G) motivo PRAZO_TAREFA_VENCIDO registrado", rG.motivos.includes("PRAZO_TAREFA_VENCIDO") && rG.motivos.length === 1, JSON.stringify(rG.motivos))
 
-  secao("Teste H — prazo macro + prazo passo + acompanhamento devido, TODOS simultâneos: uma categoria, três motivos")
+  secao("Teste H — prazo macro + acompanhamento devido, simultâneos: uma categoria, dois motivos")
   const h: LinhaComAtencao = {
     ...BASE, coluna: "AGUARDANDO_TERCEIRO", executavelAgora: false,
-    atrasada: true, acompanhamentoVencido: true,
-    prazoPasso: { atrasado: true, venceHoje: false, aguardandoTerceiro: false },
+    atrasada: true, atrasoInterno: true, acompanhamentoVencido: true,
   }
   const rH = calcularAtencaoOperacional(h)
-  // Atraso interno (macro OU do passo) vence acompanhamento na precedência —
-  // "existia uma ação que dependia de você e o prazo passou" é mais urgente
-  // do que "está na hora de acompanhar" (item 13: a categoria responde "qual
-  // é a coisa mais importante que o responsável precisa saber/fazer agora").
-  ok("Teste H) categoria principal = atrasoInterno (o mais urgente dos três fatos)", rH.categoriaPrincipal === "atrasoInterno", rH.categoriaPrincipal)
+  // Atraso interno vence acompanhamento na precedência — "existia uma ação
+  // que dependia de você e o prazo passou" é mais urgente do que "está na
+  // hora de acompanhar" (item 13: a categoria responde "qual é a coisa mais
+  // importante que o responsável precisa saber/fazer agora").
+  ok("Teste H) categoria principal = atrasoInterno (o mais urgente dos dois fatos)", rH.categoriaPrincipal === "atrasoInterno", rH.categoriaPrincipal)
   ok(
-    "Teste H) TRÊS motivos simultâneos (prazo macro + prazo passo + acompanhamento), uma tarefa só",
-    rH.motivos.includes("PRAZO_TAREFA_VENCIDO") && rH.motivos.includes("PRAZO_PASSO_VENCIDO") && rH.motivos.includes("ACOMPANHAMENTO_DEVIDO") && rH.motivos.length === 3,
+    "Teste H) DOIS motivos simultâneos (prazo macro + acompanhamento), uma tarefa só",
+    rH.motivos.includes("PRAZO_TAREFA_VENCIDO") && rH.motivos.includes("ACOMPANHAMENTO_DEVIDO") && rH.motivos.length === 2,
     JSON.stringify(rH.motivos),
   )
 
@@ -134,11 +121,11 @@ async function partA() {
   )
   ok(
     "INVARIANTE 2) N relógios produzem N motivos, nunca N tarefas — motivos é um array, categoriaPrincipal continua sendo um valor só",
-    Array.isArray(rH.motivos) && rH.motivos.length === 3 && typeof rH.categoriaPrincipal === "string",
+    Array.isArray(rH.motivos) && rH.motivos.length === 2 && typeof rH.categoriaPrincipal === "string",
   )
   ok(
-    "INVARIANTE 3) prazo macro (atrasada) != prazo do passo (prazoPasso.atrasado) != acompanhamento (acompanhamentoVencido) — três campos, três fontes",
-    g.atrasada !== undefined && g.prazoPasso?.atrasado !== undefined && h.acompanhamentoVencido !== undefined,
+    "INVARIANTE 3) prazo macro (atrasada) != acompanhamento (acompanhamentoVencido) — a Tarefa tem um único prazo; acompanhamento é campo próprio, nunca um segundo vencimento",
+    g.atrasada !== undefined && h.acompanhamentoVencido !== undefined,
   )
   ok(
     "INVARIANTE 4) espera de terceiro não é atraso interno — aguardando sem nenhum atraso classifica aguardandoTerceiros, nunca atrasoInterno",
@@ -158,9 +145,9 @@ async function partA() {
     somaPorCategoria === universo.length,
   )
   ok(
-    "a soma de TODOS os motivos pode ser maior que o total de linhas (g tem 2, h tem 3) — prova que motivos != categorias",
-    somaDeMotivos > universo.length,
-    `motivos somados=${somaDeMotivos}, linhas=${universo.length}`,
+    "uma linha isolada pode ter MAIS de um motivo simultâneo (h tem 2: prazo + acompanhamento) — prova que motivos != categorias",
+    motivosAtivos(h).length > 1,
+    `motivos de h=${JSON.stringify(motivosAtivos(h))}, total do universo=${somaDeMotivos}`,
   )
 
   console.log(`\nParte A: ${passou} passaram, ${falhou} falharam até aqui`)

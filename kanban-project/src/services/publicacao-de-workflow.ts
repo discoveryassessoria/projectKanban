@@ -235,7 +235,7 @@ export async function preverPublicacao(
          { nome: "máximo de ocorrências", ler: (x) => x.maxOcorrencias },
          { nome: "modo de execução", ler: (x) => x.modoExecucao },
          { nome: "regra de responsável", ler: (x) => x.responsavelRegra },
-         { nome: "responsável", ler: (x) => x.responsavelId }, { nome: "SLA (dias)", ler: (x) => x.slaDays },
+         { nome: "responsável", ler: (x) => x.responsavelId },
          { nome: "condição de entrada", ler: (x) => x.condicaoEntrada },
          { nome: "condição de conclusão", ler: (x) => x.condicaoConclusao },
          { nome: "condição de visibilidade", ler: (x) => x.condicaoVisibilidade },

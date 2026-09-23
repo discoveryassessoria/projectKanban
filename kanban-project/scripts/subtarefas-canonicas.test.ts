@@ -161,7 +161,7 @@ async function main() {
     data: {
       stepId: passo.id, key: "conferir_elemento_y", label: "Conferir elemento Y", ordem: 1,
       obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA",
-      fonteDeCanais: "FORNECEDOR_RELACIONADO", dependeDe: [] as never, slaDays: 2,
+      fonteDeCanais: "FORNECEDOR_RELACIONADO", dependeDe: [] as never,
     },
     select: { id: true, key: true },
   })

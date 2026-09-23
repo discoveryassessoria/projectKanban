@@ -72,7 +72,7 @@ function linhaComAcompanhamento(agora: Date, dataAcompanhamento: Date): LinhaCom
     taskId: 1, coluna: "AGUARDANDO_TERCEIRO", dataPrazo: null, atrasada: false, venceHoje: false,
     executavelAgora: false, atribuidaEm: null, acompanhamentoVencido: false, atrasoInterno: false,
     atrasoTerceiro: false, retornoRecebido: false, emRisco: false,
-    prazoPasso: null, regraTemporalPasso: null,
+    regraTemporalPasso: null,
     acompanhamentoPasso: { atrasado: est.atrasado, venceHoje: est.venceHoje },
   }
 }

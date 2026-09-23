@@ -102,7 +102,7 @@ async function main() {
     data: {
       stepId: passo.id, key: "enviar_requerimento", label: "Enviar requerimento", ordem: 1,
       obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA",
-      fonteDeCanais: "NENHUMA", dependeDe: [] as never, slaDays: 1,
+      fonteDeCanais: "NENHUMA", dependeDe: [] as never,
     },
     select: { id: true, key: true },
   })
@@ -153,7 +153,7 @@ async function main() {
     data: {
       stepId: passo.id, key: "conferir_e_validar", label: "Conferir e validar", ordem: 4,
       obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA",
-      fonteDeCanais: "NENHUMA", dependeDe: ["receber_certidao"] as never, slaDays: 1,
+      fonteDeCanais: "NENHUMA", dependeDe: ["receber_certidao"] as never,
     },
     select: { id: true, key: true },
   })

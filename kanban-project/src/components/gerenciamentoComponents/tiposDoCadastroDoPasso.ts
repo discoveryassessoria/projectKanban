@@ -62,7 +62,6 @@ export interface SubtarefaCfg {
   modoExecucao?: string
   responsavelRegra?: string
   responsavelId?: number | null
-  slaDays?: number | null
   condicaoEntrada?: unknown
   condicaoConclusao?: unknown
   condicaoVisibilidade?: unknown
@@ -78,9 +77,9 @@ export interface SubtarefaCfg {
   /// automaticamente ao ser liberada — sem exigir ação manual do operador.
   esperaExternaAoLiberar?: boolean
   /// CONTROLE TEMPORAL DA ESPERA — dois relógios independentes, nenhum dos
-  /// dois é `slaDays` (que continua sendo, exclusivamente, o SLA de AÇÃO
-  /// INTERNA) nem o prazo oficial da Tarefa. Ver `lib/operacional/tempo-operacional.ts`
-  /// e o mandato "correção definitiva do modelo temporal" (19-20/09/2026).
+  /// dois é o prazo oficial da Tarefa (decisão definitiva, 23/09/2026: um
+  /// único prazo final por Tarefa — subtarefa não tem relógio de execução
+  /// próprio). Ver `lib/operacional/tempo-operacional.ts`.
   /// ACOMPANHAMENTO — quando esta espera volta à atenção do responsável.
   acompanhamentoAtivo?: boolean
   acompanhamentoPrimeiroDias?: number | null

@@ -145,7 +145,7 @@ async function main() {
     select: { id: true, key: true },
   })
   await prisma.stepSubtaskDefinition.create({
-    data: { stepId: passo.id, key: "acao_interna", label: "Ação interna", ordem: 1, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: [] as never, slaDays: 1 },
+    data: { stepId: passo.id, key: "acao_interna", label: "Ação interna", ordem: 1, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: [] as never },
   })
   await prisma.stepSubtaskDefinition.create({
     data: { stepId: passo.id, key: "espera_terceiro", label: "Espera de terceiro", ordem: 2, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["acao_interna"] as never, esperaExternaAoLiberar: true },

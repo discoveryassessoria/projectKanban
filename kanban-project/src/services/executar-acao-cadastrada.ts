@@ -34,7 +34,7 @@ import { registrarNaTentativa, tentativaVigente } from "@/src/services/execucao-
 import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { validarReferencia } from "@/src/services/referencia-canonica"
 import {
-  subtarefasDaEtapa, passoPodeConcluir, relogioDeNascimentoDaSubtarefa,
+  subtarefasDaEtapa, passoPodeConcluir,
   relogioDeEsperaExternaDaSubtarefa, dataDoGatilhoDaRegraTemporal,
 } from "@/src/services/subtarefas-da-etapa"
 import { canaisDaSubtarefa } from "@/src/lib/motor/canais-do-fornecedor"
@@ -373,17 +373,9 @@ export async function executarAcaoCadastrada(
   // na tentativa do passo devolveria o problema ao ponto de partida: três coisas
   // acontecendo dentro de um passo e um único lugar para registrar as três.
   if (subtarefa) {
-    // MESMO RELÓGIO de qualquer subtarefa que nasce com ação correndo — achado
-    // real (18/09/2026): este ramo (execução síncrona de uma ação) nunca
-    // passava pelo ramo DISPONIVEL de `materializarSubtarefas`, então o
-    // `slaDays` cadastrado nela nunca virava `prazo`.
-    const relogioDeNascimento = relogioDeNascimentoDaSubtarefa(
-      ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO, subtarefa.slaDays, hist.passo.slaDays, new Date(),
-    )
     await garantirExecucao({
       stepInstanceId, subtaskKey: subtarefa.key, workflowVersao: hist.versao,
       status: ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO,
-      prazo: relogioDeNascimento.prazo,
     })
     // ── EXECUTAR UMA AÇÃO CONCLUI A SUBTAREFA ─────────────────────────────
     //

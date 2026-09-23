@@ -171,16 +171,14 @@ export interface HomeData {
   filas: FilaOperacional[]
   /** null quando o usuário não vê processos */
   prazosResumo: PrazosResumo | null
-  /** grain TAREFA (dataPrazo, prazo MACRO) — nunca somado ao de subtarefa abaixo. Os DOIS relógios operacionais canônicos, ver [[prazo-tarefa-subtarefa-dois-relogios]]. null quando o usuário não vê tarefas. */
+  /** Prazo final ÚNICO da Tarefa (dataPrazo) — decisão definitiva (23/09/2026): a subtarefa não tem relógio de execução próprio. null quando o usuário não vê tarefas. */
   prazosTarefas: FilaOperacional[] | null
-  /** grain SUBTAREFA (prazo OPERACIONAL, ação corrente) — o relógio mais fino, convive com `prazosTarefas` sem substituí-lo. null quando o usuário não vê tarefas. */
-  prazosSubtarefas: FilaOperacional[] | null
   /**
    * ACOMPANHAMENTOS — dimensão D, PRÓPRIA (`SubtaskExecution.proximoAcompanhamentoEm`),
-   * NUNCA um terceiro "prazo": diz quando uma espera de terceiro volta à
-   * atenção, não quando algo vence. Convive com `prazosTarefas`/`prazosSubtarefas`
-   * sem se misturar a nenhum dos dois (mandato "correção definitiva do modelo
-   * temporal", 19-20/09/2026). null quando o usuário não vê tarefas.
+   * NUNCA um segundo prazo: diz quando uma espera de terceiro volta à
+   * atenção, não quando algo vence. Convive com `prazosTarefas` sem se
+   * misturar a ele (mandato "correção definitiva do modelo temporal",
+   * 19-20/09/2026, reafirmado 23/09/2026). null quando o usuário não vê tarefas.
    */
   acompanhamentos: FilaOperacional[] | null
   agenda: Agenda

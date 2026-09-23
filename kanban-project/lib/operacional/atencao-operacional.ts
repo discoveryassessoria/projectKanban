@@ -48,29 +48,6 @@ export interface LinhaComAtencao {
   atrasoTerceiro: boolean
   retornoRecebido: boolean
   emRisco: boolean
-  /**
-   * O RELÓGIO DA SUBTAREFA CORRENTE — irmão do prazo macro (`atrasada`
-   * acima), nunca o mesmo (mandato "motor de atenção operacional",
-   * 17/09/2026). `undefined`/`null` = sem subtarefa corrente com prazo
-   * ancorado (passo sem subtarefas, ou a corrente nasceu em espera externa
-   * — sem ação interna, sem relógio interno). Subconjunto estrutural de
-   * `EstadoTemporal` (`tempo-operacional.ts`) — os campos que a
-   * classificação usa.
-   *
-   * `aguardandoTerceiro` (achado real, 19/09/2026 — mandato "correção
-   * definitiva do modelo temporal"): uma subtarefa corrente pode estar
-   * `AGUARDANDO_EXTERNO` com `prazo` preenchido a partir do SLA próprio dela
-   * — mas para esse status, `slaDays` não representa um prazo/deadline
-   * exigível, representa a cadência de ACOMPANHAMENTO (quando volta à
-   * atenção se o terceiro ainda não respondeu). `estadoTemporalSubtarefa`
-   * continua calculando `atrasado` de forma pura (é só aritmética de data);
-   * quem decide se isso é uma dívida INTERNA é este classificador — e a
-   * mesma regra que já vale para o prazo macro (`proximo-acontecimento.ts`:
-   * "atrasoInterno = !encerrada && !aguardando && tempo.atrasado") precisa
-   * valer aqui, no relógio mais fino, ou "aguardando terceiro" vira
-   * silenciosamente "atraso meu" só porque o relógio errado foi consultado.
-   */
-  prazoPasso?: { atrasado: boolean; venceHoje: boolean; aguardandoTerceiro: boolean } | null
 
   /**
    * REGRA TEMPORAL DA ESPERA CORRENTE (dimensão C própria da subtarefa,
@@ -125,27 +102,18 @@ export type CategoriaPrincipal = CategoriaAtencao | 'outras'
  * mora; `motivos` é o que a linha pode mostrar por baixo, sem inventar uma
  * segunda tarefa nem uma segunda notificação.
  */
-export type MotivoAtencao = 'PRAZO_TAREFA_VENCIDO' | 'PRAZO_PASSO_VENCIDO' | 'ACOMPANHAMENTO_DEVIDO' | 'TERCEIRO_ATRASADO'
+export type MotivoAtencao = 'PRAZO_TAREFA_VENCIDO' | 'ACOMPANHAMENTO_DEVIDO' | 'TERCEIRO_ATRASADO'
 
 /** O rótulo de cada motivo — em linguagem de gente, um lugar só (nunca reescrito por tela). */
 export const ROTULO_MOTIVO: Record<MotivoAtencao, string> = {
-  PRAZO_TAREFA_VENCIDO: 'Prazo final também vencido',
-  PRAZO_PASSO_VENCIDO: 'Prazo do passo vencido',
+  PRAZO_TAREFA_VENCIDO: 'Prazo final vencido',
   ACOMPANHAMENTO_DEVIDO: 'Acompanhamento devido',
   TERCEIRO_ATRASADO: 'Terceiro atrasado',
 }
 
 export function motivosAtivos(l: LinhaComAtencao): MotivoAtencao[] {
   const motivos: MotivoAtencao[] = []
-  // FATO CRU (nunca o `atrasoInterno` refinado): o prazo macro pode ter
-  // passado mesmo durante uma espera de terceiro legítima — isso é
-  // informação, não motivo pra reclassificar a tarefa como "minha culpa".
   if (l.atrasada) motivos.push('PRAZO_TAREFA_VENCIDO')
-  // MESMA GUARDA de `atrasoInterno` (dimensão B, `proximo-acontecimento.ts`):
-  // um relógio de subtarefa "vencido" enquanto ela está AGUARDANDO_EXTERNO
-  // não é um prazo de ação interna — é (no máximo) acompanhamento, tratado
-  // à parte por `acompanhamentoVencido`.
-  if (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro) motivos.push('PRAZO_PASSO_VENCIDO')
   if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) motivos.push('ACOMPANHAMENTO_DEVIDO')
   if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) motivos.push('TERCEIRO_ATRASADO')
   return motivos
@@ -168,29 +136,20 @@ export function calcularAtencaoOperacional(l: LinhaComAtencao): AtencaoOperacion
 }
 
 /**
- * PRECEDÊNCIA (mandato item 13): atraso interno (macro OU do passo corrente
- * — os dois são "eu deveria ter agido e não agi") → terceiro atrasado →
- * acompanhamento devido → ação interna executável agora → aguardando
- * terceiro → demais estados legítimos. `prazoPasso.atrasado` entra como
- * MAIS UM jeito de virar atraso interno, nunca um degrau à parte — uma
- * subtarefa corrente com SLA próprio vencido é exatamente "existia uma ação
- * que dependia do responsável e o prazo foi ultrapassado" (item 10), só que
- * medido pelo relógio mais fino em vez do macro.
- *
- * MAS SÓ QUANDO A SUBTAREFA É AÇÃO INTERNA (achado real, 19/09/2026): se a
- * subtarefa corrente está `AGUARDANDO_EXTERNO`, o relógio dela não é um
- * prazo exigível — é, no máximo, cadência de acompanhamento. Aplicar aqui a
- * MESMA regra que `proximo-acontecimento.ts` já aplica no prazo macro
- * (`atrasoInterno = !encerrada && !aguardando && tempo.atrasado`) —
- * "aguardando terceiro" nunca vira "atraso meu" só porque o relógio mais
- * fino também está com uma data no passado.
+ * PRECEDÊNCIA (mandato item 13): atraso interno (prazo final da Tarefa) →
+ * terceiro atrasado → acompanhamento devido → ação interna executável agora
+ * → aguardando terceiro → demais estados legítimos.
  *
  * `regraTemporalPasso`/`acompanhamentoPasso` (19-20/09/2026): dimensões C/D
  * PRÓPRIAS da subtarefa corrente entram nos MESMOS degraus que as dimensões
  * C/D da Tarefa já ocupavam — nunca um degrau novo, só mais uma fonte.
+ *
+ * A subtarefa NÃO tem relógio de execução próprio (decisão definitiva,
+ * 23/09/2026): existia aqui `prazoPasso`, removido por completo — um único
+ * prazo final por Tarefa, `atrasoInterno` já o cobre inteiro.
  */
 export function classificarAtencaoOperacional(l: LinhaComAtencao): CategoriaPrincipal {
-  if (l.atrasoInterno || (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro)) return 'atrasoInterno'
+  if (l.atrasoInterno) return 'atrasoInterno'
   if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) return 'terceirosAtrasados'
   if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) return 'acompanharHoje'
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) return 'paraAgirAgora'
@@ -203,7 +162,7 @@ export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
   const cats: CategoriaAtencao[] = []
   if (l.executavelAgora && (l.coluna === 'A_FAZER' || l.coluna === 'EM_ANDAMENTO')) cats.push('paraAgirAgora')
   if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) cats.push('acompanharHoje')
-  if (l.atrasoInterno || (l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro)) cats.push('atrasoInterno')
+  if (l.atrasoInterno) cats.push('atrasoInterno')
   if (l.atrasoTerceiro || l.regraTemporalPasso?.atrasado) cats.push('terceirosAtrasados')
   if (l.coluna === 'AGUARDANDO_TERCEIRO') cats.push('aguardandoTerceiros')
   return cats
@@ -219,9 +178,8 @@ export function categoriasDaLinha(l: LinhaComAtencao): CategoriaAtencao[] {
  * Daniela, é sinal de configuração (Saúde do Sistema, EMI-022).
  */
 function degrauDeAtencao(l: LinhaComAtencao): number {
-  const atrasoInternoPasso = l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro
-  if (l.atrasada && (l.atrasoInterno || atrasoInternoPasso)) return 0
-  if (l.atrasoInterno || atrasoInternoPasso) return 1
+  if (l.atrasada && l.atrasoInterno) return 0
+  if (l.atrasoInterno) return 1
   if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje)) return 2
   if (l.retornoRecebido) return 3
   if (l.venceHoje && l.executavelAgora) return 4
@@ -238,9 +196,8 @@ function degrauDeAtencao(l: LinhaComAtencao): number {
  * não um segundo campo de prioridade inventado pela UI.
  */
 export function rotuloDeAtencao(l: LinhaComAtencao & { prioridade: string }): { rotulo: string; tom: 'critico' | 'alerta' | 'neutro' } {
-  const atrasoInternoPasso = l.prazoPasso?.atrasado && !l.prazoPasso.aguardandoTerceiro
-  if (l.atrasada && (l.atrasoInterno || atrasoInternoPasso)) return { rotulo: 'Crítico', tom: 'critico' }
-  if (l.atrasoInterno || atrasoInternoPasso) return { rotulo: 'Atrasado', tom: 'critico' }
+  if (l.atrasada && l.atrasoInterno) return { rotulo: 'Crítico', tom: 'critico' }
+  if (l.atrasoInterno) return { rotulo: 'Atrasado', tom: 'critico' }
   if (l.acompanhamentoVencido || (l.acompanhamentoPasso?.atrasado || l.acompanhamentoPasso?.venceHoje) || l.retornoRecebido) return { rotulo: 'Atenção', tom: 'alerta' }
   if (l.venceHoje && l.executavelAgora) return { rotulo: 'Hoje', tom: 'alerta' }
   if (l.prioridade === 'URGENTE') return { rotulo: 'Urgente', tom: 'alerta' }

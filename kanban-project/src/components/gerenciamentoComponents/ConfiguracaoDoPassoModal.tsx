@@ -445,24 +445,11 @@ export default function ConfiguracaoDoPassoModal({
                               <label className={lbl}>Descrição</label>
                               <input className={inp} value={st.descricao ?? ""} onChange={(e) => setSub(i, { descricao: e.target.value })} />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className={lbl}>Modo de execução</label>
-                                <select className={inp} value={st.modoExecucao ?? "MANUAL"} onChange={(e) => setSub(i, { modoExecucao: e.target.value })}>
-                                  {MODOS_DE_EXECUCAO.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
-                                </select>
-                              </div>
-                              <div>
-                                <label className={lbl}>SLA de ação interna (dias, vazio = herda)</label>
-                                <input className={inp} type="number" min={0} value={st.slaDays ?? ""}
-                                  onChange={(e) => setSub(i, { slaDays: Number(e.target.value) || null })}
-                                  disabled={st.esperaExternaAoLiberar === true} />
-                                {st.esperaExternaAoLiberar === true && (
-                                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
-                                    Não se aplica: esta subtarefa é espera de terceiro — o prazo dela é configurado em Controle temporal, abaixo, nunca aqui.
-                                  </p>
-                                )}
-                              </div>
+                            <div>
+                              <label className={lbl}>Modo de execução</label>
+                              <select className={inp} value={st.modoExecucao ?? "MANUAL"} onChange={(e) => setSub(i, { modoExecucao: e.target.value })}>
+                                {MODOS_DE_EXECUCAO.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
+                              </select>
                             </div>
                             <div className="flex flex-wrap gap-4">
                               <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">

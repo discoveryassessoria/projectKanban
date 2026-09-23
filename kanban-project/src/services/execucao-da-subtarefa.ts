@@ -29,7 +29,6 @@
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
-import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -94,7 +93,6 @@ export interface ExecucaoDeSubtarefa {
   completedAt: Date | null
   executadoPorId: number | null
   responsavelId: number | null
-  prazo: Date | null
   resultado: string | null
   payload: unknown
   fornecedorId: number | null
@@ -154,7 +152,6 @@ export async function abrirExecucao(
     bloqueioCodigo?: CausaDeBloqueio | null
     bloqueioAlvo?: string | null
     responsavelId?: number | null
-    prazo?: Date | null
     previstoPara?: Date | null
     proximoAcompanhamentoEm?: Date | null
     payload?: Prisma.InputJsonValue | null
@@ -212,7 +209,6 @@ export async function abrirExecucao(
       bloqueioAlvo: args.bloqueioAlvo ?? null,
       completedAt: nasceCumprida ? agora : null,
       responsavelId: args.responsavelId ?? null,
-      prazo: args.prazo ?? null,
       previstoPara: args.previstoPara ?? null,
       proximoAcompanhamentoEm: args.proximoAcompanhamentoEm ?? null,
       payload: args.payload ?? undefined,
@@ -456,8 +452,7 @@ export async function reabrirSubtarefa(args: {
   // campo é null em execuções legadas (achado real, 16/09/2026, processo
   // 613 stepInstance 2498 — TODAS as execuções tinham `subtaskDefinitionId:
   // null`), e é exatamente a mesma fonte que `subtarefasDaEtapa` já usa pra
-  // saber "quem depende de quem" nesta instância — e, agora, o SLA efetivo
-  // pra ligar o relógio de novo.
+  // saber "quem depende de quem" nesta instância.
   const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
 
   const dependentesConcluidas = !args.comDependentes ? [] : await (async () => {
@@ -488,13 +483,6 @@ export async function reabrirSubtarefa(args: {
     return resultado
   })()
 
-  // NOVA TENTATIVA, NOVO RELÓGIO: reabrir é uma execução nova (sequência
-  // seguinte, ver cabeçalho do arquivo) — o prazo antigo pertence à execução
-  // substituída, que fica preservada como histórico. Mesmo SLA efetivo
-  // (própria ou herdada do passo) que `materializarSubtarefas` usa.
-  const defReaberta = hist?.passo.subtarefas.find((d) => d.key === args.subtaskKey)
-  const prazoReaberta = prazoOperacional(defReaberta?.slaDays ?? hist?.passo.slaDays ?? 0, new Date())
-
   await prisma.$transaction(async (tx) => {
     await abrirExecucao({
       stepInstanceId: args.stepInstanceId,
@@ -504,7 +492,6 @@ export async function reabrirSubtarefa(args: {
       motivo: MOTIVOS_DE_EXECUCAO.REABERTURA_MANUAL,
       status: ESTADOS_DA_SUBTAREFA.DISPONIVEL,
       responsavelId: vigente.responsavelId,
-      prazo: prazoReaberta,
       correlationId: args.correlationId ?? null,
     }, tx)
 
@@ -554,7 +541,6 @@ export async function registrarNaExecucao(
     completedAt?: Date | null
     executadoPorId?: number | null
     responsavelId?: number | null
-    prazo?: Date | null
     resultado?: string | null
     payload?: Prisma.InputJsonValue | null
     fornecedorId?: number | null
@@ -593,7 +579,6 @@ export async function registrarNaExecucao(
       ...(dados.startedAt !== undefined && vigente.startedAt == null ? { startedAt: dados.startedAt } : {}),
       ...(dados.executadoPorId !== undefined ? { executadoPorId: dados.executadoPorId } : {}),
       ...(dados.responsavelId !== undefined ? { responsavelId: dados.responsavelId } : {}),
-      ...(dados.prazo !== undefined ? { prazo: dados.prazo } : {}),
       ...(dados.resultado !== undefined ? { resultado: dados.resultado } : {}),
       ...(dados.payload !== undefined && dados.payload !== null ? { payload: dados.payload } : {}),
       ...(dados.fornecedorId !== undefined ? { fornecedorId: dados.fornecedorId } : {}),
@@ -624,7 +609,6 @@ export async function garantirExecucao(
     bloqueioCodigo?: CausaDeBloqueio | null
     bloqueioAlvo?: string | null
     responsavelId?: number | null
-    prazo?: Date | null
     previstoPara?: Date | null
     proximoAcompanhamentoEm?: Date | null
   },

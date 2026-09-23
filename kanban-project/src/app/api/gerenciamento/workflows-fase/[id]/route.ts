@@ -284,7 +284,6 @@ export function buildFilhos(s: any, stepId: number) {
       modoExecucao: ['MANUAL', 'AUTOMATICA'].includes(String(t?.modoExecucao)) ? String(t.modoExecucao) : 'MANUAL',
       responsavelRegra: ['HERDA', 'ESPECIFICO', 'REGRA'].includes(String(t?.responsavelRegra)) ? String(t.responsavelRegra) : 'HERDA',
       responsavelId: Number(t?.responsavelId) > 0 ? Number(t.responsavelId) : null,
-      slaDays: Number(t?.slaDays) > 0 ? Number(t.slaDays) : null,
       condicaoEntrada: (t?.condicaoEntrada ?? undefined) as Prisma.InputJsonValue | undefined,
       condicaoConclusao: (t?.condicaoConclusao ?? undefined) as Prisma.InputJsonValue | undefined,
       condicaoVisibilidade: (t?.condicaoVisibilidade ?? undefined) as Prisma.InputJsonValue | undefined,

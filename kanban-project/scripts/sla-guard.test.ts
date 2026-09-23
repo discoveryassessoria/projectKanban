@@ -154,8 +154,10 @@ function run() {
   ok(!/FILAS_SLA/.test(semComentarios(logic)), "FILAS_SLA não existe mais no catálogo de filas")
   ok(!/faixaDaFilaSla/.test(semComentarios(logic)) && !/faixaDaFilaSla/.test(semComentarios(coleta)) && !/faixaDaFilaSla/.test(semComentarios(homeContent)),
     "faixaDaFilaSla não existe mais em lugar nenhum")
-  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_PRAZO_SUBTAREFA(, \.\.\.FILAS_ACOMPANHAMENTO)?\]/.test(logic),
-    "o catálogo de filas tem só passo/estado/prazo-Tarefa/prazo-Subtarefa/acompanhamento — sem FaseMacro")
+  ok(/TODAS_FILAS: FilaDef\[\] = \[\.\.\.FILAS_PASSO, \.\.\.FILAS_ESTADO, \.\.\.FILAS_PRAZO_TAREFA, \.\.\.FILAS_ACOMPANHAMENTO\]/.test(logic),
+    "o catálogo de filas tem só passo/estado/prazo-Tarefa/acompanhamento — sem FaseMacro, sem prazo-Subtarefa (removido, decisão definitiva 23/09/2026)")
+  ok(!/FILAS_PRAZO_SUBTAREFA/.test(semComentarios(logic)) && !/FILAS_PRAZO_SUBTAREFA/.test(semComentarios(coleta)),
+    "FILAS_PRAZO_SUBTAREFA não existe mais em lugar nenhum — a subtarefa não tem relógio de execução próprio")
   ok(!/montarSla/.test(semComentarios(coleta)) && !/montarSla/.test(semComentarios(apiHome)), "montarSla não existe mais — Home não monta painel de SLA de processo")
   ok(!/\bsla:\s*Map</.test(coleta), "BaseOperacional não carrega mais Map de SLA por processo")
   ok(!/"processo-sla"/.test(coleta), "o tipo Membro não tem mais variante processo-sla")

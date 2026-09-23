@@ -192,16 +192,6 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoAbrir }: {
       <td className="px-3 py-2.5">
         <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
         {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
-        {/* PRAZO DO PASSO — o relógio irmão do prazo final, só quando existe
-            (subtarefa corrente com ação interna, nunca inventado). Enquanto
-            aguarda terceiro, o relógio dela é cadência de acompanhamento,
-            não um prazo exigível — nunca pinta de vermelho como "atrasada"
-            aqui (achado real, 19/09/2026). */}
-        {l.prazoPasso && !l.prazoPasso.semPrazo && (
-          <div className={`mt-0.5 text-[10px] ${l.prazoPasso.atrasado && !l.prazoPasso.aguardandoTerceiro ? "text-[var(--danger-text)]" : "text-[var(--text-muted)]"}`}>
-            Passo: {l.prazoPasso.aguardandoTerceiro ? "aguardando terceiro" : l.prazoPasso.rotulo.toLowerCase()}
-          </div>
-        )}
       </td>
       <td className="px-3 py-2.5 text-[11.5px] tabular-nums text-[var(--text-secondary)]">
         {l.esperandoHaDias != null ? `${l.esperandoHaDias} dia${l.esperandoHaDias === 1 ? "" : "s"}` : "—"}

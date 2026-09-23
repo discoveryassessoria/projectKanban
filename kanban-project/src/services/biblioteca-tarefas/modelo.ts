@@ -223,7 +223,7 @@ export async function duplicarModelo(
         data: {
           stepId: passoNovo.id, key: st.key, label: st.label, descricao: st.descricao, ordem: st.ordem, ativo: st.ativo,
           obrigatoria: st.obrigatoria, repetivel: st.repetivel, maxOcorrencias: st.maxOcorrencias, modoExecucao: st.modoExecucao,
-          responsavelRegra: st.responsavelRegra, responsavelId: st.responsavelId, slaDays: st.slaDays,
+          responsavelRegra: st.responsavelRegra, responsavelId: st.responsavelId,
           condicaoEntrada: st.condicaoEntrada ?? undefined, condicaoConclusao: st.condicaoConclusao ?? undefined, condicaoVisibilidade: st.condicaoVisibilidade ?? undefined,
           dependeDe: st.dependeDe ?? undefined, executorKey: st.executorKey, cardinalidade: st.cardinalidade,
           fonteDeCanais: st.fonteDeCanais, tiposDeCanal: st.tiposDeCanal ?? undefined,

@@ -542,6 +542,13 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // prazo real) e StepSubtaskDefinition/SubtaskExecution (dois relógios)
   // permanecem intocados.
   '20260923010000_remover_prazos_e_sla',
+  // Decisão definitiva (23/09/2026): existe um único prazo final por Tarefa —
+  // a subtarefa não tem relógio de execução próprio. Remove
+  // StepSubtaskDefinition.slaDays e SubtaskExecution.prazo (0 dados reais:
+  // 1 linha era debris sintético de teste visual). Acompanhamento/regra
+  // temporal (SubtaskExecution.previstoPara/proximoAcompanhamentoEm)
+  // permanecem intocados.
+  '20260923020000_remover_prazo_proprio_subtarefa',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

@@ -84,10 +84,10 @@ async function main() {
   // para materializar sem tocar processo real.
   await prisma.stepSubtaskDefinition.createMany({
     data: [
-      { stepId: passo.id, key: "enviar_requerimento_ao_cartorio", label: "Enviar requerimento ao cartório", ordem: 1, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: [] as never, slaDays: 1 },
-      { stepId: passo.id, key: "receber_confirmacao_do_pedido", label: "Receber confirmação do pedido", ordem: 2, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["enviar_requerimento_ao_cartorio"] as never, esperaExternaAoLiberar: true, slaDays: 1 },
+      { stepId: passo.id, key: "enviar_requerimento_ao_cartorio", label: "Enviar requerimento ao cartório", ordem: 1, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: [] as never },
+      { stepId: passo.id, key: "receber_confirmacao_do_pedido", label: "Receber confirmação do pedido", ordem: 2, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["enviar_requerimento_ao_cartorio"] as never, esperaExternaAoLiberar: true },
       { stepId: passo.id, key: "receber_certidao", label: "Receber certidão", ordem: 3, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["receber_confirmacao_do_pedido"] as never, esperaExternaAoLiberar: true, regraTemporalAtiva: true, regraTemporalDias: 7, regraTemporalGatilhoChave: "receber_confirmacao_do_pedido" },
-      { stepId: passo.id, key: "conferir_e_validar_certidao", label: "Conferir e validar certidão", ordem: 4, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["receber_certidao"] as never, slaDays: 1 },
+      { stepId: passo.id, key: "conferir_e_validar_certidao", label: "Conferir e validar certidão", ordem: 4, obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["receber_certidao"] as never },
     ],
   })
   const subtarefasCriadas = await prisma.stepSubtaskDefinition.findMany({ where: { stepId: passo.id }, select: { id: true, key: true } })

@@ -3889,8 +3889,6 @@ model StepSubtaskDefinition {
   /// Protegido pelo banco: ON DELETE SET NULL.
   responsavel      Usuario? @relation("StepSubtaskDefinition_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId    Int?
-  /// SLA próprio em dias úteis. `null` = herda o do passo.
-  slaDays          Int?
 
   /// CONDIÇÕES DECLARATIVAS (motor `src/lib/motor/condicoes.ts`; nunca código).
   /// Entrada: quando ela fica DISPONÍVEL. Conclusão: o que precisa valer para
@@ -3932,12 +3930,13 @@ model StepSubtaskDefinition {
   esperaExternaAoLiberar Boolean @default(false)
 
   /// ═══ CONTROLE TEMPORAL DA ESPERA (mandato "correção definitiva do modelo
-  /// temporal", 19-20/09/2026) — DOIS RELÓGIOS INDEPENDENTES da mesma espera,
-  /// nenhum dos dois é o prazo oficial da Tarefa (esse é `Tarefa.dataPrazo`,
-  /// intocado) e nenhum dos dois reaproveita `slaDays` (que continua sendo,
-  /// exclusivamente, o SLA de AÇÃO INTERNA desta subtarefa — nunca os dois
-  /// papéis no mesmo campo). Uma subtarefa pode ter acompanhamento sem regra
-  /// temporal, regra temporal sem acompanhamento, os dois, ou nenhum.
+  /// temporal", 19-20/09/2026, ajustado em 23/09/2026) — DOIS RELÓGIOS
+  /// INDEPENDENTES da mesma espera, nenhum dos dois é o prazo oficial da
+  /// Tarefa (esse é `Tarefa.dataPrazo`, intocado — decisão definitiva:
+  /// existe só ele, a subtarefa não tem relógio de execução próprio; o
+  /// antigo `slaDays` desta tabela foi removido por completo). Uma
+  /// subtarefa pode ter acompanhamento sem regra temporal, regra temporal
+  /// sem acompanhamento, os dois, ou nenhum.
   ///
   /// ACOMPANHAMENTO — "quando esta espera volta à atenção de quem é dono da
   /// tarefa". NÃO é vencimento: só materializa `SubtaskExecution.
@@ -5490,7 +5489,6 @@ model SubtaskExecution {
   /// Protegido pelo banco: ON DELETE SET NULL.
   responsavel    Usuario?  @relation("SubtaskExecution_responsavelId", fields: [responsavelId], references: [id], onDelete: SetNull)
   responsavelId  Int?
-  prazo          DateTime?
 
   /// Desfecho declarado (a `key` da ação escolhida).
   resultado String? @db.VarChar(60)

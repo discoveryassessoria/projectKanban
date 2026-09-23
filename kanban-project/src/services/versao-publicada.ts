@@ -92,7 +92,6 @@ export interface SubtarefaCongelada {
   modoExecucao: string
   responsavelRegra: string
   responsavelId: number | null
-  slaDays: number | null
   condicaoEntrada: unknown
   condicaoConclusao: unknown
   condicaoVisibilidade: unknown
@@ -109,9 +108,9 @@ export interface SubtarefaCongelada {
   /// Ver `aplicarEsperaExternaDaSubtarefaSeConfigurado` (subtarefas-da-etapa.ts).
   esperaExternaAoLiberar: boolean
   /// CONTROLE TEMPORAL DA ESPERA — dois relógios independentes, nenhum dos
-  /// dois é o prazo oficial da Tarefa nem reaproveita `slaDays` (que
-  /// continua sendo só o SLA de ação interna). Ver comentário completo no
-  /// schema (`StepSubtaskDefinition`).
+  /// dois é o prazo oficial da Tarefa (decisão definitiva: só a Tarefa tem
+  /// vencimento — subtarefa não tem relógio de execução próprio). Ver
+  /// comentário completo no schema (`StepSubtaskDefinition`).
   acompanhamentoAtivo: boolean
   acompanhamentoPrimeiroDias: number | null
   regraTemporalAtiva: boolean
@@ -411,7 +410,7 @@ export async function retratarPassos(passos: PassosComFilhos, db: DB = prisma): 
       key: st.key, label: st.label, descricao: st.descricao, ordem: st.ordem, ativo: st.ativo,
       obrigatoria: st.obrigatoria, repetivel: st.repetivel, maxOcorrencias: st.maxOcorrencias,
       modoExecucao: st.modoExecucao, responsavelRegra: st.responsavelRegra,
-      responsavelId: st.responsavelId, slaDays: st.slaDays,
+      responsavelId: st.responsavelId,
       condicaoEntrada: st.condicaoEntrada ?? null,
       condicaoConclusao: st.condicaoConclusao ?? null,
       condicaoVisibilidade: st.condicaoVisibilidade ?? null,

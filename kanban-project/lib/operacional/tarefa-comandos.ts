@@ -668,7 +668,7 @@ export async function avisarAcontecimentosOperacionais(
 export type TipoAtencaoConsolidada = 'ATRASO' | 'ACOMPANHAMENTO_VENCIDO' | 'TERCEIRO_ATRASADO'
 
 export function tipoPrincipalDeAtencao(motivos: MotivoAtencao[]): TipoAtencaoConsolidada | null {
-  if (motivos.includes('PRAZO_TAREFA_VENCIDO') || motivos.includes('PRAZO_PASSO_VENCIDO')) return 'ATRASO'
+  if (motivos.includes('PRAZO_TAREFA_VENCIDO')) return 'ATRASO'
   if (motivos.includes('ACOMPANHAMENTO_DEVIDO')) return 'ACOMPANHAMENTO_VENCIDO'
   if (motivos.includes('TERCEIRO_ATRASADO')) return 'TERCEIRO_ATRASADO'
   return null

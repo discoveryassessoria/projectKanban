@@ -176,11 +176,10 @@ function LinhaDeChip({ fila }: { fila: FilaOperacional }) {
 }
 
 /**
- * UM PAINEL DE PRAZO — Tarefa (compromisso de entrega) OU Subtarefa (ação
- * corrente). Os dois convivem lado a lado na Home, NUNCA um substituindo o
- * outro: uma tarefa pode estar no prazo enquanto a subtarefa que está
- * rodando agora já está atrasada, e as duas leituras são verdadeiras ao
- * mesmo tempo (regra definitiva do usuário, 17/09/2026).
+ * UM PAINEL DE PRAZO — genérico, reaproveitado pelo prazo da Tarefa
+ * (compromisso único) e pelos Acompanhamentos (dimensão própria, nunca um
+ * segundo prazo). Decisão definitiva (23/09/2026): a subtarefa não tem
+ * relógio de execução próprio.
  */
 function PainelDePrazo({
   icone: Icone,
@@ -213,32 +212,23 @@ function PainelDePrazo({
   )
 }
 
+// "Subtarefas ativas" — REMOVIDO (23/09/2026, decisão definitiva): a
+// subtarefa não tem relógio de execução próprio. Existe um único prazo
+// final por Tarefa; acompanhamento de terceiro continua em bloco à parte
+// (`AcompanhamentosBloco`, abaixo), nunca um segundo vencimento.
 function PrazosBloco({ data }: { data: HomeData }) {
   const tarefas = data.prazosTarefas ?? null
-  const subtarefas = data.prazosSubtarefas ?? null
-  if (!tarefas && !subtarefas) return null
+  if (!tarefas) return null
 
   return (
     <BlocoCard id="prazos">
-      <BlocoHeader titulo="Prazos" descricao="Os dois controles de prazo da operação, lado a lado" />
-      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
-        {tarefas && (
-          <PainelDePrazo
-            icone={CheckCircle2}
-            titulo="Tarefas"
-            descricao="Prazo de conclusão — o compromisso macro"
-            cards={tarefas}
-          />
-        )}
-        {subtarefas && (
-          <PainelDePrazo
-            icone={ChevronRight}
-            titulo="Subtarefas ativas"
-            descricao="Prazo da ação atual — o relógio operacional"
-            cards={subtarefas}
-          />
-        )}
-      </div>
+      <BlocoHeader titulo="Prazos" descricao="Prazo final da tarefa — o compromisso único" />
+      <PainelDePrazo
+        icone={CheckCircle2}
+        titulo="Tarefas"
+        descricao="Prazo de conclusão"
+        cards={tarefas}
+      />
     </BlocoCard>
   )
 }

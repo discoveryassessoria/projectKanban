@@ -283,28 +283,33 @@ function main() {
   ok('§97) mesmo núcleo: Tarefa e Subtarefa concordam byte a byte quando o status não distingue',
     tarefaEquivalente.rotulo === subDepois.rotulo && tarefaEquivalente.diasParaPrazo === subDepois.diasParaPrazo)
 
-  // O RELÓGIO DA SUBTAREFA PRECISA ESTAR LIGADO EM PRODUÇÃO — não só existir
-  // na engine. Achado real (18/09/2026): só o ramo DISPONIVEL chamava
-  // `prazoOperacional` — EM_ANDAMENTO síncrono e AGUARDANDO_EXTERNO
-  // automático ficavam com o relógio desligado, mesmo com `slaDays`
-  // cadastrado. `relogioDeNascimentoDaSubtarefa` é agora o ÚNICO lugar que
-  // decide isso — prova que ELA chama `prazoOperacional` (nunca uma fórmula
-  // duplicada) e que os ramos reais (materialização e execução síncrona da
-  // ação) chamam ELA, não `prazoOperacional` direto.
+  // A SUBTAREFA NÃO TEM RELÓGIO DE EXECUÇÃO PRÓPRIO — decisão definitiva
+  // (23/09/2026): existe um único prazo final por Tarefa. `relogioDeNascimentoDaSubtarefa`/
+  // `slaEfetivoDaSubtarefa` (o antigo "SLA de ação interna" da subtarefa)
+  // foram removidos por completo, schema incluso (`StepSubtaskDefinition.
+  // slaDays`/`SubtaskExecution.prazo`) — prova de ausência, para a regra
+  // antiga nunca ser reintroduzida silenciosamente.
   const subtarefasDaEtapaSrc = semComentarios(ler('src/services/subtarefas-da-etapa.ts'))
-  ok('§97) relogioDeNascimentoDaSubtarefa é o único lugar que liga o relógio de nascimento, e chama prazoOperacional',
-    /function relogioDeNascimentoDaSubtarefa/.test(subtarefasDaEtapaSrc)
-    && /relogioDeNascimentoDaSubtarefa[\s\S]*?prazoOperacional\(slaEfetivoDaSubtarefa/.test(subtarefasDaEtapaSrc))
-  ok('§97) materializarSubtarefas liga o relógio via relogioDeNascimentoDaSubtarefa (DISPONIVEL e AGUARDANDO_EXTERNO de nascença)',
-    /materializarSubtarefas[\s\S]*?relogioDeNascimentoDaSubtarefa\(s\.status/.test(subtarefasDaEtapaSrc))
-  ok('§97) a espera externa automática liga prazo E previstoPara pela MESMA função, nunca uma fórmula própria',
-    /aplicarEsperaExternaDaSubtarefaSeConfigurado[\s\S]*?relogioDeNascimentoDaSubtarefa\(/.test(subtarefasDaEtapaSrc))
-  ok('§97) a execução síncrona da ação (EM_ANDAMENTO) também liga o relógio pela MESMA função — nunca ficava null antes desta correção',
-    /relogioDeNascimentoDaSubtarefa\(/.test(semComentarios(ler('src/services/executar-acao-cadastrada.ts'))))
-  ok('§97) reabrirSubtarefa liga um relógio NOVO (nova tentativa, novo prazo)',
-    /prazoOperacional\(defReaberta\?\.slaDays/.test(semComentarios(ler('src/services/execucao-da-subtarefa.ts'))))
-  ok('§97) a projeção (subtarefasDaEtapa) expõe o estado já calculado — nenhuma tela recalcula',
-    /estadoTemporalSubtarefa\(\{/.test(semComentarios(ler('src/services/subtarefas-da-etapa.ts'))))
+  ok('§97) relogioDeNascimentoDaSubtarefa não existe em lugar nenhum',
+    !/relogioDeNascimentoDaSubtarefa/.test(subtarefasDaEtapaSrc)
+    && !/relogioDeNascimentoDaSubtarefa/.test(semComentarios(ler('src/services/executar-acao-cadastrada.ts')))
+    && !/relogioDeNascimentoDaSubtarefa/.test(semComentarios(ler('src/services/execucao-da-subtarefa.ts'))))
+  ok('§97) slaEfetivoDaSubtarefa não existe em lugar nenhum', !/slaEfetivoDaSubtarefa/.test(subtarefasDaEtapaSrc))
+  ok('§97) StepSubtaskDefinition não tem mais coluna slaDays no schema',
+    !/model StepSubtaskDefinition[\s\S]*?slaDays/.test(semComentarios(ler('prisma/schema.prisma')).slice(
+      semComentarios(ler('prisma/schema.prisma')).indexOf('model StepSubtaskDefinition'),
+      semComentarios(ler('prisma/schema.prisma')).indexOf('model StepSubtaskDefinition') + 2000,
+    )))
+  ok('§97) SubtaskExecution não tem mais coluna prazo no schema',
+    !/model SubtaskExecution[\s\S]*?\n\s+prazo\s+DateTime/.test(semComentarios(ler('prisma/schema.prisma')).slice(
+      semComentarios(ler('prisma/schema.prisma')).indexOf('model SubtaskExecution'),
+      semComentarios(ler('prisma/schema.prisma')).indexOf('model SubtaskExecution') + 2000,
+    )))
+  ok('§97) acompanhamento/regra temporal continuam intocados (dimensões C/D, nunca prazo)',
+    /acompanhamentoAtivo/.test(subtarefasDaEtapaSrc) === false // a régua vive em relogioDeEsperaExternaDaSubtarefa, não mais citada por nome de campo aqui
+    || /relogioDeEsperaExternaDaSubtarefa/.test(subtarefasDaEtapaSrc))
+  ok('§97) a projeção (subtarefasDaEtapa) não expõe mais situacaoTemporal — a subtarefa não tem estado temporal próprio',
+    !/situacaoTemporal/.test(subtarefasDaEtapaSrc))
 
   // A HOME PAROU DE TER RÉGUA PRÓPRIA — achado real, 17/09/2026: `estaAtrasado`/
   // `venceHoje` reimplementavam a conta com o fuso LOCAL DA MÁQUINA.

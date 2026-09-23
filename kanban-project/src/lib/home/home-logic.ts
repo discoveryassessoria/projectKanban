@@ -245,15 +245,15 @@ export const FILAS_ESTADO: FilaDef[] = [
 ]
 
 // SLA de FaseMacro/Processo (FILAS_SLA/faixaDaFilaSla) — REMOVIDO
-// (17/09/2026): terceiro relógio de prazo concorrente com os dois oficiais,
-// Tarefa (macro) e Subtarefa (operacional). Ver FILAS_PRAZO_TAREFA/
-// FILAS_PRAZO_SUBTAREFA abaixo e [[prazo-tarefa-subtarefa-dois-relogios]].
+// (17/09/2026): terceiro relógio de prazo concorrente com o único oficial.
+// FILAS_PRAZO_SUBTAREFA — REMOVIDO (23/09/2026, decisão definitiva): a
+// subtarefa não tem relógio de execução próprio. Existe só UM prazo, o da
+// Tarefa (macro) — FILAS_PRAZO_TAREFA abaixo. Acompanhamento (dimensão D,
+// FILAS_ACOMPANHAMENTO) continua: é lembrete de terceiro, nunca um segundo
+// vencimento.
 
 // ---------------------------------------------------------------------------
-// FILAS DE PRAZO — Tarefa (macro) e Subtarefa (operacional), os DOIS
-// controles independentes que a Home mostra lado a lado. NUNCA a mesma coisa
-// que `FILAS_SLA` acima (que é FaseMacro — Processo, um terceiro relógio que
-// não é apresentado como prazo operacional em lugar nenhum).
+// FILA DE PRAZO — a Tarefa, único relógio de vencimento que a Home mostra.
 // ---------------------------------------------------------------------------
 export type FaixaPrazo = "atrasadas" | "vencem-hoje" | "proximos-3" | "proximos-7" | "no-prazo"
 
@@ -263,33 +263,24 @@ export interface FilaPrazoDef extends FilaDef {
 }
 
 export const FILAS_PRAZO_TAREFA: FilaPrazoDef[] = [
-  { key: "tarefa-atrasadas", faixa: "atrasadas", grain: "tarefa", titulo: "Tarefas atrasadas", descricao: "Prazo macro da tarefa já vencido", modulo: "tarefas", nivelBase: "critico" },
-  { key: "tarefa-vencem-hoje", faixa: "vencem-hoje", grain: "tarefa", titulo: "Tarefas — vencem hoje", descricao: "Prazo macro da tarefa termina hoje", modulo: "tarefas", nivelBase: "alto" },
-  { key: "tarefa-proximos-3", faixa: "proximos-3", grain: "tarefa", titulo: "Tarefas — próximos 3 dias", descricao: "Prazo macro da tarefa nos próximos 3 dias", modulo: "tarefas", nivelBase: "medio" },
-  { key: "tarefa-proximos-7", faixa: "proximos-7", grain: "tarefa", titulo: "Tarefas — próximos 7 dias", descricao: "Prazo macro da tarefa nos próximos 7 dias", modulo: "tarefas", nivelBase: "baixo" },
-  { key: "tarefa-no-prazo", faixa: "no-prazo", grain: "tarefa", titulo: "Tarefas no prazo", descricao: "Dentro do prazo macro de conclusão", modulo: "tarefas", nivelBase: "baixo" },
+  { key: "tarefa-atrasadas", faixa: "atrasadas", grain: "tarefa", titulo: "Tarefas atrasadas", descricao: "Prazo da tarefa já vencido", modulo: "tarefas", nivelBase: "critico" },
+  { key: "tarefa-vencem-hoje", faixa: "vencem-hoje", grain: "tarefa", titulo: "Tarefas — vencem hoje", descricao: "Prazo da tarefa termina hoje", modulo: "tarefas", nivelBase: "alto" },
+  { key: "tarefa-proximos-3", faixa: "proximos-3", grain: "tarefa", titulo: "Tarefas — próximos 3 dias", descricao: "Prazo da tarefa nos próximos 3 dias", modulo: "tarefas", nivelBase: "medio" },
+  { key: "tarefa-proximos-7", faixa: "proximos-7", grain: "tarefa", titulo: "Tarefas — próximos 7 dias", descricao: "Prazo da tarefa nos próximos 7 dias", modulo: "tarefas", nivelBase: "baixo" },
+  { key: "tarefa-no-prazo", faixa: "no-prazo", grain: "tarefa", titulo: "Tarefas no prazo", descricao: "Dentro do prazo de conclusão", modulo: "tarefas", nivelBase: "baixo" },
 ]
 
-export const FILAS_PRAZO_SUBTAREFA: FilaPrazoDef[] = [
-  { key: "subtarefa-atrasadas", faixa: "atrasadas", grain: "subtarefa", titulo: "Subtarefas atrasadas", descricao: "SLA da ação atual já vencido", modulo: "tarefas", nivelBase: "critico" },
-  { key: "subtarefa-vencem-hoje", faixa: "vencem-hoje", grain: "subtarefa", titulo: "Subtarefas — vencem hoje", descricao: "SLA da ação atual termina hoje", modulo: "tarefas", nivelBase: "alto" },
-  { key: "subtarefa-proximos-3", faixa: "proximos-3", grain: "subtarefa", titulo: "Subtarefas — próximos 3 dias", descricao: "SLA da ação atual nos próximos 3 dias", modulo: "tarefas", nivelBase: "medio" },
-  { key: "subtarefa-proximos-7", faixa: "proximos-7", grain: "subtarefa", titulo: "Subtarefas — próximos 7 dias", descricao: "SLA da ação atual nos próximos 7 dias", modulo: "tarefas", nivelBase: "baixo" },
-  { key: "subtarefa-no-prazo", faixa: "no-prazo", grain: "subtarefa", titulo: "Subtarefas no prazo", descricao: "Dentro do SLA da ação atual", modulo: "tarefas", nivelBase: "baixo" },
-]
-
-/** A faixa/grain de prazo de uma fila; null quando a fila não é de prazo Tarefa/Subtarefa. */
+/** A faixa de prazo de uma fila; null quando a fila não é de prazo da Tarefa. */
 export function faixaDaFilaPrazo(key: string): FilaPrazoDef | null {
-  return [...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA].find((f) => f.key === key) ?? null
+  return FILAS_PRAZO_TAREFA.find((f) => f.key === key) ?? null
 }
 
 // ---------------------------------------------------------------------------
 // FILAS DE ACOMPANHAMENTO — dimensão D, PRÓPRIA da espera de terceiro
 // (`SubtaskExecution.proximoAcompanhamentoEm`), nunca prazo/SLA (mandato
-// "correção definitiva do modelo temporal", 19-20/09/2026, seção 5/8). Uma
-// subtarefa AGUARDANDO_EXTERNO nunca entra nos baldes de PRAZO
-// (`FILAS_PRAZO_SUBTAREFA`, acima) — é aqui, e só aqui, que ela aparece
-// quando tem acompanhamento configurado.
+// "correção definitiva do modelo temporal", 19-20/09/2026, seção 5/8;
+// reafirmado 23/09/2026). Lembrete de retorno de terceiro — nunca um
+// segundo vencimento da Tarefa.
 // ---------------------------------------------------------------------------
 export const FILAS_ACOMPANHAMENTO: FilaPrazoDef[] = [
   { key: "acompanhamento-atrasados", faixa: "atrasadas", grain: "subtarefa", titulo: "Acompanhamentos atrasados", descricao: "O próximo acompanhamento já venceu", modulo: "tarefas", nivelBase: "critico" },
@@ -314,7 +305,7 @@ export function faixaPrazoDoEstado(diasParaPrazo: number | null, atrasado: boole
   return "no-prazo"
 }
 
-export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_PRAZO_TAREFA, ...FILAS_PRAZO_SUBTAREFA, ...FILAS_ACOMPANHAMENTO]
+export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_PRAZO_TAREFA, ...FILAS_ACOMPANHAMENTO]
 
 const FILA_POR_VERBO = new Map<string, string>()
 for (const f of FILAS_PASSO) for (const v of f.verbos ?? []) FILA_POR_VERBO.set(v, f.key)
