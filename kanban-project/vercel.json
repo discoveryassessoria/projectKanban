@@ -27,10 +27,6 @@
     {
       "path": "/api/cron/cartorios",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/prazo-sla",
-      "schedule": "0 * * * *"
     }
   ]
 }

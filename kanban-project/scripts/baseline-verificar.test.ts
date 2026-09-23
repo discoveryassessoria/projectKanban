@@ -535,6 +535,13 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // bibliotecaModeloVersao — o passo da fase passa a poder ser uma seleção
   // direta de um Modelo da Biblioteca, sem tabela de vínculo à parte.
   '20260922190000_biblioteca_selecao_no_workflow_interno',
+  // Remoção integral do módulo "Prazos e SLA" e da tela "SLA" (pedido
+  // explícito do usuário, 22-23/09/2026) — dropa PoliticaPrazoSla e as
+  // outras 4 tabelas do mandato 22/09/2026 (0 linhas em produção) e as 7
+  // colunas que ele tinha acrescentado a Tarefa. Tarefa.dataPrazo (o único
+  // prazo real) e StepSubtaskDefinition/SubtaskExecution (dois relógios)
+  // permanecem intocados.
+  '20260923010000_remover_prazos_e_sla',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

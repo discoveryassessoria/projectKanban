@@ -8,7 +8,6 @@
 // Automações, Regras Documentais, Configurações Financeiras) — nenhuma segunda
 // porta de escrita, nenhuma segunda fonte de verdade.
 //
-//   SLAConfiguracaoTab        → Processos › Configurações › SLA
 //   VersoesConfiguracaoTab    → Processos › Configurações › Versões
 //   ConfiguracoesGeraisTab    → Processos › Configurações › Configurações Gerais
 //   TransicoesTab             → Workflow  › Transições
@@ -152,7 +151,6 @@ function SemFluxo({ nome }: { nome: string }) {
   )
 }
 
-// ═══════════════════════════════════ 1. SLA ═══════════════════════════════════
 const ENTRY_LABEL: Record<string, string> = {
   process_created: "criação do processo",
   previous_phase_completed: "conclusão da fase anterior",
@@ -160,65 +158,7 @@ const ENTRY_LABEL: Record<string, string> = {
 }
 const entryLabel = (k: string) => ENTRY_LABEL[k] ?? k
 
-// SLA da FASE MACRO (FaseMacro.slaDays) ELIMINADO (17/09/2026, decisão do
-// usuário): a Fase Macro não tem prazo — ela representa posição do Processo,
-// não uma unidade operacional de execução. O prazo canônico vive em Tarefa
-// (macro da entrega) e Subtarefa (execução), nunca em Fase/Processo — ver
-// [[prazo-tarefa-subtarefa-dois-relogios]]. Esta tela continua mostrando o
-// SLA do PASSO (Workflow Interno), que alimenta esses dois relógios.
-export function SLAConfiguracaoTab() {
-  return (
-    <Consulta
-      titulo="SLA"
-      descricao="Prazos configurados nos passos do Workflow Interno de cada fase — a fonte do prazo de Tarefa e Subtarefa. A Fase Macro e o Processo não têm prazo próprio."
-      onde="Workflow › Fluxos"
-    >
-      {({ tipo }) => {
-        if (!tipo) return null
-        if (!tipo.macro || tipo.fases.length === 0) return <SemFluxo nome={tipo.name} />
-        return (
-          <div className={`overflow-x-auto ${CARD}`}>
-            <table className="w-full text-sm">
-              <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
-                <tr>
-                  <th className={TH}>#</th>
-                  <th className={TH}>Fase</th>
-                  <th className={TH}>Passos</th>
-                  <th className={TH}>Maior SLA de passo</th>
-                  <th className={TH}>Regime</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tipo.fases.map((f) => {
-                  const passos = f.interno?.passos ?? []
-                  const maiorPasso = passos.reduce((m, p) => Math.max(m, p.slaDays), 0)
-                  return (
-                    <tr key={f.phaseKey} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordem}</td>
-                      <td className="px-4 py-2.5 text-white">{f.label}</td>
-                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{passos.length || "—"}</td>
-                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{maiorPasso ? `${maiorPasso} d` : "—"}</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex flex-wrap gap-1 text-[10px]">
-                          {f.required
-                            ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>
-                            : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-muted)]">opcional</span>}
-                          {f.conditional && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800">condicional</span>}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      }}
-    </Consulta>
-  )
-}
-
-// ═════════════════════════════════ 2. VERSÕES ═════════════════════════════════
+// ═════════════════════════════════ VERSÕES ═════════════════════════════════
 export function VersoesConfiguracaoTab() {
   return (
     <Consulta

@@ -28,13 +28,6 @@ import {
   TIPO_OUTBOX_RECONCILIACAO_FASE_MACRO,
   type ReconciliacaoFaseMacroPayload,
 } from "@/src/lib/motor/reconciliar-fase-macro"
-// Módulo de Prazos/SLA/Acompanhamento (mandato 22/09/2026) — reconciliação
-// retroativa de publicação de Política de Prazo/SLA.
-import {
-  processarReconciliacaoPrazoSla,
-  type ReconciliacaoPrazoSlaPayload,
-} from "@/src/services/prazo-sla/reconciliar-prazo-sla"
-import { TIPO_OUTBOX_RECONCILIACAO_PRAZO_SLA } from "@/src/services/prazo-sla/politica-prazo-sla"
 // Reconciliação disparada pela EDIÇÃO de uma fase no Catálogo (não pela
 // publicação do Workflow Macro) — mesmo payload/efeito, tipo de outbox
 // próprio para rastrear a origem no log. Ver reconciliar-fase-macro.ts.
@@ -131,7 +124,6 @@ export const TIPOS_DRENADOS = [
   // só a avaliação no TOPO do módulo precisa ser o literal.
   "fase.macro.reconciliar",
   "catalogo.fase.reconciliar",
-  "prazo.sla.reconciliar",
 ] as const
 
 export interface OutboxProcessResumo {
@@ -285,13 +277,6 @@ export async function processarOutbox(opts?: {
         // já ramifica internamente por `payload.escopoMudou`.
         const p = evt.payload as unknown as ReconciliacaoFaseMacroPayload
         await processarReconciliacaoFaseMacro(p, evt.correlationId ?? undefined)
-      } else if (evt.tipo === TIPO_OUTBOX_RECONCILIACAO_PRAZO_SLA) {
-        // EFEITO: reconciliação retroativa de Política de Prazo/SLA publicada
-        // (mandato 22/09/2026) — recalcula os campos temporais da MESMA
-        // Tarefa pela estratégia escolhida na publicação. Idempotente; falha
-        // PROPAGA e não afeta as outras tarefas (uma linha de outbox cada).
-        const p = evt.payload as unknown as ReconciliacaoPrazoSlaPayload
-        await processarReconciliacaoPrazoSla(p)
       } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
         // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).
       }

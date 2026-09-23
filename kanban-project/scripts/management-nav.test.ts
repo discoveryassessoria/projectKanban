@@ -135,7 +135,7 @@ ok(
 // de domínio — o comportamento já é determinado por Fase, Workflow Interno, Matriz
 // e Regras. Nenhum runtime a consumia; era cadastro sem consumidor.
 ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases"]), "Processos › Estrutura = Fases")
-ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
+ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["cfgversions", "proccfg"]), "Processos › Configurações = Versões, Configurações Gerais (SLA e Prazos e SLA removidas)")
 // OS CANAIS SAÍRAM DO WORKFLOW em 22/08. Eles entraram sob Fluxos em 21/08, quando o
 // que importava era tirá-los do código; a segunda metade da correção é que eles nunca
 // foram do workflow. "Por onde dá para pedir" é fato do CARTÓRIO — o workflow apenas
@@ -190,11 +190,15 @@ const ANTES_ATIVAS = [
   "users", "teams", "opcapacity", "roles",
 ]
 // telas que existiam registradas (deep-link) e não podem sumir do mapa TELAS
+// "sla" e "prazo-sla" REMOVIDAS de propósito (pedido explícito do usuário,
+// 22-23/09/2026: "remover integralmente as abas SLA e Prazos e SLA") — não
+// entram aqui, porque este inventário existe para pegar remoção ACIDENTAL,
+// não para impedir uma remoção deliberada.
 const ANTES_REGISTRADAS = [
   "certtypes", "docmatrix", "honorariums", "catalogmestre", "estruturafin",
   "precificacao", "comercial", "pagamentos", "fornecedoresconc", "integracaofin",
   "permprofiles", "syshealth", "execmotor", "runtimediag", "audit", "protocols",
-  "sla", "templates", "notifications", "impexp", "backup", "settings",
+  "templates", "notifications", "impexp", "backup", "settings",
 ]
 const temDestino = (k: string) => !!moduloDaScreen(k) || ALIAS_KEYS.has(k) || TELAS_KEYS.has(k)
 const semDestino = [...ANTES_ATIVAS, ...ANTES_REGISTRADAS].filter((k) => !temDestino(k))

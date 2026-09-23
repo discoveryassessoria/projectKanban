@@ -84,10 +84,6 @@ const API_PUBLICA: string[] = [
   "/api/cron/outbox",
   // Auto-verifica (x-vercel-cron ou CRON_SECRET) — mesma régua dos três acima.
   "/api/cron/cartorios",
-  // Módulo de Prazos/SLA/Acompanhamento (22/09/2026) — mesma régua de
-  // autorização própria (x-vercel-cron/CRON_SECRET/operador admin) e mesma
-  // cadência horária de `avisos-prazo`, agendada em `vercel.json`.
-  "/api/cron/prazo-sla",
 ]
 
 function isApiPublica(pathname: string): boolean {

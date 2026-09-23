@@ -173,16 +173,13 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),
 
       // CONFIGURAÇÕES
-      a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
-      // Cadastro PRÓPRIO das políticas de prazo/SLA/acompanhamento — distinto de
-      // "SLA" acima, que é só leitura da configuração vigente de cada processo.
-      a(75, "prazo-sla", "Prazos e SLA", ["prazo", "sla", "politica", "política", "acompanhamento", "feriado", "calendario", "calendário", "vencimento", "risco"], "Configurações"),
+      // "SLA" e "Prazos e SLA" foram REMOVIDAS por completo (mandato 22/09/2026)
+      // — telas e todo o cadastro/schema por trás delas. Ver git log deste arquivo.
       a(80, "cfgversions", "Versões", ["versao", "versão", "config", "publicacao", "publicação"], "Configurações"),
       a(90, "proccfg", "Configurações Gerais", ["configuracao", "configuração", "padrao", "padrão", "identidade", "situacao"], "Configurações"),
 
-      // RASCUNHOS do mockup: as telas reais acima os substituíram no menu, mas eles
-      // continuam acessíveis por ?screen= (nada foi apagado).
-      h(900, "sla-rascunho", "SLA e Prazos (rascunho do mockup)"),
+      // RASCUNHO do mockup: a tela real acima o substituiu no menu, mas ele
+      // continua acessível por ?screen= (nada foi apagado).
       h(910, "cfgversions-rascunho", "Versionamento e Publicação (rascunho do mockup)"),
     ],
   },
