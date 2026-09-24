@@ -37,7 +37,7 @@
 "use client"
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   ListChecks, AlertTriangle, Clock, CheckCircle2, Users2, FileStack,
   Bookmark, ChevronDown, Plus, SlidersHorizontal, X as XIcon, MoreVertical, ArrowUpDown,
@@ -65,6 +65,54 @@ export interface LinhaGerencial extends LinhaDeFila {
   esperandoHaDias: number | null
   motivoBloqueio: string | null
   concluidaEm: string | null
+}
+
+/** Só os campos que este painel lê de `GET /api/operacao/capacidade`. */
+interface CapacidadeLinha {
+  usuarioId: number
+  nome: string
+  podeExecutar: boolean
+  carga: { ativas: number; executaveis: number; atrasadas: number }
+}
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  const primeira = partes[0]?.[0] ?? ""
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ""
+  return (primeira + ultima).toUpperCase() || "?"
+}
+
+/**
+ * DISTRIBUIÇÃO POR EQUIPE — quem pode receber mais trabalho agora, na hora de
+ * decidir pra quem distribuir. Faixa horizontal compacta (não sidebar): esta
+ * tela já é densa de filtro e tabela, e "sem responsável" é só UM dos vários
+ * recortes possíveis — um painel lateral fixo roubaria espaço o tempo todo
+ * por um contexto que nem sempre está ativo.
+ */
+function FaixaCapacidadeEquipe({ linhas }: { linhas: CapacidadeLinha[] | null }) {
+  if (linhas == null) return null
+  const executores = linhas.filter((l) => l.podeExecutar).sort((a, b) => b.carga.ativas - a.carga.ativas)
+  if (executores.length === 0) return null
+  const maiorCarga = Math.max(1, ...executores.map((l) => l.carga.ativas))
+  return (
+    <div className="mx-6 mt-3 flex items-center gap-4 overflow-x-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3.5 py-2">
+      <span className="shrink-0 text-[11px] font-semibold text-[var(--text-secondary)]">Distribuição por equipe</span>
+      {executores.map((f) => (
+        <div key={f.usuarioId} className="flex shrink-0 items-center gap-1.5">
+          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[9.5px] font-semibold text-[var(--pessoa)]">
+            {iniciaisDe(f.nome)}
+          </span>
+          <span className="text-[11px] text-[var(--text-primary)]">{f.nome}</span>
+          <div className="h-1.5 w-14 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+            <div
+              className={`h-full rounded-full ${f.carga.atrasadas > 0 ? "bg-[var(--danger-tile)]" : "bg-[var(--action-primary)]"}`}
+              style={{ width: `${Math.round((f.carga.ativas / maiorCarga) * 100)}%` }}
+            />
+          </div>
+          <span className="text-[10.5px] tabular-nums text-[var(--text-muted)]">{f.carga.ativas}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // `ColunaKanban` é importado de `tarefa-projecoes.ts` (Etapa 5, item 1) — três
@@ -256,6 +304,25 @@ export function VisaoGlobal() {
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
   const [alvoLote, setAlvoLote] = useState<{ linhas: LinhaGerencial[] } | null>(null)
   const router = useRouter()
+
+  // DEEP-LINK — "Distribuir tarefas" (Minha Operação, obrigação administrativa)
+  // manda pra cá com `?semResponsavel=1&processo=N&modo=lista`. Reativo (não só
+  // no mount): navegar pra CÁ de dentro daqui mesmo não remonta o componente —
+  // a mesma causa do clique morto já corrigida em `/operacao` (achado real
+  // 24/09/2026) se repetiria aqui sem isto.
+  const paramsIniciais = useSearchParams()
+  useEffect(() => {
+    const processo = paramsIniciais.get("processo")
+    const semResp = paramsIniciais.get("semResponsavel")
+    const modoUrl = paramsIniciais.get("modo")
+    if (!processo && !semResp && !modoUrl) return
+    if (modoUrl === "visaoGeral" || modoUrl === "lista" || modoUrl === "kanban") setModo(modoUrl)
+    setFiltros((f) => ({
+      ...f,
+      processoId: processo ? Number(processo) : f.processoId,
+      semResponsavel: semResp === "1" ? true : f.semResponsavel,
+    }))
+  }, [paramsIniciais])
   const irParaOProcesso = useCallback((taskId: number, processoId: number | null) => {
     router.push(urlOperacionalDaTarefa({ taskId, processoId }))
   }, [router])
@@ -298,6 +365,22 @@ export function VisaoGlobal() {
   const carregandoFamilias = resultadoFamilias?.chave !== chave
   const dadosFamilias = carregandoFamilias ? null : resultadoFamilias?.d ?? null
   const falhouFamilias = !carregandoFamilias && dadosFamilias == null
+
+  // CAPACIDADE DA EQUIPE — só quando se está olhando "Sem responsável": é
+  // exatamente o momento de decidir pra quem mandar. Mesma leitura do módulo
+  // de Usuários e Acessos (Capacidade Operacional) — nenhuma segunda conta de
+  // carga. `usuarios.gerenciar` pode faltar para quem só distribui — 403 vira
+  // "painel indisponível", nunca erro na tela.
+  const [capacidade, setCapacidade] = useState<CapacidadeLinha[] | null>(null)
+  useEffect(() => {
+    if (!filtros.semResponsavel) return
+    let vivo = true
+    fetch("/api/operacao/capacidade", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { linhas?: CapacidadeLinha[] }) => { if (vivo) setCapacidade(d.linhas ?? []) })
+      .catch(() => { if (vivo) setCapacidade(null) })
+    return () => { vivo = false }
+  }, [filtros.semResponsavel, recarga])
 
   /**
    * TODA MUDANÇA SAI POR UMA PORTA SÓ — inclusive as do Kanban.
@@ -519,7 +602,7 @@ export function VisaoGlobal() {
       {/* ── NAVEGAÇÃO DE ABAS ── */}
       <div className="flex items-center gap-1 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-6">
         {([
-          ["visaoGeral", "Visão Geral"], ["lista", "Lista"], ["kanban", "Kanban"], ["calendario", "Calendário"],
+          ["visaoGeral", "Visão Geral"], ["lista", "Lista"], ["kanban", "Kanban"],
         ] as const).map(([m, r]) => (
           <button
             key={m}
@@ -756,6 +839,8 @@ export function VisaoGlobal() {
           <Button size="sm" variant="ghost" onClick={() => setSelecionados(new Set())}>Limpar seleção</Button>
         </div>
       )}
+
+      {filtros.semResponsavel && <FaixaCapacidadeEquipe linhas={capacidade} />}
 
       <div className="mx-6 mb-6 mt-4 min-h-0 flex-1 overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-1)]">
         <div className="h-full overflow-auto">

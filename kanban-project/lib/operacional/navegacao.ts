@@ -68,13 +68,17 @@ export function urlOperacionalDoProcesso(processoId: number): string {
  * certidão (pessoa/documento/passo), sem sentido para "distribuir 15 tarefas
  * sem responsável" (essa obrigação não tem pessoa nem documento). O lugar
  * onde essa obrigação se executa é a ferramenta CANÔNICA de distribuição —
- * Operação → Distribuição → Sem responsável (`central-tarefas.tsx`) — já no
+ * Tarefas e Projetos, Lista, "Sem responsável" (`visao-global.tsx`) — já no
  * contexto desta família, nunca uma tela genérica que o usuário precise
  * procurar por dentro.
+ *
+ * Decisão 24/09/2026: distribuir é gestão de TODA a operação da empresa —
+ * pertence a Tarefas e Projetos, não a Operação (que é só a fila PESSOAL de
+ * quem está logado). `Operação → Distribuição` foi removida.
  */
 export function urlDistribuicaoDoProcesso(processoId: number): string {
-  const p = new URLSearchParams({ aba: 'distribuicao', processo: String(processoId) })
-  return `/operacao?${p.toString()}`
+  const p = new URLSearchParams({ semResponsavel: '1', processo: String(processoId), modo: 'lista' })
+  return `/tarefas?${p.toString()}`
 }
 
 /**

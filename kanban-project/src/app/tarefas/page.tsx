@@ -16,7 +16,7 @@
 
 "use client"
 
-import { useEffect } from "react"
+import { Suspense, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -75,7 +75,9 @@ export default function TarefasEProjetosPage() {
 
       <main className="min-h-0 flex-1 px-6 pb-4 pt-4">
         <div className="h-full overflow-hidden rounded-lg border border-white/[0.08] bg-black/25">
-          <VisaoGlobal />
+          <Suspense fallback={null}>
+            <VisaoGlobal />
+          </Suspense>
         </div>
       </main>
     </div>
