@@ -3,12 +3,11 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useApi, invalidar } from "@/src/lib/dados"
-import { uploadFiles } from "@/src/lib/storage"
 import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
 import {
   Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X,
   FileText, Scale, Landmark, Search, Download, Eye, MoreVertical, ChevronDown,
-  ExternalLink, Link2, Paperclip, Upload, Copy, ClipboardCheck, ScanText,
+  ExternalLink, Link2, Upload, Copy, ClipboardCheck, ScanText,
 } from "lucide-react"
 
 interface Divergencia {
@@ -145,7 +144,6 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
   const [filtroStatus, setFiltroStatus] = useState<"todos" | "com" | "sem">("todos")
   const [filtroPessoa, setFiltroPessoa] = useState("todas")
   const [filtroTipo, setFiltroTipo] = useState("todos")
-  const [modalAnexar, setModalAnexar] = useState(false)
   const [modalImportar, setModalImportar] = useState(false)
 
   const consulta = useApi<{ analise?: Analise | null }>(`/api/processos/${processoId}/analise`)
@@ -430,9 +428,6 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
           {analise && <RelatorioDropdown />}
           {!readOnly && (
             <>
-              <button onClick={() => setModalAnexar(true)} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-hover)] rounded-md inline-flex items-center gap-2">
-                <Paperclip className="w-4 h-4" /> Anexar certidão
-              </button>
               <button onClick={() => setModalImportar(true)} className="whitespace-nowrap px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-hover)] rounded-md inline-flex items-center gap-2">
                 <Upload className="w-4 h-4" /> Importar relatório
               </button>
@@ -489,7 +484,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
 
       {!analise ? (
         <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">
-          A análise ainda não foi rodada. Clique em <b>Extrair automaticamente</b> pra ler os documentos e preencher os dados sozinho, depois em <b>Analisar automaticamente</b> para comparar; use <b>Anexar certidão</b> se ainda faltar certidão na aba Documentos, ou <b>Importar relatório</b> se a comparação já foi feita fora do sistema.
+          A análise ainda não foi rodada. Clique em <b>Extrair automaticamente</b> pra ler os documentos e preencher os dados sozinho, depois em <b>Analisar automaticamente</b> para comparar; se ainda faltar certidão, ela precisa ser cadastrada pela Árvore Genealógica — nunca anexada por aqui —, ou use <b>Importar relatório</b> se a comparação já foi feita fora do sistema.
         </div>
       ) : (
         <>
@@ -631,21 +626,6 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         />
       )}
 
-      {modalAnexar && (
-        <ModalAnexarCertidao
-          pessoas={pessoasV2}
-          onClose={() => setModalAnexar(false)}
-          onSalvo={async () => { setModalAnexar(false); await consultaV2.recarregar() }}
-          anexar={async (payload) => {
-            const res = await fetch(`/api/processos/${processoId}/analise/documentos`, {
-              method: "POST", headers: jsonHeaders(), body: JSON.stringify(payload),
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.mensagem || data.error || "Erro ao anexar a certidão.")
-          }}
-        />
-      )}
-
       {modalImportar && (
         <ModalImportarRelatorio
           onClose={() => setModalImportar(false)}
@@ -712,95 +692,6 @@ function BarraBuscaFiltro({ busca, onBusca, status, onStatus, pessoa, onPessoa, 
       <button onClick={onExportar} className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-xs font-semibold text-white/80 hover:bg-[var(--surface-hover)]">
         <Download className="w-3.5 h-3.5" /> Exportar
       </button>
-    </div>
-  )
-}
-
-const TIPOS_CERTIDAO: Array<[string, string]> = [
-  ["CERTIDAO_NASCIMENTO", "Certidão de Nascimento"],
-  ["CERTIDAO_NASCIMENTO_INTEIRO_TEOR", "Certidão de Nascimento (Inteiro Teor)"],
-  ["CERTIDAO_CASAMENTO", "Certidão de Casamento"],
-  ["CERTIDAO_CASAMENTO_INTEIRO_TEOR", "Certidão de Casamento (Inteiro Teor)"],
-  ["CERTIDAO_OBITO", "Certidão de Óbito"],
-  ["CERTIDAO_OBITO_INTEIRO_TEOR", "Certidão de Óbito (Inteiro Teor)"],
-]
-
-function ModalAnexarCertidao({ pessoas, onClose, onSalvo, anexar }: {
-  pessoas: Array<{ id: number; nome: string }>
-  onClose: () => void
-  onSalvo: () => void
-  anexar: (payload: { pessoaId: number; tipo: string; arquivoUrl: string; arquivoNome: string; arquivoMimeType: string }) => Promise<void>
-}) {
-  const [pessoaId, setPessoaId] = useState<number | "">("")
-  const [tipo, setTipo] = useState("")
-  const [arquivo, setArquivo] = useState<File | null>(null)
-  const [enviando, setEnviando] = useState(false)
-  const [progresso, setProgresso] = useState(0)
-  const [erro, setErro] = useState<string | null>(null)
-
-  const salvar = async () => {
-    if (!pessoaId || !tipo || !arquivo) { setErro("Escolha a pessoa, o tipo e o arquivo."); return }
-    setEnviando(true); setErro(null)
-    try {
-      const [up] = await uploadFiles([arquivo], { prefix: "analise-documental", onProgress: (_f, p) => setProgresso(p) })
-      await anexar({ pessoaId: Number(pessoaId), tipo, arquivoUrl: up.url, arquivoNome: up.name, arquivoMimeType: up.type })
-      onSalvo()
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro ao anexar a certidão.")
-    } finally {
-      setEnviando(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-semibold text-white/95">Anexar certidão</h3>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
-        </div>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">O arquivo vira um documento da pessoa, disponível para comparação na Análise Documental.</p>
-
-        <div className="mt-4 space-y-3">
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Pessoa</label>
-            <select value={pessoaId} onChange={(e) => setPessoaId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white">
-              <option value="">Selecione…</option>
-              {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Tipo de certidão</label>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)}
-              className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white">
-              <option value="">Selecione…</option>
-              {TIPOS_CERTIDAO.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Arquivo (PDF ou imagem)</label>
-            <input type="file" accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
-              onChange={(e) => setArquivo(e.target.files?.[0] ?? null)}
-              className="w-full text-xs text-white/80 file:mr-2 file:rounded-md file:border-0 file:bg-[var(--surface-secondary)] file:px-2 file:py-1.5 file:text-xs file:text-white/80" />
-            {enviando && (
-              <div className="mt-1.5 h-1.5 w-full rounded-full bg-[var(--surface-tertiary)] overflow-hidden">
-                <div className="h-full bg-[var(--action-primary)] transition-all" style={{ width: `${progresso}%` }} />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {erro && <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-red-700">{erro}</div>}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
-          <button onClick={() => void salvar()} disabled={enviando}
-            className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--surface-hover)] disabled:opacity-40">
-            {enviando ? "Enviando…" : "Anexar"}
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -1370,7 +1261,7 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
 
         {abaDoc === "dados" && !doc.arquivoUrl && (
           <div className="rounded-lg border border-dashed border-[var(--border-default)] p-6 text-center text-xs text-[var(--text-muted)]">
-            Anexe o arquivo do documento (aba "Visualização" ou botão "Anexar certidão") antes de extrair ou preencher os dados.
+            Este documento ainda não tem arquivo — certidões só nascem pela Árvore Genealógica; volte lá para gerá-lo antes de extrair ou preencher os dados aqui.
           </div>
         )}
 
