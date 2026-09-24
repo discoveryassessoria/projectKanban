@@ -1749,7 +1749,6 @@ function FormAguardarRetorno({
 
   const readOnly = stepStatus === "concluida"
   const podeSalvar = acoes.includes("salvar_andamento") && !readOnly
-  const podeConcluir = acoes.includes("concluir") && !readOnly
 
   // Rascunho dos campos de acompanhamento. Nasce do gravado (a `key` do
   // componente reinicia quando o servidor devolve conteúdo novo).
@@ -1789,6 +1788,20 @@ function FormAguardarRetorno({
   }), [doc, solicitacao])
 
   const semProtocolo = !solicitacao
+
+  // CONCLUIR EXIGE UM RECEBIMENTO REGISTRADO — protocolo já gravado, um
+  // número prestes a ser gravado por este mesmo clique (`concluir` chama
+  // `registrarProtocoloSeNecessario` antes do PATCH), ou a ausência de
+  // retorno marcada explicitamente. Sem isso, o botão disparava
+  // `{status:"concluida"}` sem NENHUM dado — achado real 24/09/2026 (o
+  // processo "Teste" concluiu esta subtarefa com payload vazio, exigindo
+  // reabertura manual). Mandato do usuário, 23/09/2026: "'Receber
+  // confirmação do pedido'... deve[m] permitir registrar os respectivos
+  // recebimentos" — permitir não é o mesmo que dispensar. O botão continua
+  // VISÍVEL (a ação em si segue liberada pelo cadastro) mas fica DESABILITADO
+  // com um aviso, nunca escondido sem explicação.
+  const temConfirmacaoParaConcluir = solicit.protocolo != null || numeroProtocolo.trim().length > 0 || semRetorno
+  const podeConcluir = acoes.includes("concluir") && !readOnly
 
   const inicioEspera = textoOuNulo(etapa?.startedAt)
   const previsaoMostrada = previsao || andamento.previsaoEfetiva || ""
@@ -1857,6 +1870,10 @@ function FormAguardarRetorno({
 
   const concluir = async () => {
     if (!podeConcluir || concluindo) return
+    if (!temConfirmacaoParaConcluir) {
+      setFalha("Registre o protocolo do cartório ou marque \"sem retorno\" antes de concluir.")
+      return
+    }
     setConcluindo(true)
     setFalha(null)
     if (!(await registrarProtocoloSeNecessario())) { setConcluindo(false); return }
@@ -1896,7 +1913,8 @@ function FormAguardarRetorno({
           {podeConcluir && (
             <button
               onClick={concluir}
-              disabled={salvando || concluindo}
+              disabled={salvando || concluindo || !temConfirmacaoParaConcluir}
+              title={!temConfirmacaoParaConcluir ? "Registre o protocolo do cartório (ou marque \"sem retorno\") para concluir." : undefined}
               className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-2"
             >
               {concluindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -2072,6 +2090,13 @@ function FormAguardarRetorno({
               />
               Registrar AUSÊNCIA de retorno (cartório não respondeu no prazo informado)
             </label>
+          )}
+
+          {podeConcluir && !readOnly && !temConfirmacaoParaConcluir && (
+            <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-[var(--text-secondary)] flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              Para concluir, informe o número do protocolo recebido acima ou marque &ldquo;sem retorno&rdquo;.
+            </div>
           )}
 
           {/* 4. HISTÓRICO DE CONTATOS */}

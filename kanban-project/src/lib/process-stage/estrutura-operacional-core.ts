@@ -650,7 +650,19 @@ function expandirComSubtarefas(brutosOrdenados: PassoBruto[], montados: PassoDaE
       continue
     }
     for (const sub of bruto.subtarefas) {
-      const status = sub.concluida ? "CONCLUIDO" : sub.status
+      // TRADUÇÃO DE VOCABULÁRIO na fronteira subtarefa→pseudo-passo: o status
+      // de SUBTAREFA usa "AGUARDANDO_EXTERNO" (execucao-da-subtarefa.ts,
+      // ESTADOS_DA_SUBTAREFA); o de PASSO usa "AGUARDANDO" (StepInstanceStatus
+      // — baldeDoPasso/rotuloStatusPasso/STATUS_ESPERA_EXTERNA, todos "régua
+      // única" documentada só para passo). Sem esta tradução, nenhum dos três
+      // reconhecia "AGUARDANDO_EXTERNO": caía no balde PENDENTE por omissão, e
+      // `passoCorrente` (que prefere o balde EM_ANDAMENTO) pulava a subtarefa
+      // realmente corrente para a primeira do array — achado real 24/09/2026,
+      // processo "Teste": "Etapa atual" mostrava "Enviar requerimento ao
+      // cartório" (subtarefa 1, já concluída) enquanto a Tarefa (fonte certa do
+      // badge de status, à parte) já dizia "Aguardando terceiro" — inconsistência
+      // visível que levou à reabertura manual da subtarefa 1 por engano.
+      const status = sub.concluida ? "CONCLUIDO" : sub.status === "AGUARDANDO_EXTERNO" ? "AGUARDANDO" : sub.status
       resultado.push({
         ...montado,
         titulo: sub.label,
