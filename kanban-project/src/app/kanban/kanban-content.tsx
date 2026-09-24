@@ -30,6 +30,7 @@ import {
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Shield } from "lucide-react"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useToast } from "@/src/contexts/toast-context"
 
 interface User {
   id: number
@@ -61,6 +62,7 @@ const SEM_ARVORES: ArvoreResumo[] = []
 export function KanbanContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { showToast } = useToast()
 
   // Sessão e usuário pela leitura oficial do localStorage.
   const noCliente = useIsClient()
@@ -148,7 +150,16 @@ export function KanbanContent() {
         const r = await fetch(`/api/processos/${initialProcessoId}/localizacao`, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         })
-        if (!r.ok || !vivo) return
+        if (!vivo) return
+        if (r.status === 404) {
+          // Sem isto o link falhava calado: a página ficava exatamente como
+          // já estava (quadro padrão), sem nada indicando que o processo do
+          // link não existe mais — parecia um clique morto (achado 24/09/2026).
+          posicionadoPara.current = initialProcessoId
+          showToast("O processo deste link não existe mais — pode ter sido excluído.", "error")
+          return
+        }
+        if (!r.ok) return
         const loc = (await r.json()) as { pais?: string | null; tipoProcessoMotorId?: number | null }
         if (!vivo || !loc?.pais) return
         posicionadoPara.current = initialProcessoId
