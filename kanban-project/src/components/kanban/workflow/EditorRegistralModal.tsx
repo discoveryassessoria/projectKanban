@@ -274,6 +274,26 @@ function ConteudoModal({
     setRascunho({ versao: versaoDoc, form: valor })
   }
 
+  // -- PAÍS: seleção travada, base mundial (~250 países, GeoNames) — nunca
+  //    texto livre. Nascimento/registro em árvore genealógica pode ser de
+  //    QUALQUER país, não só onde a agência vende cidadania (por isso não é
+  //    `CatalogoPais` — ver comentário do model `Pais` em schema.prisma).
+  //    Documento sem país gravado ainda (legado) segue tratado como Brasil,
+  //    pra não quebrar o fluxo de quem nunca tocou este campo.
+  const paisesReq = useApi<{ paises?: { id: number; codigo: string; nome: string }[] }>(isOpen ? "/api/geografia/paises" : null)
+  const paisesDisponiveis = paisesReq.dados?.paises ?? []
+  const paisSelecionado = paisesDisponiveis.find((p) => p.nome === form.pais_registro) ?? null
+  const paisCodigo = paisSelecionado?.codigo ?? (form.pais_registro ? null : "BR")
+  const ehBrasil = paisCodigo === "BR"
+
+  // -- CIDADE FORA DO BRASIL: mesma base mundial (Cidade, GeoNames população
+  //    ≥ 5000), sugerida por texto — MESMO padrão já usado pra Cartório
+  //    (busca na base local, nunca serviço externo por tecla).
+  const cidadesMundoReq = useApi<{ cidades?: { id: number; nome: string; regiao: string | null }[] }>(
+    !ehBrasil && paisCodigo ? `/api/geografia/cidades?paisCodigo=${paisCodigo}&q=${encodeURIComponent(form.cidade_registro)}` : null,
+  )
+  const cidadesDoMundo = cidadesMundoReq.dados?.cidades ?? []
+
   // -- Estado → Cidade em cascata, direto do IBGE (fonte pública oficial, sem
   //    chave/custo). "Cartório" continua texto livre — nem todo cartório tem
   //    cadastro prévio — mas passa a sugerir (via <datalist>) os já cadastrados
@@ -323,7 +343,8 @@ function ConteudoModal({
   // UMA exceção: Data do registro (nem toda certidão tem essa data anotada
   // no momento em que o registro é localizado).
   const nomeRegistradoOk = form.nome_registrado.trim().length > 0
-  const estadoOk = form.estado_registro.trim().length > 0
+  // Estado (UF) só existe no fluxo do Brasil — fora dele a cidade já basta.
+  const estadoOk = ehBrasil ? form.estado_registro.trim().length > 0 : true
   const cidadeOk = form.cidade_registro.trim().length > 0
   const cartorioOk = form.cartorio.trim().length > 0
   const livroOk = form.livro.trim().length > 0
@@ -624,48 +645,86 @@ function ConteudoModal({
                   onToggle={() => toggleSection("localidade")}
                 >
                   <div className="grid grid-cols-2 gap-3">
+                    {/* PAÍS — seleção travada, base mundial. Vem primeiro porque é ELE
+                        que decide se o resto usa IBGE+cartório nacional (Brasil) ou
+                        a base mundial de cidades (qualquer outro país) — nunca os
+                        dois esquemas ao mesmo tempo. */}
                     <SelectField
-                      label="Estado"
+                      label="País"
                       requiredToComplete={isModoBuscar}
-                      value={form.estado_registro}
-                      onChange={(v) => setForm({ ...form, estado_registro: v, cidade_registro: "" })}
-                      options={ufs.map((u) => u.nome)}
-                      placeholder={ufs.length ? "Selecione o estado" : "Carregando…"}
+                      value={paisSelecionado?.nome ?? (form.pais_registro ? form.pais_registro : "Brazil")}
+                      onChange={(v) => setForm({ ...form, pais_registro: v === "Brazil" ? "" : v, estado_registro: "", cidade_registro: "" })}
+                      options={paisesDisponiveis.map((p) => p.nome)}
+                      placeholder={paisesDisponiveis.length ? "Selecione o país" : "Carregando…"}
                     />
-                    <SelectField
-                      label="Cidade"
-                      requiredToComplete={isModoBuscar}
-                      value={form.cidade_registro}
-                      onChange={(v) => setForm({ ...form, cidade_registro: v })}
-                      options={municipios}
-                      placeholder={!form.estado_registro ? "Escolha o estado primeiro" : municipios.length ? "Selecione a cidade" : "Carregando…"}
-                      disabled={!form.estado_registro}
-                    />
+                    {ehBrasil ? (
+                      <SelectField
+                        label="Estado"
+                        requiredToComplete={isModoBuscar}
+                        value={form.estado_registro}
+                        onChange={(v) => setForm({ ...form, estado_registro: v, cidade_registro: "" })}
+                        options={ufs.map((u) => u.nome)}
+                        placeholder={ufs.length ? "Selecione o estado" : "Carregando…"}
+                      />
+                    ) : (
+                      // País fora do Brasil não tem UF — a região aparece junto do
+                      // nome da cidade, na sugestão, quando a fonte tem essa info.
+                      <div />
+                    )}
+                    {ehBrasil ? (
+                      <SelectField
+                        label="Cidade"
+                        requiredToComplete={isModoBuscar}
+                        value={form.cidade_registro}
+                        onChange={(v) => setForm({ ...form, cidade_registro: v })}
+                        options={municipios}
+                        placeholder={!form.estado_registro ? "Escolha o estado primeiro" : municipios.length ? "Selecione a cidade" : "Carregando…"}
+                        disabled={!form.estado_registro}
+                      />
+                    ) : (
+                      <>
+                        <Field
+                          label="Cidade"
+                          requiredToComplete={isModoBuscar}
+                          value={form.cidade_registro}
+                          onChange={(v) => setForm({ ...form, cidade_registro: v })}
+                          colSpan={2}
+                          list="cidades-mundo-sugeridas"
+                        />
+                        <datalist id="cidades-mundo-sugeridas">
+                          {cidadesDoMundo.map((c) => (
+                            <option key={c.id} value={c.nome}>{c.regiao ? `${c.nome} — ${c.regiao}` : c.nome}</option>
+                          ))}
+                        </datalist>
+                      </>
+                    )}
                     <Field
                       label="Cartório"
                       requiredToComplete={isModoBuscar}
                       value={form.cartorio}
                       onChange={(v) => setForm({ ...form, cartorio: v })}
                       colSpan={2}
-                      list="cartorios-sugeridos"
+                      list={ehBrasil ? "cartorios-sugeridos" : undefined}
                     />
-                    <datalist id="cartorios-sugeridos">
-                      {cartoriosDaApi.map((c) => (
-                        <option key={c.id} value={c.nome} />
-                      ))}
-                    </datalist>
-                    {ufSigla && cartoriosDaApi.length === 0 && (
+                    {ehBrasil && (
+                      <datalist id="cartorios-sugeridos">
+                        {cartoriosDaApi.map((c) => (
+                          <option key={c.id} value={c.nome} />
+                        ))}
+                      </datalist>
+                    )}
+                    {ehBrasil && ufSigla && cartoriosDaApi.length === 0 && (
                       <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
                         {form.cidade_registro ? "Nenhum cartório sincronizado para esta cidade ainda." : "Selecione a cidade para ver os cartórios dessa região."}
                       </div>
                     )}
+                    {!ehBrasil && (
+                      <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
+                        Fora do Brasil o cartório/órgão de registro ainda é texto livre — só temos base sincronizada de cartórios nacionais.
+                      </div>
+                    )}
                     {!isModoBuscar && (
                       <>
-                        <Field
-                          label="País"
-                          value={form.pais_registro}
-                          onChange={(v) => setForm({ ...form, pais_registro: v })}
-                        />
                         <Field
                           label="Comune"
                           value={form.comune}

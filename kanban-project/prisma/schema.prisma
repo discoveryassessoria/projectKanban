@@ -8571,6 +8571,57 @@ model Cartorio {
   @@index([cns])
 }
 
+/// BASE MUNDIAL DE PAÍSES — seleção travada (nunca texto livre) para "país de
+/// registro"/"país de nascimento" em formulários que hoje só sabem lidar com o
+/// Brasil (ex.: EditorRegistralModal). Sincronizada da fonte pública gratuita
+/// GeoNames (download.geonames.org/export/dump/countryInfo.txt).
+///
+/// NÃO É `CatalogoPais`: aquele é o cadastro travado/congelado da hierarquia
+/// País×Tipo×Modalidade×Workflow Macro — só os poucos países onde a agência
+/// vende cidadania, protegido por suíte própria (doc 31). Uma pessoa da árvore
+/// pode ter nascido em QUALQUER um dos ~250 países do mundo; misturar as duas
+/// listas contaminaria a hierarquia congelada com países que não são produto.
+model Pais {
+  id              Int      @id @default(autoincrement())
+  /// ISO 3166-1 alpha-2 — identidade estável da fonte.
+  codigo          String   @unique @db.VarChar(2)
+  nome            String   @db.VarChar(120)
+  /// Normalizado (minúsculo, sem acento) só para busca textual — nunca exibido.
+  nomeNormalizado String   @db.VarChar(120)
+  ativo           Boolean  @default(true)
+  criadoEm        DateTime @default(now())
+  atualizadoEm    DateTime @updatedAt
+
+  cidades Cidade[]
+
+  @@index([nomeNormalizado])
+  @@index([ativo])
+}
+
+/// BASE MUNDIAL DE CIDADES — mesma fonte e mesmo motivo do `Pais` acima
+/// (GeoNames, download.geonames.org/export/dump/cities5000.zip — municípios
+/// com população ≥ 5000, o piso que cobre comuni pequenos de processos de
+/// cidadania italiana/espanhola sem inflar a base com todo povoado do mundo).
+model Cidade {
+  id              Int    @id @default(autoincrement())
+  /// geonameid — identidade estável da fonte.
+  sourceId        String @unique @db.VarChar(20)
+  nome            String @db.VarChar(200)
+  nomeNormalizado String @db.VarChar(200)
+  /// Região/estado/província (ex.: "Lombardia", "Andaluzia") — livre da fonte,
+  /// só para exibição/desambiguação, nunca chave de busca própria.
+  regiao          String? @db.VarChar(200)
+
+  paisId Int
+  pais   Pais @relation(fields: [paisId], references: [id], onDelete: Cascade)
+
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now())
+
+  @@index([paisId, nomeNormalizado])
+  @@index([ativo])
+}
+
 /// AUDITORIA de cada execução da sincronização de cartórios — cron e "Sincronizar
 /// agora" gravam aqui, pela mesma porta (CartorioSyncService).
 model CartorioSyncRun {

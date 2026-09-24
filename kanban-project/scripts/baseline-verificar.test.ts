@@ -549,6 +549,13 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // temporal (SubtaskExecution.previstoPara/proximoAcompanhamentoEm)
   // permanecem intocados.
   '20260923020000_remover_prazo_proprio_subtarefa',
+  // Base mundial de países e cidades (24/09/2026, pedido explícito): tabelas
+  // NOVAS `Pais`/`Cidade`, sincronizadas da fonte pública GeoNames — seleção
+  // travada para "país/cidade de registro" em EditorRegistralModal, que hoje
+  // só sabia lidar com o Brasil. Aditiva, isolada de `CatalogoPais` (cadastro
+  // travado/congelado da hierarquia País×Tipo×Modalidade, doc 31) — ver
+  // comentário do model `Pais` em schema.prisma.
+  '20260924200000_paises_cidades_base_mundial',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
