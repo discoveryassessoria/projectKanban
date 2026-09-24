@@ -122,6 +122,11 @@ interface Filtros {
   processoId: number | null
   atrasadas: boolean
   venceHoje: boolean
+  /** Distinto de `venceHoje` — mesma régua que Minha Fila já usa (`proximos7Dias`
+   * no backend). Achado real 24/09/2026: o card "Vencem em 7 dias" mandava
+   * `venceHoje`, e "3 tarefas nos próximos 7 dias" filtrava contra "vence hoje
+   * exatamente" — zerava a lista quase sempre. */
+  venceEm7Dias: boolean
   marcoFaseConcluida: boolean
   dataTipo: DataTipo
   dataInicio: string | null
@@ -130,13 +135,13 @@ interface Filtros {
 const SEM_FILTRO: Filtros = {
   busca: "", responsavel: null, semResponsavel: false, fase: null, prioridade: null,
   statusTarefa: [], statusProcesso: null, tipoTarefa: [], familia: null, processoId: null,
-  atrasadas: false, venceHoje: false, marcoFaseConcluida: false,
+  atrasadas: false, venceHoje: false, venceEm7Dias: false, marcoFaseConcluida: false,
   dataTipo: "vencimento", dataInicio: null, dataFim: null,
 }
 const temFiltro = (f: Filtros) =>
   f.busca.trim() !== "" || f.responsavel != null || f.semResponsavel || f.fase != null || f.prioridade != null ||
   f.statusTarefa.length > 0 || f.statusProcesso != null || f.tipoTarefa.length > 0 || f.familia != null ||
-  f.processoId != null || f.atrasadas || f.venceHoje || f.marcoFaseConcluida || f.dataInicio != null || f.dataFim != null
+  f.processoId != null || f.atrasadas || f.venceHoje || f.venceEm7Dias || f.marcoFaseConcluida || f.dataInicio != null || f.dataFim != null
 
 function queryDe(f: Filtros, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams()
@@ -152,6 +157,7 @@ function queryDe(f: Filtros, extra: Record<string, string> = {}): string {
   if (f.processoId != null) p.set("processo", String(f.processoId))
   if (f.atrasadas) p.set("atrasadas", "1")
   if (f.venceHoje) p.set("venceHoje", "1")
+  if (f.venceEm7Dias) p.set("proximos7Dias", "1")
   if (f.marcoFaseConcluida) p.set("marcoFaseConcluida", "1")
   if (f.dataInicio || f.dataFim) {
     p.set("dataTipo", f.dataTipo)
@@ -222,7 +228,7 @@ const TILES: Array<{
 }> = [
   { chave: "tarefasAbertas", rotulo: "Tarefas abertas", tom: "text-[var(--text-primary)]", icone: ListChecks, iconeTom: "bg-[var(--info-tile)] text-[var(--info-text)]" },
   { chave: "atrasadas", rotulo: "Atrasadas", tom: "text-[var(--danger-text)]", icone: AlertTriangle, iconeTom: "bg-[var(--danger-tile)] text-[var(--danger-text)]", filtro: { atrasadas: true } },
-  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-[var(--warning-text)]", icone: Clock, iconeTom: "bg-[var(--warning-tile)] text-[var(--warning-text)]", filtro: { venceHoje: true } },
+  { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-[var(--warning-text)]", icone: Clock, iconeTom: "bg-[var(--warning-tile)] text-[var(--warning-text)]", filtro: { venceEm7Dias: true } },
   {
     chave: "concluidasHoje", rotulo: "Concluídas (hoje)", tom: "text-[var(--success-text)]", icone: CheckCircle2, iconeTom: "bg-[var(--success-tile)] text-[var(--success-text)]",
     filtro: { dataTipo: "concluida", dataInicio: new Date().toISOString().slice(0, 10), dataFim: new Date().toISOString().slice(0, 10) },
@@ -686,7 +692,7 @@ export function VisaoGlobal() {
             >
               Marco: fase concluída
             </Button>
-            {([["atrasadas", "Atrasadas"], ["venceHoje", "Vence hoje"]] as const).map(([k, r]) => (
+            {([["atrasadas", "Atrasadas"], ["venceHoje", "Vence hoje"], ["venceEm7Dias", "Vencem em 7 dias"]] as const).map(([k, r]) => (
               <Button key={k} variant={rascunho[k] ? "secondary" : "outline"} size="sm" onClick={() => mudarRascunho({ [k]: !rascunho[k] } as Partial<Filtros>)}>
                 {r}
               </Button>
@@ -721,6 +727,7 @@ export function VisaoGlobal() {
           {filtros.marcoFaseConcluida && <Chip rotulo="Marco: fase concluída" aoRemover={() => aplicar({ marcoFaseConcluida: false })} />}
           {filtros.atrasadas && <Chip rotulo="Atrasadas" aoRemover={() => aplicar({ atrasadas: false })} />}
           {filtros.venceHoje && <Chip rotulo="Vence hoje" aoRemover={() => aplicar({ venceHoje: false })} />}
+          {filtros.venceEm7Dias && <Chip rotulo="Vencem em 7 dias" aoRemover={() => aplicar({ venceEm7Dias: false })} />}
           <button
             onClick={() => { setNomeVisao(""); setSalvarAberto(true) }}
             className="ml-1 text-[12px] font-medium text-[var(--action-primary)] underline-offset-2 hover:underline"
