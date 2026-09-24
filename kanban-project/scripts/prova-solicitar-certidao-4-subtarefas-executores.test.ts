@@ -10,10 +10,11 @@
 //   1) subtarefa 1 (envio) FALHA sem os requisitos do canal — nada conclui.
 //   2) subtarefa 1 conclui só com envio efetivo válido — libera a 2 (com
 //      acompanhamento automático, em dias corridos), nunca fecha o passo.
-//   3) ACHADO: a linha SolicitacaoDocumento é idempotente por reenvio, mas a
-//      porta de conclusão não confere "para qual subtarefa" — reenviar dados
-//      válidos depois do sucesso avança a subtarefa seguinte sem aviso
-//      (não alcançável pela UI real, documentado como limitação conhecida).
+//   3) chamador ANTIGO (sem subtarefaEsperada): reenviar dados válidos depois
+//      do sucesso avança a subtarefa seguinte sem aviso — retrocompatibilidade
+//      preservada, não é o caminho da UI real.
+//   3b) CORREÇÃO 24/09/2026: com subtarefaEsperada (a UI real sempre manda),
+//      o mesmo reenvio fica idempotente e NUNCA avança a subtarefa errada.
 //   4) subtarefa 3 conclui pela PONTE do editor legado (patch direto no
 //      passo → redirecionado à subtarefa corrente) — nunca fecha o passo.
 //   5) subtarefa 4 (a última) conclui e SÓ AÍ o passo fecha de verdade.
@@ -182,38 +183,72 @@ async function main() {
   check("2.6) subtarefa 2 liberada (dependência satisfeita) e já em espera externa (acompanhamento automático)", sub2.status === "AGUARDANDO_EXTERNO", sub2.status)
   check("2.7) acompanhamento da subtarefa 2 calculado (3 dias corridos) — sem tocar no prazo da Tarefa", sub2.execucao?.proximoAcompanhamentoEm != null, sub2.execucao?.proximoAcompanhamentoEm)
 
-  console.log("\n3) ACHADO — reenviar dados válidos depois da subtarefa 1 já concluída AVANÇA a subtarefa seguinte")
+  console.log("\n3) CHAMADOR ANTIGO (sem subtarefaEsperada) — reenviar dados válidos depois da subtarefa 1 já concluída AVANÇA a subtarefa seguinte")
   // A linha SolicitacaoDocumento é idempotente por (documentoId, stepInstanceId,
   // ciclo) — reenviar não cria uma segunda. Mas `concluirSubtarefaCorrentePeloPasso`
-  // (chamada de novo porque `concluirEtapa:true`) conclui "quem for a CORRENTE
-  // agora" — sem conferir se é a MESMA subtarefa que a primeira chamada tratou.
-  // Como subtarefa 1 já está concluída, a corrente já é a 2: reenviar o
-  // formulário da 1 (com o anexo já registrado satisfazendo a exigência de novo)
-  // avança a 2 SEM AVISO. Não é um caminho que a UI real ofereça (a subtarefa 1
-  // concluída abre somente-leitura, sem o botão de enviar), mas é uma
-  // característica real e pré-existente da porta (vale para qualquer passo com
-  // subtarefas, não só este) — registrada aqui como LIMITAÇÃO CONHECIDA,
-  // fora do escopo desta correção (routing de editor + prazo).
+  // (chamada de novo porque `concluirEtapa:true`), QUANDO O CHAMADOR NÃO INFORMA
+  // qual subtarefa esperava fechar, conclui "quem for a CORRENTE agora" — sem
+  // conferir se é a MESMA subtarefa que a primeira chamada tratou. Como
+  // subtarefa 1 já está concluída, a corrente já é a 2: reenviar o formulário
+  // da 1 (com o anexo já registrado satisfazendo a exigência de novo) avança a
+  // 2 SEM AVISO. Não é um caminho que a UI real ofereça (a subtarefa 1
+  // concluída abre somente-leitura, sem o botão de enviar, e a tela real SEMPRE
+  // manda `subtarefaEsperada` — ver item 3b) — preservado aqui só para provar
+  // que um chamador ANTIGO, sem essa informação, mantém o comportamento de
+  // sempre (retrocompatibilidade), nunca passa a recusar silenciosamente.
   const solicitacoesAntesRetry = await prisma.solicitacaoDocumento.count({ where: { documentoId: p.doc.id } })
   const rReenvio = await registrarSolicitacaoDocumento(p.doc.id, p.stepInstanceId, {
     canal: "EMAIL", destinatarioNome: "Cartório Teste", concluirEtapa: true,
   }, p.ctx)
   const solicitacoesDepoisRetry = await prisma.solicitacaoDocumento.count({ where: { documentoId: p.doc.id } })
   check("3.1) a LINHA da solicitação é idempotente (nenhuma segunda nasce do reenvio)", solicitacoesDepoisRetry === solicitacoesAntesRetry)
-  check("3.2) [achado] o reenvio sucede e avança a subtarefa 2 (não é bloqueado pela porta)", rReenvio.ok === true && rReenvio.subtarefaConcluida === "receber_confirmacao_pedido", rReenvio)
+  check("3.2) [sem subtarefaEsperada] o reenvio sucede e avança a subtarefa 2 (comportamento antigo preservado)", rReenvio.ok === true && rReenvio.subtarefaConcluida === "receber_confirmacao_pedido", rReenvio)
 
-  console.log("\n4) SUBTAREFA 3 (receber certidão) conclui pela PONTE do editor legado (patch direto no passo) — libera a 4")
-  const r3 = await atualizarPassoV2(p.doc.id, p.stepInstanceId, { status: "concluida" }, p.ctx)
+  // ══════════════════════════════════════════════════════════════════════
+  console.log("\n3b) CORREÇÃO 24/09/2026 — com subtarefaEsperada (a tela real SEMPRE manda), o mesmo reenvio NÃO avança a subtarefa errada")
+  // ══════════════════════════════════════════════════════════════════════
+  const p3b = await palco()
+  const rEnvio3b = await registrarSolicitacaoDocumento(p3b.doc.id, p3b.stepInstanceId, {
+    canal: "EMAIL", destinatarioNome: "Cartório Teste", concluirEtapa: true,
+    requerimento: { url: "https://exemplo.test/requerimento.pdf", nome: "requerimento.pdf" },
+    subtarefaEsperada: "enviar_requerimento_cartorio",
+  }, p3b.ctx)
+  check("3b.1) primeiro envio sucede e conclui a subtarefa 1", rEnvio3b.ok === true && rEnvio3b.subtarefaConcluida === "enviar_requerimento_cartorio", rEnvio3b)
+
+  const rReenvio3b = await registrarSolicitacaoDocumento(p3b.doc.id, p3b.stepInstanceId, {
+    canal: "EMAIL", destinatarioNome: "Cartório Teste", concluirEtapa: true,
+    subtarefaEsperada: "enviar_requerimento_cartorio",
+  }, p3b.ctx)
+  check("3b.2) o reenvio da MESMA subtarefa esperada sucede (idempotente)", rReenvio3b.ok === true, rReenvio3b)
+  check("3b.3) o reenvio NÃO avança a subtarefa 2 — devolve a MESMA subtarefa 1 (esperada)",
+    rReenvio3b.ok === true && rReenvio3b.subtarefaConcluida === "enviar_requerimento_cartorio", rReenvio3b)
+  const subs3b = await subtarefasDaEtapa({ stepInstanceId: p3b.stepInstanceId })
+  const sub2Depois3b = subs3b.find((s) => s.key === "receber_confirmacao_pedido")!
+  check("3b.4) a subtarefa 2 continua NÃO concluída — o reenvio não tocou nela",
+    sub2Depois3b.concluida === false, sub2Depois3b)
+
+  console.log("\n4) SUBTAREFA 3 (receber certidão) conclui pela PONTE do editor legado (patch direto no passo, com subtarefaEsperada — como a UI real manda) — libera a 4")
+  const r3 = await atualizarPassoV2(p.doc.id, p.stepInstanceId, { status: "concluida", subtarefaEsperada: "receber_certidao" }, p.ctx)
   check("4.1) sucede via a ponte (não erro 409 travado)", r3.ok === true, r3)
   if (r3.ok) {
     check("4.2) concluiu a subtarefa 3 (receber_certidao), não o passo inteiro direto", r3.subtarefaConcluida === "receber_certidao", r3.subtarefaConcluida)
     check("4.3) ainda falta a subtarefa 4", Array.isArray(r3.aindaFaltam) && r3.aindaFaltam.length > 0, r3.aindaFaltam)
   }
+
+  console.log("\n4b) retry da PONTE com a MESMA subtarefaEsperada (rede instável/duplo-clique) NÃO avança a subtarefa 4")
+  const r3Retry = await atualizarPassoV2(p.doc.id, p.stepInstanceId, { status: "concluida", subtarefaEsperada: "receber_certidao" }, p.ctx)
+  check("4b.1) o retry sucede (idempotente), sem 409", r3Retry.ok === true, r3Retry)
+  check("4b.2) devolve a MESMA subtarefa 3 (esperada), não avança para a 4",
+    r3Retry.ok === true && r3Retry.subtarefaConcluida === "receber_certidao", r3Retry)
+  const subsApos4b = await subtarefasDaEtapa({ stepInstanceId: p.stepInstanceId })
+  const sub4Apos4b = subsApos4b.find((s) => s.key === "conferir_validar_certidao")!
+  check("4b.3) a subtarefa 4 continua NÃO concluída — o retry não tocou nela", sub4Apos4b.concluida === false, sub4Apos4b)
+
   const passoApos3 = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepInstanceId }, select: { status: true } })
   check("4.4) passo continua NÃO concluído (3/4)", passoApos3.status !== "CONCLUIDO", passoApos3.status)
 
   console.log("\n5) SUBTAREFA 4 (conferir e validar) — a ÚLTIMA: agora sim o PASSO fecha")
-  const r4 = await atualizarPassoV2(p.doc.id, p.stepInstanceId, { status: "concluida" }, p.ctx)
+  const r4 = await atualizarPassoV2(p.doc.id, p.stepInstanceId, { status: "concluida", subtarefaEsperada: "conferir_validar_certidao" }, p.ctx)
   check("5.1) sucede", r4.ok === true, r4)
   if (r4.ok) check("5.2) concluiu a subtarefa 4 (conferir_validar_certidao)", r4.subtarefaConcluida === "conferir_validar_certidao", r4.subtarefaConcluida)
   const passoApos4 = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepInstanceId }, select: { status: true } })

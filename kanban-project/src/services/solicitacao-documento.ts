@@ -115,6 +115,8 @@ export interface EntradaSolicitacao {
   anexos?: Array<{ url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null; hash?: string | null; tipo?: TipoArquivoDocumento }> | null
   /** Concluir a etapa junto (o botão "Confirmar envio · concluir etapa"). */
   concluirEtapa?: boolean
+  /** Qual subtarefa a TELA acreditava estar concluindo — ver `concluirSubtarefaCorrentePeloPasso`. */
+  subtarefaEsperada?: string | null
 }
 
 function texto(v: unknown): string | null {
@@ -585,6 +587,7 @@ export async function registrarSolicitacaoDocumento(
       protocoloId, protocolo: numeroProtocolo,
       canalKey: canal.toLowerCase(),
       fornecedorId: entrada.orgaoId ?? null,
+      subtarefaKeyEsperada: texto(entrada.subtarefaEsperada) ?? undefined,
     })
     if (r.aplicavel) {
       subtarefaConcluida = r.subtarefaKey

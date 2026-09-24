@@ -111,6 +111,12 @@ interface StepEditorBaseProps {
    *  próprio texto fixo (comportamento de sempre, para passo sem subtarefas). */
   subtarefaLabel?: string | null
   subtarefaDescricao?: string | null
+  /** A CHAVE da subtarefa clicada — a tela manda de volta ao concluir, para a
+   *  porta do servidor confirmar que está fechando a MESMA subtarefa que o
+   *  operador abriu (ver `concluirSubtarefaCorrentePeloPasso`). Achado real
+   *  24/09/2026: sem isto, um reenvio tardio (retry de rede, duplo-clique)
+   *  concluía "a corrente agora" — que podia já ser OUTRA subtarefa. */
+  subtarefaKey?: string | null
 }
 
 interface UserBrief {
@@ -469,6 +475,7 @@ interface EditorEspecificoProps {
   stepStatus: string
   subtarefaLabel?: string | null
   subtarefaDescricao?: string | null
+  subtarefaKey?: string | null
   isOpen: boolean
   onClose: () => void
   onSaved?: () => void
@@ -570,6 +577,10 @@ function EditorPorSubtarefaCorrente({
     // subtarefa clicada (ver acima), então isto vale para qualquer uma.
     subtarefaLabel: corrente.label,
     subtarefaDescricao: corrente.descricao,
+    // A CHAVE, não só o texto — é o que o servidor usa para confirmar que
+    // está concluindo a MESMA subtarefa que esta tela tem aberta (ver
+    // `concluirSubtarefaCorrentePeloPasso`).
+    subtarefaKey: corrente.key,
   }
   return <EditorDoKind kind={kindDaSubtarefa} stepTitle={stepTitle} rest={restEfetivo} />
 }
@@ -876,6 +887,7 @@ function FormSolicitarCertidao({
   documentoId,
   stepId,
   stepStatus,
+  subtarefaKey,
   isOpen,
   onClose,
   onSaved,
@@ -1025,6 +1037,7 @@ function FormSolicitarCertidao({
               }
             : null,
           concluirEtapa: true,
+          subtarefaEsperada: subtarefaKey ?? undefined,
         }),
       })
       const json = (await res.json().catch(() => ({}))) as { error?: string }
@@ -1725,6 +1738,7 @@ function FormAguardarRetorno({
   stepStatus,
   subtarefaLabel,
   subtarefaDescricao,
+  subtarefaKey,
   isOpen,
   onClose,
   onSaved,
@@ -1877,7 +1891,7 @@ function FormAguardarRetorno({
     setConcluindo(true)
     setFalha(null)
     if (!(await registrarProtocoloSeNecessario())) { setConcluindo(false); return }
-    const r = await patchStepComErro(documentoId, stepId, { status: "concluida" })
+    const r = await patchStepComErro(documentoId, stepId, { status: "concluida", subtarefaEsperada: subtarefaKey ?? undefined })
     setConcluindo(false)
     if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
     void celebrar()
@@ -2347,6 +2361,7 @@ function FormReceberCertidao({
   stepStatus,
   subtarefaLabel,
   subtarefaDescricao,
+  subtarefaKey,
   isOpen,
   onClose,
   onSaved,
@@ -2416,6 +2431,7 @@ function FormReceberCertidao({
         completedById: getUserId(),
         documentMedium: medium,
         stepObservation: observacao.trim() || null,
+        subtarefaEsperada: subtarefaKey ?? undefined,
       })
       if (!r.ok) {
         // A etapa NÃO concluiu: o modal fica aberto, com o motivo, e o
@@ -2743,6 +2759,7 @@ function FormConferirCertidao({
   stepStatus,
   subtarefaLabel,
   subtarefaDescricao,
+  subtarefaKey,
   isOpen,
   onClose,
   onSaved,
@@ -2897,6 +2914,7 @@ function FormConferirCertidao({
         reviewResult: resultado,
         reviewChecklist: checklist,
         stepObservation: observacao.trim() || null,
+        subtarefaEsperada: subtarefaKey ?? undefined,
       })
       if (!r.ok) {
         // A etapa NÃO concluiu: o modal fica aberto, com o motivo, e o
@@ -3515,6 +3533,7 @@ function FormPadrao({
   stepTitle,
   subtarefaLabel,
   subtarefaDescricao,
+  subtarefaKey,
   isOpen,
   onClose,
   onSaved,
@@ -3549,7 +3568,7 @@ function FormPadrao({
     if (!podeConcluir || concluindo) return
     setConcluindo(true)
     setFalha(null)
-    const resultado = await patchStepComErro(documentoId, stepId, { status: "concluida" })
+    const resultado = await patchStepComErro(documentoId, stepId, { status: "concluida", subtarefaEsperada: subtarefaKey ?? undefined })
     setConcluindo(false)
     if (!resultado.ok) { setFalha(mensagemDoErro(resultado.codigo)); return }
     void celebrar()

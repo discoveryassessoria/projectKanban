@@ -892,6 +892,12 @@ export async function atualizarPassoV2(
           resultado: "concluida_via_editor_legado",
           protocolo: typeof patch.externalProtocol === "string" ? patch.externalProtocol : null,
           canalKey: typeof patch.requestChannel === "string" ? patch.requestChannel : null,
+          // A TELA manda qual subtarefa estava aberta quando o operador clicou em
+          // concluir (`subtarefaKey`, StepEditors.tsx) — sem isto, um PATCH
+          // atrasado (retry de rede, duplo-clique) fecharia "a corrente agora",
+          // que pode já ser outra. `undefined` (chamador antigo) preserva o
+          // comportamento de sempre.
+          subtarefaKeyEsperada: typeof patch.subtarefaEsperada === "string" ? patch.subtarefaEsperada : undefined,
         })
         if (!r.aplicavel) {
           return { ok: false, error: "STEP_TRANSITION_REJECTED", status: 409 }

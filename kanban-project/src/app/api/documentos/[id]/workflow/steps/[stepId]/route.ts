@@ -32,6 +32,8 @@ interface PatchBody {
   reviewChecklist?: Record<string, boolean> | null
   stepObservation?: string | null
   legalOpinion?: string | null
+  /** Qual subtarefa a TELA acreditava estar concluindo — ver `concluirSubtarefaCorrentePeloPasso`. */
+  subtarefaEsperada?: string | null
   /** Ato ADMINISTRATIVO auditado. Exige permissão própria + motivo + justificativa. */
   forcar?: boolean
   motivo?: string | null

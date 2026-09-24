@@ -587,11 +587,26 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
   canalKey?: string | null
   fornecedorId?: number | null
   valores?: Record<string, unknown>
+  /**
+   * QUAL subtarefa o CHAMADOR pretende concluir — quando informado, só
+   * conclui de verdade se ela for de fato a CORRENTE agora. Achado real
+   * 24/09/2026: sem isto, um reenvio tardio da MESMA chamada (rede
+   * instável, duplo-clique, retry) que chegasse depois de a subtarefa já
+   * ter fechado concluía a subtarefa SEGUINTE por engano — porque esta
+   * porta só perguntava "qual é a corrente agora?", nunca "é esta que eu
+   * pedi para fechar?". Sem o parâmetro (chamador antigo, sem essa
+   * informação), o comportamento é o de sempre — nada muda.
+   */
+  subtarefaKeyEsperada?: string
 }): Promise<
   | { aplicavel: false }
   | {
       aplicavel: true
       subtarefaKey: string
+      /** true = nada foi gravado agora; a subtarefa ESPERADA já estava
+       *  concluída antes desta chamada (retry idempotente) — nenhuma OUTRA
+       *  subtarefa foi tocada. */
+      jaEstavaConcluida?: true
       podeConcluirPasso: boolean
       faltando: Array<{ key: string; label: string; motivo: string }>
     }
@@ -600,6 +615,22 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
     stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId,
   })
   const corrente = subs.find((s) => !s.concluida)
+
+  if (args.subtarefaKeyEsperada && corrente?.key !== args.subtarefaKeyEsperada) {
+    const esperada = subs.find((s) => s.key === args.subtarefaKeyEsperada)
+    if (esperada?.concluida) {
+      // Retry tardio de uma subtarefa que OUTRA chamada já fechou — sucesso
+      // idempotente, sem tocar em nenhuma subtarefa diferente da pedida.
+      const gate = await passoPodeConcluir({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+      return { aplicavel: true, subtarefaKey: esperada.key, jaEstavaConcluida: true, podeConcluirPasso: gate.pode, faltando: gate.faltando }
+    }
+    // Pediram para concluir uma subtarefa que NÃO é a corrente e não está
+    // concluída — estado inconsistente (corrida entre duas abas, ordem
+    // fora do esperado). Recusa: nunca conclui a subtarefa ERRADA no lugar
+    // da pedida.
+    return { aplicavel: false }
+  }
+
   if (!corrente) return { aplicavel: false }
 
   const { garantirExecucao, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
