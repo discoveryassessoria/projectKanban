@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { estadoOperacionalDosDocumentos, rotularEstadoDoDocumento } from "@/lib/operacional/documento-estado"
+import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
 
 // ============================================================
 // TIPOS DE RESPOSTA
@@ -273,7 +274,7 @@ export async function GET(
             where: { processoId: id, supersedePorId: null },
             select: {
               id: true, pessoaId: true, itemCatalogoId: true,
-              uniao: { select: { pessoa1Id: true } },
+              uniao: { select: SELECT_UNIAO_PARA_TITULAR },
             },
           })
         : []
@@ -287,15 +288,16 @@ export async function GET(
     const tipoPorItemCatalogo = new Map(tiposCadastro.map((t) => [t.itemCatalogoId, t.legacyEnumKey]))
 
     // Placeholder por necessidade SEM Documento ainda — mesmo titular que
-    // `garantirDocumentoDaNecessidade` usaria: a pessoa, ou (casamento) o 1º
-    // cônjuge da união. `id` negativo (nunca colide com um Documento real) —
-    // o clique nele materializa o Documento de verdade, pela MESMA porta.
+    // `garantirDocumentoDaNecessidade` usaria: a pessoa, ou (casamento) o
+    // cônjuge da linha de transmissão (ver titular-uniao.ts). `id` negativo
+    // (nunca colide com um Documento real) — o clique nele materializa o
+    // Documento de verdade, pela MESMA porta.
     const placeholders: typeof allDocs = []
     for (const n of necessidades) {
       if (necessidadesComDoc.has(n.id)) continue
       const tipo = tipoPorItemCatalogo.get(n.itemCatalogoId) ?? null
       if (!tipo || !TIPOS_CERTIDAO_PLACEHOLDER.has(tipo)) continue
-      const titularId = n.pessoaId ?? n.uniao?.pessoa1Id ?? null
+      const titularId = n.pessoaId ?? titularDaUniao(n.uniao)
       if (titularId == null || !pessoasIds.includes(titularId)) continue
       placeholders.push({
         id: -n.id,

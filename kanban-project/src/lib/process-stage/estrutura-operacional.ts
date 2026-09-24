@@ -25,6 +25,7 @@ import {
   type PessoaDoProcesso,
 } from "./central-operacional-core"
 import { nomeCanonicoDaObrigacao, codigosAceitos } from "@/src/lib/documentos/nome-canonico-obrigacao"
+import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
 import {
   montarEstruturaOperacional,
   montarIndiceOperacional,
@@ -314,13 +315,15 @@ export async function getPhaseOperationalStructure(
   const SELECT_NECESSIDADE = {
     id: true, pessoaId: true, status: true, matrizSnapshot: true, ciclo: true,
     itemCatalogo: { select: { name: true } },
-    // Certidão de casamento tem a UNIÃO como sujeito. O titular operacional é
-    // pessoa1 — mesma régua do motor documental, nunca uma escolha de tela.
+    // Certidão de casamento tem a UNIÃO como sujeito. O titular operacional é o
+    // cônjuge da LINHA DE TRANSMISSÃO — nunca um lado fixo (pessoa1/pessoa2) do
+    // registro do casamento, que não tem significado de negócio. Mesma régua do
+    // motor documental (garantirDocumentoDaNecessidade) — ver titular-uniao.ts.
     uniao: {
       select: {
-        pessoa1Id: true,
-        pessoa1: { select: { nome: true, sobrenome: true } },
-        pessoa2: { select: { nome: true, sobrenome: true } },
+        ...SELECT_UNIAO_PARA_TITULAR,
+        pessoa1: { select: { nome: true, sobrenome: true, linhaReta: true } },
+        pessoa2: { select: { nome: true, sobrenome: true, linhaReta: true } },
       },
     },
     documentos: { select: { id: true } },
@@ -404,7 +407,7 @@ export async function getPhaseOperationalStructure(
   }
   const necPorPessoaETipo = new Map<string, number>()
   for (const n of necessidades) {
-    const pid = n.pessoaId ?? n.uniao?.pessoa1Id ?? null
+    const pid = n.pessoaId ?? titularDaUniao(n.uniao)
     if (pid == null) continue
     for (const tipoId of tiposAceitosDaNecessidade(n)) {
       const k = `${pid}:${tipoId}`
@@ -575,13 +578,14 @@ export async function getPhaseOperationalStructure(
   for (const n of necessidades) {
     const chave = `necessidade:${n.id}`
     if (!chavesUsadas.has(chave)) continue
-    // Dono: a pessoa da necessidade; para certidão de união, o titular é pessoa1 —
-    // a MESMA regra que o motor documental já aplica ao criar o Documento. Em último
-    // caso, o titular do próprio Documento que atende a necessidade (vínculo oficial).
-    const pessoaId = n.pessoaId ?? n.uniao?.pessoa1Id ?? pessoaPorNecessidade.get(n.id) ?? null
+    // Dono: a pessoa da necessidade; para certidão de união, o titular é o cônjuge
+    // da LINHA DE TRANSMISSÃO — a MESMA regra que o motor documental já aplica ao
+    // criar o Documento (ver titular-uniao.ts). Em último caso, o titular do próprio
+    // Documento que atende a necessidade (vínculo oficial).
+    const pessoaId = n.pessoaId ?? titularDaUniao(n.uniao) ?? pessoaPorNecessidade.get(n.id) ?? null
     const nomesUniao = n.uniao
       ? [n.uniao.pessoa1, n.uniao.pessoa2]
-          .filter((x): x is { nome: string; sobrenome: string | null } => x != null)
+          .filter((x): x is { nome: string; sobrenome: string | null; linhaReta: boolean } => x != null)
           .map((x) => nomeCompletoPessoa(x))
           .join(" e ")
       : null

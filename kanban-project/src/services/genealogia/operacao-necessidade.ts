@@ -12,6 +12,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma, TipoDocumento } from "@prisma/client"
+import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
 
 /** Enum legado de tipo de documento aceito pelo Documento. */
 const TIPOS = new Set<string>([
@@ -42,7 +43,7 @@ export async function garantirDocumentoDaNecessidade(
     where: { id: necessidadeId },
     select: {
       id: true, processoId: true, pessoaId: true, itemCatalogoId: true,
-      uniao: { select: { pessoa1Id: true, pessoa2Id: true } },
+      uniao: { select: SELECT_UNIAO_PARA_TITULAR },
     },
   })
   if (!nec || nec.processoId !== processoId) {
@@ -51,9 +52,10 @@ export async function garantirDocumentoDaNecessidade(
 
   // SUJEITO DO REGISTRO. Nascimento e óbito têm PESSOA; casamento tem UNIÃO — e uma
   // certidão de casamento é sempre lavrada em nome de um dos cônjuges. O Documento
-  // exige um titular, então a união usa o primeiro cônjuge, de forma determinística.
+  // exige um titular: é sempre o cônjuge da LINHA DE TRANSMISSÃO, nunca um lado fixo
+  // (pessoa1/pessoa2) do registro do casamento — ver titular-uniao.ts.
   // O vínculo real do trabalho continua sendo `necessidadeId`, que aponta para a união.
-  const titularId = nec.pessoaId ?? nec.uniao?.pessoa1Id ?? null
+  const titularId = nec.pessoaId ?? titularDaUniao(nec.uniao)
   if (!titularId) {
     throw new OperacaoNecessidadeErro(
       "Registro sem sujeito (nem pessoa, nem união) — não é possível abrir a busca.",
