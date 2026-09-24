@@ -295,14 +295,36 @@ export interface ResumoLinhagem {
   proximaAcao: string | null
 }
 
+/** Soma todos os campos numéricos de `fonte` em `alvo`, in place. */
+function somarIndicadorEm(alvo: IndicadorDocumental, fonte: IndicadorDocumental): void {
+  alvo.necessarias += fonte.necessarias
+  alvo.atendidas += fonte.atendidas
+  alvo.emAtendimento += fonte.emAtendimento
+  alvo.pendentes += fonte.pendentes
+  alvo.naoLocalizadas += fonte.naoLocalizadas
+  alvo.dispensadas += fonte.dispensadas
+  alvo.opcionais += fonte.opcionais
+}
+
 export function resumirLinhagem(
   linhagem: Linhagem,
   dossies: Map<number, DossiePessoa>,
+  grafo: GrafoGenealogico,
+  /**
+   * Projeção BRUTA (por pessoa e por união, sem a fusão que `indicadorDaPessoa`
+   * faz pro cartão). Necessária aqui porque `d.documental` de cada pessoa já
+   * inclui a(s) união(ões) dela — somar isso pra CADA cônjuge visível contaria
+   * a MESMA certidão de casamento duas vezes no total da linhagem (achado
+   * real 24/09/2026: 5 casamentos infl// avam o total em +5). Aqui a pessoa
+   * entra pela parte que é só dela, e cada união entra exatamente uma vez.
+   */
+  projecao: ProjecaoDocumental,
   /** Data de referência para "tarefa vencida". Injetada — nada lê o relógio. */
   agora: Date = new Date(0),
 ): ResumoLinhagem {
   const ids = [...linhagem.visivel]
   const documental = indicadorVazio()
+  const uniõesContadas = new Set<number>()
   let divergencias = 0
   let tarefasAbertas = 0
   let tarefasVencidas = 0
@@ -312,13 +334,14 @@ export function resumirLinhagem(
   for (const id of ids) {
     const d = dossies.get(id)
     if (!d) continue
-    documental.necessarias += d.documental.necessarias
-    documental.atendidas += d.documental.atendidas
-    documental.emAtendimento += d.documental.emAtendimento
-    documental.pendentes += d.documental.pendentes
-    documental.naoLocalizadas += d.documental.naoLocalizadas
-    documental.dispensadas += d.documental.dispensadas
-    documental.opcionais += d.documental.opcionais
+    const pessoal = projecao.porPessoa.get(id)
+    if (pessoal) somarIndicadorEm(documental, pessoal)
+    for (const uid of uniaoIdsDe(grafo, id)) {
+      if (uniõesContadas.has(uid)) continue
+      uniõesContadas.add(uid)
+      const uniao = projecao.porUniao.get(uid)
+      if (uniao) somarIndicadorEm(documental, uniao)
+    }
     divergencias += d.divergencias.length
     tarefasAbertas += d.tarefasAbertas.length
     for (const t of d.tarefasAbertas) {

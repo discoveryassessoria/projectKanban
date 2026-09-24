@@ -11,6 +11,7 @@ import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import type { Tarefa, Prisma } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
+import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
 import {
   type FailureCodeC,
   type TarefaGenIssue,
@@ -142,7 +143,11 @@ export async function garantirTarefaDePasso(
   const necessidade = step.necessidadeId != null
     ? await db.necessidadeDocumental.findUnique({
         where: { id: step.necessidadeId },
-        select: { pessoaId: true, itemCatalogo: { select: { name: true } } },
+        select: {
+          pessoaId: true,
+          uniao: { select: SELECT_UNIAO_PARA_TITULAR },
+          itemCatalogo: { select: { name: true } },
+        },
       })
     : null
   const documento = step.documentoId != null
@@ -151,7 +156,13 @@ export async function garantirTarefaDePasso(
         select: { descricao: true, pessoaId: true, documentType: { select: { name: true } } },
       })
     : null
-  const pessoaId = necessidade?.pessoaId ?? documento?.pessoaId ?? step.pessoaId ?? null
+  // Certidão de casamento é sujeita da UNIÃO (pessoaId nulo por desenho) — sem
+  // este fallback a tarefa nascia sem pessoa e sem nome no título (achado real
+  // 24/09/2026: "Certidão de Casamento - Inteiro Teor" aparecia na fila de
+  // distribuição sem dizer de quem era). O titular é o cônjuge da linha de
+  // transmissão — ver titular-uniao.ts.
+  const pessoaId =
+    necessidade?.pessoaId ?? titularDaUniao(necessidade?.uniao) ?? documento?.pessoaId ?? step.pessoaId ?? null
   const pessoa = pessoaId != null
     ? await db.pessoa.findUnique({ where: { id: pessoaId }, select: { nome: true, sobrenome: true } })
     : null

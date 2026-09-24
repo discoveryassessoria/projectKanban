@@ -49,6 +49,7 @@ import {
   tarefaVencida,
 } from "@/src/lib/genealogia/operacional/diagnostico"
 import { analisarIntegridade } from "@/src/lib/genealogia/motor/regras/integridade"
+import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
 import { analisarLacunaParental, analisarLacunas } from "@/src/lib/genealogia/navegacao/lacunas"
 import {
   oQueImpedeAvancar,
@@ -372,7 +373,8 @@ ok(limpo === null, "sem pendência, a próxima ação é ausência de ação", l
 // ── 4. RESUMO DA LINHAGEM ───────────────────────────────────────────────────
 secao("4) resumo da linhagem")
 
-const resumo = resumirLinhagem(lMarcos, dossies)
+const projecaoFatos = projetarIndicadores(FATOS.necessidades)
+const resumo = resumirLinhagem(lMarcos, dossies, grafo, projecaoFatos)
 ok(resumo.requerenteId === 4, "o resumo é da linhagem pedida")
 ok(resumo.pessoas === lMarcos.visivel.size, "conta as pessoas visíveis da linha")
 ok(resumo.documental.necessarias > 0, "consolida as exigências da linha inteira")

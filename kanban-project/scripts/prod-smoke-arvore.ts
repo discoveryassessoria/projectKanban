@@ -26,6 +26,7 @@ import { analisarArvore } from "@/src/lib/genealogia/motor/analisar"
 import { mapaDeLinhagens, trilhaDaLinhagem } from "@/src/lib/genealogia/motor/linhagens"
 import { calcularFoco, preferenciasPadrao } from "@/src/lib/genealogia/navegacao/foco"
 import { projetarDossies, resumirLinhagem, type FatosOperacionais } from "@/src/lib/genealogia/operacional/dossie"
+import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
 import { diagnosticar, resolveNextGenealogyAction } from "@/src/lib/genealogia/operacional/diagnostico"
 import type { PaisAlvo } from "@/src/lib/genealogia/motor/tipos"
 
@@ -189,7 +190,8 @@ async function main() {
   console.log(`       fonte: ${acao.fonte}`)
 
   if (linhagem) {
-    const resumo = resumirLinhagem(linhagem, dossies, agora)
+    const projecaoDocumental = projetarIndicadores(fatos.necessidades)
+    const resumo = resumirLinhagem(linhagem, dossies, grafo, projecaoDocumental, agora)
     const trilha = trilhaDaLinhagem(grafo, linhagem, mapa)
     ok(trilha.length === linhagem.cadeia.length, "trilha da linhagem coerente com a cadeia")
     console.log(

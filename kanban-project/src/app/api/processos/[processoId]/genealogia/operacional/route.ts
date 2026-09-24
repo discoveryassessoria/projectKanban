@@ -47,7 +47,17 @@ export async function GET(
 
     const [necessidadesRaw, tarefasRaw, lancamentosRaw] = await Promise.all([
       prisma.necessidadeDocumental.findMany({
-        where: { processoId: id },
+        // A ÁRVORE SÓ CONHECE REGISTRO CIVIL (nascimento/casamento/óbito) — a
+        // exigência que nasce da estrutura genealógica. RG, comprovante de
+        // endereço, procuração etc. são documentos ADMINISTRATIVOS do processo
+        // (do requerente, não de um fato genealógico); contá-los aqui inflava
+        // "Documentos exigidos" da árvore com algo que não é dela (achado real
+        // 24/09/2026, processo Cibils). `CategoriaDocumental.code` é a
+        // classificação canônica, sistema/imutável — nunca o texto livre.
+        where: {
+          processoId: id,
+          itemCatalogo: { tiposDocumento: { some: { categoriaDocumental: { code: "REGISTRO_CIVIL" } } } },
+        },
         select: {
           id: true,
           pessoaId: true,

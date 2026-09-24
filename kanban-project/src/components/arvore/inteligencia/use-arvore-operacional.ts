@@ -227,6 +227,14 @@ export function useArvoreOperacional(params: {
     [analise, mapa, fatos],
   )
 
+  // Projeção BRUTA (por pessoa e por união, sem a fusão que os dossiês fazem
+  // pro cartão) — `resumirLinhagem` precisa dela pra não contar a mesma
+  // certidão de casamento duas vezes (uma por cônjuge) no total da linhagem.
+  const projecaoDocumental = useMemo(
+    () => projetarIndicadores(fatos.necessidades),
+    [fatos.necessidades],
+  )
+
   // Filtro REALÇA: quem casa fica em pleno mesmo fora da linhagem. Esconder por
   // filtro deixaria o pai filtrado fora e o filho órfão na tela.
   const realcados = useMemo<ReadonlySet<number> | undefined>(() => {
@@ -298,15 +306,21 @@ export function useArvoreOperacional(params: {
   }, [dossies])
 
   const resumo = useMemo<ResumoLinhagem | null>(
-    () => (linhagem ? resumirLinhagem(linhagem, dossies, agora) : null),
-    [linhagem, dossies, agora],
+    () =>
+      linhagem && analise
+        ? resumirLinhagem(linhagem, dossies, analise.grafo, projecaoDocumental, agora)
+        : null,
+    [linhagem, dossies, analise, projecaoDocumental, agora],
   )
 
   // Comparação: um resumo por requerente. É o mesmo `resumirLinhagem` — nenhuma
   // segunda contagem, e por isso a comparação nunca discorda do resumo do topo.
   const comparacao = useMemo<ResumoLinhagem[]>(
-    () => mapa.linhagens.map((l) => resumirLinhagem(l, dossies, agora)),
-    [mapa, dossies, agora],
+    () =>
+      analise
+        ? mapa.linhagens.map((l) => resumirLinhagem(l, dossies, analise.grafo, projecaoDocumental, agora))
+        : [],
+    [mapa, dossies, analise, projecaoDocumental, agora],
   )
 
   // O canvas só desenha slot "+pai/+mãe" para a pessoa RAIZ (profundidade 0);
