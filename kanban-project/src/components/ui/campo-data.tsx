@@ -12,7 +12,7 @@
 // (mm/dd/yyyy num sistema em português).
 //
 // Aqui: dia num calendário clicável, mês e ano em seletores próprios. Ir de 2026
-// para 1890 são dois cliques.
+// para 1500 são dois cliques.
 //
 // ─── O VALOR CONTINUA SENDO ISO ─────────────────────────────────────────────
 // Entra e sai "AAAA-MM-DD", igual ao input nativo. Quem usa não muda nada além
@@ -89,10 +89,11 @@ export function CampoData({
     return () => { document.removeEventListener("mousedown", fora); document.removeEventListener("keydown", esc) }
   }, [aberto, fechar])
 
-  // A faixa cobre o passado longo por padrão: certidão de 1890 é rotina aqui.
+  // A faixa cobre o passado longo por padrão: registro de 1500 é rotina aqui
+  // (certidão de nascimento europeia pré-registro-civil-brasileiro).
   const anos = useMemo(() => {
     const fim = anoMaximo ?? hoje.getFullYear() + 5
-    const ini = anoMinimo ?? 1890
+    const ini = anoMinimo ?? 1500
     const l: number[] = []
     for (let a = fim; a >= ini; a--) l.push(a)
     return l

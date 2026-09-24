@@ -21,9 +21,17 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { prisma } from "@/lib/prisma"
 import { identificador, retratar, classificar, CLASSE } from "../lib/db/identidade-banco.mjs"
+import countriesI18n from "i18n-iso-countries"
+import ptLocale from "i18n-iso-countries/langs/pt.json" with { type: "json" }
+
+countriesI18n.registerLocale(ptLocale)
 
 const APLICAR = process.argv.includes("--aplicar")
 const PROD = process.argv.includes("--prod")
+// Refaz só os países (nome/tradução) — pula a releitura das ~70 mil cidades
+// quando só o nome do país mudou (achado real: GeoNames devolve em inglês;
+// o sistema é em português — ex.: "Spain" → "Espanha").
+const SOMENTE_PAISES = process.argv.includes("--somente-paises")
 
 const BASE = "https://download.geonames.org/export/dump"
 
@@ -62,13 +70,15 @@ async function main() {
   // ---- 1) PAÍSES ----------------------------------------------------------
   console.log("\nBaixando countryInfo.txt…")
   const countryInfo = await baixarTexto(`${BASE}/countryInfo.txt`)
-  const paisesPorCodigo = new Map<string, string>() // ISO2 -> nome
+  const paisesPorCodigo = new Map<string, string>() // ISO2 -> nome (em português quando a tradução existe)
   for (const linha of countryInfo.split("\n")) {
     if (!linha.trim() || linha.startsWith("#")) continue
     const col = linha.split("\t")
     const codigo = col[0]?.trim()
-    const nome = col[4]?.trim()
-    if (codigo && nome && codigo.length === 2) paisesPorCodigo.set(codigo, nome)
+    const nomeFonte = col[4]?.trim()
+    if (!codigo || !nomeFonte || codigo.length !== 2) continue
+    const nome = countriesI18n.getName(codigo, "pt") ?? nomeFonte
+    paisesPorCodigo.set(codigo, nome)
   }
   console.log(`  ${paisesPorCodigo.size} países`)
 
@@ -86,31 +96,35 @@ async function main() {
   console.log(`  ${regiaoPorCodigo.size} regiões`)
 
   // ---- 3) CIDADES (cities5000.zip) -----------------------------------------
-  console.log("Baixando cities5000.zip…")
-  const zipResp = await fetch(`${BASE}/cities5000.zip`)
-  if (!zipResp.ok) throw new Error(`falha ao baixar cities5000.zip: HTTP ${zipResp.status}`)
-  const zipBuf = Buffer.from(await zipResp.arrayBuffer())
-  const dirTmp = mkdtempSync(path.join(tmpdir(), "geonames-"))
-  const zipPath = path.join(dirTmp, "cities5000.zip")
-  writeFileSync(zipPath, zipBuf)
-  execSync(`unzip -o -q "${zipPath}" -d "${dirTmp}"`)
-  const citiesTxt = readFileSync(path.join(dirTmp, "cities5000.txt"), "utf-8")
-  rmSync(dirTmp, { recursive: true, force: true })
-
   interface CidadeRow { sourceId: string; nome: string; nomeNormalizado: string; regiao: string | null; paisCodigo: string }
   const cidades: CidadeRow[] = []
-  for (const linha of citiesTxt.split("\n")) {
-    if (!linha.trim()) continue
-    const col = linha.split("\t")
-    const geonameid = col[0]?.trim()
-    const nome = col[1]?.trim()
-    const paisCodigo = col[8]?.trim()
-    const admin1 = col[10]?.trim()
-    if (!geonameid || !nome || !paisCodigo) continue
-    const regiao = admin1 ? (regiaoPorCodigo.get(`${paisCodigo}.${admin1}`) ?? null) : null
-    cidades.push({ sourceId: geonameid, nome, nomeNormalizado: normalizar(nome), regiao, paisCodigo })
+  if (SOMENTE_PAISES) {
+    console.log("--somente-paises: pulando cidades (não mudaram).")
+  } else {
+    console.log("Baixando cities5000.zip…")
+    const zipResp = await fetch(`${BASE}/cities5000.zip`)
+    if (!zipResp.ok) throw new Error(`falha ao baixar cities5000.zip: HTTP ${zipResp.status}`)
+    const zipBuf = Buffer.from(await zipResp.arrayBuffer())
+    const dirTmp = mkdtempSync(path.join(tmpdir(), "geonames-"))
+    const zipPath = path.join(dirTmp, "cities5000.zip")
+    writeFileSync(zipPath, zipBuf)
+    execSync(`unzip -o -q "${zipPath}" -d "${dirTmp}"`)
+    const citiesTxt = readFileSync(path.join(dirTmp, "cities5000.txt"), "utf-8")
+    rmSync(dirTmp, { recursive: true, force: true })
+
+    for (const linha of citiesTxt.split("\n")) {
+      if (!linha.trim()) continue
+      const col = linha.split("\t")
+      const geonameid = col[0]?.trim()
+      const nome = col[1]?.trim()
+      const paisCodigo = col[8]?.trim()
+      const admin1 = col[10]?.trim()
+      if (!geonameid || !nome || !paisCodigo) continue
+      const regiao = admin1 ? (regiaoPorCodigo.get(`${paisCodigo}.${admin1}`) ?? null) : null
+      cidades.push({ sourceId: geonameid, nome, nomeNormalizado: normalizar(nome), regiao, paisCodigo })
+    }
+    console.log(`  ${cidades.length} cidades`)
   }
-  console.log(`  ${cidades.length} cidades`)
 
   console.log(`\n${APLICAR ? "Aplicando" : "Simulando (dry-run)"}…`)
   if (!APLICAR) {

@@ -147,7 +147,6 @@ interface FormState {
 
   // Datas (yyyy-mm-dd pro input[type=date])
   data_evento: string
-  data_registro: string
 
   // Rastreamento
   nro_pedido: string
@@ -178,7 +177,6 @@ const emptyForm = (): FormState => ({
   crc: "",
   protocolo: "",
   data_evento: "",
-  data_registro: "",
   nro_pedido: "",
   canal_solicitacao: "",
   link_acompanhamento: "",
@@ -209,7 +207,6 @@ const docToForm = (doc: Documento): FormState => ({
   crc: doc.crc || "",
   protocolo: doc.protocolo || "",
   data_evento: doc.data_evento ? doc.data_evento.slice(0, 10) : "",
-  data_registro: doc.data_registro ? doc.data_registro.slice(0, 10) : "",
   nro_pedido: doc.nro_pedido || "",
   canal_solicitacao: doc.canal_solicitacao || "",
   link_acompanhamento: doc.link_acompanhamento || "",
@@ -405,7 +402,6 @@ function ConteudoModal({
         protocolo: form.protocolo.trim() || null,
 
         data_evento: form.data_evento || null,
-        data_registro: form.data_registro || null,
 
         nro_pedido: form.nro_pedido.trim() || null,
         canal_solicitacao: form.canal_solicitacao.trim() || null,
@@ -592,7 +588,7 @@ function ConteudoModal({
                       <strong className={dataEventoOk ? "text-green-800" : "text-[var(--accent-text)]"}>
                         {labelDataEvento(doc.tipo)}
                       </strong>
-                      . Só a Data do registro continua opcional.
+                      .
                     </div>
                   </div>
                 )}
@@ -815,12 +811,6 @@ function ConteudoModal({
                       requiredToComplete={isModoBuscar}
                       value={form.data_evento}
                       onChange={(v) => setForm({ ...form, data_evento: v })}
-                    />
-                    <Field
-                      label="Data do registro"
-                      type="date"
-                      value={form.data_registro}
-                      onChange={(v) => setForm({ ...form, data_registro: v })}
                     />
                   </div>
                 </Section>
