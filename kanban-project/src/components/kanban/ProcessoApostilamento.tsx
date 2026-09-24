@@ -1,9 +1,10 @@
 // src/components/kanban/ProcessoApostilamento.tsx
 "use client"
 
-import { useState, useEffect, useCallback, type ReactNode } from "react"
+import { useState, Fragment, type ReactNode } from "react"
 import {
-  Loader2, FolderOpen, Users, CheckCircle2, AlertTriangle, Check, X, Upload,
+  Loader2, FolderOpen, Check, X, Upload, ChevronDown, ChevronRight,
+  Search, FileText, Send, History, ListChecks, CheckSquare,
 } from "lucide-react"
 import { useApi } from "@/src/lib/dados"
 
@@ -44,20 +45,57 @@ interface Pasta {
   workflow: ApStep[]
   documentos: ApDoc[]
 }
+interface PessoaDoc {
+  documentoId: number
+  tipoLabel: string
+  categoria: string
+  apto: boolean
+  origemLabel: string
+  motivoNaoApto: string | null
+  naPasta: boolean
+  statusNaPasta: string | null
+  statusNaPastaLabel: string | null
+  conferenceResult: string | null
+}
+interface PessoaGrupo {
+  pessoaId: number
+  nome: string
+  documentos: PessoaDoc[]
+}
+interface Totais {
+  documentosNecessarios: number
+  aptos: number
+  bloqueados: number
+  naPasta: number
+  enviados: number
+  recebidos: number
+  conferidos: number
+  validados: number
+}
+interface RespostaGet {
+  pasta?: Pasta | null
+  progress?: number
+  paisDestino?: { label: string; flag: string | null } | null
+  responsavel?: { id: number; nome: string } | null
+  pessoas?: PessoaGrupo[]
+  totais?: Totais
+}
 
 interface Props {
   processoId: number
   onConcluido?: () => void
 }
 
-const AP_STEP_IDS = [
-  "montar_pasta_apostilamento", "enviar_para_apostilamento", "aguardar_retorno_apostilamento",
-  "receber_documentos_apostilados", "conferir_apostilas", "validar_pasta_apostilada",
-]
-const AP_SHORT = [
-  "Montar pasta", "Enviar p/ apostilamento", "Aguardar retorno",
-  "Receber apostilados", "Conferir apostilas", "Validar pasta",
-]
+// 6 etapas internas (motor) — a barra visual mostra 5 (ver ProcessoTraducao.tsx).
+const VISUAL_STEPS = ["Montar pasta", "Enviar para apostilamento", "Receber apostilados", "Conferir apostilas", "Validar pasta"]
+const VISUAL_INDEX: Record<string, number> = {
+  montar_pasta_apostilamento: 0,
+  enviar_para_apostilamento: 1,
+  aguardar_retorno_apostilamento: 2,
+  receber_documentos_apostilados: 2,
+  conferir_apostilas: 3,
+  validar_pasta_apostilada: 4,
+}
 const AP_DOC_LABEL: Record<string, string> = {
   pendente: "Pendente",
   incluido_na_pasta: "Incluído na pasta",
@@ -68,23 +106,9 @@ const AP_DOC_LABEL: Record<string, string> = {
   correcao_solicitada: "Correção solicitada",
   bloqueado: "Bloqueado",
 }
-const PILL: Record<string, string> = {
-  validado: "bg-[var(--surface-secondary)] text-green-800",
-  bloqueado: "bg-[var(--surface-secondary)] text-red-700",
-  correcao_solicitada: "bg-[var(--surface-secondary)] text-red-700",
-  pendente: "bg-[var(--surface-tertiary)] text-white/68",
-}
-const PILL_DOT: Record<string, string> = {
-  validado: "bg-[var(--surface-secondary)]",
-  bloqueado: "bg-[var(--surface-secondary)]",
-  correcao_solicitada: "bg-[var(--surface-secondary)]",
-  pendente: "bg-[var(--surface-secondary)]",
-}
-const pillCls = (s: string) => PILL[s] || "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]"
-const pillDot = (s: string) => PILL_DOT[s] || "bg-amber-600"
+const TIPO_LABEL: Record<string, string> = { fisico: "Físico", digital: "Digital", ambos: "Ambos", haia: "Apostila de Haia" }
 
 const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:border-[var(--border-default)] focus:border-[var(--border-default)]"
-
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
 const ini = (nome: string) => {
@@ -96,45 +120,37 @@ const fmtDate = (v: string | null) => {
   const d = new Date(v)
   return isNaN(d.getTime()) ? v : d.toLocaleDateString("pt-BR")
 }
-const TIPO_LABEL: Record<string, string> = { fisico: "Físico", digital: "Digital", ambos: "Ambos" }
-
-const colApostila = (it: ApDoc) =>
-  it.apostilledFile ? "Recebida" : it.status === "enviado" ? "Aguardando" : "Pendente"
-const colConf = (it: ApDoc) =>
-  it.conferenceResult
-    ? it.conferenceResult === "aprovar" ? "Aprovado"
-      : it.conferenceResult === "ressalva" ? "Ressalva" : it.conferenceResult
-    : "—"
-const PROX: Record<string, string> = {
-  pendente: "Montar pasta",
-  incluido_na_pasta: "Enviar p/ apostilamento",
-  enviado: "Aguardar retorno",
-  apostila_recebida: "Conferir apostila",
-  conferido: "Validar pasta",
-  validado: "Validado",
-}
 
 export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
-  const [erro, setErro] = useState<string | null>(null)
-  const [aviso, setAviso] = useState<string | null>(null)
+  const [aba, setAba] = useState<"documentos" | "resumo" | "historico">("documentos")
+  const [visao, setVisao] = useState<"pessoa" | "documento">("pessoa")
+  const [busca, setBusca] = useState("")
+  const [filtroStatus, setFiltroStatus] = useState<"todos" | "apto" | "nao_apto" | "na_pasta">("todos")
+  const [filtroPessoa, setFiltroPessoa] = useState<number | "todas">("todas")
+  const [filtroTipo, setFiltroTipo] = useState("todos")
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
+  const [colapsadas, setColapsadas] = useState<Set<number>>(new Set())
   const [modalStep, setModalStep] = useState<string | null>(null)
+  const [historicoAberto, setHistoricoAberto] = useState(false)
   const [posting, setPosting] = useState(false)
   const [modalErro, setModalErro] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+  const [erroAcao, setErroAcao] = useState<string | null>(null)
 
-  // Consulta em cache (src/lib/dados): loading e erro vêm da camada, e a
-  // revalidação pós-ação é o mesmo `carregar()` de antes.
-  const { dados, carregando: loading, erro: erroCarregar, recarregar: carregar } =
-    useApi<{ pasta?: Pasta | null; progress?: number }>(`/api/processos/${processoId}/apostilamento`)
+  const { dados, carregando: loading, recarregar: carregar } =
+    useApi<RespostaGet>(`/api/processos/${processoId}/apostilamento`)
   const pasta = dados?.pasta ?? null
   const progress = dados?.progress ?? 0
+  const pessoas = dados?.pessoas ?? []
+  const totais = dados?.totais
+  const paisDestino = dados?.paisDestino ?? null
+  const responsavel = dados?.responsavel ?? null
 
   const postEtapa = async (stepId: string, payload: Record<string, unknown>) => {
     setPosting(true); setModalErro(null)
     try {
       const res = await fetch(`/api/processos/${processoId}/apostilamento/etapas/${stepId}`, {
-        method: "POST",
-        headers: jsonHeaders(),
-        body: JSON.stringify(payload),
+        method: "POST", headers: jsonHeaders(), body: JSON.stringify(payload),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Não foi possível concluir a etapa.")
@@ -153,14 +169,24 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
-      </div>
-    )
+  const mutarPasta = async (acao: "adicionar" | "remover", documentoIds: number[]) => {
+    setErroAcao(null)
+    try {
+      const res = await fetch(`/api/processos/${processoId}/apostilamento/pasta/documentos`, {
+        method: "POST", headers: jsonHeaders(), body: JSON.stringify({ acao, documentoIds }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.mensagem || data.error || "Não foi possível atualizar a pasta.")
+      setSelecionados(new Set())
+      await carregar()
+    } catch (e) {
+      setErroAcao(e instanceof Error ? e.message : "Erro ao atualizar a pasta.")
+    }
   }
 
+  if (loading) {
+    return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" /></div>
+  }
   if (!pasta) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">
@@ -169,225 +195,305 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
     )
   }
 
-  const docs = pasta.documentos
-  const by = (s: string) => docs.filter((d) => d.status === s).length
-  const k = {
-    total: docs.length,
-    enviados: by("enviado"),
-    aguard: by("enviado"),
-    receb: by("apostila_recebida"),
-    conf: by("conferido"),
-    valid: by("validado"),
-    corr: by("correcao_solicitada"),
-    bloq: by("bloqueado"),
-  }
-  const kpis: Array<[string, number, string]> = [
-    ["📄", k.total, "Documentos na pasta"],
-    ["📤", k.enviados, "Enviados p/ apostilar"],
-    ["⏳", k.aguard, "Aguardando retorno"],
-    ["📥", k.receb, "Apostilas recebidas"],
-    ["🔍", k.conf, "Conferidos"],
-    ["✅", k.valid, "Validados"],
-    ["↺", k.corr, "Correção solicitada"],
-    ["🔒", k.bloq, "Bloqueados"],
-  ]
-
+  const podeEditarPasta = pasta.currentStep === "montar_pasta_apostilamento"
+  const visualIndex = VISUAL_INDEX[pasta.currentStep] ?? 0
   const concluida = pasta.status === "concluida"
-  const activeStep = pasta.workflow.find((s) => s.status === "pendente" || s.status === "em_andamento")
+
+  const todosDocs = pessoas.flatMap((p) => p.documentos.map((d) => ({ ...d, pessoaId: p.pessoaId, pessoaNome: p.nome })))
+  const tiposDisponiveis = [...new Set(todosDocs.map((d) => d.tipoLabel))]
+
+  const passaFiltro = (d: PessoaDoc & { pessoaId: number; pessoaNome: string }) => {
+    if (busca && !d.tipoLabel.toLowerCase().includes(busca.toLowerCase()) && !d.pessoaNome.toLowerCase().includes(busca.toLowerCase())) return false
+    if (filtroStatus === "apto" && !d.apto) return false
+    if (filtroStatus === "nao_apto" && d.apto) return false
+    if (filtroStatus === "na_pasta" && !d.naPasta) return false
+    if (filtroPessoa !== "todas" && d.pessoaId !== filtroPessoa) return false
+    if (filtroTipo !== "todos" && d.tipoLabel !== filtroTipo) return false
+    return true
+  }
+
+  const pessoasFiltradas = pessoas
+    .map((p) => ({ ...p, documentos: p.documentos.filter((d) => passaFiltro({ ...d, pessoaId: p.pessoaId, pessoaNome: p.nome })) }))
+    .filter((p) => p.documentos.length > 0)
+
+  const aptosVisiveis = pessoasFiltradas.flatMap((p) => p.documentos.filter((d) => d.apto && !d.naPasta))
+  const naPastaSelecionaveis = pessoasFiltradas.flatMap((p) => p.documentos.filter((d) => d.naPasta && selecionados.has(d.documentoId)))
+  const selecionadosAptos = [...selecionados].filter((id) => todosDocs.find((d) => d.documentoId === id)?.apto && !todosDocs.find((d) => d.documentoId === id)?.naPasta)
+
+  const toggleSelecionado = (documentoId: number) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev)
+      if (next.has(documentoId)) next.delete(documentoId); else next.add(documentoId)
+      return next
+    })
+  }
+  const selecionarTodosAptos = () => setSelecionados(new Set(aptosVisiveis.map((d) => d.documentoId)))
+  const toggleColapsada = (pessoaId: number) => setColapsadas((prev) => {
+    const next = new Set(prev)
+    if (next.has(pessoaId)) next.delete(pessoaId); else next.add(pessoaId)
+    return next
+  })
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-bold text-white/95">Central Operacional · Apostilamento</h2>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Envie os documentos finais para Apostila de Haia, acompanhe o retorno e valide as apostilas.
-          </p>
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-11 h-11 rounded-xl bg-[var(--action-primary)]/15 text-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
+              <FileText className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white/95">Apostilamento</h2>
+              <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                Monte a pasta com os documentos aptos, envie ao cartório/autoridade de apostilamento, acompanhe o retorno e valide as apostilas.
+              </p>
+            </div>
+          </div>
+          <AcoesDaFase onAtualizar={carregar} onHistorico={() => setHistoricoAberto(true)} />
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
-          <Stat label="Progresso da fase" value={`${progress}%`} />
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            concluida ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`} />
-            {concluida ? "Concluída" : "Em andamento"}
-          </span>
+
+        <div className="mt-4 flex flex-wrap gap-6">
+          <CampoContexto label="Responsável">
+            {responsavel ? (
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-[var(--surface-tertiary)] text-white/80 text-[10px] font-bold flex items-center justify-center">{ini(responsavel.nome)}</span>
+                <span className="text-sm font-semibold text-white/95">{responsavel.nome}</span>
+              </div>
+            ) : <span className="text-sm text-[var(--text-muted)]">—</span>}
+          </CampoContexto>
+          <CampoContexto label="Cartório / Autoridade">
+            {pasta.authorityName
+              ? <span className="text-sm font-semibold text-white/95">{pasta.authorityName}</span>
+              : <button onClick={() => setModalStep("enviar_para_apostilamento")} className="text-sm font-semibold text-[var(--accent-text)] hover:underline">Selecionar</button>}
+          </CampoContexto>
+          <CampoContexto label="Tipo de apostilamento">
+            <span className="text-sm font-semibold text-white/95">{pasta.apostilleType ? (TIPO_LABEL[pasta.apostilleType] || pasta.apostilleType) : "Apostila de Haia"}</span>
+          </CampoContexto>
+          <CampoContexto label="País de destino">
+            <span className="text-sm font-semibold text-white/95">{paisDestino?.flag ? `${paisDestino.flag} ` : ""}{pasta.destinationCountry || paisDestino?.label || "—"}</span>
+          </CampoContexto>
+          <CampoContexto label="Prazo estimado">
+            <span className="text-sm font-semibold text-white/95">{fmtDate(pasta.expectedDate)}</span>
+            {podeEditarPasta && <button onClick={() => setModalStep("enviar_para_apostilamento")} className="ml-1.5 text-xs font-semibold text-[var(--accent-text)] hover:underline">Editar</button>}
+          </CampoContexto>
+          <CampoContexto label="Custo estimado">
+            <span className="text-sm font-semibold text-white/95">{pasta.cost || "—"}</span>
+          </CampoContexto>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-4">
-        <div className="space-y-4">
-          {/* Barra das 6 etapas */}
-          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
-            <div className="flex items-start">
-              {pasta.workflow.map((s, i) => {
-                const done = s.status === "concluida"
-                const active = s.status === "pendente" || s.status === "em_andamento"
-                return (
-                  <div key={s.id} className={`flex items-start ${i < pasta.workflow.length - 1 ? "flex-1" : ""}`}>
-                    <button
-                      type="button"
-                      disabled={!active}
-                      onClick={() => active && setModalStep(s.id)}
-                      className={`flex flex-col items-center text-center w-[96px] shrink-0 ${active ? "cursor-pointer" : "cursor-default"}`}
-                    >
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        done ? "bg-[var(--surface-secondary)] text-white"
-                          : active ? "bg-[var(--action-primary)] text-[var(--color-pure)]"
-                            : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
-                        {done ? <Check className="w-4 h-4" /> : i + 1}
-                      </div>
-                      <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{AP_SHORT[i]}</div>
-                      <div className={`text-[10px] ${
-                        done ? "text-green-800" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>
-                        {done ? "Concluído" : active ? "Em andamento" : "Pendente"}
-                      </div>
-                    </button>
-                    {i < pasta.workflow.length - 1 && (
-                      <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-tertiary)]"}`} />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <Kpi icon="📄" value={totais?.documentosNecessarios ?? 0} label="Documentos necessários" />
+        <Kpi icon="✅" value={totais?.aptos ?? 0} label="Aptos para a pasta" tone="green" />
+        <Kpi icon="📁" value={totais?.naPasta ?? 0} label="Na pasta atual" />
+        <Kpi icon="⚠️" value={totais?.bloqueados ?? 0} label="Bloqueados" tone={((totais?.bloqueados ?? 0) > 0) ? "red" : undefined} />
+        <Kpi icon="📤" value={totais?.enviados ?? 0} label="Enviados ao cartório" />
+        <Kpi icon="📥" value={totais?.recebidos ?? 0} label="Apostilados recebidos" />
+        <Kpi icon="🔍" value={totais?.conferidos ?? 0} label="Conferidos" />
+        <Kpi icon="🏅" value={totais?.validados ?? 0} label="Validados" tone="green" />
+      </div>
 
-            {!concluida && activeStep && (
-              <div className="mt-3 pt-3 border-t border-[var(--border-default)] flex justify-end">
-                <button
-                  onClick={() => setModalStep(activeStep.id)}
-                  className="px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2"
-                >
-                  {activeStep.title}
-                </button>
-              </div>
-            )}
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex items-start flex-1">
+            {VISUAL_STEPS.map((title, i) => {
+              const done = i < visualIndex || concluida
+              const active = i === visualIndex && !concluida
+              return (
+                <div key={title} className={`flex items-start ${i < VISUAL_STEPS.length - 1 ? "flex-1" : ""}`}>
+                  <button
+                    type="button"
+                    disabled={!active}
+                    onClick={() => active && setModalStep(pasta.currentStep)}
+                    className={`flex flex-col items-center text-center w-[110px] shrink-0 ${active ? "cursor-pointer" : "cursor-default"}`}
+                  >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                      done ? "bg-[var(--action-primary)] text-white"
+                        : active ? "bg-[var(--action-primary)] text-white"
+                          : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
+                      {done ? <Check className="w-4 h-4" /> : i + 1}
+                    </div>
+                    <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{title}</div>
+                    <div className={`text-[10px] ${done ? "text-green-800" : active ? "text-[var(--accent-text)]" : "text-[var(--text-muted)]"}`}>
+                      {done ? "Concluído" : active ? "Em andamento" : "Pendente"}
+                    </div>
+                  </button>
+                  {i < VISUAL_STEPS.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-[var(--action-primary)]" : "bg-[var(--surface-tertiary)]"}`} />}
+                </div>
+              )
+            })}
           </div>
+          <button onClick={() => setHistoricoAberto(true)} className="flex-shrink-0 ml-3 px-3 py-2 text-xs font-semibold text-white/80 border border-[var(--border-default)] rounded-md hover:bg-[var(--surface-secondary)] inline-flex items-center gap-1.5">
+            <History className="w-3.5 h-3.5" /> Ver histórico da fase
+          </button>
+        </div>
+      </div>
 
-          {/* Card de contexto */}
-          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-[var(--surface-secondary)] text-white/80 flex items-center justify-center flex-shrink-0">
-              <FolderOpen className="w-5 h-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-white/95">Pasta de apostilamento do processo</div>
-              <p className="text-xs text-white/68 mt-0.5">
-                Todos os documentos finais (traduzidos e válidos) são enviados juntos para Apostila de Haia.
-                A fase só conclui quando a pasta inteira estiver apostilada, conferida e validada.
-              </p>
-              <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs text-[var(--text-secondary)]">
-                <span>País destino: <b className="text-white/95">{pasta.destinationCountry || "—"}</b></span>
-                <span>Tipo: <b className="text-white/95">{pasta.apostilleType ? (TIPO_LABEL[pasta.apostilleType] || pasta.apostilleType) : "—"}</b></span>
-                <span>Autoridade: <b className="text-white/95">{pasta.authorityName || "—"}</b></span>
-                <span>Prazo: <b className="text-white/95">{fmtDate(pasta.expectedDate)}</b></span>
-                <span>Custo: <b className="text-white/95">{pasta.cost || "—"}</b></span>
-              </div>
-            </div>
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 flex items-start gap-3 flex-wrap">
+        <div className="w-9 h-9 rounded-lg bg-[var(--surface-secondary)] text-white/80 flex items-center justify-center flex-shrink-0">
+          <FolderOpen className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-[260px]">
+          <div className="text-sm font-semibold text-white/95">Pasta de apostilamento do processo</div>
+          <p className="text-xs text-white/68 mt-0.5">
+            Todos os documentos aptos são reunidos e enviados juntos ao cartório/autoridade de apostilamento.
+            A fase só conclui quando a pasta inteira estiver apostilada, conferida e validada.
+          </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2 text-xs text-[var(--text-secondary)]">
+            <span>Destino: <b className="text-white/95">{pasta.destinationCountry || paisDestino?.label || "—"}</b></span>
+            <span>Tipo: <b className="text-white/95">{pasta.apostilleType ? (TIPO_LABEL[pasta.apostilleType] || pasta.apostilleType) : "Apostila de Haia"}</b></span>
+            <span>Cartório: <b className="text-white/95">{pasta.authorityName || "—"}</b></span>
+            <span>Prazo: <b className="text-white/95">{fmtDate(pasta.expectedDate)}</b></span>
+            <span>Custo: <b className="text-white/95">{pasta.cost || "—"}</b></span>
           </div>
+        </div>
+        {podeEditarPasta && (
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2">
+              <div className="text-sm font-semibold text-white/95 inline-flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5 text-[var(--action-primary)]" /> {totais?.naPasta ?? 0} documentos na pasta atual</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">{(totais?.naPasta ?? 0) > 0 ? "Pronta para envio ao cartório" : "Adicione documentos aptos"}</div>
+            </div>
+            <button
+              onClick={() => setModalStep("enviar_para_apostilamento")}
+              disabled={(totais?.naPasta ?? 0) === 0}
+              className="px-4 py-2.5 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed rounded-md inline-flex items-center gap-2">
+              <Send className="w-4 h-4" /> Enviar pasta ao cartório
+            </button>
+          </div>
+        )}
+      </div>
 
-          {/* 8 KPIs */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {kpis.map(([ic, val, lbl]) => (
-              <div key={lbl} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5">
-                <div className="text-base leading-none">{ic}</div>
-                <div className="text-xl font-bold text-white/95 mt-1">{val}</div>
-                <div className="text-[11px] text-[var(--text-secondary)]">{lbl}</div>
-              </div>
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-4 pt-3 border-b border-[var(--border-default)] flex-wrap">
+          <div className="flex items-center gap-1">
+            {([["documentos", "Documentos por pessoa"], ["resumo", "Resumo da pasta"], ["historico", "Histórico"]] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setAba(k)}
+                className={`px-3 py-2 text-sm font-semibold border-b-2 -mb-px ${aba === k ? "border-[var(--action-primary)] text-white/95" : "border-transparent text-[var(--text-secondary)] hover:text-white/80"}`}>
+                {label}{k === "resumo" && <span className="ml-1.5 text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-tertiary)] rounded-full px-1.5">{totais?.naPasta ?? 0}</span>}
+              </button>
             ))}
           </div>
-
-          {/* Tabela */}
-          <div className="rounded-xl border border-[var(--border-default)] overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-[var(--border-default)] flex items-center gap-2">
-              <span className="text-sm font-semibold text-white/95">Documentos da pasta de apostilamento</span>
-              <span className="text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-tertiary)] rounded-full px-2 py-0.5">{docs.length}</span>
+          {aba === "documentos" && podeEditarPasta && (
+            <div className="flex items-center gap-2 pb-2.5">
+              <button onClick={selecionarTodosAptos} className="px-3 py-1.5 text-xs font-semibold text-white/80 border border-[var(--border-default)] rounded-md hover:bg-[var(--surface-secondary)] inline-flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5" /> Selec. todos os aptos
+              </button>
+              <button onClick={() => selecionadosAptos.length > 0 && mutarPasta("adicionar", selecionadosAptos)} disabled={selecionadosAptos.length === 0}
+                className="px-3 py-1.5 text-xs font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed rounded-md inline-flex items-center gap-1.5">
+                <FolderOpen className="w-3.5 h-3.5" /> Adicionar à pasta
+              </button>
+              <button onClick={() => naPastaSelecionaveis.length > 0 && mutarPasta("remover", naPastaSelecionaveis.map((d) => d.documentoId))} disabled={naPastaSelecionaveis.length === 0}
+                className="px-3 py-1.5 text-xs font-semibold text-white/80 border border-[var(--border-default)] rounded-md hover:bg-[var(--surface-secondary)] disabled:opacity-40 disabled:cursor-not-allowed">
+                Remover da pasta
+              </button>
             </div>
-            {docs.length === 0 ? (
-              <div className="p-8 text-center text-sm text-[var(--text-secondary)]">Nenhum documento final para apostilamento.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
-                      {["Pessoa","Documento","Origem","Status","Apostila","Conferência","Próxima ação"].map((h) => (
-                        <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/10">
-                    {docs.map((it) => (
-                      <tr key={it.id} className="hover:bg-[var(--surface-secondary)] align-top">
-                        <td className="px-3 py-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="w-7 h-7 rounded-full bg-[var(--surface-tertiary)] text-white/68 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{ini(it.pessoaNome)}</span>
-                            <div className="font-semibold text-white/95">{it.pessoaNome}</div>
-                          </div>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          <div className="font-medium text-white/95">{it.documentoTitulo}</div>
-                          {it.apostilleNumber && <div className="text-[11px] text-[var(--text-secondary)]">Apostila {it.apostilleNumber}</div>}
-                        </td>
-                        <td className="px-3 py-2.5 text-white/68">{it.origem}</td>
-                        <td className="px-3 py-2.5">
-                          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${pillCls(it.status)}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${pillDot(it.status)}`} />
-                            {AP_DOC_LABEL[it.status] || it.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2.5 text-white/80">{colApostila(it)}</td>
-                        <td className="px-3 py-2.5 text-white/80">{colConf(it)}</td>
-                        <td className="px-3 py-2.5 text-white/68">{PROX[it.status] || "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          )}
         </div>
 
-        {/* Coluna direita */}
-        <aside className="space-y-4">
-          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
-            <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => activeStep ? setModalStep(activeStep.id) : setAviso("A fase já está concluída.")}
-                className="w-full text-left text-sm text-white/80 hover:bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">
-                <FolderOpen className="w-4 h-4 text-[var(--text-muted)]" /> Abrir etapa atual
-              </button>
-              <button
-                onClick={() => setAviso("Cartórios / autoridades de apostilamento — em breve.")}
-                className="w-full text-left text-sm text-white/80 hover:bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">
-                <Users className="w-4 h-4 text-[var(--text-muted)]" /> Cartórios / autoridades
+        {aba === "documentos" && (
+          <>
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-default)]">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)]" />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pessoa ou documento..."
+                  className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] pl-8 pr-3 py-2 text-xs text-white/90 placeholder-[var(--text-muted)] focus:outline-none" />
+              </div>
+              <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value as typeof filtroStatus)} className="text-xs border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] text-white/80">
+                <option value="todos">Todos os status</option>
+                <option value="apto">Apto</option>
+                <option value="nao_apto">Não apto</option>
+                <option value="na_pasta">Na pasta</option>
+              </select>
+              <select value={filtroPessoa} onChange={(e) => setFiltroPessoa(e.target.value === "todas" ? "todas" : Number(e.target.value))} className="text-xs border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] text-white/80">
+                <option value="todas">Todas as pessoas</option>
+                {pessoas.map((p) => <option key={p.pessoaId} value={p.pessoaId}>{p.nome}</option>)}
+              </select>
+              <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className="text-xs border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] text-white/80">
+                <option value="todos">Todos os tipos</option>
+                {tiposDisponiveis.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <button onClick={() => setVisao((v) => (v === "pessoa" ? "documento" : "pessoa"))} className="ml-auto px-3 py-2 text-xs font-semibold text-white/80 border border-[var(--border-default)] rounded-md hover:bg-[var(--surface-secondary)] inline-flex items-center gap-1.5">
+                <ListChecks className="w-3.5 h-3.5" /> Visão por {visao === "pessoa" ? "documento" : "pessoa"}
               </button>
             </div>
-          </div>
 
-          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
-            <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center gap-2 text-[var(--accent-text)] bg-[var(--accent-primary)]/12 rounded-lg px-3 py-2">
-                <AlertTriangle className="w-4 h-4 shrink-0" /> {k.total - k.valid} documento(s) de apostila pendente(s)
-              </div>
-              {k.corr > 0 && (
-                <div className="flex items-center gap-2 text-[var(--accent-text)] bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/25 rounded-lg px-3 py-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" /> {k.corr} correção(ões) solicitada(s)
-                </div>
-              )}
-              <div className="flex items-center gap-2 text-green-800 bg-[var(--surface-secondary)] rounded-lg px-3 py-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validado(s)
+            {erroAcao && <div className="mx-4 mt-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-xs text-red-700">{erroAcao}</div>}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
+                    <th className="w-8 px-3 py-2"></th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Pessoa</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Documento</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Origem</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Apto para apostilar</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Na pasta</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Status da apostila</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Conferência</th>
+                    <th className="text-left font-semibold px-3 py-2 whitespace-nowrap">Observações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {visao === "pessoa" ? pessoasFiltradas.map((p) => {
+                    const colapsada = colapsadas.has(p.pessoaId)
+                    const naPastaN = p.documentos.filter((d) => d.naPasta).length
+                    const bloqueadosN = p.documentos.filter((d) => !d.apto).length
+                    return (
+                      <Fragment key={p.pessoaId}>
+                        <tr className="bg-[var(--surface-secondary)]/40 hover:bg-[var(--surface-secondary)]">
+                          <td className="px-3 py-2.5">
+                            <button onClick={() => toggleColapsada(p.pessoaId)} className="text-[var(--text-muted)] hover:text-white/80">
+                              {colapsada ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            </button>
+                          </td>
+                          <td colSpan={7} className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-7 h-7 rounded-full bg-[var(--surface-tertiary)] text-white/68 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{ini(p.nome)}</span>
+                              <div>
+                                <div className="font-semibold text-white/95">{p.nome}</div>
+                                <div className="text-[11px] text-[var(--text-secondary)]">{p.documentos.length} documento(s){bloqueadosN > 0 ? `, ${bloqueadosN} bloqueado(s)` : ""}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                            <span className="text-[11px] font-semibold text-green-800 bg-[var(--surface-secondary)] rounded-full px-2 py-0.5 mr-1.5">{naPastaN} na pasta</span>
+                            {bloqueadosN > 0 && <span className="text-[11px] font-semibold text-red-700 bg-[var(--surface-secondary)] rounded-full px-2 py-0.5">{bloqueadosN} bloqueado{bloqueadosN > 1 ? "s" : ""}</span>}
+                          </td>
+                        </tr>
+                        {!colapsada && p.documentos.map((d) => (
+                          <LinhaDocumento key={d.documentoId} d={d} podeEditarPasta={podeEditarPasta} selecionado={selecionados.has(d.documentoId)} onToggle={() => toggleSelecionado(d.documentoId)} labelStatus={AP_DOC_LABEL} />
+                        ))}
+                      </Fragment>
+                    )
+                  }) : (
+                    todosDocs.filter(passaFiltro).map((d) => (
+                      <LinhaDocumento key={d.documentoId} d={d} podeEditarPasta={podeEditarPasta} selecionado={selecionados.has(d.documentoId)} onToggle={() => toggleSelecionado(d.documentoId)} labelStatus={AP_DOC_LABEL} mostrarPessoa />
+                    ))
+                  )}
+                  {pessoasFiltradas.length === 0 && (
+                    <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-[var(--text-secondary)]">Nenhum documento encontrado com estes filtros.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--border-default)] text-xs text-[var(--text-secondary)]">
+              <span>{pessoas.length} pessoas · {totais?.documentosNecessarios ?? 0} documentos no total</span>
+              <div className="flex items-center gap-3">
+                <Legenda cor="bg-green-700" label="Apto" />
+                <Legenda cor="bg-red-700" label="Não apto" />
+                <Legenda cor="bg-[var(--surface-tertiary)]" label="Pendente" />
+                <Legenda cor="bg-[var(--action-primary)]" label="Na pasta" />
               </div>
             </div>
-          </div>
+          </>
+        )}
 
-          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
-            <h3 className="text-sm font-semibold text-white/95 mb-2.5">Últimas movimentações</h3>
-            <div className="text-xs text-[var(--text-muted)]">Sem movimentações.</div>
-          </div>
-        </aside>
+        {aba === "resumo" && <ResumoDaPasta docs={pasta.documentos} labelStatus={AP_DOC_LABEL} />}
+        {aba === "historico" && <HistoricoInline processoId={processoId} />}
       </div>
 
-      {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
       {aviso && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-[var(--text-secondary)]">{aviso}</div>}
 
       {modalStep && (
@@ -401,21 +507,164 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           onSubmit={(payload) => postEtapa(modalStep, payload)}
         />
       )}
+
+      {historicoAberto && <HistoricoDrawer processoId={processoId} onClose={() => setHistoricoAberto(false)} />}
     </div>
   )
 }
 
-function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+function CampoContexto({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center">
-      <div className={`text-lg font-bold ${ok ? "text-green-800" : "text-white/95"}`}>{value}</div>
-      <div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">{label}</div>
+    <div>
+      <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] mb-0.5">{label}</div>
+      {children}
+    </div>
+  )
+}
+
+function Kpi({ icon, value, label, tone }: { icon: string; value: number; label: string; tone?: "green" | "red" }) {
+  return (
+    <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5">
+      <div className="text-base leading-none">{icon}</div>
+      <div className={`text-xl font-bold mt-1 ${tone === "green" ? "text-green-800" : tone === "red" ? "text-red-700" : "text-white/95"}`}>{value}</div>
+      <div className="text-[11px] text-[var(--text-secondary)]">{label}</div>
+    </div>
+  )
+}
+
+function Legenda({ cor, label }: { cor: string; label: string }) {
+  return <span className="inline-flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${cor}`} />{label}</span>
+}
+
+function AcoesDaFase({ onAtualizar, onHistorico }: { onAtualizar: () => void; onHistorico: () => void }) {
+  const [aberto, setAberto] = useState(false)
+  return (
+    <div className="relative flex-shrink-0">
+      <button onClick={() => setAberto((v) => !v)} className="px-3 py-2 text-sm font-semibold text-white/80 border border-[var(--border-default)] rounded-md hover:bg-[var(--surface-secondary)] inline-flex items-center gap-1.5">
+        Ações da fase <ChevronDown className="w-3.5 h-3.5" />
+      </button>
+      {aberto && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setAberto(false)} />
+          <div className="absolute right-0 mt-1 w-52 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-3)] z-20 py-1">
+            <button onClick={() => { onAtualizar(); setAberto(false) }} className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-[var(--surface-secondary)]">Atualizar dados</button>
+            <button onClick={() => { onHistorico(); setAberto(false) }} className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-[var(--surface-secondary)]">Ver histórico da fase</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function LinhaDocumento({ d, podeEditarPasta, selecionado, onToggle, labelStatus, mostrarPessoa }: {
+  d: PessoaDoc & { pessoaNome?: string }
+  podeEditarPasta: boolean
+  selecionado: boolean
+  onToggle: () => void
+  labelStatus: Record<string, string>
+  mostrarPessoa?: boolean
+}) {
+  return (
+    <tr className="hover:bg-[var(--surface-secondary)] align-top">
+      <td className="px-3 py-2.5">
+        {podeEditarPasta && (
+          <input type="checkbox" checked={selecionado} onChange={onToggle} disabled={!d.apto && !d.naPasta}
+            className="accent-[var(--action-primary)]" />
+        )}
+      </td>
+      {mostrarPessoa ? (
+        <td className="px-3 py-2.5 font-semibold text-white/95">{d.pessoaNome}</td>
+      ) : (
+        <td className="px-3 py-2.5" />
+      )}
+      <td className="px-3 py-2.5">
+        <div className="font-medium text-white/95">{d.tipoLabel}</div>
+        <div className="text-[11px] text-[var(--text-secondary)]">{d.categoria}</div>
+      </td>
+      <td className="px-3 py-2.5 text-white/68">{d.origemLabel}</td>
+      <td className="px-3 py-2.5">
+        {d.apto
+          ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-800"><Check className="w-3.5 h-3.5" /> Apto</span>
+          : <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700"><X className="w-3.5 h-3.5" /> Não apto</span>}
+      </td>
+      <td className="px-3 py-2.5">
+        {d.naPasta
+          ? <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-text)]"><Check className="w-3.5 h-3.5" /> Na pasta</span>
+          : <span className="text-xs text-[var(--text-muted)]">Não incluído</span>}
+      </td>
+      <td className="px-3 py-2.5 text-white/80">{d.naPasta ? (labelStatus[d.statusNaPasta ?? ""] ?? d.statusNaPastaLabel ?? "—") : "—"}</td>
+      <td className="px-3 py-2.5 text-white/80">{d.conferenceResult ?? "—"}</td>
+      <td className="px-3 py-2.5 text-[var(--text-secondary)]">{!d.apto ? d.motivoNaoApto : "—"}</td>
+    </tr>
+  )
+}
+
+function ResumoDaPasta({ docs, labelStatus }: { docs: ApDoc[]; labelStatus: Record<string, string> }) {
+  if (docs.length === 0) return <div className="p-8 text-center text-sm text-[var(--text-secondary)]">Nenhum documento na pasta ainda.</div>
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
+            {["Pessoa", "Documento", "Origem", "Status"].map((h) => <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/10">
+          {docs.map((d) => (
+            <tr key={d.id} className="hover:bg-[var(--surface-secondary)]">
+              <td className="px-3 py-2.5 font-semibold text-white/95">{d.pessoaNome}</td>
+              <td className="px-3 py-2.5">{d.documentoTitulo}{d.apostilleNumber ? ` · Apostila ${d.apostilleNumber}` : ""}</td>
+              <td className="px-3 py-2.5 text-white/68">{d.origem}</td>
+              <td className="px-3 py-2.5">{labelStatus[d.status] ?? d.status}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+interface LogItem { id: string; acao: string; descricao: string; criadoEm: string; usuario: { nome: string } | null }
+
+function HistoricoInline({ processoId }: { processoId: number }) {
+  const { dados, carregando } = useApi<{ logs: LogItem[] }>(`/api/processos/${processoId}/logs?limite=100`)
+  const logs = dados?.logs ?? []
+  if (carregando) return <div className="p-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" /></div>
+  if (logs.length === 0) return <div className="p-8 text-center text-sm text-[var(--text-secondary)]">Sem movimentações registradas.</div>
+  return (
+    <div className="divide-y divide-white/10 max-h-[420px] overflow-y-auto">
+      {logs.map((l) => (
+        <div key={l.id} className="px-4 py-2.5 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-white/90">{l.descricao}</span>
+            <span className="text-[var(--text-muted)]">{new Date(l.criadoEm).toLocaleString("pt-BR")}</span>
+          </div>
+          {l.usuario && <div className="text-[var(--text-secondary)] mt-0.5">por {l.usuario.nome}</div>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function HistoricoDrawer({ processoId, onClose }: { processoId: number; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-[var(--surface-popover)] h-full shadow-[var(--elev-3)] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
+          <h3 className="text-base font-bold text-white/95">Histórico do processo</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <HistoricoInline processoId={processoId} />
+        </div>
+      </div>
     </div>
   )
 }
 
 // ============================================================
-// MODAIS DAS ETAPAS (espelham apStepMontar/Enviar/Aguardar/Receber/Conferir/Validar)
+// MODAL DA ETAPA ATIVA (mesmo motor de sempre: applyStep no servidor)
 // ============================================================
 
 const TIPO_APOSTILA: Array<[string, string]> = [["fisico", "Físico"], ["digital", "Digital"], ["ambos", "Ambos"]]
@@ -456,39 +705,34 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
   onSubmit: (payload: Record<string, unknown>) => void
 }) {
   const docs = pasta.documentos
-  const num = AP_STEP_IDS.indexOf(stepId) + 1
+  const num = VISUAL_INDEX[stepId] + 1
 
-  // montar
   const [destino, setDestino] = useState(pasta.destinationCountry || "")
   const [tipo, setTipo] = useState(pasta.apostilleType || "")
   const [obs, setObs] = useState("")
   const [montarChk, setMontarChk] = useState<Record<string, boolean>>({})
 
-  // enviar
   const [authorityName, setAuthorityName] = useState(pasta.authorityName || "")
   const [attendant, setAttendant] = useState(pasta.attendant || "")
   const [canal, setCanal] = useState("")
   const [sentAt, setSentAt] = useState("")
   const [expectedDate, setExpectedDate] = useState("")
-  const [cost, setCost] = useState("")
+  const [cost, setCost] = useState(pasta.cost || "")
   const [trackingCode, setTrackingCode] = useState("")
 
-  // receber
   const [receivedAt, setReceivedAt] = useState("")
   const [custoFinal, setCustoFinal] = useState("")
   const [files, setFiles] = useState<Record<number, string>>({})
   const [nums, setNums] = useState<Record<number, string>>({})
   const [dates, setDates] = useState<Record<number, string>>({})
 
-  // conferir
   const [confRes, setConfRes] = useState<Record<number, string>>({})
   const [confChk, setConfChk] = useState<Record<string, boolean>>({})
 
-  // validar
   const [decision, setDecision] = useState("")
   const [valObs, setValObs] = useState("")
 
-  const title = AP_SHORT[num - 1]
+  const title = VISUAL_STEPS[num - 1]
 
   const montarOk = docs.length > 0 && !!destino.trim() && !!tipo && MONTAR_CHK.every(([key]) => montarChk[key])
   const enviarOk = !!authorityName.trim() && !!sentAt.trim() && !!expectedDate.trim() && !!canal
@@ -529,14 +773,13 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
       <div className="relative w-full max-w-lg bg-[var(--surface-popover)] rounded-xl shadow-[var(--elev-3)] max-h-[85vh] flex flex-col">
         <div className="flex items-start justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Etapa {num} de 6 · Workflow do Apostilamento</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Etapa {num} de 5 · Workflow do Apostilamento</div>
             <h3 className="text-base font-bold text-white/95 mt-0.5">{title}</h3>
           </div>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto">
-          {/* 1) Montar */}
           {stepId === "montar_pasta_apostilamento" && (
             <>
               <Sec>Documentos incluídos ({docs.length})</Sec>
@@ -548,10 +791,9 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       <div className="text-sm font-medium text-white/95">{d.documentoTitulo}</div>
                       <div className="text-[11px] text-[var(--text-secondary)]">{d.pessoaNome} · {d.origem}</div>
                     </div>
-                    <span className="text-[11px] text-[var(--text-secondary)]">{AP_DOC_LABEL[d.status] || d.status}</span>
                   </div>
                 ))}
-                {docs.length === 0 && <div className="text-sm text-[var(--text-secondary)]">Nenhum documento na pasta.</div>}
+                {docs.length === 0 && <div className="text-sm text-[var(--text-secondary)]">Nenhum documento na pasta — adicione documentos aptos na aba &quot;Documentos por pessoa&quot; antes de enviar.</div>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="País de destino" required><input className={EC} value={destino} onChange={(e) => setDestino(e.target.value)} placeholder="ex: Itália" /></Field>
@@ -582,7 +824,6 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
             </>
           )}
 
-          {/* 2) Enviar */}
           {stepId === "enviar_para_apostilamento" && (
             <>
               <Sec>Autoridade / cartório</Sec>
@@ -612,7 +853,6 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
             </>
           )}
 
-          {/* 3) Aguardar */}
           {stepId === "aguardar_retorno_apostilamento" && (
             <>
               <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
@@ -628,7 +868,6 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
             </>
           )}
 
-          {/* 4) Receber */}
           {stepId === "receber_documentos_apostilados" && (
             <>
               <Sec>Documentos apostilados ({docs.length})</Sec>
@@ -659,7 +898,6 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
             </>
           )}
 
-          {/* 5) Conferir */}
           {stepId === "conferir_apostilas" && (
             <div className="space-y-3">
               {docs.map((d) => (
@@ -701,7 +939,6 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
             </div>
           )}
 
-          {/* 6) Validar */}
           {stepId === "validar_pasta_apostilada" && (
             <>
               <div className="grid grid-cols-5 gap-2 text-center">
