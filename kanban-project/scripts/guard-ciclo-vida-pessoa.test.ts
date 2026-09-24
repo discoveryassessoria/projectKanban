@@ -256,6 +256,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "as PRÓPRIAS árvores/pessoas (marca SOL4SUB) só no banco de teste — a limpeza remove só o " +
     "que o próprio teste criou (deleteMany direto, nunca via pessoa-ciclo-vida.ts, porque não " +
     "é remoção de pessoa de um processo real: é desmontar o próprio cenário sintético)",
+  "scripts/prova-avancar-lote-fase-documental.test.ts":
+    "mandato 'reconstruir a tela de Tradução/Apostilamento em cima do motor canônico' (24/09/2026): " +
+    "cria as PRÓPRIAS árvores/pessoas (marca LOTEFASEDOC) só no banco de teste — a limpeza remove só " +
+    "o que o próprio teste criou (deleteMany direto, desmontar o próprio cenário sintético)",
   "scripts/mandato-rascunho-publicacao.test.ts":
     "rascunho e publicação de Workflow Interno (mandato Bloco 3): cria as PRÓPRIAS " +
     "árvores/pessoas (marca RASCUNHOPUB-TEST) só no banco de teste — a limpeza remove só o " +

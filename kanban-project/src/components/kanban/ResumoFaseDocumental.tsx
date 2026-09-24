@@ -12,8 +12,9 @@
 // ============================================================================
 "use client"
 
+import { useState } from "react"
 import { useApi } from "@/src/lib/dados"
-import { Loader2 } from "lucide-react"
+import { Loader2, PlayCircle } from "lucide-react"
 
 interface Totais {
   documentosNecessarios: number
@@ -26,10 +27,17 @@ interface Totais {
   validados: number
 }
 
+interface DocumentoResumo {
+  documentoId: number
+  subtarefas: Array<{ key: string; label: string; status: string; concluida: boolean; disponivel: boolean }>
+}
 interface Resposta {
   totais: Totais
-  pessoas: Array<{ pessoaId: number; nome: string; documentos: unknown[] }>
+  pessoas: Array<{ pessoaId: number; nome: string; documentos: DocumentoResumo[] }>
 }
+
+const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
+const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
 
 const CONFIG: Record<string, { titulo: string; icones: Record<keyof Totais, string> }> = {
   traducao_juramentada: {
@@ -60,8 +68,34 @@ const LABEL: Record<keyof Totais, string> = {
 }
 
 export function ResumoFaseDocumental({ processoId, stepKey }: { processoId: number; stepKey: "traducao_juramentada" | "apostilamento" }) {
-  const { dados, carregando } = useApi<Resposta>(`/api/processos/${processoId}/fase-documental-kpis/${stepKey}`)
+  const { dados, carregando, recarregar } = useApi<Resposta>(`/api/processos/${processoId}/fase-documental-kpis/${stepKey}`)
   const cfg = CONFIG[stepKey]
+  const [avancando, setAvancando] = useState(false)
+  const [resultadoLote, setResultadoLote] = useState<string | null>(null)
+
+  const documentosComEtapaDisponivel = (dados?.pessoas ?? [])
+    .flatMap((p) => p.documentos)
+    .filter((d) => d.subtarefas.some((s) => !s.concluida && s.disponivel))
+    .map((d) => d.documentoId)
+
+  const avancarLote = async () => {
+    if (documentosComEtapaDisponivel.length === 0 || avancando) return
+    setAvancando(true); setResultadoLote(null)
+    try {
+      const res = await fetch(`/api/processos/${processoId}/fase-documental-kpis/${stepKey}/avancar-lote`, {
+        method: "POST", headers: jsonHeaders(),
+        body: JSON.stringify({ documentoIds: documentosComEtapaDisponivel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.mensagem || data.error || "Não foi possível avançar em lote.")
+      setResultadoLote(`${data.concluidos} concluído(s)${data.falhas > 0 ? `, ${data.falhas} não avançaram (veja motivo abrindo o documento)` : ""}.`)
+      await recarregar()
+    } catch (e) {
+      setResultadoLote(e instanceof Error ? e.message : "Erro ao avançar em lote.")
+    } finally {
+      setAvancando(false)
+    }
+  }
 
   if (carregando) {
     return (
@@ -77,7 +111,21 @@ export function ResumoFaseDocumental({ processoId, stepKey }: { processoId: numb
 
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4 mb-4">
-      <div className="text-sm font-semibold text-white/95 mb-3">{cfg.titulo}</div>
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <div className="text-sm font-semibold text-white/95">{cfg.titulo}</div>
+        {documentosComEtapaDisponivel.length > 0 && (
+          <button
+            onClick={avancarLote}
+            disabled={avancando}
+            title="Cada documento avança na SUA própria etapa corrente — nenhuma exige dado (só confirmar), por isso é seguro em lote."
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 rounded-md"
+          >
+            {avancando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
+            Avançar etapa de {documentosComEtapaDisponivel.length} documento{documentosComEtapaDisponivel.length > 1 ? "s" : ""}
+          </button>
+        )}
+      </div>
+      {resultadoLote && <div className="mb-3 text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] rounded-md px-3 py-2">{resultadoLote}</div>}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {ordem.map((k) => (
           <div key={k} className="rounded-lg border border-[var(--border-default)] px-3 py-2.5">

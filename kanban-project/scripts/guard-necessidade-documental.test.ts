@@ -201,6 +201,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "mandato Bloco 2 (SLA por cartório): monta e derruba o PRÓPRIO cenário (marca SLACARTORIO-TEST), só no banco de teste — a resolução de precedência (regra do órgão > SLA do passo > default) e o wiring real de registrarSolicitacaoDocumento precisam de uma NecessidadeDocumental real para materializar o passo que recebe a solicitação",
   "scripts/prova-solicitar-certidao-4-subtarefas-executores.test.ts":
     "mandato 'religar os 4 editores especializados de Solicitar certidão' (23/09/2026): monta e derruba o PRÓPRIO cenário (marca SOL4SUB), só no banco de teste — as 4 subtarefas (motor documental + ponte do editor legado) precisam de uma NecessidadeDocumental real para o documento/passo existir; a necessidade é insumo do palco, nunca o que está sendo provado",
+  "scripts/prova-avancar-lote-fase-documental.test.ts":
+    "mandato 'reconstruir a tela de Tradução/Apostilamento em cima do motor canônico' (24/09/2026): monta e derruba o PRÓPRIO cenário (marca LOTEFASEDOC), só no banco de teste — a ação em lote (avancar-lote) precisa de uma NecessidadeDocumental real por documento para o passo existir; a necessidade é insumo do palco, nunca o que está sendo provado",
   "scripts/mandato-financeiro-cartorio-isolado.test.ts":
     "mandato Bloco 5 (isolamento financeiro do custo de cartório): monta e derruba o PRÓPRIO cenário (marca FINCARTORIO-TEST), só no banco de teste — prova que custoPago não gera ObrigacaoEconomica e que o gerador real de custo documental recusa o passo, exigindo uma NecessidadeDocumental real para o documento existir",
   "scripts/motor-documental-idempotencia.test.ts": "teste: monta e limpa o cenário das 20 rodadas",
