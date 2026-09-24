@@ -144,14 +144,25 @@ function Linha({
   acao,
   aoAbrir,
   selecao,
+  ocultarPessoa,
 }: {
   l: LinhaOperacional
   acao?: React.ReactNode
   aoAbrir?: () => void
   /** Checkbox de seleção em lote — só em "Sem responsável". */
   selecao?: React.ReactNode
+  /**
+   * Dentro de um grupo por pessoa, o nome dela já está no cabeçalho — repeti-lo
+   * em toda linha era ruído. `titulo` também já traz "· Nome" embutido
+   * (`nomeDaTarefa`); `servico` é a MESMA obrigação sem o sufixo — a fonte
+   * limpa, não um corte de string.
+   */
+  ocultarPessoa?: boolean
 }) {
-  const contexto = [l.processoNome, l.pessoaNome, l.servico].filter(Boolean).join(" · ")
+  const tituloExibido = ocultarPessoa ? (l.servico ?? l.titulo) : l.titulo
+  const contexto = ocultarPessoa
+    ? [l.processoNome].filter(Boolean).join(" · ")
+    : [l.processoNome, l.pessoaNome, l.servico].filter(Boolean).join(" · ")
   return (
     <div className={`group grid items-start gap-4 border-b border-white/[0.06] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-primary)] ${selecao ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]"}`}>
       {selecao && <div className="pt-1">{selecao}</div>}
@@ -159,7 +170,7 @@ function Linha({
           funcionário chega ao workflow interno sem passar pelo processo. */}
       <button type="button" onClick={aoAbrir} className="min-w-0 cursor-pointer text-left">
         <div className="flex items-center gap-2">
-          <span className="truncate text-[13px] font-medium text-white/90">{l.titulo}</span>
+          <span className="truncate text-[13px] font-medium text-white/90">{tituloExibido}</span>
           {l.atrasada && <Etiqueta tom="critico">Atrasada</Etiqueta>}
           {l.prioridade === "URGENTE" && <Etiqueta tom="alerta">Urgente</Etiqueta>}
           {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
@@ -197,6 +208,55 @@ function Linha({
       </div>
     </div>
   )
+}
+
+/** Iniciais para o avatar do cabeçalho — a mesma régua do resto do Discovery. */
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  const primeira = partes[0]?.[0] ?? ""
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : ""
+  return (primeira + ultima).toUpperCase() || "?"
+}
+
+/**
+ * AGRUPA "SEM RESPONSÁVEL" POR PESSOA — pessoa em cima, documentos dela
+ * embaixo, a mesma leitura que a Central Operacional já usa (pessoa → alvo).
+ * "Sem responsável" existe por causa hoje; ver as certidões de UMA pessoa
+ * juntas é o que permite atribuir todo o lote dela de uma vez, em vez de
+ * caçar linha por linha numa lista plana com o nome repetido em cada uma.
+ *
+ * Chave por `pessoaId` (identidade, nunca nome — regra do domínio). Tarefa
+ * sem pessoa (obrigação administrativa, ex.: "Atribuir tarefas") cai num
+ * grupo à parte — ela não é órfã, só não é DE uma pessoa.
+ */
+interface GrupoPorPessoa {
+  chave: string
+  pessoaId: number | null
+  nome: string
+  processoNome: string | null
+  linhas: LinhaOperacional[]
+}
+function agruparPorPessoa(linhas: LinhaOperacional[]): GrupoPorPessoa[] {
+  const porChave = new Map<string, GrupoPorPessoa>()
+  for (const l of linhas) {
+    const chave = l.pessoaId != null ? `p${l.pessoaId}` : "sem-pessoa"
+    let grupo = porChave.get(chave)
+    if (!grupo) {
+      grupo = {
+        chave, pessoaId: l.pessoaId,
+        nome: l.pessoaNome ?? "Sem pessoa vinculada",
+        processoNome: l.processoNome,
+        linhas: [],
+      }
+      porChave.set(chave, grupo)
+    }
+    grupo.linhas.push(l)
+  }
+  return [...porChave.values()].sort((a, b) => {
+    if (a.chave === "sem-pessoa") return 1
+    if (b.chave === "sem-pessoa") return -1
+    return a.nome.localeCompare(b.nome, "pt-BR")
+  })
 }
 
 /**
@@ -570,6 +630,12 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
     return linhas
   }, [linhas, drillDown, visao, processoAlvoId])
 
+  /** "Sem responsável" em Lista: pessoa em cima, documentos dela embaixo. */
+  const gruposPorPessoa = useMemo(
+    () => (visao === "sem_responsavel" && linhasFiltradas ? agruparPorPessoa(linhasFiltradas) : []),
+    [visao, linhasFiltradas],
+  )
+
   // ── SELEÇÃO EM LOTE — só em "Sem responsável": nenhuma tarefa nova nasce
   // aqui, e a atribuição sai pela MESMA porta canônica de sempre
   // (`redistribuirTarefas`, item a item, auditada, notificação consolidada)
@@ -829,51 +895,92 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           </div>
         )}
 
-        {modo === "lista" && visao === "sem_responsavel" && linhasFiltradas?.map((l) => (
-          <Linha
-            key={l.taskId}
-            l={l}
-            aoAbrir={() => abrirOTrabalho(l)}
-            selecao={
-              podeDistribuir ? (
-                <input
-                  type="checkbox"
-                  checked={selecionadas.has(l.taskId)}
-                  onChange={() => alternarSelecao(l.taskId)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-3.5 w-3.5 accent-[var(--action-primary)]"
-                />
-              ) : undefined
-            }
-            acao={
-              podeDistribuir ? (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => { setErroComando(null); setAlvo(l) }}
-                    className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)]"
-                  >
-                    {l.responsavelId == null ? "Atribuir" : "Transferir"}
-                  </button>
-                  {/* RETIRAR fica NA LINHA, junto do trabalho a que se refere.
-                      Antes era uma barra flutuante que só aparecia com o
-                      seletor aberto — ou seja, para devolver a tarefa à
-                      distribuição era preciso primeiro fingir que ia
-                      transferi-la. */}
-                  {l.responsavelId != null && (
-                    <button
-                      disabled={ocupado}
-                      onClick={() => void comandar(l.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")}
-                      className="rounded px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/75 disabled:opacity-40"
-                      title="Remover o responsável e devolver para distribuição"
-                    >
-                      Retirar
-                    </button>
-                  )}
+        {modo === "lista" && visao === "sem_responsavel" && gruposPorPessoa.map((grupo) => {
+          const idsDoGrupo = grupo.linhas.map((l) => l.taskId)
+          const selecionadosNoGrupo = idsDoGrupo.filter((id) => selecionadas.has(id)).length
+          const todosDoGrupoSelecionados = selecionadosNoGrupo > 0 && selecionadosNoGrupo === idsDoGrupo.length
+          return (
+            <Fragment key={grupo.chave}>
+              {/* CABEÇALHO DA PESSOA — mesma leitura da Central Operacional:
+                  pessoa em cima, o que é dela embaixo. O nome não se repete
+                  linha a linha; aparece uma vez, aqui. */}
+              <div className="flex items-center gap-3 border-b border-white/[0.08] bg-[var(--surface-primary)]/40 px-4 py-2.5">
+                {podeDistribuir && grupo.pessoaId != null && (
+                  <input
+                    type="checkbox"
+                    checked={todosDoGrupoSelecionados}
+                    onChange={() => {
+                      setSelecionadas((prev) => {
+                        const proximo = new Set(prev)
+                        if (todosDoGrupoSelecionados) for (const id of idsDoGrupo) proximo.delete(id)
+                        else for (const id of idsDoGrupo) proximo.add(id)
+                        return proximo
+                      })
+                    }}
+                    className="h-3.5 w-3.5 accent-[var(--action-primary)]"
+                    title={`Selecionar todos os documentos de ${grupo.nome}`}
+                  />
+                )}
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[10.5px] font-semibold text-[var(--pessoa)]">
+                  {iniciaisDe(grupo.nome)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12.5px] font-medium text-white/90">{grupo.nome}</div>
+                  {grupo.processoNome && <div className="truncate text-[10.5px] text-[var(--text-muted)]">{grupo.processoNome}</div>}
                 </div>
-              ) : undefined
-            }
-          />
-        ))}
+                <span className="shrink-0 text-[11px] text-[var(--text-muted)]">
+                  {grupo.linhas.length} documento{grupo.linhas.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              {grupo.linhas.map((l) => (
+                <Linha
+                  key={l.taskId}
+                  l={l}
+                  ocultarPessoa
+                  aoAbrir={() => abrirOTrabalho(l)}
+                  selecao={
+                    podeDistribuir ? (
+                      <input
+                        type="checkbox"
+                        checked={selecionadas.has(l.taskId)}
+                        onChange={() => alternarSelecao(l.taskId)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-3.5 w-3.5 accent-[var(--action-primary)]"
+                      />
+                    ) : undefined
+                  }
+                  acao={
+                    podeDistribuir ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => { setErroComando(null); setAlvo(l) }}
+                          className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)]"
+                        >
+                          {l.responsavelId == null ? "Atribuir" : "Transferir"}
+                        </button>
+                        {/* RETIRAR fica NA LINHA, junto do trabalho a que se refere.
+                            Antes era uma barra flutuante que só aparecia com o
+                            seletor aberto — ou seja, para devolver a tarefa à
+                            distribuição era preciso primeiro fingir que ia
+                            transferi-la. */}
+                        {l.responsavelId != null && (
+                          <button
+                            disabled={ocupado}
+                            onClick={() => void comandar(l.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")}
+                            className="rounded px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/75 disabled:opacity-40"
+                            title="Remover o responsável e devolver para distribuição"
+                          >
+                            Retirar
+                          </button>
+                        )}
+                      </div>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </Fragment>
+          )
+        })}
       </div>
 
       {alvo && (

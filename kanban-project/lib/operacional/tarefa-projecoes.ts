@@ -193,6 +193,7 @@ export interface LinhaDeFila {
   processoNome: string | null
   /** Família do processo — agrupamento visual, nunca dono da tarefa. */
   familiaNome: string | null
+  pessoaId: number | null
   pessoaNome: string | null
   /** Marca a NATUREZA da tarefa (ex.: "obrigacao-atribuicao") — `null` para uma tarefa comum. */
   origem: string | null
@@ -361,6 +362,7 @@ function projetar(
     processoNome: t.processo?.nome ?? null,
     familiaNome: t.processo?.familia?.nome ?? null,
     origem: t.origem ?? null,
+    pessoaId: t.pessoaId ?? null,
     pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
     faseMacroKey: t.faseMacroKey,
     // O NOME DO PASSO, na ordem da fonte mais próxima do que foi publicado:
