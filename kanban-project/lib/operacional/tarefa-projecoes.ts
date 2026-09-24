@@ -648,6 +648,18 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: L
 }
 
 /**
+ * O Nº LINHAGEM das pessoas das linhas — a MESMA régua de ordenação que a
+ * Central Operacional já usa (`central-operacional-core.ts`: "ORDEM DE
+ * EXIBIÇÃO = Nº Linhagem"), nunca uma segunda conta de geração aqui.
+ */
+async function numerosLinhagemDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma): Promise<Map<number, number | null>> {
+  const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
+  if (ids.length === 0) return new Map()
+  const pessoas = await db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, numeroLinhagem: true } })
+  return new Map(pessoas.map((p) => [p.id, p.numeroLinhagem ?? null]))
+}
+
+/**
  * MINHA FILA — o que ESTA pessoa tem para fazer.
  *
  * Ordenada pelo que a operação olha primeiro: atrasado, depois prazo mais
@@ -674,6 +686,23 @@ export async function minhaFila(
   const { linhas } = await visaoGerencial({ ...filtrosExtra, responsavelId: usuarioId, porPagina: 500 }, agora, db)
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
   return ordenarFila(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
+}
+
+/**
+ * AS LINHAS — o que ESTE usuário concluiu hoje. `minhaFila` exclui CONCLUIDA
+ * de propósito ("o que já foi entregue não é trabalho de hoje"), então o KPI
+ * "Concluídas hoje" (Minha Operação) — e o badge por família, que precisa das
+ * linhas de verdade pra agrupar, não só o total — pedem a MESMA
+ * `visaoGerencial`, com o filtro OPOSTO (mesmo `dataTipo: 'concluida'` que os
+ * tiles de Tarefas e Projetos já usam).
+ */
+export async function concluidasHojeDoUsuario(usuarioId: number, agora = new Date(), db: Leitor = prisma): Promise<LinhaGerencial[]> {
+  const hoje = agora.toISOString().slice(0, 10)
+  const { linhas } = await visaoGerencial(
+    { responsavelId: usuarioId, dataTipo: 'concluida', dataInicio: hoje, dataFim: hoje, porPagina: 500 },
+    agora, db,
+  )
+  return linhas as LinhaGerencial[]
 }
 
 /**

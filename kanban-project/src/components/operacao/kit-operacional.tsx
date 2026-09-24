@@ -26,7 +26,50 @@ import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 // tipo canônico (import type, apagado no build do client) fecha a divergência
 // em vez de perpetuá-la numa terceira tela.
 export type { LinhaDeFila } from "@/lib/operacional/tarefa-projecoes"
-import type { ColunaKanban } from "@/lib/operacional/tarefa-projecoes"
+import type { ColunaKanban, LinhaDeFila } from "@/lib/operacional/tarefa-projecoes"
+
+/**
+ * A LINHA ENRIQUECIDA DA OPERAÇÃO — a MESMA leitura de Minha Fila/Distribuição/
+ * Tarefas e Projetos (`visaoGerencial`/`minhaFila`, ambas devolvem este
+ * formato). Vivia duplicada em `central-tarefas.tsx` (órfão, removido
+ * 24/09/2026) e sob o nome `LinhaGerencial` em `visao-global.tsx` — mesmo
+ * shape, dois nomes. Esta é a declaração canônica; novas telas importam
+ * daqui, nunca reescrevem os mesmos 7 campos pela terceira vez.
+ */
+export interface LinhaOperacional extends LinhaDeFila {
+  venceHoje: boolean
+  coluna: ColunaKanban
+  esperandoDe: "terceiro" | "cliente" | null
+  esperandoDesde: string | null
+  esperandoHaDias: number | null
+  motivoBloqueio: string | null
+  concluidaEm: string | null
+}
+
+/**
+ * A AÇÃO PRINCIPAL — UMA por cartão, decidida pelo estado.
+ *
+ * O rótulo diz o que vai acontecer, e o `comando` diz se algo é ESCRITO:
+ *
+ *   A FAZER              Iniciar tarefa   → comanda (assume o trabalho)
+ *   EM ANDAMENTO         Continuar        → só navega
+ *   AGUARDANDO TERCEIRO  Ver etapa        → só navega
+ *   BLOQUEADA            Ver bloqueio     → só navega
+ *   CONCLUÍDA            Ver histórico    → só navega
+ *   causa removida       Ver decisão      → só navega
+ *
+ * "Continuar" nunca aparece para uma tarefa que ninguém começou, e "Requer
+ * decisão" não diz Continuar: continuar sugere executar, e essa tarefa perdeu a
+ * causa — o que ela precisa é de alguém decidir o que fazer com ela.
+ */
+export function acaoPrincipal(l: LinhaOperacional): { rotulo: string; comando: "iniciar" | null } {
+  if (l.requerDecisao) return { rotulo: "Ver decisão", comando: null }
+  if (l.coluna === "A_FAZER") return { rotulo: "Iniciar tarefa", comando: "iniciar" }
+  if (l.coluna === "BLOQUEADA") return { rotulo: "Ver bloqueio", comando: null }
+  if (l.coluna === "AGUARDANDO_TERCEIRO") return { rotulo: "Ver etapa", comando: null }
+  if (l.coluna === "CONCLUIDA") return { rotulo: "Ver histórico", comando: null }
+  return { rotulo: "Continuar", comando: null }
+}
 
 interface Funcionario {
   id: number

@@ -69,14 +69,14 @@ async function main() {
 
   // Todas as entradas usam a MESMA função.
   for (const [tela, arquivo] of [
-    ['Minha Fila', 'src/components/operacao/central-tarefas.tsx'],
+    ['Minha Fila', 'src/components/operacao/minha-operacao.tsx'],
     ['Tarefas e Projetos / Kanban global', 'src/components/operacao/visao-global.tsx'],
     ['notificações', 'lib/operacional/tarefa-comandos.ts'],
   ] as const) {
     ok(`§36-§38) ${tela} usa o helper canônico`,
       /urlOperacionalDaTarefa/.test(semComentarios(ler(arquivo))))
   }
-  const espalhadas = ['src/components/operacao/central-tarefas.tsx', 'src/components/operacao/visao-global.tsx']
+  const espalhadas = ['src/components/operacao/minha-operacao.tsx', 'src/components/operacao/visao-global.tsx']
     .filter((f) => /`\/kanban\?/.test(semComentarios(ler(f))))
   ok('§39) e ninguém concatena URL à mão', espalhadas.length === 0, espalhadas.join(', ') || 'nenhuma')
 
@@ -174,9 +174,10 @@ async function main() {
   const comDecisao = (await minhaFila(dani.id)).find((l) => l.taskId === alvoDecisao)
   ok('§26) a fila marca a tarefa', comDecisao?.requerDecisao === true)
 
-  const tela = semComentarios(ler('src/components/operacao/central-tarefas.tsx'))
+  const tela = semComentarios(ler('src/components/operacao/minha-operacao.tsx'))
+  const kit = semComentarios(ler('src/components/operacao/kit-operacional.tsx'))
   ok('§27) e a ação principal deixa de ser "Continuar"',
-    /requerDecisao\) return \{ rotulo: 'Ver decisão'|requerDecisao\) return \{ rotulo: "Ver decisão"/.test(tela))
+    /requerDecisao\) return \{ rotulo: 'Ver decisão'|requerDecisao\) return \{ rotulo: "Ver decisão"/.test(kit))
   const central = semComentarios(ler('src/components/kanban/ProcessoCentralOperacional.tsx'))
   ok('§26) e a Central NÃO abre o executor para ela',
     /if \(!alvo \|\| alvo\.requerDecisao\) return/.test(central))
@@ -255,10 +256,10 @@ async function main() {
   ok('§33) abrir o cartão apenas navega',
     /const abrirOTrabalho = useCallback\(\(l: LinhaOperacional\) => \{\s*router\.push/.test(tela),
     'sem comando nenhum antes do push')
-  ok('§33) e é ele que o corpo do cartão usa',
-    /onClick=\{aoAbrir\} className="min-w-0 flex-1/.test(tela))
+  ok('§33) e é a LINHA (clicar para olhar) que usa só isso — nunca o botão',
+    /<tr\s[\s\S]{0,40}onClick=\{aoSelecionar\}/.test(tela))
   ok('§34) iniciar continua explícito, no botão',
-    /onClick=\{aoExecutar\}[\s\S]{0,200}?\{acao\.rotulo\}/.test(tela))
+    /onClick=\{[^}]*aoExecutar\(\)[^}]*\}[\s\S]{0,500}?\{ocupado && acao\.comando === "iniciar"/.test(tela))
   ok('§34) e só o botão comanda',
     /const irParaOTrabalho[\s\S]{0,400}?acao\.comando === "iniciar"[\s\S]{0,200}?comandar\(/.test(tela))
 
@@ -318,7 +319,7 @@ async function main() {
   secao('§13/§14) TODA superfície usa o MESMO construtor de URL')
   // ══════════════════════════════════════════════════════════════════════════
   const superficies = [
-    ['Minha Fila / cockpit', 'src/components/operacao/central-tarefas.tsx'],
+    ['Minha Fila / cockpit', 'src/components/operacao/minha-operacao.tsx'],
     ['Visão global (Tarefas e Projetos)', 'src/components/operacao/visao-global.tsx'],
   ] as const
   for (const [nome, arq] of superficies) {

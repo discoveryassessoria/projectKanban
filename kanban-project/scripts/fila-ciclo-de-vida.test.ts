@@ -38,8 +38,7 @@ import { minhaFila, semResponsavel, colunaDaTarefa } from '@/lib/operacional/tar
 import { resolverAlvoDaTarefa, urlOperacionalDaTarefa } from '@/lib/operacional/navegacao'
 import { getPhaseOperationalSummary } from '@/src/lib/process-stage/estrutura-operacional'
 import { resolveProgressoFaseDocumento } from '@/src/lib/process-stage/resolve-fase-progresso'
-import { acaoPrincipal } from '@/src/components/operacao/central-tarefas'
-import { ROTULO_STATUS } from '@/src/components/operacao/kit-operacional'
+import { acaoPrincipal, ROTULO_STATUS } from '@/src/components/operacao/kit-operacional'
 import { PrismaClient } from '@prisma/client'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -633,7 +632,7 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   secao('§10/§27) A Minha Fila NÃO executa — ela leva ao trabalho')
   // ═════════════════════════════════════════════════════════════════════════
-  const tela = semComentarios(ler('src/components/operacao/central-tarefas.tsx'))
+  const tela = semComentarios(ler('src/components/operacao/minha-operacao.tsx'))
   ok('a fila não monta drawer, painel nem executor',
     !/Drawer|CentralDaEtapa|StepEditor|WorkflowTab|TabOperation/.test(tela))
   ok('não desenha o workflow do documento',
@@ -664,8 +663,8 @@ async function main() {
     /tarefa\?\.statusTarefa === "BLOQUEADA"[\s\S]{0,200}?Bloqueado:/.test(drawerDoc))
   ok('§10) e o motivo de uma operação encerrada aparece como registro anterior',
     /Registro anterior:/.test(drawerDoc))
-  ok('e o cartão inteiro nunca comanda — clicar para olhar não assume trabalho',
-    /aoAbrir\}/.test(tela) && !/onClick=\{aoExecutar\}[\s\S]{0,80}min-w-0 flex-1/.test(tela))
+  ok('e a linha inteira nunca comanda — clicar para olhar não assume trabalho',
+    /<tr\s[\s\S]{0,40}onClick=\{aoSelecionar\}/.test(tela) && !/<tr\s[\s\S]{0,80}onClick=\{aoExecutar\}/.test(tela))
   // UM ESTADO, UM NOME. O cartão dizia "Não iniciada", o filtro logo acima dizia
   // "A fazer" e a Central dizia "A fazer" — sobre a mesma tarefa.
   ok('o vocabulário de estado é o MESMO da Central e do filtro',

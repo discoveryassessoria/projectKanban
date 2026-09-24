@@ -67,18 +67,20 @@ export function urlOperacionalDoProcesso(processoId: number): string {
  * `urlOperacionalDaTarefa` leva ao Kanban DO PROCESSO — certo para uma
  * certidão (pessoa/documento/passo), sem sentido para "distribuir 15 tarefas
  * sem responsável" (essa obrigação não tem pessoa nem documento). O lugar
- * onde essa obrigação se executa é a ferramenta CANÔNICA de distribuição —
- * Tarefas e Projetos, Lista, "Sem responsável" (`visao-global.tsx`) — já no
- * contexto desta família, nunca uma tela genérica que o usuário precise
- * procurar por dentro.
+ * onde essa obrigação se executa é a tela PRÓPRIA de Distribuição
+ * (`distribuicao-tarefas.tsx`, mandato 24/09/2026) — já no contexto desta
+ * família (deep-link `?processo=`), nunca uma tela genérica que o usuário
+ * precise procurar por dentro.
  *
- * Decisão 24/09/2026: distribuir é gestão de TODA a operação da empresa —
- * pertence a Tarefas e Projetos, não a Operação (que é só a fila PESSOAL de
- * quem está logado). `Operação → Distribuição` foi removida.
+ * Decisão 24/09/2026 (revista): Distribuição é tela PRÓPRIA sob Operação
+ * (`/operacao/distribuicao`) — não a mesma superfície de Tarefas e Projetos
+ * (que continua sendo a visão gerencial ampla: prazos, atrasos, conclusões de
+ * toda a operação). As duas leem a MESMA Tarefa canônica; só a apresentação é
+ * dedicada.
  */
 export function urlDistribuicaoDoProcesso(processoId: number): string {
-  const p = new URLSearchParams({ semResponsavel: '1', processo: String(processoId), modo: 'lista' })
-  return `/tarefas?${p.toString()}`
+  const p = new URLSearchParams({ processo: String(processoId) })
+  return `/operacao/distribuicao?${p.toString()}`
 }
 
 /**

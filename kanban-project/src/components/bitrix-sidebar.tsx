@@ -16,6 +16,7 @@ import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
+import { CalendarGridIcon } from "@/src/components/icons/calendar-grid-icon"
 import { DollarIcon } from "@/src/components/icons/dollar-icon"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ManagementIcon } from "@/src/components/icons/management-icon"
@@ -60,6 +61,17 @@ const menuItems = [
     iconOffset: "",
     permissao: "tarefas.editar",
     soAdmin: true,
+  },
+  {
+    // CALENDÁRIO — agendamentos consulares (mandato 24/09/2026). Item PRÓPRIO,
+    // ícone distinto de Eventos: são telas diferentes, nunca a mesma rota
+    // renomeada — só o desenho por enquanto, sem fonte de dado ligada ainda.
+    title: "Calendário",
+    url: "/calendario",
+    icon: CalendarGridIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "tarefas.ver",
   },
   {
     title: "Eventos",

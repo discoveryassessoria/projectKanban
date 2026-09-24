@@ -144,7 +144,7 @@ async function main() {
   ok('§9) e a visão global não monta executor', !/StepEditorRouter/.test(tela))
   ok('§9) e não existe um segundo modal de tarefa aqui',
     !/function\s+\w*Modal(Tarefa|Detalhe)/.test(codigoTela))
-  const central = ler('src/components/operacao/central-tarefas.tsx')
+  const central = ler('src/components/operacao/minha-operacao.tsx')
   ok('§10) a Central passou a IMPORTAR o kit em vez de ter cópia própria',
     /from "\.\/kit-operacional"/.test(central) && !/function SeletorResponsavel\(/.test(central))
 

@@ -4,7 +4,7 @@
 //
 // Mesmo shell das demais telas (fundo + HeaderBar + main), mesmo contrato de
 // hidratação e mesmo porteiro por PERMISSÃO. O conteúdo vive em
-// src/components/operacao/central-tarefas.tsx.
+// src/components/operacao/minha-operacao.tsx.
 //
 // Superfície NOVA: nasce sobre a Tarefa canônica. A árvore de subtarefas que
 // existia antes (`tarefaPaiId`) foi removida do schema — a execução se desdobra
@@ -53,10 +53,9 @@ function OperacaoPageConteudo() {
   const user = userSalvo ?? { nome: "Usuário" }
 
   // Operação é a fila PESSOAL de quem está logado — só isso. Distribuir é
-  // gestão de TODA a operação da empresa, e mora em Tarefas e Projetos
-  // (decisão 24/09/2026, explícita do usuário). A aba "Distribuição" que
-  // vivia aqui foi removida; `CentralTarefas`/`urlDistribuicaoDoProcesso`
-  // agora apontam pra lá.
+  // gestão de TODA a operação da empresa: tem tela PRÓPRIA em
+  // `/operacao/distribuicao` (mandato 24/09/2026), aberta a partir do cartão
+  // de obrigação administrativa acima — nunca uma aba misturada aqui dentro.
   const autorizado = pode("tarefas.ver")
 
   useEffect(() => {

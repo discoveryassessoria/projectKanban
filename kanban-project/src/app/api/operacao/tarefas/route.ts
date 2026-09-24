@@ -16,7 +16,7 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { minhaFila, semResponsavel, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
+import { minhaFila, semResponsavel, concluidasHojeDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 
 /**
  * OS FILTROS DA QUERY STRING → `FiltrosGerenciais` — SERVER-SIDE, antes da
@@ -71,5 +71,11 @@ export async function GET(request: NextRequest) {
     const linhas = await minhaFila(usuario.userId, agora, undefined, filtrosDaQuery(request.nextUrl.searchParams))
     return NextResponse.json({ visao, total: linhas.length, linhas })
   }
-  return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel'] }, { status: 400 })
+  // KPI "Concluídas hoje" de Minha Operação — `minhaFila` exclui CONCLUIDA de
+  // propósito, então este é o recorte OPOSTO, sempre do usuário do TOKEN.
+  if (visao === 'concluidas_hoje') {
+    const linhas = await concluidasHojeDoUsuario(usuario.userId, agora)
+    return NextResponse.json({ visao, total: linhas.length, linhas })
+  }
+  return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel', 'concluidas_hoje'] }, { status: 400 })
 }
