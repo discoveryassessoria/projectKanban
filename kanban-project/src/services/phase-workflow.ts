@@ -33,7 +33,7 @@ import { planejarMaterializacao, cardinalidadeEfetiva, type ContextoEscopo, type
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
-import type { PassoCongelado } from "@/src/services/versao-publicada"
+import type { PassoCongelado, SubtarefaCongelada } from "@/src/services/versao-publicada"
 import { supersederPasso } from "@/src/services/task-step-sync"
 
 export type OrigemInstanciaStr = "MOTOR" | "MANUAL" | "MIGRACAO" | "REABERTURA"
@@ -878,6 +878,23 @@ function semSubtarefasNemSla(p: PassoCongelado): Omit<PassoCongelado, "subtarefa
   return resto
 }
 
+/**
+ * `executorKey` só escolhe QUAL EDITOR renderiza a subtarefa — nunca grava,
+ * apaga nem reinterpreta um dado já registrado (ver `subtarefasDaEtapa`: a
+ * definição é lida ao vivo pela versão do passo a cada render; trocar o
+ * executor não reescreve `SubtaskExecution` nenhuma). Por isso é tratado
+ * como campo SEGURO (mesmo grupo do `slaDays` acima) — mudar só ele nunca
+ * é "conflito com trabalho já executado" (regra 23/09/2026: fase atual
+ * recebe mudança segura automaticamente; só conflito real de dado bloqueia).
+ * Achado real 23/09/2026: comparar a subtarefa inteira travava o cadastro
+ * dos 4 editores especializados de "Solicitar certidão" no único processo
+ * real em andamento, mesmo sem overwrite nenhum de dado.
+ */
+function semExecutorKey(s: SubtarefaCongelada): Omit<SubtarefaCongelada, "executorKey"> {
+  const { executorKey: _executorKey, ...resto } = s
+  return resto
+}
+
 interface MudancaDeSla {
   stepInstanceId: number
   stepKey: string
@@ -1040,6 +1057,10 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   const passosAlterados: PassoAlterado[] = []
   const passosRemovidos: { stepInstanceId: number; stepKey: string }[] = []
   const subtarefasRetiradas: SubtarefaRetirada[] = []
+  // Só o ponteiro `PhaseWorkflowInstance.workflowVersion` precisa avançar —
+  // a definição em si é lida ao vivo pela versão a cada render
+  // (`definicaoHistoricaDoPasso`), nunca duplicada por subtarefa.
+  let algumExecutorKeyMudou = false
 
   for (const [key, mat] of materializadoPorChave) {
     const antes = versaoAntiga.passos.find((p) => p.key === key)
@@ -1083,8 +1104,10 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
         } else {
           subtarefasRetiradas.push({ stepInstanceId: mat.id, stepKey: key, subtaskKey: sk })
         }
-      } else if (JSON.stringify(sAntes) !== JSON.stringify(sDepois) && tocadaAqui) {
+      } else if (JSON.stringify(semExecutorKey(sAntes)) !== JSON.stringify(semExecutorKey(sDepois)) && tocadaAqui) {
         conflitos.push({ stepKey: key, subtaskKey: sk, campo: "subtarefa", detalhe: `A subtarefa "${sk}" do passo "${key}" mudou de definição na versão ${workflow.versao}, mas já tem execução registrada — a reconciliação automática não altera subtarefa em andamento.` })
+      } else if (sAntes.executorKey !== sDepois.executorKey) {
+        algumExecutorKeyMudou = true
       }
     }
 
@@ -1130,7 +1153,8 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
   const instantiatedAt = new Date().toISOString()
 
   const houveAlgumaMudanca =
-    passosAlterados.length > 0 || passosRemovidos.length > 0 || subtarefasRetiradas.length > 0 || slaMudancas.length > 0
+    passosAlterados.length > 0 || passosRemovidos.length > 0 || subtarefasRetiradas.length > 0 ||
+    slaMudancas.length > 0 || algumExecutorKeyMudou
 
   const resultado = await prisma.$transaction(async (tx) => {
     const r = await materializarAlvos(

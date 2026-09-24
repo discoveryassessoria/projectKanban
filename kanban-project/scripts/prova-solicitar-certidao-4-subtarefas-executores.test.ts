@@ -18,9 +18,12 @@
 //      passo → redirecionado à subtarefa corrente) — nunca fecha o passo.
 //   5) subtarefa 4 (a última) conclui e SÓ AÍ o passo fecha de verdade.
 //   7) o prazo ÚNICO da Tarefa nunca mudou em nenhum passo do caminho.
-//   8) reconciliação de uma Tarefa JÁ MATERIALIZADA: mudar o cadastro
-//      depois que as subtarefas já têm execução registrada gera CONFLITO —
-//      nunca aplica pela metade.
+//   8) reconciliação de uma Tarefa JÁ MATERIALIZADA: mudar CONTEÚDO real
+//      (descrição) depois que as subtarefas já têm execução registrada
+//      gera CONFLITO — nunca aplica pela metade.
+//   9) reconciliação: mudar SÓ o executorKey (qual editor renderiza, nunca
+//      dado gravado) de uma subtarefa já tocada é SEGURO — aplica, não é
+//      conflito (fase atual recebe a mudança segura, como pedido).
 // ============================================================================
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 exigirBancoDeTeste("prova-solicitar-certidao-4-subtarefas-executores.test.ts")
@@ -270,6 +273,42 @@ async function main() {
   check("8.2) reconciliação recusa aplicar (conflito, não silêncio)", rRecon.success === true && rRecon.aplicado === false && rRecon.motivo === "CONFLITO_DADOS_EXISTENTES", rRecon)
   const tarefaP2Depois = await prisma.tarefa.findUniqueOrThrow({ where: { id: p2.tarefaId }, select: { dataPrazo: true, concluida: true } })
   check("8.3) a Tarefa dessa segunda instância continua intacta (prazo/estado preservados)", tarefaP2Depois.dataPrazo?.getTime() === p2.prazoOriginal?.getTime() && tarefaP2Depois.concluida === false, tarefaP2Depois)
+
+  // ══════════════════════════════════════════════════════════════════════
+  console.log("\n9) RECONCILIAÇÃO — mudar SÓ o executorKey de uma subtarefa já tocada é SEGURO e aplica (fase atual recebe a mudança, não é conflito)")
+  // ══════════════════════════════════════════════════════════════════════
+  // Esclarecimento do usuário (23/09/2026): "fase atual ou futura → aplica
+  // a mudança segura; só fase ULTRAPASSADA não muda". `executorKey` só
+  // escolhe qual editor renderiza — nunca sobrescreve dado já gravado — por
+  // isso não pode travar como o item 8 (que muda `descricao`, conteúdo real).
+  //
+  // Limpa o workflow do item 8 primeiro: dois workflows "solo" na MESMA
+  // FASE_RECON confundem `resolverWorkflowAplicavel` (WORKFLOW_MUDOU_DE_IDENTIDADE)
+  // — cada item precisa da fase com um único workflow aplicável, como no cadastro real.
+  await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: p2.proc.id } })
+  await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: p2.proc.id } })
+  await prisma.subtaskExecution.deleteMany({ where: { stepInstance: { processoId: p2.proc.id } } })
+  await prisma.tarefa.deleteMany({ where: { processoId: p2.proc.id } })
+  await prisma.phaseInternalWorkflowVersao.deleteMany({ where: { workflowId: p2.wf.id } })
+  await prisma.phaseInternalWorkflowStep.deleteMany({ where: { workflowId: p2.wf.id } })
+  await prisma.phaseInternalWorkflow.delete({ where: { id: p2.wf.id } })
+
+  const p3 = await palco(FASE_RECON)
+  await materializarSubtarefas({ stepInstanceId: p3.stepInstanceId })
+  await prisma.stepSubtaskDefinition.updateMany({
+    where: { stepId: p3.passo.id, key: "enviar_requerimento_cartorio" },
+    data: { executorKey: "solicitacao_cartorio_v2" },
+  })
+  const pub3 = await publicarNovaVersao(p3.wf.id)
+  await congelarVersaoVigente(p3.wf.id, "PUBLICACAO")
+  check("9.1) uma versão nova foi publicada e congelada (2)", pub3.nova === 2, pub3)
+
+  const rRecon3 = await reconciliarNovaVersaoNaInstanciaAtual({ processoId: p3.proc.id, faseMacroKey: FASE_RECON })
+  check("9.2) reconciliação APLICA (não é conflito — só executorKey mudou)", rRecon3.success === true && rRecon3.aplicado === true, rRecon3)
+  const instP3Depois = await prisma.phaseWorkflowInstance.findUniqueOrThrow({ where: { id: p3.inst.id }, select: { workflowVersion: true } })
+  check("9.3) o ponteiro de versão da instância avançou para a nova versão", instP3Depois.workflowVersion === 2, instP3Depois)
+  const tarefaP3Depois = await prisma.tarefa.findUniqueOrThrow({ where: { id: p3.tarefaId }, select: { dataPrazo: true, concluida: true } })
+  check("9.4) nenhum dado da Tarefa foi tocado (prazo/estado preservados — só o executor mudou)", tarefaP3Depois.dataPrazo?.getTime() === p3.prazoOriginal?.getTime() && tarefaP3Depois.concluida === false, tarefaP3Depois)
 
   await prisma.catalogoFase.delete({ where: { phaseKey: FASE_RECON } }).catch(() => null)
 
