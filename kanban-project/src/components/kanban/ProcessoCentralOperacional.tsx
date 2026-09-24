@@ -18,6 +18,7 @@ import { PainelDaFase, type FaseKpi } from "./PainelDaFase"
 // workflow do documento → passos). Vem pronta do backend; a tela não reagrupa.
 import type { DocumentoDoIndice, IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import { ProcessoAnalise } from "./ProcessoAnalise"
+import { ResumoFaseDocumental } from "./ResumoFaseDocumental"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
 import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { PedidosDeRetificacao } from "./PedidosDeRetificacao"
@@ -992,6 +993,14 @@ export function ProcessoCentralOperacional({
   // (.../traducao/etapas, .../apostilamento/etapas) continuam existindo s\u00f3
   // para recusar com mensagem clara (`recusarSeCanonicoAssumiu`), nunca mais
   // para conduzir.
+  //
+  // O painel de KPIs abaixo (`ResumoFaseDocumental`) é ADITIVO — some, o corpo
+  // genérico continua completo sozinho — nunca um branch concorrente.
+  const faseNormParaResumo = faseAtualNome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  const stepKeyDocumentalComResumo: "traducao_juramentada" | "apostilamento" | null =
+    faseNormParaResumo.includes("traducao juramentada") ? "traducao_juramentada"
+      : faseNormParaResumo.includes("apostilamento") ? "apostilamento"
+        : null
 
   const ehFaseFinal = ["aguardando protocolo", "protocolado", "finalizado"].some((nome) =>
     faseAtualNome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(nome)
@@ -1166,6 +1175,9 @@ export function ProcessoCentralOperacional({
 
         {/* ===== Central Operacional (largura cheia, sem sidebar) ===== */}
         <div className="min-w-0">
+          {!isView && stepKeyDocumentalComResumo && (
+            <ResumoFaseDocumental processoId={processo.id} stepKey={stepKeyDocumentalComResumo} />
+          )}
           <PainelDaFase
             faseNome={faseAtualNome}
             faseSub={bodyData.genealogiaReestruturacao ? "" : meta.sub}
