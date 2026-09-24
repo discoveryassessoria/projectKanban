@@ -18,9 +18,7 @@ import { PainelDaFase, type FaseKpi } from "./PainelDaFase"
 // workflow do documento → passos). Vem pronta do backend; a tela não reagrupa.
 import type { DocumentoDoIndice, IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import { ProcessoAnalise } from "./ProcessoAnalise"
-import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
-import { ProcessoApostilamento } from "./ProcessoApostilamento"
 import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { PedidosDeRetificacao } from "./PedidosDeRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
@@ -983,13 +981,17 @@ export function ProcessoCentralOperacional({
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
     .includes("analise documental")
 
-  const ehTraducao = faseAtualNome
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    .includes("traducao juramentada")
-
-  const ehApostilamento = faseAtualNome
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
-    .includes("apostilamento")
+  // TRADU\u00c7\u00c3O JURAMENTADA e APOSTILAMENTO n\u00e3o t\u00eam mais tela bespoke pr\u00f3pria
+  // (migra\u00e7\u00e3o 24/09/2026): as duas passaram a ser conduzidas pelo Workflow
+  // Interno \u2014 `CatalogoFase.conduzidaPeloWorkflowInterno = true`, Biblioteca
+  // publicada e vinculada (4 subtarefas: preparar/enviar/receber-com-espera-
+  // externa/conferir-e-validar documentos), exatamente como `emissao_documental`
+  // ("Solicitar certid\u00e3o") j\u00e1 fazia. Sem branch aqui, as duas caem sozinhas no
+  // corpo GEN\u00c9RICO da Central (mesmo caminho de emissao_documental), que j\u00e1
+  // sabe renderizar passo com subtarefas. As rotas bespoke antigas
+  // (.../traducao/etapas, .../apostilamento/etapas) continuam existindo s\u00f3
+  // para recusar com mensagem clara (`recusarSeCanonicoAssumiu`), nunca mais
+  // para conduzir.
 
   const ehFaseFinal = ["aguardando protocolo", "protocolado", "finalizado"].some((nome) =>
     faseAtualNome.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(nome)
@@ -999,8 +1001,6 @@ export function ProcessoCentralOperacional({
   const FASE_CODE_POR_NOME: Record<string, FaseCode> = {
     "retificacao de registros": "RETIFICACAO_REGISTROS",
     "emissao documental retificada": "EMISSAO_DOCUMENTAL_RETIFICADA",
-    "traducao juramentada": "TRADUCAO_JURAMENTADA",
-    "apostilamento": "APOSTILAMENTO",
     "aguardando protocolo": "AGUARDANDO_PROTOCOLO",
     "protocolado": "PROTOCOLADO",
     "finalizado": "FINALIZADO",
@@ -1113,10 +1113,6 @@ export function ProcessoCentralOperacional({
             : <div className="flex items-center justify-center py-16 text-[var(--text-muted)]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !isView && ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
-        ) : !isView && ehTraducao ? (
-          <ProcessoTraducao processoId={processo.id} onConcluido={() => carregar(true)} />
-        ) : !isView && ehApostilamento ? (
-          <ProcessoApostilamento processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehRetificacao ? (
           // A TELA ANTERIOR SAIU. A Retificação é conduzida pelo Workflow Interno
           // desde 24/08/2026 (v2, seis passos com cadastro, cardinalidade por pedido),
