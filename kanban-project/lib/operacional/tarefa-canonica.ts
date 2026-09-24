@@ -208,8 +208,25 @@ export async function materializarTarefaOperacional(
 ): Promise<ResultadoMaterializacao> {
   const { chave, unidade } = await identidadeDaUnidade(tx, nova)
 
-  const existente = await tx.tarefa.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
-  if (existente) return { tarefaId: existente.id, criada: false, motivo: 'já existia' }
+  const existente = await tx.tarefa.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true, statusTarefa: true, motivoCodigo: true, dataInicio: true } })
+  if (existente) {
+    // REVIVE em vez de reaproveitar como se estivesse ativa: esta tarefa só
+    // foi cancelada porque a CAUSA (a necessidade) foi dispensada por este
+    // reconciliador (`motivoCodigo: CAUSA_REMOVIDA`, nunca iniciada) — e a
+    // causa voltou a existir agora, senão `materializarTarefaOperacional` nem
+    // teria sido chamado para esta chave. Sem isto a tarefa ficava CANCELADA
+    // pra sempre, invisível pra fila, enquanto a necessidade dizia PENDENTE
+    // (achado real 24/09/2026: Isonia/Atahualpa, processo Cibils — cônjuge
+    // reativado na árvore, certidão nunca reaparecia pra ninguém assumir).
+    if (existente.statusTarefa === 'CANCELADA' && existente.motivoCodigo === 'CAUSA_REMOVIDA' && existente.dataInicio == null) {
+      await tx.tarefa.update({
+        where: { id: existente.id },
+        data: { statusTarefa: 'NAO_INICIADA', motivoCodigo: null, dataConclusao: null, causaRemovidaEm: null },
+      })
+      return { tarefaId: existente.id, criada: false, motivo: 'revivida (causa voltou a valer)' }
+    }
+    return { tarefaId: existente.id, criada: false, motivo: 'já existia' }
+  }
 
   // E PELA OBRIGAÇÃO, não só pela chave: a tarefa que já existe pode ter sido
   // gravada num formato anterior, ou por um escritor que conhecia a unidade

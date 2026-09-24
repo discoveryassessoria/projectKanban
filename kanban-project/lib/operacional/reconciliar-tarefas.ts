@@ -87,7 +87,7 @@ export async function reconciliarTarefas(
     where: { status: 'ATIVO', ...(opts.processoId ? { processoId: opts.processoId } : {}) },
     select: {
       id: true, processoId: true, faseMacroKey: true, ciclo: true,
-      tarefas: { select: { id: true, necessidadeId: true, documentoId: true } },
+      tarefas: { select: { id: true, necessidadeId: true, documentoId: true, statusTarefa: true, workflowStepInstanceId: true } },
       steps: {
         select: {
           id: true, status: true, obrigatorio: true, ordem: true, stepKey: true, papel: true,
@@ -130,9 +130,22 @@ export async function reconciliarTarefas(
 
     // Tarefas que JÁ existem nesta instância sincronizam; o resto vira unidade
     // nova. A comparação é por obrigação, não por instância.
-    const jaTem = new Set(
-      inst.tarefas.map((t) => (t.necessidadeId != null ? `nec${t.necessidadeId}` : t.documentoId != null ? `doc${t.documentoId}` : '')),
-    )
+    //
+    // TERMINAL não conta como "já tem" — a menos que esteja ancorada num
+    // passo AINDA VIVO da própria obrigação. Uma necessidade dispensada e
+    // depois reativada cancela o passo antigo e materializa um passo novo
+    // (mesma instância, StepInstance diferente); sem este filtro a tarefa
+    // cancelada do passo antigo bloqueava para sempre a tarefa do passo novo
+    // — a exigência voltava a valer, mas ninguém via o trabalho na fila
+    // (achado real 24/09/2026: Isonia/Atahualpa, processo Cibils).
+    const jaTem = new Set<string>()
+    for (const t of inst.tarefas) {
+      const chave = t.necessidadeId != null ? `nec${t.necessidadeId}` : t.documentoId != null ? `doc${t.documentoId}` : ''
+      if (!chave) continue
+      const terminal = STATUS_TERMINAIS.includes(t.statusTarefa)
+      const idsVivosDoGrupo = new Set((grupos.get(chave) ?? []).map((s) => s.id))
+      if (!terminal || idsVivosDoGrupo.has(t.workflowStepInstanceId ?? -1)) jaTem.add(chave)
+    }
     for (const t of inst.tarefas) {
       if (!dryRun) {
         const r = await prisma.$transaction((tx) => sincronizarTarefaComWorkflow(tx, t.id, agora))

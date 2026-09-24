@@ -70,6 +70,17 @@ function OperacaoPageConteudo() {
     paramsIniciais.get("aba") === "distribuicao" ? "distribuicao" : "minha_operacao",
   )
 
+  // DEEP-LINK REATIVO: o `useState` acima só lê a URL no PRIMEIRO mount. Quem
+  // clica em "Distribuir tarefas" de dentro de Minha Operação já aberta
+  // (`/operacao` → `/operacao?aba=distribuicao&processo=N`) navega para a
+  // MESMA rota — o componente não remonta, o `useState` não reavalia, e a
+  // aba fica presa em "Minha Operação" mesmo com a URL certa. Parecia um
+  // clique morto (achado real 24/09/2026). `useSearchParams()` muda de
+  // identidade a cada navegação, mesmo sem remount — é o sinal certo.
+  useEffect(() => {
+    if (paramsIniciais.get("aba") === "distribuicao") setAba("distribuicao")
+  }, [paramsIniciais])
+
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/")
   }, [mounted, carregando, autorizado, router])

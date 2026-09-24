@@ -221,8 +221,16 @@ export async function garantirTarefaDePasso(
       const jaEncerrada =
         porChave != null
         && TERMINAIS_DA_UNIDADE.includes(porChave.statusTarefa as (typeof TERMINAIS_DA_UNIDADE)[number])
-      if (jaEncerrada && porChave!.workflowInstanceId === step.workflowInstanceId) {
-        // Mesmo roteiro: é a mesma execução, e ela terminou.
+      // MESMO ROTEIRO não basta — precisa ser o MESMO PASSO. Uma necessidade
+      // dispensada e depois reativada (achado real 24/09/2026: Isonia/Atahualpa,
+      // processo Cibils) cancela o passo antigo e materializa um passo NOVO —
+      // mesma workflowInstance, StepInstance diferente. Sem o segundo `&&`, a
+      // tarefa cancelada do passo antigo era devolvida como se fosse a
+      // pendência do passo novo: a exigência voltava a valer, mas a tarefa
+      // continuava cancelada e invisível pra fila — a certidão nunca aparecia
+      // pra ninguém assumir.
+      if (jaEncerrada && porChave!.workflowInstanceId === step.workflowInstanceId && porChave!.workflowStepInstanceId === step.id) {
+        // Mesmo passo, mesma execução: é a mesma tentativa, e ela terminou.
         return { success: true, created: false, tarefa: porChave!, warnings, correlationId }
       }
       const chaveDaExecucao = jaEncerrada
