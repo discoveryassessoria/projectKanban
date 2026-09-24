@@ -132,6 +132,14 @@ export function acaoPrincipal(l: LinhaOperacional): { rotulo: string; comando: "
 type Visao = "minha_fila" | "sem_responsavel"
 type Modo = "agrupada" | "lista" | "calendario"
 
+/** Só os campos que este painel lê de `GET /api/operacao/capacidade` — o resto (aptidões, indisponibilidade…) é do módulo de Usuários. */
+interface CapacidadeLinha {
+  usuarioId: number
+  nome: string
+  podeExecutar: boolean
+  carga: { ativas: number; executaveis: number; atrasadas: number }
+}
+
 /**
  * UMA LINHA = UMA TAREFA.
  *
@@ -205,6 +213,123 @@ function Linha({
           </div>
         </div>
         {acao}
+      </div>
+    </div>
+  )
+}
+
+/** O ladrilho de KPI do topo — mesma linguagem visual dos cartões da Central Operacional. */
+function LadrilhoKpi({ rotulo, valor, tom }: { rotulo: string; valor: number | null; tom: "neutro" | "alerta" | "critico" | "ok" }) {
+  const cor =
+    tom === "critico" ? "text-red-700/90"
+    : tom === "alerta" ? "text-amber-800/90"
+    : tom === "ok" ? "text-[var(--success)]"
+    : "text-white/90"
+  return (
+    <div className="rounded-lg border border-white/[0.08] bg-[var(--surface-primary)] px-3 py-2.5">
+      <div className={`text-[20px] font-semibold tabular-nums ${cor}`}>{valor ?? "—"}</div>
+      <div className="mt-0.5 text-[10.5px] text-[var(--text-muted)]">{rotulo}</div>
+    </div>
+  )
+}
+
+/**
+ * ATRIBUIÇÃO EM MASSA — painel lateral, sempre visível enquanto há seleção.
+ * Mesma porta de sempre (`atribuirLote` → `/api/tarefas/redistribuir`); o que
+ * muda aqui é só o gesto: escolher o responsável sem abrir modal por cima da
+ * lista, com a lista continuando visível ao lado.
+ */
+function PainelAtribuicaoEmMassa({
+  quantidade, ocupado, erro, aoLimpar, aoAtribuir,
+}: {
+  quantidade: number
+  ocupado: boolean
+  erro: string | null
+  aoLimpar: () => void
+  aoAtribuir: (responsavelId: number, prioridadeAlta: boolean) => void
+}) {
+  const [resultado, setResultado] = useState<{ id: number; nome: string }[] | null>(null)
+  const [responsavelId, setResponsavelId] = useState<number | "">("")
+  const [prioridadeAlta, setPrioridadeAlta] = useState(false)
+
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/operacao/atribuiveis", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { funcionarios?: { id: number; nome: string }[] }) => { if (vivo) setResultado(d.funcionarios ?? []) })
+      .catch(() => { if (vivo) setResultado([]) })
+    return () => { vivo = false }
+  }, [])
+
+  return (
+    <div className="rounded-lg border border-[var(--action-primary)]/40 bg-[var(--surface-primary)] p-3.5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[12.5px] font-semibold text-white/90">Atribuição em massa</h3>
+        <button onClick={aoLimpar} className="text-[11px] text-[var(--text-muted)] hover:text-white/75">Limpar</button>
+      </div>
+      <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
+        {quantidade} tarefa{quantidade === 1 ? "" : "s"} selecionada{quantidade === 1 ? "" : "s"}.
+      </p>
+
+      {erro && <div className="mt-2 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[11px] text-red-700/90">{erro}</div>}
+
+      <label className="mt-3 block text-[11px] font-medium text-[var(--text-secondary)]">Responsável</label>
+      <select
+        value={responsavelId}
+        onChange={(e) => setResponsavelId(e.target.value ? Number(e.target.value) : "")}
+        className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-white/85"
+      >
+        <option value="">Selecione…</option>
+        {resultado?.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+      </select>
+
+      <label className="mt-3 flex items-center gap-2 text-[11px] text-white/80">
+        <input type="checkbox" checked={prioridadeAlta} onChange={(e) => setPrioridadeAlta(e.target.checked)} className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
+        Definir como prioridade alta
+      </label>
+
+      <button
+        disabled={ocupado || responsavelId === ""}
+        onClick={() => responsavelId !== "" && aoAtribuir(responsavelId, prioridadeAlta)}
+        className="mt-3 w-full rounded border border-[var(--action-primary)] bg-[var(--action-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90 disabled:opacity-40"
+      >
+        {ocupado ? "Atribuindo…" : "Atribuir selecionadas"}
+      </button>
+    </div>
+  )
+}
+
+/**
+ * CAPACIDADE DA EQUIPE — quem pode receber mais trabalho agora, na MESMA
+ * conta que Usuários e Acessos › Capacidade Operacional já usa. Sem essa
+ * consulta o painel simplesmente não aparece — nunca um número inventado.
+ */
+function PainelCapacidadeEquipe({ linhas }: { linhas: CapacidadeLinha[] | null }) {
+  if (linhas == null) return null
+  const executores = linhas.filter((l) => l.podeExecutar).sort((a, b) => b.carga.ativas - a.carga.ativas)
+  if (executores.length === 0) return null
+  const maiorCarga = Math.max(1, ...executores.map((l) => l.carga.ativas))
+  return (
+    <div className="rounded-lg border border-white/[0.08] bg-[var(--surface-primary)] p-3.5">
+      <h3 className="text-[12.5px] font-semibold text-white/90">Distribuição por equipe</h3>
+      <div className="mt-2.5 flex flex-col gap-2.5">
+        {executores.map((f) => (
+          <div key={f.usuarioId} className="flex items-center gap-2">
+            <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[9.5px] font-semibold text-[var(--pessoa)]">
+              {iniciaisDe(f.nome)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[11px] text-white/85">{f.nome}</div>
+              <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+                <div
+                  className={`h-full rounded-full ${f.carga.atrasadas > 0 ? "bg-red-700/70" : "bg-[var(--action-primary)]"}`}
+                  style={{ width: `${Math.round((f.carga.ativas / maiorCarga) * 100)}%` }}
+                />
+              </div>
+            </div>
+            <span className="shrink-0 text-[10.5px] tabular-nums text-[var(--text-muted)]">{f.carga.ativas} ativa{f.carga.ativas === 1 ? "" : "s"}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -469,6 +594,22 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const falhou = !carregando && linhas == null
   const carregar = useCallback(() => setRecarga((n) => n + 1), [])
 
+  // CAPACIDADE DA EQUIPE — a MESMA leitura do módulo de Usuários e Acessos
+  // (Cadastro › Capacidade Operacional), nunca uma segunda contagem de carga.
+  // Só busca em "Sem responsável": é o painel que ajuda A DISTRIBUIR, não faz
+  // sentido em "Minha fila". `usuarios.gerenciar` pode faltar para um
+  // distribuidor não-admin — 403 vira "painel indisponível", nunca erro na tela.
+  const [capacidade, setCapacidade] = useState<CapacidadeLinha[] | null>(null)
+  useEffect(() => {
+    if (!podeDistribuir || visao !== "sem_responsavel") return
+    let vivo = true
+    fetch("/api/operacao/capacidade", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { linhas?: CapacidadeLinha[] }) => { if (vivo) setCapacidade(d.linhas ?? []) })
+      .catch(() => { if (vivo) setCapacidade(null) })
+    return () => { vivo = false }
+  }, [podeDistribuir, visao, recarga])
+
   // A AGRUPADA É UMA CONSULTA À PARTE — o mesmo resumo por família de Tarefas
   // e Projetos, recortado pela visão atual (minha fila / sem responsável). Só
   // busca quando a aba está aberta, e de novo a cada recarga ou troca de visão.
@@ -636,6 +777,26 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
     [visao, linhasFiltradas],
   )
 
+  /**
+   * OS KPIS DO TOPO — do MESMO `linhas` que a lista mostra, nunca uma segunda
+   * consulta. Cada número aqui tem de bater com o que dá pra contar rolando a
+   * lista — é por isso que não existe "atribuídas esta semana": essa conta
+   * pede tarefa JÁ atribuída, e "Sem responsável" por definição só traz quem
+   * não tem dono — inventar o número aqui seria a MESMA mentira que a régua
+   * de "Cancelada != Concluída" existe para evitar.
+   */
+  const kpis = useMemo(() => {
+    const base = linhas ?? []
+    const familias = new Set(base.map((l) => l.familiaNome ?? l.processoNome).filter(Boolean))
+    return {
+      semResponsavel: base.length,
+      familiasComPendencia: familias.size,
+      vencemEm3Dias: base.filter((l) => l.diasParaPrazo != null && l.diasParaPrazo >= 0 && l.diasParaPrazo <= 3).length,
+      atrasadas: base.filter((l) => l.atrasada).length,
+      membrosEquipe: capacidade?.filter((c) => c.podeExecutar).length ?? null,
+    }
+  }, [linhas, capacidade])
+
   // ── SELEÇÃO EM LOTE — só em "Sem responsável": nenhuma tarefa nova nasce
   // aqui, e a atribuição sai pela MESMA porta canônica de sempre
   // (`redistribuirTarefas`, item a item, auditada, notificação consolidada)
@@ -654,7 +815,6 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   })
   const alternarSelecaoTodas = () => setSelecionadas(todasSelecionadas ? new Set() : new Set(elegiveisParaLote.map((l) => l.taskId)))
 
-  const [loteResponsavelAberto, setLoteResponsavelAberto] = useState(false)
   const [loteOcupado, setLoteOcupado] = useState(false)
   const [loteAviso, setLoteAviso] = useState<string | null>(null)
 
@@ -666,23 +826,31 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
    * item, e o que falhar (ex.: alguém já atribuiu no meio do caminho) não
    * derruba as demais; a notificação final é UMA só para o destinatário).
    */
-  const atribuirLote = async (novoResponsavelId: number) => {
+  const atribuirLote = async (novoResponsavelId: number, prioridadeAlta?: boolean) => {
     if (selecionadas.size === 0) return
     setLoteOcupado(true)
     setLoteAviso(null)
     try {
+      const idsDoLote = [...selecionadas]
       const resp = await fetch("/api/tarefas/redistribuir", {
         method: "POST",
         headers: auth(),
         body: JSON.stringify({
-          tarefaIds: [...selecionadas],
+          tarefaIds: idsDoLote,
           novoResponsavelId,
           motivo: "Atribuição em lote — Operação → Distribuição",
         }),
       })
       const res: { total: number; sucesso: number; falha: number } = await resp.json()
+      // "PRIORIDADE ALTA" É AÇÃO REAL — passa pela MESMA porta de comando de
+      // sempre (`alterar_prioridade`), item a item, best-effort: uma tarefa que
+      // falhe aqui já foi atribuída (o essencial do lote), e não desfaz o resto.
+      if (prioridadeAlta) {
+        await Promise.all(idsDoLote.map((id) =>
+          fetch(`/api/tarefas/${id}/comando`, { method: "POST", headers: auth(), body: JSON.stringify({ acao: "alterar_prioridade", prioridade: "ALTA" }) }).catch(() => null),
+        ))
+      }
       setAviso(`${res.sucesso} de ${res.total} tarefa(s) atribuída(s).${res.falha > 0 ? ` ${res.falha} não puderam mudar — recarregue e confira.` : ""}`)
-      setLoteResponsavelAberto(false)
       setSelecionadas(new Set())
       carregar()
     } catch {
@@ -698,7 +866,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   ]
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
+    <div className={`mx-auto w-full ${visao === "sem_responsavel" ? "max-w-7xl" : "max-w-5xl"}`}>
       <div className="mb-3 flex items-end justify-between">
         <div className="flex gap-1">
           {abas.map((a) => (
@@ -736,6 +904,16 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           </div>
         </div>
       </div>
+
+      {visao === "sem_responsavel" && podeDistribuir && linhas != null && (
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          <LadrilhoKpi rotulo="Sem responsável" valor={kpis.semResponsavel} tom="neutro" />
+          <LadrilhoKpi rotulo="Famílias com pendências" valor={kpis.familiasComPendencia} tom="neutro" />
+          <LadrilhoKpi rotulo="Vencem em até 3 dias" valor={kpis.vencemEm3Dias} tom={kpis.vencemEm3Dias > 0 ? "alerta" : "neutro"} />
+          <LadrilhoKpi rotulo="Atrasadas" valor={kpis.atrasadas} tom={kpis.atrasadas > 0 ? "critico" : "neutro"} />
+          <LadrilhoKpi rotulo="Membros da equipe" valor={kpis.membrosEquipe} tom="ok" />
+        </div>
+      )}
 
       {drillDown && modo === "lista" && (
         <div className="mb-2 flex items-center gap-1.5 text-[11px]">
@@ -807,6 +985,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         </div>
       )}
 
+      <div className={visao === "sem_responsavel" && podeDistribuir ? "grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]" : ""}>
       <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-primary)]">
         {modo === "agrupada" && falhouFamilias && <Estado tipo="erro" mensagem="Não foi possível carregar o resumo." aoTentar={carregar} />}
         {modo === "agrupada" && carregandoFamilias && <Estado tipo="carregando" mensagem="Carregando o resumo…" />}
@@ -876,21 +1055,15 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
               <input type="checkbox" checked={todasSelecionadas} onChange={alternarSelecaoTodas} className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
               {selecionadas.size > 0 ? `${selecionadas.size} selecionada${selecionadas.size === 1 ? "" : "s"}` : `Selecionar todas (${elegiveisParaLote.length})`}
             </label>
+            {/* Atribuir sai só pelo painel "Atribuição em massa" na lateral — uma
+                porta só para o mesmo gesto, em vez de um botão aqui e outro lá. */}
             {selecionadas.size > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setSelecionadas(new Set())}
-                  className="text-[11px] text-[var(--text-muted)] transition-colors hover:text-white/75"
-                >
-                  Limpar seleção
-                </button>
-                <button
-                  onClick={() => { setLoteAviso(null); setLoteResponsavelAberto(true) }}
-                  className="rounded border border-[var(--action-primary)] bg-[var(--action-primary)] px-3 py-1.5 text-[11px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90"
-                >
-                  Atribuir responsável
-                </button>
-              </div>
+              <button
+                onClick={() => setSelecionadas(new Set())}
+                className="text-[11px] text-[var(--text-muted)] transition-colors hover:text-white/75"
+              >
+                Limpar seleção
+              </button>
             )}
           </div>
         )}
@@ -983,6 +1156,23 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         })}
       </div>
 
+      {visao === "sem_responsavel" && podeDistribuir && (
+        <aside className="lg:sticky lg:top-4 lg:self-start">
+          {selecionadas.size > 0 ? (
+            <PainelAtribuicaoEmMassa
+              quantidade={selecionadas.size}
+              ocupado={loteOcupado}
+              erro={loteAviso}
+              aoLimpar={() => setSelecionadas(new Set())}
+              aoAtribuir={(responsavelId, prioridadeAlta) => void atribuirLote(responsavelId, prioridadeAlta)}
+            />
+          ) : (
+            <PainelCapacidadeEquipe linhas={capacidade} />
+          )}
+        </aside>
+      )}
+      </div>
+
       {alvo && (
         <SeletorResponsavel
           titulo={alvo.responsavelId == null ? "Atribuir tarefa" : `Transferir de ${alvo.responsavelNome ?? "—"}`}
@@ -1002,16 +1192,6 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         />
       )}
 
-      {loteResponsavelAberto && (
-        <SeletorResponsavel
-          titulo={`Atribuir ${selecionadas.size} tarefa${selecionadas.size === 1 ? "" : "s"}`}
-          atual={null}
-          ocupado={loteOcupado}
-          erro={loteAviso}
-          aoFechar={() => { setLoteResponsavelAberto(false); setLoteAviso(null) }}
-          aoEscolher={(responsavelId) => void atribuirLote(responsavelId)}
-        />
-      )}
     </div>
   )
 }
