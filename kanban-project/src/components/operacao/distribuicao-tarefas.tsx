@@ -39,7 +39,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ClipboardList, History, Search, ChevronDown, ChevronRight, Folder,
-  MoreVertical, Download, SlidersHorizontal, X as XIcon, ChevronLeft,
+  MoreVertical, Download, SlidersHorizontal, X as XIcon, ChevronLeft, Users2, BarChart3,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -229,6 +229,217 @@ interface Filtros {
 }
 const SEM_FILTRO: Filtros = { busca: "", fase: null, tipo: null, prazo: "todos", status: null, responsavel: null }
 
+/**
+ * SUCESSÃO EM MASSA (D5, mandato "grandes fluxos operacionais", 24/09/2026)
+ * — quando alguém sai de férias/desliga, a carteira inteira precisa mudar de
+ * dono de uma vez, não tarefa por tarefa. Busca TODAS as tarefas abertas da
+ * origem (mesma leitura de `/api/operacao/visao-global`) e chama a MESMA
+ * porta canônica de lote (`/api/tarefas/redistribuir`) — nenhum motor novo.
+ */
+function PainelSucessao({ funcionarios, aoFechar, aoConcluido }: {
+  funcionarios: Funcionario[] | null
+  aoFechar: () => void
+  aoConcluido: () => void
+}) {
+  const [origemId, setOrigemId] = useState<number | "">("")
+  const [destinoId, setDestinoId] = useState<number | "">("")
+  const [ocupado, setOcupado] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [resultado, setResultado] = useState<{ sucesso: number; falha: number } | null>(null)
+
+  const executar = async () => {
+    if (!origemId || !destinoId) return
+    if (origemId === destinoId) { setErro("Origem e destino não podem ser a mesma pessoa."); return }
+    setOcupado(true)
+    setErro(null)
+    setResultado(null)
+    try {
+      const r = await fetch(`/api/operacao/visao-global?responsavel=${origemId}&porPagina=500`, { headers: auth() })
+      if (!r.ok) throw new Error(String(r.status))
+      const d: { linhas?: { taskId: number }[] } = await r.json()
+      const ids = (d.linhas ?? []).map((l) => l.taskId)
+      if (ids.length === 0) {
+        setErro("Esta pessoa não tem tarefas abertas — nada para redistribuir.")
+        setOcupado(false)
+        return
+      }
+      const r2 = await fetch("/api/tarefas/redistribuir", {
+        method: "POST", headers: auth(),
+        body: JSON.stringify({ tarefaIds: ids, novoResponsavelId: destinoId, motivo: "Sucessão em massa" }),
+      })
+      const d2: { sucesso: number; falha: number } = await r2.json()
+      if (!r2.ok && r2.status !== 207) throw new Error(String(r2.status))
+      setResultado({ sucesso: d2.sucesso, falha: d2.falha })
+      aoConcluido()
+    } catch {
+      setErro("Não foi possível concluir a sucessão agora.")
+    } finally {
+      setOcupado(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
+      <div className="w-full max-w-md overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
+        <div className="border-b border-[var(--border-subtle)] px-4 py-3">
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Sucessão em massa</h2>
+          <p className="mt-0.5 text-[11.5px] text-[var(--text-secondary)]">Move TODAS as tarefas abertas de uma pessoa para outra, de uma vez — férias, afastamento, desligamento.</p>
+        </div>
+        <div className="p-4">
+          {erro && <div className="mb-3 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[11px] text-[var(--danger-text)]">{erro}</div>}
+          {resultado && (
+            <div className="mb-3 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[11px] text-[var(--success-text)]">
+              {resultado.sucesso} tarefa{resultado.sucesso === 1 ? "" : "s"} movida{resultado.sucesso === 1 ? "" : "s"}{resultado.falha > 0 ? `, ${resultado.falha} falhou/falharam` : ""}.
+            </div>
+          )}
+          <label className="block text-[11px] font-medium text-[var(--text-secondary)]">De (sai de férias/desliga)</label>
+          <select
+            value={origemId}
+            onChange={(e) => setOrigemId(e.target.value ? Number(e.target.value) : "")}
+            className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)]"
+          >
+            <option value="">Selecione…</option>
+            {funcionarios?.map((f) => <option key={f.id} value={f.id}>{f.nome} ({f.tarefasAtivas} ativas)</option>)}
+          </select>
+          <label className="mt-3 block text-[11px] font-medium text-[var(--text-secondary)]">Para (recebe a carteira)</label>
+          <select
+            value={destinoId}
+            onChange={(e) => setDestinoId(e.target.value ? Number(e.target.value) : "")}
+            className="mt-1 w-full rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)]"
+          >
+            <option value="">Selecione…</option>
+            {funcionarios?.map((f) => <option key={f.id} value={f.id}>{f.nome} ({f.tarefasAtivas} ativas)</option>)}
+          </select>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-[var(--border-subtle)] px-4 py-2.5">
+          <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]">Fechar</button>
+          <button
+            disabled={ocupado || !origemId || !destinoId}
+            onClick={() => void executar()}
+            className="rounded bg-[var(--action-primary)] px-3 py-1.5 text-[11px] font-medium text-[var(--action-primary-ink)] disabled:opacity-40"
+          >
+            {ocupado ? "Movendo…" : "Mover toda a carteira"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface AnalyticsResposta {
+  periodoSemanas: number
+  throughputPorSemana: { semana: string; concluidas: number }[]
+  gargaloPorFase: { faseMacroKey: string; tempoMedioDias: number; quantidade: number }[]
+  performanceTerceiro: { terceiro: string; tempoMedioDias: number; quantidade: number }[]
+  capacidade: {
+    backlogAtual: number
+    mediaCriadasPorSemana: number
+    mediaConcluidasPorSemana: number
+    semanasParaZerarBacklog: number | null
+    tendenciaSaudavel: boolean
+  }
+}
+
+/**
+ * ANALYTICS OPERACIONAL (D1-D4, mandato "grandes fluxos operacionais",
+ * 24/09/2026) — a primeira vez que o sistema olha throughput, gargalo por
+ * etapa, performance de terceiro e capacidade, em vez de só fotografar o
+ * agora. Fonte única: `GET /api/operacao/analytics`.
+ */
+function PainelAnalytics({ aoFechar }: { aoFechar: () => void }) {
+  const [dado, setDado] = useState<AnalyticsResposta | null>(null)
+  const [falhou, setFalhou] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/operacao/analytics", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: AnalyticsResposta) => { if (vivo) setDado(d) })
+      .catch(() => { if (vivo) setFalhou(true) })
+    return () => { vivo = false }
+  }, [])
+  const maiorThroughput = Math.max(1, ...(dado?.throughputPorSemana.map((p) => p.concluidas) ?? [1]))
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-stretch justify-end bg-[var(--overlay-modal)]" onClick={aoFechar}>
+      <div className="flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+          <div>
+            <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Analytics da operação</h2>
+            <p className="text-[11px] text-[var(--text-secondary)]">Últimas {dado?.periodoSemanas ?? 8} semanas · operação inteira</p>
+          </div>
+          <button onClick={aoFechar} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"><XIcon className="h-4 w-4" /></button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar os analytics." />}
+          {!falhou && dado == null && <Estado tipo="carregando" mensagem="Carregando analytics…" />}
+          {dado && (
+            <>
+              <h3 className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Capacidade</h3>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-page)] px-3 py-2.5">
+                  <div className="text-[18px] font-semibold tabular-nums text-[var(--text-primary)]">{dado.capacidade.backlogAtual}</div>
+                  <div className="text-[10.5px] text-[var(--text-muted)]">Backlog aberto agora</div>
+                </div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-page)] px-3 py-2.5">
+                  <div className={`text-[18px] font-semibold tabular-nums ${dado.capacidade.tendenciaSaudavel ? "text-[var(--success-text)]" : "text-[var(--danger-text)]"}`}>
+                    {dado.capacidade.mediaConcluidasPorSemana}/{dado.capacidade.mediaCriadasPorSemana}
+                  </div>
+                  <div className="text-[10.5px] text-[var(--text-muted)]">Concluídas/criadas por semana</div>
+                </div>
+              </div>
+              <p className="mt-2 text-[12px] text-[var(--text-secondary)]">
+                {dado.capacidade.tendenciaSaudavel
+                  ? dado.capacidade.semanasParaZerarBacklog != null
+                    ? `No ritmo atual, o backlog zera em ~${dado.capacidade.semanasParaZerarBacklog} semanas.`
+                    : "A operação está fechando mais do que abrindo — backlog estável ou caindo."
+                  : "⚠ A operação está abrindo mais tarefas do que fecha — o backlog está crescendo, não só acumulando por acaso."}
+              </p>
+
+              <h3 className="mt-4 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Throughput por semana</h3>
+              <div className="mt-2 flex h-20 items-end gap-1">
+                {dado.throughputPorSemana.map((p) => (
+                  <div key={p.semana} className="flex flex-1 flex-col items-center gap-1" title={`${p.concluidas} na semana de ${dataCurta(p.semana)}`}>
+                    <div className={`w-full rounded-t ${p.concluidas > 0 ? "bg-[var(--action-primary)]" : "bg-[var(--border-subtle)]"}`} style={{ height: `${Math.max(2, (p.concluidas / maiorThroughput) * 64)}px` }} />
+                    <span className="text-[8px] text-[var(--text-muted)]">{p.semana.slice(5, 10)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="mt-4 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Gargalo por fase (tempo médio de ciclo)</h3>
+              {dado.gargaloPorFase.length === 0 && <p className="mt-2 text-[12px] text-[var(--text-muted)]">Sem dado suficiente no período.</p>}
+              <div className="mt-2 flex flex-col gap-1.5">
+                {dado.gargaloPorFase.map((f) => {
+                  const maior = Math.max(1, ...dado.gargaloPorFase.map((x) => x.tempoMedioDias))
+                  return (
+                    <div key={f.faseMacroKey} className="flex items-center gap-2">
+                      <span className="w-28 shrink-0 truncate text-[11px] text-[var(--text-secondary)]">{rotularFase(f.faseMacroKey) ?? f.faseMacroKey}</span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
+                        <div className="h-full rounded-full bg-[var(--warning)]" style={{ width: `${(f.tempoMedioDias / maior) * 100}%` }} />
+                      </div>
+                      <span className="w-16 shrink-0 text-right text-[11px] tabular-nums text-[var(--text-secondary)]">{f.tempoMedioDias}d ({f.quantidade})</span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <h3 className="mt-4 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Performance de terceiro (tempo médio de ciclo)</h3>
+              {dado.performanceTerceiro.length === 0 && <p className="mt-2 text-[12px] text-[var(--text-muted)]">Sem dado suficiente no período.</p>}
+              <div className="mt-2 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)]">
+                {dado.performanceTerceiro.map((t) => (
+                  <div key={t.terceiro} className="flex items-center justify-between px-3 py-1.5 text-[12px]">
+                    <span className="min-w-0 truncate text-[var(--text-primary)]">{t.terceiro}</span>
+                    <span className="shrink-0 tabular-nums text-[var(--text-secondary)]">{t.tempoMedioDias}d · {t.quantidade}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /** O painel de histórico — leitura pura de `LogAuditoria`, nunca uma tabela nova. */
 function PainelHistorico({ aoFechar }: { aoFechar: () => void }) {
   interface ItemHistorico {
@@ -331,6 +542,8 @@ export function DistribuicaoTarefas() {
   const [pagina, setPagina] = useState(1)
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set())
   const [historicoAberto, setHistoricoAberto] = useState(false)
+  const [sucessaoAberta, setSucessaoAberta] = useState(false)
+  const [analyticsAberto, setAnalyticsAberto] = useState(false)
 
   const opcoesFase = useMemo(() => {
     const vistos = new Map<string, string>()
@@ -492,6 +705,30 @@ export function DistribuicaoTarefas() {
     setRecarga((n) => n + 1)
   }
 
+  // D6 — exportação pronta pra auditoria/compliance: lê LogAuditoria de
+  // TODAS as tarefas do processo, formata CSV, baixa. Nenhum dado novo.
+  const exportarAuditoria = async (processoId: number, nomeFamilia: string) => {
+    try {
+      const r = await fetch(`/api/operacao/auditoria-processo?processoId=${processoId}`, { headers: auth() })
+      if (!r.ok) throw new Error(String(r.status))
+      const d: { itens: { quando: string; acao: string; entidade: string; entidadeId: number | null; descricao: string; autor: string }[] } = await r.json()
+      const cabecalho = ["Quando", "Ação", "Entidade", "ID", "Descrição", "Autor"]
+      const corpo = d.itens.map((i) => [
+        new Date(i.quando).toLocaleString("pt-BR"), i.acao, i.entidade, String(i.entidadeId ?? "—"), i.descricao, i.autor,
+      ].map((c) => csvEscapar(String(c))).join(","))
+      const csv = [cabecalho.join(","), ...corpo].join("\n")
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `auditoria-${nomeFamilia.toLowerCase().replace(/\s+/g, "-")}-processo-${processoId}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setLoteErro("Não foi possível exportar a auditoria agora.")
+    }
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--surface-page)]">
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
@@ -507,12 +744,26 @@ export function DistribuicaoTarefas() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setHistoricoAberto(true)}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-          >
-            <History className="h-3.5 w-3.5" /> Ver histórico de atribuições
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => setAnalyticsAberto(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <BarChart3 className="h-3.5 w-3.5" /> Analytics
+            </button>
+            <button
+              onClick={() => setSucessaoAberta(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <Users2 className="h-3.5 w-3.5" /> Sucessão em massa
+            </button>
+            <button
+              onClick={() => setHistoricoAberto(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <History className="h-3.5 w-3.5" /> Ver histórico de atribuições
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
@@ -720,6 +971,7 @@ export function DistribuicaoTarefas() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className={Z_POPOVER}>
                               <DropdownMenuItem onClick={() => router.push(`/kanban?processo=${g.processoId}`)}>Ver processo</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => void exportarAuditoria(g.processoId!, g.rotulo)}>Exportar auditoria (CSV)</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
@@ -965,6 +1217,16 @@ export function DistribuicaoTarefas() {
       )}
 
       {historicoAberto && <PainelHistorico aoFechar={() => setHistoricoAberto(false)} />}
+
+      {sucessaoAberta && (
+        <PainelSucessao
+          funcionarios={funcionarios}
+          aoFechar={() => setSucessaoAberta(false)}
+          aoConcluido={() => setRecarga((n) => n + 1)}
+        />
+      )}
+
+      {analyticsAberto && <PainelAnalytics aoFechar={() => setAnalyticsAberto(false)} />}
     </div>
   )
 }

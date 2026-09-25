@@ -25,16 +25,17 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Search, Play, CalendarClock, AlertTriangle, Clock3, Hourglass, CheckCircle2,
   SlidersHorizontal, X as XIcon, ArrowUpRight, UserPlus, MoreVertical, ClipboardCheck,
-  ChevronLeft, ChevronRight, ChevronDown, LayoutGrid, List, Maximize2, Minimize2,
+  ChevronLeft, ChevronRight, ChevronDown, LayoutGrid, List, Maximize2, Minimize2, Bell, BarChart3,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { toast } from "@/src/hooks/use-toast"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_STATUS, ROTULO_PRIORIDADE, rotularFase, useRotulosDeFaseProntos,
@@ -147,6 +148,54 @@ function exportarFamiliaCsv(nome: string, linhas: LinhaOperacional[]) {
   URL.revokeObjectURL(url)
 }
 
+/** A cor da bolinha de prioridade — mesma régua semântica usada no resto da tela. */
+const COR_PRIORIDADE: Record<string, string> = {
+  URGENTE: "bg-[var(--danger)]",
+  ALTA: "bg-[var(--danger)]",
+  MEDIA: "bg-[var(--warning)]",
+  BAIXA: "bg-[var(--success)]",
+}
+const ORDEM_PRIORIDADE: Record<string, number> = { URGENTE: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 }
+
+/** Ordenação manual das LINHAS visíveis — nunca mexe no agrupamento por família, só na ordem dentro dele. */
+function ordenarPorColuna(
+  linhas: LinhaOperacional[],
+  coluna: "prazo" | "prioridade" | "pessoa" | "fase" | null,
+  asc: boolean,
+): LinhaOperacional[] {
+  if (!coluna) return linhas
+  const cmp = (a: LinhaOperacional, b: LinhaOperacional): number => {
+    if (coluna === "prazo") {
+      const pa = a.dataPrazo ? Date.parse(a.dataPrazo) : Number.POSITIVE_INFINITY
+      const pb = b.dataPrazo ? Date.parse(b.dataPrazo) : Number.POSITIVE_INFINITY
+      return pa - pb
+    }
+    if (coluna === "prioridade") return (ORDEM_PRIORIDADE[a.prioridade] ?? 9) - (ORDEM_PRIORIDADE[b.prioridade] ?? 9)
+    if (coluna === "pessoa") return (a.pessoaNome ?? "").localeCompare(b.pessoaNome ?? "", "pt-BR")
+    return (rotularFase(a.faseMacroKey) ?? "").localeCompare(rotularFase(b.faseMacroKey) ?? "", "pt-BR")
+  }
+  return [...linhas].sort((a, b) => (asc ? cmp(a, b) : -cmp(a, b)))
+}
+
+/** O cabeçalho clicável — seta indica coluna ativa e sentido, nunca decorativa. */
+function ThOrdenavel({ label, campo, ativo, asc, aoClicar, className = "" }: {
+  label: string
+  campo: string
+  ativo: boolean
+  asc: boolean
+  aoClicar: () => void
+  className?: string
+}) {
+  return (
+    <th className={className}>
+      <button onClick={aoClicar} className="flex items-center gap-1 hover:text-[var(--text-primary)]">
+        {label}
+        <span className={`text-[9px] transition-transform ${ativo ? "opacity-100" : "opacity-30"} ${ativo && !asc ? "rotate-180" : ""}`}>▲</span>
+      </button>
+    </th>
+  )
+}
+
 function iniciaisDe(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean)
   return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase() || "?"
@@ -163,6 +212,7 @@ const TOM_CATEGORIA: Record<CategoriaAtencao, string> = {
 const TODOS = "todos"
 const Z_POPOVER = "z-[10060]"
 const POR_PAGINA_GRUPOS = 8
+const POR_PAGINA_LINHAS = 50
 const LINHAS_VISIVEIS_POR_FAMILIA = 5
 
 interface GrupoOperacional {
@@ -188,7 +238,10 @@ interface GrupoOperacional {
  * N grupos — a TAREFA continua sendo a mesma linha canônica, só o container
  * visual mudou (item 13 do mandato: agrupamento é projeção, não motor).
  */
-function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoExecutar, ocupado, marcado, aoMarcar, mostrarSelecao }: {
+function LinhaOperacaoTabela({
+  l, selecionado, aoSelecionar, aoExecutar, ocupado, marcado, aoMarcar, mostrarSelecao,
+  aoAguardarTerceiro, aoBloquear, aoDevolverAFila, aoContatarTerceiro,
+}: {
   l: LinhaOperacional
   /**
    * CLICAR PARA OLHAR NUNCA ASSUME TRABALHO — o clique na LINHA só abre o
@@ -204,6 +257,11 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoExecutar, ocupado
   aoMarcar: () => void
   /** `tarefas.editar` — sem ela, a coluna nem existe (nunca um checkbox morto). */
   mostrarSelecao: boolean
+  /** Cada callback só existe quando a PERMISSÃO existe — o item nem aparece sem ela (nunca botão morto). */
+  aoAguardarTerceiro?: () => void
+  aoBloquear?: () => void
+  aoDevolverAFila?: () => void
+  aoContatarTerceiro?: () => void
 }) {
   const atencaoLinha = rotuloDeAtencao(l)
   const acao = acaoPrincipal(l)
@@ -220,9 +278,16 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoExecutar, ocupado
       <td className="px-3 py-2.5">
         <Etiqueta tom={atencaoLinha.tom === "critico" ? "critico" : atencaoLinha.tom === "alerta" ? "alerta" : "neutro"}>{atencaoLinha.rotulo}</Etiqueta>
       </td>
-      <td className="max-w-[160px] px-3 py-2.5">
-        <div className="truncate text-[12px] font-medium text-[var(--text-primary)]">{l.pessoaNome ?? "—"}</div>
-        <div className="truncate text-[10.5px] text-[var(--text-muted)]">{l.processoNome ?? "—"}</div>
+      <td className="max-w-[160px] overflow-hidden px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[8.5px] font-semibold text-[var(--pessoa)]">
+            {iniciaisDe(l.pessoaNome ?? l.processoNome ?? "?")}
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[12px] font-medium text-[var(--text-primary)]">{l.pessoaNome ?? "—"}</div>
+            <div className="truncate text-[10.5px] text-[var(--text-muted)]">{l.processoNome ?? "—"}</div>
+          </div>
+        </div>
       </td>
       <td className="max-w-[220px] overflow-hidden px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -253,7 +318,12 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoExecutar, ocupado
         <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
         {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
       </td>
-      <td className="px-3 py-2.5 text-[11.5px] text-[var(--text-secondary)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
+      <td className="px-3 py-2.5">
+        <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)]">
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${COR_PRIORIDADE[l.prioridade] ?? "bg-[var(--text-muted)]"}`} />
+          {ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}
+        </span>
+      </td>
       <td className="px-3 py-2.5">
         <Etiqueta tom={tomDaSituacao(l)}>{textoDaSituacao(l)}</Etiqueta>
       </td>
@@ -281,6 +351,10 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoExecutar, ocupado
             </DropdownMenuTrigger>
             <DropdownMenuContent className={Z_POPOVER}>
               <DropdownMenuItem onClick={aoSelecionar}>Ver detalhes</DropdownMenuItem>
+              {aoContatarTerceiro && <DropdownMenuItem onClick={aoContatarTerceiro}>Contatar {l.terceiroNome}</DropdownMenuItem>}
+              {aoAguardarTerceiro && l.coluna !== "AGUARDANDO_TERCEIRO" && <DropdownMenuItem onClick={aoAguardarTerceiro}>Aguardar terceiro</DropdownMenuItem>}
+              {aoBloquear && l.coluna !== "BLOQUEADA" && <DropdownMenuItem onClick={aoBloquear}>Bloquear</DropdownMenuItem>}
+              {aoDevolverAFila && l.responsavelId != null && <DropdownMenuItem onClick={aoDevolverAFila}>Devolver à fila</DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -309,6 +383,212 @@ function MiniLadrilho({ icone: Icone, valor, rotulo, tom }: {
       <div className="leading-tight">
         <div className={`text-[13px] font-semibold tabular-nums ${cor}`}>{valor}</div>
         <div className="whitespace-nowrap text-[9px] text-[var(--text-muted)]">{rotulo}</div>
+      </div>
+    </div>
+  )
+}
+
+/** O motivo é obrigatório no serviço (SEM_MOTIVO se vazio) — pedir aqui evita o roundtrip de erro. */
+function ModalMotivo({ titulo, placeholder, ocupado, erro, aoFechar, aoConfirmar }: {
+  titulo: string
+  placeholder: string
+  ocupado: boolean
+  erro: string | null
+  aoFechar: () => void
+  aoConfirmar: (motivo: string) => void
+}) {
+  const [motivo, setMotivo] = useState("")
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
+      <div
+        className="w-full max-w-sm overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-white/[0.08] px-4 py-3">
+          <h2 className="text-[13px] font-medium text-white/90">{titulo}</h2>
+        </div>
+        {erro && <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2 text-[11px] text-red-700/90">{erro}</div>}
+        <div className="p-4">
+          <textarea
+            autoFocus
+            value={motivo}
+            onChange={(e) => setMotivo(e.target.value.slice(0, 300))}
+            rows={3}
+            placeholder={placeholder}
+            className="w-full resize-none rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)]"
+          />
+          <div className="mt-0.5 text-right text-[10px] text-[var(--text-muted)]">{motivo.length}/300</div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-white/[0.08] px-4 py-2.5">
+          <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] transition-colors hover:text-white/80">Cancelar</button>
+          <button
+            disabled={ocupado || !motivo.trim()}
+            onClick={() => aoConfirmar(motivo.trim())}
+            className="rounded bg-[var(--action-primary)] px-3 py-1.5 text-[11px] font-medium text-[var(--action-primary-ink)] disabled:opacity-40"
+          >
+            {ocupado ? "Enviando…" : "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface Acontecimento { id: number; tipo: string; titulo: string; mensagem: string; link: string | null; criadoEm: string }
+
+/**
+ * NOTIFICAÇÃO DENTRO DA ABA (C9) — o sino do topo é do app inteiro,
+ * misturado com tudo. Aqui é só o que aconteceu NA operação de quem está
+ * olhando, lido da MESMA porta canônica (`/api/notificacoes`) — nenhuma
+ * tabela nova, nenhum estado paralelo ao sino.
+ */
+function PainelNotificacoes({ itens, aoFechar, aoMarcarLida, aoAbrirLink }: {
+  itens: Acontecimento[] | null
+  aoFechar: () => void
+  aoMarcarLida: (id: number) => void
+  aoAbrirLink: (link: string | null) => void
+}) {
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-stretch justify-end bg-[var(--overlay-modal)]" onClick={aoFechar}>
+      <div
+        className="flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Notificações</h2>
+          <button onClick={aoFechar} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {itens == null && <Estado tipo="carregando" mensagem="Carregando notificações…" />}
+          {itens != null && itens.length === 0 && <Estado tipo="vazio" mensagem="Nada de novo desde a última vez que você entrou aqui." />}
+          {itens?.map((n) => (
+            <div key={n.id} className="border-b border-[var(--border-subtle)] px-4 py-2.5">
+              <button
+                onClick={() => { aoMarcarLida(n.id); aoAbrirLink(n.link) }}
+                className="block w-full text-left"
+              >
+                <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{n.titulo}</div>
+                <div className="mt-0.5 text-[11.5px] text-[var(--text-secondary)]">{n.mensagem}</div>
+                <div className="mt-0.5 text-[10.5px] text-[var(--text-muted)]">{new Date(n.criadoEm).toLocaleString("pt-BR")}</div>
+              </button>
+              <button onClick={() => aoMarcarLida(n.id)} className="mt-1 text-[10.5px] text-[var(--action-primary)] hover:underline">
+                Marcar como lida
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface RelatorioPessoal {
+  dias: number
+  porDia: { dia: string; total: number }[]
+  totalNoPeriodo: number
+  totalUltimos7Dias: number
+  totalSemanaAnterior: number
+  tendencia: number | null
+  mediaPorDia: number
+  tempoMedioCicloHoras: number | null
+  ultimasConcluidas: { id: number; titulo: string; dataConclusao: string; processoId: number | null }[]
+}
+
+/**
+ * RELATÓRIO PESSOAL (C6) — a primeira vez que Minha Operação olha pra trás.
+ * Fonte única: `GET /api/operacao/relatorio-pessoal` (Tarefa.dataConclusao),
+ * nenhum número inventado — se não há dado, o gráfico mostra 0, nunca oculta
+ * o dia.
+ */
+function PainelRelatorio({ aoFechar, aoAbrirTarefa }: { aoFechar: () => void; aoAbrirTarefa: (taskId: number, processoId: number | null) => void }) {
+  const [dado, setDado] = useState<RelatorioPessoal | null>(null)
+  const [falhou, setFalhou] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    fetch("/api/operacao/relatorio-pessoal?dias=14", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: RelatorioPessoal) => { if (vivo) setDado(d) })
+      .catch(() => { if (vivo) setFalhou(true) })
+    return () => { vivo = false }
+  }, [])
+
+  const maiorDia = Math.max(1, ...(dado?.porDia.map((p) => p.total) ?? [1]))
+
+  return (
+    <div className="fixed inset-0 z-[10000] flex items-stretch justify-end bg-[var(--overlay-modal)]" onClick={aoFechar}>
+      <div
+        className="flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Meu relatório</h2>
+          <button onClick={aoFechar} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]">
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar o relatório." />}
+          {!falhou && dado == null && <Estado tipo="carregando" mensagem="Carregando relatório…" />}
+          {dado && (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-page)] px-3 py-2.5">
+                  <div className="text-[18px] font-semibold tabular-nums text-[var(--text-primary)]">{dado.totalUltimos7Dias}</div>
+                  <div className="text-[10.5px] text-[var(--text-muted)]">Últimos 7 dias</div>
+                  {dado.tendencia != null && (
+                    <div className={`mt-0.5 text-[10px] font-medium ${dado.tendencia >= 0 ? "text-[var(--success-text)]" : "text-[var(--danger-text)]"}`}>
+                      {dado.tendencia >= 0 ? "▲" : "▼"} {Math.abs(dado.tendencia)}% vs semana anterior
+                    </div>
+                  )}
+                </div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-page)] px-3 py-2.5">
+                  <div className="text-[18px] font-semibold tabular-nums text-[var(--text-primary)]">{dado.mediaPorDia}</div>
+                  <div className="text-[10.5px] text-[var(--text-muted)]">Média por dia ({dado.dias}d)</div>
+                </div>
+                <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-page)] px-3 py-2.5">
+                  <div className="text-[18px] font-semibold tabular-nums text-[var(--text-primary)]">
+                    {dado.tempoMedioCicloHoras != null ? `${Math.round(dado.tempoMedioCicloHoras / 24)}d` : "—"}
+                  </div>
+                  <div className="text-[10.5px] text-[var(--text-muted)]">Tempo médio de ciclo</div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Conclusões por dia</h3>
+                <div className="mt-2 flex h-24 items-end gap-1">
+                  {dado.porDia.map((p) => (
+                    <div key={p.dia} className="flex flex-1 flex-col items-center gap-1" title={`${p.total} em ${dataCurta(p.dia)}`}>
+                      <div
+                        className={`w-full rounded-t ${p.total > 0 ? "bg-[var(--action-primary)]" : "bg-[var(--border-subtle)]"}`}
+                        style={{ height: `${Math.max(2, (p.total / maiorDia) * 80)}px` }}
+                      />
+                      <span className="text-[8px] text-[var(--text-muted)]">{p.dia.slice(8, 10)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Últimas concluídas</h3>
+                {dado.ultimasConcluidas.length === 0 && <p className="mt-2 text-[12px] text-[var(--text-muted)]">Nenhuma tarefa concluída no período.</p>}
+                <div className="mt-2 divide-y divide-[var(--border-subtle)] rounded-lg border border-[var(--border-subtle)]">
+                  {dado.ultimasConcluidas.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => aoAbrirTarefa(t.id, t.processoId)}
+                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--surface-secondary)]"
+                    >
+                      <span className="min-w-0 truncate text-[12px] text-[var(--text-primary)]">{t.titulo}</span>
+                      <span className="shrink-0 text-[10.5px] text-[var(--text-muted)]">{new Date(t.dataConclusao).toLocaleDateString("pt-BR")}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -364,6 +644,8 @@ interface Filtros {
 }
 const SEM_FILTRO: Filtros = { busca: "", fase: null, etapa: null, prioridade: null, terceiro: null, prazo: "todos" }
 
+interface VisaoSalva { id: number; nome: string; spec: { filtros: Filtros; categoria: CategoriaAtencao | "todas" | "concluidas"; visaoModo: "familia" | "lista" } }
+
 export function MinhaOperacao() {
   useRotulosDeFaseProntos()
   const router = useRouter()
@@ -375,6 +657,11 @@ export function MinhaOperacao() {
   // teste com Daniela/assistente, 24/09/2026).
   const { pode: podePermissao } = usePermissoes()
   const podeAtribuirLote = podePermissao("tarefas.editar")
+  // AÇÕES DO MENU "⋮" DA LINHA — cada uma com sua permissão própria (mesma
+  // régua do backend, `PERMISSAO` em comando/route.ts): quem executa aguarda
+  // terceiro/bloqueia a PRÓPRIA tarefa; devolver à fila é gestão.
+  const podeIniciarConcluir = podePermissao("tarefas.iniciar_concluir")
+  const podeBloquear = podePermissao("tarefas.bloquear")
   // DEEP-LINK — a notificação de "nova atribuição em lote" (Sino) e o
   // cartão da obrigação administrativa mandam pra cá com `?processo=<id>`,
   // lido só uma vez, no mount, pra abrir aquele contexto já expandido.
@@ -390,7 +677,7 @@ export function MinhaOperacao() {
   // tem 300 tarefas abertas não deve precisar procurar dentro das 300 pra
   // achar as 12 que exigem ação agora. "Todas" continua existindo — só não é
   // mais a porta de entrada.
-  const [categoria, setCategoria] = useState<CategoriaAtencao | "todas">("paraAgirAgora")
+  const [categoria, setCategoria] = useState<CategoriaAtencao | "todas" | "concluidas">("paraAgirAgora")
   const [filtros, setFiltros] = useState<Filtros>(SEM_FILTRO)
   const [maisFiltros, setMaisFiltros] = useState(false)
   const [pagina, setPagina] = useState(1)
@@ -402,6 +689,60 @@ export function MinhaOperacao() {
   const [loteErro, setLoteErro] = useState<string | null>(null)
   const [familiasVerTodas, setFamiliasVerTodas] = useState<Set<string>>(new Set())
   const [ordenarPor, setOrdenarPor] = useState<"prazo" | "nome" | "tarefas">("prazo")
+
+  // ── MINHAS VISÕES (C2) — reaproveita RelatorioVisao, domínio
+  // "minha-operacao" (mesma tabela genérica que Tarefas e Projetos e o motor
+  // de Relatórios já usam). Salva filtros+categoria+visão, nunca resultado.
+  const [minhasVisoes, setMinhasVisoes] = useState<VisaoSalva[] | null>(null)
+  const [salvarVisaoAberto, setSalvarVisaoAberto] = useState(false)
+  const [nomeVisao, setNomeVisao] = useState("")
+  const [salvandoVisao, setSalvandoVisao] = useState(false)
+  const carregarVisoes = useCallback(() => {
+    fetch("/api/operacao/tarefas/visoes", { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { visoes: VisaoSalva[] }) => setMinhasVisoes(d.visoes))
+      .catch(() => setMinhasVisoes([]))
+  }, [])
+  useEffect(() => { carregarVisoes() }, [carregarVisoes])
+  const salvarVisaoAtual = async () => {
+    const nome = nomeVisao.trim()
+    if (!nome) return
+    setSalvandoVisao(true)
+    try {
+      const r = await fetch("/api/operacao/tarefas/visoes", {
+        method: "POST", headers: auth(), body: JSON.stringify({ nome, filtros, categoria, visaoModo }),
+      })
+      if (r.ok) {
+        setSalvarVisaoAberto(false); setNomeVisao(""); carregarVisoes()
+        toast({ description: `Visão "${nome}" salva.`, variant: "success" })
+      } else setErroComando("Não foi possível salvar a visão.")
+    } catch {
+      setErroComando("Não foi possível falar com o servidor.")
+    } finally {
+      setSalvandoVisao(false)
+    }
+  }
+  const abrirVisaoSalva = (v: VisaoSalva) => {
+    setFiltros(v.spec.filtros)
+    setBuscaDigitada(v.spec.filtros.busca ?? "")
+    setCategoria(v.spec.categoria)
+    setVisaoModo(v.spec.visaoModo)
+    setPagina(1)
+  }
+  const excluirVisaoSalva = async (id: number) => {
+    await fetch(`/api/operacao/tarefas/visoes?id=${id}`, { method: "DELETE", headers: auth() }).catch(() => {})
+    carregarVisoes()
+  }
+  // ── ORDENAÇÃO DA TABELA (C4/A4) — independente do ranking de atenção: quem
+  // clica no cabeçalho quer control MANUAL sobre a ordem das linhas
+  // visíveis, sem perder o agrupamento por família nem o ranking quando
+  // nenhuma coluna está ativa (`sortColuna === null`).
+  const [sortColuna, setSortColuna] = useState<"prazo" | "prioridade" | "pessoa" | "fase" | null>(null)
+  const [sortAsc, setSortAsc] = useState(true)
+  const alternarSortColuna = (coluna: NonNullable<typeof sortColuna>) => {
+    if (sortColuna === coluna) setSortAsc((v) => !v)
+    else { setSortColuna(coluna); setSortAsc(true) }
+  }
   // DATA/HORA DO CABEÇALHO — mesmo formato de `header-bar-app.tsx` (pt-BR,
   // dia da semana por extenso + hora), só que aqui dentro do CONTEÚDO
   // (mandato "ultra fiel ao desenho", 24/09/2026).
@@ -411,12 +752,36 @@ export function MinhaOperacao() {
     const atualizar = () => {
       const agora = new Date()
       setHoraAgora(agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
-      const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+      const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
       setDataAgora(data.charAt(0).toUpperCase() + data.slice(1))
     }
     atualizar()
     const t = setInterval(atualizar, 30000)
     return () => clearInterval(t)
+  }, [])
+
+  // ── NOTIFICAÇÕES DENTRO DA ABA (C9) — mesma porta canônica do sino
+  // (`/api/notificacoes`), sem tabela nova. Recarrega no mesmo ritmo do
+  // polling silencioso, pra o número do sininho local nunca ficar velho.
+  const [notifAberto, setNotifAberto] = useState(false)
+  const [relatorioAberto, setRelatorioAberto] = useState(false)
+  const [acontecimentos, setAcontecimentos] = useState<Acontecimento[] | null>(null)
+  const carregarNotificacoes = useCallback(async () => {
+    try {
+      const r = await fetch("/api/notificacoes", { headers: auth() })
+      if (!r.ok) return
+      const d: { acontecimentos?: Acontecimento[] } = await r.json()
+      setAcontecimentos(d.acontecimentos ?? [])
+    } catch { /* poll silencioso */ }
+  }, [])
+  useEffect(() => {
+    void carregarNotificacoes()
+    const t = setInterval(() => { if (!document.hidden) void carregarNotificacoes() }, 20000)
+    return () => clearInterval(t)
+  }, [carregarNotificacoes])
+  const marcarNotificacaoLida = useCallback(async (id: number) => {
+    setAcontecimentos((prev) => (prev ? prev.filter((n) => n.id !== id) : prev))
+    await fetch(`/api/notificacoes/${id}/lida`, { method: "POST", headers: auth() }).catch(() => {})
   }, [])
 
   // A BUSCA TEM DEBOUNCE — não dispara um request por tecla (mandato §21).
@@ -425,6 +790,23 @@ export function MinhaOperacao() {
     const t = setTimeout(() => { setFiltros((f) => ({ ...f, busca: buscaDigitada })); setPagina(1) }, 350)
     return () => clearTimeout(t)
   }, [buscaDigitada])
+
+  // ── ATALHO "/" PARA A BUSCA (C5) — padrão de toda ferramenta densa
+  // (Linear, Gmail, GitHub); nunca dispara dentro de um campo de texto já
+  // focado, senão a pessoa digitando "usuário/senha" perderia o "/".
+  const buscaRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null
+      const dentroDeCampo = alvo?.tagName === "INPUT" || alvo?.tagName === "TEXTAREA" || alvo?.isContentEditable
+      if (e.key === "/" && !dentroDeCampo) {
+        e.preventDefault()
+        buscaRef.current?.focus()
+      }
+    }
+    window.addEventListener("keydown", aoTeclar)
+    return () => window.removeEventListener("keydown", aoTeclar)
+  }, [])
 
   // ── FILTROS SERVER-SIDE (mandato §20): fase/terceiro/prazo/busca viram
   // query string e entram no `where` do banco, ANTES da paginação — a MESMA
@@ -488,7 +870,7 @@ export function MinhaOperacao() {
    * 24/09/2026).
    */
   const comandar = useCallback(
-    async (tarefaId: number, corpo: Record<string, unknown>): Promise<boolean> => {
+    async (tarefaId: number, corpo: Record<string, unknown>, mensagemSucesso?: string): Promise<boolean> => {
       setOcupado(true)
       setErroComando(null)
       try {
@@ -514,6 +896,7 @@ export function MinhaOperacao() {
         // ESPERA a lista nova. Sem isto o ato "terminava" antes de a tela mudar.
         await recarregarAgora()
         setRecarga((n) => n + 1) // também atualiza KPIs e opções de filtro
+        if (mensagemSucesso) toast({ description: mensagemSucesso, variant: "success" })
         return true
       } catch {
         // FALHA DE REDE NÃO É SILÊNCIO. O comando pode ter chegado ao servidor e
@@ -595,6 +978,29 @@ export function MinhaOperacao() {
     return mapa
   }, [concluidasHoje])
 
+  // ── TEMPO REAL (polling silencioso, mandato "premium", 24/09/2026) — a
+  // tela se atualiza sozinha a cada 20s, sem piscar loading: atualiza
+  // `resultado` pelo MESMO `recarregarAgora` que já existe pro comando (não
+  // muda `chave`, então `carregando` nunca vira true), e `universo`/
+  // `concluidasHoje` direto (esses dois nunca tiveram spinner próprio). Se um
+  // colega assumir/concluir uma tarefa, o número muda sozinho na tela de
+  // quem está só olhando — sem F5.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.hidden) return // aba em segundo plano não gasta request à toa
+      void recarregarAgora()
+      fetch(`/api/operacao/tarefas?visao=minha_fila`, { headers: auth() })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((d: { linhas?: LinhaOperacional[] }) => setUniverso(d.linhas ?? []))
+        .catch(() => { /* poll silencioso — falha aqui não é erro pro usuário, só tenta de novo no próximo tick */ })
+      fetch(`/api/operacao/tarefas?visao=concluidas_hoje`, { headers: auth() })
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((d: { linhas?: LinhaOperacional[] }) => setConcluidasHoje(d.linhas ?? []))
+        .catch(() => { /* idem */ })
+    }, 20000)
+    return () => clearInterval(t)
+  }, [recarregarAgora])
+
   // ── AS CONTAGENS DE FILA — MESMO UNIVERSO da tabela (mandato "fila real de
   // trabalho", 17/09/2026): sobre o resultado JÁ FILTRADO pelo servidor
   // (fase/terceiro/prazo/busca), nunca sobre o universo total. EXCLUSIVA —
@@ -611,12 +1017,15 @@ export function MinhaOperacao() {
   }, [linhasNormais])
 
   const filtradas = useMemo(() => {
+    // "Concluídas hoje" é universo SEPARADO (minhaFila exclui concluída de
+    // propósito) — o ladrilho vira filtro de verdade, nunca número morto.
+    if (categoria === "concluidas") return concluidasHoje ?? []
     if (!linhasNormais) return null
     let base = categoria === "todas" ? linhasNormais : linhasNormais.filter((l) => classificarAtencaoOperacional(l) === categoria)
     if (filtros.etapa) base = base.filter((l) => l.etapaAtual === filtros.etapa)
     if (filtros.prioridade) base = base.filter((l) => l.prioridade === filtros.prioridade)
     return base
-  }, [linhasNormais, categoria, filtros.etapa, filtros.prioridade])
+  }, [linhasNormais, categoria, filtros.etapa, filtros.prioridade, concluidasHoje])
 
   const ordenadas = useMemo(() => (filtradas ? ordenarPorAtencaoOperacional(filtradas) : null), [filtradas])
 
@@ -719,14 +1128,24 @@ export function MinhaOperacao() {
       setLoteErro(`${falhas} tarefa${falhas === 1 ? "" : "s"} não pôde${falhas === 1 ? "" : "ram"} ser atribuída${falhas === 1 ? "" : "s"}.`)
       return
     }
+    const total = linhasSelecionadasLote.length
     setLoteAberto(false)
     setSelecionadosLote(new Set())
     setRecarga((n) => n + 1)
+    toast({ description: `${total} tarefa${total === 1 ? "" : "s"} atribuída${total === 1 ? "" : "s"}.`, variant: "success" })
   }
 
   const totalPaginas = Math.max(1, Math.ceil((grupos?.length ?? 0) / POR_PAGINA_GRUPOS))
   const paginaValida = Math.min(Math.max(pagina, 1), totalPaginas)
   const gruposVisiveis = grupos?.slice((paginaValida - 1) * POR_PAGINA_GRUPOS, paginaValida * POR_PAGINA_GRUPOS) ?? null
+
+  // ── PAGINAÇÃO DA "VISÃO POR LISTA" (C3) — sem isto, 300 tarefas renderizam
+  // de uma vez só. Mesmo state `pagina` da visão por família: só uma das
+  // duas visões está montada por vez, então não colidem.
+  const linhasListaOrdenadas = useMemo(() => ordenarPorColuna(ordenadas ?? [], sortColuna, sortAsc), [ordenadas, sortColuna, sortAsc])
+  const totalPaginasLista = Math.max(1, Math.ceil(linhasListaOrdenadas.length / POR_PAGINA_LINHAS))
+  const paginaListaValida = Math.min(Math.max(pagina, 1), totalPaginasLista)
+  const linhasListaVisiveis = linhasListaOrdenadas.slice((paginaListaValida - 1) * POR_PAGINA_LINHAS, paginaListaValida * POR_PAGINA_LINHAS)
 
   // O rótulo da fila ATIVA no cabeçalho do grupo — "N tarefas · Aguardando
   // terceiros", nunca hardcoded "a fazer" pra QUALQUER fila (era o defeito
@@ -764,11 +1183,36 @@ export function MinhaOperacao() {
   const irParaOTrabalho = useCallback(async (l: LinhaOperacional) => {
     const acao = acaoPrincipal(l)
     if (acao.comando === "iniciar") {
-      const ok = await comandar(l.taskId, { acao: "iniciar" })
+      const ok = await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.")
       if (!ok) return
     }
     abrirOTrabalho(l)
   }, [comandar, abrirOTrabalho])
+
+  // ── MENU "⋮" DA LINHA — aguardar terceiro/bloquear pedem motivo (exigido
+  // pelo próprio serviço, `SEM_MOTIVO` se vazio); devolver à fila não pede.
+  const [acaoComMotivo, setAcaoComMotivo] = useState<{ tarefaId: number; acao: "aguardar_terceiro" | "bloquear"; titulo: string } | null>(null)
+  const devolverAFila = useCallback(async (l: LinhaOperacional) => {
+    await comandar(l.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")
+  }, [comandar])
+
+  /** Abre o canal de contato real do terceiro — nunca um número decorativo. */
+  const contatarTerceiro = useCallback((l: LinhaOperacional) => {
+    if (l.terceiroEmail) window.open(`mailto:${l.terceiroEmail}`, "_blank")
+    else if (l.terceiroTelefone) window.open(`tel:${l.terceiroTelefone.replace(/\D/g, "")}`, "_blank")
+  }, [])
+
+  // Props do menu "⋮" — cada callback só existe com a PERMISSÃO correspondente
+  // (mesma régua do backend); sem ela, o item de menu nem aparece.
+  // Função pura de leitura por linha — barata (objeto pequeno), não precisa
+  // de memoização própria (o `useCallback` aqui só confundia o React
+  // Compiler sobre `setAcaoComMotivo`, um setState estável).
+  const acoesDaLinha = (l: LinhaOperacional) => ({
+    aoAguardarTerceiro: podeIniciarConcluir ? () => setAcaoComMotivo({ tarefaId: l.taskId, acao: "aguardar_terceiro", titulo: `Aguardar terceiro — ${l.titulo}` }) : undefined,
+    aoBloquear: podeBloquear ? () => setAcaoComMotivo({ tarefaId: l.taskId, acao: "bloquear", titulo: `Bloquear — ${l.titulo}` }) : undefined,
+    aoDevolverAFila: podeAtribuirLote ? () => void devolverAFila(l) : undefined,
+    aoContatarTerceiro: (l.terceiroEmail || l.terceiroTelefone) ? () => contatarTerceiro(l) : undefined,
+  })
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--surface-page)]">
@@ -784,16 +1228,37 @@ export function MinhaOperacao() {
           </div>
         </div>
         <div className="flex flex-col items-end gap-2">
-          <div className="text-right">
-            <div className="text-[11.5px] text-[var(--text-secondary)]">{dataAgora}</div>
-            <div className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">{horaAgora}</div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setRelatorioAberto(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+            >
+              <BarChart3 className="h-3.5 w-3.5" /> Meu relatório
+            </button>
+            <button
+              onClick={() => setNotifAberto(true)}
+              className="relative rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+              aria-label="Notificações da operação"
+            >
+              <Bell className="h-4 w-4" />
+              {acontecimentos != null && acontecimentos.length > 0 && (
+                <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[9px] font-semibold text-white">
+                  {acontecimentos.length > 9 ? "9+" : acontecimentos.length}
+                </span>
+              )}
+            </button>
+            <div className="text-right">
+              <div className="text-[11.5px] text-[var(--text-secondary)]">{dataAgora}</div>
+              <div className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">{horaAgora}</div>
+            </div>
           </div>
           <div className="relative w-full max-w-sm sm:w-72">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
             <Input
+              ref={buscaRef}
               value={buscaDigitada}
               onChange={(e) => setBuscaDigitada(e.target.value)}
-              placeholder="Buscar por pessoa, processo, documento, cartório…"
+              placeholder="Buscar por pessoa, processo, documento, cartório… (/)"
               className="h-9 bg-[var(--surface-elevated)] pl-8 text-[13px]"
             />
           </div>
@@ -866,14 +1331,21 @@ export function MinhaOperacao() {
                   </button>
                 )
               })}
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2.5 text-left">
+              <button
+                onClick={() => { setCategoria(categoria === "concluidas" ? "todas" : "concluidas"); setPagina(1) }}
+                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                  categoria === "concluidas"
+                    ? "border-[var(--action-primary)] bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
+                    : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-secondary)]"
+                }`}
+              >
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success-text)]" />
-                  <span className="text-[20px] font-semibold tabular-nums text-[var(--text-primary)]">{concluidasHoje?.length ?? 0}</span>
+                  <CheckCircle2 className={`h-3.5 w-3.5 ${categoria === "concluidas" ? "text-[var(--action-primary-ink)]" : "text-[var(--success-text)]"}`} />
+                  <span className={`text-[20px] font-semibold tabular-nums ${categoria === "concluidas" ? "text-[var(--action-primary-ink)]" : "text-[var(--text-primary)]"}`}>{concluidasHoje?.length ?? 0}</span>
                 </div>
-                <div className="text-[11.5px] font-medium text-[var(--text-primary)]">Concluídas hoje</div>
-                <div className="truncate text-[10px] text-[var(--text-muted)]">Tarefas finalizadas</div>
-              </div>
+                <div className={`text-[11.5px] font-medium ${categoria === "concluidas" ? "text-[var(--action-primary-ink)]" : "text-[var(--text-primary)]"}`}>Concluídas hoje</div>
+                <div className={`truncate text-[10px] ${categoria === "concluidas" ? "text-[var(--action-primary-ink)]/80" : "text-[var(--text-muted)]"}`}>Tarefas finalizadas</div>
+              </button>
             </div>
 
             {/* ── FILTROS — item 10, + Etapa atual/Prioridade (client-side) ── */}
@@ -907,7 +1379,10 @@ export function MinhaOperacao() {
               </Campo>
               <Campo rotulo="Prazo">
                 <Select value={filtros.prazo} onValueChange={(v) => { setFiltros((f) => ({ ...f, prazo: v as Filtros["prazo"] })); setPagina(1) }}>
-                  <SelectTrigger className="h-8 w-36 bg-[var(--surface-elevated)] text-[12px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-8 w-36 bg-[var(--surface-elevated)] text-[12px]">
+                    <CalendarClock className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" />
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent className={Z_POPOVER}>
                     <SelectItem value="todos">Qualquer prazo</SelectItem>
                     <SelectItem value="atrasadas">Atrasadas</SelectItem>
@@ -936,15 +1411,39 @@ export function MinhaOperacao() {
                   <XIcon className="h-3.5 w-3.5" /> Limpar filtros
                 </button>
               )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)]">
+                    Minhas Visões {minhasVisoes && minhasVisoes.length > 0 && <span className="tabular-nums text-[var(--text-muted)]">({minhasVisoes.length})</span>} <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className={Z_POPOVER}>
+                  <DropdownMenuItem onClick={() => setSalvarVisaoAberto(true)}>Salvar visão atual…</DropdownMenuItem>
+                  {minhasVisoes && minhasVisoes.length > 0 && (
+                    <>
+                      {minhasVisoes.map((v) => (
+                        <div key={v.id} className="flex items-center justify-between gap-2 px-2 py-1">
+                          <button onClick={() => abrirVisaoSalva(v)} className="min-w-0 flex-1 truncate text-left text-[13px] text-[var(--text-primary)] hover:underline">
+                            {v.nome}
+                          </button>
+                          <button onClick={() => void excluirVisaoSalva(v.id)} className="shrink-0 text-[var(--text-muted)] hover:text-[var(--danger-text)]" aria-label={`Excluir visão ${v.nome}`}>
+                            <XIcon className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <div className="ml-auto flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-0.5">
                 <button
-                  onClick={() => setVisaoModo("familia")}
+                  onClick={() => { setVisaoModo("familia"); setPagina(1) }}
                   className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[12px] font-medium transition-colors ${visaoModo === "familia" ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"}`}
                 >
                   <LayoutGrid className="h-3.5 w-3.5" /> Visão por família
                 </button>
                 <button
-                  onClick={() => setVisaoModo("lista")}
+                  onClick={() => { setVisaoModo("lista"); setPagina(1) }}
                   className={`flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[12px] font-medium transition-colors ${visaoModo === "lista" ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"}`}
                 >
                   <List className="h-3.5 w-3.5" /> Visão por lista
@@ -1015,39 +1514,58 @@ export function MinhaOperacao() {
               )}
 
               {visaoModo === "lista" && !carregando && !falhou && ordenadas != null && ordenadas.length > 0 && (
-                <div className="min-h-0 flex-1 overflow-auto">
-                  <table className="w-full border-collapse text-left">
-                    <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
-                      <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
-                        {podeAtribuirLote && <th className="w-8" />}
-                        <th>Atenção</th>
-                        <th>Pessoa</th>
-                        <th>Documento / Tarefa</th>
-                        <th>Fase</th>
-                        <th>Etapa atual</th>
-                        <th>Prazo</th>
-                        <th>Prioridade</th>
-                        <th>Situação</th>
-                        <th>Terceiro</th>
-                        <th className="w-24">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ordenadas.map((l) => (
-                        <LinhaOperacaoTabela
-                          key={l.taskId}
-                          l={l}
-                          selecionado={selecionado === l.taskId}
-                          aoSelecionar={() => setSelecionado(l.taskId)}
-                          aoExecutar={() => void irParaOTrabalho(l)}
-                          ocupado={ocupado}
-                          marcado={selecionadosLote.has(l.taskId)}
-                          aoMarcar={() => alternarSelecaoLote(l.taskId)}
-                          mostrarSelecao={podeAtribuirLote}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="min-h-0 flex-1 overflow-auto">
+                    <table className="w-full border-collapse text-left">
+                      <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
+                        <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
+                          {podeAtribuirLote && <th className="w-8" />}
+                          <th>Atenção</th>
+                          <ThOrdenavel label="Pessoa" campo="pessoa" ativo={sortColuna === "pessoa"} asc={sortAsc} aoClicar={() => alternarSortColuna("pessoa")} />
+                          <th>Documento / Tarefa</th>
+                          <ThOrdenavel label="Fase" campo="fase" ativo={sortColuna === "fase"} asc={sortAsc} aoClicar={() => alternarSortColuna("fase")} />
+                          <th>Etapa atual</th>
+                          <ThOrdenavel label="Prazo" campo="prazo" ativo={sortColuna === "prazo"} asc={sortAsc} aoClicar={() => alternarSortColuna("prazo")} />
+                          <ThOrdenavel label="Prioridade" campo="prioridade" ativo={sortColuna === "prioridade"} asc={sortAsc} aoClicar={() => alternarSortColuna("prioridade")} />
+                          <th>Situação</th>
+                          <th>Terceiro</th>
+                          <th className="w-24">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {linhasListaVisiveis.map((l) => (
+                          <LinhaOperacaoTabela
+                            key={l.taskId}
+                            l={l}
+                            selecionado={selecionado === l.taskId}
+                            aoSelecionar={() => setSelecionado(l.taskId)}
+                            aoExecutar={() => void irParaOTrabalho(l)}
+                            ocupado={ocupado}
+                            marcado={selecionadosLote.has(l.taskId)}
+                            aoMarcar={() => alternarSelecaoLote(l.taskId)}
+                            mostrarSelecao={podeAtribuirLote}
+                            {...acoesDaLinha(l)}
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalPaginasLista > 1 && (
+                    <div className="flex shrink-0 items-center justify-between gap-2 border-t border-[var(--border-subtle)] px-3 py-2">
+                      <span className="text-[11px] text-[var(--text-muted)]">
+                        Mostrando {linhasListaVisiveis.length} de {ordenadas.length} tarefas
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button disabled={paginaListaValida <= 1} onClick={() => setPagina(paginaListaValida - 1)} className="rounded border border-[var(--border-default)] p-1 text-[var(--text-secondary)] disabled:opacity-40">
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="text-[11px] tabular-nums text-[var(--text-primary)]">{paginaListaValida} / {totalPaginasLista}</span>
+                        <button disabled={paginaListaValida >= totalPaginasLista} onClick={() => setPagina(paginaListaValida + 1)} className="rounded border border-[var(--border-default)] p-1 text-[var(--text-secondary)] disabled:opacity-40">
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1056,7 +1574,8 @@ export function MinhaOperacao() {
                   {gruposVisiveis.map((g) => {
                     const aberto = expandidos.has(g.chave)
                     const verTodas = familiasVerTodas.has(g.chave)
-                    const linhasVisiveis = verTodas ? g.linhas : g.linhas.slice(0, LINHAS_VISIVEIS_POR_FAMILIA)
+                    const linhasOrdenadas = ordenarPorColuna(g.linhas, sortColuna, sortAsc)
+                    const linhasVisiveis = verTodas ? linhasOrdenadas : linhasOrdenadas.slice(0, LINHAS_VISIVEIS_POR_FAMILIA)
                     const idsDaFamilia = g.linhas.map((l) => l.taskId)
                     const todasMarcadas = idsDaFamilia.length > 0 && idsDaFamilia.every((id) => selecionadosLote.has(id))
                     const selecionadasNaFamilia = idsDaFamilia.filter((id) => selecionadosLote.has(id)).length
@@ -1102,12 +1621,12 @@ export function MinhaOperacao() {
                                 <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
                                   {podeAtribuirLote && <th className="w-8" />}
                                   <th>Atenção</th>
-                                  <th>Pessoa</th>
+                                  <ThOrdenavel label="Pessoa" campo="pessoa" ativo={sortColuna === "pessoa"} asc={sortAsc} aoClicar={() => alternarSortColuna("pessoa")} />
                                   <th>Documento / Tarefa</th>
-                                  <th>Fase</th>
+                                  <ThOrdenavel label="Fase" campo="fase" ativo={sortColuna === "fase"} asc={sortAsc} aoClicar={() => alternarSortColuna("fase")} />
                                   <th>Etapa atual</th>
-                                  <th>Prazo</th>
-                                  <th>Prioridade</th>
+                                  <ThOrdenavel label="Prazo" campo="prazo" ativo={sortColuna === "prazo"} asc={sortAsc} aoClicar={() => alternarSortColuna("prazo")} />
+                                  <ThOrdenavel label="Prioridade" campo="prioridade" ativo={sortColuna === "prioridade"} asc={sortAsc} aoClicar={() => alternarSortColuna("prioridade")} />
                                   <th>Situação</th>
                                   <th>Terceiro</th>
                                   <th className="w-24">Ações</th>
@@ -1125,6 +1644,7 @@ export function MinhaOperacao() {
                                     marcado={selecionadosLote.has(l.taskId)}
                                     aoMarcar={() => alternarSelecaoLote(l.taskId)}
                                     mostrarSelecao={podeAtribuirLote}
+                                    {...acoesDaLinha(l)}
                                   />
                                 ))}
                               </tbody>
@@ -1226,6 +1746,72 @@ export function MinhaOperacao() {
           aoFechar={() => { setLoteAberto(false); setLoteErro(null) }}
           aoEscolher={atribuirLote}
         />
+      )}
+
+      {acaoComMotivo && (
+        <ModalMotivo
+          titulo={acaoComMotivo.titulo}
+          placeholder={acaoComMotivo.acao === "aguardar_terceiro" ? "Do que a tarefa está esperando?" : "Motivo do bloqueio"}
+          ocupado={ocupado}
+          erro={erroComando}
+          aoFechar={() => { setAcaoComMotivo(null); setErroComando(null) }}
+          aoConfirmar={async (motivo) => {
+            const ok = await comandar(
+              acaoComMotivo.tarefaId, { acao: acaoComMotivo.acao, motivo },
+              acaoComMotivo.acao === "aguardar_terceiro" ? "Tarefa marcada como aguardando terceiro." : "Tarefa bloqueada.",
+            )
+            if (ok) setAcaoComMotivo(null)
+          }}
+        />
+      )}
+
+      {notifAberto && (
+        <PainelNotificacoes
+          itens={acontecimentos}
+          aoFechar={() => setNotifAberto(false)}
+          aoMarcarLida={(id) => void marcarNotificacaoLida(id)}
+          aoAbrirLink={(link) => { if (link) router.push(link) }}
+        />
+      )}
+
+      {relatorioAberto && (
+        <PainelRelatorio
+          aoFechar={() => setRelatorioAberto(false)}
+          aoAbrirTarefa={(taskId, processoId) => router.push(urlOperacionalDaTarefa({ taskId, processoId }))}
+        />
+      )}
+
+      {salvarVisaoAberto && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setSalvarVisaoAberto(false)}>
+          <div
+            className="w-full max-w-sm overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-white/[0.08] px-4 py-3">
+              <h2 className="text-[13px] font-medium text-white/90">Salvar visão atual</h2>
+            </div>
+            <div className="p-4">
+              <input
+                autoFocus
+                value={nomeVisao}
+                onChange={(e) => setNomeVisao(e.target.value.slice(0, 80))}
+                placeholder="Ex.: Prioridade alta, Cibils"
+                onKeyDown={(e) => { if (e.key === "Enter") void salvarVisaoAtual() }}
+                className="w-full rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)]"
+              />
+            </div>
+            <div className="flex justify-end gap-2 border-t border-white/[0.08] px-4 py-2.5">
+              <button onClick={() => setSalvarVisaoAberto(false)} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] transition-colors hover:text-white/80">Cancelar</button>
+              <button
+                disabled={salvandoVisao || !nomeVisao.trim()}
+                onClick={() => void salvarVisaoAtual()}
+                className="rounded bg-[var(--action-primary)] px-3 py-1.5 text-[11px] font-medium text-[var(--action-primary-ink)] disabled:opacity-40"
+              >
+                {salvandoVisao ? "Salvando…" : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

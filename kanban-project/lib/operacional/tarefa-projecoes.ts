@@ -226,6 +226,9 @@ export interface LinhaDeFila {
    * `null` = espera real, terceiro não identificado.
    */
   terceiroNome: string | null
+  /** Contato do terceiro (`OrgaoProtocolo.email`/`.telefone`) — mesma fonte de `terceiroNome`, nunca inventado. */
+  terceiroEmail: string | null
+  terceiroTelefone: string | null
   /** O que se está obtendo: o item do catálogo por trás da obrigação. */
   servico: string | null
   criadaEm: string | null
@@ -329,7 +332,7 @@ const SELECT = {
   // SÓ para IDENTIFICAR o terceiro quando a tarefa já está esperando um — o
   // vínculo em si nunca decide o estado (ver `aguardandoTerceiro` em
   // `whereGerencial`).
-  documento: { select: { orgao: { select: { name: true } } } },
+  documento: { select: { orgao: { select: { name: true, email: true, telefone: true } } } },
 } satisfies Prisma.TarefaSelect
 
 type Bruta = Prisma.TarefaGetPayload<{ select: typeof SELECT }>
@@ -408,6 +411,8 @@ function projetar(
       statusTarefa: t.statusTarefa, aguardandoDependencia, causaRemovidaEm: t.causaRemovidaEm,
     }),
     terceiroNome: t.documento?.orgao?.name ?? null,
+    terceiroEmail: t.documento?.orgao?.email ?? null,
+    terceiroTelefone: t.documento?.orgao?.telefone ?? null,
     servico: t.necessidade?.itemCatalogo?.name ?? null,
     criadaEm: t.createdAt?.toISOString() ?? null,
     atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
