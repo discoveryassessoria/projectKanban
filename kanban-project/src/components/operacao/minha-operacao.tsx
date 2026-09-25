@@ -157,13 +157,43 @@ const COR_PRIORIDADE: Record<string, string> = {
 }
 const ORDEM_PRIORIDADE: Record<string, number> = { URGENTE: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 }
 
+const ORDEM_CATEGORIA_DOC: Record<string, number> = { NASCIMENTO: 0, CASAMENTO: 1, OBITO: 2 }
+
+/**
+ * ORDEM PADRÃO (nenhuma coluna clicada) — pedido explícito do usuário
+ * 25/09/2026: sempre agrupada por PESSOA, sequência nascimento → casamento →
+ * óbito dentro da pessoa, e as pessoas na ordem da ÁRVORE (ancestral mais
+ * antigo primeiro, descendo até o requerente) — a MESMA régua de "Nº
+ * Linhagem" que a pasta documental/Central Operacional já usa
+ * (`l.numeroLinhagem`, nunca uma conta de geração nova aqui).
+ */
+function agruparPorPessoaEGeracao(linhas: LinhaOperacional[]): LinhaOperacional[] {
+  const grupos = new Map<string, LinhaOperacional[]>()
+  for (const l of linhas) {
+    const chave = l.pessoaId != null ? `p:${l.pessoaId}` : `n:${l.pessoaNome ?? "—"}`
+    const g = grupos.get(chave)
+    if (g) g.push(l); else grupos.set(chave, [l])
+  }
+  const ordemGrupo = (g: LinhaOperacional[]) => g[0]?.numeroLinhagem ?? Number.MAX_SAFE_INTEGER
+  const gruposOrdenados = [...grupos.values()].sort((a, b) => {
+    const d = ordemGrupo(a) - ordemGrupo(b)
+    return d !== 0 ? d : (a[0]?.pessoaNome ?? "").localeCompare(b[0]?.pessoaNome ?? "", "pt-BR")
+  })
+  return gruposOrdenados.flatMap((g) =>
+    [...g].sort((a, b) => {
+      const d = (ORDEM_CATEGORIA_DOC[a.categoriaDoc ?? ""] ?? 9) - (ORDEM_CATEGORIA_DOC[b.categoriaDoc ?? ""] ?? 9)
+      return d !== 0 ? d : (a.titulo ?? "").localeCompare(b.titulo ?? "", "pt-BR")
+    }),
+  )
+}
+
 /** Ordenação manual das LINHAS visíveis — nunca mexe no agrupamento por família, só na ordem dentro dele. */
 function ordenarPorColuna(
   linhas: LinhaOperacional[],
   coluna: "prazo" | "prioridade" | "pessoa" | "fase" | null,
   asc: boolean,
 ): LinhaOperacional[] {
-  if (!coluna) return linhas
+  if (!coluna) return agruparPorPessoaEGeracao(linhas)
   const cmp = (a: LinhaOperacional, b: LinhaOperacional): number => {
     if (coluna === "prazo") {
       const pa = a.dataPrazo ? Date.parse(a.dataPrazo) : Number.POSITIVE_INFINITY

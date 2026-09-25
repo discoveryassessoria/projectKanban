@@ -24,7 +24,7 @@ import {
 } from '@/lib/operacional/tempo-operacional'
 import { estadosTemporaisDasOperacoes, ehEsperaExterna } from '@/lib/operacional/proximo-acontecimento'
 import { lerVersaoPublicada } from '@/src/services/versao-publicada'
-import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoTarefa } from '@prisma/client'
+import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoDocumento, TipoTarefa } from '@prisma/client'
 
 /**
  * O LEITOR — o cliente global por padrão, outro quando quem chama precisa.
@@ -195,6 +195,22 @@ export interface LinhaDeFila {
   familiaNome: string | null
   pessoaId: number | null
   pessoaNome: string | null
+  /**
+   * Nº Linhagem da pessoa (`Pessoa.numeroLinhagem`) — a MESMA régua de "ORDEM
+   * DE EXIBIÇÃO" que a pasta documental/Central Operacional já usa (ver
+   * `central-operacional-core.ts`): 1 = ancestral mais antigo da linha de
+   * sangue, descendo ramo a ramo até o requerente. Nunca recalculado aqui —
+   * só lido (`numerosLinhagemDasPessoas`). `null` = pessoa sem número
+   * calculado (árvore sem essa pessoa, ou fora da linha reta).
+   */
+  numeroLinhagem: number | null
+  /**
+   * NASCIMENTO/CASAMENTO/OBITO — resumo do `Documento.tipo` (enum legado,
+   * espelho de `documentType.legacyEnumKey`) para agrupar/ordenar a sequência
+   * genealógica de uma pessoa (Minha Operação, achado 25/09/2026). `null` para
+   * tarefas sem documento vinculado ou cujo tipo não é um dos três.
+   */
+  categoriaDoc: "NASCIMENTO" | "CASAMENTO" | "OBITO" | null
   /** Marca a NATUREZA da tarefa (ex.: "obrigacao-atribuicao") — `null` para uma tarefa comum. */
   origem: string | null
   faseMacroKey: string | null
@@ -332,8 +348,33 @@ const SELECT = {
   // SÓ para IDENTIFICAR o terceiro quando a tarefa já está esperando um — o
   // vínculo em si nunca decide o estado (ver `aguardandoTerceiro` em
   // `whereGerencial`).
-  documento: { select: { orgao: { select: { name: true, email: true, telefone: true } } } },
+  // `tipo`: só pra classificar nascimento/casamento/óbito na ordenação da
+  // sequência genealógica (`categoriaDoc`) — nunca usado como identidade.
+  documento: { select: { tipo: true, orgao: { select: { name: true, email: true, telefone: true } } } },
 } satisfies Prisma.TarefaSelect
+
+/** NASCIMENTO/CASAMENTO/OBITO a partir do enum legado — só as variantes "Inteiro Teor" contam junto, o resto (RG, CPF, apostila…) fica `null` e vai para o fim da sequência. */
+function categoriaDocumento(tipo: TipoDocumento | null | undefined): "NASCIMENTO" | "CASAMENTO" | "OBITO" | null {
+  if (tipo === 'CERTIDAO_NASCIMENTO' || tipo === 'CERTIDAO_NASCIMENTO_INTEIRO_TEOR') return 'NASCIMENTO'
+  if (tipo === 'CERTIDAO_CASAMENTO' || tipo === 'CERTIDAO_CASAMENTO_INTEIRO_TEOR') return 'CASAMENTO'
+  if (tipo === 'CERTIDAO_OBITO' || tipo === 'CERTIDAO_OBITO_INTEIRO_TEOR') return 'OBITO'
+  return null
+}
+
+/**
+ * MESMA CLASSIFICAÇÃO, a partir do TÍTULO — fallback só de ORDENAÇÃO (nunca
+ * identidade): achado real 25/09/2026, a Tarefa nasce antes do `Documento`
+ * (fase de Genealogia — "Localizar registro" — ainda não tem
+ * `documentoId`), e sem isto essas tarefas caíam pro fim da sequência em vez
+ * de ficarem junto das irmãs nascimento/casamento/óbito da mesma pessoa.
+ */
+function categoriaDocumentoDoTitulo(titulo: string): "NASCIMENTO" | "CASAMENTO" | "OBITO" | null {
+  const t = titulo.toLowerCase()
+  if (t.includes('nascimento')) return 'NASCIMENTO'
+  if (t.includes('casamento')) return 'CASAMENTO'
+  if (t.includes('óbito') || t.includes('obito')) return 'OBITO'
+  return null
+}
 
 type Bruta = Prisma.TarefaGetPayload<{ select: typeof SELECT }>
 
@@ -343,6 +384,7 @@ function projetar(
   rotulosDePasso?: Map<number, string>,
   totaisDePassos?: Map<string, number>,
   progressoSubtarefa?: Map<number, ResumoSubtarefasDoPasso>,
+  numerosLinhagem?: Map<number, number | null>,
 ): LinhaDeFila {
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
@@ -367,6 +409,8 @@ function projetar(
     origem: t.origem ?? null,
     pessoaId: t.pessoaId ?? null,
     pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
+    numeroLinhagem: t.pessoaId != null ? numerosLinhagem?.get(t.pessoaId) ?? null : null,
+    categoriaDoc: categoriaDocumento(t.documento?.tipo) ?? categoriaDocumentoDoTitulo(t.titulo),
     faseMacroKey: t.faseMacroKey,
     // O NOME DO PASSO, na ordem da fonte mais próxima do que foi publicado:
     // o snapshot do momento da instanciação, depois a DEFINIÇÃO publicada, e a
@@ -1812,8 +1856,9 @@ type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL 
  * fila — nunca só na visão gerencial.
  */
 async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leitor = prisma): Promise<LinhaGerencial[]> {
-  const [nomes, rotulos, totais, subtarefas] = await Promise.all([
+  const [nomes, rotulos, totais, subtarefas, numerosLinhagem] = await Promise.all([
     nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db), progressoPorSubtarefa(brutas, db),
+    numerosLinhagemDasPessoas(brutas, db),
   ])
   const paradas = await contextoDeParada(
     brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
@@ -1822,7 +1867,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
   const hoje = diaOperacional(agora)
 
   const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas)
+    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, numerosLinhagem)
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
