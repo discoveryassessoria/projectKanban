@@ -30,7 +30,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import {
   Search, Play, CalendarClock, AlertTriangle, Clock3, Hourglass, CheckCircle2,
   SlidersHorizontal, X as XIcon, ArrowUpRight, UserPlus, MoreVertical, ClipboardCheck,
-  ChevronLeft, ChevronRight, ChevronDown, LayoutGrid, List, Maximize2, Minimize2, Bell, BarChart3,
+  ChevronLeft, ChevronRight, ChevronDown, LayoutGrid, List, Maximize2, Minimize2, BarChart3,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -42,7 +42,7 @@ import {
   SeletorResponsavel, acaoPrincipal, type LinhaDeFila, type LinhaOperacional,
 } from "./kit-operacional"
 import {
-  CATEGORIAS_ATENCAO, classificarAtencaoOperacional, motivosAtivos, ordenarPorAtencaoOperacional, rotuloDeAtencao,
+  CATEGORIAS_ATENCAO, classificarAtencaoOperacional, motivosAtivos, ordenarPorAtencaoOperacional,
   ROTULO_MOTIVO, type CategoriaAtencao,
 } from "@/lib/operacional/atencao-operacional"
 import { urlOperacionalDaTarefa, urlDistribuicaoDoProcesso } from "@/lib/operacional/navegacao"
@@ -263,7 +263,6 @@ function LinhaOperacaoTabela({
   aoDevolverAFila?: () => void
   aoContatarTerceiro?: () => void
 }) {
-  const atencaoLinha = rotuloDeAtencao(l)
   const acao = acaoPrincipal(l)
   return (
     <tr
@@ -275,9 +274,6 @@ function LinhaOperacaoTabela({
           <input type="checkbox" checked={marcado} onChange={aoMarcar} className="h-3.5 w-3.5 accent-[var(--action-primary)]" />
         </td>
       )}
-      <td className="px-3 py-2.5">
-        <Etiqueta tom={atencaoLinha.tom === "critico" ? "critico" : atencaoLinha.tom === "alerta" ? "alerta" : "neutro"}>{atencaoLinha.rotulo}</Etiqueta>
-      </td>
       <td className="max-w-[160px] overflow-hidden px-3 py-2.5">
         <div className="flex items-center gap-1.5">
           <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[8.5px] font-semibold text-[var(--pessoa)]">
@@ -294,7 +290,10 @@ function LinhaOperacaoTabela({
           {l.emRisco && (
             <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--danger)]" title={l.motivosRisco.length ? l.motivosRisco.join(" · ") : "Em risco"} />
           )}
-          <span className="block min-w-0 truncate text-[12.5px] font-medium text-[var(--text-primary)]">{l.titulo}</span>
+          {/* `servico` é a MESMA obrigação sem o " · Nome" que `titulo` embute —
+              a coluna Pessoa ao lado já mostra o nome; repeti-lo aqui era
+              duplicação, não informação nova. */}
+          <span className="block min-w-0 truncate text-[12.5px] font-medium text-[var(--text-primary)]">{l.servico ?? l.titulo}</span>
         </div>
         {/* MOTIVOS CONCORRENTES — vários relógios podem tocar ao mesmo tempo
             pra MESMA tarefa (mandato "motor de atenção operacional",
@@ -323,9 +322,6 @@ function LinhaOperacaoTabela({
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${COR_PRIORIDADE[l.prioridade] ?? "bg-[var(--text-muted)]"}`} />
           {ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}
         </span>
-      </td>
-      <td className="px-3 py-2.5">
-        <Etiqueta tom={tomDaSituacao(l)}>{textoDaSituacao(l)}</Etiqueta>
       </td>
       <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-[11.5px] text-[var(--text-secondary)]">
         {l.terceiroNome ? <span className="block truncate text-[var(--info-text)]">{l.terceiroNome}</span> : "—"}
@@ -428,56 +424,6 @@ function ModalMotivo({ titulo, placeholder, ocupado, erro, aoFechar, aoConfirmar
           >
             {ocupado ? "Enviando…" : "Confirmar"}
           </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface Acontecimento { id: number; tipo: string; titulo: string; mensagem: string; link: string | null; criadoEm: string }
-
-/**
- * NOTIFICAÇÃO DENTRO DA ABA (C9) — o sino do topo é do app inteiro,
- * misturado com tudo. Aqui é só o que aconteceu NA operação de quem está
- * olhando, lido da MESMA porta canônica (`/api/notificacoes`) — nenhuma
- * tabela nova, nenhum estado paralelo ao sino.
- */
-function PainelNotificacoes({ itens, aoFechar, aoMarcarLida, aoAbrirLink }: {
-  itens: Acontecimento[] | null
-  aoFechar: () => void
-  aoMarcarLida: (id: number) => void
-  aoAbrirLink: (link: string | null) => void
-}) {
-  return (
-    <div className="fixed inset-0 z-[10000] flex items-stretch justify-end bg-[var(--overlay-modal)]" onClick={aoFechar}>
-      <div
-        className="flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
-          <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Notificações</h2>
-          <button onClick={aoFechar} className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]">
-            <XIcon className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          {itens == null && <Estado tipo="carregando" mensagem="Carregando notificações…" />}
-          {itens != null && itens.length === 0 && <Estado tipo="vazio" mensagem="Nada de novo desde a última vez que você entrou aqui." />}
-          {itens?.map((n) => (
-            <div key={n.id} className="border-b border-[var(--border-subtle)] px-4 py-2.5">
-              <button
-                onClick={() => { aoMarcarLida(n.id); aoAbrirLink(n.link) }}
-                className="block w-full text-left"
-              >
-                <div className="text-[12.5px] font-medium text-[var(--text-primary)]">{n.titulo}</div>
-                <div className="mt-0.5 text-[11.5px] text-[var(--text-secondary)]">{n.mensagem}</div>
-                <div className="mt-0.5 text-[10.5px] text-[var(--text-muted)]">{new Date(n.criadoEm).toLocaleString("pt-BR")}</div>
-              </button>
-              <button onClick={() => aoMarcarLida(n.id)} className="mt-1 text-[10.5px] text-[var(--action-primary)] hover:underline">
-                Marcar como lida
-              </button>
-            </div>
-          ))}
         </div>
       </div>
     </div>
@@ -615,15 +561,6 @@ function textoDaSituacao(l: LinhaOperacional): string {
   return ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa
 }
 /** A cor do badge de situação — mesma régua semântica do resto da tela. */
-function tomDaSituacao(l: LinhaOperacional): "neutro" | "alerta" | "critico" | "acento" | "sucesso" {
-  if (l.requerDecisao) return "alerta"
-  if (l.coluna === "AGUARDANDO_TERCEIRO") return "alerta"
-  if (l.coluna === "BLOQUEADA") return "critico"
-  if (l.coluna === "A_FAZER") return "acento"
-  if (l.coluna === "CONCLUIDA") return "sucesso"
-  return "neutro"
-}
-
 /** A próxima ação/acontecimento — mandato §15, a coluna mais importante da tela. */
 function textoDaProximaAcao(l: LinhaOperacional): string {
   if (l.proximoAcontecimento?.descricao) return l.proximoAcontecimento.descricao
@@ -760,29 +697,7 @@ export function MinhaOperacao() {
     return () => clearInterval(t)
   }, [])
 
-  // ── NOTIFICAÇÕES DENTRO DA ABA (C9) — mesma porta canônica do sino
-  // (`/api/notificacoes`), sem tabela nova. Recarrega no mesmo ritmo do
-  // polling silencioso, pra o número do sininho local nunca ficar velho.
-  const [notifAberto, setNotifAberto] = useState(false)
   const [relatorioAberto, setRelatorioAberto] = useState(false)
-  const [acontecimentos, setAcontecimentos] = useState<Acontecimento[] | null>(null)
-  const carregarNotificacoes = useCallback(async () => {
-    try {
-      const r = await fetch("/api/notificacoes", { headers: auth() })
-      if (!r.ok) return
-      const d: { acontecimentos?: Acontecimento[] } = await r.json()
-      setAcontecimentos(d.acontecimentos ?? [])
-    } catch { /* poll silencioso */ }
-  }, [])
-  useEffect(() => {
-    void carregarNotificacoes()
-    const t = setInterval(() => { if (!document.hidden) void carregarNotificacoes() }, 20000)
-    return () => clearInterval(t)
-  }, [carregarNotificacoes])
-  const marcarNotificacaoLida = useCallback(async (id: number) => {
-    setAcontecimentos((prev) => (prev ? prev.filter((n) => n.id !== id) : prev))
-    await fetch(`/api/notificacoes/${id}/lida`, { method: "POST", headers: auth() }).catch(() => {})
-  }, [])
 
   // A BUSCA TEM DEBOUNCE — não dispara um request por tecla (mandato §21).
   const [buscaDigitada, setBuscaDigitada] = useState("")
@@ -1215,7 +1130,7 @@ export function MinhaOperacao() {
   })
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--surface-page)]">
+    <div className="flex flex-1 min-h-0 flex-col bg-[var(--surface-page)]">
       {/* ── CABEÇALHO ── */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-6 py-5">
         <div className="flex items-start gap-3">
@@ -1235,18 +1150,6 @@ export function MinhaOperacao() {
             >
               <BarChart3 className="h-3.5 w-3.5" /> Meu relatório
             </button>
-            <button
-              onClick={() => setNotifAberto(true)}
-              className="relative rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] p-1.5 text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-              aria-label="Notificações da operação"
-            >
-              <Bell className="h-4 w-4" />
-              {acontecimentos != null && acontecimentos.length > 0 && (
-                <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-[var(--danger)] px-1 text-[9px] font-semibold text-white">
-                  {acontecimentos.length > 9 ? "9+" : acontecimentos.length}
-                </span>
-              )}
-            </button>
             <div className="text-right">
               <div className="text-[11.5px] text-[var(--text-secondary)]">{dataAgora}</div>
               <div className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">{horaAgora}</div>
@@ -1265,9 +1168,24 @@ export function MinhaOperacao() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden px-6 py-4">
-        <div className="flex h-full min-h-0 gap-4">
-          <div className={`flex min-h-0 min-w-0 flex-1 flex-col gap-3 ${selecionado != null ? "hidden lg:flex" : ""}`}>
+      <div className="flex min-h-0 flex-1 overflow-hidden px-6 py-4">
+        <div className="flex flex-1 min-h-0 gap-4">
+          {/* O PAINEL INTEIRO ROLA COMO UMA UNIDADE — ladrilhos, filtros e
+              tabela juntos, não uma "gaveta" interna minúscula. Achado real
+              24/09/2026: com `overflow-hidden` aqui e `overflow-auto` só na
+              lista de famílias lá dentro, telas mais baixas (laptop, janela
+              não maximizada) esbarravam num cálculo de flexbox que nunca
+              sobra altura suficiente pra segunda travar — o rodapé "Mostrando
+              5 de 17…" ficava cortado sem jeito de rolar até ele.
+              Achado nº2, mesmo dia: mesmo depois de isolar o scroll aqui, a
+              cadeia de `h-full` (porcentagem) contra ancestrais `display:block`
+              nunca resolvia — cada nível renderizava na altura do CONTEÚDO em
+              vez de encolher pro espaço disponível, e o excesso ficava
+              invisível, cortado sem rolagem pelo `overflow-hidden` do
+              `page.tsx`. Troquei toda a cadeia de `h-full` por `flex-1`
+              (item de flexbox, não porcentagem) — é o mesmo padrão que já
+              funciona entre `main` e o wrapper do `page.tsx`. */}
+          <div className={`flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden ${selecionado != null ? "hidden lg:flex" : ""}`}>
             {/* O QUE ACONTECEU AO COMANDAR — nunca falha silenciosa. Antes de
                 existir, um 403/409/rede perdida no "Iniciar tarefa" não
                 aparecia em lugar nenhum: a pessoa clicava, nada mudava, e o
@@ -1497,7 +1415,12 @@ export function MinhaOperacao() {
             )}
 
             {/* ── TABELA — item 13, "Visão por família" (padrão) ou "Visão por lista" (chata) ── */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+            {/* `shrink-0`: sem isto, `overflow-hidden` zera o tamanho mínimo
+                automático deste item (regra do flexbox) e o painel pai
+                (que é quem deve rolar) encolhe a tabela pra caber em vez de
+                deixá-la no tamanho real e rolar por cima — achado real
+                24/09/2026, parte 2 do mesmo bug de rolagem. */}
+            <div className="flex shrink-0 flex-col overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
               {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar sua operação." aoTentar={() => setRecarga((n) => n + 1)} />}
               {carregando && <Estado tipo="carregando" mensagem="Carregando sua operação…" />}
               {!carregando && !falhou && gruposVisiveis?.length === 0 && (
@@ -1514,20 +1437,18 @@ export function MinhaOperacao() {
               )}
 
               {visaoModo === "lista" && !carregando && !falhou && ordenadas != null && ordenadas.length > 0 && (
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="min-h-0 flex-1 overflow-auto">
+                <div className="flex flex-col">
+                  <div>
                     <table className="w-full border-collapse text-left">
                       <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
                         <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
                           {podeAtribuirLote && <th className="w-8" />}
-                          <th>Atenção</th>
                           <ThOrdenavel label="Pessoa" campo="pessoa" ativo={sortColuna === "pessoa"} asc={sortAsc} aoClicar={() => alternarSortColuna("pessoa")} />
                           <th>Documento / Tarefa</th>
                           <ThOrdenavel label="Fase" campo="fase" ativo={sortColuna === "fase"} asc={sortAsc} aoClicar={() => alternarSortColuna("fase")} />
                           <th>Etapa atual</th>
                           <ThOrdenavel label="Prazo" campo="prazo" ativo={sortColuna === "prazo"} asc={sortAsc} aoClicar={() => alternarSortColuna("prazo")} />
                           <ThOrdenavel label="Prioridade" campo="prioridade" ativo={sortColuna === "prioridade"} asc={sortAsc} aoClicar={() => alternarSortColuna("prioridade")} />
-                          <th>Situação</th>
                           <th>Terceiro</th>
                           <th className="w-24">Ações</th>
                         </tr>
@@ -1570,7 +1491,7 @@ export function MinhaOperacao() {
               )}
 
               {visaoModo === "familia" && gruposVisiveis != null && gruposVisiveis.length > 0 && (
-                <div className="min-h-0 flex-1 overflow-auto divide-y divide-[var(--border-subtle)]">
+                <div className="divide-y divide-[var(--border-subtle)]">
                   {gruposVisiveis.map((g) => {
                     const aberto = expandidos.has(g.chave)
                     const verTodas = familiasVerTodas.has(g.chave)
@@ -1620,14 +1541,12 @@ export function MinhaOperacao() {
                               <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
                                 <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
                                   {podeAtribuirLote && <th className="w-8" />}
-                                  <th>Atenção</th>
                                   <ThOrdenavel label="Pessoa" campo="pessoa" ativo={sortColuna === "pessoa"} asc={sortAsc} aoClicar={() => alternarSortColuna("pessoa")} />
                                   <th>Documento / Tarefa</th>
                                   <ThOrdenavel label="Fase" campo="fase" ativo={sortColuna === "fase"} asc={sortAsc} aoClicar={() => alternarSortColuna("fase")} />
                                   <th>Etapa atual</th>
                                   <ThOrdenavel label="Prazo" campo="prazo" ativo={sortColuna === "prazo"} asc={sortAsc} aoClicar={() => alternarSortColuna("prazo")} />
                                   <ThOrdenavel label="Prioridade" campo="prioridade" ativo={sortColuna === "prioridade"} asc={sortAsc} aoClicar={() => alternarSortColuna("prioridade")} />
-                                  <th>Situação</th>
                                   <th>Terceiro</th>
                                   <th className="w-24">Ações</th>
                                 </tr>
@@ -1765,14 +1684,6 @@ export function MinhaOperacao() {
         />
       )}
 
-      {notifAberto && (
-        <PainelNotificacoes
-          itens={acontecimentos}
-          aoFechar={() => setNotifAberto(false)}
-          aoMarcarLida={(id) => void marcarNotificacaoLida(id)}
-          aoAbrirLink={(link) => { if (link) router.push(link) }}
-        />
-      )}
 
       {relatorioAberto && (
         <PainelRelatorio

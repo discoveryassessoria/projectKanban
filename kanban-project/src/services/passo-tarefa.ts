@@ -255,7 +255,10 @@ export async function garantirTarefaDePasso(
           chaveIdempotencia: chaveTarefa,
           necessidadeId: unidade.necessidadeId,
           documentoId: unidade.documentoId,
-          pessoaId: unidade.pessoaId,
+          // `pessoaId` (não `unidade.pessoaId`): a variável local já passou
+          // pelo fallback de casamento (`titularDaUniao`) que
+          // `normalizarUnidade` não conhece — mesma correção do `create` acima.
+          pessoaId,
           deInstanciaId: daUnidade.workflowInstanceId,
           chaveAnterior: daUnidade.chaveIdempotencia,
         })
@@ -277,6 +280,13 @@ export async function garantirTarefaDePasso(
           workflowStepInstanceId: step.id,
           necessidadeId: step.necessidadeId,
           documentoId: step.documentoId,
+          // A MESMA `pessoaId` que já resolvia o TÍTULO (necessidade → união →
+          // documento → passo) nunca chegava à COLUNA — achado real 24/09/2026:
+          // o título dizia "· Ignacio Cibils", mas `Tarefa.pessoaId` ficava
+          // `null` pra sempre, e toda projeção que lê a coluna (Minha
+          // Operação, Distribuição) mostrava "—" na Pessoa mesmo com o nome
+          // certo no documento/tarefa.
+          pessoaId,
           faseMacroKey: step.faseMacroKey,
           // O CICLO DA OBRIGAÇÃO — o MESMO que a chave de identidade carrega.
           //

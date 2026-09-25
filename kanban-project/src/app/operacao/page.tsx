@@ -93,7 +93,11 @@ function OperacaoPageConteudo() {
             Abrir Central Operacional →
           </Link>
         </div>
-        <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-white/[0.08]">
+        {/* `flex` aqui (não só `flex-1`): o filho usa `flex-1` pra herdar
+            altura, e isso só funciona como ITEM de flexbox — `height:100%`
+            contra um ancestral `display:block` não resolvia (achado real
+            24/09/2026, a rolagem da Minha Operação nunca reproduzia). */}
+        <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border border-white/[0.08]">
           <MinhaOperacao />
         </div>
       </main>
