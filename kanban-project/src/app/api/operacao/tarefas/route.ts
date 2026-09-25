@@ -37,6 +37,13 @@ function filtrosDaQuery(sp: URLSearchParams): Omit<FiltrosGerenciais, 'responsav
   if (prazo === 'atrasadas') f.atrasadas = true
   else if (prazo === 'hoje') f.venceHoje = true
   else if (prazo === '7dias') f.proximos7Dias = true
+  // ESCOPAR A UMA FAMÍLIA/PROCESSO — usado pela tabela rica da família
+  // expandida (Central Operacional, fusão 25/09/2026): a MESMA fila pessoal,
+  // só recortada a quem já está vendo, nunca uma segunda consulta.
+  const familia = sp.get('familia')
+  if (familia) { const n = Number(familia); if (Number.isInteger(n) && n > 0) f.familiaId = n }
+  const processo = sp.get('processo')
+  if (processo) { const n = Number(processo); if (Number.isInteger(n) && n > 0) f.processoId = n }
   return f
 }
 

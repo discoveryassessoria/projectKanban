@@ -18,15 +18,15 @@
 // ============================================================================
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
+import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { gravarLocal, useJsonLocalStorage } from "@/src/lib/cliente"
-import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
-  auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, rotularFase, useRotulosDeFaseProntos,
-  SeletorResponsavel, type LinhaDeFila,
+  auth, dataCurta, Estado, ROTULO_PRIORIDADE, rotularFase, useRotulosDeFaseProntos,
+  type LinhaOperacional,
 } from "./kit-operacional"
+import { FamiliaTabelaExpandida, CartaoObrigacaoAdministrativa, ORIGEM_OBRIGACAO_ATRIBUICAO } from "./tabela-familia"
+import { MinhaOperacaoDetalhe } from "./minha-operacao-detalhe"
 
 // ── tipos que espelham a projeção canônica (lib/operacional/tarefa-projecoes.ts) ──
 
@@ -41,12 +41,6 @@ interface ProcessoAgrupado extends Contagens {
 interface FamiliaAgrupada extends Contagens {
   familiaId: number | null; nomeFamilia: string; processos: ProcessoAgrupado[]
   responsavelPrincipal: { id: number; nome: string } | null; ultimaAtividade: string | null; pendenciasFaseAnterior: number
-}
-interface LinhaGerencial extends LinhaDeFila {
-  venceHoje: boolean
-  esperandoDe: "terceiro" | "cliente" | null
-  esperandoHaDias: number | null
-  motivoBloqueio: string | null
 }
 interface RespostaCentral {
   familias: FamiliaAgrupada[]
@@ -156,14 +150,7 @@ const PONTO_TOM: Record<string, string> = {
 
 export function CentralOperacional() {
   useRotulosDeFaseProntos()
-  const router = useRouter()
   const paramsIniciais = useSearchParams()
-  // MESMA permissão que a porta canônica exige no backend (`tarefas.editar`,
-  // /api/tarefas/redistribuir e /api/tarefas/repriorizar) — esconder o botão
-  // sem repetir a checagem aqui seria confiar só na UI; a rota já barra quem
-  // não tem a permissão, isto só evita mostrar um controle que vai falhar.
-  const { pode } = usePermissoes()
-  const podeRedistribuirOuRepriorizar = pode("tarefas.editar")
   // DEEP-LINK — a Home ("Trabalho para distribuir", famílias) linka pra cá já
   // com o recorte pronto. Lido só uma vez, no mount: depois disso quem manda
   // é o estado local, como em qualquer filtro desta tela.
@@ -183,106 +170,10 @@ export function CentralOperacional() {
   const [recarga, setRecarga] = useState(0)
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set())
   const [maisFiltrosAberto, setMaisFiltrosAberto] = useState(false)
-  const [fasesAbertas, setFasesAbertas] = useState<Set<string>>(new Set())
-  const [tarefasPorFase, setTarefasPorFase] = useState<Map<string, { carregando: boolean; linhas: LinhaGerencial[] | null; erro: string | null }>>(new Map())
-  const [loteAlvo, setLoteAlvo] = useState<{ familia: FamiliaAgrupada; acao: "atribuir" | "repriorizar" } | null>(null)
-  const [loteOcupado, setLoteOcupado] = useState(false)
-  const [loteAviso, setLoteAviso] = useState<string | null>(null)
-
-  // ── PENDÊNCIA CONSOLIDADA "SEM RESPONSÁVEL" ─────────────────────────────
-  // Nenhuma tabela nova, nenhuma notificação persistida: é a MESMA leitura
-  // gerencial (`/api/operacao/visao-global?familia=…&semResponsavel=1`) que
-  // `executarLote` já usa, só que aberta direto no recorte "sem responsável"
-  // da família clicada, com seleção parcial — em vez de "todas as tarefas do
-  // filtro ativo da tela". `agregacaoPorFamilia` continua sendo a ÚNICA fonte
-  // do contador (`f.semResponsavel`); este painel só lê o detalhe por trás.
-  const [pendenciaAlvo, setPendenciaAlvo] = useState<FamiliaAgrupada | null>(null)
-  const [pendenciaCarregando, setPendenciaCarregando] = useState(false)
-  const [pendenciaLinhas, setPendenciaLinhas] = useState<LinhaGerencial[] | null>(null)
-  const [pendenciaSelecionadas, setPendenciaSelecionadas] = useState<Set<number>>(new Set())
-  const [pendenciaSeletorAberto, setPendenciaSeletorAberto] = useState(false)
-  const [pendenciaOcupado, setPendenciaOcupado] = useState(false)
-  const [pendenciaAviso, setPendenciaAviso] = useState<string | null>(null)
-
-  const carregarPendenciaSemResponsavel = useCallback((familia: FamiliaAgrupada) => {
-    setPendenciaCarregando(true)
-    setPendenciaLinhas(null)
-    const p = new URLSearchParams({ semResponsavel: "1", porPagina: "500" })
-    if (familia.familiaId != null) p.set("familia", String(familia.familiaId))
-    else p.set("processo", String(familia.processos[0]?.processoId ?? ""))
-    fetch(`/api/operacao/visao-global?${p.toString()}`, { headers: auth() })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { linhas: LinhaGerencial[] }) => { setPendenciaLinhas(d.linhas); setPendenciaCarregando(false) })
-      .catch(() => { setPendenciaLinhas(null); setPendenciaCarregando(false) })
-  }, [])
-
-  const abrirPendenciaSemResponsavel = useCallback((familia: FamiliaAgrupada) => {
-    setPendenciaAlvo(familia)
-    setPendenciaSelecionadas(new Set())
-    setPendenciaAviso(null)
-    setPendenciaSeletorAberto(false)
-    carregarPendenciaSemResponsavel(familia)
-  }, [carregarPendenciaSemResponsavel])
-
-  const fecharPendencia = useCallback(() => {
-    setPendenciaAlvo(null)
-    setPendenciaLinhas(null)
-    setPendenciaSelecionadas(new Set())
-  }, [])
-
-  // DEEP-LINK DA OBRIGAÇÃO ADMINISTRATIVA — `urlDistribuicaoDoProcesso`
-  // (lib/operacional/navegacao.ts) manda pra cá com `abrirDistribuicao=1` +
-  // `processoId`. Lido só uma vez, no mount, como `filtros` acima.
-  const [abrirDistribuicaoProcessoId] = useState<number | null>(() => {
-    if (paramsIniciais.get("abrirDistribuicao") !== "1") return null
-    const n = Number(paramsIniciais.get("processoId"))
-    return Number.isInteger(n) && n > 0 ? n : null
-  })
-  const deepLinkTentado = useRef(false)
-
-  const alternarSelecaoTarefa = (taskId: number) => setPendenciaSelecionadas((prev) => {
-    const novo = new Set(prev)
-    if (novo.has(taskId)) novo.delete(taskId); else novo.add(taskId)
-    return novo
-  })
-
-  const alternarSelecaoTodas = () => setPendenciaSelecionadas((prev) => {
-    if (!pendenciaLinhas) return prev
-    if (prev.size === pendenciaLinhas.length) return new Set()
-    return new Set(pendenciaLinhas.map((l) => l.taskId))
-  })
-
-  // ATRIBUI SÓ AS SELECIONADAS — mesma porta (`redistribuirTarefas`, item a
-  // item, auditado) que `executarLote` já usa; a diferença é o CONJUNTO de
-  // IDs, nunca "tudo que bate no filtro". Depois de escrever, relê o estado
-  // real (nunca assume localmente quem sobrou) e recarrega a lista de fora
-  // para o contador da família convergir sozinho.
-  const atribuirSelecionadas = async (novoResponsavelId: number) => {
-    if (!pendenciaAlvo || pendenciaSelecionadas.size === 0) return
-    setPendenciaOcupado(true)
-    setPendenciaAviso(null)
-    try {
-      const resp = await fetch("/api/tarefas/redistribuir", {
-        method: "POST",
-        headers: auth(),
-        body: JSON.stringify({
-          tarefaIds: [...pendenciaSelecionadas],
-          novoResponsavelId,
-          motivo: "Atribuição a partir da pendência 'sem responsável' da Central Operacional",
-        }),
-      })
-      const res: { total: number; sucesso: number; falha: number } = await resp.json()
-      setPendenciaAviso(`${res.sucesso} de ${res.total} tarefa(s) atribuída(s).${res.falha > 0 ? ` ${res.falha} não puderam mudar.` : ""}`)
-      setPendenciaSeletorAberto(false)
-      setPendenciaSelecionadas(new Set())
-      carregarPendenciaSemResponsavel(pendenciaAlvo)
-      recarregar()
-    } catch {
-      setPendenciaAviso("Não foi possível concluir a atribuição.")
-    } finally {
-      setPendenciaOcupado(false)
-    }
-  }
+  // PAINEL DE DETALHE — a mesma gaveta lateral que Minha Operação já usava,
+  // agora compartilhada por qualquer família expandida nesta tela (uma só de
+  // cada vez, nunca uma por família).
+  const [selecionado, setSelecionado] = useState<{ taskId: number; processoId: number | null } | null>(null)
 
   useEffect(() => {
     try { setIsAdmin(JSON.parse(localStorage.getItem("user") ?? "{}")?.tipo === "admin") } catch { /* ignora */ }
@@ -312,18 +203,61 @@ export function CentralOperacional() {
   const carregando = resultado?.chave !== chave
   const dados = carregando ? null : resultado?.d ?? null
   const falhou = !carregando && dados == null
-  const recarregar = useCallback(() => setRecarga((n) => n + 1), [])
+  const recarregar = () => setRecarga((n) => n + 1)
 
-  // Assim que a família daquele processo aparece na primeira leitura, abre o
-  // MESMO painel que o clique manual no chip "sem responsável" abriria — sem
-  // isso, o link da tarefa/notificação administrativa aterrissava aqui e não
-  // executava nada.
+  // ── CONCLUÍDAS HOJE, POR PROCESSO ───────────────────────────────────────
+  // `linhas` de cada família expandida NUNCA inclui concluídas quando o
+  // escopo é `minha_fila` (`minhaFila()` exclui de propósito — "o que já foi
+  // entregue não é trabalho de hoje"). Por isso o contador de "concluídas
+  // hoje" do mini-ladrilho vem de UMA leitura à parte, aqui em cima, e desce
+  // por processo — o mesmo padrão que Minha Operação já usava antes da
+  // fusão, só que agora escopado por `filtros.escopo` também.
+  const [concluidasPorProcesso, setConcluidasPorProcesso] = useState<Map<number, number>>(new Map())
   useEffect(() => {
-    if (deepLinkTentado.current || abrirDistribuicaoProcessoId == null || !dados) return
-    deepLinkTentado.current = true
-    const familia = dados.familias.find((f) => f.processos.some((p) => p.processoId === abrirDistribuicaoProcessoId))
-    if (familia) abrirPendenciaSemResponsavel(familia)
-  }, [abrirDistribuicaoProcessoId, dados, abrirPendenciaSemResponsavel])
+    let vivo = true
+    const hoje = new Date().toISOString().slice(0, 10)
+    const p = filtros.escopo === "minha_fila"
+      ? new URLSearchParams({ visao: "concluidas_hoje" })
+      : (() => {
+          const q = new URLSearchParams({ dataTipo: "concluida", dataInicio: hoje, dataFim: hoje, porPagina: "500" })
+          if (filtros.escopo === "sem_responsavel") q.set("semResponsavel", "1")
+          return q
+        })()
+    const url = filtros.escopo === "minha_fila" ? `/api/operacao/tarefas?${p}` : `/api/operacao/visao-global?${p}`
+    fetch(url, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { linhas?: LinhaOperacional[] }) => {
+        if (!vivo) return
+        const mapa = new Map<number, number>()
+        for (const l of d.linhas ?? []) {
+          if (l.processoId == null) continue
+          mapa.set(l.processoId, (mapa.get(l.processoId) ?? 0) + 1)
+        }
+        setConcluidasPorProcesso(mapa)
+      })
+      .catch(() => { if (vivo) setConcluidasPorProcesso(new Map()) })
+    return () => { vivo = false }
+  }, [filtros.escopo, recarga])
+
+  // ── OBRIGAÇÃO ADMINISTRATIVA ("Atribuir tarefas") ───────────────────────
+  // Cartão próprio, sempre visível no topo, independente de filtro — só faz
+  // sentido em "Minha fila" (é trabalho ATRIBUÍDO ao usuário logado; "Toda a
+  // operação"/"Sem responsável" já mostram a operação inteira, o cartão seria
+  // redundante ali).
+  const [linhasAdministrativasBrutas, setLinhasAdministrativasBrutas] = useState<LinhaOperacional[]>([])
+  useEffect(() => {
+    if (filtros.escopo !== "minha_fila") return
+    let vivo = true
+    fetch(`/api/operacao/tarefas?visao=minha_fila`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { linhas?: LinhaOperacional[] }) => {
+        if (vivo) setLinhasAdministrativasBrutas((d.linhas ?? []).filter((l) => l.origem === ORIGEM_OBRIGACAO_ATRIBUICAO))
+      })
+      .catch(() => { if (vivo) setLinhasAdministrativasBrutas([]) })
+    return () => { vivo = false }
+  }, [filtros.escopo, recarga])
+  // Só faz sentido em "Minha fila" — nunca mostra dado velho de outro escopo.
+  const linhasAdministrativas = filtros.escopo === "minha_fila" ? linhasAdministrativasBrutas : []
 
   const vistas = useJsonLocalStorage<VistaSalva[]>(CHAVE_VISTAS) ?? []
 
@@ -338,40 +272,6 @@ export function CentralOperacional() {
     if (novo.has(chaveFamilia)) novo.delete(chaveFamilia); else novo.add(chaveFamilia)
     return novo
   })
-
-  const alternarFase = useCallback((chaveFase: string, familiaId: number | null, processoId: number, faseMacroKey: string) => {
-    setFasesAbertas((prev) => {
-      const novo = new Set(prev)
-      if (novo.has(chaveFase)) novo.delete(chaveFase); else novo.add(chaveFase)
-      return novo
-    })
-    // Já carregada com SUCESSO (linhas não-nula): não refaz. Uma tentativa anterior
-    // que terminou em ERRO tem `linhas === null` e cai adiante, refazendo o fetch —
-    // sem isso, um 403/timeout deixava a fase presa para sempre no estado de erro,
-    // sem qualquer forma de tentar de novo (mandato "Catálogo de Fases", item 7).
-    const existente = tarefasPorFase.get(chaveFase)
-    if (existente && (existente.carregando || existente.linhas !== null)) return
-    setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: true, linhas: null, erro: null }))
-    const p = new URLSearchParams({ processo: String(processoId), fase: faseMacroKey, incluirEncerradas: "1", porPagina: "200" })
-    if (familiaId != null) p.set("familia", String(familiaId))
-    fetch(`/api/operacao/visao-global?${p.toString()}`, { headers: auth() })
-      .then(async (r) => {
-        if (!r.ok) {
-          const corpo = await r.json().catch(() => null)
-          throw new Error(corpo?.error ?? `Falha ao carregar (HTTP ${r.status})`)
-        }
-        return r.json() as Promise<{ linhas: LinhaGerencial[] }>
-      })
-      .then((d) => setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: false, linhas: d.linhas, erro: null })))
-      // ERRO É OBSERVÁVEL, nunca mascarado como "nenhuma tarefa" (Regra 12 do
-      // protocolo): `linhas` permanece null especificamente para diferenciar de
-      // uma fase genuinamente vazia (`linhas: []`), que é um resultado válido.
-      .catch((e: Error) => setTarefasPorFase((m) => new Map(m).set(chaveFase, { carregando: false, linhas: null, erro: e.message || "Falha ao carregar etapas." })))
-  }, [tarefasPorFase])
-
-  const irParaOProcesso = useCallback((l: LinhaGerencial) => {
-    router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
-  }, [router])
 
   const salvarVista = () => {
     const nome = window.prompt("Nome desta vista:")?.trim()
@@ -396,38 +296,6 @@ export function CentralOperacional() {
   }
   const removerVista = (nome: string) => gravarLocal(CHAVE_VISTAS, vistas.filter((v) => v.nome !== nome))
 
-  // O LOTE AGE SOBRE O QUE ESTÁ NA TELA AGORA — busca as tarefas da família
-  // com o MESMO recorte de filtro ativo, nunca "todas as tarefas que já
-  // existiram". Reatribuir/repriorizar, nunca concluir.
-  const executarLote = async (novoValor: number | string) => {
-    if (!loteAlvo) return
-    setLoteOcupado(true)
-    setLoteAviso(null)
-    try {
-      const p = new URLSearchParams(query)
-      p.set("familia", String(loteAlvo.familia.familiaId ?? loteAlvo.familia.processos[0]?.processoId ?? ""))
-      p.set("porPagina", "500")
-      const r = await fetch(`/api/operacao/visao-global?${p.toString()}`, { headers: auth() })
-      const d: { linhas: LinhaGerencial[] } = await r.json()
-      const tarefaIds = d.linhas.map((l) => l.taskId)
-      if (tarefaIds.length === 0) { setLoteAviso("Nenhuma tarefa nesta família com o filtro atual."); setLoteOcupado(false); return }
-
-      const rota = loteAlvo.acao === "atribuir" ? "/api/tarefas/redistribuir" : "/api/tarefas/repriorizar"
-      const corpo = loteAlvo.acao === "atribuir"
-        ? { tarefaIds, novoResponsavelId: novoValor === "" ? null : Number(novoValor), motivo: "Ação em lote pela Central Operacional" }
-        : { tarefaIds, novaPrioridade: novoValor, motivo: "Ação em lote pela Central Operacional" }
-      const resp = await fetch(rota, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
-      const res: { total: number; sucesso: number; falha: number } = await resp.json()
-      setLoteAviso(`${res.sucesso} de ${res.total} tarefa(s) atualizada(s).${res.falha > 0 ? ` ${res.falha} não puderam mudar.` : ""}`)
-      setTarefasPorFase(new Map())
-      recarregar()
-    } catch {
-      setLoteAviso("Não foi possível concluir a ação em lote.")
-    } finally {
-      setLoteOcupado(false)
-    }
-  }
-
   const tiles = useMemo(() => {
     if (!dados) return []
     return [
@@ -445,6 +313,16 @@ export function CentralOperacional() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ── OBRIGAÇÃO ADMINISTRATIVA — sempre visível, independente de
+          filtro/condição/fase (a tabela abaixo é só para tarefas NORMAL/
+          TRANSVERSAL). "Se existe uma tarefa canônica ativa atribuída a mim
+          que exige uma ação minha, eu preciso encontrá-la aqui." ── */}
+      {linhasAdministrativas.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {linhasAdministrativas.map((l) => <CartaoObrigacaoAdministrativa key={l.taskId} l={l} />)}
+        </div>
+      )}
+
       {/* ── ESCOPO + BUSCA ── */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] p-0.5">
@@ -643,13 +521,6 @@ export function CentralOperacional() {
         </div>
       )}
 
-      {loteAviso && (
-        <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
-          {loteAviso}
-          <button onClick={() => setLoteAviso(null)} className="ml-2 text-[var(--text-muted)] hover:text-white/70">fechar</button>
-        </div>
-      )}
-
       {/* ── LISTA ── */}
       {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar a Central Operacional." aoTentar={recarregar} />}
       {carregando && <Estado tipo="carregando" mensagem="Carregando o que precisa ser feito…" />}
@@ -661,6 +532,7 @@ export function CentralOperacional() {
             const chaveFamilia = f.familiaId != null ? `f:${f.familiaId}` : `p:${f.processos[0]?.processoId}`
             const aberta = expandidas.has(chaveFamilia)
             const umSoProcesso = f.processos.length === 1
+            const processoPrincipalId = f.processos[0]?.processoId ?? null
             return (
               <div key={chaveFamilia} className="border-b border-white/[0.05] last:border-b-0">
                 <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-[var(--surface-primary)]">
@@ -689,129 +561,35 @@ export function CentralOperacional() {
                     {f.executavelAgora > 0 && <span className="text-white/70">{f.executavelAgora} executáveis</span>}
                     {f.atrasadas > 0 && <span className="text-red-700/90">{f.atrasadas} atrasadas</span>}
                     {f.bloqueadas > 0 && <span className="text-red-700/90">{f.bloqueadas} bloqueadas</span>}
-                    {/* PENDÊNCIA ADMINISTRATIVA CONSOLIDADA — 1 chip por família,
-                        nunca 1 por tarefa. Clique abre direto as tarefas sem
-                        responsável DESTA família, já prontas para atribuição em
-                        lote (total ou parcial). Destaque de cor (não só texto)
-                        porque isto pede ação, não é mais uma estatística. */}
                     {f.semResponsavel > 0 && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); abrirPendenciaSemResponsavel(f) }}
-                        title="Abrir e atribuir as tarefas sem responsável desta família"
-                        className="rounded-full bg-[var(--warning-tile)] px-2.5 py-1 font-semibold text-[var(--warning-text)] transition-colors hover:brightness-110"
-                      >
+                      <span className="rounded-full bg-[var(--warning-tile)] px-2.5 py-1 font-semibold text-[var(--warning-text)]">
                         {f.semResponsavel} sem responsável
-                      </button>
+                      </span>
                     )}
                     <span className="hidden text-[var(--text-secondary)] sm:inline">
                       {f.responsavelPrincipal?.nome ?? "Vários"}
                     </span>
                     <span className="hidden text-[var(--text-muted)] md:inline">{dataCurta(f.ultimaAtividade)}</span>
                   </div>
-                  {podeRedistribuirOuRepriorizar && (
-                    <div className="relative shrink-0">
-                      <button
-                        onClick={() => setLoteAlvo({ familia: f, acao: "atribuir" })}
-                        className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
-                      >
-                        Atribuir
-                      </button>
-                      <button
-                        onClick={() => setLoteAlvo({ familia: f, acao: "repriorizar" })}
-                        className="ml-1 rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]"
-                      >
-                        Repriorizar
-                      </button>
-                    </div>
-                  )}
                 </div>
 
-                {aberta && f.processos.map((p) => (
-                  <div key={p.processoId} className="bg-[var(--surface-primary)]/30">
-                    {!umSoProcesso && (
-                      <div className="px-3 py-1.5 pl-9 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                        Processo: {p.nomeProcesso} · fase atual: {rotularFase(p.faseAtualKey) ?? "—"}
-                      </div>
-                    )}
-                    {p.fases.map((fa) => {
-                      const chaveFase = `${p.processoId}:${fa.faseMacroKey}`
-                      const faseAberta = fasesAbertas.has(chaveFase)
-                      const carga = tarefasPorFase.get(chaveFase)
-                      return (
-                        <div key={fa.faseMacroKey}>
-                          <button
-                            onClick={() => alternarFase(chaveFase, f.familiaId, p.processoId, fa.faseMacroKey)}
-                            className="flex w-full items-center gap-2 px-3 py-2 pl-12 text-left hover:bg-[var(--surface-primary)]"
-                          >
-                            <span className="w-3 shrink-0 text-[9px] text-[var(--text-muted)]">{faseAberta ? "▾" : "▸"}</span>
-                            <span className="min-w-0 flex-1 text-[11px] text-[var(--text-secondary)]">{fa.label}</span>
-                            <span className="h-1.5 w-20 shrink-0 overflow-hidden rounded-full bg-[var(--surface-secondary)]">
-                              <span
-                                className="block h-full rounded-full bg-[var(--action-primary)]"
-                                style={{ width: `${fa.total > 0 ? Math.round((fa.concluidas / fa.total) * 100) : 0}%` }}
-                              />
-                            </span>
-                            <span className="w-24 shrink-0 text-right text-[10px] tabular-nums text-[var(--text-muted)]">
-                              {fa.concluidas}/{fa.total}
-                              {fa.atrasadas > 0 && <span className="text-red-700/90"> · {fa.atrasadas} atr.</span>}
-                            </span>
-                          </button>
-                          {faseAberta && (
-                            <div className="pb-1 pl-16 pr-3">
-                              {carga?.carregando && <div className="py-2 text-[10px] text-[var(--text-muted)]">Carregando etapas…</div>}
-                              {carga?.erro && (
-                                <div className="flex items-center gap-2 py-2 text-[10px] text-red-700/90">
-                                  <span className="min-w-0 flex-1 truncate">{carga.erro}</span>
-                                  <button
-                                    onClick={() => {
-                                      setTarefasPorFase((m) => {
-                                        const n = new Map(m)
-                                        n.delete(chaveFase)
-                                        return n
-                                      })
-                                      alternarFase(chaveFase, f.familiaId, p.processoId, fa.faseMacroKey)
-                                    }}
-                                    className="shrink-0 rounded border border-red-700/30 px-2 py-0.5 text-[9px] text-red-700/90 hover:bg-red-700/10"
-                                  >
-                                    Tentar de novo
-                                  </button>
-                                </div>
-                              )}
-                              {carga && !carga.carregando && !carga.erro && (carga.linhas?.length ?? 0) === 0 && (
-                                <div className="py-2 text-[10px] text-[var(--text-muted)]">Nenhuma tarefa nesta fase.</div>
-                              )}
-                              {carga?.linhas?.map((l) => (
-                                <button
-                                  key={l.taskId}
-                                  onClick={() => irParaOProcesso(l)}
-                                  className="flex w-full items-center gap-2 border-b border-white/[0.04] py-1.5 text-left last:border-b-0 hover:bg-[var(--surface-primary)]"
-                                >
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-[11px] text-white/85">{l.etapaAtual ?? l.titulo}</span>
-                                    <span className="block truncate text-[9px] text-[var(--text-muted)]">
-                                      {l.pessoaNome ?? "—"} · {l.responsavelNome ?? "sem responsável"}
-                                    </span>
-                                  </span>
-                                  <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                                    {l.executavelAgora && <Etiqueta tom="acento">Executável</Etiqueta>}
-                                    {l.atrasada && <Etiqueta tom="critico">Atrasada</Etiqueta>}
-                                    {!l.atrasada && l.venceHoje && <Etiqueta tom="alerta">Vence hoje</Etiqueta>}
-                                    {/* BLOQUEADA por espera de terceiro NÃO é "Bloqueada" genérica — é
-                                        `esperandoDe` (já resolvido via ehEsperaExterna) quem decide o rótulo. */}
-                                    {l.statusTarefa === "BLOQUEADA" && !l.esperandoDe && <Etiqueta tom="critico">Bloqueada</Etiqueta>}
-                                    {l.esperandoDe && <Etiqueta tom="alerta">Aguardando {l.terceiroNome ?? l.esperandoDe}</Etiqueta>}
-                                    {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
-                                    <span className="text-[9px] text-[var(--text-muted)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</span>
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))}
+                {/* A FAMÍLIA EXPANDE DIRETO NA TABELA RICA — sem o nível
+                    intermediário "família → fase → lista" que existia antes
+                    (achado do usuário, 25/09/2026: um clique a mais que só
+                    atrapalhava, e a lista simples não tinha ação nenhuma —
+                    só navegava pra fora). Todas as fases da família juntas,
+                    cada linha já mostra a sua na coluna Fase. */}
+                {aberta && (
+                  <FamiliaTabelaExpandida
+                    familiaId={f.familiaId}
+                    processoId={processoPrincipalId}
+                    nomeFamilia={f.nomeFamilia}
+                    escopo={filtros.escopo}
+                    concluidasHoje={f.processos.reduce((soma, p) => soma + (concluidasPorProcesso.get(p.processoId) ?? 0), 0)}
+                    selecionado={selecionado?.taskId ?? null}
+                    aoSelecionar={(taskId, processoId) => setSelecionado({ taskId, processoId })}
+                  />
+                )}
               </div>
             )
           })}
@@ -844,142 +622,17 @@ export function CentralOperacional() {
         </div>
       )}
 
-      {pendenciaAlvo && (
-        <>
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={fecharPendencia}>
-            <div
-              className="flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="border-b border-white/[0.08] px-4 py-3">
-                <h2 className="text-[13px] font-medium text-white/90">{pendenciaAlvo.nomeFamilia} · Tarefas sem responsável</h2>
-                <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
-                  {pendenciaLinhas ? `${pendenciaLinhas.length} tarefa(s) aguardando atribuição` : "Carregando…"}
-                </p>
-              </div>
-
-              {pendenciaAviso && (
-                <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2 text-[11px] text-[var(--text-secondary)]">
-                  {pendenciaAviso}
-                </div>
-              )}
-
-              {/* Selecionar todas OU só algumas — a mesma porta de atribuição
-                  atende os dois casos; a diferença é só o conjunto de IDs. */}
-              <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-2">
-                <label className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
-                  <input
-                    type="checkbox"
-                    checked={!!pendenciaLinhas && pendenciaLinhas.length > 0 && pendenciaSelecionadas.size === pendenciaLinhas.length}
-                    onChange={alternarSelecaoTodas}
-                    disabled={pendenciaCarregando || !pendenciaLinhas || pendenciaLinhas.length === 0}
-                    className="h-3.5 w-3.5 accent-blue-500"
-                  />
-                  Selecionar todas
-                </label>
-                <button
-                  disabled={pendenciaSelecionadas.size === 0 || pendenciaOcupado}
-                  onClick={() => setPendenciaSeletorAberto(true)}
-                  className="rounded border border-[var(--action-primary)] bg-[var(--action-primary)]/15 px-2.5 py-1 text-[11px] font-medium text-white/90 transition-colors hover:bg-[var(--action-primary)]/25 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Atribuir responsável ({pendenciaSelecionadas.size})
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                {pendenciaCarregando && <Estado tipo="carregando" mensagem="Carregando tarefas sem responsável…" />}
-                {!pendenciaCarregando && pendenciaLinhas == null && (
-                  <Estado tipo="erro" mensagem="Não foi possível carregar as tarefas." aoTentar={() => carregarPendenciaSemResponsavel(pendenciaAlvo)} />
-                )}
-                {!pendenciaCarregando && pendenciaLinhas?.length === 0 && (
-                  <Estado tipo="vazio" mensagem="Nenhuma tarefa sem responsável nesta família — tudo atribuído." />
-                )}
-                {pendenciaLinhas?.map((l) => (
-                  <label
-                    key={l.taskId}
-                    className="flex w-full items-center gap-2 border-b border-white/[0.04] px-4 py-2 last:border-b-0 hover:bg-[var(--surface-primary)]"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={pendenciaSelecionadas.has(l.taskId)}
-                      onChange={() => alternarSelecaoTarefa(l.taskId)}
-                      className="h-3.5 w-3.5 shrink-0 accent-blue-500"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[11px] text-white/85">{l.etapaAtual ?? l.titulo}</span>
-                      <span className="block truncate text-[9px] text-[var(--text-muted)]">
-                        {l.pessoaNome ?? "—"} · {l.processoNome ?? "—"}
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      {l.atrasada && <Etiqueta tom="critico">Atrasada</Etiqueta>}
-                      <span className="text-[9px] text-[var(--text-muted)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-between border-t border-white/[0.08] px-4 py-2.5">
-                <span className="text-[10px] text-[var(--text-muted)]">
-                  {pendenciaSelecionadas.size} de {pendenciaLinhas?.length ?? 0} selecionada(s)
-                </span>
-                <button onClick={fecharPendencia} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white/80">
-                  Fechar
-                </button>
-              </div>
-            </div>
+      {/* ── PAINEL DE DETALHE — a mesma gaveta lateral de Minha Operação, agora
+          acionável a partir de QUALQUER família expandida. ── */}
+      {selecionado != null && (
+        <div className="fixed inset-0 z-[70] flex items-stretch justify-end bg-[var(--overlay-modal)]" onClick={() => setSelecionado(null)}>
+          <div
+            className="flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-elevated)] shadow-[var(--elev-3)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MinhaOperacaoDetalhe taskId={selecionado.taskId} aoFechar={() => setSelecionado(null)} />
           </div>
-
-          {pendenciaSeletorAberto && (
-            <SeletorResponsavel
-              titulo={`Atribuir ${pendenciaSelecionadas.size} tarefa(s) sem responsável — ${pendenciaAlvo.nomeFamilia}`}
-              atual={null}
-              ocupado={pendenciaOcupado}
-              erro={pendenciaAviso}
-              aoEscolher={(id) => { void atribuirSelecionadas(id) }}
-              aoFechar={() => setPendenciaSeletorAberto(false)}
-            />
-          )}
-        </>
-      )}
-
-      {loteAlvo && (
-        loteAlvo.acao === "atribuir" ? (
-          <SeletorResponsavel
-            titulo={`Atribuir família "${loteAlvo.familia.nomeFamilia}" (recorte atual)`}
-            atual={null}
-            ocupado={loteOcupado}
-            erro={loteAviso}
-            aoEscolher={(id) => { void executarLote(id) }}
-            aoFechar={() => setLoteAlvo(null)}
-          />
-        ) : (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setLoteAlvo(null)}>
-            <div
-              className="w-full max-w-xs overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="border-b border-white/[0.08] px-4 py-3">
-                <h2 className="text-[13px] font-medium text-white/90">Repriorizar família "{loteAlvo.familia.nomeFamilia}" (recorte atual)</h2>
-              </div>
-              <div className="flex flex-col gap-1 p-2">
-                {(["URGENTE", "ALTA", "MEDIA", "BAIXA"] as const).map((p) => (
-                  <button
-                    key={p}
-                    disabled={loteOcupado}
-                    onClick={() => void executarLote(p)}
-                    className="rounded px-3 py-2 text-left text-[12px] text-white/85 transition-colors hover:bg-[var(--surface-primary)] disabled:opacity-40"
-                  >
-                    {ROTULO_PRIORIDADE[p]}
-                  </button>
-                ))}
-              </div>
-              <div className="flex justify-end border-t border-white/[0.08] px-4 py-2.5">
-                <button onClick={() => setLoteAlvo(null)} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white/80">Fechar</button>
-              </div>
-            </div>
-          </div>
-        )
+        </div>
       )}
     </div>
   )

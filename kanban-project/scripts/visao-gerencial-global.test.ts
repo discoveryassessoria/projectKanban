@@ -144,7 +144,9 @@ async function main() {
   ok('§9) e a visão global não monta executor', !/StepEditorRouter/.test(tela))
   ok('§9) e não existe um segundo modal de tarefa aqui',
     !/function\s+\w*Modal(Tarefa|Detalhe)/.test(codigoTela))
-  const central = ler('src/components/operacao/minha-operacao.tsx')
+  // `minha-operacao.tsx` foi extraído/fundido em `tabela-familia.tsx` (fusão
+  // Central Operacional + Minha Operação, 25/09/2026).
+  const central = ler('src/components/operacao/tabela-familia.tsx')
   ok('§10) a Central passou a IMPORTAR o kit em vez de ter cópia própria',
     /from "\.\/kit-operacional"/.test(central) && !/function SeletorResponsavel\(/.test(central))
 

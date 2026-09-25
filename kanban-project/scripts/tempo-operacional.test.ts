@@ -205,8 +205,10 @@ function main() {
   ok('§3) ninguém mais fabrica prazo somando milissegundos',
     inventores.length === 0, inventores.join(', ') || 'nenhum')
 
-  // A frase do prazo é do servidor; a tela escolhe a cor.
-  const fila = semComentarios(ler('src/components/operacao/minha-operacao.tsx'))
+  // A frase do prazo é do servidor; a tela escolhe a cor. `minha-operacao.tsx`
+  // foi extraído/fundido em `tabela-familia.tsx` (fusão Central Operacional +
+  // Minha Operação, 25/09/2026) — é lá que a linha da fila vive agora.
+  const fila = semComentarios(ler('src/components/operacao/tabela-familia.tsx'))
   ok('§16) a fila mostra a frase canônica', /l\.rotuloDoPrazo/.test(fila))
   const painel = semComentarios(ler('src/components/kanban/PainelDaFase.tsx'))
   ok('§16) a tabela da fase também', /const texto = f\.rotuloDoPrazo/.test(painel))

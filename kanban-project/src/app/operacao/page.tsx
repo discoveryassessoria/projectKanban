@@ -4,7 +4,17 @@
 //
 // Mesmo shell das demais telas (fundo + HeaderBar + main), mesmo contrato de
 // hidratação e mesmo porteiro por PERMISSÃO. O conteúdo vive em
-// src/components/operacao/minha-operacao.tsx.
+// src/components/operacao/central-operacional.tsx.
+//
+// FUSÃO 25/09/2026: esta rota mostrava `MinhaOperacao` (a fila pessoal, com
+// filtros em dropdown e 6 ladrilhos grandes) e havia uma segunda tela,
+// `/operacao/central`, com o painel mais compacto (chips de filtro + KPIs
+// numa faixa só) mas sem a tabela rica por família. Pedido explícito do
+// usuário: uma tela só, com o painel compacto da Central Operacional por
+// cima e a tabela rica de Minha Operação por baixo — `/operacao/central`
+// deixou de existir como rota própria; `CentralOperacional` (o componente)
+// já sabe mostrar só a fila pessoal (escopo "Minha fila", o único que
+// não-admin vê) ou a operação inteira, dependendo de quem está logado.
 //
 // Superfície NOVA: nasce sobre a Tarefa canônica. A árvore de subtarefas que
 // existia antes (`tarefaPaiId`) foi removida do schema — a execução se desdobra
@@ -13,13 +23,12 @@
 "use client"
 
 import { Suspense, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
-import { MinhaOperacao } from "@/src/components/operacao/minha-operacao"
+import { CentralOperacional } from "@/src/components/operacao/central-operacional"
 
 const CARREGANDO = (
   <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
@@ -73,8 +82,8 @@ function OperacaoPageConteudo() {
           decorativa aqui. Os elementos globais (busca, câmbio, data,
           notificações, usuário, sair) são os mesmos do resto do sistema. */}
       <HeaderBarApp
-        title="Minha Operação"
-        subtitle="Tudo que precisa da sua atenção agora."
+        title="Central Operacional"
+        subtitle="O que a empresa precisa fazer agora — agrupado por família."
         userName={user.nome}
         userRole={user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"}
         onLogout={() => void encerrarSessao("manual")}
@@ -83,22 +92,17 @@ function OperacaoPageConteudo() {
       {/* `max-h` (não `h`): a lista pode PRECISAR do teto para rolar quando
           tem muita coisa, mas com poucos resultados o contêiner deve encolher
           para o conteúdo — não esticar até a viewport e deixar um vazio
-          enorme embaixo (achado do mandato "modernização visual", 19/09/2026). */}
+          enorme embaixo (achado do mandato "modernização visual", 19/09/2026).
+          `overflow-y-auto` direto aqui (não uma cadeia de `flex-1`/`h-full`
+          internos): `CentralOperacional` é UM painel só, sem cabeçalho
+          próprio pra separar do resto — a rolagem de Minha Operação só
+          funcionou depois de virar item de flexbox único (achado 24/09/2026),
+          então o mesmo padrão nasce aqui desde o início. */}
       <main className="flex max-h-[calc(100vh-80px)] flex-col px-6 pb-16 pt-6">
-        <div className="mb-4 flex items-center justify-end gap-3">
-          <Link
-            href="/operacao/central"
-            className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
-          >
-            Abrir Central Operacional →
-          </Link>
-        </div>
-        {/* `flex` aqui (não só `flex-1`): o filho usa `flex-1` pra herdar
-            altura, e isso só funciona como ITEM de flexbox — `height:100%`
-            contra um ancestral `display:block` não resolvia (achado real
-            24/09/2026, a rolagem da Minha Operação nunca reproduzia). */}
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-lg border border-white/[0.08]">
-          <MinhaOperacao />
+        <div className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-page)] p-4">
+          <div className="min-w-0 flex-1">
+            <CentralOperacional />
+          </div>
         </div>
       </main>
     </div>

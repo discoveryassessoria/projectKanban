@@ -67,16 +67,18 @@ async function main() {
   ok('§4) sem processo, ainda leva à tarefa',
     urlOperacionalDaTarefa({ taskId: 42, processoId: null }) === '/operacao?taskId=42')
 
-  // Todas as entradas usam a MESMA função.
+  // Todas as entradas usam a MESMA função. `minha-operacao.tsx` foi extraído/
+  // fundido em `tabela-familia.tsx` (fusão Central Operacional + Minha
+  // Operação, 25/09/2026).
   for (const [tela, arquivo] of [
-    ['Minha Fila', 'src/components/operacao/minha-operacao.tsx'],
+    ['Minha Fila', 'src/components/operacao/tabela-familia.tsx'],
     ['Tarefas e Projetos / Kanban global', 'src/components/operacao/visao-global.tsx'],
     ['notificações', 'lib/operacional/tarefa-comandos.ts'],
   ] as const) {
     ok(`§36-§38) ${tela} usa o helper canônico`,
       /urlOperacionalDaTarefa/.test(semComentarios(ler(arquivo))))
   }
-  const espalhadas = ['src/components/operacao/minha-operacao.tsx', 'src/components/operacao/visao-global.tsx']
+  const espalhadas = ['src/components/operacao/tabela-familia.tsx', 'src/components/operacao/visao-global.tsx']
     .filter((f) => /`\/kanban\?/.test(semComentarios(ler(f))))
   ok('§39) e ninguém concatena URL à mão', espalhadas.length === 0, espalhadas.join(', ') || 'nenhuma')
 
@@ -174,7 +176,7 @@ async function main() {
   const comDecisao = (await minhaFila(dani.id)).find((l) => l.taskId === alvoDecisao)
   ok('§26) a fila marca a tarefa', comDecisao?.requerDecisao === true)
 
-  const tela = semComentarios(ler('src/components/operacao/minha-operacao.tsx'))
+  const tela = semComentarios(ler('src/components/operacao/tabela-familia.tsx'))
   const kit = semComentarios(ler('src/components/operacao/kit-operacional.tsx'))
   ok('§27) e a ação principal deixa de ser "Continuar"',
     /requerDecisao\) return \{ rotulo: 'Ver decisão'|requerDecisao\) return \{ rotulo: "Ver decisão"/.test(kit))
@@ -319,7 +321,7 @@ async function main() {
   secao('§13/§14) TODA superfície usa o MESMO construtor de URL')
   // ══════════════════════════════════════════════════════════════════════════
   const superficies = [
-    ['Minha Fila / cockpit', 'src/components/operacao/minha-operacao.tsx'],
+    ['Minha Fila / cockpit', 'src/components/operacao/tabela-familia.tsx'],
     ['Visão global (Tarefas e Projetos)', 'src/components/operacao/visao-global.tsx'],
   ] as const
   for (const [nome, arq] of superficies) {

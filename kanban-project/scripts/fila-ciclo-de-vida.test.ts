@@ -632,7 +632,10 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   secao('§10/§27) A Minha Fila NÃO executa — ela leva ao trabalho')
   // ═════════════════════════════════════════════════════════════════════════
-  const tela = semComentarios(ler('src/components/operacao/minha-operacao.tsx'))
+  // `minha-operacao.tsx` foi extraído/fundido em `tabela-familia.tsx` (fusão
+  // Central Operacional + Minha Operação, 25/09/2026) — a linha da fila e o
+  // pipeline de comando vivem lá agora.
+  const tela = semComentarios(ler('src/components/operacao/tabela-familia.tsx'))
   ok('a fila não monta drawer, painel nem executor',
     !/Drawer|CentralDaEtapa|StepEditor|WorkflowTab|TabOperation/.test(tela))
   ok('não desenha o workflow do documento',
