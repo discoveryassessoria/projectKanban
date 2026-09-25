@@ -17,6 +17,7 @@ import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
 import { CalendarGridIcon } from "@/src/components/icons/calendar-grid-icon"
+import { DistributeIcon } from "@/src/components/icons/distribute-icon"
 import { DollarIcon } from "@/src/components/icons/dollar-icon"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ManagementIcon } from "@/src/components/icons/management-icon"
@@ -61,6 +62,18 @@ const menuItems = [
     iconOffset: "",
     permissao: "tarefas.editar",
     soAdmin: true,
+  },
+  {
+    // DISTRIBUIÇÃO — tela própria de "quem decide de quem é o trabalho"
+    // (mandato "ultra fiel ao desenho", 24/09/2026 — confirmado em dois
+    // mockups distintos). Mesma permissão da própria tela
+    // (`/operacao/distribuicao`): `tarefas.editar`.
+    title: "Distribuição",
+    url: "/operacao/distribuicao",
+    icon: DistributeIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "tarefas.editar",
   },
   {
     // CALENDÁRIO — agendamentos consulares (mandato 24/09/2026). Item PRÓPRIO,

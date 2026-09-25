@@ -29,11 +29,12 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Search, Play, CalendarClock, AlertTriangle, Clock3, Hourglass, CheckCircle2,
-  SlidersHorizontal, X as XIcon, ArrowUpRight, UserPlus,
-  ChevronLeft, ChevronRight, LayoutGrid, List,
+  SlidersHorizontal, X as XIcon, ArrowUpRight, UserPlus, MoreVertical, ClipboardCheck,
+  ChevronLeft, ChevronRight, ChevronDown, LayoutGrid, List, Maximize2, Minimize2,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_STATUS, ROTULO_PRIORIDADE, rotularFase, useRotulosDeFaseProntos,
@@ -116,6 +117,39 @@ const ICONE_CATEGORIA: Record<CategoriaAtencao, React.ComponentType<{ className?
   atrasoInterno: AlertTriangle,
   terceirosAtrasados: Clock3,
   aguardandoTerceiros: Hourglass,
+}
+/** O subtítulo curto do ladrilho — mandato "ultra fiel ao desenho", 24/09/2026. */
+const SUBTITULO_CATEGORIA: Record<CategoriaAtencao, string> = {
+  paraAgirAgora: "Suas tarefas de execução",
+  acompanharHoje: "Aguardando terceiros",
+  atrasoInterno: "Suas tarefas em atraso",
+  terceirosAtrasados: "Aguardando retorno",
+  aguardandoTerceiros: "Dentro do prazo",
+}
+
+function csvEscapar(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+}
+/** "Mais ações" da família — exportar, real e local, sem round-trip novo. */
+function exportarFamiliaCsv(nome: string, linhas: LinhaOperacional[]) {
+  const cabecalho = ["Pessoa", "Documento/Tarefa", "Fase", "Etapa atual", "Prazo", "Prioridade", "Situação", "Terceiro"]
+  const corpo = linhas.map((l) => [
+    l.pessoaNome ?? "—", l.titulo, rotularFase(l.faseMacroKey) ?? "—", l.etapaAtual ?? "—",
+    dataCurta(l.dataPrazo), ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade, textoDaSituacao(l), l.terceiroNome ?? "—",
+  ].map((c) => csvEscapar(String(c))).join(","))
+  const csv = [cabecalho.join(","), ...corpo].join("\n")
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `${nome.toLowerCase().replace(/\s+/g, "-")}-tarefas.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? partes[partes.length - 1][0] : "")).toUpperCase() || "?"
 }
 /** Mesmos tokens semânticos de tile/tinta que `visao-global.tsx` (Etapa 5) já usa — nunca cor inventada. */
 const TOM_CATEGORIA: Record<CategoriaAtencao, string> = {
@@ -220,20 +254,63 @@ function LinhaOperacaoTabela({ l, selecionado, aoSelecionar, aoExecutar, ocupado
         {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
       </td>
       <td className="px-3 py-2.5 text-[11.5px] text-[var(--text-secondary)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
-      <td className="max-w-[180px] overflow-hidden truncate px-3 py-2.5 text-[11.5px] text-[var(--text-secondary)]">{textoDaSituacao(l)}</td>
+      <td className="px-3 py-2.5">
+        <Etiqueta tom={tomDaSituacao(l)}>{textoDaSituacao(l)}</Etiqueta>
+      </td>
       <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-[11.5px] text-[var(--text-secondary)]">
         {l.terceiroNome ? <span className="block truncate text-[var(--info-text)]">{l.terceiroNome}</span> : "—"}
       </td>
       <td className="px-3 py-2.5">
-        <button
-          disabled={ocupado}
-          onClick={(e) => { e.stopPropagation(); aoExecutar() }}
-          className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 py-1 text-[10.5px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
-        >
-          {ocupado && acao.comando === "iniciar" ? "Iniciando…" : acao.rotulo} <ArrowUpRight className="h-3 w-3" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            disabled={ocupado}
+            onClick={(e) => { e.stopPropagation(); aoExecutar() }}
+            className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 py-1 text-[10.5px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40"
+          >
+            {ocupado && acao.comando === "iniciar" ? "Iniciando…" : acao.rotulo} <ArrowUpRight className="h-3 w-3" />
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={(e) => e.stopPropagation()}
+                className="rounded p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)]"
+                aria-label="Mais ações"
+              >
+                <MoreVertical className="h-3.5 w-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className={Z_POPOVER}>
+              <DropdownMenuItem onClick={aoSelecionar}>Ver detalhes</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </td>
     </tr>
+  )
+}
+
+/** O mini-ladrilho de KPI por família — mesma linguagem visual dos ladrilhos do topo, em escala menor. */
+function MiniLadrilho({ icone: Icone, valor, rotulo, tom }: {
+  icone: React.ComponentType<{ className?: string }>
+  valor: number
+  rotulo: string
+  tom: "neutro" | "info" | "warning" | "danger" | "success"
+}) {
+  const cor = {
+    neutro: "text-[var(--text-secondary)]",
+    info: "text-[var(--info-text)]",
+    warning: "text-[var(--warning-text)]",
+    danger: "text-[var(--danger-text)]",
+    success: "text-[var(--success-text)]",
+  }[tom]
+  return (
+    <div className="flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-page)] px-2 py-1">
+      <Icone className={`h-3.5 w-3.5 shrink-0 ${cor}`} />
+      <div className="leading-tight">
+        <div className={`text-[13px] font-semibold tabular-nums ${cor}`}>{valor}</div>
+        <div className="whitespace-nowrap text-[9px] text-[var(--text-muted)]">{rotulo}</div>
+      </div>
+    </div>
   )
 }
 
@@ -256,6 +333,15 @@ function textoDaSituacao(l: LinhaOperacional): string {
   if (l.coluna === "A_FAZER") return "Ação necessária"
   if (l.coluna === "CONCLUIDA") return "Concluída"
   return ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa
+}
+/** A cor do badge de situação — mesma régua semântica do resto da tela. */
+function tomDaSituacao(l: LinhaOperacional): "neutro" | "alerta" | "critico" | "acento" | "sucesso" {
+  if (l.requerDecisao) return "alerta"
+  if (l.coluna === "AGUARDANDO_TERCEIRO") return "alerta"
+  if (l.coluna === "BLOQUEADA") return "critico"
+  if (l.coluna === "A_FAZER") return "acento"
+  if (l.coluna === "CONCLUIDA") return "sucesso"
+  return "neutro"
 }
 
 /** A próxima ação/acontecimento — mandato §15, a coluna mais importante da tela. */
@@ -315,13 +401,22 @@ export function MinhaOperacao() {
   const [loteOcupado, setLoteOcupado] = useState(false)
   const [loteErro, setLoteErro] = useState<string | null>(null)
   const [familiasVerTodas, setFamiliasVerTodas] = useState<Set<string>>(new Set())
-  const [usuario, setUsuario] = useState<{ nome?: string } | null>(null)
-
+  const [ordenarPor, setOrdenarPor] = useState<"prazo" | "nome" | "tarefas">("prazo")
+  // DATA/HORA DO CABEÇALHO — mesmo formato de `header-bar-app.tsx` (pt-BR,
+  // dia da semana por extenso + hora), só que aqui dentro do CONTEÚDO
+  // (mandato "ultra fiel ao desenho", 24/09/2026).
+  const [dataAgora, setDataAgora] = useState("")
+  const [horaAgora, setHoraAgora] = useState("")
   useEffect(() => {
-    try {
-      const bruto = localStorage.getItem("user")
-      if (bruto) setUsuario(JSON.parse(bruto))
-    } catch { /* leitura best-effort — sem usuário salvo, cai no fallback do saudação */ }
+    const atualizar = () => {
+      const agora = new Date()
+      setHoraAgora(agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }))
+      const data = agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+      setDataAgora(data.charAt(0).toUpperCase() + data.slice(1))
+    }
+    atualizar()
+    const t = setInterval(atualizar, 30000)
+    return () => clearInterval(t)
   }, [])
 
   // A BUSCA TEM DEBOUNCE — não dispara um request por tecla (mandato §21).
@@ -564,15 +659,19 @@ export function MinhaOperacao() {
       g.pessoas = pessoasPorGrupo.get(g.chave)?.size ?? 0
       g.concluidas = g.processoId != null ? concluidasPorProcesso.get(g.processoId) ?? 0 : 0
     }
-    // O pior sinal primeiro — mesmo princípio do ranking de atenção, agora
-    // agregado: quem tem atraso aparece antes de quem só tem prazo distante.
-    return [...mapa.values()].sort((a, b) => {
+    const lista = [...mapa.values()]
+    if (ordenarPor === "nome") return lista.sort((a, b) => a.rotuloPrincipal.localeCompare(b.rotuloPrincipal, "pt-BR"))
+    if (ordenarPor === "tarefas") return lista.sort((a, b) => b.linhas.length - a.linhas.length)
+    // "prazo" (padrão) — o pior sinal primeiro, mesmo princípio do ranking de
+    // atenção, agora agregado: quem tem atraso aparece antes de quem só tem
+    // prazo distante.
+    return lista.sort((a, b) => {
       if (a.atrasadas !== b.atrasadas) return b.atrasadas - a.atrasadas
       const pa = a.proximoPrazo ? Date.parse(a.proximoPrazo) : Number.POSITIVE_INFINITY
       const pb = b.proximoPrazo ? Date.parse(b.proximoPrazo) : Number.POSITIVE_INFINITY
       return pa - pb
     })
-  }, [ordenadas, concluidasPorProcesso])
+  }, [ordenadas, concluidasPorProcesso, ordenarPor])
 
   const alternarGrupo = (chave: string) => setExpandidos((prev) => {
     const novo = new Set(prev)
@@ -671,26 +770,33 @@ export function MinhaOperacao() {
     abrirOTrabalho(l)
   }, [comandar, abrirOTrabalho])
 
-  const primeiroNome = usuario?.nome?.trim().split(/\s+/)[0]
-
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--surface-page)]">
       {/* ── CABEÇALHO ── */}
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-6 py-5">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">
-            {primeiroNome ? `Olá, ${primeiroNome}!` : "Minha Operação"}
-          </h1>
-          <p className="mt-1 text-[13px] text-[var(--text-secondary)]">Aqui está tudo o que precisa da sua atenção agora.</p>
+        <div className="flex items-start gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-[var(--info-tile)] text-[var(--info-text)]">
+            <ClipboardCheck className="h-5 w-5" />
+          </span>
+          <div>
+            <h1 className="text-[22px] font-semibold tracking-tight text-[var(--text-primary)]">Minha Operação</h1>
+            <p className="mt-1 text-[13px] text-[var(--text-secondary)]">Aqui está tudo o que precisa da sua atenção hoje.</p>
+          </div>
         </div>
-        <div className="relative w-full max-w-sm sm:w-72">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
-          <Input
-            value={buscaDigitada}
-            onChange={(e) => setBuscaDigitada(e.target.value)}
-            placeholder="Buscar por pessoa, processo, documento, cartório…"
-            className="h-9 bg-[var(--surface-elevated)] pl-8 text-[13px]"
-          />
+        <div className="flex flex-col items-end gap-2">
+          <div className="text-right">
+            <div className="text-[11.5px] text-[var(--text-secondary)]">{dataAgora}</div>
+            <div className="text-[15px] font-semibold tabular-nums text-[var(--text-primary)]">{horaAgora}</div>
+          </div>
+          <div className="relative w-full max-w-sm sm:w-72">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Input
+              value={buscaDigitada}
+              onChange={(e) => setBuscaDigitada(e.target.value)}
+              placeholder="Buscar por pessoa, processo, documento, cartório…"
+              className="h-9 bg-[var(--surface-elevated)] pl-8 text-[13px]"
+            />
+          </div>
         </div>
       </div>
 
@@ -736,18 +842,6 @@ export function MinhaOperacao() {
                 "Concluídas hoje" é só informativo (não tem linha própria no
                 pipeline de categoria). ── */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-              <button
-                onClick={() => { setCategoria("todas"); setPagina(1) }}
-                className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
-                  categoria === "todas"
-                    ? "border-[var(--action-primary)] bg-[var(--surface-elevated)]"
-                    : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-secondary)]"
-                }`}
-              >
-                <div className="text-[20px] font-semibold tabular-nums text-[var(--text-primary)]">{linhasNormais?.length ?? 0}</div>
-                <div className="text-[11.5px] font-medium text-[var(--text-primary)]">Todas</div>
-                <div className="text-[10px] text-[var(--text-muted)]">Toda a sua fila</div>
-              </button>
               {CATEGORIAS_ATENCAO.map((c) => {
                 const Icone = ICONE_CATEGORIA[c.chave]
                 const n = porCategoria.get(c.chave)?.length ?? 0
@@ -759,16 +853,16 @@ export function MinhaOperacao() {
                     onClick={() => { setCategoria(ativo ? "todas" : c.chave); setPagina(1) }}
                     className={`rounded-lg border px-3 py-2.5 text-left transition-colors ${
                       ativo
-                        ? "border-[var(--action-primary)] bg-[var(--surface-elevated)]"
+                        ? "border-[var(--action-primary)] bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
                         : "border-[var(--border-subtle)] bg-[var(--surface-elevated)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
                     <div className="flex items-center gap-1.5">
-                      <Icone className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                      <span className="text-[20px] font-semibold tabular-nums text-[var(--text-primary)]">{n}</span>
+                      <Icone className={`h-3.5 w-3.5 ${ativo ? "text-[var(--action-primary-ink)]" : "text-[var(--text-muted)]"}`} />
+                      <span className={`text-[20px] font-semibold tabular-nums ${ativo ? "text-[var(--action-primary-ink)]" : "text-[var(--text-primary)]"}`}>{n}</span>
                     </div>
-                    <div className="text-[11.5px] font-medium text-[var(--text-primary)]">{c.rotulo}</div>
-                    <div className="truncate text-[10px] text-[var(--text-muted)]">{c.tooltip}</div>
+                    <div className={`text-[11.5px] font-medium ${ativo ? "text-[var(--action-primary-ink)]" : "text-[var(--text-primary)]"}`}>{c.rotulo}</div>
+                    <div className={`truncate text-[10px] ${ativo ? "text-[var(--action-primary-ink)]/80" : "text-[var(--text-muted)]"}`}>{SUBTITULO_CATEGORIA[c.chave]}</div>
                   </button>
                 )
               })}
@@ -811,15 +905,6 @@ export function MinhaOperacao() {
                   </SelectContent>
                 </Select>
               </Campo>
-              <Campo rotulo="Terceiro">
-                <Select value={filtros.terceiro ?? TODOS} onValueChange={(v) => { setFiltros((f) => ({ ...f, terceiro: v === TODOS ? null : v })); setPagina(1) }}>
-                  <SelectTrigger className="h-8 w-40 bg-[var(--surface-elevated)] text-[12px]"><SelectValue placeholder="Todos" /></SelectTrigger>
-                  <SelectContent className={Z_POPOVER}>
-                    <SelectItem value={TODOS}>Todos os terceiros</SelectItem>
-                    {opcoesTerceiro.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </Campo>
               <Campo rotulo="Prazo">
                 <Select value={filtros.prazo} onValueChange={(v) => { setFiltros((f) => ({ ...f, prazo: v as Filtros["prazo"] })); setPagina(1) }}>
                   <SelectTrigger className="h-8 w-36 bg-[var(--surface-elevated)] text-[12px]"><SelectValue /></SelectTrigger>
@@ -828,6 +913,15 @@ export function MinhaOperacao() {
                     <SelectItem value="atrasadas">Atrasadas</SelectItem>
                     <SelectItem value="hoje">Vencem hoje</SelectItem>
                     <SelectItem value="7dias">Vencem em 7 dias</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Campo>
+              <Campo rotulo="Terceiro">
+                <Select value={filtros.terceiro ?? TODOS} onValueChange={(v) => { setFiltros((f) => ({ ...f, terceiro: v === TODOS ? null : v })); setPagina(1) }}>
+                  <SelectTrigger className="h-8 w-40 bg-[var(--surface-elevated)] text-[12px]"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent className={Z_POPOVER}>
+                    <SelectItem value={TODOS}>Todos os terceiros</SelectItem>
+                    {opcoesTerceiro.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </Campo>
@@ -857,6 +951,36 @@ export function MinhaOperacao() {
                 </button>
               </div>
             </div>
+
+            {visaoModo === "familia" && grupos != null && (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-[14px] font-semibold text-[var(--text-primary)]">Famílias e processos ({grupos.length})</h2>
+                <div className="flex items-center gap-2">
+                  <Campo rotulo="Ordenar por:">
+                    <Select value={ordenarPor} onValueChange={(v) => setOrdenarPor(v as typeof ordenarPor)}>
+                      <SelectTrigger className="h-8 w-44 bg-[var(--surface-elevated)] text-[12px]"><SelectValue /></SelectTrigger>
+                      <SelectContent className={Z_POPOVER}>
+                        <SelectItem value="prazo">Prazo (mais próximo)</SelectItem>
+                        <SelectItem value="nome">Nome (A-Z)</SelectItem>
+                        <SelectItem value="tarefas">Mais tarefas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Campo>
+                  <button
+                    onClick={() => setExpandidos(new Set(grupos.map((g) => g.chave)))}
+                    className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)]"
+                  >
+                    <Maximize2 className="h-3.5 w-3.5" /> Expandir todas
+                  </button>
+                  <button
+                    onClick={() => setExpandidos(new Set())}
+                    className="flex h-8 items-center gap-1.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 text-[12px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)]"
+                  >
+                    <Minimize2 className="h-3.5 w-3.5" /> Recolher todas
+                  </button>
+                </div>
+              </div>
+            )}
 
             {podeAtribuirLote && selecionadosLote.size > 0 && (
               <div className="flex items-center gap-3 rounded-lg border border-[var(--border-strong)] bg-[var(--surface-secondary)] px-3.5 py-2 shadow-[var(--elev-1)]">
@@ -935,6 +1059,7 @@ export function MinhaOperacao() {
                     const linhasVisiveis = verTodas ? g.linhas : g.linhas.slice(0, LINHAS_VISIVEIS_POR_FAMILIA)
                     const idsDaFamilia = g.linhas.map((l) => l.taskId)
                     const todasMarcadas = idsDaFamilia.length > 0 && idsDaFamilia.every((id) => selecionadosLote.has(id))
+                    const selecionadasNaFamilia = idsDaFamilia.filter((id) => selecionadosLote.has(id)).length
                     return (
                       <div key={g.chave}>
                         <button
@@ -943,38 +1068,35 @@ export function MinhaOperacao() {
                         >
                           <div className="flex min-w-0 items-center gap-2.5">
                             <span className="w-3 shrink-0 text-[10px] text-[var(--text-muted)]">{aberto ? "▾" : "▸"}</span>
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--pessoa-tile)] text-[11px] font-semibold text-[var(--pessoa)]">
+                              {iniciaisDe(g.rotuloPrincipal)}
+                            </span>
                             <div className="min-w-0">
-                              <div className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{g.rotuloPrincipal}</div>
-                              {g.rotuloSecundario && <div className="truncate text-[10.5px] text-[var(--text-muted)]">{g.rotuloSecundario}</div>}
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
-                                <span className="rounded-full bg-[var(--info-tile)] px-1.5 py-0.5 font-medium text-[var(--info-text)]">{g.paraFazer} para fazer</span>
-                                <span className="rounded-full bg-[var(--warning-tile)] px-1.5 py-0.5 font-medium text-[var(--warning-text)]">{g.acompanhar} acompanhar</span>
-                                <span className="rounded-full bg-[var(--danger-tile)] px-1.5 py-0.5 font-medium text-[var(--danger-text)]">{g.atrasadas} atrasadas</span>
-                                <span className="rounded-full bg-[var(--warning-tile)] px-1.5 py-0.5 font-medium text-[var(--warning-text)]">{g.terceirosAtrasados} terceiros atrasados</span>
-                                <span className="rounded-full bg-[var(--success-tile)] px-1.5 py-0.5 font-medium text-[var(--success-text)]">{g.concluidas} concluídas</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate text-[13px] font-semibold text-[var(--text-primary)]">{g.rotuloPrincipal}</span>
+                                {g.processoId != null && <span className="shrink-0 text-[10.5px] text-[var(--text-muted)]">Processo #{g.processoId}</span>}
+                                {g.faseMacroKey && <Etiqueta tom="neutro">{rotularFase(g.faseMacroKey)}</Etiqueta>}
+                              </div>
+                              <div className="truncate text-[10.5px] text-[var(--text-muted)]">
+                                {g.pessoas} pessoa{g.pessoas === 1 ? "" : "s"} · {g.linhas.length} tarefa{g.linhas.length === 1 ? "" : "s"} no total
                               </div>
                             </div>
                           </div>
-                          <div className="flex shrink-0 flex-col items-end gap-1 text-[11.5px] text-[var(--text-secondary)]">
-                            <span className="tabular-nums">{g.pessoas} pessoa{g.pessoas === 1 ? "" : "s"} · {g.linhas.length} tarefa{g.linhas.length === 1 ? "" : "s"} no total</span>
-                            {g.proximoPrazo && <span className="tabular-nums">Próximo prazo: {dataCurta(g.proximoPrazo)}</span>}
+                          <div className="flex shrink-0 flex-wrap items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <MiniLadrilho icone={Play} valor={g.paraFazer} rotulo="Para fazer" tom="info" />
+                              <MiniLadrilho icone={CalendarClock} valor={g.acompanhar} rotulo="Acompanhar" tom="warning" />
+                              <MiniLadrilho icone={AlertTriangle} valor={g.atrasadas} rotulo="Atrasadas" tom="danger" />
+                              <MiniLadrilho icone={Clock3} valor={g.terceirosAtrasados} rotulo="Terceiros atrasados" tom="warning" />
+                              <MiniLadrilho icone={CheckCircle2} valor={g.concluidas} rotulo="Concluídas" tom="success" />
+                            </div>
+                            {g.proximoPrazo && (
+                              <span className="shrink-0 text-[11.5px] tabular-nums text-[var(--text-secondary)]">Próximo prazo: {dataCurta(g.proximoPrazo)}</span>
+                            )}
                           </div>
                         </button>
                         {aberto && (
                           <>
-                            {podeAtribuirLote && (
-                              <div className="flex items-center gap-3 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-4 py-1.5">
-                                <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
-                                  <input
-                                    type="checkbox"
-                                    checked={todasMarcadas}
-                                    onChange={() => alternarTodosNaFamilia(idsDaFamilia, todasMarcadas)}
-                                    className="h-3.5 w-3.5 accent-[var(--action-primary)]"
-                                  />
-                                  Selecionar todas ({idsDaFamilia.length})
-                                </label>
-                              </div>
-                            )}
                             <table className="w-full border-collapse text-left">
                               <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
                                 <tr className="border-b border-[var(--border-subtle)] [&>th]:px-3 [&>th]:py-2 [&>th]:text-[10px] [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-[var(--text-muted)]">
@@ -1007,21 +1129,57 @@ export function MinhaOperacao() {
                                 ))}
                               </tbody>
                             </table>
-                            {g.linhas.length > LINHAS_VISIVEIS_POR_FAMILIA && (
-                              <div className="border-t border-[var(--border-subtle)] px-4 py-2 text-[11px] text-[var(--text-secondary)]">
-                                Mostrando {linhasVisiveis.length} de {g.linhas.length} tarefas ·{" "}
-                                <button
-                                  onClick={() => setFamiliasVerTodas((prev) => {
-                                    const novo = new Set(prev)
-                                    if (verTodas) novo.delete(g.chave); else novo.add(g.chave)
-                                    return novo
-                                  })}
-                                  className="font-medium text-[var(--action-primary)] hover:underline"
-                                >
-                                  {verTodas ? "Mostrar menos" : `Ver todas as tarefas de ${g.rotuloPrincipal}`}
-                                </button>
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] bg-[var(--surface-secondary)]/40 px-4 py-2">
+                              <div className="text-[11px] text-[var(--text-secondary)]">
+                                {g.linhas.length > LINHAS_VISIVEIS_POR_FAMILIA ? (
+                                  <>
+                                    Mostrando {linhasVisiveis.length} de {g.linhas.length} tarefas ·{" "}
+                                    <button
+                                      onClick={() => setFamiliasVerTodas((prev) => {
+                                        const novo = new Set(prev)
+                                        if (verTodas) novo.delete(g.chave); else novo.add(g.chave)
+                                        return novo
+                                      })}
+                                      className="font-medium text-[var(--action-primary)] hover:underline"
+                                    >
+                                      {verTodas ? "Mostrar menos" : `Ver todas as tarefas de ${g.rotuloPrincipal}`}
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>{g.linhas.length} tarefa{g.linhas.length === 1 ? "" : "s"}</>
+                                )}
                               </div>
-                            )}
+                              {podeAtribuirLote && (
+                                <div className="flex items-center gap-3">
+                                  <label className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]">
+                                    <input
+                                      type="checkbox"
+                                      checked={todasMarcadas}
+                                      onChange={() => alternarTodosNaFamilia(idsDaFamilia, todasMarcadas)}
+                                      className="h-3.5 w-3.5 accent-[var(--action-primary)]"
+                                    />
+                                    Selecionar todas ({idsDaFamilia.length})
+                                  </label>
+                                  <button
+                                    disabled={selecionadasNaFamilia === 0}
+                                    onClick={() => setLoteAberto(true)}
+                                    className="flex items-center gap-1.5 rounded-md bg-[var(--action-primary)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--action-primary-ink)] transition-opacity hover:opacity-90 disabled:opacity-40"
+                                  >
+                                    <UserPlus className="h-3.5 w-3.5" /> Atribuir selecionadas
+                                  </button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-1.5 text-[11.5px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)]">
+                                        Mais ações <ChevronDown className="h-3.5 w-3.5" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className={Z_POPOVER}>
+                                      <DropdownMenuItem onClick={() => exportarFamiliaCsv(g.rotuloPrincipal, g.linhas)}>Exportar CSV</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              )}
+                            </div>
                           </>
                         )}
                       </div>
