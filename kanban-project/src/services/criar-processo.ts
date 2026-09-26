@@ -166,6 +166,12 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
 
   const occurredAt = new Date().toISOString()
 
+  // Os stepInstanceId cuja Tarefa nasceu NESTA chamada — fora da transação,
+  // porque `materializarSubtarefas` (chamado logo abaixo, depois do commit)
+  // usa `prisma` cru, nunca `tx` (invariante transação×conexão). Só
+  // preenchido se a transação COMITAR; rollback nunca chega a usá-lo.
+  const stepInstancesComTarefaNova: number[] = []
+
   // ── 3) transação atômica de nascimento ────────────────────────────────────
   try {
     const out = await prisma.$transaction(async (tx) => {
@@ -232,7 +238,10 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
           { stepInstanceId: step.id, correlationId, causationId: chaveCriacao, origem: "process_created", solicitadoPorId: input.solicitadoPorId },
           tx,
         )
-        if (g.success && g.created) tarefasIniciais++
+        if (g.success && g.created) {
+          tarefasIniciais++
+          stepInstancesComTarefaNova.push(step.id)
+        }
       }
 
       // 3.3) phase.entered INICIAL — mesma infra dos eventos de transição.
@@ -285,6 +294,26 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
       }
       return ok
     }, { timeout: 20000, maxWait: 10000 })
+
+    // MATERIALIZA AS SUBTAREFAS DOS PASSOS NOVOS — FORA da transação, de
+    // propósito (mesmo padrão de `garantirTarefaDePasso`/passo-tarefa.ts:
+    // as primitivas de subtarefa usam o `prisma` cru; chamar dentro do `tx`
+    // violaria transação×conexão). Fecha o gap que existia aqui: até
+    // 26/09/2026, todo processo novo cujo primeiro passo tivesse subtarefas
+    // nascia sem NENHUMA `SubtaskExecution` — aIniciar/passoCorrente ficavam
+    // errados até alguém rodar um backfill manual (achado real, família
+    // Cibils). Best-effort: uma falha aqui não desfaz o processo já criado
+    // (ele existe de qualquer forma; fica pendente de reconciliação — mesma
+    // garantia que passo-tarefa.ts já dá pro caminho standalone).
+    if (stepInstancesComTarefaNova.length > 0) {
+      const { materializarSubtarefas } = await import("@/src/services/subtarefas-da-etapa")
+      for (const stepInstanceId of stepInstancesComTarefaNova) {
+        await materializarSubtarefas({ stepInstanceId }).catch((e) => {
+          console.error(`materializarSubtarefas falhou para stepInstanceId=${stepInstanceId} (processo ${out.processId} já foi criado; subtarefas ficam pendentes de reconciliação):`, e)
+        })
+      }
+    }
+
     return out
   } catch (e) {
     const ex = e as { code?: string; __instFail?: string }
