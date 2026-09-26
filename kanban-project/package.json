@@ -74,6 +74,8 @@
     "prod:seed-tabela-taxas": "node scripts/prod-seed-tabela-taxas.mjs",
     "prod:smoke-dual-write": "node scripts/prod-smoke-dual-write.mjs",
     "prod:verificar-catalogo": "node scripts/prod-verificar-catalogo.mjs",
+    "realinhar:emissao-4-passos": "npm run guard:escrita && tsx scripts/realinhar-emissao-4-passos.ts",
+    "prod:realinhar-emissao-4-passos": "tsx scripts/realinhar-emissao-4-passos.ts --dry --prod",
     "reconciliar:sequencias": "npm run guard:escrita && tsx scripts/reconciliar-sequencias-codigo.ts",
     "reconciliar:sequencias:dry": "tsx scripts/reconciliar-sequencias-codigo.ts --dry-run",
     "remover:fase-nao-canonica": "tsx scripts/remover-fase-nao-canonica.ts",
