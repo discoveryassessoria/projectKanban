@@ -193,6 +193,8 @@ export interface LinhaDeFila {
   documentoId: number | null
   processoId: number | null
   processoNome: string | null
+  /** O país/nacionalidade do processo (`Processo.paisCanonico.countryLabel`) — Etapa 3 (vista "Só Espanha"/"Só Itália"). `null` sem país cadastrado. */
+  pais: string | null
   /** Família do processo — agrupamento visual, nunca dono da tarefa. */
   familiaNome: string | null
   pessoaId: number | null
@@ -349,7 +351,7 @@ const SELECT = {
   // O ESTADO TEMPORAL precisa destes: conclusão congela o atraso, e a pausa de
   // SLA é o que separa "parado esperando o cartório" de "parado devendo".
   dataConclusao: true, slaPausadoEm: true, slaPausaAcumuladaMin: true,
-  processo: { select: { nome: true, familia: { select: { nome: true } } } },
+  processo: { select: { nome: true, familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } } } },
   responsavel: { select: { nome: true } },
   // Discrimina a NATUREZA da tarefa ADMINISTRATIVA (ex.: "obrigacao-atribuicao")
   // — quem projeta essa tarefa genericamente (Tarefas Administrativas) precisa
@@ -429,6 +431,7 @@ function projetar(
     documentoId: t.documentoId ?? null,
     processoId: t.processoId,
     processoNome: t.processo?.nome ?? null,
+    pais: t.processo?.paisCanonico?.countryLabel ?? null,
     familiaNome: t.processo?.familia?.nome ?? null,
     origem: t.origem ?? null,
     pessoaId: t.pessoaId ?? null,
