@@ -219,10 +219,10 @@ export function OperacaoV3() {
   return (
     <div className="opv3-root" style={{ display: "flex", flexDirection: "column", minHeight: 0, position: "relative" }}>
       {/* ===== HEADER: título + KPIs + sino ===== */}
-      <header style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 4px 0", background: "#fff", borderBottom: "1px solid #dfe4ee" }}>
+      <header style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 24px 0", background: "#fff", borderBottom: "1px solid #dfe4ee" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#0b1f4b" }}>Operação</h1>
-          <div style={{ fontSize: 13, color: "#5b6478" }}>{hoje} · {usuario?.nome ?? "—"} · equipe documental</div>
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0b1f4b" }}>Operação</h1>
+          <div style={{ fontSize: 12, color: "#5b6478" }}>{hoje} · {usuario?.nome ?? "—"} · equipe documental</div>
         </div>
         <div style={{ flexGrow: 1 }} />
         <div style={{ display: "flex", gap: 8, paddingBottom: 12, alignItems: "center" }}>
@@ -253,9 +253,9 @@ export function OperacaoV3() {
             <span>Notificações operacionais</span>
             <button className="opv3-btn opv3-sm" onClick={() => setNotifOpen(false)}>✕</button>
           </div>
-          {notifs.length === 0 && <div style={{ padding: 14, fontSize: 13, color: "#5b6478" }}>Nada pendente.</div>}
+          {notifs.length === 0 && <div style={{ padding: 14, fontSize: 12, color: "#5b6478" }}>Nada pendente.</div>}
           {notifs.map((n, i) => (
-            <button key={i} onClick={n.go} style={{ display: "block", width: "100%", textAlign: "left", border: 0, background: "transparent", padding: "10px 14px", borderBottom: "1px solid #edf0f5", fontSize: 13, cursor: "pointer" }}>
+            <button key={i} onClick={n.go} style={{ display: "block", width: "100%", textAlign: "left", border: 0, background: "transparent", padding: "10px 14px", borderBottom: "1px solid #edf0f5", fontSize: 12, cursor: "pointer" }}>
               <span className={`opv3-pill ${n.cls}`}>{n.tag}</span> {n.txt}
             </button>
           ))}
@@ -263,7 +263,7 @@ export function OperacaoV3() {
       )}
 
       {/* ===== ABAS + VISTA/BUSCA ===== */}
-      <div style={{ display: "flex", gap: 2, padding: "0 4px", background: "#fff", borderBottom: "1px solid #dfe4ee", alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 2, padding: "0 24px", background: "#fff", borderBottom: "1px solid #dfe4ee", alignItems: "center", flexWrap: "wrap" }}>
         <button className={`opv3-tab ${tab === "fila" ? "on" : ""}`} onClick={() => irPara("fila")}>Fila <span className="opv3-n">{filaBase.length}</span></button>
         <button className={`opv3-tab ${tab === "aguard" ? "on" : ""}`} onClick={() => irPara("aguard")}>Aguardando <span className="opv3-n">{aguardBase.length}</span></button>
         <button className={`opv3-tab ${tab === "acomp" ? "on" : ""}`} onClick={() => irPara("acomp")}>Acompanhamento <span className="opv3-n opv3-warn">{acompVenc.length} vencidos</span></button>
@@ -282,14 +282,14 @@ export function OperacaoV3() {
             </select>
           </label>
           <input aria-label="Buscar" placeholder="Buscar família, pessoa, documento, órgão…" value={busca} onChange={(e) => setBusca(e.target.value)}
-            style={{ fontSize: 13, padding: "8px 12px", border: "1px solid #cfd6e3", borderRadius: 8, width: 260, minHeight: 38 }} />
+            style={{ fontSize: 12, padding: "5px 10px", border: "1px solid #cfd6e3", borderRadius: 7, width: 230, minHeight: 30 }} />
           {busca && <button className="opv3-btn opv3-sm" onClick={() => setBusca("")}>✕</button>}
         </div>
       </div>
 
       {/* ===== CORPO + DRAWER ===== */}
       <div style={{ display: "flex", flexGrow: 1, minHeight: 0 }}>
-        <section style={{ flexGrow: 1, minWidth: 0, padding: "18px 4px", overflow: "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+        <section style={{ flexGrow: 1, minWidth: 0, padding: "14px 24px", overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
           {tab === "fila" && (
             <AbaFila
               linhas={fila} todasSelecionaveis={filaBase}
@@ -400,7 +400,7 @@ export function OperacaoV3() {
       </div>
 
       {toast && (
-        <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", background: "#0b1f4b", color: "#fff", padding: "10px 16px", borderRadius: 10, fontSize: 13, zIndex: 30, boxShadow: "0 10px 30px rgba(0,0,0,.3)", display: "flex", gap: 12, alignItems: "center", maxWidth: 720 }}>
+        <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", background: "#0b1f4b", color: "#fff", padding: "10px 16px", borderRadius: 10, fontSize: 12, zIndex: 30, boxShadow: "0 10px 30px rgba(0,0,0,.3)", display: "flex", gap: 12, alignItems: "center", maxWidth: 720 }}>
           <span>{toast}</span>
           <button className="opv3-btn opv3-sm" onClick={() => setToast(null)} style={{ background: "#1d3466", color: "#fff", borderColor: "#2c4a86" }}>ok</button>
         </div>
@@ -479,7 +479,7 @@ function AbaFila({
         <div style={{ flexGrow: 1 }} />
         {selCount > 0 && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", background: "#fff6f0", border: "1px solid #f0c9b3", borderRadius: 10, padding: "5px 8px" }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#8a3f15" }}>{selCount} sel.</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#8a3f15" }}>{selCount} sel.</span>
             <button className="opv3-btn opv3-acc opv3-sm" onClick={onIniciarSelecionadas}>Iniciar (enviar ao cartório) as {selCount}</button>
             <button className="opv3-btn opv3-sm" onClick={() => onVincularTodos(Object.keys(sel).map(Number))}>Vincular órgão</button>
             <button className="opv3-btn opv3-sm" onClick={onNaoLigado}>Atribuir</button>
@@ -490,7 +490,7 @@ function AbaFila({
       <div style={{ fontSize: 12, color: "#5b6478" }}>Fila = o que depende de você agora: certidões <b>a iniciar</b> (enviar ao cartório) e no <b>passo 4</b> (conferir e validar). O que está com o cartório fica em Aguardando.</div>
 
       {noOrgTotal.length > 0 && !radar && !quick && (
-        <div className="opv3-card" style={{ borderLeft: "4px solid #b3261e", padding: "10px 14px", display: "flex", gap: 12, alignItems: "center", fontSize: 13 }}>
+        <div className="opv3-card" style={{ borderLeft: "4px solid #b3261e", padding: "10px 14px", display: "flex", gap: 12, alignItems: "center", fontSize: 12 }}>
           <span className="opv3-pill opv3-p-red">Bloqueio</span>
           <span><b>{noOrgTotal.length} certidões sem órgão emissor.</b> Não dá pra enviar sem destino — vincule antes de iniciar.</span>
           <div style={{ flexGrow: 1 }} />
@@ -500,7 +500,7 @@ function AbaFila({
 
       {linhas.length === 0 && (
         <div className="opv3-card" style={{ padding: 40, textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-          <b style={{ fontSize: 16, color: "#155e39" }}>{quick || radar ? "Nenhuma na fila com esse filtro." : "Nada na fila."}</b>
+          <b style={{ fontSize: 14, color: "#155e39" }}>{quick || radar ? "Nenhuma na fila com esse filtro." : "Nada na fila."}</b>
           <span style={{ color: "#5b6478" }}>{nAguard} certidões com o cartório · {nAcompVenc} acompanhamentos vencidos.</span>
         </div>
       )}
@@ -515,7 +515,7 @@ function AbaFila({
             <div className="opv3-grp" style={{ borderTop: 0, borderRadius: "12px 12px 0 0", background: "#e3e8f2", padding: "13px 16px" }}>
               <button className={`opv3-chk ${todosMarcados ? "on" : ""}`} onClick={() => toggleGrupo(F.linhas)} aria-label="Selecionar família" />
               <button className="opv3-btn opv3-sm" onClick={() => toggleCol(fk)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{aberta ? "▾" : "▸"}</button>
-              <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 14 }}>{F.fam}</b><span style={{ color: "#5b6478" }}>{F.pais} · {F.linhas.length} tarefa(s) na fila</span>
+              <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{F.fam}</b><span style={{ color: "#5b6478" }}>{F.pais} · {F.linhas.length} tarefa(s) na fila</span>
               <div style={{ flexGrow: 1 }} />
               <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(F.fam)}>Ver família</button>
             </div>

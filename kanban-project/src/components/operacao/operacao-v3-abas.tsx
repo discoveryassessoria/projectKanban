@@ -37,7 +37,7 @@ export function AbaAguardando({
   return (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#0b1f4b" }}>O que está com o cartório</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>O que está com o cartório</div>
         <span style={{ fontSize: 12, color: "#5b6478" }}>passos 2 (confirmar pedido) e 3 (receber certidão) — vencido ou não</span>
         <label className="opv3-field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <span>Agrupar por</span>
@@ -79,7 +79,7 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
       <div className="opv3-grp" style={{ borderTop: 0, borderRadius: "12px 12px 0 0", background: "#e3e8f2", padding: "13px 16px" }}>
         <button className="opv3-btn opv3-sm" onClick={() => toggle(col, setCol, ck)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{aberto ? "▾" : "▸"}</button>
         <span className="opv3-pill opv3-p-gry">{onVerFamilia ? "Família" : "Órgão"}</span>
-        <b style={{ fontSize: 14 }}>{grupo.fam}</b>
+        <b style={{ fontSize: 12.5 }}>{grupo.fam}</b>
         <span style={{ color: "#5b6478" }}>{grupo.pais ? `${grupo.pais} · ` : ""}{grupo.linhas.length} tarefa(s)</span>
         <div style={{ flexGrow: 1 }} />
         {onVerFamilia && <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(grupo.fam)}>Ver família</button>}
@@ -158,7 +158,7 @@ export function AbaAcompanhamento({
   return (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#0b1f4b" }}>O que precisa de controle</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>O que precisa de controle</div>
         <span style={{ fontSize: 12, color: "#5b6478" }}>só acompanhamentos vencidos, de hoje, de amanhã e dos próximos 7 dias — de qualquer passo, esteja na Fila ou em Aguardando</span>
         <div style={{ flexGrow: 1 }} />
         <button className="opv3-btn opv3-sm" onClick={() => setAcompDepois(!acompDepois)}>{acompDepois ? "Ocultar depois de 7 dias" : "Mostrar depois de 7 dias"}</button>
@@ -185,7 +185,7 @@ export function AbaAcompanhamento({
             <div key={g.fam} className="opv3-card" style={{ borderLeft: "4px solid #0b1f4b", marginTop: 10, paddingBottom: 12, boxShadow: "0 2px 8px rgba(11,31,75,.06)" }}>
               <div className="opv3-grp" style={{ borderTop: 0, borderRadius: "12px 12px 0 0", background: "#e3e8f2", padding: "13px 16px" }}>
                 <button className="opv3-btn opv3-sm" onClick={() => toggle(col, setCol, `ac|${b.title}|${g.fam}`)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{col[`ac|${b.title}|${g.fam}`] ? "▸" : "▾"}</button>
-                <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 14 }}>{g.fam}</b><span style={{ color: "#5b6478" }}>{g.pais} · {g.linhas.length} tarefa(s)</span>
+                <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{g.fam}</b><span style={{ color: "#5b6478" }}>{g.pais} · {g.linhas.length} tarefa(s)</span>
                 <div style={{ flexGrow: 1 }} />
                 <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(g.fam)}>Ver família</button>
               </div>
@@ -263,7 +263,7 @@ export function AbaFamilias({
 
   return (
     <>
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#0b1f4b" }}>Como está cada processo</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>Como está cada processo</div>
       {familias.map((f) => {
         const aberto = famOpen?.fam === f.nome ? ESTAGIOS.find((e) => e.chave === famOpen.estagio) : null
         const cards = ESTAGIOS.map((e) => ({ ...e, rows: f.ts.filter(e.pred) }))
@@ -272,7 +272,7 @@ export function AbaFamilias({
           <div key={f.nome} className="opv3-card" style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, borderLeft: `4px solid ${aberto ? "#c9622b" : "#1d3f8f"}` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <div style={{ width: 38, height: 38, borderRadius: 999, background: "#0b1f4b", color: "#fff", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{inicial}</div>
-              <div><div style={{ fontWeight: 700, fontSize: 16 }}>{f.nome}</div><div style={{ fontSize: 12, color: "#5b6478" }}>{f.pais} · {f.ts.length} tarefa(s)</div></div>
+              <div><div style={{ fontWeight: 700, fontSize: 12.5 }}>{f.nome}</div><div style={{ fontSize: 12, color: "#5b6478" }}>{f.pais} · {f.ts.length} tarefa(s)</div></div>
               <div style={{ flexGrow: 1 }} />
               <span className="opv3-pill opv3-p-blu">{f.fase}</span>
               <button className="opv3-btn" onClick={() => { const ultimo = famUltimo[f.nome] ?? "iniciar"; const abrindo = famOpen?.fam !== f.nome; setFamOpen(abrindo ? { fam: f.nome, estagio: ultimo } : null) }}>
@@ -289,7 +289,7 @@ export function AbaFamilias({
                     <div style={{ fontSize: 11, color: "#7a8296", textTransform: "uppercase", fontWeight: 600, display: "flex", justifyContent: "space-between", width: "100%" }}>
                       <span>{c.label}</span><span>{op ? "▴ ocultar" : "▾ ver"}</span>
                     </div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: c.cor }}>{c.rows.length}</div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: c.cor }}>{c.rows.length}</div>
                   </button>
                 )
               })}
@@ -304,7 +304,7 @@ export function AbaFamilias({
                 </div>
                 <div className="opv3-hd" style={{ gridTemplateColumns: "1.5fr 1.1fr 1fr 1fr 0.9fr 0.8fr 120px" }}><span>Documento</span><span>Pessoa</span><span>Passo atual</span><span>Acompanhamento</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
                 {(cards.find((c) => c.chave === aberto.chave)?.rows.length ?? 0) === 0 && (
-                  <div style={{ padding: 20, textAlign: "center", color: "#5b6478", fontSize: 13 }}>Nenhuma tarefa neste estágio.</div>
+                  <div style={{ padding: 20, textAlign: "center", color: "#5b6478", fontSize: 12 }}>Nenhuma tarefa neste estágio.</div>
                 )}
                 {cards.find((c) => c.chave === aberto.chave)?.rows.map((t) => {
                   const passo = passoLabelDe(t)
@@ -353,8 +353,8 @@ export function AbaRadar({
   return (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: "#0b1f4b" }}>Só o que está errado — clique para abrir a lista</div>
-        <span style={{ fontSize: 13, color: "#5b6478" }}>Vazio é bom sinal.</span>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>Só o que está errado — clique para abrir a lista</div>
+        <span style={{ fontSize: 12, color: "#5b6478" }}>Vazio é bom sinal.</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
         <button className="opv3-radar" style={{ borderLeftColor: cor(atras.length) }} onClick={onKAtras}>
@@ -420,7 +420,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
 
   return (
     <>
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#0b1f4b" }}>O que andou</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>O que andou</div>
       <div style={{ display: "flex", gap: 10 }}>
         <div className="opv3-kpi"><b>{hoje.length}</b><span>Concluídas hoje</span></div>
         <div className="opv3-kpi"><b>{ontem.length}</b><span>Ontem</span></div>
@@ -434,7 +434,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
             <div key={g.fam} className="opv3-card" style={{ borderLeft: "4px solid #0b1f4b", marginTop: 10, paddingBottom: 12, boxShadow: "0 2px 8px rgba(11,31,75,.06)" }}>
               <div className="opv3-grp" style={{ borderTop: 0, borderRadius: "12px 12px 0 0", background: "#e3e8f2", padding: "13px 16px" }}>
                 <button className="opv3-btn opv3-sm" onClick={() => toggle(col, setCol, `fe|${b.title}|${g.fam}`)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{col[`fe|${b.title}|${g.fam}`] ? "▸" : "▾"}</button>
-                <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 14 }}>{g.fam}</b><span style={{ color: "#5b6478" }}>{g.pais} · {g.linhas.length} tarefa(s)</span>
+                <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{g.fam}</b><span style={{ color: "#5b6478" }}>{g.pais} · {g.linhas.length} tarefa(s)</span>
               </div>
               {!col[`fe|${b.title}|${g.fam}`] && (
                 <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
@@ -457,7 +457,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
       ))}
       <div className="opv3-card">
         <div className="opv3-blk" style={{ borderTop: 0 }}><span>Eventos do processo</span><span style={{ fontSize: 12, color: "#7a8296", fontWeight: 500 }}>não são tarefas — mudanças de fase e atribuições</span></div>
-        <div style={{ padding: 20, textAlign: "center", color: "#5b6478", fontSize: 13 }}>Sem eventos recentes.</div>
+        <div style={{ padding: 20, textAlign: "center", color: "#5b6478", fontSize: 12 }}>Sem eventos recentes.</div>
       </div>
     </>
   )
