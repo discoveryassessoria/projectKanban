@@ -845,6 +845,25 @@ export async function concluidasHojeDoUsuario(usuarioId: number, agora = new Dat
 }
 
 /**
+ * AS LINHAS — o que ESTE usuário concluiu nos últimos `dias` (Etapa 3, aba
+ * "Feito": blocos Hoje/Ontem/Antes) — mesma régua de `concluidasHojeDoUsuario`,
+ * só com a janela maior. O agrupamento por dia é feito no CLIENTE, a partir
+ * de `concluidaEm` — nenhuma lógica nova de servidor, só uma janela mais larga
+ * da mesma consulta.
+ */
+export async function concluidasRecentesDoUsuario(
+  usuarioId: number, agora = new Date(), dias = 14, db: Leitor = prisma,
+): Promise<LinhaGerencial[]> {
+  const fim = agora.toISOString().slice(0, 10)
+  const inicio = new Date(agora.getTime() - dias * 86_400_000).toISOString().slice(0, 10)
+  const { linhas } = await visaoGerencial(
+    { responsavelId: usuarioId, dataTipo: 'concluida', dataInicio: inicio, dataFim: fim, porPagina: 500 },
+    agora, db,
+  )
+  return linhas as LinhaGerencial[]
+}
+
+/**
  * FILA DA EQUIPE — o trabalho que ainda não tem dono.
  *
  * É a tela do gestor: tudo aqui está esperando uma decisão de distribuição, e

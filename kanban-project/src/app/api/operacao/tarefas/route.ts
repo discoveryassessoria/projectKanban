@@ -16,7 +16,7 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { minhaFila, semResponsavel, concluidasHojeDoUsuario, acompanhamentoDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
+import { minhaFila, semResponsavel, concluidasHojeDoUsuario, concluidasRecentesDoUsuario, acompanhamentoDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 import { comDuracaoLogada, respostaSeIndisponibilidade } from '@/lib/operacional/erro-indisponibilidade-prisma'
 
@@ -94,10 +94,16 @@ export async function GET(request: NextRequest) {
       )
       return NextResponse.json({ visao, total: linhas.length, linhas })
     }
+    // FEITO (Etapa 3, aba "Feito") — concluídas dos últimos 14 dias; a tela
+    // agrupa em Hoje/Ontem/Antes no cliente, a partir de `concluidaEm`.
+    if (visao === 'feito') {
+      const linhas = await comDuracaoLogada('operacao.tarefas.feito', () => concluidasRecentesDoUsuario(usuario.userId, agora, 14))
+      return NextResponse.json({ visao, total: linhas.length, linhas })
+    }
   } catch (e) {
     const indisponivel = respostaSeIndisponibilidade(e)
     if (indisponivel) return indisponivel
     throw e
   }
-  return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel', 'concluidas_hoje', 'acompanhamento'] }, { status: 400 })
+  return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel', 'concluidas_hoje', 'acompanhamento', 'feito'] }, { status: 400 })
 }
