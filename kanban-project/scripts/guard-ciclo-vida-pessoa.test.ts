@@ -276,6 +276,14 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "estado operacional da tarefa — FILA/AGUARDANDO/CONCLUIDA (Etapa 2, fechamento, " +
     "26/09/2026): cria as PRÓPRIAS árvore/processos (marca MOTORESTADO) só no banco de " +
     "teste — a limpeza remove só o que o próprio teste criou",
+  "scripts/operacao-v3-projecao.test.ts":
+    "LinhaDeFila.estadoOperacao/aIniciar/passoCorrente (Etapa 3, tela Operação v3, " +
+    "26/09/2026): cria a PRÓPRIA árvore/processo (marca OPV3PROJ) só no banco de teste " +
+    "— a limpeza remove só o que o próprio teste criou",
+  "scripts/operacao-v3-cobrar-adiar-por-tarefa.test.ts":
+    "cobrar/adiar pela porta de tarefaId (Etapa 3, tela Operação v3, 26/09/2026): cria " +
+    "a PRÓPRIA árvore/processo (marca OPV3COBADIAR) só no banco de teste — a limpeza " +
+    "remove só o que o próprio teste criou",
   "scripts/mandato-financeiro-cartorio-isolado.test.ts":
     "isolamento financeiro do custo de cartório (mandato Bloco 5): cria a PRÓPRIA " +
     "árvore/pessoa (marca FINCARTORIO-TEST) só no banco de teste — a limpeza remove só o " +
