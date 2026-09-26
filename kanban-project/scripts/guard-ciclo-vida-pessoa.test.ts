@@ -264,6 +264,18 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "rascunho e publicação de Workflow Interno (mandato Bloco 3): cria as PRÓPRIAS " +
     "árvores/pessoas (marca RASCUNHOPUB-TEST) só no banco de teste — a limpeza remove só o " +
     "que o próprio teste criou",
+  "scripts/motor-prazo-ancoragem-subtarefas.test.ts":
+    "motor de prazo/acompanhamento/cobrança, fonte da verdade = versão publicada (Etapa 2, " +
+    "25/09/2026): cria a PRÓPRIA árvore/processo (marca MOTORPRAZO-ANCORA) só no banco de " +
+    "teste — a limpeza remove só o que o próprio teste criou",
+  "scripts/motor-cobranca-escalada.test.ts":
+    "motor de cobrança e escalada (Etapa 2, item 5/8, 26/09/2026): cria a PRÓPRIA árvore/" +
+    "processo (marca MOTORCOBRANCA) só no banco de teste — a limpeza remove só o que o " +
+    "próprio teste criou",
+  "scripts/motor-estado-operacao.test.ts":
+    "estado operacional da tarefa — FILA/AGUARDANDO/CONCLUIDA (Etapa 2, fechamento, " +
+    "26/09/2026): cria as PRÓPRIAS árvore/processos (marca MOTORESTADO) só no banco de " +
+    "teste — a limpeza remove só o que o próprio teste criou",
   "scripts/mandato-financeiro-cartorio-isolado.test.ts":
     "isolamento financeiro do custo de cartório (mandato Bloco 5): cria a PRÓPRIA " +
     "árvore/pessoa (marca FINCARTORIO-TEST) só no banco de teste — a limpeza remove só o " +

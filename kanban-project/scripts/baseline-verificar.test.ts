@@ -556,6 +556,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // travado/congelado da hierarquia País×Tipo×Modalidade, doc 31) — ver
   // comentário do model `Pais` em schema.prisma.
   '20260924200000_paises_cidades_base_mundial',
+  // Motor de prazo/acompanhamento/cobrança (mandato 25/09/2026): escopo
+  // estritamente aditivo — 3 colunas em PhaseInternalWorkflowStep (a
+  // iniciar/cobrança/escalada), 2 em StepSubtaskDefinition (prazo nasce na
+  // subtarefa), 2 em SubtaskExecution (escalada), tabela nova ContatoTerceiro.
+  '20260925231907_motor_prazo_acompanhamento_cobranca',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
