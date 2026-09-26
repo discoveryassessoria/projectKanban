@@ -22,7 +22,7 @@ import {
   estadoTemporalSubtarefa,
   type EstadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
-import { estadosTemporaisDasOperacoes, ehEsperaExterna } from '@/lib/operacional/proximo-acontecimento'
+import { estadosTemporaisDasOperacoes, ehEsperaExterna, type EstadoTemporalDaOperacao } from '@/lib/operacional/proximo-acontecimento'
 import { lerVersaoPublicada } from '@/src/services/versao-publicada'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoDocumento, TipoTarefa } from '@prisma/client'
 
@@ -585,6 +585,20 @@ function projetar(
 async function comAtencaoTemporal<T extends LinhaDeFila>(linhas: T[], agora: Date, db: Leitor = prisma): Promise<T[]> {
   if (linhas.length === 0) return linhas
   const estados = await estadosTemporaisDasOperacoes(db, linhas.map((l) => l.taskId), agora)
+  return aplicarEstadosTemporais(linhas, estados)
+}
+
+/**
+ * O MERGE puro de `comAtencaoTemporal`, separado da busca — permite que
+ * `enriquecerLinhas` dispare `estadosTemporaisDasOperacoes` no MESMO
+ * `Promise.all` das outras consultas em lote (nomes/rótulos/subtarefas/...),
+ * em vez de esperar elas terminarem pra só então buscar os estados temporais
+ * (achado real 26/09/2026, Etapa B — perf de /api/operacao/tarefas: eram 2
+ * idas ao banco inteiramente sequenciais que não dependiam uma da outra).
+ * O cálculo em si (`estadosTemporaisDasOperacoes`) continua o único —
+ * só a ORDEM de quando ele é buscado mudou, nunca o que ele calcula.
+ */
+function aplicarEstadosTemporais<T extends LinhaDeFila>(linhas: T[], estados: Map<number, EstadoTemporalDaOperacao>): T[] {
   return linhas.map((l) => {
     const e = estados.get(l.taskId)
     if (!e) return l
@@ -2054,14 +2068,22 @@ type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL 
  * fila — nunca só na visão gerencial.
  */
 async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leitor = prisma): Promise<LinhaGerencial[]> {
-  const [nomes, rotulos, totais, subtarefas, linhagem] = await Promise.all([
+  // TUDO NUMA SÓ IDA REDONDA — `contextoDeParada` e `estadosTemporaisDasOperacoes`
+  // não dependem de nomes/rótulos/subtarefas/linhagem (só de `brutas`, já em
+  // mãos), mas eram buscados DEPOIS, em série (achado real 26/09/2026, Etapa
+  // B: /api/operacao/tarefas — 7 idas sequenciais ao banco por causa disso).
+  // `estadosTemporaisDasOperacoes` some do fim (era `comAtencaoTemporal`
+  // depois de `linhas` pronta) e entra aqui; o merge dela roda no MESMO
+  // `.map()` que já aplica `paradas`, sem consulta extra.
+  const [nomes, rotulos, totais, subtarefas, linhagem, paradas, estados] = await Promise.all([
     nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db), progressoPorSubtarefa(brutas, db),
     linhagemDasPessoas(brutas, db),
+    contextoDeParada(
+      brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
+      db,
+    ),
+    brutas.length > 0 ? estadosTemporaisDasOperacoes(db, brutas.map((t) => t.id), agora) : Promise.resolve(new Map<number, EstadoTemporalDaOperacao>()),
   ])
-  const paradas = await contextoDeParada(
-    brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
-    db,
-  )
   const hoje = diaOperacional(agora)
 
   const linhas = brutas.map((t): LinhaGerencial => {
@@ -2080,7 +2102,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
       concluidaEm: t.dataConclusao?.toISOString() ?? null,
     }
   })
-  return await comAtencaoTemporal(linhas, agora, db) as LinhaGerencial[]
+  return aplicarEstadosTemporais(linhas, estados) as LinhaGerencial[]
 }
 
 /**

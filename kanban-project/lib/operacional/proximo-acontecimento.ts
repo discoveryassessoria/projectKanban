@@ -459,10 +459,24 @@ export async function estadosTemporaisDasOperacoes(
   const resultado = new Map<number, EstadoTemporalDaOperacao>()
   if (tarefaIds.length === 0) return resultado
 
-  const tarefas = await db.tarefa.findMany({
-    where: { id: { in: tarefaIds } },
-    select: SELECT_TAREFA_TEMPORAL,
-  })
+  // `tarefas` e `solicitacoes` não dependem uma da outra (as duas só
+  // precisam de `tarefaIds`) — buscadas juntas, nunca uma depois da outra
+  // (achado real 26/09/2026, Etapa B: perf de /api/operacao/tarefas).
+  const [tarefas, solicitacoes] = await Promise.all([
+    db.tarefa.findMany({
+      where: { id: { in: tarefaIds } },
+      select: SELECT_TAREFA_TEMPORAL,
+    }),
+    db.solicitacaoDocumento.findMany({
+      where: { tarefaId: { in: tarefaIds } },
+      select: {
+        id: true, tarefaId: true, status: true, previsaoRetorno: true, prazoEsperadoDias: true, dataEnvio: true,
+        destinatarioNome: true, orgao: { select: { name: true, nomeFantasia: true } },
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ])
 
   const stepIds = [...new Set(tarefas.map((t) => t.workflowStepInstanceId).filter((id): id is number => id != null))]
   const steps = stepIds.length
@@ -486,16 +500,6 @@ export async function estadosTemporaisDasOperacoes(
     const snap = s.snapshot as { label?: string; titulo?: string } | null
     return snap?.label ?? snap?.titulo ?? (s.stepDefinitionId != null ? labelPorDefId.get(s.stepDefinitionId) : null) ?? null
   }
-
-  const solicitacoes = await db.solicitacaoDocumento.findMany({
-    where: { tarefaId: { in: tarefaIds } },
-    select: {
-      id: true, tarefaId: true, status: true, previsaoRetorno: true, prazoEsperadoDias: true, dataEnvio: true,
-      destinatarioNome: true, orgao: { select: { name: true, nomeFantasia: true } },
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  })
   // UMA solicitação por tarefa — a mais recente, quando há mais de uma (nova via).
   const solicitacaoPorTarefa = new Map<number, (typeof solicitacoes)[number]>()
   for (const s of solicitacoes) {

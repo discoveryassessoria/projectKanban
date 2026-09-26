@@ -745,6 +745,12 @@ model Tarefa {
   @@index([workflowStepInstanceId])
   @@index([workflowInstanceId])
   @@index([necessidadeId])
+  @@index([faseMacroKey])
+  /// Etapa B (perf /api/operacao/tarefas, 26/09/2026): `minhaFila`/`visaoGerencial`
+  /// SEMPRE filtram responsavelId+statusTarefa juntos e ordenam por dataPrazo — os
+  /// índices soltos acima já existiam, mas o par filtro+ordenação é o caminho mais
+  /// quente do sistema (toda fila de todo operador, todo carregamento da tela).
+  @@index([responsavelId, statusTarefa, dataPrazo])
 }
 
 model TarefaHistorico {
