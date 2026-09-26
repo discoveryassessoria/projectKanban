@@ -14,6 +14,8 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
+import { urlArvoreDoProcesso } from "@/lib/operacional/navegacao"
 import { auth } from "./kit-operacional"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
@@ -539,9 +541,22 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
   onAbrir: (id: number) => void
   famKey: string
 }) {
+  const router = useRouter()
   const ck = `fila|${famKey}|${grupo.chave}`
   const aberto = !col[ck]
   const toggleCol = () => setCol(col[ck] ? Object.fromEntries(Object.entries(col).filter(([x]) => x !== ck)) : { ...col, [ck]: true })
+  // GENEALOGIA É SEM DOCUMENTO POR NATUREZA (Etapa D, 26/09/2026):
+  // `localizar_registro` confirma o registro civil ANTES de qualquer
+  // Documento existir — abrir o drawer documental (que espera
+  // `documentoId`) sempre dá "sem documento associado". "Continuar" leva à
+  // aba Árvore do processo, onde a Genealogia acontece de verdade.
+  const abrirLinha = (t: LinhaOperacaoV3) => {
+    if (t.faseMacroKey === "genealogia" && t.documentoId == null && t.processoId != null) {
+      router.push(urlArvoreDoProcesso(t.processoId))
+      return
+    }
+    onAbrir(t.taskId)
+  }
   const todosMarcados = grupo.linhas.every((r) => sel[r.taskId])
   return (
     <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
@@ -568,7 +583,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
                 <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span><div style={{ fontSize: 11, color: "#7a8296" }}>{t.rotuloDoPrazo}</div></div>
                 <div><span className={`opv3-pill ${orgaoCls(t)}`}>{orgaoTxt(t)}</span></div>
-                <div style={{ display: "flex", gap: 4 }}><button className={`opv3-btn opv3-sm ${acao.accent ? "opv3-acc" : ""}`} onClick={() => onAbrir(t.taskId)}>{acao.label}</button></div>
+                <div style={{ display: "flex", gap: 4 }}><button className={`opv3-btn opv3-sm ${acao.accent ? "opv3-acc" : ""}`} onClick={() => abrirLinha(t)}>{acao.label}</button></div>
               </div>
             )
           })}

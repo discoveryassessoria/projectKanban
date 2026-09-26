@@ -62,6 +62,23 @@ export function urlOperacionalDoProcesso(processoId: number): string {
 }
 
 /**
+ * A URL DA ÁRVORE (Genealogia) DE UM PROCESSO.
+ *
+ * Etapa D (fechamento Operação v3, 26/09/2026): a tarefa de `localizar_registro`
+ * (Genealogia) é, por natureza, SEM `Documento` — o registro ainda está sendo
+ * confirmado, o Documento só nasce depois, na Emissão Documental
+ * (`materializar-genealogia.ts`: "Documento NÃO é criado aqui"). Abrir o
+ * drawer operacional pra essa tarefa (que espera `documentoId`) sempre dá
+ * "sem documento associado" — não é bug de vínculo faltando, é a aba errada.
+ * "Continuar" leva à aba Árvore do processo, onde a Genealogia realmente
+ * acontece — nunca ao drawer documental.
+ */
+export function urlArvoreDoProcesso(processoId: number): string {
+  const p = new URLSearchParams({ processoId: String(processoId), tab: 'arvore' })
+  return `/kanban?${p.toString()}`
+}
+
+/**
  * A URL DE EXECUÇÃO DE UMA OBRIGAÇÃO ADMINISTRATIVA DE DISTRIBUIÇÃO.
  *
  * `urlOperacionalDaTarefa` leva ao Kanban DO PROCESSO — certo para uma
