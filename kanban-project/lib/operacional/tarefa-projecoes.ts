@@ -362,7 +362,7 @@ const SELECT = {
   pessoaId: true,
   createdAt: true, dataAtribuicao: true,
   necessidade: { select: { itemCatalogo: { select: { name: true } } } },
-  workflowStepInstance: { select: { id: true, stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true } },
+  workflowStepInstance: { select: { id: true, stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true, createdAt: true } },
   // Par que identifica a CADEIA de passos da obrigação — várias Tarefas
   // (documentos distintos) podem compartilhar a mesma `workflowInstanceId`
   // (fato real de produção, achado na reconciliação da Emissão Documental),
@@ -499,7 +499,7 @@ function projetar(
         // `ordem - 1` = quantos passos anteriores (1..ordem-1) já ficaram
         // para trás — ver o comentário do campo na interface.
         ordem: Math.max(0, t.workflowStepInstance.ordem - 1),
-        total: totaisDePassos?.get(`${t.workflowInstanceId}:${t.documentoId}`) ?? t.workflowStepInstance.ordem,
+        total: totaisDePassos?.get(chaveDeTotalPassos(t.workflowInstanceId, t.documentoId, t.workflowStepInstance.id)) ?? t.workflowStepInstance.ordem,
       }
     })(),
     // MESMA RÉGUA (`estadoTemporalSubtarefa`), aplicada aos DOIS relógios
@@ -614,12 +614,27 @@ async function rotulosDosPassos(linhas: Bruta[], db: Leitor = prisma): Promise<M
 }
 
 /**
+ * A CHAVE de agrupamento de `totalDePassos` — (workflowInstanceId,
+ * documentoId) quando `documentoId` existe (o caso real: vários documentos
+ * compartilhando a mesma `PhaseWorkflowInstance`, achado da reconciliação da
+ * Emissão Documental, instância 350 compartilhada por 6 documentos).
+ *
+ * Quando `documentoId` é `null` (comum na Genealogia: step ainda não ligado
+ * a um Documento materializado), usar só `workflowInstanceId` agruparia
+ * TODOS os steps de `documentoId` nulo daquela instância como se fossem a
+ * MESMA cadeia — achado real 26/09/2026: 4 obrigações de Genealogia
+ * distintas (`localizar_registro` de 4 pessoas) sob a mesma
+ * `workflowInstanceId`, todas com `documentoId: null`, contadas juntas
+ * ("1/4" em vez de "1/1" cada). Sem `documentoId`, cada `stepInstanceId` é a
+ * sua própria cadeia — chave por ele, nunca pelo placeholder `null`
+ * compartilhado.
+ */
+const chaveDeTotalPassos = (workflowInstanceId: number | null, documentoId: number | null, stepInstanceId: number | null): string =>
+  documentoId != null ? `${workflowInstanceId}:${documentoId}` : `${workflowInstanceId}:step:${stepInstanceId}`
+
+/**
  * O TOTAL DE PASSOS DA CADEIA (o "N" de X/N) — UMA consulta, nunca uma por
- * tarefa. Agrupado por (workflowInstanceId, documentoId): várias Tarefas
- * (documentos distintos) podem compartilhar a mesma `PhaseWorkflowInstance` —
- * achado real da reconciliação da Emissão Documental (produção: instância 350
- * compartilhada por 6 documentos) — então contar só por instância inflaria o
- * total de todo mundo pelo total de todo mundo junto.
+ * tarefa. Agrupado por `chaveDeTotalPassos` (ver acima).
  */
 async function totalDePassos(
   linhas: Array<{ workflowInstanceId: number | null; documentoId: number | null }>,
@@ -629,11 +644,11 @@ async function totalDePassos(
   if (instanciaIds.length === 0) return new Map()
   const passos = await db.phaseWorkflowStepInstance.findMany({
     where: { workflowInstanceId: { in: instanciaIds } },
-    select: { workflowInstanceId: true, documentoId: true },
+    select: { id: true, workflowInstanceId: true, documentoId: true },
   })
   const totais = new Map<string, number>()
   for (const p of passos) {
-    const chave = `${p.workflowInstanceId}:${p.documentoId}`
+    const chave = chaveDeTotalPassos(p.workflowInstanceId, p.documentoId, p.id)
     totais.set(chave, (totais.get(chave) ?? 0) + 1)
   }
   return totais
@@ -677,7 +692,7 @@ export interface ResumoSubtarefasDoPasso {
 }
 
 async function progressoPorSubtarefa(
-  linhas: Array<{ workflowStepInstance: { id: number; stepKey: string } | null; workflowInstanceId: number | null }>,
+  linhas: Array<{ workflowStepInstance: { id: number; stepKey: string; createdAt: Date } | null; workflowInstanceId: number | null }>,
   db: Leitor = prisma,
 ): Promise<Map<number, ResumoSubtarefasDoPasso>> {
   const instanciaIds = [...new Set(linhas.map((l) => l.workflowInstanceId).filter((x): x is number => x != null))]
@@ -706,11 +721,13 @@ async function progressoPorSubtarefa(
   const totalPorStepInstance = new Map<number, number>()
   const ordemPorStepInstance = new Map<number, Map<string, number>>()
   const definicaoPorStepInstance = new Map<number, Map<string, { label: string; dependeDe: string[] }>>()
+  const createdAtPorStepInstance = new Map<number, Date>()
   const stepInstanceIds: number[] = []
   for (const l of linhas) {
     const si = l.workflowStepInstance
     if (!si || l.workflowInstanceId == null) continue
     stepInstanceIds.push(si.id)
+    createdAtPorStepInstance.set(si.id, si.createdAt)
     const inst = instanciaPorId.get(l.workflowInstanceId)
     if (!inst?.workflowDefinitionId || inst.workflowVersion == null) continue
     const versao = versaoPorChave.get(`${inst.workflowDefinitionId}:${inst.workflowVersion}`)
@@ -766,6 +783,40 @@ async function progressoPorSubtarefa(
       } : null,
     })
   }
+
+  // GAP DE MATERIALIZAÇÃO CONHECIDO (achado 26/09/2026, hotfix "régua antiga"
+  // da família Cibils — ver `src/services/criar-processo.ts`, criação de
+  // Processo sob transação externa não chama `materializarSubtarefas`):
+  // step instance com subtarefas ATIVAS na definição congelada mas ZERO
+  // `SubtaskExecution` ainda gravada. Sem isto, `atual` fica `null` e
+  // `aIniciar`/`passoAtual` caem no fallback por STEP (sempre "1/1",
+  // `aIniciar=false`) — mesmo sendo, na prática, a subtarefa de ENTRADA
+  // ainda disponível, nunca tocada. A leitura aqui reflete o que
+  // `materializarSubtarefas` seguramente criaria (subtarefa sem
+  // `dependeDe`, `DISPONIVEL`) — nunca inventa um estado que a
+  // materialização real não geraria.
+  for (const [stepInstanceId, total] of totalPorStepInstance) {
+    if (resultado.has(stepInstanceId)) continue
+    const defs = definicaoPorStepInstance.get(stepInstanceId)
+    const ordens = ordemPorStepInstance.get(stepInstanceId)
+    if (!defs || !ordens) continue
+    const entrada = [...defs.entries()]
+      .filter(([, d]) => d.dependeDe.length === 0)
+      .sort((a, b) => (ordens.get(a[0]) ?? 0) - (ordens.get(b[0]) ?? 0))[0]
+    if (!entrada) continue
+    const [subtaskKey, def] = entrada
+    resultado.set(stepInstanceId, {
+      concluidas: 0, total,
+      atual: {
+        subtaskKey, status: 'DISPONIVEL',
+        criadoEm: createdAtPorStepInstance.get(stepInstanceId) ?? new Date(),
+        startedAt: null, previstoPara: null, proximoAcompanhamentoEm: null,
+        escalada: false, totalCobrancas: 0,
+        label: def.label, dependeDe: def.dependeDe,
+      },
+    })
+  }
+
   return resultado
 }
 
