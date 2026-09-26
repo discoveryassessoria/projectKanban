@@ -778,8 +778,22 @@ async function progressoPorSubtarefa(
     const ordens = ordemPorStepInstance.get(stepInstanceId)
     const defs = definicaoPorStepInstance.get(stepInstanceId)
     const concluidas = execs.filter((e) => e.status === 'CONCLUIDO').length
+    // A CORRENTE é a alcançável de menor ordem — NUNCA só "menor ordem entre
+    // as não-encerradas". Achado real 26/09/2026 (hotfix Cibils): o snapshot
+    // pode ter duas subtarefas com a MESMA `ordem` (cadastro torto —
+    // `enviar_requerimento_cartorio` e `receber_confirmacao_pedido` as duas
+    // em 1) e a query de execuções não tem `ORDER BY`, então o empate virava
+    // sorteio pela ordem física que o Postgres devolvia: 9 de 16 tarefas
+    // "correntes" caíam numa subtarefa BLOQUEADA (dependência pendente) só
+    // por ter vindo primeiro no array. `dependeDe` é sempre a fonte de
+    // alcançabilidade (mesma régua de `aIniciar`/`estadoOperacaoDaTarefa` —
+    // nunca a `ordem`, que é só display); uma subtarefa cuja dependência
+    // ainda não concluiu NUNCA pode ser "atual", não importa o que `ordem`
+    // diga.
+    const concluidasKeys = new Set(execs.filter((e) => e.status === 'CONCLUIDO').map((e) => e.subtaskKey))
     const atual = execs
       .filter((e) => !ENCERRADOS.has(e.status))
+      .filter((e) => (defs?.get(e.subtaskKey)?.dependeDe ?? []).every((dep) => concluidasKeys.has(dep)))
       .sort((a, b) => (ordens?.get(a.subtaskKey) ?? 0) - (ordens?.get(b.subtaskKey) ?? 0))[0] ?? null
     const defAtual = atual ? defs?.get(atual.subtaskKey) : null
     resultado.set(stepInstanceId, {

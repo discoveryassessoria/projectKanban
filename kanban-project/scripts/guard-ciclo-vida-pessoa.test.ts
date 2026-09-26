@@ -284,6 +284,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "cobrar/adiar pela porta de tarefaId (Etapa 3, tela Operação v3, 26/09/2026): cria " +
     "a PRÓPRIA árvore/processo (marca OPV3COBADIAR) só no banco de teste — a limpeza " +
     "remove só o que o próprio teste criou",
+  "scripts/progresso-subtarefa-empate-ordem.test.ts":
+    "regressão do empate de ordem em progressoPorSubtarefa (hotfix Cibils, 26/09/2026): " +
+    "cria a PRÓPRIA árvore/processo (marca EMPATEORDEM) só no banco de teste — a limpeza " +
+    "remove só o que o próprio teste criou",
   "scripts/mandato-financeiro-cartorio-isolado.test.ts":
     "isolamento financeiro do custo de cartório (mandato Bloco 5): cria a PRÓPRIA " +
     "árvore/pessoa (marca FINCARTORIO-TEST) só no banco de teste — a limpeza remove só o " +
