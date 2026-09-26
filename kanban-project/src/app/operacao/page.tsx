@@ -28,7 +28,7 @@ import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
-import { CentralOperacional } from "@/src/components/operacao/central-operacional"
+import { OperacaoV3 } from "@/src/components/operacao/operacao-v3"
 
 const CARREGANDO = (
   <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
@@ -82,8 +82,8 @@ function OperacaoPageConteudo() {
           decorativa aqui. Os elementos globais (busca, câmbio, data,
           notificações, usuário, sair) são os mesmos do resto do sistema. */}
       <HeaderBarApp
-        title="Central Operacional"
-        subtitle="O que a empresa precisa fazer agora — agrupado por família."
+        title="Operação"
+        subtitle="Fila, aguardando, acompanhamento, famílias, radar e feito."
         userName={user.nome}
         userRole={user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"}
         onLogout={() => void encerrarSessao("manual")}
@@ -101,7 +101,7 @@ function OperacaoPageConteudo() {
       <main className="flex max-h-[calc(100vh-80px)] flex-col px-6 pb-16 pt-6">
         <div className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-page)] p-4">
           <div className="min-w-0 flex-1">
-            <CentralOperacional />
+            <OperacaoV3 />
           </div>
         </div>
       </main>

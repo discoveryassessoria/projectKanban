@@ -3,7 +3,7 @@
 "use client"
 
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
@@ -171,6 +171,22 @@ interface DocumentoOperationalDrawerProps {
    * da Genealogia, porque a visita mais recente (Emissão) sempre vencia.
    */
   faseInstanciaId?: number | null
+  /**
+   * ETAPA 3 (tela Operação v3, 26/09/2026) — três encaixes aditivos para quem
+   * empilha contexto PRÓPRIO em volta do mesmo painel real, sem duplicar o
+   * header dele (que já diz "Central Operacional · NOME" — ver a renderização
+   * logo abaixo). Todos os três vivem DENTRO do mesmo z-index/portal do
+   * drawer real — nunca fora, que é o que causava um wrapper próprio ficar
+   * coberto assim que o conteúdo carregava (achado real, 26/09/2026: um
+   * `<aside>` externo tentando desenhar cabeçalho/rodapé próprios ficava por
+   * baixo do `fixed z-[10001]` deste componente).
+   */
+  /** Pílula extra ao lado de "Central Operacional · NOME" — ex.: "painel real do processo · espelhado". */
+  pilulaExtra?: string
+  /** Barra fixa no TOPO do painel, acima de tudo — ex.: a barra de "Modo foco". */
+  barraSuperiorExtra?: ReactNode
+  /** Rodapé fixo na BASE do painel — ex.: "Navegação da fila (só na Operação)". */
+  rodapeExtra?: ReactNode
 }
 
 import {
@@ -362,6 +378,9 @@ function ConteudoDrawer({
   bannerAntecipada,
   contextoAntecipada,
   faseInstanciaId,
+  pilulaExtra,
+  barraSuperiorExtra,
+  rodapeExtra,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [delegandoResp, setDelegandoResp] = useState(false)
@@ -526,6 +545,7 @@ function ConteudoDrawer({
           background: "var(--surface-overlay)", transform: "translateX(0)",
         }}
       >
+        {barraSuperiorExtra}
         {/* LOADING — enquanto a projeção operacional oficial não resolve. Só skeleton:
             nunca "Sem operação ativa", nunca botão "Iniciar operação", nenhuma ação. */}
         {opState === "LOADING" && (
@@ -572,9 +592,16 @@ function ConteudoDrawer({
                     {backLabel || nomeCompleto(doc.pessoa)}
                   </button>
                 ) : (
-                  <div className="text-[10px] uppercase tracking-wide">
-                    <span className="font-bold text-[var(--text-secondary)]">Central Operacional</span>
-                    <span className="text-[var(--text-secondary)]"> · {nomeCompleto(doc.pessoa)}</span>
+                  <div className="text-[10px] uppercase tracking-wide flex items-center gap-2 flex-wrap">
+                    <span>
+                      <span className="font-bold text-[var(--text-secondary)]">Central Operacional</span>
+                      <span className="text-[var(--text-secondary)]"> · {nomeCompleto(doc.pessoa)}</span>
+                    </span>
+                    {pilulaExtra && (
+                      <span className="normal-case tracking-normal text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[var(--action-primary)]/15 text-[var(--action-primary)]">
+                        {pilulaExtra}
+                      </span>
+                    )}
                   </div>
                 )}
                 <button
@@ -836,6 +863,7 @@ function ConteudoDrawer({
                 <AbaObservacoesDocumentais documentoId={documentoId} podeRegistrar />
               )}
             </div>
+            {rodapeExtra}
             <InitOperationModal
               documentoId={documentoId}
               isOpen={initModalOpen}
