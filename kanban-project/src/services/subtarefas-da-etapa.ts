@@ -881,6 +881,72 @@ export async function estadoOperacaoDaTarefa(args: {
   }
 }
 
+/**
+ * A SUBTAREFA CORRENTE DE UMA TAREFA — resolve `stepInstanceId`+`subtaskKey`
+ * a partir do `tarefaId`, para as portas da Operação (`/api/operacao/tarefas/
+ * [id]/cobrar`, `.../adiar-acompanhamento`) que recebem o id da TAREFA, nunca
+ * o do step instance (a tela de Operação não conhece esse id interno).
+ */
+export async function subtarefaCorrenteDaTarefa(
+  tarefaId: number,
+): Promise<{ stepInstanceId: number; subtaskKey: string } | null> {
+  const tarefa = await prisma.tarefa.findUnique({
+    where: { id: tarefaId },
+    select: { workflowStepInstanceId: true },
+  })
+  if (!tarefa?.workflowStepInstanceId) return null
+  const subs = await subtarefasDaEtapa({ stepInstanceId: tarefa.workflowStepInstanceId })
+  const corrente = subs.find((s) => !s.concluida)
+  if (!corrente) return null
+  return { stepInstanceId: tarefa.workflowStepInstanceId, subtaskKey: corrente.key }
+}
+
+/**
+ * ADIA O ACOMPANHAMENTO — Etapa 3 (tela Operação v3, 26/09/2026): "Adiar +3
+ * dias" do protótipo. NUNCA mexe no prazo oficial da Tarefa (dimensão A) nem
+ * na regra temporal do terceiro (dimensão C) — só na dimensão D
+ * (`proximoAcompanhamentoEm`), a mesma que `registrarCobranca` também move.
+ *
+ * Motivo é OBRIGATÓRIO (parâmetro não-opcional) — vira `LogAuditoria`, mesmo
+ * padrão de `reabrirSubtarefa`: adiar sem dizer por quê esconde de quem for
+ * auditar depois por que o despertador não tocou na data que deveria.
+ *
+ * FORA DE TRANSAÇÃO, de propósito — mesma classe das outras primitivas.
+ */
+export async function adiarAcompanhamento(args: {
+  stepInstanceId: number
+  subtaskKey: string
+  motivo: string
+  dias?: number
+  registradoPorId?: number | null
+}): Promise<
+  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_ACOMPANHAMENTO_ATIVO" }
+  | { ok: true; proximoAcompanhamentoEm: Date }
+> {
+  const { execucaoVigente, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
+  const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
+  if (!vigente) return { ok: false, motivo: "SEM_EXECUCAO_VIGENTE" }
+  if (!vigente.proximoAcompanhamentoEm) return { ok: false, motivo: "SEM_ACOMPANHAMENTO_ATIVO" }
+
+  const dias = args.dias ?? 3
+  const novaData = prazoOperacional(dias, vigente.proximoAcompanhamentoEm)
+  if (novaData == null) return { ok: false, motivo: "SEM_ACOMPANHAMENTO_ATIVO" }
+
+  await registrarNaExecucao(args.stepInstanceId, args.subtaskKey, { proximoAcompanhamentoEm: novaData })
+  await prisma.logAuditoria.create({
+    data: {
+      acao: "ACOMPANHAMENTO_ADIADO",
+      entidade: "SubtaskExecution",
+      entidadeId: vigente.id,
+      usuarioId: args.registradoPorId ?? null,
+      descricao: `Acompanhamento de "${args.subtaskKey}" (passo ${args.stepInstanceId}) adiado ${dias} dia(s): ${args.motivo}`,
+      detalhes: { stepInstanceId: args.stepInstanceId, subtaskKey: args.subtaskKey, dias, novaData } as never,
+    },
+  }).catch(() => null)
+
+  return { ok: true, proximoAcompanhamentoEm: novaData }
+}
+
 /** O histórico de cobranças da subtarefa — todas as execuções (vigente e substituídas). */
 export async function historicoDeCobrancasDaSubtarefa(stepInstanceId: number, subtaskKey: string) {
   const { execucoesDaSubtarefa } = await import("@/src/services/execucao-da-subtarefa")
