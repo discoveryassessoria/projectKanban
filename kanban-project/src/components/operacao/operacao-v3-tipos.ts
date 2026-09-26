@@ -30,6 +30,7 @@ export interface LinhaOperacaoV3 {
   pessoaId: number | null
   pessoaNome: string | null
   numeroLinhagem: number | null
+  linhaReta: boolean | null
   categoriaDoc: "NASCIMENTO" | "CASAMENTO" | "OBITO" | null
   origem: string | null
   faseMacroKey: string | null

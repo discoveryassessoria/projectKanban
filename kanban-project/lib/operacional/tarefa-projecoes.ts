@@ -209,6 +209,14 @@ export interface LinhaDeFila {
    */
   numeroLinhagem: number | null
   /**
+   * `Pessoa.linhaReta` — distingue a linha de sangue de quem entrou por
+   * casamento. `numeroLinhagem` sozinho NÃO serve pra isso: é calculado pra
+   * toda a árvore, cônjuges inclusive (achado 26/09/2026 — Zenir/Isonia
+   * apareciam como "Linha reta" na Operação por terem número, mesmo sendo
+   * cônjuges). `null` = pessoa sem registro (mesmo caso de `numeroLinhagem`).
+   */
+  linhaReta: boolean | null
+  /**
    * NASCIMENTO/CASAMENTO/OBITO — resumo do `Documento.tipo` (enum legado,
    * espelho de `documentType.legacyEnumKey`) para agrupar/ordenar a sequência
    * genealógica de uma pessoa (Minha Operação, achado 25/09/2026). `null` para
@@ -409,7 +417,7 @@ function projetar(
   rotulosDePasso?: Map<number, string>,
   totaisDePassos?: Map<string, number>,
   progressoSubtarefa?: Map<number, ResumoSubtarefasDoPasso>,
-  numerosLinhagem?: Map<number, number | null>,
+  linhagem?: Map<number, { numeroLinhagem: number | null; linhaReta: boolean }>,
 ): LinhaDeFila {
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
@@ -436,7 +444,8 @@ function projetar(
     origem: t.origem ?? null,
     pessoaId: t.pessoaId ?? null,
     pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
-    numeroLinhagem: t.pessoaId != null ? numerosLinhagem?.get(t.pessoaId) ?? null : null,
+    numeroLinhagem: t.pessoaId != null ? linhagem?.get(t.pessoaId)?.numeroLinhagem ?? null : null,
+    linhaReta: t.pessoaId != null ? linhagem?.get(t.pessoaId)?.linhaReta ?? null : null,
     categoriaDoc: categoriaDocumento(t.documento?.tipo) ?? categoriaDocumentoDoTitulo(t.titulo),
     faseMacroKey: t.faseMacroKey,
     // O NOME DO PASSO, na ordem da fonte mais próxima do que foi publicado:
@@ -832,12 +841,21 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: L
  * O Nº LINHAGEM das pessoas das linhas — a MESMA régua de ordenação que a
  * Central Operacional já usa (`central-operacional-core.ts`: "ORDEM DE
  * EXIBIÇÃO = Nº Linhagem"), nunca uma segunda conta de geração aqui.
+ *
+ * `linhaReta` (`Pessoa.linhaReta`) vem junto, mesma consulta: achado real
+ * 26/09/2026 — `numeroLinhagem` é calculado pra TODA a árvore, cônjuges
+ * inclusive (não só a linha de sangue, ao contrário do que o comentário de
+ * `LinhaDeFila.numeroLinhagem` presumia) — então `numeroLinhagem != null`
+ * sozinho NUNCA distingue "linha reta" de "cônjuge". Quem decide isso é
+ * `linhaReta`, nunca a presença do número.
  */
-async function numerosLinhagemDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma): Promise<Map<number, number | null>> {
+async function linhagemDasPessoas(
+  linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma,
+): Promise<Map<number, { numeroLinhagem: number | null; linhaReta: boolean }>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
   if (ids.length === 0) return new Map()
-  const pessoas = await db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, numeroLinhagem: true } })
-  return new Map(pessoas.map((p) => [p.id, p.numeroLinhagem ?? null]))
+  const pessoas = await db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, numeroLinhagem: true, linhaReta: true } })
+  return new Map(pessoas.map((p) => [p.id, { numeroLinhagem: p.numeroLinhagem ?? null, linhaReta: p.linhaReta }]))
 }
 
 /**
@@ -2022,9 +2040,9 @@ type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL 
  * fila — nunca só na visão gerencial.
  */
 async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leitor = prisma): Promise<LinhaGerencial[]> {
-  const [nomes, rotulos, totais, subtarefas, numerosLinhagem] = await Promise.all([
+  const [nomes, rotulos, totais, subtarefas, linhagem] = await Promise.all([
     nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db), progressoPorSubtarefa(brutas, db),
-    numerosLinhagemDasPessoas(brutas, db),
+    linhagemDasPessoas(brutas, db),
   ])
   const paradas = await contextoDeParada(
     brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
@@ -2033,7 +2051,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
   const hoje = diaOperacional(agora)
 
   const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, numerosLinhagem)
+    const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, linhagem)
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)

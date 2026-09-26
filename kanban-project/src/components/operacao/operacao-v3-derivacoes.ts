@@ -48,12 +48,22 @@ export function passoLabelDe(l: LinhaOperacaoV3): { label: string; sub: string }
 }
 
 /** "Por que aqui" — aproximação honesta: a API não expõe a razão genealógica
- *  fina (linha reta/colateral/requerente) que o protótipo mostra por pessoa;
- *  usa o que já existe (origem/numeroLinhagem/serviço). */
+ *  fina (colateral/requerente) que o protótipo mostra por pessoa; usa o que
+ *  já existe (origem/numeroLinhagem+linhaReta/serviço).
+ *
+ *  `numeroLinhagem` sozinho NUNCA basta pra dizer "Linha reta": é calculado
+ *  pra toda a árvore, cônjuges inclusive (achado 26/09/2026 — Zenir/Isonia
+ *  apareciam como "Linha reta" por terem número, mesmo sendo cônjuges).
+ *  `linhaReta` (`Pessoa.linhaReta`) é quem decide o rótulo. */
 export function porQueAquiDe(l: LinhaOperacaoV3): { texto: string; cls: string } {
   if (l.origem === "TRANSVERSAL") return { texto: "Transversal", cls: "opv3-p-gry" }
   if (l.faseMacroKey === "genealogia") return { texto: "Trava a família", cls: "opv3-p-red" }
-  if (l.numeroLinhagem != null) return { texto: `Linha reta${l.numeroLinhagem ? ` · G${l.numeroLinhagem}` : ""}`, cls: "opv3-p-blu" }
+  if (l.numeroLinhagem != null) {
+    const geracao = ` · G${l.numeroLinhagem}`
+    return l.linhaReta === false
+      ? { texto: `Cônjuge${geracao}`, cls: "opv3-p-gry" }
+      : { texto: `Linha reta${geracao}`, cls: "opv3-p-blu" }
+  }
   return { texto: l.servico ?? "—", cls: "opv3-p-gry" }
 }
 
