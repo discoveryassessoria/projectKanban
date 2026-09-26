@@ -816,6 +816,71 @@ export async function registrarCobranca(args: {
   return { ok: true, contatoId: contato.id, totalContatos, escalada, proximoAcompanhamentoEm }
 }
 
+/** Os três estados operacionais que a tela agrupa — nunca um `statusTarefa` novo. */
+export const ESTADOS_DE_OPERACAO = { FILA: "FILA", AGUARDANDO: "AGUARDANDO", CONCLUIDA: "CONCLUIDA" } as const
+export type EstadoDeOperacao = (typeof ESTADOS_DE_OPERACAO)[keyof typeof ESTADOS_DE_OPERACAO]
+
+/**
+ * ESTADO OPERACIONAL DA TAREFA — Etapa 2, fechamento (26/09/2026): a
+ * PROJEÇÃO de três estados que a tela de operação agrupa (fila do operador /
+ * esperando terceiro / encerrada), derivada da SUBTAREFA CORRENTE — nunca um
+ * `statusTarefa` novo, nunca uma segunda régua de conclusão.
+ *
+ * REGRA (a mesma em qualquer passo, sem lista de stepKey hardcoded):
+ *   • Tarefa concluída → CONCLUIDA. Ponto final, nunca reavaliado.
+ *   • Sem motor de subtarefas para este passo (nenhuma cadastrada, ou a
+ *     tarefa nem tem `stepInstance` — ex.: Genealogia, fases sem
+ *     decomposição em subtarefas) → FILA: não há espera embutida no passo
+ *     em si, a ação sempre foi do operador.
+ *   • Subtarefa corrente em ESPERA DE TERCEIRO (`AGUARDANDO_EXTERNO`) →
+ *     AGUARDANDO. `prazoTarefaEm` acompanha o prazo OFICIAL da Tarefa
+ *     (`dataPrazo`) sempre que ele já nasceu — nunca inventa um segundo
+ *     prazo por subtarefa (decisão definitiva 23/09/2026).
+ *   • Qualquer outro estado da corrente (disponível, em andamento, bloqueada
+ *     por dependência) → FILA: existe uma ação para o operador considerar,
+ *     mesmo que ele ainda não possa executá-la agora.
+ *
+ * `aIniciar` — true SÓ quando a corrente é o PONTO DE ENTRADA do passo (sem
+ * `dependeDe`) e ainda não foi tocada (sem execução, ou execução sem
+ * `startedAt`) — o mesmo par que `materializarSubtarefas` usa para decidir
+ * o acompanhamento "a iniciar" (`diasParaIniciar`), aqui como rótulo pra tela.
+ */
+/** Os dois status TERMINAIS DE CONCLUSÃO da Tarefa — mesmo vocabulário de `tarefa-canonica.ts`, nunca uma string solta "CONCLUIDA". */
+const STATUS_CONCLUIDOS = new Set(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
+
+export async function estadoOperacaoDaTarefa(args: {
+  stepInstanceId: number | null
+  statusTarefa: string
+  dataPrazo: Date | null
+}): Promise<{ estado: EstadoDeOperacao; aIniciar: boolean; prazoTarefaEm: Date | null }> {
+  if (STATUS_CONCLUIDOS.has(args.statusTarefa)) {
+    return { estado: ESTADOS_DE_OPERACAO.CONCLUIDA, aIniciar: false, prazoTarefaEm: args.dataPrazo }
+  }
+  if (args.stepInstanceId == null) {
+    return { estado: ESTADOS_DE_OPERACAO.FILA, aIniciar: false, prazoTarefaEm: args.dataPrazo }
+  }
+
+  const subs = await subtarefasDaEtapa({ stepInstanceId: args.stepInstanceId })
+  // MESMA NOÇÃO DE "CORRENTE" que `concluirSubtarefaCorrentePeloPasso` já usa
+  // (a primeira, na ordem, ainda não concluída) — nunca uma segunda conta.
+  const corrente = subs.find((s) => !s.concluida)
+  if (!corrente) {
+    // Sem subtarefa cadastrada para este passo (motor de subtarefas não se
+    // aplica) — o passo comum sempre foi FILA.
+    return { estado: ESTADOS_DE_OPERACAO.FILA, aIniciar: false, prazoTarefaEm: args.dataPrazo }
+  }
+  if (corrente.status === ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO) {
+    return { estado: ESTADOS_DE_OPERACAO.AGUARDANDO, aIniciar: false, prazoTarefaEm: args.dataPrazo }
+  }
+  const éPontoDeEntrada = (corrente.dependeDe ?? []).length === 0
+  const aindaNaoFoiTocada = corrente.execucao == null || corrente.execucao.startedAt == null
+  return {
+    estado: ESTADOS_DE_OPERACAO.FILA,
+    aIniciar: éPontoDeEntrada && aindaNaoFoiTocada,
+    prazoTarefaEm: args.dataPrazo,
+  }
+}
+
 /** O histórico de cobranças da subtarefa — todas as execuções (vigente e substituídas). */
 export async function historicoDeCobrancasDaSubtarefa(stepInstanceId: number, subtaskKey: string) {
   const { execucoesDaSubtarefa } = await import("@/src/services/execucao-da-subtarefa")

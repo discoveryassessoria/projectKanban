@@ -490,10 +490,28 @@ export function FamiliaTabelaExpandida({
   const chave = `${endpoint}#${recarga}`
   useEffect(() => {
     let vivo = true
-    fetch(endpoint, { headers: auth() })
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { linhas?: LinhaOperacional[] }) => { if (vivo) setResultado({ chave, linhas: d.linhas ?? [] }) })
-      .catch(() => { if (vivo) setResultado({ chave, linhas: null }) })
+    // 503 (`{erro:'indisponivel', retryAfterMs}`) É CONTENÇÃO TRANSITÓRIA do
+    // Prisma (Etapa 2, fechamento 26/09/2026) — não um erro real. Antes de
+    // mostrar "Não foi possível carregar" pra quem só clicou na tela na hora
+    // errada, tenta UMA vez de novo, depois do tempo que o servidor pediu.
+    const carregar = async (jaTentouDeNovo = false): Promise<void> => {
+      try {
+        const r = await fetch(endpoint, { headers: auth() })
+        if (r.status === 503 && !jaTentouDeNovo) {
+          const corpo: { retryAfterMs?: number } = await r.json().catch(() => ({}))
+          const espera = typeof corpo.retryAfterMs === "number" ? corpo.retryAfterMs : 1500
+          await new Promise((resolve) => setTimeout(resolve, espera))
+          if (vivo) await carregar(true)
+          return
+        }
+        if (!r.ok) throw new Error(String(r.status))
+        const d: { linhas?: LinhaOperacional[] } = await r.json()
+        if (vivo) setResultado({ chave, linhas: d.linhas ?? [] })
+      } catch {
+        if (vivo) setResultado({ chave, linhas: null })
+      }
+    }
+    carregar()
     return () => { vivo = false }
   }, [chave, endpoint])
 

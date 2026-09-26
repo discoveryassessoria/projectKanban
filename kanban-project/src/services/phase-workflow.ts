@@ -202,24 +202,27 @@ export async function resolverWorkflowAplicavel(
 }
 
 /**
- * ÂNCORA NA VERSÃO PUBLICADA — mandato Bloco 3 (rascunho/publicação).
+ * ÂNCORA NA VERSÃO PUBLICADA — mandato Bloco 3 (rascunho/publicação), FECHADO
+ * na Etapa 2/fechamento (26/09/2026): a ancoragem é INCONDICIONAL agora, não
+ * mais "só quando há rascunho pendente".
  *
  * `resolverWorkflowAplicavel` lê `PhaseInternalWorkflowStep` — a definição VIVA,
  * que É o rascunho editável (comentário original de `publicacao-de-workflow.ts`:
- * "a definição viva SEMPRE foi o rascunho"). Enquanto ninguém publicava um passo
- * NOVO no meio de uma edição, isso não importava: rascunho e última publicação
- * coincidiam. Confirmado por reprodução real (`scripts/mandato-rascunho-publicacao.test.ts`)
- * que NÃO coincidem mais a partir do instante em que alguém salva uma alteração
- * sem publicar (`rascunhoAlteradoEm` fica preenchido): uma Tarefa nova materializada
- * NESSE INSTANTE herdava o `slaDays` do rascunho, nunca revisado, e o
- * `PhaseWorkflowInstance.workflowVersion` gravado apontava para um número que a
- * publicação ainda nem criou (`PhaseInternalWorkflowVersao` correspondente não
- * existe) — a mesma classe de problema que `politicaDeSla` já resolveu para leituras
- * de instância existente (ver seu comentário), agora fechada também na CRIAÇÃO.
+ * "a definição viva SEMPRE foi o rascunho"). A versão anterior desta função só
+ * ancorava quando `PhaseInternalWorkflow.rascunhoAlteradoEm` estava preenchido
+ * — um atalho: "sem rascunho pendente, tabela viva e última publicação
+ * coincidem, então ler a viva direto é grátis e sem risco". Essa premissa
+ * FALHOU na prática: o editor pode escrever na tabela viva (ou zerá-la, como
+ * em 24/09/2026) por um caminho que não atualiza `rascunhoAlteradoEm`
+ * corretamente — e nesse instante a tabela viva deixa de coincidir com o
+ * publicado SEM que o atalho perceba. FONTE DA VERDADE = versão publicada,
+ * SEMPRE, é a única regra que não depende de mais ninguém lembrar de manter
+ * uma flag em sincronia. O único caso em que ainda se cai na tabela viva é
+ * "workflow nunca publicado" — aí não existe snapshot nenhum pra ancorar, e
+ * a viva (o rascunho) é, por definição, a única fonte que já existe.
  *
  * Esta função ANCORA a materialização de uma instância NOVA na última versão
- * REALMENTE publicada sempre que existir uma edição de rascunho pendente:
- * substitui o CONJUNTO de passos (quais existem, quantos, ordem, `slaDays` —
+ * REALMENTE publicada, sempre: substitui o CONJUNTO de passos (quais existem, quantos, ordem, `slaDays` —
  * o campo do qual os 4 relógios do mandato dependem, Bloco 1/2) pelo
  * CONGELADO, e ancora `workflow.versao` na versão que o congelamento
  * comprova existir, nunca no contador "próxima versão" que
@@ -252,11 +255,6 @@ async function ancorarNaVersaoPublicada(
   db: Prisma.TransactionClient | typeof prisma,
 ): Promise<{ workflow: DefWorkflow; steps: DefStep[] }> {
   const { workflow, steps } = resolvido
-  const wf = await db.phaseInternalWorkflow.findUnique({
-    where: { id: workflow.id },
-    select: { rascunhoAlteradoEm: true },
-  })
-  if (!wf?.rascunhoAlteradoEm) return resolvido
 
   const ultimaPublicada = await db.phaseInternalWorkflowVersao.findFirst({
     where: { workflowId: workflow.id },
@@ -288,7 +286,27 @@ async function ancorarNaVersaoPublicada(
     }))
 
   return {
-    workflow: { ...workflow, versao: ultimaPublicada.versao },
+    // ETAPA 2b-EDITOR (fechamento, 26/09/2026): a ancoragem cobre também os
+    // campos ESCALARES do workflow que a versão publicada congela
+    // (`execucao`/`escopoExecucao`/`name`/`phaseKey`/`tipoProcessoId`/
+    // `exigeDocumento`/`exigePessoa`) — antes só `versao` era substituída, e
+    // um rascunho que mudasse "execução sequencial → paralela" (por
+    // exemplo) sem publicar vazava pro runtime do mesmo jeito que os
+    // Steps vazavam antes desta função existir. `wfUid`/`active`/
+    // `arquivado` continuam vindo da tabela viva DE PROPÓSITO: não são
+    // conteúdo de rascunho, são toggles administrativos que sempre valem
+    // no instante em que são ligados, nunca versionados.
+    workflow: {
+      ...workflow,
+      versao: ultimaPublicada.versao,
+      name: publicada.name,
+      phaseKey: publicada.phaseKey,
+      tipoProcessoId: publicada.tipoProcessoId,
+      execucao: normalizarModoExecucao(publicada.execucao),
+      escopoExecucao: publicada.escopoExecucao,
+      exigeDocumento: publicada.exigeDocumento,
+      exigePessoa: publicada.exigePessoa,
+    },
     steps: stepsAncorados,
   }
 }

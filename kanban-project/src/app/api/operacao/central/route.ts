@@ -20,6 +20,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { agregacaoPorFamilia, facetasGerenciais, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 import { fasesParaSelecao } from '@/src/lib/process-stage/fases-catalog'
+import { comDuracaoLogada, respostaSeIndisponibilidade } from '@/lib/operacional/erro-indisponibilidade-prisma'
 
 const ESCOPOS = ['minha_fila', 'sem_responsavel', 'tudo'] as const
 type Escopo = (typeof ESCOPOS)[number]
@@ -87,10 +88,17 @@ export async function GET(request: NextRequest) {
   const porPagina = Math.min(Math.max(inteiro(p.get('porPagina')) ?? 30, 1), 100)
   const pagina = Math.max(inteiro(p.get('pagina')) ?? 1, 1)
 
-  const [todasAsFamilias, facetas] = await Promise.all([
-    agregacaoPorFamilia(new Date(), filtros),
-    facetasGerenciais(new Date()),
-  ])
+  let todasAsFamilias: Awaited<ReturnType<typeof agregacaoPorFamilia>>
+  let facetas: Awaited<ReturnType<typeof facetasGerenciais>>
+  try {
+    ;[todasAsFamilias, facetas] = await comDuracaoLogada('central.agregacaoPorFamilia+facetasGerenciais', () =>
+      Promise.all([agregacaoPorFamilia(new Date(), filtros), facetasGerenciais(new Date())]),
+    )
+  } catch (e) {
+    const indisponivel = respostaSeIndisponibilidade(e)
+    if (indisponivel) return indisponivel
+    throw e
+  }
   const totalPaginas = Math.max(1, Math.ceil(todasAsFamilias.length / porPagina))
   const paginaValida = Math.min(pagina, totalPaginas)
   const familias = todasAsFamilias.slice((paginaValida - 1) * porPagina, paginaValida * porPagina)

@@ -3734,6 +3734,21 @@ model PhaseInternalWorkflowVersao {
   @@index([workflowId])
 }
 
+/// ÁREA DE RASCUNHO, por definição (Etapa 2b-editor, fechamento 26/09/2026).
+/// `resolverWorkflowAplicavel` ancora INCONDICIONALMENTE em
+/// `PhaseInternalWorkflowVersao.passos` (o snapshot congelado na publicação)
+/// — nunca nesta tabela, publicado ou não. O que está aqui é sempre o que o
+/// editor tem em mãos agora, nunca o que o runtime materializa: salvar (sem
+/// publicar) pode reordenar, remover ou zerar linhas à vontade sem qualquer
+/// efeito em produção. As únicas leituras legítimas fora do editor
+/// (`workflows-fase/[id]/route.ts`) e da publicação
+/// (`publicacao-de-workflow.ts`/`validacao-de-publicacao.ts`) são
+/// DIAGNÓSTICAS — rótulo de exibição com fallback documentado
+/// (`rotulosDosPassos`/`proximo-acontecimento.ts`, nunca fonte de decisão) e
+/// Saúde do Sistema (`lib/saude/verificacoes/cadastro-execucao.ts`, que
+/// audita o CADASTRO, não o runtime, de propósito). Qualquer leitura nova
+/// fora dessa lista que decida algo do runtime a partir daqui é a mesma
+/// classe de bug que gerou o wipe de 24/09/2026.
 model PhaseInternalWorkflowStep {
   id             Int                   @id @default(autoincrement())
   workflowId     Int
@@ -3881,6 +3896,11 @@ model PhaseInternalWorkflowStep {
 /// Não é um segundo motor de workflow escondido dentro do passo: ela pertence ao
 /// `PhaseInternalWorkflowStep` e morre com ele. Não é tarefa: `Tarefa` continua sendo
 /// a unidade atribuível, e subtarefa não cria tarefa por conta própria.
+///
+/// ─── ÁREA DE RASCUNHO, MESMA REGRA DO STEP (Etapa 2b-editor, 26/09/2026) ────
+/// O runtime (`subtarefasDaEtapa`/`definicaoHistoricaDoPasso`) NUNCA lê esta
+/// tabela — só `PhaseInternalWorkflowVersao.passos[].subtarefas` (congelado).
+/// Editar aqui sem publicar não afeta nenhuma execução em andamento nem nova.
 model StepSubtaskDefinition {
   id     Int                       @id @default(autoincrement())
   stepId Int
