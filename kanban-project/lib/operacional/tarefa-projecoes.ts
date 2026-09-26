@@ -328,6 +328,17 @@ export interface LinhaDeFila {
   escalada: boolean
   /** Quantas cobranças (`ContatoTerceiro`) já foram registradas na execução vigente da subtarefa corrente. */
   totalCobrancas: number
+
+  // ── ETAPA 3 (TELA OPERAÇÃO V3, 26/09/2026) — projeção de 3 estados, NUNCA
+  // um `statusTarefa` novo. Mesma regra de `estadoOperacaoDaTarefa`
+  // (`src/services/subtarefas-da-etapa.ts`), aqui computada em LOTE a partir
+  // do que `progressoPorSubtarefa` já buscou — sem segunda consulta por linha.
+  /** FILA (ação do operador) · AGUARDANDO (espera de terceiro) · CONCLUIDA. */
+  estadoOperacao: 'FILA' | 'AGUARDANDO' | 'CONCLUIDA'
+  /** A subtarefa corrente é o PONTO DE ENTRADA do passo (sem `dependeDe`) e ainda não foi tocada. */
+  aIniciar: boolean
+  /** A subtarefa CORRENTE — chave e rótulo, para a coluna "Passo atual" mostrar o nível certo (subtarefa, não só passo). `null` sem motor de subtarefas. */
+  passoCorrente: { chave: string; label: string } | null
 }
 
 const SELECT = {
@@ -520,6 +531,26 @@ function projetar(
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
       return porSubtarefa?.atual?.totalCobrancas ?? 0
     })(),
+    estadoOperacao: (() => {
+      if (t.statusTarefa === 'CONCLUIDO_RECEBIDO' || t.statusTarefa === 'CONCLUIDO_NAO_POSSUI') return 'CONCLUIDA'
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      const atual = porSubtarefa?.atual
+      if (!atual) return 'FILA'
+      return atual.status === 'AGUARDANDO_EXTERNO' ? 'AGUARDANDO' : 'FILA'
+    })(),
+    aIniciar: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      const atual = porSubtarefa?.atual
+      if (!atual || atual.status === 'AGUARDANDO_EXTERNO') return false
+      const pontoDeEntrada = atual.dependeDe.length === 0
+      const aindaNaoTocada = atual.startedAt == null
+      return pontoDeEntrada && aindaNaoTocada
+    })(),
+    passoCorrente: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      const atual = porSubtarefa?.atual
+      return atual ? { chave: atual.subtaskKey, label: atual.label } : null
+    })(),
   }
 }
 
@@ -632,6 +663,10 @@ export interface ResumoSubtarefasDoPasso {
     escalada: boolean
     /** Quantas cobranças (`ContatoTerceiro`) já foram registradas nesta execução vigente. */
     totalCobrancas: number
+    /** O rótulo da subtarefa (versão congelada) — para `passoCorrente` (Etapa 3). */
+    label: string
+    /** A dependência declarada dela — vazio = PONTO DE ENTRADA do passo (nunca por `ordem`, ver `estadoOperacaoDaTarefa`). */
+    dependeDe: string[]
   } | null
 }
 
@@ -658,9 +693,13 @@ async function progressoPorSubtarefa(
   )
   const versaoPorChave = new Map(versoes)
 
-  // total de subtarefas ATIVAS + a ORDEM de cada uma (pela definição congelada) — por stepInstance.
+  // total de subtarefas ATIVAS + a ORDEM/RÓTULO/DEPENDÊNCIA de cada uma (pela
+  // definição congelada) — por stepInstance. `dependeDe` é o que decide o
+  // PONTO DE ENTRADA (Etapa 3: `aIniciar`) — nunca a menor `ordem`, que é só
+  // display: ordem e dependência já divergiram em cadastro real.
   const totalPorStepInstance = new Map<number, number>()
   const ordemPorStepInstance = new Map<number, Map<string, number>>()
+  const definicaoPorStepInstance = new Map<number, Map<string, { label: string; dependeDe: string[] }>>()
   const stepInstanceIds: number[] = []
   for (const l of linhas) {
     const si = l.workflowStepInstance
@@ -674,6 +713,7 @@ async function progressoPorSubtarefa(
     if (subtarefasAtivas.length > 0) {
       totalPorStepInstance.set(si.id, subtarefasAtivas.length)
       ordemPorStepInstance.set(si.id, new Map(subtarefasAtivas.map((s) => [s.key, s.ordem])))
+      definicaoPorStepInstance.set(si.id, new Map(subtarefasAtivas.map((s) => [s.key, { label: s.label, dependeDe: s.dependeDe ?? [] }])))
     }
   }
   if (stepInstanceIds.length === 0) return new Map()
@@ -704,16 +744,19 @@ async function progressoPorSubtarefa(
   for (const [stepInstanceId, execs] of execucoesPorStepInstance) {
     const total = totalPorStepInstance.get(stepInstanceId) ?? execs.length
     const ordens = ordemPorStepInstance.get(stepInstanceId)
+    const defs = definicaoPorStepInstance.get(stepInstanceId)
     const concluidas = execs.filter((e) => e.status === 'CONCLUIDO').length
     const atual = execs
       .filter((e) => !ENCERRADOS.has(e.status))
       .sort((a, b) => (ordens?.get(a.subtaskKey) ?? 0) - (ordens?.get(b.subtaskKey) ?? 0))[0] ?? null
+    const defAtual = atual ? defs?.get(atual.subtaskKey) : null
     resultado.set(stepInstanceId, {
       concluidas, total,
       atual: atual ? {
         subtaskKey: atual.subtaskKey, status: atual.status, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
         escalada: atual.escalada, totalCobrancas: totalCobrancasPorExecucaoId.get(atual.id) ?? 0,
         previstoPara: atual.previstoPara, proximoAcompanhamentoEm: atual.proximoAcompanhamentoEm,
+        label: defAtual?.label ?? atual.subtaskKey, dependeDe: defAtual?.dependeDe ?? [],
       } : null,
     })
   }
