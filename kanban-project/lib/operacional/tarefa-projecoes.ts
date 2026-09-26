@@ -318,6 +318,16 @@ export interface LinhaDeFila {
     data: string | null
     descricao: string
   } | null
+
+  // ── ETAPA 2 (MOTOR DE COBRANÇA, 26/09/2026) — ADITIVO, NUNCA SUBSTITUI OS
+  // CAMPOS ACIMA. Fonte: `SubtaskExecution.escalada`/`ContatoTerceiro` da
+  // subtarefa CORRENTE (mesmo `porSubtarefa.atual` que já resolve
+  // `acompanhamentoPasso`). `false`/`0` quando não há subtarefa corrente ou
+  // ela nunca foi cobrada.
+  /** Ligada quando o total de cobranças desta execução atinge `escalarApos` do cadastro do passo. */
+  escalada: boolean
+  /** Quantas cobranças (`ContatoTerceiro`) já foram registradas na execução vigente da subtarefa corrente. */
+  totalCobrancas: number
 }
 
 const SELECT = {
@@ -502,6 +512,14 @@ function projetar(
     // desta função é o defeito, não estes valores.
     emRisco: false, motivosRisco: [], atrasoInterno: false, atrasoTerceiro: false,
     acompanhamentoVencido: false, retornoRecebido: false, proximoAcontecimento: null,
+    escalada: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      return porSubtarefa?.atual?.escalada ?? false
+    })(),
+    totalCobrancas: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      return porSubtarefa?.atual?.totalCobrancas ?? 0
+    })(),
   }
 }
 
@@ -609,6 +627,11 @@ export interface ResumoSubtarefasDoPasso {
     previstoPara: Date | null
     /** Dimensão D (acompanhamento) — quando esta espera volta à atenção. */
     proximoAcompanhamentoEm: Date | null
+    /** Etapa 2 (motor de cobrança, 26/09/2026): ligada por `registrarCobranca`
+     *  quando o total de contatos atinge `escalarApos`; zerada só na conclusão. */
+    escalada: boolean
+    /** Quantas cobranças (`ContatoTerceiro`) já foram registradas nesta execução vigente. */
+    totalCobrancas: number
   } | null
 }
 
@@ -662,12 +685,20 @@ async function progressoPorSubtarefa(
   const execucoes = await db.subtaskExecution.findMany({
     where: { stepInstanceId: { in: stepInstanceIds }, supersededAt: null },
     select: {
-      stepInstanceId: true, subtaskKey: true, status: true, criadoEm: true, startedAt: true,
-      previstoPara: true, proximoAcompanhamentoEm: true,
+      id: true, stepInstanceId: true, subtaskKey: true, status: true, criadoEm: true, startedAt: true,
+      previstoPara: true, proximoAcompanhamentoEm: true, escalada: true,
     },
   })
   const execucoesPorStepInstance = new Map<number, typeof execucoes>()
   for (const e of execucoes) execucoesPorStepInstance.set(e.stepInstanceId, [...(execucoesPorStepInstance.get(e.stepInstanceId) ?? []), e])
+
+  // TOTAL DE COBRANÇAS por execução vigente — uma consulta em lote (groupBy),
+  // nunca uma por linha. Só interessa a contagem, nunca o conteúdo aqui.
+  const execucaoIds = execucoes.map((e) => e.id)
+  const contagensDeContato = execucaoIds.length
+    ? await db.contatoTerceiro.groupBy({ by: ['subtaskExecutionId'], where: { subtaskExecutionId: { in: execucaoIds } }, _count: { _all: true } })
+    : []
+  const totalCobrancasPorExecucaoId = new Map(contagensDeContato.map((c) => [c.subtaskExecutionId, c._count._all]))
 
   const resultado = new Map<number, ResumoSubtarefasDoPasso>()
   for (const [stepInstanceId, execs] of execucoesPorStepInstance) {
@@ -681,6 +712,7 @@ async function progressoPorSubtarefa(
       concluidas, total,
       atual: atual ? {
         subtaskKey: atual.subtaskKey, status: atual.status, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
+        escalada: atual.escalada, totalCobrancas: totalCobrancasPorExecucaoId.get(atual.id) ?? 0,
         previstoPara: atual.previstoPara, proximoAcompanhamentoEm: atual.proximoAcompanhamentoEm,
       } : null,
     })
@@ -735,6 +767,21 @@ export async function minhaFila(
   const { linhas } = await visaoGerencial({ ...filtrosExtra, responsavelId: usuarioId, porPagina: 500 }, agora, db)
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
   return ordenarFila(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
+}
+
+/**
+ * ACOMPANHAMENTO — o recorte de `minhaFila` que precisa de ATENÇÃO AGORA:
+ * acompanhamento vencido (dimensão D) OU escalada (Etapa 2, cadastro de
+ * cobrança). ADITIVO: mesma consulta/enriquecimento de `minhaFila`, sem
+ * regra nova nenhuma — só um filtro sobre campos que já existiam
+ * (`acompanhamentoVencido`) ou que a Etapa 2 acabou de aditivar (`escalada`).
+ */
+export async function acompanhamentoDoUsuario(
+  usuarioId: number, agora = new Date(), db: Leitor = prisma,
+  filtrosExtra: Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> = {},
+): Promise<LinhaGerencial[]> {
+  const fila = await minhaFila(usuarioId, agora, db, filtrosExtra)
+  return fila.filter((l) => l.acompanhamentoVencido || l.escalada)
 }
 
 /**

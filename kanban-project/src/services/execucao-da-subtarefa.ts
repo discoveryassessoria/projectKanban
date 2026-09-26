@@ -102,6 +102,8 @@ export interface ExecucaoDeSubtarefa {
   enviadoEm: Date | null
   previstoPara: Date | null
   proximoAcompanhamentoEm: Date | null
+  escalada: boolean
+  escaladaEm: Date | null
   supersededAt: Date | null
   supersededPorId: number | null
   criadoEm: Date
@@ -556,6 +558,8 @@ export async function registrarNaExecucao(
     enviadoEm?: Date | null
     previstoPara?: Date | null
     proximoAcompanhamentoEm?: Date | null
+    escalada?: boolean
+    escaladaEm?: Date | null
   },
   db: DB = prisma,
 ): Promise<ExecucaoDeSubtarefa | null> {
@@ -588,6 +592,8 @@ export async function registrarNaExecucao(
       ...(dados.enviadoEm !== undefined ? { enviadoEm: dados.enviadoEm } : {}),
       ...(dados.previstoPara !== undefined ? { previstoPara: dados.previstoPara } : {}),
       ...(dados.proximoAcompanhamentoEm !== undefined ? { proximoAcompanhamentoEm: dados.proximoAcompanhamentoEm } : {}),
+      ...(dados.escalada !== undefined ? { escalada: dados.escalada } : {}),
+      ...(dados.escaladaEm !== undefined ? { escaladaEm: dados.escaladaEm } : {}),
     },
   })
   return atualizada as ExecucaoDeSubtarefa

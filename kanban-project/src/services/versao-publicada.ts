@@ -65,6 +65,12 @@ export interface PassoCongelado {
   /// cadastro hoje não muda o que valia para uma execução já materializada.
   /// Ver `aplicarEsperaExternaSeConfigurado` (task-step-sync.ts).
   esperaExternaAoLiberar: boolean
+  /// OS TRÊS PARÂMETROS do motor de prazo/acompanhamento/cobrança (mandato
+  /// 25/09/2026) — congelados como o resto. Ver comentário completo no
+  /// schema (`PhaseInternalWorkflowStep`).
+  diasParaIniciar: number | null
+  diasAposCobranca: number | null
+  escalarApos: number | null
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
   checkItens: ItemChecklistCongelado[]
@@ -116,6 +122,11 @@ export interface SubtarefaCongelada {
   regraTemporalAtiva: boolean
   regraTemporalDias: number | null
   regraTemporalGatilhoChave: string | null
+  /// PRAZO DA TAREFA NASCE AQUI — mandato "motor de prazo/acompanhamento/
+  /// cobrança", 25/09/2026. Congelado como o resto: ver comentário completo
+  /// no schema (`StepSubtaskDefinition.definePrazoDaTarefa`).
+  definePrazoDaTarefa: boolean
+  prazoDaTarefaDias: number | null
   /// Os filhos DELA — os que o passo tem para si ficam no passo.
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
@@ -405,6 +416,9 @@ export async function retratarPassos(passos: PassosComFilhos, db: DB = prisma): 
     reaberturaExigeJustificativa: p.reaberturaExigeJustificativa,
     reaberturaPermissao: p.reaberturaPermissao,
     esperaExternaAoLiberar: p.esperaExternaAoLiberar,
+    diasParaIniciar: p.diasParaIniciar,
+    diasAposCobranca: p.diasAposCobranca,
+    escalarApos: p.escalarApos,
     regraDeConclusao: p.regraDeConclusao,
     subtarefas: p.subtarefas.map((st) => ({
       key: st.key, label: st.label, descricao: st.descricao, ordem: st.ordem, ativo: st.ativo,
@@ -427,6 +441,8 @@ export async function retratarPassos(passos: PassosComFilhos, db: DB = prisma): 
       regraTemporalAtiva: st.regraTemporalAtiva,
       regraTemporalDias: st.regraTemporalDias,
       regraTemporalGatilhoChave: st.regraTemporalGatilhoChave,
+      definePrazoDaTarefa: st.definePrazoDaTarefa,
+      prazoDaTarefaDias: st.prazoDaTarefaDias,
       acoes: st.acoes.map(congelarAcao),
       campos: st.campos.map(congelarCampo),
       checkItens: st.checkItens.map(congelarItem),

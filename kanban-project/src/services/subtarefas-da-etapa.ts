@@ -24,7 +24,7 @@ import {
   vigentesDoPasso, ESTADOS_DA_SUBTAREFA, CAUSAS_DE_BLOQUEIO,
   type ExecucaoDeSubtarefa, type EstadoDaSubtarefa, type CausaDeBloqueio,
 } from "@/src/services/execucao-da-subtarefa"
-import { canaisDaSubtarefa, type CanalDisponivel } from "@/src/lib/motor/canais-do-fornecedor"
+import { canaisDaOrganizacao, FONTES_DE_CANAIS, type CanalDisponivel } from "@/src/lib/motor/canais-do-fornecedor"
 import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 
 export interface RelogioDeEsperaExterna {
@@ -172,6 +172,21 @@ export async function subtarefasDaEtapa(args: {
       .map((d) => d.key),
   )
 
+  // CACHE DOS CANAIS DO FORNECEDOR — `args.fornecedorId` é CONSTANTE dentro
+  // desta chamada (é o mesmo documento/passo para todas as subtarefas), mas
+  // cada subtarefa que precisa de canal chamava `canaisDaSubtarefa` de novo,
+  // um SELECT idêntico repetido (achado real, Etapa 2 item 7 — 26/09/2026:
+  // "Solicitar certidão" tem 2 das 4 subtarefas com `fonteDeCanais` ativo,
+  // e cada leitura da tela fazia 2 SELECTs iguais em vez de 1). Resolvido
+  // uma vez, memoizado; a interseção por `tiposDeCanal` continua por
+  // subtarefa, mas é pura (sem I/O).
+  let canaisDoFornecedorCache: CanalDisponivel[] | null = null
+  const canaisDoFornecedor = async (): Promise<CanalDisponivel[]> => {
+    if (!args.fornecedorId) return []
+    if (canaisDoFornecedorCache == null) canaisDoFornecedorCache = await canaisDaOrganizacao(args.fornecedorId)
+    return canaisDoFornecedorCache
+  }
+
   const projetadas: SubtarefaProjetada[] = []
   for (const d of definicoes) {
     const execucao = porChave.get(d.key) ?? null
@@ -218,11 +233,14 @@ export async function subtarefasDaEtapa(args: {
           bloqueioTexto = "Falta definir o órgão/fornecedor deste documento — sem ele não há por onde enviar."
         }
       } else {
-        canais = await canaisDaSubtarefa({
-          fonteDeCanais: d.fonteDeCanais,
-          tiposPermitidos: d.tiposDeCanal,
-          fornecedorId: args.fornecedorId,
-        })
+        const doFornecedor = await canaisDoFornecedor()
+        if (d.fonteDeCanais !== FONTES_DE_CANAIS.TIPOS_PERMITIDOS) {
+          canais = doFornecedor
+        } else {
+          const permitidos = new Set(d.tiposDeCanal ?? [])
+          // RESTRIÇÃO É INTERSEÇÃO, nunca acréscimo — mesma regra de `canaisDaSubtarefa`.
+          canais = permitidos.size === 0 ? doFornecedor : doFornecedor.filter((c) => permitidos.has(c.key))
+        }
         if (canais.length === 0 && !bloqueioCodigo) {
           bloqueioCodigo = CAUSAS_DE_BLOQUEIO.CANAL_INDISPONIVEL
           bloqueioTexto = "O órgão deste documento não tem canal de atendimento cadastrado."
@@ -324,6 +342,15 @@ export async function materializarSubtarefas(args: {
   const { garantirExecucao } = await import("@/src/services/execucao-da-subtarefa")
   const subs = await subtarefasDaEtapa(args)
   const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+  // A TAREFA "A INICIAR" (mandato "motor de prazo/acompanhamento/cobrança",
+  // 25/09/2026) — só busca se ALGUMA subtarefa vai precisar da data de
+  // atribuição (a entrada, sem `dependeDe`, e sem acompanhamento PRÓPRIO
+  // configurado): uma consulta a mais, nunca uma por subtarefa.
+  const precisaDeAtribuicao = hist?.passo.diasParaIniciar != null
+    && subs.some((s) => s.dependeDe.length === 0 && s.definicao.acompanhamentoAtivo !== true)
+  const tarefaParaAIniciar = precisaDeAtribuicao
+    ? await prisma.tarefa.findFirst({ where: { workflowStepInstanceId: args.stepInstanceId }, select: { dataAtribuicao: true, createdAt: true } })
+    : null
   let criadas = 0
   let jaExistiam = 0
   for (const s of subs) {
@@ -345,6 +372,16 @@ export async function materializarSubtarefas(args: {
       })
       previstoPara = relogioExterno.previstoPara
       proximoAcompanhamentoEm = relogioExterno.proximoAcompanhamentoEm
+    } else if (s.dependeDe.length === 0 && s.definicao.acompanhamentoAtivo !== true && hist?.passo.diasParaIniciar != null) {
+      // "A INICIAR" — a subtarefa de ENTRADA (sem dependência, ponto de
+      // partida do passo) ainda não foi executada. Não é espera de
+      // terceiro — é o operador que ainda não começou. Acompanhamento
+      // próprio, a partir de QUANDO A TAREFA FOI ATRIBUÍDA (não da
+      // liberação da subtarefa, que aqui coincide com a criação — "atribuir
+      // e nunca abrir" é o caso que este relógio existe para pegar; sem
+      // responsável ainda, cai para a criação, honesto em vez de inventado).
+      const base = tarefaParaAIniciar?.dataAtribuicao ?? tarefaParaAIniciar?.createdAt ?? agora
+      proximoAcompanhamentoEm = prazoOperacional(hist.passo.diasParaIniciar, base)
     }
     await garantirExecucao({
       stepInstanceId: args.stepInstanceId,
@@ -358,6 +395,10 @@ export async function materializarSubtarefas(args: {
     })
     criadas++
   }
+  // A subtarefa CORRENTE já pode nascer definindo o prazo da Tarefa (ex.:
+  // um cadastro futuro em que a subtarefa de entrada já é ela) — mesmo
+  // guard idempotente de `aplicarPrazoDaTarefaSeConfigurado`.
+  await aplicarPrazoDaTarefaSeConfigurado(args)
   return { criadas, jaExistiam }
 }
 
@@ -497,6 +538,50 @@ export async function aplicarEsperaExternaDaSubtarefaSeConfigurado(args: {
     motivoCodigo: "AGUARDANDO_TERCEIRO",
     justificativa: `"${corrente.label}" liberada como dependência externa — aguardando o terceiro automaticamente.`,
   })
+  return { aplicado: true }
+}
+
+/**
+ * O PRAZO DA TAREFA NASCE NUMA SUBTAREFA (mandato "motor de prazo/
+ * acompanhamento/cobrança", 25/09/2026) — mesma régua de
+ * `aplicarEsperaExternaDaSubtarefaSeConfigurado`, um nível ao lado: quando a
+ * subtarefa CORRENTE está marcada `definePrazoDaTarefa` no cadastro, e a
+ * Tarefa ainda não tem `dataPrazo` (nasceu `null` de propósito — ver
+ * `garantirTarefaDePasso`, que já verifica se ALGUMA subtarefa do passo
+ * define prazo antes de decidir o valor inicial), grava
+ * `dataPrazo = prazoOperacional(prazoDaTarefaDias, agora)` — em dias
+ * CORRIDOS, a partir de AGORA (o instante em que esta subtarefa virou
+ * corrente), nunca da criação da Tarefa.
+ *
+ * FICA FIXO DEPOIS: o guard `tarefa.dataPrazo != null` é o que impede
+ * qualquer chamada seguinte (mesma subtarefa revisitada, outra subtarefa
+ * também marcada por engano) de sobrescrever — `Tarefa.dataPrazo` continua
+ * sendo o ÚNICO prazo oficial, nunca dois, nunca recalculado depois de
+ * nascido.
+ *
+ * IDEMPOTENTE por construção: chamar de novo depois de já ter aplicado é
+ * sempre um no-op (o guard acima).
+ */
+export async function aplicarPrazoDaTarefaSeConfigurado(args: {
+  stepInstanceId: number
+  valores?: Record<string, unknown>
+  fornecedorId?: number | null
+}): Promise<{ aplicado: boolean }> {
+  const subs = await subtarefasDaEtapa(args)
+  const corrente = subs.find((s) => !s.concluida && s.bloqueioCodigo === null)
+  if (!corrente) return { aplicado: false }
+  if (corrente.definicao.definePrazoDaTarefa !== true) return { aplicado: false }
+
+  const tarefa = await prisma.tarefa.findFirst({
+    where: { workflowStepInstanceId: args.stepInstanceId },
+    select: { id: true, dataPrazo: true },
+  })
+  if (!tarefa || tarefa.dataPrazo != null) return { aplicado: false }
+
+  const prazo = prazoOperacional(corrente.definicao.prazoDaTarefaDias, new Date())
+  if (prazo == null) return { aplicado: false }
+
+  await prisma.tarefa.update({ where: { id: tarefa.id }, data: { dataPrazo: prazo } })
   return { aplicado: true }
 }
 
@@ -645,14 +730,103 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
     executadoPorId: args.executadoPorId,
     startedAt: new Date(),
     payload: args.payload as never,
+    // ZERA A ESCALADA AO CONCLUIR — cobrança/escalada é sobre uma espera que
+    // ainda está aberta; fechar a subtarefa encerra a espera, e uma escalada
+    // pendurada numa subtarefa já concluída seria histórico falso (mesmo
+    // raciocínio de `bloqueioCodigo` acima, para o par escalada/escaladaEm).
+    escalada: false,
+    escaladaEm: null,
     ...(args.canalKey ? { canalKey: args.canalKey } : {}),
     ...(args.protocoloId ? { protocoloId: args.protocoloId, protocolo: args.protocolo ?? null } : {}),
     ...(args.fornecedorId ? { fornecedorId: args.fornecedorId } : {}),
   })
   await reconciliarSubtarefas({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   await aplicarEsperaExternaDaSubtarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+  await aplicarPrazoDaTarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   const gate = await passoPodeConcluir({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   return { aplicavel: true, subtarefaKey: corrente.key, podeConcluirPasso: gate.pode, faltando: gate.faltando }
+}
+
+/**
+ * REGISTRA UMA COBRANÇA (contato ao terceiro) — Etapa 2, item 5.
+ *
+ * ContatoTerceiro é FATO HISTÓRICO append-only, nunca sobrescrito — cada
+ * cobrança é uma linha própria, presa à EXECUÇÃO VIGENTE da subtarefa no
+ * momento (não à subtarefa em abstrato: se ela for reaberta depois, a
+ * cobrança antiga continua presa à tentativa antiga, correto).
+ *
+ * DOIS EFEITOS COLATERAIS, ambos vindos do CADASTRO do passo (nunca
+ * hardcoded): reagenda `proximoAcompanhamentoEm` em
+ * `PhaseInternalWorkflowStep.diasAposCobranca` dias corridos a partir de
+ * agora (default 1), e liga `escalada` quando o total de cobranças desta
+ * execução atinge `escalarApos` (default 2) — nunca desliga sozinha: só
+ * `concluirSubtarefaCorrentePeloPasso` zera, porque só a conclusão da
+ * subtarefa encerra de fato a espera que a escalada sinaliza.
+ *
+ * FORA DE TRANSAÇÃO, de propósito — mesma classe das outras primitivas
+ * deste módulo (usa o prisma cru).
+ */
+export async function registrarCobranca(args: {
+  stepInstanceId: number
+  subtaskKey: string
+  canal: string
+  observacao?: string | null
+  documentoId?: number | null
+  orgaoId?: number | null
+  registradoPorId?: number | null
+}): Promise<
+  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" }
+  | { ok: true; contatoId: number; totalContatos: number; escalada: boolean; proximoAcompanhamentoEm: Date | null }
+> {
+  const { execucaoVigente, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
+  const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
+  if (!vigente) return { ok: false, motivo: "SEM_EXECUCAO_VIGENTE" }
+
+  const tarefa = await prisma.tarefa.findFirst({
+    where: { workflowStepInstanceId: args.stepInstanceId }, select: { id: true },
+  })
+  if (!tarefa) return { ok: false, motivo: "SEM_TAREFA" }
+
+  const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
+  const diasAposCobranca = hist?.passo.diasAposCobranca ?? 1
+  const escalarApos = hist?.passo.escalarApos ?? 2
+
+  const contato = await prisma.contatoTerceiro.create({
+    data: {
+      subtaskExecutionId: vigente.id,
+      tarefaId: tarefa.id,
+      documentoId: args.documentoId ?? null,
+      orgaoId: args.orgaoId ?? null,
+      canal: args.canal,
+      observacao: args.observacao ?? null,
+      registradoPorId: args.registradoPorId ?? null,
+    },
+  })
+
+  const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id } })
+  const escalada = totalContatos >= escalarApos
+  const proximoAcompanhamentoEm = prazoOperacional(diasAposCobranca, new Date())
+
+  await registrarNaExecucao(args.stepInstanceId, args.subtaskKey, {
+    proximoAcompanhamentoEm,
+    escalada,
+    escaladaEm: escalada ? (vigente.escaladaEm ?? new Date()) : vigente.escaladaEm,
+  })
+
+  return { ok: true, contatoId: contato.id, totalContatos, escalada, proximoAcompanhamentoEm }
+}
+
+/** O histórico de cobranças da subtarefa — todas as execuções (vigente e substituídas). */
+export async function historicoDeCobrancasDaSubtarefa(stepInstanceId: number, subtaskKey: string) {
+  const { execucoesDaSubtarefa } = await import("@/src/services/execucao-da-subtarefa")
+  const execucoes = await execucoesDaSubtarefa(stepInstanceId, subtaskKey)
+  const ids = execucoes.map((e) => e.id)
+  if (ids.length === 0) return []
+  return prisma.contatoTerceiro.findMany({
+    where: { subtaskExecutionId: { in: ids } },
+    orderBy: { registradoEm: "asc" },
+    include: { registradoPor: { select: { id: true, nome: true } } },
+  })
 }
 
 /** Só para a tela: o texto do que falta, sem repetir a conta. */

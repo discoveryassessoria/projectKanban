@@ -25,6 +25,7 @@ import { identidadeDaUnidade, tarefaVivaDaUnidade, TERMINAIS_DA_UNIDADE } from "
 import { reancorarTarefaNaUnidade } from "@/lib/operacional/tarefa-canonica"
 import { nomeDaTarefa } from "@/lib/operacional/nome-da-tarefa"
 import { reconciliarObrigacaoDeAtribuicao } from "@/lib/operacional/obrigacao-atribuicao"
+import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 
 /**
  * Pré-condições do processo, iguais para TODOS os passos de uma mesma rodada.
@@ -176,7 +177,18 @@ export async function garantirTarefaDePasso(
   const descricao = snap?.descricao ?? null
   const prioridade = mapearPrioridade(step.prioridade ?? snap?.prioridade)
   const sla = step.slaDays ?? snap?.sla ?? null
-  const dataPrazo = calcularPrazo(new Date(), sla)
+  // O PRAZO PODE NASCER NUMA SUBTAREFA, NÃO NA CRIAÇÃO (mandato "motor de
+  // prazo/acompanhamento/cobrança", 25/09/2026) — quando o passo tem
+  // ALGUMA subtarefa marcada `definePrazoDaTarefa` (ex.: "Receber
+  // certidão", na Emissão Documental), a Tarefa nasce com `dataPrazo: null`
+  // de propósito; `aplicarPrazoDaTarefaSeConfigurado`
+  // (subtarefas-da-etapa.ts) grava o valor real quando aquela subtarefa
+  // virar corrente — nunca aqui, nunca do `slaDays` do passo. Sem nenhuma
+  // subtarefa configurada assim, o comportamento é o de sempre (prazo já na
+  // criação, a partir do SLA do passo).
+  const historico = await definicaoHistoricaDoPasso(step.id, db)
+  const algumaSubtarefaDefinePrazo = historico?.passo.subtarefas.some((s) => s.definePrazoDaTarefa) ?? false
+  const dataPrazo = algumaSubtarefaDefinePrazo ? null : calcularPrazo(new Date(), sla)
   const resp = resolverResponsavel({ responsavelId: step.responsavelId, papel: step.papel, equipe: step.equipe, stepKey: step.stepKey })
   const warnings: TarefaGenIssue[] = resp.warning ? [resp.warning] : []
 
@@ -342,7 +354,28 @@ export async function garantirTarefaDePasso(
   try {
     // timeout maior que o padrão (5s) — mesma causa real de phase-workflow.ts:
     // RTT até o banco pooled já estourou esta transação por distância pura.
-    return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo, { timeout: 15_000 })
+    const resultado = txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo, { timeout: 15_000 })
+    // MATERIALIZA AS SUBTAREFAS DA TAREFA NOVA — mandato "motor de prazo/
+    // acompanhamento/cobrança", 25/09/2026. FORA da transação, de propósito
+    // (mesma invariante de `concluirSubtarefaCorrentePeloPasso`: as
+    // primitivas de subtarefa usam o `prisma` cru, chamar dentro do `tx`
+    // violaria transação×conexão). Só no caminho STANDALONE (`!txExterno`)
+    // — sob uma transação externa (ex.: avanço de fase em lote), o
+    // chamador dela é quem materializa depois que A PRÓPRIA transação dele
+    // comita, mesmo padrão; não fizemos isso ainda em todo chamador de
+    // `txExterno` — gap conhecido, não deste mandato, não escondido.
+    // Best-effort: uma falha aqui não desfaz a Tarefa já criada (ela existe
+    // de qualquer forma; a subtarefa 1 fica materializada na próxima leitura
+    // via `subtarefasDaEtapa`, que já calcula o estado sem depender de
+    // execução persistida — só o ACOMPANHAMENTO "a iniciar" fica pra depois).
+    if (!txExterno && resultado.success && resultado.created && resultado.tarefa.workflowStepInstanceId != null) {
+      const stepInstanceId = resultado.tarefa.workflowStepInstanceId
+      const { materializarSubtarefas } = await import("@/src/services/subtarefas-da-etapa")
+      await materializarSubtarefas({ stepInstanceId }).catch((e) => {
+        console.error(`materializarSubtarefas falhou para stepInstanceId=${stepInstanceId} (Tarefa ${resultado.tarefa.id} já foi criada; subtarefas ficam pendentes de reconciliação):`, e)
+      })
+    }
+    return resultado
   } catch (e) {
     // Convergência só no modo standalone; sob txExterno, propaga p/ rollback do chamador.
     if (!txExterno && (e as { code?: string })?.code === "P2002") {

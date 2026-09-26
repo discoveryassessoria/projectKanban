@@ -189,7 +189,16 @@ export async function resolverWorkflowAplicavel(
     }
   }
 
-  return { workflow, steps }
+  // ANCORAR NA VERSÃO PUBLICADA SEMPRE — dentro da própria função, não como
+  // um segundo passo que cada chamador precisa lembrar de dar. Achado real
+  // 25/09/2026: só 2 dos 5 chamadores de `resolverWorkflowAplicavel` no
+  // código faziam esse segundo passo (`ancorarNaVersaoPublicada`) depois de
+  // chamar esta função — os outros 3 (`phase-simulation.ts`,
+  // `workflow-activation.ts`, `materializar-genealogia.ts`) liam a tabela
+  // viva direto, exposta a um rascunho pendente sem publicar. Dobrar a
+  // chamada nos 2 que já a faziam é inofensivo (idempotente, mesmo `db`); os
+  // outros 3 ganham a proteção sem precisar de nenhuma mudança própria.
+  return ancorarNaVersaoPublicada({ workflow, steps }, db)
 }
 
 /**
@@ -676,7 +685,9 @@ export async function instanciarWorkflowDaFase(
       ? [{ code: resolvido.erro, message: resolvido.detalhe, entityType: "fase", entityId: input.faseMacroKey }]
       : [])
   }
-  const { workflow, steps } = await ancorarNaVersaoPublicada(resolvido, db)
+  // `resolverWorkflowAplicavel` já ancora na versão publicada por dentro —
+  // nenhum segundo passo aqui (achado 25/09/2026, ver comentário na função).
+  const { workflow, steps } = resolvido
 
   // 4) validação completa da definição ANTES de escrever
   const val = validarDefinicao(workflow, steps)
@@ -1007,7 +1018,9 @@ export async function reconciliarNovaVersaoNaInstanciaAtual(
       ? fail(resolvido.erro, [{ code: resolvido.erro, message: resolvido.detalhe, entityType: "fase", entityId: input.faseMacroKey }])
       : fail(resolvido.erro)
   }
-  const { workflow, steps } = await ancorarNaVersaoPublicada(resolvido, prisma)
+  // `resolverWorkflowAplicavel` já ancora na versão publicada por dentro —
+  // nenhum segundo passo aqui (achado 25/09/2026, ver comentário na função).
+  const { workflow, steps } = resolvido
 
   if (workflow.id !== instancia.workflowDefinitionId) {
     // O workflow aplicável mudou de IDENTIDADE (ex.: passou a existir um

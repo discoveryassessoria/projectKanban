@@ -75,28 +75,23 @@ export const FASES: Record<FaseCode, FaseDef> = {
   EMISSAO_DOCUMENTAL: {
     code: "EMISSAO_DOCUMENTAL", phaseKey: "emissao_documental", ordem: 1, label: "Emissão documental", kind: "documento", scope: "DOCUMENTO",
     next: "ANALISE_DOCUMENTAL",
+    // ALINHADO 26/09/2026 (Etapa 2 do motor de prazo/acompanhamento/cobrança):
+    // desde 15/09/2026 o Workflow Interno publicado (id=12, v8+) restruturou
+    // Emissão Documental para UM ÚNICO Step ("solicitar_certidao") com 4
+    // SUBTAREFAS internas (enviar requerimento → confirmação do pedido →
+    // receber certidão → conferir/validar) — doc 29, "4 passos operacionais",
+    // implementados como subtarefas-de-um-passo em vez de 4 Steps separados.
+    // Este catálogo estático (RESERVA, nunca fonte de verdade em runtime —
+    // ver `resolverWorkflowAplicavel`/versão publicada) listava 5 Steps
+    // antigos (pré-14/09) e ficou desalinhado por 11 dias sem que nada no
+    // caminho real notasse, porque nenhum consumidor daqui cai neste
+    // fallback no caminho comum. Corrigido para refletir o único Step real;
+    // peso 100 = a fase inteira, mesmo raciocínio já aplicado a GENEALOGIA
+    // (passo único → peso irrelevante para o gate, que nunca lê catálogo).
     steps: [
       { ordem: 1, stepKey: "solicitar_certidao", title: "Solicitar certidão",
-        description: "Enviar requerimento ao cartório e registrar protocolo retornado.",
-        weight: 25, ownerKey: "daniela_brait", slaDays: 3 },
-      // stepKey CANÔNICO = a chave do passo PUBLICADO no Workflow Interno
-      // (PhaseInternalWorkflowStep.key). Enquanto o catálogo dizia "aguardar_retorno" e o
-      // publicado dizia "aguardar_retorno_do_cartorio", TODO lookup por catálogo falhava
-      // silenciosamente para esta etapa: título virava a chave crua, peso caía para o
-      // default 1 (distorcendo o progresso) e o SLA de 15 dias nunca era aplicado.
-      // A chave legada continua resolvendo por STEP_KEY_ALIASES.
-      { ordem: 2, stepKey: "aguardar_retorno_do_cartorio", title: "Aguardar retorno do cartório",
-        description: "Aguardar resposta do cartório · follow-ups manuais e automáticos disponíveis.",
-        weight: 10, ownerKey: "daniela_brait", slaDays: 15 },
-      { ordem: 3, stepKey: "receber_certidao", title: "Receber certidão",
-        description: "Upload do PDF da certidão recebida.",
-        weight: 18, ownerKey: "daniela_brait", slaDays: 2 },
-      { ordem: 4, stepKey: "conferir_certidao", title: "Conferir certidão",
-        description: "Inspeção operacional: legibilidade, integridade, dados mínimos, apostila, tradução.",
-        weight: 15, ownerKey: "daniela_brait", slaDays: 2 },
-      { ordem: 5, stepKey: "validar_certidao", title: "Validar certidão",
-        description: "Decisão jurídica final · marca documento como Recebido.",
-        weight: 12, ownerKey: "marco_rovatti", slaDays: 1 },
+        description: "Enviar requerimento ao cartório, acompanhar confirmação do pedido, receber e conferir/validar a certidão — subtarefas do mesmo passo, sob a mesma responsável.",
+        weight: 100, ownerKey: "daniela_brait", slaDays: 10 },
     ],
   },
 

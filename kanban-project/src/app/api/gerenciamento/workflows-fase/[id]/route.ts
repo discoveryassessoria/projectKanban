@@ -388,6 +388,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           const antigos = await tx.phaseInternalWorkflowStep.findMany({ where: { workflowId: id }, select: { key: true } })
           const chavesNovas = new Set(stepData.map((s) => s.key))
           chavesRemovidas = antigos.map((a) => a.key).filter((k) => !chavesNovas.has(k))
+          // ETAPA 2b-editor (documentado 26/09/2026, NÃO corrigido por pedido
+          // explícito — "documente, não corrija"): delete-then-recreate-from-
+          // client-payload. Este deleteMany cascateia (onDelete: Cascade) para
+          // StepSubtaskDefinition/StepAction/StepField/StepChecklistItem/
+          // StepRequirement de TODOS os passos vivos, e o loop abaixo
+          // recria tudo a partir de `body.steps` (o que o CLIENTE enviou, não
+          // o que o servidor tinha). Um save com payload parcial/desatualizado
+          // apaga passos reais antes de a versão publicada existir para
+          // protegê-los — foi exatamente isto que zerou a tabela viva de
+          // StepSubtaskDefinition da Emissão Documental em 24/09/2026 16:32
+          // (WORKFLOW_DRAFT_SAVED sem publish), expondo o motor a
+          // resolverWorkflowAplicavel sem ancoragem em 3 dos 5 chamadores da
+          // época (corrigido na Etapa 2/acréscimo dobrando a ancoragem para
+          // DENTRO de resolverWorkflowAplicavel — mas a causa raiz aqui, o
+          // padrão delete-then-recreate-from-client, permanece).
           await tx.phaseInternalWorkflowStep.deleteMany({ where: { workflowId: id } })
           for (let i = 0; i < stepData.length; i++) {
             // UM A UM porque cada passo tem filhos que precisam do id dele. A versão

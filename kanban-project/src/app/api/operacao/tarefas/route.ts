@@ -16,7 +16,7 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { minhaFila, semResponsavel, concluidasHojeDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
+import { minhaFila, semResponsavel, concluidasHojeDoUsuario, acompanhamentoDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 
 /**
@@ -82,5 +82,11 @@ export async function GET(request: NextRequest) {
     const linhas = await concluidasHojeDoUsuario(usuario.userId, agora)
     return NextResponse.json({ visao, total: linhas.length, linhas })
   }
-  return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel', 'concluidas_hoje'] }, { status: 400 })
+  // ACOMPANHAMENTO (Etapa 2, motor de cobrança) — o recorte de `minhaFila`
+  // que precisa de atenção agora: acompanhamento vencido ou escalada.
+  if (visao === 'acompanhamento') {
+    const linhas = await acompanhamentoDoUsuario(usuario.userId, agora, undefined, filtrosDaQuery(request.nextUrl.searchParams))
+    return NextResponse.json({ visao, total: linhas.length, linhas })
+  }
+  return NextResponse.json({ error: `visão desconhecida: "${visao}"`, visoes: ['minha_fila', 'sem_responsavel', 'concluidas_hoje', 'acompanhamento'] }, { status: 400 })
 }

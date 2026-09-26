@@ -80,6 +80,7 @@ model Usuario {
   snapshotCambial_usuario                   SnapshotCambial[]                   @relation("SnapshotCambial_usuarioId")
   stepSubtaskDefinition_responsavel         StepSubtaskDefinition[]             @relation("StepSubtaskDefinition_responsavelId")
   subtaskExecution_responsavel              SubtaskExecution[]                  @relation("SubtaskExecution_responsavelId")
+  contatosTerceiroRegistrados               ContatoTerceiro[]
 
   @@index([perfilId])
 }
@@ -355,6 +356,8 @@ model Documento {
 
   custosFin   Custo[]
   receitasFin Receita[]
+  /// As cobranças registradas sobre este documento. Ver `ContatoTerceiro`.
+  contatosRegistrados ContatoTerceiro[]
 
   documentTypeId Int?
   documentType   TipoDocumentoCadastro? @relation(fields: [documentTypeId], references: [id])
@@ -3755,6 +3758,23 @@ model PhaseInternalWorkflowStep {
   cardinalidade  String?               @db.VarChar(20)
   completionRule String?               @db.Text // "CondiÃ§Ã£o de conclusÃ£o"
   checklist      Json?
+
+  /// ═══ MOTOR DE PRAZO/ACOMPANHAMENTO/COBRANÇA (mandato 25/09/2026) — três
+  /// parâmetros do CADASTRO da etapa, nunca hardcoded no motor.
+  /// A ININCIAR: a Tarefa nasceu, mas a primeira subtarefa (ponto de entrada,
+  /// sem `dependeDe`) ainda não foi executada — dias corridos, a partir de
+  /// `Tarefa.dataAtribuicao` (ou da criação, sem responsável ainda), até o
+  /// primeiro acompanhamento pedir atenção. `null` = sem acompanhamento "a
+  /// iniciar" configurado para este passo.
+  diasParaIniciar  Int? @default(2)
+  /// COBRANÇA: ao registrar um contato com o terceiro (`ContatoTerceiro`),
+  /// quantos dias corridos até o próximo acompanhamento voltar a pedir
+  /// atenção. `null` = usa o comportamento padrão do motor (sem reagendar).
+  diasAposCobranca Int? @default(1)
+  /// ESCALADA: quantas cobranças sem resposta até marcar
+  /// `SubtaskExecution.escalada = true` (some ao gestor). `null` = nunca
+  /// escala automaticamente por contagem.
+  escalarApos      Int? @default(2)
   versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
 
   // TRAVA: cada chave sÃ³ existe UMA vez por workflow (impede duplicaÃ§Ã£o silenciosa)
@@ -3942,7 +3962,10 @@ model StepSubtaskDefinition {
   /// tarefa". NÃO é vencimento: só materializa `SubtaskExecution.
   /// proximoAcompanhamentoEm`, nunca `prazo`.
   acompanhamentoAtivo         Boolean @default(false)
-  /// Dias úteis, contados da liberação desta espera, até o primeiro
+  /// Dias CORRIDOS (`prazoOperacional`, decisão definitiva 23/09/2026 — nunca
+  /// pula fim de semana/feriado; o comentário deste campo dizia "dias úteis"
+  /// até 25/09/2026, desatualizado desde a unificação, nunca foi essa a conta
+  /// de verdade), contados da liberação desta espera, até o primeiro
   /// acompanhamento. `null` enquanto `acompanhamentoAtivo` não tiver essa
   /// decisão de negócio definida — nunca inventado pelo motor.
   acompanhamentoPrimeiroDias  Int?
@@ -3952,7 +3975,8 @@ model StepSubtaskDefinition {
   /// nunca é, por si só, a Tarefa atrasada (essa comparação é sempre contra
   /// `Tarefa.dataPrazo`, à parte).
   regraTemporalAtiva          Boolean @default(false)
-  /// Duração em dias úteis da regra temporal, a partir do gatilho.
+  /// Duração em dias CORRIDOS (mesma correção do campo acima) da regra
+  /// temporal, a partir do gatilho.
   regraTemporalDias           Int?
   /// GATILHO — a `key` de OUTRA subtarefa do MESMO passo cuja CONCLUSÃO
   /// inicia a contagem (lida em `SubtaskExecution.completedAt` dela — nenhum
@@ -3961,6 +3985,21 @@ model StepSubtaskDefinition {
   /// Genérico de propósito — nunca "confirmação de cartório" no motor, só
   /// "conclusão da subtarefa X", seja X o que o cadastro apontar.
   regraTemporalGatilhoChave   String? @db.VarChar(60)
+
+  /// ═══ PRAZO DA TAREFA NASCE NUMA SUBTAREFA (mandato "motor de prazo,
+  /// acompanhamento e cobrança", 25/09/2026) — decisão de negócio nova:
+  /// `Tarefa.dataPrazo` pode nascer FIXO quando UMA subtarefa específica vira
+  /// corrente (ex.: "Receber certidão", quando o cartório confirma o pedido),
+  /// em vez de nascer junto com a Tarefa (comportamento antigo, ainda o
+  /// default). Só uma subtarefa por passo deveria ter isto ligado — o motor
+  /// não impõe unicidade, é o cadastro que decide. `Tarefa.dataPrazo`
+  /// continua sendo o ÚNICO prazo oficial (nunca dois), só o MOMENTO em que
+  /// ele nasce passou a ser configurável.
+  definePrazoDaTarefa Boolean @default(false)
+  /// Dias CORRIDOS, a partir da liberação desta subtarefa, até o prazo da
+  /// Tarefa. `null` enquanto `definePrazoDaTarefa` não tiver essa decisão
+  /// definida.
+  prazoDaTarefaDias   Int?
 
   metadata Json?
 
@@ -4527,6 +4566,8 @@ model OrgaoProtocolo {
   /// Por onde ESTA organização atende. Ver `OrganizacaoCanal`.
   canais                OrganizacaoCanal[]
   execucoesDeSubtarefa  SubtaskExecution[]
+  /// As cobranças registradas contra ESTE órgão. Ver `ContatoTerceiro`.
+  contatosRegistrados   ContatoTerceiro[]
   /// Documentos que ESTA organização emite. Ver `Documento.orgaoId`.
   documentosEmitidos    Documento[]            @relation("DocumentoOrgaoEmissor")
   retificacoes          RetificacaoPacote[]    @relation("OrgaoDaRetificacao")
@@ -5519,6 +5560,16 @@ model SubtaskExecution {
   /// já terminou.
   proximoAcompanhamentoEm DateTime?
 
+  /// ESCALADA (mandato "motor de prazo/acompanhamento/cobrança", 25/09/2026):
+  /// atingiu `PhaseInternalWorkflowStep.escalarApos` cobranças sem resposta
+  /// do terceiro. `escaladaEm` é quando isso aconteceu; zera (`false`/`null`)
+  /// quando a espera termina (a subtarefa conclui) — nunca fica escalada pra
+  /// sempre depois de resolvida.
+  escalada   Boolean   @default(false)
+  escaladaEm DateTime?
+  /// AS TENTATIVAS DE CONTATO com o terceiro, durante esta espera.
+  contatos ContatoTerceiro[]
+
   supersededAt      DateTime?
   supersededPorId   Int?
   correlationId     String?   @db.VarChar(60)
@@ -5530,6 +5581,48 @@ model SubtaskExecution {
   @@index([stepInstanceId])
   @@index([subtaskKey])
   @@index([protocoloId])
+}
+
+/// ═══ CONTATO COM O TERCEIRO (mandato "motor de prazo/acompanhamento/
+/// cobrança", 25/09/2026) — a COBRANÇA ao cartório/órgão emissor, registrada
+/// como fato (quem, quando, por qual canal), nunca inferida. Cada contato
+/// reagenda `SubtaskExecution.proximoAcompanhamentoEm`
+/// (`PhaseInternalWorkflowStep.diasAposCobranca`); ao atingir `escalarApos`
+/// contatos sem resposta, marca `SubtaskExecution.escalada`.
+///
+/// NÃO É O MODEL `Cobranca` (financeiro — cliente/receita, domínio
+/// completamente diferente; falso cognato, nunca confundir).
+model ContatoTerceiro {
+  id Int @id @default(autoincrement())
+
+  subtaskExecutionId Int
+  subtaskExecution   SubtaskExecution @relation(fields: [subtaskExecutionId], references: [id], onDelete: Cascade)
+
+  /// Referência solta — a Tarefa é quem a tela lê para listar/contar
+  /// cobranças por obrigação; o banco não cascateia a exclusão daqui.
+  tarefaId Int
+
+  documentoId Int?
+  documento   Documento? @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+
+  orgaoId Int?
+  orgao   OrgaoProtocolo? @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+
+  /// EMAIL | TELEFONE | PORTAL | CORREIO | PRESENCIAL | OUTRO — vocabulário
+  /// fechado, conferido na porta (não no banco: mesmo padrão de `canalKey`
+  /// solto que `SubtaskExecution` já usa).
+  canal       String  @db.VarChar(20)
+  observacao  String? @db.Text
+
+  /// Protegido pelo banco: ON DELETE SET NULL — quem registrou não trava a
+  /// exclusão da própria conta.
+  registradoPor   Usuario? @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+  registradoPorId Int?
+  registradoEm    DateTime @default(now())
+
+  @@index([subtaskExecutionId])
+  @@index([tarefaId])
+  @@index([orgaoId])
 }
 
 model PhaseWorkflowStepInstance {
