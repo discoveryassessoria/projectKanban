@@ -292,6 +292,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "Etapa A (fechamento Operação v3, 26/09/2026): criarProcessoV2 materializa subtarefas " +
     "do 1º passo — cria a PRÓPRIA árvore/processo (marca CRIARPROCMAT) só no banco de " +
     "teste — a limpeza remove só o que o próprio teste criou",
+  "scripts/operacao-v3-lote-endpoints.test.ts":
+    "Etapa C (fechamento Operação v3, 26/09/2026): os 3 endpoints de lote — cria a " +
+    "PRÓPRIA árvore/processo (marca OPV3LOTE) só no banco de teste — a limpeza remove " +
+    "só o que o próprio teste criou",
   "scripts/mandato-financeiro-cartorio-isolado.test.ts":
     "isolamento financeiro do custo de cartório (mandato Bloco 5): cria a PRÓPRIA " +
     "árvore/pessoa (marca FINCARTORIO-TEST) só no banco de teste — a limpeza remove só o " +
