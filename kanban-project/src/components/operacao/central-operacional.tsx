@@ -113,18 +113,32 @@ interface VistaSalva {
 }
 const CHAVE_VISTAS = "central-operacional:vistas-salvas"
 
-function queryDe(f: FiltrosCentral, pagina: number): string {
+/**
+ * SÓ A PARTE QUE É FILTRO DE VERDADE (fase/prioridade/busca/condições) —
+ * sem escopo/ordenação/paginação, que não fazem sentido pra uma família já
+ * escolhida. `parseFiltrosGerenciais` (mesmo parser de `/api/operacao/
+ * visao-global` e `/api/operacao/tarefas`) lê exatamente estas chaves —
+ * reaproveitada aqui pra tabela por família nunca divergir dos chips do
+ * topo (achado real 25/09/2026: clicar "Vence hoje" filtrava os ladrilhos
+ * mas a tabela da família continuava mostrando tudo).
+ */
+function queryDeFiltros(f: FiltrosCentral): URLSearchParams {
   const p = new URLSearchParams()
-  p.set("escopo", f.escopo)
   if (f.fase) p.set("fase", f.fase)
-  if (f.equipe) p.set("equipe", f.equipe)
-  if (f.escopo === "tudo" && f.responsavel != null) p.set("responsavel", String(f.responsavel))
   for (const pr of f.prioridade) p.append("prioridade", pr)
   if (f.busca.trim()) p.set("busca", f.busca.trim())
   for (const c of f.condicoes) {
     if (c === "semMovimentacao") p.set("semMovimentacaoDias", "7")
     else p.set(c, "1")
   }
+  return p
+}
+
+function queryDe(f: FiltrosCentral, pagina: number): string {
+  const p = queryDeFiltros(f)
+  p.set("escopo", f.escopo)
+  if (f.equipe) p.set("equipe", f.equipe)
+  if (f.escopo === "tudo" && f.responsavel != null) p.set("responsavel", String(f.responsavel))
   p.set("ordenacao", f.ordenacao)
   p.set("pagina", String(pagina))
   p.set("porPagina", "30")
@@ -585,6 +599,7 @@ export function CentralOperacional() {
                     processoId={processoPrincipalId}
                     nomeFamilia={f.nomeFamilia}
                     escopo={filtros.escopo}
+                    filtrosQuery={queryDeFiltros(filtros).toString()}
                     concluidasHoje={f.processos.reduce((soma, p) => soma + (concluidasPorProcesso.get(p.processoId) ?? 0), 0)}
                     selecionado={selecionado?.taskId ?? null}
                     aoSelecionar={(taskId, processoId) => setSelecionado({ taskId, processoId })}

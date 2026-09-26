@@ -418,7 +418,7 @@ function LinhaOperacaoTabela({
  * próprias ações e se releitura sozinha.
  */
 export function FamiliaTabelaExpandida({
-  familiaId, processoId, nomeFamilia, escopo, concluidasHoje, selecionado, aoSelecionar,
+  familiaId, processoId, nomeFamilia, escopo, filtrosQuery, concluidasHoje, selecionado, aoSelecionar,
 }: {
   familiaId: number | null
   processoId: number | null
@@ -431,6 +431,14 @@ export function FamiliaTabelaExpandida({
    * quem não é admin (achado real 25/09/2026).
    */
   escopo: "minha_fila" | "tudo" | "sem_responsavel"
+  /**
+   * fase/prioridade/busca/condições ATIVAS no painel de cima (`queryDeFiltros`
+   * em central-operacional.tsx) — já como querystring pronta. Sem isto, a
+   * tabela desta família ignorava os chips (achado real 25/09/2026: clicar
+   * "Vence hoje" filtrava os ladrilhos do topo, a tabela continuava mostrando
+   * tudo).
+   */
+  filtrosQuery: string
   /**
    * "Concluídas hoje" não pode vir das `linhas` desta família: `minhaFila`
    * exclui CONCLUIDA de propósito (mandato "fila real de trabalho"), então a
@@ -462,7 +470,12 @@ export function FamiliaTabelaExpandida({
   const [loteErro, setLoteErro] = useState<string | null>(null)
 
   const endpoint = useMemo(() => {
-    const p = new URLSearchParams({ porPagina: "500" })
+    // Os filtros ativos entram PRIMEIRO — `familia`/`processo`/`visao`/
+    // `incluirEncerradas`/`semResponsavel` abaixo nunca podem ser
+    // sobrescritos por eles (não fazem parte do vocabulário de
+    // `queryDeFiltros`, mas a ordem protege mesmo assim).
+    const p = new URLSearchParams(filtrosQuery)
+    p.set("porPagina", "500")
     if (familiaId != null) p.set("familia", String(familiaId))
     else if (processoId != null) p.set("processo", String(processoId))
     if (escopo === "minha_fila") {
@@ -472,7 +485,7 @@ export function FamiliaTabelaExpandida({
     p.set("incluirEncerradas", "1")
     if (escopo === "sem_responsavel") p.set("semResponsavel", "1")
     return `/api/operacao/visao-global?${p.toString()}`
-  }, [familiaId, processoId, escopo])
+  }, [familiaId, processoId, escopo, filtrosQuery])
 
   const chave = `${endpoint}#${recarga}`
   useEffect(() => {

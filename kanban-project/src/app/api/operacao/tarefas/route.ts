@@ -17,33 +17,31 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { minhaFila, semResponsavel, concluidasHojeDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
+import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 
 /**
- * OS FILTROS DA QUERY STRING → `FiltrosGerenciais` — SERVER-SIDE, antes da
- * paginação (mandato "Minha Operação" §20). `busca` já cobre pessoa/família/
- * processo/documento/terceiro/protocolo numa caixa só (`whereGerencial`,
- * mesma leitura de Tarefas e Projetos); `prazo` é o mesmo açúcar
- * atrasadas/venceHoje/proximos7Dias que a visão gerencial já suportava.
+ * OS FILTROS DA QUERY STRING → `FiltrosGerenciais` — o MESMO parser que
+ * `/api/operacao/visao-global` e `/api/operacao/central` já usam
+ * (`parseFiltrosGerenciais`), nunca uma segunda leitura de querystring.
+ * Achado real 25/09/2026: a versão antiga desta função só entendia
+ * `busca`/`fase`/`terceiro`/`prazo` — os chips de condição (Executável
+ * agora/Atrasadas/Vence hoje/Aguardando terceiro/Sem responsável/…) da
+ * Central Operacional não tinham efeito nenhum na tabela por família, que
+ * lê esta rota em "Minha fila". `responsavelId`/`porPagina` do resultado
+ * são ignorados de propósito — quem chama (`minhaFila`) já os fixa.
  */
 function filtrosDaQuery(sp: URLSearchParams): Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> {
-  const f: Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> = {}
-  const busca = sp.get('busca')?.trim()
-  if (busca) f.busca = busca
-  const fase = sp.get('fase')?.trim()
-  if (fase) f.faseMacroKey = fase
+  const req = { nextUrl: { searchParams: sp } } as unknown as NextRequest
+  const f = parseFiltrosGerenciais(req)
   const terceiro = sp.get('terceiro')?.trim()
   if (terceiro) f.terceiro = terceiro
+  // `prazo` (açúcar legado desta rota, ainda usado por chamadores antigos):
+  // só aplica se as condições canônicas (atrasadas/venceHoje/proximos7Dias)
+  // não vieram, pra não sobrescrever silenciosamente o que a Central manda.
   const prazo = sp.get('prazo')
-  if (prazo === 'atrasadas') f.atrasadas = true
-  else if (prazo === 'hoje') f.venceHoje = true
-  else if (prazo === '7dias') f.proximos7Dias = true
-  // ESCOPAR A UMA FAMÍLIA/PROCESSO — usado pela tabela rica da família
-  // expandida (Central Operacional, fusão 25/09/2026): a MESMA fila pessoal,
-  // só recortada a quem já está vendo, nunca uma segunda consulta.
-  const familia = sp.get('familia')
-  if (familia) { const n = Number(familia); if (Number.isInteger(n) && n > 0) f.familiaId = n }
-  const processo = sp.get('processo')
-  if (processo) { const n = Number(processo); if (Number.isInteger(n) && n > 0) f.processoId = n }
+  if (prazo === 'atrasadas' && !sp.has('atrasadas')) f.atrasadas = true
+  else if (prazo === 'hoje' && !sp.has('venceHoje')) f.venceHoje = true
+  else if (prazo === '7dias' && !sp.has('proximos7Dias')) f.proximos7Dias = true
   return f
 }
 
