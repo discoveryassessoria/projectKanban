@@ -87,6 +87,32 @@ export const semAspas = (s) =>
     .replace(/"/g, '')
     .replace(/^public\./, '')
 
+/** As migrations do repositório que a tabela `_prisma_migrations` do alvo ainda não registra. */
+export function migrationsPendentes(todas, registradas) {
+  return todas.filter((m) => !registradas.has(m))
+}
+
+/**
+ * PULAR `prisma migrate deploy` É SEGURO quando o PLANO já provou que não há
+ * nada a aplicar — fonte única (`prod-migrate-guard.mjs` chama esta função,
+ * nunca reimplementa a condição).
+ *
+ * Achado real (26/09/2026): mesmo sem nada pendente, `migrate deploy` ainda
+ * precisa do advisory lock do Postgres (`pg_advisory_lock`) — e um lock
+ * contencioso (outra sessão, um pooler trocando a conexão física no meio da
+ * chamada) faz o build inteiro falhar (P1002) por uma operação que não
+ * mudaria nada no schema. Dois builds seguidos travaram exatamente assim,
+ * com a migration já 100% aplicada.
+ *
+ * `pendentes === null` (o PLANO não pôde ser lido — ver o `catch` de quem
+ * chama) NUNCA pula: sem saber se há pendência, a única opção segura é
+ * tentar aplicar, exatamente como o guard sempre fez antes de existir esta
+ * função.
+ */
+export function pularMigrateDeploy(pendentes) {
+  return Array.isArray(pendentes) && pendentes.length === 0
+}
+
 /** Identificador SQL: `X`, `"X"` ou `"public"."X"`. `§` no corpo vira esse padrão. */
 const NOME = '((?:"[^"]+"|\\w+)(?:\\.(?:"[^"]+"|\\w+))?)'
 export const re = (corpo, flags = 'i') => new RegExp(corpo.replace(/§/g, NOME), flags)

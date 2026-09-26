@@ -27,6 +27,7 @@ import {
   mesmoBanco,
   retratar,
 } from '../lib/db/identidade-banco.mjs'
+import { pularMigrateDeploy } from '../lib/db/leitura-migrations.mjs'
 
 const abortar = (msg) => {
   console.error(`[migrate-guard] ABORTADO: ${msg}`)
@@ -133,15 +134,19 @@ try {
   // Quais migrations do repositório ainda não estão em `_prisma_migrations`, e
   // quais delas contêm SQL destrutivo. Produção é patrimônio: o que vai ser
   // executado precisa estar no log ANTES de ser executado.
+  //
+  // `pendentes` ESCAPA do try (fica `null` se o plano não pôde ser lido) —
+  // é o que decide, mais abaixo, se `migrate deploy` roda ou é pulado.
+  let pendentes = null
   try {
     const { default: path } = await import('node:path')
-    const { listarMigrations, sqlDaMigration, analisarRisco } = await import('../lib/db/leitura-migrations.mjs')
+    const { listarMigrations, sqlDaMigration, analisarRisco, migrationsPendentes } = await import('../lib/db/leitura-migrations.mjs')
     const DIR = path.join(process.cwd(), 'prisma', 'migrations')
     const todas = listarMigrations(DIR)
     const registradas = new Set(
       (await prisma.$queryRawUnsafe('SELECT migration_name FROM _prisma_migrations')).map((r) => r.migration_name),
     )
-    const pendentes = todas.filter((m) => !registradas.has(m))
+    pendentes = migrationsPendentes(todas, registradas)
     console.log(`[migrate-guard] PLANO: ${todas.length} no repositório · ${registradas.size} registradas · ${pendentes.length} pendentes`)
     // A análise roda sobre o SQL SEM COMENTÁRIOS e vive em `analisarRisco`
     // (lib/db/leitura-migrations.mjs), com teste próprio. Cabeçalho que documenta
@@ -152,7 +157,7 @@ try {
       const marcas = analisarRisco(sqlDaMigration(DIR, m))
       console.log(`[migrate-guard]   ○ ${m}${marcas.length ? `  ⚠ ${marcas.join(' + ')}` : ''}`)
     }
-    if (!pendentes.length) console.log('[migrate-guard]   (nada pendente — migrate deploy será no-op)')
+    if (!pendentes.length) console.log('[migrate-guard]   (nada pendente)')
   } catch (e) {
     console.log(`[migrate-guard] AVISO: não consegui montar o plano (${String(e?.message ?? e).slice(0, 150)}). Seguindo — o Prisma loga cada migration aplicada.`)
   }
@@ -193,14 +198,26 @@ try {
     }
   }
 
-  console.log('[migrate-guard] identidade CONFIRMADA — aplicando migrations (migrate deploy).')
+  console.log('[migrate-guard] identidade CONFIRMADA.')
 
-  // directUrl forçada para a mesma URL: DIRECT_DATABASE_URL do projeto está
-  // obsoleta (aponta para o banco danificado de 21/07).
-  execSync('npx prisma migrate deploy', {
-    stdio: 'inherit',
-    env: { ...process.env, DIRECT_DATABASE_URL: url },
-  })
+  if (pularMigrateDeploy(pendentes)) {
+    // NADA PENDENTE — pular é o correto, não só "aceitável". `migrate deploy`
+    // seria um no-op no schema, mas ainda precisa do advisory lock do
+    // Postgres — e um lock contencioso (achado real, 26/09/2026: dois builds
+    // seguidos, schema já 100% migrado) derruba o build inteiro por uma
+    // operação que não mudaria nada. `pendentes` só chega aqui como array
+    // vazio quando o PLANO leu o ledger com sucesso — plano que falhou
+    // (`pendentes === null`) nunca pula, ver `pularMigrateDeploy`.
+    console.log('[migrate-guard] nada pendente — pulando `migrate deploy` (seria no-op).')
+  } else {
+    console.log('[migrate-guard] aplicando migrations (migrate deploy).')
+    // directUrl forçada para a mesma URL: DIRECT_DATABASE_URL do projeto está
+    // obsoleta (aponta para o banco danificado de 21/07).
+    execSync('npx prisma migrate deploy', {
+      stdio: 'inherit',
+      env: { ...process.env, DIRECT_DATABASE_URL: url },
+    })
+  }
 
   const depois = await retratar(prisma)
   console.log(`[migrate-guard] migrations: ${antes} → ${depois.migrations}`)
