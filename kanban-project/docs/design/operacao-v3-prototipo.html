@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>Operação — protótipo v3 (autônomo)</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:'IBM Plex Sans',system-ui,sans-serif;background:#eef1f6;color:#141a2b}
+a{color:#0b1f4b}a:hover{color:#c9622b}
+button{font-family:inherit;cursor:pointer}
+.tab{border:0;background:transparent;padding:14px 14px;font-size:14px;font-weight:600;color:#5b6478;border-bottom:3px solid transparent;display:flex;gap:8px;align-items:center;min-height:44px}
+.tab.on{color:#0b1f4b;border-bottom-color:#c9622b}
+.tab .n{background:#e6eaf2;color:#0b1f4b;border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700}
+.tab.on .n{background:#c9622b;color:#fff}
+.tab .n.warn{background:#fff1d6;color:#7a4a00}
+.row{display:grid;gap:10px;align-items:center;padding:9px 14px;border-top:1px solid #edf0f5;font-size:13px;min-height:44px}
+.row:hover{background:#f7f9fc}.row.sel{background:#fff6f0}
+.hd{display:grid;gap:10px;padding:8px 14px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#7a8296;font-weight:600}
+.gF{grid-template-columns:26px 1.5fr 1.1fr 0.9fr 1fr 1fr 0.8fr 130px}
+.gA{grid-template-columns:1.4fr 1fr 1.1fr 0.9fr 1fr 0.7fr 0.8fr 210px}
+.gC{grid-template-columns:1.4fr 1fr 1.1fr 1fr 1fr 0.7fr 230px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-red{background:#fbe7e6;color:#8f1d17}.p-amb{background:#fff1d6;color:#7a4a00}.p-grn{background:#e1f3e8;color:#155e39}.p-blu{background:#e3ebfa;color:#1d3f8f}.p-gry{background:#eceff4;color:#4c5568}.p-ex{background:#f1e8fb;color:#5b2a8a;border:1px dashed #b98ee0}
+.btn{border:1px solid #cfd6e3;background:#fff;border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;color:#0b1f4b;min-height:36px;white-space:nowrap}
+.btn.pri{background:#0b1f4b;color:#fff;border-color:#0b1f4b}.btn.acc{background:#c9622b;color:#fff;border-color:#c9622b}.btn.sm{padding:4px 9px;min-height:30px;font-size:12px}
+.card{background:#fff;border:1px solid #dfe4ee;border-radius:12px}
+.kpi{background:#fff;border:1px solid #dfe4ee;border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;gap:3px;min-width:118px}
+.kpi b{font-size:24px;line-height:1}.kpi span{font-size:11px;color:#5b6478;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.grp{display:flex;align-items:center;gap:12px;padding:11px 14px;background:#f7f9fc;border-top:1px solid #dfe4ee;font-size:13px}
+.side a{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;color:#c9d2e6;text-decoration:none;font-size:14px;font-weight:500}
+.side a.on{background:#1d3466;color:#fff}
+.chk{width:18px;height:18px;border:2px solid #9aa4b8;border-radius:4px;display:inline-block;box-sizing:border-box;background:#fff;padding:0}
+.chk.on{background:#c9622b;border-color:#c9622b}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#5b6478;font-weight:600}
+.field input,.field select,.field textarea{font-family:inherit;font-size:13px;padding:8px 10px;border:1px solid #cfd6e3;border-radius:8px;min-height:38px;color:#141a2b;background:#fff;box-sizing:border-box;width:100%}
+.step{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border:1px solid #dfe4ee;border-radius:10px;font-size:13px}
+.step.cur{border-color:#c9622b;background:#fff8f3}.step.done{background:#f3faf6;border-color:#cfe8d8}
+.dtab{border:0;background:transparent;padding:8px 10px;font-size:13px;font-weight:600;color:#5b6478;border-bottom:2px solid transparent;min-height:36px}
+.dtab.on{color:#0b1f4b;border-bottom-color:#0b1f4b}
+.radar{padding:14px 16px;display:flex;flex-direction:column;gap:6px;text-align:left;font-family:inherit;color:inherit;background:#fff;border:1px solid #dfe4ee;border-radius:12px;border-left-width:4px;min-height:44px}
+.radar:hover{background:#f7f9fc}
+.bar{height:8px;background:#eceff4;border-radius:4px;overflow:hidden}
+.blk{padding:10px 14px;font-weight:700;font-size:13px;border-top:1px solid #dfe4ee;display:flex;gap:10px;align-items:center}
+</style>
+
+<style>html,body{background:#dfe4ee} #app{margin:16px auto;width:1440px;box-shadow:0 20px 60px rgba(11,31,75,.25)}</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/template" id="tpl">
+
+<div style="width: 1440px; height: 1080px; box-sizing: border-box; display: flex; background: #eef1f6; overflow: hidden; position: relative">
+
+  <nav class="side" style="width: 200px; flex-shrink: 0; background: #0b1f4b; padding: 20px 12px; display: flex; flex-direction: column; gap: 4px; box-sizing: border-box">
+    <div style="color: #fff; font-weight: 700; font-size: 16px; padding: 6px 12px 18px">Grupo Discovery</div>
+    <a href="#">Página Inicial</a><a href="#">Processos</a><a href="#" class="on">Operação</a><a href="#">Calendário</a><a href="#">Árvore Genealógica</a><a href="#">Revisão Registral</a><a href="#">Relatórios</a>
+    <div style="flex-grow: 1"></div>
+  </nav>
+
+  <main style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box">
+
+    <header style="display: flex; align-items: center; gap: 14px; padding: 12px 24px 0; background: #fff; border-bottom: 1px solid #dfe4ee">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding-bottom: 12px">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700; color: #0b1f4b">Operação</h1>
+        <div style="font-size: 13px; color: #5b6478">Sexta, 25 de setembro · Daniela Brait · equipe documental</div>
+      </div>
+      <div style="flex-grow: 1"></div>
+      <div style="display: flex; gap: 8px; padding-bottom: 12px; align-items: center">
+        <button class="kpi" onClick="{{ kFila }}" style="border-color: #c9622b; cursor: pointer; text-align: left; font-family: inherit"><b style="color: #c9622b">{{ nFila }}</b><span>Fila</span></button>
+        <button class="kpi" onClick="{{ kAguard }}" style="cursor: pointer; text-align: left; font-family: inherit"><b>{{ nAguard }}</b><span>Aguardando</span></button>
+        <button class="kpi" onClick="{{ kVenc }}" style="border-color: #b26a00; cursor: pointer; text-align: left; font-family: inherit"><b style="color: #7a4a00">{{ nAcompVenc }}</b><span>Acomp. vencidos</span></button>
+        <button class="kpi" onClick="{{ kAtras }}" style="border-color: #b3261e; cursor: pointer; text-align: left; font-family: inherit"><b style="color: #8f1d17">{{ nAtras }}</b><span>Atrasadas</span></button>
+        <button class="kpi" onClick="{{ kAbertas }}" style="cursor: pointer; text-align: left; font-family: inherit"><b>{{ nAbertas }}</b><span>Abertas</span></button>
+        <button class="btn" onClick="{{ toggleNotif }}" aria-label="Notificações operacionais" style="min-width: 44px; position: relative">🔔 <span class="pill p-red" style="padding: 0 6px">{{ nNotif }}</span></button>
+      </div>
+    </header>
+    <sc-if value="{{ notifOpen }}" hint-placeholder-val="{{ false }}">
+      <div class="card" style="position: absolute; right: 24px; top: 70px; width: 400px; z-index: 20; box-shadow: 0 12px 32px rgba(11,31,75,.18)">
+        <div style="padding: 10px 14px; font-weight: 700; border-bottom: 1px solid #edf0f5; display: flex; justify-content: space-between"><span>Notificações operacionais</span><button class="btn sm" onClick="{{ toggleNotif }}">✕</button></div><sc-if value="{{ noNotif }}" hint-placeholder-val="{{ false }}"><div style="padding: 14px; font-size: 13px; color: #5b6478">Nada pendente.</div></sc-if>
+        <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="3">
+          <button onClick="{{ n.go }}" style="display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 10px 14px; border-bottom: 1px solid #edf0f5; font-size: 13px; font-family: inherit; color: inherit; cursor: pointer"><span class="pill {{ n.cls }}">{{ n.tag }}</span> {{ n.txt }}</button>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <div style="display: flex; gap: 2px; padding: 0 24px; background: #fff; border-bottom: 1px solid #dfe4ee; align-items: center">
+      <button class="tab {{ onFila }}" onClick="{{ goFila }}">Fila <span class="n">{{ nFila }}</span></button>
+      <button class="tab {{ onAguard }}" onClick="{{ goAguard }}">Aguardando <span class="n">{{ nAguard }}</span></button>
+      <button class="tab {{ onAcomp }}" onClick="{{ goAcomp }}">Acompanhamento <span class="n warn">{{ nAcompVenc }} vencidos</span></button>
+      <button class="tab {{ onFam }}" onClick="{{ goFam }}">Famílias <span class="n">{{ nFam }}</span></button>
+      <button class="tab {{ onRadar }}" onClick="{{ goRadar }}">Radar <span class="n">{{ nRadar }}</span></button>
+      <button class="tab {{ onFeito }}" onClick="{{ goFeito }}">Feito <span class="n">{{ nFeito }}</span></button>
+      <div style="flex-grow: 1"></div>
+      <div style="display: flex; gap: 8px; align-items: center; padding: 8px 0">
+        <label class="field" style="flex-direction: row; align-items: center; gap: 6px"><span>Vista</span><select aria-label="Vista salva" value="{{ vista }}" onChange="{{ setVista }}" style="width: auto"><option value="minha">Minha fila</option><option value="es">Só Espanha</option><option value="it">Só Itália</option><option value="urg">Só urgentes (vencidos + atrasadas)</option></select></label>
+        <input aria-label="Buscar" placeholder="Buscar família, pessoa, documento, órgão…" value="{{ busca }}" onChange="{{ setBusca }}" style="font-family: inherit; font-size: 13px; padding: 8px 12px; border: 1px solid #cfd6e3; border-radius: 8px; width: 260px; min-height: 38px; box-sizing: border-box"><sc-if value="{{ hasBusca }}" hint-placeholder-val="{{ false }}"><button class="btn sm" onClick="{{ clearBusca }}">✕</button></sc-if>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-grow: 1; min-height: 0">
+      <section style="flex-grow: 1; min-width: 0; padding: 18px 24px; overflow: auto; display: flex; flex-direction: column; gap: 14px">
+
+        <!-- ===== FILA ===== -->
+        <sc-if value="{{ tabFila }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+            <button class="btn acc" onClick="{{ startFocus }}">▶ Trabalhar a fila ({{ nFila }})</button>
+            <label class="field" style="flex-direction: row; align-items: center; gap: 6px"><span>Por família, depois por</span>
+              <select aria-label="Agrupar por" value="{{ group }}" onChange="{{ setGroup }}" style="width: auto"><option value="pessoa">Pessoa</option><option value="orgao">Órgão</option><option value="passo">Passo</option></select>
+            </label>
+            <sc-if value="{{ hasRadarFilter }}" hint-placeholder-val="{{ false }}"><span class="pill p-red">Radar: {{ radarLabel }} <button class="btn sm" onClick="{{ clearRadar }}" style="border: 0; background: transparent; color: #8f1d17; min-height: 22px; padding: 0 4px">✕</button></span></sc-if>
+            <sc-if value="{{ hasQuick }}" hint-placeholder-val="{{ false }}"><span class="pill p-red">Filtro: {{ quickLabel }} <button class="btn sm" onClick="{{ clearQuick }}" style="border: 0; background: transparent; color: #8f1d17; min-height: 22px; padding: 0 4px">✕</button></span></sc-if>
+            <button class="btn" onClick="{{ addTransversal }}">+ Tarefa transversal</button><button class="btn sm" onClick="{{ colAll }}">Recolher tudo</button><button class="btn sm" onClick="{{ expAll }}">Expandir tudo</button>
+            <div style="flex-grow: 1"></div>
+            <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; gap: 6px; align-items: center; background: #fff6f0; border: 1px solid #f0c9b3; border-radius: 10px; padding: 5px 8px">
+                <span style="font-size: 13px; font-weight: 600; color: #8a3f15">{{ selCount }} sel.</span>
+                <button class="btn acc sm" onClick="{{ iniciarSel }}">Iniciar (enviar ao cartório) as {{ selCount }}</button>
+                <button class="btn sm" onClick="{{ note }}">Vincular órgão</button>
+                <button class="btn sm" onClick="{{ note }}">Atribuir</button>
+                <button class="btn sm" onClick="{{ clearSel }}">Limpar</button>
+              </div>
+            </sc-if>
+          </div>
+          <div style="font-size: 12px; color: #5b6478">Fila = o que depende de você agora: certidões <b>a iniciar</b> (enviar ao cartório) e no <b>passo 4</b> (conferir e validar). O que está com o cartório fica em Aguardando.</div>
+          <sc-if value="{{ showBlock }}" hint-placeholder-val="{{ true }}">
+            <div class="card" style="border-left: 4px solid #b3261e; padding: 10px 14px; display: flex; gap: 12px; align-items: center; font-size: 13px">
+              <span class="pill p-red">Bloqueio</span><span><b>{{ nNoOrg }} certidões sem órgão emissor.</b> Não dá pra enviar sem destino — vincule antes de iniciar.</span>
+              <div style="flex-grow: 1"></div><button class="btn pri" onClick="{{ vincularTodos }}">Vincular órgão nas {{ nNoOrg }}</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ emptyFila }}" hint-placeholder-val="{{ false }}">
+            <div class="card" style="padding: 40px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center"><b style="font-size: 16px; color: #155e39">{{ emptyFilaTitle }}</b><span style="color: #5b6478">{{ nAguard }} certidões com o cartório · {{ nAcompVenc }} acompanhamentos vencidos.</span></div>
+          </sc-if>
+          <sc-for list="{{ filaFams }}" as="F" hint-placeholder-count="2">
+            <div class="card" style="border-left: 4px solid #0b1f4b; margin-top: 10px; padding-bottom: 12px; box-shadow: 0 2px 8px rgba(11,31,75,.06)">
+              <div class="grp" style="border-top: 0; border-radius: 12px 12px 0 0; background: #e3e8f2; padding: 13px 16px">
+                <button class="chk {{ F.chkCls }}" onClick="{{ F.toggleAll }}" aria-label="Selecionar família"></button>
+                <button class="btn sm" onClick="{{ F.toggleCol }}" aria-label="Expandir ou recolher família" style="min-width: 32px">{{ F.caret }}</button>
+                <span class="pill p-gry">Família</span><b style="font-size: 14px">{{ F.fam }}</b><span style="color:#5b6478">{{ F.pais }} · {{ F.n }} tarefa(s) na fila</span>
+                <div style="flex-grow: 1"></div>
+                <button class="btn sm" onClick="{{ F.openFam }}">Ver família</button>
+              </div>
+              <sc-if value="{{ F.open }}" hint-placeholder-val="{{ true }}">
+              <sc-for list="{{ F.groups }}" as="g" hint-placeholder-count="3">
+              <div style="margin: 12px 12px 0; border: 1px solid #dfe4ee; border-radius: 10px; overflow: hidden">
+                <div class="grp" style="border-top: 0">
+                  <button class="chk {{ g.chkCls }}" onClick="{{ g.toggleAll }}" aria-label="Selecionar grupo"></button>
+                  <button class="btn sm" onClick="{{ g.toggleCol }}" aria-label="Expandir ou recolher" style="min-width: 32px">{{ g.caret }}</button>
+                  <span class="pill {{ g.pillCls }}">{{ g.pill }}</span><b>{{ g.title }}</b><span style="color:#5b6478">{{ g.sub }}</span>
+                  <div style="flex-grow: 1"></div>
+                  <sc-if value="{{ g.lote }}" hint-placeholder-val="{{ true }}"><button class="btn sm" onClick="{{ g.toggleAll }}">Selecionar as {{ g.n }} (mesmo requerimento)</button></sc-if>
+                </div>
+                <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+                <div class="hd gF"><span></span><span>Documento</span><span>Pessoa</span><span>Por que aqui</span><span>Passo atual</span><span>Acompanhamento</span><span>Órgão</span><span>Ação</span></div>
+                <sc-for list="{{ g.rows }}" as="t" hint-placeholder-count="2">
+                  <div class="row gF {{ t.selCls }}">
+                    <button class="chk {{ t.chkCls }}" onClick="{{ t.toggle }}" aria-label="Selecionar"></button>
+                    <div style="font-weight: 600">{{ t.doc }}<div style="font-size: 11px; color: #7a8296; font-weight: 500">{{ t.fam }} · {{ t.pais }}</div></div>
+                    <div>{{ t.pessoa }}<div style="font-size: 11px; color: #7a8296">{{ t.ger }}</div></div>
+                    <div><span class="pill {{ t.whyCls }}">{{ t.why }}</span></div>
+                    <div>{{ t.passoLabel }}<div style="font-size: 11px; color: #7a8296">{{ t.passoSub }}</div></div>
+                    <div><span class="pill {{ t.acompCls }}">{{ t.acompTxt }}</span><div style="font-size: 11px; color: #7a8296">{{ t.prazoTxt }}</div></div>
+                    <div><span class="pill {{ t.orgCls }}">{{ t.org }}</span></div>
+                    <div style="display: flex; gap: 4px"><button class="btn sm {{ t.btnCls }}" onClick="{{ t.open }}">{{ t.acao }}</button></div>
+                  </div>
+                </sc-for>
+                </sc-if>
+              </div>
+              </sc-for>
+              </sc-if>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <!-- ===== AGUARDANDO ===== -->
+        <sc-if value="{{ tabAguard }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; gap: 10px; align-items: center"><div style="font-size: 15px; font-weight: 600; color: #0b1f4b">O que está com o cartório</div><span style="font-size: 12px; color: #5b6478">passos 2 (confirmar pedido) e 3 (receber certidão) — vencido ou não</span><label class="field" style="flex-direction: row; align-items: center; gap: 6px"><span>Agrupar por</span><select aria-label="Agrupar Aguardando" value="{{ aguardPor }}" onChange="{{ setAguardPor }}" style="width: auto"><option value="familia">Família</option><option value="orgao">Órgão (cobrar juntos)</option></select></label><sc-if value="{{ hasQuick }}" hint-placeholder-val="{{ false }}"><span class="pill p-red">Filtro: {{ quickLabel }} <button class="btn sm" onClick="{{ clearQuick }}" style="border: 0; background: transparent; color: #8f1d17; min-height: 22px; padding: 0 4px">✕</button></span></sc-if><div style="flex-grow: 1"></div></div>
+          <sc-if value="{{ emptyAguard }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding: 40px; text-align: center; color: #5b6478"><b style="color: #0b1f4b">{{ emptyAguardTitle }}</b><br>{{ emptyAguardSub }}</div></sc-if>
+          <sc-if value="{{ hasAguard }}" hint-placeholder-val="{{ true }}">
+            <sc-for list="{{ aguardGroups }}" as="g" hint-placeholder-count="2">
+            <div class="card" style="border-left: 4px solid #0b1f4b; margin-top: 10px; padding-bottom: 12px; box-shadow: 0 2px 8px rgba(11,31,75,.06)">
+              <div class="grp" style="border-top: 0; border-radius: 12px 12px 0 0; background: #e3e8f2; padding: 13px 16px"><button class="btn sm" onClick="{{ g.toggleCol }}" aria-label="Expandir ou recolher família" style="min-width: 32px">{{ g.caret }}</button><span class="pill p-gry">{{ g.pill }}</span><b style="font-size: 14px">{{ g.fam }}</b><span style="color:#5b6478">{{ g.pais }} · {{ g.n }} tarefa(s)</span><div style="flex-grow: 1"></div><sc-if value="{{ g.hasFam }}" hint-placeholder-val="{{ true }}"><button class="btn sm" onClick="{{ g.openFam }}">Ver família</button></sc-if></div>
+              <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+              <div style="margin: 12px 12px 0; border: 1px solid #dfe4ee; border-radius: 10px; overflow: hidden">
+              <div class="hd gA"><span>Documento</span><span>Com quem</span><span>Passo atual</span><span>Desde</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo da tarefa</span><span>Ação</span></div>
+            <sc-for list="{{ g.rows }}" as="t" hint-placeholder-count="2">
+              <div class="row gA" style="box-shadow: inset 4px 0 0 {{ t.rowMark }}">
+                <div style="font-weight: 600">{{ t.doc }}<div style="font-size: 11px; color: #7a8296; font-weight: 500">{{ t.fam }} · {{ t.pessoa }}</div></div>
+                <div>{{ t.org }}</div>
+                <div>{{ t.passoLabel }}<div style="font-size: 11px; color: #7a8296">{{ t.passoSub }}</div></div>
+                <div>{{ t.desde }}</div>
+                <div><span class="pill {{ t.acompCls }}">{{ t.acompTxt }}</span></div>
+                <div>{{ t.cobTxt }}</div>
+                <div><span class="pill {{ t.prazoCls }}">{{ t.prazoTxt }}</span></div>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap"><sc-if value="{{ t.acompVenc }}" hint-placeholder-val="{{ false }}"><button class="btn sm acc" onClick="{{ t.cobrar }}">Cobrar</button></sc-if><button class="btn sm" onClick="{{ t.concluir }}">{{ t.concluirLabel }}</button><button class="btn sm" onClick="{{ t.open }}">Abrir</button></div>
+              </div>
+            </sc-for>
+              </div>
+            </sc-if>
+            </div>
+            </sc-for>
+          </sc-if>
+        </sc-if>
+
+        <!-- ===== ACOMPANHAMENTO ===== -->
+        <sc-if value="{{ tabAcomp }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; gap: 10px; align-items: center"><div style="font-size: 15px; font-weight: 600; color: #0b1f4b">O que precisa de controle</div><span style="font-size: 12px; color: #5b6478">só acompanhamentos vencidos, de hoje, de amanhã e dos próximos 7 dias — de qualquer passo, esteja na Fila ou em Aguardando</span><div style="flex-grow: 1"></div><button class="btn sm" onClick="{{ toggleDepois }}">{{ depoisLabel }}</button><button class="btn" onClick="{{ cobrarVencidos }}">Cobrar todos os vencidos de terceiro</button></div>
+          <div style="display: flex; gap: 10px">
+            <div class="kpi" style="border-color: #b3261e"><b style="color: #8f1d17">{{ cVenc }}</b><span>Vencidos</span></div>
+            <div class="kpi" style="border-color: #c9622b"><b style="color: #c9622b">{{ cHoje }}</b><span>Hoje</span></div>
+            <div class="kpi"><b>{{ cAmanha }}</b><span>Amanhã</span></div>
+            <div class="kpi"><b>{{ cSemana }}</b><span>Próximos 7 dias</span></div>
+          </div>
+          <sc-if value="{{ emptyAcomp }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding: 40px; text-align: center; color: #5b6478"><b style="color: #155e39">Tudo em dia.</b><br>Próximo acompanhamento: {{ proxAcomp }}</div></sc-if>
+          <sc-for list="{{ acompBlocks }}" as="b" hint-placeholder-count="4">
+            <div style="margin-top: 6px">
+              <div class="blk" style="border-top: 0; color: {{ b.color }}; padding: 6px 4px"><span>{{ b.title }}</span><span class="pill {{ b.cls }}">{{ b.n }}</span></div>
+              <sc-for list="{{ b.groups }}" as="g" hint-placeholder-count="2">
+              <div class="card" style="border-left: 4px solid #0b1f4b; margin-top: 10px; padding-bottom: 12px; box-shadow: 0 2px 8px rgba(11,31,75,.06)">
+              <div class="grp" style="border-top: 0; border-radius: 12px 12px 0 0; background: #e3e8f2; padding: 13px 16px"><button class="btn sm" onClick="{{ g.toggleCol }}" aria-label="Expandir ou recolher família" style="min-width: 32px">{{ g.caret }}</button><span class="pill p-gry">Família</span><b style="font-size: 14px">{{ g.fam }}</b><span style="color:#5b6478">{{ g.pais }} · {{ g.n }} tarefa(s)</span><div style="flex-grow: 1"></div><button class="btn sm" onClick="{{ g.openFam }}">Ver família</button></div>
+              <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+              <div style="margin: 12px 12px 0; border: 1px solid #dfe4ee; border-radius: 10px; overflow: hidden">
+              <div class="hd gC"><span>Documento</span><span>Passo</span><span>Com quem / de onde veio a data</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo tarefa</span><span>Ação</span></div>
+              <sc-for list="{{ g.rows }}" as="t" hint-placeholder-count="2">
+                <div class="row gC">
+                  <div style="font-weight: 600">{{ t.doc }}<div style="font-size: 11px; color: #7a8296; font-weight: 500">{{ t.fam }} · {{ t.pessoa }}</div></div>
+                  <div>{{ t.passoLabel }}<div style="font-size: 11px; color: #7a8296">{{ t.tipoTxt }}</div></div>
+                  <div>{{ t.org }}<div style="font-size: 11px; color: #7a8296">{{ t.origemData }}</div></div>
+                  <div><span class="pill {{ t.acompCls }}">{{ t.acompTxt }}</span></div>
+                  <div>{{ t.cobTxt }}</div>
+                  <div><span class="pill {{ t.prazoCls }}">{{ t.prazoTxt }}</span></div>
+                  <div style="display: flex; gap: 4px; flex-wrap: wrap"><sc-if value="{{ t.podeCobrar }}" hint-placeholder-val="{{ false }}"><button class="btn sm acc" onClick="{{ t.cobrar }}">Cobrar</button></sc-if><button class="btn sm" onClick="{{ t.concluir }}">{{ t.concluirLabel }}</button><button class="btn sm" onClick="{{ t.adiar }}">Adiar +3 d</button><button class="btn sm" onClick="{{ t.open }}">Abrir</button></div>
+                </div>
+              </sc-for>
+              </div>
+              </sc-if>
+              </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <!-- ===== FAMILIAS ===== -->
+        <sc-if value="{{ tabFam }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 10px"><div style="font-size: 15px; font-weight: 600; color: #0b1f4b">Como está cada processo</div>
+            <label class="field" style="flex-direction: row; align-items: center; gap: 6px"><span>Ordenar</span><select style="width: auto"><option>Mais parada</option><option>Mais atrasada</option><option>País</option><option>Responsável</option></select></label>
+</div>
+          <sc-for list="{{ fams }}" as="f" hint-placeholder-count="3">
+            <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; border-left: 4px solid {{ f.color }}">
+              <div style="display: flex; align-items: center; gap: 12px">
+                <div style="width: 38px; height: 38px; border-radius: 999px; background: #0b1f4b; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center">{{ f.ini }}</div>
+                <div><div style="font-weight: 700; font-size: 16px">{{ f.nome }} </div><div style="font-size: 12px; color: #5b6478">{{ f.sub }}</div></div>
+                <div style="flex-grow: 1"></div>
+                <span class="pill p-blu">{{ f.fase }}</span>
+                <div style="font-size: 12px; color: #5b6478">Resp.: <b>Daniela Brait</b></div>
+                <button class="btn" onClick="{{ f.toggleExp }}">{{ f.expLabel }}</button>
+                <button class="btn" onClick="{{ note }}">Abrir processo</button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px">
+                <sc-for list="{{ f.cards }}" as="c" hint-placeholder-count="6">
+                  <button class="btn" onClick="{{ c.open }}" style="border: 1px solid {{ c.border }}; background: {{ c.bg }}; border-radius: 10px; padding: 10px; text-align: left; display: flex; flex-direction: column; gap: 2px; min-height: 60px; white-space: normal"><div style="font-size: 11px; color: #7a8296; text-transform: uppercase; font-weight: 600; display: flex; justify-content: space-between; width: 100%"><span>{{ c.label }}</span><span style="color: #7a8296; font-weight: 600; text-transform: none; letter-spacing: 0">{{ c.caret }}</span></div><div style="font-size: 20px; font-weight: 700; color: {{ c.color }}">{{ c.n }}</div></button>
+                </sc-for>
+              </div>
+              <div style="font-size: 12px; color: #5b6478">Gargalo: <b>{{ f.gargalo }}</b> · Próximo marco: <b>{{ f.marco }}</b></div>
+              <sc-if value="{{ f.openList }}" hint-placeholder-val="{{ false }}">
+                <div style="border: 1px solid #dfe4ee; border-radius: 10px; overflow: hidden">
+                  <div class="grp" style="border-top: 0"><b>{{ f.openLabel }}</b><span style="color:#5b6478">{{ f.openCount }} tarefa(s) · mesma linha e mesmo painel da Fila</span><div style="flex-grow: 1"></div><button class="btn sm" onClick="{{ f.close }}">Recolher ▴</button></div>
+                  <div class="hd" style="grid-template-columns: 1.5fr 1.1fr 1fr 1fr 0.9fr 0.8fr 120px"><span>Documento</span><span>Pessoa</span><span>Passo atual</span><span>Acompanhamento</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
+                  <sc-if value="{{ f.openEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding: 20px; text-align: center; color: #5b6478; font-size: 13px">Nenhuma tarefa neste estágio.</div></sc-if>
+                  <sc-for list="{{ f.openRows }}" as="t" hint-placeholder-count="2">
+                    <div class="row" style="grid-template-columns: 1.5fr 1.1fr 1fr 1fr 0.9fr 0.8fr 120px; box-shadow: inset 4px 0 0 {{ t.rowMark }}">
+                      <div style="font-weight: 600">{{ t.doc }}<div style="font-size: 11px; color: #7a8296; font-weight: 500">{{ t.fam }} · {{ t.pais }}</div></div>
+                      <div>{{ t.pessoa }}<div style="font-size: 11px; color: #7a8296">{{ t.ger }}</div></div>
+                      <div>{{ t.passoLabel }}<div style="font-size: 11px; color: #7a8296">{{ t.passoSub }}</div></div>
+                      <div><span class="pill {{ t.acompCls }}">{{ t.acompTxt }}</span></div>
+                      <div><span class="pill {{ t.prazoCls }}">{{ t.prazoTxt }}</span></div>
+                      <div><span class="pill {{ t.orgCls }}">{{ t.org }}</span></div>
+                      <div><button class="btn sm {{ t.btnCls }}" onClick="{{ t.open }}">{{ t.acao }}</button></div>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </sc-if>
+
+        <!-- ===== RADAR ===== -->
+        <sc-if value="{{ tabRadar }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; gap: 10px; align-items: center"><div style="font-size: 15px; font-weight: 600; color: #0b1f4b">Só o que está errado — clique para abrir a lista</div><span style="font-size: 13px; color: #5b6478">Vazio é bom sinal.</span></div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+            <button class="radar" style="border-left-color: {{ rAtrasCol }}" onClick="{{ kAtras }}"><div style="display:flex;justify-content:space-between"><b>Tarefas atrasadas</b><span class="pill {{ rAtrasCls }}">{{ nAtras }}</span></div><div style="font-size: 12px; color: #5b6478">passou o prazo da tarefa (10 dias do cartório) — falha de entrega</div></button>
+            <button class="radar" style="border-left-color: {{ rVencCol }}" onClick="{{ goAcomp }}"><div style="display:flex;justify-content:space-between"><b>Acompanhamentos vencidos</b><span class="pill {{ rVencCls }}">{{ nAcompVenc }}</span></div><div style="font-size: 12px; color: #5b6478">despertador tocou e ninguém agiu — controle, não atraso</div></button>
+            <button class="radar" style="border-left-color: {{ rEscCol }}" onClick="{{ kEsc }}"><div style="display:flex;justify-content:space-between"><b>Escaladas ao gestor</b><span class="pill {{ rEscCls }}">{{ nDecis }}</span></div><div style="font-size: 12px; color: #5b6478">2 cobranças sem resposta</div></button>
+            <button class="radar" style="border-left-color: {{ rOrgCol }}" onClick="{{ radarNoOrg }}"><div style="display:flex;justify-content:space-between"><b>Sem órgão emissor</b><span class="pill {{ rOrgCls }}">{{ nNoOrg }}</span></div><div style="font-size: 12px; color: #5b6478">não dá pra iniciar sem destino</div></button>
+            <button class="radar" style="border-left-color: {{ rGenCol }}" onClick="{{ radarFaseAnt }}"><div style="display:flex;justify-content:space-between"><b>Pendência de fase anterior</b><span class="pill {{ rGenCls }}">{{ nGen }}</span></div><div style="font-size: 12px; color: #5b6478">{{ rGenSub }}</div></button>
+            <button class="radar" style="border-left-color: #b26a00" onClick="{{ note }}"><div style="display:flex;justify-content:space-between"><b>Dados inconsistentes</b><span class="pill p-amb">1</span></div><div style="font-size: 12px; color: #5b6478">certidão "(IT)" em processo espanhol · José Civils Martí</div></button>
+            <button class="radar" style="border-left-color: #1f7a4d" onClick="{{ note }}"><div style="display:flex;justify-content:space-between"><b>Sem responsável</b><span class="pill p-grn">0</span></div></button>
+            <button class="radar" style="border-left-color: #1f7a4d" onClick="{{ note }}"><div style="display:flex;justify-content:space-between"><b>Anexo faltando</b><span class="pill p-grn">0</span></div><div style="font-size: 12px; color: #5b6478">recebida sem arquivo</div></button>
+            <button class="radar" style="border-left-color: #1f7a4d" onClick="{{ note }}"><div style="display:flex;justify-content:space-between"><b>Erro do sistema</b><span class="pill p-grn">0</span></div><div style="font-size: 12px; color: #5b6478">ex.: lista não carregou (500)</div></button>
+          </div>
+        </sc-if>
+
+        <!-- ===== FEITO ===== -->
+        <sc-if value="{{ tabFeito }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size: 15px; font-weight: 600; color: #0b1f4b">O que andou</div>
+          <div style="display: flex; gap: 10px"><div class="kpi"><b>{{ nFeitoHoje }}</b><span>Concluídas hoje</span></div><div class="kpi"><b>{{ nFeitoOntem }}</b><span>Ontem</span></div><div class="kpi"><b>{{ nFeitoSem }}</b><span>Esta semana</span></div><div class="kpi"><b>{{ nEnviadasHoje }}</b><span>Enviadas hoje</span></div></div>
+          <sc-for list="{{ feitoBlocks }}" as="b" hint-placeholder-count="2">
+            <div style="margin-top: 6px">
+              <div class="blk" style="border-top: 0; padding: 6px 4px"><span>{{ b.title }}</span><span class="pill p-grn">{{ b.n }} concluída(s)</span></div>
+              <sc-for list="{{ b.groups }}" as="g" hint-placeholder-count="2">
+              <div class="card" style="border-left: 4px solid #0b1f4b; margin-top: 10px; padding-bottom: 12px; box-shadow: 0 2px 8px rgba(11,31,75,.06)">
+              <div class="grp" style="border-top: 0; border-radius: 12px 12px 0 0; background: #e3e8f2; padding: 13px 16px"><button class="btn sm" onClick="{{ g.toggleCol }}" aria-label="Expandir ou recolher família" style="min-width: 32px">{{ g.caret }}</button><span class="pill p-gry">Família</span><b style="font-size: 14px">{{ g.fam }}</b><span style="color:#5b6478">{{ g.pais }} · {{ g.n }} tarefa(s)</span><div style="flex-grow: 1"></div><button class="btn sm" onClick="{{ g.openFam }}">Ver família</button></div>
+              <sc-if value="{{ g.open }}" hint-placeholder-val="{{ true }}">
+              <div style="margin: 12px 12px 0; border: 1px solid #dfe4ee; border-radius: 10px; overflow: hidden">
+              <div class="hd" style="grid-template-columns: 1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px"><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
+              <sc-for list="{{ g.rows }}" as="t" hint-placeholder-count="3">
+                <div class="row" style="grid-template-columns: 1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px">
+                  <div style="font-weight: 600">{{ t.doc }}<div style="font-size: 11px; color: #7a8296; font-weight: 500">{{ t.fam }} · {{ t.pais }}</div></div>
+                  <div>{{ t.pessoa }}<div style="font-size: 11px; color: #7a8296">{{ t.ger }}</div></div>
+                  <div><span class="pill p-grn">{{ t.passoLabel }}</span></div>
+                  <div><span class="pill {{ t.prazoCls }}">{{ t.prazoTxt }}</span></div>
+                  <div><span class="pill {{ t.orgCls }}">{{ t.org }}</span></div>
+                  <div><button class="btn sm" onClick="{{ t.open }}">Abrir</button></div>
+                </div>
+              </sc-for>
+              </div>
+              </sc-if>
+              </div>
+              </sc-for>
+            </div>
+          </sc-for>
+          <div class="card">
+            <div class="blk" style="border-top: 0"><span>Eventos do processo</span><span style="font-size: 12px; color: #7a8296; font-weight: 500">não são tarefas — mudanças de fase e atribuições</span></div>
+            <div class="row" style="grid-template-columns: 150px 1fr 90px"><div><span class="pill p-grn">Fase avançada</span></div><div>Cibils · Genealogia → Emissão documental (14 de 18 concluídas)</div><div style="color:#7a8296">24/09 17:02</div></div>
+            <div class="row" style="grid-template-columns: 150px 1fr 90px"><div><span class="pill p-gry">Atribuição</span></div><div>16 tarefas de Emissão atribuídas a Daniela Brait por Marco Rovatti</div><div style="color:#7a8296">24/09 15:14</div></div>
+          </div>
+        </sc-if>
+
+      </section>
+
+      <!-- PAINEL REAL DO PROCESSO (espelhado) -->
+      <sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+        <aside style="width: 560px; flex-shrink: 0; background: #f4f6fa; border-left: 1px solid #dfe4ee; box-sizing: border-box; display: flex; flex-direction: column; overflow: auto">
+          <div style="background: #fff; border-bottom: 1px solid #dfe4ee; padding: 10px 18px; display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #5b6478; font-weight: 600">
+            <span>Central Operacional · {{ dPessoaUp }}</span><span class="pill p-blu" style="text-transform: none; letter-spacing: 0">painel real do processo · espelhado</span>
+            <div style="flex-grow: 1"></div><button class="btn sm" onClick="{{ closeDrawer }}" aria-label="Fechar">✕</button>
+          </div>
+          <sc-if value="{{ focusOn }}" hint-placeholder-val="{{ false }}">
+            <div style="background: #fff6f0; border-bottom: 1px solid #f0c9b3; padding: 8px 18px; display: flex; align-items: center; gap: 10px; font-size: 12px"><span class="pill p-blu">Modo foco</span><b>{{ fIdx }} de {{ nFila }}</b><div class="bar" style="width: 120px"><div style="width: {{ fPct }}; height: 8px; background: #c9622b"></div></div><div style="flex-grow: 1"></div><button class="btn sm" onClick="{{ fPrev }}">←</button><button class="btn sm" onClick="{{ fNext }}">Pular →</button><button class="btn sm" onClick="{{ stopFocus }}">Sair</button></div>
+          </sc-if>
+          <div style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; gap: 12px; align-items: center">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: #e6eaf2; display: flex; align-items: center; justify-content: center; color: #0b1f4b; font-weight: 700">▤</div>
+              <div><div style="font-size: 18px; font-weight: 700">{{ dTitle }}</div><div style="font-size: 13px; color: #5b6478">{{ dPessoa }} · {{ dFam }}</div></div>
+            </div>
+            <div class="card" style="padding: 12px 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; font-size: 12px">
+              <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase; letter-spacing: .06em; font-weight: 600">Status</div><span class="pill {{ dStatusCls }}" style="margin-top: 4px">{{ dStatus }}</span></div>
+              <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase; letter-spacing: .06em; font-weight: 600">Responsável</div><div style="margin-top: 4px; font-weight: 600">Daniela Brait</div></div>
+              <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase; letter-spacing: .06em; font-weight: 600">Prazo da tarefa</div><div style="margin-top: 4px; font-weight: 600">{{ dPrazoTxt }}</div><div style="color: #7a8296">{{ dPrazoSub }}</div></div>
+              <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase; letter-spacing: .06em; font-weight: 600">Órgão emissor</div><div style="margin-top: 4px; font-weight: 600">{{ dOrg }}</div></div>
+            </div>
+            <div style="display: flex; border-bottom: 1px solid #dfe4ee; background: #fff; border-radius: 10px 10px 0 0; padding: 0 6px">
+              <button class="dtab {{ dtWf }}" onClick="{{ dGoWf }}">Workflow</button><button class="dtab {{ dtReg }}" onClick="{{ dGoReg }}">Dados Registrais</button><button class="dtab {{ dtAnd }}" onClick="{{ dGoAnd }}">Andamento</button><button class="dtab {{ dtAnx }}" onClick="{{ dGoAnx }}">Anexos</button><button class="dtab {{ dtObs }}" onClick="{{ dGoObs }}">Observações</button>
+            </div>
+            <sc-if value="{{ dIsWf }}" hint-placeholder-val="{{ true }}">
+              <div class="card" style="padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; font-size: 12px"><div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase; letter-spacing: .06em; font-weight: 600">Progresso operacional</div><div style="margin-top: 2px">{{ dTotal }} passos · {{ dDone }} concluídos</div></div><div style="text-align: right; color: #7a8296">{{ dPct }}</div></div>
+              <sc-if value="{{ dIsNaoIniciada }}" hint-placeholder-val="{{ false }}">
+                <div class="card" style="padding: 12px 14px; border-left: 4px solid #c9622b; display: flex; flex-direction: column; gap: 8px; font-size: 13px">
+                  <b>Iniciar a tarefa = enviar o pedido ao cartório</b>
+                  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+                    <label class="field" style="grid-column: span 2">Órgão emissor <select><option>{{ dOrg }}</option><option>Registro Civil (Espanha)</option><option>Cartório de Registro Civil (Brasil)</option></select></label>
+                    <label class="field">Canal <select><option>E-mail</option><option>Portal</option><option>Correio</option><option>Presencial</option></select></label>
+                    <label class="field">Data do envio <input placeholder="25/09/2026"></label>
+                  </div>
+                  <div style="font-size: 12px; color: #5b6478">Ao iniciar: passo 1 concluído · abre passo 2 (confirmar pedido, 1 dia) · vai para Aguardando.</div>
+                  <button class="btn acc" onClick="{{ dIniciar }}" style="align-self: flex-start">Iniciar → (enviado ao cartório)</button>
+                </div>
+              </sc-if>
+              <div class="card" style="padding: 10px 12px; display: flex; flex-direction: column; gap: 8px">
+                <sc-for list="{{ dSteps }}" as="p" hint-placeholder-count="4">
+                  <div class="step {{ p.cls }}">
+                    <div style="width: 22px; font-weight: 700; color: {{ p.numColor }}">{{ p.icon }}</div>
+                    <div style="flex-grow: 1"><b>{{ p.n }}. {{ p.nome }}</b> <span class="pill {{ p.stCls }}" style="margin-left: 6px">{{ p.st }}</span>
+                      <div style="font-size: 12px; color: #5b6478; margin-top: 2px">{{ p.quem }} · regra: {{ p.regra }}</div>
+                      <sc-if value="{{ p.showAcomp }}" hint-placeholder-val="{{ false }}"><div style="font-size: 12px; margin-top: 4px"><span class="pill {{ p.acompCls }}">acompanhamento {{ p.acompTxt }}</span> <span style="color:#7a8296">{{ p.cobTxt }}</span></div></sc-if>
+                    </div>
+                    <sc-if value="{{ p.isCur }}" hint-placeholder-val="{{ false }}"><div style="display: flex; flex-direction: column; gap: 4px"><button class="btn pri sm" onClick="{{ p.concluir }}">{{ p.concluirLabel }}</button><sc-if value="{{ p.podeCobrar }}" hint-placeholder-val="{{ false }}"><button class="btn sm" onClick="{{ p.cobrar }}">Cobrar</button></sc-if><button class="btn sm" onClick="{{ p.adiar }}">Adiar +3 d</button></div></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ dIsReg }}" hint-placeholder-val="{{ false }}">
+              <div class="card" style="padding: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; font-size: 13px">
+                <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Pessoa (na árvore)</div>{{ dPessoa }}</div><div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Tipo</div>{{ dTitle }}</div>
+                <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Data do evento</div>—</div><div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Data do registro</div>—</div>
+                <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">País</div>—</div><div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Cidade</div>—</div>
+                <div style="grid-column: span 2"><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Órgão emissor (cadastro)</div><span style="color: {{ dOrgColor }}">{{ dOrgMsg }}</span></div>
+                <div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Livro</div>—</div><div><div style="font-size: 10px; color: #7a8296; text-transform: uppercase">Folha</div>—</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ dIsAnd }}" hint-placeholder-val="{{ false }}">
+              <div class="card" style="padding: 6px 14px; font-size: 12px">
+                <sc-for list="{{ dHist }}" as="h" hint-placeholder-count="3"><div style="padding: 8px 0; border-top: 1px solid #edf0f5; display: flex; justify-content: space-between"><div><b>{{ h.t }}</b></div><span style="color: #9aa4b8">{{ h.when }}</span></div></sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ dIsAnx }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding: 28px 14px; text-align: center; font-size: 13px; color: #5b6478; display: flex; flex-direction: column; gap: 6px; align-items: center"><b style="color: #141a2b">Nenhum anexo</b><span>Os arquivos de toda a operação deste documento aparecem aqui.</span><button class="btn" onClick="{{ note }}" style="margin-top: 8px">⬆ Anexar arquivo</button></div></sc-if>
+            <sc-if value="{{ dIsObs }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding: 20px 14px; font-size: 13px; color: #5b6478; display: flex; flex-direction: column; gap: 10px"><div style="text-align: center"><b style="color: #141a2b">Nenhuma observação</b></div><label class="field">Nova observação <textarea rows="2" placeholder="Anote algo relevante…"></textarea></label><button class="btn" onClick="{{ note }}" style="align-self: flex-end">Adicionar observação</button></div></sc-if>
+          </div>
+          <div style="margin-top: auto; background: #fff; border-top: 1px solid #dfe4ee; padding: 10px 18px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: #7a8296">
+            <span>Navegação da fila (só na Operação)</span><div style="flex-grow: 1"></div>
+            <button class="btn sm" onClick="{{ dPrev }}">← Anterior</button><button class="btn sm" onClick="{{ dNext }}">Próxima →</button><button class="btn sm" onClick="{{ note }}">Abrir processo completo</button>
+          </div>
+        </aside>
+      </sc-if>
+    </div>
+  </main>
+
+  <sc-if value="{{ toastOn }}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: #0b1f4b; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 30; box-shadow: 0 10px 30px rgba(0,0,0,.3); display: flex; gap: 12px; align-items: center; max-width: 720px"><span>{{ toastMsg }}</span><button class="btn sm" onClick="{{ toastOff }}" style="background: #1d3466; color: #fff; border-color: #2c4a86">ok</button></div>
+  </sc-if>
+</div>
+</script>
+
+<script>
+(function(){
+  // --- tiny runtime that mirrors the DC template semantics (holes, sc-if, sc-for, onClick/onChange) ---
+  var TEMPLATE = document.getElementById('tpl').innerHTML;
+  var handlers = [];
+  function lookup(scope, path){
+    var parts = path.trim().split('.');
+    if (parts[0]==='true') return true; if (parts[0]==='false') return false;
+    for (var i=scope.length-1;i>=0;i--){
+      var o = scope[i];
+      if (o && Object.prototype.hasOwnProperty.call(o, parts[0])){
+        var v = o[parts[0]];
+        for (var j=1;j<parts.length && v!=null;j++) v = v[parts[j]];
+        return v;
+      }
+    }
+    return undefined;
+  }
+  function findClose(s, tag, from){
+    var open = '<'+tag, close = '</'+tag+'>', depth = 0, i = from;
+    while (i < s.length){
+      var a = s.indexOf(open, i), b = s.indexOf(close, i);
+      if (b < 0) return -1;
+      if (a >= 0 && a < b){ depth++; i = a + open.length; }
+      else { if (depth===0) return b; depth--; i = b + close.length; }
+    }
+    return -1;
+  }
+  function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function render(s, scope){
+    var out = '', i = 0;
+    while (i < s.length){
+      var m = /<(sc-if|sc-for)\b([^>]*)>/.exec(s.slice(i));
+      if (!m){ out += fill(s.slice(i), scope); break; }
+      var start = i + m.index, tag = m[1], attrs = m[2];
+      out += fill(s.slice(i, start), scope);
+      var innerStart = start + m[0].length;
+      var end = findClose(s, tag, innerStart);
+      var inner = s.slice(innerStart, end);
+      if (tag==='sc-if'){
+        var vm = /value="\{\{\s*([^}]+?)\s*\}\}"/.exec(attrs);
+        if (vm && lookup(scope, vm[1])) out += render(inner, scope);
+      } else {
+        var lm = /list="\{\{\s*([^}]+?)\s*\}\}"/.exec(attrs), am = /as="([^"]+)"/.exec(attrs);
+        var list = (lm && lookup(scope, lm[1])) || [];
+        for (var k=0;k<list.length;k++){ var sc = {}; sc[am[1]] = list[k]; sc.$index = k; out += render(inner, scope.concat([sc])); }
+      }
+      i = end + ('</'+tag+'>').length;
+    }
+    return out;
+  }
+  function fill(s, scope){
+    // event attributes
+    s = s.replace(/\s(onClick|onChange)="\{\{\s*([^}]+?)\s*\}\}"/g, function(_, ev, path){
+      var fn = lookup(scope, path); var id = handlers.push(fn) - 1;
+      return ' data-'+(ev==='onClick'?'click':'change')+'="'+id+'"';
+    });
+    // controlled value on select
+    s = s.replace(/\svalue="\{\{\s*([^}]+?)\s*\}\}"/g, function(_, path){ return ' data-value="'+esc(lookup(scope, path))+'"'; });
+    s = s.replace(/\shint-placeholder-(?:val|count)="[^"]*"/g, '');
+    return s.replace(/\{\{\s*([^}]+?)\s*\}\}/g, function(_, path){ return esc(lookup(scope, path)); });
+  }
+  var root = document.getElementById('app');
+  var instance = null, vals = null;
+  function DCLogic(props){ this.props = props||{}; }
+  DCLogic.prototype.setState = function(o){ Object.assign(this.state, o); mount(); };
+  window.DCLogic = DCLogic;
+  function mount(){
+    handlers = [];
+    vals = instance.renderVals();
+    var scrollers = Array.prototype.map.call(root.querySelectorAll('section, aside'), function(el){ return el.scrollTop; });
+    root.innerHTML = render(TEMPLATE, [vals]);
+    root.querySelectorAll('[data-click]').forEach(function(el){ el.addEventListener('click', function(e){ var fn = handlers[+el.getAttribute('data-click')]; if (typeof fn==='function') fn(e); }); });
+    root.querySelectorAll('[data-change]').forEach(function(el){ el.addEventListener('change', function(e){ var fn = handlers[+el.getAttribute('data-change')]; if (typeof fn==='function') fn(e); }); });
+    root.querySelectorAll('[data-value]').forEach(function(el){ el.value = el.getAttribute('data-value'); });
+    Array.prototype.forEach.call(root.querySelectorAll('section, aside'), function(el, i){ if (scrollers[i]) el.scrollTop = scrollers[i]; });
+  }
+  window.__boot = function(Component){ instance = new Component({perfil:'operador'}); mount(); };
+})();
+</script>
+
+<script>
+
+class Component extends DCLogic {
+  constructor(p){ super(p); this.state = { tab:'fila', sel:{}, drawer:null, dtab:'wf', perfilOverride:null, group:'pessoa', radar:null, quick:null, famOpen:null, famLast:{}, col:{}, vista:'minha', busca:'', acompDepois:false, aguardPor:'familia', focus:null, notif:false, toast:null, tasks: this.seed(), ops:{d:17,e:9}, aus:{d:false,e:false} }; }
+  seed(){
+    const C=(id,doc,pessoa,ger,why,whyCls)=>({id,fam:'Cibils',pais:'Espanha',doc,pessoa,ger,passo:0,acomp:1,prazo:null,org:null,cob:0,cobLast:null,ex:false,why,whyCls,desde:-1,hist:[['24/09 15:14','Atribuída a Daniela Brait por Marco Rovatti']]});
+    return [
+      {id:3827,fam:'Cibils',pais:'Espanha',doc:'Certidão de casamento · inteiro teor',pessoa:'Atahualpa Irineo Cibils Revello',ger:'G3 · bisavô',passo:'gen',acomp:0,prazo:null,org:null,cob:0,cobLast:null,ex:false,why:'Trava a família',whyCls:'p-red',desde:-1,hist:[['24/09 16:37','Localizar registro — fase Genealogia']]},
+      C(3834,'Certidão de nascimento · inteiro teor','Atahualpa Irineo Cibils Revello','G3 · bisavô','Linha reta','p-blu'),
+      C(3846,'Certidão de óbito · inteiro teor','Atahualpa Irineo Cibils Revello','G3 · bisavô','Linha reta','p-blu'),
+      C(3845,'Certidão de óbito · inteiro teor','José Civils Martí','G1 · tetravô','Linha reta · G1','p-blu'),
+      C(3857,'Certidão de nascimento · inteiro teor','José Civils Martí','G1 · tetravô','Linha reta · G1','p-blu'),
+      C(3859,'Certidão de casamento · inteiro teor','José Civils Martí','G1 · tetravô','Linha reta · G1','p-blu'),
+      C(3848,'Certidão de nascimento · inteiro teor','Ignacio Cibils','G2 · trisavô','Linha reta','p-blu'),
+      C(3858,'Certidão de óbito · inteiro teor','Ignacio Cibils','G2 · trisavô','Linha reta','p-blu'),
+      C(3860,'Certidão de casamento · inteiro teor','Ignacio Cibils','G2 · trisavô','Linha reta','p-blu'),
+      C(3849,'Certidão de nascimento · inteiro teor','Ruben Cibils','G4 · avô','Linha reta','p-blu'),
+      C(3850,'Certidão de casamento · inteiro teor','Ruben Cibils','G4 · avô','Linha reta','p-blu'),
+      C(3851,'Certidão de óbito · inteiro teor','Ruben Cibils','G4 · avô','Linha reta','p-blu'),
+      C(3852,'Certidão de nascimento · inteiro teor','Itiberê Barreto Cibils','G5 · requerente','Requerente','p-gry'),
+      C(3853,'Certidão de casamento · inteiro teor','Itiberê Barreto Cibils','G5 · requerente','Requerente','p-gry'),
+      C(3854,'Certidão de nascimento · inteiro teor','Patrícia Maldaner Cibils','G6 · requerente','Requerente','p-gry'),
+      C(3855,'Certidão de nascimento · inteiro teor','Zenir Cunha Barreto','G4 · avó (fora da linha)','Cônjuge','p-gry'),
+      C(3856,'Certidão de nascimento · inteiro teor','Isonia Terezinha Maldaner','G5 · mãe (fora da linha)','Cônjuge','p-gry'),
+      ...[[3834,'Certidão de nascimento · inteiro teor','Atahualpa Irineo Cibils Revello','G3 · bisavô'],[3846,'Certidão de óbito · inteiro teor','Atahualpa Irineo Cibils Revello','G3 · bisavô'],[3845,'Certidão de óbito · inteiro teor','José Civils Martí','G1 · tetravô'],[3857,'Certidão de nascimento · inteiro teor','José Civils Martí','G1 · tetravô'],[3859,'Certidão de casamento · inteiro teor','José Civils Martí','G1 · tetravô'],[3848,'Certidão de nascimento · inteiro teor','Ignacio Cibils','G2 · trisavô'],[3858,'Certidão de óbito · inteiro teor','Ignacio Cibils','G2 · trisavô'],[3860,'Certidão de casamento · inteiro teor','Ignacio Cibils','G2 · trisavô'],[3849,'Certidão de nascimento · inteiro teor','Ruben Cibils','G4 · avô'],[3850,'Certidão de casamento · inteiro teor','Ruben Cibils','G4 · avô'],[3851,'Certidão de óbito · inteiro teor','Ruben Cibils','G4 · avô'],[3852,'Certidão de nascimento · inteiro teor','Itiberê Barreto Cibils','G5 · requerente'],[3853,'Certidão de casamento · inteiro teor','Itiberê Barreto Cibils','G5 · requerente'],[3854,'Certidão de nascimento · inteiro teor','Patrícia Maldaner Cibils','G6 · requerente']].map((r,i)=>({id:5000+i,fam:'Cibils',pais:'Espanha',doc:r[1],pessoa:r[2],ger:r[3],passo:5,genDone:true,doneDay:-1,acomp:null,prazo:null,org:null,cob:0,cobLast:null,ex:false,why:'',whyCls:'p-gry',desde:-1,hist:[['24/09 16:41','Localizar registro (Genealogia) · concluída por Daniela Brait']]})),
+      {id:9001,fam:'Álvarez Pérez',pais:'Espanha',doc:'Certidão de nascimento · inteiro teor',pessoa:'José Benito Álvarez Pérez',ger:'G1',passo:2,acomp:-2,prazo:null,org:'Registro Civil de A Guarda',cob:1,cobLast:-1,ex:true,why:'Linha reta · G1',whyCls:'p-blu',desde:-3,hist:[['22/09','Enviado ao cartório por e-mail'],['24/09','1ª cobrança (e-mail)']]},
+      {id:9002,fam:'Álvarez Pérez',pais:'Espanha',doc:'Certidão de casamento · inteiro teor',pessoa:'José Benito Álvarez Pérez',ger:'G1',passo:3,acomp:6,prazo:6,org:'Registro Civil de A Guarda',cob:0,cobLast:null,ex:true,why:'Linha reta · G1',whyCls:'p-blu',desde:-4,hist:[['20/09','Enviado'],['21/09','Cartório confirmou · protocolo 2026-0457']]},
+      {id:9003,fam:'Álvarez Pérez',pais:'Espanha',doc:'Certidão de óbito · inteiro teor',pessoa:'Manuel Álvarez',ger:'G2',passo:3,acomp:-1,prazo:-3,org:'Registro Civil de Tui',cob:2,cobLast:-1,ex:true,why:'Linha reta',whyCls:'p-blu',desde:-13,hist:[['10/09','Enviado'],['12/09','Confirmado'],['23/09','1ª cobrança'],['24/09','2ª cobrança → escalada']]},
+      {id:9004,fam:'Álvarez Pérez',pais:'Espanha',doc:'Certidão de nascimento · inteiro teor',pessoa:'Rosa Pérez',ger:'G2',passo:4,acomp:0,prazo:2,org:'Registro Civil de Tui',cob:0,cobLast:null,ex:true,why:'Linha reta',whyCls:'p-blu',desde:0,hist:[['14/09','Enviado'],['15/09','Confirmado'],['25/09','Certidão recebida (anexada)']]},
+      {id:9005,fam:'Fogli',pais:'Itália',doc:'Certidão de nascimento · inteiro teor',pessoa:'Rodolfo Giovanni Fogli',ger:'G1',passo:3,acomp:1,prazo:1,org:'Comune di Comacchio',cob:0,cobLast:null,ex:true,why:'Linha reta · G1',whyCls:'p-blu',desde:-9,hist:[['15/09','Enviado via PEC'],['16/09','Confirmado']]},
+      {id:9006,fam:'Fogli',pais:'Itália',doc:'Certidão de casamento · inteiro teor',pessoa:'Rodolfo Giovanni Fogli',ger:'G1',passo:2,acomp:0,prazo:null,org:'Comune di Comacchio',cob:0,cobLast:null,ex:true,why:'Linha reta · G1',whyCls:'p-blu',desde:-1,hist:[['24/09','Enviado via PEC']]},
+      {id:9007,fam:'Fogli',pais:'Itália',doc:'Certidão de óbito · inteiro teor',pessoa:'Maria Serpa',ger:'G1',passo:5,doneDay:0,acomp:null,prazo:null,org:'Comune di Comacchio',cob:0,cobLast:null,ex:true,why:'',whyCls:'p-gry',desde:-15,hist:[['25/09 09:10','Conferida e validada por Daniela']]}
+    ];
+  }
+  renderVals() {
+    const s=this.state, st=(o)=>this.setState(o);
+    const R = { iniciar:2, p2:1, p3:10, p4:1, cob:1, esc:2 };
+    const perfil = s.perfilOverride || this.props.perfil || 'gestor'; const isGestor = perfil==='gestor';
+    const go=(t)=>()=>st({tab:t, quick:null}); const on=(t)=>s.tab===t?'on':'';
+    const fmt=(off)=>{ if(off===null||off===undefined) return '—'; const d=new Date(2026,8,25+off); return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'); };
+    const rel=(off)=> off<0 ? 'vencido há '+(-off)+' d' : off===0 ? 'hoje' : off===1 ? 'amanhã' : 'em '+off+' d';
+    const relCls=(off)=> off<0?'p-red': off===0?'p-amb': 'p-gry';
+    const PASSOS=[null,'Enviar pedido ao cartório','Confirmar pedido do cartório','Receber certidão','Conferir e validar certidão'];
+    const REGRA=[null,'no início','1 dia após o envio','10 dias após a confirmação','1 dia após receber'];
+    const upd=(id,fn)=>{ const tasks=s.tasks.map(t=> t.id===id ? fn({...t, hist:[...t.hist]}) : t); return tasks; };
+    const now=new Date(); const H='25/09 '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+    const actions=(t)=>({
+      iniciar:()=>{ if(!t.org){ st({toast:'Não dá pra iniciar sem órgão emissor. Vincule antes.'}); return; } st({tasks:upd(t.id,x=>{x.passo=2;x.acomp=R.p2;x.desde=0;x.hist.push([H,'Enviado ao cartório · abre passo 2 (confirmar, 1 dia)']);return x;}), toast:'Enviada. Foi para Aguardando · acompanhamento em '+fmt(R.p2)+'.'}); },
+      concluir:()=>{ const msg = t.passo===2?'Confirmado. Prazo da tarefa começou a contar: '+fmt(R.p3)+'.': t.passo===3?'Recebida. Voltou para a Fila (conferir e validar).':'Concluída. Foi para Feito.'; st({tasks:upd(t.id,x=>{ if(x.passo===2){x.passo=3;x.acomp=R.p3;x.prazo=R.p3;x.desde=0;x.hist.push([H,'Cartório confirmou · abre passo 3 · PRAZO DA TAREFA = '+fmt(R.p3)]);} else if(x.passo===3){x.passo=4;x.acomp=R.p4;x.desde=0;x.hist.push([H,'Certidão recebida · abre passo 4 (conferir, 1 dia) · volta para a Fila']);} else if(x.passo===4){x.passo=5;x.doneDay=0;x.acomp=null;x.hist.push([H,'Conferida e validada · CONCLUÍDA']);} else if(x.passo==='gen'){x.passo=5;x.doneDay=0;x.genDone=true;x.acomp=null;x.hist.push([H,'Registro localizado · concluída']);} x.cob=0; return x;}), toast:msg, drawer: (t.passo===4||t.passo==='gen')?null:s.drawer, focus: (t.passo===4||t.passo==='gen')?null:s.focus}); },
+      cobrar:()=>{ const n=t.cob+1; st({tasks:upd(t.id,x=>{x.cob=n;x.cobLast=0;x.acomp=R.cob;x.hist.push([H,n+'ª cobrança ao '+x.org+(n>=R.esc?' → ESCALADA ao gestor':'')]);return x;}), toast:n+'ª cobrança registrada · lembrar de novo '+fmt(R.cob)+(n>=R.esc?' · escalada ao gestor.':'.')}); },
+      adiar:()=>{ st({tasks:upd(t.id,x=>{x.acomp=(x.acomp||0)+3;x.hist.push([H,'Acompanhamento adiado +3 d (motivo registrado)']);return x;}), toast:'Acompanhamento adiado 3 dias. O prazo da tarefa não muda.'}); },
+      trocarOrgao:()=>{ st({tasks:upd(t.id,x=>{x.passo=0;x.acomp=R.iniciar;x.prazo=null;x.cob=0;x.org=null;x.hist.push([H,'Gestor decidiu trocar de órgão · tarefa reiniciada']);return x;}), toast:'Tarefa reiniciada sem órgão. Vincule outro e inicie de novo.'}); },
+      open:()=>st({drawer:t.id,dtab:'wf'})
+    });
+    const dec=(t)=>{ const a=actions(t); const isGen=t.passo==='gen'; const p=t.passo; const terceiro=(p===2||p===3);
+      const passoLabel = t.transversal?'Transversal · ação interna': isGen?'Localizar registro': p===0?'A iniciar (enviar ao cartório)': p===5?(t.genDone?'Concluída · Genealogia (registro localizado)':'Concluída · 4/4'): (p+'/4 · '+PASSOS[p]);
+      const passoSub = t.transversal?'não muda a fase': isGen?'fase Genealogia': p===0?'passo 1 acontece ao iniciar': p===5?'': REGRA[p];
+      const acompTxt = t.acomp===null?'—': (p===0?'iniciar ':'')+rel(t.acomp)+' · '+fmt(t.acomp);
+      const prazoTxt = t.prazo===null?'ainda não conta': (t.prazo<0?'ATRASADA há '+(-t.prazo)+' d':'até '+fmt(t.prazo));
+      const prazoCls = t.prazo===null?'p-gry':(t.prazo<0?'p-red':'p-blu');
+      const concluirLabel = t.transversal?'Concluída ✓': isGen?'Registro localizado': p===2?'Confirmado ✓': p===3?'Recebi ✓': p===4?'Validar ✓':'—';
+      const cobTxt = t.cob===0?'0': t.cob+' (última '+fmt(t.cobLast)+')'+(t.cob>=R.esc?' · escalada':'');
+      return {...t, ...a, orgRaw:t.org, atrasadaFlag: t.prazo!==null&&t.prazo<0, podeCobrar: terceiro && t.acomp!==null && t.acomp<0, rowMark: (t.prazo!==null&&t.prazo<0)?'#b3261e':'transparent', terceiro, passoLabel, passoSub, acompTxt, acompCls: t.acomp===null?'p-gry':relCls(t.acomp), acompVenc: t.acomp!==null && t.acomp<0, prazoTxt, prazoCls, concluirLabel, cobTxt,
+        org: t.org||'não vinculado', orgCls: t.org?'p-gry':'p-red', desde: fmt(t.desde)+' · há '+(-t.desde)+' d', tipoTxt: terceiro?'espera de terceiro':'ação interna',
+        origemData: p===0?'iniciar até 2 d após atribuída': isGen?'régua da Genealogia': (REGRA[p]||''), acao: p===0?'Iniciar': isGen?'Continuar': p===4?'Conferir':'Abrir', btnCls: (p===0||p===4||isGen)?'acc':'',
+        selCls: s.sel[t.id]?'sel':'', chkCls: s.sel[t.id]?'on':'', toggle:()=>{const n={...s.sel}; if(n[t.id]) delete n[t.id]; else n[t.id]=true; st({sel:n});} };
+    };
+    const isCol=(k)=>!!s.col[k]; const togCol=(k)=>()=>{ const c={...s.col}; if(c[k]) delete c[k]; else c[k]=true; st({col:c}); };
+    const norm=(x)=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const bq=norm(s.busca.trim());
+    const allRaw = s.tasks.map(dec);
+    const vf=(t)=> s.vista==='es'?t.pais==='Espanha': s.vista==='it'?t.pais==='Itália': s.vista==='urg'?((t.acomp!==null&&t.acomp<0)||(t.prazo!==null&&t.prazo<0)): true;
+    const all0 = allRaw.filter(vf);
+    const all = bq ? all0.filter(t=> norm(t.fam+' '+t.pessoa+' '+t.doc+' '+t.org+' '+t.pais).includes(bq)) : all0;
+    const abertas = all.filter(t=>t.passo!==5);
+    let fila = abertas.filter(t=>t.passo===0||t.passo===4||t.passo==='gen');
+    const q=s.quick; const qf=(t)=> !q || (q==='atrasadas'?t.atrasadaFlag: q==='escaladas'?(t.cob>=R.esc): q==='vencidos'?(t.acomp!==null&&t.acomp<0): true);
+    let aguard = abertas.filter(t=>t.passo===2||t.passo===3);
+    const acompVenc = abertas.filter(t=>t.acomp!==null&&t.acomp<0);
+    const atras = abertas.filter(t=>t.prazo!==null&&t.prazo<0);
+    const decis = abertas.filter(t=>t.cob>=R.esc);
+    const noOrg = abertas.filter(t=>!t.orgRaw&&t.passo===0);
+    const genOpen = abertas.filter(t=>t.passo==='gen'&&!t.transversal);
+    fila=fila.filter(qf); aguard=aguard.filter(qf);
+    const rf=s.radar; if(rf==='noorg') fila=fila.filter(t=>t.orgCls==='p-red'); if(rf==='faseant') fila=fila.filter(t=>t.passo==='gen');
+    const keyOf=(t)=> s.group==='orgao'?t.org : s.group==='passo'?t.passoLabel : (t.pessoa+'|'+(t.transversal?'tr':t.passo==='gen'?'gen':'em'));
+    const mkGroups=(rows,fk)=>{ const keys=[], map={}; rows.forEach(t=>{const k=keyOf(t); if(!map[k]){map[k]=[];keys.push(k);} map[k].push(t);});
+      return keys.map(k=>{ const rs=map[k]; const f=rs[0]; const allSel=rs.every(r=>s.sel[r.id]); let title=k,sub='',pill='',pillCls='p-blu',lote=false;
+        if(s.group==='pessoa'){ title=f.pessoa; sub=f.ger+' · '+rs.length+' tarefa(s)'; pill=f.transversal?'Transversal':(f.passo==='gen'?'Fase anterior':'Emissão documental'); pillCls=f.transversal?'p-gry':(f.passo==='gen'?'p-amb':'p-blu'); lote=rs.filter(r=>r.passo===0).length>1; }
+        if(s.group==='orgao'){ title=f.org; sub=rs.length+' certidões'; pill=f.org==='não vinculado'?'Sem destino':'Órgão'; pillCls=f.org==='não vinculado'?'p-red':'p-gry'; }
+        if(s.group==='passo'){ title=f.passoLabel; sub=rs.length+' tarefas'; pill='Passo'; pillCls='p-gry'; }
+        const ck='fila|'+fk+'|'+k; return { title, sub, pill, pillCls, n: rs.length, rows: rs, lote, open: !isCol(ck), caret: isCol(ck)?'▸':'▾', toggleCol: togCol(ck), chkCls: allSel?'on':'', toggleAll:()=>{const n={...s.sel}; rs.forEach(r=>{ if(allSel) delete n[r.id]; else n[r.id]=true; }); st({sel:n});} }; }); };
+    const filaFams = (()=>{ const ks=[], mp={}; fila.forEach(t=>{ if(!mp[t.fam]){mp[t.fam]=[];ks.push(t.fam);} mp[t.fam].push(t); });
+      return ks.map(k=>{ const rs=mp[k]; const allSel=rs.every(r=>s.sel[r.id]); const fk='fila|'+k; return { fam:k, pais:rs[0].pais, n:rs.length, groups:mkGroups(rs,k), open: !isCol(fk), caret: isCol(fk)?'▸':'▾', toggleCol: togCol(fk), chkCls: allSel?'on':'', toggleAll:()=>{const n={...s.sel}; rs.forEach(r=>{ if(allSel) delete n[r.id]; else n[r.id]=true; }); st({sel:n});}, openFam:()=>st({tab:'fam',famOpen:{fam:k,k:'iniciar'}}) }; }); })();
+    const selIds=Object.keys(s.sel).map(Number);
+    const withAcomp = abertas.filter(t=>t.acomp!==null && (t.acomp<=7 || s.acompDepois));
+    const byFam=(rows,pre)=>{ const ks=[], mp={}; rows.forEach(t=>{ if(!mp[t.fam]){mp[t.fam]=[];ks.push(t.fam);} mp[t.fam].push(t); }); return ks.map(k=>{ const ck=(pre||'x')+'|'+k; return {fam:k, pill:'Família', hasFam:true, pais:mp[k][0].pais, n:mp[k].length, rows:mp[k], open:!isCol(ck), caret:isCol(ck)?'▸':'▾', toggleCol:togCol(ck), openFam:()=>this.setState({tab:'fam',famOpen:{fam:k,k:(pre||'').startsWith('ag')?'cartorio':(pre||'').startsWith('fe')?'concluidas':'vencidos'}, famLast:{...this.state.famLast,[k]:(pre||'').startsWith('ag')?'cartorio':(pre||'').startsWith('fe')?'concluidas':'vencidos'}})}; }); };
+    const mkBlock=(title,pred,color,cls)=>{ const rows=withAcomp.filter(pred); return {title, n:rows.length, rows, groups:byFam(rows,'ac|'+title), color, cls}; };
+    const acompBlocks=[ mkBlock('Vencidos',t=>t.acomp<0,'#8f1d17','p-red'), mkBlock('Hoje',t=>t.acomp===0,'#c9622b','p-amb'), mkBlock('Amanhã',t=>t.acomp===1,'#0b1f4b','p-gry'), mkBlock('Próximos 7 dias',t=>t.acomp>1&&t.acomp<=7,'#5b6478','p-gry'), mkBlock('Depois de 7 dias',t=>t.acomp>7,'#9aa4b8','p-gry') ].filter(b=>b.n>0);
+    const future = abertas.filter(t=>t.acomp!==null).sort((a,b)=>a.acomp-b.acomp)[0];
+    const cnt=(name)=>{ const b=acompBlocks.find(x=>x.title===name); return b?b.n:0; };
+    const dd = all.find(t=>t.id===s.drawer);
+    const fi=s.focus; const focusOn = fi!==null && !!dd;
+    const dSteps = dd && dd.passo==='gen' ? [{ n:1, nome: dd.transversal?dd.doc:'Localizar registro da certidão', regra:'régua da Genealogia', quem:'executa Daniela Brait', cls:'cur', icon:'▶', numColor:'#c9622b', st:'Em andamento', stCls:'p-blu', isCur:true, showAcomp:true, acompTxt:rel(dd.acomp)+' · '+fmt(dd.acomp), acompCls:relCls(dd.acomp), cobTxt:'', terceiro:false, concluir:dd.concluir, concluirLabel:'Registro localizado ✓', cobrar:dd.cobrar, adiar:dd.adiar }] : dd ? [1,2,3,4].map(n=>{ const p=dd.passo; const cur = p===n; const done = (p===5) || (typeof p==='number' && p>n); const quem = (n===1||n===4)?'executa Daniela Brait':'espera o cartório';
+      return { n, nome:PASSOS[n], regra: n===1?'ao iniciar (até 2 d após atribuída)':REGRA[n], quem, cls: cur?'cur':(done?'done':''), icon: done?'✓':(cur?'▶':'🔒'), numColor: done?'#155e39':(cur?'#c9622b':'#9aa4b8'), st: done?'Concluído':(cur?'Em andamento':'Bloqueado'), stCls: done?'p-grn':(cur?'p-blu':'p-gry'), isCur: cur && n>1, showAcomp: cur && n>1, acompTxt: cur?(rel(dd.acomp)+' · '+fmt(dd.acomp)):'', acompCls: cur?relCls(dd.acomp):'p-gry', cobTxt: (cur&&dd.cob>0)?('· '+dd.cob+' cobrança(s)'):'', terceiro: n===2||n===3, podeCobrar: (n===2||n===3) && cur && dd.acomp!==null && dd.acomp<0, concluir: dd.concluir, concluirLabel: n===2?'Confirmado ✓':n===3?'Recebi ✓':'Validar ✓', cobrar: dd.cobrar, adiar: dd.adiar }; }) : [];
+    const dDone = dd ? (dd.passo==='gen'?0: dd.passo===5?4: typeof dd.passo==='number'&&dd.passo>=2 ? dd.passo-1 : 0) : 0;
+    const navList = fila.length?fila:abertas;
+    const dNav=(dir)=>{ const i=navList.findIndex(t=>t.id===(dd?dd.id:0)); const nx=navList[(i+dir+navList.length)%navList.length]; if(!nx) return; st({drawer:nx.id,dtab:'wf',focus: fi!==null?((fi+dir+navList.length)%navList.length):null}); };
+    const fams=[
+      {ini:'C',nome:'Cibils',ex:false,sub:'Nacionalidade Espanhola · Proc. ES-1 · 2 requerentes',fase:'Emissão documental',color:'#c9622b',gargalo:'órgão emissor não vinculado',marco:'Análise documental (quando as 16 chegarem)'},
+      {ini:'A',nome:'Álvarez Pérez',ex:true,sub:'Nacionalidade Espanhola · A Guarda',fase:'Emissão documental',color:'#1d3f8f',gargalo:'Registro Civil de Tui (escalada)',marco:'Tradução juramentada'},
+      {ini:'F',nome:'Fogli',ex:true,sub:'Cidadania Italiana · Comacchio',fase:'Emissão documental',color:'#1d3f8f',gargalo:'—',marco:'Análise documental'}
+    ].map(f=>{ const ts=all.filter(t=>t.fam===f.nome);
+      const defs=[ ['iniciar','A iniciar',t=>t.passo===0,'#141a2b'], ['cartorio','Com o cartório',t=>t.passo===2||t.passo===3,'#141a2b'], ['conferir','A conferir',t=>t.passo===4||t.passo==='gen','#141a2b'], ['concluidas','Concluídas',t=>t.passo===5,'#155e39'], ['atrasadas','Atrasadas',t=>t.atrasadaFlag&&t.passo!==5,'#8f1d17'], ['vencidos','Acomp. vencidos',t=>t.acomp!==null&&t.acomp<0&&t.passo!==5,'#7a4a00'] ];
+      const fo=s.famOpen; const isOpen=(k)=> !!fo && fo.fam===f.nome && fo.k===k;
+      const cards=defs.map(d=>{ const rows=ts.filter(d[2]); const op=isOpen(d[0]); return { label:d[1], n:rows.length, color:d[3], caret: op?'▴ ocultar':'▾ ver', border: op?'#c9622b':'#dfe4ee', bg: op?'#fff8f3':'#fff', open:()=>st({famOpen: op?null:{fam:f.nome,k:d[0]}, famLast:{...s.famLast,[f.nome]:d[0]}}), rows }; });
+      const cur = fo && fo.fam===f.nome ? cards[defs.findIndex(d=>d[0]===fo.k)] : null;
+      const lastK = s.famLast[f.nome] || (cards.find(c=>c.rows.length>0)||cards[0]) && (defs[cards.findIndex(c=>c.rows.length>0)]||defs[0])[0];
+      const expLabel = cur ? 'Recolher ▴' : 'Expandir ▾'; const toggleExp = () => st({ famOpen: cur ? null : {fam:f.nome, k:lastK} });
+      return {...f, cards, expLabel, toggleExp, openList: !!cur, openLabel: cur?cur.label:'', openRows: cur?cur.rows:[], openCount: cur?cur.rows.length:0, openEmpty: !!cur && cur.rows.length===0, close:()=>st({famOpen:null}), openList: !!cur }; });
+    const ops=[{k:'d',nome:'Daniela Brait',equipe:'documental',ex:false,n:s.ops.d,color:'#c9622b'},{k:'e',nome:'Operador 2',equipe:'documental',ex:true,n:s.ops.e,color:'#1d3f8f'}].map(o=>({...o,pct:Math.min(100,Math.round(o.n/20*100))+'%',ausente:s.aus[o.k],ausLabel:s.aus[o.k]?'Marcar presente':'Marcar ausência',give:()=>{const n={...s.ops};const other=o.k==='d'?'e':'d';const m=Math.min(5,n[o.k]);n[o.k]-=m;n[other]+=m;st({ops:n});},toggleAus:()=>{const a={...s.aus};a[o.k]=!a[o.k];st({aus:a});}}));
+    const notifs=[ ...acompVenc.slice(0,3).map(t=>({tag:'Acomp. vencido',cls:'p-amb',txt:t.passoLabel+' · '+t.doc+' · '+t.pessoa+' · '+t.fam, go:()=>st({notif:false,drawer:t.id,dtab:'wf'})})), ...atras.slice(0,2).map(t=>({tag:'Atrasada',cls:'p-red',txt:t.doc+' · '+t.pessoa+' · '+t.fam+' · '+t.prazoTxt, go:()=>st({notif:false,drawer:t.id,dtab:'wf'})})), ...decis.slice(0,1).map(t=>({tag:'Escalada',cls:'p-red',txt:t.org+' não responde após '+t.cob+' cobranças · '+t.fam, go:()=>st({notif:false,drawer:t.id,dtab:'wf'})})), ...(noOrg.length?[{tag:'Bloqueio',cls:'p-red',txt:noOrg.length+' certidões sem órgão emissor', go:()=>st({notif:false,tab:'fila',radar:'noorg'})}]:[]) ];
+    const done = all.filter(t=>t.passo===5); const dHoje=done.filter(t=>t.doneDay===0), dOntem=done.filter(t=>t.doneDay===-1), dAntes=done.filter(t=>t.doneDay<-1);
+    const feitoBlocks=[{title:'Hoje · 25/09',rows:dHoje},{title:'Ontem · 24/09',rows:dOntem},{title:'Antes',rows:dAntes}].map(b=>({...b,n:b.rows.length,groups:byFam(b.rows,'fe|'+b.title)})).filter(b=>b.n>0);
+    const auditRows = s.tasks.flatMap(t=>t.hist.filter(h=>h[0].startsWith('25/09 ')).map(h=>({when:h[0],who:'Daniela',txt:h[1]+' · '+t.pessoa}))).slice(-6).reverse();
+    return {
+      isGestor, profileLabel:isGestor?'Gestor (gerência / adm)':'Operador (Daniela)', whoLabel:isGestor?'Marco Rovatti · gerência operacional':'Daniela Brait · equipe documental',
+      toggleProfile:()=>st({perfilOverride:isGestor?'operador':'gestor',tab:(isGestor&&s.tab==='gestao')?'fila':s.tab}), resetAll:()=>st({tasks:this.seed(),sel:{},drawer:null,focus:null,radar:null,toast:'Dados reiniciados.'}),
+      goFila:go('fila'),goAguard:go('aguard'),goAcomp:go('acomp'),goFam:go('fam'),goRadar:go('radar'),goFeito:go('feito'),
+      onFila:on('fila'),onAguard:on('aguard'),onAcomp:on('acomp'),onFam:on('fam'),onRadar:on('radar'),onFeito:on('feito'),
+      tabFila:s.tab==='fila',tabAguard:s.tab==='aguard',tabAcomp:s.tab==='acomp',tabFam:s.tab==='fam',tabRadar:s.tab==='radar',tabFeito:s.tab==='feito',
+      nFila:fila.length, nAguard:aguard.length, nAcompVenc:acompVenc.length, nAtras:atras.length, nAbertas:abertas.length, nFam:3, nRadar: (atras.length?1:0)+(acompVenc.length?1:0)+(decis.length?1:0)+(noOrg.length?1:0)+(genOpen.length?1:0)+1, nGen:genOpen.length, rGenCol: genOpen.length?'#b26a00':'#1f7a4d', rGenCls: genOpen.length?'p-amb':'p-grn', rGenSub: genOpen.length? (genOpen[0].fam+' · '+genOpen[0].doc+' · '+genOpen[0].pessoa+' · trava a família') : 'nenhuma', nFeito: all.filter(t=>t.passo===5).length, nDecis:decis.length, nNoOrg:noOrg.length, nNotif:notifs.length,
+      hasQuick:!!q, quickLabel: q==='atrasadas'?'Atrasadas': q==='escaladas'?'Escaladas ao gestor':'Acompanhamento vencido', clearQuick:()=>st({quick:null}),
+      kFila:()=>st({tab:'fila',quick:null,radar:null}), kAguard:()=>st({tab:'aguard',quick:null}), kVenc:()=>st({tab:'acomp'}), kAtras:()=>{ const emFila=abertas.filter(t=>t.atrasadaFlag&&(t.passo===4)).length; st({tab: emFila>0?'fila':'aguard', quick:'atrasadas', radar:null}); }, kAbertas:()=>st({tab:'fam'}), kEsc:()=>st({tab:'aguard',quick:'escaladas'}),
+      notifOpen:s.notif, toggleNotif:()=>st({notif:!s.notif}), notifs, noNotif: notifs.length===0,
+      group:s.group, setGroup:(e)=>st({group:e.target.value}), hasRadarFilter:!!rf, radarLabel: rf==='noorg'?'Sem órgão':'Pendência de fase anterior', clearRadar:()=>st({radar:null}), radarNoOrg:()=>st({tab:'fila',radar:'noorg'}), radarFaseAnt:()=>st({tab:'fila',radar:'faseant'}),
+      showBlock: noOrg.length>0 && !rf && !q, emptyFila: fila.length===0, emptyFilaTitle: q?'Nenhuma na fila com esse filtro.':'Nada na fila.', filaFams, hasSel:selIds.length>0, selCount:selIds.length, clearSel:()=>st({sel:{}}),
+      iniciarSel:()=>{ const selT=selIds.map(id=>s.tasks.find(x=>x.id===id)).filter(Boolean); const aIniciar=selT.filter(t=>t.passo===0); const outras=selT.length-aIniciar.length; if(!aIniciar.length){ st({toast:'Nenhuma das selecionadas está "a iniciar". Iniciar = enviar ao cartório; só vale para certidões ainda não enviadas.'}); return; } const semOrg=aIniciar.filter(t=>!t.org); if(semOrg.length){ st({toast:semOrg.length+' das selecionadas não têm órgão vinculado — vincule antes.'}); return; } const ids=aIniciar.map(t=>t.id); const tasks=s.tasks.map(t=> ids.includes(t.id) ? {...t,passo:2,acomp:R.p2,desde:0,hist:[...t.hist,[H,'Enviada em lote (mesmo requerimento) · abre passo 2']]} : t); st({tasks,sel:{},toast:ids.length+' certidões enviadas no mesmo requerimento. Foram para Aguardando.'+(outras?' ('+outras+' selecionada(s) não eram "a iniciar" e foram ignoradas.)':'')}); },
+      vincularTodos:()=>{ const tasks=s.tasks.map(t=> (!t.org&&t.passo===0) ? {...t,org:'Registro Civil (Espanha)'} : t); st({tasks,toast:'Órgão vinculado. Agora dá pra iniciar.'}); },
+      emptyAguard:aguard.length===0, hasAguard:aguard.length>0, aguardGroups: s.aguardPor==='orgao' ? (()=>{ const ks=[],mp={}; aguard.forEach(t=>{ if(!mp[t.org]){mp[t.org]=[];ks.push(t.org);} mp[t.org].push(t); }); return ks.map(k=>{ const ck='ag|'+k; return {fam:k, pill:'Órgão', hasFam:false, pais:[...new Set(mp[k].map(t=>t.fam))].join(', '), n:mp[k].length, rows:mp[k], open:!isCol(ck), caret:isCol(ck)?'▸':'▾', toggleCol:togCol(ck)}; }); })() : byFam(aguard,'ag'), aguardPor:s.aguardPor, setAguardPor:(e)=>st({aguardPor:e.target.value}), emptyAguardTitle: q?'Nenhuma com esse filtro.':'Nada com terceiros.', emptyAguardSub: q?'Tire o filtro para ver todas.':'Inicie uma certidão na Fila (enviar ao cartório) e ela aparece aqui.', aguardRows:aguard,
+      cVenc:cnt('Vencidos'), cHoje:cnt('Hoje'), cAmanha:cnt('Amanhã'), cSemana:cnt('Próximos 7 dias'),
+      toggleDepois:()=>st({acompDepois:!s.acompDepois}), depoisLabel: s.acompDepois?'Ocultar depois de 7 dias':'Mostrar depois de 7 dias', emptyAcomp:acompBlocks.length===0, proxAcomp: future?(fmt(future.acomp)+' · '+future.passoLabel+' · '+future.pessoa):'—', acompBlocks,
+      cobrarVencidos:()=>{ const ids=acompVenc.filter(t=>t.terceiro).map(t=>t.id); const tasks=s.tasks.map(t=> ids.includes(t.id)?{...t,cob:t.cob+1,cobLast:0,acomp:R.cob,hist:[...t.hist,[H,(t.cob+1)+'ª cobrança em lote']]}:t); st({tasks,toast:ids.length+' cobranças registradas (agrupadas por órgão).'}); },
+      fams, rAtrasCol:atras.length?'#b3261e':'#1f7a4d', rAtrasCls:atras.length?'p-red':'p-grn', rVencCol:acompVenc.length?'#b26a00':'#1f7a4d', rVencCls:acompVenc.length?'p-amb':'p-grn', rEscCol:decis.length?'#b3261e':'#1f7a4d', rEscCls:decis.length?'p-red':'p-grn', rOrgCol:noOrg.length?'#b3261e':'#1f7a4d', rOrgCls:noOrg.length?'p-red':'p-grn',
+      nFeitoHoje:dHoje.length, nFeitoOntem:dOntem.length, nFeitoSem:done.length, feitoBlocks, nEnviadasHoje: s.tasks.filter(t=>t.hist.some(h=>h[0].startsWith('25/09 ')&&h[1].startsWith('Enviad'))).length,
+      noDecis:decis.length===0, decisRows:decis, ops, auditRows,
+      drawerOpen:!!dd, dTitle:dd?dd.doc:'', dPessoa:dd?dd.pessoa+' · '+dd.ger:'', dPessoaUp:dd?dd.pessoa.toUpperCase():'', dFam:dd?dd.fam:'', dStatus: dd?(dd.passo===0?'A iniciar':dd.passo===5?'Concluída':(dd.passo===2||dd.passo===3)?'Aguardando cartório':'Em andamento'):'', dStatusCls: dd?(dd.passo===5?'p-grn':(dd.prazo!==null&&dd.prazo<0)?'p-red':'p-blu'):'p-gry',
+      dPrazoTxt:dd?dd.prazoTxt:'', dPrazoSub: dd?(dd.prazo===null?'começa na confirmação do cartório':'10 dias da confirmação'):'', dOrg:dd?dd.org:'', dOrgColor: dd&&dd.org!=='não vinculado'?'#141a2b':'#8f1d17', dOrgMsg: dd?(dd.org!=='não vinculado'?dd.org:'Não vinculado — a Emissão Documental fica bloqueada até definir o órgão.'):'',
+      dGoWf:()=>st({dtab:'wf'}),dGoReg:()=>st({dtab:'reg'}),dGoAnd:()=>st({dtab:'and'}),dGoAnx:()=>st({dtab:'anx'}),dGoObs:()=>st({dtab:'obs'}),
+      dtWf:s.dtab==='wf'?'on':'',dtReg:s.dtab==='reg'?'on':'',dtAnd:s.dtab==='and'?'on':'',dtAnx:s.dtab==='anx'?'on':'',dtObs:s.dtab==='obs'?'on':'',
+      dIsWf:s.dtab==='wf',dIsReg:s.dtab==='reg',dIsAnd:s.dtab==='and',dIsAnx:s.dtab==='anx',dIsObs:s.dtab==='obs',
+      dIsNaoIniciada: !!dd && dd.passo===0, dTotal: dd&&dd.passo==='gen'?1:4, dIniciar: dd?dd.iniciar:()=>{}, dSteps, dDone, dPct: Math.round(dDone/(dd&&dd.passo==='gen'?1:4)*100)+'%', dHist: dd?[...dd.hist].reverse().map(h=>({when:h[0],t:h[1]})):[],
+      closeDrawer:()=>st({drawer:null,focus:null}), dPrev:()=>dNav(-1), dNext:()=>dNav(1),
+      focusOn, startFocus:()=>{ if(!fila.length){st({toast:'Fila vazia.'});return;} st({focus:0,drawer:fila[0].id,dtab:'wf'}); }, stopFocus:()=>st({focus:null,drawer:null}), fIdx:fi!==null?fi+1:0, fPct: fi!==null&&fila.length?Math.round((fi+1)/fila.length*100)+'%':'0%', fPrev:()=>dNav(-1), fNext:()=>dNav(1),
+      vista:s.vista, setVista:(e)=>st({vista:e.target.value}),
+      busca:s.busca, setBusca:(e)=>st({busca:e.target.value}), hasBusca:!!bq, clearBusca:()=>st({busca:''}),
+      addTransversal:()=>{ const id=7000+s.tasks.filter(t=>t.transversal).length; const nt={id,fam:'Cibils',pais:'Espanha',doc:'Tarefa transversal · pedir procuração ao requerente',pessoa:'Itiberê Barreto Cibils',ger:'G5 · requerente',passo:'gen',transversal:true,acomp:2,prazo:null,org:null,cob:0,cobLast:null,ex:false,why:'Transversal',whyCls:'p-gry',desde:0,hist:[[H,'Tarefa transversal criada por Daniela (não muda a fase)']]}; st({tasks:[...s.tasks,nt],toast:'Tarefa transversal criada na Fila (exemplo: procuração). Não muda a fase do processo.'}); },
+      colAll:()=>{ const c={}; filaFams.forEach(F=>{ c['fila|'+F.fam]=true; }); st({col:{...s.col,...c}}); }, expAll:()=>st({col:{}}),
+      toastOn:!!s.toast, toastMsg:s.toast||'', toastOff:()=>st({toast:null}),
+      note:(e)=>{ const t=(e&&e.currentTarget&&e.currentTarget.innerText||'Ação').replace(/\s+/g,' ').trim(); st({toast:'Protótipo: "'+t+'" será ligado à API na implementação.'}); }
+    };
+  }
+}
+
+window.__boot(Component);
+</script>
+</body>
+</html>
