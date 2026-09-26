@@ -189,6 +189,8 @@ async function whereFasesAnteriores(
 export interface LinhaDeFila {
   taskId: number
   titulo: string
+  /** O documento desta obrigação — fonte para abrir `DocumentoOperationalDrawer` (Etapa 3). `null` quando a tarefa não é escopada por documento. */
+  documentoId: number | null
   processoId: number | null
   processoNome: string | null
   /** Família do processo — agrupamento visual, nunca dono da tarefa. */
@@ -424,6 +426,7 @@ function projetar(
   return {
     taskId: t.id,
     titulo: t.titulo,
+    documentoId: t.documentoId ?? null,
     processoId: t.processoId,
     processoNome: t.processo?.nome ?? null,
     familiaNome: t.processo?.familia?.nome ?? null,
