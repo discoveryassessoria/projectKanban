@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -138,13 +139,7 @@ function ConteudoModal({
   }, [isOpen])
 
   // -- ESC fecha
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) onClose()
-    }
-    document.addEventListener("keydown", onEsc)
-    return () => document.removeEventListener("keydown", onEsc)
-  }, [isOpen, onClose])
+  useFecharComEsc(isOpen, onClose)
 
   // -- Salva
   const handleConfirm = async () => {

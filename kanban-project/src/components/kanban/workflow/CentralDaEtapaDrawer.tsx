@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -314,13 +315,7 @@ function ConteudoDrawer({
   }, [usuariosReq.dados])
 
   // -- ESC fecha
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) onClose()
-    }
-    document.addEventListener("keydown", onEsc)
-    return () => document.removeEventListener("keydown", onEsc)
-  }, [isOpen, onClose])
+  useFecharComEsc(isOpen, onClose)
 
   // -- PATCH wrapper. O erro do domínio chega CODIFICADO e é traduzido para uma
   //    frase operacional — nada de "veja o console" nem de nome de model na tela.

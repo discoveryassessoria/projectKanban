@@ -3,6 +3,7 @@
 "use client"
 
 import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { createPortal } from "react-dom"
@@ -435,18 +436,12 @@ function ConteudoModal({
   }, [onClose])
 
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose()
-    }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEsc)
-      document.body.style.overflow = 'auto'
-    }
-  }, [isOpen, handleClose])
+    if (!isOpen) return
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = 'auto' }
+  }, [isOpen])
+
+  useFecharComEsc(isOpen, handleClose)
 
   const handleSaveEdit = async () => {
     if (!processo) return

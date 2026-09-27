@@ -23,6 +23,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import PainelDeclarativoDaEtapa from "./PainelDeclarativoDaEtapa"
 import { useConfiguracaoDaEtapa } from "./useConfiguracaoDaEtapa"
 import { useApi } from "@/src/lib/dados"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -309,20 +310,16 @@ function EditorShell({
   footer,
   headerGradient = "var(--surface-overlay)",
 }: ShellProps) {
-  // ESC + scroll lock
+  // Scroll lock
   useEffect(() => {
     if (!isOpen) return
     const orig = document.body.style.overflow
     document.body.style.overflow = "hidden"
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    document.addEventListener("keydown", onEsc)
-    return () => {
-      document.body.style.overflow = orig
-      document.removeEventListener("keydown", onEsc)
-    }
-  }, [isOpen, onClose])
+    return () => { document.body.style.overflow = orig }
+  }, [isOpen])
+
+  // ESC fecha — só o overlay do topo (ver escape-stack.ts)
+  useFecharComEsc(isOpen, onClose)
 
   if (!isOpen) return null
 

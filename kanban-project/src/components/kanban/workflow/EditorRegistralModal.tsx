@@ -12,6 +12,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 import { CampoData } from "@/src/components/ui/campo-data"
@@ -338,20 +339,16 @@ function ConteudoModal({
     setForm({ ...form, cartorio: v, orgaoId: bateExato?.orgaoId ?? null })
   }
 
-  // -- Trava scroll body e ESC
+  // -- Trava scroll body
   useEffect(() => {
     if (!isOpen) return
     const orig = document.body.style.overflow
     document.body.style.overflow = "hidden"
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose()
-    }
-    document.addEventListener("keydown", onEsc)
-    return () => {
-      document.body.style.overflow = orig
-      document.removeEventListener("keydown", onEsc)
-    }
-  }, [isOpen, onClose])
+    return () => { document.body.style.overflow = orig }
+  }, [isOpen])
+
+  // -- ESC fecha — só o overlay do topo (ver escape-stack.ts)
+  useFecharComEsc(isOpen, onClose)
 
   // -- Validação pra "Localizar registro"
   // Todos os campos desta tela são obrigatórios para concluir a etapa, com

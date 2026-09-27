@@ -21,6 +21,7 @@
 import { useState, useEffect } from "react"
 import { X, Ban, Loader2 } from "lucide-react"
 import { createPortal } from "react-dom"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 
 // ============================================================
 // MOTIVOS — copiados do mockup (Engine.CANCEL_REASONS e INVALIDATE_REASONS)
@@ -95,12 +96,7 @@ function ConteudoModal({
   const [erro, setErro] = useState<string | null>(null)
 
   // ESC fecha
-  useEffect(() => {
-    if (!isOpen) return
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
-    document.addEventListener("keydown", onEsc)
-    return () => document.removeEventListener("keydown", onEsc)
-  }, [isOpen, onClose])
+  useFecharComEsc(isOpen, onClose)
 
   const titles: Record<Mode, string> = {
     cancel:     "CANCELAR OPERAÇÃO",

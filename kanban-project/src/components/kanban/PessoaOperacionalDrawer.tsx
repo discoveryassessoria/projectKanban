@@ -6,6 +6,7 @@ import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, Plus, Pencil, Trash2, FileText, ChevronRight, PlayCircle } from "lucide-react"
 
@@ -214,13 +215,7 @@ function ConteudoDrawer({
   }, [isOpen])
 
   // ESC fecha
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) onClose()
-    }
-    document.addEventListener("keydown", onEsc)
-    return () => document.removeEventListener("keydown", onEsc)
-  }, [isOpen, onClose])
+  useFecharComEsc(isOpen, onClose)
 
   // Stats
   const docs = pessoa?.documentos || []

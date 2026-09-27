@@ -5,6 +5,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
+import { authHeaders } from "@/src/lib/financeiro/http"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import {
   X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText,
@@ -320,6 +322,84 @@ const relativeTime = (s: string | null): string => {
 }
 
 // ============================================================
+// PROJEÇÃO OPERACIONAL — TIMEOUT ESCOPADO (27/09/2026)
+// ============================================================
+//
+// Achado real: o usuário clicava, o drawer abria, e o GET
+// operational-projection — lento sob contenção do pool Postgres (causa raiz
+// ainda não corrigida, ver relatório) — ficava pendurado sem NENHUM prazo
+// visível ao usuário. `useApi`/`buscar()` (src/lib/dados) já tem um prazo de
+// 45s, mas é compartilhado por TODA a aplicação — encurtá-lo aqui mudaria o
+// prazo de toda tela que usa `useApi`. Por isso esta ÚNICA chamada usa fetch
+// cru + AbortController, mesmo padrão de `abrirOperacao` em
+// ProcessoCentralOperacional.tsx: 15s de prazo, aviso em 5s, retry sem fechar
+// o drawer.
+export type ProjecaoOperacional = {
+  document?: Documento | null
+  workflow?: WorkflowDoDrawer | null
+  projection?: DocumentOperationalProjection | null
+}
+
+export function useProjecaoOperacional(chave: string | null) {
+  const [dados, setDados] = useState<ProjecaoOperacional | undefined>(undefined)
+  const [erro, setErro] = useState<string | null>(null)
+  const [carregando, setCarregando] = useState(false)
+  const [demorando, setDemorando] = useState(false)
+  // Fechar o drawer no meio do fetch não pode virar "setState em componente
+  // desmontado": `ConteudoDrawer` desmonta de verdade (a `key` no componente
+  // pai troca de identidade) sempre que o documento muda.
+  const vivoRef = useRef(true)
+  useEffect(() => {
+    vivoRef.current = true
+    return () => { vivoRef.current = false }
+  }, [])
+
+  const buscar = useCallback(async () => {
+    if (!chave) {
+      setDados(undefined); setErro(null); setCarregando(false); setDemorando(false)
+      return
+    }
+    setCarregando(true)
+    setErro(null)
+    setDemorando(false)
+    const ctrl = new AbortController()
+    const avisoLento = setTimeout(() => { if (vivoRef.current) setDemorando(true) }, 5000)
+    const prazo = setTimeout(() => ctrl.abort(), 15000)
+    try {
+      const res = await fetch(chave, { headers: authHeaders(), signal: ctrl.signal })
+      const corpo = await res.json().catch(() => null)
+      if (!vivoRef.current) return
+      if (!res.ok) {
+        const msg = corpo && typeof corpo === "object" && "error" in corpo
+          ? String((corpo as Record<string, unknown>).error)
+          : `Falha ao carregar (HTTP ${res.status}).`
+        setErro(msg)
+        return
+      }
+      setDados(corpo as ProjecaoOperacional)
+    } catch (e) {
+      if (!vivoRef.current) return
+      setErro(
+        (e as Error)?.name === "AbortError"
+          ? "A consulta excedeu 15 segundos."
+          : "Falha de rede ao carregar a operação."
+      )
+    } finally {
+      clearTimeout(avisoLento)
+      clearTimeout(prazo)
+      if (vivoRef.current) { setCarregando(false); setDemorando(false) }
+    }
+  }, [chave])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void buscar()
+  }, [buscar])
+
+  return { dados, erro, carregando, demorando, recarregar: buscar }
+}
+
+// ============================================================
 // COMPONENTE PRINCIPAL
 // ============================================================
 
@@ -400,11 +480,7 @@ function ConteudoDrawer({
   // função `vigente()`) SAIU: a chave da consulta é o documento, então uma resposta
   // atrasada de outro documento não tem onde ser aplicada. Era código correto
   // resolvendo, à mão, o que a chave resolve por construção.
-  const consulta = useApi<{
-    document?: Documento | null
-    workflow?: WorkflowDoDrawer | null
-    projection?: DocumentOperationalProjection | null
-  }>(
+  const consulta = useProjecaoOperacional(
     documentoId
       ? `/api/documentos/${documentoId}/operational-projection${faseInstanciaId != null ? `?workflowInstanceId=${faseInstanciaId}` : ""}`
       : null,
@@ -415,7 +491,7 @@ function ConteudoDrawer({
   const carregar = consulta.recarregar
   const erro = !documentoId
     ? "Operação sem documento associado."
-    : (consulta.erro ? "Erro ao carregar operação." : null)
+    : consulta.erro
 
   // Usuários para delegação — leitura independente, com o seu cache.
   const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>("/api/usuarios")
@@ -445,14 +521,8 @@ function ConteudoDrawer({
     }
   }, [isOpen])
 
-  // ESC fecha
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) onClose()
-    }
-    document.addEventListener("keydown", onEsc)
-    return () => document.removeEventListener("keydown", onEsc)
-  }, [isOpen, onClose])
+  // ESC fecha — só o overlay do topo (ver escape-stack.ts)
+  useFecharComEsc(isOpen, onClose)
 
   // ────────────────────────────────────────────────────────────────────────────
   // DELEGAR = TRANSFERIR A TAREFA, pela porta canônica.
@@ -554,23 +624,37 @@ function ConteudoDrawer({
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-[12px]">Carregando operação…</span>
             </div>
+            {consulta.demorando && (
+              <div className="text-[12px] text-amber-800">Está demorando mais que o normal…</div>
+            )}
             <div className="h-16 rounded-lg bg-[var(--surface-overlay)] animate-pulse" />
             <div className="h-24 rounded-lg bg-[var(--surface-overlay)] animate-pulse" />
             <div className="h-40 rounded-lg bg-[var(--surface-overlay)] animate-pulse" />
           </div>
         )}
 
-        {/* ERROR — estado terminal fechável (falha ou documentoId inválido). */}
+        {/* ERROR — estado terminal fechável (falha, timeout de 15s ou documentoId
+            inválido). Timeout/falha tem retry PRÓPRIO — não fecha o drawer. */}
         {opState === "ERROR" && (
           <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-6">
             <AlertTriangle className="w-8 h-8 text-amber-800" />
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
-            <button
-              onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] rounded-md"
-            >
-              Fechar
-            </button>
+            <div className="flex items-center gap-2">
+              {documentoId && (
+                <button
+                  onClick={() => void carregar()}
+                  className="px-3 py-1.5 text-xs font-semibold bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)] rounded-md"
+                >
+                  Tentar de novo
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="px-3 py-1.5 text-xs bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] rounded-md"
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         )}
 
