@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react'
 import useSWR from 'swr'
 
 const fetcher = async (url: string) => {
@@ -26,8 +27,20 @@ export function usePermissoes() {
     errorRetryCount: 2,
   })
 
-  const permissoes: Record<string, boolean> = data?.permissoes || {}
-  const pode = (chave: string) => !!permissoes[chave]
+  // MEMOIZADO (achado real, 27/09/2026): `data?.permissoes || {}` cria um objeto
+  // NOVO sempre que `data` ainda não chegou (o `{}` do fallback) — sem o
+  // useMemo, `pode` (abaixo) ficaria instável nesse intervalo mesmo depois do
+  // useCallback.
+  const permissoes: Record<string, boolean> = useMemo(() => data?.permissoes || {}, [data?.permissoes])
+  // MEMOIZADO: uma arrow function nova a cada chamada do hook — ou seja, a
+  // cada render de QUALQUER componente que o usa — vira uma identidade
+  // instável em quem depende dela num useEffect. Causou um loop de >18.500
+  // requisições/2min em ProcessoCentralOperacional.tsx (efeito com `[pode]`
+  // refazendo fetch a cada render, e o próprio `setState` do fetch já sendo o
+  // próximo render) e exigia um workaround manual por ref em
+  // administrator/page.tsx. `pode` só precisa mudar de identidade quando
+  // `permissoes` de fato mudar.
+  const pode = useCallback((chave: string) => !!permissoes[chave], [permissoes])
   const tipo: string | null = data?.tipo ?? null
   const userId: number | null = data?.userId ?? null
 

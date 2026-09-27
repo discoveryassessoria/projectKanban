@@ -123,9 +123,15 @@ export default function FinanceiroPage() {
 
   const handleLogout = () => { void encerrarSessao("manual") }
 
+  // `pode` (usePermissoes) não é memoizado — depender dele refazia este efeito
+  // a cada render (mesma causa do loop de /api/operacao/atribuiveis em
+  // ProcessoCentralOperacional.tsx). Aqui não gerava tempestade de fetch (só
+  // router.push condicional), mas é a mesma classe de bug — o booleano
+  // primitivo é a dependência estável.
+  const podeVerFinanceiro = pode("financeiro.ver")
   useEffect(() => {
-    if (mounted && !carregando && !pode("financeiro.ver")) router.push("/")
-  }, [mounted, carregando, pode, router])
+    if (mounted && !carregando && !podeVerFinanceiro) router.push("/")
+  }, [mounted, carregando, podeVerFinanceiro, router])
 
   if (!mounted || carregando || !pode("financeiro.ver")) {
     return (

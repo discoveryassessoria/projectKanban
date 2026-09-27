@@ -700,13 +700,24 @@ export function ProcessoCentralOperacional({
   // documentos, um seletor por linha seria quinhentas listas de gente no DOM
   // para no máximo uma ser usada. O seletor em si abre sob demanda.
   const [atribuiveis, setAtribuiveis] = useState<Array<{ id: number; nome: string }>>([])
+  // LOOP DE PRODUÇÃO (27/09/2026, achado real): `pode` (usePermissoes) não é
+  // memoizado — é uma arrow function nova a cada chamada do hook, ou seja, a
+  // cada render deste componente. Um efeito com `[pode]` nas deps refazia o
+  // fetch em TODO render; o `setAtribuiveis` do próprio fetch já É um render,
+  // então o efeito nunca parava — mais de 18.500 chamadas a
+  // /api/operacao/atribuiveis em ~2min, sozinho, sem nenhum clique, até
+  // esgotar o pool do Postgres (mesma causa da lentidão de 5-35s no
+  // operational-projection: as conexões estavam presas aqui). A permissão em
+  // si (`podeEditarTarefas`, um booleano primitivo) só muda quando o dado real
+  // muda — nunca por identidade de função.
+  const podeEditarTarefas = pode("tarefas.editar")
   useEffect(() => {
-    if (!pode("tarefas.editar")) return
+    if (!podeEditarTarefas) return
     fetch("/api/operacao/atribuiveis", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: { funcionarios?: Array<{ id: number; nome: string }> }) => setAtribuiveis(d.funcionarios ?? []))
       .catch(() => setAtribuiveis([]))
-  }, [pode])
+  }, [podeEditarTarefas])
 
   const [salvandoResp, setSalvandoResp] = useState<number | null>(null)
   const comandarTarefa = useCallback(
