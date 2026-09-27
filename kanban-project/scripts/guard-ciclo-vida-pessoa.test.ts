@@ -300,6 +300,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "Bug 1 (rodada de ajustes Operação v3, 26/09/2026): prazo da Tarefa só nasce quando " +
     "o passo 2 conclui — cria a PRÓPRIA árvore/processo (marca PRAZOCONFIRM) só no banco " +
     "de teste — a limpeza remove só o que o próprio teste criou",
+  "scripts/protocolo-obrigatorio-confirmacao.test.ts":
+    "Bug 2 (rodada de ajustes Operação v3, 26/09/2026): protocolo obrigatório pra concluir " +
+    "'Confirmar pedido' — cria a PRÓPRIA árvore/processo (marca PROTOCOLOOBRIG) só no " +
+    "banco de teste — a limpeza remove só o que o próprio teste criou",
   "scripts/mandato-financeiro-cartorio-isolado.test.ts":
     "isolamento financeiro do custo de cartório (mandato Bloco 5): cria a PRÓPRIA " +
     "árvore/pessoa (marca FINCARTORIO-TEST) só no banco de teste — a limpeza remove só o " +

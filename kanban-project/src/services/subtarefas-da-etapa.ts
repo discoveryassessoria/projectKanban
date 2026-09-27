@@ -673,6 +673,15 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
   fornecedorId?: number | null
   valores?: Record<string, unknown>
   /**
+   * A ÚNICA alternativa aceita a `protocolo`/`protocoloId` numa subtarefa
+   * `exigeProtocolo` (Bug 2, 26/09/2026) — o cartório genuinamente nunca
+   * respondeu ("ausência de retorno", já registrada pela TELA como fato
+   * antes deste clique — `StepEditors.tsx`, checkbox "sem retorno"). Nunca
+   * um bypass silencioso: só existe quando o chamador manda EXPLICITAMENTE
+   * `true`, nunca como default.
+   */
+  confirmadoSemProtocolo?: boolean
+  /**
    * QUAL subtarefa o CHAMADOR pretende concluir — quando informado, só
    * conclui de verdade se ela for de fato a CORRENTE agora. Achado real
    * 24/09/2026: sem isto, um reenvio tardio da MESMA chamada (rede
@@ -684,7 +693,7 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
    */
   subtarefaKeyEsperada?: string
 }): Promise<
-  | { aplicavel: false }
+  | { aplicavel: false; motivo?: "SUBTAREFA_INCORRETA" | "SEM_SUBTAREFA_ABERTA" | "PROTOCOLO_OBRIGATORIO" }
   | {
       aplicavel: true
       subtarefaKey: string
@@ -713,10 +722,19 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
     // concluída — estado inconsistente (corrida entre duas abas, ordem
     // fora do esperado). Recusa: nunca conclui a subtarefa ERRADA no lugar
     // da pedida.
-    return { aplicavel: false }
+    return { aplicavel: false, motivo: "SUBTAREFA_INCORRETA" }
   }
 
-  if (!corrente) return { aplicavel: false }
+  if (!corrente) return { aplicavel: false, motivo: "SEM_SUBTAREFA_ABERTA" }
+
+  // BUG 2 (rodada de ajustes Operação v3, 26/09/2026): subtarefa marcada
+  // `exigeProtocolo` (cadastro — StepSubtaskDefinition.exigeProtocolo) NUNCA
+  // conclui sem `protocolo`/`protocoloId`. Ex.: "Receber confirmação do
+  // pedido" — sem o nº do pedido do cartório, a Tarefa perde rastreamento.
+  // Checado ANTES de qualquer escrita — recusa limpa, nada fica pela metade.
+  if (corrente.definicao.exigeProtocolo && !args.protocolo?.trim() && args.protocoloId == null && args.confirmadoSemProtocolo !== true) {
+    return { aplicavel: false, motivo: "PROTOCOLO_OBRIGATORIO" }
+  }
 
   const { garantirExecucao, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
   const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
@@ -737,7 +755,14 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
     escalada: false,
     escaladaEm: null,
     ...(args.canalKey ? { canalKey: args.canalKey } : {}),
-    ...(args.protocoloId ? { protocoloId: args.protocoloId, protocolo: args.protocolo ?? null } : {}),
+    // ACHADO (Bug 2, 26/09/2026): `protocolo` (texto) só era gravado quando
+    // `protocoloId` (a referência canônica) TAMBÉM vinha — um chamador que
+    // manda só o texto (como o editor de "Confirmar pedido") nunca via o
+    // valor persistir, mesmo a validação de `exigeProtocolo` aceitando o
+    // texto sozinho como prova suficiente. Os dois agora são
+    // independentes, exatamente como o tipo desta função já declarava.
+    ...(args.protocoloId ? { protocoloId: args.protocoloId } : {}),
+    ...(args.protocolo ? { protocolo: args.protocolo } : {}),
     ...(args.fornecedorId ? { fornecedorId: args.fornecedorId } : {}),
   })
   await reconciliarSubtarefas({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })

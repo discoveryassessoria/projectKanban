@@ -1891,7 +1891,15 @@ function FormAguardarRetorno({
     setConcluindo(true)
     setFalha(null)
     if (!(await registrarProtocoloSeNecessario())) { setConcluindo(false); return }
-    const r = await patchStepComErro(documentoId, stepId, { status: "concluida", subtarefaEsperada: subtarefaKey ?? undefined })
+    // O BACKEND agora também exige protocolo nesta subtarefa (Bug 2,
+    // 26/09/2026) — manda a MESMA prova que já decide `temConfirmacaoParaConcluir`
+    // aqui na tela, pra ele nunca recusar um "sem retorno" já registrado
+    // pelo operador só porque o valor não veio neste PATCH.
+    const r = await patchStepComErro(documentoId, stepId, {
+      status: "concluida", subtarefaEsperada: subtarefaKey ?? undefined,
+      externalProtocol: numeroProtocolo.trim() || solicit.protocolo || undefined,
+      semRetorno: semRetorno || undefined,
+    })
     setConcluindo(false)
     if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
     void celebrar()

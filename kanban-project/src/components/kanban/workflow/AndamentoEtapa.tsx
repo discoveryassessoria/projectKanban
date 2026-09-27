@@ -152,11 +152,14 @@ const MENSAGEM_DO_ERRO: Record<string, string> = {
   CONCURRENT_UPDATE: "Outra pessoa alterou esta etapa enquanto você editava. Recarregue para ver o que mudou.",
   VALIDATION_ERROR: "Confira os dados informados e tente de novo.",
   INTERNAL_ERROR: "Não foi possível concluir a operação agora. Tente novamente.",
+  // Código COMPLETO (com o sufixo depois de ":") — checado antes do prefixo
+  // em `mensagemDoErro`, pra mensagens específicas por motivo (Bug 2, 26/09/2026).
+  "VALIDATION_ERROR:PROTOCOLO_OBRIGATORIO": "Número do protocolo é obrigatório para confirmar este passo.",
 }
 
 export function mensagemDoErro(codigo: string | null | undefined): string {
   if (!codigo) return MENSAGEM_DO_ERRO.INTERNAL_ERROR
-  return MENSAGEM_DO_ERRO[codigo.split(":")[0]] ?? MENSAGEM_DO_ERRO.INTERNAL_ERROR
+  return MENSAGEM_DO_ERRO[codigo] ?? MENSAGEM_DO_ERRO[codigo.split(":")[0]] ?? MENSAGEM_DO_ERRO.INTERNAL_ERROR
 }
 
 // ── Canal único de gravação do andamento ─────────────────────────────────────

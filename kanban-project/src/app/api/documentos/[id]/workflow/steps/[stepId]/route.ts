@@ -34,6 +34,8 @@ interface PatchBody {
   legalOpinion?: string | null
   /** Qual subtarefa a TELA acreditava estar concluindo — ver `concluirSubtarefaCorrentePeloPasso`. */
   subtarefaEsperada?: string | null
+  /** "Sem retorno" (Bug 2, 26/09/2026) — única alternativa a protocolo numa subtarefa `exigeProtocolo`. */
+  semRetorno?: boolean
   /** Ato ADMINISTRATIVO auditado. Exige permissão própria + motivo + justificativa. */
   forcar?: boolean
   motivo?: string | null

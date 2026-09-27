@@ -127,6 +127,12 @@ export interface SubtarefaCongelada {
   /// no schema (`StepSubtaskDefinition.definePrazoDaTarefa`).
   definePrazoDaTarefa: boolean
   prazoDaTarefaDias: number | null
+  /// Bug 2 (rodada de ajustes Operação v3, 26/09/2026): esta subtarefa NÃO
+  /// pode ser concluída sem `protocolo`/`protocoloId` preenchido — ver
+  /// `concluirSubtarefaCorrentePeloPasso` (subtarefas-da-etapa.ts). Congelado
+  /// como o resto: mudar o cadastro hoje não muda o que valia para uma
+  /// execução já materializada.
+  exigeProtocolo: boolean
   /// Os filhos DELA — os que o passo tem para si ficam no passo.
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
@@ -443,6 +449,7 @@ export async function retratarPassos(passos: PassosComFilhos, db: DB = prisma): 
       regraTemporalGatilhoChave: st.regraTemporalGatilhoChave,
       definePrazoDaTarefa: st.definePrazoDaTarefa,
       prazoDaTarefaDias: st.prazoDaTarefaDias,
+      exigeProtocolo: st.exigeProtocolo,
       acoes: st.acoes.map(congelarAcao),
       campos: st.campos.map(congelarCampo),
       checkItens: st.checkItens.map(congelarItem),

@@ -4027,6 +4027,14 @@ model StepSubtaskDefinition {
   /// definida.
   prazoDaTarefaDias   Int?
 
+  /// ═══ PROTOCOLO OBRIGATÓRIO PRA CONCLUIR (Bug 2, rodada de ajustes
+  /// Operação v3, 26/09/2026) — algumas subtarefas de espera de terceiro só
+  /// fazem sentido concluídas com o nº do pedido/protocolo do terceiro em
+  /// mãos (ex.: "Receber confirmação do pedido" — sem o protocolo do
+  /// cartório, não tem como rastrear a solicitação depois). Congelado como
+  /// o resto: ver `concluirSubtarefaCorrentePeloPasso` (subtarefas-da-etapa.ts).
+  exigeProtocolo Boolean @default(false)
+
   metadata Json?
 
   criadoEm     DateTime @default(now())

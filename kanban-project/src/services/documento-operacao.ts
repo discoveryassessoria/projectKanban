@@ -898,8 +898,19 @@ export async function atualizarPassoV2(
           // que pode já ser outra. `undefined` (chamador antigo) preserva o
           // comportamento de sempre.
           subtarefaKeyEsperada: typeof patch.subtarefaEsperada === "string" ? patch.subtarefaEsperada : undefined,
+          // "Sem retorno" (checkbox da tela, Bug 2) é a ÚNICA alternativa a
+          // protocolo numa subtarefa exigeProtocolo — só passa quando a
+          // TELA manda explicitamente `true`, nunca como default.
+          confirmadoSemProtocolo: patch.semRetorno === true,
         })
         if (!r.aplicavel) {
+          // Recusa POR FALTA DE PROTOCOLO é validação de entrada (422, com
+          // mensagem clara pra tela) — nunca um 409 genérico de "estado
+          // mudou", que a tela trataria mandando recarregar em vez de pedir
+          // o protocolo (Bug 2, 26/09/2026).
+          if (r.motivo === "PROTOCOLO_OBRIGATORIO") {
+            return { ok: false, error: "VALIDATION_ERROR:PROTOCOLO_OBRIGATORIO", status: 422 }
+          }
           return { ok: false, error: "STEP_TRANSITION_REJECTED", status: 409 }
         }
         subtarefaConcluida = r.subtarefaKey
