@@ -561,6 +561,12 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // iniciar/cobrança/escalada), 2 em StepSubtaskDefinition (prazo nasce na
   // subtarefa), 2 em SubtaskExecution (escalada), tabela nova ContatoTerceiro.
   '20260925231907_motor_prazo_acompanhamento_cobranca',
+  // Etapa B de performance (26/09/2026): 2 índices em Tarefa para o caminho
+  // quente de /api/operacao/tarefas (minhaFila/visaoGerencial).
+  '20260926190000_indices_tarefa_operacao_etapa_b',
+  // Bug 2 (rodada de ajustes Operação v3, 26/09/2026): StepSubtaskDefinition
+  // ganha exigeProtocolo — protocolo obrigatório pra concluir a subtarefa.
+  '20260927000000_exige_protocolo_subtarefa',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
