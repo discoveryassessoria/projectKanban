@@ -16,11 +16,11 @@
 
 import { rotuloDeData } from "./datas"
 import type { PermissaoChave } from "@/src/lib/permissoes"
-import type { DominioDef, QuerySpec, ValorDeFiltro } from "./tipos"
+import type { CorDeCelula, DominioDef, QuerySpec, ValorDeFiltro } from "./tipos"
 
 export interface LinhaResultado {
   id: number
-  celulas: { key: string; valor: string | number | null; link?: string | null }[]
+  celulas: { key: string; valor: string | number | null; link?: string | null; cor?: CorDeCelula | null }[]
 }
 
 export interface GrupoResultado {
@@ -135,7 +135,7 @@ export async function executar(
 
   const montar = (l: any): LinhaResultado => ({
     id: l.id,
-    celulas: colunas.map((c) => ({ key: c.key, valor: c.valor(l), link: c.link?.(l) ?? null })),
+    celulas: colunas.map((c) => ({ key: c.key, valor: c.valor(l), link: c.link?.(l) ?? null, cor: c.corDoValor?.(l) ?? null })),
   })
   const linhas = cruas.map(montar)
 

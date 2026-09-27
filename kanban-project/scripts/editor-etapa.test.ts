@@ -77,10 +77,11 @@ const aguardarPublicado = resolveWorkflowStepEditor({
 ok(aguardarPublicado.kind === "acompanhamento_retorno" && aguardarPublicado.especifico,
   "3. REGRESSÃO: aguardar_retorno_do_cartorio resolve para o editor específico (era o bug)")
 
-// 4. a chave LEGADA continua resolvendo para o mesmo editor (compat sem duplicar registro)
+// 4. a chave LEGADA (de antes da consolidação de 15/09/2026) resolve para o Step
+// único de hoje, canonizada — não para o Step antigo que não existe mais.
 const aguardarLegado = resolveWorkflowStepEditor({ stepKey: "aguardar_retorno", phaseKey: "emissao_documental" })
-ok(aguardarLegado.kind === "acompanhamento_retorno" && aguardarLegado.stepKeyCanonico === "aguardar_retorno_do_cartorio",
-  "4. chave legada resolve para o mesmo editor, canonizada")
+ok(aguardarLegado.kind === "solicitacao_cartorio" && aguardarLegado.stepKeyCanonico === "solicitar_certidao",
+  "4. chave legada resolve para o Step consolidado, canonizada")
 
 // 5. resolver NUNCA devolve ausência de editor
 const amostras = ["", "x", "AGUARDAR RETORNO DO CARTÓRIO", "protocolar", "montar_dossie", "qualquer_coisa"]
@@ -106,17 +107,22 @@ ok(kinds.every((k) => APRESENTACAO_EDITOR[k] && APRESENTACAO_EDITOR[k].titulo.le
 // ════════════════════════════════════════════════════════════════
 console.log("\n(A) Catálogo × passo publicado:")
 
+// Consolidação de 15/09/2026 (doc 29): Emissão Documental tem UM Step só
+// ("solicitar_certidao", peso 100), com a confirmação do pedido vivendo como
+// SUBTAREFA dele — ver src/lib/process-stage/subtarefa-confirmacao-pedido.ts,
+// verificado em produção (27/09/2026). Os testes 8-11 checavam a estrutura de
+// ANTES da consolidação (5 Steps); atualizados para a estrutura real de hoje.
 const emissao = FASES.EMISSAO_DOCUMENTAL
-const passoAguardar = emissao.steps.find((s) => s.stepKey === "aguardar_retorno_do_cartorio")
-ok(!!passoAguardar, "8. o catálogo declara a chave PUBLICADA aguardar_retorno_do_cartorio")
-ok(passoAguardar?.title === "Aguardar retorno do cartório" && passoAguardar?.weight === 10 && passoAguardar?.slaDays === 15,
+const passoSolicitar = emissao.steps.find((s) => s.stepKey === "solicitar_certidao")
+ok(emissao.steps.length === 1 && !!passoSolicitar, "8. o catálogo declara o Step único publicado solicitar_certidao")
+ok(passoSolicitar?.title === "Solicitar certidão" && passoSolicitar?.weight === 100 && passoSolicitar?.slaDays === 10,
   "9. título, peso e SLA do passo voltam a ser encontrados (não caem no default)")
 
-ok(getStepDef("EMISSAO_DOCUMENTAL", "aguardar_retorno")?.stepKey === "aguardar_retorno_do_cartorio" &&
-   getStepDef("EMISSAO_DOCUMENTAL", "aguardar_retorno_do_cartorio")?.weight === 10,
-  "10. getStepDef acha a definição tanto pela chave legada quanto pela publicada")
+ok(getStepDef("EMISSAO_DOCUMENTAL", "aguardar_retorno")?.stepKey === "solicitar_certidao" &&
+   getStepDef("EMISSAO_DOCUMENTAL", "aguardar_retorno")?.weight === 100,
+  "10. getStepDef acha o Step consolidado pela chave legada (alias aponta pro Step único de hoje)")
 
-ok(resolveStepKeyCompat("emissao_documental", "aguardar_retorno_do_cartorio") === "aguardar_retorno_do_cartorio",
+ok(resolveStepKeyCompat("emissao_documental", "solicitar_certidao") === "solicitar_certidao",
   "11. canonizar a chave publicada é idempotente")
 
 // os stepKeys do catálogo não podem sair do registro sem editor — cobertura declarada

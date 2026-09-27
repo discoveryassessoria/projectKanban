@@ -246,8 +246,23 @@ export function phaseKeyToFaseCode(phaseKey: string | null | undefined): FaseCod
 const STEP_KEY_ALIASES: Record<string, Record<string, string>> = {
   // Genealogia UNIFICADA: o passo canônico é "localizar_registro" (sem alias). O
   // workflow interno publicado, o editor e a execução usam exatamente este stepKey.
+  //
+  // EMISSÃO DOCUMENTAL — consolidação de 15/09/2026 (doc 29, "4 passos
+  // operacionais"): os 5 Steps antigos viraram UM Step só ("solicitar_certidao",
+  // peso 100). O alvo deste alias ficou apontando para um Step que não existe
+  // mais no catálogo ("aguardar_retorno_do_cartorio" era um dos 5 antigos) —
+  // `getStepDef("EMISSAO_DOCUMENTAL", "aguardar_retorno")` caía no miss
+  // silencioso que o comentário dele descreve (title=stepKey, weight=1,
+  // slaDays=1). Corrigido para o Step único real.
+  //
+  // "aguardar_retorno_do_cartorio" em si NÃO entra aqui: `step-editor-registry.ts`
+  // já tem entrada própria e direta para essa chave (linha ~68), e ela nunca foi
+  // usada em produção (verificado 27/09/2026 — ver
+  // src/lib/process-stage/subtarefa-confirmacao-pedido.ts) — sem motivo para
+  // redirecioná-la e arriscar um consumidor que dependa dela continuar apontando
+  // pro editor específico certo.
   emissao_documental: {
-    aguardar_retorno: "aguardar_retorno_do_cartorio", // rename do mesmo passo
+    aguardar_retorno: "solicitar_certidao",
   },
 }
 

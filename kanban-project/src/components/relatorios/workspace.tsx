@@ -28,7 +28,16 @@ interface Meta {
   ordenacaoPadrao: { key: string; direcao: "asc" | "desc" }
   visoesDoSistema: { key: string; nome: string; spec: QuerySpec }[]
 }
-interface Linha { id: number; celulas: { key: string; valor: string | number | null; link?: string | null }[] }
+type CorDeCelula = "vermelho" | "amarelo" | "verde" | "cinza"
+interface Linha { id: number; celulas: { key: string; valor: string | number | null; link?: string | null; cor?: CorDeCelula | null }[] }
+
+/** As 4 cores semânticas do motor — a mesma leitura em toda tela que colorir célula. */
+const COR_CELULA: Record<CorDeCelula, string> = {
+  vermelho: "text-red-700 font-medium",
+  amarelo: "text-amber-700 font-medium",
+  verde: "text-green-700",
+  cinza: "text-[var(--text-muted)]",
+}
 interface Resultado {
   total: number; pagina: number; porPagina: number; grain: string
   colunas: { key: string; rotulo: string; alinhamento?: string }[]
@@ -189,7 +198,7 @@ export function Workspace({ dominioKey, nacionalidade = null }: { dominioKey: st
               <td key={c.key} className={`px-3 py-1.5 ${res?.colunas[i]?.alinhamento === "direita" ? "text-right tabular-nums" : ""}`}>
                 {c.link
                   ? <a href={c.link} className="text-[var(--action-primary)] hover:underline">{c.valor ?? "—"}</a>
-                  : <span className="text-[var(--text-primary)]">{c.valor ?? "—"}</span>}
+                  : <span className={c.cor ? COR_CELULA[c.cor] : "text-[var(--text-primary)]"}>{c.valor ?? "—"}</span>}
               </td>
             ))}
           </tr>

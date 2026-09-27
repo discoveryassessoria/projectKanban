@@ -14,11 +14,32 @@
 // documento entregue é uma das colunas.
 
 import { prisma } from "@/lib/prisma"
-import type { DominioDef } from "../tipos"
+import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
+import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/subtarefa-confirmacao-pedido"
+import type { CorDeCelula, DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, periodo, porCampo } from "./_comuns"
 
 /** A categoria que define "certidão" — do Cadastro Mestre, não do nome. */
 export const CATEGORIA_CERTIDAO = "REGISTRO_CIVIL"
+
+const STEP_KEY_SOLICITAR_CERTIDAO = "solicitar_certidao"
+
+/**
+ * A SITUAÇÃO DO PRAZO, em 4 estados (achado real, rodada "Relatório de
+ * Certidões" 27/09/2026). Reaproveita `estadoTemporal` — o núcleo canônico
+ * de `Tarefa.dataPrazo` ("uma régua, uma frase" — a mesma que Central
+ * Operacional e Minha Fila usam — nunca uma segunda conta de dias aqui.
+ * Só a BUCKETIZAÇÃO em 4 rótulos fixos (o que o relatório pediu) é nova.
+ */
+export function situacaoDoPrazo(t: { dataPrazo: Date | null; dataConclusao: Date | null; statusTarefa: string | null } | null):
+  { rotulo: string; cor: CorDeCelula } {
+  if (!t) return { rotulo: "Sem prazo", cor: "cinza" }
+  const et = estadoTemporal({ dataPrazo: t.dataPrazo, dataConclusao: t.dataConclusao, statusTarefa: t.statusTarefa })
+  if (et.semPrazo) return { rotulo: "Sem prazo", cor: "cinza" }
+  if (et.atrasado) return { rotulo: "Vencido", cor: "vermelho" }
+  if (et.diasParaPrazo != null && et.diasParaPrazo <= 7) return { rotulo: "Vence em até 7 dias", cor: "amarelo" }
+  return { rotulo: "No prazo", cor: "verde" }
+}
 
 const STATUS = ["PENDENTE", "EM_ATENDIMENTO", "ATENDIDA", "NAO_LOCALIZADA", "DISPENSADA"] as const
 
@@ -29,7 +50,7 @@ const INCLUDE = {
       tiposDocumento: { select: { name: true, categoriaDocumental: { select: { code: true, name: true } } } },
     },
   },
-  pessoa: { select: { id: true, nome: true, sobrenome: true, arvoreId: true } },
+  pessoa: { select: { id: true, nome: true, sobrenome: true, arvoreId: true, numeroLinhagem: true } },
   processo: {
     select: {
       id: true, codigo: true, nome: true, faseAtualKey: true,
@@ -40,13 +61,36 @@ const INCLUDE = {
   documentos: {
     select: {
       id: true, status: true, cartorio: true, data_emissao: true, traduzido: true, apostilado: true,
-      orgao: { select: { id: true, name: true, pais: { select: { countryLabel: true } } } },
+      orgao: { select: { id: true, name: true, city: true, state: true, pais: { select: { countryLabel: true } } } },
       solicitacoes: {
         select: {
           id: true, status: true, dataEnvio: true, previsaoRetorno: true, custoPago: true,
           canal: true, orgao: { select: { name: true } }, criadoPor: { select: { nome: true } },
         },
         orderBy: { id: "desc" as const }, take: 1,
+      },
+      // RESPONSÁVEL E PRAZO — da TAREFA vinculada (fonte única de
+      // responsável/prazo, ver ownership-canonico-tarefa), não do Documento.
+      tarefasVinculadas: {
+        select: { id: true, dataPrazo: true, dataConclusao: true, statusTarefa: true, responsavel: { select: { nome: true } } },
+        take: 1,
+      },
+      // CONFIRMAÇÃO DO PEDIDO — a subtarefa "Receber confirmação do pedido"
+      // dentro do Step único "Solicitar certidão" (4 subtarefas, 1 Step desde
+      // a consolidação de 15/09/2026). Casa pelo PAPEL SEMÂNTICO da subtarefa
+      // (CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), nunca uma string solta — ver
+      // src/lib/process-stage/subtarefa-confirmacao-pedido.ts.
+      stepInstances: {
+        where: { stepKey: STEP_KEY_SOLICITAR_CERTIDAO },
+        select: {
+          execucoesDeSubtarefa: {
+            where: { subtaskKey: { in: [...CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO] as string[] }, status: "CONCLUIDO" },
+            orderBy: { sequencia: "desc" as const },
+            take: 1,
+            select: { completedAt: true, protocolo: true, protocoloRef: { select: { numeroProtocolo: true } } },
+          },
+        },
+        take: 1,
       },
     },
     take: 1,
@@ -55,6 +99,8 @@ const INCLUDE = {
 
 const doc = (l: any) => l.documentos?.[0] ?? null
 const sol = (l: any) => doc(l)?.solicitacoes?.[0] ?? null
+const tarefaDoDoc = (l: any) => doc(l)?.tarefasVinculadas?.[0] ?? null
+const confirmacao = (l: any) => doc(l)?.stepInstances?.[0]?.execucoesDeSubtarefa?.[0] ?? null
 
 /** Só necessidades cujo item pertence à categoria de registro civil. */
 const SO_CERTIDAO = {
@@ -108,6 +154,42 @@ export const DOMINIO_CERTIDOES: DominioDef = {
         ? { documentos: { some: { solicitacoes: { some: { canal: { in: v.valores as never } } } } } } : null) },
     { key: "pessoa", rotulo: "Pessoa (nome contém)", tipo: "texto",
       paraWhere: (v) => (v.tipo === "texto" && v.texto.trim() ? { pessoa: { nome: { contains: v.texto.trim(), mode: "insensitive" } } } : null) },
+    { key: "confirmado_em", rotulo: "Confirmado em", tipo: "intervalo_data",
+      descricao: "Quando a subtarefa \"Receber confirmação do pedido\" concluiu — não a data do envio.",
+      paraWhere: (v) => {
+        const p = periodo("completedAt", v)
+        if (!p) return null
+        return {
+          documentos: { some: { stepInstances: { some: {
+            stepKey: STEP_KEY_SOLICITAR_CERTIDAO,
+            execucoesDeSubtarefa: { some: { subtaskKey: { in: [...CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO] as string[] }, status: "CONCLUIDO", ...p } },
+          } } } },
+        }
+      } },
+    { key: "responsavel", rotulo: "Responsável", tipo: "entidade", opcoes: cadastro("usuarios"),
+      paraWhere: (v) => (v.tipo === "entidade"
+        ? { documentos: { some: { tarefasVinculadas: { some: { responsavelId: v.id } } } } } : null) },
+    { key: "situacao_prazo", rotulo: "Situação do prazo", tipo: "multi_selecao",
+      descricao: "Calendário simples (hoje ± N dias) — não os dias úteis da régua operacional completa.",
+      opcoes: { tipo: "catalogo", valores: [
+        { valor: "VENCIDO", rotulo: "Vencido" },
+        { valor: "VENCE_7", rotulo: "Vence em até 7 dias" },
+        { valor: "NO_PRAZO", rotulo: "No prazo" },
+        { valor: "SEM_PRAZO", rotulo: "Sem prazo" },
+      ] },
+      paraWhere: (v) => {
+        if (v.tipo !== "multi_selecao" || !v.valores.length) return null
+        const hoje = new Date()
+        const em7 = new Date(); em7.setDate(em7.getDate() + 7)
+        const clausulaPorBucket: Record<string, Record<string, unknown>> = {
+          VENCIDO: { dataPrazo: { lt: hoje }, dataConclusao: null },
+          VENCE_7: { dataPrazo: { gte: hoje, lte: em7 }, dataConclusao: null },
+          NO_PRAZO: { dataPrazo: { gt: em7 }, dataConclusao: null },
+          SEM_PRAZO: { dataPrazo: null },
+        }
+        const ou = v.valores.map((b) => clausulaPorBucket[b]).filter(Boolean)
+        return ou.length ? { documentos: { some: { tarefasVinculadas: { some: { OR: ou } } } } } : null
+      } },
   ],
 
   agrupamentos: [
@@ -152,14 +234,37 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     { key: "apostilada", rotulo: "Apostilada", valor: (l) => (doc(l) ? (doc(l).apostilado ? "sim" : "não") : null) },
     { key: "motivo", rotulo: "Por que é exigida", valor: (l) => l.motivoAplicabilidade ?? null },
     { key: "fase", rotulo: "Fase do processo", valor: (l) => l.processo?.faseAtualKey ?? null },
+    { key: "protocolo", rotulo: "Nº protocolo",
+      valor: (l) => { const c = confirmacao(l); return c?.protocoloRef?.numeroProtocolo ?? c?.protocolo ?? null } },
+    { key: "confirmado_em", rotulo: "Confirmado em", valor: (l) => dataBR(confirmacao(l)?.completedAt) },
+    { key: "prazo", rotulo: "Prazo", valor: (l) => dataBR(tarefaDoDoc(l)?.dataPrazo ?? null) },
+    { key: "situacao_prazo", rotulo: "Situação do prazo",
+      valor: (l) => situacaoDoPrazo(tarefaDoDoc(l)).rotulo,
+      corDoValor: (l) => situacaoDoPrazo(tarefaDoDoc(l)).cor },
+    // Chave DIFERENTE de "responsavel" (linha acima, "Solicitada por" — quem
+    // CRIOU o registro de solicitação): este é quem tem a Tarefa AGORA, a
+    // fonte única de responsável (ownership-canonico-tarefa).
+    { key: "responsavel_tarefa", rotulo: "Responsável", valor: (l) => tarefaDoDoc(l)?.responsavel?.nome ?? null },
+    { key: "geracao", rotulo: "Geração", valor: (l) => (l.pessoa?.numeroLinhagem != null ? `G${l.pessoa.numeroLinhagem}` : null) },
+    { key: "orgao_municipio_uf", rotulo: "Município/UF do órgão",
+      valor: (l) => { const o = doc(l)?.orgao; const t = [o?.city, o?.state].filter(Boolean).join("/"); return t || null } },
   ],
 
   ordenacoes: [
     { key: "criacao", rotulo: "Criação da necessidade", orderBy: (d) => [{ createdAt: d }, { id: d }] },
     { key: "status", rotulo: "Situação", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
+    // FAMÍLIA → GERAÇÃO: os dois primeiros níveis pedidos pela visão "Certidões
+    // solicitadas no período". "Confirmado em" como 3º critério NÃO é possível
+    // aqui: vive 2 relações "muitos" abaixo (Documento → StepInstance →
+    // SubtaskExecution) e o Prisma não ordena `findMany` por campo de relação
+    // to-many aninhada duas vezes — só por `_count`. Com a confirmação ainda
+    // zerada em toda a produção (verificado 27/09/2026), o impacto prático
+    // hoje é nulo; registrado como limitação, não escondido.
+    { key: "familia_geracao", rotulo: "Família e geração",
+      orderBy: (d) => [{ processo: { familia: { nome: d } } }, { pessoa: { numeroLinhagem: d } }, { id: "asc" as const }] },
   ],
 
-  filtrosPrincipais: ["status", "tipo", "periodo_solicitacao", "orgao_emissor"],
+  filtrosPrincipais: ["status", "tipo", "periodo_solicitacao", "confirmado_em", "orgao_emissor"],
   colunasIniciais: ["tipo", "status", "pessoa", "familia", "processo", "orgao", "solicitada_em", "atraso_dias"],
   ordenacaoPadrao: { key: "criacao", direcao: "desc" },
 
@@ -170,21 +275,43 @@ export const DOMINIO_CERTIDOES: DominioDef = {
       orderBy, skip: pular, take: levar, include: INCLUDE,
     }),
 
-  visoesDoSistema: [
-    { key: "faltantes", nome: "Certidões faltantes",
-      spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao", valores: ["PENDENTE"] } }] } },
-    { key: "em-atendimento", nome: "Em atendimento",
-      spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao", valores: ["EM_ATENDIMENTO"] } }] } },
-    { key: "nao-localizadas", nome: "Não localizadas",
-      spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao", valores: ["NAO_LOCALIZADA"] } }] } },
-    { key: "atrasadas", nome: "Com retorno vencido",
-      spec: { filtros: [{ key: "atrasada", valor: { tipo: "booleano", valor: true } }] } },
-    { key: "nao-solicitadas", nome: "Pendentes ainda não solicitadas",
-      spec: { filtros: [
-        { key: "status", valor: { tipo: "multi_selecao", valores: ["PENDENTE"] } },
-        { key: "solicitada", valor: { tipo: "booleano", valor: false } },
-      ] } },
-    { key: "por-orgao", nome: "Por órgão emissor", spec: { filtros: [], agruparPor: "orgao" } },
-    { key: "por-familia", nome: "Por família", spec: { filtros: [], agruparPor: "familia" } },
-  ],
+  // GETTER (não array estático): "Certidões solicitadas no período" precisa do
+  // mês ATUAL, recalculado a cada consulta a /api/relatorios/meta — um array
+  // fixo congelaria a data de quando o servidor subiu. As demais visões não
+  // dependem de data e continuam idênticas a cada leitura.
+  get visoesDoSistema() {
+    const hoje = new Date()
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10)
+    const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().slice(0, 10)
+    return [
+      { key: "faltantes", nome: "Certidões faltantes",
+        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["PENDENTE"] } }] } },
+      { key: "em-atendimento", nome: "Em atendimento",
+        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["EM_ATENDIMENTO"] } }] } },
+      { key: "nao-localizadas", nome: "Não localizadas",
+        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["NAO_LOCALIZADA"] } }] } },
+      { key: "atrasadas", nome: "Com retorno vencido",
+        spec: { filtros: [{ key: "atrasada", valor: { tipo: "booleano" as const, valor: true } }] } },
+      { key: "nao-solicitadas", nome: "Pendentes ainda não solicitadas",
+        spec: { filtros: [
+          { key: "status", valor: { tipo: "multi_selecao" as const, valores: ["PENDENTE"] } },
+          { key: "solicitada", valor: { tipo: "booleano" as const, valor: false } },
+        ] } },
+      { key: "por-orgao", nome: "Por órgão emissor", spec: { filtros: [], agruparPor: "orgao" } },
+      { key: "por-familia", nome: "Por família", spec: { filtros: [], agruparPor: "familia" } },
+      // VISÃO PADRÃO pedida (rodada "Relatório de Certidões", 27/09/2026):
+      // Confirmado em = mês atual (ajustável depois de abrir), agrupada por
+      // Família, colunas na ordem pedida, ordenada por família → geração (o
+      // 3º critério — confirmado em — não é possível via Prisma orderBy
+      // aninhado; ver comentário na ordenação "familia_geracao").
+      { key: "certidoes-solicitadas-periodo", nome: "Certidões solicitadas no período",
+        spec: {
+          filtros: [{ key: "confirmado_em", valor: { tipo: "intervalo_data" as const, de: inicioMes, ate: fimMes } }],
+          agruparPor: "familia",
+          colunas: ["confirmado_em", "pessoa", "geracao", "tipo", "protocolo", "orgao", "orgao_municipio_uf", "prazo", "responsavel_tarefa"],
+          ordenarPor: "familia_geracao",
+          direcao: "asc" as const,
+        } },
+    ]
+  },
 }

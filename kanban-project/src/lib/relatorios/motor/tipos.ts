@@ -77,6 +77,9 @@ export type ValorDeFiltro =
   | { tipo: "multi_selecao"; valores: string[]; rotulos?: string[] }
   | { tipo: "entidade"; id: number; rotulo?: string }
 
+/** As 4 cores semânticas que o motor conhece — nunca uma quinta sem pedido explícito. */
+export type CorDeCelula = "vermelho" | "amarelo" | "verde" | "cinza"
+
 export interface ColunaDef {
   key: string
   rotulo: string
@@ -87,6 +90,13 @@ export interface ColunaDef {
   alinhamento?: "esquerda" | "direita"
   /** Coluna numérica que faz sentido somar no rodapé de um grupo. */
   somavel?: boolean
+  /**
+   * A COR SEMÂNTICA da célula, quando o valor É um estado (vencido/no prazo,
+   * bloqueado/livre) — nunca decoração. Declarada aqui, não inventada na tela:
+   * é o mesmo texto que decide a cor no CSV/Excel/PDF (que não têm cor — mas
+   * têm o MESMO texto, então a leitura nunca diverge entre tela e exportação).
+   */
+  corDoValor?: (linha: any) => CorDeCelula | null
   /**
    * PERMISSÃO ALÉM DA DO DOMÍNIO. Um domínio expõe UMA permissão, mas nem toda
    * coluna dele pertence ao mesmo assunto: "Certidões" abre com `processos.ver`
