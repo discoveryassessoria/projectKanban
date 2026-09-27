@@ -134,9 +134,26 @@ function headers(): HeadersInit {
 
 export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
   const [cfg, setCfg] = useState<ConfiguracaoDaEtapa | null>(null)
-  const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [recarga, setRecarga] = useState(0)
+  // JANELA DE FALSO-NEGATIVO (achado real, 27/09/2026): `carregando` era um
+  // `useState(false)` separado, só virando `true` DENTRO do microtask abaixo.
+  // No PRIMEIRO render depois de `stepInstanceId` passar de `null` para um id
+  // real, esse `setState(true)` ainda não tinha rodado — `carregando` lia
+  // `false` e `subtarefas` lia `[]` (nada carregado ainda), e
+  // `EditorPorSubtarefaCorrente` (StepEditors.tsx) concluía "esta etapa
+  // definitivamente não tem subtarefas", abrindo o editor ERRADO (o kind do
+  // PASSO, não da subtarefa). Um render depois, `carregando` virava `true` de
+  // verdade e o editor errado sumia — visualmente "abre e fecha sozinho" ao
+  // clicar em "Iniciar" (Central Operacional, Emissão Documental).
+  //
+  // Fix: `carregando` deixa de ser estado solto — é DERIVADO de "a resposta
+  // que temos é para ESTA consulta (id + recarga)?". Sem essa combinação
+  // resolvida, é sempre carregando — nenhuma janela em que "ainda não
+  // perguntei" pareça "perguntei e não tem nada".
+  const [chaveResolvida, setChaveResolvida] = useState<string | null>(null)
+  const chaveAtual = stepInstanceId != null ? `${stepInstanceId}:${recarga}` : null
+  const carregando = chaveAtual != null && chaveResolvida !== chaveAtual
 
   useEffect(() => {
     // A carga sai do corpo do efeito: chamar direto faria o primeiro `setState`
@@ -145,8 +162,7 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
     let vivo = true
     void Promise.resolve().then(async () => {
       if (!vivo) return
-      if (!stepInstanceId) { setCfg(null); setCarregando(false); return }
-      setCarregando(true)
+      if (!stepInstanceId) { setCfg(null); setChaveResolvida(null); return }
       setErro(null)
       try {
         const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/execucao`, { headers: headers() })
@@ -173,7 +189,7 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
       } catch {
         if (vivo) { setErro("Erro de conexão ao carregar a etapa."); setCfg(null) }
       } finally {
-        if (vivo) setCarregando(false)
+        if (vivo) setChaveResolvida(`${stepInstanceId}:${recarga}`)
       }
     })
     return () => { vivo = false }
