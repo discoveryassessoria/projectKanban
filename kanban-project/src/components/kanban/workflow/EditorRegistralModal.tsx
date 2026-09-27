@@ -37,6 +37,8 @@ interface Documento {
   comune?: string | null
   cartorio?: string | null
   orgao_emissor?: string | null
+  /** Bug 3 (26/09/2026) — vínculo estruturado com Órgãos e Organizações, resolvido via a ponte Cartório→Órgão pra cartórios brasileiros. */
+  orgaoId?: number | null
 
   // Referência registral
   livro?: string | null
@@ -135,6 +137,8 @@ interface FormState {
   comune: string
   cartorio: string
   orgao_emissor: string
+  /** Bug 3 (26/09/2026) — resolvido em silêncio ao escolher um cartório brasileiro da Base de Cartórios; `null` = estrangeiro OU gap real de cadastro. */
+  orgaoId: number | null
 
   // Referência
   livro: string
@@ -169,6 +173,7 @@ const emptyForm = (): FormState => ({
   comune: "",
   cartorio: "",
   orgao_emissor: "",
+  orgaoId: null,
   livro: "",
   folha: "",
   termo: "",
@@ -199,6 +204,7 @@ const docToForm = (doc: Documento): FormState => ({
   comune: doc.comune || "",
   cartorio: doc.cartorio || "",
   orgao_emissor: doc.orgao_emissor || "",
+  orgaoId: doc.orgaoId ?? null,
   livro: doc.livro || "",
   folha: doc.folha || "",
   termo: doc.termo || "",
@@ -315,10 +321,22 @@ function ConteudoModal({
   // BASE NACIONAL DE CARTÓRIOS (Registro Civil, sincronizada — ver
   // CartorioSyncService/16-09-2026): sempre disponível, sem apikey, sem
   // depender de nenhum serviço externo em tempo real — busca é na base LOCAL.
-  const cartoriosReq = useApi<{ cartorios?: Array<{ id: number; nome: string; municipio: string; endereco: string | null }> }>(
+  const cartoriosReq = useApi<{ cartorios?: Array<{ id: number; nome: string; municipio: string; endereco: string | null; orgaoId: number | null }> }>(
     ufSigla ? `/api/cartorios?uf=${encodeURIComponent(ufSigla)}${form.cidade_registro ? `&municipio=${encodeURIComponent(form.cidade_registro)}` : ""}&limit=100` : null,
   )
   const cartoriosDaApi = cartoriosReq.dados?.cartorios ?? []
+
+  // BUG 3 (26/09/2026) — PONTE Cartório→Órgão. "Cartório" continua um campo
+  // de texto com sugestões (<datalist>, nunca um <select> — cartório fora da
+  // base sincronizada segue digitável); ao digitar/escolher um nome que bate
+  // EXATO com um cartório da base filtrada (já por UF+município, então
+  // seguro), resolve o `orgaoId` que `/api/cartorios` já trouxe pronto —
+  // nenhuma chamada nova por seleção. Nome sem match exato (estrangeiro,
+  // digitado à mão, ou fora da base) sempre volta pra `orgaoId: null`.
+  const aoMudarCartorio = (v: string) => {
+    const bateExato = ehBrasil ? cartoriosDaApi.find((c) => c.nome === v) : undefined
+    setForm({ ...form, cartorio: v, orgaoId: bateExato?.orgaoId ?? null })
+  }
 
   // -- Trava scroll body e ESC
   useEffect(() => {
@@ -344,13 +362,18 @@ function ConteudoModal({
   const estadoOk = ehBrasil ? form.estado_registro.trim().length > 0 : true
   const cidadeOk = form.cidade_registro.trim().length > 0
   const cartorioOk = form.cartorio.trim().length > 0
+  // BUG 3 (26/09/2026) — cartório BRASILEIRO sem órgão mapeado bloqueia a
+  // conclusão (gap de cadastro real, nunca silencioso); fora do Brasil o
+  // vínculo estruturado ainda não existe (ver investigação), então não se
+  // exige — a mesma régua de sempre (texto livre) continua valendo lá.
+  const orgaoOk = ehBrasil ? (!cartorioOk || form.orgaoId != null) : true
   const livroOk = form.livro.trim().length > 0
   const folhaOk = form.folha.trim().length > 0
   const termoOk = form.termo.trim().length > 0
   const numeroRegistroOk = form.numero_registro.trim().length > 0
   const dataEventoOk = form.data_evento.trim().length > 0
   const podeConcluirEtapa =
-    nomeRegistradoOk && estadoOk && cidadeOk && cartorioOk &&
+    nomeRegistradoOk && estadoOk && cidadeOk && cartorioOk && orgaoOk &&
     livroOk && folhaOk && termoOk && numeroRegistroOk && dataEventoOk
 
   // -- Salvar (e opcionalmente concluir etapa)
@@ -364,6 +387,7 @@ function ConteudoModal({
         !estadoOk && "Estado",
         !cidadeOk && "Cidade",
         !cartorioOk && "Cartório",
+        !orgaoOk && `Cartório "${form.cartorio}" sem órgão mapeado — contate o administrador (Gerenciamento → Órgãos e Organizações)`,
         !livroOk && "Livro",
         !folhaOk && "Folha",
         !termoOk && "Termo",
@@ -392,6 +416,7 @@ function ConteudoModal({
         comune: form.comune.trim() || null,
         cartorio: form.cartorio.trim() || null,
         orgao_emissor: form.orgao_emissor.trim() || null,
+        orgaoId: form.orgaoId,
 
         livro: form.livro.trim() || null,
         folha: form.folha.trim() || null,
@@ -698,10 +723,17 @@ function ConteudoModal({
                       label="Cartório"
                       requiredToComplete={isModoBuscar}
                       value={form.cartorio}
-                      onChange={(v) => setForm({ ...form, cartorio: v })}
+                      onChange={aoMudarCartorio}
                       colSpan={2}
                       list={ehBrasil ? "cartorios-sugeridos" : undefined}
                     />
+                    {ehBrasil && form.cartorio.trim() && (
+                      <div className={`col-span-2 text-[10.5px] ${form.orgaoId ? "text-[var(--success-text)]" : "text-[var(--warning-text)]"}`}>
+                        {form.orgaoId
+                          ? "✓ Órgão emissor vinculado automaticamente."
+                          : "Cartório sem órgão mapeado no cadastro de Órgãos e Organizações ainda — escolha um da lista sugerida, ou contate o administrador."}
+                      </div>
+                    )}
                     {ehBrasil && (
                       <datalist id="cartorios-sugeridos">
                         {cartoriosDaApi.map((c) => (

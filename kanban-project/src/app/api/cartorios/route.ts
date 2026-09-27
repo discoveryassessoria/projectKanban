@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { normalizarNome } from "@/src/services/cartorios/cartorio-sync-service"
+import { identidadeCompostaDoCartorio } from "@/src/lib/cartorio-bridge"
 import type { Prisma } from "@prisma/client"
 
 const LIMITE_PADRAO = 30
@@ -55,8 +56,21 @@ export async function GET(req: NextRequest) {
     }),
   ])
 
+  // ORGAO JÁ MAPEADO (Bug 3, 26/09/2026) — a mesma identidade composta
+  // (nome + município/UF) que a ponte usa pra resolver, numa consulta em
+  // lote nunca uma por linha. `null` = cartório sem OrgaoProtocolo
+  // cadastrado ainda (gap de dado real, não erro).
+  const identidades = cartorios.map((c) => identidadeCompostaDoCartorio(c))
+  const orgaos = identidades.length
+    ? await prisma.orgaoProtocolo.findMany({ where: { name: { in: identidades } }, select: { id: true, name: true } })
+    : []
+  const orgaoIdPorIdentidade = new Map(orgaos.map((o) => [o.name, o.id]))
+  const cartoriosComOrgao = cartorios.map((c) => ({
+    ...c, orgaoId: orgaoIdPorIdentidade.get(identidadeCompostaDoCartorio(c)) ?? null,
+  }))
+
   return NextResponse.json({
-    cartorios,
+    cartorios: cartoriosComOrgao,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   })
 }

@@ -185,6 +185,27 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // BUG 3 (26/09/2026) — cartório BRASILEIRO precisa de `orgaoId` vinculado
+    // PRA CONCLUIR "Localizar registro" — nunca pra salvar um rascunho no
+    // meio do preenchimento. `body.status === "SOLICITAR"` é o MESMO sinal
+    // que `EditorRegistralModal.tsx` já usa pra saber que está concluindo
+    // (`isModoBuscar && podeConcluirEtapa`) — mesma régua de Bug 2
+    // (validar na CONCLUSÃO, nunca em toda escrita intermediária): um
+    // documento que já tinha esse gap antes desta regra continua editável
+    // em qualquer outro campo, só não avança de status sem resolver.
+    if (body.status === "SOLICITAR") {
+      const cartorioFinal = body.cartorio !== undefined ? body.cartorio : documentoAtual.cartorio
+      const paisRegistroFinal = body.pais_registro !== undefined ? body.pais_registro : documentoAtual.pais_registro
+      const orgaoIdFinal = body.orgaoId !== undefined ? body.orgaoId : documentoAtual.orgaoId
+      const cartorioBrasileiroSemOrgao = !paisRegistroFinal && !!cartorioFinal?.trim() && orgaoIdFinal == null
+      if (cartorioBrasileiroSemOrgao) {
+        return NextResponse.json(
+          { error: `Cartório "${cartorioFinal}" sem órgão mapeado — vincule pela lista sugerida ou contate o administrador.` },
+          { status: 422 },
+        )
+      }
+    }
+
     // Dados do registro
     if (body.cartorio !== undefined) dataToUpdate.cartorio = body.cartorio
     if (body.livro !== undefined) dataToUpdate.livro = body.livro
