@@ -209,12 +209,20 @@ registrar({
       })
     }
 
+    // ESCOPO É "COM RESPONSÁVEL", NÃO "TODA TAREFA VENCIDA" — achado real
+    // (28/09/2026): a tarefa 3827 estava vencida (TAR-002 contava 1), mas
+    // sem responsável — o filtro `responsavelId: { not: null }` acima
+    // corretamente a exclui daqui (não há para quem avisar). O resumo dizia
+    // "Nenhuma tarefa vencida", que lido ao lado de TAR-002 ("1 vencida")
+    // parecia contradição — a chave `vencidas` também colidia por nome com a
+    // métrica de TAR-002, que mede outra população. Os dois nomes agora
+    // deixam o recorte explícito.
     return {
       achados,
-      metricas: { vencidas: vencidas.length, semAviso: semAviso.length },
+      metricas: { vencidasComResponsavel: vencidas.length, semAviso: semAviso.length },
       resumo: vencidas.length
-        ? `${vencidas.length} tarefa(s) vencida(s), ${semAviso.length} sem aviso.`
-        : 'Nenhuma tarefa vencida — nada a avisar.',
+        ? `${vencidas.length} tarefa(s) vencida(s) com responsável, ${semAviso.length} sem aviso.`
+        : 'Nenhuma tarefa vencida COM RESPONSÁVEL — nada a avisar (ver TAR-002 para o total de tarefas vencidas, com ou sem dono).',
     }
   },
 })

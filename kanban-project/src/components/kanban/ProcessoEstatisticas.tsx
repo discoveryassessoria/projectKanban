@@ -136,6 +136,22 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
     <div className="h-full overflow-y-auto p-6">
 
       {/* ============== 4 CARDS ESTATÍSTICOS (grid 2x2) ============== */}
+      {/* Achado real (28/09/2026): antes do fetch responder, `stats` ainda é
+          `ESTATISTICAS_VAZIAS` — os cards mostravam "0 em linha direta",
+          "Sem requerente definido", "0 de 0 documentos" como se fosse o dado
+          real, não "ainda carregando". Um esqueleto evita afirmar algo falso
+          por uma fração de segundo. */}
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3.5 mb-5" aria-busy="true" aria-label="Carregando estatísticas do processo">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className={`${cardCls} animate-pulse`}>
+              <div className="h-2.5 w-16 rounded bg-white/10 mb-2.5" />
+              <div className="h-5 w-12 rounded bg-white/10 mb-2.5" />
+              <div className="h-2.5 w-full rounded bg-white/10" />
+            </div>
+          ))}
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-3.5 mb-5">
 
         {/* Card 1: Linhagem */}
@@ -210,6 +226,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
         </div>
 
       </div>
+      )}
 
       {/* ============== ALERTAS EXECUTIVOS ============== */}
       <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-4 py-3.5 mb-4">

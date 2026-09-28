@@ -90,7 +90,15 @@ const SITUACOES_SOLICITACAO: readonly SituacaoSolicitacaoCertidao[] =
  * nunca divergirem. `concluiu`/`naoConcluiu` casam pelo PAPEL semântico da
  * subtarefa dentro do Step "Solicitar certidão" — nunca string solta.
  */
-function whereSituacaoSolicitacao(bucket: SituacaoSolicitacaoCertidao): Record<string, unknown> {
+/**
+ * Exportada — é a MESMA lógica que a coluna "Situação" do Relatório de
+ * Certidões usa, e "certidão recebida" precisa significar a mesma coisa em
+ * toda tela (achado real, 28/09/2026: a aba Geral do processo contava
+ * "recebido" como "dado preenchido" — cartório/livro/folha, o marco de
+ * Genealogia — em vez de RECEBIDA — a certidão física ter chegado, o marco de
+ * Emissão Documental. São marcos diferentes; usar o errado inflava o card).
+ */
+export function whereSituacaoSolicitacao(bucket: SituacaoSolicitacaoCertidao): Record<string, unknown> {
   // MESMA exclusão de ciclo SUPERSEDIDO/CANCELADO do INCLUDE (abaixo) — sem
   // isso, um envio concluído num ciclo antigo já reaberto faria o filtro
   // divergir da coluna, que só olha o ciclo vigente.

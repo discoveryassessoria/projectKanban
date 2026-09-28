@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
+import { whereSituacaoSolicitacao } from "@/src/lib/relatorios/motor/dominios/certidoes"
 
 type AlertaSev = "crit" | "warn" | "info"
 
@@ -101,28 +101,34 @@ export async function GET(
     // (congelado: um documento cuja Tarefa já concluiu não voltava a mexer
     // nesse campo, então "recebido" ficava contando errado assim que a Tarefa
     // avançava sem que ninguém tivesse tocado no campo do Documento).
-    // "RECEBIDO" É O DOCUMENTO TER DADO REAL, NÃO A TAREFA TER FECHADO.
+    // "RECEBIDO" SIGNIFICA A CERTIDÃO TER CHEGADO — não o registro ter sido
+    // localizado (Genealogia) nem uma Tarefa ter fechado.
     //
-    // Achado real (28/09/2026, processo 651): esta conta usava `Tarefa` viva por
-    // `documentoId` + status terminal — mas o achado de registro em Genealogia
-    // ("localizar_registro") pode concluir sem que exista Tarefa terminal presa a
-    // ESTE `documentoId` (a Tarefa dessa etapa é por NECESSIDADE, e a etapa pode
-    // fechar por caminho que não materializa Tarefa própria). Resultado: 17
-    // documentos genuinamente localizados (cartório/livro/folha preenchidos)
-    // contavam como "0 recebidos" — Geral do processo contradizia a Árvore, que lê
-    // o dado do Documento direto. `documentoTemDadosPreenchidos` é a MESMA função
-    // que `resolverCompletudeDocumental` já usa (unificação de completude
-    // documental, mesma sessão): um documento está feito quando tem cartório,
-    // livro e folha — não quando uma Tarefa específica fechou.
+    // Correção anterior (28/09/2026, mesma sessão) tinha trocado esta conta por
+    // `documentoTemDadosPreenchidos` (cartório/livro/folha) — mas esse é o marco
+    // de Genealogia ("localizar registro"), não o de Emissão Documental
+    // ("receber certidão"). São marcos diferentes: um documento pode estar
+    // LOCALIZADO (dado preenchido) e ainda não ter sido RECEBIDO (a via física
+    // ainda não chegou). Usar o marco errado inflava o card. A régua certa é a
+    // MESMA que a coluna "Situação" do Relatório de Certidões usa —
+    // `whereSituacaoSolicitacao("RECEBIDA")`, exportada de lá pra nunca haver
+    // duas implementações do mesmo critério.
     let totalDocs = 0
     let recebidosDocs = 0
     if (pessoaIds.length) {
       const docsValidos = await prisma.documento.findMany({
         where: { pessoaId: { in: pessoaIds }, status: { notIn: ["CANCELADO", "INVALIDO"] } },
-        select: { id: true, cartorio: true, livro: true, folha: true },
+        select: { id: true },
       })
       totalDocs = docsValidos.length
-      recebidosDocs = docsValidos.filter((d) => documentoTemDadosPreenchidos(d)).length
+      if (totalDocs > 0) {
+        recebidosDocs = await prisma.necessidadeDocumental.count({
+          where: {
+            documentos: { some: { id: { in: docsValidos.map((d) => d.id) } } },
+            ...whereSituacaoSolicitacao("RECEBIDA"),
+          },
+        })
+      }
     }
 
     const percentual = totalDocs > 0 ? Math.round((recebidosDocs / totalDocs) * 100) : 0
