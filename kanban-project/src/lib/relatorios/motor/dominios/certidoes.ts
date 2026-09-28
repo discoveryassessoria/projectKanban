@@ -22,6 +22,7 @@ import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/sub
 import {
   CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO, CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO,
   ROTULO_SITUACAO_SOLICITACAO, situacaoDaSolicitacaoCertidao,
+  STEP_KEY_LOCALIZAR_REGISTRO, STATUS_STEP_LOCALIZADO,
   type SituacaoSolicitacaoCertidao,
 } from "@/src/lib/process-stage/situacao-solicitacao-certidao"
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
@@ -89,7 +90,7 @@ const SITUACOES_SOLICITACAO: readonly SituacaoSolicitacaoCertidao[] =
  * subtarefa dentro do Step "Solicitar certidão" — nunca string solta.
  */
 function whereSituacaoSolicitacao(bucket: SituacaoSolicitacaoCertidao): Record<string, unknown> {
-  // MESMA exclusão de ciclo SUPERSEDIDO/CANCELADO do INCLUDE (acima) — sem
+  // MESMA exclusão de ciclo SUPERSEDIDO/CANCELADO do INCLUDE (abaixo) — sem
   // isso, um envio concluído num ciclo antigo já reaberto faria o filtro
   // divergir da coluna, que só olha o ciclo vigente.
   const concluiu = (chaves: readonly string[]) => ({
@@ -100,23 +101,41 @@ function whereSituacaoSolicitacao(bucket: SituacaoSolicitacaoCertidao): Record<s
     } } } },
   })
   const naoConcluiu = (chaves: readonly string[]) => ({ NOT: concluiu(chaves) })
-  const naoDispensadaNemNaoLocalizada = { status: { notIn: ["DISPENSADA", "NAO_LOCALIZADA"] } }
+  const naoDispensada = { status: { not: "DISPENSADA" } }
+  // Registro já localizado na Genealogia — decisão do usuário (28/09/2026):
+  // "essas tarefas ainda não foram fechadas na fase de Genealogia, então como
+  // que elas seriam solicitadas?" — NAO_LOCALIZADA vira o estado padrão até a
+  // Genealogia concluir "Localizar registro", não um status manual à parte.
+  const registroLocalizado = {
+    stepInstances: { some: { stepKey: STEP_KEY_LOCALIZAR_REGISTRO, status: { in: [...STATUS_STEP_LOCALIZADO] } } },
+  }
+  const registroNaoLocalizado = { NOT: registroLocalizado }
 
   switch (bucket) {
     case "DISPENSADA": return { status: "DISPENSADA" }
-    case "NAO_LOCALIZADA": return { status: "NAO_LOCALIZADA" }
+    case "NAO_LOCALIZADA": return { AND: [naoDispensada, registroNaoLocalizado] }
     case "RECEBIDA":
-      return { AND: [naoDispensadaNemNaoLocalizada, concluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
+      return { AND: [naoDispensada, registroLocalizado, concluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
     case "SOLICITADO":
-      return { AND: [naoDispensadaNemNaoLocalizada, concluiu(CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), naoConcluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
+      return { AND: [naoDispensada, registroLocalizado, concluiu(CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), naoConcluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
     case "PENDENTE":
-      return { AND: [naoDispensadaNemNaoLocalizada, concluiu(CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO), naoConcluiu(CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), naoConcluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
+      return { AND: [naoDispensada, registroLocalizado, concluiu(CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO), naoConcluiu(CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), naoConcluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
     case "NAO_SOLICITADA":
-      return { AND: [naoDispensadaNemNaoLocalizada, naoConcluiu(CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO)] }
+      return { AND: [naoDispensada, registroLocalizado, naoConcluiu(CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO)] }
   }
 }
 
 const INCLUDE = {
+  // REGISTRO LOCALIZADO NA GENEALOGIA — direto na NecessidadeDocumental (não
+  // no Documento): é o passo "Localizar registro" que decide se dá pra
+  // perguntar "já solicitei a certidão?" — ver situacao-solicitacao-certidao.ts.
+  // Só o vigente: SUPERSEDIDO/CANCELADO nunca entram em CONCLUIDO/DISPENSADO,
+  // então nem precisa de where.status extra pra excluir ciclo antigo.
+  stepInstances: {
+    where: { stepKey: STEP_KEY_LOCALIZAR_REGISTRO, status: { in: [...STATUS_STEP_LOCALIZADO] as ("CONCLUIDO" | "DISPENSADO")[] } },
+    select: { id: true },
+    take: 1,
+  },
   itemCatalogo: {
     select: {
       id: true, code: true, name: true,
@@ -197,6 +216,7 @@ const confirmacao = (l: any) => execucaoDoPapel(l, CHAVES_SUBTAREFA_CONFIRMACAO_
 const situacaoSolicitacao = (l: any): SituacaoSolicitacaoCertidao =>
   situacaoDaSolicitacaoCertidao({
     necessidadeStatus: l.status,
+    registroLocalizado: (l.stepInstances?.length ?? 0) > 0,
     chavesConcluidas: execucoesSituacao(l).map((e) => e.subtaskKey),
   })
 

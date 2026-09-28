@@ -74,16 +74,18 @@ async function main() {
   // "Município/UF do órgão" não pode inventar dado que o cadastro não tem.
   // Direto no Documento (não por nome de exibição — "Tapes" também é nome
   // real de um OrgaoProtocolo cadastrado, então casar por texto daria falso
-  // positivo). Eram 6 na sessão 27/09; passou a 7 na sessão 28/09 (MUDANÇA 1 —
-  // Documento nasce junto com a necessidade: a necessidade 607, que não tinha
-  // Documento nenhum, ganhou um rascunho automaticamente — sem orgaoId, como
-  // todo rascunho recém-nascido).
+  // positivo). CONTAGEM VOLÁTIL de propósito (6 em 27/09, 7 em 28/09 de manhã
+  // — rascunho novo da necessidade 607 —, 6 de novo em 28/09 à tarde — alguém
+  // vinculou o órgão de um dos documentos no cadastro): time trabalhando o
+  // processo real muda esse número o tempo todo. Checa só que existe PELO
+  // MENOS 1 (o cenário que a coluna abaixo precisa cobrir continua real), não
+  // um valor exato — a garantia de verdade é a asserção da coluna, logo abaixo.
   const { prisma: prismaChk } = await import("@/lib/prisma")
   const docsSemOrgao = await prismaChk.documento.findMany({
     where: { necessidade: { processoId: PROCESSO_CIBILS }, orgaoId: null },
     select: { id: true, cartorio: true },
   })
-  t(docsSemOrgao.length === 7, "7 Documentos do Cibils sem orgaoId (achado 5b + rascunho novo da 607)", String(docsSemOrgao.length))
+  t(docsSemOrgao.length >= 1, "há pelo menos 1 Documento do Cibils sem orgaoId (achado 5b continua reproduzível)", String(docsSemOrgao.length))
   const colunaOrgaoUf = D.colunas.find((c) => c.key === "orgao_municipio_uf")!
   const linhaSinteticaSemOrgao = { documentos: [{ orgao: null, cartorio: "Bage" }] }
   t(colunaOrgaoUf.valor(linhaSinteticaSemOrgao) === null, "coluna município/UF: Documento sem orgao → null, nunca lê cartorio")

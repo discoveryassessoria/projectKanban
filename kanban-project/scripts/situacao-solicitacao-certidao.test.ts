@@ -11,10 +11,17 @@
 // (Ruben Cibils, Nascimento, Documento #2263) — ATENDIDA, mas ZERO
 // solicitações, ZERO subtarefas concluídas.
 //
-// Novo mapeamento (decidido pelo usuário, 6 estados):
-//   NAO_LOCALIZADA — Genealogia não achou o registro (NecessidadeDocumental,
-//     0 casos reais em produção — verificado, nunca confundido com PENDENTE).
-//   NAO_SOLICITADA — nada enviado ao cartório ainda.
+// SEGUNDA RODADA (mesmo dia): NAO_LOCALIZADA deixou de ser um status manual
+// (que nunca teve botão nenhum na UI — 0 casos reais) e passou a ser DERIVADO
+// de a Genealogia já ter concluído "Localizar registro" pra aquela
+// necessidade ou não. Decisão do usuário: "se existem 3 registros na fase de
+// genealogia que não foram localizados, eles vão aparecer no relatório como
+// não localizados... até porque essas tarefas ainda não foram fechadas na
+// fase de Genealogia, então como que elas seriam solicitadas?"
+//
+// Mapeamento final (6 estados):
+//   NAO_LOCALIZADA — Genealogia ainda NÃO concluiu "Localizar registro".
+//   NAO_SOLICITADA — registro localizado, nada enviado ao cartório ainda.
 //   PENDENTE       — enviei, aguardando confirmação.
 //   SOLICITADO     — cartório confirmou o recebimento do pedido.
 //   RECEBIDA       — a certidão (documento) chegou de fato.
@@ -41,26 +48,31 @@ async function main() {
   console.log("SITUAÇÃO DA SOLICITAÇÃO DE CERTIDÃO — reformulação 28/09/2026\n")
 
   console.log("(1) situacaoDaSolicitacaoCertidao — função pura, precedência correta:")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "DISPENSADA", chavesConcluidas: ["receber_certidao"] }) === "DISPENSADA",
-    "DISPENSADA sempre vence, mesmo com tudo concluído")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "PENDENTE", chavesConcluidas: [] }) === "NAO_SOLICITADA",
-    "nada concluído → NAO_SOLICITADA (nunca herda o nome 'PENDENTE' do enum bruto)")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", chavesConcluidas: ["enviar_requerimento_cartorio"] }) === "PENDENTE",
-    "só envio concluído → PENDENTE (mesmo com necessidade ATENDIDA)")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", chavesConcluidas: ["enviar_requerimento_cartorio", "receber_confirmacao_pedido"] }) === "SOLICITADO",
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "DISPENSADA", registroLocalizado: false, chavesConcluidas: ["receber_certidao"] }) === "DISPENSADA",
+    "DISPENSADA sempre vence, mesmo com registro não localizado")
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", registroLocalizado: false, chavesConcluidas: [] }) === "NAO_LOCALIZADA",
+    "registro NÃO localizado → NAO_LOCALIZADA, mesmo com necessidade ATENDIDA (era a origem da confusão)")
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "PENDENTE", registroLocalizado: true, chavesConcluidas: [] }) === "NAO_SOLICITADA",
+    "registro localizado, nada enviado → NAO_SOLICITADA (nunca herda o nome 'PENDENTE' do enum bruto)")
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", registroLocalizado: true, chavesConcluidas: ["enviar_requerimento_cartorio"] }) === "PENDENTE",
+    "registro localizado + só envio concluído → PENDENTE")
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", registroLocalizado: true, chavesConcluidas: ["enviar_requerimento_cartorio", "receber_confirmacao_pedido"] }) === "SOLICITADO",
     "envio + confirmação → SOLICITADO")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", chavesConcluidas: ["enviar_requerimento_cartorio", "receber_confirmacao_pedido", "receber_certidao"] }) === "RECEBIDA",
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", registroLocalizado: true, chavesConcluidas: ["enviar_requerimento_cartorio", "receber_confirmacao_pedido", "receber_certidao"] }) === "RECEBIDA",
     "os 3 concluídos → RECEBIDA")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", chavesConcluidas: ["receber_certidao"] }) === "RECEBIDA",
+  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "ATENDIDA", registroLocalizado: true, chavesConcluidas: ["receber_certidao"] }) === "RECEBIDA",
     "recebimento sozinho (sem confirmação registrada) ainda vence → RECEBIDA")
-  t(situacaoDaSolicitacaoCertidao({ necessidadeStatus: "NAO_LOCALIZADA", chavesConcluidas: [] }) === "NAO_LOCALIZADA",
-    "NAO_LOCALIZADA nunca cai em NAO_SOLICITADA por omissão")
 
   console.log("\n(2) Caso nomeado pelo usuário — necessidade #620 (Ruben Cibils, Nascimento, Documento #2263):")
   const doc2263 = await prisma.documento.findUnique({
     where: { id: 2263 },
     select: {
-      necessidade: { select: { id: true, status: true } },
+      necessidade: {
+        select: {
+          id: true, status: true,
+          stepInstances: { where: { stepKey: "localizar_registro", status: { in: ["CONCLUIDO", "DISPENSADO"] } }, select: { id: true }, take: 1 },
+        },
+      },
       stepInstances: {
         where: { stepKey: "solicitar_certidao", status: { notIn: ["SUPERSEDIDO", "CANCELADO"] } },
         orderBy: { id: "desc" }, take: 1,
@@ -69,16 +81,18 @@ async function main() {
     },
   })
   t(doc2263?.necessidade?.status === "ATENDIDA", "necessidade #620 tem status bruto ATENDIDA (a origem da confusão)", String(doc2263?.necessidade?.status))
+  const registroLocalizado2263 = (doc2263?.necessidade?.stepInstances.length ?? 0) > 0
+  t(registroLocalizado2263 === true, "e o registro JÁ foi localizado na Genealogia (tem cartório/livro/folha preenchidos)")
   const chaves2263 = doc2263?.stepInstances[0]?.execucoesDeSubtarefa.map((e) => e.subtaskKey) ?? []
-  t(chaves2263.length === 0, "e zero subtarefas concluídas — nenhuma solicitação foi feita")
-  const situacao2263 = situacaoDaSolicitacaoCertidao({ necessidadeStatus: doc2263?.necessidade?.status ?? "", chavesConcluidas: chaves2263 })
-  t(situacao2263 === "NAO_SOLICITADA", "situação calculada é NAO_SOLICITADA, não mais 'Atendida'", situacao2263)
+  t(chaves2263.length === 0, "mas zero subtarefas de 'Solicitar certidão' concluídas — nenhuma solicitação foi feita")
+  const situacao2263 = situacaoDaSolicitacaoCertidao({ necessidadeStatus: doc2263?.necessidade?.status ?? "", registroLocalizado: registroLocalizado2263, chavesConcluidas: chaves2263 })
+  t(situacao2263 === "NAO_SOLICITADA", "situação calculada é NAO_SOLICITADA (registro localizado, só não pedido) — não mais 'Atendida'", situacao2263)
 
-  console.log("\n(3) NAO_LOCALIZADA e NAO_ENCONTRADO — 0 casos reais em toda a produção (verificado, não fabricado):")
-  const necNaoLocalizada = await prisma.necessidadeDocumental.count({ where: { status: "NAO_LOCALIZADA" } })
+  console.log("\n(3) NAO_LOCALIZADA agora é DERIVADO da Genealogia, não um status morto:")
+  const necNaoLocalizadaBruto = await prisma.necessidadeDocumental.count({ where: { status: "NAO_LOCALIZADA" } })
   const docNaoEncontrado = await prisma.documento.count({ where: { status: "NAO_ENCONTRADO" } })
-  t(necNaoLocalizada === 0, "NecessidadeDocumental.status=NAO_LOCALIZADA: 0 casos em produção", String(necNaoLocalizada))
-  t(docNaoEncontrado === 0, "Documento.status=NAO_ENCONTRADO: 0 casos em produção", String(docNaoEncontrado))
+  t(necNaoLocalizadaBruto === 0, "NecessidadeDocumental.status=NAO_LOCALIZADA (o status morto antigo): 0 casos — confirma que não é mais essa a fonte", String(necNaoLocalizadaBruto))
+  t(docNaoEncontrado === 0, "Documento.status=NAO_ENCONTRADO: 0 casos em produção (achado à parte, não mexido)", String(docNaoEncontrado))
 
   console.log("\n(4) Contra o processo real (Cibils, 20 necessidades REGISTRO_CIVIL) — filtro e coluna NUNCA divergem:")
   const rTodas = await executar(DOMINIO_CERTIDOES, {
@@ -109,20 +123,16 @@ async function main() {
   }
   t(somaCruzada === 20, "a soma dos 6 buckets fecha nas 20 necessidades (nenhuma sobra, nenhuma duplicada)", String(somaCruzada))
 
-  console.log("\n(5) A regressão do ciclo SUPERSEDIDO está corrigida (achado desta rodada):")
-  // Sem excluir SUPERSEDIDO/CANCELADO e sem orderBy, `take:1` podia pegar uma
-  // instância antiga (sem execução nenhuma) mesmo com o envio já concluído no
-  // ciclo vigente — é por isso que ANTES da correção a coluna mostrava
-  // "Não solicitada" pra tudo (17 de 17), mesmo com 5 envios reais concluídos.
-  const rPendente = await executar(DOMINIO_CERTIDOES, {
+  console.log("\n(5) NAO_LOCALIZADA bate com o que a aba Resumo da Genealogia mostra (3 Pendentes, 14/17 concluídos):")
+  const rNaoLocalizada = await executar(DOMINIO_CERTIDOES, {
     dominio: "certidoes",
     filtros: [
       { key: "processo", valor: { tipo: "entidade", id: PROCESSO_CIBILS } },
-      { key: "status", valor: { tipo: "multi_selecao", valores: ["PENDENTE"] } },
+      { key: "status", valor: { tipo: "multi_selecao", valores: ["NAO_LOCALIZADA"] } },
     ],
     porPagina: 50,
   })
-  t(rPendente.total === 5, "5 necessidades com envio real concluído aparecem como PENDENTE (não 'Não solicitada')", String(rPendente.total))
+  t(rNaoLocalizada.total === 3, "3 necessidades NAO_LOCALIZADA — mesmo número da aba Resumo da Genealogia ('3 Pendentes')", String(rNaoLocalizada.total))
 
   console.log(`\n${"=".repeat(70)}`)
   console.log(`✅ ${ok} passaram · ❌ ${falhou} falharam`)
