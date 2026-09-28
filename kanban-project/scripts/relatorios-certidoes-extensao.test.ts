@@ -134,6 +134,28 @@ async function main() {
     t(Number.isFinite(rv.total), "a visão roda de ponta a ponta sem erro", `total=${rv.total} (mês atual, todo o sistema)`)
   }
 
+  console.log("\n(7) Coluna 'Pessoa' de casamento (união) mostra o titular da linha de transmissão, nunca vazia:")
+  // Regra permanente do usuário (28/09/2026): certidão de casamento SEMPRE
+  // mostra o nome da pessoa em linha reta de transmissão — nunca "—", nunca
+  // pessoa1/pessoa2 cru. Mesma régua de titular-uniao.ts.
+  const rCasamento = await executar(D, {
+    dominio: "certidoes",
+    filtros: [
+      { key: "processo", valor: { tipo: "entidade", id: PROCESSO_CIBILS } },
+      { key: "tipo", valor: { tipo: "multi_selecao", valores: [] } },
+    ],
+    colunas: ["tipo", "pessoa", "geracao"],
+    porPagina: 50,
+  })
+  const casamentos = rCasamento.linhas.filter((l) => String(l.celulas.find((c) => c.key === "tipo")?.valor).includes("Casamento"))
+  t(casamentos.length === 5, "5 necessidades de casamento no Cibils", String(casamentos.length))
+  t(casamentos.every((l) => l.celulas.find((c) => c.key === "pessoa")?.valor != null),
+    "nenhuma linha de casamento tem 'Pessoa' vazia")
+  t(casamentos.every((l) => l.celulas.find((c) => c.key === "geracao")?.valor != null),
+    "nenhuma linha de casamento tem 'Geração' vazia (mesma pessoa titular)")
+  const ignacio = casamentos.find((l) => String(l.celulas.find((c) => c.key === "pessoa")?.valor).includes("Ignacio"))
+  t(!!ignacio, "o casamento Ignacio×Cipriana Cornelia mostra 'Ignacio Cibils' (linha reta), não 'Cipriana' (fora da linhagem)")
+
   console.log(`\n${"=".repeat(70)}`)
   console.log(`✅ ${ok} passaram · ❌ ${falhou} falharam`)
   if (falhou > 0) { console.log("\nFalhas:", falhas.join(", ")); process.exit(1) }

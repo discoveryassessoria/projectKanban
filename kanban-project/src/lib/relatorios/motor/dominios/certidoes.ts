@@ -26,6 +26,7 @@ import {
   type SituacaoSolicitacaoCertidao,
 } from "@/src/lib/process-stage/situacao-solicitacao-certidao"
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
+import { titularDaUniao } from "@/src/services/genealogia/titular-uniao"
 import type { CorDeCelula, DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, periodo, porCampo } from "./_comuns"
 
@@ -143,6 +144,18 @@ const INCLUDE = {
     },
   },
   pessoa: { select: { id: true, nome: true, sobrenome: true, arvoreId: true, numeroLinhagem: true } },
+  // TITULAR DA UNIÃO — necessidade de casamento tem UNIÃO como sujeito
+  // (pessoaId sempre null por desenho), mas a coluna "Pessoa" nunca pode
+  // ficar vazia: regra do usuário (28/09/2026, mesma régua de
+  // titular-uniao.ts): sempre mostra o cônjuge da LINHA DE TRANSMISSÃO,
+  // nunca pessoa1/pessoa2 cru (que não tem significado de negócio).
+  uniao: {
+    select: {
+      pessoa1Id: true, pessoa2Id: true,
+      pessoa1: { select: { id: true, nome: true, sobrenome: true, arvoreId: true, numeroLinhagem: true, linhaReta: true } },
+      pessoa2: { select: { id: true, nome: true, sobrenome: true, arvoreId: true, numeroLinhagem: true, linhaReta: true } },
+    },
+  },
   processo: {
     select: {
       id: true, codigo: true, nome: true, faseAtualKey: true,
@@ -204,6 +217,20 @@ const INCLUDE = {
 
 const doc = (l: any) => l.documentos?.[0] ?? null
 const sol = (l: any) => doc(l)?.solicitacoes?.[0] ?? null
+// PESSOA DA LINHA — sempre resolve pra uma Pessoa, mesmo quando o sujeito da
+// necessidade é uma União (casamento): a própria pessoa quando a necessidade
+// já é grão-pessoa, senão o titular da união (cônjuge da linha de
+// transmissão, nunca pessoa1/pessoa2 cru — regra permanente do usuário,
+// 28/09/2026, mesma régua de titular-uniao.ts). Nunca fica vazia por
+// desenho — casamento SEMPRE tem uma pessoa da linha reta por trás.
+const pessoaDaLinha = (l: any): { id: number; nome: string; sobrenome: string | null; arvoreId: number | null; numeroLinhagem: number | null } | null => {
+  if (l.pessoa) return l.pessoa
+  if (!l.uniao) return null
+  const titularId = titularDaUniao(l.uniao)
+  if (titularId === l.uniao.pessoa1Id) return l.uniao.pessoa1 ?? null
+  if (titularId === l.uniao.pessoa2Id) return l.uniao.pessoa2 ?? null
+  return null
+}
 const tarefaDoDoc = (l: any) => doc(l)?.tarefasVinculadas?.[0] ?? null
 // As execuções concluídas das 3 subtarefas de "Solicitar certidão" (envio,
 // confirmação, recebimento) que o INCLUDE busca juntas — nunca mais de uma
@@ -327,7 +354,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     porCampo("nacionalidade", "Nacionalidade", (l) => l.processo?.paisCanonico?.countryLabel),
     porCampo("orgao", "Órgão emissor", (l) => doc(l)?.orgao?.name),
     porCampo("orgao_pais", "País do emissor", (l) => doc(l)?.orgao?.pais?.countryLabel),
-    porCampo("pessoa", "Pessoa", (l) => (l.pessoa ? `${l.pessoa.nome} ${l.pessoa.sobrenome ?? ""}`.trim() : null)),
+    porCampo("pessoa", "Pessoa", (l) => { const p = pessoaDaLinha(l); return p ? `${p.nome} ${p.sobrenome ?? ""}`.trim() : null }),
   ],
 
   colunas: [
@@ -342,8 +369,8 @@ export const DOMINIO_CERTIDOES: DominioDef = {
       valor: (l) => (doc(l) ? (documentoTemDadosPreenchidos(doc(l)) ? "Sim" : "Não") : null),
       corDoValor: (l) => (!doc(l) ? null : documentoTemDadosPreenchidos(doc(l)) ? "verde" : "cinza") },
     { key: "obrigatoriedade", rotulo: "Obrigatoriedade", valor: (l) => l.obrigatoriedade },
-    { key: "pessoa", rotulo: "Pessoa", valor: (l) => (l.pessoa ? `${l.pessoa.nome} ${l.pessoa.sobrenome ?? ""}`.trim() : null),
-      link: (l) => (l.pessoa?.arvoreId ? `/genealogy?arvoreId=${l.pessoa.arvoreId}&pessoaId=${l.pessoa.id}` : null) },
+    { key: "pessoa", rotulo: "Pessoa", valor: (l) => { const p = pessoaDaLinha(l); return p ? `${p.nome} ${p.sobrenome ?? ""}`.trim() : null },
+      link: (l) => { const p = pessoaDaLinha(l); return p?.arvoreId ? `/genealogy?arvoreId=${p.arvoreId}&pessoaId=${p.id}` : null } },
     { key: "familia", rotulo: "Família", valor: (l) => l.processo?.familia?.nome ?? null },
     { key: "processo", rotulo: "Processo",
       valor: (l) => (l.processo ? `${l.processo.codigo ?? l.processo.id} — ${l.processo.nome}` : null),
@@ -385,7 +412,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     // CRIOU o registro de solicitação): este é quem tem a Tarefa AGORA, a
     // fonte única de responsável (ownership-canonico-tarefa).
     { key: "responsavel_tarefa", rotulo: "Responsável", valor: (l) => tarefaDoDoc(l)?.responsavel?.nome ?? null },
-    { key: "geracao", rotulo: "Geração", valor: (l) => (l.pessoa?.numeroLinhagem != null ? `G${l.pessoa.numeroLinhagem}` : null) },
+    { key: "geracao", rotulo: "Geração", valor: (l) => { const p = pessoaDaLinha(l); return p?.numeroLinhagem != null ? `G${p.numeroLinhagem}` : null } },
     { key: "orgao_municipio_uf", rotulo: "Município/UF do órgão",
       valor: (l) => { const o = doc(l)?.orgao; const t = [o?.city, o?.state].filter(Boolean).join("/"); return t || null } },
   ],
