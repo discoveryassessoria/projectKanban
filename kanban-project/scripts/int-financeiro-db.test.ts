@@ -9,6 +9,7 @@
  *   Cenário 10 — idempotência REAL: repetir confirmação com a mesma chave não duplica.
  */
 import { prisma } from '@/lib/prisma'
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { registrarPagamentoComposto } from '@/lib/financeiro/pagamentos/registrar-pagamento-composto'
 
@@ -56,6 +57,7 @@ async function seedParticipante(nome: string, requerenteId: number, valor: numbe
 }
 
 async function main() {
+  exigirBancoDeTeste("teste de integração financeira com persistência real")
   console.log('int-financeiro-db — persistência real (banco de teste)\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-INT-FINANCEIRO' } }).catch(() => {})

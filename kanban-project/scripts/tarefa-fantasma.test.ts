@@ -18,6 +18,7 @@
 
 import { PrismaClient } from "@prisma/client"
 import { supersederPassosDaInstanciaTx } from "../src/services/task-step-sync"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "FANT"
@@ -88,6 +89,7 @@ async function montar() {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova que superseder a instância leva os passos filhos junto")
   await limpar()
   const { proc, inst, ids } = await montar()
 

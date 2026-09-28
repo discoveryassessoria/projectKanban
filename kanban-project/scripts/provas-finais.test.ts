@@ -17,6 +17,7 @@ import { analisarRemocaoPessoa, removerPessoaDaArvore } from "../src/services/pe
 import { executarAcaoCadastrada } from "../src/services/executar-acao-cadastrada"
 import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { congelarVersaoVigente, publicarNovaVersao, definicaoHistoricaDoPasso } from "../src/services/versao-publicada"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const ROOT = join(__dirname, "..")
 const ler = (r: string) => (existsSync(join(ROOT, r)) ? readFileSync(join(ROOT, r), "utf8") : "")
@@ -55,6 +56,7 @@ async function limpar() {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova exclusão/permissões/auditoria/pipeline/escala")
   await limpar()
 
   // ══════════════════════════════════════════════════════════════

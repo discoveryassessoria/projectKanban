@@ -27,6 +27,7 @@ import { preverPublicacao, publicarWorkflow, marcarRascunho } from "../src/servi
 import { requisitosPendentes } from "../src/services/requisitos-da-etapa"
 import { executarAcaoCadastrada } from "../src/services/executar-acao-cadastrada"
 import { garantirTentativa, tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "CI"
@@ -66,6 +67,7 @@ async function limpar() {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova o cadastro integral do passo")
   await limpar()
 
   // ══════════════════════════════════════════════════════════════

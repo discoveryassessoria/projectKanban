@@ -21,6 +21,7 @@ import { lerOperacao, gravarOperacao, historicoDaOperacao } from "../src/service
 import { transicionarPassoTx, reabrirPassoTx } from "../src/services/task-step-sync"
 import { movePhaseManual } from "../src/lib/motor/phase-advance"
 import { minhaFila } from "../lib/operacional/tarefa-projecoes"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "E2E"
@@ -62,6 +63,7 @@ async function limpar() {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova o sistema inteiro, ponta a ponta")
   await limpar()
   console.log("\nE2E MASTER — do cadastro à conclusão, sem código específico\n")
 

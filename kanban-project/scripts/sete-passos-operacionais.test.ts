@@ -28,6 +28,7 @@ import { publicarWorkflow, preverPublicacao } from "../src/services/publicacao-d
 import { definicaoHistoricaDoPasso } from "../src/services/versao-publicada"
 import { executarAcaoCadastrada } from "../src/services/executar-acao-cadastrada"
 import { garantirTentativa, tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "SPO"
@@ -135,6 +136,7 @@ async function montarRetificacao(phaseKey: string) {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova os sete passos que a auditoria acusou de não terem como ser executados")
   await limpar()
   const phaseKey = `${M.toLowerCase()}_retificacao`
 

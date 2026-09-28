@@ -23,6 +23,7 @@ import { abrirTentativa, tentativasDoPasso, garantirTentativa, MOTIVOS_DE_TENTAT
 import { gravarOperacao, lerOperacao } from "../src/services/operacao-da-etapa"
 import { novaViaDocumental } from "../src/services/efeitos-de-dominio"
 import { movePhaseManual } from "../src/lib/motor/phase-advance"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "CONC"
@@ -122,6 +123,7 @@ async function coerente(p: Palco): Promise<string[]> {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova a matriz de concorrência (duas pessoas, o mesmo instante)")
   await limpar()
   console.log("\nMATRIZ DE CONCORRÊNCIA — comandos disparados JUNTOS\n")
 

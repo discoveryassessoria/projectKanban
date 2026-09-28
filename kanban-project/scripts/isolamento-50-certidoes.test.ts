@@ -21,6 +21,7 @@ import { planejarReabertura, executarReabertura } from "../src/services/reabertu
 import { garantirTentativa, tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { congelarVersaoVigente } from "../src/services/versao-publicada"
 import { garantirOferta } from "./_fixture-oferta"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "ESCALA50"
@@ -88,6 +89,7 @@ async function fotografar(processoId: number) {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova que uma certidão jamais altera as outras, em escala")
   await limpar()
   console.log(`\nISOLAMENTO EM ESCALA — ${PESSOAS} pessoas · ${PESSOAS * DOCS_POR_PESSOA} certidões · ${ETAPAS.length} etapas\n`)
 

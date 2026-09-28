@@ -55,6 +55,11 @@ const arquivos: string[] = []
   }
 })(RAIZ)
 const conteudo = new Map(arquivos.map((f) => [f, readFileSync(join(RAIZ, f), "utf8")]))
+/** Só o CÓDIGO — um comentário mencionando "127.0.0.1"/"discovery_test" como
+ *  INSTRUÇÃO de como rodar não é proteção nenhuma; é texto pra humano ler. */
+const semComentarios = (t: string) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
+const conteudoSemComentarios = new Map(arquivos.map((f) => [f, semComentarios(conteudo.get(f)!)]))
 const quemUsa = (re: RegExp, exceto: string[] = []) =>
   arquivos.filter((f) => !exceto.includes(f) && re.test(conteudo.get(f)!))
 
@@ -170,7 +175,17 @@ const testesQueEscrevem = arquivos.filter((f) => {
   const s = conteudo.get(f)!
   return USA_PRISMA.test(s) && ESCRITA.test(s)
 })
-const semTrava = testesQueEscrevem.filter((f) => !TEM_TRAVA.test(conteudo.get(f)!))
+// Achado real (28/09/2026): dois scripts (pendencias-a-e.test.ts,
+// profissional-e-judicial.test.ts) passavam aqui só porque o CABEÇALHO tinha um
+// comentário do tipo "rode com PRISMA_DATABASE_URL=...127.0.0.1.../discovery_test" —
+// instrução pra humano copiar e colar, nunca executada. Nenhum dos dois chamava
+// `exigirBancoDeTeste` nem tinha um `if` real checando o host. Os dois escreveram
+// direto em produção (3 linhas órfãs em OrgaoProtocolo, achado via Saúde do
+// Sistema/ORG-002) antes de alguém notar — porque este guard, que existe
+// EXATAMENTE pra pegar isso, dizia "todos travados". A trava frouxa (mencionar a
+// string em qualquer lugar) virou a própria brecha; por isso o teste roda contra o
+// código SEM comentários agora — só menção em código de verdade conta.
+const semTrava = testesQueEscrevem.filter((f) => !TEM_TRAVA.test(conteudoSemComentarios.get(f)!))
 ok("todo teste/smoke que escreve tem trava de ambiente",
   semTrava.length === 0,
   semTrava.join(", ") || `${testesQueEscrevem.length} arquivos varridos, todos travados`)

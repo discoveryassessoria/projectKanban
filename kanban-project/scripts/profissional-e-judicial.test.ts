@@ -27,6 +27,7 @@ import { executarAcaoCadastrada } from "../src/services/executar-acao-cadastrada
 import { garantirTentativa, tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { avaliarCondicao, type Condicao } from "../src/lib/motor/condicoes"
 import { PRAZO_HERDADO } from "../lib/operacional/tempo-operacional"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "PJU"
@@ -71,6 +72,7 @@ async function limpar() {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova o cadastro de profissional (advogado) e número de processo judicial")
   await limpar()
 
   // ══════════════════════════════════════════════════════════════════════════

@@ -6,6 +6,7 @@
 // Rodar: DATABASE_URL=...kanban_test (+ PRISMA_/DIRECT_) FINANCEIRO_V3_POSICAO_READ=1
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { registrarOcorrencia } from '@/lib/financeiro/ocorrencias/ocorrencia-service'
 import { podeExcluir, excluirReceita } from '@/lib/financeiro/acoes/excluir-receita'
@@ -55,6 +56,7 @@ async function seed(valor: number): Promise<{ receitaId: number; obrigacaoId: nu
 const ledgerCount = async (obrigacaoId: number) => prisma.ledgerEntry.count({ where: { obrigacaoId } })
 
 async function main() {
+  exigirBancoDeTeste("prova a exclusão segura da Receita")
   console.log('excluir-receita — persistência real\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-EXCLUIR-RECEITA' } }).catch(() => {})

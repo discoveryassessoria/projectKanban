@@ -17,6 +17,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { vincularRequerente, vincularPessoaExistenteAoRequerente } from "@/lib/genealogia/vincular-requerente"
 
 const MARK = "__TEST_DEDUP_REQ__"
@@ -63,6 +64,7 @@ async function limpar(ctx: {
 }
 
 async function main() {
+  exigirBancoDeTeste("prova o invariante de dedup de requerente na árvore")
   console.log("\nÁrvore — dedup de requerente (invariante: 1 Pessoa por requerente)\n")
 
   const ctx = { arvoreIds: [] as number[], processoIds: [] as number[], requerenteIds: [] as number[] }

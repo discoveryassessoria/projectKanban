@@ -17,6 +17,7 @@
 import type { PrismaClient } from "@prisma/client"
 import { prisma as prismaCompartilhado } from "../lib/prisma"
 import { minhaFila, semResponsavel, cargaPorResponsavel } from "../lib/operacional/tarefa-projecoes"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const arg = (n: string) => process.argv.find((a) => a.startsWith(`--${n}=`))?.split("=")[1]
 const VOLUMES = (arg("volumes") ?? "500,5000,50000").split(",").map(Number)
@@ -119,6 +120,7 @@ async function semear(n: number, usuarioId: number, processoId: number) {
 }
 
 async function main() {
+  exigirBancoDeTeste("gera até 50.000 tarefas sintéticas para medir performance/N+1")
   await limpar()
   console.log("\nPERFORMANCE EM ESCALA — tempo e, sobretudo, número de consultas\n")
 

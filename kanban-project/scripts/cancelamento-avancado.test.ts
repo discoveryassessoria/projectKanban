@@ -7,6 +7,7 @@
 // Rodar: DATABASE_URL=...kanban_test (+ PRISMA_/DIRECT_) FINANCEIRO_V3_POSICAO_READ=1
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { registrarOcorrencia } from '@/lib/financeiro/ocorrencias/ocorrencia-service'
 import { previsaoCancelamento, executarCancelamento } from '@/lib/financeiro/acoes/cancelamento-avancado'
@@ -63,6 +64,7 @@ const saldo = async (obrigacaoId: number) => Number((await prisma.saldoProjecao.
 const recebido = async (obrigacaoId: number) => Number((await prisma.saldoProjecao.findUnique({ where: { obrigacaoId } }))?.recebidoBruto ?? NaN)
 
 async function main() {
+  exigirBancoDeTeste("prova o cancelamento profissional da Receita")
   console.log('cancelamento-avancado — persistência real\n')
   await limpar()
   await prisma.processo.deleteMany({ where: { nome: 'TESTE-CANCEL-AVANCADO' } }).catch(() => {})

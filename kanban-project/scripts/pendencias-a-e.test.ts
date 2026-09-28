@@ -28,6 +28,7 @@ import { executarAcaoCadastrada } from "../src/services/executar-acao-cadastrada
 import { garantirTentativa, tentativasDoPasso, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { prazoOperacional, temPrazoProprio, PRAZO_HERDADO } from "../lib/operacional/tempo-operacional"
 import { resolverResponsavel } from "../src/services/passo-tarefa-helpers"
+import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
 const M = "PAE"
@@ -76,6 +77,7 @@ const defPasso = (key: string, ordem: number, cardinalidade: string | null) => (
 }) as never
 
 async function main() {
+  exigirBancoDeTeste("prova as cinco pendências arquiteturais da retificação")
   await limpar()
 
   // ══════════════════════════════════════════════════════════════════════════
