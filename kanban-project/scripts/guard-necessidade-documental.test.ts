@@ -140,6 +140,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/tarefa-unidade-operacional.test.ts":
     "unidade operacional da Tarefa: cria e derruba as PRÓPRIAS necessidades (marca TAREFA-OP) " +
     "só no banco de teste — o cenário precisa de uma obrigação real para a tarefa ter causa",
+  "scripts/reancoragem-nao-rouba-trabalho-aberto.test.ts":
+    "achado real (28/09/2026, processo 651): reancoragem cruzada de fase não pode roubar " +
+    "tarefa de instância ainda aberta — cria e derruba a PRÓPRIA necessidade (marca REANC) " +
+    "só no banco de teste, para materializar via garantirTarefaDePasso (o caminho oficial) " +
+    "e provar que a trava impede exatamente o que o movePhaseManual real quebrou",
   "scripts/equivalencia-portas-etapa.test.ts":
     "equivalência das portas de conclusão de etapa: monta DOIS cenários idênticos (marca EQUIV) " +
     "e derruba os dois — a prova exige que a única diferença entre eles seja a porta usada, " +

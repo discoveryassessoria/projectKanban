@@ -47,7 +47,11 @@ const CODIGO_API: Record<string, string> = {
   RUNTIME_V2_DESABILITADO: "MIGRATION_NOT_READY",
   PROCESSO_LEGACY: "MIGRATION_NOT_READY",
   SEM_TIPO_MOTOR: "PHASE_NOT_IN_WORKFLOW",
-  INSTANCIACAO_FALHOU: "INTERNAL_ERROR",
+  // Achado real (28/09/2026): WORKFLOW_SEM_PASSOS é erro de CADASTRO (a fase
+  // de destino não tem passo publicado nenhum) — não é falha do servidor, é
+  // configuração ausente. Caía em INTERNAL_ERROR/500 antes; a tela mostrava
+  // "erro interno" para um problema que é do cadastro, não do código.
+  INSTANCIACAO_FALHOU: "PHASE_NOT_CONFIGURED",
 }
 
 const STATUS_POR_CODIGO: Record<string, number> = {
@@ -62,6 +66,7 @@ const STATUS_POR_CODIGO: Record<string, number> = {
   MISSING_JUSTIFICATION: 422,
   CONCURRENT_MODIFICATION: 409,
   MIGRATION_NOT_READY: 409,
+  PHASE_NOT_CONFIGURED: 422,
   INTERNAL_ERROR: 500,
 }
 

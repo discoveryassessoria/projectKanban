@@ -1099,8 +1099,24 @@ async function materializarFasesPuladas(
   const ordemDestino = fases.find((f) => f.phaseKey === faseDestino)?.ordem
   if (ordemOrigem == null || ordemDestino == null || ordemDestino <= ordemOrigem) return
 
+  // CONDICIONAL SÓ ENTRA QUANDO A CONDIÇÃO SE APLICA — mesma regra de
+  // `proximaFaseComCondicional` (avanço normal), nunca uma segunda aqui.
+  //
+  // Achado real (28/09/2026, processo 651): esta função materializava TODA
+  // fase pulada por ordem, sem olhar `conditional` — moveu o processo pra
+  // "apostilamento" e materializou de brinde "retificacao_registros" e
+  // "emissao_documental_retificada" (as duas marcadas `conditional: true` no
+  // cadastro, `requerRetificacao` nunca avaliado) com 10 tarefas cada, para um
+  // processo que nunca teve retificação decidida. Fase condicional pulada
+  // continua pulada aqui também.
+  const temCondicional = fases.some((f) => f.conditional)
+  const requerRetificacao = temCondicional
+    ? (await prisma.analiseDocumental.findUnique({ where: { processoId }, select: { requerRetificacao: true } }).catch(() => null))?.requerRetificacao === true
+    : false
+
   const puladas = fases
     .filter((f) => f.ordem > ordemOrigem && f.ordem < ordemDestino)
+    .filter((f) => !f.conditional || requerRetificacao)
     .sort((a, b) => a.ordem - b.ordem)
 
   for (const fase of puladas) {

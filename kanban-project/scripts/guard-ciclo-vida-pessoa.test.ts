@@ -358,6 +358,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/tarefa-unidade-operacional.test.ts":
     "unidade operacional da Tarefa: monta e derruba as próprias árvores (marca TAREFA-OP), " +
     "só no banco de teste; prova que 7 etapas continuam sendo 1 tarefa",
+  "scripts/reancoragem-nao-rouba-trabalho-aberto.test.ts":
+    "achado real (28/09/2026, processo 651): monta e derruba a própria árvore (marca REANC), " +
+    "só no banco de teste; prova que reancoragem cruzada de fase não rouba tarefa aberta",
   "scripts/equivalencia-portas-etapa.test.ts":
     "equivalência das portas de conclusão de etapa: monta e derruba DUAS árvores idênticas " +
     "(marca EQUIV), só no banco de teste; a prova depende de os dois cenários serem gêmeos",

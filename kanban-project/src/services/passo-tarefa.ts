@@ -259,6 +259,42 @@ export async function garantirTarefaDePasso(
           const inteira = porChave ?? await tx.tarefa.findUniqueOrThrow({ where: { id: daUnidade.id } })
           return { success: true, created: false, tarefa: inteira, warnings, correlationId }
         }
+        // A CHAVE NÃO CARREGA A FASE DE PROPÓSITO (ver identidade-da-tarefa.ts) —
+        // e isso está certo para o avanço NORMAL, sequencial: quando esta função
+        // roda, a instância de origem já foi CONCLUÍDA/SUPERSEDIDA na MESMA
+        // transição (`executarPlano`, passo 1, antes de qualquer materialização
+        // de tarefa). "Seguir o trabalho" é reancorar uma obrigação que já
+        // FECHOU do lado de onde veio.
+        //
+        // `materializarFasesPuladas` (movePhaseManual com preservarHistorico)
+        // quebra essa premissa: ela materializa VÁRIAS fases de uma vez sem
+        // fechar nenhuma origem — de propósito, para não apagar trabalho em
+        // andamento. Achado real (28/09/2026, processo 651): mover pra
+        // "apostilamento" reancorou 7 tarefas ABERTAS de genealogia/emissão
+        // (uma delas EM_ANDAMENTO há dias, outra AGUARDANDO_TERCEIRO com pedido
+        // já enviado ao cartório) para um passo de "emissão retificada" — a
+        // tarefa perdeu status e prazo reais porque a chave enxergou "mesmo
+        // documento" e concluiu "mesma obrigação continuando", quando na
+        // verdade eram DUAS obrigações distintas que só coincidem no documento
+        // (localizar registro ≠ obter certidão ≠ emitir retificada).
+        //
+        // A trava: só reancorar quando a instância DE ONDE a tarefa está vindo
+        // já não está mais aberta. Instância ainda ATIVO/BLOQUEADO/AGUARDANDO
+        // é trabalho real em curso em outro lugar — não se rouba, e também não
+        // se duplica (o passo novo fica sem tarefa até a obrigação anterior
+        // fechar; a reconciliação de rotina materializa/reancora certo depois).
+        const instanciaDeOrigem = daUnidade.workflowInstanceId != null
+          ? await tx.phaseWorkflowInstance.findUnique({ where: { id: daUnidade.workflowInstanceId }, select: { status: true } })
+          : null
+        const origemAindaAberta =
+          instanciaDeOrigem != null && ["ATIVO", "BLOQUEADO", "AGUARDANDO"].includes(instanciaDeOrigem.status)
+        if (origemAindaAberta && daUnidade.workflowInstanceId !== step.workflowInstanceId) {
+          return fail("OBRIGACAO_ABERTA_EM_OUTRA_INSTANCIA", [{
+            code: "OBRIGACAO_ABERTA_EM_OUTRA_INSTANCIA",
+            message: `A tarefa ${daUnidade.id} desta obrigação está aberta na instância ${daUnidade.workflowInstanceId} — não reancorada para preservar o trabalho em curso.`,
+            stepKey: step.stepKey,
+          }])
+        }
         const reancorada = await reancorarTarefaNaUnidade(tx, {
           tarefaId: daUnidade.id,
           workflowInstanceId: step.workflowInstanceId,

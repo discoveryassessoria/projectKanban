@@ -207,6 +207,19 @@ check(
   "só materializa fases puladas quando o destino é POSTERIOR à origem",
   /ordemDestino <= ordemOrigem\) return/.test(semComentarios(motor)),
 )
+// Achado real (28/09/2026, processo 651): materializarFasesPuladas materializava
+// TODA fase pulada por ordem, ignorando `conditional` — moveu pra "apostilamento" e
+// materializou de brinde "retificacao_registros"/"emissao_documental_retificada"
+// (as duas condicionais) com 10 tarefas cada, pra um processo sem retificação
+// decidida. Mesma regra de proximaFaseComCondicional, nunca uma segunda.
+check(
+  "fase condicional pulada continua pulada — nunca materializada sem a condição",
+  /filter\(\(f\) => !f\.conditional \|\| requerRetificacao\)/.test(semComentarios(motor)),
+)
+check(
+  "a condição é a MESMA usada no avanço normal — analiseDocumental.requerRetificacao",
+  /materializarFasesPuladas[\s\S]{0,600}analiseDocumental\.findUnique/.test(semComentarios(motor)),
+)
 
 check(
   "existe o gancho de auto-avanço escopado à fase ATUAL (não reage a conclusão de tarefa histórica)",
