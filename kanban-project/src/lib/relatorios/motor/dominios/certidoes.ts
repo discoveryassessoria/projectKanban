@@ -7,7 +7,10 @@
 // ele muda de domínio sozinho — nenhuma linha aqui precisa ser tocada.
 //
 // Nascimento, casamento e óbito são TIPOS dentro deste domínio, não relatórios
-// diferentes. "Certidões faltantes" é este domínio com status PENDENTE.
+// diferentes. "Certidões faltantes" é este domínio filtrado pela SITUAÇÃO DA
+// SOLICITAÇÃO (não solicitada/pendente/solicitado) — ver
+// situacao-solicitacao-certidao.ts; nunca o status bruto de
+// NecessidadeDocumental (achado real: ATENDIDA não significa "recebida").
 //
 // A unidade é a NECESSIDADE — o que a regra documental disse que precisa
 // existir. É ela que permite responder "o que falta", que é a pergunta real; o
@@ -16,6 +19,11 @@
 import { prisma } from "@/lib/prisma"
 import { estadoTemporal, estadoTemporalSolicitacao, type EstadoTemporal } from "@/lib/operacional/tempo-operacional"
 import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/subtarefa-confirmacao-pedido"
+import {
+  CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO, CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO,
+  ROTULO_SITUACAO_SOLICITACAO, situacaoDaSolicitacaoCertidao,
+  type SituacaoSolicitacaoCertidao,
+} from "@/src/lib/process-stage/situacao-solicitacao-certidao"
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
 import type { CorDeCelula, DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, periodo, porCampo } from "./_comuns"
@@ -24,6 +32,11 @@ import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, perio
 export const CATEGORIA_CERTIDAO = "REGISTRO_CIVIL"
 
 const STEP_KEY_SOLICITAR_CERTIDAO = "solicitar_certidao"
+const CHAVES_SITUACAO_SOLICITACAO = [
+  ...CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO,
+  ...CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO,
+  ...CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO,
+] as const
 
 /** A BUCKETIZAÇÃO em 4 rótulos fixos, comum às duas fontes abaixo — nunca duplicada. */
 function bucketizarPrazo(et: EstadoTemporal): { rotulo: string; cor: CorDeCelula } {
@@ -65,7 +78,43 @@ export function situacaoDoPrazoSolicitacao(s: { previsaoRetorno: Date | null; st
   return bucketizarPrazo(estadoTemporalSolicitacao({ dataPrazo: s.previsaoRetorno, status: s.status }))
 }
 
-const STATUS = ["PENDENTE", "EM_ATENDIMENTO", "ATENDIDA", "NAO_LOCALIZADA", "DISPENSADA"] as const
+const SITUACOES_SOLICITACAO: readonly SituacaoSolicitacaoCertidao[] =
+  ["NAO_LOCALIZADA", "NAO_SOLICITADA", "PENDENTE", "SOLICITADO", "RECEBIDA", "DISPENSADA"]
+
+/**
+ * O WHERE Prisma de cada bucket de `situacaoDaSolicitacaoCertidao` — espelha
+ * EXATAMENTE a mesma precedência da função pura (DISPENSADA/NAO_LOCALIZADA
+ * primeiro, depois recebimento → confirmação → envio), pra filtro e coluna
+ * nunca divergirem. `concluiu`/`naoConcluiu` casam pelo PAPEL semântico da
+ * subtarefa dentro do Step "Solicitar certidão" — nunca string solta.
+ */
+function whereSituacaoSolicitacao(bucket: SituacaoSolicitacaoCertidao): Record<string, unknown> {
+  // MESMA exclusão de ciclo SUPERSEDIDO/CANCELADO do INCLUDE (acima) — sem
+  // isso, um envio concluído num ciclo antigo já reaberto faria o filtro
+  // divergir da coluna, que só olha o ciclo vigente.
+  const concluiu = (chaves: readonly string[]) => ({
+    documentos: { some: { stepInstances: { some: {
+      stepKey: STEP_KEY_SOLICITAR_CERTIDAO,
+      status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
+      execucoesDeSubtarefa: { some: { subtaskKey: { in: [...chaves] }, status: "CONCLUIDO" } },
+    } } } },
+  })
+  const naoConcluiu = (chaves: readonly string[]) => ({ NOT: concluiu(chaves) })
+  const naoDispensadaNemNaoLocalizada = { status: { notIn: ["DISPENSADA", "NAO_LOCALIZADA"] } }
+
+  switch (bucket) {
+    case "DISPENSADA": return { status: "DISPENSADA" }
+    case "NAO_LOCALIZADA": return { status: "NAO_LOCALIZADA" }
+    case "RECEBIDA":
+      return { AND: [naoDispensadaNemNaoLocalizada, concluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
+    case "SOLICITADO":
+      return { AND: [naoDispensadaNemNaoLocalizada, concluiu(CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), naoConcluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
+    case "PENDENTE":
+      return { AND: [naoDispensadaNemNaoLocalizada, concluiu(CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO), naoConcluiu(CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), naoConcluiu(CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO)] }
+    case "NAO_SOLICITADA":
+      return { AND: [naoDispensadaNemNaoLocalizada, naoConcluiu(CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO)] }
+  }
+}
 
 const INCLUDE = {
   itemCatalogo: {
@@ -99,19 +148,32 @@ const INCLUDE = {
         select: { id: true, dataPrazo: true, dataConclusao: true, statusTarefa: true, responsavel: { select: { nome: true } } },
         take: 1,
       },
-      // CONFIRMAÇÃO DO PEDIDO — a subtarefa "Receber confirmação do pedido"
-      // dentro do Step único "Solicitar certidão" (4 subtarefas, 1 Step desde
-      // a consolidação de 15/09/2026). Casa pelo PAPEL SEMÂNTICO da subtarefa
-      // (CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO), nunca uma string solta — ver
-      // src/lib/process-stage/subtarefa-confirmacao-pedido.ts.
+      // SITUAÇÃO DA SOLICITAÇÃO — as 3 subtarefas do Step único "Solicitar
+      // certidão" (4 subtarefas, 1 Step desde a consolidação de 15/09/2026)
+      // que marcam o fluxo real do pedido ao cartório: enviar_requerimento_
+      // cartorio / receber_confirmacao_pedido / receber_certidao. Casa pelo
+      // PAPEL SEMÂNTICO de cada uma (CHAVES_SUBTAREFA_*), nunca string solta —
+      // ver src/lib/process-stage/situacao-solicitacao-certidao.ts. Sem
+      // `take` no array: precisa da mais recente de CADA uma das 3 chaves,
+      // não só da última execução do passo inteiro.
+      // SEM `where.status`/`orderBy` aqui, `take: 1` podia pegar um CICLO
+      // SUPERSEDIDO (reabertura/reconciliação) em vez do vigente — achado real
+      // (28/09/2026): a coluna "Situação" mostrava "Não solicitada" pra
+      // Documentos que JÁ tinham envio concluído no ciclo VIVO, porque o
+      // `take:1` sem ordem trazia a instância antiga (sem execução nenhuma).
       stepInstances: {
-        where: { stepKey: STEP_KEY_SOLICITAR_CERTIDAO },
+        where: { stepKey: STEP_KEY_SOLICITAR_CERTIDAO, status: { notIn: [...["SUPERSEDIDO", "CANCELADO"]] as ("SUPERSEDIDO" | "CANCELADO")[] } },
+        // `id desc` basta: ciclo novo sempre cria PhaseWorkflowStepInstance com
+        // id maior que o antigo (autoincrement) — não precisa de 2 critérios.
+        orderBy: { id: "desc" as const },
         select: {
           execucoesDeSubtarefa: {
-            where: { subtaskKey: { in: [...CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO] as string[] }, status: "CONCLUIDO" },
+            where: {
+              subtaskKey: { in: [...CHAVES_SITUACAO_SOLICITACAO] as string[] },
+              status: "CONCLUIDO",
+            },
             orderBy: { sequencia: "desc" as const },
-            take: 1,
-            select: { completedAt: true, protocolo: true, protocoloRef: { select: { numeroProtocolo: true } } },
+            select: { subtaskKey: true, completedAt: true, protocolo: true, protocoloRef: { select: { numeroProtocolo: true } } },
           },
         },
         take: 1,
@@ -124,7 +186,19 @@ const INCLUDE = {
 const doc = (l: any) => l.documentos?.[0] ?? null
 const sol = (l: any) => doc(l)?.solicitacoes?.[0] ?? null
 const tarefaDoDoc = (l: any) => doc(l)?.tarefasVinculadas?.[0] ?? null
-const confirmacao = (l: any) => doc(l)?.stepInstances?.[0]?.execucoesDeSubtarefa?.[0] ?? null
+// As execuções concluídas das 3 subtarefas de "Solicitar certidão" (envio,
+// confirmação, recebimento) que o INCLUDE busca juntas — nunca mais de uma
+// por chave (é a mais recente de cada, orderBy sequencia desc já garante).
+const execucoesSituacao = (l: any): Array<{ subtaskKey: string; completedAt: Date | null; protocolo: string | null; protocoloRef: { numeroProtocolo: string | null } | null }> =>
+  doc(l)?.stepInstances?.[0]?.execucoesDeSubtarefa ?? []
+const execucaoDoPapel = (l: any, chaves: readonly string[]) =>
+  execucoesSituacao(l).find((e) => (chaves as readonly string[]).includes(e.subtaskKey)) ?? null
+const confirmacao = (l: any) => execucaoDoPapel(l, CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO)
+const situacaoSolicitacao = (l: any): SituacaoSolicitacaoCertidao =>
+  situacaoDaSolicitacaoCertidao({
+    necessidadeStatus: l.status,
+    chavesConcluidas: execucoesSituacao(l).map((e) => e.subtaskKey),
+  })
 
 /** Só necessidades cujo item pertence à categoria de registro civil. */
 const SO_CERTIDAO = {
@@ -146,9 +220,19 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     { key: "tipo", rotulo: "Tipo de certidão",
       descricao: "Só registro civil — a mesma categoria do Cadastro Mestre que define este domínio.",
       tipo: "multi_selecao", opcoes: cadastro("itens_certidao"), paraWhere: emListaId("itemCatalogoId") },
+    // Achado real (processo 651, 28/09/2026): o status BRUTO da Necessidade
+    // (ATENDIDA) confundia "localizei o registro" com "recebi a certidão" —
+    // ver situacao-solicitacao-certidao.ts. Filtro e coluna usam a MESMA
+    // fonte derivada, nunca o enum cru de NecessidadeDocumental.
     { key: "status", rotulo: "Situação", tipo: "multi_selecao",
-      opcoes: { tipo: "catalogo", valores: STATUS.map((s) => ({ valor: s, rotulo: s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ") })) },
-      paraWhere: emLista("status") },
+      opcoes: { tipo: "catalogo", valores: SITUACOES_SOLICITACAO.map((s) => ({ valor: s, rotulo: ROTULO_SITUACAO_SOLICITACAO[s] })) },
+      paraWhere: (v) => {
+        if (v.tipo !== "multi_selecao" || !v.valores.length) return null
+        const ou = v.valores
+          .filter((s): s is SituacaoSolicitacaoCertidao => (SITUACOES_SOLICITACAO as readonly string[]).includes(s))
+          .map(whereSituacaoSolicitacao)
+        return ou.length ? { OR: ou } : null
+      } },
     { key: "obrigatoriedade", rotulo: "Obrigatoriedade", tipo: "multi_selecao",
       opcoes: { tipo: "catalogo", valores: [
         { valor: "OBRIGATORIA", rotulo: "Obrigatória" }, { valor: "OPCIONAL", rotulo: "Opcional" } ] },
@@ -218,7 +302,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
 
   agrupamentos: [
     porCampo("tipo", "Tipo de certidão", (l) => l.itemCatalogo?.name),
-    porCampo("status", "Situação", (l) => l.status),
+    porCampo("status", "Situação", (l) => ROTULO_SITUACAO_SOLICITACAO[situacaoSolicitacao(l)]),
     porCampo("familia", "Família", (l) => l.processo?.familia?.nome),
     porCampo("nacionalidade", "Nacionalidade", (l) => l.processo?.paisCanonico?.countryLabel),
     porCampo("orgao", "Órgão emissor", (l) => doc(l)?.orgao?.name),
@@ -228,7 +312,7 @@ export const DOMINIO_CERTIDOES: DominioDef = {
 
   colunas: [
     { key: "tipo", rotulo: "Certidão", valor: (l) => l.itemCatalogo?.name ?? null },
-    { key: "status", rotulo: "Situação", valor: (l) => l.status },
+    { key: "status", rotulo: "Situação", valor: (l) => ROTULO_SITUACAO_SOLICITACAO[situacaoSolicitacao(l)] },
     // Documento nasce automaticamente junto com a necessidade (unificação
     // 28/09/2026) — vazio, sem cartório/livro/folha. "Tem Documento" não é mais
     // sinal de "tem dado real"; esta coluna é quem responde isso. Achado real que
@@ -288,6 +372,12 @@ export const DOMINIO_CERTIDOES: DominioDef = {
 
   ordenacoes: [
     { key: "criacao", rotulo: "Criação da necessidade", orderBy: (d) => [{ createdAt: d }, { id: d }] },
+    // LIMITAÇÃO CONHECIDA (mesma família da de "confirmado_em" logo abaixo):
+    // ordena pelo status BRUTO de NecessidadeDocumental, não pelo bucket
+    // derivado que a coluna "Situação" exibe — a ordem alfabética do enum não
+    // bate com Não localizada→Não solicitada→Pendente→Solicitado→Recebida→
+    // Dispensada. Ordenar pelo bucket certo exigiria SQL bruto (CASE WHEN
+    // sobre 2 relações aninhadas); registrado como limitação, não escondido.
     { key: "status", rotulo: "Situação", orderBy: (d) => [{ status: d }, { id: "desc" as const }] },
     // FAMÍLIA → GERAÇÃO: os dois primeiros níveis pedidos pela visão "Certidões
     // solicitadas no período". "Confirmado em" como 3º critério NÃO é possível
@@ -320,19 +410,22 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0, 10)
     const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().slice(0, 10)
     return [
+      // Redefinidas pra "Situação" derivada (achado real, 28/09/2026 — ver
+      // situacao-solicitacao-certidao.ts). "Certidões faltantes" = ainda não
+      // tenho a certidão em mãos, qualquer estágio antes de RECEBIDA.
       { key: "faltantes", nome: "Certidões faltantes",
-        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["PENDENTE"] } }] } },
+        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["NAO_SOLICITADA", "PENDENTE", "SOLICITADO"] } }] } },
       { key: "em-atendimento", nome: "Em atendimento",
-        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["EM_ATENDIMENTO"] } }] } },
+        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["SOLICITADO"] } }] } },
       { key: "nao-localizadas", nome: "Não localizadas",
         spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["NAO_LOCALIZADA"] } }] } },
       { key: "atrasadas", nome: "Com retorno vencido",
         spec: { filtros: [{ key: "atrasada", valor: { tipo: "booleano" as const, valor: true } }] } },
+      // Antes precisava combinar 2 filtros (status=PENDENTE + solicitada=false)
+      // porque não existia um bucket próprio pra "nada foi enviado ainda" — a
+      // situação NAO_SOLICITADA agora é exatamente isso, sozinha.
       { key: "nao-solicitadas", nome: "Pendentes ainda não solicitadas",
-        spec: { filtros: [
-          { key: "status", valor: { tipo: "multi_selecao" as const, valores: ["PENDENTE"] } },
-          { key: "solicitada", valor: { tipo: "booleano" as const, valor: false } },
-        ] } },
+        spec: { filtros: [{ key: "status", valor: { tipo: "multi_selecao" as const, valores: ["NAO_SOLICITADA"] } }] } },
       { key: "por-orgao", nome: "Por órgão emissor", spec: { filtros: [], agruparPor: "orgao" } },
       { key: "por-familia", nome: "Por família", spec: { filtros: [], agruparPor: "familia" } },
       // VISÃO PADRÃO pedida (rodada "Relatório de Certidões", 27/09/2026):

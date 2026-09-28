@@ -393,6 +393,7 @@
     "test:completude-documental-unificacao": "tsx scripts/completude-documental-unificacao.test.ts",
     "test:documento-nasce-com-necessidade": "tsx scripts/documento-nasce-com-necessidade.test.ts",
     "test:prazo-solicitacao-documento": "tsx scripts/prazo-solicitacao-documento.test.ts",
+    "test:situacao-solicitacao-certidao": "tsx scripts/situacao-solicitacao-certidao.test.ts",
     "test:relatorios-coluna": "tsx scripts/relatorios-coluna-restrita.test.ts",
     "test:seletor-css": "tsx scripts/seletor-css-valido.test.ts",
     "test:ui:relatorios": "playwright test tests/ui/relatorios.spec.ts",
