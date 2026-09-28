@@ -125,12 +125,26 @@ inv("18", "reabrir passa pela porta canônica do motor", reab.includes("reabrirP
 secao("(3) O ESCOPO DA UNIDADE OPERACIONAL")
 // ══════════════════════════════════════════════════════════════════════════════
 
-// A regressão mais perigosa deste motor: com `OR`, dois documentos que atendem à mesma
-// necessidade — o que uma nova via produz — caem na mesma unidade, e reabrir um alcança
-// o outro. Com cinquenta certidões isso é invisível até acontecer.
-inv("19", "a unidade é a CONJUNÇÃO das âncoras",
-  canonica.includes("AND: conjuncao") && !/OR: porObrigacao/.test(canonica),
-  "com OR, uma certidão alcança outra que compartilhe a necessidade")
+// A regressão mais perigosa deste motor: com `OR` ingênuo (`necessidadeId` OU
+// `documentoId`, sem mais nada), dois documentos que atendem à mesma necessidade — o
+// que uma nova via produz — caem na mesma unidade, e reabrir um alcança o outro. Com
+// cinquenta certidões isso é invisível até acontecer.
+//
+// REESCRITO 28/09/2026 (deliberado, não silenciado — ver comentário em
+// `escopoDaUnidade`): a conjunção rígida original (`necessidadeId` E `documentoId`
+// batendo sempre) quebrava passos DOCUMENTO-scope-only, que nunca preenchem
+// `necessidadeId` por construção (ex.: "solicitar_certidao" em Emissão Documental) —
+// achado real: 6 tarefas com `workflowStepInstanceId: null` apesar do passo ativo
+// existir (Saúde do Sistema, regra EMI-001). A regra nova não é OR ingênuo: um passo
+// pertence à unidade quando NENHUMA âncora que ele carrega diverge da tarefa (uma
+// âncora que o passo não tem não desqualifica), e ao menos uma âncora real bate. Isso
+// preserva a mesma proteção — um passo de OUTRO documento sob a mesma necessidade
+// diverge em `documentoId` e continua de fora — sem exigir que todo passo preencha as
+// duas âncoras. Prova comportamental: scripts/tarefa-unidade-operacional.test.ts, seção K.
+inv("19", "a unidade não confunde âncoras — nenhuma diverge, e ao menos uma bate",
+  canonica.includes("semDivergencia") && canonica.includes("algumaAncoraBate") &&
+  !/OR:\s*\[\s*\{\s*necessidadeId:\s*u\.necessidadeId\s*\},\s*\{\s*documentoId:\s*u\.documentoId\s*\}\s*\]/.test(canonica),
+  "nem AND rígido (quebra passo documento-scope-only) nem OR ingênuo (mistura documentos da mesma necessidade)")
 inv("20", "a cadeia da reabertura é escopada pela unidade", reab.includes("escopoDaUnidade("))
 inv("21", "a propagação do motor também é escopada pela unidade",
   /descendentes\(grafoDaUnidade/.test(sync) && /escopoDaUnidade\(\{[\s\S]{0,240}?documentoId: step\.documentoId/.test(sync))

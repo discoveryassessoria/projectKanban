@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import {
   materializarTarefaOperacional, sincronizarTarefaComWorkflow, chaveDaTarefa,
-  estadoDerivado, etapaCorrente, calcularPrazo,
+  estadoDerivado, etapaCorrente, calcularPrazo, escopoDaUnidade,
 } from "@/lib/operacional/tarefa-canonica"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 
@@ -221,6 +221,80 @@ async function main() {
     (await prisma.tarefa.count({ where: { processoId: q.processoId } })) === 1)
   const r2 = await reconciliarTarefas({ processoId: q.processoId })
   ok("e a última rodada não cria nada", r2.tarefasCriadas === 0, `${r2.tarefasCriadas}`)
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao("K) escopoDaUnidade — passo documento-scope-only entra; documento vizinho da MESMA necessidade não vaza")
+  // ═════════════════════════════════════════════════════════════════════════
+  // Achado real (28/09/2026, Saúde do Sistema, regra EMI-001): 6 tarefas de
+  // Emissão Documental com workflowStepInstanceId=null porque a conjunção
+  // rígida (necessidadeId E documentoId batendo) exigia um necessidadeId que o
+  // passo "solicitar_certidao" (documento-scope-only) nunca preenche. Este
+  // bloco prova a correção E que a proteção original (não misturar dois
+  // documentos da mesma necessidade) continua de pé.
+  const kItem = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_K`, name: "Certidão K", natureza: "DOCUMENTO" }, select: { id: true } })
+  const kArv = await prisma.arvore.create({ data: { nome: `${MARCA} K` }, select: { id: true } })
+  const kProc = await prisma.processo.create({ data: { nome: `${MARCA} K`, arvoreId: kArv.id }, select: { id: true } })
+  const kPes = await prisma.pessoa.create({ data: { arvoreId: kArv.id, nome: "Ademir", sobrenome: "K" }, select: { id: true } })
+  const kNec = await prisma.necessidadeDocumental.create({
+    data: { processoId: kProc.id, itemCatalogoId: kItem.id, pessoaId: kPes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-nec-K-${kProc.id}` },
+    select: { id: true },
+  })
+  const kInst = await prisma.phaseWorkflowInstance.create({
+    data: { processoId: kProc.id, faseMacroKey: "emissao_documental", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-inst-K-${kProc.id}` },
+    select: { id: true },
+  })
+  const docAlvo = await prisma.documento.create({ data: { pessoaId: kPes.id }, select: { id: true } })
+  const docVizinho = await prisma.documento.create({ data: { pessoaId: kPes.id }, select: { id: true } })
+
+  // Passo DOCUMENTO-scope-only do documento alvo — nunca preenche necessidadeId,
+  // exatamente como "solicitar_certidao" em produção.
+  const stepAlvo = await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: kInst.id, processoId: kProc.id, faseMacroKey: "emissao_documental",
+      stepKey: "solicitar_certidao", ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      documentoId: docAlvo.id, papel: "equipe_documental",
+      chaveIdempotencia: `${MARCA}-step-K-alvo-${kProc.id}`,
+    },
+    select: { id: true },
+  })
+  // Passo do documento VIZINHO, MESMA necessidade — o cenário que o AND original protegia.
+  await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: kInst.id, processoId: kProc.id, faseMacroKey: "emissao_documental",
+      stepKey: "solicitar_certidao", ordem: 2, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      documentoId: docVizinho.id, necessidadeId: kNec.id, papel: "equipe_documental",
+      chaveIdempotencia: `${MARCA}-step-K-vizinho-${kProc.id}`,
+    },
+    select: { id: true },
+  })
+
+  const whereAlvo = escopoDaUnidade({ workflowInstanceId: kInst.id, necessidadeId: kNec.id, documentoId: docAlvo.id })
+  const encontrados = await prisma.phaseWorkflowStepInstance.findMany({ where: whereAlvo, select: { id: true, documentoId: true } })
+  ok("encontra o passo documento-scope-only mesmo a unidade carregando necessidadeId também",
+    encontrados.length === 1 && encontrados[0].id === stepAlvo.id, JSON.stringify(encontrados))
+  ok("NÃO traz o passo do documento vizinho da mesma necessidade — proteção original preservada",
+    !encontrados.some((s) => s.documentoId === docVizinho.id))
+
+  // Ponta a ponta: a tarefa real, materializada com as duas âncoras, sincroniza
+  // pro passo certo — não fica com workflowStepInstanceId null.
+  const materK = await prisma.$transaction((tx) => materializarTarefaOperacional(tx, {
+    titulo: "Certidão K", processoId: kProc.id, pessoaId: kPes.id, necessidadeId: kNec.id,
+    documentoId: docAlvo.id, ciclo: 1, workflowInstanceId: kInst.id, slaDays: 5,
+  }, new Date()))
+  await prisma.$transaction((tx) => sincronizarTarefaComWorkflow(tx, materK.tarefaId, new Date()))
+  const tarefaK = await prisma.tarefa.findUnique({ where: { id: materK.tarefaId }, select: { workflowStepInstanceId: true } })
+  ok("a tarefa real (nec+doc) aponta pro passo documento-scope-only certo, não fica null",
+    tarefaK?.workflowStepInstanceId === stepAlvo.id, `${tarefaK?.workflowStepInstanceId} vs esperado ${stepAlvo.id}`)
+
+  await prisma.tarefa.deleteMany({ where: { processoId: kProc.id } })
+  await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: kProc.id } })
+  await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: kProc.id } })
+  await prisma.necessidadeDocumental.deleteMany({ where: { processoId: kProc.id } })
+  await prisma.documento.deleteMany({ where: { id: { in: [docAlvo.id, docVizinho.id] } } })
+  await prisma.pessoa.deleteMany({ where: { arvoreId: kArv.id } })
+  await prisma.processo.deleteMany({ where: { id: kProc.id } })
+  await prisma.arvore.deleteMany({ where: { id: kArv.id } })
+  await prisma.itemCatalogo.deleteMany({ where: { id: kItem.id } })
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("I) A identidade é a obrigação, não o título nem a etapa")

@@ -412,12 +412,49 @@ export function escopoDaUnidade(u: {
   // Sem âncora nenhuma (cardinalidade PROCESSO), a unidade é a fase inteira, e o
   // filtro por nulos é o que a delimita: passos de processo não se misturam com
   // passos de documento.
-  const conjuncao: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
-  if (u.necessidadeId != null) conjuncao.push({ necessidadeId: u.necessidadeId })
-  if (u.documentoId != null) conjuncao.push({ documentoId: u.documentoId })
+  const necId = u.necessidadeId ?? null
+  const docId = u.documentoId ?? null
+
+  if (necId == null && docId == null) {
+    return { workflowInstanceId: u.workflowInstanceId, necessidadeId: null, documentoId: null }
+  }
+
+  // EXIGIR AMBAS AS ÂNCORAS BATENDO QUEBRA PASSOS DE ESCOPO ÚNICO.
+  //
+  // A conjunção rígida (`necessidadeId: X AND documentoId: Y`) presumia que todo
+  // passo de uma tarefa com as duas âncoras preenchidas também preenche as duas —
+  // e não é verdade: passos DOCUMENTO-scope only (ex.: "solicitar_certidao", em
+  // Emissão Documental) nunca gravam `necessidadeId`, é estrutural, não dado
+  // perdido. Uma tarefa que carrega os dois campos (o `necessidadeId` aqui é
+  // referência cruzada — ver `central-operacional/route.ts`, "p/ Tarefa
+  // Transversal na linha do documento") nunca encontrava esse passo: a conjunção
+  // exigia um `necessidadeId` que o passo nunca teria. `etapaCorrente([])` voltava
+  // `null`, e a tarefa perdia o ponteiro — achado real: 6 tarefas de Emissão
+  // Documental com `workflowStepInstanceId: null` apesar do passo ativo existir
+  // (28/09/2026, Saúde do Sistema, regra EMI-001).
+  //
+  // A regra certa: um passo pertence à unidade quando NENHUMA âncora que ELE
+  // carrega diverge da tarefa (uma âncora que o passo não tem não o desqualifica
+  // — é isso que deixa os passos documento-scope-only entrarem), E ao menos uma
+  // âncora real bate (senão um passo sem âncora nenhuma "não diverge" por vácuo e
+  // entraria indevidamente). Isso preserva exatamente a proteção original: um
+  // passo de OUTRO documento sob a mesma necessidade (`necessidadeId: X,
+  // documentoId: Y2`) diverge em `documentoId` e continua de fora. E também
+  // preserva passos que legitimamente carregam as duas âncoras ao mesmo tempo
+  // (ex.: "localizar_registro", em Genealogia) — aí as duas precisam bater, como
+  // sempre bateram.
+  const semDivergencia: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
+  if (necId != null) semDivergencia.push({ OR: [{ necessidadeId: necId }, { necessidadeId: null }] })
+  if (docId != null) semDivergencia.push({ OR: [{ documentoId: docId }, { documentoId: null }] })
+
+  const algumaAncoraBate: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
+  if (necId != null) algumaAncoraBate.push({ necessidadeId: necId })
+  if (docId != null) algumaAncoraBate.push({ documentoId: docId })
+
   return {
     workflowInstanceId: u.workflowInstanceId,
-    ...(conjuncao.length > 0 ? { AND: conjuncao } : { necessidadeId: null, documentoId: null }),
+    AND: semDivergencia,
+    OR: algumaAncoraBate,
   }
 }
 
