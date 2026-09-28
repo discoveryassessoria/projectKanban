@@ -84,6 +84,23 @@ async function main() {
   t(!/const byPersonAgg/.test(route) && !/const byPersonV2/.test(route),
     "os 2 cálculos antigos de byPerson (Documento+linhaReta cru; localizar_registro V2) foram removidos, não só sobrescritos")
 
+  console.log("\n(6) matrix.missingCount e matrix.missing.length fecham no MESMO escopo (achado real, 27/09/2026):")
+  // Regressão encontrada pelo usuário direto em produção: missingCount vinha de
+  // completudeTodas (17) mas matrix.missing vinha de completudeLinhaPrincipal (15) —
+  // dois escopos diferentes dentro do MESMO objeto matrix. Correção: missing também
+  // passa a ser TODAS (nunca esconde Zenir/Isonia, os 2 cônjuges FORA_DA_LINHAGEM);
+  // byPerson continua LINHA_PRINCIPAL de propósito (pergunta diferente: "quanto cada
+  // pessoa da linha principal precisa", não "quais documentos faltam no processo").
+  t(/const matrixMissingUnificado = completudeTodas\.missing\.map/.test(route),
+    "matrix.missing constrói a partir de completudeTodas (mesmo escopo de missingCount/total/completed)")
+  t(/const matrixByPersonUnificado = completudeLinhaPrincipal\.byPerson\.map/.test(route),
+    "matrix.byPerson continua LINHA_PRINCIPAL (detalhamento por pessoa é pergunta diferente)")
+  t(todas.missingCount === todas.missing.length,
+    "no processo real: missingCount === missing.length dentro do escopo TODAS", `${todas.missingCount} === ${todas.missing.length}`)
+  const zenir = todas.missing.find((m) => m.pessoaNome === "Zenir Cunha Barreto")
+  const isonia = todas.missing.find((m) => m.pessoaNome === "Isonia Terezinha Maldaner")
+  t(!!zenir && !!isonia, "as 2 necessidades dos cônjuges FORA_DA_LINHAGEM (Zenir, Isonia) aparecem em missing — não ficam escondidas")
+
   console.log(`\n${"=".repeat(70)}`)
   console.log(`✅ ${ok} passaram · ❌ ${falhou} falharam`)
   if (falhou > 0) { console.log("\nFalhas:", falhas.join(", ")); process.exit(1) }

@@ -435,8 +435,11 @@ export async function GET(
     // pessoa) por uma única conta, sempre a partir de NecessidadeDocumental (nunca
     // esconde necessidade sem Documento — era o caso #607) e sempre com a MESMA
     // classificação rica de pessoa que só a #3 calculava. TODAS = igual ao total
-    // oficial (matrixOficial/indice.resumo); LINHA_PRINCIPAL = só o detalhamento
-    // por pessoa do byPerson/missing (achado real: linhaReta cru somava 14 de 17).
+    // oficial (matrixOficial/indice.resumo) e à LISTA de faltantes (matrix.missing —
+    // achado real, 27/09/2026: missingCount vinha de TODAS mas missing[] vinha de
+    // LINHA_PRINCIPAL, 17 ≠ 15 dentro do MESMO objeto). LINHA_PRINCIPAL só segue pro
+    // detalhamento POR PESSOA (byPerson) — pergunta diferente ("quanto cada pessoa da
+    // linha principal precisa" vs "quais documentos faltam no processo todo").
     const mesmaInstanciaConsultada = faseContexto?.workflowInstanceId ?? instanciaVigente?.id ?? null
     const [completudeTodas, completudeLinhaPrincipal] = await Promise.all([
       resolverCompletudeDocumental(id, {
@@ -458,7 +461,7 @@ export async function GET(
       total: p.required,
       percentage: p.percentage,
     }))
-    const matrixMissingUnificado = completudeLinhaPrincipal.missing.map((m) => ({
+    const matrixMissingUnificado = completudeTodas.missing.map((m) => ({
       // necessidade ainda sem Documento materializado (ex.: #607) não tem id de
       // documento pra abrir — null, nunca um sentinel numérico (front não lê hoje;
       // se vier a ler, tratar null como "documento não criado", nunca como id 0).
