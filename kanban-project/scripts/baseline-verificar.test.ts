@@ -567,6 +567,10 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // Bug 2 (rodada de ajustes Operação v3, 26/09/2026): StepSubtaskDefinition
   // ganha exigeProtocolo — protocolo obrigatório pra concluir a subtarefa.
   '20260927000000_exige_protocolo_subtarefa',
+  // PROC-005 (achado real, processo 651, 28/09/2026): índice único parcial
+  // impedindo fisicamente 2ª PhaseWorkflowInstance ativa na mesma
+  // (processoId, faseMacroKey) — ver escopoDaUnidade/cicloAlvoParaFase.
+  '20260928200000_trava_instancia_ativa_unica_por_fase',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
