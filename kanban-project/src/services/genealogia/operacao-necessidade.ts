@@ -14,6 +14,8 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma, TipoDocumento } from "@prisma/client"
 import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
 
+type DB = typeof prisma | Prisma.TransactionClient
+
 /** Enum legado de tipo de documento aceito pelo Documento. */
 const TIPOS = new Set<string>([
   "CERTIDAO_NASCIMENTO", "CERTIDAO_NASCIMENTO_INTEIRO_TEOR",
@@ -32,14 +34,24 @@ export class OperacaoNecessidadeErro extends Error {
 }
 
 /**
- * Documento operacional do registro a localizar. Cria na primeira abertura, reusa
- * nas seguintes, e vincula os passos daquele alvo ao Documento.
+ * Documento operacional do registro a localizar. Cria na primeira abertura (ou na
+ * materialização da necessidade — ver `materializarGenealogia`), reusa nas
+ * seguintes, e vincula os passos daquele alvo ao Documento.
+ *
+ * Aceita `db` (tx) pra participar de uma transação já aberta pelo chamador — nunca
+ * abre a SUA PRÓPRIA transação com o client global quando já está dentro de uma
+ * (CLAUDE.md, invariante transação×conexão). Isso importa de verdade:
+ * `simularImpactoPessoa` chama `materializarGenealogia` dentro de um `tx` que
+ * sempre dá ROLLBACK (simulação é read-only por construção) — se este serviço
+ * abrisse sua própria transação com `prisma` global, o Documento criado durante
+ * uma simulação vazaria de verdade pro banco, sem rollback nenhum.
  */
 export async function garantirDocumentoDaNecessidade(
   processoId: number,
   necessidadeId: number,
-): Promise<number> {
-  const nec = await prisma.necessidadeDocumental.findUnique({
+  db: DB = prisma,
+): Promise<{ documentoId: number; criado: boolean }> {
+  const nec = await db.necessidadeDocumental.findUnique({
     where: { id: necessidadeId },
     select: {
       id: true, processoId: true, pessoaId: true, itemCatalogoId: true,
@@ -64,7 +76,7 @@ export async function garantirDocumentoDaNecessidade(
   }
 
   // Tipo do documento a partir do itemCatalogo da necessidade (ponte legacyEnumKey).
-  const tipoDoc = await prisma.tipoDocumentoCadastro.findFirst({
+  const tipoDoc = await db.tipoDocumentoCadastro.findFirst({
     where: { itemCatalogoId: nec.itemCatalogoId },
     select: { id: true, legacyEnumKey: true },
   })
@@ -72,15 +84,17 @@ export async function garantirDocumentoDaNecessidade(
     ? (tipoDoc.legacyEnumKey as TipoDocumento)
     : null
 
-  const doc = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const criarOuReusar = async (tx: DB) => {
     // ADVISORY LOCK transacional por necessidade (namespace fixo): serializa criações
     // concorrentes (duplo-clique/retry) SEM constraint no banco — como o modelo permite
     // N documentos por necessidade, um unique global não cabe; o lock garante que só o
-    // primeiro cria e os demais reusam. Liberado no fim da transação.
+    // primeiro cria e os demais reusam. Liberado no fim da transação (a do chamador,
+    // quando `db` já era um tx; a nossa própria, quando não era).
     // ::int4 obrigatório: o Prisma vincula como bigint e a assinatura
     // pg_advisory_xact_lock(int4,int4) não casa com (int4,bigint).
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(741852, ${nec.id}::int4)`
     let d = await tx.documento.findFirst({ where: { necessidadeId: nec.id }, select: { id: true } })
+    let criado = false
     if (!d) {
       d = await tx.documento.create({
         data: {
@@ -95,6 +109,7 @@ export async function garantirDocumentoDaNecessidade(
         },
         select: { id: true },
       })
+      criado = true
     }
     // Liga ao Documento TODOS os passos daquele alvo — por necessidade, não por nome
     // de passo. Assim qualquer passo que o workflow publicado tenha para este registro
@@ -103,8 +118,11 @@ export async function garantirDocumentoDaNecessidade(
       where: { necessidadeId: nec.id, documentoId: null },
       data: { documentoId: d.id },
     })
-    return d
-  })
+    return { documentoId: d.id, criado }
+  }
 
-  return doc.id
+  // `db` já é um tx (chamador está dentro de uma transação, ex.: materializarGenealogia
+  // ou simularImpactoPessoa): participa dela, nunca abre uma segunda. Só quando `db` é o
+  // client global é que este serviço abre a SUA PRÓPRIA transação, como sempre fez.
+  return db === prisma ? await prisma.$transaction((tx) => criarOuReusar(tx)) : await criarOuReusar(db)
 }

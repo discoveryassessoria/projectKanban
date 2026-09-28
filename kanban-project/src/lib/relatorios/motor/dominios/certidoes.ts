@@ -16,6 +16,7 @@
 import { prisma } from "@/lib/prisma"
 import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/subtarefa-confirmacao-pedido"
+import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
 import type { CorDeCelula, DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, periodo, porCampo } from "./_comuns"
 
@@ -60,7 +61,7 @@ const INCLUDE = {
   },
   documentos: {
     select: {
-      id: true, status: true, cartorio: true, data_emissao: true, traduzido: true, apostilado: true,
+      id: true, status: true, cartorio: true, livro: true, folha: true, data_emissao: true, traduzido: true, apostilado: true,
       orgao: { select: { id: true, name: true, city: true, state: true, pais: { select: { countryLabel: true } } } },
       solicitacoes: {
         select: {
@@ -205,6 +206,14 @@ export const DOMINIO_CERTIDOES: DominioDef = {
   colunas: [
     { key: "tipo", rotulo: "Certidão", valor: (l) => l.itemCatalogo?.name ?? null },
     { key: "status", rotulo: "Situação", valor: (l) => l.status },
+    // Documento nasce automaticamente junto com a necessidade (unificação
+    // 28/09/2026) — vazio, sem cartório/livro/folha. "Tem Documento" não é mais
+    // sinal de "tem dado real"; esta coluna é quem responde isso. Achado real que
+    // motivou: a Tarefa #3827 (necessidade 607) aparecia "em andamento" sem
+    // nenhum dado real por trás do Documento.
+    { key: "dados_preenchidos", rotulo: "Dados preenchidos",
+      valor: (l) => (doc(l) ? (documentoTemDadosPreenchidos(doc(l)) ? "Sim" : "Não") : null),
+      corDoValor: (l) => (!doc(l) ? null : documentoTemDadosPreenchidos(doc(l)) ? "verde" : "cinza") },
     { key: "obrigatoriedade", rotulo: "Obrigatoriedade", valor: (l) => l.obrigatoriedade },
     { key: "pessoa", rotulo: "Pessoa", valor: (l) => (l.pessoa ? `${l.pessoa.nome} ${l.pessoa.sobrenome ?? ""}`.trim() : null),
       link: (l) => (l.pessoa?.arvoreId ? `/genealogy?arvoreId=${l.pessoa.arvoreId}&pessoaId=${l.pessoa.id}` : null) },

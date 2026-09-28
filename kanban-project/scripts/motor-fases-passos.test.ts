@@ -325,7 +325,7 @@ async function main() {
 
     for (const s of passos) {
       // Abrir a busca materializa o Documento do registro (mesmo caminho do botão "Abrir").
-      const docId = await garantirDocumentoDaNecessidade(pg, s.necessidadeId!)
+      const { documentoId: docId } = await garantirDocumentoDaNecessidade(pg, s.necessidadeId!)
       check(`busca do registro ${s.necessidadeId} abriu com documento próprio`, docId > 0)
       const r = await atualizarPassoV2(docId, s.id, { status: "concluida" })
       check(`busca do registro ${s.necessidadeId} concluída`, r.ok, r.ok ? "" : r.error)

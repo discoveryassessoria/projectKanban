@@ -2,19 +2,26 @@
 //
 // FATIA 2 — Materialização das Regras Documentais na Genealogia (V2).
 // Regras Documentais PUBLICADAS exigidas na Genealogia → avaliação por Pessoa →
-// NecessidadeDocumental (canônica, idempotente, com snapshot da regra) + passo
-// operacional "Localizar registro" (PhaseWorkflowStepInstance) vinculado à
-// necessidade. ADITIVO, IDEMPOTENTE, REVERSÍVEL. NÃO avança fase, NÃO conclui, NÃO
-// cria tarefa, NÃO usa document-generator/DOCUMENT_RULES/reconcileDocsForPessoa.
+// NecessidadeDocumental (canônica, idempotente, com snapshot da regra) + Documento
+// operacional (rascunho, via `garantirDocumentoDaNecessidade` — mesma porta que o
+// clique manual "Iniciar" sempre usou) + passo operacional "Localizar registro"
+// (PhaseWorkflowStepInstance) vinculado à necessidade. ADITIVO, IDEMPOTENTE,
+// REVERSÍVEL. NÃO avança fase, NÃO conclui, NÃO cria tarefa, NÃO usa
+// document-generator/DOCUMENT_RULES/reconcileDocsForPessoa.
 //
-// Documento NÃO é criado aqui: Documento.necessidadeId é preenchido quando houver
-// Documento materializado pela operação (seção 3.4 da tarefa).
+// Documento nasce JUNTO com a necessidade (unificação 28/09/2026) — não mais só no
+// clique manual do editor "Localizar registro". Achado real: a necessidade 607
+// (união, processo 651) tinha a Tarefa em EM_ANDAMENTO sem Documento nenhum por
+// trás, porque "iniciar a tarefa" e "abrir o editor" eram ações independentes e só
+// a segunda criava o Documento. Nasce vazio (rascunho, sem cartório/livro/folha) —
+// ver `documentoTemDadosPreenchidos` para distinguir rascunho de dado real.
 
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { prisma } from "@/lib/prisma"
 import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
 import { garantirNecessidade, dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
+import { garantirDocumentoDaNecessidade } from "@/src/services/genealogia/operacao-necessidade"
 import { recalcularNumerosLinhagemDaArvore } from "@/src/services/genealogia/numero-linhagem"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
@@ -43,6 +50,7 @@ export interface MaterializarResultado {
   aplicaveis: number
   necessidadesCriadas: number
   necessidadesReusadas: number
+  documentosCriados: number
   stepsCriados: number
   stepsReusados: number
   dispensadas: number
@@ -103,7 +111,7 @@ function chaveStep(necessidadeId: number, ciclo: number): string {
 // ---- núcleo: materializa a Genealogia de UM processo (idempotente) ----
 export async function materializarGenealogia(processoId: number, db: DB = prisma): Promise<MaterializarResultado> {
   const res: MaterializarResultado = {
-    processoId, aplicaveis: 0, necessidadesCriadas: 0, necessidadesReusadas: 0,
+    processoId, aplicaveis: 0, necessidadesCriadas: 0, necessidadesReusadas: 0, documentosCriados: 0,
     stepsCriados: 0, stepsReusados: 0, dispensadas: 0, reativadas: 0, pendencias: [], semInstanciaWorkflow: false,
   }
 
@@ -262,6 +270,20 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       if (!criada && necessidade.status === "DISPENSADA" && !necessidade.dispensaManual) {
         await reativarNecessidade(necessidade.id, db)
         res.reativadas++
+      }
+
+      // DOCUMENTO OPERACIONAL — nasce JUNTO com a necessidade, não mais só no clique
+      // manual "Iniciar" (unificação 28/09/2026). Mesma porta que o clique sempre usou
+      // (`garantirDocumentoDaNecessidade`, idempotente por advisory lock: reexecutar a
+      // materialização nunca duplica). Mesmo gate de elegibilidade do passo logo abaixo
+      // (`recebeWorkflowOperacional`) — RG/comprovante/procuração continuam sem
+      // Documento operacional aqui, do jeito que já ficam sem passo. Uma necessidade
+      // DISPENSADA por decisão manual do operador NÃO ganha Documento (ela não deveria
+      // nem existir mais como trabalho a fazer).
+      const necessidadeDispensadaManual = !criada && necessidade.status === "DISPENSADA" && necessidade.dispensaManual
+      if (!necessidadeDispensadaManual && recebeWorkflowOperacional(tipoDoc)) {
+        const { criado: documentoCriado } = await garantirDocumentoDaNecessidade(processoId, necessidade.id, db)
+        if (documentoCriado) res.documentosCriados++
       }
 
       // PASSO OPERACIONAL — só para documento cujo PERFIL declara workflow.

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "processoId e necessidadeId são obrigatórios." }, { status: 400 })
     }
 
-    const documentoId = await garantirDocumentoDaNecessidade(procId, necessidadeId)
+    const { documentoId } = await garantirDocumentoDaNecessidade(procId, necessidadeId)
     return NextResponse.json({ documentoId })
   } catch (e) {
     if (e instanceof OperacaoNecessidadeErro) {

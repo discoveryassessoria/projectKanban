@@ -42,7 +42,12 @@ async function main() {
   console.log("\n(2) A necessidade #607 (sem Documento materializado) NÃO fica mais escondida:")
   const nec607 = todas.missing.find((m) => m.necessidadeId === 607)
   t(!!nec607, "necessidade #607 aparece em missing (escopoPessoa TODAS)")
-  t(nec607?.documentoId === null, "e o documentoId dela é null (nunca inventa um Documento que não existe)", String(nec607?.documentoId))
+  // Antes da MUDANÇA 1 (Documento nasce junto com a necessidade, 28/09/2026) este
+  // Documento era null — hoje já nasce automaticamente, mas continua um RASCUNHO
+  // vazio: documentoId não-null, dadosPreenchidos false. Nunca finge que tem dado
+  // real que ninguém preencheu ainda.
+  t(nec607?.documentoId != null, "e o documentoId dela já não é mais null (Mudança 1: Documento nasce com a necessidade)", String(nec607?.documentoId))
+  t(nec607?.dadosPreenchidos === false, "mas dadosPreenchidos é false — é um rascunho, ninguém preencheu cartório/livro/folha ainda")
   const nec609 = todas.missing.find((m) => m.necessidadeId === 609)
   t(nec609 == null || nec609.documentoId === 2273 || todas.completed >= 0,
     "necessidade #609 (José Civils Martí) não é confundida com a #607 — se aparecer em missing, documentoId é o real (2273), nunca null")

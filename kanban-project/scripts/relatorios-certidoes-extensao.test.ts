@@ -69,18 +69,21 @@ async function main() {
   const situacoes = r.linhas.map((l) => l.celulas.find((c) => c.key === "situacao_prazo"))
   t(situacoes.every((s) => ["Vencido", "Vence em até 7 dias", "No prazo", "Sem prazo"].includes(String(s?.valor))), "situação do prazo sempre um dos 4 rótulos")
   t(situacoes.every((s) => !s?.valor || ["vermelho", "amarelo", "verde", "cinza"].includes(String(s?.cor))), "toda situação preenchida tem cor")
-  // Achado do Bug 3 (sessão 27/09): 6 Documentos deste processo têm
+  // Achado do Bug 3 (sessão 27/09): Documentos deste processo com
   // Documento.orgaoId nulo (texto livre em Documento.cartorio) — a coluna
   // "Município/UF do órgão" não pode inventar dado que o cadastro não tem.
   // Direto no Documento (não por nome de exibição — "Tapes" também é nome
   // real de um OrgaoProtocolo cadastrado, então casar por texto daria falso
-  // positivo).
+  // positivo). Eram 6 na sessão 27/09; passou a 7 na sessão 28/09 (MUDANÇA 1 —
+  // Documento nasce junto com a necessidade: a necessidade 607, que não tinha
+  // Documento nenhum, ganhou um rascunho automaticamente — sem orgaoId, como
+  // todo rascunho recém-nascido).
   const { prisma: prismaChk } = await import("@/lib/prisma")
   const docsSemOrgao = await prismaChk.documento.findMany({
     where: { necessidade: { processoId: PROCESSO_CIBILS }, orgaoId: null },
     select: { id: true, cartorio: true },
   })
-  t(docsSemOrgao.length === 6, "6 Documentos do Cibils sem orgaoId (achado 5b)", String(docsSemOrgao.length))
+  t(docsSemOrgao.length === 7, "7 Documentos do Cibils sem orgaoId (achado 5b + rascunho novo da 607)", String(docsSemOrgao.length))
   const colunaOrgaoUf = D.colunas.find((c) => c.key === "orgao_municipio_uf")!
   const linhaSinteticaSemOrgao = { documentos: [{ orgao: null, cartorio: "Bage" }] }
   t(colunaOrgaoUf.valor(linhaSinteticaSemOrgao) === null, "coluna município/UF: Documento sem orgao → null, nunca lê cartorio")

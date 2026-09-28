@@ -28,6 +28,7 @@ import type { FaseCode } from "@prisma/client"
 import { getFase, phaseKeyToFaseCode } from "./fases-catalog"
 import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 import { mapStepToGate } from "./operational-projection"
 import {
@@ -77,6 +78,11 @@ export interface CompletudeDocumentalFaltante {
   docType: string
   status: string
   geracao: number | null
+  /** Documento existe mas ainda vazio (rascunho, nasceu com a necessidade — ver
+   *  materializar-genealogia.ts) vs. já tem cartório/livro/folha reais. `false`
+   *  quando `documentoId` é null (não há o que checar). Nunca confundir "existe" com
+   *  "tem dado real" — ver src/lib/documentos/dados-preenchidos.ts. */
+  dadosPreenchidos: boolean
 }
 
 export interface CompletudeDocumental {
@@ -187,7 +193,7 @@ export async function resolverCompletudeDocumental(
       id: true, status: true, obrigatoriedade: true, itemCatalogoId: true,
       pessoaId: true, uniaoId: true,
       itemCatalogo: { select: { name: true } },
-      documentos: { select: { id: true, status: true, pessoaId: true }, take: 1 },
+      documentos: { select: { id: true, status: true, pessoaId: true, cartorio: true, livro: true, folha: true }, take: 1 },
     },
   })
 
@@ -273,6 +279,7 @@ export async function resolverCompletudeDocumental(
         docType: necRaw.itemCatalogo?.name ?? "Certidão",
         status: necRaw.documentos[0]?.status ?? necRaw.status,
         geracao: pessoa?.numeroLinhagem ?? null,
+        dadosPreenchidos: documentoTemDadosPreenchidos(necRaw.documentos[0] ?? null),
       })
     }
   }

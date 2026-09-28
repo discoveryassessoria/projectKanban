@@ -391,6 +391,7 @@
     "test:relatorios-motor": "tsx scripts/relatorios-motor.test.ts",
     "test:relatorios-certidoes-extensao": "tsx scripts/relatorios-certidoes-extensao.test.ts",
     "test:completude-documental-unificacao": "tsx scripts/completude-documental-unificacao.test.ts",
+    "test:documento-nasce-com-necessidade": "tsx scripts/documento-nasce-com-necessidade.test.ts",
     "test:relatorios-coluna": "tsx scripts/relatorios-coluna-restrita.test.ts",
     "test:seletor-css": "tsx scripts/seletor-css-valido.test.ts",
     "test:ui:relatorios": "playwright test tests/ui/relatorios.spec.ts",
