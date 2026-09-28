@@ -19,9 +19,28 @@ interface TipoScore {
   fases: number; fasesNoKanban: number; fasesComInterno: number
   automacoes: number; regrasDocumentais: number; score: number; bloqueante: boolean
 }
+interface Pendencia { code?: string; message?: string; severity?: string }
 interface AdvanceLog {
   id: number; processoId: number; faseAtual: string; fasePretendida: string | null
   resultado: string; motivoCodigo: string | null; forcado: boolean; criadoEm: string
+  pendencias?: Pendencia[] | null
+}
+
+/**
+ * O MOTIVO EXIBIDO — `motivoCodigo` é justificativa HUMANA (reabrir/retornar/mover/
+ * forçar exigem digitar uma); um BLOQUEADO é o gate recusando sozinho, ninguém
+ * digitou nada, e por isso esse campo sempre foi "—" ali. A razão sempre existiu em
+ * `pendencias` (o que `calcularPendencias` apontou como BLOCKING) — só nunca tinha
+ * chegado à coluna.
+ */
+function motivoExibido(l: AdvanceLog): string {
+  if (l.motivoCodigo) return l.motivoCodigo
+  if (l.resultado !== "BLOQUEADO" || !Array.isArray(l.pendencias) || l.pendencias.length === 0) return "—"
+  const bloqueantes = l.pendencias.filter((p) => (p.severity ?? "BLOCKING") === "BLOCKING")
+  const alvo = bloqueantes[0] ?? l.pendencias[0]
+  const texto = alvo?.message ?? alvo?.code ?? "pendência não descrita"
+  const resto = bloqueantes.length - 1
+  return resto > 0 ? `${texto} (+${resto})` : texto
 }
 interface Artefato {
   id: number; processoId: number; phaseKey: string; event: string; ruleKind: string
@@ -269,7 +288,9 @@ export function HistoricoExecucoesTab() {
                       <span className={`rounded px-1.5 py-0.5 text-[10px] ${l.resultado === "PERMITIDO" ? SEV.ok : SEV.alerta}`}>{l.resultado}</span>
                       {l.forcado && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-800">forçado</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">{l.motivoCodigo ?? "—"}</td>
+                    <td className="max-w-xs px-4 py-2.5 text-[var(--text-secondary)]" title={motivoExibido(l)}>
+                      <span className="line-clamp-2">{motivoExibido(l)}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

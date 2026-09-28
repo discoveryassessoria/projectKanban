@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { estadoOperacionalDosDocumentos } from "@/lib/operacional/documento-estado"
+import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
 
 type AlertaSev = "crit" | "warn" | "info"
 
@@ -101,16 +101,28 @@ export async function GET(
     // (congelado: um documento cuja Tarefa já concluiu não voltava a mexer
     // nesse campo, então "recebido" ficava contando errado assim que a Tarefa
     // avançava sem que ninguém tivesse tocado no campo do Documento).
+    // "RECEBIDO" É O DOCUMENTO TER DADO REAL, NÃO A TAREFA TER FECHADO.
+    //
+    // Achado real (28/09/2026, processo 651): esta conta usava `Tarefa` viva por
+    // `documentoId` + status terminal — mas o achado de registro em Genealogia
+    // ("localizar_registro") pode concluir sem que exista Tarefa terminal presa a
+    // ESTE `documentoId` (a Tarefa dessa etapa é por NECESSIDADE, e a etapa pode
+    // fechar por caminho que não materializa Tarefa própria). Resultado: 17
+    // documentos genuinamente localizados (cartório/livro/folha preenchidos)
+    // contavam como "0 recebidos" — Geral do processo contradizia a Árvore, que lê
+    // o dado do Documento direto. `documentoTemDadosPreenchidos` é a MESMA função
+    // que `resolverCompletudeDocumental` já usa (unificação de completude
+    // documental, mesma sessão): um documento está feito quando tem cartório,
+    // livro e folha — não quando uma Tarefa específica fechou.
     let totalDocs = 0
     let recebidosDocs = 0
     if (pessoaIds.length) {
       const docsValidos = await prisma.documento.findMany({
         where: { pessoaId: { in: pessoaIds }, status: { notIn: ["CANCELADO", "INVALIDO"] } },
-        select: { id: true },
+        select: { id: true, cartorio: true, livro: true, folha: true },
       })
       totalDocs = docsValidos.length
-      const estados = await estadoOperacionalDosDocumentos(docsValidos.map((d) => d.id))
-      recebidosDocs = docsValidos.filter((d) => estados.get(d.id)?.jaRecebido).length
+      recebidosDocs = docsValidos.filter((d) => documentoTemDadosPreenchidos(d)).length
     }
 
     const percentual = totalDocs > 0 ? Math.round((recebidosDocs / totalDocs) * 100) : 0

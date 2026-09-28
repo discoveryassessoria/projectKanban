@@ -46,6 +46,11 @@ export async function GET(
           }
         },
         arvore: true,
+        // Achado real (28/09/2026, processo 651): sem isto, a aba "Geral" mostrava
+        // "País: —" mesmo com `paisId` corretamente preenchido — o card lê
+        // `processo.paisCanonico` (ver atividade-details-modal.tsx), que esta rota
+        // nunca incluía.
+        paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
         requerentes: {
           where: VINCULO_PROCESSO_ATIVO,
           include: {
@@ -214,6 +219,11 @@ export async function PUT(
           }
         },
         arvore: true,
+        // Achado real (28/09/2026, processo 651): sem isto, a aba "Geral" mostrava
+        // "País: —" mesmo com `paisId` corretamente preenchido — o card lê
+        // `processo.paisCanonico` (ver atividade-details-modal.tsx), que esta rota
+        // nunca incluía.
+        paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } },
         requerentes: {
           where: VINCULO_PROCESSO_ATIVO,
           include: {

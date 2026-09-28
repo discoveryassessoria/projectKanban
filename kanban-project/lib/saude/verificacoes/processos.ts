@@ -237,6 +237,84 @@ registrar({
 })
 
 registrar({
+  id: 'saude.processos.tarefa-orfa-de-fase-anterior',
+  codigo: 'PROC-903',
+  nome: 'Tarefa viva numa fase que o processo já deixou, sem responsável',
+  descricao:
+    'Uma movimentação de fase preserva o trabalho pendente da fase anterior por design (§9-12: mover fase ' +
+    'não conclui/cancela/apaga tarefa alheia) — mas sem responsável e numa fase que o Kanban não mostra mais, ' +
+    'esse trabalho fica tecnicamente vivo e operacionalmente esquecido.',
+  dominio: 'PROCESSOS',
+  modulo: 'Motor / Workflow Interno',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.0.0',
+  timeoutMs: 20_000,
+  orientacao:
+    'Atribua um responsável (a tarefa volta a aparecer na Capacidade Operacional), ou decida explicitamente ' +
+    'encerrar/superseder a obrigação pelo Diagnóstico de Runtime se ela deixou de ser devida.',
+  rotaCorrecao: '/administrator?screen=runtimediag',
+  responsavel: 'Motor',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // Achado real (28/09/2026, processo 651): movePhaseManual com
+    // preservarHistorico=true (kanban-drag, motivo OPERACAO_ADMINISTRATIVA)
+    // moveu de genealogia para emissao_documental sem fechar a instância de
+    // genealogia — corretamente, por doutrina (`tarefa histórica`). A tarefa
+    // #3827 (necessidade 607, "localizar_registro") ficou EM_ANDAMENTO, sem
+    // responsável, na fase que o Kanban já não mostra — vencida desde 25/09,
+    // invisível na Capacidade Operacional (que só soma tarefa COM dono).
+    //
+    // Não é bug de dado (a tarefa aponta pro passo certo, a instância está
+    // corretamente ATIVO) — é ausência de sinal operacional. Esta verificação
+    // não fecha nada sozinha: fechar automaticamente violaria a mesma doutrina
+    // que preservou o trabalho em primeiro lugar. Só torna visível.
+    const STATUS_ATIVOS = ['NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_CLIENTE', 'AGUARDANDO_TERCEIRO', 'BLOQUEADA']
+    const candidatas = await prisma.tarefa.findMany({
+      where: {
+        statusTarefa: { in: STATUS_ATIVOS as never }, responsavelId: null, faseMacroKey: { not: null },
+        processo: { faseAtualKey: { not: null } },
+      },
+      select: {
+        id: true, titulo: true, faseMacroKey: true, dataPrazo: true, createdAt: true,
+        processo: { select: { id: true, nome: true, faseAtualKey: true } },
+      },
+      take: 500,
+    })
+    const orfas = candidatas.filter(
+      (t): t is typeof t & { processo: NonNullable<typeof t.processo> } =>
+        t.processo != null && t.faseMacroKey !== t.processo.faseAtualKey,
+    )
+    if (!orfas.length) {
+      return { achados: [], metricas: { tarefasOrfasDeFaseAnterior: 0 }, resumo: 'Nenhuma tarefa sem responsável numa fase que o processo já deixou.' }
+    }
+    return {
+      achados: orfas.slice(0, 100).map((t): Achado => ({
+        chave: `tarefa-orfa-fase-anterior:${t.id}`,
+        severidade: 'ALERTA',
+        titulo: `Tarefa ${t.id} sem responsável em "${t.faseMacroKey}" — processo já está em "${t.processo.faseAtualKey}"`,
+        descricao: `"${t.titulo}" (processo ${t.processo.id} "${t.processo.nome}") continua aberta na fase ${t.faseMacroKey}, sem responsável.`,
+        explicacao:
+          'O processo avançou/foi movido para outra fase sem fechar esta obrigação — comportamento correto ' +
+          'quando o trabalho ainda é devido, mas sem dono ela não aparece em nenhuma fila de trabalho.',
+        impacto: 'Trabalho pendente real fica invisível na Capacidade Operacional e pode vencer sem que ninguém saiba.',
+        entidade: 'Tarefa',
+        registroId: String(t.id),
+        registroNome: t.titulo,
+        link: linkProcesso(t.processo.id),
+        recomendacao: 'Atribua um responsável, ou encerre/supersenda explicitamente se a obrigação deixou de ser devida.',
+        evidencia: {
+          tarefaId: t.id, processoId: t.processo.id, faseDaTarefa: t.faseMacroKey, faseAtualDoProcesso: t.processo.faseAtualKey,
+          dataPrazo: t.dataPrazo?.toISOString() ?? null, criadaEm: t.createdAt.toISOString(),
+        },
+      })),
+      metricas: { tarefasOrfasDeFaseAnterior: orfas.length },
+    }
+  },
+})
+
+registrar({
   id: 'saude.processos.familia-orfa',
   codigo: 'PROC-900',
   nome: 'Família sem processo e sem árvore',

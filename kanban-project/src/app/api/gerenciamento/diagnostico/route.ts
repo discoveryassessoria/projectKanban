@@ -43,7 +43,13 @@ export async function GET(request: NextRequest) {
       prisma.phaseWorkflowInstance.count({ where: { status: 'ATIVO' } }).catch(() => 0),
       prisma.phaseAdvanceLog.findMany({
         orderBy: { criadoEm: 'desc' }, take: 60,
-        select: { id: true, processoId: true, faseAtual: true, fasePretendida: true, resultado: true, motivoCodigo: true, forcado: true, criadoEm: true },
+        // `pendencias` viaja junto: BLOQUEADO nunca tem `motivoCodigo` (esse campo é
+        // JUSTIFICATIVA HUMANA — reabrir/retornar/mover/forçar exigem digitar um
+        // motivo; um bloqueio automático do gate não é decisão de ninguém, é o motor
+        // recusando). A razão do bloqueio sempre existiu — em `pendencias`, calculada
+        // por `calcularPendencias` — só nunca tinha chegado à tela. A UI deriva o
+        // texto exibido a partir daqui (ver `motivoExibido` em DiagnosticoViews.tsx).
+        select: { id: true, processoId: true, faseAtual: true, fasePretendida: true, resultado: true, motivoCodigo: true, forcado: true, criadoEm: true, pendencias: true },
       }).catch(() => []),
       prisma.motorArtefato.findMany({
         orderBy: { criadoEm: 'desc' }, take: 60,

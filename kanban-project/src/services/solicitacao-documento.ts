@@ -395,6 +395,17 @@ export async function registrarSolicitacaoDocumento(
     })
     if (tarefa) {
       await tx.solicitacaoDocumento.update({ where: { id: solicitacaoId }, data: { tarefaId: tarefa.id } })
+      // TAREFA.DATAPRAZO SEGUE O MESMO RELÓGIO — achado real (28/09/2026): o
+      // Dashboard ("Prazos") lê `Tarefa.dataPrazo` direto, e esse campo nunca era
+      // escrito pelo fluxo de solicitação de certidão (só `SolicitacaoDocumento.
+      // previsaoRetorno`, que o Relatório de Certidões já usa). Resultado: 17 de 18
+      // tarefas abertas do processo 651 com `dataPrazo: null` — Dashboard mostrava
+      // "0 no prazo" enquanto o Relatório de Certidões mostrava 6 "No prazo" reais.
+      // `previsaoRetorno` é o dono da verdade (dataEnvio + prazoEsperadoDias, regime
+      // corrigido nesta mesma sessão); `dataPrazo` é projeção dela, não uma segunda
+      // fonte — mantém Capacidade Operacional/Tarefas e Projetos/Dashboard
+      // convergentes automaticamente, sem cada tela reimplementar a regra.
+      await tx.tarefa.update({ where: { id: tarefa.id }, data: { dataPrazo: previsaoRetornoResolvida } })
     }
 
     // ── 4.2 PROTOCOLO — MESMO cadastro, ligado à solicitação e ao documento ──
