@@ -390,6 +390,7 @@
     "test:identidade-canonica": "tsx scripts/identidade-canonica-cobertura.ts",
     "test:relatorios-motor": "tsx scripts/relatorios-motor.test.ts",
     "test:relatorios-certidoes-extensao": "tsx scripts/relatorios-certidoes-extensao.test.ts",
+    "test:completude-documental-unificacao": "tsx scripts/completude-documental-unificacao.test.ts",
     "test:relatorios-coluna": "tsx scripts/relatorios-coluna-restrita.test.ts",
     "test:seletor-css": "tsx scripts/seletor-css-valido.test.ts",
     "test:ui:relatorios": "playwright test tests/ui/relatorios.spec.ts",

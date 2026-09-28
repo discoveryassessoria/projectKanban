@@ -10,6 +10,7 @@ import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { nomeCanonicoDaObrigacao } from "@/src/lib/documentos/nome-canonico-obrigacao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import { resolverCompletudeDocumental } from "@/src/lib/process-stage/completude-documental"
 import {
   montarPessoasDoProcesso,
   nomeCompletoPessoa,
@@ -57,7 +58,7 @@ interface MatrixResponse {
     percentage: number
   }>
   missing: Array<{
-    docId: number
+    docId: number | null
     pessoaId: number
     pessoaNome: string
     docType: string
@@ -428,6 +429,47 @@ export async function GET(
     // como dado operacional, mas o headline de progresso é a projeção.
     const projection = await resolveOperationalProjection(id, faseContexto)
 
+    // FONTE ÚNICA DE COMPLETUDE DOCUMENTAL (unificação 27/09/2026) — substitui os
+    // dois cálculos paralelos que geravam matrix.byPerson/missing (Documento +
+    // Pessoa.linhaReta cru) e indice.resumo (montarIndiceOperacional, sem filtro de
+    // pessoa) por uma única conta, sempre a partir de NecessidadeDocumental (nunca
+    // esconde necessidade sem Documento — era o caso #607) e sempre com a MESMA
+    // classificação rica de pessoa que só a #3 calculava. TODAS = igual ao total
+    // oficial (matrixOficial/indice.resumo); LINHA_PRINCIPAL = só o detalhamento
+    // por pessoa do byPerson/missing (achado real: linhaReta cru somava 14 de 17).
+    const mesmaInstanciaConsultada = faseContexto?.workflowInstanceId ?? instanciaVigente?.id ?? null
+    const [completudeTodas, completudeLinhaPrincipal] = await Promise.all([
+      resolverCompletudeDocumental(id, {
+        faseMacroKey: faseConsultadaKey,
+        workflowInstanceId: mesmaInstanciaConsultada,
+        escopoPessoa: "TODAS",
+      }),
+      resolverCompletudeDocumental(id, {
+        faseMacroKey: faseConsultadaKey,
+        workflowInstanceId: mesmaInstanciaConsultada,
+        escopoPessoa: "LINHA_PRINCIPAL",
+      }),
+    ])
+    const matrixByPersonUnificado = completudeLinhaPrincipal.byPerson.map((p) => ({
+      pessoaId: p.pessoaId,
+      nome: p.nome,
+      generation: p.geracao ?? 99,
+      completed: p.completed,
+      total: p.required,
+      percentage: p.percentage,
+    }))
+    const matrixMissingUnificado = completudeLinhaPrincipal.missing.map((m) => ({
+      // necessidade ainda sem Documento materializado (ex.: #607) não tem id de
+      // documento pra abrir — null, nunca um sentinel numérico (front não lê hoje;
+      // se vier a ler, tratar null como "documento não criado", nunca como id 0).
+      docId: m.documentoId,
+      pessoaId: m.pessoaId ?? 0,
+      pessoaNome: m.pessoaNome,
+      docType: m.docType,
+      status: m.status,
+      generation: m.geracao ?? 99,
+    }))
+
     // Geração exibida (1 = requerente, 2 = pais, …) derivada do MESMO roster — não de
     // um campo denormalizado que pode estar vazio (numeroLinhagem é null em toda a
     // base atual, o que fazia toda pessoa cair em "99").
@@ -620,8 +662,7 @@ export async function GET(
       return generationOf(a.pessoaId) - generationOf(b.pessoaId)
     })
 
-    // CONCLUSÃO e PRÓXIMA AÇÃO vêm da FONTE OFICIAL (prog) — sem recálculo local.
-    const docConcluiuFase = (docId: number): boolean => prog.concluidosPorDoc.has(docId)
+    // PRÓXIMA AÇÃO vem da FONTE OFICIAL (prog) — sem recálculo local.
     const proximaAcaoDoc = (docId: number): string | null => prog.proximaAcaoPorDoc.get(docId) ?? null
 
     // ============================================================
@@ -719,63 +760,12 @@ export async function GET(
 
     // ============================================================
     // 8) Matriz de completude
+    // ------------------------------------------------------------
+    // byPerson/missing vêm da FONTE ÚNICA (resolverCompletudeDocumental,
+    // escopoPessoa LINHA_PRINCIPAL — computada acima, junto com a projeção). Não
+    // há mais recálculo local por Documento+Pessoa.linhaReta cru aqui: era essa
+    // 2ª conta que somava 14 de 17 na mesma tela que a Genealogia mostrava 17.
     // ============================================================
-    const byPersonAgg = new Map<number, { completed: number; total: number; generation: number }>()
-    for (const d of docs) {
-      const pid = d.pessoaId
-      const cur = byPersonAgg.get(pid) ?? {
-        completed: 0,
-        total: 0,
-        generation: generationOf(pid),
-      }
-      cur.total += 1
-      if (docConcluiuFase(d.id)) cur.completed += 1 // conclusão REAL do workflow, não status
-      byPersonAgg.set(pid, cur)
-    }
-
-    const matrixByPerson = Array.from(byPersonAgg.entries())
-      .filter(([pid]) => pessoasMap.get(pid)?.linhaReta)
-      .map(([pid, v]) => {
-        const p = pessoasMap.get(pid)!
-        return {
-          pessoaId: pid,
-          nome: nomeCompleto(p),
-          generation: v.generation,
-          completed: v.completed,
-          total: v.total,
-          percentage: v.total > 0 ? Math.round((v.completed / v.total) * 100) : 0,
-        }
-      })
-      .sort((a, b) => a.generation - b.generation)
-
-    // só a linha reta conta pro progresso da fase (igual ao header e ao gate);
-    // docs de apoio seguem na fila operacional, mas não entram no % da fase
-    const linhaRetaDocs = docs.filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
-    const totalDocs = linhaRetaDocs.length
-
-    // FONTE OFICIAL: "concluiu a fase atual" = última etapa obrigatória do Workflow
-    // Interno concluída (validar_certidao na Emissão) — NÃO o status mestre do documento
-    // (RECEBIDO não conclui). Alinha matrix/barra/macro/header ao faseProgress.
-    const concluiuFaseAtual = (d: DocFull): boolean => docConcluiuFase(d.id)
-
-    const validados = prog.done // FONTE OFICIAL (mesma do cabeçalho)
-
-    const missing = docs
-      .filter((d) => !concluiuFaseAtual(d))
-      .filter((d) => pessoasMap.get(d.pessoaId)?.linhaReta)
-      .slice(0, 50)
-      .map((d) => {
-        const pessoa = pessoasMap.get(d.pessoaId)!
-        return {
-          docId: d.id,
-          pessoaId: d.pessoaId,
-          pessoaNome: nomeCompleto(pessoa),
-          docType: TIPO_LABELS[d.tipo] || d.tipo,
-          status: STATUS_LABELS[d.status] || d.status,
-          generation: pessoa.numeroLinhagem ?? 99,
-        }
-      })
-
     const matrixLegado: MatrixResponse = {
       percentage: prog.percent,          // FONTE OFICIAL (idêntica ao cabeçalho)
       completed: prog.done,
@@ -783,8 +773,8 @@ export async function GET(
       directPeopleCount: pessoasNaLinha.length,
       missingCount: Math.max(0, prog.total - prog.done),
       nameVariationsCount: 0,
-      byPerson: matrixByPerson,
-      missing,
+      byPerson: matrixByPersonUnificado,
+      missing: matrixMissingUnificado,
     }
 
     // ============================================================
@@ -809,7 +799,7 @@ export async function GET(
           directPeopleCount: pessoasNaLinha.length,
           missingCount: 0,
           nameVariationsCount: 0,
-          byPerson: matrixByPerson.map((p) => ({ ...p, completed: 0, total: 0, percentage: 0 })),
+          byPerson: matrixByPersonUnificado.map((p) => ({ ...p, completed: 0, total: 0, percentage: 0 })),
           missing: [],
         }
       : matrixLegado
@@ -912,19 +902,6 @@ export async function GET(
       const obrigDone = obrig.filter((n) => localizado(n.id)).length
       const percentage = totalObrig > 0 ? Math.round((obrigDone / totalObrig) * 100) : 0
 
-      const byP = new Map<number, { completed: number; total: number; generation: number }>()
-      for (const n of necs) {
-        if (n.pessoaId == null) continue
-        const cur = byP.get(n.pessoaId) ?? { completed: 0, total: 0, generation: generationOf(n.pessoaId) }
-        cur.total += 1
-        if (localizado(n.id)) cur.completed += 1
-        byP.set(n.pessoaId, cur)
-      }
-      const byPersonV2 = Array.from(byP.entries())
-        .filter(([pid]) => pessoasMap.get(pid)?.linhaReta)
-        .map(([pid, v]) => { const p = pessoasMap.get(pid)!; return { pessoaId: pid, nome: nomeCompleto(p), generation: v.generation, completed: v.completed, total: v.total, percentage: v.total > 0 ? Math.round((v.completed / v.total) * 100) : 0 } })
-        .sort((a, b) => a.generation - b.generation)
-
       const queueV2: QueueRow[] = necs.map((n) => {
         const s = stepByNec.get(n.id)
         const ok = localizado(n.id)
@@ -975,9 +952,10 @@ export async function GET(
       })
 
       genealogiaV2 = {
-        // FONTE ÚNICA: percentual/total/done vêm da projeção canônica (prog) — idênticos ao
-        // cabeçalho (/phase). byPerson permanece (detalhe por pessoa da própria fila).
-        matrix: { percentage: prog.percent, completed: prog.done, total: prog.total, directPeopleCount: pessoasNaLinha.length, missingCount: Math.max(0, prog.total - prog.done), nameVariationsCount: 0, byPerson: byPersonV2, missing: [] },
+        // FONTE ÚNICA: percentual/total/done vêm da projeção canônica (prog); byPerson/
+        // missing vêm da mesma resolverCompletudeDocumental usada no resto da Central —
+        // nunca mais um cálculo de "localizado" só pra Genealogia.
+        matrix: { percentage: prog.percent, completed: prog.done, total: prog.total, directPeopleCount: pessoasNaLinha.length, missingCount: Math.max(0, prog.total - prog.done), nameVariationsCount: 0, byPerson: matrixByPersonUnificado, missing: matrixMissingUnificado },
         queue: queueV2,
         faseProgress: {
           faseCode: faseAtualCode ?? null, kind: "documento", docsNaFase: necs.length,
@@ -1012,7 +990,7 @@ export async function GET(
     // passada, excluindo SUPERSEDIDO/CANCELADO). O roster já lido acima é
     // REAPROVEITADO — a árvore não é relida na mesma requisição.
     // ============================================================
-    const { indice } = await getPhaseOperationalSummary(
+    const { indice: indiceBruto } = await getPhaseOperationalSummary(
       {
         processoId: id,
         faseMacroKey: faseConsultadaKey,
@@ -1024,16 +1002,41 @@ export async function GET(
       { pessoas: pessoasDoProcesso, agora: now },
     )
 
-    // Headline de progresso vem da PROJEÇÃO OFICIAL (mesmo % do Kanban/Header). O
-    // detalhamento por pessoa (byPerson) e a lista de faltantes seguem como dado
-    // operacional detalhado da Central.
+    // resumo.documentos/prontos/pendentes/pessoasComTrabalho vêm da FONTE ÚNICA
+    // (completudeTodas) — era a 3ª conta (montarIndiceOperacional, sem filtro de
+    // pessoa) que mostrava "16 Documentos" na mesma tela em que a matrix mostrava
+    // "17" (achado real, processo 651, 27/09/2026). divergentes/cancelados
+    // continuam do índice: são status de Documento que a completude não distingue
+    // (não fazem parte da pergunta "necessário/pronto/faltando").
+    const indice: IndiceOperacional = {
+      ...indiceBruto,
+      resumo: {
+        ...indiceBruto.resumo,
+        documentos: completudeTodas.required,
+        prontos: completudeTodas.completed,
+        pendentes: completudeTodas.missingCount,
+        pessoasComTrabalho: completudeTodas.byPerson.length,
+      },
+    }
+
+    // Headline de progresso vem da FONTE ÚNICA (completudeTodas, escopoPessoa TODAS —
+    // MESMO required/completed que o gate de avanço usa internamente, já que
+    // resolveOperationalProjection e resolverCompletudeDocumental chamam o mesmo núcleo
+    // certidoesObrigatoriasNecessidade/Documento). `projection` continua sendo a fonte de
+    // gate/bloqueio/avanço (response.projection abaixo) — isso não migra pra cá, é owner
+    // separado (CLAUDE.md §23).
     const matrixBase = genealogiaV2 ? genealogiaV2.matrix : matrix
     const matrixOficial: MatrixResponse = {
       ...matrixBase,
+      // percentage continua de `projection`: carrega a "blindagem" do gate (nunca
+      // 100% com bloqueio de trabalho pendente, mesmo que as certidões fechem) —
+      // essa regra é do OWNER do gate/avanço, não da contagem de completude
+      // (CLAUDE.md §23). required/completed/missingCount são a contagem pura, sem
+      // essa semântica, e por isso migram para a fonte única.
       percentage: projection.progress.percentage,
-      completed: projection.metrics.completed,
-      total: projection.metrics.required,
-      missingCount: Math.max(0, projection.metrics.required - projection.metrics.completed),
+      completed: completudeTodas.completed,
+      total: completudeTodas.required,
+      missingCount: completudeTodas.missingCount,
     }
 
     const response: CentralOperacionalResponse = {

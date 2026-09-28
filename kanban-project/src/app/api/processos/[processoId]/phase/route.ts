@@ -18,6 +18,7 @@ import { stageFromFaseCode } from "@/src/lib/process-stage/compute-phase-progres
 import { STAGE_LABELS } from "@/src/lib/process-stage/derive-stage"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { resolveOperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import { resolverCompletudeDocumental } from "@/src/lib/process-stage/completude-documental"
 import { motorVigenteDaFase } from "@/src/services/motor-da-fase"
 
 export async function GET(
@@ -36,8 +37,13 @@ export async function GET(
 
   const faseCode = phaseKeyToFaseCode(projection.activePhase?.id ?? undefined)
   const stage = stageFromFaseCode(faseCode ?? undefined) ?? "GENEALOGIA"
-  const done = projection.metrics.completed
-  const total = projection.metrics.required
+  // done/total (contagem pura) migram pra FONTE ÚNICA de completude documental
+  // (unificação 27/09/2026); percent continua de `projection` — carrega a
+  // blindagem do gate (nunca 100% com bloqueio de trabalho pendente), que não é
+  // parte do contrato de completude (CLAUDE.md §23).
+  const completude = await resolverCompletudeDocumental(processoId, { escopoPessoa: "TODAS" })
+  const done = completude.completed
+  const total = completude.required
   const percent = projection.progress.percentage
 
   // A fase pode estar sob o motor LEGADO (tela bespoke da fase, ex.: Análise

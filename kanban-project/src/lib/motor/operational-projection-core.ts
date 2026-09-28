@@ -101,6 +101,15 @@ export interface NecessidadeData {
   status: string
   obrigatoria: boolean
   ehCertidao: boolean
+  /** Sujeito: pessoaId XOR uniaoId (casamento pertence à União, nunca a uma Pessoa).
+   *  Opcional/aditivo — só `resolverCompletudeDocumental` (completude-documental.ts)
+   *  usa, pra agrupar por pessoa; o núcleo de progresso/gate nunca leu isto. */
+  pessoaId?: number | null
+  uniaoId?: number | null
+  /** O Documento (se algum já foi materializado) que atende esta necessidade.
+   *  `null` = necessidade obrigatória sem Documento ainda — um gap de dado real,
+   *  nunca escondido (achado real, 27/09/2026 — necessidade #607). */
+  documentoId?: number | null
 }
 
 export interface DocumentoData {
@@ -110,6 +119,8 @@ export interface DocumentoData {
   /** Necessidade (certidão) que este documento atende — vínculo Documento.necessidadeId.
    *  Usado para gatear a fase DOCUMENTO pelas CERTIDÕES OBRIGATÓRIAS (não por docs de apoio). */
   necessidadeId?: number | null
+  /** Aditivo — só `resolverCompletudeDocumental` usa, pra agrupar por pessoa. */
+  pessoaId?: number | null
 }
 
 export interface ProjectionInput {
@@ -240,7 +251,7 @@ function passosPorObrigacao(input: ProjectionInput): Map<number, GateStepData[]>
  * gateiam. Fonte ÚNICA usada por computeGate E computeProgress → gate e progresso
  * nunca divergem (100% ⟺ pode avançar).
  */
-function certidoesObrigatoriasDocumento(input: ProjectionInput): {
+export function certidoesObrigatoriasDocumento(input: ProjectionInput): {
   certObrig: NecessidadeData[]
   emitida: (n: NecessidadeData) => boolean
 } {
@@ -250,6 +261,25 @@ function certidoesObrigatoriasDocumento(input: ProjectionInput): {
   // "Existe documento" nunca foi conclusão de nada.
   const emitida = (n: NecessidadeData): boolean =>
     obrigacaoConcluidaNaFase(porObrigacao.get(n.id) ?? [], false)
+  return { certObrig, emitida }
+}
+
+/**
+ * Escopo NECESSIDADE (Genealogia): a MESMA régua de `certidoesObrigatoriasDocumento`,
+ * só que com o fallback de `n.status === "ATENDIDA"` quando a obrigação não tem passo
+ * nenhum nesta fase (ver `obrigacaoConcluidaNaFase`). Extraído do corpo de
+ * `computeProgress` (27/09/2026, unificação de completude documental) pra ser
+ * reusável por `resolverCompletudeDocumental` sem duplicar a regra.
+ */
+export function certidoesObrigatoriasNecessidade(input: ProjectionInput): {
+  certObrig: NecessidadeData[]
+  emitida: (n: NecessidadeData) => boolean
+} {
+  const porObrigacao = passosPorObrigacao(input)
+  const emitida = (n: NecessidadeData): boolean =>
+    obrigacaoConcluidaNaFase(porObrigacao.get(n.id) ?? [], n.status === "ATENDIDA")
+  // Legítimas = certidões não dispensadas; progresso sobre as OBRIGATÓRIAS.
+  const certObrig = input.necessidades.filter((n) => n.ehCertidao && n.status !== "DISPENSADA" && n.obrigatoria)
   return { certObrig, emitida }
 }
 
@@ -438,11 +468,7 @@ function computeProgress(input: ProjectionInput, blocked: boolean): ProgressResu
     // Com dois passos para a mesma obrigação, um concluído e outro em aberto, a
     // conta dizia "1 de 1 concluído" enquanto o gate (que olha todos) bloqueava:
     // 100% virava 99% pela blindagem, e a tela anunciava a fase concluída.
-    const porObrigacao = passosPorObrigacao(input)
-    const localizada = (n: NecessidadeData): boolean =>
-      obrigacaoConcluidaNaFase(porObrigacao.get(n.id) ?? [], n.status === "ATENDIDA")
-    // Legítimas = certidões não dispensadas; progresso sobre as OBRIGATÓRIAS.
-    const obrig = input.necessidades.filter((n) => n.ehCertidao && n.status !== "DISPENSADA" && n.obrigatoria)
+    const { certObrig: obrig, emitida: localizada } = certidoesObrigatoriasNecessidade(input)
     for (const n of obrig) {
       totalWeight += 1
       required += 1

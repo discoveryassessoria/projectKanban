@@ -9,6 +9,7 @@ import {
   getProcessSteps,
 } from '@/src/lib/process-stage/fases-catalog';
 import { resolveOperationalProjection } from '@/src/lib/process-stage/operational-projection';
+import { resolverCompletudeDocumental } from '@/src/lib/process-stage/completude-documental';
 
 // Rótulos amigáveis dos tipos de documento (mesma lista da Central Operacional).
 const TIPO_LABELS: Record<string, string> = {
@@ -122,10 +123,18 @@ export async function GET(
     // ── Progresso: FONTE OFICIAL (mesma do Kanban e do cabeçalho interno) ──
     // Nunca calcular progresso por conta própria aqui: o número que o cliente
     // vê tem que ser idêntico ao que a equipe vê.
+    // progressoGeral (%) continua de resolveOperationalProjection: carrega a
+    // "blindagem" do gate (nunca 100% com bloqueio de trabalho pendente, mesmo que
+    // as certidões fechem) — regra do owner do gate/avanço, não da contagem
+    // (CLAUDE.md §23). totalEtapasFase/etapasConcluidasFase (contagem pura, sem essa
+    // semântica) migram pra FONTE ÚNICA de completude documental (unificação
+    // 27/09/2026, escopoPessoa TODAS — mesmo required/completed que a projeção usa
+    // por baixo, já que as duas chamam o mesmo núcleo).
     const projection = await resolveOperationalProjection(processoId);
+    const completude = await resolverCompletudeDocumental(processoId, { escopoPessoa: 'TODAS' });
     const progressoGeral = projection.progress.percentage;
-    const totalEtapasFase = projection.metrics.required;
-    const etapasConcluidasFase = projection.metrics.completed;
+    const totalEtapasFase = completude.required;
+    const etapasConcluidasFase = completude.completed;
 
     // ── Andamento: passos reais da fase atual (runtime v2) ─────────────────
     const instancia = processo.faseAtualKey

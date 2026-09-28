@@ -30,9 +30,13 @@ ok(/mensagemReestruturacao:\s*genealogiaV2\s*\?\s*null\s*:/.test(route), "respon
 console.log("\n3) Progresso da Genealogia vem dos passos obrigatórios (não Documento.status)")
 ok(/obrig\.filter\(\(n\) => localizado\(n\.id\)\)/.test(route), "progresso = passos localizar_registro obrigatórios concluídos")
 // matrix BASE vem do V2 (byPerson/faltantes detalhados); o headline de progresso
-// (percentage/completed/total) é sobrescrito pela PROJEÇÃO OFICIAL (mesmo % do Kanban).
+// (percentage) continua sobrescrito pela PROJEÇÃO OFICIAL (mesmo % do Kanban —
+// carrega a blindagem do gate, nunca 100% com bloqueio de trabalho pendente).
+// completed/total/missingCount migraram pra FONTE ÚNICA DE COMPLETUDE DOCUMENTAL
+// (resolverCompletudeDocumental, escopoPessoa TODAS — unificação 27/09/2026).
 ok(/matrixBase = genealogiaV2 \? genealogiaV2\.matrix : matrix/.test(route) && /queue: genealogiaV2 \? genealogiaV2\.queue : queue/.test(route), "matrix (base) e queue da Genealogia vêm do V2")
-ok(/percentage: projection\.progress\.percentage/.test(route), "headline de progresso vem da projeção oficial (matrixOficial)")
+ok(/percentage: projection\.progress\.percentage/.test(route), "headline de percentual vem da projeção oficial (blindagem do gate)")
+ok(/completed: completudeTodas\.completed/.test(route) && /total: completudeTodas\.required/.test(route), "completed/total do headline vêm da fonte única de completude documental")
 
 console.log("\n4) Front reconhece 'localizado' como concluído")
 const front = ler("src/components/kanban/ProcessoCentralOperacional.tsx")
