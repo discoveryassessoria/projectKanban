@@ -33,6 +33,31 @@ const INCLUDE = {
 /** Atrasada = tem prazo, o prazo passou e ela não foi concluída. */
 const atrasada = (l: any) => !!l.dataPrazo && !l.concluida && new Date(l.dataPrazo) < new Date()
 
+// CANCELADA/SUPERSEDIDA não aparecem por padrão — achado real (28/09/2026):
+// de 48 tarefas totais, 13 eram CANCELADA(3)/SUPERSEDIDA(10) aparecendo sem
+// o usuário ter pedido, mesmo em visões como "Backlog (não concluídas)"
+// (CLAUDE.md: cancelamento nunca conta como sucesso, mas as duas têm
+// `concluida: false` — cancelada não é concluída, só também não é backlog
+// ativo). O usuário continua podendo vê-las escolhendo o filtro "Status"
+// explicitamente (ou "Todos", que inclui tudo) — só deixam de ser o padrão.
+const STATUS_EXCLUIDOS_POR_PADRAO = ["CANCELADA", "SUPERSEDIDA"] as const
+
+/** O usuário já escolheu "Status" explicitamente nesta consulta? */
+function usuarioEscolheuStatus(where: Record<string, unknown>): boolean {
+  const clausulas = (where as { AND?: Record<string, unknown>[] }).AND
+  if (!clausulas) return "statusTarefa" in where
+  return clausulas.some((c) => "statusTarefa" in c)
+}
+
+/** Aplica o padrão SÓ quando o usuário não filtrou por status — nunca
+ *  sobrepõe uma escolha explícita (inclusive "Todos"). */
+function comPadraoDeStatus(where: Record<string, unknown>): Record<string, unknown> {
+  if (usuarioEscolheuStatus(where)) return where
+  const exclusao = { statusTarefa: { notIn: [...STATUS_EXCLUIDOS_POR_PADRAO] } }
+  const clausulas = (where as { AND?: Record<string, unknown>[] }).AND
+  return { AND: clausulas ? [...clausulas, exclusao] : [exclusao] }
+}
+
 export const DOMINIO_TAREFAS: DominioDef = {
   key: "tarefas",
   rotulo: "Tarefas",
@@ -130,9 +155,9 @@ export const DOMINIO_TAREFAS: DominioDef = {
   colunasIniciais: ["codigo", "titulo", "responsavel", "status", "processo", "fase", "prazo", "atraso_dias"],
   ordenacaoPadrao: { key: "prazo", direcao: "asc" },
 
-  contar: (where) => prisma.tarefa.count({ where }),
+  contar: (where) => prisma.tarefa.count({ where: comPadraoDeStatus(where) }),
   carregar: (where, orderBy, pular, levar) =>
-    prisma.tarefa.findMany({ where, orderBy, skip: pular, take: levar, include: INCLUDE }),
+    prisma.tarefa.findMany({ where: comPadraoDeStatus(where), orderBy, skip: pular, take: levar, include: INCLUDE }),
 
   visoesDoSistema: [
     { key: "atrasadas", nome: "Atrasadas", spec: { filtros: [{ key: "atrasada", valor: { tipo: "booleano", valor: true } }] } },
