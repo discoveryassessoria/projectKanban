@@ -201,6 +201,48 @@ export async function proximoCiclo(processoId: number, faseMacroKey: string): Pr
   return (ultima?.ciclo ?? 0) + 1
 }
 
+/**
+ * O CICLO-ALVO DE UMA VISITA A UMA FASE DIFERENTE DA ATUAL — reaproveita, não duplica.
+ *
+ * `proximoCiclo` sempre incrementa. É o que `reopenPhase` quer: pedir o trabalho de
+ * novo NA MESMA fase que está sendo fechada pela MESMA transação (a instância ativa
+ * que ele encontraria já vai ser supersedida pelo passo 1 de `executarPlano` antes da
+ * nova ser criada — reusar o ciclo dela ali seria errado, e por isso `reopenPhase`
+ * continua chamando `proximoCiclo` puro).
+ *
+ * Mas mover, retornar ou avançar para uma fase DIFERENTE da atual é REPOSICIONAR — se
+ * essa fase já tem uma instância ATIVO/BLOQUEADO/AGUARDANDO parada de uma visita
+ * anterior que nunca foi fechada, a visita nova precisa CONTINUAR nela, não abrir um
+ * ciclo irmão. Duas instâncias ativas para a mesma (processo, fase) ao mesmo tempo é
+ * exatamente o bug — não uma forma de corrigi-lo.
+ *
+ * Achado real (PROC-005, processo 651, 26-28/09/2026): `movePhaseManual` chamava
+ * `proximoCiclo` sem checar isso. A fase "genealogia" tinha a instância #485 ainda
+ * ATIVO (seu único trabalho pendente — tarefa 3827 — nunca tinha sido concluído nem
+ * cancelado); um retrocesso manual de volta para "genealogia" mesmo assim mintou o
+ * ciclo 2 (instância #494) do zero. As outras 17 obrigações da fase, já concluídas,
+ * ficaram — corretamente — apontando para #485; só a tarefa #3827, ainda viva, foi
+ * reancorada para #494 (`reancorarTarefaNaUnidade`, item 3b de `executarPlano`). O
+ * resultado: duas instâncias ATIVO simultâneas para a mesma fase, uma delas (#494)
+ * órfã — e a fase nunca fecha limpa porque nenhuma reconciliação pensa em procurar
+ * uma SEGUNDA instância ativa da mesma fase.
+ *
+ * A trava física contra isso é o índice único parcial em
+ * `PhaseWorkflowInstance(processoId, faseMacroKey) WHERE status IN (ATIVO, BLOQUEADO,
+ * AGUARDANDO)` (migration `20260928200000_trava_instancia_ativa_unica_por_fase`) —
+ * esta função é o que evita bater nele no caminho normal; o índice é o que impede
+ * fisicamente que aconteça de novo, mesmo se outro caminho futuro esquecer de chamar
+ * esta função.
+ */
+export async function cicloAlvoParaFase(processoId: number, faseMacroKey: string): Promise<number> {
+  const ativa = await prisma.phaseWorkflowInstance.findFirst({
+    where: { processoId, faseMacroKey, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
+    orderBy: { ciclo: "desc" }, select: { ciclo: true },
+  })
+  if (ativa) return ativa.ciclo
+  return proximoCiclo(processoId, faseMacroKey)
+}
+
 // --------------------------------------------------------------------------
 // Plano de mutação (compartilhado por todas as operações)
 // --------------------------------------------------------------------------
@@ -811,11 +853,13 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     }
   }
 
-  // CICLO ALVO da fase destino = próximo ciclo REAL (não 1 fixo). Após um returnPhase que
-  // criou um novo ciclo, a fase destino pode já ter uma instância ciclo-1 CONCLUÍDA; usar
-  // ciclo 1 reusaria a instância morta (fase vira no-op que passa sozinha). proximoCiclo
-  // devolve 1 na 1ª passagem e o próximo ciclo após reabertura/retorno — igual a reopen/return.
-  const cicloAlvo = await proximoCiclo(processoId, proxima)
+  // CICLO ALVO da fase destino = a instância ATIVA dela, se houver (reposicionar
+  // continua uma visita aberta em vez de abrir uma irmã — ver `cicloAlvoParaFase`);
+  // senão o próximo ciclo REAL. Após um returnPhase que criou um novo ciclo, a fase
+  // destino pode já ter uma instância ciclo-1 CONCLUÍDA; usar ciclo 1 reusaria a
+  // instância morta (fase vira no-op que passa sozinha) — só CONCLUÍDA não conta como
+  // ativa, então cai no fallback de sempre.
+  const cicloAlvo = await cicloAlvoParaFase(processoId, proxima)
   return executarPlano({
     operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
@@ -849,9 +893,10 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
   // pendências são apenas SNAPSHOT para auditoria (ignoradas no forçado)
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
 
-  // ciclo alvo = próximo ciclo REAL da fase destino (ver advance) — evita reusar instância
-  // CONCLUÍDA de ciclo anterior após retorno de fase.
-  const cicloAlvo = await proximoCiclo(processoId, proxima)
+  // ciclo alvo = a instância ATIVA da fase destino, se houver; senão o próximo ciclo
+  // REAL (ver `cicloAlvoParaFase` / `advance`) — evita reusar instância CONCLUÍDA de
+  // ciclo anterior após retorno de fase.
+  const cicloAlvo = await cicloAlvoParaFase(processoId, proxima)
   return executarPlano({
     operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion, fases: c.fases,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
@@ -919,7 +964,7 @@ export async function returnPhase(processoId: number, input: ReturnInput): Promi
     return { success: false, resultado: "REJEITADO", code: "FASE_ALVO_NAO_ANTERIOR", message: "Retorno só é permitido para uma fase anterior à atual", correlationId }
   }
 
-  const cicloAlvo = await proximoCiclo(processoId, input.faseAlvo)
+  const cicloAlvo = await cicloAlvoParaFase(processoId, input.faseAlvo)
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
 
   return executarPlano({
@@ -987,7 +1032,9 @@ export async function movePhaseManual(processoId: number, input: MoveInput): Pro
     return { success: false, resultado: "REJEITADO", code: "MOTIVO_OBRIGATORIO", message: "Movimentação manual exige código de motivo", correlationId }
   }
 
-  const cicloAlvo = await proximoCiclo(processoId, faseAlvo)
+  // PROC-005 (processo 651, 26/09/2026): mover pra uma fase que já tem instância
+  // ATIVO parada não pode abrir um ciclo irmão — ver `cicloAlvoParaFase`.
+  const cicloAlvo = await cicloAlvoParaFase(processoId, faseAlvo)
   // As pendências entram no log como FOTOGRAFIA do estado, não como decisão: a
   // movimentação manual não é gateada por elas. Sem isso, o registro não diria de
   // onde o processo saiu.

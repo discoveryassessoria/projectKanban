@@ -5394,6 +5394,19 @@ enum WorkflowEventoTipo {
   FASE_MOVIDA
 }
 
+/// SÓ UMA INSTÂNCIA ATIVA POR (processo, fase) AO MESMO TEMPO — garantido por índice
+/// único parcial no banco (`PhaseWorkflowInstance_uma_ativa_por_fase`, migration
+/// 20260928200000), não por convenção. Prisma não representa índice parcial no
+/// schema (mesma situação de `StepExecution_uma_vigente_por_passo`) — `db push` NÃO
+/// cria esta constraint; só `prisma migrate deploy` a partir da migration real.
+///
+/// Achado real (PROC-005, processo 651, 26/09/2026): `movePhaseManual` mintava um
+/// ciclo novo (`proximoCiclo`) sem checar se a fase-destino já tinha uma instância
+/// ATIVO parada de uma visita anterior nunca fechada — duas instâncias ATIVO para a
+/// mesma fase coexistiram, uma delas órfã, e a fase nunca fechava limpa. A aplicação
+/// evita isso via `cicloAlvoParaFase` (phase-advance.ts); este índice é o que
+/// impede fisicamente que aconteça de novo, mesmo se um caminho futuro esquecer de
+/// chamar essa função.
 model PhaseWorkflowInstance {
   id               Int      @id @default(autoincrement())
   processoId       Int
