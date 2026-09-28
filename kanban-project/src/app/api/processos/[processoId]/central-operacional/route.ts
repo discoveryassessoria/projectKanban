@@ -393,9 +393,18 @@ export async function GET(
               updatedAt: true,
               responsavelId: true,
               responsavel: { select: { nome: true } },
-              dataPrazoOperacao: true,
               motivoBloqueio: true,
               ultimaMovimentacao: true,
+              // PRAZO — achado real ("regime de prazo das certidões", 28/09/2026):
+              // Documento.dataPrazoOperacao está vazio em produção pra este fluxo.
+              // SolicitacaoDocumento.previsaoRetorno é quem já nasce preenchido, a
+              // partir do ENVIO do requerimento ao cartório (não da confirmação) —
+              // mesma fonte que o domínio Certidões da Central de Relatórios usa.
+              solicitacoes: {
+                select: { previsaoRetorno: true, status: true },
+                orderBy: { id: "desc" as const },
+                take: 1,
+              },
               // CUTOVER V2: sem leitura de Workflow legado. Passos V2 por-documento
               // (PhaseWorkflowStepInstance com documentoId) alimentam a operação.
             },
@@ -528,7 +537,10 @@ export async function GET(
         // doc tem prioridade; se não tiver, cai pro responsável da etapa ativa
         responsavelId: d.responsavelId ?? stepOwner?.id ?? null,
         responsavelNome: d.responsavel?.nome ?? stepOwner?.nome ?? null,
-        dataPrazoOperacao: d.dataPrazoOperacao,
+        // Campo continua se chamando `dataPrazoOperacao` (nome do projeto interno,
+        // não do schema) — a FONTE mudou: vem da última SolicitacaoDocumento do
+        // Documento (previsaoRetorno), não mais de Documento.dataPrazoOperacao.
+        dataPrazoOperacao: d.solicitacoes?.[0]?.previsaoRetorno ?? null,
         motivoBloqueio: d.motivoBloqueio,
         ultimaMovimentacao: d.ultimaMovimentacao,
       }

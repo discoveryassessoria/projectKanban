@@ -411,6 +411,47 @@ export function estadoTemporalSubtarefa(e: EntradaTemporalSubtarefa): EstadoTemp
   })
 }
 
+/** Estados de `SolicitacaoDocumento` em que o relógio da solicitação já não corre. */
+const SOLICITACAO_ENCERRADA = new Set(['RESPONDIDA', 'CANCELADA'])
+
+/**
+ * O QUE A OPERAÇÃO PRECISA SABER SOBRE O TEMPO DE UMA SOLICITAÇÃO AO CARTÓRIO.
+ *
+ * `dataPrazo` vem de `SolicitacaoDocumento.previsaoRetorno` — ancorado no
+ * `dataEnvio` (o instante real do ENVIO do requerimento, achado real
+ * "regime de prazo das certidões", 28/09/2026: `Tarefa.dataPrazo` e
+ * `Documento.dataPrazoOperacao` estão os dois vazios em produção pra este
+ * fluxo — a única data que já nasce certa, a partir do envio e não da
+ * confirmação do cartório, é esta).
+ *
+ * Mesma matemática de `estadoTemporal`/`estadoTemporalSubtarefa` (um só
+ * núcleo, `nucleoTemporal`), com o vocabulário de status de
+ * `SolicitacaoDocumento` (AGUARDANDO_PROTOCOLO/PROTOCOLADA/RESPONDIDA/
+ * CANCELADA) — RESPONDIDA/CANCELADA param o relógio, do mesmo jeito que
+ * concluir para a Tarefa ou a subtarefa.
+ */
+export interface EntradaTemporalSolicitacao {
+  dataPrazo: Date | string | null
+  /** status vigente da SolicitacaoDocumento — vocabulário próprio, não o de Tarefa/Subtarefa. */
+  status?: string | null
+  criadaEm?: Date | string | null
+  agora?: Date
+}
+
+export function estadoTemporalSolicitacao(e: EntradaTemporalSolicitacao): EstadoTemporal {
+  const encerrada = e.status != null ? SOLICITACAO_ENCERRADA.has(e.status) : false
+  return nucleoTemporal({
+    dataPrazo: e.dataPrazo,
+    dataConclusao: null,
+    encerrada,
+    aguardandoTerceiro: e.status === 'AGUARDANDO_PROTOCOLO' || e.status === 'PROTOCOLADA',
+    previsaoExterna: null,
+    slaPausadoEm: null,
+    criadaEm: e.criadaEm,
+    agora: e.agora,
+  })
+}
+
 // ============================================================================
 // EM RISCO — PROPOSTA DOCUMENTADA, AINDA NÃO LIGADA (17/09/2026)
 // ----------------------------------------------------------------------------

@@ -14,7 +14,7 @@
 // documento entregue é uma das colunas.
 
 import { prisma } from "@/lib/prisma"
-import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
+import { estadoTemporal, estadoTemporalSolicitacao, type EstadoTemporal } from "@/lib/operacional/tempo-operacional"
 import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/subtarefa-confirmacao-pedido"
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
 import type { CorDeCelula, DominioDef } from "../tipos"
@@ -25,21 +25,44 @@ export const CATEGORIA_CERTIDAO = "REGISTRO_CIVIL"
 
 const STEP_KEY_SOLICITAR_CERTIDAO = "solicitar_certidao"
 
+/** A BUCKETIZAÇÃO em 4 rótulos fixos, comum às duas fontes abaixo — nunca duplicada. */
+function bucketizarPrazo(et: EstadoTemporal): { rotulo: string; cor: CorDeCelula } {
+  if (et.semPrazo) return { rotulo: "Sem prazo", cor: "cinza" }
+  if (et.atrasado) return { rotulo: "Vencido", cor: "vermelho" }
+  if (et.diasParaPrazo != null && et.diasParaPrazo <= 7) return { rotulo: "Vence em até 7 dias", cor: "amarelo" }
+  return { rotulo: "No prazo", cor: "verde" }
+}
+
 /**
  * A SITUAÇÃO DO PRAZO, em 4 estados (achado real, rodada "Relatório de
  * Certidões" 27/09/2026). Reaproveita `estadoTemporal` — o núcleo canônico
  * de `Tarefa.dataPrazo` ("uma régua, uma frase" — a mesma que Central
  * Operacional e Minha Fila usam — nunca uma segunda conta de dias aqui.
- * Só a BUCKETIZAÇÃO em 4 rótulos fixos (o que o relatório pediu) é nova.
+ *
+ * MANTIDA por compatibilidade de assinatura (testada isoladamente), mas as
+ * colunas "Prazo"/"Situação do prazo" deste domínio NÃO usam mais esta
+ * função — ver `situacaoDoPrazoSolicitacao` abaixo (achado real, "regime de
+ * prazo das certidões", 28/09/2026: `Tarefa.dataPrazo` está sempre vazio em
+ * produção para o fluxo de Solicitar certidão).
  */
 export function situacaoDoPrazo(t: { dataPrazo: Date | null; dataConclusao: Date | null; statusTarefa: string | null } | null):
   { rotulo: string; cor: CorDeCelula } {
   if (!t) return { rotulo: "Sem prazo", cor: "cinza" }
-  const et = estadoTemporal({ dataPrazo: t.dataPrazo, dataConclusao: t.dataConclusao, statusTarefa: t.statusTarefa })
-  if (et.semPrazo) return { rotulo: "Sem prazo", cor: "cinza" }
-  if (et.atrasado) return { rotulo: "Vencido", cor: "vermelho" }
-  if (et.diasParaPrazo != null && et.diasParaPrazo <= 7) return { rotulo: "Vence em até 7 dias", cor: "amarelo" }
-  return { rotulo: "No prazo", cor: "verde" }
+  return bucketizarPrazo(estadoTemporal({ dataPrazo: t.dataPrazo, dataConclusao: t.dataConclusao, statusTarefa: t.statusTarefa }))
+}
+
+/**
+ * A SITUAÇÃO DO PRAZO a partir de `SolicitacaoDocumento` — a fonte que
+ * realmente nasce preenchida hoje (`previsaoRetorno = dataEnvio +
+ * prazoEsperadoDias`, ancorada no ENVIO do requerimento ao cartório, não na
+ * confirmação). `Tarefa.dataPrazo`/`Documento.dataPrazoOperacao` continuam
+ * existindo no schema mas estão vazios em produção para este fluxo — usar
+ * qualquer um dos dois aqui mostraria "Sem prazo" para tudo.
+ */
+export function situacaoDoPrazoSolicitacao(s: { previsaoRetorno: Date | null; status: string | null } | null):
+  { rotulo: string; cor: CorDeCelula } {
+  if (!s) return { rotulo: "Sem prazo", cor: "cinza" }
+  return bucketizarPrazo(estadoTemporalSolicitacao({ dataPrazo: s.previsaoRetorno, status: s.status }))
 }
 
 const STATUS = ["PENDENTE", "EM_ATENDIMENTO", "ATENDIDA", "NAO_LOCALIZADA", "DISPENSADA"] as const
@@ -246,10 +269,14 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     { key: "protocolo", rotulo: "Nº protocolo",
       valor: (l) => { const c = confirmacao(l); return c?.protocoloRef?.numeroProtocolo ?? c?.protocolo ?? null } },
     { key: "confirmado_em", rotulo: "Confirmado em", valor: (l) => dataBR(confirmacao(l)?.completedAt) },
-    { key: "prazo", rotulo: "Prazo", valor: (l) => dataBR(tarefaDoDoc(l)?.dataPrazo ?? null) },
+    // Mesma fonte da coluna "Previsão de retorno" (achado real, "regime de prazo
+    // das certidões", 28/09/2026): Tarefa.dataPrazo está vazio em produção para
+    // este fluxo — SolicitacaoDocumento.previsaoRetorno é quem já nasce
+    // preenchido, a partir do ENVIO do requerimento (não da confirmação).
+    { key: "prazo", rotulo: "Prazo", valor: (l) => dataBR(sol(l)?.previsaoRetorno ?? null) },
     { key: "situacao_prazo", rotulo: "Situação do prazo",
-      valor: (l) => situacaoDoPrazo(tarefaDoDoc(l)).rotulo,
-      corDoValor: (l) => situacaoDoPrazo(tarefaDoDoc(l)).cor },
+      valor: (l) => situacaoDoPrazoSolicitacao(sol(l)).rotulo,
+      corDoValor: (l) => situacaoDoPrazoSolicitacao(sol(l)).cor },
     // Chave DIFERENTE de "responsavel" (linha acima, "Solicitada por" — quem
     // CRIOU o registro de solicitação): este é quem tem a Tarefa AGORA, a
     // fonte única de responsável (ownership-canonico-tarefa).
