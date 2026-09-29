@@ -708,8 +708,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: 'Este workflow é um Modelo da Biblioteca de Tarefas. Inative-o em Gerenciamento › Biblioteca de Tarefas — excluir apagaria a definição que Vínculos publicados referenciam.' }, { status: 409 })
     }
 
-    await prisma.phaseInternalWorkflow.delete({ where: { id } })
+    // ACHADO REAL (28/09/2026): esta exclusão nunca deixou rastro — nenhum
+    // LogAuditoria, ao contrário de PUT/publicar. Um hard delete que cascateia
+    // (onDelete: Cascade) até StepRequirement/StepSubtaskDefinition/etc. ficava
+    // invisível depois do fato: uma queda no catálogo não tinha como ser
+    // atribuída a ninguém. Grava ANTES do delete (a linha ainda existe para
+    // descrever o que se perdeu).
+    const usuario = await extrairUsuarioComPermissoes(request)
+    await prisma.logAuditoria.create({
+      data: {
+        acao: 'WORKFLOW_EXCLUIDO', entidade: 'PhaseInternalWorkflow', entidadeId: id,
+        descricao: `Workflow interno "${atual.name}" (fase "${atual.phaseKey}") excluído definitivamente — passos/requisitos/subtarefas cascateiam.`,
+        detalhes: { name: atual.name, phaseKey: atual.phaseKey, versao: atual.versao } as never,
+        usuarioId: usuario?.userId ?? null,
+      },
+    }).catch(() => null)
 
+    await prisma.phaseInternalWorkflow.delete({ where: { id } })
 
     return NextResponse.json({ ok: true })
   } catch (e) {
