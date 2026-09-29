@@ -102,7 +102,9 @@ async function main() {
   secao('3) Reconciliação GERAL: fase existente que se TORNA obrigatória')
   // ══════════════════════════════════════════════════════════════════════
   const admin = await prisma.usuario.create({ data: { nome: 'Admin AltFase', email: 'admin@altfase.test', senha: 'x', tipo: 'admin' }, select: { id: true } })
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: 'País AltFase', modalityKey: `${MARCA}_modal`, modalityLabel: 'Modalidade AltFase' })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde 22/09 — texto
+  // livre por MARCA nunca foi válido, só não tinha CHECK que recusasse antes disso.
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: 'País AltFase', modalityKey: 'administrativa', modalityLabel: 'Modalidade AltFase' })
   const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
   await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })

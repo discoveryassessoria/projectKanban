@@ -89,7 +89,8 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   const admin = await prisma.usuario.create({ data: { nome: "Admin ProjNova", email: "admin@projnova.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const token = await signAuthToken({ userId: admin.id, email: "admin@projnova.test", tipo: "admin", sessaoInicio: Date.now() })
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País ProjNova", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade ProjNova" })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde 22/09.
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País ProjNova", modalityKey: "administrativa", modalityLabel: "Modalidade ProjNova" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
   await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })

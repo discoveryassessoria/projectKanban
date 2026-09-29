@@ -99,7 +99,8 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   const admin = await prisma.usuario.create({ data: { nome: "Admin CFGRETRO", email: "admin@cfgretro.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const token = await signAuthToken({ userId: admin.id, email: "admin@cfgretro.test", tipo: "admin", sessaoInicio: Date.now() })
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGRETRO", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade CFGRETRO" })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde 22/09.
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGRETRO", modalityKey: "administrativa", modalityLabel: "Modalidade CFGRETRO" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
   await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro isolado`, versao: 1 }, select: { id: true } })

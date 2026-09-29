@@ -87,7 +87,8 @@ async function main() {
     data: { nome: 'Admin RecFase', email: 'admin@recfase.test', senha: 'x', tipo: 'admin' },
     select: { id: true },
   })
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: 'País RecFase', modalityKey: `${MARCA}_modal`, modalityLabel: 'Modalidade RecFase' })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde 22/09.
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: 'País RecFase', modalityKey: 'administrativa', modalityLabel: 'Modalidade RecFase' })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId },
     select: { id: true },

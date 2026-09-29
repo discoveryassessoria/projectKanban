@@ -76,7 +76,8 @@ async function main() {
   ok("0.4) escopoCanonicoDaFase('apostilamento') === DOCUMENTO", escopoCanonicoDaFase("apostilamento") === "DOCUMENTO")
 
   const admin = await prisma.usuario.create({ data: { nome: "Admin RescDoc", email: "admin@rescdoc.test", senha: "x", tipo: "admin" }, select: { id: true } })
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País RescDoc", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade RescDoc" })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde 22/09.
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País RescDoc", modalityKey: "administrativa", modalityLabel: "Modalidade RescDoc" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
   await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })

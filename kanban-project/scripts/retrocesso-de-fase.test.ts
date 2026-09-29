@@ -24,7 +24,7 @@ import { PrismaClient } from "@prisma/client"
 import { planejarRetrocesso, executarRetrocesso } from "../src/services/retrocesso-de-fase"
 import { planejarReabertura, executarReabertura } from "../src/services/reabertura-de-execucao"
 import { tentativasDoPasso, garantirTentativa, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
-import { congelarVersaoVigente } from "../src/services/versao-publicada"
+import { congelarVersaoVigente, publicarNovaVersao } from "../src/services/versao-publicada"
 import { gravarOperacao, historicoDaOperacao, historicoDaOperacaoDaUnidade } from "../src/services/operacao-da-etapa"
 import { garantirOferta } from "./_fixture-oferta"
 
@@ -188,7 +188,11 @@ interface Palco {
  * que ordem visual não é dependência.
  */
 async function montar(marca: string): Promise<Palco> {
-  const oferta = await garantirOferta(prisma, { countryKey: "retro", countryLabel: "Retro", nationalityKey: "retro", nationalityLabel: "Retro", modalityKey: "retro", modalityLabel: "Retro" })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde o "hierarquia
+  // congelada" 22/09 — este fixture ainda reusava a countryKey sintética "retro",
+  // que nunca foi um valor válido; achado ao rodar esta suíte pela primeira vez
+  // depois daquele CHECK ter sido apertado.
+  const oferta = await garantirOferta(prisma, { countryKey: "retro", countryLabel: "Retro", nationalityKey: "retro", nationalityLabel: "Retro", modalityKey: "administrativa", modalityLabel: "Administrativa" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({
     data: {
       code: `${M}_${marca}`.toUpperCase().slice(0, 40), name: `${M} ${marca}`, ativo: true,
@@ -390,6 +394,42 @@ async function main() {
   check("TESTE 2: a tarefa concluída continua concluída", tarefa2?.statusTarefa === "CONCLUIDO_RECEBIDO")
   const audit2 = await prisma.logAuditoria.count({ where: { acao: "STEP_EXECUTION_REOPENED", entidadeId: { in: Object.values(p2.si) } } })
   check("  e nenhum evento de reabertura foi emitido", audit2 === 0)
+
+  // ══════════════════════════════════════════════════════════════
+  secao("(C2) Retrocesso para fase cujo Workflow Interno foi republicado desde a instância ativa (produção: processo 651, 29/09/2026)")
+  // ══════════════════════════════════════════════════════════════
+  // Reproduz exatamente o incidente: a instância ATIVO da fase de destino nasceu sob
+  // uma versão do Workflow Interno; alguém o republica (versão sobe) enquanto essa
+  // instância continua a mesma visita em aberto; o retrocesso tenta reentrar na fase.
+  // A busca por `chaveIdempotencia` exata erra o achado (a versão mudou) e caía direto
+  // no `create`, que colide com o índice físico "uma ATIVO/BLOQUEADO/AGUARDANDO por
+  // (processoId, faseMacroKey)" — produção: `Unique constraint failed` em
+  // `phase-workflow.ts`, retrocesso do 651 para "emissao_documental" recusado.
+  const p2b = await montar("republicado")
+  const wfEmissao = await prisma.phaseInternalWorkflow.findFirstOrThrow({
+    where: { phaseKey: p2b.faseEmissao }, select: { id: true, versao: true },
+  })
+  check("a instância ativa nasceu na versão 1 do workflow",
+    (await prisma.phaseWorkflowInstance.findUniqueOrThrow({ where: { id: p2b.instEmissao }, select: { workflowVersion: true } })).workflowVersion === 1)
+  const republicacao = await publicarNovaVersao(wfEmissao.id)
+  check("o workflow foi republicado (v1 → v2), instância ativa continua na v1",
+    republicacao.anterior === 1 && republicacao.nova === 2, JSON.stringify(republicacao))
+  const r2b = await executarRetrocesso({
+    processoId: p2b.processoId, faseDestino: p2b.faseEmissao, motivoCodigo: "CORRECAO_CADASTRO",
+    justificativa: "Reposicionar depois de republicar o cadastro.", actorId: p2b.actorId,
+  })
+  check("o retrocesso acontece mesmo com o cadastro republicado", r2b.ok, JSON.stringify(r2b))
+  check("  a fase do processo passou a ser a de destino",
+    (await prisma.processo.findUnique({ where: { id: p2b.processoId }, select: { faseAtualKey: true } }))?.faseAtualKey === p2b.faseEmissao)
+  const instanciasEmissao2b = await prisma.phaseWorkflowInstance.findMany({
+    where: { processoId: p2b.processoId, faseMacroKey: p2b.faseEmissao }, select: { id: true, status: true, workflowVersion: true },
+  })
+  check("  a instância ativa foi REUSADA — nenhuma segunda linha nasceu (mesmo ciclo)",
+    instanciasEmissao2b.length === 1 && instanciasEmissao2b[0].id === p2b.instEmissao, JSON.stringify(instanciasEmissao2b))
+  check("  as 5 obrigações da visita anterior continuam intactas (nenhuma execução nova)",
+    JSON.stringify(await estados(p2b.si)) === JSON.stringify(await estados(p2b.si)))
+  const tentativas2b = await prisma.stepExecution.count({ where: { stepInstance: { id: { in: Object.values(p2b.si) } } } })
+  check("  e nenhuma tentativa nova nasceu nos passos da visita anterior", tentativas2b === 5, String(tentativas2b))
 
   // ══════════════════════════════════════════════════════════════
   secao("(D) TESTE 3/5 — reabrir UMA tarefa, na Central, depois de estar na fase")

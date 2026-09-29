@@ -740,7 +740,31 @@ export async function instanciarWorkflowDaFase(
   const avisos = [...val.warnings, ...diagEscopo, ...plano.avisos]
 
   const corpo = async (tx: Prisma.TransactionClient): Promise<InstanciarResultado> => {
+      // A CHAVE EXATA cobre o retry do MESMO pedido (mesma versão de cadastro).
+      //
+      // Ela NÃO cobre reentrar no MESMO ciclo de uma fase cuja instância ativa nasceu
+      // sob uma versão ANTERIOR do Workflow Interno — o cadastro pode ser republicado
+      // (versão sobe) enquanto a instância continua a mesma visita em aberto. Sem este
+      // fallback, a busca exata errava o achado (instância existe, chave não bate) e
+      // caía direto no `create`, que colide com o índice físico que garante uma ATIVO/
+      // BLOQUEADO/AGUARDANDO por (processoId, faseMacroKey) — produção, processo 651:
+      // retrocesso para "emissao_documental" com a instância 495 ativa (nascida na
+      // v20) depois do workflow ir para v21. Mesmo critério de `cicloAlvoParaFase`
+      // (phase-advance.ts), que é quem decide o `ciclo` recebido aqui QUANDO reentra no
+      // mesmo ciclo — a instância que ele encontra é exatamente esta.
+      //
+      // O FILTRO POR `ciclo` AQUI NÃO É REDUNDANTE: `processarReconciliacaoEscopoDeFase`
+      // (reconciliar-fase-macro.ts) passa deliberadamente um ciclo NOVO (maior) mesmo
+      // com a instância legada ainda ATIVO — é assim que ela força uma segunda visita
+      // (novo ciclo, `previousInstanceId` apontando pra legada) em vez de reescrever a
+      // que já existe. Sem escopar por `ciclo`, este fallback encontraria a legada
+      // (mesma faseMacroKey, status ATIVO) e a reusaria — a reconciliação de escopo
+      // parava de nascer ciclo novo. A trava física é por (processoId, faseMacroKey)
+      // sem `ciclo`, mas ela só entra em jogo quando os dois lados pedem o MESMO ciclo.
       const existente = await tx.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveWorkflow } })
+        ?? await tx.phaseWorkflowInstance.findFirst({
+          where: { processoId: processo.id, faseMacroKey: input.faseMacroKey, ciclo, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
+        })
       if (existente) {
         // CONVERGÊNCIA: a instância da fase já existe, mas pode ter nascido sob uma
         // regra que descartava os passos publicados (ver `resolverWorkflowAplicavel`

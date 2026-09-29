@@ -130,7 +130,8 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("7) Alteração de escopo por nova revisão RETROAGE a processo em andamento")
   // ══════════════════════════════════════════════════════════════════════
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGC", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade CFGC" })
+  // modalityKey é enumeração canônica (administrativa|judicial) desde 22/09.
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País CFGC", modalityKey: "administrativa", modalityLabel: "Modalidade CFGC" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
   await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId } })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })
