@@ -25,7 +25,7 @@ import { garantirDocumentoDaNecessidade } from "@/src/services/genealogia/operac
 import { recalcularNumerosLinhagemDaArvore } from "@/src/services/genealogia/numero-linhagem"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
-import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
+import type { RegraDocumental, ResultadoRegra, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
 import {
   politicaDaFase, resolverTiposDocumentais, naturezaPermitidaNaFase, recebeWorkflowOperacional,
   type TipoDocumentalResolvido,
@@ -35,8 +35,172 @@ import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
 import { resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
+import { montarPessoasDoProcesso, type ClassificacaoPessoa, type PessoaBruta, type UniaoBruta } from "@/src/lib/process-stage/central-operacional-core"
 
 type DB = typeof prisma | Prisma.TransactionClient
+
+/**
+ * A REGRA — "nunca mais árvore ↔ documentação" (mandato Torre de Controle, 29/09/2026).
+ *
+ * `Pessoa.documentacao` é o interruptor de quem está FORA da linhagem: por padrão
+ * (`@default(true)`) todo mundo entra, e desligar tira. Quem está NA linhagem — o
+ * requerente e os ascendentes diretos que a classificação confirma — nunca pode ser
+ * excluído por este campo: a exigência documental deles não depende de um checkbox
+ * pensado para parentes de apoio. `PENDENTE_CLASSIFICACAO` (declarado na linha reta,
+ * mas sem filiação que a travessia confirme) é tratado como "exige" — é pendência de
+ * CADASTRO a resolver, nunca um motivo pra dispensar documento sozinho.
+ *
+ * Achado real (processo 675, 29/09/2026): o filtro antigo excluía QUALQUER pessoa com
+ * `documentacao: false` da avaliação, linhagem ou não — o campo nunca deveria ter
+ * esse poder sobre quem está na linha reta.
+ */
+export function pessoaExigeDocumentacao(classificacao: ClassificacaoPessoa, documentacao: boolean): boolean {
+  return classificacao === "FORA_DA_LINHAGEM" ? documentacao === true : true
+}
+
+export interface ExigenciaGenealogia {
+  pessoaId: number | null
+  uniaoId: number | null
+  chave: string
+  varianteKey: string
+  itemCatalogoId: number
+  regra: RegraDocumental
+  ap: ResultadoRegra
+  sujeitoNome: string
+}
+
+export interface CalculoExigenciasGenealogia {
+  processoId: number
+  tipoProcessoId: number | null
+  arvoreId: number
+  exigencias: ExigenciaGenealogia[]
+  pendencias: string[]
+  instancia: { id: number; ciclo: number } | null
+  labelLocalizarRegistro: string
+  slaDaysLocalizarRegistro: number
+  tipoPorCode: Map<string, TipoDocumentalResolvido>
+}
+
+/**
+ * NÚCLEO PURO (sem escrita nenhuma): deriva de árvore + matriz + `documentacao` o
+ * conjunto de exigências documentais da Genealogia deste processo — a MESMA
+ * pergunta que `materializarGenealogia` responde antes de gravar, e que `NEC-001`
+ * (Saúde) faz de novo, sozinha, para comparar com o que está gravado. Uma leitura
+ * aqui não escreve nada em lugar nenhum — quem decide se aplica é o chamador.
+ */
+export async function calcularExigenciasDaGenealogia(processoId: number, db: DB = prisma): Promise<CalculoExigenciasGenealogia | null> {
+  const processo = await db.processo.findUnique({
+    where: { id: processoId },
+    select: { id: true, arvoreId: true, tipoProcessoMotorId: true },
+  })
+  if (!processo?.arvoreId) return null
+
+  const regras = await regrasGenealogiaDoProcesso(processo.tipoProcessoMotorId ?? null, db)
+  const pendencias: string[] = []
+  if (regras.length === 0) pendencias.push("nenhuma Regra Documental publicada exigida na Genealogia")
+
+  const wfGenealogia = await resolverWorkflowAplicavel(processo.tipoProcessoMotorId ?? null, FASE_GENEALOGIA, db)
+  const passoLocalizarRegistroCadastrado =
+    "steps" in wfGenealogia ? wfGenealogia.steps.find((s) => s.key === STEP_LOCALIZAR) : null
+  const slaDaysLocalizarRegistro = passoLocalizarRegistroCadastrado?.slaDays ?? 5
+  const labelLocalizarRegistro = passoLocalizarRegistroCadastrado?.label ?? STEP_LABEL
+
+  // TODAS as pessoas ativas da árvore — SEM filtrar por `documentacao` aqui. O
+  // filtro certo depende da CLASSIFICAÇÃO (linhagem), calculada abaixo com os
+  // mesmos dados e a mesma régua que a Central Operacional usa
+  // (`montarPessoasDoProcesso`) — nunca um `linhaReta` cru e solto neste arquivo.
+  const todasAtivas = await db.pessoa.findMany({
+    where: pessoasAtivasDaArvore(processo.arvoreId),
+    select: {
+      id: true, nome: true, sobrenome: true, sexo: true, publicCode: true, numeroLinhagem: true,
+      documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true, paiId: true, maeId: true, data_nasc: true,
+    },
+  })
+  const todasIds = todasAtivas.map((p) => p.id)
+  const todasUnioes: UniaoBruta[] = todasIds.length
+    ? await db.uniao.findMany({
+        where: { OR: [{ pessoa1Id: { in: todasIds } }, { pessoa2Id: { in: todasIds } }] },
+        select: { id: true, pessoa1Id: true, pessoa2Id: true },
+      })
+    : []
+  const classificadas = montarPessoasDoProcesso(todasAtivas as PessoaBruta[], todasUnioes)
+  const classificacaoPorId = new Map(classificadas.map((c) => [c.pessoaId, c.classificacao]))
+  const pessoas = todasAtivas.filter((p) => pessoaExigeDocumentacao(classificacaoPorId.get(p.id) ?? "PENDENTE_CLASSIFICACAO", p.documentacao))
+
+  const politica = await politicaDaFase(FASE_GENEALOGIA, db)
+  if (!politica) pendencias.push(`fase "${FASE_GENEALOGIA}" não existe no Catálogo de Fases`)
+  else if (politica.naturezasPermitidas.size === 0) {
+    pendencias.push(`fase "${FASE_GENEALOGIA}" sem naturezas documentais habilitadas — cadastre a política da fase`)
+  }
+  const tiposPorId = await resolverTiposDocumentais(db)
+  const tipoPorCode = new Map<string, TipoDocumentalResolvido>()
+  for (const t of tiposPorId.values()) if (t.code) tipoPorCode.set(t.code, t)
+
+  const pessoaIds = pessoas.map((p) => p.id)
+  const uniõesRaw = pessoaIds.length
+    ? await db.uniao.findMany({
+        where: { OR: [{ pessoa1Id: { in: pessoaIds } }, { pessoa2Id: { in: pessoaIds } }] },
+        select: { id: true, pessoa1Id: true, pessoa2Id: true },
+      })
+    : []
+  const uniõesPorPessoa = new Map<number, number[]>()
+  for (const u of uniõesRaw) {
+    for (const pid of [u.pessoa1Id, u.pessoa2Id]) {
+      const lista = uniõesPorPessoa.get(pid) ?? []
+      lista.push(u.id)
+      uniõesPorPessoa.set(pid, lista)
+    }
+  }
+
+  const instanciaRaw = await db.phaseWorkflowInstance.findFirst({
+    where: { processoId, faseMacroKey: FASE_GENEALOGIA, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
+    orderBy: { ciclo: "desc" },
+    select: { id: true, ciclo: true },
+  })
+
+  const exigencias: ExigenciaGenealogia[] = []
+  for (const p of pessoas) {
+    const sujeito = contextoDaPessoa(p)
+    const av = avaliarRegrasDocumentais({
+      tipoProcessoId: processo.tipoProcessoMotorId ?? 0,
+      faseKey: FASE_GENEALOGIA, sujeito, dataReferencia: new Date().toISOString(), regras,
+    })
+    for (const ap of av.aplicaveis) {
+      const tipoDoc = tipoPorCode.get(ap.documentTypeCode)
+      const elegivel = naturezaPermitidaNaFase(politica, tipoDoc)
+      if (!elegivel.permitido) { pendencias.push(`"${ap.documentTypeCode}": ${elegivel.detalhe}`); continue }
+      const regra = regras.find((r) => r.id === ap.regraId)!
+      const codigo = regra.codigo ?? `MDX_${regra.id}`
+      const varianteKey = `rd:${codigo}:v${regra.versao}`
+      const itemCatalogoId = tipoDoc?.itemCatalogoId ?? null
+      if (itemCatalogoId == null) {
+        pendencias.push(`sem ItemCatalogo para "${ap.documentTypeCode}" (pessoa ${p.id}, regra ${codigo}) — necessidade não materializada`)
+        continue
+      }
+      type Alvo = { pessoaId?: number; uniaoId?: number; chave: string }
+      const alvos: Alvo[] =
+        regra.alvoNecessidade === "UNIAO"
+          ? (uniõesPorPessoa.get(p.id) ?? []).map((uniaoId) => ({ uniaoId, chave: `u${uniaoId}::${varianteKey}` }))
+          : [{ pessoaId: p.id, chave: `p${p.id}::${varianteKey}` }]
+      if (regra.alvoNecessidade === "UNIAO" && alvos.length === 0) {
+        pendencias.push(`"${ap.documentTypeCode}": regra de união aplicável a ${p.id}, mas a pessoa não tem nenhuma União cadastrada — necessidade não materializada`)
+        continue
+      }
+      for (const alvo of alvos) {
+        exigencias.push({
+          pessoaId: alvo.pessoaId ?? null, uniaoId: alvo.uniaoId ?? null, chave: alvo.chave,
+          varianteKey, itemCatalogoId, regra, ap, sujeitoNome: sujeito.nome ?? `Pessoa ${p.id}`,
+        })
+      }
+    }
+  }
+
+  return {
+    processoId, tipoProcessoId: processo.tipoProcessoMotorId ?? null, arvoreId: processo.arvoreId,
+    exigencias, pendencias, instancia: instanciaRaw ?? null,
+    labelLocalizarRegistro, slaDaysLocalizarRegistro, tipoPorCode,
+  }
+}
 
 const FASE_GENEALOGIA = "genealogia" // phaseKey canônica (minúscula)
 // stepKey canônico ÚNICO da Genealogia. "Localizar registro" (não "buscar
@@ -115,139 +279,25 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
     stepsCriados: 0, stepsReusados: 0, dispensadas: 0, reativadas: 0, pendencias: [], semInstanciaWorkflow: false,
   }
 
-  const processo = await db.processo.findUnique({
-    where: { id: processoId },
-    select: { id: true, arvoreId: true, tipoProcessoMotorId: true },
-  })
-  if (!processo?.arvoreId) { res.pendencias.push("processo sem árvore vinculada"); return res }
+  const calculo = await calcularExigenciasDaGenealogia(processoId, db)
+  if (!calculo) { res.pendencias.push("processo sem árvore vinculada"); return res }
+  res.pendencias.push(...calculo.pendencias)
+  if (calculo.exigencias.length === 0 && calculo.pendencias.some((p) => p.includes("nenhuma Regra Documental"))) return res
 
-  const regras = await regrasGenealogiaDoProcesso(processo.tipoProcessoMotorId ?? null, db)
-  if (regras.length === 0) { res.pendencias.push("nenhuma Regra Documental publicada exigida na Genealogia"); return res }
-
-  // O PRAZO DO PASSO VEM DO CADASTRO (Gerenciamento › Workflow › Workflow
-  // Interno), nunca de um número escrito aqui. Um `slaDays: 5` literal neste
-  // arquivo é exatamente a segunda fonte de verdade que o resto do motor já
-  // eliminou para Emissão Documental — o administrador editava o prazo na
-  // tela e a tarefa nascida aqui continuava materializando o valor antigo,
-  // sem erro e sem aviso. `resolverWorkflowAplicavel` é o mesmo resolvedor
-  // que a Emissão Documental usa (tipo-específico → fallback global);
-  // ausência de cadastro publicado cai no default do domínio (5d), nunca
-  // trava a materialização por um problema de configuração que não é dela.
-  const wfGenealogia = await resolverWorkflowAplicavel(processo.tipoProcessoMotorId ?? null, FASE_GENEALOGIA, db)
-  const passoLocalizarRegistroCadastrado =
-    "steps" in wfGenealogia ? wfGenealogia.steps.find((s) => s.key === STEP_LOCALIZAR) : null
-  const slaDaysLocalizarRegistro = passoLocalizarRegistroCadastrado?.slaDays ?? 5
-  // MESMO PRINCÍPIO DO PRAZO ACIMA, agora pro NOME: `STEP_LABEL` era a mesma
-  // segunda fonte de verdade — texto fixo aqui, nunca lido do cadastro. Renomear
-  // o passo em Gerenciamento não mudava nada do que já tinha sido materializado
-  // (achado real, 16/09/2026: "Localizar registro da certidão" continuava
-  // aparecendo mesmo depois de o cadastro dizer só "Localizar registro").
-  const labelLocalizarRegistro = passoLocalizarRegistroCadastrado?.label ?? STEP_LABEL
-
-  // Pessoa REMOVIDA com histórico preservado não volta a materializar: seria
-  // recriar necessidade, passo e tarefa para quem já saiu da operação.
-  //
-  // `documentacao: false` é a PROMESSA do próprio checkbox "Precisa de
-  // documentação" na Árvore ("Se desligado, o sistema não gera os documentos
-  // desta pessoa e ela não entra na Central Operacional / workflow") — nenhuma
-  // Regra Documental publicada (nascimento/casamento/óbito, público
-  // TODAS_AS_PESSOAS_DA_ARVORE) tinha essa condição, então desligar o campo não
-  // tirava a pessoa da avaliação: a necessidade nascia e ficava, mesmo depois de
-  // desligado. O gate é estrutural aqui (não por regra) para valer pra toda
-  // regra presente e futura, sem depender de cada uma lembrar de checar o
-  // campo. Ficar fora desta lista também remove da RECONCILIAÇÃO: quem já tinha
-  // necessidade PENDENTE criada antes de desligar é dispensada (e o passo
-  // cancelado) na próxima materialização, por `reconciliarEfinalizar` abaixo.
-  const pessoas = await db.pessoa.findMany({
-    where: { ...pessoasAtivasDaArvore(processo.arvoreId), documentacao: true },
-    select: { id: true, nome: true, sobrenome: true, documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true, data_nasc: true },
-  })
-
-  // POLÍTICA DA FASE — o que a Genealogia materializa vem do CADASTRO (quais
-  // naturezas a fase aceita), não de uma premissa no motor. Fase sem política
-  // declarada não materializa nada: esquecimento de cadastro não pode virar
-  // materialização indevida.
-  const politica = await politicaDaFase(FASE_GENEALOGIA, db)
-  if (!politica) res.pendencias.push(`fase "${FASE_GENEALOGIA}" não existe no Catálogo de Fases`)
-  else if (politica.naturezasPermitidas.size === 0) {
-    res.pendencias.push(`fase "${FASE_GENEALOGIA}" sem naturezas documentais habilitadas — cadastre a política da fase`)
-  }
-  const tiposPorId = await resolverTiposDocumentais(db)
-  const tipoPorCode = new Map<string, TipoDocumentalResolvido>()
-  for (const t of tiposPorId.values()) if (t.code) tipoPorCode.set(t.code, t)
-
-  // UNIÕES de cada pessoa — só para regras cujo alvo é UNIAO (ex.: certidão de
-  // casamento). Casamento é ato entre DUAS pessoas: a regra continua avaliada
-  // POR PESSOA (a condição `casado` lê o atributo dela), mas a necessidade
-  // materializada aponta pra UNIÃO, não pra pessoa — assim os dois cônjuges
-  // convergem na MESMA linha (mesma chaveIdempotencia) em vez de uma cada.
-  const pessoaIds = pessoas.map((p) => p.id)
-  const uniõesRaw = pessoaIds.length
-    ? await db.uniao.findMany({
-        where: { OR: [{ pessoa1Id: { in: pessoaIds } }, { pessoa2Id: { in: pessoaIds } }] },
-        select: { id: true, pessoa1Id: true, pessoa2Id: true },
-      })
-    : []
-  const uniõesPorPessoa = new Map<number, number[]>()
-  for (const u of uniõesRaw) {
-    for (const pid of [u.pessoa1Id, u.pessoa2Id]) {
-      const lista = uniõesPorPessoa.get(pid) ?? []
-      lista.push(u.id)
-      uniõesPorPessoa.set(pid, lista)
-    }
-  }
-
-  // instância ativa do Workflow Interno da Genealogia (para pendurar o passo)
-  const instancia = await db.phaseWorkflowInstance.findFirst({
-    where: { processoId, faseMacroKey: FASE_GENEALOGIA, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
-    orderBy: { ciclo: "desc" },
-    select: { id: true, ciclo: true, faseMacroKey: true },
-  })
+  const { arvoreId, tipoProcessoId, instancia, labelLocalizarRegistro, slaDaysLocalizarRegistro, tipoPorCode } = calculo
   if (!instancia) res.semInstanciaWorkflow = true
 
   // varianteKeys aplicáveis nesta rodada (para reconciliação)
-  const aplicaveisVariante = new Set<string>()
+  const aplicaveisVariante = new Set(calculo.exigencias.map((e) => e.chave))
 
-  for (const p of pessoas) {
-    const sujeito = contextoDaPessoa(p)
-    const av = avaliarRegrasDocumentais({
-      tipoProcessoId: processo.tipoProcessoMotorId ?? 0,
-      faseKey: FASE_GENEALOGIA, sujeito, dataReferencia: new Date().toISOString(), regras,
-    })
-    for (const ap of av.aplicaveis) {
+  for (const exigencia of calculo.exigencias) {
       res.aplicaveis++
-      // ELEGIBILIDADE ESTRUTURAL — por CADASTRO, comparando IDs: a fase declara as
-      // naturezas que aceita, o tipo documental declara a sua. Nunca por código
-      // DOC, nome ou substring. Cada recusa tem motivo nomeado.
+      const { ap, regra, varianteKey, itemCatalogoId } = exigencia
       const tipoDoc = tipoPorCode.get(ap.documentTypeCode)
-      const elegivel = naturezaPermitidaNaFase(politica, tipoDoc)
-      if (!elegivel.permitido) { res.pendencias.push(`"${ap.documentTypeCode}": ${elegivel.detalhe}`); continue }
-      const regra = regras.find((r) => r.id === ap.regraId)!
       const codigo = regra.codigo ?? `MDX_${regra.id}`
-      const varianteKey = `rd:${codigo}:v${regra.versao}`
-      const itemCatalogoId = tipoDoc?.itemCatalogoId ?? null
-      if (itemCatalogoId == null) { res.pendencias.push(`sem ItemCatalogo para "${ap.documentTypeCode}" (pessoa ${p.id}, regra ${codigo}) — necessidade não materializada`); continue }
 
-      // GRÃO da necessidade: PESSOA (padrão) — um sujeito, esta pessoa. UNIAO —
-      // um sujeito por união DELA (uma pessoa com duas uniões distintas gera
-      // duas necessidades de casamento; o cônjuge da MESMA união, avaliado na
-      // sua própria volta do `for (const p of pessoas)`, converge pra ESTE
-      // mesmo uniaoId — `garantirNecessidade` é idempotente por
-      // chaveIdempotencia, então a segunda chamada só reaproveita a linha, não
-      // duplica.
-      type Alvo = { pessoaId?: number; uniaoId?: number; chave: string }
-      const alvos: Alvo[] =
-        regra.alvoNecessidade === "UNIAO"
-          ? (uniõesPorPessoa.get(p.id) ?? []).map((uniaoId) => ({ uniaoId, chave: `u${uniaoId}::${varianteKey}` }))
-          : [{ pessoaId: p.id, chave: `p${p.id}::${varianteKey}` }]
-      if (regra.alvoNecessidade === "UNIAO" && alvos.length === 0) {
-        res.pendencias.push(`"${ap.documentTypeCode}": regra de união aplicável a ${p.id}, mas a pessoa não tem nenhuma União cadastrada — necessidade não materializada`)
-        continue
-      }
-
-      for (const alvo of alvos) {
-      // materializa a variante aplicável (para reconciliação depois)
-      aplicaveisVariante.add(alvo.chave)
+      {
+      const alvo = { pessoaId: exigencia.pessoaId ?? undefined, uniaoId: exigencia.uniaoId ?? undefined }
 
       const snapshot = {
         codigo, requisito: ap.requisitoNome ?? regra.requisitoNome ?? ap.documentTypeCode,
@@ -258,7 +308,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       const { necessidade, criada } = await garantirNecessidade({
         processoId, itemCatalogoId, pessoaId: alvo.pessoaId ?? null, uniaoId: alvo.uniaoId ?? null, varianteKey, origem: "MATRIZ",
         obrigatoriedade: ap.obrigatoriedade, matrizRegraId: regra.id, matrizRegraVersao: regra.versao,
-        matrizSnapshot: snapshot, motivoAplicabilidade: ap.justificativa, arvoreId: processo.arvoreId, ruleCode: codigo.slice(0, 20),
+        matrizSnapshot: snapshot, motivoAplicabilidade: ap.justificativa, arvoreId, ruleCode: codigo.slice(0, 20),
       }, db)
       criada ? res.necessidadesCriadas++ : res.necessidadesReusadas++
 
@@ -370,8 +420,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
           }
         }
       }
-      } // fim do for (const alvo of alvos)
-    }
+      }
   }
 
   const finalizado = await reconciliarEfinalizar(res, processoId, aplicaveisVariante, db)
@@ -458,3 +507,13 @@ export async function dispararMaterializacaoPorArvore(arvoreId: number | null | 
   }
 }
 
+
+/**
+ * NOME PÚBLICO DO RECONCILIADOR (mandato "nunca mais árvore ↔ documentação",
+ * 29/09/2026). `materializarGenealogia` é a implementação; este é o nome pelo
+ * qual toda gravação de Pessoa/União/linhagem e a verificação de Saúde (NEC-001)
+ * o chamam — deriva de árvore + matriz + `documentacao` o conjunto esperado de
+ * necessidades e ajusta necessidade/Documento/Tarefa (cria, reativa, dispensa +
+ * cancela) até bater, na mesma transação de quem chama.
+ */
+export const reconciliarNecessidades = materializarGenealogia

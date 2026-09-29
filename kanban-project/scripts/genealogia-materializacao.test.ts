@@ -7,7 +7,7 @@
  * "Buscar documento" que seriam materializados, para os cenários 1..6 da tarefa.
  */
 import { avaliarRegrasDocumentais } from "../src/lib/documentos/regras-documentais/avaliador"
-import { exigidaNaGenealogia, aplicaAoProcesso, contextoDaPessoa } from "../src/services/genealogia/materializar-genealogia"
+import { exigidaNaGenealogia, aplicaAoProcesso, contextoDaPessoa, pessoaExigeDocumentacao } from "../src/services/genealogia/materializar-genealogia"
 import { ehNaturezaCertidao, NATUREZA_CERTIDAO } from "../src/lib/documentos/natureza-certidao"
 import type { RegraDocumental } from "../src/lib/documentos/regras-documentais/tipos"
 
@@ -97,6 +97,24 @@ ok(!ehNaturezaCertidao("identidade") && !ehNaturezaCertidao("documento") && !ehN
 // estrutural, não textual: um documento chamado "Certidão de X" mas com natureza
 // != certidao NÃO passa (a elegibilidade é pela natureza, não pelo nome).
 ok(!ehNaturezaCertidao("documento"), "não usa fallback por nome — só a natureza estruturada decide")
+
+console.log("\npessoaExigeDocumentacao — regra 'nunca mais árvore ↔ documentação' (mandato 29/09/2026, processo 675)")
+// NA linhagem: documentacao NUNCA pode dispensar quem está na linha reta/requerente.
+ok(pessoaExigeDocumentacao("LINHA_PRINCIPAL", true) === true, "1) LINHA_PRINCIPAL + documentacao=true → exige")
+ok(pessoaExigeDocumentacao("LINHA_PRINCIPAL", false) === true, "2) LINHA_PRINCIPAL + documentacao=false → exige AINDA ASSIM (linhagem manda, não o checkbox)")
+// PENDENTE_CLASSIFICACAO é pendência de cadastro, não confirmação de "fora" — trata como exige (nunca dispensa por incerteza).
+ok(pessoaExigeDocumentacao("PENDENTE_CLASSIFICACAO", true) === true, "3) PENDENTE_CLASSIFICACAO + documentacao=true → exige")
+ok(pessoaExigeDocumentacao("PENDENTE_CLASSIFICACAO", false) === true, "4) PENDENTE_CLASSIFICACAO + documentacao=false → exige (pendência de cadastro não é motivo de dispensa)")
+// FORA da linhagem: documentacao É o interruptor.
+ok(pessoaExigeDocumentacao("FORA_DA_LINHAGEM", true) === true, "5) FORA_DA_LINHAGEM + documentacao=true → exige (produção: Evanir, processo 675)")
+ok(pessoaExigeDocumentacao("FORA_DA_LINHAGEM", false) === false, "6) FORA_DA_LINHAGEM + documentacao=false → NÃO exige (produção: Priscila, processo 675)")
+// A sequência do achado real: fora da linhagem, false→true→false→true (Evanir) —
+// cada chamada é independente e pura; a mesma classificação sempre responde pelo
+// valor ATUAL de documentacao, nunca por um valor anterior.
+{
+  const sequenciaEvanir = [true, false, true, true].map((doc) => pessoaExigeDocumentacao("FORA_DA_LINHAGEM", doc))
+  ok(JSON.stringify(sequenciaEvanir) === JSON.stringify([true, false, true, true]), "7) sequência fora-da-linhagem→documentacao (Evanir): cada chamada reflete o valor atual, sem memória do anterior")
+}
 
 console.log(`\n${failed === 0 ? "✅" : "❌"} MATERIALIZAÇÃO GENEALOGIA — ${passed} ok, ${failed} falhas`)
 if (failed > 0) { console.log("Falhas: " + falhas.join("; ")); process.exit(1) }

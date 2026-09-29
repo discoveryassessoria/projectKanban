@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse, after } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
@@ -161,14 +161,16 @@ export async function POST(request: NextRequest) {
     // Best-effort e idempotente, como nos demais gatilhos: falha do motor
     // documental não pode impedir o registro do casamento.
     //
-    // via after(): a união já está gravada quando respondemos — reavaliar toda
-    // a árvore não precisa travar o "Salvar" do usuário.
+    // SÍNCRONO — não pela fila (mandato "nunca mais árvore ↔ documentação",
+    // 29/09/2026). Era `after()`; a mesma janela de corrida que produziu o
+    // achado real do processo 675 (edições em sequência na mesma árvore
+    // convergindo fora de ordem) vale aqui também — casar alguém pode ligar
+    // a exigência de certidão de casamento, e a resposta precisa refletir
+    // isso, não uma foto de minutos atrás.
     const arvoreIdAfetada = novaUniao.pessoa1?.arvoreId ?? novaUniao.pessoa2?.arvoreId
-    after(() => {
-      dispararMaterializacaoPorArvore(arvoreIdAfetada).catch((e) =>
-        console.error(`[POST /api/unioes] materialização adiada falhou (árvore ${arvoreIdAfetada}):`, e),
-      )
-    })
+    await dispararMaterializacaoPorArvore(arvoreIdAfetada).catch((e) =>
+      console.error(`[POST /api/unioes] materialização falhou (árvore ${arvoreIdAfetada}):`, e),
+    )
 
     return NextResponse.json(novaUniao, { status: 201 })
   } catch (error) {

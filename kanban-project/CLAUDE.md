@@ -249,6 +249,8 @@ Ela não deve criar duplicidade documental simplesmente por possuir relações c
 
 Toda Tarefa de Genealogia deve possuir obrigação operacional própria e identificável.
 
+Nada altera NecessidadeDocumental fora do reconciliador (`reconciliarNecessidades`/`materializarGenealogia`, `src/services/genealogia/materializar-genealogia.ts`). `Pessoa.documentacao` NUNCA dispensa quem está NA linhagem (requerente/ascendente direto confirmado) — só quem está FORA dela. Toda gravação em Pessoa/União chama o reconciliador SÍNCRONO (nunca via fila/`after()`) — achado real, processo 675, 29/09/2026: reconciliação assíncrona deixava necessidade convergir e Documento/Passo/Tarefa presos no estado anterior. `NEC-001` (Saúde) prova a convergência das quatro camadas por processo.
+
 ## 21. Motor documental
 
 Fluxo conceitual:

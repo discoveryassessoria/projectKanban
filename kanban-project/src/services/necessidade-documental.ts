@@ -9,7 +9,9 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { montarChaveIdempotencia } from "@/src/services/necessidade-documental-helpers"
 import { codeDocumentoMestre } from "@/src/services/catalogo-helpers"
-import { transicionarPassoTx } from "@/src/services/task-step-sync"
+import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
+import { assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
+import { MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { randomUUID } from "crypto"
 
 export { montarChaveIdempotencia, sujeitoValido } from "@/src/services/necessidade-documental-helpers"
@@ -234,6 +236,21 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
       })
     }
   }
+  // A TAREFA CONVERGE PELA VARREDURA, NÃO AQUI — de propósito.
+  //
+  // `lib/operacional/reconciliar-tarefas.ts` já cobre "necessidade DISPENSADA →
+  // Tarefa sem causa" (fix "Santin", 10/09/2026: `semCausa` inclui
+  // `necessidade.status === 'DISPENSADA'` INDEPENDENTE do container), com a
+  // nuance certa — cancela quem nunca começou, só marca `causaRemovidaEm` em
+  // quem já está trabalhando. Projetar `CANCELADO` direto aqui, sem essa
+  // distinção, atropelava a segunda regra (regressão pega ao rodar
+  // scripts/necessidade-dispensada-cancela-tarefa.test.ts, cenário 2 — trabalho
+  // em andamento sendo cancelado à força). O gap real de produção (#3967,
+  // Priscila) não era esta função: era a reconciliação nunca rodar de novo
+  // depois do primeiro disparo (`after()`, ver PUT /api/pessoas/[id]) — corrigido
+  // lá. Quem chama `dispensarNecessidade` fora de `materializarGenealogia`
+  // (que já chama `reconciliarTarefas` ao final) precisa chamar a varredura
+  // também, não duplicar a lógica dela aqui.
 
   // NÃO SE APLICA NA GENEALOGIA ⇒ NÃO SE APLICA EM NENHUMA FASE. A etapa é da
   // fase que materializou (acima); o Documento é da OBRIGAÇÃO inteira, e outras
@@ -278,9 +295,13 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
       })
     }
   }
+  // Mesma nota acima: a Tarefa converge pela varredura de `reconciliarTarefas`,
+  // não por projeção direta aqui.
 }
 
-const MOTIVO_DOCUMENTO_DISPENSADO = "Necessidade dispensada — não se aplica em nenhuma fase"
+/** Exportado para NEC-001 (Saúde) reconhecer um cancelamento AUTOMÁTICO (por
+ * dispensa) e distingui-lo de uma invalidação manual de operador. */
+export const MOTIVO_DOCUMENTO_DISPENSADO = "Necessidade dispensada — não se aplica em nenhuma fase"
 
 /** Reativa uma necessidade DISPENSADA (voltou a ser aplicável) → PENDENTE. */
 export async function reativarNecessidade(necessidadeId: number, db: DB = prisma) {
@@ -294,10 +315,55 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
   // invalidou por outro motivo real (documento errado, ilegível). A regra
   // voltou a valer; a decisão humana sobre um documento específico não se
   // desfaz sozinha.
-  await db.documento.updateMany({
+  const docsReabertos = await db.documento.findMany({
     where: { necessidadeId, status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO },
-    data: { status: "PENDENTE", motivoBloqueio: null, ultimaMovimentacao: new Date() },
+    select: { id: true },
   })
+  if (docsReabertos.length) {
+    await db.documento.updateMany({
+      where: { id: { in: docsReabertos.map((d) => d.id) } },
+      data: { status: "PENDENTE", motivoBloqueio: null, ultimaMovimentacao: new Date() },
+    })
+  }
+
+  // ESPELHO DO LADO DO PASSO — dispensarNecessidade cancela (a) o(s) passo(s) DESTA
+  // necessidade e (b) os de OUTRAS fases ligados ao MESMO Documento. Reativar
+  // precisa desfazer os dois, ou a Tarefa fica travada em CANCELADA/NAO_INICIADA com
+  // a necessidade já de volta em PENDENTE (produção, processo 675: Tarefa #3948,
+  // necessidade 671/Evanir — necessidade voltou, passo e tarefa não).
+  //
+  // `transicionarPassoTx` (CAS de avanço) RECUSA CANCELADO→DISPONIVEL — é
+  // retrocesso na precedência (ver PRECEDENCIA_PASSO). Só `reabrirPassoTx` sobe de
+  // um estado terminal, e ele já projeta a Tarefa por dentro (mesma régua de
+  // qualquer reabertura). `ignorarDependencias: true` porque esta é uma restauração
+  // SISTÊMICA de tudo que a própria dispensa cancelou — não uma reabertura
+  // pontual de um passo só, onde a cadeia de dependência do vizinho importaria.
+  const passosDaNecessidade = await db.phaseWorkflowStepInstance.findMany({
+    where: { necessidadeId, status: "CANCELADO" },
+    select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+    orderBy: { ordem: "asc" },
+  })
+  const passosDeOutrasFases = docsReabertos.length
+    ? await db.phaseWorkflowStepInstance.findMany({
+        where: { documentoId: { in: docsReabertos.map((d) => d.id) }, status: "CANCELADO" },
+        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+        orderBy: { ordem: "asc" },
+      })
+    : []
+  const passos = [...passosDaNecessidade, ...passosDeOutrasFases]
+  if (passos.length) {
+    const correlationId = randomUUID()
+    for (const p of passos) {
+      await reabrirPassoTx(db as Prisma.TransactionClient, p.id, "DISPONIVEL", {
+        correlationId, operacao: "necessidade-reativada", ciclo: p.ciclo,
+        processoId: p.processoId, workflowInstanceId: p.workflowInstanceId,
+        motivoTentativa: MOTIVOS_DE_TENTATIVA.BACKFILL,
+        ignorarDependencias: true,
+        extra: { motivo: "Necessidade voltou a se aplicar (reconciliação)" },
+      })
+    }
+    await assegurarCoerenciaPassoTarefa(db as Prisma.TransactionClient, passos.map((p) => p.id))
+  }
 }
 
 /**

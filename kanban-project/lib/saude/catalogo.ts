@@ -24,7 +24,10 @@ import { DOMINIOS } from './tipos'
 // 5 passos, pré-unificação, de estado atual inválido) e EMI-022 (Tarefa
 // aberta sem próxima ação determinável) — correção "4 passos operacionais"
 // + "Minha Operação" (14-15/09/2026).
-export const VERSAO_CATALOGO = '1.9.0'
+// 1.10.0 — 29/09/2026: entrou NEC-001 (árvore + matriz + Pessoa.documentacao
+// coerentes com NecessidadeDocumental/Documento/PhaseWorkflowStepInstance/
+// Tarefa) — mandato "nunca mais árvore ↔ documentação", processo 675.
+export const VERSAO_CATALOGO = '1.10.0'
 
 export interface ContextoVerificacao {
   /** agora, congelado no início da rodada (execuções são comparáveis) */

@@ -28,7 +28,7 @@
 import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
-import { dispensarNecessidade } from "@/src/services/necessidade-documental"
+import { dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
 
 const MARCA = "DISPTASK"
 
@@ -172,6 +172,62 @@ async function main() {
   const tarefa5 = await prisma.tarefa.findUniqueOrThrow({ where: { id: c5.tarefaId }, select: { statusTarefa: true } })
   ok("5a) necessidade PENDENTE (não dispensada) sob workflow SUPERSEDIDO NÃO cancela a tarefa — regra preservada", tarefa5.statusTarefa !== "CANCELADA", tarefa5.statusTarefa)
   void r5
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao("6) reativarNecessidade reabre Documento e Passo — sequência Evanir (processo 675, 29/09/2026)")
+  // ══════════════════════════════════════════════════════════════════════════
+  // Achado real: dispensar cancelava necessidade+step+Documento certo, mas
+  // reativar só devolvia a necessidade a PENDENTE — Documento e Passo ficavam
+  // travados em CANCELADO pra sempre, e a Tarefa nunca via o trabalho de volta.
+  const arv6 = await prisma.arvore.create({ data: { nome: `${MARCA} C6` }, select: { id: true } })
+  const proc6 = await prisma.processo.create({ data: { nome: `${MARCA} C6`, arvoreId: arv6.id }, select: { id: true } })
+  const pes6 = await prisma.pessoa.create({ data: { arvoreId: arv6.id, nome: "Evanir", sobrenome: "C6", linhaReta: false, requerente: "nao" }, select: { id: true } })
+  const item6 = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_C6`, name: "Certidão C6", natureza: "DOCUMENTO" }, select: { id: true } })
+  const nec6 = await prisma.necessidadeDocumental.create({
+    data: { processoId: proc6.id, itemCatalogoId: item6.id, pessoaId: pes6.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-C6-${proc6.id}` },
+    select: { id: true },
+  })
+  const doc6 = await prisma.documento.create({ data: { pessoaId: pes6.id, necessidadeId: nec6.id, status: "PENDENTE" }, select: { id: true } })
+  const inst6 = await prisma.phaseWorkflowInstance.create({
+    data: { processoId: proc6.id, faseMacroKey: "genealogia", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-C6-${proc6.id}` },
+    select: { id: true },
+  })
+  const step6 = await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: inst6.id, processoId: proc6.id, faseMacroKey: "genealogia", stepKey: "localizar_registro",
+      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      necessidadeId: nec6.id, documentoId: doc6.id, pessoaId: pes6.id, papel: "equipe_documental", slaDays: 5,
+      chaveIdempotencia: `${MARCA}-s-C6-${proc6.id}-0`,
+    },
+    select: { id: true },
+  })
+  await reconciliarTarefas({ processoId: proc6.id })
+  const tarefa6 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc6.id }, select: { id: true } })
+
+  // documentacao=false (Priscila-like): dispensa tudo.
+  await dispensarNecessidade(nec6.id, "teste: fora da linhagem, documentacao=false")
+  const necPosDispensa = await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: nec6.id }, select: { status: true } })
+  ok("6a) dispensada", necPosDispensa.status === "DISPENSADA")
+  const docPosDispensa = await prisma.documento.findUniqueOrThrow({ where: { id: doc6.id }, select: { status: true, motivoBloqueio: true } })
+  ok("6b) documento cancelado com o motivo automático", docPosDispensa.status === "CANCELADO" && docPosDispensa.motivoBloqueio === "Necessidade dispensada — não se aplica em nenhuma fase")
+  const stepPosDispensa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step6.id }, select: { status: true } })
+  ok("6c) passo cancelado", stepPosDispensa.status === "CANCELADO")
+
+  // documentacao=true de novo (Evanir-like): reativa tudo.
+  await reativarNecessidade(nec6.id)
+  const necPosReativa = await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: nec6.id }, select: { status: true } })
+  ok("6d) necessidade voltou a PENDENTE", necPosReativa.status === "PENDENTE")
+  const docPosReativa = await prisma.documento.findUniqueOrThrow({ where: { id: doc6.id }, select: { status: true, motivoBloqueio: true } })
+  ok("6e) DOCUMENTO REABERTO — este era o gap real (Evanir, Documento 2315)", docPosReativa.status === "PENDENTE" && docPosReativa.motivoBloqueio === null, JSON.stringify(docPosReativa))
+  const stepPosReativa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step6.id }, select: { status: true } })
+  ok("6f) PASSO REABERTO (DISPONIVEL) — este era o gap real (Evanir, passos 2979/2999)", stepPosReativa.status === "DISPONIVEL", stepPosReativa.status)
+  const tarefaPosReativa = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefa6.id }, select: { statusTarefa: true, workflowStepInstanceId: true } })
+  ok("6g) TAREFA ATIVA DE NOVO (reabrirPassoTx projeta por dentro) — Evanir com tarefa ativa", tarefaPosReativa.statusTarefa === "NAO_INICIADA" && tarefaPosReativa.workflowStepInstanceId === step6.id, JSON.stringify(tarefaPosReativa))
+
+  // Idempotência: reativar de novo não duplica tentativa nem lança.
+  await reativarNecessidade(nec6.id)
+  const stepPosReativaDeNovo = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step6.id }, select: { status: true } })
+  ok("6h) reativar necessidade já PENDENTE é no-op (idempotente, não lança)", stepPosReativaDeNovo.status === "DISPONIVEL")
 
   console.log(`\n${passou} passaram, ${falhou} falharam`)
   if (falhou > 0) console.log("Falhas:", falhas.join(", "))
