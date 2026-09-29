@@ -219,7 +219,30 @@ export async function identificarImpactoDownstream(documentoId: number): Promise
   ]
 }
 
+/**
+ * A ORDEM DAS FASES, para ESTE tipo de processo — mesma fonte que
+ * `retrocesso-de-fase.ts::planejarRetrocesso` usa (`FaseMacro` do
+ * `MacroWorkflow` do tipo), nunca uma segunda tabela de ordenação. `null` para
+ * uma `phaseKey` fora do catálogo deste tipo — fase desconhecida não é "mais
+ * à frente" nem "mais atrás", é neutra (nunca exclui um candidato por engano).
+ */
+async function ordensDeFase(tipoProcessoMotorId: number): Promise<Map<string, number>> {
+  const fases = await prisma.faseMacro.findMany({
+    where: { macroWorkflow: { tipoProcessoId: tipoProcessoMotorId } },
+    select: { phaseKey: true, ordem: true },
+  })
+  return new Map(fases.map((f) => [f.phaseKey, f.ordem]))
+}
+
 export async function visitaAtualDoDocumento(documentoId: number): Promise<VisitaDoDocumento | null> {
+  const doc = await prisma.documento.findUnique({
+    where: { id: documentoId },
+    select: { pessoa: { select: { arvore: { select: { processos: { select: { id: true, faseAtualKey: true, tipoProcessoMotorId: true } } } } } } },
+  })
+  const processo = doc?.pessoa?.arvore?.processos?.[0]
+  const ordens = processo?.tipoProcessoMotorId != null ? await ordensDeFase(processo.tipoProcessoMotorId) : null
+  const ordemFaseAtual = processo?.faseAtualKey != null ? ordens?.get(processo.faseAtualKey) ?? null : null
+
   // 1) O documento JÁ TEM passo materializado (em qualquer fase)? A visita é a
   //    instância ONDE O TRABALHO REALMENTE ESTÁ — nunca a fase atual do processo.
   //
@@ -230,11 +253,34 @@ export async function visitaAtualDoDocumento(documentoId: number): Promise<Visit
   //    "sem Workflow Interno configurado" para uma tarefa real, pendente,
   //    clicável em todo o resto do sistema. A tarefa sobrevivia; ficava
   //    congelada — visível, mas impossível de operar. Incidente do processo 573.
-  const passoExistente = await prisma.phaseWorkflowStepInstance.findFirst({
+  //
+  //    MAS "onde o trabalho está" nunca pode ser uma fase À FRENTE da fase atual
+  //    do processo — achado real (mandato "Correção do reconciliador NEC-001",
+  //    29/09/2026, processo 651): um retrocesso de Emissão Retificada/
+  //    Apostilamento de volta para Emissão Documental normal NUNCA mexe nos
+  //    passos das fases futuras (retrocesso-de-fase.ts, por desenho — "mover a
+  //    fase é reposicionar, não refazer trabalho"; as Tarefas dessas fases já
+  //    foram canceladas por outro caminho, mas os PASSOS ficaram `em_andamento`
+  //    pra trás). `orderBy: id desc` sozinho pegava o passo mais RECENTEMENTE
+  //    CRIADO entre TODOS — inclusive os de uma fase que o processo já deixou
+  //    de estar — e `/api/documentos/[id]/workflow` mostrava a etapa errada
+  //    (Retificada) para 16 tarefas que a Operação já sabia estarem em Emissão
+  //    Documental normal. `ordemFaseAtual` filtra os candidatos por ordem —
+  //    nunca aceita um passo cuja fase vem DEPOIS da fase atual — sem tocar em
+  //    nenhuma escrita: é o mesmo `orderBy: id desc`, só que só entre os
+  //    candidatos que ainda fazem sentido.
+  const candidatos = await prisma.phaseWorkflowStepInstance.findMany({
     where: { documentoId, status: { notIn: INATIVOS } },
     orderBy: { id: "desc" },
     select: { workflowInstanceId: true, faseMacroKey: true, ciclo: true, processoId: true },
+    take: 20,
   })
+  const passoExistente = ordemFaseAtual == null
+    ? candidatos[0] ?? null
+    : candidatos.find((c) => {
+        const ordemCandidato = ordens?.get(c.faseMacroKey) ?? null
+        return ordemCandidato == null || ordemCandidato <= ordemFaseAtual
+      }) ?? null
   if (passoExistente) {
     return {
       processoId: passoExistente.processoId,
@@ -244,13 +290,8 @@ export async function visitaAtualDoDocumento(documentoId: number): Promise<Visit
     }
   }
 
-  // 2) SEM passo nenhum ainda: aqui, e só aqui, "abrir pela primeira vez"
+  // 2) SEM passo válido ainda: aqui, e só aqui, "abrir pela primeira vez"
   //    materializa — na fase ATUAL do processo, como sempre foi.
-  const doc = await prisma.documento.findUnique({
-    where: { id: documentoId },
-    select: { pessoa: { select: { arvore: { select: { processos: { select: { id: true, faseAtualKey: true } } } } } } },
-  })
-  const processo = doc?.pessoa?.arvore?.processos?.[0]
   if (!processo?.faseAtualKey) return null
   const inst = await resolverInstanciaVigente(processo.id, processo.faseAtualKey)
   if (!inst) return null
