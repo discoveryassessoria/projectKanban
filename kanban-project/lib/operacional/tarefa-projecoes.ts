@@ -1365,8 +1365,15 @@ export async function dossieDaTarefa(tarefaId: number) {
   )
 
   const agoraDossie = new Date()
+  // `progressoSubtarefa` (6º parâmetro de `projetar`) faltava aqui — achado
+  // real (Torre de Controle, Bloco B, 29/09/2026): o dossiê de UMA tarefa
+  // sempre devolvia `escalada:false`/`totalCobrancas:0`/`cobrancasSemResposta:0`
+  // mesmo com cobranças registradas, porque só `enriquecerLinhas` (a fila em
+  // lote) passava esse mapa. Testado ao vivo na #3853 — sem isto, a projeção
+  // da tarefa individual mentia por omissão.
+  const progressoSubtarefaDossie = await progressoPorSubtarefa([t as unknown as Bruta])
   const [linha] = await comAtencaoTemporal(
-    [projetar(t as unknown as Bruta, agoraDossie, await nomesDasPessoas([t]))],
+    [projetar(t as unknown as Bruta, agoraDossie, await nomesDasPessoas([t]), undefined, undefined, progressoSubtarefaDossie)],
     agoraDossie,
   )
   // MESMO ENRIQUECIMENTO DE `visaoGerencial`/`enriquecerLinhas` — sem isto o
