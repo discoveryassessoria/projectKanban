@@ -16,6 +16,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { WorkflowTab, type ContextoAntecipada } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowControls } from "./WorkflowControls"
+import { RepactuarPrazoModal } from "@/src/components/operacao/RepactuarPrazoModal"
 
 // ============================================================
 // LABELS (mantidos no componente porque o GET retorna o documento cru)
@@ -464,6 +465,7 @@ function ConteudoDrawer({
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [delegandoResp, setDelegandoResp] = useState(false)
+  const [repactuandoPrazo, setRepactuandoPrazo] = useState(false)
   // O DOCUMENTO ABRE NO SEU WORKFLOW.
   //
   // A aba de entrada era "Operação": um segundo cockpit com status, próxima
@@ -561,6 +563,27 @@ function ConteudoDrawer({
     } finally {
       setSalvando(false)
     }
+  }
+
+  // REPACTUAR PRAZO — Torre de Controle, Bloco D (29/09/2026). Porta canônica
+  // já existente (`POST /api/tarefas/{id}/comando`, `acao:"alterar_prazo"` →
+  // `alterarPrazo`, `tarefa-ciclo.ts`): motivo obrigatório, de/para e autor
+  // gravados em LogAuditoria, já lidos por "Andamento" — este componente só
+  // chama, não decide nada sobre o prazo.
+  const repactuarPrazo = async (dados: { novoPrazo: string | null; motivo: string }): Promise<{ ok: boolean; mensagem?: string }> => {
+    const taskId = projection?.tarefa?.taskId
+    if (!taskId) return { ok: false, mensagem: "Sem tarefa para repactuar." }
+    const r = await fetch(`/api/tarefas/${taskId}/comando`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      body: JSON.stringify({ acao: "alterar_prazo", novoPrazo: dados.novoPrazo, motivo: dados.motivo }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!j.ok) return { ok: false, mensagem: j.mensagem }
+    setRepactuandoPrazo(false)
+    await carregar()
+    onSave?.()
+    return { ok: true }
   }
 
 
@@ -794,8 +817,19 @@ function ConteudoDrawer({
                     temporal da espera corrente. Mandato "correção definitiva do
                     modelo temporal" (19-20/09/2026), seção 11. */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    Prazo da tarefa
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Prazo da tarefa
+                    </div>
+                    {tarefa && pode('tarefas.editar') && (
+                      <button
+                        onClick={() => setRepactuandoPrazo(true)}
+                        title="Repactuar o prazo oficial desta tarefa"
+                        className="text-[var(--text-secondary)] text-[11px] hover:underline"
+                      >
+                        Repactuar
+                      </button>
+                    )}
                   </div>
                   <div className={`flex items-center gap-1.5 text-[13px] font-semibold ${sla.cls || "text-white/85"}`}>
                     <Clock className="w-4 h-4 flex-shrink-0" />
@@ -958,6 +992,13 @@ function ConteudoDrawer({
                 onSave?.()
               }}
             />
+            {repactuandoPrazo && (
+              <RepactuarPrazoModal
+                prazoAtualIso={tarefa?.dataPrazo ?? null}
+                onFechar={() => setRepactuandoPrazo(false)}
+                onEnviar={repactuarPrazo}
+              />
+            )}
           </>
         )}
       </div>

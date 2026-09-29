@@ -146,6 +146,13 @@ async function main() {
   const evPrazo = t4.find((e) => e.categoria === "prazo")
   check("4a) alterar prazo gera evento de categoria 'prazo'", !!evPrazo)
   check("4b) motivo capturado", evPrazo?.motivo === "SLA renegociado com o cliente")
+  // Torre de Controle, Bloco D (29/09/2026): de/para chegam FORMATADOS
+  // (dd/mm/aaaa), não o ISO cru que LogAuditoria grava — achado real: a
+  // timeline mostrava "2026-10-14T13:52:50.429Z" no meio de uma linha do
+  // tempo pensada pra ler, não depurar.
+  const dataISONaoFormatada = /^\d{4}-\d{2}-\d{2}T/
+  check("4c) 'de' não é ISO cru", typeof evPrazo?.de === "string" && !dataISONaoFormatada.test(evPrazo.de), evPrazo?.de ?? "null")
+  check("4d) 'para' vem no formato dd/mm/aaaa", /^\d{2}\/\d{2}\/\d{4}$/.test(evPrazo?.para ?? ""), evPrazo?.para ?? "null")
 
   // ══════════════════════════════════════════════════════════════════════════
   secao("5) ANEXO — arquivo anexado gera evento com autor real")

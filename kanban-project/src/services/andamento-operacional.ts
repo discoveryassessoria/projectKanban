@@ -270,9 +270,22 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
     return null
   }
 
+  // ISO → dd/mm/aaaa. `TAREFA_PRAZO_ALTERADO` (Torre de Controle, Bloco D,
+  // 29/09/2026) grava `de`/`para` como ISO puro — sem isto, Andamento
+  // mostrava a data crua ("2026-10-06T16:34:07.919Z"), ilegível no meio de
+  // uma timeline pensada pra gente ler, não depurar.
+  const rotuloDeData = (v: unknown): string | null => {
+    if (v === null) return "Sem prazo"
+    if (typeof v !== "string") return null
+    const d = new Date(v)
+    if (Number.isNaN(d.getTime())) return v
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" })
+  }
+
   for (const l of logs) {
     const det = (l.detalhes ?? {}) as Record<string, unknown>
     const ehResponsabilidade = CATEGORIA_LOG_ACAO(l.acao) === "responsabilidade"
+    const ehPrazo = l.acao === "TAREFA_PRAZO_ALTERADO"
     eventos.push({
       id: `log:${l.id}`,
       tipo: l.acao,
@@ -281,8 +294,8 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       autor: autorDe(l.usuarioId, nomesUsuario),
       titulo: TITULO_LOG_ACAO[l.acao] ?? l.acao,
       descricao: l.descricao,
-      de: ehResponsabilidade ? rotuloDeValor(det.de) : (typeof det.de === "string" ? det.de : null),
-      para: ehResponsabilidade ? rotuloDeValor(det.para) : (typeof det.para === "string" ? det.para : null),
+      de: ehResponsabilidade ? rotuloDeValor(det.de) : ehPrazo ? rotuloDeData(det.de) : (typeof det.de === "string" ? det.de : null),
+      para: ehResponsabilidade ? rotuloDeValor(det.para) : ehPrazo ? rotuloDeData(det.para) : (typeof det.para === "string" ? det.para : null),
       etapa: typeof det.stepKey === "string" ? det.stepKey : null,
       // `reabertura-de-execucao.ts` grava a justificativa sob `justificativa`,
       // não `motivo` — nome mais preciso para "razão de reabrir" (ela nunca
