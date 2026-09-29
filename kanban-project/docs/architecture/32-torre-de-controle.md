@@ -41,3 +41,60 @@ dele): `docs/torre-controle-prototipo.html`.
   comum, sem `operacao.distribuirTarefas`) com o MESMO `escopo=equipe`: devolve
   `escopo:"individual"` e só as 15 tarefas dela — o parâmetro foi corretamente
   ignorado.
+
+## Bloco B — Registrar contato completo (29/09/2026)
+
+`ContatoTerceiro` ganha `resultado` (vocabulário fechado: `SEM_RESPOSTA |
+CONFIRMOU_PEDIDO | PEDIU_DOCUMENTO | EM_BUSCA | NAO_LOCALIZOU | ENVIOU`) — migração
+`20260929120000_contato_terceiro_resultado`, backfill `SEM_RESPOSTA` (era o único
+fluxo que existia até aqui: "cobrar" sem saber o resultado).
+
+- **Cobrança sem resposta, de verdade**: nova função pura `contarCobrancasSemResposta`
+  (`src/services/subtarefas-da-etapa.ts`) conta só os `SEM_RESPOSTA` a partir do
+  último contato com resultado DIFERENTE (ou todos, se nunca houve um) — nunca o
+  total bruto de contatos. `escalada` passa a ligar quando essa contagem
+  (`cobrancasSemResposta`) atinge `escalarApos` do cadastro do passo, não mais o
+  total. `resultado: "ENVIOU"` nunca conclui nada sozinho — só "Receber certidão"
+  recebe a certidão de fato.
+- **`registrarCobranca()`** (a porta única, já reaproveitada pelas 3 rotas que
+  existiam) agora exige `canal` E `resultado` válidos contra o vocabulário fechado
+  — `CANAL_INVALIDO`/`RESULTADO_INVALIDO`, nunca gravação com valor livre. Fim do
+  canal fixo em `EMAIL`.
+- **`cobrancasSemResposta` exposto** em `LinhaGerencial` e em
+  `ResumoSubtarefasDoPasso.atual` (`lib/operacional/tarefa-projecoes.ts`), ao lado de
+  `totalCobrancas`/`escalada` — mesmo cálculo em lote (`progressoPorSubtarefa`) e por
+  tarefa.
+- **Achado corrigido no caminho**: `dossieDaTarefa` (o dossiê de UMA tarefa,
+  `GET /api/operacao/tarefas/[tarefaId]`) chamava `projetar()` sem o parâmetro
+  `progressoSubtarefa` — só a fila em lote (`enriquecerLinhas`) passava esse mapa.
+  Resultado: a tela de uma tarefa individual sempre mostrava
+  `escalada:false`/`totalCobrancas:0`/`cobrancasSemResposta:0`, mesmo com cobranças
+  reais registradas. Corrigido no mesmo bloco — achado testando a evidência abaixo.
+- **UI — um mini-formulário, três portas** (`canal`, `resultado`, `observação`
+  opcional, `data` opcional — `src/components/operacao/RegistrarContatoModal.tsx`):
+  1. Botão "Cobrar" da aba Acompanhamento da Operação (`operacao-v3.tsx`);
+  2. "Cobrar todos os vencidos" (mesmo formulário, aplicado em lote — uma
+     gravação por tarefa vencida, via `registrarCobranca()`, nunca uma segunda
+     implementação);
+  3. Bloco novo "Contato com o cartório" dentro de `WorkflowTab.tsx`
+     (`DocumentoOperationalDrawer`), na subtarefa corrente em espera de terceiro —
+     lista o histórico (data · canal · resultado · quem) e abre o mesmo modal.
+  As três chamam a mesma porta (`registrarCobranca`) — nunca uma segunda gravação.
+- **"Adiar" sem `window.prompt`**: modal `AdiarAcompanhamentoModal.tsx` (dias 1–15,
+  motivo 10–300 caracteres, validado também no servidor). `adiarAcompanhamento`
+  passou a gravar o motivo em `TarefaHistorico` (além do `LogAuditoria` que já
+  escrevia, escopado por `SubtaskExecution` — histórico que "Andamento" nunca lia).
+  `montarAndamentoDaOperacao` (`src/services/andamento-operacional.ts`) passou a
+  consultar `TarefaHistorico` por `tarefaId` além de `LogAuditoria` — o motivo do
+  adiamento agora aparece na timeline de Andamento, onde antes não aparecia (gap
+  real: a subtarefa é escopo de execução, não de tarefa, e "Andamento" só lia por
+  `tarefaId`).
+- **Evidência ao vivo, tarefa #3853** (processo 651/Cibils, subtarefa
+  `receber_confirmacao_pedido` do passo instância 2827):
+  - Antes de qualquer contato: `escalada:false, totalCobrancas:0,
+    cobrancasSemResposta:0`.
+  - 1º contato `SEM_RESPOSTA`: `cobrancasSemResposta:1, escalada:false`.
+  - 2º contato `SEM_RESPOSTA`: `cobrancasSemResposta:2, escalada:true` (escalarApos
+    do passo = 2).
+  - 3º contato `EM_BUSCA`: `cobrancasSemResposta:0, escalada:false` — o `EM_BUSCA`
+    quebra a sequência de `SEM_RESPOSTA` e desliga a escalada, exatamente a regra.
