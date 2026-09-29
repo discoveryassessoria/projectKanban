@@ -1383,6 +1383,7 @@ export async function dossieDaTarefa(tarefaId: number) {
   const paradaDossie = (await contextoDeParada([tarefaId])).get(tarefaId)
   const esperaDossie = paradaDossie?.esperandoDesde ?? null
   const esperandoDossie = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
+  const repactuacaoDossie = (await repactuacoesDePrazo([tarefaId])).get(tarefaId)
   return {
     ...linha,
     coluna: colunaDaTarefa(t) ?? 'CANCELADA',
@@ -1390,6 +1391,8 @@ export async function dossieDaTarefa(tarefaId: number) {
     esperandoDesde: esperandoDossie ? esperaDossie?.toISOString() ?? null : null,
     esperandoHaDias: esperandoDossie && esperaDossie ? Math.floor((agoraDossie.getTime() - esperaDossie.getTime()) / 86400000) : null,
     motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? paradaDossie?.motivo ?? null : null,
+    repactuacoes: repactuacaoDossie?.total ?? 0,
+    ultimaRepactuacao: repactuacaoDossie?.ultima ?? null,
     passoAtual: linha.passoAtual ? { ordem: linha.passoAtual.ordem, total: etapasDaUnidade.length || linha.passoAtual.total } : null,
     // PROVENANCE: a cadeia inteira do "por quê", por IDs canônicos.
     porQueExisto: {
@@ -1761,6 +1764,16 @@ export interface LinhaGerencial extends LinhaDeFila {
   /** Por que parou. Bloqueio sem motivo visível obriga a abrir cinco telas. */
   motivoBloqueio: string | null
   concluidaEm: string | null
+  /**
+   * QUANTAS VEZES o prazo desta Tarefa já foi repactuado (Torre de
+   * Controle, Bloco D — correção 29/09/2026: a Torre precisa enxergar
+   * repactuação sem abrir o drawer). Conta `LogAuditoria` com
+   * `acao:"TAREFA_PRAZO_ALTERADO"` — a mesma fonte que "Andamento" já lê,
+   * nunca um contador paralelo.
+   */
+  repactuacoes: number
+  /** A repactuação mais recente, quando existe — `null` = nunca repactuado. */
+  ultimaRepactuacao: { de: string | null; para: string | null; quando: string; quem: string | null } | null
 }
 
 export interface FiltrosGerenciais {
@@ -2040,6 +2053,42 @@ async function contextoDeParada(ids: number[], db: Leitor = prisma): Promise<Map
 }
 
 /**
+ * QUANTAS VEZES e QUANDO cada Tarefa foi repactuada — a mesma
+ * `LogAuditoria`/`TAREFA_PRAZO_ALTERADO` que "Andamento" já lê (Torre de
+ * Controle, Bloco D, correção pós-conferência 29/09/2026), em lote.
+ */
+async function repactuacoesDePrazo(
+  ids: number[], db: Leitor = prisma,
+): Promise<Map<number, { total: number; ultima: { de: string | null; para: string | null; quando: string; quem: string | null } }>> {
+  const mapa = new Map<number, { total: number; ultima: { de: string | null; para: string | null; quando: string; quem: string | null } }>()
+  if (ids.length === 0) return mapa
+  const logs = await db.logAuditoria.findMany({
+    where: { entidade: { in: ['Tarefa', 'TAREFA'] }, entidadeId: { in: ids }, acao: 'TAREFA_PRAZO_ALTERADO' },
+    orderBy: { criadoEm: 'asc' },
+    select: { entidadeId: true, criadoEm: true, usuarioId: true, detalhes: true },
+  })
+  const idsUsuario = [...new Set(logs.map((l) => l.usuarioId).filter((id): id is number => id != null))]
+  const usuarios = idsUsuario.length
+    ? await db.usuario.findMany({ where: { id: { in: idsUsuario } }, select: { id: true, nome: true } })
+    : []
+  const nomePorUsuarioId = new Map(usuarios.map((u) => [u.id, u.nome]))
+  for (const l of logs) {
+    if (l.entidadeId == null) continue
+    const det = (l.detalhes ?? {}) as { de?: string | null; para?: string | null }
+    const atual = mapa.get(l.entidadeId) ?? { total: 0, ultima: { de: null, para: null, quando: l.criadoEm.toISOString(), quem: null } }
+    atual.total += 1
+    atual.ultima = {
+      de: typeof det.de === 'string' ? det.de : null,
+      para: typeof det.para === 'string' ? det.para : null,
+      quando: l.criadoEm.toISOString(),
+      quem: l.usuarioId != null ? (nomePorUsuarioId.get(l.usuarioId) ?? `Usuário #${l.usuarioId}`) : null,
+    }
+    mapa.set(l.entidadeId, atual)
+  }
+  return mapa
+}
+
+/**
  * RESULTADOS que representam uma transição de fase REAL e efetiva — nunca
  * `BLOQUEADO` (tentativa negada), `CONFLITO` (CAS perdido) ou `IDEMPOTENTE`
  * (retry do mesmo pedido: o motor já garantiu que não é uma segunda
@@ -2207,7 +2256,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
   // `estadosTemporaisDasOperacoes` some do fim (era `comAtencaoTemporal`
   // depois de `linhas` pronta) e entra aqui; o merge dela roda no MESMO
   // `.map()` que já aplica `paradas`, sem consulta extra.
-  const [nomes, rotulos, totais, subtarefas, linhagem, paradas, estados] = await Promise.all([
+  const [nomes, rotulos, totais, subtarefas, linhagem, paradas, estados, repactuacoes] = await Promise.all([
     nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db), progressoPorSubtarefa(brutas, db),
     linhagemDasPessoas(brutas, db),
     contextoDeParada(
@@ -2215,6 +2264,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
       db,
     ),
     brutas.length > 0 ? estadosTemporaisDasOperacoes(db, brutas.map((t) => t.id), agora) : Promise.resolve(new Map<number, EstadoTemporalDaOperacao>()),
+    repactuacoesDePrazo(brutas.map((t) => t.id), db),
   ])
   const hoje = diaOperacional(agora)
 
@@ -2223,6 +2273,7 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)
+    const repactuacao = repactuacoes.get(t.id)
     return {
       ...base,
       venceHoje: t.dataPrazo != null && diaOperacional(t.dataPrazo) === hoje,
@@ -2232,6 +2283,8 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
       esperandoHaDias: esperando && espera ? Math.floor((agora.getTime() - espera.getTime()) / 86400000) : null,
       motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? parada?.motivo ?? null : null,
       concluidaEm: t.dataConclusao?.toISOString() ?? null,
+      repactuacoes: repactuacao?.total ?? 0,
+      ultimaRepactuacao: repactuacao?.ultima ?? null,
     }
   })
   return aplicarEstadosTemporais(linhas, estados) as LinhaGerencial[]

@@ -477,20 +477,84 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
   })
 }
 
+/**
+ * REPACTUAR O PRAZO — grava na FONTE que a projeção de certidão lê (Parte 1,
+ * "fonte única de status e prazo de certidão", 29/09/2026:
+ * `src/lib/process-stage/projecao-certidao.ts`), e mantém `Tarefa.dataPrazo`
+ * ESPELHADO no mesmo valor — nunca só um dos dois.
+ *
+ * ACHADO REAL (conferência ao vivo do Bloco D, Torre de Controle,
+ * 29/09/2026): a primeira versão desta porta só escrevia
+ * `Tarefa.dataPrazo` — para uma Tarefa de Emissão Documental (a maioria),
+ * Central/Relatório/Dashboard leem `SolicitacaoDocumento.previsaoRetorno`
+ * via `statusEPrazoEfetivos`, não `Tarefa.dataPrazo`. A mudança ficava
+ * invisível nessas três telas.
+ *
+ * POR QUE ESPELHAR (não só escrever a fonte): CERT-001
+ * (`lib/saude/verificacoes/emissao-documental.ts`) audita continuamente que
+ * `Tarefa.dataPrazo` gravado bate com a projeção calculada — e o próprio
+ * achado documenta por quê: Kanban e notificações AINDA leem
+ * `Tarefa.dataPrazo` bruto, não a projeção (migração parcial, Parte 1). Uma
+ * repactuação que só mexesse em `previsaoRetorno` corrigiria 3 telas e
+ * quebraria Kanban/notificações — o espelho é o que fecha as duas pontas.
+ *
+ * MESMO GATE de `statusEPrazoEfetivos` (`tipo==='NORMAL' &&
+ * faseMacroKey==='emissao_documental' && necessidadeId!=null`), reaplicado
+ * aqui em vez de reinventado — nunca duas réguas para "é certidão?". Mas só
+ * espelha quando JÁ EXISTE `SolicitacaoDocumento`: sem ela, a projeção
+ * calculada já devolve prazo `null` independente do que `Tarefa.dataPrazo`
+ * disser — não há o que espelhar ainda, e `alterarPrazo` é primitiva
+ * COMPARTILHADA (não só a porta do drawer): `resolverPoliticaTemporal`
+ * (mandato "SLA por cartório", 24-25/09/2026) já a reaproveita para um
+ * override PONTUAL de uma Tarefa de certidão ANTES de qualquer solicitação
+ * existir — exigir solicitação aqui quebraria esse degrau. Tarefa
+ * MANUAL/TRANSVERSAL/ADMINISTRATIVA (sem essa origem) sempre cai neste
+ * mesmo caminho — só `Tarefa.dataPrazo`.
+ */
 export async function alterarPrazo(args: {
   tarefaId: number; autorId: number; novoPrazo: Date | null; motivo: string
 }): Promise<Resultado> {
   if (!args.motivo?.trim()) return { ok: false, codigo: 'SEM_MOTIVO', mensagem: 'Informe o motivo da mudança de prazo.' }
   return prisma.$transaction(async (tx) => {
-    const t = await tx.tarefa.findUnique({ where: { id: args.tarefaId }, select: { id: true, titulo: true, dataPrazo: true, statusTarefa: true } })
+    const t = await tx.tarefa.findUnique({
+      where: { id: args.tarefaId },
+      select: { id: true, titulo: true, dataPrazo: true, statusTarefa: true, tipo: true, faseMacroKey: true, necessidadeId: true, documentoId: true },
+    })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
       return { ok: false as const, codigo: 'TERMINAL' as const, mensagem: 'Tarefa encerrada não muda de prazo.' }
     }
+
+    // `ehCertidao` só decide a FONTE quando já existe `SolicitacaoDocumento`
+    // por trás — sem ela, a projeção calculada (`projecao.prazo`) já
+    // devolve `null` independente do que `Tarefa.dataPrazo` disser (ver
+    // `projecoesDeCertidaoPorNecessidade`), então não há o que espelhar
+    // ainda: cai no mesmo caminho de MANUAL/TRANSVERSAL. É o que preserva o
+    // 4º degrau de `resolverPoliticaTemporal` (override ANTES de qualquer
+    // solicitação existir, mandato "SLA por cartório", 24-25/09/2026) —
+    // `alterarPrazo` é primitiva COMPARTILHADA, não só a porta do drawer.
+    const ehCertidao = t.tipo === 'NORMAL' && t.faseMacroKey === 'emissao_documental' && t.necessidadeId != null
+    const solicitacao = ehCertidao && t.documentoId
+      ? await tx.solicitacaoDocumento.findFirst({
+          where: { documentoId: t.documentoId },
+          orderBy: { id: 'desc' },
+          select: { id: true, previsaoRetorno: true },
+        })
+      : null
+
+    let deEfetivo: Date | null = t.dataPrazo
+    let fonte: 'SolicitacaoDocumento.previsaoRetorno+Tarefa.dataPrazo (espelhado)' | 'Tarefa.dataPrazo' = 'Tarefa.dataPrazo'
+
+    if (solicitacao) {
+      deEfetivo = solicitacao.previsaoRetorno
+      fonte = 'SolicitacaoDocumento.previsaoRetorno+Tarefa.dataPrazo (espelhado)'
+      await tx.solicitacaoDocumento.update({ where: { id: solicitacao.id }, data: { previsaoRetorno: args.novoPrazo } })
+    }
     await tx.tarefa.update({ where: { id: t.id }, data: { dataPrazo: args.novoPrazo, lockVersion: { increment: 1 } } })
+
     await auditar(tx, 'TAREFA_PRAZO_ALTERADO', t.id, args.autorId,
-      `Prazo de "${t.titulo}" alterado de ${t.dataPrazo?.toISOString().slice(0, 10) ?? 'sem prazo'} para ${args.novoPrazo?.toISOString().slice(0, 10) ?? 'sem prazo'}. Motivo: ${args.motivo}`,
-      { tarefaId: t.id, de: t.dataPrazo?.toISOString() ?? null, para: args.novoPrazo?.toISOString() ?? null, motivo: args.motivo })
+      `Prazo de "${t.titulo}" alterado de ${deEfetivo?.toISOString().slice(0, 10) ?? 'sem prazo'} para ${args.novoPrazo?.toISOString().slice(0, 10) ?? 'sem prazo'}. Motivo: ${args.motivo}`,
+      { tarefaId: t.id, de: deEfetivo?.toISOString() ?? null, para: args.novoPrazo?.toISOString() ?? null, motivo: args.motivo, fonte })
     return { ok: true as const, tarefaId: t.id }
   })
 }

@@ -34,6 +34,7 @@ import { resolverPoliticaTemporal } from "@/lib/operacional/sla-por-orgao"
 import { registrarSolicitacaoDocumento } from "@/src/services/solicitacao-documento"
 import { alterarPrazo } from "@/lib/operacional/tarefa-ciclo"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
+import { projecoesDeCertidaoPorNecessidade, statusEPrazoEfetivos } from "@/src/lib/process-stage/projecao-certidao"
 
 const MARCA = "SLACARTORIO-TEST"
 
@@ -77,7 +78,11 @@ async function palco() {
   const nec = await prisma.necessidadeDocumental.create({
     data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-nec-${proc.id}` }, select: { id: true },
   })
-  const doc = await prisma.documento.create({ data: { pessoaId: pes.id }, select: { id: true } })
+  // `necessidadeId` precisa estar no Documento (não só no passo) — é o que
+  // `NecessidadeDocumental.documentos` (a relação que `projecoesDeCertidaoPorNecessidade`
+  // usa) enxerga. Sem ele, a seção 5 (CERT-001) achava a necessidade mas
+  // nenhum documento — gap do fixture, não do código sob teste.
+  const doc = await prisma.documento.create({ data: { pessoaId: pes.id, necessidadeId: nec.id }, select: { id: true } })
   const wf = await prisma.phaseInternalWorkflow.create({ data: { wfUid: `${MARCA}-wf-${proc.id}`, phaseKey: "emissao_documental", name: `${MARCA} wf` }, select: { id: true } })
   const inst = await prisma.phaseWorkflowInstance.create({
     data: { processoId: proc.id, faseMacroKey: "emissao_documental", ciclo: 1, status: "ATIVO", workflowDefinitionId: wf.id, chaveIdempotencia: `${MARCA}-inst-${proc.id}` },
@@ -202,6 +207,51 @@ async function main() {
   ok("4.7) NÃO altera configuração global — RegraTemporalOrgao do Cartório X continua com slaDays=2 após o override local", regraIntacta?.slaDays === 2, String(regraIntacta?.slaDays))
   const r7 = await resolverPoliticaTemporal(prisma, { stepKey: "solicitar_certidao", orgaoProtocoloId: cartorioX.id, slaDaysDoPasso: 5 })
   ok("4.8) outra resolução para o MESMO (passo, órgão) continua devolvendo 2 — override é só desta Tarefa, não vaza para o cadastro", r7.slaDays === 2)
+
+  // ══════════════════════════════════════════════════════════════════════
+  secao("5) REPACTUAR PRAZO DE CERTIDÃO — grava na fonte que a projeção lê (Torre de Controle, Bloco D, correção pós-conferência 29/09/2026)")
+  // ══════════════════════════════════════════════════════════════════════
+  // Achado real (#3853, processo 651): a 1ª versão de `alterarPrazo` só
+  // escrevia `Tarefa.dataPrazo` — para uma Tarefa de certidão JÁ COM
+  // solicitação enviada, as 3 telas que leem `previsaoRetorno` nunca viam a
+  // mudança. Corrigido: grava a fonte E espelha `Tarefa.dataPrazo` (CERT-001
+  // audita os dois batendo; Kanban/notificações ainda leem o bruto).
+  const p4 = await palco()
+  const rSolic5 = await registrarSolicitacaoDocumento(
+    p4.documentoId, p4.stepInstanceId,
+    { canal: "EMAIL", destinatarioNome: "Cartório X — 1º Ofício", orgaoId: cartorioX.id, requerimento: { url: "https://exemplo.test/requerimento5.pdf" } },
+    ctx,
+  )
+  ok("5.1) solicitação registrada", rSolic5.ok === true, JSON.stringify(rSolic5).slice(0, 200))
+  const solicitacaoId5 = (rSolic5 as { ok: true; solicitacaoId: number }).solicitacaoId
+  const solAntes5 = await prisma.solicitacaoDocumento.findUniqueOrThrow({ where: { id: solicitacaoId5 }, select: { previsaoRetorno: true } })
+
+  const novoPrazo5 = new Date(Date.now() + 60 * 86400000)
+  const rRepactua = await alterarPrazo({ tarefaId: p4.tarefaId, autorId: marco.id, novoPrazo: novoPrazo5, motivo: "Cartório confirmou atraso de 60 dias por reforma no arquivo." })
+  ok("5.2) repactuação sucede", rRepactua.ok === true, JSON.stringify(rRepactua))
+
+  const sol5 = await prisma.solicitacaoDocumento.findUniqueOrThrow({ where: { id: solicitacaoId5 }, select: { previsaoRetorno: true } })
+  ok("5.3) FONTE — SolicitacaoDocumento.previsaoRetorno mudou para o novo prazo", sol5.previsaoRetorno?.getTime() === novoPrazo5.getTime())
+
+  const tarefa5 = await prisma.tarefa.findUniqueOrThrow({ where: { id: p4.tarefaId }, select: { dataPrazo: true } })
+  ok("5.4) ESPELHO — Tarefa.dataPrazo acompanha o mesmo valor (CERT-001 exige os dois iguais)", tarefa5.dataPrazo?.getTime() === novoPrazo5.getTime())
+
+  const log5 = await prisma.logAuditoria.findFirst({ where: { entidade: "Tarefa", entidadeId: p4.tarefaId, acao: "TAREFA_PRAZO_ALTERADO" }, orderBy: { id: "desc" } })
+  const det5 = log5?.detalhes as Record<string, unknown> | null
+  ok("5.5) LogAuditoria.de = a previsaoRetorno ANTERIOR (não Tarefa.dataPrazo cru)", det5?.de === solAntes5.previsaoRetorno?.toISOString(), String(det5?.de))
+  ok("5.6) LogAuditoria.para = o novo prazo", det5?.para === novoPrazo5.toISOString())
+  ok("5.7) LogAuditoria.fonte identifica o espelhamento", det5?.fonte === "SolicitacaoDocumento.previsaoRetorno+Tarefa.dataPrazo (espelhado)", String(det5?.fonte))
+
+  // A MESMA verificação que CERT-001 roda — Tarefa gravada e projeção
+  // calculada precisam concordar depois da repactuação.
+  const tarefaParaProjecao = await prisma.tarefa.findUniqueOrThrow({
+    where: { id: p4.tarefaId },
+    select: { id: true, necessidadeId: true, tipo: true, statusTarefa: true, dataPrazo: true, faseMacroKey: true },
+  })
+  const projecoes5 = await projecoesDeCertidaoPorNecessidade([tarefaParaProjecao.necessidadeId!])
+  const efetivo5 = statusEPrazoEfetivos(tarefaParaProjecao, projecoes5)
+  ok("5.8) CERT-001 — projeção calculada usa a origem CERTIDAO", efetivo5.origem === "CERTIDAO")
+  ok("5.9) CERT-001 — dataPrazo gravado e projeção calculada CONCORDAM (0 achados)", efetivo5.dataPrazo?.getTime() === tarefaParaProjecao.dataPrazo?.getTime())
 
   await limpar()
 

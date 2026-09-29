@@ -238,3 +238,89 @@ formatada.
   que já tinha o modal e o fix de formatação escritos (não commitados) —
   revisados, testados (tsc/lint/suíte + prova ao vivo) e completados aqui,
   sem duplicar trabalho.
+
+## Bloco D — correção pós-conferência ao vivo (29/09/2026): coluna errada + projeção + CERT-001
+
+Conferência ao vivo achou o bug real: `alterarPrazo` (versão inicial do
+Bloco D) só escrevia `Tarefa.dataPrazo` — para uma Tarefa de Emissão
+Documental (a maioria), as telas que leem a certidão (Central, Relatório,
+e o check de saúde CERT-001) leem `SolicitacaoDocumento.previsaoRetorno`
+(Parte 1, "fonte única de status e prazo de certidão"), não
+`Tarefa.dataPrazo`. #3853: repactuado para 08/10 no drawer, mas
+`previsaoRetorno` continuava 06/10 — a mudança só existia numa coluna que
+nenhuma das 3 telas mostra.
+
+- **Fonte + espelho, não só fonte**: `alterarPrazo` (`lib/operacional/
+  tarefa-ciclo.ts`) agora, quando a Tarefa é de certidão (`tipo==='NORMAL'
+  && faseMacroKey==='emissao_documental' && necessidadeId!=null`) E já
+  existe `SolicitacaoDocumento` para o documento dela: escreve
+  `previsaoRetorno` (a fonte que a projeção lê) E `Tarefa.dataPrazo`
+  (espelhado, mesmo valor) — nunca só um dos dois. Por quê espelhar: o
+  próprio CERT-001 audita que os dois batem, E — achado ao investigar —
+  PRZ-001 (`lib/saude/verificacoes/agendados.ts`) lê `Tarefa.dataPrazo`
+  BRUTO como fonte primária para decidir "tarefa vencida"; Kanban e
+  notificações também (migração da Parte 1 foi parcial: só Central/
+  Relatório/CERT-001 foram migrados para ler a projeção). Só escrever
+  `previsaoRetorno` teria corrigido 2 telas e quebrado PRZ-001/Kanban/
+  notificações silenciosamente.
+- **Sem `SolicitacaoDocumento` ainda → cai no caminho antigo** (só
+  `Tarefa.dataPrazo`, sem espelho): `alterarPrazo` é primitiva
+  COMPARTILHADA, não só a porta do drawer — `resolverPoliticaTemporal`
+  (mandato "SLA por cartório", 24-25/09/2026) já a reaproveita para um
+  override pontual ANTES de qualquer solicitação existir (achado ao rodar
+  a suíte: exigir solicitação aqui quebrava
+  `mandato-sla-cartorio-override.test.ts`, seção 4 — 6 asserts que hoje
+  provam exatamente esse caminho).
+- **Dado de #3853 reconciliado**: `SolicitacaoDocumento(id:62).
+  previsaoRetorno = 08/10/2026` e `Tarefa.dataPrazo = 08/10/2026`
+  (mirrorados) — coerente com o histórico já gravado em `LogAuditoria`
+  (`de: 06/10 → para: 08/10`, que não foi tocado).
+- **`repactuacoes`/`ultimaRepactuacao` em `LinhaGerencial`**
+  (`lib/operacional/tarefa-projecoes.ts`): nova função batched
+  `repactuacoesDePrazo` lê `LogAuditoria` (`TAREFA_PRAZO_ALTERADO`), conta
+  por tarefa e resolve o nome do autor em lote — nenhuma consulta N+1,
+  mesmo padrão de `contextoDeParada`. Ligada em `enriquecerLinhas` (o
+  caminho de `/api/operacao/tarefas`, `visaoGerencial`, `minhaFila`,
+  `semResponsavel`) E em `dossieDaTarefa` (`/api/operacao/tarefas/
+  [tarefaId]`) — as duas rotas de leitura, nunca só uma.
+- **Achado extra, corrigido no caminho**: `repactuarPrazo`
+  (`DocumentoOperationalDrawer.tsx`) checava `j.ok`/`j.mensagem` — mas o
+  contrato real de `POST /api/tarefas/[id]/comando` é `{tarefaId, acao}`
+  no sucesso (sem `ok`) e `{error, codigo}` no erro (sem `mensagem`), com o
+  HTTP status decidindo. Sucesso E erro caíam no mesmo ramo (`!j.ok` é
+  sempre `true` nessa resposta), calados — a UI nunca soube dizer se a
+  repactuação deu certo. Corrigido para `r.ok` (do `Response`) + `j.error`,
+  o mesmo padrão que `visao-global.tsx` já usa para a mesma porta.
+- **CERT-001, antes e depois** (reconstruindo o estado real do bug em
+  produção, rodando, corrigindo, rodando de novo):
+  - **Antes** (`Tarefa.dataPrazo=08/10` / `previsaoRetorno=06/10`,
+    exatamente o estado que o bug deixou): `status: "COM_ACHADOS"`, 1
+    achado — `cert-divergencia:3853` (`Tarefa grava dataPrazo=2026-10-08`;
+    `projeção calculada daria dataPrazo=2026-10-06`).
+  - **Depois** (os dois em 08/10): `status: "APROVADA"`, 0 achados.
+- **Evidência ao vivo, as 4 superfícies, #3853** (via API real, produção):
+  Tarefa (`dossieDaTarefa`/`/api/operacao/tarefas`): `dataPrazo:
+  "2026-10-08T12:00:00.000Z"`, `repactuacoes:1`,
+  `ultimaRepactuacao:{de:"2026-10-06T16:34:07.918Z",
+  para:"2026-10-08T12:00:00.000Z", quando:"2026-09-29T15:47:38.775Z",
+  quem:"Marco Rovatti"}`; Central Operacional
+  (`/api/processos/651/central-operacional?faseCode=EMISSAO_DOCUMENTAL`):
+  `taskId:3853, prazo:"2026-10-08T12:00:00.000Z"`; Relatório de Certidões
+  (`POST /api/relatorios/consultar`, domínio `certidoes`, necessidade 605):
+  `previsao:"08/10/2026", situacao_prazo:"No prazo"`; CERT-001/Dashboard: 0
+  achados (acima).
+- **Teste novo**: seção 5 de `scripts/mandato-sla-cartorio-override.test.ts`
+  (9 asserts) — registra uma solicitação real, repactua, prova fonte +
+  espelho + LogAuditoria + a MESMA verificação que CERT-001 roda
+  (`statusEPrazoEfetivos` batendo). Fixture `palco()` ganhou
+  `Documento.necessidadeId` (faltava — gap do fixture, não do código sob
+  teste; sem ele a seção 5 não achava o documento pela relação que
+  `projecoesDeCertidaoPorNecessidade` usa).
+
+## E — disciplina de sessão única (29/09/2026)
+
+O usuário encontrou, ao vivo, uma sessão concorrente do Claude Code editando
+este mesmo repositório sem coordenação (trabalho do Bloco D em progresso,
+não commitado). Regra now em vigor: **detectar sessão concorrente → PARAR e
+avisar o usuário**, nunca decidir sozinho revisar/completar o trabalho
+alheio. `ListAgents` deve ser checado antes de iniciar qualquer bloco novo.

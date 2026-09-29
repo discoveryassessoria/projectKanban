@@ -570,6 +570,14 @@ function ConteudoDrawer({
   // `alterarPrazo`, `tarefa-ciclo.ts`): motivo obrigatório, de/para e autor
   // gravados em LogAuditoria, já lidos por "Andamento" — este componente só
   // chama, não decide nada sobre o prazo.
+  //
+  // O CONTRATO REAL de `/comando` (achado real, correção pós-conferência):
+  // sucesso devolve `{tarefaId, acao}` — SEM `ok`; erro devolve
+  // `{error, codigo}` com status HTTP >= 400 — SEM `mensagem`. É `r.ok` (do
+  // Response) que decide, e `j.error` que explica — o mesmo padrão que
+  // `visao-global.tsx` já usa para a mesma porta. `j.ok`/`j.mensagem` nunca
+  // existiram nesta rota: a primeira versão testava campos que a resposta
+  // real não tem — sucesso e erro caíam no mesmo ramo, calados.
   const repactuarPrazo = async (dados: { novoPrazo: string | null; motivo: string }): Promise<{ ok: boolean; mensagem?: string }> => {
     const taskId = projection?.tarefa?.taskId
     if (!taskId) return { ok: false, mensagem: "Sem tarefa para repactuar." }
@@ -579,7 +587,7 @@ function ConteudoDrawer({
       body: JSON.stringify({ acao: "alterar_prazo", novoPrazo: dados.novoPrazo, motivo: dados.motivo }),
     })
     const j = await r.json().catch(() => ({}))
-    if (!j.ok) return { ok: false, mensagem: j.mensagem }
+    if (!r.ok) return { ok: false, mensagem: j.error ?? `Falha (HTTP ${r.status}).` }
     setRepactuandoPrazo(false)
     await carregar()
     onSave?.()
