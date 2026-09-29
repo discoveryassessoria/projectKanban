@@ -98,3 +98,55 @@ fluxo que existia até aqui: "cobrar" sem saber o resultado).
     do passo = 2).
   - 3º contato `EM_BUSCA`: `cobrancasSemResposta:0, escalada:false` — o `EM_BUSCA`
     quebra a sequência de `SEM_RESPOSTA` e desliga a escalada, exatamente a regra.
+
+## Bloco B — ajuste pós-conferência ao vivo (29/09/2026): `acompanhamentoVencido` e `esperandoHaDias`
+
+Conferência ao vivo das tarefas #3861/#3863/#3865/#3867 (processo 651/Cibils, subtarefa
+`receber_confirmacao_pedido`, enviadas 26/09) achou dois bugs REAIS, pré-existentes ao
+Bloco B (não introduzidos por ele, mas expostos pela primeira leitura de
+`cobrancasSemResposta`/histórico de contato ao vivo):
+
+- **`acompanhamentoVencido` (booleano) divergia de `acompanhamentoPasso.rotulo`
+  (texto)** — as 4 tarefas mostravam rótulo "Atrasada há 2 dias" com
+  `acompanhamentoVencido:false`. Causa: `computarProximoAcontecimento`
+  (`lib/operacional/proximo-acontecimento.ts`) calculava a DIMENSÃO D (próximo
+  acompanhamento) a partir de `PhaseWorkflowStepInstance.metadata.operacao.
+  proximoAcompanhamento` — um campo JSON informal do motor ANTERIOR ao de
+  subtarefas, nunca escrito por `registrarCobranca`/`adiarAcompanhamento`/
+  `aplicarEsperaExternaDaSubtarefaSeConfigurado` (sempre `undefined` nos dados
+  reais). O rótulo, correto, já lia `SubtaskExecution.proximoAcompanhamentoEm`
+  (`estadoTemporalSubtarefa`, em `tarefa-projecoes.ts`) — a mesma dimensão, duas
+  fontes. Corrigido: `computarProximoAcontecimento` agora lê
+  `SubtaskExecution.proximoAcompanhamentoEm` da subtarefa vigente em
+  `AGUARDANDO_EXTERNO` primeiro (dias CORRIDOS, via `diasEntreDiasOperacionais`,
+  inalterado); o campo `metadata.operacao...` vira fallback só para passos sem
+  motor de subtarefas. Rótulo, booleano e o KPI "Acomp. vencidos" (que só soma o
+  booleano) agora sempre concordam — mesma fonte, uma leitura.
+- **`esperandoHaDias`/`esperandoDesde` sempre `null`** para tarefas postas em
+  espera pelo motor automático. Causa: `contextoDeParada` (`tarefa-projecoes.ts`)
+  só lia `LogAuditoria` (`acao IN ('TAREFA_AGUARDANDO_TERCEIRO','TAREFA_BLOQUEADA')`)
+  — mas `bloquearTarefa` (`task-step-sync.ts`, a porta que
+  `aplicarEsperaExternaDaSubtarefaSeConfigurado` chama, o caminho automático real)
+  NUNCA grava `LogAuditoria`, só `WorkflowEvento` (`entityType:"tarefa",
+  tipo:"TAREFA_BLOQUEADA", dados.motivoCodigo`). `LogAuditoria` continua sendo a
+  fonte de `aguardarTerceiro` (`tarefa-ciclo.ts`, comando manual ainda vivo em
+  `/api/tarefas/[id]/comando`) — as duas fontes agora são mescladas em
+  `contextoDeParada`, em ordem cronológica real (nunca "uma fonte inteira antes
+  da outra"), o sinal mais recente de cada tarefa decide `esperandoDesde`.
+- **Achado à parte, não corrigido (decisão de cadastro, não bug de código)**: a
+  hipótese inicial era "acompanhamento cadastrado 7 dias → 03/10" — mas os 7 dias
+  pertencem à subtarefa SEGUINTE ("Receber certidão", `acompanhamentoPrimeiroDias:
+  7`), não à corrente ("Receber confirmação do pedido", cadastrada com
+  `acompanhamentoPrimeiroDias: 1`). Com o cadastro real (1 dia, enviado 26/09), o
+  vencimento correto É 27/09 — as 4 tarefas estão genuinamente atrasadas há 2 dias,
+  não "a vencer em 03/10". Nenhum código foi ajustado para produzir o número
+  esperado originalmente; o cadastro de 1 dia para "Receber confirmação do
+  pedido" fica como decisão a confirmar (ou corrigir, se for engano) em
+  Gerenciamento — fora do escopo desta correção.
+- **Evidência ao vivo, #3861/#3863/#3865/#3867** (via `visaoGerencial` e
+  `dossieDaTarefa`, as duas rotas de leitura reais): `acompanhamentoVencido:true`,
+  `acompanhamentoPasso.rotulo:"Atrasada há 2 dias"`, `esperandoDe:"terceiro"`,
+  `esperandoDesde:"2026-09-26T16:3x..."`, `esperandoHaDias:2` — as quatro
+  concordando entre si e com a data real (`SubtaskExecution.
+  proximoAcompanhamentoEm` = 27/09), nas duas rotas de leitura (fila em lote e
+  dossiê de uma tarefa).

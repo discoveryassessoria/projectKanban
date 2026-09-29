@@ -1982,24 +1982,56 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   return where
 }
 
-/** Desde quando cada tarefa espera / por que bloqueou — UMA consulta, em lote. */
+/**
+ * Desde quando cada tarefa espera / por que bloqueou — DUAS fontes, em lote.
+ *
+ * ACHADO REAL (ajuste pós-Bloco-B, 29/09/2026): esta função só lia
+ * `LogAuditoria` (`'TAREFA_AGUARDANDO_TERCEIRO'`/`'TAREFA_BLOQUEADA'`) — mas
+ * `bloquearTarefa` (`task-step-sync.ts`, a porta que o motor automático de
+ * subtarefas usa via `aplicarEsperaExternaDaSubtarefaSeConfigurado`) NUNCA
+ * grava `LogAuditoria`, só `WorkflowEvento` (`entityType:"tarefa"`,
+ * `tipo:"TAREFA_BLOQUEADA"`, `dados.motivoCodigo`). Resultado: toda tarefa
+ * posta em espera pelo caminho automático (a maioria — #3861/#3863/#3865/
+ * #3867 confirmadas em produção) tinha `esperandoDesde`/`esperandoHaDias`
+ * sempre `null`, mesmo com `esperando=true`. `LogAuditoria` continua lida —
+ * é o que `aguardarTerceiro` (`tarefa-ciclo.ts`, comando manual, ainda vivo
+ * em `/api/tarefas/[id]/comando`) grava — as duas fontes são mescladas em
+ * ORDEM CRONOLÓGICA REAL (nunca "logs primeiro, eventos depois"), porque o
+ * último sinal de cada tarefa é que decide `esperandoDesde`.
+ */
 async function contextoDeParada(ids: number[], db: Leitor = prisma): Promise<Map<number, { esperandoDesde?: Date; motivo?: string }>> {
   const mapa = new Map<number, { esperandoDesde?: Date; motivo?: string }>()
   if (ids.length === 0) return mapa
-  // Ordem crescente e sobrescrita: o último registro de cada tarefa vence, que
-  // é o que interessa — a espera ATUAL, não a primeira que já houve.
-  const logs = await db.logAuditoria.findMany({
-    where: { entidade: 'Tarefa', entidadeId: { in: ids }, acao: { in: ['TAREFA_AGUARDANDO_TERCEIRO', 'TAREFA_BLOQUEADA'] } },
-    select: { entidadeId: true, acao: true, criadoEm: true, detalhes: true },
-    orderBy: { criadoEm: 'asc' },
-  })
+  const [logs, wfEventos] = await Promise.all([
+    db.logAuditoria.findMany({
+      where: { entidade: 'Tarefa', entidadeId: { in: ids }, acao: { in: ['TAREFA_AGUARDANDO_TERCEIRO', 'TAREFA_BLOQUEADA'] } },
+      select: { entidadeId: true, acao: true, criadoEm: true, detalhes: true },
+    }),
+    db.workflowEvento.findMany({
+      where: { entityType: 'tarefa', entityId: { in: ids }, tipo: 'TAREFA_BLOQUEADA' },
+      select: { entityId: true, criadoEm: true, dados: true },
+    }),
+  ])
+  type Sinal = { entidadeId: number; criadoEm: Date; esperaExterna: boolean; motivo?: string }
+  const sinais: Sinal[] = []
   for (const l of logs) {
     if (l.entidadeId == null) continue
-    const atual = mapa.get(l.entidadeId) ?? {}
     const motivo = (l.detalhes as { motivo?: string } | null)?.motivo
-    if (l.acao === 'TAREFA_AGUARDANDO_TERCEIRO') atual.esperandoDesde = l.criadoEm
-    else atual.motivo = motivo ?? undefined
-    mapa.set(l.entidadeId, atual)
+    sinais.push({ entidadeId: l.entidadeId, criadoEm: l.criadoEm, esperaExterna: l.acao === 'TAREFA_AGUARDANDO_TERCEIRO', motivo })
+  }
+  for (const e of wfEventos) {
+    if (e.entityId == null) continue
+    const dados = (e.dados as { motivoCodigo?: string; justificativa?: string } | null) ?? null
+    sinais.push({ entidadeId: e.entityId, criadoEm: e.criadoEm, esperaExterna: dados?.motivoCodigo === 'AGUARDANDO_TERCEIRO', motivo: dados?.justificativa ?? undefined })
+  }
+  // Ordem crescente e sobrescrita: o último sinal de cada tarefa vence, que é
+  // o que interessa — a espera ATUAL, não a primeira que já houve.
+  sinais.sort((a, b) => a.criadoEm.getTime() - b.criadoEm.getTime())
+  for (const s of sinais) {
+    const atual = mapa.get(s.entidadeId) ?? {}
+    if (s.esperaExterna) atual.esperandoDesde = s.criadoEm
+    else atual.motivo = s.motivo ?? atual.motivo
+    mapa.set(s.entidadeId, atual)
   }
   return mapa
 }

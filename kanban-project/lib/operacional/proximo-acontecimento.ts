@@ -19,7 +19,12 @@
 //                                (a fonte estruturada); senão
 //                                `previsaoEfetiva()` do andamento do passo
 //                                (`metadata.operacao`, a fonte informal).
-//   D. PRÓXIMO ACOMPANHAMENTO — `metadata.operacao.proximoAcompanhamento`.
+//   D. PRÓXIMO ACOMPANHAMENTO — `SubtaskExecution.proximoAcompanhamentoEm` da
+//                                subtarefa corrente em espera externa (ajuste
+//                                pós-Bloco-B, 29/09/2026 — era
+//                                `metadata.operacao.proximoAcompanhamento`,
+//                                nunca escrito pelo motor atual; preservado
+//                                só como fallback de passos sem subtarefas).
 //
 // Este módulo NUNCA escreve em nenhuma delas — é leitura pura, como
 // `estadoTemporal`/`sla-core.ts`. Quando A e B deveriam representar a MESMA
@@ -154,6 +159,16 @@ export interface EntradaOperacao {
   responsavelId: number | null
   createdAt: Date
   agora: Date
+  /**
+   * DIMENSÃO D, fonte canônica (ajuste pós-Bloco-B, 29/09/2026):
+   * `SubtaskExecution.proximoAcompanhamentoEm` da subtarefa CORRENTE em
+   * `AGUARDANDO_EXTERNO`, quando o passo usa o motor de subtarefas
+   * (`subtarefas-da-etapa.ts`/`registrarCobranca`/`adiarAcompanhamento` —
+   * quem de fato grava esta data hoje). `null` = passo sem subtarefas
+   * (motor mais antigo) ou nenhuma subtarefa em espera agora — cai no
+   * fallback de `passo.andamento.proximoAcompanhamento` abaixo.
+   */
+  proximoAcompanhamentoDaSubtarefaCorrente?: Date | null
   /** O passo corrente da Tarefa, quando existe. */
   passo: {
     prazo: Date | null
@@ -245,8 +260,18 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
   }
 
   // ── DIMENSÃO D ────────────────────────────────────────────────────────────
+  // FONTE CANÔNICA primeiro (`SubtaskExecution.proximoAcompanhamentoEm`, a
+  // mesma que `acompanhamentoPasso.rotulo` usa em tarefa-projecoes.ts — as
+  // duas precisam SEMPRE concordar, achado real 29/09/2026:
+  // #3861/#3863/#3865/#3867 mostravam rótulo "Atrasada há 2 dias" com
+  // `acompanhamentoVencido=false` porque só esta dimensão ainda lia o campo
+  // legado, nunca escrito pelo motor atual). `metadata.operacao...` só entra
+  // quando a subtarefa canônica não existe (passo sem motor de subtarefas).
   let proximoAcompanhamentoData: Date | null = null
-  if (e.passo?.andamento.proximoAcompanhamento) {
+  if (e.proximoAcompanhamentoDaSubtarefaCorrente) {
+    proximoAcompanhamentoData = e.proximoAcompanhamentoDaSubtarefaCorrente
+    origemDosDados.push("SubtaskExecution.proximoAcompanhamentoEm")
+  } else if (e.passo?.andamento.proximoAcompanhamento) {
     proximoAcompanhamentoData = isoDoDia(e.passo.andamento.proximoAcompanhamento)
     origemDosDados.push("metadata.operacao.proximoAcompanhamento")
   }
@@ -487,6 +512,21 @@ export async function estadosTemporaisDasOperacoes(
     : []
   const stepPorId = new Map(steps.map((s) => [s.id, s]))
 
+  // DIMENSÃO D, fonte canônica — a subtarefa vigente (não substituída) em
+  // `AGUARDANDO_EXTERNO` de cada passo, quando o passo usa o motor de
+  // subtarefas. No máximo uma por `stepInstanceId` (só a corrente espera por
+  // vez) — sem `progressoPorSubtarefa` (tarefa-projecoes.ts) de propósito:
+  // aquele módulo IMPORTA este arquivo, importar de volta criaria ciclo.
+  const subtarefasEmEspera = stepIds.length
+    ? await db.subtaskExecution.findMany({
+        where: { stepInstanceId: { in: stepIds }, supersededAt: null, status: "AGUARDANDO_EXTERNO" },
+        select: { stepInstanceId: true, proximoAcompanhamentoEm: true },
+      })
+    : []
+  const proximoAcompanhamentoPorStepInstance = new Map(
+    subtarefasEmEspera.map((s) => [s.stepInstanceId, s.proximoAcompanhamentoEm]),
+  )
+
   // O RÓTULO PUBLICADO DO PASSO — batched pelo `stepDefinitionId` (mesmo
   // padrão de `rotulosDosPassos` em `tarefa-projecoes.ts`; não importado
   // daqui para não criar ciclo de import — este arquivo é importado por ele).
@@ -526,6 +566,8 @@ export async function estadosTemporaisDasOperacoes(
       responsavelId: t.responsavelId,
       createdAt: t.createdAt,
       agora,
+      proximoAcompanhamentoDaSubtarefaCorrente:
+        t.workflowStepInstanceId != null ? proximoAcompanhamentoPorStepInstance.get(t.workflowStepInstanceId) ?? null : null,
       passo: stepRow
         ? {
             prazo: stepRow.prazo,
