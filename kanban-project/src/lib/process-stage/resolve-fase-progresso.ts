@@ -14,6 +14,7 @@ import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-core"
 import { normalizarUnidade, chaveDaUnidade, tarefasVivasDasUnidades, type UnidadeDeTrabalho } from "@/lib/operacional/identidade-da-tarefa"
+import { subtarefasDaEtapa } from "@/src/services/subtarefas-da-etapa"
 import type { FaseCode } from "@prisma/client"
 
 /**
@@ -221,14 +222,27 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
     return u ? tarefaVivaPorDoc.get(chaveDaUnidade(u)) ?? null : null
   }
 
+  // PRÓXIMA AÇÃO DENTRO DO PASSO — achado real (#3860, 28/09/2026): um passo
+  // com várias subtarefas (ex.: "Solicitar certidão" tem 4) mostrava sempre o
+  // MESMO título fixo do passo como "próxima ação", da primeira subtarefa até
+  // a última — a Central dizia "Solicitar certidão" para uma certidão que já
+  // estava aguardando o cartório responder. A ação real é a da SUBTAREFA
+  // CORRENTE (a primeira ainda não concluída); só cai para o título do passo
+  // quando ele não tem subtarefas cadastradas (passo de ação única).
   const proximaAcaoPorDoc = new Map<number, string | null>()
-  for (const id of docIdsComWf) {
+  const entradas = [...docIdsComWf].map((id) => {
     const tarefa = tarefaDoDoc(id)
     const passoAtual = tarefa?.workflowStepInstanceId != null
       ? (wfPorDoc.get(id)?.steps ?? []).find((s) => s.id === tarefa.workflowStepInstanceId)
       : null
-    proximaAcaoPorDoc.set(id, passoAtual ? tituloStep(passoAtual.stepKey) : proximaAcao(id))
-  }
+    return { id, passoAtual }
+  })
+  await Promise.all(entradas.map(async ({ id, passoAtual }) => {
+    if (!passoAtual) { proximaAcaoPorDoc.set(id, proximaAcao(id)); return }
+    const subs = await subtarefasDaEtapa({ stepInstanceId: passoAtual.id }).catch(() => [])
+    const corrente = subs.find((s) => !s.concluida)
+    proximaAcaoPorDoc.set(id, corrente ? corrente.label : tituloStep(passoAtual.stepKey))
+  }))
 
   // responsável do passo ATIVO por doc — Tarefa canônica primeiro.
   const stepOwnerPorDoc = new Map<number, { id: number; nome: string }>()

@@ -30,6 +30,10 @@ import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 import { lerAndamento } from '@/src/lib/process-stage/andamento-etapa'
 import type { StatusTarefa } from '@prisma/client'
+import { projecoesDeCertidaoPorNecessidade, statusEPrazoEfetivos } from '@/src/lib/process-stage/projecao-certidao'
+
+/** Mesma categoria do Cadastro Mestre que define "certidão" em `certidoes.ts` (Relatório). */
+const CATEGORIA_CERTIDAO = 'REGISTRO_CIVIL'
 
 const PHASE_KEY = 'emissao_documental'
 const ROTA_CENTRAL = '/operacao'
@@ -1219,6 +1223,107 @@ registrar({
         evidencia: { tarefaId: t.id, processoId: t.processoId, motivosRisco: estado!.motivosRisco },
       })),
       metricas: { total: candidatas.length, semProximaAcao: semProximaAcao.length },
+    }
+  },
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CERT-001 — CONVERGÊNCIA DE STATUS/PRAZO DE CERTIDÃO ENTRE AS 4 SUPERFÍCIES
+// ═══════════════════════════════════════════════════════════════════════════
+registrar({
+  id: 'saude.certidao.convergencia-status-prazo',
+  codigo: 'CERT-001',
+  nome: 'Tarefa, Central Operacional, Relatório de Certidões e Dashboard concordam',
+  descricao: 'Achado real (#3860, processo 651, 28/09/2026): Tarefa.statusTarefa/dataPrazo são gravados por EVENTO — se o ponteiro da Tarefa estiver momentaneamente errado no instante do evento, a escrita não acontece, e como não é valor calculado, nada reavalia depois. A partir da decisão da Parte 1 (opção ii, 29/09/2026), Central Operacional e Dashboard/PRZ-001 passaram a CALCULAR o status/prazo de certidão a partir de SolicitacaoDocumento+SubtaskExecution (a mesma função pura que o Relatório de Certidões já usava) em vez de confiar no valor gravado. Esta verificação prova que a Tarefa gravada e a projeção calculada concordam — enquanto concordarem, é indiferente qual superfície o operador está olhando; divergindo, é o mesmo buraco do #3860 acontecendo de novo.',
+  dominio: 'TAREFAS',
+  modulo: 'Emissão Documental',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '2.1.0',
+  timeoutMs: 30_000,
+  orientacao: 'Abra a Tarefa pelo id — se o workflowStepInstanceId dela não corresponde ao step vigente da necessidade, é o mesmo bug de ponteiro do #3860. Reaplique aplicarEsperaExternaDaSubtarefaSeConfigurado/aplicarPrazoDaTarefaSeConfigurado depois de corrigir o ponteiro.',
+  rotaCorrecao: ROTA_CENTRAL,
+  responsavel: 'Emissão Documental',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const tarefas = await prisma.tarefa.findMany({
+      where: {
+        tipo: 'NORMAL',
+        // SÓ a Tarefa da Emissão Documental (solicitar_certidao) — a
+        // Tarefa de Genealogia (localizar_registro) da MESMA necessidade
+        // não é "a solicitação da certidão" e tem seu próprio significado
+        // de statusTarefa/dataPrazo (achado real, 29/09/2026).
+        faseMacroKey: PHASE_KEY,
+        necessidadeId: { not: null },
+        statusTarefa: { notIn: ['CANCELADA', 'SUPERSEDIDA', 'BLOQUEADA'] },
+        necessidade: { itemCatalogo: { tiposDocumento: { some: { categoriaDocumental: { code: CATEGORIA_CERTIDAO } } } } },
+      },
+      select: {
+        id: true, titulo: true, necessidadeId: true, documentoId: true, tipo: true,
+        statusTarefa: true, dataPrazo: true, processoId: true, faseMacroKey: true,
+      },
+      take: 1000,
+    })
+    if (!tarefas.length) return vazio({ verificadas: 0, divergentes: 0 }, 'Nenhuma Tarefa de certidão elegível no momento.')
+
+    const necIds = [...new Set(tarefas.map((t) => t.necessidadeId!).filter((x) => x != null))]
+    const projecoes = await projecoesDeCertidaoPorNecessidade(necIds)
+
+    // SOLICITACAO vigente por documento — só para a evidência (registroId da
+    // solicitação), não entra na decisão (essa já está em `projecoes`).
+    const docIds = [...new Set(tarefas.map((t) => t.documentoId).filter((x): x is number => x != null))]
+    const solicitacoesPorDoc = docIds.length
+      ? await prisma.solicitacaoDocumento.findMany({
+          where: { documentoId: { in: docIds } },
+          orderBy: { id: 'desc' },
+          select: { id: true, documentoId: true },
+        })
+      : []
+    const solicitacaoIdPorDoc = new Map<number, number>()
+    for (const s of solicitacoesPorDoc) if (!solicitacaoIdPorDoc.has(s.documentoId)) solicitacaoIdPorDoc.set(s.documentoId, s.id)
+
+    const divergentes: Array<{
+      tarefa: (typeof tarefas)[number]
+      efetivo: ReturnType<typeof statusEPrazoEfetivos>
+    }> = []
+    for (const t of tarefas) {
+      const efetivo = statusEPrazoEfetivos(t, projecoes)
+      if (efetivo.origem !== 'CERTIDAO') continue // sem projeção calculável — nada a comparar
+      const statusDivergiu = efetivo.statusTarefa !== t.statusTarefa
+      const prazoDivergiu = (efetivo.dataPrazo?.getTime() ?? null) !== (t.dataPrazo?.getTime() ?? null)
+      if (statusDivergiu || prazoDivergiu) divergentes.push({ tarefa: t, efetivo })
+    }
+
+    if (!divergentes.length) {
+      return vazio(
+        { verificadas: tarefas.length, divergentes: 0 },
+        `${tarefas.length} Tarefa(s) de certidão verificada(s) — Tarefa e projeção calculada concordam em todas.`,
+      )
+    }
+
+    return {
+      achados: divergentes.map(({ tarefa: t, efetivo }): Achado => ({
+        chave: `cert-divergencia:${t.id}`,
+        severidade: 'ERRO',
+        titulo: `Tarefa #${t.id} diverge da projeção calculada de status/prazo da certidão`,
+        descricao: `"${t.titulo}": Tarefa grava statusTarefa=${t.statusTarefa}/dataPrazo=${t.dataPrazo?.toISOString() ?? 'null'}; a projeção calculada (SolicitacaoDocumento+SubtaskExecution) daria statusTarefa=${efetivo.statusTarefa}/dataPrazo=${efetivo.dataPrazo?.toISOString() ?? 'null'}.`,
+        explicacao: 'Mesma causa do achado #3860: a escrita por evento (aplicarEsperaExternaDaSubtarefaSeConfigurado/solicitacao-documento.ts) não alcançou esta Tarefa no instante certo — provavelmente porque o ponteiro workflowStepInstanceId dela estava temporariamente errado.',
+        impacto: 'Central Operacional e Dashboard já leem a projeção calculada (não divergem mais do que o operador vê) — mas qualquer OUTRA tela que ainda leia Tarefa.statusTarefa/dataPrazo bruto (Kanban, notificações) continua mostrando o valor errado até a Tarefa ser corrigida.',
+        entidade: 'Tarefa', registroId: String(t.id), registroNome: t.titulo, quantidade: 1,
+        link: ROTA_CENTRAL,
+        recomendacao: 'Confirme o workflowStepInstanceId da Tarefa contra o step vigente da necessidade e reaplique os efeitos automáticos.',
+        evidencia: {
+          tarefaId: t.id,
+          necessidadeId: t.necessidadeId,
+          documentoId: t.documentoId,
+          solicitacaoId: t.documentoId != null ? (solicitacaoIdPorDoc.get(t.documentoId) ?? null) : null,
+          processoId: t.processoId,
+          tarefaGravado: { statusTarefa: t.statusTarefa, dataPrazo: t.dataPrazo },
+          projecaoCalculada: { statusTarefa: efetivo.statusTarefa, dataPrazo: efetivo.dataPrazo },
+        },
+      })),
+      metricas: { verificadas: tarefas.length, divergentes: divergentes.length },
     }
   },
 })

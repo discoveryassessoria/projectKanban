@@ -34,6 +34,16 @@ Uma obrigação real executável deve corresponder a UMA Tarefa canônica.
 
 Não criar outra representação operacional da mesma obrigação.
 
+Tarefa continua a unidade canônica de TRABALHO: quem faz, atribuição, responsabilidade, histórico.
+
+Status e prazo de CERTIDÃO não são mais gravados como fonte em Tarefa.statusTarefa/dataPrazo (decisão "fonte única de status e prazo de certidão", 29/09/2026, achado #3860: escrita por evento que pode falhar silenciosamente sem nada reavaliar depois).
+
+Status e prazo de certidão são PROJEÇÃO calculada na leitura a partir de SolicitacaoDocumento (dataEnvio + prazoEsperadoDias → previsaoRetorno) + SubtaskExecution.status, via a função pura `situacaoDaSolicitacaoCertidao` (`src/lib/process-stage/situacao-solicitacao-certidao.ts`) e o serviço `src/lib/process-stage/projecao-certidao.ts` — uma única implementação, importada por Central Operacional, Relatório de Certidões e Dashboard/PRZ-001.
+
+Tarefa MANUAL, TRANSVERSAL, ADMINISTRATIVA e qualquer Tarefa sem NecessidadeDocumental de origem continuam usando o statusTarefa/dataPrazo gravado — não há SolicitacaoDocumento por trás para calcular.
+
+Tarefa CANCELADA/SUPERSEDIDA/BLOQUEADA nunca é sobrescrita pela projeção calculada — são decisão humana/do motor sobre o TRABALHO, não fato de progresso da certidão.
+
 ## 2. Workflow
 
 O Workflow é definido/configurado por fase (PhaseInternalWorkflow) e sua execução é materializada como PhaseWorkflowInstance.

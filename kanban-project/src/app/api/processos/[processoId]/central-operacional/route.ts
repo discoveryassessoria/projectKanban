@@ -23,6 +23,7 @@ import { DOCUMENTO_STATUS_LABELS, getPhaseOperationalSummary, TIPO_DOCUMENTO_LAB
 import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
 import { materializarExecucaoDaFase, motivosAcionaveis } from "@/src/services/materializar-fase"
 import { indicadoresGerenciais, visaoGerencial } from "@/lib/operacional/tarefa-projecoes"
+import { projecoesDeCertidaoPorNecessidade } from "@/src/lib/process-stage/projecao-certidao"
 import type { IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
@@ -516,6 +517,7 @@ export async function GET(
       necessidadeId?: number | null
       tipo: string
       status: string
+      situacaoCertidao?: { situacao: string; rotuloSituacao: string; prazo: Date | null } | null
       updatedAt: Date
       responsavelId?: number | null
       responsavelNome?: string | null
@@ -525,14 +527,25 @@ export async function GET(
       workflows?: Array<{ faseCode: string | null; status: string }>
     }
 
+    // FONTE ÚNICA DE STATUS/PRAZO DE CERTIDÃO (Parte 1 opção ii, 29/09/2026) —
+    // calculada de SolicitacaoDocumento+SubtaskExecution, uma consulta em
+    // lote pra todos os documentos da tela. `Documento.status` continua
+    // existindo (é outro domínio, o legado de 15 valores — ver
+    // documento-status-legado), mas deixa de ser a fonte da coluna "Situação"
+    // aqui quando a necessidade tem projeção calculável.
+    const necessidadeIdsDosDocs = [...new Set(docsRaw.map((d: any) => d.necessidadeId).filter((x: unknown): x is number => x != null))]
+    const projecoesCertidao = await projecoesDeCertidaoPorNecessidade(necessidadeIdsDosDocs)
+
     const docs: DocFull[] = docsRaw.map((d: any) => {
       const stepOwner = stepOwnerByDoc.get(d.id) ?? null
+      const projecao = d.necessidadeId != null ? projecoesCertidao.get(d.necessidadeId) : undefined
       return {
         id: d.id,
         pessoaId: d.pessoaId,
         necessidadeId: d.necessidadeId ?? null,
         tipo: d.tipo,
         status: d.status,
+        situacaoCertidao: projecao ?? null,
         updatedAt: d.updatedAt,
         // doc tem prioridade; se não tiver, cai pro responsável da etapa ativa
         responsavelId: d.responsavelId ?? stepOwner?.id ?? null,
@@ -704,8 +717,11 @@ export async function GET(
         pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
         docType: d.tipo,
         docTypeLabel: TIPO_LABELS[d.tipo] || d.tipo,
-        status: STATUS_LABELS[d.status] || d.status,
-        statusRaw: d.status,
+        // SITUAÇÃO DA CERTIDÃO tem prioridade sobre `Documento.status` (o
+        // vocabulário legado) quando a necessidade tem projeção calculável —
+        // mesma fonte que o Relatório de Certidões e a Central já concordam.
+        status: d.situacaoCertidao?.rotuloSituacao ?? STATUS_LABELS[d.status] ?? d.status,
+        statusRaw: d.situacaoCertidao?.situacao ?? d.status,
         responsavelNome: d.responsavelNome ?? null,
         prazo: d.dataPrazoOperacao?.toISOString() ?? null,
         diasParaPrazo: dias,

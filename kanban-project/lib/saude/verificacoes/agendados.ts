@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 import { phaseKeyToFaseCode, isProcessoFase } from '@/src/lib/process-stage/fases-catalog'
+import { projecoesDeCertidaoPorNecessidade, statusEPrazoEfetivos } from '@/src/lib/process-stage/projecao-certidao'
 
 const HORA = 60 * 60 * 1000
 
@@ -173,6 +174,39 @@ registrar({
       orderBy: { dataPrazo: 'asc' },
       take: 200,
     })
+
+    // O BURACO EXATO DO ACHADO #3860 (28/09/2026): uma tarefa de certidão pode
+    // ter `dataPrazo` NULO no banco — a escrita por evento falhou — enquanto o
+    // prazo REAL (SolicitacaoDocumento.previsaoRetorno) já venceu. A consulta
+    // acima nunca a encontraria (filtra `dataPrazo: { not: null }`). Escopo
+    // pequeno de propósito: só quem tem responsável e NecessidadeDocumental —
+    // mesma régua de `statusEPrazoEfetivos` (Parte 1 opção ii, 29/09/2026).
+    const semPrazoGravado = await prisma.tarefa.findMany({
+      where: {
+        statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] },
+        responsavelId: { not: null },
+        dataPrazo: null,
+        necessidadeId: { not: null },
+        tipo: 'NORMAL',
+        // SÓ a Tarefa de Emissão Documental — a de Genealogia da mesma
+        // necessidade não representa "solicitação de certidão" (mesma
+        // régua de `statusEPrazoEfetivos`, achado real 29/09/2026).
+        faseMacroKey: 'emissao_documental',
+      },
+      select: { id: true, titulo: true, dataPrazo: true, responsavelId: true, necessidadeId: true, tipo: true, statusTarefa: true, faseMacroKey: true },
+      take: 500,
+    })
+    if (semPrazoGravado.length) {
+      const necIds = [...new Set(semPrazoGravado.map((t) => t.necessidadeId!).filter((x) => x != null))]
+      const projecoes = await projecoesDeCertidaoPorNecessidade(necIds)
+      for (const t of semPrazoGravado) {
+        const efetivo = statusEPrazoEfetivos(t, projecoes)
+        if (efetivo.origem === 'CERTIDAO' && efetivo.dataPrazo && efetivo.dataPrazo < corte) {
+          vencidas.push({ id: t.id, titulo: t.titulo, dataPrazo: efetivo.dataPrazo, responsavelId: t.responsavelId })
+        }
+      }
+      vencidas.sort((a, b) => (a.dataPrazo?.getTime() ?? 0) - (b.dataPrazo?.getTime() ?? 0))
+    }
 
     const semAviso: typeof vencidas = []
     if (vencidas.length) {

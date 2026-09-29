@@ -22,7 +22,7 @@ import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/sub
 import {
   CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO, CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO,
   ROTULO_SITUACAO_SOLICITACAO, situacaoDaSolicitacaoCertidao,
-  STEP_KEY_LOCALIZAR_REGISTRO, STATUS_STEP_LOCALIZADO,
+  STEP_KEY_LOCALIZAR_REGISTRO, STEP_KEY_SOLICITAR_CERTIDAO, STATUS_STEP_LOCALIZADO,
   type SituacaoSolicitacaoCertidao,
 } from "@/src/lib/process-stage/situacao-solicitacao-certidao"
 import { documentoTemDadosPreenchidos } from "@/src/lib/documentos/dados-preenchidos"
@@ -33,7 +33,6 @@ import { cadastro, contem, dataBR, diasEntre, emLista, emListaId, igualId, perio
 /** A categoria que define "certidão" — do Cadastro Mestre, não do nome. */
 export const CATEGORIA_CERTIDAO = "REGISTRO_CIVIL"
 
-const STEP_KEY_SOLICITAR_CERTIDAO = "solicitar_certidao"
 const CHAVES_SITUACAO_SOLICITACAO = [
   ...CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO,
   ...CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO,

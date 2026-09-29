@@ -35,6 +35,8 @@ import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "./subtarefa-confirmacao-ped
 
 /** A chave canônica do passo "Localizar registro" na Genealogia. */
 export const STEP_KEY_LOCALIZAR_REGISTRO = "localizar_registro"
+/** A chave canônica do passo "Solicitar certidão" na Emissão Documental. */
+export const STEP_KEY_SOLICITAR_CERTIDAO = "solicitar_certidao"
 /** Estados do passo que valem como "localizado" — mesma régua de
  *  central-operacional/route.ts (`CONCLUIDO`/`DISPENSADO` contam; um passo
  *  SUPERSEDIDO já fica de fora da consulta, é ciclo antigo). */
