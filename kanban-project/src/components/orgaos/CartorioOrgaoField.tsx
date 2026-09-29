@@ -38,26 +38,39 @@ export function CartorioOrgaoField({
   onVinculado: (orgao: { id: number; name: string }) => void
 }) {
   const [aberto, setAberto] = useState(false)
-  const [resultado, setResultado] = useState<{ q: string; lista: OrgaoSugerido[] }>({ q: "", lista: [] })
+  const [resultado, setResultado] = useState<OrgaoSugerido[]>([])
+  const [carregando, setCarregando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [cadastro, setCadastro] = useState(false)
   const seq = useRef(0)
   const q = texto.trim()
+  const cidadeSel = cidade.trim()
+  // Sem texto digitado, mas com CIDADE já escolhida na Localidade acima: ainda
+  // assim busca — lista todos os cartórios daquela cidade ao abrir o campo
+  // (era o comportamento de antes, com o <datalist> por uf+município; perdido
+  // quando este campo passou a exigir 2+ caracteres pra buscar).
+  const podeBuscar = q.length >= 2 || !!cidadeSel
 
   useEffect(() => {
-    if (!aberto || q.length < 2) return
+    if (!aberto || !podeBuscar) { setResultado([]); return }
     let ativo = true
+    setCarregando(true)
     const t = setTimeout(() => {
-      fetch(`/api/operacao/orgaos/busca?q=${encodeURIComponent(q)}`, { headers: auth() })
+      const params = new URLSearchParams()
+      if (q) params.set("q", q)
+      if (ufSigla) params.set("uf", ufSigla)
+      if (cidadeSel) params.set("cidade", cidadeSel)
+      fetch(`/api/operacao/orgaos/busca?${params.toString()}`, { headers: auth() })
         .then((r) => (r.ok ? r.json() : { orgaos: [] }))
-        .then((j) => { if (ativo) setResultado({ q, lista: j.orgaos ?? [] }) })
-        .catch(() => { if (ativo) setResultado({ q, lista: [] }) })
+        .then((j) => { if (ativo) setResultado(j.orgaos ?? []) })
+        .catch(() => { if (ativo) setResultado([]) })
+        .finally(() => { if (ativo) setCarregando(false) })
     }, 250)
     return () => { ativo = false; clearTimeout(t) }
-  }, [q, aberto])
-  const buscando = aberto && q.length >= 2 && resultado.q !== q
-  const sugestoes = resultado.q === q ? resultado.lista : []
+  }, [q, aberto, ufSigla, cidadeSel, podeBuscar])
+  const buscando = aberto && podeBuscar && carregando
+  const sugestoes = resultado
 
   const vincular = async (corpo: Record<string, unknown>) => {
     setSalvando(true); setErro(null)
@@ -74,7 +87,7 @@ export function CartorioOrgaoField({
   }
 
   const aMapear = !!q && orgaoId == null
-  const semResultado = aberto && !buscando && q.length >= 2 && sugestoes.length === 0
+  const semResultado = aberto && !buscando && podeBuscar && sugestoes.length === 0
 
   return (
     <div className="col-span-2 relative">
@@ -99,13 +112,13 @@ export function CartorioOrgaoField({
           value={texto}
           onChange={(e) => { onTextoChange(e.target.value); setAberto(true) }}
           onFocus={() => setAberto(true)}
-          placeholder="Buscar cartório por nome, cidade ou UF…"
+          placeholder={cidadeSel ? `Buscar cartório em ${cidadeSel}…` : "Buscar cartório por nome, cidade ou UF…"}
           className="w-full pl-8 pr-8 py-2 text-[13px] rounded-md bg-[var(--surface-secondary)] border border-[var(--border-default)] text-[var(--text-primary)]"
         />
         {buscando && <Loader2 className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 animate-spin" />}
       </div>
 
-      {aberto && q.length >= 2 && (
+      {aberto && podeBuscar && (
         <div className="absolute left-0 right-0 mt-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-lg max-h-64 overflow-y-auto" style={{ zIndex: LAYER.popover }}>
           {sugestoes.map((o) => (
             <button key={`${o.origem}-${o.id}`} type="button" disabled={salvando} data-testid="cartorio-sugestao"

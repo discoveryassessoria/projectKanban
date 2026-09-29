@@ -51,25 +51,36 @@ export interface OrgaoBusca {
  * nunca foi ligada a esta busca — "santos" sempre voltava vazio, para QUALQUER
  * cartório brasileiro, não só Santos.
  */
-export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; limit?: number } = {}): Promise<OrgaoBusca[]> {
+export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidade?: string; limit?: number } = {}): Promise<OrgaoBusca[]> {
   const termos = norm(q).split(" ").filter(Boolean)
-  if (termos.length === 0) return []
   const uf = ufDe(opts.uf)
+  const cidade = (opts.cidade ?? "").trim()
+  if (termos.length === 0 && !cidade) return []
   const limit = Math.min(50, Math.max(1, opts.limit ?? 15))
+
+  // Cidade já escolhida na LOCALIDADE do documento (achado ao vivo, 29/09/2026:
+  // buscar sem escopo de cidade deixava "santos" competir com "Brejo dos
+  // Santos"/"Osasco" nacionalmente) — quando vem, é filtro DURO, não mais um
+  // termo de texto que o nome pode ou não bater; o texto livre passa a filtrar
+  // só nome/fantasia/tipo DENTRO daquela cidade.
+  const filtroOrgao = termos.map((t) => ({
+    OR: [
+      { name: { contains: t, mode: "insensitive" as const } },
+      { nomeFantasia: { contains: t, mode: "insensitive" as const } },
+      { type: { contains: t, mode: "insensitive" as const } },
+      ...(cidade ? [] : [
+        { city: { contains: t, mode: "insensitive" as const } },
+        { state: { contains: t, mode: "insensitive" as const } },
+      ]),
+    ],
+  }))
 
   const rows = await db.orgaoProtocolo.findMany({
     where: {
       ativo: true,
       ...(uf ? { state: { equals: uf, mode: "insensitive" as const } } : {}),
-      AND: termos.map((t) => ({
-        OR: [
-          { name: { contains: t, mode: "insensitive" as const } },
-          { nomeFantasia: { contains: t, mode: "insensitive" as const } },
-          { city: { contains: t, mode: "insensitive" as const } },
-          { state: { contains: t, mode: "insensitive" as const } },
-          { type: { contains: t, mode: "insensitive" as const } },
-        ],
-      })),
+      ...(cidade ? { city: { equals: cidade, mode: "insensitive" as const } } : {}),
+      ...(filtroOrgao.length ? { AND: filtroOrgao } : {}),
     },
     select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { countryLabel: true } } },
     take: 200,
@@ -84,17 +95,21 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; limit
   // promovido (mesma régua de `acharDuplicado`, só que em memória).
   const jaCadastrado = new Set(cadastrados.map((o) => `${norm(o.name)}|${norm(o.city)}`))
 
+  const filtroCartorio = termos.map((t) => ({
+    OR: [
+      { nome: { contains: t, mode: "insensitive" as const } },
+      ...(cidade ? [] : [
+        { municipio: { contains: t, mode: "insensitive" as const } },
+        { uf: { contains: t, mode: "insensitive" as const } },
+      ]),
+    ],
+  }))
   const cartRows = await db.cartorio.findMany({
     where: {
       ativo: true,
       ...(uf ? { uf: { equals: uf, mode: "insensitive" as const } } : {}),
-      AND: termos.map((t) => ({
-        OR: [
-          { nome: { contains: t, mode: "insensitive" as const } },
-          { municipio: { contains: t, mode: "insensitive" as const } },
-          { uf: { contains: t, mode: "insensitive" as const } },
-        ],
-      })),
+      ...(cidade ? { municipio: { equals: cidade, mode: "insensitive" as const } } : {}),
+      ...(filtroCartorio.length ? { AND: filtroCartorio } : {}),
     },
     select: { id: true, nome: true, municipio: true, uf: true },
     take: 200,
