@@ -28,7 +28,7 @@
 import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
-import { dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
+import { dispensarNecessidade, reativarNecessidade, MOTIVO_DOCUMENTO_DISPENSADO } from "@/src/services/necessidade-documental"
 
 const MARCA = "DISPTASK"
 
@@ -252,11 +252,18 @@ async function main() {
     data: { processoId: proc7.id, faseMacroKey: "genealogia", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-C7-${proc7.id}` },
     select: { id: true },
   })
-  // O par duplicado: mesma (workflowInstanceId, stepKey, ciclo, documentoId), chaveIdempotencia divergente — a assinatura exata do bug.
+  // O par duplicado, já CANCELADO — depois do índice único parcial
+  // (PhaseWorkflowStepInstance_unico_por_documento, item 5 do mandato), os dois
+  // NUNCA MAIS podem coexistir ATIVOS ao mesmo tempo (a criação do segundo
+  // levantaria P2002) — então o fixture monta direto o estado que
+  // `reativarNecessidade` precisa saber desfazer: debito histórico (duplicata
+  // de antes da trava, ou de qualquer caminho que ainda a produza) já dispensado,
+  // os dois CANCELADO, um deles com a Tarefa. Mesma (workflowInstanceId, stepKey,
+  // ciclo, documentoId), chaveIdempotencia divergente — a assinatura exata do bug.
   const step7matdoc = await prisma.phaseWorkflowStepInstance.create({
     data: {
       workflowInstanceId: inst7.id, processoId: proc7.id, faseMacroKey: "genealogia", stepKey: "localizar_registro",
-      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "CANCELADO",
       necessidadeId: nec7.id, documentoId: doc7.id, pessoaId: pes7.id, papel: "equipe_documental", slaDays: 5,
       chaveIdempotencia: `matdoc|localizar_registro|nec${nec7.id}|c1`,
     },
@@ -265,30 +272,26 @@ async function main() {
   const step7wfi = await prisma.phaseWorkflowStepInstance.create({
     data: {
       workflowInstanceId: inst7.id, processoId: proc7.id, faseMacroKey: "genealogia", stepKey: "localizar_registro",
-      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "CANCELADO",
       necessidadeId: nec7.id, documentoId: doc7.id, pessoaId: pes7.id, papel: "equipe_documental", slaDays: 5,
       chaveIdempotencia: `wfi${inst7.id}|stepdefX|stepkeylocalizar_registro|stepv1|c1|doc${doc7.id}|nec${nec7.id}`,
     },
     select: { id: true },
   })
-  // A Tarefa real referencia UM dos dois (o que a materialização "canônica" apontou) — o outro fica órfão, exatamente como em produção.
+  await prisma.documento.update({ where: { id: doc7.id }, data: { status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO } })
+  await prisma.necessidadeDocumental.update({ where: { id: nec7.id }, data: { status: "DISPENSADA" } })
+  // A Tarefa real referencia UM dos dois (o que a materialização "canônica" apontou,
+  // ANTES de ser cancelada) — o outro fica órfão, exatamente como em produção —
+  // e ainda carrega o responsável atribuído em lote antes da dispensa.
   const tarefa7 = await prisma.tarefa.create({
     data: {
       titulo: "Certidão C7", processoId: proc7.id, pessoaId: pes7.id, necessidadeId: nec7.id, documentoId: doc7.id,
       workflowInstanceId: inst7.id, workflowStepInstanceId: step7matdoc.id, faseMacroKey: "genealogia",
-      statusTarefa: "NAO_INICIADA", prioridade: "MEDIA", origem: "RECONCILIADOR",
+      statusTarefa: "CANCELADA", prioridade: "MEDIA", origem: "RECONCILIADOR",
       responsavelId: usr7.id, atribuidoPorId: usr7.id, dataAtribuicao: new Date(),
     },
     select: { id: true },
   })
-
-  await dispensarNecessidade(nec7.id, "teste: dedup de duplicata na reativação")
-  const step7matdocPosDispensa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7matdoc.id }, select: { status: true } })
-  const step7wfiPosDispensa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7wfi.id }, select: { status: true } })
-  ok("7a) dispensa cancela OS DOIS duplicados", step7matdocPosDispensa.status === "CANCELADO" && step7wfiPosDispensa.status === "CANCELADO")
-  const tarefa7PosDispensa = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefa7.id }, select: { responsavelId: true } })
-  ok("7b) cancelamento PRESERVA o responsável (histórico intacto)", tarefa7PosDispensa.responsavelId === usr7.id)
-
   await reativarNecessidade(nec7.id)
   const step7matdocPosReativa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7matdoc.id }, select: { status: true } })
   const step7wfiPosReativa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7wfi.id }, select: { status: true } })
