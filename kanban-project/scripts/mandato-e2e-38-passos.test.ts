@@ -31,7 +31,8 @@ import type { Prisma } from "@prisma/client"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
-import { atribuirTarefa, avisarAcontecimentosOperacionais } from "@/lib/operacional/tarefa-comandos"
+import { atribuirTarefa } from "@/lib/operacional/tarefa-comandos"
+import { avaliarPrecisaAgir } from "@/lib/operacional/avisos-sino"
 import { minhaFila, visaoGerencial, dossieDaTarefa } from "@/lib/operacional/tarefa-projecoes"
 import { estadoTemporalDaOperacao } from "@/lib/operacional/proximo-acontecimento"
 import { resolverAlvoDaTarefa, urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
@@ -377,7 +378,13 @@ async function main() {
   ok("3) atribuição aceita", atrib.ok === true, JSON.stringify(atrib))
   const tAposAtrib = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefaId } })
   ok("3) responsavelId = Daniela", tAposAtrib.responsavelId === daniela.id)
-  ok("3) notificação de atribuição criada", (await prisma.notificacaoOperacional.count({ where: { tarefaId, tipo: "ATRIBUICAO" } })) === 1)
+  // CONTRATO NOVO (sino agrupado, 29/09/2026): o aviso é da (pessoa, família, tipo) e lista as
+  // tarefas em `tarefaIds` (o `tarefaId` por tarefa só existe no legado).
+  const avisosDaTarefa = (tipo: string) =>
+    prisma.notificacaoOperacional.findMany({ where: { tarefaIds: { has: tarefaId }, tipo, agrupado: true } })
+  const avisosDeAtribuicao = await avisosDaTarefa("CHEGOU_TRABALHO")
+  const chegouAvisado = avisosDeAtribuicao.length === 1 && avisosDeAtribuicao[0].destinatarioId === daniela.id
+  ok("3) notificação de atribuição criada (CHEGOU_TRABALHO da Daniela)", chegouAvisado)
 
   // ==========================================================================
   secao("4) VALIDAR MINHA OPERAÇÃO (fila do responsável, 1 linha, com deep-link)")
@@ -515,8 +522,11 @@ async function main() {
   const { linhas: linhas17 } = await visaoGerencial({ processoId: processo.id }, new Date())
   const retornosRecebidos = linhas17.filter((l) => l.retornoRecebido === true)
   ok("17) aparece no filtro 'retornos recebidos'", retornosRecebidos.some((l) => l.taskId === tarefaId))
-  const avisoRetorno = await avisarAcontecimentosOperacionais()
-  ok("17) notificação de retorno de terceiro gerada", (await prisma.notificacaoOperacional.count({ where: { tarefaId, tipo: "RETORNO_TERCEIRO" } })) === 1, JSON.stringify(avisoRetorno.retorno))
+  // "retorno recebido" agora é COBRANÇA dentro do PRECISA_AGIR da (pessoa, família).
+  const avisoRetorno = await avaliarPrecisaAgir({ modo: "FOTO" })
+  const avisosRetorno = (await avisosDaTarefa("PRECISA_AGIR")).filter((n) => ((n.resumo ?? {}) as { cobrancas?: number[] }).cobrancas?.includes(tarefaId) === true)
+  const retornoAvisado = avisosRetorno.length === 1 && avisosRetorno[0].destinatarioId === daniela.id
+  ok("17) notificação de retorno de terceiro gerada (cobrança no PRECISA_AGIR da Daniela)", retornoAvisado, JSON.stringify({ criados: avisoRetorno.criados, atualizados: avisoRetorno.atualizados }))
 
   // ==========================================================================
   secao("18) CONFIRMAÇÃO/PROTOCOLO (campos do pedido preenchidos)")
@@ -711,11 +721,13 @@ async function main() {
   // ==========================================================================
   secao("35) NOTIFICAÇÕES (geradas nos pontos certos)")
   // ==========================================================================
-  const notifsTodas = await prisma.notificacaoOperacional.findMany({ where: { tarefaId } })
-  ok("35) notificação de ATRIBUICAO existe", notifsTodas.some((n) => n.tipo === "ATRIBUICAO"))
-  ok("35) notificação de RETORNO_TERCEIRO existe (do passo 17)", notifsTodas.some((n) => n.tipo === "RETORNO_TERCEIRO"))
-  ok("35) nenhuma notificação duplicada do mesmo tipo+destinatário (idempotência)",
-    notifsTodas.filter((n) => n.tipo === "ATRIBUICAO").length === 1 && notifsTodas.filter((n) => n.tipo === "RETORNO_TERCEIRO").length === 1)
+  // Contrato novo: com a Tarefa CONCLUÍDA ela já saiu de todos os avisos abertos (não fica
+  // aviso de trabalho que não existe mais); os avisos dos passos 3 e 17 foram provados na hora.
+  const notifsTodas = await prisma.notificacaoOperacional.findMany({ where: { tarefaIds: { has: tarefaId }, agrupado: true } })
+  ok("35) notificação de atribuição (CHEGOU_TRABALHO) existiu no passo 3", chegouAvisado)
+  ok("35) notificação de retorno (cobrança no PRECISA_AGIR) existiu no passo 17", retornoAvisado)
+  ok("35) nenhuma notificação duplicada do mesmo tipo+destinatário (idempotência) e nenhuma sobra para a Tarefa concluída",
+    notifsTodas.length === 0)
 
   // ==========================================================================
   secao("36) MINHA OPERAÇÃO (a Tarefa sai da fila, aparece concluída/fora da atenção)")

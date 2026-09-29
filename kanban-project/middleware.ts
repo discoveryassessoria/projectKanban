@@ -80,6 +80,8 @@ const API_PUBLICA: string[] = [
   // `vercel.json` esteja aqui, para não haver uma quarta vez.
   "/api/cron/saude",
   "/api/cron/avisos-prazo",
+  // Resumo diário do sino (07:00 SP). Auto-verifica: x-vercel-cron, CRON_SECRET ou operador.
+  "/api/cron/resumo-diario",
   "/api/cron/reconciliar-fases",
   "/api/cron/outbox",
   // Auto-verifica (x-vercel-cron ou CRON_SECRET) — mesma régua dos três acima.

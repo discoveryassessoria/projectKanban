@@ -24,6 +24,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { concluirEtapa } from "@/lib/operacional/tarefa-etapa"
 import { atribuirTarefa } from "@/lib/operacional/tarefa-comandos"
+import { avisosDoSino } from "@/lib/operacional/notificacao-canonica"
 
 const MARCA = "PROCGLOBAL"
 const PASSOS = ["preparar", "comparar", "registrar", "classificar", "concluir"]
@@ -44,7 +45,10 @@ async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
   const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefaId: { in: ts.map((t) => t.id) } } })
+  const usersLimpeza = await prisma.usuario.findMany({ where: { email: { endsWith: "@procglobal.test" } }, select: { id: true } })
+  await prisma.notificacaoOperacional.deleteMany({
+    where: { OR: [{ tarefaId: { in: ts.map((t) => t.id) } }, { processoId: { in: ids } }, { destinatarioId: { in: usersLimpeza.map((u) => u.id) } }] },
+  })
   await prisma.logAuditoria.deleteMany({ where: { entidade: "Tarefa", entidadeId: { in: ts.map((t) => t.id) } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
@@ -107,6 +111,11 @@ const ler = (id: number) =>
     },
   })
 
+// Sino agrupado: UM aviso não lido por (destinatário, família=processo, tipo). "Notificações" da
+// Tarefa = avisos da Daniela nesta família.
+const avisosDaFamilia = (processoId: number, destinatarioId: number) =>
+  prisma.notificacaoOperacional.findMany({ where: { processoId, destinatarioId, agrupado: true }, orderBy: { id: "asc" } })
+
 const stepDe = (id: number) => prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id }, select: { id: true, stepKey: true, status: true } })
 
 async function main() {
@@ -120,8 +129,10 @@ async function main() {
   const dataAtribuicaoOriginal = antes.dataAtribuicao
   ok("A) dataAtribuicao gravada", dataAtribuicaoOriginal != null)
   ok("A) aponta pro passo 1 (DISPONIVEL)", antes.workflowStepInstanceId === p.stepIds[0])
-  const notifsIniciais = await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId } })
-  ok("A) 1 notificação de atribuição", notifsIniciais === 1, `${notifsIniciais}`)
+  const avisosIniciais = await avisosDaFamilia(p.processoId, p.danielaId)
+  ok("A) 1 aviso de atribuição (CHEGOU_TRABALHO da família, cobrindo esta Tarefa)",
+    avisosIniciais.length === 1 && avisosIniciais[0].tipo === "CHEGOU_TRABALHO" && avisosIniciais[0].tarefaIds.includes(p.tarefaId), `${avisosIniciais.length}`)
+  const idAvisoInicial = avisosIniciais[0]?.id
 
   secao("B) Concluir passo 1 de 5 — Tarefa deve REANCORAR no passo 2, não perder o ponteiro")
   const r1 = await concluirEtapa({ tarefaId: p.tarefaId, autorId: p.autorId })
@@ -134,8 +145,8 @@ async function main() {
   ok("B) dataAtribuicao NÃO recriada", depois1.dataAtribuicao?.getTime() === dataAtribuicaoOriginal?.getTime())
   ok("B) dataPrazo preservado", depois1.dataPrazo?.getTime() === p.dataPrazoOriginal.getTime())
   ok("B) tarefa continua EM_ANDAMENTO, não concluída", depois1.statusTarefa !== "CONCLUIDO_RECEBIDO" && !depois1.concluida)
-  const notifsDepois1 = await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId } })
-  ok("B) NENHUMA notificação nova (só a de atribuição)", notifsDepois1 === 1, `${notifsDepois1}`)
+  const avisosDepois1 = await avisosDaFamilia(p.processoId, p.danielaId)
+  ok("B) NENHUM aviso novo (só o de atribuição)", avisosDepois1.length === 1 && avisosDepois1[0].id === idAvisoInicial, `${avisosDepois1.length}`)
   const tarefasDoProcesso1 = await prisma.tarefa.count({ where: { processoId: p.processoId } })
   ok("B) continua sendo 1 única Tarefa (sem duplicar)", tarefasDoProcesso1 === 1)
 
@@ -147,8 +158,8 @@ async function main() {
   if (r1retry.ok) ok("C) retry reconhece 'já estava concluída'", r1retry.jaEstavaConcluida === true)
   const depoisRetry = await ler(p.tarefaId)
   ok("C) ponteiro não regrediu com o retry", depoisRetry.workflowStepInstanceId === p.stepIds[1])
-  const notifsDepoisRetry = await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId } })
-  ok("C) retry não gerou notificação nova", notifsDepoisRetry === 1, `${notifsDepoisRetry}`)
+  const avisosDepoisRetry = await avisosDaFamilia(p.processoId, p.danielaId)
+  ok("C) retry não gerou aviso novo", avisosDepoisRetry.length === 1 && avisosDepoisRetry[0].id === idAvisoInicial, `${avisosDepoisRetry.length}`)
 
   secao("D) Concluir passos 2, 3 e 4 — reancoragem se repete a cada avanço")
   const r2 = await concluirEtapa({ tarefaId: p.tarefaId, autorId: p.autorId })
@@ -178,8 +189,14 @@ async function main() {
   ok("E) workflowStepInstanceId=null é CORRETO aqui (não há passo 6)", depois5.workflowStepInstanceId === null)
   ok("E) responsavelId continua sendo o de sempre", depois5.responsavelId === p.danielaId)
   ok("E) MESMO Tarefa.id do início ao fim", depois5.id === p.tarefaId)
-  const notifsFinal = await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId } })
-  ok("E) nenhuma notificação nova em nenhuma das 5 conclusões", notifsFinal === 1, `${notifsFinal}`)
+  // Concluir a Tarefa tira ela dos avisos na hora: o de atribuição pode ter saído, mas nenhuma
+  // conclusão pode ter criado aviso NOVO (nem de outro tipo, nem outra linha do mesmo).
+  const avisosFinal = await avisosDaFamilia(p.processoId, p.danielaId)
+  ok("E) nenhum aviso novo em nenhuma das 5 conclusões",
+    avisosFinal.every((a) => a.id === idAvisoInicial && a.tipo === "CHEGOU_TRABALHO") && avisosFinal.length <= 1, `${avisosFinal.length}`)
+  // O que a pessoa VÊ vem de `avisosDoSino` (que retira da lista a Tarefa que já não vale).
+  const sinoFinal = await avisosDoSino(prisma, p.danielaId)
+  ok("E) o sino da Daniela já não mostra a Tarefa concluída", sinoFinal.naoLidos.every((a) => a.familiaId !== p.processoId), `${sinoFinal.total}`)
   const tarefasFinal = await prisma.tarefa.count({ where: { processoId: p.processoId } })
   ok("E) continua sendo 1 única Tarefa do início ao fim", tarefasFinal === 1)
   const logsFinal = await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: p.tarefaId, acao: { in: ["TAREFA_ETAPA_CONCLUIDA", "TAREFA_ETAPA_CONCLUIDA_E_TAREFA_CONCLUIDA"] } } })

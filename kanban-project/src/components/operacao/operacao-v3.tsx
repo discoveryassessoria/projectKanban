@@ -14,8 +14,8 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
-import { urlArvoreDoProcesso } from "@/lib/operacional/navegacao"
+import { useRouter, useSearchParams } from "next/navigation"
+import { urlArvoreDoProcesso, ABAS_DA_OPERACAO, type AbaDaOperacao } from "@/lib/operacional/navegacao"
 import { auth } from "./kit-operacional"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
@@ -65,11 +65,53 @@ function useOperacaoV3Dados() {
 // ── TIPO DE ABA ──────────────────────────────────────────────────────────
 type Tab = "fila" | "aguard" | "acomp" | "fam" | "radar" | "feito"
 
+// DEEP-LINK DO SINO (redesenho 29/09/2026): `?processo=<id>&aba=<aba>`. As abas da URL são
+// as do contrato de `navegacao.ts`; a tela guarda chaves curtas internas.
+const ABA_DA_URL: Record<AbaDaOperacao, Tab> = {
+  fila: "fila", aguardando: "aguard", acompanhamento: "acomp", familias: "fam", radar: "radar", feito: "feito",
+}
+const abaDaUrl = (v: string | null): Tab | null =>
+  v != null && (ABAS_DA_OPERACAO as readonly string[]).includes(v) ? ABA_DA_URL[v as AbaDaOperacao] : null
+const processoDaUrl = (v: string | null): number | null => {
+  const n = Number(v)
+  return v != null && Number.isInteger(n) && n > 0 ? n : null
+}
+
+/** As tarefas "novas" da família: as do último aviso CHEGOU_TRABALHO (lido ou não). */
+function useNovasDaFamilia(processoId: number | null): Set<number> {
+  const [estado, setEstado] = useState<{ processoId: number; ids: number[] } | null>(null)
+  useEffect(() => {
+    if (processoId == null) return
+    let vivo = true
+    fetch(`/api/operacao/novas?processo=${processoId}`, { headers: auth() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d: { tarefaIds: number[] }) => { if (vivo) setEstado({ processoId, ids: d.tarefaIds }) })
+      .catch(() => { if (vivo) setEstado({ processoId, ids: [] }) })
+    return () => { vivo = false }
+  }, [processoId])
+  return useMemo(() => new Set(estado && estado.processoId === processoId ? estado.ids : []), [estado, processoId])
+}
+
 export function OperacaoV3() {
   const usuario = useJsonLocalStorage<{ nome?: string }>("user")
+  const router = useRouter()
   const dados = useOperacaoV3Dados()
 
-  const [tab, setTab] = useState<Tab>("fila")
+  const params = useSearchParams()
+  const [tab, setTab] = useState<Tab>(() => abaDaUrl(params.get("aba")) ?? "fila")
+  // A FAMÍLIA vinda do sino (`?processo=`) é lida DIRETO da URL (a URL é a fonte): filtra a
+  // tela inteira até a pessoa tirar o chip (que limpa a query).
+  const processoFiltro = processoDaUrl(params.get("processo"))
+  // O sino navega para a MESMA rota trocando só a query — a tela não remonta, então a aba
+  // da URL nova entra no estado aqui (ajuste durante a renderização, sem efeito).
+  const paramsChave = params.toString()
+  const [paramsAplicados, setParamsAplicados] = useState(paramsChave)
+  if (paramsAplicados !== paramsChave) {
+    setParamsAplicados(paramsChave)
+    const aba = abaDaUrl(params.get("aba"))
+    if (aba) setTab(aba)
+  }
+  const novasIds = useNovasDaFamilia(processoFiltro)
   const [sel, setSel] = useState<Record<number, true>>({})
   const [drawerTaskId, setDrawerTaskId] = useState<number | null>(null)
   const [group, setGroup] = useState<AgruparFilaPor>("pessoa")
@@ -83,7 +125,6 @@ export function OperacaoV3() {
   const [aguardPor, setAguardPor] = useState<"familia" | "orgao">("familia")
   const [acompDepois, setAcompDepois] = useState(false)
   const [focus, setFocus] = useState<number | null>(null)
-  const [notifOpen, setNotifOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [transversalProcessoId, setTransversalProcessoId] = useState<number | null>(null)
   const [contatoModal, setContatoModal] = useState<{ tipo: "unica"; taskId: number } | { tipo: "lote"; ids: number[] } | null>(null)
@@ -100,9 +141,18 @@ export function OperacaoV3() {
 
   // ── FILTROS (vista → busca → quick/radar) ────────────────────────────
   const todos = useMemo(() => {
-    const base = dados.abertos ?? []
+    const base = (dados.abertos ?? []).filter((l) => processoFiltro == null || l.processoId === processoFiltro)
     return aplicarBusca(aplicarVista(base, vista), busca)
-  }, [dados.abertos, vista, busca])
+  }, [dados.abertos, vista, busca, processoFiltro])
+  const feitoVisivel = useMemo(
+    () => (dados.feito ?? []).filter((l) => processoFiltro == null || l.processoId === processoFiltro),
+    [dados.feito, processoFiltro],
+  )
+  const nomeDaFamiliaFiltrada = useMemo(() => {
+    if (processoFiltro == null) return null
+    const l = [...(dados.abertos ?? []), ...(dados.feito ?? [])].find((x) => x.processoId === processoFiltro)
+    return l ? (l.familiaNome ?? l.processoNome ?? "família") : "família"
+  }, [dados.abertos, dados.feito, processoFiltro])
 
   const abertosVisiveis = useMemo(() => todos.filter((l) => l.estadoOperacao !== "CONCLUIDA"), [todos])
   const filaBase = useMemo(() => abertosVisiveis.filter((l) => l.estadoOperacao === "FILA"), [abertosVisiveis])
@@ -135,27 +185,15 @@ export function OperacaoV3() {
     let f = filaBase.filter(qf)
     if (radar === "noorg") f = f.filter((l) => l.aIniciar && !l.terceiroNome && l.faseMacroKey !== "genealogia")
     if (radar === "faseant") f = f.filter((l) => l.faseMacroKey === "genealogia")
+    // As NOVAS (último aviso "chegou trabalho") sobem ao topo; o resto mantém a ordem.
+    if (novasIds.size) f = [...f].sort((a, b) => Number(novasIds.has(b.taskId)) - Number(novasIds.has(a.taskId)))
     return f
-  }, [filaBase, qf, radar])
+  }, [filaBase, qf, radar, novasIds])
   const aguard = useMemo(() => aguardBase.filter(qf), [aguardBase, qf])
 
   const nFam = useMemo(() => new Set(abertosVisiveis.map((l) => l.familiaNome ?? l.processoNome ?? "—")).size, [abertosVisiveis])
   const nRadar = (atras.length ? 1 : 0) + (acompVenc.length ? 1 : 0) + (decis.length ? 1 : 0) + (noOrg.length ? 1 : 0) + (genOpen.length ? 1 : 0) + 1
 
-  const notifs = useMemo(() => {
-    const itens: Array<{ tag: string; cls: string; txt: string; go: () => void }> = []
-    for (const l of acompVenc.slice(0, 3)) {
-      itens.push({ tag: "Acomp. vencido", cls: "opv3-p-amb", txt: `${passoLabelDe(l).label} · ${l.titulo} · ${l.pessoaNome ?? "—"} · ${l.familiaNome ?? "—"}`, go: () => { setNotifOpen(false); setDrawerTaskId(l.taskId) } })
-    }
-    for (const l of atras.slice(0, 2)) {
-      itens.push({ tag: "Atrasada", cls: "opv3-p-red", txt: `${l.titulo} · ${l.pessoaNome ?? "—"} · ${l.familiaNome ?? "—"} · ${l.rotuloDoPrazo}`, go: () => { setNotifOpen(false); setDrawerTaskId(l.taskId) } })
-    }
-    for (const l of decis.slice(0, 1)) {
-      itens.push({ tag: "Escalada", cls: "opv3-p-red", txt: `${l.terceiroNome ?? "órgão"} não responde após ${l.totalCobrancas} cobranças · ${l.familiaNome ?? "—"}`, go: () => { setNotifOpen(false); setDrawerTaskId(l.taskId) } })
-    }
-    if (noOrg.length) itens.push({ tag: "Bloqueio", cls: "opv3-p-red", txt: `${noOrg.length} certidões sem órgão emissor`, go: () => { setNotifOpen(false); setTab("fila"); setRadar("noorg") } })
-    return itens
-  }, [acompVenc, atras, decis, noOrg])
 
   const linhaPorId = useMemo(() => new Map(todos.map((l) => [l.taskId, l])), [todos])
   const drawerLinha = drawerTaskId != null ? linhaPorId.get(drawerTaskId) ?? null : null
@@ -273,24 +311,15 @@ export function OperacaoV3() {
           <button className="opv3-kpi" onClick={() => irPara("fam")} style={{ textAlign: "left" }}>
             <b>{abertosVisiveis.length}</b><span>Abertas</span>
           </button>
-          <button className="opv3-btn" onClick={() => setNotifOpen((v) => !v)} aria-label="Notificações operacionais" style={{ minWidth: 44, position: "relative" }}>
-            🔔 <span className="opv3-pill opv3-p-red" style={{ padding: "0 6px" }}>{notifs.length}</span>
-          </button>
         </div>
       </header>
 
-      {notifOpen && (
-        <div className="opv3-card" style={{ position: "absolute", right: 4, top: 70, width: 400, zIndex: 20, boxShadow: "0 12px 32px rgba(11,31,75,.18)" }}>
-          <div style={{ padding: "10px 14px", fontWeight: 700, borderBottom: "1px solid #edf0f5", display: "flex", justifyContent: "space-between" }}>
-            <span>Notificações operacionais</span>
-            <button className="opv3-btn opv3-sm" onClick={() => setNotifOpen(false)}>✕</button>
-          </div>
-          {notifs.length === 0 && <div style={{ padding: 14, fontSize: 12, color: "#5b6478" }}>Nada pendente.</div>}
-          {notifs.map((n, i) => (
-            <button key={i} onClick={n.go} style={{ display: "block", width: "100%", textAlign: "left", border: 0, background: "transparent", padding: "10px 14px", borderBottom: "1px solid #edf0f5", fontSize: 12, cursor: "pointer" }}>
-              <span className={`opv3-pill ${n.cls}`}>{n.tag}</span> {n.txt}
-            </button>
-          ))}
+      {processoFiltro != null && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 24px", background: "#eef3fb", borderBottom: "1px solid #dfe4ee", fontSize: 12 }}>
+          <span className="opv3-pill opv3-p-gry">Família</span>
+          <b>{nomeDaFamiliaFiltrada}</b>
+          {novasIds.size > 0 && <span className="opv3-pill opv3-p-amb">{novasIds.size} {novasIds.size === 1 ? "nova" : "novas"}</span>}
+          <button className="opv3-btn opv3-sm" onClick={() => router.replace("/operacao")}>✕ Ver toda a operação</button>
         </div>
       )}
 
@@ -301,7 +330,7 @@ export function OperacaoV3() {
         <button className={`opv3-tab ${tab === "acomp" ? "on" : ""}`} onClick={() => irPara("acomp")}>Acompanhamento <span className="opv3-n opv3-warn">{acompVenc.length} vencidos</span></button>
         <button className={`opv3-tab ${tab === "fam" ? "on" : ""}`} onClick={() => irPara("fam")}>Famílias <span className="opv3-n">{nFam}</span></button>
         <button className={`opv3-tab ${tab === "radar" ? "on" : ""}`} onClick={() => irPara("radar")}>Radar <span className="opv3-n">{nRadar}</span></button>
-        <button className={`opv3-tab ${tab === "feito" ? "on" : ""}`} onClick={() => irPara("feito")}>Feito <span className="opv3-n">{(dados.feito ?? []).length}</span></button>
+        <button className={`opv3-tab ${tab === "feito" ? "on" : ""}`} onClick={() => irPara("feito")}>Feito <span className="opv3-n">{feitoVisivel.length}</span></button>
         <div style={{ flexGrow: 1 }} />
         <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0" }}>
           <label className="opv3-field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -343,6 +372,7 @@ export function OperacaoV3() {
               }}
               onNaoLigado={naoLigado}
               onVerFamilia={(fam) => { setTab("fam"); setFamOpen({ fam, estagio: "iniciar" }); setFamUltimo((m) => ({ ...m, [fam]: "iniciar" })) }}
+              novasIds={novasIds}
             />
           )}
           {tab === "aguard" && (
@@ -368,7 +398,7 @@ export function OperacaoV3() {
           )}
           {tab === "fam" && (
             <AbaFamilias
-              abertos={abertosVisiveis} feito={dados.feito ?? []}
+              abertos={abertosVisiveis} feito={feitoVisivel}
               famOpen={famOpen} setFamOpen={setFamOpen} famUltimo={famUltimo} setFamUltimo={setFamUltimo}
               onAbrir={(id) => setDrawerTaskId(id)} onNaoLigado={naoLigado}
             />
@@ -385,7 +415,7 @@ export function OperacaoV3() {
             />
           )}
           {tab === "feito" && (
-            <AbaFeito linhas={dados.feito ?? []} col={col} setCol={setCol} onAbrir={(id) => setDrawerTaskId(id)} />
+            <AbaFeito linhas={feitoVisivel} col={col} setCol={setCol} onAbrir={(id) => setDrawerTaskId(id)} />
           )}
         </section>
 
@@ -468,7 +498,7 @@ export function OperacaoV3() {
 function AbaFila({
   linhas, todasSelecionaveis, todosAbertos, group, setGroup, radar, clearRadar, quick, clearQuick,
   sel, setSel, col, setCol, nAguard, nAcompVenc, noOrgTotal,
-  onAbrir, onIniciarFoco, onIniciarSelecionadas, onVincularTodos, onAddTransversal, onNaoLigado, onVerFamilia,
+  onAbrir, onIniciarFoco, onIniciarSelecionadas, onVincularTodos, onAddTransversal, onNaoLigado, onVerFamilia, novasIds,
 }: {
   linhas: LinhaOperacaoV3[]
   todasSelecionaveis: LinhaOperacaoV3[]
@@ -497,6 +527,8 @@ function AbaFila({
   onAddTransversal: () => void
   onNaoLigado: () => void
   onVerFamilia: (fam: string) => void
+  /** Tarefas do último aviso "chegou trabalho" — ganham a pílula "Nova". */
+  novasIds: Set<number>
 }) {
   const familias = useMemo(() => agruparPorFamilia(linhas), [linhas])
   const statsPorFamilia = useMemo(() => {
@@ -584,7 +616,7 @@ function AbaFila({
               <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(F.fam)}>Ver família</button>
             </div>
             {aberta && grupos.map((g) => (
-              <GrupoFila key={g.chave} grupo={g} col={col} setCol={setCol} sel={sel} toggleLinha={toggleLinha} toggleGrupo={toggleGrupo} onAbrir={onAbrir} onVincular={(id) => onVincularTodos([id])} famKey={F.fam} />
+              <GrupoFila key={g.chave} grupo={g} col={col} setCol={setCol} sel={sel} toggleLinha={toggleLinha} toggleGrupo={toggleGrupo} onAbrir={onAbrir} onVincular={(id) => onVincularTodos([id])} famKey={F.fam} novasIds={novasIds} />
             ))}
           </div>
         )
@@ -593,7 +625,7 @@ function AbaFila({
   )
 }
 
-function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir, onVincular, famKey }: {
+function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir, onVincular, famKey, novasIds }: {
   grupo: GrupoDeLinhas
   col: Record<string, true>
   setCol: (c: Record<string, true>) => void
@@ -603,6 +635,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
   onAbrir: (id: number) => void
   onVincular: (taskId: number) => void
   famKey: string
+  novasIds: Set<number>
 }) {
   const router = useRouter()
   const ck = `fila|${famKey}|${grupo.chave}`
@@ -640,7 +673,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
             return (
               <div key={t.taskId} className={`opv3-row opv3-gF ${sel[t.taskId] ? "opv3-sel" : ""}`}>
                 <button className={`opv3-chk ${sel[t.taskId] ? "on" : ""}`} onClick={() => toggleLinha(t.taskId)} aria-label="Selecionar" />
-                <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
+                <div style={{ fontWeight: 600 }}>{novasIds.has(t.taskId) && <span className="opv3-pill opv3-p-amb" style={{ marginRight: 6 }}>Nova</span>}{docTipoTxt(t)}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
                 <div>
                   {t.pessoaId != null && t.processoId != null ? (
                     <a href={urlArvoreDoProcesso(t.processoId, t.pessoaId)} style={{ color: "inherit", textDecoration: "underline" }} onClick={(e) => e.stopPropagation()}>

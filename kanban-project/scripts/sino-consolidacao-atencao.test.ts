@@ -1,30 +1,27 @@
 // scripts/sino-consolidacao-atencao.test.ts
 // ============================================================================
-// CONSOLIDAÇÃO DO SINO — mandato 19/09/2026 (fechamento do item 9 pendente na
-// validação pós-deploy). Prova, com dado real materializado (não mock):
+// CONSOLIDAÇÃO DO SINO — mandato 19/09/2026, reescrito para o sino AGRUPADO
+// (redesenho de 29/09/2026). Prova, com dado real materializado (não mock):
 //
-//   1) PRAZO_TAREFA_VENCIDO isolado continua pelo dono de sempre
-//      (`avisarPrazosEAtrasos`, tipo ATRASO) — formato de chave INALTERADO,
-//      nenhuma regressão nos testes que já dependem dele.
+//   1) PRAZO_TAREFA_VENCIDO isolado vira "<Família> — 1 vencida" no PRECISA_AGIR.
 //   2) ACOMPANHAMENTO_DEVIDO isolado, vindo SÓ do relógio novo da subtarefa
-//      (`acompanhamentoPasso`), passa a notificar — antes não tinha dono.
-//   3) TERCEIRO_ATRASADO isolado passa a notificar — dimensão nova, sem dono
-//      antes desta rodada.
-//   4) COLISÃO (cenário F): prazo + acompanhamento + terceiro vencidos na
-//      MESMA Tarefa → EXATAMENTE 1 notificação, com os 3 motivos no payload
-//      — nunca 2 nem 3 notificações. Roda a varredura completa (consolidada
-//      + as duas de sempre, com exclusão), do jeito que o cron real orquestra.
-//   5) Idempotência: rodar tudo de novo não duplica nada.
+//      (`acompanhamentoPasso`), vira "1 cobrança a fazer".
+//   3) TERCEIRO_ATRASADO isolado também vira "1 cobrança a fazer".
+//   4) COLISÃO (cenário F): prazo + acompanhamento + terceiro vencidos na MESMA
+//      Tarefa → EXATAMENTE 1 aviso (por pessoa/família), que cobre UMA tarefa
+//      (contagem 1, nunca 2 nem 3) e diz "1 vencida · 1 cobrança a fazer".
+//      Roda o resumo diário e a varredura horária, do jeito que os crons reais fazem.
+//   5) Idempotência: rodar tudo de novo não duplica nem renotifica nada.
+//   6) Determinismo: a mesma foto em outra ordem de ids é o mesmo aviso (SEM_MUDANCA).
 //
 //   node scripts/mrg-banco-teste.mjs up
 //   PRISMA_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/discovery_test \
 //     npx tsx scripts/sino-consolidacao-atencao.test.ts
 // ============================================================================
 import { PrismaClient } from "@prisma/client"
-import {
-  avisarAtencaoConsolidada, avisarPrazosEAtrasos, avisarAcontecimentosOperacionais,
-  chaveDeAtencaoConsolidada, tipoPrincipalDeAtencao,
-} from "../lib/operacional/tarefa-comandos"
+import { rodarResumoDiario, rodarVarreduraHoraria } from "../lib/operacional/avisos-sino"
+import { gravarFotoDoAviso } from "../lib/operacional/notificacao-canonica"
+import { textoDoAviso, type ResumoDoAviso } from "../lib/operacional/aviso-texto"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 const prisma = new PrismaClient()
@@ -40,7 +37,10 @@ function check(nome: string, cond: boolean, extra?: string) {
 async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: `${M} ` } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefa: { processoId: { in: ids } } } })
+  const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
+  await prisma.notificacaoOperacional.deleteMany({
+    where: { OR: [{ processoId: { in: ids } }, { tarefaId: { in: ts.map((t) => t.id) } }] },
+  })
   await prisma.subtaskExecution.deleteMany({ where: { stepInstance: { processoId: { in: ids } } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
@@ -152,65 +152,77 @@ async function main() {
   const taskT = tarefaPorLetra.get("T")!
   const taskF = tarefaPorLetra.get("F")!
 
-  console.log("1) VARREDURA CONSOLIDADA — quem ela assume e quem ela deixa pro dono de sempre")
-  const consolidada1 = await avisarAtencaoConsolidada({ agora: hoje })
-  check("P (só prazo) NÃO foi assumida pela consolidada — dono de sempre continua",
-    !consolidada1.tarefasConsolidadas.includes(taskP))
-  check("A (só acompanhamento da subtarefa) FOI assumida — dimensão sem dono antes",
-    consolidada1.tarefasConsolidadas.includes(taskA))
-  check("T (só terceiro atrasado) FOI assumida — dimensão nova, sem dono antes",
-    consolidada1.tarefasConsolidadas.includes(taskT))
-  check("F (colisão) FOI assumida", consolidada1.tarefasConsolidadas.includes(taskF))
+  const avisosDe = (processoId: number) =>
+    prisma.notificacaoOperacional.findMany({ where: { processoId }, orderBy: { id: "asc" } })
+  const procDe = async (taskId: number) => (await prisma.tarefa.findUniqueOrThrow({ where: { id: taskId }, select: { processoId: true } })).processoId!
+  const procP = await procDe(taskP), procA = await procDe(taskA), procT = await procDe(taskT), procF = await procDe(taskF)
+  const resumoDe = (a: { resumo: unknown } | undefined) => (a?.resumo ?? {}) as ResumoDoAviso
 
-  console.log("\n2) NOTIFICAÇÕES CRIADAS PELA CONSOLIDADA — 1 por tarefa assumida, motivos certos")
-  const notifA = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: taskA } })
-  check("A: exatamente 1 notificação", notifA.length === 1, `n=${notifA.length}`)
-  check("A: tipo = ACOMPANHAMENTO_VENCIDO", notifA[0]?.tipo === "ACOMPANHAMENTO_VENCIDO")
-  check("A: motivos = [ACOMPANHAMENTO_DEVIDO]", JSON.stringify(notifA[0]?.motivos) === JSON.stringify(["ACOMPANHAMENTO_DEVIDO"]), JSON.stringify(notifA[0]?.motivos))
+  console.log("1) RESUMO DIÁRIO — cada cenário vira o seu texto, na sua família")
+  const dia1 = await rodarResumoDiario({ agora: hoje })
+  void dia1
+  const [avP] = await avisosDe(procP)
+  const [avA] = await avisosDe(procA)
+  const [avT] = await avisosDe(procT)
+  check("P (só prazo vencido): '<Família> — 1 vencida'", avP?.tipo === "PRECISA_AGIR" && avP.titulo.endsWith(" — 1 vencida"), avP?.titulo)
+  check("A (só acompanhamento da subtarefa): '1 cobrança a fazer' — dimensão sem dono antes",
+    avA?.tipo === "PRECISA_AGIR" && avA.titulo.endsWith(" — 1 cobrança a fazer"), avA?.titulo ?? "sem aviso")
+  check("T (só terceiro atrasado): '1 cobrança a fazer' — dimensão nova, sem dono antes",
+    avT?.tipo === "PRECISA_AGIR" && avT.titulo.endsWith(" — 1 cobrança a fazer"), avT?.titulo ?? "sem aviso")
 
-  const notifT = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: taskT } })
-  check("T: exatamente 1 notificação", notifT.length === 1, `n=${notifT.length}`)
-  check("T: tipo = TERCEIRO_ATRASADO", notifT[0]?.tipo === "TERCEIRO_ATRASADO")
-  check("T: motivos = [TERCEIRO_ATRASADO]", JSON.stringify(notifT[0]?.motivos) === JSON.stringify(["TERCEIRO_ATRASADO"]), JSON.stringify(notifT[0]?.motivos))
+  console.log("\n2) AVISOS DE FAMÍLIA — 1 por (pessoa, família), categorias certas no resumo")
+  const notifA = await avisosDe(procA)
+  check("A: exatamente 1 aviso", notifA.length === 1, `n=${notifA.length}`)
+  check("A: destinatário é o responsável e o aviso é agrupado (sem tarefaId)", notifA[0]?.destinatarioId === user.id && notifA[0].agrupado === true && notifA[0].tarefaId == null)
+  check("A: só cobrança (nenhuma vencida)", JSON.stringify(resumoDe(notifA[0]).cobrancas) === JSON.stringify([taskA]) && (resumoDe(notifA[0]).vencidas ?? []).length === 0, JSON.stringify(notifA[0]?.resumo))
+  const notifT = await avisosDe(procT)
+  check("T: exatamente 1 aviso", notifT.length === 1, `n=${notifT.length}`)
+  check("T: só cobrança (nenhuma vencida)", JSON.stringify(resumoDe(notifT[0]).cobrancas) === JSON.stringify([taskT]) && (resumoDe(notifT[0]).vencidas ?? []).length === 0, JSON.stringify(notifT[0]?.resumo))
 
-  console.log("\n3) COLISÃO F — a varredura completa, orquestrada como o cron real (consolidada primeiro, exclusão nas outras duas)")
-  const [prazos, atencao] = await Promise.all([
-    avisarPrazosEAtrasos({ agora: hoje, excluirTarefaIds: consolidada1.tarefasConsolidadas }),
-    avisarAcontecimentosOperacionais({ agora: hoje, excluirTarefaIds: consolidada1.tarefasConsolidadas }),
-  ])
-  check("avisarPrazosEAtrasos não gerou ATRASO para F (excluída)", prazos.previa.every((p) => p.tarefaId !== taskF) && true)
-  check("avisarAcontecimentosOperacionais não gerou nada para F (excluída)", atencao.previa.every((p) => p.tarefaId !== taskF) && true)
+  console.log("\n3) COLISÃO F — prazo + acompanhamento + terceiro na mesma tarefa: UM aviso, UMA tarefa")
+  const hora1 = await rodarVarreduraHoraria({ agora: hoje })
+  const todasDeF = await avisosDe(procF)
+  check("F: EXATAMENTE 1 aviso no total (nunca 2 nem 3)", todasDeF.length === 1, `n=${todasDeF.length} tipos=${todasDeF.map((n) => n.tipo).join(",")}`)
+  const rF = resumoDe(todasDeF[0])
+  check("F: a tarefa está em 'vencidas' (prazo vencido)", (rF.vencidas ?? []).includes(taskF), JSON.stringify(rF))
+  check("F: a tarefa está em 'cobranças' (acompanhamento devido / terceiro atrasado)", (rF.cobrancas ?? []).includes(taskF), JSON.stringify(rF))
+  check("F: cobre UMA tarefa (a mesma em duas categorias não conta em dobro)", todasDeF[0]?.contagem === 1 && todasDeF[0].tarefaIds.length === 1 && todasDeF[0].tarefaIds[0] === taskF, `contagem=${todasDeF[0]?.contagem}`)
+  check("F: texto '<Família> — 1 vencida · 1 cobrança a fazer'", todasDeF[0]?.titulo.endsWith(" — 1 vencida · 1 cobrança a fazer") === true, todasDeF[0]?.titulo)
+  const nomeF = (await prisma.processo.findUniqueOrThrow({ where: { id: procF }, select: { nome: true } })).nome
+  check("F: texto = função pura de (tipo, família, contagem, resumo)",
+    todasDeF[0]?.titulo === textoDoAviso("PRECISA_AGIR", nomeF, { contagem: todasDeF[0].contagem, resumo: rF }))
+  check("F: deep-link único aponta para a aba de acompanhamento da família na Operação",
+    todasDeF[0]?.link === `/operacao?processo=${procF}&aba=acompanhamento`, todasDeF[0]?.link ?? "")
 
-  const todasDeF = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: taskF } })
-  check("F: EXATAMENTE 1 notificação no total (nunca 2 nem 3)", todasDeF.length === 1, `n=${todasDeF.length} tipos=${todasDeF.map((n) => n.tipo).join(",")}`)
-  const motivosF = (todasDeF[0]?.motivos ?? []) as string[]
-  check("F: motivos contém PRAZO_TAREFA_VENCIDO", motivosF.includes("PRAZO_TAREFA_VENCIDO"), JSON.stringify(motivosF))
-  check("F: motivos contém ACOMPANHAMENTO_DEVIDO", motivosF.includes("ACOMPANHAMENTO_DEVIDO"), JSON.stringify(motivosF))
-  check("F: motivos contém TERCEIRO_ATRASADO", motivosF.includes("TERCEIRO_ATRASADO"), JSON.stringify(motivosF))
-  check("F: tipoPrincipalDeAtencao(motivos) = ATRASO (maior precedência, prazo vencido)", tipoPrincipalDeAtencao(motivosF as never) === "ATRASO")
-  check("F: deep-link único aponta para a tarefa/família na Minha Operação", !!todasDeF[0]?.link && todasDeF[0]!.link!.length > 0, todasDeF[0]?.link ?? "")
+  console.log("\n4) P (isolado) — só vencida, sem cobrança misturada")
+  const notifP = await avisosDe(procP)
+  check("P: exatamente 1 aviso, PRECISA_AGIR", notifP.length === 1 && notifP[0]?.tipo === "PRECISA_AGIR", `n=${notifP.length} tipo=${notifP[0]?.tipo}`)
+  check("P: sem cobranças no resumo", (resumoDe(notifP[0]).cobrancas ?? []).length === 0 && (resumoDe(notifP[0]).vencidas ?? []).includes(taskP), JSON.stringify(notifP[0]?.resumo))
+  check("nenhum aviso legado por tarefa (agrupado=false) em nenhum cenário",
+    (await prisma.notificacaoOperacional.count({ where: { processoId: { in: [procP, procA, procT, procF] }, agrupado: false } })) === 0)
 
-  console.log("\n4) P (isolado) — o dono de sempre (ATRASO) continua funcionando, formato de chave inalterado")
-  const notifP = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: taskP } })
-  check("P: exatamente 1 notificação, tipo ATRASO (via avisarPrazosEAtrasos, dono de sempre)",
-    notifP.length === 1 && notifP[0]?.tipo === "ATRASO", `n=${notifP.length} tipo=${notifP[0]?.tipo}`)
-  check("P: motivos = null (não passou pela consolidada)", notifP[0]?.motivos == null)
+  console.log("\n5) IDEMPOTÊNCIA — roda tudo de novo, nada duplica nem renotifica")
+  const idsAntes = new Map<number, Date>()
+  for (const pr of [procP, procA, procT, procF]) for (const a of await avisosDe(pr)) idsAntes.set(a.id, a.atualizadoEm)
+  const dia2 = await rodarResumoDiario({ agora: hoje })
+  const hora2 = await rodarVarreduraHoraria({ agora: hoje })
+  const totalDepois = await prisma.notificacaoOperacional.count({ where: { processoId: { in: [procP, procA, procT, procF] } } })
+  check("segunda rodada: total continua 4 (1 por família), nenhuma duplicata", totalDepois === 4, `total=${totalDepois}`)
+  check("segunda rodada: nenhum aviso criado nem atualizado", dia2.precisaAgir.criados === 0 && hora2.precisaAgir.criados === 0 && dia2.precisaAgir.atualizados === 0 && hora2.precisaAgir.atualizados === 0,
+    `dia criados=${dia2.precisaAgir.criados} hora criados=${hora2.precisaAgir.criados}`)
+  let intactos = true
+  for (const pr of [procP, procA, procT, procF]) for (const a of await avisosDe(pr)) if (idsAntes.get(a.id)?.getTime() !== a.atualizadoEm.getTime()) intactos = false
+  check("os avisos não voltaram ao topo (atualizadoEm intacto)", intactos)
+  void hora1
 
-  console.log("\n5) IDEMPOTÊNCIA — roda tudo de novo, nada duplica")
-  const consolidada2 = await avisarAtencaoConsolidada({ agora: hoje })
-  await Promise.all([
-    avisarPrazosEAtrasos({ agora: hoje, excluirTarefaIds: consolidada2.tarefasConsolidadas }),
-    avisarAcontecimentosOperacionais({ agora: hoje, excluirTarefaIds: consolidada2.tarefasConsolidadas }),
-  ])
-  const totalDepois = await prisma.notificacaoOperacional.count({
-    where: { tarefaId: { in: [taskP, taskA, taskT, taskF] } },
+  console.log("\n6) DETERMINISMO — a mesma foto, em outra ordem de ids, é o mesmo aviso")
+  const avF = todasDeF[0]
+  const embaralhado: ResumoDoAviso = { ...rF, vencidas: [...(rF.vencidas ?? [])].reverse(), cobrancas: [...(rF.cobrancas ?? [])].reverse() }
+  const regravado = await gravarFotoDoAviso(prisma, {
+    tipo: "PRECISA_AGIR", destinatarioId: user.id, processoId: procF, familiaNome: nomeF,
+    resumo: embaralhado, link: avF.link ?? "",
   })
-  check("segunda rodada: total continua 4 (1 por tarefa), nenhuma duplicata", totalDepois === 4, `total=${totalDepois}`)
-
-  console.log("\n6) CHAVE DETERMINÍSTICA — mesmo conjunto de motivos, mesma chave (dedup pelo banco)")
-  const chave1 = chaveDeAtencaoConsolidada(taskF, ["ACOMPANHAMENTO_DEVIDO", "PRAZO_TAREFA_VENCIDO", "TERCEIRO_ATRASADO"] as never, user.id)
-  const chave2 = chaveDeAtencaoConsolidada(taskF, ["TERCEIRO_ATRASADO", "PRAZO_TAREFA_VENCIDO", "ACOMPANHAMENTO_DEVIDO"] as never, user.id)
-  check("chave não depende da ORDEM dos motivos (ordenada internamente)", chave1 === chave2, `${chave1} vs ${chave2}`)
+  check("mesma foto, ordem diferente → SEM_MUDANCA no mesmo aviso (a foto é normalizada)", regravado.acao === "SEM_MUDANCA" && regravado.id === avF.id, `${regravado.acao}`)
 
   console.log(`\n${ok} passaram, ${falhas.length} falharam`)
   if (falhas.length > 0) { console.log("Falhas:", falhas.join(" | ")); process.exitCode = 1 }

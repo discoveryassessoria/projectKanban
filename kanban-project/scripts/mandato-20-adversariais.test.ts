@@ -30,7 +30,8 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { concluirEtapa } from "@/lib/operacional/tarefa-etapa"
-import { atribuirTarefa, transferirTarefa, avisarAcontecimentosOperacionais } from "@/lib/operacional/tarefa-comandos"
+import { atribuirTarefa, transferirTarefa } from "@/lib/operacional/tarefa-comandos"
+import { avaliarPrecisaAgir } from "@/lib/operacional/avisos-sino"
 import { minhaFila } from "@/lib/operacional/tarefa-projecoes"
 import { estadosTemporaisDasOperacoes, estadoTemporalDaOperacao } from "@/lib/operacional/proximo-acontecimento"
 import { abrirIndisponibilidade } from "@/lib/operacional/organizacao"
@@ -216,12 +217,16 @@ async function cenarioA() {
   ok("A2) acompanhamentoVencido = false NO INSTANTE EXATO (< estrito, nunca <=) — evita o gatilho duplo", estado?.acompanhamentoVencido === false)
   ok("A3) o próximo acontecimento é 'retorno_recebido', não 'em_risco' nem duplicado", estado?.proximoAcontecimento.tipo === "retorno_recebido")
 
-  const r1 = await avisarAcontecimentosOperacionais({ agora: instante })
-  const r2 = await avisarAcontecimentosOperacionais({ agora: instante })
-  const notifs = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: p.tarefaId } })
-  ok("A4) exatamente 1 notificação de retorno de terceiro — sem dupla", notifs.filter((n) => n.tipo === "RETORNO_TERCEIRO").length === 1)
-  ok("A5) nenhuma notificação de acompanhamento vencido nasce no mesmo instante", notifs.filter((n) => n.tipo === "ACOMPANHAMENTO_VENCIDO").length === 0)
-  ok("A6) a segunda varredura, no MESMO instante, não duplica (dedup real)", r1.retorno >= 1 && r2.retorno === 0 && r2.deduplicados >= 1)
+  // CONTRATO NOVO (sino agrupado, 29/09/2026): "retorno recebido" e "acompanhamento devido"
+  // contam como COBRANÇA dentro do PRECISA_AGIR da (pessoa, família) — um aviso só, no lugar.
+  const r1 = await avaliarPrecisaAgir({ agora: instante, modo: "FOTO" })
+  const r2 = await avaliarPrecisaAgir({ agora: instante, modo: "FOTO" })
+  const notifs = await prisma.notificacaoOperacional.findMany({ where: { destinatarioId: user.id } })
+  const agir = notifs.filter((n) => n.tipo === "PRECISA_AGIR" && n.agrupado)
+  const resumoAgir = (agir[0]?.resumo ?? {}) as { cobrancas?: number[] }
+  ok("A4) exatamente 1 aviso de cobrança (retorno do terceiro) ao responsável — sem dupla", agir.length === 1 && agir[0].destinatarioId === user.id && (resumoAgir.cobrancas ?? []).includes(p.tarefaId) && agir[0].tarefaIds.includes(p.tarefaId))
+  ok("A5) o acompanhamento vencido não vira segundo aviso nem segunda cobrança no mesmo instante", notifs.filter((n) => n.tipo === "PRECISA_AGIR").length === 1 && (resumoAgir.cobrancas ?? []).filter((id) => id === p.tarefaId).length === 1 && notifs.every((n) => n.tipo !== "ACOMPANHAMENTO_VENCIDO" && n.tipo !== "RETORNO_TERCEIRO"))
+  ok("A6) a segunda varredura, no MESMO instante, não duplica (aviso atualizado no lugar / sem mudança)", r1.criados >= 1 && r2.criados === 0 && r2.semMudanca >= 1)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -271,10 +276,11 @@ async function cenarioB() {
   ok("B2) o estado converge: o retorno recebido prevalece sobre o acompanhamento agendado", estado?.retornoRecebido === true)
   ok("B3) nenhum conflito espúrio entre as duas fontes (elas concordam sobre o retorno)", !(estado?.motivosRisco ?? []).some((m) => m.startsWith("CONFLITO_RETORNO_TERCEIRO")))
 
-  await avisarAcontecimentosOperacionais({})
-  await avisarAcontecimentosOperacionais({})
-  const notifs = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: p.tarefaId, tipo: "RETORNO_TERCEIRO" } })
-  ok("B4) mesmo com a corrida, só UMA notificação de retorno nasceu (converge sem duplicar)", notifs.length === 1)
+  await avaliarPrecisaAgir({ modo: "FOTO" })
+  await avaliarPrecisaAgir({ modo: "FOTO" })
+  const notifs = await prisma.notificacaoOperacional.findMany({ where: { destinatarioId: daniela.id, tipo: "PRECISA_AGIR", agrupado: true } })
+  ok("B4) mesmo com a corrida, só UM aviso de cobrança (retorno) nasceu para o responsável (converge sem duplicar)",
+    notifs.length === 1 && notifs[0].tarefaIds.includes(p.tarefaId) && ((notifs[0].resumo ?? {}) as { cobrancas?: number[] }).cobrancas?.includes(p.tarefaId) === true)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -679,10 +685,11 @@ async function cenarioM() {
   ok("M2) motivo de risco explícito", (estado?.motivosRisco ?? []).includes("ACOMPANHAMENTO_VENCIDO"))
   ok("M3) a operação fica EM_RISCO", estado?.emRisco === true)
 
-  const relatorio = await avisarAcontecimentosOperacionais({ agora })
-  const notif = await prisma.notificacaoOperacional.findFirst({ where: { tarefaId: p.tarefaId, tipo: "ACOMPANHAMENTO_VENCIDO" } })
-  ok("M4) ESCALONAMENTO REAL: uma notificação de acompanhamento vencido foi de fato criada — nunca silêncio", notif != null)
-  ok("M5) o relatório da varredura contabiliza o escalonamento", relatorio.acompanhamento >= 1)
+  const relatorio = await avaliarPrecisaAgir({ agora, modo: "FOTO" })
+  const notif = await prisma.notificacaoOperacional.findFirst({ where: { destinatarioId: user.id, tipo: "PRECISA_AGIR", agrupado: true } })
+  const cobrancasM = ((notif?.resumo ?? {}) as { cobrancas?: number[] }).cobrancas ?? []
+  ok("M4) ESCALONAMENTO REAL: o acompanhamento vencido virou cobrança no PRECISA_AGIR do responsável — nunca silêncio", notif != null && cobrancasM.includes(p.tarefaId) && /cobranças? a fazer/.test(notif.titulo), notif?.titulo ?? "")
+  ok("M5) o relatório da varredura contabiliza o escalonamento", relatorio.criados >= 1)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

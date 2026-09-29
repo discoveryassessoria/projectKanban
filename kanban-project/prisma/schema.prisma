@@ -8509,7 +8509,34 @@ model NotificacaoOperacional {
   lidaEm   DateTime?
   criadoEm DateTime  @default(now())
 
+  /// AVISO AGRUPADO (redesenho do sino, 29/09/2026) — `true` = a linha é UM aviso
+  /// por (destinatário, família, tipo), atualizado NO LUGAR enquanto não lido;
+  /// `processoId` passa a significar FAMÍLIA. `false` = linha do modelo antigo
+  /// (um aviso por tarefa) — a migração de dados converte ou apaga; nenhum
+  /// código novo escreve `false`. O índice único parcial
+  /// `NotificacaoOperacional_um_aberto_por_familia_tipo` (migration SQL, não
+  /// `db push`) garante fisicamente "um aberto por (pessoa, família, tipo)".
+  agrupado Boolean @default(false)
+
+  /// Quantas tarefas o aviso cobre hoje (CHEGOU_TRABALHO/MUDOU_DE_MAO) — o texto
+  /// nasce daqui, nunca de um número guardado em `titulo`.
+  contagem Int @default(1)
+
+  /// Tarefas que o aviso cobre. Existe para o aviso SAIR quando a tarefa deixa
+  /// de ser da pessoa (reatribuída, removida, concluída, cancelada, supersedida).
+  tarefaIds Int[] @default([])
+
+  /// Foto do aviso: `{ vencidas:[ids], hoje:[ids], amanha:[ids], cobrancas:[ids],
+  /// novos:{...} }` para PRECISA_AGIR. Congelada na hora da leitura — é a base
+  /// para decidir o que é FATO NOVO depois do clique.
+  resumo Json?
+
+  /// Última vez que o aviso ganhou fato novo — ordena o sino ("volta ao topo") e
+  /// dá a validade de 7 dias do não lido.
+  atualizadoEm DateTime @default(now())
+
   @@index([destinatarioId, lidaEm])
+  @@index([destinatarioId, agrupado, lidaEm, atualizadoEm], map: "NotificacaoOperacional_sino_idx")
   @@index([tarefaId])
   @@index([processoId])
 }

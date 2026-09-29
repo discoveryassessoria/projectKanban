@@ -68,7 +68,7 @@ const semComentarios = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace
 async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefa: { processoId: { in: ids } } } })
+  await prisma.notificacaoOperacional.deleteMany({ where: { OR: [{ tarefa: { processoId: { in: ids } } }, { processoId: { in: ids } }] } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
@@ -481,10 +481,12 @@ async function main() {
     (await eventos(semDono2.tarefaId, 'TAREFA_INICIADA')) === iniciosAntes, `${iniciosAntes}`)
   ok('§22) o histórico é o canônico, venha de onde vier',
     (await eventos(semDono2.tarefaId, 'TAREFA_ATRIBUIDA')) + (await eventos(semDono2.tarefaId, 'TAREFA_TRANSFERIDA')) >= 1)
-  ok('§23) e a notificação é a única da porta',
-    (await prisma.notificacaoOperacional.count({
-      where: { tarefaId: semDono2.tarefaId, tipo: { in: ['ATRIBUICAO', 'TRANSFERENCIA'] } },
-    })) >= 1)
+  // Sino agrupado: a porta é a mesma → UM aviso CHEGOU_TRABALHO por (quem recebeu, família).
+  const avisosDaPorta = await prisma.notificacaoOperacional.findMany({
+    where: { destinatarioId: gabriel.id, processoId: p.processoId, tipo: 'CHEGOU_TRABALHO', agrupado: true, lidaEm: null },
+  })
+  ok('§23) e o aviso é o único da porta (CHEGOU_TRABALHO da família, cobrindo a tarefa)',
+    avisosDaPorta.length === 1 && avisosDaPorta[0].tarefaIds.includes(semDono2.tarefaId), `${avisosDaPorta.length}`)
   ok('§24) some da fila "Sem responsável"',
     !(await semResponsavel()).some((l) => l.taskId === semDono2.tarefaId))
   ok('§24) e aparece na Minha Fila de quem recebeu',

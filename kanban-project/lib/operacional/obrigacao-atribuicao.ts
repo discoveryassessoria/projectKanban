@@ -45,7 +45,6 @@ import { type Prisma, TipoTarefa, type StatusTarefa } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { STATUS_ATIVOS, STATUS_TERMINAIS } from "./tarefa-canonica"
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from "@/src/lib/permissoes"
-import { notificarAcontecimento } from "./notificacao-canonica"
 import { urlDistribuicaoDoProcesso } from "./navegacao"
 import { criarTarefaAdministrativa, concluirTarefaAdministrativa } from "./tarefa-ciclo"
 
@@ -170,19 +169,11 @@ async function abrirObrigacaoDeAtribuicao(db: DB, processoId: number, quantidade
   if (!criada) return
   const tarefaId = criada.tarefaId
 
-  await notificarAcontecimento(db, {
-    tipo: "DISTRIBUICAO_NECESSARIA",
-    destinatarioId: responsavelId,
-    tarefaId,
-    titulo: `${nomeProcesso} — tarefas aguardando atribuição`,
-    mensagem: `${quantidadeAgora} tarefa${quantidadeAgora === 1 ? "" : "s"} precisa${quantidadeAgora === 1 ? "" : "m"} de responsável.`,
-    // `urlOperacionalDaTarefa` levaria ao Kanban do processo (pessoa/documento/
-    // passo) — esta obrigação não tem nenhum dos três. O lugar onde ela se
-    // executa é a Central Operacional gerencial, com o painel de distribuição
-    // desta família já aberto.
-    link: urlDistribuicaoDoProcesso(processoId),
-    chaveIdempotencia: `notif::${chave}`,
-  })
+  // O SINO (redesenho 29/09/2026): DISTRIBUICAO_NECESSARIA foi fundida em SEM_RESPONSAVEL
+  // do gestor — "<Família> — N tarefas sem responsável há mais de 1 dia", recomposto pelas
+  // varreduras (`precisaDeVoce`, em avisos-sino.ts). A OBRIGAÇÃO (a Tarefa
+  // administrativa acima) continua existindo na fila do responsável pela distribuição;
+  // só o aviso deixou de nascer aqui, um por abertura.
 
   await db.logAuditoria.create({
     data: {
@@ -199,13 +190,11 @@ async function abrirObrigacaoDeAtribuicao(db: DB, processoId: number, quantidade
 async function concluirObrigacaoDeAtribuicao(db: DB, tarefaId: number): Promise<void> {
   // A ESCRITA mora em tarefa-ciclo.ts (dono único de estado operacional de Tarefa).
   await concluirTarefaAdministrativa(db, tarefaId)
-  // Item 7 do mandato: "com zero, deixa de existir como pendência" — vale
-  // para o sino também. Sem isto a notificação de abertura ficava `lidaEm:
-  // null` para sempre, mesmo depois de a obrigação já ter sido resolvida.
-  await db.notificacaoOperacional.updateMany({
-    where: { tarefaId, lidaEm: null },
-    data: { lidaEm: new Date() },
-  })
+  // Item 7 do mandato: "com zero, deixa de existir como pendência" — vale para o sino
+  // também: cada tarefa atribuída já saiu do SEM_RESPONSAVEL do gestor na mesma transação
+  // em que foi atribuída (`aoMudarDeDono` → `sincronizarAvisosDeTarefas`), então não há
+  // nada a limpar aqui.
+
   await db.logAuditoria.create({
     data: {
       acao: "OBRIGACAO_ATRIBUICAO_CONCLUIDA",

@@ -29,8 +29,8 @@ import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/serv
 import { calcularObrigacoesRetroativasPendentes } from "@/src/lib/motor/reconciliar-fase-macro"
 import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
-import { notificarAcontecimento } from "@/lib/operacional/notificacao-canonica"
-import { urlOperacionalDoProcesso } from "@/lib/operacional/navegacao"
+import { somarAoAviso, rotuloDaFamilia } from "@/lib/operacional/notificacao-canonica"
+import { urlVisaoGlobalDaFamilia } from "@/lib/operacional/navegacao"
 import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
 import {
   fotografarObrigacoes,
@@ -558,24 +558,22 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         // que nunca usa "CONCLUIR") nunca passam por aqui, então nunca "fingem"
         // ser uma conclusão de fase.
         //
-        // Idempotente pela MESMA `chave` que já protege `WorkflowEvento` e
-        // `PhaseAdvanceLog` desta transição (inclui `lockVersion`): a
-        // conclusão desta fase é UM fato, e reprocessar a transação não pode
-        // produzir uma segunda notificação por admin. Grão PROCESSO — sem
-        // `tarefaId`: 15 tarefas concluindo a mesma fase não geram 15 avisos.
+        // O SINO (redesenho 29/09/2026): "fase concluída" é aviso do GESTOR, agrupado por
+        // FAMÍLIA — "<Família> — N fases concluídas", somando no aviso aberto de cada
+        // administrador. Idempotente pela MESMA `chave` que já protege `WorkflowEvento` e
+        // `PhaseAdvanceLog` desta transição (inclui `lockVersion`): a conclusão é UM fato,
+        // e reprocessar a transação não soma duas vezes (o item é chaveado por ela).
         const admins = await tx.usuario.findMany({ where: { tipo: "admin" }, select: { id: true } })
+        const proc = await tx.processo.findUnique({ where: { id: p.processoId }, select: { nome: true, familia: { select: { nome: true } } } })
         for (const admin of admins) {
-          await notificarAcontecimento(tx, {
+          await somarAoAviso(tx, {
             tipo: "FASE_CONCLUIDA",
             destinatarioId: admin.id,
             processoId: p.processoId,
+            familiaNome: rotuloDaFamilia(proc),
+            itens: [`fase::${chave}`],
             autorId: p.solicitadoPorId ?? null,
-            titulo: p.forcado ? "Fase concluída (avanço forçado)" : "Fase concluída",
-            mensagem: p.forcado
-              ? `Processo ${p.processoId}: fase "${p.faseAtual}" encerrada por avanço forçado.`
-              : `Processo ${p.processoId}: fase "${p.faseAtual}" concluída.`,
-            link: urlOperacionalDoProcesso(p.processoId),
-            chaveIdempotencia: `notif::fase_concluida::${chave}::u${admin.id}`,
+            link: urlVisaoGlobalDaFamilia(p.processoId),
           })
         }
       }

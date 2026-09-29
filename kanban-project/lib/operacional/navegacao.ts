@@ -118,6 +118,27 @@ export function urlMinhaOperacaoDoProcesso(processoId: number): string {
 }
 
 /**
+ * OS LINKS DO SINO (redesenho 29/09/2026) — sempre a Operação, nunca `/kanban`.
+ * `aba` é uma das abas da Operação v3 (`fila | aguardando | acompanhamento |
+ * familias | radar | feito`); `processo` é a FAMÍLIA. `OperacaoV3` lê os dois.
+ */
+export type AbaDaOperacao = 'fila' | 'aguardando' | 'acompanhamento' | 'familias' | 'radar' | 'feito'
+export const ABAS_DA_OPERACAO: readonly AbaDaOperacao[] = ['fila', 'aguardando', 'acompanhamento', 'familias', 'radar', 'feito']
+
+export function urlOperacaoDaFamilia(processoId: number | null, aba?: AbaDaOperacao): string {
+  const p = new URLSearchParams()
+  if (processoId != null) p.set('processo', String(processoId))
+  if (aba) p.set('aba', aba)
+  const qs = p.toString()
+  return qs ? `/operacao?${qs}` : '/operacao'
+}
+
+/** Visão global (gestor) já filtrada na família — `visao-global.tsx` lê `?processo=`. */
+export function urlVisaoGlobalDaFamilia(processoId: number): string {
+  return `/tarefas?${new URLSearchParams({ processo: String(processoId) }).toString()}`
+}
+
+/**
  * O QUE A CENTRAL PRECISA PARA SE POSICIONAR.
  *
  * Resolvido no servidor a partir do `taskId`, com permissão conferida lá — a

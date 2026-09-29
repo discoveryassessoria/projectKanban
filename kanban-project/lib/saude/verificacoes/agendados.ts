@@ -140,7 +140,7 @@ registrar({
   id: 'saude.cron.avisos-de-prazo',
   codigo: 'PRZ-001',
   nome: 'A varredura de prazos está avisando',
-  descricao: 'O cron horário /api/cron/avisos-prazo avisa o responsável quando o prazo vence. Tarefa vencida SEM o aviso dela é prova de que a varredura não está rodando.',
+  descricao: 'Os crons do sino (resumo diário 07:00 e varredura horária) mantêm um resumo por (pessoa, família). Tarefa vencida cuja pessoa/família não tem resumo é prova de que a varredura não está rodando.',
   dominio: 'OBSERVABILIDADE',
   modulo: 'Plataforma / Jobs agendados',
   severidadePadrao: 'ERRO',
@@ -208,18 +208,29 @@ registrar({
       vencidas.sort((a, b) => (a.dataPrazo?.getTime() ?? 0) - (b.dataPrazo?.getTime() ?? 0))
     }
 
+    // SINO AGRUPADO (29/09/2026): não existe mais "um aviso de atraso por tarefa". O
+    // efeito que a varredura tem de produzir é o RESUMO da (pessoa, família): um PRECISA_AGIR
+    // aberto, ou um que ela já leu nas últimas 26h. Tarefa vencida cuja (responsável,
+    // família) não tem nenhum dos dois é o buraco — a mesma pergunta de antes ("o aviso
+    // está passando?"), no grão certo.
     const semAviso: typeof vencidas = []
     if (vencidas.length) {
-      const avisos = await prisma.notificacaoOperacional.findMany({
-        where: { tipo: 'ATRASO', tarefaId: { in: vencidas.map((t) => t.id) } },
-        select: { tarefaId: true, chaveIdempotencia: true },
+      const vencidasComFamilia = await prisma.tarefa.findMany({
+        where: { id: { in: vencidas.map((t) => t.id) } },
+        select: { id: true, processoId: true },
       })
-      const avisadas = new Set(avisos.map((a) => a.chaveIdempotencia))
+      const familiaDe = new Map(vencidasComFamilia.map((t) => [t.id, t.processoId]))
+      const resumos = await prisma.notificacaoOperacional.findMany({
+        where: {
+          tipo: 'PRECISA_AGIR', agrupado: true,
+          destinatarioId: { in: [...new Set(vencidas.map((t) => t.responsavelId!))] },
+          OR: [{ lidaEm: null }, { lidaEm: { gte: new Date(agora.getTime() - 26 * HORA) } }],
+        },
+        select: { destinatarioId: true, processoId: true },
+      })
+      const cobertos = new Set(resumos.map((r) => `${r.destinatarioId}|${r.processoId ?? 0}`))
       for (const t of vencidas) {
-        // A chave carrega o PRAZO: remarcar a tarefa cria um marco novo, e a
-        // ausência do aviso do prazo NOVO é um buraco legítimo.
-        const dia = t.dataPrazo!.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
-        if (!avisadas.has(`notif::atraso::t${t.id}::${dia}`)) semAviso.push(t)
+        if (!cobertos.has(`${t.responsavelId}|${familiaDe.get(t.id) ?? 0}`)) semAviso.push(t)
       }
     }
 
@@ -232,7 +243,7 @@ registrar({
         severidade: horas > 24 ? 'ERRO' : 'ALERTA',
         titulo: `${semAviso.length} tarefa(s) vencida(s) sem aviso de atraso`,
         descricao: `A mais antiga venceu há ${horas}h (tarefa ${maisAntiga.id} — ${maisAntiga.titulo}).`,
-        explicacao: 'O cron /api/cron/avisos-prazo roda de hora em hora e cria um aviso por marco. Tarefa vencida sem o aviso dela significa que ele não está passando.',
+        explicacao: 'Os crons /api/cron/resumo-diario (07:00) e /api/cron/avisos-prazo (de hora em hora) mantêm um resumo por (pessoa, família). Tarefa vencida cuja pessoa/família não tem nenhum resumo significa que ele não está passando.',
         impacto: 'O prazo vence e o responsável não fica sabendo — a fila continua correta e ninguém é avisado.',
         entidade: 'Tarefa',
         registroId: String(maisAntiga.id),

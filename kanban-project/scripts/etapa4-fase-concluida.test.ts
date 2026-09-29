@@ -3,6 +3,10 @@
 // ETAPA 4 — CASO 12/13/14: fase concluída notifica admin, retry não duplica,
 // movimentação manual NUNCA finge ser conclusão.
 //
+// CONTRATO DO SINO AGRUPADO (29/09/2026): FASE_CONCLUIDA é aviso do GESTOR, UM não lido por
+// (admin, família), atualizado no lugar ("<Família> — N fases concluídas"); cada conclusão
+// é um item `fase::<chave>` no resumo — o replay do mesmo fato não soma duas vezes.
+//
 // TRUNCATA o banco de teste — só roda isolado, nunca junto de outro teste que
 // dependa de dados persistentes (mesmo padrão de mover-fase-manual.test.ts).
 // ============================================================================
@@ -71,7 +75,7 @@ async function main() {
 
   // O banco de teste é COMPARTILHADO entre arquivos de teste, e `Usuario` fica
   // FORA do TRUNCATE de propósito — outros arquivos podem ter deixado admins
-  // seus. `notificarAcontecimento` notifica TODO admin real (correto em
+  // seus. O avanço notifica TODO admin real (correto em
   // produção); aqui escopamos a prova aos DOIS admins que ESTE teste criou.
   const meusAdmins = new Set([admin1.id, admin2.id])
   const notifsP1Todos = await prisma.notificacaoOperacional.findMany({ where: { processoId: p1.id, tipo: "FASE_CONCLUIDA" } })
@@ -81,17 +85,32 @@ async function main() {
   check("todo admin REAL do sistema foi notificado (não só os 2 deste teste)", notifsP1Todos.length >= notifsP1.length, String(notifsP1Todos.length))
   check("grão PROCESSO — sem tarefaId", notifsP1.every((n) => n.tarefaId === null))
   check("com processoId correto", notifsP1.every((n) => n.processoId === p1.id))
+  check("aviso AGRUPADO (não legado), contagem 1", notifsP1.every((n) => n.agrupado === true && n.contagem === 1), JSON.stringify(notifsP1.map((n) => [n.agrupado, n.contagem])))
+  check("o fato entra como item `fase::<chave>` no resumo", notifsP1.every((n) => { const it = (n.resumo as { itens?: string[] } | null)?.itens ?? []; return it.length === 1 && it[0].startsWith("fase::") }), JSON.stringify(notifsP1[0]?.resumo))
+  check("texto: '<Família> — 1 fase concluída'", notifsP1.every((n) => /— 1 fase concluída$/.test(n.titulo)), notifsP1[0]?.titulo)
+  check("link → /tarefas?processo=<id> (nunca /kanban)", notifsP1.every((n) => n.link === `/tarefas?processo=${p1.id}`), notifsP1[0]?.link ?? "")
+  check("nasce não lida", notifsP1.every((n) => n.lidaEm === null))
 
   console.log("\nCASO 13 — Retry do mesmo commit não duplica")
   if (notifsP1[0]) {
-    const { notificarAcontecimento } = await import("../lib/operacional/notificacao-canonica")
-    const retry = await notificarAcontecimento(prisma, {
-      tipo: "FASE_CONCLUIDA", destinatarioId: notifsP1[0].destinatarioId, processoId: p1.id, titulo: "x",
-      chaveIdempotencia: notifsP1[0].chaveIdempotencia,
+    const { somarAoAviso } = await import("../lib/operacional/notificacao-canonica")
+    const n0 = notifsP1[0]
+    const itensOriginais = (n0.resumo as { itens?: string[] }).itens ?? []
+    const retry = await somarAoAviso(prisma, {
+      tipo: "FASE_CONCLUIDA", destinatarioId: n0.destinatarioId, processoId: p1.id, familiaNome: null,
+      itens: itensOriginais, link: n0.link ?? "",
     })
-    check("retry da MESMA chave não cria outra linha", retry.criada === false)
+    check("retry do MESMO fato (mesmo item `fase::<chave>`) não soma nem abre outro aviso", retry.criado === false && retry.id === n0.id && retry.contagem === 1, JSON.stringify(retry))
     const recontagem = (await prisma.notificacaoOperacional.findMany({ where: { processoId: p1.id, tipo: "FASE_CONCLUIDA" } })).filter((n) => meusAdmins.has(n.destinatarioId))
     check("continuam exatamente 2 (não virou 3)", recontagem.length === 2, String(recontagem.length))
+    check("e a contagem de cada um continua 1", recontagem.every((n) => n.contagem === 1))
+    // Um fato NOVO da mesma família soma no aviso aberto ("2 fases concluídas"), no mesmo lugar.
+    const soma = await somarAoAviso(prisma, {
+      tipo: "FASE_CONCLUIDA", destinatarioId: n0.destinatarioId, processoId: p1.id, familiaNome: null,
+      itens: ["fase::teste-e4-outra-conclusao"], link: n0.link ?? "",
+    })
+    const somado = await prisma.notificacaoOperacional.findUniqueOrThrow({ where: { id: n0.id } })
+    check("fato novo soma NO LUGAR: mesmo aviso, contagem 2, '2 fases concluídas'", soma.criado === false && soma.id === n0.id && somado.contagem === 2 && /— 2 fases concluídas$/.test(somado.titulo), somado.titulo)
   }
   // Concorrência real: duas chamadas simultâneas de avanço da MESMA fase não podem duplicar.
   const p2 = await novoProcesso("E4-P2")

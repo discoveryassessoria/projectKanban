@@ -34,7 +34,7 @@ async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
   const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefaId: { in: ts.map((t) => t.id) } } })
+  await prisma.notificacaoOperacional.deleteMany({ where: { OR: [{ tarefaId: { in: ts.map((t) => t.id) } }, { processoId: { in: ids } }] } })
   await prisma.logAuditoria.deleteMany({ where: { entidade: 'Tarefa', entidadeId: { in: ts.map((t) => t.id) } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: ids } } })
@@ -221,9 +221,13 @@ async function main() {
     where: { id: { in: resto } }, select: { responsavelId: true },
   })
   ok('§75) as outras 50 continuam sem responsável', intactas.every((t) => t.responsavelId == null))
-  ok('§75) e o total de tarefas não mudou',
-    (await prisma.tarefa.count({ where: { processoId: processo.id } })) === TOTAL,
+  // A Tarefa ADMINISTRATIVA da obrigação de distribuição (origem obrigacao-atribuicao)
+  // é a única que pode existir além das 500: é recomposta pela porta e não é do lote.
+  ok('§75) e o total de tarefas do lote não mudou',
+    (await prisma.tarefa.count({ where: { processoId: processo.id, origem: { not: 'obrigacao-atribuicao' } } })) === TOTAL,
     'lote não cria nem duplica')
+  ok('§75) a obrigação de distribuição é UMA Tarefa administrativa (nunca uma por tarefa)',
+    (await prisma.tarefa.count({ where: { processoId: processo.id, origem: 'obrigacao-atribuicao' } })) <= 1)
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('§41) IDEMPOTÊNCIA: confirmar duas vezes não transfere duas vezes')

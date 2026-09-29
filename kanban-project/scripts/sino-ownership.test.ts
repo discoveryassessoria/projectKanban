@@ -1,6 +1,7 @@
 // scripts/sino-ownership.test.ts
 // ============================================================================
-// O SINO RESPEITA OWNERSHIP — correção pontual 17/09/2026.
+// O SINO RESPEITA OWNERSHIP — correção pontual 17/09/2026, reescrita para o sino
+// AGRUPADO (redesenho 29/09/2026).
 // Rodar: PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/sino-ownership.test.ts
 //
 // ACHADO: `GET /api/notificacoes` filtrava `{ OR: [{responsavelId: eu},
@@ -9,8 +10,16 @@
 // virava "PRÓXIMOS 3 DIAS (15)" no sino PESSOAL do Admin, mesmo sem nenhuma
 // delas ter sido atribuída a ele. Visibilidade administrativa (Tarefas e
 // Projetos/Central Operacional/obrigação ATRIBUIR_TAREFAS) != notificação
-// pessoal de prazo (vencida/hoje/próximos 3 dias) — as duas são perguntas
-// diferentes, e só a segunda é o que este arquivo prova.
+// pessoal (o que a PESSOA tem para fazer) — as duas são perguntas diferentes.
+//
+// Contrato novo, o que este arquivo prova:
+//   • o aviso pessoal (CHEGOU_TRABALHO / PRECISA_AGIR) só lista tarefa do RESPONSÁVEL;
+//     tarefa sem dono NUNCA vira aviso pessoal do Admin;
+//   • o Admin recebe UM aviso de gestor por família (SEM_RESPONSAVEL, "N tarefas sem
+//     responsável há mais de 1 dia") com link para /operacao/distribuicao — a antiga
+//     DISTRIBUICAO_NECESSARIA foi fundida nele;
+//   • atribuir tira as tarefas do aviso do gestor na hora e o aviso some;
+//   • a Daniela recebe UM CHEGOU_TRABALHO ("15 tarefas atribuídas a você"), nunca 15.
 //
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
@@ -21,6 +30,7 @@ import { criarTarefaManual } from "@/lib/operacional/tarefa-ciclo"
 import { redistribuirTarefas } from "@/lib/operacional/tarefa-comandos"
 import { reconciliarObrigacaoDeAtribuicao, usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
 import { marcarNotificacaoComoLida } from "@/lib/operacional/notificacao-canonica"
+import { avisarGestores, rodarResumoDiario } from "@/lib/operacional/avisos-sino"
 import { GET as getNotificacoes } from "@/src/app/api/notificacoes/route"
 
 const MARCA = "SINOOWN"
@@ -49,14 +59,14 @@ async function tokenPara(userId: number, email: string, tipo: string): Promise<s
   return signAuthToken({ userId, email, tipo, sessaoInicio: Date.now() })
 }
 
-async function bucketsDoSino(userId: number, email: string, tipo: string) {
+async function sinoDe(userId: number, email: string, tipo: string) {
   const token = await tokenPara(userId, email, tipo)
   const req = new Request("http://localhost/api/notificacoes", { headers: { Authorization: `Bearer ${token}` } })
   const resp = await getNotificacoes(req as never)
   if (resp.status !== 200) throw new Error(`sino respondeu ${resp.status} para userId=${userId}`)
   return resp.json() as Promise<{
-    vencidas: Array<{ id: number }>; hoje: Array<{ id: number }>; proximos3Dias: Array<{ id: number }>
-    acontecimentos: Array<{ id: number; tipo: string; link: string }>
+    avisos: Array<{ id: number; tipo: string; titulo: string; link: string; familiaId: number | null; contagem: number }>
+    anteriores: Array<{ id: number }>; total: number
   }>
 }
 
@@ -117,23 +127,31 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("3/4) SINO do Admin ANTES da atribuição")
   // ══════════════════════════════════════════════════════════════════════
-  const sinoAdminAntes = await bucketsDoSino(admin.id, admin.email, admin.tipo)
-  const idsNoSino = [...sinoAdminAntes.vencidas, ...sinoAdminAntes.hoje, ...sinoAdminAntes.proximos3Dias].map((x) => x.id)
-  const vazamento = tarefaIds.filter((id) => idsNoSino.includes(id))
+  // "Sem responsável há mais de 1 dia": recua a criação das 15 (como sino-agrupado.test.ts).
+  await prisma.tarefa.updateMany({ where: { id: { in: tarefaIds } }, data: { createdAt: new Date(Date.now() - 2 * 86_400_000) } })
+  await avisarGestores({ agora: new Date() })
+  const sinoAdminAntes = await sinoDe(admin.id, admin.email, admin.tipo)
+  const pessoaisDoAdmin = await prisma.notificacaoOperacional.findMany({
+    where: { destinatarioId: admin.id, agrupado: true, tipo: { in: ["CHEGOU_TRABALHO", "PRECISA_AGIR"] }, tarefaIds: { hasSome: tarefaIds } },
+    select: { id: true },
+  })
   ok(
-    "3) NENHUMA das 15 certidões sem responsável aparece como notificação pessoal de prazo do Admin",
-    vazamento.length === 0,
-    `vazadas: ${vazamento.length}`,
+    "3) NENHUMA das 15 certidões sem responsável aparece como aviso PESSOAL (CHEGOU_TRABALHO/PRECISA_AGIR) do Admin",
+    pessoaisDoAdmin.length === 0,
+    `vazadas: ${pessoaisDoAdmin.length}`,
   )
-  // Escopado ao LINK desta obrigação (contém `processo=<proc.id>`) — nunca
-  // uma contagem global: o banco de teste é compartilhado entre suítes, e o
-  // mesmo Admin pode ter notificações de OUTRO processo/outra suíte ainda
-  // não lidas. "Exatamente 1" precisa ser "exatamente 1 PARA ESTE processo".
-  const distribuicaoNotifDesteProcesso = sinoAdminAntes.acontecimentos.filter(
-    (a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processo=${proc.id}`),
-  )
-  ok("4) exatamente 1 notificação da obrigação de distribuir DESTE processo no sino do Admin", distribuicaoNotifDesteProcesso.length === 1, String(distribuicaoNotifDesteProcesso.length))
-  ok("4) a notificação leva direto para o contexto de execução da distribuição", (distribuicaoNotifDesteProcesso[0]?.link ?? "").includes("/operacao?") && (distribuicaoNotifDesteProcesso[0]?.link ?? "").includes("aba=distribuicao"))
+  // Escopado à FAMÍLIA desta obrigação — nunca uma contagem global: o banco de teste é
+  // compartilhado entre suítes, e o mesmo Admin pode ter avisos de OUTRA família/suíte.
+  const distribuicaoDesteProcesso = sinoAdminAntes.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)
+  ok("4) exatamente 1 aviso de gestor SEM_RESPONSAVEL DESTA família no sino do Admin (não 15)", distribuicaoDesteProcesso.length === 1, String(distribuicaoDesteProcesso.length))
+  ok("4) o aviso diz '<Família> — 15 tarefas sem responsável há mais de 1 dia'",
+    distribuicaoDesteProcesso[0]?.titulo === `${MARCA} Grisotto — 15 tarefas sem responsável há mais de 1 dia` && distribuicaoDesteProcesso[0].contagem === 15, distribuicaoDesteProcesso[0]?.titulo)
+  ok("4) o aviso leva direto para o contexto de execução da distribuição da família",
+    distribuicaoDesteProcesso[0]?.link === `/operacao/distribuicao?processo=${proc.id}`, distribuicaoDesteProcesso[0]?.link ?? "")
+  ok("4) a antiga DISTRIBUICAO_NECESSARIA não nasce mais (fundida em SEM_RESPONSAVEL)",
+    (await prisma.notificacaoOperacional.count({ where: { processoId: proc.id, tipo: "DISTRIBUICAO_NECESSARIA" } })) === 0)
+  ok("4) nem um aviso por tarefa (tarefaId preenchido) para o Admin",
+    (await prisma.notificacaoOperacional.count({ where: { destinatarioId: admin.id, tarefaId: { in: tarefaIds } } })) === 0)
 
   // ══════════════════════════════════════════════════════════════════════
   secao("5) Admin atribui as 15 para Daniela")
@@ -144,42 +162,47 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("6) SINO do Admin DEPOIS — a obrigação se resolveu")
   // ══════════════════════════════════════════════════════════════════════
-  const sinoAdminDepois = await bucketsDoSino(admin.id, admin.email, admin.tipo)
-  const aindaPendenteDesteProcesso = sinoAdminDepois.acontecimentos.filter(
-    (a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processo=${proc.id}`),
-  )
-  ok("6) a notificação de distribuição DESTE processo não fica mais pendente no sino do Admin", aindaPendenteDesteProcesso.length === 0, String(aindaPendenteDesteProcesso.length))
+  const sinoAdminDepois = await sinoDe(admin.id, admin.email, admin.tipo)
+  const aindaPendenteDesteProcesso = sinoAdminDepois.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)
+  ok("6) o aviso de distribuição DESTA família não fica mais pendente no sino do Admin", aindaPendenteDesteProcesso.length === 0, String(aindaPendenteDesteProcesso.length))
   const obrigacaoDepois = await prisma.tarefa.findUnique({ where: { id: obrigacao!.id }, select: { concluida: true } })
   ok("6) a obrigação administrativa foi concluída", obrigacaoDepois?.concluida === true)
+  // Ela mesma reconcilia sem novo aviso: rodar o gestor de novo não ressuscita nada.
+  await avisarGestores({ agora: new Date() })
+  ok("6) e rodar a lista do gestor de novo não ressuscita o aviso",
+    (await prisma.notificacaoOperacional.count({ where: { destinatarioId: admin.id, processoId: proc.id, tipo: "SEM_RESPONSAVEL" } })) === 0)
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("7/8) SINO da Daniela — consolidada primeiro, prazo individual só depois de lida")
+  secao("7/8) SINO da Daniela — UM aviso de chegada; o prazo vem pelo resumo do dia, agrupado")
   // ══════════════════════════════════════════════════════════════════════
-  const sinoDanielaAntesDeLer = await bucketsDoSino(daniela.id, daniela.email, daniela.tipo)
-  const idsNoSinoDanielaAntes = [...sinoDanielaAntesDeLer.vencidas, ...sinoDanielaAntesDeLer.hoje, ...sinoDanielaAntesDeLer.proximos3Dias].map((x) => x.id)
+  const sinoDanielaAntesDeLer = await sinoDe(daniela.id, daniela.email, daniela.tipo)
   ok(
-    "7) enquanto a notificação consolidada está pendente, as 15 NÃO explodem em prazo individual (correção 17/09/2026)",
-    tarefaIds.every((id) => !idsNoSinoDanielaAntes.includes(id)),
+    "7) enquanto o aviso de chegada está pendente, as 15 NÃO explodem em avisos individuais (correção 17/09/2026)",
+    sinoDanielaAntesDeLer.avisos.length === 1 && sinoDanielaAntesDeLer.total === 1, `${sinoDanielaAntesDeLer.avisos.length} aviso(s)`,
   )
-  const consolidada = sinoDanielaAntesDeLer.acontecimentos.find((a) => a.tipo === "ATRIBUICAO_LOTE")
-  ok("7) existe a notificação consolidada da atribuição", consolidada != null)
+  const consolidada = sinoDanielaAntesDeLer.avisos.find((a) => a.tipo === "CHEGOU_TRABALHO" && a.familiaId === proc.id)
+  ok("7) existe o aviso consolidado da atribuição: '15 tarefas atribuídas a você'",
+    consolidada?.contagem === 15 && consolidada.titulo === `${MARCA} Grisotto — 15 tarefas atribuídas a você`, consolidada?.titulo)
 
-  // Marcar como lida libera a projeção de prazo normal — notificação lida ≠ tarefa concluída.
+  // Marcar como lido não muda nada nas tarefas — aviso lido ≠ tarefa concluída.
   if (consolidada) await marcarNotificacaoComoLida(prisma, { notificacaoId: consolidada.id, usuarioId: daniela.id })
-  const sinoDaniela = await bucketsDoSino(daniela.id, daniela.email, daniela.tipo)
-  const idsNoSinoDaniela = [...sinoDaniela.vencidas, ...sinoDaniela.hoje, ...sinoDaniela.proximos3Dias].map((x) => x.id)
-  const achadasDaniela = tarefaIds.filter((id) => idsNoSinoDaniela.includes(id))
-  ok("7) depois de lida, as 15 tarefas voltam a projetar prazo individual normalmente", achadasDaniela.length === 15, String(achadasDaniela.length))
-  ok("8) nenhuma duplicação — 15 ids distintos, nunca mais", new Set(idsNoSinoDaniela).size === idsNoSinoDaniela.length)
-  ok("8) o sino do Admin não continua mostrando as 15 (ownership migrou de verdade)", tarefaIds.every((id) => !idsNoSinoAdminDepois(sinoAdminDepois, id)))
+  // O prazo (em 2 dias) chega na véspera: o resumo das 07:00 diz que 15 vencem amanhã — em UM aviso.
+  await rodarResumoDiario({ agora: new Date(Date.now() + 86_400_000) })
+  const sinoDaniela = await sinoDe(daniela.id, daniela.email, daniela.tipo)
+  const agir = sinoDaniela.avisos.filter((a) => a.tipo === "PRECISA_AGIR" && a.familiaId === proc.id)
+  ok("7) depois de lida a chegada, as 15 voltam pelo prazo normal — num único PRECISA_AGIR '15 vencem amanhã'",
+    agir.length === 1 && agir[0].titulo === `${MARCA} Grisotto — 15 vencem amanhã` && agir[0].contagem === 15, agir[0]?.titulo ?? "sem aviso")
+  const linhaAgir = await prisma.notificacaoOperacional.findUnique({ where: { id: agir[0]?.id ?? 0 }, select: { tarefaIds: true } })
+  ok("8) nenhuma duplicação — 15 ids distintos, nunca mais", new Set(linhaAgir?.tarefaIds).size === 15 && tarefaIds.every((id) => linhaAgir?.tarefaIds.includes(id)))
+  const sinoAdminFinal = await sinoDe(admin.id, admin.email, admin.tipo)
+  ok("8) o sino do Admin não mostra as 15 (ownership migrou de verdade)",
+    (await prisma.notificacaoOperacional.count({
+      where: { destinatarioId: admin.id, agrupado: true, lidaEm: null, tarefaIds: { hasSome: tarefaIds } },
+    })) === 0 && sinoAdminFinal.avisos.every((a) => a.familiaId !== proc.id))
 
   console.log(`\n${passou} passaram, ${falhou} falharam`)
   if (falhou > 0) { console.log("Falhas:", falhas.join(", ")); process.exitCode = 1 }
   await limpar()
-}
-
-function idsNoSinoAdminDepois(sino: { vencidas: Array<{ id: number }>; hoje: Array<{ id: number }>; proximos3Dias: Array<{ id: number }> }, id: number) {
-  return [...sino.vencidas, ...sino.hoje, ...sino.proximos3Dias].some((x) => x.id === id)
 }
 
 main()

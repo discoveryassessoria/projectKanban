@@ -587,6 +587,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // stepKey + ciclo + documentoId) — mesmo padrão de
   // trava_instancia_ativa_unica_por_fase (20260928200000).
   '20260929220300_step_instance_unico_por_documento',
+  '20260929230000_sino_aviso_agrupado',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

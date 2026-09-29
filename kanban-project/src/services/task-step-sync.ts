@@ -23,7 +23,7 @@ import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { politicaDeSla, pausarSla, retomarSla } from "@/lib/operacional/sla-pausa"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
-import { marcarAtribuicaoComoLidaAoProgredir } from "@/lib/operacional/notificacao-canonica"
+import { marcarAtribuicaoComoLidaAoProgredir, sincronizarAvisosDeTarefas } from "@/lib/operacional/notificacao-canonica"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
@@ -818,6 +818,13 @@ async function aplicarTarefa(
     data,
   })
   if (res.count === 0) return { changed: false, anterior: t.statusTarefa, atual: t.statusTarefa, code: "CONFLITO" as H.FailureCodeD }
+
+  // O SINO (redesenho 29/09/2026, regra 5): tarefa que ENCERRA (concluída, cancelada,
+  // supersedida) sai dos avisos na hora, na mesma transação — qualquer que seja a porta
+  // que a levou até aqui (última etapa, retorno de fase, movimentação manual).
+  if (TAREFA_CONCLUIDA_SET.has(alvo) || alvo === "CANCELADA" || alvo === "SUPERSEDIDA") {
+    await sincronizarAvisosDeTarefas(tx, [tarefaId])
+  }
 
   const chaveEvt = H.chaveEvento(tipoEvento, "tarefa", tarefaId, alvo, o.ciclo, t.lockVersion)
   await tx.workflowEvento.create({

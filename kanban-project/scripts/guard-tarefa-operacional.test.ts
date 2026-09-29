@@ -210,47 +210,74 @@ ok("a rota delega à porta canônica", /atribuirTarefa\(/.test(rotaAtrib) && !/p
 ok("e valida permissão no backend", /verificarPermissao\(request, 'tarefas\./.test(rotaAtrib))
 
 // ═══════════════════════════════════════════════════════════════════════════
-secao("9) Notificação é marco da TAREFA — nunca da etapa")
+secao("9) Notificação é consequência da TAREFA — nunca da etapa")
 // ═══════════════════════════════════════════════════════════════════════════
+// SINO AGRUPADO (29/09/2026): o aviso não é mais "um por tarefa"; é UM não lido por
+// (destinatário, família, tipo), que LISTA as tarefas que cobre (`tarefaIds`). A regra
+// que este bloco protege é a mesma — notificação nunca é de etapa e nunca é fonte da
+// operação — no formato novo.
 ok("a notificação tem entidade própria", /model NotificacaoOperacional \{/.test(schema))
 const modeloNotif = schema.slice(schema.indexOf("model NotificacaoOperacional {"))
 const corpoNotif = modeloNotif.slice(0, modeloNotif.indexOf("\n}"))
-ok("ela aponta para a TAREFA, não para o passo",
-  /tarefaId Int/.test(corpoNotif) && !/stepInstance/i.test(corpoNotif))
+ok("ela aponta para TAREFAS (tarefaIds) e para a família (processoId), não para o passo",
+  /tarefaIds Int\[\]/.test(corpoNotif) && /processoId Int\?/.test(corpoNotif) && !/stepInstance/i.test(corpoNotif))
 ok("e tem chave de idempotência", /chaveIdempotencia String @unique/.test(corpoNotif))
-// Etapa 4 (12/09/2026): a porta única passou a viver em
-// notificacao-canonica.ts — tarefa-comandos.ts (e todo o resto do sistema)
-// DELEGA a ela, em vez de reimplementar a leitura+P2002 em cada chamador.
+ok("o aviso agrupado carrega contagem e atualizadoEm (recompostos no lugar)",
+  /agrupado Boolean/.test(corpoNotif) && /contagem Int/.test(corpoNotif) && /atualizadoEm DateTime/.test(corpoNotif))
+// A porta única de escrita vive em notificacao-canonica.ts — tarefa-comandos.ts (e
+// todo o resto do sistema) DELEGA a ela (`avisarChegouTrabalho`/`aoMudarDeDono` em
+// avisos-fatos.ts → `somarAoAviso`), em vez de reimplementar "acha ou cria" em cada
+// chamador.
 const notifCanonica = ler("lib/operacional/notificacao-canonica.ts")
-ok("existe UMA porta canônica de notificação", /export async function notificarAcontecimento/.test(notifCanonica))
-ok("o retry não duplica (leitura prévia pela chave, na porta única)",
-  /findUnique\(\{\s*where: \{ chaveIdempotencia: e\.chaveIdempotencia \}/.test(notifCanonica))
+const avisosSino = ler("lib/operacional/avisos-sino.ts")
+const avisosFatos = ler("lib/operacional/avisos-fatos.ts")
+ok("existe UMA porta canônica de escrita do sino (somar / gravar a foto)",
+  /export async function somarAoAviso/.test(notifCanonica) && /export async function gravarFotoDoAviso/.test(notifCanonica))
+ok("o retry não duplica: somar o mesmo fato (mesmos ids/itens) não muda nada",
+  /ordenar\(\[\.\.\.aberto\.tarefaIds, \.\.\.novosIds\]\)/.test(notifCanonica) &&
+  /contagem === aberto\.contagem && ids\.length === aberto\.tarefaIds\.length\) \{\s*return \{ id: aberto\.id, criado: false/.test(notifCanonica))
 ok("tarefa-comandos.ts DELEGA à porta única, não reimplementa",
-  /notificarAcontecimento\(/.test(comandos) && !/notificacaoOperacional\.create\(/.test(comandos))
-// A IDENTIDADE DO MARCO É O PRAZO, não o dia da varredura.
+  /aoMudarDeDono\(/.test(comandos) && /avisarChegouTrabalho\(/.test(comandos) &&
+  !/notificacaoOperacional\.(create|update|delete)/.test(comandos) && !/notificarAcontecimento\(/.test(comandos))
+ok("e as portas de dono (avisos-fatos) só escrevem via somarAoAviso",
+  /somarAoAviso\(/.test(avisosFatos) && !/notificacaoOperacional\./.test(avisosFatos))
+// A IDENTIDADE DO FATO NÃO É O DIA DA VARREDURA.
 //
-// Com o dia na chave, o aviso de atraso renascia toda manhã: um prazo vencido
-// virava um alerta por dia até alguém desligar o sino. E, quando o gestor movia
-// o prazo, o marco antigo continuava valendo — a tarefa remarcada recebia
-// "atrasada" pelo prazo que já não existia.
-ok("o marco é tarefa + tipo + PRAZO de referência",
-  /diaOperacional\(prazo\)/.test(comandos) && /export function marcoDoPrazo/.test(comandos),
-  "um prazo vencido é um fato, não um fato por manhã")
-ok("a varredura distingue criada de reencontrada", /criada\.criada/.test(comandos))
-ok("e a idempotência é garantida pelo BANCO, não só pela leitura (na porta única)",
-  /code !== "P2002"/.test(notifCanonica),
+// Antes era "tarefa + tipo + prazo de referência" numa chave por linha (`marcoDoPrazo`).
+// Com o aviso agrupado, prazo vencido é PARTE do PRECISA_AGIR (`vencidas`), recomposto
+// NO LUGAR: a varredura horária nunca renotifica o mesmo prazo vencido, e depois do
+// clique só um FATO NOVO (nova vencida / nova cobrança, comparada à foto que a pessoa
+// viu) abre outro aviso. Um prazo vencido é um fato, não um fato por manhã.
+ok("prazo/atraso são parte do PRECISA_AGIR (foto), não aviso por tarefa",
+  /export async function avaliarPrecisaAgir/.test(avisosSino) && /vencidas: number\[\]/.test(avisosSino) &&
+  !/export function marcoDoPrazo/.test(comandos))
+ok("depois do clique só reabre com FATO NOVO (nunca por vencida já vista)",
+  /novosDoResumo\(candidato\)/.test(avisosSino) && /nv\.vencidas\.length \+ nv\.cobrancas\.length === 0\) return \{ acao: 'NADA'/.test(avisosSino))
+ok("a foto distingue criada de reencontrada (SEM_MUDANCA não renotifica nem sobe ao topo)",
+  /acao: "CRIADO"/.test(notifCanonica) && /acao: "SEM_MUDANCA"/.test(notifCanonica))
+// A trava é DUPLA: aplicação (advisory lock por pessoa/família/tipo) e BANCO (índice
+// único parcial), porque duas varreduras simultâneas leem "não existe" ao mesmo tempo.
+ok("e a unicidade é garantida pelo BANCO, não só pela leitura (índice único parcial + advisory lock)",
+  /pg_advisory_xact_lock/.test(notifCanonica) &&
+  /NotificacaoOperacional_um_aberto_por_familia_tipo/.test(ler("prisma/migrations/20260929230000_sino_aviso_agrupado/migration.sql")),
   "duas varreduras simultâneas leem 'não existe' ao mesmo tempo")
-// A notificação é da TAREFA. Avisar por etapa transformaria um pedido de
+// A notificação é da TAREFA/FAMÍLIA. Avisar por etapa transformaria um pedido de
 // certidão em seis avisos e devolveria, pelo sino, o desenho "etapa é tarefa"
 // que o resto do guard proíbe.
 // (`transicionarPassoTx` aparece aqui porque iniciar a tarefa move a etapa
 // corrente — é delegação de transição, não tipo de notificação.)
 ok("nenhum tipo de notificação é de etapa",
-  !/tipo:\s*'(STEP|PASSO_|ETAPA_)/.test(comandos))
-// O link passou a carregar o PROCESSO, para o aviso abrir a Central no
-// documento certo em vez da home da operação. Continua sendo o helper canônico.
-ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(/.test(comandos))
-ok("e ele leva ao processo, não à home da operação", /urlOperacionalDaTarefa/.test(comandos))
+  !/tipo:\s*'(STEP|PASSO_|ETAPA_)/.test(comandos) && !/'(STEP|PASSO_|ETAPA_)[A-Z_]*'/.test(ler("lib/operacional/aviso-texto.ts")))
+// O link do aviso carrega o PROCESSO (a família) pelo helper de navegação canônico —
+// o aviso abre a Operação já na família certa, nunca a home nem o /kanban.
+ok("o link do aviso vem do helper canônico de navegação (família)",
+  /urlOperacaoDaFamilia\(processoId, 'fila'\)/.test(avisosFatos) && /urlOperacaoDaFamilia\(processoId\)/.test(avisosFatos) &&
+  /urlOperacaoDaFamilia\(g\.processoId, 'acompanhamento'\)/.test(avisosSino))
+ok("e ele leva ao processo, não à home da operação nem ao /kanban",
+  /p\.set\('processo', String\(processoId\)\)/.test(ler("lib/operacional/navegacao.ts")) &&
+  !/\/kanban/.test(semComentarios(avisosFatos + avisosSino + notifCanonica)))
+ok("o link canônico da tarefa (linkDaTarefa) continua sendo o helper único, para quem abre UMA tarefa",
+  /urlOperacionalDaTarefa/.test(comandos))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("10) O motor atravessa fases sem destruir trabalho")

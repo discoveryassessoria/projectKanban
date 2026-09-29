@@ -26,6 +26,7 @@ import {
   materializarTarefaOperacional, sincronizarTarefaComWorkflow, STATUS_TERMINAIS,
 } from './tarefa-canonica'
 import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
+import { sincronizarAvisosDeTarefas } from './notificacao-canonica'
 
 export interface ResultadoReconciliacao {
   instanciasAvaliadas: number
@@ -340,6 +341,8 @@ export async function reconciliarTarefas(
         where: { id: t.id },
         data: { statusTarefa: 'CANCELADA', motivoCodigo: 'CAUSA_REMOVIDA', dataConclusao: agora, causaRemovidaEm: agora },
       })
+      // O SINO (regra 5): cancelada sai dos avisos na hora.
+      await sincronizarAvisosDeTarefas(tx, [t.id])
       await tx.logAuditoria.create({
         data: {
           acao: 'TAREFA_CANCELADA',

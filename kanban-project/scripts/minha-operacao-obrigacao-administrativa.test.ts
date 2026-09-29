@@ -21,6 +21,7 @@ import { signAuthToken } from "@/lib/auth-jwt"
 import { criarTarefaManual } from "@/lib/operacional/tarefa-ciclo"
 import { redistribuirTarefas } from "@/lib/operacional/tarefa-comandos"
 import { reconciliarObrigacaoDeAtribuicao, usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
+import { avisarGestores } from "@/lib/operacional/avisos-sino"
 import { urlDistribuicaoDoProcesso } from "@/lib/operacional/navegacao"
 import { GET as getTarefasOperacao } from "@/src/app/api/operacao/tarefas/route"
 import { GET as getHome } from "@/src/app/api/home/route"
@@ -74,7 +75,8 @@ async function sinoDe(userId: number, email: string, tipo: string) {
   const req = new NextRequest("http://localhost/api/notificacoes", { headers: { Authorization: `Bearer ${token}` } })
   const resp = await getNotificacoes(req)
   if (resp.status !== 200) throw new Error(`notificacoes respondeu ${resp.status}`)
-  return (await resp.json()) as { vencidas: Array<{ id: number }>; hoje: Array<{ id: number }>; proximos3Dias: Array<{ id: number }>; acontecimentos: Array<{ tipo: string; link: string }> }
+  // Sino agrupado: { avisos, anteriores, total } — só a tabela de avisos, nenhum balde de Tarefa.
+  return (await resp.json()) as { avisos: Array<{ id: number; tipo: string; link: string | null; familiaId: number | null; contagem: number }>; anteriores: unknown[]; total: number }
 }
 
 async function main() {
@@ -154,12 +156,22 @@ async function corpo() {
   const atencaoA = somaAtencao(homeAdmin)
   ok("A) Home do Admin conta pelo menos 1 (executavelAgora+atrasadas+bloqueadas) — a obrigação exige atenção", atencaoA >= 1, String(atencaoA))
 
+  // A tarefa sem dono só vira aviso do gestor (SEM_RESPONSAVEL) depois de MAIS DE 1 DIA sem dono:
+  // envelhece as 15 e recompõe a lista do gestor (a mesma função que o cron horário chama).
+  await prisma.tarefa.updateMany({ where: { id: { in: tarefaIds } }, data: { createdAt: new Date(Date.now() - 2 * 86_400_000) } })
+  await avisarGestores({ agora: new Date() })
   const sinoAntes = await sinoDe(admin.id, admin.email, admin.tipo)
-  const idsPessoaisAntes = [...sinoAntes.vencidas, ...sinoAntes.hoje, ...sinoAntes.proximos3Dias].map((x) => x.id)
-  ok("A) nenhuma das 15 certidões vaza como notificação pessoal de prazo do Admin", tarefaIds.every((id) => !idsPessoaisAntes.includes(id)))
-  const distribNotifAntes = sinoAntes.acontecimentos.filter((a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processo=${proc.id}`))
-  ok("A) existe exatamente a notificação administrativa pertinente", distribNotifAntes.length === 1, String(distribNotifAntes.length))
-  ok("A) o link da notificação leva à Distribuição, escopado à Grisotto", distribNotifAntes[0]?.link === urlDistribuicaoDoProcesso(proc.id))
+  const avisosDaFamiliaAntes = sinoAntes.avisos.filter((a) => a.familiaId === proc.id)
+  const pessoaisDaFamilia = await prisma.notificacaoOperacional.findMany({
+    where: { destinatarioId: admin.id, agrupado: true, tipo: { in: ["PRECISA_AGIR", "CHEGOU_TRABALHO"] }, tarefaIds: { hasSome: tarefaIds } },
+  })
+  ok("A) nenhuma das 15 certidões vaza como aviso pessoal (PRECISA_AGIR/CHEGOU_TRABALHO) do Admin", pessoaisDaFamilia.length === 0, String(pessoaisDaFamilia.length))
+  const distribNotifAntes = avisosDaFamiliaAntes.filter((a) => a.tipo === "SEM_RESPONSAVEL")
+  ok("A) existe exatamente o aviso administrativo pertinente (UM SEM_RESPONSAVEL da família, cobrindo as 15)",
+    distribNotifAntes.length === 1 && distribNotifAntes[0].contagem === 15, String(distribNotifAntes.length))
+  ok("A) o link do aviso leva à Distribuição, escopado à Grisotto", distribNotifAntes[0]?.link === urlDistribuicaoDoProcesso(proc.id))
+  ok("A) a tarefa administrativa não gera aviso próprio (nem DISTRIBUICAO_NECESSARIA)",
+    (await prisma.notificacaoOperacional.count({ where: { OR: [{ tarefaId: obrigacao?.id }, { processoId: proc.id, tipo: "DISTRIBUICAO_NECESSARIA" }] } })) === 0)
 
   // ══════════════════════════════════════════════════════════════════════
   secao("B) Admin distribui 10 para Daniela — mesma obrigação, contador vira 5")
@@ -203,8 +215,8 @@ async function corpo() {
   ok("C) Home do Admin caiu em pelo menos 1 (a fatia desta obrigação resolvida)", atencaoC <= atencaoA - 1, `${atencaoA} → ${atencaoC}`)
 
   const sinoDepoisC = await sinoDe(admin.id, admin.email, admin.tipo)
-  const aindaPendenteC = sinoDepoisC.acontecimentos.filter((a) => a.tipo === "DISTRIBUICAO_NECESSARIA" && a.link.includes(`processo=${proc.id}`))
-  ok("C) a notificação administrativa foi resolvida (não fica pendente)", aindaPendenteC.length === 0)
+  const aindaPendenteC = sinoDepoisC.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)
+  ok("C) o aviso administrativo foi resolvido (não fica pendente)", aindaPendenteC.length === 0)
 
   const filaDanielaC = await minhaFilaDe(daniela.id, daniela.email, daniela.tipo)
   const idsDanielaC = filaDanielaC.linhas.map((l) => l.taskId)

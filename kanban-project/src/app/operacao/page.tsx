@@ -44,7 +44,7 @@ const CARREGANDO = (
 
 // `useSearchParams()` exige um limite de Suspense — sem isto o build estático
 // falha ("should be wrapped in a suspense boundary") na hora de prerenderizar
-// a página. `OperacaoPageConteudo` é quem lê `?aba=`; a casca só monta o
+// a página. `OperacaoV3` (dentro de `OperacaoPageConteudo`) é quem lê `?processo=` e `?aba=`; a casca só monta o
 // limite, com o MESMO visual de carregamento de sempre como fallback.
 export default function OperacaoPage() {
   return (

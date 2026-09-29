@@ -1,38 +1,26 @@
 // src/app/api/cron/avisos-prazo/route.ts
 // ============================================================================
-// A VARREDURA DE PRAZOS — de hora em hora, e só isso.
+// A VARREDURA HORÁRIA DO SINO — só FATO NOVO (redesenho 29/09/2026).
 //
-//   GET/POST /api/cron/avisos-prazo          executa e envia
-//   GET/POST /api/cron/avisos-prazo?ensaio=1 só relata o que enviaria
+//   GET/POST /api/cron/avisos-prazo          executa
+//   GET/POST /api/cron/avisos-prazo?ensaio=1 só relata o que faria
 //
-// `avisarPrazosEAtrasos` existia, era testada e não tinha chamador: prazo
-// vencia e ninguém era avisado, porque não havia quem perguntasse as horas.
-// Esta rota é esse chamador — e não faz mais nada.
+// Já NÃO cria um aviso por tarefa (esse modelo — 10 "Prazo próximo" da mesma família
+// no mesmo minuto — foi abolido). De hora em hora esta rota:
+//   • atualiza NO LUGAR o PRECISA_AGIR aberto de cada (pessoa, família);
+//   • abre aviso só quando há FATO NOVO depois do clique (nova vencida, nova cobrança),
+//     com o texto dizendo o que é novo ("Cibils — 1 nova vencida");
+//   • atualiza a lista do gestor (ESCALADA, SEM_RESPONSAVEL, INTEGRIDADE crítica);
+//   • reconcilia posse (regra 5) e expurga: não lido expira em 7 dias, lido some em 30.
+// A foto do dia (07:00) é de `/api/cron/resumo-diario`.
 //
-// Etapa 4 (item 19): a mesma rota também chama `avisarAcontecimentosOperacionais`
-// — retorno de terceiro, acompanhamento vencido, entrada em EM_RISCO — porque
-// nenhum cron pode ter sua própria definição de atrasado/risco/retorno; as
-// duas varreduras leem os mesmos motores canônicos (`tempo-operacional.ts`,
-// `proximo-acontecimento.ts`) e não um segundo cron com semântica própria.
+// Não muda status, prazo, workflow, etapa, responsável nem SLA: só LÊ e escreve aviso.
 //
-// ─── O QUE ELA NÃO FAZ ──────────────────────────────────────────────────────
-// Não muda status, não move prazo, não toca em workflow, etapa, responsável
-// nem SLA. Um cron que escreve estado é um segundo motor operando sem ninguém
-// olhando; este LÊ o relógio e cria notificação quando um marco novo acontece.
-//
-// ─── POR QUE DE HORA EM HORA ────────────────────────────────────────────────
-// O SLA é medido em dias. De hora em hora, o aviso do dia anterior sai no
-// máximo com uma hora de diferença do ideal — precisão de sobra. A cada minuto
-// seriam 1.440 execuções diárias para produzir a mesma informação.
-//
-// Rodar de hora em hora não multiplica aviso: a identidade do marco é
-// `tarefa + tipo + prazo`, e o banco recusa a segunda pela chave única.
-//
-// Autorização: mesma convenção dos crons existentes (header da Vercel,
-// CRON_SECRET ou operador autenticado com permissão de gerenciamento).
+// Autorização: mesma convenção dos crons existentes (header da Vercel, CRON_SECRET ou
+// operador autenticado com permissão de gerenciamento).
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
-import { avisarPrazosEAtrasos, avisarAcontecimentosOperacionais, avisarAtencaoConsolidada } from '@/lib/operacional/tarefa-comandos'
+import { rodarVarreduraHoraria } from '@/lib/operacional/avisos-sino'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 
@@ -52,48 +40,20 @@ async function executar(req: NextRequest) {
   if (!(await autorizado(req))) {
     return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
   }
-
-  // ENSAIO: conta e lista sem enviar. É como se confere o volume antes de
-  // ligar o sino para gente de verdade.
   const ensaio = new URL(req.url).searchParams.get('ensaio') === '1'
-
   try {
-    // A CONSOLIDADA VAI PRIMEIRO, e sozinha — ela decide quais tarefas têm
-    // 2+ relógios vencendo juntos (ou a dimensão nova, TERCEIRO_ATRASADO/
-    // acompanhamento só da subtarefa) e as duas varreduras de sempre
-    // recebem essa lista para EXCLUIR: a mesma tarefa nunca recebe o aviso
-    // consolidado E o aviso isolado no mesmo instante (mandato "consolidação
-    // do sino", 19/09/2026).
-    const consolidada = await avisarAtencaoConsolidada({ ensaio })
-    const [prazos, atencao] = await Promise.all([
-      avisarPrazosEAtrasos({ ensaio, excluirTarefaIds: consolidada.tarefasConsolidadas }),
-      avisarAcontecimentosOperacionais({ ensaio, excluirTarefaIds: consolidada.tarefasConsolidadas }),
-    ])
-    // O log da EXECUÇÃO, não da tarefa: registrar "verifiquei a tarefa 3358"
-    // uma vez por hora encheria o histórico de cada tarefa com o fato de nada
-    // ter acontecido.
+    const r = await rodarVarreduraHoraria({ ensaio })
     console.log(
-      `[cron/atencao-consolidada]${ensaio ? ' ENSAIO' : ''} avaliadas=${consolidada.avaliadas} ` +
-      `consolidadas=${consolidada.consolidadas} dedup=${consolidada.deduplicadas} ` +
-      `semDestinatario=${consolidada.semDestinatario} erros=${consolidada.erros}`,
+      `[cron/avisos-prazo]${ensaio ? ' ENSAIO' : ''} precisaAgir grupos=${r.precisaAgir.grupos} criados=${r.precisaAgir.criados} ` +
+      `atualizados=${r.precisaAgir.atualizados} removidos=${r.precisaAgir.removidos} | gestor itens=${r.gestor.itens} ` +
+      `criados=${r.gestor.criados} removidos=${r.gestor.removidos} | posse retiradas=${r.posse?.retiradas ?? '-'} ` +
+      `expirados=${r.expurgo?.expirados ?? '-'} lidosApagados=${r.expurgo?.apagadosLidos ?? '-'}`,
     )
-    console.log(
-      `[cron/avisos-prazo]${ensaio ? ' ENSAIO' : ''} avaliadas=${prazos.avaliadas} ` +
-      `prazo=${prazos.prazo} atraso=${prazos.atraso} dedup=${prazos.deduplicados} ` +
-      `semDestinatario=${prazos.semDestinatario} erros=${prazos.erros}`,
-    )
-    console.log(
-      `[cron/atencao]${ensaio ? ' ENSAIO' : ''} avaliadas=${atencao.avaliadas} ` +
-      `retorno=${atencao.retorno} acompanhamento=${atencao.acompanhamento} risco=${atencao.risco} ` +
-      `dedup=${atencao.deduplicados} semDestinatario=${atencao.semDestinatario} erros=${atencao.erros}`,
-    )
-    // Erro em tarefa isolada não é sucesso: o agendador precisa enxergar.
-    const erros = consolidada.erros + prazos.erros + atencao.erros
-    return NextResponse.json({ consolidada, prazos, atencao }, { status: erros > 0 ? 207 : 200 })
+    return NextResponse.json(r)
   } catch (e) {
     console.error('[cron/avisos-prazo] falha na varredura:', e)
     return NextResponse.json(
-      { error: 'Varredura de prazos indisponível.', detalhe: String((e as Error)?.message ?? e).slice(0, 300) },
+      { error: 'Varredura de avisos indisponível.', detalhe: String((e as Error)?.message ?? e).slice(0, 300) },
       { status: 500 },
     )
   }

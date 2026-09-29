@@ -23,8 +23,9 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import {
-  atribuirTarefa, transferirTarefa, avisarAcontecimentosOperacionais,
+  atribuirTarefa, transferirTarefa,
 } from "@/lib/operacional/tarefa-comandos"
+import { avaliarPrecisaAgir } from "@/lib/operacional/avisos-sino"
 import { concluirEtapa } from "@/lib/operacional/tarefa-etapa"
 import {
   aguardarTerceiro, retomarDeEspera, politicaDeSla, reabrirTarefa,
@@ -264,8 +265,17 @@ async function registrarContato(stepId: number, contato: Record<string, unknown>
   await prisma.phaseWorkflowStepInstance.update({ where: { id: stepId }, data: { metadata: { operacao: novaOperacao } as Prisma.InputJsonValue } })
 }
 
+// CONTRATO NOVO (sino agrupado, 29/09/2026): o aviso é da (pessoa, família, tipo) e lista
+// as tarefas em `tarefaIds` — `tarefaId` (por tarefa) só existe no legado.
 const notifs = (tarefaId: number, tipo?: string) =>
-  prisma.notificacaoOperacional.findMany({ where: { tarefaId, ...(tipo ? { tipo } : {}) }, select: { id: true, tipo: true, destinatarioId: true, lidaEm: true } })
+  prisma.notificacaoOperacional.findMany({
+    where: { tarefaIds: { has: tarefaId }, agrupado: true, ...(tipo ? { tipo } : {}) },
+    select: { id: true, tipo: true, destinatarioId: true, lidaEm: true, resumo: true },
+  })
+/** A tarefa está como COBRANÇA no PRECISA_AGIR aberto da pessoa (retorno/acompanhamento/terceiro atrasado). */
+const cobradaNoPrecisaAgir = async (tarefaId: number, destinatarioId: number) =>
+  (await notifs(tarefaId, "PRECISA_AGIR")).filter((n) =>
+    n.destinatarioId === destinatarioId && n.lidaEm == null && ((n.resumo ?? {}) as { cobrancas?: number[] }).cobrancas?.includes(tarefaId) === true)
 const logsDe = (tarefaId: number, acao?: string) =>
   prisma.logAuditoria.findMany({ where: { entidade: "Tarefa", entidadeId: tarefaId, ...(acao ? { acao } : {}) }, orderBy: { id: "asc" } })
 const eventosDe = (processoId: number, tipo?: string) =>
@@ -415,8 +425,8 @@ async function main() {
     // da operadora. O escalonamento para admin citado no comentário original
     // (dívida arquitetural em proximo-acontecimento.ts) ficou moot: não há
     // mais notificação de risco nenhuma para escalar.
-    await avisarAcontecimentosOperacionais()
-    const notifsRisco = await notifs(t1.id, "EM_RISCO")
+    await avaliarPrecisaAgir({ modo: "FOTO" })
+    const notifsRisco = await prisma.notificacaoOperacional.findMany({ where: { OR: [{ tarefaId: t1.id }, { tarefaIds: { has: t1.id } }], tipo: "EM_RISCO" } })
     ok("14) EM_RISCO não notifica ninguém — nem o responsável atual, nem admin", notifsRisco.length === 0)
 
     // 15) retorno antecipado — antes de qualquer previsão vencer
@@ -431,10 +441,11 @@ async function main() {
     ok("16) retorno remove a espera (statusTarefa sai de AGUARDANDO_TERCEIRO)", tRetomada.statusTarefa !== "AGUARDANDO_TERCEIRO")
 
     // 17) retorno aparece na atenção (notificação real)
-    const rAviso = await avisarAcontecimentosOperacionais()
-    void rAviso
-    const notifsRetorno = await notifs(t1.id, "RETORNO_TERCEIRO")
-    ok("17) retorno aparece na atenção — notificação RETORNO_TERCEIRO real", notifsRetorno.length >= 1)
+    // Contrato novo: "retorno recebido" vira COBRANÇA no PRECISA_AGIR do responsável.
+    await avaliarPrecisaAgir({ modo: "FOTO" })
+    const respT1 = (await prisma.tarefa.findUniqueOrThrow({ where: { id: t1.id }, select: { responsavelId: true } })).responsavelId
+    const notifsRetorno = respT1 != null ? await cobradaNoPrecisaAgir(t1.id, respT1) : []
+    ok("17) retorno aparece na atenção — cobrança real no PRECISA_AGIR do responsável", notifsRetorno.length >= 1)
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -457,7 +468,7 @@ async function main() {
     ok("20) terceiro atrasado (acompanhamentoVencido) NÃO vira atraso interno (Tarefa.dataPrazo no futuro)", estado20?.acompanhamentoVencido === true && estado20?.atrasoInterno === false)
 
     // 21) follow-up do passo 3
-    await avisarAcontecimentosOperacionais()
+    await avaliarPrecisaAgir({ modo: "FOTO" })
     ok("21) follow-up do passo 3 gera acompanhamento vencido na leitura canônica (mesmo predicado do passo 2)", estado20?.acompanhamentoVencido === true)
 
     await retomarDeEspera({ tarefaId: t1.id, autorId: daniela.id, motivo: "Correios entregou" })
@@ -803,9 +814,9 @@ async function main() {
     const cN = pN.certidoes[0]
     const tN = await tarefaDoDocumento(cN.documentoId)
     const rAtrib = await atribuirTarefa({ tarefaId: tN.id, responsavelId: daniela.id, autorId: marco.id })
-    ok("62) atribuição inicial notifica (ATRIBUICAO)", rAtrib.ok === true && rAtrib.notificacaoId != null)
-    const notifAtrib = await notifs(tN.id, "ATRIBUICAO")
-    ok("62b) exatamente 1 notificação de atribuição inicial", notifAtrib.length === 1)
+    ok("62) atribuição inicial notifica (CHEGOU_TRABALHO)", rAtrib.ok === true && rAtrib.notificacaoId != null)
+    const notifAtrib = await notifs(tN.id, "CHEGOU_TRABALHO")
+    ok("62b) exatamente 1 notificação de atribuição inicial", notifAtrib.length === 1 && notifAtrib[0].destinatarioId === daniela.id)
 
     // 58) notificação lida não altera atenção — a Tarefa continua na fila
     await prisma.notificacaoOperacional.update({ where: { id: notifAtrib[0].id }, data: { lidaEm: new Date() } })
@@ -828,27 +839,28 @@ async function main() {
     // 61) falha da notificação não perde atenção — a varredura tolera erro por
     // item (catch interno) e a Tarefa continua na fila independentemente do
     // resultado da varredura.
-    const r1 = await avisarAcontecimentosOperacionais()
-    const r2 = await avisarAcontecimentosOperacionais()
-    ok("61) duas varreduras seguidas não lançam exceção (erros são contidos por item, nunca derrubam a varredura)", typeof r1.erros === "number" && typeof r2.erros === "number")
+    const r1 = await avaliarPrecisaAgir({ modo: "INCREMENTAL" })
+    const r2 = await avaliarPrecisaAgir({ modo: "INCREMENTAL" })
+    ok("61) duas varreduras seguidas não lançam exceção (nunca derrubam a varredura)", typeof r1.grupos === "number" && typeof r2.grupos === "number")
     const filaFinal = await minhaFila(daniela.id)
     ok("61b) a Tarefa continua na fila independentemente de erro/sucesso de notificação", filaFinal.some((l) => l.taskId === tN.id))
 
     // 63) avanço normal de step não notifica como nova atribuição
-    const notifsAtribAntes = (await notifs(tN.id, "ATRIBUICAO")).length
+    const notifsAtribAntes = (await notifs(tN.id, "CHEGOU_TRABALHO")).length
     await concluirEtapa({ tarefaId: tN.id, autorId: daniela.id })
-    const notifsAtribDepois = (await notifs(tN.id, "ATRIBUICAO")).length
+    const notifsAtribDepois = (await notifs(tN.id, "CHEGOU_TRABALHO")).length
     ok("63) avanço normal de step NÃO gera notificação de \"nova atribuição\"", notifsAtribDepois === notifsAtribAntes, `${notifsAtribAntes} → ${notifsAtribDepois}`)
 
     // 64) handoff notifica
     const handoffN = await transferirTarefa({ tarefaId: tN.id, responsavelId: joao.id, autorId: marco.id, motivo: "handoff item 64" })
-    ok("64) handoff notifica (TRANSFERENCIA)", handoffN.ok === true && (await notifs(tN.id, "TRANSFERENCIA")).length === 1)
+    ok("64) handoff notifica (CHEGOU_TRABALHO para quem recebeu)", handoffN.ok === true && (await notifs(tN.id, "CHEGOU_TRABALHO")).filter((n) => n.destinatarioId === joao.id).length === 1)
+    ok("64b) handoff avisa quem perdeu (MUDOU_DE_MAO)", (await notifs(tN.id, "MUDOU_DE_MAO")).filter((n) => n.destinatarioId === daniela.id).length === 1)
 
     // 65) retorno notifica conforme política (RETORNO_TERCEIRO)
     await aguardarTerceiro({ tarefaId: tN.id, autorId: joao.id, motivo: "esperando terceiro" })
     await registrarContato(cN.stepIds[1], { canal: "EMAIL", resultado: "RETORNO_RECEBIDO" })
-    await avisarAcontecimentosOperacionais()
-    ok("65) retorno notifica conforme a política (RETORNO_TERCEIRO real)", (await notifs(tN.id, "RETORNO_TERCEIRO")).length >= 1)
+    await avaliarPrecisaAgir({ modo: "FOTO" })
+    ok("65) retorno notifica conforme a política (cobrança real no PRECISA_AGIR do responsável atual)", (await cobradaNoPrecisaAgir(tN.id, joao.id)).length >= 1)
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -1082,7 +1094,7 @@ async function main() {
     const totalAposRetroceder = await prisma.tarefa.count({ where: { processoId: p77.processoId } })
     ok("78) retroceder para a fase original não recria a Tarefa (contagem continua 1)", totalAposRetroceder === tarefasAntesMover.length, `${totalAposRetroceder}`)
     const mesmaTarefa = await prisma.tarefa.findUniqueOrThrow({ where: { id: t77.id } })
-    ok("78b) é a MESMA Tarefa (id preservado, statusTarefa preservado)", mesmaTarefa.id === t77.id && mesmaTarefa.statusTarefa === tarefasAntesMover[0].statusTarefa)
+    ok("78b) é a MESMA Tarefa (id preservado, statusTarefa preservado)", mesmaTarefa.id === t77.id && mesmaTarefa.statusTarefa === tarefasAntesMover.find((x) => x.id === t77.id)?.statusTarefa)
 
     // 79) CANCELADA != CONCLUÍDA — em nenhuma projeção
     const rCancelar = await import("@/lib/operacional/tarefa-ciclo").then((m) => m.cancelarTarefa({ tarefaId: t77.id, autorId: marco.id, motivo: "teste item 79" }))
@@ -1309,8 +1321,9 @@ async function main() {
 
     // 107) falha de notificação não afeta a fila operacional — a Tarefa continua visível
     await prisma.tarefa.update({ where: { id: t104a.id }, data: { responsavelId: null } }) // remove destinatário — a varredura pula, sem lançar
-    const r107 = await avisarAcontecimentosOperacionais()
-    ok("107) varredura tolera tarefa sem destinatário sem lançar exceção", typeof r107.semDestinatario === "number")
+    const r107 = await avaliarPrecisaAgir({ modo: "FOTO" })
+    ok("107) varredura tolera tarefa sem destinatário sem lançar exceção (e não avisa ninguém por ela)",
+      typeof r107.grupos === "number" && (await notifs(t104a.id, "PRECISA_AGIR")).length === 0)
     const { linhas: linhas107 } = await visaoGerencial({ processoId: p104a.processoId }, new Date())
     ok("107b) a Tarefa continua visível/operável na fila mesmo sem poder ser notificada", linhas107.some((l) => l.taskId === t104a.id))
   }

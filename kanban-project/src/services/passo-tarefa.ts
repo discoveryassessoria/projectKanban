@@ -7,6 +7,7 @@
 // Regra: gera só quando tipo=HUMANO && geraTarefa=true && status=DISPONIVEL &&
 // aplicável ao contexto. Passos não aplicáveis não geram Tarefa.
 
+import { avisarChegouTrabalho } from "@/lib/operacional/avisos-fatos"
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import type { Tarefa, Prisma } from "@prisma/client"
@@ -350,6 +351,14 @@ export async function garantirTarefaDePasso(
           chaveIdempotencia: chaveDaExecucao,
         },
       })
+
+      // O SINO (redesenho 29/09/2026): trabalho que NASCE já com dono "chega" para ele —
+      // soma no aviso "<Família> — N tarefas atribuídas a você" (um por família).
+      if (resp.responsavelId != null) {
+        await avisarChegouTrabalho(tx, {
+          destinatarioId: resp.responsavelId, tarefas: [{ id: tarefa.id, processoId: step.processoId }], autorId: null,
+        })
+      }
 
       // O EVENTO E O OUTBOX SÃO IDEMPOTENTES PELA CHAVE — e agora respeitam isso.
       //

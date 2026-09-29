@@ -33,10 +33,9 @@ test('Operação v3 — 6 abas, KPIs e sino carregam sem erro', async ({ page })
     await expect(page.getByText(rotulo, { exact: true }).first(), `KPI "${rotulo}" existe`).toBeVisible({ timeout: 20_000 })
   }
 
-  // O sino de notificações abre e fecha.
-  await page.getByRole('button', { name: /Notificações operacionais/i }).click()
-  await expect(page.getByText('Notificações operacionais', { exact: true })).toBeVisible({ timeout: 10_000 })
-  await page.getByRole('button', { name: '✕' }).first().click()
+  // NÃO existe mais um sininho próprio da Operação (redesenho do sino, 29/09/2026): o sino é
+  // UM só, no cabeçalho global, e a aba Acompanhamento já mostra vencidas e escaladas.
+  await expect(page.getByRole('button', { name: /Notificações operacionais/i })).toHaveCount(0)
 
   // Navega pelas 6 abas — cada uma renderiza sem quebrar (estado vazio é ok, crash não).
   for (const rotulo of ABAS.slice(1)) {

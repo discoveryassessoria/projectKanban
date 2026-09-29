@@ -15,6 +15,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { atribuirTarefa } from "@/lib/operacional/tarefa-comandos"
 import { devolverAFila } from "@/lib/operacional/tarefa-ciclo"
+import { avisarGestores } from "@/lib/operacional/avisos-sino"
 import { minhaFila, semResponsavel } from "@/lib/operacional/tarefa-projecoes"
 import {
   contarSemResponsavelDistribuivel, usuarioResponsavelPelaDistribuicao,
@@ -34,7 +35,10 @@ async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
   const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefaId: { in: ts.map((t) => t.id) } } })
+  const usersLimpeza = await prisma.usuario.findMany({ where: { email: { endsWith: "@obrig.test" } }, select: { id: true } })
+  await prisma.notificacaoOperacional.deleteMany({
+    where: { OR: [{ tarefaId: { in: ts.map((t) => t.id) } }, { processoId: { in: ids } }, { destinatarioId: { in: usersLimpeza.map((u) => u.id) } }] },
+  })
   await prisma.logAuditoria.deleteMany({ where: { entidade: "Tarefa", entidadeId: { in: ts.map((t) => t.id) } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: ids } } })
@@ -110,6 +114,23 @@ async function main() {
   ok("A) responsável resolvido é o mesmo (competência, não hardcode)",
     (await usuarioResponsavelPelaDistribuicao(prisma)) === gestor.id)
 
+  // Sino agrupado: a obrigação NÃO cria mais notificação por tarefa administrativa
+  // (DISTRIBUICAO_NECESSARIA saiu). O aviso equivalente é o SEM_RESPONSAVEL do gestor, recomposto
+  // por `avisarGestores` — UM por família, só para tarefa sem dono há MAIS DE 1 dia.
+  ok("A) a obrigação não gera nenhuma notificação própria (nem por tarefa administrativa, nem DISTRIBUICAO_NECESSARIA)",
+    (await prisma.notificacaoOperacional.count({ where: { OR: [{ tarefaId: todasAdm[0].id }, { processoId: grisotto.processoId, tipo: "DISTRIBUICAO_NECESSARIA" }] } })) === 0)
+  await avisarGestores({ agora: new Date() })
+  ok("A) recém-criadas (menos de 1 dia sem dono) ainda não avisam o gestor",
+    (await prisma.notificacaoOperacional.count({ where: { destinatarioId: gestor.id, processoId: grisotto.processoId, tipo: "SEM_RESPONSAVEL" } })) === 0)
+  await prisma.tarefa.updateMany({ where: { id: { in: grisotto.tarefaIds } }, data: { createdAt: new Date(Date.now() - 2 * 86_400_000) } })
+  await avisarGestores({ agora: new Date() })
+  const srGris = await prisma.notificacaoOperacional.findMany({
+    where: { destinatarioId: gestor.id, processoId: grisotto.processoId, tipo: "SEM_RESPONSAVEL", agrupado: true, lidaEm: null },
+  })
+  ok("A) o gestor recebe UM SEM_RESPONSAVEL da família cobrindo as 15 (nunca 15 avisos)",
+    srGris.length === 1 && srGris[0].contagem === 15 && srGris[0].tarefaIds.length === 15, `${srGris.length}`)
+  ok("A) o aviso leva à Distribuição da família", srGris[0]?.link === `/operacao/distribuicao?processo=${grisotto.processoId}`, srGris[0]?.link ?? "")
+
   // ═══════════════════════════════════════════════════════════════════════
   secao("B) Minha Operação do Marco — 1 item administrativo")
   // ═══════════════════════════════════════════════════════════════════════
@@ -174,8 +195,12 @@ async function main() {
     obrigacaoFinal.concluida === true && obrigacaoFinal.statusTarefa === "CONCLUIDO_RECEBIDO")
   const filaMarcoDepois = await minhaFila(gestor.id)
   ok("F) desaparece da Minha Operação ativa do Marco", !filaMarcoDepois.some((l) => l.taskId === obrigacaoAntes))
+  const srFinal = await prisma.notificacaoOperacional.count({
+    where: { processoId: grisotto.processoId, tipo: "SEM_RESPONSAVEL", agrupado: true },
+  })
+  ok("F) o aviso SEM_RESPONSAVEL do gestor não fica pendente (atribuir todas o tira na hora)", srFinal === 0, `${srFinal}`)
   const notifDaObrigacao = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: obrigacaoAntes } })
-  ok("F) a notificação correspondente não fica pendente", notifDaObrigacao.every((n) => n.lidaEm != null))
+  ok("F) e a Tarefa administrativa nunca teve notificação própria pendente", notifDaObrigacao.every((n) => n.lidaEm != null))
 
   // ═══════════════════════════════════════════════════════════════════════
   secao("B/F) Daniela agora tem as 15 — ownership mudou, tarefas não se multiplicaram")

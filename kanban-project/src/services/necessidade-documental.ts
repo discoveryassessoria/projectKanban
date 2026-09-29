@@ -13,6 +13,7 @@ import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sy
 import { assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { randomUUID } from "crypto"
+import { aoMudarDeDono } from "@/lib/operacional/avisos-fatos"
 
 export { montarChaveIdempotencia, sujeitoValido } from "@/src/services/necessidade-documental-helpers"
 
@@ -425,10 +426,11 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
     // decisão de distribuição, não herança automática do ciclo anterior.
     const tarefasReabertas = await db.tarefa.findMany({
       where: { workflowStepInstanceId: { in: passos.map((p) => p.id) }, responsavelId: { not: null } },
-      select: { id: true, responsavelId: true, titulo: true },
+      select: { id: true, responsavelId: true, titulo: true, processoId: true },
     })
     for (const t of tarefasReabertas) {
       await db.tarefa.update({ where: { id: t.id }, data: { responsavelId: null } })
+      await aoMudarDeDono(db, { tarefas: [{ id: t.id, processoId: t.processoId }], de: t.responsavelId, para: null, autorId: null })
       await db.logAuditoria.create({
         data: {
           acao: "TAREFA_SEM_RESPONSAVEL_NA_REATIVACAO", entidade: "Tarefa", entidadeId: t.id,

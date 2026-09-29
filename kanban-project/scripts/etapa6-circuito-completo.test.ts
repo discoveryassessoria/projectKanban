@@ -19,7 +19,8 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
-import { atribuirTarefa, transferirTarefa, avisarAcontecimentosOperacionais } from "@/lib/operacional/tarefa-comandos"
+import { atribuirTarefa, transferirTarefa } from "@/lib/operacional/tarefa-comandos"
+import { avaliarPrecisaAgir } from "@/lib/operacional/avisos-sino"
 import { aguardarTerceiro, retomarDeEspera, politicaDeSla } from "@/lib/operacional/tarefa-ciclo"
 import { concluirEtapa } from "@/lib/operacional/tarefa-etapa"
 import { estadoTemporalDaOperacao } from "@/lib/operacional/proximo-acontecimento"
@@ -108,8 +109,16 @@ function naLista<T extends { taskId: number }>(linhas: T[], taskId: number): T |
   return linhas.find((l) => l.taskId === taskId)
 }
 
+// CONTRATO NOVO (sino agrupado, 29/09/2026): o aviso é da (pessoa, família, tipo) e lista as
+// tarefas em `tarefaIds` (o `tarefaId` por tarefa só existe no legado).
 const notifs = (tarefaId: number, tipo?: string) =>
-  prisma.notificacaoOperacional.findMany({ where: { tarefaId, ...(tipo ? { tipo } : {}) }, select: { id: true, tipo: true, destinatarioId: true } })
+  prisma.notificacaoOperacional.findMany({
+    where: { tarefaIds: { has: tarefaId }, agrupado: true, ...(tipo ? { tipo } : {}) },
+    select: { id: true, tipo: true, destinatarioId: true, resumo: true },
+  })
+const cobrancasDe = async (tarefaId: number, destinatarioId: number) =>
+  (await notifs(tarefaId, "PRECISA_AGIR")).filter((n) =>
+    n.destinatarioId === destinatarioId && ((n.resumo ?? {}) as { cobrancas?: number[] }).cobrancas?.includes(tarefaId) === true)
 
 const logsDe = (tarefaId: number, acao?: string) =>
   prisma.logAuditoria.findMany({ where: { entidade: "Tarefa", entidadeId: tarefaId, ...(acao ? { acao } : {}) }, orderBy: { id: "asc" } })
@@ -156,7 +165,7 @@ async function main() {
     const logs = await logsDe(p.tarefaId)
     ok("2) histórico registrou a atribuição", logs.length > 0)
 
-    const ns = await notifs(p.tarefaId, "ATRIBUICAO")
+    const ns = await notifs(p.tarefaId, "CHEGOU_TRABALHO")
     ok("2) notificação real criada para Daniela", ns.length === 1 && ns[0].destinatarioId === daniela.id)
 
     // Recarregar TODAS as projeções — a verdade precisa persistir em todas.
@@ -194,7 +203,9 @@ async function main() {
     ok("4) passo atual avançou para o SEGUNDO step", t.workflowStepInstanceId === p.stepIds[1])
     ok("4) mesma Tarefa (nenhuma duplicada)", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
     ok("5) ownership PERMANECEU com Daniela", t.responsavelId === daniela.id)
-    ok("5) nenhuma nova notificação de atribuição surgiu", (await notifs(p.tarefaId, "ATRIBUICAO")).length === 1)
+    ok("5) nenhuma nova notificação de atribuição surgiu (nenhum novo CHEGOU_TRABALHO da família; o aviso não cresceu)",
+      (await prisma.notificacaoOperacional.findMany({ where: { destinatarioId: daniela.id, processoId: p.processoId, tipo: "CHEGOU_TRABALHO", agrupado: true } }))
+        .every((n, _i, todos) => todos.length <= 1 && n.contagem <= 1))
     ok("5) nenhuma segunda obrigação materializada", (await prisma.necessidadeDocumental.count({ where: { processoId: p.processoId } })) === 1)
 
     const step2 = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[1] } })
@@ -254,7 +265,7 @@ async function main() {
     const { linhas } = await visaoGerencial({ processoId: p.processoId }, new Date())
     const l = naLista(linhas, p.tarefaId)
     ok("7) a projeção reflete acompanhamentoVencido sem qualquer notificação ter sido enviada ainda",
-      l?.acompanhamentoVencido === true && (await notifs(p.tarefaId, "ACOMPANHAMENTO_VENCIDO")).length === 0)
+      l?.acompanhamentoVencido === true && (await notifs(p.tarefaId, "PRECISA_AGIR")).length === 0)
   }
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -266,13 +277,15 @@ async function main() {
     ok("8) atenção muda IMEDIATAMENTE (leitura pura, antes de qualquer notificação)",
       estado?.retornoRecebido === true && estado?.proximoAcontecimento.tipo === "retorno_recebido")
 
-    const r1 = await avisarAcontecimentosOperacionais()
-    const notifsRetorno1 = await notifs(p.tarefaId, "RETORNO_TERCEIRO")
-    ok("8) exatamente 1 notificação de retorno", notifsRetorno1.length === 1)
+    // Contrato novo: "retorno recebido" é COBRANÇA dentro do PRECISA_AGIR da (pessoa, família).
+    const r1 = await avaliarPrecisaAgir({ modo: "FOTO" })
+    const notifsRetorno1 = await cobrancasDe(p.tarefaId, daniela.id)
+    ok("8) exatamente 1 notificação de retorno (cobrança no PRECISA_AGIR da Daniela)", notifsRetorno1.length === 1)
 
     // Retry do mesmo retorno — não duplica.
-    const r2 = await avisarAcontecimentosOperacionais()
-    ok("8) retry do mesmo retorno não duplica", (await notifs(p.tarefaId, "RETORNO_TERCEIRO")).length === 1, JSON.stringify({ r1: r1.retorno, r2: r2.retorno }))
+    const r2 = await avaliarPrecisaAgir({ modo: "FOTO" })
+    ok("8) retry do mesmo retorno não duplica", (await cobrancasDe(p.tarefaId, daniela.id)).length === 1 && (await notifs(p.tarefaId, "PRECISA_AGIR")).length === 1,
+      JSON.stringify({ r1: r1.criados, r2: r2.criados }))
 
     // Daniela volta a agir — retoma da espera.
     const antesTarefas = await prisma.tarefa.count({ where: { processoId: p.processoId } })
@@ -320,10 +333,13 @@ async function main() {
     // CORREÇÃO 15/09/2026: EM_RISCO deixou de notificar — é diagnóstico de
     // configuração (Saúde do Sistema), não urgência da operadora. A projeção/
     // contador/filtro acima continuam corretos; só o sino fica quieto.
-    const r1 = await avisarAcontecimentosOperacionais()
-    ok("10) EM_RISCO não gera notificação nenhuma (correção 15/09/2026)", r1.risco === 0 && (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
-    const r2 = await avisarAcontecimentosOperacionais()
-    ok("10) reprocessar continua sem notificar ninguém", r2.risco === 0 && (await notifs(p.tarefaId, "EM_RISCO")).length === 0)
+    const semAvisoDeRisco = async () => (await prisma.notificacaoOperacional.count({
+      where: { tipo: "EM_RISCO", OR: [{ tarefaId: p.tarefaId }, { tarefaIds: { has: p.tarefaId } }] },
+    })) === 0
+    await avaliarPrecisaAgir({ modo: "FOTO" })
+    ok("10) EM_RISCO não gera notificação nenhuma (correção 15/09/2026)", await semAvisoDeRisco())
+    await avaliarPrecisaAgir({ modo: "FOTO" })
+    ok("10) reprocessar continua sem notificar ninguém", await semAvisoDeRisco())
 
     // A causa é resolvida — o conflito deixa de existir.
     await prisma.phaseWorkflowStepInstance.update({ where: { id: p.stepIds[1] }, data: { prazo: new Date(hoje.getTime() + 9 * 86400000) } })
@@ -340,6 +356,9 @@ async function main() {
 
     const r1 = await transferirTarefa({ tarefaId: p.tarefaId, responsavelId: joao.id, autorId: marco.id, motivo: "Daniela de férias" })
     ok("11a) transferência 1 aceita", r1.ok === true)
+    ok("11a) a primeira transferência avisou João (CHEGOU_TRABALHO) e Daniela (MUDOU_DE_MAO)",
+      (await notifs(p.tarefaId, "CHEGOU_TRABALHO")).some((n) => n.destinatarioId === joao.id)
+      && (await notifs(p.tarefaId, "MUDOU_DE_MAO")).some((n) => n.destinatarioId === daniela.id))
     const r2 = await transferirTarefa({ tarefaId: p.tarefaId, responsavelId: daniela.id, autorId: marco.id, motivo: "Daniela de volta" })
     ok("11b) transferência 2 (de volta) aceita", r2.ok === true)
 
@@ -351,10 +370,13 @@ async function main() {
     const logsTransf = await logsDe(p.tarefaId, "TAREFA_TRANSFERIDA")
     ok("11) histórico preserva as DUAS transferências", logsTransf.length === 2)
 
-    const notifsTransf = await notifs(p.tarefaId, "TRANSFERENCIA")
-    ok("11) uma notificação por transferência (2 no total)", notifsTransf.length === 2)
-    ok("11) a segunda foi para Daniela, a primeira para João",
-      notifsTransf.some((n) => n.destinatarioId === joao.id) && notifsTransf.some((n) => n.destinatarioId === daniela.id))
+    // Contrato novo: um aviso agrupado por (pessoa, família, tipo) — a segunda transferência
+    // avisa Daniela (CHEGOU_TRABALHO), João perde a tarefa (MUDOU_DE_MAO) e o aviso de
+    // chegada dele sobre ela some (regra 5).
+    const chegouT = await notifs(p.tarefaId, "CHEGOU_TRABALHO")
+    ok("11) a segunda transferência avisou Daniela (CHEGOU_TRABALHO), um aviso só", chegouT.filter((n) => n.destinatarioId === daniela.id).length === 1)
+    ok("11) João não fica com aviso de chegada de uma tarefa que já não é dele", chegouT.every((n) => n.destinatarioId !== joao.id))
+    ok("11) João foi avisado de que a tarefa saiu da fila dele (MUDOU_DE_MAO)", (await notifs(p.tarefaId, "MUDOU_DE_MAO")).some((n) => n.destinatarioId === joao.id))
 
     const { linhas } = await visaoGerencial({ processoId: p.processoId }, new Date())
     ok("11) projeção converge no responsável final", naLista(linhas, p.tarefaId)?.responsavelId === daniela.id)
@@ -388,12 +410,12 @@ async function main() {
   // ═══════════════════════════════════════════════════════════════════════
   {
     const antesTarefas = await prisma.tarefa.count({ where: { processoId: p.processoId } })
-    const antesNotifs = await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId } })
+    const antesNotifs = (await notifs(p.tarefaId)).length
     // Reatribuir para o MESMO responsável é recusado (idempotência por regra de negócio).
     const retry = await atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: daniela.id, autorId: marco.id })
     ok("19) reatribuir ao MESMO responsável é recusado, não silenciosamente aceito", retry.ok === false)
     ok("19) nenhuma Tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === antesTarefas)
-    ok("19) nenhuma notificação nova", (await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId } })) === antesNotifs)
+    ok("19) nenhuma notificação nova", (await notifs(p.tarefaId)).length === antesNotifs)
 
     // Concluir a MESMA etapa de novo — idempotente (não reconclui, não duplica evento).
     const eventosAntes = await prisma.workflowEvento.count({ where: { processoId: p.processoId } })

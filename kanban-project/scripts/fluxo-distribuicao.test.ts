@@ -14,6 +14,10 @@
 // SEM RESPONSÁVEL é estado operacional NORMAL. Não é órfã, não é erro, não é
 // bloqueio: é trabalho existente esperando uma decisão humana de distribuição.
 //
+// CONTRATO DO SINO AGRUPADO (29/09/2026): "recebe" = UM aviso CHEGOU_TRABALHO por
+// (pessoa, família) listando a tarefa em `tarefaIds`; quem perde a tarefa recebe
+// MUDOU_DE_MAO e some dos avisos dela (regra 5). Nunca um aviso por tarefa.
+//
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
 import { prisma } from "@/lib/prisma"
@@ -37,7 +41,10 @@ async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
   const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefaId: { in: ts.map((t) => t.id) } } })
+  const users = await prisma.usuario.findMany({ where: { email: { endsWith: "@distr.test" } }, select: { id: true } })
+  await prisma.notificacaoOperacional.deleteMany({
+    where: { OR: [{ tarefaId: { in: ts.map((t) => t.id) } }, { processoId: { in: ids } }, { destinatarioId: { in: users.map((u) => u.id) } }] },
+  })
   await prisma.logAuditoria.deleteMany({ where: { entidade: "Tarefa", entidadeId: { in: ts.map((t) => t.id) } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.workflowEvento.deleteMany({ where: { processoId: { in: ids } } })
@@ -99,8 +106,12 @@ async function palco(sufixo: string, prioridade?: "URGENTE" | "ALTA" | "MEDIA" |
 }
 
 const naFila = (linhas: LinhaDeFila[], taskId: number) => linhas.some((l) => l.taskId === taskId)
+/** Avisos AGRUPADOS que listam a tarefa (`tarefaIds`) — o sino novo não tem aviso por tarefa. */
 const notificacoes = (tarefaId: number) =>
-  prisma.notificacaoOperacional.findMany({ where: { tarefaId }, select: { id: true, destinatarioId: true, tipo: true, chaveIdempotencia: true } })
+  prisma.notificacaoOperacional.findMany({
+    where: { agrupado: true, tarefaIds: { has: tarefaId } },
+    select: { id: true, destinatarioId: true, tipo: true, contagem: true, link: true }, orderBy: { id: "asc" },
+  })
 
 async function main() {
   exigirBancoDeTeste("prova o fluxo de distribuição de tarefas")
@@ -166,7 +177,8 @@ async function main() {
   ok("12) e não na de Maria", !naFila(await minhaFila(maria.id), X))
 
   const n1 = await notificacoes(X)
-  ok("13) UMA notificação, para a Daniela", n1.length === 1 && n1[0].destinatarioId === daniela.id, `${n1.length}`)
+  ok("13) UM aviso (CHEGOU_TRABALHO), para a Daniela", n1.length === 1 && n1[0].destinatarioId === daniela.id && n1[0].tipo === "CHEGOU_TRABALHO", `${n1.length}`)
+  ok("13) com link para a fila da família", n1[0]?.link === `/operacao?processo=${p.processoId}&aba=fila`, n1[0]?.link ?? "")
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("§25) Retry de assignTask não duplica nada")
@@ -177,7 +189,8 @@ async function main() {
   // (aberta quando X nasceu sem responsável, já concluída quando X foi
   // atribuído) é histórico legítimo, não uma tarefa operacional nova.
   ok("nenhuma tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: "NORMAL" } })) === 1)
-  ok("nenhuma notificação nova", (await notificacoes(X)).length === 1)
+  const nRetry = await notificacoes(X)
+  ok("nenhum aviso novo nem contagem alterada", nRetry.length === 1 && nRetry[0].contagem === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("§24) Concorrência: ninguém sobrescreve em silêncio")
@@ -191,7 +204,8 @@ async function main() {
     conflito.ok ? "sobrescreveu!" : conflito.codigo)
   ok("a responsabilidade permanece de quem chegou primeiro",
     (await prisma.tarefa.findUniqueOrThrow({ where: { id: X }, select: { responsavelId: true } })).responsavelId === daniela.id)
-  ok("e nenhuma notificação foi criada pelo conflito", (await notificacoes(X)).length === 1)
+  const nConf = await notificacoes(X)
+  ok("e nenhum aviso foi criado pelo conflito", nConf.length === 1 && nConf[0].destinatarioId === daniela.id && nConf[0].contagem === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("§22) Transferência: Daniela → Maria, mesma tarefa")
@@ -202,8 +216,10 @@ async function main() {
   ok("saiu da fila da Daniela", !naFila(await minhaFila(daniela.id), X))
   ok("entrou na fila da Maria", naFila(await minhaFila(maria.id), X))
   const n2 = await notificacoes(X)
-  ok("Maria recebeu UMA notificação pertinente",
-    n2.filter((x) => x.destinatarioId === maria.id).length === 1, `${n2.length} no total`)
+  ok("Maria recebeu UM aviso pertinente (CHEGOU_TRABALHO)",
+    n2.filter((x) => x.destinatarioId === maria.id).length === 1 && n2.find((x) => x.destinatarioId === maria.id)?.tipo === "CHEGOU_TRABALHO", `${n2.length} no total`)
+  ok("a Daniela recebeu MUDOU_DE_MAO e a tarefa saiu do aviso de chegada dela (regra 5)",
+    n2.filter((x) => x.destinatarioId === daniela.id).map((x) => x.tipo).join() === "MUDOU_DE_MAO", n2.map((x) => `${x.destinatarioId}:${x.tipo}`).join(" "))
   ok("o histórico registra a transferência",
     (await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: X } })) >= 2)
 
@@ -218,6 +234,8 @@ async function main() {
   ok("e a marca de atribuição foi limpa junto", t2.dataAtribuicao === null)
   ok("saiu da fila da Maria", !naFila(await minhaFila(maria.id), X))
   ok("voltou para SEM RESPONSÁVEL", naFila(await semResponsavel(), X))
+  ok("a Maria recebeu MUDOU_DE_MAO e a tarefa saiu do CHEGOU_TRABALHO dela",
+    (await notificacoes(X)).filter((x) => x.destinatarioId === maria.id).map((x) => x.tipo).join() === "MUDOU_DE_MAO")
   // `tipo: "NORMAL"` — devolver à fila abre a obrigação administrativa de
   // distribuir (Tarefa própria, `tipo: "ADMINISTRATIVA"`, ver
   // lib/operacional/obrigacao-atribuicao.ts). Ela NÃO é uma cópia de X: é

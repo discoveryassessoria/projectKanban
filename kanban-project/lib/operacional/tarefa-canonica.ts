@@ -30,6 +30,7 @@
 // `chaveIdempotencia` = processo + obrigação + pessoa + ciclo. Nunca o título:
 // título muda, o trabalho é o mesmo. Materializar três vezes dá UMA tarefa.
 // ============================================================================
+import { avisarChegouTrabalho } from './avisos-fatos'
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
 import { chaveDaUnidade, identidadeDaUnidade, tarefaVivaDaUnidade } from '@/lib/operacional/identidade-da-tarefa'
@@ -295,6 +296,15 @@ export async function materializarTarefaOperacional(
       detalhes: { chave, ...nova, prazo: prazo?.toISOString() ?? null },
     },
   })
+
+  // O SINO (redesenho 29/09/2026): trabalho que NASCE já com dono também "chegou" para
+  // ele — soma no aviso "<Família> — N tarefas atribuídas a você" (um por família), em vez
+  // de o sino recalcular "novas" a partir de Tarefa.
+  if (nova.responsavelId != null) {
+    await avisarChegouTrabalho(tx, {
+      destinatarioId: nova.responsavelId, tarefas: [{ id: criada.id, processoId: nova.processoId }], autorId: null,
+    })
+  }
 
   return { tarefaId: criada.id, criada: true }
 }

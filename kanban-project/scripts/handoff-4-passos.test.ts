@@ -137,9 +137,11 @@ async function main() {
   ok("6) histórico contém a transferência (handoff) para o Marco", acoes.includes("TAREFA_TRANSFERIDA"), acoes.join(","))
   ok("6) NENHUM log de 'tarefa criada' novo aparece além da materialização original — histórico é UM só, não dois", true)
 
-  secao("7) Notificação — Marco é avisado do handoff")
-  const notifMarco = await prisma.notificacaoOperacional.findMany({ where: { tarefaId: p.tarefaId, destinatarioId: marco.id, tipo: "TRANSFERENCIA" } })
-  ok("7) Marco recebeu notificação de transferência/handoff", notifMarco.length === 1, `${notifMarco.length}`)
+  secao("7) Aviso — Marco é avisado do handoff (CHEGOU_TRABALHO); a Daniela, que fez o handoff, não é avisada do que ela mesma fez")
+  const avisosMarco = await prisma.notificacaoOperacional.findMany({ where: { processoId: p.processoId, destinatarioId: marco.id, tipo: "CHEGOU_TRABALHO", agrupado: true } })
+  ok("7) Marco recebeu UM aviso CHEGOU_TRABALHO da família cobrindo a tarefa", avisosMarco.length === 1 && avisosMarco[0].tarefaIds.includes(p.tarefaId), `${avisosMarco.length}`)
+  const avisosDaniela = await prisma.notificacaoOperacional.findMany({ where: { processoId: p.processoId, destinatarioId: daniela.id, agrupado: true } })
+  ok("7) a Daniela (autora da transferência) não recebe MUDOU_DE_MAO, e o CHEGOU_TRABALHO inicial dela saiu com a tarefa", avisosDaniela.length === 0, `${avisosDaniela.length}`)
 
   secao("8) Filas depois do handoff — sai de Daniela, entra em Marco")
   const filaDanielaDepois = await minhaFila(daniela.id)
@@ -159,11 +161,17 @@ async function main() {
   const totalTarefasFinal = await prisma.tarefa.count({ where: { processoId: p.processoId } })
   ok("10) ainda 1 única Tarefa no processo ao final", totalTarefasFinal === 1, `${totalTarefasFinal}`)
 
-  secao("11) AVANÇO NORMAL (mesmo responsável) não deve gerar notificação de nova atribuição/transferência")
-  const notifsAtribuicaoTotal = await prisma.notificacaoOperacional.count({ where: { tarefaId: p.tarefaId, tipo: { in: ["ATRIBUICAO", "TRANSFERENCIA"] } } })
-  // Só 2 esperadas: a atribuição inicial à Daniela e o handoff para o Marco — os
-  // 4 concluirEtapa (3 da Daniela + 1 do Marco) NÃO geraram nenhuma a mais.
-  ok("11) só 2 notificações de responsabilidade no total (atribuição inicial + 1 handoff), nunca uma por passo concluído", notifsAtribuicaoTotal === 2, `${notifsAtribuicaoTotal}`)
+  secao("11) AVANÇO NORMAL (mesmo responsável) não deve gerar aviso de nova atribuição/mudança de mão")
+  const avisosResp = await prisma.notificacaoOperacional.findMany({
+    where: { processoId: p.processoId, agrupado: true, tipo: { in: ["CHEGOU_TRABALHO", "MUDOU_DE_MAO"] } },
+    select: { destinatarioId: true, tipo: true },
+  })
+  // Só o do handoff: o CHEGOU_TRABALHO do Marco (o inicial da Daniela saiu quando a tarefa saiu
+  // da mão dela; ela, autora do handoff, não é avisada). Os 4 concluirEtapa (3 da Daniela + 1 do
+  // Marco) NÃO criaram nenhum aviso a mais, e nunca é um por passo.
+  const chaves = avisosResp.map((a) => `${a.destinatarioId}:${a.tipo}`)
+  ok("11) só 1 aviso de responsabilidade no total (chegou p/ Marco no handoff), nunca um por passo concluído",
+    avisosResp.length === 1 && chaves[0] === `${marco.id}:CHEGOU_TRABALHO`, chaves.join(","))
 
   await limpar()
 

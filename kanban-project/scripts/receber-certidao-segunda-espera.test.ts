@@ -46,6 +46,7 @@ const secao = (t: string) => console.log(`\n${t}`)
 async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
+  await prisma.notificacaoOperacional.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.subtaskExecution.deleteMany({ where: { stepInstance: { processoId: { in: ids } } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
@@ -138,10 +139,11 @@ async function main() {
   const antesDeEnviar = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true } })
   ok("01) antes de enviar, Tarefa NÃO está bloqueada", antesDeEnviar.statusTarefa !== "BLOQUEADA", antesDeEnviar.statusTarefa)
 
-  const notifAntes = await prisma.notificacaoOperacional.findFirstOrThrow({
-    where: { tarefaId: p.tarefaId, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  const avisoAntes = await prisma.notificacaoOperacional.findMany({
+    where: { processoId: processo.id, destinatarioId: daniela.id, tipo: "CHEGOU_TRABALHO", agrupado: true, tarefaIds: { has: p.tarefaId } },
+    select: { lidaEm: true },
   })
-  ok("01b) notificação de atribuição nasce não lida", notifAntes.lidaEm == null)
+  ok("01b) o aviso de atribuição (CHEGOU_TRABALHO da família) nasce não lido", avisoAntes.length === 1 && avisoAntes[0].lidaEm == null, `${avisoAntes.length}`)
 
   const r1 = await executarAcaoCadastrada(p.stepIds[0], "enviado", {}, ctx)
   ok("02) passo 1 (solicitar) conclui", r1.ok === true, JSON.stringify(r1).slice(0, 150))
@@ -149,10 +151,10 @@ async function main() {
   // CORREÇÃO (15/09/2026) — Daniela nunca chamou iniciarTarefa() explicitamente
   // neste teste; concluir o passo 1 direto (concluirPasso → marcarAtribuicaoComoLidaAoProgredir)
   // já é progresso real e precisa limpar a notificação sozinho.
-  const notifDepois = await prisma.notificacaoOperacional.findFirstOrThrow({
-    where: { tarefaId: p.tarefaId, destinatarioId: daniela.id, tipo: "ATRIBUICAO" }, select: { lidaEm: true },
+  const avisoDepois = await prisma.notificacaoOperacional.findMany({
+    where: { processoId: processo.id, destinatarioId: daniela.id, tipo: "CHEGOU_TRABALHO", agrupado: true, tarefaIds: { has: p.tarefaId } },
   })
-  ok("02b) concluir o passo 1 (sem nunca ter chamado iniciarTarefa) já marca a notificação como lida", notifDepois.lidaEm != null)
+  ok("02b) concluir o passo 1 (sem nunca ter chamado iniciarTarefa) já tira a tarefa do aviso de atribuição", avisoDepois.length === 0, `${avisoDepois.length}`)
 
   const step1Depois = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: p.stepIds[0] }, select: { status: true } })
   ok("03) passo 1 fica CONCLUIDO (não fica preso em BLOQUEADO)", step1Depois.status === "CONCLUIDO", step1Depois.status)

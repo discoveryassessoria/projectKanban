@@ -6,11 +6,17 @@
 // A pergunta: mudar de dono muda a MESMA tarefa, avisa UMA vez, e não vira
 // ruído quando o retry acontece?
 //
+// CONTRATO DO SINO AGRUPADO (29/09/2026): "avisa" = UM aviso não lido por (pessoa,
+// família, tipo), atualizado no lugar. Atribuir → CHEGOU_TRABALHO para quem recebe;
+// transferir → MUDOU_DE_MAO para quem perdeu + CHEGOU_TRABALHO para quem recebeu;
+// prazo/atraso viraram partes do PRECISA_AGIR ("vencidas · vencem hoje · vencem amanhã").
+//
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
 import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
-import { atribuirTarefa, transferirTarefa, iniciarTarefa, avisarPrazosEAtrasos, linkDaTarefa } from "@/lib/operacional/tarefa-comandos"
+import { atribuirTarefa, transferirTarefa, iniciarTarefa } from "@/lib/operacional/tarefa-comandos"
+import { avaliarPrecisaAgir } from "@/lib/operacional/avisos-sino"
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 
 const MARCA = "ATRIB-TEST"
@@ -26,7 +32,10 @@ const secao = (t: string) => console.log(`\n${t}`)
 async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
   const ids = procs.map((p) => p.id)
-  await prisma.notificacaoOperacional.deleteMany({ where: { tarefa: { processoId: { in: ids } } } })
+  const users = await prisma.usuario.findMany({ where: { email: { endsWith: "@atrib.test" } }, select: { id: true } })
+  await prisma.notificacaoOperacional.deleteMany({
+    where: { OR: [{ tarefa: { processoId: { in: ids } } }, { processoId: { in: ids } }, { destinatarioId: { in: users.map((u) => u.id) } }] },
+  })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
@@ -69,8 +78,13 @@ async function palco() {
 const usuario = (nome: string) =>
   prisma.usuario.create({ data: { nome, email: `${nome.toLowerCase()}@atrib.test`, senha: "x", tipo: "assistente" }, select: { id: true, nome: true } })
 
+/** Avisos AGRUPADOS que listam a tarefa (o sino novo não tem aviso por tarefa: `tarefaIds`). */
 const notifs = (tarefaId: number, tipo?: string) =>
-  prisma.notificacaoOperacional.findMany({ where: { tarefaId, ...(tipo ? { tipo } : {}) }, select: { id: true, tipo: true, destinatarioId: true, titulo: true, link: true, chaveIdempotencia: true } })
+  prisma.notificacaoOperacional.findMany({
+    where: { agrupado: true, tarefaIds: { has: tarefaId }, ...(tipo ? { tipo } : {}) },
+    select: { id: true, tipo: true, destinatarioId: true, titulo: true, link: true, contagem: true, processoId: true, resumo: true, lidaEm: true },
+    orderBy: { id: "asc" },
+  })
 
 async function main() {
   exigirBancoDeTeste("prova atribuição, transferência e notificação canônicas")
@@ -111,23 +125,26 @@ async function main() {
     (await prisma.phaseWorkflowInstance.count({ where: { processoId: p.processoId } })) === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
-  secao("E/F) Atribuição cria UMA notificação — e o retry não cria outra")
+  secao("E/F) Atribuição cria UM aviso (CHEGOU_TRABALHO) — e o retry não cria outro")
   // ═════════════════════════════════════════════════════════════════════════
-  let ns = await notifs(p.tarefaId, "ATRIBUICAO")
-  ok("exatamente uma notificação", ns.length === 1, `${ns.length}`)
+  let ns = await notifs(p.tarefaId, "CHEGOU_TRABALHO")
+  ok("exatamente um aviso", ns.length === 1, `${ns.length}`)
   ok("para a Daniela", ns[0]?.destinatarioId === daniela.id)
-  // O link do aviso é o MESMO deep-link da fila: processo + Central + taskId.
-  // Enquanto ele era só `/operacao?taskId=`, clicar no sino levava à lista em
-  // vez de levar ao trabalho.
-  ok("com link canônico para a tarefa",
-    ns[0]?.link === linkDaTarefa(p.tarefaId, p.processoId), String(ns[0]?.link))
-  ok("e o título diz o que aconteceu", /Nova tarefa atribuída/.test(ns[0]?.titulo ?? ""))
+  ok("da família do processo, cobrindo a tarefa (contagem 1)", ns[0]?.processoId === p.processoId && ns[0]?.contagem === 1)
+  // O aviso leva à FILA da família (`aba=fila`, as novas no topo): o sino é agrupado,
+  // não aponta mais para UMA tarefa. Nunca /kanban.
+  ok("com link canônico para a fila da família",
+    ns[0]?.link === `/operacao?processo=${p.processoId}&aba=fila`, String(ns[0]?.link))
+  ok("e o título diz o que aconteceu", /— 1 tarefa atribuída a você$/.test(ns[0]?.titulo ?? ""), ns[0]?.titulo)
+  ok("nenhum aviso legado por tarefa (agrupado=false / tarefaId)",
+    (await prisma.notificacaoOperacional.count({ where: { destinatarioId: daniela.id, OR: [{ agrupado: false }, { tarefaId: { not: null } }] } })) === 0)
 
   // O retry: mesma chamada de novo. A tarefa já é da Daniela, então o comando
-  // recusa — e, sobretudo, não nasce uma segunda notificação.
+  // recusa — e, sobretudo, não nasce um segundo aviso nem a contagem sobe.
   const retry = await atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: daniela.id, autorId: gestor.id })
   ok("reatribuir para a mesma pessoa é recusado", retry.ok === false && retry.codigo === "MESMO_RESPONSAVEL")
-  ok("e continua havendo UMA notificação", (await notifs(p.tarefaId, "ATRIBUICAO")).length === 1)
+  const nsRetry = await notifs(p.tarefaId, "CHEGOU_TRABALHO")
+  ok("e continua havendo UM aviso, com contagem 1", nsRetry.length === 1 && nsRetry[0].contagem === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("L) Iniciar não cria workflow novo")
@@ -151,8 +168,12 @@ async function main() {
   ok("uma tarefa só no processo", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
   ok("o responsável agora é o João",
     (await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { responsavelId: true } })).responsavelId === joao.id)
-  const nt = await notifs(p.tarefaId, "TRANSFERENCIA")
-  ok("o novo responsável foi avisado", nt.length === 1 && nt[0].destinatarioId === joao.id)
+  const nt = await notifs(p.tarefaId, "CHEGOU_TRABALHO")
+  ok("o novo responsável foi avisado (CHEGOU_TRABALHO)", nt.length === 1 && nt[0].destinatarioId === joao.id && nt[0].contagem === 1)
+  const perdeu = await notifs(p.tarefaId, "MUDOU_DE_MAO")
+  ok("quem perdeu a tarefa foi avisado (MUDOU_DE_MAO), e só ela", perdeu.length === 1 && perdeu[0].destinatarioId === daniela.id)
+  ok("nenhum aviso de posse sobrou para a Daniela sobre a tarefa (regra 5)",
+    (await notifs(p.tarefaId)).filter((n) => n.destinatarioId === daniela.id).every((n) => n.tipo === "MUDOU_DE_MAO"))
   const logT = await prisma.logAuditoria.findFirst({ where: { entidade: "Tarefa", entidadeId: p.tarefaId, acao: "TAREFA_TRANSFERIDA" }, select: { descricao: true, detalhes: true } })
   ok("a auditoria registra de-para e motivo",
     !!logT && /transferida/.test(logT.descricao ?? "") && /férias/.test(JSON.stringify(logT.detalhes)))
@@ -182,30 +203,38 @@ async function main() {
   await reconciliarTarefas({ processoId: p.processoId })
   ok("concluir etapa NÃO gera notificação", (await notifs(p.tarefaId)).length === antesRuido, `${(await notifs(p.tarefaId)).length}`)
 
-  // Prazo vencido → aviso de atraso, um por dia.
+  // Prazo vencido → "N vencidas" no PRECISA_AGIR da família do responsável ATUAL (o
+  // vencedor da corrida acima), uma linha só — atualizada no lugar, nunca um aviso por dia.
   await prisma.tarefa.update({
     where: { id: p.tarefaId },
     data: { dataPrazo: new Date(Date.now() - 86400000), statusTarefa: "EM_ANDAMENTO", concluida: false },
   })
-  // A varredura é GLOBAL de propósito (em produção ela roda para todo mundo),
-  // então a asserção não pode ser sobre o contador dela: uma tarefa vencida
-  // deixada por outro cenário entraria na conta e o teste passaria a depender
-  // da ordem de execução. O que é DESTE cenário é o aviso desta tarefa.
-  await avisarPrazosEAtrasos()
-  ok("a varredura avisa a tarefa atrasada", (await notifs(p.tarefaId, "ATRASO")).length === 1)
-  const v2 = await avisarPrazosEAtrasos()
-  ok("rodar de novo no mesmo dia não duplica", (await notifs(p.tarefaId, "ATRASO")).length === 1, `${(await notifs(p.tarefaId, "ATRASO")).length}`)
-  ok("e a segunda varredura não conta ESTE aviso como novo", v2.atraso === 0, JSON.stringify(v2))
+  const dono = (await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { responsavelId: true } })).responsavelId
+  ok("pré-condição: a tarefa tem dono depois da corrida", dono != null)
+  const agirDaTarefa = () => notifs(p.tarefaId, "PRECISA_AGIR")
+  // A varredura é GLOBAL de propósito (em produção ela roda para todo mundo), então a
+  // asserção não pode ser sobre o contador dela: uma tarefa vencida deixada por outro
+  // cenário entraria na conta. O que é DESTE cenário é o aviso desta tarefa.
+  await avaliarPrecisaAgir({ modo: "FOTO" })
+  const agir1 = await agirDaTarefa()
+  ok("a varredura avisa a tarefa atrasada, ao responsável atual",
+    agir1.length === 1 && agir1[0].destinatarioId === dono && (agir1[0].resumo as { vencidas?: number[] } | null)?.vencidas?.includes(p.tarefaId) === true, JSON.stringify(agir1))
+  ok("o texto diz '1 vencida'", /— 1 vencida$/.test(agir1[0]?.titulo ?? ""), agir1[0]?.titulo)
+  const v2 = await avaliarPrecisaAgir({ modo: "FOTO" })
+  ok("rodar de novo no mesmo dia não duplica", (await agirDaTarefa()).length === 1, `${(await agirDaTarefa()).length}`)
+  ok("e a segunda varredura não conta ESTE aviso como novo nem o atualiza",
+    (await agirDaTarefa())[0]?.id === agir1[0]?.id && v2.criados === 0, JSON.stringify({ criados: v2.criados, semMudanca: v2.semMudanca }))
   ok("o atraso não criou tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
-  const nAtraso = await notifs(p.tarefaId, "ATRASO")
-  ok("o aviso é da tarefa e aponta para ela",
-    nAtraso[0]?.link === linkDaTarefa(p.tarefaId, p.processoId), String(nAtraso[0]?.link))
+  ok("o aviso é da família e aponta para a aba de acompanhamento dela",
+    agir1[0]?.processoId === p.processoId && agir1[0]?.link === `/operacao?processo=${p.processoId}&aba=acompanhamento`, String(agir1[0]?.link))
 
-  // Prazo futuro dentro da janela → aviso de prazo, também um por dia.
+  // Prazo futuro (amanhã) → o MESMO aviso é recomposto no lugar ("1 vence amanhã"), único.
   await prisma.tarefa.update({ where: { id: p.tarefaId }, data: { dataPrazo: new Date(Date.now() + 86400000) } })
-  await avisarPrazosEAtrasos()
-  await avisarPrazosEAtrasos()
-  ok("aviso de prazo também é único no dia", (await notifs(p.tarefaId, "PRAZO")).length === 1)
+  await avaliarPrecisaAgir({ modo: "FOTO" })
+  await avaliarPrecisaAgir({ modo: "FOTO" })
+  const agir2 = await agirDaTarefa()
+  ok("aviso de prazo também é único (o mesmo aviso, recomposto no lugar)", agir2.length === 1 && agir2[0].id === agir1[0].id, JSON.stringify(agir2.map((n) => n.id)))
+  ok("e diz '1 vence amanhã'", /— 1 vence amanhã$/.test(agir2[0]?.titulo ?? ""), agir2[0]?.titulo)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("J) Bloqueio não cria tarefa nova")
