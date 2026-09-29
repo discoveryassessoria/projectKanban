@@ -197,3 +197,44 @@ existentes por nome, mostrada antes de aplicar.
   (Porto Alegre - 4ª Zona, 10 tarefas históricas) →
   `porStatusTarefa:{AGUARDANDO_TERCEIRO:1,SUPERSEDIDA:6,CANCELADA:2,
   NAO_INICIADA:1}` — números batendo com o histórico real do processo 651.
+
+## Bloco D — Repactuar prazo com histórico (29/09/2026)
+
+Nenhuma gravação nova. A porta já existia inteira: `POST /api/tarefas/[id]/
+comando` com `acao:"alterar_prazo"` → `alterarPrazo` (`lib/operacional/
+tarefa-ciclo.ts:480`) — motivo obrigatório, tarefa terminal recusa, e grava
+`LogAuditoria` (`TAREFA_PRAZO_ALTERADO`) com `de`/`para`/`motivo`/autor. O
+gap real era só a INTERFACE: não havia botão em lugar nenhum, e a Andamento
+mostrava a data crua do log (`"2026-10-06T16:34:07.918Z"`) em vez de
+formatada.
+
+- **`RepactuarPrazoModal.tsx`** — mesmo mini-formulário canônico da família
+  (dias/motivo, `AdiarAcompanhamentoModal`/`RegistrarContatoModal` do Bloco
+  B): prazo atual (leitura), novo prazo (`<input type="date">`), motivo
+  obrigatório (≥5 caracteres), desabilitado se a data não mudou. Chama
+  `POST /api/tarefas/{id}/comando` (`acao:"alterar_prazo"`) — nenhuma porta
+  nova no backend.
+- **Botão "Repactuar"** ao lado de "Prazo da tarefa" no cabeçalho do
+  `DocumentoOperationalDrawer`, visível só para quem tem `tarefas.editar`
+  (mudar o prazo OFICIAL é decisão de gestão, não do executor — mesma régua
+  que já separa "Delegar" no mesmo cabeçalho; confirmado ao vivo: some para
+  Daniela — perfil "Assistente", `tarefas.editar:false` — e aparece para
+  Marco/admin).
+- **Fix no Andamento**: `montarAndamentoDaOperacao` formata `de`/`para` de
+  `TAREFA_PRAZO_ALTERADO` como `dd/mm/aaaa` (`rotuloDeData`, meio-dia UTC
+  como qualquer outra data-calendário do sistema) — antes mostrava o ISO
+  cru. Coberto por assert novo (`4c`/`4d`) em
+  `andamento-operacional.test.ts`.
+- **Evidência ao vivo, #3853** (documento 2267, via drawer real como
+  Marco/admin, Central Operacional → Itiberê Barreto Cibils → Ver etapa →
+  Repactuar): prazo 06/10/2026 → 08/10/2026, motivo "Teste Bloco D ao vivo -
+  adiando 2 dias por atraso do cartorio". Confirmado em produção:
+  `Tarefa.dataPrazo = 2026-10-08`, `LogAuditoria.detalhes = {de:
+  "2026-10-06T16:34:07.918Z", para: "2026-10-08T12:00:00.000Z", motivo:
+  "..."}`, e Andamento devolve `{de:"06/10/2026", para:"08/10/2026",
+  autor:"Marco Rovatti", motivo:"..."}` — a mudança fica visível, legível e
+  atribuída.
+- **Nota operacional**: este bloco foi retomado de uma sessão concorrente
+  que já tinha o modal e o fix de formatação escritos (não commitados) —
+  revisados, testados (tsc/lint/suíte + prova ao vivo) e completados aqui,
+  sem duplicar trabalho.
