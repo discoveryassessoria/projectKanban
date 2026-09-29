@@ -887,20 +887,39 @@ async function linhagemDasPessoas(
 }
 
 /**
+ * `estadoOperacao` é DERIVADO (`LinhaGerencial.estadoOperacao`), nunca coluna
+ * do banco — filtra em memória, depois de `enriquecerLinhas`. Extraído porque
+ * `minhaFila`/`semResponsavel` (Torre de Controle, Bloco A, 29/09/2026)
+ * precisam do MESMO corte.
+ */
+function filtrarPorEstadoOperacao(linhas: LinhaGerencial[], estadoOperacao?: FiltrosGerenciais['estadoOperacao']): LinhaGerencial[] {
+  if (!estadoOperacao) return linhas
+  return linhas.filter((l) => l.estadoOperacao === estadoOperacao)
+}
+
+/**
  * MINHA FILA — o que ESTA pessoa tem para fazer.
  *
  * Ordenada pelo que a operação olha primeiro: atrasado, depois prazo mais
  * próximo, depois prioridade. Tarefa sem prazo vai para o fim, não para o
  * começo: ausência de prazo não é urgência.
+ *
+ * `usuarioId = null` é o ESCOPO DE EQUIPE (Torre de Controle, Bloco A,
+ * 29/09/2026) — só para quem `verificarEscopoDeEquipe` já autorizou antes de
+ * chamar aqui: em vez de forçar `responsavelId`, devolve TODOS os
+ * responsáveis + sem responsável, e `filtrosExtra.responsavelId` (se vier)
+ * filtra para UMA pessoa dentro da equipe. Operador comum nunca chega a
+ * `null` — a rota decide isso, esta função só executa o que mandaram.
  */
 export async function minhaFila(
-  usuarioId: number, agora = new Date(), db: Leitor = prisma,
+  usuarioId: number | null, agora = new Date(), db: Leitor = prisma,
   // FILTROS SERVER-SIDE (mandato "Minha Operação" §20): fase/terceiro/prazo/
   // busca entram no `where` do banco, ANTES da paginação — nunca "busca tudo
-  // e filtra no JS". `responsavelId`/`porPagina` do chamador são ignorados de
-  // propósito: quem executa só vê a própria fila, e o teto de 500 é o mesmo
-  // de sempre.
-  filtrosExtra: Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> = {},
+  // e filtra no JS". `porPagina` do chamador é ignorado de propósito: o teto
+  // de 500 é o mesmo de sempre. `responsavelId` só é aceito em escopo de
+  // equipe (`usuarioId === null`) — em escopo individual, quem executa só vê
+  // a própria fila e o campo é ignorado.
+  filtrosExtra: Omit<FiltrosGerenciais, 'porPagina'> = {},
 ): Promise<LinhaGerencial[]> {
   // UMA FONTE, DUAS TELAS.
   //
@@ -909,10 +928,14 @@ export async function minhaFila(
   // funcionário via menos do que o gestor sobre o próprio trabalho — e duas
   // projeções do mesmo fato acabam divergindo.
   //
-  // Agora é a MESMA consulta, com o recorte de quem executa.
-  const { linhas } = await visaoGerencial({ ...filtrosExtra, responsavelId: usuarioId, porPagina: 500 }, agora, db)
+  // Agora é a MESMA consulta, com o recorte de quem executa (ou da equipe
+  // inteira, quando `usuarioId` é `null`).
+  const { estadoOperacao, ...filtrosParaWhere } = filtrosExtra
+  const responsavelId = usuarioId !== null ? usuarioId : filtrosExtra.responsavelId
+  const { linhas } = await visaoGerencial({ ...filtrosParaWhere, responsavelId, porPagina: 500 }, agora, db)
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
-  return ordenarFila(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
+  const semConcluidas = linhas.filter((l) => l.coluna !== 'CONCLUIDA') as LinhaGerencial[]
+  return ordenarFila(filtrarPorEstadoOperacao(semConcluidas, estadoOperacao)) as LinhaGerencial[]
 }
 
 /**
@@ -921,10 +944,12 @@ export async function minhaFila(
  * cobrança). ADITIVO: mesma consulta/enriquecimento de `minhaFila`, sem
  * regra nova nenhuma — só um filtro sobre campos que já existiam
  * (`acompanhamentoVencido`) ou que a Etapa 2 acabou de aditivar (`escalada`).
+ *
+ * `usuarioId = null` = escopo de equipe, mesma régua de `minhaFila`.
  */
 export async function acompanhamentoDoUsuario(
-  usuarioId: number, agora = new Date(), db: Leitor = prisma,
-  filtrosExtra: Omit<FiltrosGerenciais, 'responsavelId' | 'porPagina'> = {},
+  usuarioId: number | null, agora = new Date(), db: Leitor = prisma,
+  filtrosExtra: Omit<FiltrosGerenciais, 'porPagina'> = {},
 ): Promise<LinhaGerencial[]> {
   const fila = await minhaFila(usuarioId, agora, db, filtrosExtra)
   return fila.filter((l) => l.acompanhamentoVencido || l.escalada)
@@ -954,16 +979,24 @@ export async function concluidasHojeDoUsuario(usuarioId: number, agora = new Dat
  * de `concluidaEm` — nenhuma lógica nova de servidor, só uma janela mais larga
  * da mesma consulta.
  */
+/**
+ * `usuarioId = null` = escopo de equipe (Torre de Controle, Bloco A,
+ * 29/09/2026), mesma régua de `minhaFila`: `filtrosExtra.responsavelId`
+ * filtra para uma pessoa dentro da equipe; ausente = todos + sem responsável.
+ */
 export async function concluidasRecentesDoUsuario(
-  usuarioId: number, agora = new Date(), dias = 14, db: Leitor = prisma,
+  usuarioId: number | null, agora = new Date(), dias = 14, db: Leitor = prisma,
+  filtrosExtra: Omit<FiltrosGerenciais, 'porPagina' | 'dataTipo' | 'dataInicio' | 'dataFim'> = {},
 ): Promise<LinhaGerencial[]> {
   const fim = agora.toISOString().slice(0, 10)
   const inicio = new Date(agora.getTime() - dias * 86_400_000).toISOString().slice(0, 10)
+  const { estadoOperacao, ...filtrosParaWhere } = filtrosExtra
+  const responsavelId = usuarioId !== null ? usuarioId : filtrosExtra.responsavelId
   const { linhas } = await visaoGerencial(
-    { responsavelId: usuarioId, dataTipo: 'concluida', dataInicio: inicio, dataFim: fim, porPagina: 500 },
+    { ...filtrosParaWhere, responsavelId, dataTipo: 'concluida', dataInicio: inicio, dataFim: fim, porPagina: 500 },
     agora, db,
   )
-  return linhas as LinhaGerencial[]
+  return filtrarPorEstadoOperacao(linhas as LinhaGerencial[], estadoOperacao)
 }
 
 /**
@@ -1032,17 +1065,24 @@ export { ordenarPorAtencaoOperacional, categoriasDaLinha, rotuloDeAtencao, type 
  * não existir cadastro de equipe, exigir a chave esconderia da gestão
  * exatamente as tarefas que ninguém reivindicou.
  */
-export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: string | null } = {}): Promise<LinhaGerencial[]> {
-  const linhas = await prisma.tarefa.findMany({
-    where: {
-      responsavelId: null,
-      statusTarefa: { in: STATUS_ATIVOS },
-      ...(filtro.equipeKey ? { equipeKey: filtro.equipeKey } : {}),
-    },
-    select: SELECT_GERENCIAL,
-  })
+/**
+ * `faseMacroKey`/`processoId`/`pais`/`estadoOperacao` (Torre de Controle,
+ * Bloco A, 29/09/2026): reaproveita `whereGerencial` pra ganhar os mesmos
+ * filtros que `minhaFila` já tem — nunca uma segunda leitura de query.
+ * `estadoOperacao` continua derivado, filtra depois de enriquecer.
+ */
+export async function semResponsavel(
+  agora = new Date(),
+  filtro: { equipeKey?: string | null; faseMacroKey?: string | null; processoId?: number | null; pais?: string | null; estadoOperacao?: FiltrosGerenciais['estadoOperacao'] } = {},
+): Promise<LinhaGerencial[]> {
+  const where = whereGerencial(
+    { status: STATUS_ATIVOS, semResponsavel: true, faseMacroKey: filtro.faseMacroKey, processoId: filtro.processoId, pais: filtro.pais },
+    agora,
+  )
+  if (filtro.equipeKey) where.equipeKey = filtro.equipeKey
+  const linhas = await prisma.tarefa.findMany({ where, select: SELECT_GERENCIAL })
   const enriquecidas = await enriquecerLinhas(linhas, agora)
-  return ordenarFila(enriquecidas) as LinhaGerencial[]
+  return filtrarPorEstadoOperacao(ordenarFila(enriquecidas) as LinhaGerencial[], filtro.estadoOperacao)
 }
 
 /**
@@ -1757,6 +1797,18 @@ export interface FiltrosGerenciais {
    * qualquer posição só apontando pra ele.
    */
   ordenacaoFamilia?: 'atencao' | 'prazo' | 'familia' | 'ultimaAtividade'
+  /**
+   * `Processo.paisCanonico.countryKey` — filtro de nacionalidade (Torre de
+   * Controle, Bloco A, 29/09/2026). Mesma fonte que `LinhaGerencial.pais`
+   * (`countryLabel`) já usa para EXIBIR; aqui é a chave curta pra FILTRAR.
+   */
+  pais?: string | null
+  /**
+   * `LinhaGerencial.estadoOperacao` — é DERIVADO (não é coluna do banco), por
+   * isso filtra em memória DEPOIS de `enriquecerLinhas`, nunca no `where`.
+   * Ver `filtrarPorEstadoOperacao`.
+   */
+  estadoOperacao?: 'FILA' | 'AGUARDANDO' | 'CONCLUIDA' | null
 }
 
 /**
@@ -1800,12 +1852,13 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   // `familiaId` e `statusProcesso` recortam pelo mesmo relacionamento
   // (`Tarefa.processo`) — um único objeto, nunca dois `where.processo`
   // sobrescrevendo um ao outro.
-  if (f.familiaId != null || f.statusProcesso) {
+  if (f.familiaId != null || f.statusProcesso || f.pais) {
     where.processo = {
       ...(f.familiaId != null ? { familiaId: f.familiaId } : {}),
       // Não existe enum de status do processo (legado removido, ver
       // `docs/architecture`): ATIVO/CONCLUIDO é derivado de `dataConclusao`.
       ...(f.statusProcesso ? { dataConclusao: f.statusProcesso === 'CONCLUIDO' ? { not: null } : null } : {}),
+      ...(f.pais ? { paisCanonico: { countryKey: f.pais } } : {}),
     }
   }
 

@@ -16,9 +16,37 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import { minhaFila, semResponsavel, concluidasHojeDoUsuario, concluidasRecentesDoUsuario, acompanhamentoDoUsuario, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 import { comDuracaoLogada, respostaSeIndisponibilidade } from '@/lib/operacional/erro-indisponibilidade-prisma'
+
+/**
+ * ESCOPO DE EQUIPE (Torre de Controle, Bloco A, 29/09/2026) — "ver a fila de
+ * todo mundo" é ato de gestão, mesma régua de `visao=sem_responsavel`: exige
+ * `tipo:admin` OU a permissão que já representa "gestor operacional" no
+ * sistema (`operacao.distribuirTarefas` — quem decide de quem é o trabalho
+ * sem dono já é, por definição, quem pode ver o trabalho de todo mundo).
+ * Operador comum que mandar `escopo=equipe` é simplesmente ignorado — nunca
+ * um erro 403 por um parâmetro que ele não devia ter mandado mas mandou.
+ */
+function podeVerEscopoDeEquipe(usuario: { tipo: string; permissoes: MapaPermissoes }): boolean {
+  return usuario.tipo === 'admin' || temPermissao(usuario.permissoes, 'operacao.distribuirTarefas')
+}
+
+/** Os filtros de escopo de equipe, quando autorizados — `undefined` em qualquer outro caso. */
+function filtrosDeEquipeDaQuery(sp: URLSearchParams): Pick<FiltrosGerenciais, 'responsavelId' | 'pais' | 'faseMacroKey' | 'processoId' | 'estadoOperacao'> {
+  const responsavelId = sp.get('responsavelId')
+  const processoId = sp.get('processoId')
+  const estado = sp.get('estadoOperacao')
+  return {
+    responsavelId: responsavelId ? Number(responsavelId) : undefined,
+    pais: sp.get('pais') || undefined,
+    faseMacroKey: sp.get('faseMacroKey') || undefined,
+    processoId: processoId ? Number(processoId) : undefined,
+    estadoOperacao: estado === 'FILA' || estado === 'AGUARDANDO' || estado === 'CONCLUIDA' ? estado : undefined,
+  }
+}
 
 /**
  * OS FILTROS DA QUERY STRING → `FiltrosGerenciais` — o MESMO parser que
@@ -66,22 +94,37 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Apenas administradores veem a fila sem responsável.' }, { status: 403 })
   }
 
+  // ESCOPO DE EQUIPE — só some quando quem pediu pode ver o trabalho de todo
+  // mundo; pra qualquer outro perfil, o parâmetro é como se não tivesse vindo
+  // ("continua minha fila", nunca um 403 por um `?escopo=` de mais).
+  const pediuEquipe = request.nextUrl.searchParams.get('escopo') === 'equipe'
+  const escopoEquipe = pediuEquipe && podeVerEscopoDeEquipe(usuario)
+  const usuarioIdDoRecorte = escopoEquipe ? null : usuario.userId
+  const filtrosDeEquipe = escopoEquipe ? filtrosDeEquipeDaQuery(request.nextUrl.searchParams) : {}
+
   const agora = new Date()
   try {
     if (visao === 'sem_responsavel') {
-      const linhas = await comDuracaoLogada('operacao.tarefas.semResponsavel', () => semResponsavel(agora))
+      const linhas = await comDuracaoLogada('operacao.tarefas.semResponsavel', () => semResponsavel(agora, {
+        faseMacroKey: filtrosDeEquipe.faseMacroKey, processoId: filtrosDeEquipe.processoId,
+        pais: filtrosDeEquipe.pais, estadoOperacao: filtrosDeEquipe.estadoOperacao,
+      }))
       return NextResponse.json({ visao, total: linhas.length, linhas })
     }
     if (visao === 'minha_fila') {
-      // Sempre o usuário do TOKEN. Aceitar um `usuarioId` no query string deixaria
-      // qualquer pessoa ler a fila de qualquer outra só trocando um número.
+      // Sempre o usuário do TOKEN — a menos que o escopo de equipe já tenha
+      // sido autorizado acima. Aceitar um `usuarioId` no query string sem essa
+      // autorização deixaria qualquer pessoa ler a fila de qualquer outra só
+      // trocando um número.
       const linhas = await comDuracaoLogada('operacao.tarefas.minhaFila', () =>
-        minhaFila(usuario.userId, agora, undefined, filtrosDaQuery(request.nextUrl.searchParams)),
+        minhaFila(usuarioIdDoRecorte, agora, undefined, { ...filtrosDaQuery(request.nextUrl.searchParams), ...filtrosDeEquipe }),
       )
-      return NextResponse.json({ visao, total: linhas.length, linhas })
+      return NextResponse.json({ visao, total: linhas.length, linhas, escopo: escopoEquipe ? 'equipe' : 'individual' })
     }
     // KPI "Concluídas hoje" de Minha Operação — `minhaFila` exclui CONCLUIDA de
     // propósito, então este é o recorte OPOSTO, sempre do usuário do TOKEN.
+    // Fora do escopo de equipe deste bloco (mandato Torre de Controle Bloco A,
+    // 29/09/2026, lista só minha_fila/sem_responsavel/acompanhamento/feito).
     if (visao === 'concluidas_hoje') {
       const linhas = await comDuracaoLogada('operacao.tarefas.concluidasHoje', () => concluidasHojeDoUsuario(usuario.userId, agora))
       return NextResponse.json({ visao, total: linhas.length, linhas })
@@ -90,15 +133,17 @@ export async function GET(request: NextRequest) {
     // que precisa de atenção agora: acompanhamento vencido ou escalada.
     if (visao === 'acompanhamento') {
       const linhas = await comDuracaoLogada('operacao.tarefas.acompanhamento', () =>
-        acompanhamentoDoUsuario(usuario.userId, agora, undefined, filtrosDaQuery(request.nextUrl.searchParams)),
+        acompanhamentoDoUsuario(usuarioIdDoRecorte, agora, undefined, { ...filtrosDaQuery(request.nextUrl.searchParams), ...filtrosDeEquipe }),
       )
-      return NextResponse.json({ visao, total: linhas.length, linhas })
+      return NextResponse.json({ visao, total: linhas.length, linhas, escopo: escopoEquipe ? 'equipe' : 'individual' })
     }
     // FEITO (Etapa 3, aba "Feito") — concluídas dos últimos 14 dias; a tela
     // agrupa em Hoje/Ontem/Antes no cliente, a partir de `concluidaEm`.
     if (visao === 'feito') {
-      const linhas = await comDuracaoLogada('operacao.tarefas.feito', () => concluidasRecentesDoUsuario(usuario.userId, agora, 14))
-      return NextResponse.json({ visao, total: linhas.length, linhas })
+      const linhas = await comDuracaoLogada('operacao.tarefas.feito', () =>
+        concluidasRecentesDoUsuario(usuarioIdDoRecorte, agora, 14, undefined, filtrosDeEquipe),
+      )
+      return NextResponse.json({ visao, total: linhas.length, linhas, escopo: escopoEquipe ? 'equipe' : 'individual' })
     }
   } catch (e) {
     const indisponivel = respostaSeIndisponibilidade(e)
