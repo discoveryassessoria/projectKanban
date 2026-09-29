@@ -653,6 +653,15 @@ model Tarefa {
   necessidade            NecessidadeDocumental?     @relation("TarefaNecessidade", fields: [necessidadeId], references: [id], onDelete: SetNull)
   documentoId            Int?
   documento              Documento?                 @relation("TarefaDocumento", fields: [documentoId], references: [id], onDelete: SetNull)
+  /// O ÓRGÃO/TERCEIRO que esta Tarefa aguarda (Torre de Controle, Bloco C,
+  /// 29/09/2026) — mesmo cadastro que `Documento.orgaoId` já usa
+  /// (`OrgaoProtocolo`, nunca um `Orgao` novo). Espelha `Documento.orgaoId`
+  /// quando a tarefa tem documento (escrito pela mesma porta,
+  /// `vincular-orgao-lote`); é o campo PRÓPRIO da Tarefa para quando não há
+  /// documento (ex.: tarefa administrativa/transversal referenciando um
+  /// terceiro diretamente). `null` = ainda não vinculado.
+  orgaoId                Int?
+  orgao                  OrgaoProtocolo?            @relation("TarefaOrgao", fields: [orgaoId], references: [id], onDelete: SetNull)
   // ── FILA E ATRIBUIÇÃO ──────────────────────────────────────────────────────
   // EQUIPE responde pela fila e pela capacidade; RESPONSÁVEL é quem executa.
   // Uma tarefa pode nascer só com equipe (`responsavelId` nulo) e esperar
@@ -744,6 +753,7 @@ model Tarefa {
   @@index([workflowInstanceId])
   @@index([necessidadeId])
   @@index([faseMacroKey])
+  @@index([orgaoId])
   /// Etapa B (perf /api/operacao/tarefas, 26/09/2026): `minhaFila`/`visaoGerencial`
   /// SEMPRE filtram responsavelId+statusTarefa juntos e ordenam por dataPrazo — os
   /// índices soltos acima já existiam, mas o par filtro+ordenação é o caminho mais
@@ -4602,6 +4612,8 @@ model OrgaoProtocolo {
   contatosRegistrados   ContatoTerceiro[]
   /// Documentos que ESTA organização emite. Ver `Documento.orgaoId`.
   documentosEmitidos    Documento[]            @relation("DocumentoOrgaoEmissor")
+  /// Tarefas que aguardam ESTA organização. Ver `Tarefa.orgaoId`.
+  tarefasVinculadas     Tarefa[]               @relation("TarefaOrgao")
   retificacoes          RetificacaoPacote[]    @relation("OrgaoDaRetificacao")
   profissionais         Profissional[]         @relation("ProfissionaisDaOrganizacao")
   registrosDeClasse     RegistroProfissional[] @relation("RegistrosDoOrgaoDeClasse")

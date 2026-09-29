@@ -10,6 +10,12 @@
 // (`resolverWorkflowAplicavel`/`subtarefasDaEtapa` já leem `documento.orgaoId`
 // como `fornecedorId`). Tarefas sem `documentoId` (fase sem escopo
 // documental) são ignoradas e reportadas — nunca um 500 silencioso.
+//
+// Torre de Controle, Bloco C (29/09/2026): grava TAMBÉM `Tarefa.orgaoId` —
+// espelho do mesmo vínculo, na MESMA porta (nunca uma segunda escrita
+// concorrente). `Documento.orgaoId` continua o dono para o motor de
+// subtarefas (fornecedorId); `Tarefa.orgaoId` é o que `/estatisticas` e
+// qualquer filtro por órgão da Torre leem.
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -52,6 +58,9 @@ export async function POST(request: NextRequest) {
 
   if (documentoIds.length > 0) {
     await prisma.documento.updateMany({ where: { id: { in: [...new Set(documentoIds)] } }, data: { orgaoId } })
+  }
+  if (vinculadas.length > 0) {
+    await prisma.tarefa.updateMany({ where: { id: { in: vinculadas } }, data: { orgaoId } })
   }
 
   return NextResponse.json({ ok: true, vinculadas: vinculadas.length, ignoradas })

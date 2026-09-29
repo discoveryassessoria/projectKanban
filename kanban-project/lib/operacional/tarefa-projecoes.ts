@@ -1784,6 +1784,8 @@ export interface FiltrosGerenciais {
   proximos7Dias?: boolean
   /** O terceiro (Documento.orgao.name), exato — dropdown "Terceiro" de Minha Operação. Server-side, antes da paginação. */
   terceiro?: string | null
+  /** O ÓRGÃO por ID (Tarefa.orgaoId, canônico — Torre de Controle, Bloco C, 29/09/2026) — usado por /estatisticas. Nunca confundir com `terceiro` (texto, legado). */
+  orgaoId?: number | null
   /** Açúcar sobre `status`: idêntico a `status: ['AGUARDANDO_TERCEIRO','AGUARDANDO_CLIENTE']`. */
   aguardandoTerceiro?: boolean
   /** Açúcar sobre `status`: idêntico a `status: ['BLOQUEADA']`. */
@@ -1892,6 +1894,7 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   if (f.etapaKey?.length) e.push({ workflowStepInstance: { stepKey: { in: f.etapaKey } } })
   if (f.equipeKey?.length) where.equipeKey = { in: f.equipeKey }
   if (f.tipoTarefa?.length) where.tipo = { in: f.tipoTarefa }
+  if (f.orgaoId != null) where.orgaoId = f.orgaoId
 
   // `familiaId` e `statusProcesso` recortam pelo mesmo relacionamento
   // (`Tarefa.processo`) — um único objeto, nunca dois `where.processo`

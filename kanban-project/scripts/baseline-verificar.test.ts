@@ -579,6 +579,9 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // Torre de Controle, Bloco B (29/09/2026): resultado do contato com o
   // terceiro — o que faz "cobrança sem resposta" ser um fato gravado.
   '20260929120000_contato_terceiro_resultado',
+  // Torre de Controle, Bloco C (29/09/2026): Tarefa.orgaoId — o órgão/terceiro
+  // que a Tarefa aguarda, espelhando Documento.orgaoId (OrgaoProtocolo).
+  '20260929150000_tarefa_orgao_id',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
