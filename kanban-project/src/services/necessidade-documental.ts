@@ -340,19 +340,69 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
   // pontual de um passo só, onde a cadeia de dependência do vizinho importaria.
   const passosDaNecessidade = await db.phaseWorkflowStepInstance.findMany({
     where: { necessidadeId, status: "CANCELADO" },
-    select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+    select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true, stepKey: true, documentoId: true },
     orderBy: { ordem: "asc" },
   })
   const passosDeOutrasFases = docsReabertos.length
     ? await db.phaseWorkflowStepInstance.findMany({
         where: { documentoId: { in: docsReabertos.map((d) => d.id) }, status: "CANCELADO" },
-        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true, stepKey: true, documentoId: true },
         orderBy: { ordem: "asc" },
       })
     : []
-  const passos = [...passosDaNecessidade, ...passosDeOutrasFases]
+  // `passosDaNecessidade` (por necessidadeId) e `passosDeOutrasFases` (por
+  // documentoId) podem achar o MESMO passo duas vezes — um passo de Genealogia
+  // carrega os dois campos ao mesmo tempo. Dedup por id antes de agrupar, ou o
+  // mesmo duplicado seria "supersedido" duas vezes (dois logs para o mesmo fato).
+  const todosCancelados = [...new Map([...passosDaNecessidade, ...passosDeOutrasFases].map((p) => [p.id, p])).values()]
+
+  // COLAPSA PARA UM POR (workflowInstanceId, stepKey, ciclo, documentoId) ANTES
+  // DE REABRIR — achado real (mandato "Correção do reconciliador NEC-001",
+  // 29/09/2026, processo 675/Priscila): o bug de materialização que cria dois
+  // PhaseWorkflowStepInstance para a MESMA obrigação (`matdoc|...` local e
+  // `wfi...` do workflow publicado — já mitigado na CRIAÇÃO) deixa as duas
+  // linhas CANCELADO quando a necessidade é dispensada (`dispensarNecessidade`
+  // cancela TODOS os passos ativos daquela necessidade, corretamente). Sem este
+  // colapso, reativar reabre as duas de novo — "marcar → desmarcar → remarcar"
+  // reproduzia a duplicata a cada ciclo, mesmo já sem nenhum código criando uma
+  // StepInstance nova. O canônico é o que uma Tarefa (viva ou não) referencia —
+  // é ele que carrega responsável/histórico reais; sem isso, o mais antigo
+  // (menor id, o primeiro a existir).
+  const porChave = new Map<string, typeof todosCancelados>()
+  for (const p of todosCancelados) {
+    const k = `${p.workflowInstanceId ?? "-"}|${p.stepKey}|${p.ciclo}|${p.documentoId ?? "-"}`
+    porChave.set(k, [...(porChave.get(k) ?? []), p])
+  }
+  const passos: typeof todosCancelados = []
+  const correlationId = randomUUID()
+  for (const grupo of porChave.values()) {
+    if (grupo.length === 1) { passos.push(grupo[0]); continue }
+    const idsGrupo = grupo.map((g) => g.id)
+    const tarefaLigada = await db.tarefa.findFirst({
+      where: { workflowStepInstanceId: { in: idsGrupo } },
+      select: { workflowStepInstanceId: true },
+    })
+    const canonico = grupo.find((g) => g.id === tarefaLigada?.workflowStepInstanceId)
+      ?? grupo.reduce((a, b) => (a.id < b.id ? a : b))
+    passos.push(canonico)
+    for (const duplicado of grupo) {
+      if (duplicado.id === canonico.id) continue
+      await transicionarPassoTx(db as Prisma.TransactionClient, duplicado.id, "SUPERSEDIDO", {
+        correlationId, operacao: "necessidade-reativada-dedup", ciclo: duplicado.ciclo,
+        processoId: duplicado.processoId, workflowInstanceId: duplicado.workflowInstanceId,
+        extra: { motivo: `Duplicata do passo ${duplicado.stepKey} — superseded pelo canônico #${canonico.id} na reativação da necessidade ${necessidadeId}` },
+      })
+      await db.logAuditoria.create({
+        data: {
+          acao: "PASSO_DUPLICADO_SUPERSEDIDO", entidade: "PhaseWorkflowStepInstance", entidadeId: duplicado.id,
+          descricao: `Passo #${duplicado.id} (${duplicado.stepKey}) supersedido por duplicar #${canonico.id} na reativação da necessidade ${necessidadeId} — nunca reaberto.`,
+          usuarioId: null,
+        },
+      }).catch(() => null)
+    }
+  }
+
   if (passos.length) {
-    const correlationId = randomUUID()
     for (const p of passos) {
       await reabrirPassoTx(db as Prisma.TransactionClient, p.id, "DISPONIVEL", {
         correlationId, operacao: "necessidade-reativada", ciclo: p.ciclo,
@@ -363,6 +413,31 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
       })
     }
     await assegurarCoerenciaPassoTarefa(db as Prisma.TransactionClient, passos.map((p) => p.id))
+
+    // A REATIVAÇÃO VOLTA SEM RESPONSÁVEL — decisão de negócio (mandato "Correção
+    // do reconciliador NEC-001", 29/09/2026): o cancelamento preserva
+    // `responsavelId` (histórico intacto — quem tinha a tarefa antes continua
+    // sabido), mas a reabertura NUNCA herda esse responsável de volta. Achado
+    // real: a Tarefa #3967 (Priscila) tinha sido atribuída em lote às 18:22Z,
+    // foi cancelada pela dispensa e voltou com a Daniela ainda atribuída na
+    // reativação — sem ninguém ter reatribuído nada. A tarefa reaberta é
+    // trabalho NOVO (a obrigação voltou a se aplicar); quem vai executá-la é
+    // decisão de distribuição, não herança automática do ciclo anterior.
+    const tarefasReabertas = await db.tarefa.findMany({
+      where: { workflowStepInstanceId: { in: passos.map((p) => p.id) }, responsavelId: { not: null } },
+      select: { id: true, responsavelId: true, titulo: true },
+    })
+    for (const t of tarefasReabertas) {
+      await db.tarefa.update({ where: { id: t.id }, data: { responsavelId: null } })
+      await db.logAuditoria.create({
+        data: {
+          acao: "TAREFA_SEM_RESPONSAVEL_NA_REATIVACAO", entidade: "Tarefa", entidadeId: t.id,
+          descricao: `Tarefa "${t.titulo}" voltou SEM responsável ao reativar a necessidade ${necessidadeId} — responsável anterior era o usuário ${t.responsavelId}. Reabertura não herda atribuição do ciclo cancelado.`,
+          usuarioId: null,
+          detalhes: { necessidadeId, responsavelAnterior: t.responsavelId },
+        },
+      }).catch(() => null)
+    }
   }
 }
 

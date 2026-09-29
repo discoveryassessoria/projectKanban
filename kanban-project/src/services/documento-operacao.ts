@@ -1050,7 +1050,13 @@ export async function aplicarTransicaoDoPassoTx(
     ...(patch.motivoBloqueio !== undefined ? { motivo: patch.motivoBloqueio as string | null } : {}),
   }
   const correlationId = randomUUID()
-  const opts = { correlationId, operacao: "documento-operacao", ciclo: p.ciclo, processoId: p.processoId, workflowInstanceId: p.workflowInstanceId }
+  // `usuarioId` é o autor real da transição — sem ele, `StepExecution.executadoPorId`
+  // fica sempre `null`, mesmo quando `ctx` carrega o usuário autenticado. Achado real
+  // (mandato "Correção do reconciliador NEC-001", 29/09/2026): as 12 conclusões de
+  // Genealogia do processo 675 num intervalo de 37min (ritmo humano, uma a uma) ficaram
+  // com `executadoPorId: null` — o dado do autor existia em `ctx.usuarioId` (usado logo
+  // abaixo só para o campo morto `opPatch.completedById`) mas nunca viajava até aqui.
+  const opts = { correlationId, operacao: "documento-operacao", ciclo: p.ciclo, processoId: p.processoId, workflowInstanceId: p.workflowInstanceId, usuarioId: ctx?.usuarioId ?? null }
 
   // TRANSACIONAL (P3): passo + necessidade + passos-irmãos + documento na MESMA transação —
   // a reabertura NÃO deixa estados intermediários inconsistentes (progresso/bloqueio caem juntos).

@@ -286,6 +286,10 @@ export async function concluirEtapa(args: {
       ciclo: alvo.ciclo,
       processoId: alvo.processoId,
       workflowInstanceId: tarefa.workflowInstanceId,
+      // Mesmo achado de `documento-operacao.ts` (mandato "Correção do reconciliador
+      // NEC-001", 29/09/2026): sem `usuarioId`, `StepExecution.executadoPorId` nunca
+      // grava quem concluiu — mesmo com `args.autorId` disponível aqui o tempo todo.
+      usuarioId: args.autorId,
       ...(args.observacao ? { extra: { motivo: args.observacao.slice(0, 300) } } : {}),
       // `alvo` já É a linha atual desta etapa (lida acima, nesta mesma transação,
       // sem escrita entre a leitura e aqui) — evita o `findUnique` redundante que

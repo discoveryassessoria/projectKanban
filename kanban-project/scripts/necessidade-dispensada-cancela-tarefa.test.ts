@@ -59,6 +59,7 @@ async function limpar() {
     await prisma.arvore.deleteMany({ where: { id: { in: arvIds } } })
   }
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
+  await prisma.usuario.deleteMany({ where: { email: `${MARCA.toLowerCase()}-daniela@teste.invalido` } })
 }
 
 /** Monta processo + pessoa + necessidade + workflow + step + tarefa via reconciliarTarefas real. */
@@ -229,9 +230,88 @@ async function main() {
   const stepPosReativaDeNovo = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step6.id }, select: { status: true } })
   ok("6h) reativar necessidade já PENDENTE é no-op (idempotente, não lança)", stepPosReativaDeNovo.status === "DISPONIVEL")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  secao("7) marcar → desmarcar → remarcar com duplicata preexistente — dedup + responsável some (Correção NEC-001, 29/09/2026)")
+  // ══════════════════════════════════════════════════════════════════════════
+  // Reproduz o achado real do processo 675 (Priscila): DOIS PhaseWorkflowStepInstance
+  // para a MESMA obrigação (matdoc + wfi — bug de materialização já mitigado na
+  // criação, mas a duplicata pode preexistir) sob a MESMA necessidade. Dispensar
+  // cancela os dois (correto); reativar tinha o bug de reabrir os dois de volta,
+  // e a tarefa reaberta ainda vinha com o responsável do ciclo anterior.
+  const usr7 = await prisma.usuario.create({ data: { nome: "Daniela Teste", email: `${MARCA.toLowerCase()}-daniela@teste.invalido`, senha: "x", tipo: "operador" }, select: { id: true } })
+  const arv7 = await prisma.arvore.create({ data: { nome: `${MARCA} C7` }, select: { id: true } })
+  const proc7 = await prisma.processo.create({ data: { nome: `${MARCA} C7`, arvoreId: arv7.id }, select: { id: true } })
+  const pes7 = await prisma.pessoa.create({ data: { arvoreId: arv7.id, nome: "Priscila", sobrenome: "C7", linhaReta: false, requerente: "nao" }, select: { id: true } })
+  const item7 = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_C7`, name: "Certidão C7", natureza: "DOCUMENTO" }, select: { id: true } })
+  const nec7 = await prisma.necessidadeDocumental.create({
+    data: { processoId: proc7.id, itemCatalogoId: item7.id, pessoaId: pes7.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-C7-${proc7.id}` },
+    select: { id: true },
+  })
+  const doc7 = await prisma.documento.create({ data: { pessoaId: pes7.id, necessidadeId: nec7.id, status: "PENDENTE" }, select: { id: true } })
+  const inst7 = await prisma.phaseWorkflowInstance.create({
+    data: { processoId: proc7.id, faseMacroKey: "genealogia", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-C7-${proc7.id}` },
+    select: { id: true },
+  })
+  // O par duplicado: mesma (workflowInstanceId, stepKey, ciclo, documentoId), chaveIdempotencia divergente — a assinatura exata do bug.
+  const step7matdoc = await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: inst7.id, processoId: proc7.id, faseMacroKey: "genealogia", stepKey: "localizar_registro",
+      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      necessidadeId: nec7.id, documentoId: doc7.id, pessoaId: pes7.id, papel: "equipe_documental", slaDays: 5,
+      chaveIdempotencia: `matdoc|localizar_registro|nec${nec7.id}|c1`,
+    },
+    select: { id: true },
+  })
+  const step7wfi = await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: inst7.id, processoId: proc7.id, faseMacroKey: "genealogia", stepKey: "localizar_registro",
+      ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL",
+      necessidadeId: nec7.id, documentoId: doc7.id, pessoaId: pes7.id, papel: "equipe_documental", slaDays: 5,
+      chaveIdempotencia: `wfi${inst7.id}|stepdefX|stepkeylocalizar_registro|stepv1|c1|doc${doc7.id}|nec${nec7.id}`,
+    },
+    select: { id: true },
+  })
+  // A Tarefa real referencia UM dos dois (o que a materialização "canônica" apontou) — o outro fica órfão, exatamente como em produção.
+  const tarefa7 = await prisma.tarefa.create({
+    data: {
+      titulo: "Certidão C7", processoId: proc7.id, pessoaId: pes7.id, necessidadeId: nec7.id, documentoId: doc7.id,
+      workflowInstanceId: inst7.id, workflowStepInstanceId: step7matdoc.id, faseMacroKey: "genealogia",
+      statusTarefa: "NAO_INICIADA", prioridade: "MEDIA", origem: "RECONCILIADOR",
+      responsavelId: usr7.id, atribuidoPorId: usr7.id, dataAtribuicao: new Date(),
+    },
+    select: { id: true },
+  })
+
+  await dispensarNecessidade(nec7.id, "teste: dedup de duplicata na reativação")
+  const step7matdocPosDispensa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7matdoc.id }, select: { status: true } })
+  const step7wfiPosDispensa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7wfi.id }, select: { status: true } })
+  ok("7a) dispensa cancela OS DOIS duplicados", step7matdocPosDispensa.status === "CANCELADO" && step7wfiPosDispensa.status === "CANCELADO")
+  const tarefa7PosDispensa = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefa7.id }, select: { responsavelId: true } })
+  ok("7b) cancelamento PRESERVA o responsável (histórico intacto)", tarefa7PosDispensa.responsavelId === usr7.id)
+
+  await reativarNecessidade(nec7.id)
+  const step7matdocPosReativa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7matdoc.id }, select: { status: true } })
+  const step7wfiPosReativa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step7wfi.id }, select: { status: true } })
+  ok("7c) reabre SÓ o canônico (o que a Tarefa referenciava) — DISPONIVEL", step7matdocPosReativa.status === "DISPONIVEL", step7matdocPosReativa.status)
+  ok("7d) o duplicado NÃO é reaberto — SUPERSEDIDO, nunca volta a ser CANCELADO nem DISPONIVEL", step7wfiPosReativa.status === "SUPERSEDIDO", step7wfiPosReativa.status)
+  const ativosGrupo7 = await prisma.phaseWorkflowStepInstance.count({
+    where: { workflowInstanceId: inst7.id, stepKey: "localizar_registro", ciclo: 1, documentoId: doc7.id, status: { notIn: ["CANCELADO", "SUPERSEDIDO", "DISPENSADO"] } },
+  })
+  ok("7e) exatamente 1 passo ATIVO no grupo (workflowInstanceId,stepKey,ciclo,documentoId) — nunca 2", ativosGrupo7 === 1, String(ativosGrupo7))
+  const tarefa7PosReativa = await prisma.tarefa.findUniqueOrThrow({ where: { id: tarefa7.id }, select: { responsavelId: true, statusTarefa: true } })
+  ok("7f) TAREFA REATIVADA SEM RESPONSÁVEL — reabertura não herda atribuição do ciclo cancelado", tarefa7PosReativa.responsavelId === null, JSON.stringify(tarefa7PosReativa))
+  const logSemResp7 = await prisma.logAuditoria.findFirst({
+    where: { entidade: "Tarefa", entidadeId: tarefa7.id, acao: "TAREFA_SEM_RESPONSAVEL_NA_REATIVACAO" },
+    select: { descricao: true, detalhes: true },
+  })
+  ok("7g) LogAuditoria registra o responsável ANTERIOR", logSemResp7 != null && (logSemResp7.detalhes as { responsavelAnterior?: number })?.responsavelAnterior === usr7.id, JSON.stringify(logSemResp7))
+  const logSupersede7 = await prisma.logAuditoria.count({ where: { entidade: "PhaseWorkflowStepInstance", entidadeId: step7wfi.id, acao: "PASSO_DUPLICADO_SUPERSEDIDO" } })
+  ok("7h) LogAuditoria registra a duplicata supersedida", logSupersede7 === 1, String(logSupersede7))
+
   console.log(`\n${passou} passaram, ${falhou} falharam`)
   if (falhou > 0) console.log("Falhas:", falhas.join(", "))
   await limpar()
+  await prisma.usuario.deleteMany({ where: { email: `${MARCA.toLowerCase()}-daniela@teste.invalido` } }).catch(() => null)
   await prisma.$disconnect()
   process.exit(falhou > 0 ? 1 : 0)
 }
