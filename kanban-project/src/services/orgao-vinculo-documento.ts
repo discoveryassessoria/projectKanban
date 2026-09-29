@@ -63,6 +63,16 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidad
   // Santos"/"Osasco" nacionalmente) — quando vem, é filtro DURO, não mais um
   // termo de texto que o nome pode ou não bater; o texto livre passa a filtrar
   // só nome/fantasia/tipo DENTRO daquela cidade.
+  //
+  // O filtro de cidade é feito EM MEMÓRIA, por `norm()` (sem acento), nunca
+  // `city: {equals}` do Postgres — achado ao vivo, 29/09/2026: a base nacional
+  // de cartórios tem "Santo Andre" (sem acento, maioria das linhas de SP) E
+  // "Santo André" (com acento, um cartório de outro estado, PB) — o IBGE, que
+  // alimenta o dropdown Cidade do formulário, manda "Santo André" (com
+  // acento) sempre. `mode:"insensitive"` do Postgres só dobra maiúscula/
+  // minúscula, nunca acento — comparação exata contra a grafia do IBGE nunca
+  // batia com a maioria das linhas reais da base nacional.
+  const cidadeNorm = cidade ? norm(cidade) : ""
   const filtroOrgao = termos.map((t) => ({
     OR: [
       { name: { contains: t, mode: "insensitive" as const } },
@@ -79,17 +89,21 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidad
     where: {
       ativo: true,
       ...(uf ? { state: { equals: uf, mode: "insensitive" as const } } : {}),
-      ...(cidade ? { city: { equals: cidade, mode: "insensitive" as const } } : {}),
       ...(filtroOrgao.length ? { AND: filtroOrgao } : {}),
     },
     select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { countryLabel: true } } },
-    take: 200,
+    // Sem cidade: raso, texto livre nacional. Com cidade: já veio escopado por
+    // UF (o formulário exige estado antes de cidade) — cabe tudo daquele
+    // estado, o filtro em memória vem logo abaixo.
+    take: cidadeNorm ? 3000 : 200,
   })
-  const cadastrados: OrgaoBusca[] = rows.map((o) => {
-    const alvo = [o.name, o.city, o.state].filter(Boolean).join(" ")
-    const score = Math.max(similaridade(q, alvo), o.nomeFantasia ? similaridade(q, o.nomeFantasia) : 0)
-    return { id: o.id, name: o.name, nomeFantasia: o.nomeFantasia, type: o.type, city: o.city, state: o.state, pais: o.pais?.countryLabel ?? null, score: Number(score.toFixed(3)), origem: "cadastrado" as const, cartorioId: null }
-  })
+  const cadastrados: OrgaoBusca[] = rows
+    .filter((o) => !cidadeNorm || norm(o.city) === cidadeNorm)
+    .map((o) => {
+      const alvo = [o.name, o.city, o.state].filter(Boolean).join(" ")
+      const score = Math.max(similaridade(q, alvo), o.nomeFantasia ? similaridade(q, o.nomeFantasia) : 0)
+      return { id: o.id, name: o.name, nomeFantasia: o.nomeFantasia, type: o.type, city: o.city, state: o.state, pais: o.pais?.countryLabel ?? null, score: Number(score.toFixed(3)), origem: "cadastrado" as const, cartorioId: null }
+    })
   // Chaves (nome normalizado + cidade normalizada) já cobertas por `OrgaoProtocolo` —
   // um `Cartorio` que bate numa delas não é sugestão nova, é o mesmo cartório já
   // promovido (mesma régua de `acharDuplicado`, só que em memória).
@@ -108,14 +122,13 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidad
     where: {
       ativo: true,
       ...(uf ? { uf: { equals: uf, mode: "insensitive" as const } } : {}),
-      ...(cidade ? { municipio: { equals: cidade, mode: "insensitive" as const } } : {}),
       ...(filtroCartorio.length ? { AND: filtroCartorio } : {}),
     },
     select: { id: true, nome: true, municipio: true, uf: true },
-    take: 200,
+    take: cidadeNorm ? 3000 : 200,
   })
   const cartorios: OrgaoBusca[] = cartRows
-    .filter((c) => !jaCadastrado.has(`${norm(c.nome)}|${norm(c.municipio)}`))
+    .filter((c) => (!cidadeNorm || norm(c.municipio) === cidadeNorm) && !jaCadastrado.has(`${norm(c.nome)}|${norm(c.municipio)}`))
     .map((c) => {
       const alvo = [c.nome, c.municipio, c.uf].filter(Boolean).join(" ")
       const score = similaridade(q, alvo)
