@@ -1,14 +1,15 @@
 // POST /api/documentos/:id/orgao — vincula (ou cadastra e vincula) o órgão emissor
 // do documento SEM sair do painel. Escreve Documento.orgaoId + Tarefa.orgaoId
 // numa transação (vincularOrgaoAoDocumento).
-//   { orgaoId }                      → vincula existente
+//   { orgaoId }                      → vincula existente (OrgaoProtocolo)
+//   { cartorioId }                   → promove da base nacional (Cartorio) e vincula
 //   { novo: {name,tipo,city,state?,paisId?,email?,telefone?} }
 //                                    → cadastra (409 DUPLICADO com o existente) e vincula
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import {
-  vincularOrgaoAoDocumento, cadastrarOrgaoRapido, OrgaoInexistenteError, DocumentoInexistenteError,
+  vincularOrgaoAoDocumento, cadastrarOrgaoRapido, promoverCartorioParaOrgao, OrgaoInexistenteError, DocumentoInexistenteError,
 } from "@/src/services/orgao-vinculo-documento"
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +23,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     let orgaoId = Number(body.orgaoId)
     let criado = false
-    if (body.novo && typeof body.novo === "object") {
+    if (Number.isInteger(body.cartorioId) && Number(body.cartorioId) > 0) {
+      const r = await promoverCartorioParaOrgao(prisma, Number(body.cartorioId), usuario?.userId ?? null)
+      orgaoId = r.orgaoId; criado = r.criado
+    } else if (body.novo && typeof body.novo === "object") {
       const n = body.novo as Record<string, unknown>
       const r = await cadastrarOrgaoRapido(prisma, {
         name: String(n.name ?? ""), tipo: String(n.tipo ?? ""), city: String(n.city ?? ""),

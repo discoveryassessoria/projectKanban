@@ -15,7 +15,7 @@ import { createPortal } from "react-dom"
 import { Loader2, Plus, Search } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
 
-interface OrgaoSugerido { id: number; name: string; type: string | null; city: string | null; state: string | null; pais: string | null }
+interface OrgaoSugerido { id: number; name: string; type: string | null; city: string | null; state: string | null; pais: string | null; origem: "cadastrado" | "cartorio_nacional"; cartorioId: number | null }
 interface Existente { id: number; name: string; city: string | null; state: string | null }
 interface PaisCat { id: number; countryLabel: string }
 
@@ -108,10 +108,21 @@ export function CartorioOrgaoField({
       {aberto && q.length >= 2 && (
         <div className="absolute left-0 right-0 mt-1 rounded-md border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-lg max-h-64 overflow-y-auto" style={{ zIndex: LAYER.popover }}>
           {sugestoes.map((o) => (
-            <button key={o.id} type="button" disabled={salvando} data-testid="cartorio-sugestao"
-              onClick={() => { onTextoChange(o.name); void vincular({ orgaoId: o.id }) }}
+            <button key={`${o.origem}-${o.id}`} type="button" disabled={salvando} data-testid="cartorio-sugestao"
+              onClick={() => {
+                onTextoChange(o.name)
+                // "cartorio_nacional": ainda não é um OrgaoProtocolo — a base nacional de
+                // cartórios (7000+, Registro Civil/Transparência) é só REFERÊNCIA.
+                // `cartorioId` promove (cria ou reaproveita) e vincula na mesma chamada.
+                void vincular(o.origem === "cartorio_nacional" ? { cartorioId: o.cartorioId } : { orgaoId: o.id })
+              }}
               className="w-full text-left px-3 py-2 hover:bg-[var(--surface-secondary)] border-b border-[var(--border-default)] last:border-0">
-              <div className="text-[12.5px] text-[var(--text-primary)]">{o.name}</div>
+              <div className="text-[12.5px] text-[var(--text-primary)] flex items-center gap-1.5">
+                {o.name}
+                {o.origem === "cartorio_nacional" && (
+                  <span className="text-[8.5px] font-bold uppercase tracking-wider px-1 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]">base nacional</span>
+                )}
+              </div>
               <div className="text-[10.5px] text-[var(--text-secondary)]">{rotulo(o)}{o.pais ? ` · ${o.pais}` : ""}</div>
             </button>
           ))}
