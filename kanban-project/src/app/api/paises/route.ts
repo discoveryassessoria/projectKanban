@@ -13,7 +13,7 @@ export async function GET() {
     const paises = await prisma.catalogoPais.findMany({
       where: { ativo: true },
       orderBy: { countryLabel: 'asc' },
-      select: { countryKey: true, countryLabel: true, flag: true },
+      select: { id: true, countryKey: true, countryLabel: true, flag: true },
     })
     return NextResponse.json({ paises })
   } catch (error) {

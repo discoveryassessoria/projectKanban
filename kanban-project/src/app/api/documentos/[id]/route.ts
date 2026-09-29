@@ -321,6 +321,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     })
 
+    // Toda porta que muda `Documento.orgaoId` espelha nas Tarefas do documento
+    // (mesma regra de `vincularOrgaoAoDocumento`) — a Torre lê `Tarefa.orgaoId`.
+    if (body.orgaoId !== undefined) {
+      await prisma.tarefa.updateMany({ where: { documentoId: id }, data: { orgaoId: documentoAtualizado.orgaoId } })
+    }
+
     // ✅ AUTOMAÇÃO DE TAREFAS
     if (body.status !== undefined) {
       const processoId = documentoAtual.pessoa.arvore?.processos[0]?.id

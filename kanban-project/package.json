@@ -246,6 +246,7 @@
     "test:nav": "tsx scripts/management-nav.test.ts",
     "test:operational-projection": "tsx scripts/operational-projection.test.ts",
     "test:orgaos": "tsx scripts/orgaos-organizacoes.test.ts",
+    "test:cartorio-painel": "tsx scripts/cartorio-orgao-painel-documento.test.ts",
     "test:overview": "tsx scripts/overview-projecao.test.ts",
     "test:participante-conta": "tsx scripts/participante-conta.test.ts",
     "test:passo-tarefa": "tsx scripts/passo-tarefa-coerencia.test.ts",

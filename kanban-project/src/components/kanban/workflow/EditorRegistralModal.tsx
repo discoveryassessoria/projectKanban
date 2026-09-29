@@ -16,6 +16,7 @@ import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 import { CampoData } from "@/src/components/ui/campo-data"
+import { CartorioOrgaoField } from "@/src/components/orgaos/CartorioOrgaoField"
 
 // ============================================================
 // TIPOS
@@ -384,7 +385,7 @@ function ConteudoModal({
         !estadoOk && "Estado",
         !cidadeOk && "Cidade",
         !cartorioOk && "Cartório",
-        !orgaoOk && `Cartório "${form.cartorio}" sem órgão mapeado — contate o administrador (Gerenciamento → Órgãos e Organizações)`,
+        !orgaoOk && `Cartório "${form.cartorio}" a mapear — escolha um órgão na busca ou use "Cadastrar este cartório"`,
         !livroOk && "Livro",
         !folhaOk && "Folha",
         !termoOk && "Termo",
@@ -716,28 +717,17 @@ function ConteudoModal({
                         </datalist>
                       </>
                     )}
-                    <Field
-                      label="Cartório"
+                    <CartorioOrgaoField
+                      documentoId={documentoId as number}
+                      texto={form.cartorio}
+                      orgaoId={form.orgaoId}
+                      ufSigla={ufSigla}
+                      cidade={form.cidade_registro}
+                      paisNome={ehBrasil ? "Brasil" : form.pais_registro}
                       requiredToComplete={isModoBuscar}
-                      value={form.cartorio}
-                      onChange={aoMudarCartorio}
-                      colSpan={2}
-                      list={ehBrasil ? "cartorios-sugeridos" : undefined}
+                      onTextoChange={aoMudarCartorio}
+                      onVinculado={(o) => setForm((f) => ({ ...f, cartorio: o.name, orgaoId: o.id }))}
                     />
-                    {ehBrasil && form.cartorio.trim() && (
-                      <div className={`col-span-2 text-[10.5px] ${form.orgaoId ? "text-[var(--success-text)]" : "text-[var(--warning-text)]"}`}>
-                        {form.orgaoId
-                          ? "✓ Órgão emissor vinculado automaticamente."
-                          : "Cartório sem órgão mapeado no cadastro de Órgãos e Organizações ainda — escolha um da lista sugerida, ou contate o administrador."}
-                      </div>
-                    )}
-                    {ehBrasil && (
-                      <datalist id="cartorios-sugeridos">
-                        {cartoriosDaApi.map((c) => (
-                          <option key={c.id} value={c.nome} />
-                        ))}
-                      </datalist>
-                    )}
                     {ehBrasil && ufSigla && cartoriosDaApi.length === 0 && (
                       <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
                         {form.cidade_registro ? "Nenhum cartório sincronizado para esta cidade ainda." : "Selecione a cidade para ver os cartórios dessa região."}
@@ -745,7 +735,7 @@ function ConteudoModal({
                     )}
                     {!ehBrasil && (
                       <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
-                        Fora do Brasil o cartório/órgão de registro ainda é texto livre — só temos base sincronizada de cartórios nacionais.
+                        Fora do Brasil a busca usa o cadastro de Órgãos; se não achar, use “Cadastrar este cartório”.
                       </div>
                     )}
                     {!isModoBuscar && (
