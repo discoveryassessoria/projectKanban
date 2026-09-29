@@ -18,6 +18,7 @@ import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
 import { tentativasDoPasso, tentativaVigente } from "@/src/services/execucao-do-passo"
 import { efeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
+import { correlacaoLimitada, limitarCorrelationId } from "@/src/lib/motor/correlacao"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
 import { subtarefasDaEtapa, passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
 import { avaliarCondicao, descreverCondicao, type Condicao } from "@/src/lib/motor/condicoes"
@@ -227,7 +228,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     permissoes: Object.entries(u?.permissoes ?? {}).filter(([, v]) => v === true).map(([k]) => k),
     // IDEMPOTÊNCIA DO COMANDO: o mesmo clique reenviado traz a mesma correlação e não
     // vira duas execuções. Sem ela, dois cliques criariam duas novas vias.
-    correlationId: String(body?.correlationId ?? `acao|si${id}|${body?.subtarefa ?? "-"}|${acaoKey}|${u?.userId ?? 0}`),
+    // O que vem do cliente também é sanitizado: um cliente antigo/externo pode não ter
+    // o resumo de src/lib/motor/correlacao.ts, mas o passo não pode falhar por isso.
+    correlationId: typeof body?.correlationId === "string"
+      ? limitarCorrelationId(body.correlationId)
+      : correlacaoLimitada("acao", [`si${id}`, u?.userId ?? 0], [typeof body?.subtarefa === "string" ? body.subtarefa : null, acaoKey]),
   })
   return NextResponse.json(r, { status: r.ok ? 200 : 422 })
 }

@@ -31,6 +31,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma, StepInstanceStatus } from "@prisma/client"
+import { limitarCorrelationId } from "@/src/lib/motor/correlacao"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -76,6 +77,7 @@ export interface Tentativa {
   protocoloId: number | null
   supersededAt: Date | null
   supersededPorId: number | null
+  correlationId: string | null
   /// A chave do comando que a criou. É por ela que o retry devolve a mesma tentativa.
   chaveIdempotencia: string
   criadoEm: Date
@@ -172,7 +174,9 @@ export async function abrirTentativa(
       startedAt: args.startedAt ?? null,
       executadoPorId: args.executadoPorId ?? null,
       payload: args.payload ?? undefined,
-      correlationId: args.correlationId ?? null,
+      // VarChar(60): rede de segurança, mesma razão do `corr()` em task-step-sync.ts —
+      // quem chama pode entregar uma correlação de tamanho livre (produção: #3907/#3926).
+      correlationId: args.correlationId ? limitarCorrelationId(args.correlationId) : null,
       chaveIdempotencia: chave,
     }],
     skipDuplicates: true,

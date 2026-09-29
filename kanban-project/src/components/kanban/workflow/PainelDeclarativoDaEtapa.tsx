@@ -15,6 +15,7 @@
 // erro de sistema. O que acontece depois de escolher é do motor.
 
 import { useCallback, useEffect, useState } from "react"
+import { correlacaoLimitada } from "@/src/lib/motor/correlacao"
 
 interface Campo {
   key: string; label: string; tipo: string; obrigatorio: boolean
@@ -162,8 +163,9 @@ export default function PainelDeclarativoDaEtapa({
             ? { ...(valoresDaSub[subtarefa] ?? {}), checklist: marcadosDaSub[subtarefa] ?? {} }
             : { ...valores, checklist: marcados },
           // O MESMO CLIQUE REENVIADO não vira duas execuções: a correlação identifica
-          // o comando, não a tentativa de rede.
-          correlationId: `acao|si${stepInstanceId}|${subtarefa ?? "-"}|${acao.key}|${d?.execucaoAtual?.id ?? 0}`,
+          // o comando, não a tentativa de rede. Subtarefa/ação são cadastro de tamanho
+          // livre — por isso vão resumidas, nunca cruas (ver src/lib/motor/correlacao.ts).
+          correlationId: correlacaoLimitada("acao", [`si${stepInstanceId}`, d?.execucaoAtual?.id ?? 0], [subtarefa, acao.key]),
         }),
       })
       const j = await r.json()

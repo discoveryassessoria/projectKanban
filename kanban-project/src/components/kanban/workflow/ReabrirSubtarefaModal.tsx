@@ -9,6 +9,7 @@
 // administrador que confirma deixou de ser uma opção.
 
 import { useCallback, useEffect, useState } from "react"
+import { correlacaoLimitada } from "@/src/lib/motor/correlacao"
 
 interface Plano {
   identidade: {
@@ -90,7 +91,7 @@ export default function ReabrirSubtarefaModal({
           body: JSON.stringify({
             justificativa,
             comDependentes,
-            correlationId: `reabrir-sub|si${stepInstanceId}|${subtaskKey}|${plano?.execucoes.length ?? 0}`,
+            correlationId: correlacaoLimitada("reabrir-sub", [`si${stepInstanceId}`, plano?.execucoes.length ?? 0], [subtaskKey]),
           }),
         },
       )

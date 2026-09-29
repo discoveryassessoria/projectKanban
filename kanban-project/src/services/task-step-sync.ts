@@ -17,6 +17,7 @@ import {
   MOTIVOS_DE_TENTATIVA, type MotivoDeTentativa,
 } from "@/src/services/execucao-do-passo"
 import { liberadosPor, descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
+import { limitarCorrelationId } from "@/src/lib/motor/correlacao"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
@@ -847,7 +848,12 @@ async function gateV2(processoId: number): Promise<{ ok: true } | { ok: false; c
 }
 
 // helpers de contexto
-function corr(ctx: SyncContexto): string { return ctx.correlationId ?? randomUUID() }
+// REDE DE SEGURANÇA: qualquer chamador (UI, script, rota antiga) pode entregar uma
+// correlação de tamanho livre; `WorkflowEvento.correlationId`/`StepExecution
+// .correlationId` são VarChar(60). Sem este limite aqui, no único ponto por onde toda
+// função exportada deste módulo passa, o fechamento passo→tarefa dependia de quem
+// chamou ter cortado a string — produção: não tinha (ver #3907/#3926).
+function corr(ctx: SyncContexto): string { return limitarCorrelationId(ctx.correlationId ?? randomUUID()) }
 function ok(changed: boolean, correlationId: string, ea: { tarefa?: string; passo?: string }, ec: { tarefa?: string; passo?: string }, eventos: string[], warnings: H.SyncIssue[] = []): SyncResultado {
   return { success: true, changed, estadoAnterior: ea, estadoAtual: ec, eventos, warnings, correlationId }
 }

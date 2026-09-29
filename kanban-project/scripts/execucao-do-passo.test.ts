@@ -26,6 +26,7 @@ import {
 import {
   congelarVersaoVigente, publicarNovaVersao, definicaoHistoricaDoPasso, versaoDaInstancia,
 } from "../src/services/versao-publicada"
+import { correlacaoLimitada, limitarCorrelationId } from "../src/lib/motor/correlacao"
 
 const ROOT = join(__dirname, "..")
 const read = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
@@ -81,6 +82,42 @@ check("a definição histórica resolve pela VERSÃO, não pelo id de linha",
 const back = read("scripts/backfill-tentativa-de-execucao.ts")
 check("o backfill declara o que NÃO consegue reconstruir",
   back.includes("NÃO RECONSTRUÍVEL") && back.includes("MOTIVOS_DE_TENTATIVA.BACKFILL"))
+
+// ============================================================
+console.log("\n(A2) Correlação nunca depende do tamanho da chave de cadastro (prod: #3907/#3926)")
+// ============================================================
+// Produção, 29/09: a subtarefa "conferir_validar_certidao_retificada" (37 chars)
+// empurrou a correlação para 62+ chars — acima do VarChar(60) de WorkflowEvento/
+// StepExecution.correlationId — e o INSERT falhou (P2000) DENTRO da transação de
+// fechamento do passo. Subtarefas ficavam CONCLUIDO, o passo não.
+const chaveLonga = "x".repeat(500)
+check("correlacaoLimitada cabe em 60 mesmo com chave de cadastro absurdamente longa",
+  correlacaoLimitada("acao", ["si999999999", 999999999], [chaveLonga, chaveLonga]).length <= 60)
+check("e é determinística — o mesmo clique reenviado produz a MESMA correlação",
+  correlacaoLimitada("acao", ["si2921", 4779], ["conferir_validar_documentos", "concluir"]) ===
+  correlacaoLimitada("acao", ["si2921", 4779], ["conferir_validar_documentos", "concluir"]))
+check("mas distingue ações diferentes na mesma subtarefa",
+  correlacaoLimitada("acao", ["si2921", 4779], ["conferir_validar_documentos", "concluir"]) !==
+  correlacaoLimitada("acao", ["si2921", 4779], ["conferir_validar_documentos", "recusar"]))
+check("limitarCorrelationId é a rede de segurança: string curta passa intacta",
+  limitarCorrelationId("acao|si1|x") === "acao|si1|x")
+check("e string longa vira ≤60 sem lançar",
+  limitarCorrelationId(chaveLonga).length <= 60)
+
+const painel = semComentarios(read("src/components/kanban/workflow/PainelDeclarativoDaEtapa.tsx"))
+check("o painel declarativo usa correlacaoLimitada, não concatenação crua",
+  painel.includes("correlacaoLimitada(") && !/correlationId: `acao\|si\$\{stepInstanceId\}\|\$\{subtarefa/.test(painel))
+const useCfg = semComentarios(read("src/components/kanban/workflow/useConfiguracaoDaEtapa.ts"))
+check("o hook de configuração da etapa (segunda superfície) também usa correlacaoLimitada",
+  useCfg.includes("correlacaoLimitada("))
+const rotaExec = semComentarios(read("src/app/api/workflow-step-instances/[id]/execucao/route.ts"))
+check("o fallback do servidor também é limitado — cliente antigo não derruba a transação",
+  rotaExec.includes("correlacaoLimitada(") && rotaExec.includes("limitarCorrelationId("))
+check("o corr() de task-step-sync (choke point de TODAS as funções exportadas) tem rede de segurança",
+  sync.includes("function corr(ctx: SyncContexto): string { return limitarCorrelationId(") )
+const execDoPasso = semComentarios(read("src/services/execucao-do-passo.ts"))
+check("abrirTentativa também limita antes de escrever em StepExecution.correlationId",
+  execDoPasso.includes("args.correlationId ? limitarCorrelationId(args.correlationId) : null"))
 
 // ============================================================
 // (B) COMPORTAMENTO — banco real
@@ -162,6 +199,38 @@ async function main() {
   check("com início, fim, autor e resultado",
     t1f?.startedAt?.toISOString() === inicio.toISOString() && t1f?.completedAt?.toISOString() === fim.toISOString() &&
     t1f?.executadoPorId === 1 && t1f?.resultado === "aprovado")
+
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log("\n(B-A2) Correlação absurdamente longa não derruba o INSERT (prod: #3907/#3926)")
+  // ══════════════════════════════════════════════════════════════════════════
+  // Antes da correção, isto lançava PrismaClientKnownRequestError P2000 ("value too
+  // long for the column's type") DENTRO da transação — exatamente o que aconteceu em
+  // produção ao concluir a última subtarefa de emissao_documental_retificada/
+  // apostilamento, cuja chave de subtarefa/ação era longa. Passo DEDICADO ("b"), para
+  // não deslocar as sequências que os blocos abaixo contam sobre `passo` ("a").
+  const passoB = await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: "analise_documental", ciclo: 1,
+      stepKey: "b", ordem: 2, tipo: "HUMANO", obrigatorio: true, geraTarefa: true, status: "DISPONIVEL",
+      stepDefinitionId: wf.passos[1].id, stepDefinitionVersion: 1, chaveIdempotencia: `${MARCA}-passo-b`,
+    },
+    select: { id: true },
+  })
+  const correlacaoDeCadastroLongo = `acao|si${passoB.id}|conferir_validar_certidao_retificada_e_mais_um_pedaco_bem_longo_de_chave_de_cadastro|concluir|9999`
+  check("a chave simulada realmente excede 60 (é isto que reproduz o bug)",
+    correlacaoDeCadastroLongo.length > 60, String(correlacaoDeCadastroLongo.length))
+  let lancou = false
+  let rLonga: Awaited<ReturnType<typeof abrirTentativa>> | null = null
+  try {
+    rLonga = await abrirTentativa({
+      stepInstanceId: passoB.id, motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "EM_ANDAMENTO",
+      correlationId: correlacaoDeCadastroLongo,
+      chaveIdempotencia: `${MARCA}|correlacao-longa`,
+    })
+  } catch { lancou = true }
+  check("abrirTentativa NÃO lança mais com correlação de tamanho livre", !lancou)
+  check("e a linha gravada tem correlationId ≤ 60 (coluna real do banco)",
+    (rLonga?.tentativa.correlationId?.length ?? 0) <= 60, String(rLonga?.tentativa.correlationId?.length))
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log("\n(B-B) Reabrir cria tentativa NOVA — a 1 permanece concluída")

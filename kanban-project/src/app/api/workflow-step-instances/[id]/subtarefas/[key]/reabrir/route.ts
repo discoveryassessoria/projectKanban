@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { reabrirSubtarefa, planejarReaberturaDeSubtarefa } from "@/src/services/execucao-da-subtarefa"
+import { limitarCorrelationId } from "@/src/lib/motor/correlacao"
 
 export async function GET(
   request: NextRequest,
@@ -70,7 +71,9 @@ export async function POST(
     actorId: usuario.userId,
     justificativa,
     comDependentes: body.comDependentes === true,
-    correlationId: typeof body.correlationId === "string" ? body.correlationId.slice(0, 120) : undefined,
+    // 60, não 120: VarChar(60) é o limite real de WorkflowEvento/StepExecution
+    // .correlationId. Um corte maior que a coluna ainda deixava o P2000 acontecer.
+    correlationId: typeof body.correlationId === "string" ? limitarCorrelationId(body.correlationId) : undefined,
   })
   return NextResponse.json(r, { status: r.ok ? 200 : 422 })
 }

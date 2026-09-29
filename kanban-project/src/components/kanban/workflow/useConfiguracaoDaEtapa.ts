@@ -12,6 +12,7 @@
 // fallback de negócio: é a mesma tela, sem opções que o cadastro ainda não fornece.
 
 import { useEffect, useState } from "react"
+import { correlacaoLimitada } from "@/src/lib/motor/correlacao"
 
 export interface CampoConfigurado {
   key: string
@@ -243,7 +244,7 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
           acao: acaoKey,
           valores,
           subtarefa: subtarefa ?? null,
-          correlationId: `acao|si${stepInstanceId}|${subtarefa ?? "-"}|${acaoKey}|${cfg?.execucaoAtual?.id ?? 0}`,
+          correlationId: correlacaoLimitada("acao", [`si${stepInstanceId}`, cfg?.execucaoAtual?.id ?? 0], [subtarefa, acaoKey]),
         }),
       })
       const j = await r.json()
