@@ -150,6 +150,12 @@ export function buildSteps(raw: any[], workflowId: number) {
       // ESPERA DE TERCEIRO AO LIBERAR — cadastro canônico, nunca stepKey
       // hardcoded. Ver PhaseInternalWorkflowStep.esperaExternaAoLiberar.
       esperaExternaAoLiberar: s?.esperaExternaAoLiberar === true,
+      // MOTOR DE COBRANÇA (mandato 25/09/2026) — `registrarCobranca` já lia
+      // estes dois campos do passo; só não existia porta de cadastro pra
+      // gravá-los (ficavam sempre no default do banco). `null`/ausente =
+      // usa o default do motor (1 dia / escalar na 2ª).
+      diasAposCobranca: Number(s?.diasAposCobranca) > 0 ? Number(s.diasAposCobranca) : null,
+      escalarApos: Number(s?.escalarApos) > 0 ? Number(s.escalarApos) : null,
       // TAREFA SELECIONADA DA BIBLIOTECA (mandato "separação Biblioteca ×
       // Workflow Interno", 22/09/2026). `null`/ausente = passo autorado
       // localmente à moda antiga (compatibilidade). O conteúdo (acoes/campos/

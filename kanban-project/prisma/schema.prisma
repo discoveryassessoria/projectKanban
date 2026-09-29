@@ -620,11 +620,9 @@ model Tarefa {
   updatedAt           DateTime          @updatedAt
   dataInicio          DateTime?
   observacoes         String?
-  prazoCobranca       Int?              @default(5)
   motivoConclusao     String?           @db.VarChar(50)
   quantidadeCobrancas Int               @default(0)
   statusTarefa        StatusTarefa      @default(NAO_INICIADA)
-  ultimaCobranca      DateTime?
   processo            Processo?         @relation(fields: [processoId], references: [id], onDelete: Cascade)
   responsavel         Usuario?          @relation(fields: [responsavelId], references: [id])
   status              Status?           @relation(fields: [statusId], references: [id])

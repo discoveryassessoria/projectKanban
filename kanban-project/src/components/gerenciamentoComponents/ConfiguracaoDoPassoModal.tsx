@@ -57,6 +57,13 @@ export interface PassoConfiguravel {
   /// Este passo nasce em espera de terceiro (AGUARDANDO_TERCEIRO)
   /// automaticamente ao ser liberado — sem exigir ação manual do operador.
   esperaExternaAoLiberar?: boolean
+  /// MOTOR DE COBRANÇA (mandato 25/09/2026) — regra do PASSO, não da
+  /// subtarefa: `registrarCobranca` lê estes dois valores por `stepInstanceId`,
+  /// então valem para qualquer subtarefa em espera dentro deste mesmo passo.
+  /// A tela os expõe dentro do bloco "Acompanhamento" de cada subtarefa (é
+  /// onde o administrador pensa em cobrança), mas o dado é um só por passo.
+  diasAposCobranca?: number | null
+  escalarApos?: number | null
   acoes?: AcaoCfg[]
   campos?: CampoCfg[]
   checkItens?: ItemCfg[]
@@ -527,6 +534,29 @@ export default function ConfiguracaoDoPassoModal({
                                       <label className={lbl}>Primeiro acompanhamento após (dias)</label>
                                       <input className={inp} type="number" min={1} value={st.acompanhamentoPrimeiroDias ?? ""}
                                         onChange={(e) => setSub(i, { acompanhamentoPrimeiroDias: Number(e.target.value) || null })} />
+                                    </div>
+                                  )}
+                                  {st.acompanhamentoAtivo === true && (
+                                    <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[var(--border-default)] pt-3">
+                                      <div>
+                                        <label className={lbl}>Cobrar novamente após (dias)</label>
+                                        <input className={inp} type="number" min={1} value={f.diasAposCobranca ?? ""}
+                                          onChange={(e) => setF((x) => ({ ...x, diasAposCobranca: Number(e.target.value) || null }))} />
+                                        <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                          Quantos dias depois de registrar um contato com o terceiro o acompanhamento volta a pedir atenção.
+                                        </p>
+                                      </div>
+                                      <div>
+                                        <label className={lbl}>Escalar ao gestor a partir da cobrança nº</label>
+                                        <input className={inp} type="number" min={1} value={f.escalarApos ?? ""}
+                                          onChange={(e) => setF((x) => ({ ...x, escalarApos: Number(e.target.value) || null }))} />
+                                        <p className="mt-1 text-[11px] text-[var(--text-muted)]">
+                                          A partir de quantas cobranças sem resposta o gestor passa a ver esta espera.
+                                        </p>
+                                      </div>
+                                      <p className="col-span-2 text-[11px] text-[var(--text-muted)]">
+                                        Vale para toda a etapa — é compartilhado entre as subtarefas deste passo, não só desta.
+                                      </p>
                                     </div>
                                   )}
                                 </div>

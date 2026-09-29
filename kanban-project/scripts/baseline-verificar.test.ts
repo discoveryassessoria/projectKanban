@@ -571,6 +571,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // impedindo fisicamente 2ª PhaseWorkflowInstance ativa na mesma
   // (processoId, faseMacroKey) — ver escopoDaUnidade/cicloAlvoParaFase.
   '20260928200000_trava_instancia_ativa_unica_por_fase',
+  // Colunas órfãs do bloco antigo de cobrança em Tarefa (achado real,
+  // 28-29/09/2026): prazoCobranca/ultimaCobranca — zero leituras/escritas em
+  // todo o código. quantidadeCobrancas permanece (lida pelo Relatório de
+  // Tarefas).
+  '20260929010000_remove_colunas_orfas_cobranca_tarefa',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
