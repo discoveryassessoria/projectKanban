@@ -336,10 +336,17 @@ export interface LinhaDeFila {
   // subtarefa CORRENTE (mesmo `porSubtarefa.atual` que já resolve
   // `acompanhamentoPasso`). `false`/`0` quando não há subtarefa corrente ou
   // ela nunca foi cobrada.
-  /** Ligada quando o total de cobranças desta execução atinge `escalarApos` do cadastro do passo. */
+  /** Ligada quando `cobrancasSemResposta` desta execução atinge `escalarApos` do cadastro do passo. */
   escalada: boolean
   /** Quantas cobranças (`ContatoTerceiro`) já foram registradas na execução vigente da subtarefa corrente. */
   totalCobrancas: number
+  /**
+   * COBRANÇAS SEM RESPOSTA (Torre de Controle, Bloco B, 29/09/2026) — só as
+   * de `resultado: "SEM_RESPOSTA"` a partir do último contato com resultado
+   * DIFERENTE (ou todas, se nunca houve um). É esta conta, não
+   * `totalCobrancas`, que decide `escalada`.
+   */
+  cobrancasSemResposta: number
 
   // ── ETAPA 3 (TELA OPERAÇÃO V3, 26/09/2026) — projeção de 3 estados, NUNCA
   // um `statusTarefa` novo. Mesma regra de `estadoOperacaoDaTarefa`
@@ -546,6 +553,10 @@ function projetar(
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
       return porSubtarefa?.atual?.totalCobrancas ?? 0
     })(),
+    cobrancasSemResposta: (() => {
+      const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
+      return porSubtarefa?.atual?.cobrancasSemResposta ?? 0
+    })(),
     estadoOperacao: (() => {
       if (t.statusTarefa === 'CONCLUIDO_RECEBIDO' || t.statusTarefa === 'CONCLUIDO_NAO_POSSUI') return 'CONCLUIDA'
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
@@ -707,6 +718,8 @@ export interface ResumoSubtarefasDoPasso {
     escalada: boolean
     /** Quantas cobranças (`ContatoTerceiro`) já foram registradas nesta execução vigente. */
     totalCobrancas: number
+    /** Bloco B (29/09/2026): SEM_RESPOSTA não seguido de outro resultado — é quem decide `escalada`. */
+    cobrancasSemResposta: number
     /** O rótulo da subtarefa (versão congelada) — para `passoCorrente` (Etapa 3). */
     label: string
     /** A dependência declarada dela — vazio = PONTO DE ENTRADA do passo (nunca por `ordem`, ver `estadoOperacaoDaTarefa`). */
@@ -786,6 +799,29 @@ async function progressoPorSubtarefa(
     : []
   const totalCobrancasPorExecucaoId = new Map(contagensDeContato.map((c) => [c.subtaskExecutionId, c._count._all]))
 
+  // COBRANÇAS SEM RESPOSTA por execução vigente (Bloco B, Torre de Controle,
+  // 29/09/2026) — uma consulta em lote, `contarCobrancasSemResposta` (a MESMA
+  // função pura que `registrarCobranca` usa) aplicada por grupo em memória.
+  // Precisa do CONTEÚDO (`resultado`, em ordem), não só da contagem — por
+  // isso não dá pra ser um `groupBy`.
+  const { contarCobrancasSemResposta } = await import('@/src/services/subtarefas-da-etapa')
+  const todosOsContatos = execucaoIds.length
+    ? await db.contatoTerceiro.findMany({
+        where: { subtaskExecutionId: { in: execucaoIds } },
+        orderBy: { id: 'asc' },
+        select: { subtaskExecutionId: true, resultado: true },
+      })
+    : []
+  const resultadosPorExecucaoId = new Map<number, string[]>()
+  for (const c of todosOsContatos) {
+    const arr = resultadosPorExecucaoId.get(c.subtaskExecutionId) ?? []
+    arr.push(c.resultado)
+    resultadosPorExecucaoId.set(c.subtaskExecutionId, arr)
+  }
+  const cobrancasSemRespostaPorExecucaoId = new Map(
+    [...resultadosPorExecucaoId.entries()].map(([id, resultados]) => [id, contarCobrancasSemResposta(resultados)]),
+  )
+
   const resultado = new Map<number, ResumoSubtarefasDoPasso>()
   for (const [stepInstanceId, execs] of execucoesPorStepInstance) {
     const total = totalPorStepInstance.get(stepInstanceId) ?? execs.length
@@ -815,6 +851,7 @@ async function progressoPorSubtarefa(
       atual: atual ? {
         subtaskKey: atual.subtaskKey, status: atual.status, criadoEm: atual.criadoEm, startedAt: atual.startedAt,
         escalada: atual.escalada, totalCobrancas: totalCobrancasPorExecucaoId.get(atual.id) ?? 0,
+        cobrancasSemResposta: cobrancasSemRespostaPorExecucaoId.get(atual.id) ?? 0,
         previstoPara: atual.previstoPara, proximoAcompanhamentoEm: atual.proximoAcompanhamentoEm,
         label: defAtual?.label ?? atual.subtaskKey, dependeDe: defAtual?.dependeDe ?? [],
       } : null,
@@ -848,7 +885,7 @@ async function progressoPorSubtarefa(
         subtaskKey, status: 'DISPONIVEL',
         criadoEm: createdAtPorStepInstance.get(stepInstanceId) ?? new Date(),
         startedAt: null, previstoPara: null, proximoAcompanhamentoEm: null,
-        escalada: false, totalCobrancas: 0,
+        escalada: false, totalCobrancas: 0, cobrancasSemResposta: 0,
         label: def.label, dependeDe: def.dependeDe,
       },
     })

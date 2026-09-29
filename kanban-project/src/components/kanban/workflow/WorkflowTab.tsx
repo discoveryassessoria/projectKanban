@@ -18,6 +18,8 @@ import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAval
 import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { SubtarefaProjetada } from "./useConfiguracaoDaEtapa"
+import { authHeaders, jsonHeaders } from "@/src/lib/financeiro/http"
+import { RegistrarContatoModal, type DadosDeContato } from "@/src/components/operacao/RegistrarContatoModal"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -667,6 +669,9 @@ function SubtarefaRow({
                   )}
                 </div>
               )}
+              {esperandoTerceiro && (
+                <ContatoComCartorio stepInstanceId={stepInstanceId} subtaskKey={s.key} onRecarregar={onRecarregar} />
+              )}
             </>
           )}
         </div>
@@ -733,6 +738,96 @@ function BotaoReabrirSubtarefa({
         />
       )}
     </>
+  )
+}
+
+/**
+ * CONTATO COM O CARTÓRIO — Torre de Controle, Bloco B (29/09/2026). Enquanto a
+ * subtarefa corrente está em espera de terceiro: histórico dos contatos já
+ * registrados (data · canal · resultado · quem) + botão que abre o mesmo
+ * mini-formulário do "Cobrar" da Operação — mesma porta
+ * (`/api/workflow-step-instances/[id]/subtarefas/[key]/cobranca`, que delega
+ * para `registrarCobranca`), nunca uma segunda gravação.
+ */
+interface ContatoHistorico {
+  id: number
+  canal: string
+  resultado: string | null
+  observacao: string | null
+  registradoEm: string
+  registradoPor: { id: number; nome: string } | null
+}
+const RESULTADO_LABEL: Record<string, string> = {
+  SEM_RESPOSTA: "Sem resposta", CONFIRMOU_PEDIDO: "Confirmou o pedido", PEDIU_DOCUMENTO: "Pediu documento",
+  EM_BUSCA: "Em busca", NAO_LOCALIZOU: "Não localizou", ENVIOU: "Enviou",
+}
+const CANAL_LABEL: Record<string, string> = {
+  EMAIL: "E-mail", TELEFONE: "Telefone", WHATSAPP: "WhatsApp", OFICIO: "Ofício", PRESENCIAL: "Presencial",
+}
+const fmtContato = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+
+function ContatoComCartorio({ stepInstanceId, subtaskKey, onRecarregar }: {
+  stepInstanceId: number
+  subtaskKey: string
+  onRecarregar: () => void
+}) {
+  const [historico, setHistorico] = useState<ContatoHistorico[] | null>(null)
+  const [modalAberto, setModalAberto] = useState(false)
+
+  const carregar = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/subtarefas/${encodeURIComponent(subtaskKey)}/cobranca`, { headers: authHeaders() })
+      const j = await r.json().catch(() => ({}))
+      if (j?.ok) setHistorico(j.historico ?? [])
+    } catch { /* silencioso — histórico é auxiliar, não bloqueia a subtarefa */ }
+  }, [stepInstanceId, subtaskKey])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void carregar()
+  }, [carregar])
+
+  const registrar = useCallback(async (dados: DadosDeContato): Promise<{ ok: boolean; mensagem?: string }> => {
+    const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/subtarefas/${encodeURIComponent(subtaskKey)}/cobranca`, {
+      method: "POST", headers: jsonHeaders(), body: JSON.stringify(dados),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!j.ok) return { ok: false, mensagem: j.mensagem }
+    setModalAberto(false)
+    void carregar()
+    onRecarregar()
+    return { ok: true }
+  }, [stepInstanceId, subtaskKey, carregar, onRecarregar])
+
+  return (
+    <div className="mt-2 px-2.5 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Contato com o cartório</span>
+        <button type="button" onClick={() => setModalAberto(true)} className="text-[10.5px] font-semibold text-[var(--accent-text)] hover:underline">Registrar contato</button>
+      </div>
+      {historico == null ? (
+        <div className="text-[11px] text-[var(--text-secondary)] mt-1">Carregando…</div>
+      ) : historico.length === 0 ? (
+        <div className="text-[11px] text-[var(--text-secondary)] mt-1">Nenhum contato registrado ainda.</div>
+      ) : (
+        <ul className="mt-1.5 space-y-1 max-h-32 overflow-y-auto">
+          {historico.map((c) => (
+            <li key={c.id} className="text-[11px] text-[var(--text-secondary)]">
+              {fmtContato(c.registradoEm)} · {CANAL_LABEL[c.canal] ?? c.canal} · <span className="font-semibold">{c.resultado ? (RESULTADO_LABEL[c.resultado] ?? c.resultado) : "—"}</span> · {c.registradoPor?.nome ?? "Sistema"}
+              {c.observacao && <span className="block text-[10.5px] italic">{c.observacao}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {modalAberto && (
+        <RegistrarContatoModal
+          titulo="Registrar contato"
+          subtitulo="Vira o histórico desta espera — a régua de cobrança conta a partir daqui."
+          onFechar={() => setModalAberto(false)}
+          onEnviar={registrar}
+        />
+      )}
+    </div>
   )
 }
 

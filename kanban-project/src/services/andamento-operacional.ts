@@ -132,6 +132,16 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   // aqui, a timeline mostrava o código bruto como título.
   STEP_EXECUTION_REOPENED: "Etapa reaberta",
 }
+
+// ── Tradução das ações de TarefaHistorico já escritas hoje (Torre de
+// Controle, Bloco B, 29/09/2026 — antes só `COMENTARIO`; agora também
+// `ACOMPANHAMENTO_ADIADO`, escrito por `adiarAcompanhamento`) ─────────────
+const TITULO_HISTORICO_ACAO: Record<string, string> = {
+  COMENTARIO: "Comentário",
+  ACOMPANHAMENTO_ADIADO: "Acompanhamento adiado",
+}
+const CATEGORIA_HISTORICO_ACAO = (acao: string): EventoAndamento["categoria"] =>
+  acao === "COMENTARIO" ? "observacao" : "prazo"
 const CATEGORIA_LOG_ACAO = (acao: string): EventoAndamento["categoria"] => {
   if (acao.includes("PRAZO")) return "prazo"
   if (acao.includes("ATRIBU") || acao.includes("TRANSFER") || acao.includes("REDISTRIB") || acao.includes("DEVOLVIDA")) return "responsabilidade"
@@ -191,12 +201,15 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
   const stepIds = stepsDaObrigacao.map((s) => s.id)
   const tituloDoStep = new Map(stepsDaObrigacao.map((s) => [s.id, s.stepKey]))
 
-  const [logs, workflowEventosTarefa, workflowEventosStep, necEventos, anexos, observacoes] = await Promise.all([
+  const [logs, historicoTarefa, workflowEventosTarefa, workflowEventosStep, necEventos, anexos, observacoes] = await Promise.all([
     escopo.tarefaId != null
       ? prisma.logAuditoria.findMany({
           where: { entidade: { in: ["Tarefa", "TAREFA"] }, entidadeId: escopo.tarefaId },
           orderBy: { criadoEm: "desc" },
         })
+      : Promise.resolve([]),
+    escopo.tarefaId != null
+      ? prisma.tarefaHistorico.findMany({ where: { tarefaId: escopo.tarefaId }, orderBy: { createdAt: "desc" } })
       : Promise.resolve([]),
     escopo.tarefaId != null
       ? prisma.workflowEvento.findMany({ where: { tarefaId: escopo.tarefaId }, orderBy: { criadoEm: "desc" } })
@@ -239,6 +252,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
   }
   for (const a of anexos) if (a.criadoPorId != null) idsUsuario.add(a.criadoPorId)
   for (const o of observacoes) if (o.criadoPorId != null) idsUsuario.add(o.criadoPorId)
+  for (const h of historicoTarefa) if (h.usuarioId != null) idsUsuario.add(h.usuarioId)
   const usuarios = idsUsuario.size
     ? await prisma.usuario.findMany({ where: { id: { in: [...idsUsuario] } }, select: { id: true, nome: true } })
     : []
@@ -276,6 +290,23 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       // faz essa justificativa aparecer na aba Andamento, onde ela pertence —
       // e não mais como um "motivo de bloqueio" pintado de vermelho na Central.
       motivo: typeof det.motivo === "string" ? det.motivo : (typeof det.justificativa === "string" ? det.justificativa : null),
+      referencias: { tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined },
+    })
+  }
+
+  for (const h of historicoTarefa) {
+    const dados = (h.dados ?? {}) as Record<string, unknown>
+    eventos.push({
+      id: `hist:${h.id}`,
+      tipo: h.acao,
+      categoria: CATEGORIA_HISTORICO_ACAO(h.acao),
+      data: h.createdAt.toISOString(),
+      autor: autorDe(h.usuarioId, nomesUsuario),
+      titulo: TITULO_HISTORICO_ACAO[h.acao] ?? h.acao,
+      descricao: h.acao === "COMENTARIO" ? h.descricao : null,
+      de: null, para: null,
+      etapa: typeof dados.subtaskKey === "string" ? dados.subtaskKey : null,
+      motivo: h.acao !== "COMENTARIO" ? h.descricao : null,
       referencias: { tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined },
     })
   }

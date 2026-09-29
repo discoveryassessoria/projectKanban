@@ -20,6 +20,8 @@ import { auth } from "./kit-operacional"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
 import { TarefaTransversalModal } from "@/src/components/kanban/TarefaTransversalModal"
+import { RegistrarContatoModal, type DadosDeContato } from "./RegistrarContatoModal"
+import { AdiarAcompanhamentoModal } from "./AdiarAcompanhamentoModal"
 import type { LinhaOperacaoV3, RespostaTarefas, Vista, AgruparFilaPor, FiltroRadar, FiltroQuick } from "./operacao-v3-tipos"
 import {
   relCls, acompTxtCompleto, passoLabelDe, porQueAquiDe, orgaoTxt, orgaoCls,
@@ -84,6 +86,8 @@ export function OperacaoV3() {
   const [notifOpen, setNotifOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [transversalProcessoId, setTransversalProcessoId] = useState<number | null>(null)
+  const [contatoModal, setContatoModal] = useState<{ tipo: "unica"; taskId: number } | { tipo: "lote"; ids: number[] } | null>(null)
+  const [adiarModal, setAdiarModal] = useState<{ taskId: number } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const avisar = useCallback((msg: string) => {
@@ -162,23 +166,39 @@ export function OperacaoV3() {
   }, [fila, avisar])
 
   // ── AÇÕES (chamam a API real, recarregam, avisam) ────────────────────
-  const cobrar = useCallback(async (taskId: number, canal = "EMAIL") => {
-    const r = await fetch(`/api/operacao/tarefas/${taskId}/cobrar`, { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify({ canal }) })
-    const d = await r.json().catch(() => ({}))
-    if (d.ok) avisar(`Cobrança registrada${d.escalada ? " · escalada ao gestor" : ""}.`)
-    else avisar(d.mensagem ?? "Não foi possível registrar a cobrança.")
-    dados.recarregar()
-  }, [avisar, dados])
+  // "Cobrar" abre o mini-formulário (canal/resultado/observação/data) —
+  // Torre de Controle, Bloco B, 29/09/2026. Fim do disparo mudo em EMAIL.
+  const cobrar = useCallback((taskId: number) => setContatoModal({ tipo: "unica", taskId }), [])
 
-  const adiar = useCallback(async (taskId: number) => {
-    const motivo = typeof window !== "undefined" ? window.prompt("Por que adiar o acompanhamento?") : null
-    if (!motivo || motivo.trim().length < 3) return
-    const r = await fetch(`/api/operacao/tarefas/${taskId}/adiar-acompanhamento`, { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify({ motivo, dias: 3 }) })
+  const enviarContato = useCallback(async (dadosContato: DadosDeContato): Promise<{ ok: boolean; mensagem?: string }> => {
+    if (!contatoModal) return { ok: false }
+    const rota = contatoModal.tipo === "unica"
+      ? `/api/operacao/tarefas/${contatoModal.taskId}/cobrar`
+      : `/api/operacao/tarefas/cobrar-todos-vencidos`
+    const body = contatoModal.tipo === "unica" ? dadosContato : { ...dadosContato, tarefaIds: contatoModal.ids }
+    const r = await fetch(rota, { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify(body) })
     const d = await r.json().catch(() => ({}))
-    if (d.ok) avisar("Acompanhamento adiado 3 dias. O prazo da tarefa não muda.")
-    else avisar(d.mensagem ?? "Não foi possível adiar.")
+    if (!d.ok) return { ok: false, mensagem: d.mensagem }
+    setContatoModal(null)
+    avisar(contatoModal.tipo === "unica"
+      ? `Contato registrado${d.escalada ? " · escalada ao gestor" : ""}.`
+      : `${d.cobradas} contato(s) registrado(s).${d.ignoradas?.length ? ` (${d.ignoradas.length} ignorada(s): ${d.ignoradas[0]?.motivo})` : ""}`)
     dados.recarregar()
-  }, [avisar, dados])
+    return { ok: true }
+  }, [contatoModal, avisar, dados])
+
+  const adiar = useCallback((taskId: number) => setAdiarModal({ taskId }), [])
+
+  const enviarAdiar = useCallback(async (dadosAdiar: { dias: number; motivo: string }): Promise<{ ok: boolean; mensagem?: string }> => {
+    if (!adiarModal) return { ok: false }
+    const r = await fetch(`/api/operacao/tarefas/${adiarModal.taskId}/adiar-acompanhamento`, { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify(dadosAdiar) })
+    const d = await r.json().catch(() => ({}))
+    if (!d.ok) return { ok: false, mensagem: d.mensagem }
+    setAdiarModal(null)
+    avisar(`Acompanhamento adiado ${dadosAdiar.dias} dia(s). O prazo da tarefa não muda.`)
+    dados.recarregar()
+    return { ok: true }
+  }, [adiarModal, avisar, dados])
 
   const iniciarSelecionadas = useCallback(async () => {
     const ids = Object.keys(sel).map(Number)
@@ -328,13 +348,10 @@ export function OperacaoV3() {
               linhas={abertosVisiveis} acompDepois={acompDepois} setAcompDepois={setAcompDepois}
               col={col} setCol={setCol}
               onAbrir={(id) => setDrawerTaskId(id)} onCobrar={cobrar} onAdiar={adiar}
-              onCobrarTodosVencidos={async () => {
+              onCobrarTodosVencidos={() => {
                 const ids = abertosVisiveis.filter((l) => l.acompanhamentoVencido && (l.faseMacroKey !== "genealogia")).map((l) => l.taskId)
                 if (!ids.length) { avisar("Nenhum acompanhamento vencido de terceiro."); return }
-                const r = await fetch("/api/operacao/tarefas/cobrar-todos-vencidos", { method: "POST", headers: { ...auth(), "Content-Type": "application/json" }, body: JSON.stringify({ tarefaIds: ids }) })
-                const d = await r.json().catch(() => ({}))
-                if (d.ok) avisar(`${d.cobradas} cobranças registradas.`)
-                dados.recarregar()
+                setContatoModal({ tipo: "lote", ids })
               }}
               onVerFamilia={(fam) => { setTab("fam"); setFamOpen({ fam, estagio: "vencidos" }); setFamUltimo((m) => ({ ...m, [fam]: "vencidos" })) }}
             />
@@ -413,6 +430,22 @@ export function OperacaoV3() {
           processoId={transversalProcessoId}
           onClose={() => setTransversalProcessoId(null)}
           onCreated={() => { setTransversalProcessoId(null); avisar("Tarefa transversal criada. Não muda a fase do processo."); dados.recarregar() }}
+        />
+      )}
+
+      {contatoModal && (
+        <RegistrarContatoModal
+          titulo={contatoModal.tipo === "unica" ? "Cobrar" : `Cobrar todos os vencidos (${contatoModal.ids.length})`}
+          subtitulo={contatoModal.tipo === "unica" ? undefined : "O mesmo contato é registrado em cada certidão vencida selecionada."}
+          onFechar={() => setContatoModal(null)}
+          onEnviar={enviarContato}
+        />
+      )}
+
+      {adiarModal && (
+        <AdiarAcompanhamentoModal
+          onFechar={() => setAdiarModal(null)}
+          onEnviar={enviarAdiar}
         />
       )}
     </div>

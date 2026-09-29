@@ -12,9 +12,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { negarSeNaoForDonoDaTarefaPorId } from "@/src/lib/tarefa-acesso"
-import { registrarCobranca, historicoDeCobrancasDaSubtarefa } from "@/src/services/subtarefas-da-etapa"
+import { registrarCobranca, historicoDeCobrancasDaSubtarefa, CANAIS_DE_CONTATO, RESULTADOS_DE_CONTATO } from "@/src/services/subtarefas-da-etapa"
 
-const CANAIS_VALIDOS = new Set(["EMAIL", "TELEFONE", "PORTAL", "CORREIO", "PRESENCIAL", "OUTRO"])
+const CANAIS_VALIDOS = new Set<string>(CANAIS_DE_CONTATO)
+const RESULTADOS_VALIDOS = new Set<string>(RESULTADOS_DE_CONTATO)
 
 async function tarefaDoStepInstance(stepInstanceId: number) {
   return prisma.tarefa.findFirst({ where: { workflowStepInstanceId: stepInstanceId }, select: { id: true } })
@@ -65,15 +66,25 @@ export async function POST(
       { status: 400 },
     )
   }
+  const resultado = String(body.resultado ?? "").toUpperCase()
+  if (!RESULTADOS_VALIDOS.has(resultado)) {
+    return NextResponse.json(
+      { ok: false, code: "RESULTADO_INVALIDO", mensagem: `Resultado deve ser um de: ${[...RESULTADOS_VALIDOS].join(", ")}.` },
+      { status: 400 },
+    )
+  }
+  const dataContato = typeof body.dataContato === "string" && body.dataContato.trim() ? new Date(body.dataContato) : null
 
   const r = await registrarCobranca({
     stepInstanceId,
     subtaskKey: key,
     canal,
+    resultado,
     observacao: typeof body.observacao === "string" ? body.observacao.trim() || null : null,
     documentoId: Number.isFinite(Number(body.documentoId)) ? Number(body.documentoId) : null,
     orgaoId: Number.isFinite(Number(body.orgaoId)) ? Number(body.orgaoId) : null,
     registradoPorId: usuario.userId,
+    dataContato: dataContato && !Number.isNaN(dataContato.getTime()) ? dataContato : null,
   })
   return NextResponse.json(r, { status: r.ok ? 200 : 422 })
 }

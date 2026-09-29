@@ -140,7 +140,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("3) COBRAR pela mesma resolução — reagenda e conta certo")
   // ══════════════════════════════════════════════════════════════════════
-  const rCobrar = await registrarCobranca({ stepInstanceId: corrente!.stepInstanceId, subtaskKey: corrente!.subtaskKey, canal: "EMAIL" })
+  const rCobrar = await registrarCobranca({ stepInstanceId: corrente!.stepInstanceId, subtaskKey: corrente!.subtaskKey, canal: "EMAIL", resultado: "SEM_RESPOSTA" })
   ok("3.1) cobrança via subtarefaCorrenteDaTarefa sucede", rCobrar.ok === true && rCobrar.totalContatos === 1, JSON.stringify(rCobrar))
 
   await limpar()

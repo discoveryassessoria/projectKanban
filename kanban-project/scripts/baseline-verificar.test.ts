@@ -576,6 +576,9 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // todo o código. quantidadeCobrancas permanece (lida pelo Relatório de
   // Tarefas).
   '20260929010000_remove_colunas_orfas_cobranca_tarefa',
+  // Torre de Controle, Bloco B (29/09/2026): resultado do contato com o
+  // terceiro — o que faz "cobrança sem resposta" ser um fato gravado.
+  '20260929120000_contato_terceiro_resultado',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

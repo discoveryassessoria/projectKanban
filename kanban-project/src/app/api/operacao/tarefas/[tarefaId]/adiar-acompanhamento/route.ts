@@ -5,7 +5,7 @@
 // da tarefa, só na dimensão D (acompanhamento) da subtarefa corrente.
 //
 //   POST /api/operacao/tarefas/{tarefaId}/adiar-acompanhamento
-//   body: { motivo: string (obrigatório), dias?: number (default 3) }
+//   body: { motivo: string (10–300 chars), dias?: number (1–15, default 3) }
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
@@ -26,13 +26,16 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
 
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
   const motivo = typeof body.motivo === "string" ? body.motivo.trim() : ""
-  if (motivo.length < 3) {
+  // 10–300 caracteres — contrato do modal "Adiar" (Torre de Controle, Bloco B,
+  // 29/09/2026); antes era só ">= 3", herança do window.prompt sem regra real.
+  if (motivo.length < 10 || motivo.length > 300) {
     return NextResponse.json(
-      { ok: false, code: "MOTIVO_OBRIGATORIO", mensagem: "Explique por que o acompanhamento está sendo adiado." },
+      { ok: false, code: "MOTIVO_INVALIDO", mensagem: "O motivo precisa ter entre 10 e 300 caracteres." },
       { status: 400 },
     )
   }
-  const dias = Number.isFinite(Number(body.dias)) && Number(body.dias) > 0 ? Number(body.dias) : 3
+  const diasRaw = Number(body.dias)
+  const dias = Number.isInteger(diasRaw) && diasRaw >= 1 && diasRaw <= 15 ? diasRaw : 3
 
   const corrente = await subtarefaCorrenteDaTarefa(tarefaId)
   if (!corrente) {

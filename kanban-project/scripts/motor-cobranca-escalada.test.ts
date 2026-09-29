@@ -152,7 +152,7 @@ async function main() {
   secao("3) 1ª COBRANÇA — reagenda +1 dia corrido, não escala ainda")
   // ══════════════════════════════════════════════════════════════════════
   const antesDaCobranca = new Date()
-  const r1 = await registrarCobranca({ stepInstanceId: stepInst.id, subtaskKey: "aguardar_retorno", canal: "EMAIL", observacao: "primeiro contato" })
+  const r1 = await registrarCobranca({ stepInstanceId: stepInst.id, subtaskKey: "aguardar_retorno", canal: "EMAIL", resultado: "SEM_RESPOSTA", observacao: "primeiro contato" })
   ok("3.1) 1ª cobrança registrada com sucesso", r1.ok === true, JSON.stringify(r1))
   if (r1.ok) {
     const esperado = prazoOperacional(1, antesDaCobranca)
@@ -168,7 +168,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════
   secao("4) 2ª COBRANÇA — liga escalada")
   // ══════════════════════════════════════════════════════════════════════
-  const r2 = await registrarCobranca({ stepInstanceId: stepInst.id, subtaskKey: "aguardar_retorno", canal: "TELEFONE" })
+  const r2 = await registrarCobranca({ stepInstanceId: stepInst.id, subtaskKey: "aguardar_retorno", canal: "TELEFONE", resultado: "SEM_RESPOSTA" })
   ok("4.1) 2ª cobrança registrada com sucesso", r2.ok === true, JSON.stringify(r2))
   if (r2.ok) ok("4.2) escalada=true na 2ª cobrança (escalarApos=2)", r2.escalada === true, `totalContatos=${r2.totalContatos}`)
 

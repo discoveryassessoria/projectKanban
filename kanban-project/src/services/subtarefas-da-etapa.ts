@@ -772,8 +772,43 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
   return { aplicavel: true, subtarefaKey: corrente.key, podeConcluirPasso: gate.pode, faltando: gate.faltando }
 }
 
+/** O vocabulário fechado de `ContatoTerceiro.resultado` (Torre de Controle, Bloco B, 29/09/2026). */
+export const RESULTADOS_DE_CONTATO = ["SEM_RESPOSTA", "CONFIRMOU_PEDIDO", "PEDIU_DOCUMENTO", "EM_BUSCA", "NAO_LOCALIZOU", "ENVIOU"] as const
+export type ResultadoDeContato = (typeof RESULTADOS_DE_CONTATO)[number]
+/** O vocabulário fechado de `ContatoTerceiro.canal`. */
+export const CANAIS_DE_CONTATO = ["EMAIL", "TELEFONE", "WHATSAPP", "OFICIO", "PRESENCIAL"] as const
+
 /**
- * REGISTRA UMA COBRANÇA (contato ao terceiro) — Etapa 2, item 5.
+ * "COBRANÇA SEM RESPOSTA" É UM FATO, NÃO UMA CONTAGEM CEGA (Bloco B,
+ * 29/09/2026) — achado real: contar todo `ContatoTerceiro` como "sem
+ * resposta" escalava mesmo depois do cartório ter respondido "em busca" ou
+ * "confirmou o pedido". A conta certa: SEM_RESPOSTA a partir do último
+ * contato com resultado DIFERENTE (ou todos, se nunca houve um) — um
+ * resultado real "reseta" a régua, porque a cobrança anterior deixou de
+ * estar sem resposta.
+ *
+ * PURA — recebe os resultados JÁ EM ORDEM cronológica; quem lê em lote
+ * (`tarefa-projecoes.ts`) reaproveita esta MESMA função em vez de
+ * reimplementar a régua com outra cara.
+ */
+export function contarCobrancasSemResposta(resultadosEmOrdem: readonly string[]): number {
+  let ultimoNaoSemRespostaIdx = -1
+  resultadosEmOrdem.forEach((r, i) => { if (r !== "SEM_RESPOSTA") ultimoNaoSemRespostaIdx = i })
+  return resultadosEmOrdem.slice(ultimoNaoSemRespostaIdx + 1).filter((r) => r === "SEM_RESPOSTA").length
+}
+
+export async function cobrancasSemRespostaDesde(subtaskExecutionId: number, db: typeof prisma = prisma): Promise<number> {
+  const contatos = await db.contatoTerceiro.findMany({
+    where: { subtaskExecutionId },
+    orderBy: { id: "asc" },
+    select: { resultado: true },
+  })
+  return contarCobrancasSemResposta(contatos.map((c) => c.resultado))
+}
+
+/**
+ * REGISTRA UMA COBRANÇA (contato ao terceiro) — Etapa 2, item 5; `resultado`
+ * obrigatório desde o Bloco B (Torre de Controle, 29/09/2026).
  *
  * ContatoTerceiro é FATO HISTÓRICO append-only, nunca sobrescrito — cada
  * cobrança é uma linha própria, presa à EXECUÇÃO VIGENTE da subtarefa no
@@ -783,10 +818,14 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
  * DOIS EFEITOS COLATERAIS, ambos vindos do CADASTRO do passo (nunca
  * hardcoded): reagenda `proximoAcompanhamentoEm` em
  * `PhaseInternalWorkflowStep.diasAposCobranca` dias corridos a partir de
- * agora (default 1), e liga `escalada` quando o total de cobranças desta
- * execução atinge `escalarApos` (default 2) — nunca desliga sozinha: só
- * `concluirSubtarefaCorrentePeloPasso` zera, porque só a conclusão da
- * subtarefa encerra de fato a espera que a escalada sinaliza.
+ * agora (default 1), e liga `escalada` quando `cobrancasSemRespostaDesde`
+ * atinge `escalarApos` (default 2, contando SEM_RESPOSTA não seguido de
+ * outro resultado — nunca o total bruto de contatos) — nunca desliga
+ * sozinha: só `concluirSubtarefaCorrentePeloPasso` zera, porque só a
+ * conclusão da subtarefa encerra de fato a espera que a escalada sinaliza.
+ *
+ * `resultado: "ENVIOU"` NUNCA conclui nada sozinho — só o passo "Receber
+ * certidão" recebe a certidão de fato, como já era.
  *
  * FORA DE TRANSAÇÃO, de propósito — mesma classe das outras primitivas
  * deste módulo (usa o prisma cru).
@@ -795,14 +834,20 @@ export async function registrarCobranca(args: {
   stepInstanceId: number
   subtaskKey: string
   canal: string
+  resultado: string
   observacao?: string | null
   documentoId?: number | null
   orgaoId?: number | null
   registradoPorId?: number | null
+  /** Quando o contato ACONTECEU, se diferente de agora (registro retroativo). */
+  dataContato?: Date | null
 }): Promise<
-  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" }
-  | { ok: true; contatoId: number; totalContatos: number; escalada: boolean; proximoAcompanhamentoEm: Date | null }
+  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" | "RESULTADO_INVALIDO" | "CANAL_INVALIDO" }
+  | { ok: true; contatoId: number; totalContatos: number; cobrancasSemResposta: number; escalada: boolean; proximoAcompanhamentoEm: Date | null }
 > {
+  if (!(RESULTADOS_DE_CONTATO as readonly string[]).includes(args.resultado)) return { ok: false, motivo: "RESULTADO_INVALIDO" }
+  if (!(CANAIS_DE_CONTATO as readonly string[]).includes(args.canal)) return { ok: false, motivo: "CANAL_INVALIDO" }
+
   const { execucaoVigente, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
   const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
   if (!vigente) return { ok: false, motivo: "SEM_EXECUCAO_VIGENTE" }
@@ -823,13 +868,16 @@ export async function registrarCobranca(args: {
       documentoId: args.documentoId ?? null,
       orgaoId: args.orgaoId ?? null,
       canal: args.canal,
+      resultado: args.resultado,
       observacao: args.observacao ?? null,
       registradoPorId: args.registradoPorId ?? null,
+      ...(args.dataContato ? { registradoEm: args.dataContato } : {}),
     },
   })
 
   const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id } })
-  const escalada = totalContatos >= escalarApos
+  const cobrancasSemResposta = await cobrancasSemRespostaDesde(vigente.id)
+  const escalada = cobrancasSemResposta >= escalarApos
   const proximoAcompanhamentoEm = prazoOperacional(diasAposCobranca, new Date())
 
   await registrarNaExecucao(args.stepInstanceId, args.subtaskKey, {
@@ -838,7 +886,7 @@ export async function registrarCobranca(args: {
     escaladaEm: escalada ? (vigente.escaladaEm ?? new Date()) : vigente.escaladaEm,
   })
 
-  return { ok: true, contatoId: contato.id, totalContatos, escalada, proximoAcompanhamentoEm }
+  return { ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta, escalada, proximoAcompanhamentoEm }
 }
 
 /** Os três estados operacionais que a tela agrupa — nunca um `statusTarefa` novo. */
@@ -968,6 +1016,27 @@ export async function adiarAcompanhamento(args: {
       detalhes: { stepInstanceId: args.stepInstanceId, subtaskKey: args.subtaskKey, dias, novaData } as never,
     },
   }).catch(() => null)
+
+  // TAREFA HISTÓRICO — o LogAuditoria acima está sob `entidade: "SubtaskExecution"`
+  // (escopo da execução, não da Tarefa), e é por isso que "Andamento"
+  // (`montarAndamentoDaOperacao`, que só lê LogAuditoria com
+  // `entidade in ["Tarefa","TAREFA"]`) nunca mostrava o motivo do adiamento
+  // (Torre de Controle, Bloco B, 29/09/2026). Esta segunda gravação, escopada
+  // por tarefaId, é o que a torna visível ali.
+  const tarefa = await prisma.tarefa.findFirst({
+    where: { workflowStepInstanceId: args.stepInstanceId }, select: { id: true },
+  })
+  if (tarefa) {
+    await prisma.tarefaHistorico.create({
+      data: {
+        tarefaId: tarefa.id,
+        usuarioId: args.registradoPorId ?? null,
+        acao: "ACOMPANHAMENTO_ADIADO",
+        descricao: args.motivo,
+        dados: { stepInstanceId: args.stepInstanceId, subtaskKey: args.subtaskKey, dias, novaData } as never,
+      },
+    }).catch(() => null)
+  }
 
   return { ok: true, proximoAcompanhamentoEm: novaData }
 }

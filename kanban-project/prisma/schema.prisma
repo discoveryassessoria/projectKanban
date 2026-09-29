@@ -5653,16 +5653,27 @@ model ContatoTerceiro {
   orgaoId Int?
   orgao   OrgaoProtocolo? @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
 
-  /// EMAIL | TELEFONE | PORTAL | CORREIO | PRESENCIAL | OUTRO — vocabulário
-  /// fechado, conferido na porta (não no banco: mesmo padrão de `canalKey`
-  /// solto que `SubtaskExecution` já usa).
+  /// EMAIL | TELEFONE | WHATSAPP | OFICIO | PRESENCIAL — vocabulário fechado,
+  /// conferido na porta (não no banco: mesmo padrão de `canalKey` solto que
+  /// `SubtaskExecution` já usa).
   canal       String  @db.VarChar(20)
+  /// SEM_RESPOSTA | CONFIRMOU_PEDIDO | PEDIU_DOCUMENTO | EM_BUSCA |
+  /// NAO_LOCALIZOU | ENVIOU (Torre de Controle, Bloco B, 29/09/2026) — o que
+  /// de fato aconteceu no contato, não só que ele existiu. É o que faz
+  /// "cobrança sem resposta" ser um FATO, não uma contagem cega de contatos:
+  /// `SEM_RESPOSTA` não seguido de outro resultado é quem conta pra escalada
+  /// (ver `cobrancasSemRespostaDesde`, subtarefas-da-etapa.ts). `ENVIOU`
+  /// nunca conclui nada sozinho — só o passo "Receber certidão" recebe.
+  resultado   String  @db.VarChar(20)
   observacao  String? @db.Text
 
   /// Protegido pelo banco: ON DELETE SET NULL — quem registrou não trava a
   /// exclusão da própria conta.
   registradoPor   Usuario? @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
   registradoPorId Int?
+  /// QUANDO O CONTATO ACONTECEU — default agora, mas aceita registro
+  /// retroativo (contato feito por telefone e só anotado depois). É o mesmo
+  /// campo que já existia (`registradoEm`), não um `dataContato` duplicado.
   registradoEm    DateTime @default(now())
 
   @@index([subtaskExecutionId])

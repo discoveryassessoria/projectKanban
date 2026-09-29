@@ -13,9 +13,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { negarSeNaoForDonoDaTarefaPorId } from "@/src/lib/tarefa-acesso"
-import { registrarCobranca, subtarefaCorrenteDaTarefa } from "@/src/services/subtarefas-da-etapa"
+import { registrarCobranca, subtarefaCorrenteDaTarefa, CANAIS_DE_CONTATO, RESULTADOS_DE_CONTATO } from "@/src/services/subtarefas-da-etapa"
 
-const CANAIS_VALIDOS = new Set(["EMAIL", "TELEFONE", "PORTAL", "CORREIO", "PRESENCIAL", "OUTRO"])
+const CANAIS_VALIDOS = new Set<string>(CANAIS_DE_CONTATO)
+const RESULTADOS_VALIDOS = new Set<string>(RESULTADOS_DE_CONTATO)
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefaId: string }> }) {
   const tarefaId = Number((await ctx.params).tarefaId)
@@ -38,22 +39,34 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   }
 
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
-  const canal = String(body.canal ?? "").toUpperCase()
+  const canal = String(body.canal ?? "EMAIL").toUpperCase()
   if (!CANAIS_VALIDOS.has(canal)) {
     return NextResponse.json(
       { ok: false, code: "CANAL_INVALIDO", mensagem: `Canal deve ser um de: ${[...CANAIS_VALIDOS].join(", ")}.` },
       { status: 400 },
     )
   }
+  // Default SEM_RESPOSTA — é o que "Cobrar" sempre foi: mandar e ainda não
+  // saber o resultado (Torre de Controle, Bloco B, 29/09/2026).
+  const resultado = String(body.resultado ?? "SEM_RESPOSTA").toUpperCase()
+  if (!RESULTADOS_VALIDOS.has(resultado)) {
+    return NextResponse.json(
+      { ok: false, code: "RESULTADO_INVALIDO", mensagem: `Resultado deve ser um de: ${[...RESULTADOS_VALIDOS].join(", ")}.` },
+      { status: 400 },
+    )
+  }
+  const dataContato = typeof body.dataContato === "string" && body.dataContato.trim() ? new Date(body.dataContato) : null
 
   const r = await registrarCobranca({
     stepInstanceId: corrente.stepInstanceId,
     subtaskKey: corrente.subtaskKey,
     canal,
+    resultado,
     observacao: typeof body.observacao === "string" ? body.observacao.trim() || null : null,
     documentoId: Number.isFinite(Number(body.documentoId)) ? Number(body.documentoId) : null,
     orgaoId: Number.isFinite(Number(body.orgaoId)) ? Number(body.orgaoId) : null,
     registradoPorId: usuario.userId,
+    dataContato: dataContato && !Number.isNaN(dataContato.getTime()) ? dataContato : null,
   })
   return NextResponse.json(r, { status: r.ok ? 200 : 422 })
 }
