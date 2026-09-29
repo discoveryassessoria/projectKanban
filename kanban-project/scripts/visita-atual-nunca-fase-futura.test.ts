@@ -49,7 +49,8 @@ async function limpar() {
     await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
     await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
     await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
-    await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: ids } } })
+    // Este teste nunca cria NecessidadeDocumental (monta Documento/Step direto,
+    // sem passar pelo reconciliador) — nada a limpar aqui.
     await prisma.documento.deleteMany({ where: { pessoa: { arvore: { nome: { startsWith: MARCA } } } } })
     await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   }

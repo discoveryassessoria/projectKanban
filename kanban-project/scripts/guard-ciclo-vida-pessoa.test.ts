@@ -385,6 +385,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/fase-nao-duplica-tarefa.test.ts":
     "mudança de fase não duplica tarefa: monta e derruba a PRÓPRIA árvore (marca FASEDUP), " +
     "só no banco de teste — reproduz o caso em que a mesma certidão virou duas tarefas vivas",
+  "scripts/visita-atual-nunca-fase-futura.test.ts":
+    "visita atual do documento nunca aponta para fase futura: monta e derruba a PRÓPRIA " +
+    "árvore/pessoa (marca VISITAFUT), só no banco de teste — reproduz o retrocesso de fase " +
+    "que deixa passos de fases futuras em_andamento (processo 651, mandato NEC-001)",
   "scripts/fluxo-distribuicao.test.ts":
     "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
   "scripts/obrigacao-atribuicao.test.ts":
