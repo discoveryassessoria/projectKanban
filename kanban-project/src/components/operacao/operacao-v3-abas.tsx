@@ -248,10 +248,11 @@ export function AbaFamilias({
 }) {
   const todas = useMemo(() => [...abertos, ...feito], [abertos, feito])
   const familias = useMemo(() => {
-    const nomes = [...new Set(todas.map((l) => l.familiaNome ?? "—"))]
+    const chave = (l: LinhaOperacaoV3) => l.familiaNome ?? l.processoNome ?? "—"
+    const nomes = [...new Set(todas.map(chave))]
     return nomes.map((nome) => {
-      const ts = todas.filter((l) => (l.familiaNome ?? "—") === nome)
-      const abertosDaFam = abertos.filter((l) => (l.familiaNome ?? "—") === nome)
+      const ts = todas.filter((l) => chave(l) === nome)
+      const abertosDaFam = abertos.filter((l) => chave(l) === nome)
       const escaladaPorOrgao = new Map<string, number>()
       for (const l of abertosDaFam) if (l.escalada && l.terceiroNome) escaladaPorOrgao.set(l.terceiroNome, (escaladaPorOrgao.get(l.terceiroNome) ?? 0) + 1)
       const gargaloEntry = [...escaladaPorOrgao.entries()].sort((a, b) => b[1] - a[1])[0]
@@ -310,7 +311,7 @@ export function AbaFamilias({
                   const passo = passoLabelDe(t)
                   return (
                     <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "1.5fr 1.1fr 1fr 1fr 0.9fr 0.8fr 120px", boxShadow: `inset 4px 0 0 ${t.atrasada ? "#b3261e" : "transparent"}` }}>
-                      <div style={{ fontWeight: 600 }}>{t.titulo}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pais}</div></div>
+                      <div style={{ fontWeight: 600 }}>{t.titulo}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
                       <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
                       <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
                       <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
@@ -441,7 +442,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
                   <div className="opv3-hd" style={{ gridTemplateColumns: "1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px" }}><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
                   {g.linhas.map((t) => (
                     <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px" }}>
-                      <div style={{ fontWeight: 600 }}>{t.titulo}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pais}</div></div>
+                      <div style={{ fontWeight: 600 }}>{t.titulo}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
                       <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
                       <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
                       <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>

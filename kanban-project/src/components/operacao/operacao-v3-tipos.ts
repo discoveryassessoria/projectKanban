@@ -33,6 +33,8 @@ export interface LinhaOperacaoV3 {
   linhaReta: boolean | null
   /** Os dois nomes, quando a obrigação é de uma UNIÃO (certidão de casamento) — "Fulano e Fulana". `null` para obrigação de pessoa. */
   casalNomes: string | null
+  /** O cônjuge (quando a obrigação é de UNIÃO) — "com <cônjuge>". `pessoaId`/`pessoaNome` já são os da pessoa da linha reta. */
+  conjugeNome: string | null
   /** A tarefa é de uma fase ANTERIOR à fase atual do processo — só então o selo "Fase anterior" é correto. */
   faseAnteriorAFaseAtual: boolean
   /** Rótulo canônico da fase atual do processo — "Genealogia", nunca "genealogia". */

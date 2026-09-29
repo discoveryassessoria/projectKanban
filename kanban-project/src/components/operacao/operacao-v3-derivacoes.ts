@@ -35,41 +35,40 @@ export const relCls = (et: EstadoTemporalApi | null): string => {
   return "opv3-p-gry"
 }
 
-/** Rótulo do passo/subtarefa corrente — "X/N · Rótulo" no mesmo padrão do protótipo. */
+/** Rótulo do passo/subtarefa corrente — "X/N · Rótulo" no mesmo padrão do protótipo.
+ *  Genealogia não tem subtarefa (`passoCorrente` sempre `null`) — o rótulo real do
+ *  passo vem de `etapaAtual` (achado real, mandato "Operação/Antão", correção
+ *  pós-conferência 29/09/2026: toda tarefa "a iniciar" de Genealogia mostrava o
+ *  texto fixo da Emissão, "A iniciar (enviar ao cartório)", porque este fallback
+ *  nunca olhava `etapaAtual` — o nome real do passo, "Localizar registro", ficava
+ *  sem uso nenhum aqui). */
 export function passoLabelDe(l: LinhaOperacaoV3): { label: string; sub: string } {
   if (l.estadoOperacao === "CONCLUIDA") {
     return { label: `Concluída${l.passoAtual ? ` · ${l.passoAtual.total}/${l.passoAtual.total}` : ""}`, sub: "" }
   }
   if (l.origem === "TRANSVERSAL") return { label: "Transversal · ação interna", sub: "não muda a fase" }
-  if (l.aIniciar) return { label: "A iniciar (enviar ao cartório)", sub: l.passoCorrente?.label ?? "passo 1 acontece ao iniciar" }
   const rotulo = l.passoCorrente?.label ?? l.etapaAtual ?? "—"
+  if (l.aIniciar) {
+    const label = l.faseMacroKey === "genealogia" ? `A iniciar · ${rotulo}` : "A iniciar (enviar ao cartório)"
+    return { label, sub: l.faseMacroKey === "genealogia" ? "fase Genealogia" : (l.passoCorrente?.label ?? "passo 1 acontece ao iniciar") }
+  }
   const posicao = l.passoAtual ? `${l.passoAtual.ordem + 1}/${l.passoAtual.total} · ` : ""
   return { label: `${posicao}${rotulo}`, sub: l.faseMacroKey === "genealogia" ? "fase Genealogia" : "" }
 }
 
-/** "Por que aqui" — aproximação honesta: a API não expõe a razão genealógica
- *  fina (colateral/requerente) que o protótipo mostra por pessoa; usa o que
- *  já existe (origem/numeroLinhagem+linhaReta/serviço).
- *
- *  `numeroLinhagem` sozinho NUNCA basta pra dizer "Linha reta": é calculado
- *  pra toda a árvore, cônjuges inclusive (achado 26/09/2026 — Zenir/Isonia
- *  apareciam como "Linha reta" por terem número, mesmo sendo cônjuges).
- *  `linhaReta` (`Pessoa.linhaReta`) é quem decide o rótulo.
- *
- *  "Trava a família" (mandato "Operação/Antão", 29/09/2026): dizia sempre a
- *  mesma frase pra QUALQUER tarefa de Genealogia, mesmo quando o processo já
- *  está em Genealogia de verdade (não é mais "trava" nada, é o trabalho
- *  ATUAL). Agora diz a fase atual do processo — real e verificável. */
-export function porQueAquiDe(l: LinhaOperacaoV3): { texto: string; cls: string } {
+/** A FASE da tarefa — coluna "Fase" (renomeada de "Por que aqui", mandato
+ *  "Operação/Antão", correção pós-conferência 29/09/2026) e o selo da linha na
+ *  agrupação por pessoa. Informação NEUTRA por padrão (nunca vermelho): o
+ *  vermelho fica reservado para "Fase anterior", quando a tarefa É de uma fase
+ *  já passada do processo — a única situação que é alerta de verdade.
+ *  "Fase atual: <fase>"/"· <país>" saíram daqui: aparecem UMA vez, no
+ *  cabeçalho da família (achado real, mandato acima: repetiam em toda linha
+ *  de Genealogia, e "· Espanha" — nacionalidade do PROCESSO, não do
+ *  documento — aparecia até na certidão de quem nasceu no Brasil). */
+export function faseLabelDe(l: LinhaOperacaoV3): { texto: string; cls: string } {
   if (l.origem === "TRANSVERSAL") return { texto: "Transversal", cls: "opv3-p-gry" }
-  if (l.faseMacroKey === "genealogia") return { texto: `Fase atual: ${l.faseAtualDoProcessoLabel ?? "Genealogia"}`, cls: "opv3-p-red" }
-  if (l.numeroLinhagem != null) {
-    const geracao = ` · G${l.numeroLinhagem}`
-    return l.linhaReta === false
-      ? { texto: `Cônjuge${geracao}`, cls: "opv3-p-gry" }
-      : { texto: `Linha reta${geracao}`, cls: "opv3-p-blu" }
-  }
-  return { texto: l.servico ?? "—", cls: "opv3-p-gry" }
+  if (l.faseAnteriorAFaseAtual) return { texto: "Fase anterior", cls: "opv3-p-red" }
+  return { texto: l.faseAtualDoProcessoLabel ?? (l.faseMacroKey === "genealogia" ? "Genealogia" : "Emissão documental"), cls: "opv3-p-gry" }
 }
 
 /** Só o TIPO do documento ("Certidão de Nascimento") — sem "- Inteiro Teor" e
@@ -83,8 +82,15 @@ export function docTipoTxt(l: LinhaOperacaoV3): string {
   return semPessoa.replace(/\s*-\s*Inteiro Teor\s*$/i, "").trim()
 }
 
-export const orgaoTxt = (l: LinhaOperacaoV3): string => l.terceiroNome ?? "não vinculado"
-export const orgaoCls = (l: LinhaOperacaoV3): string => (l.terceiroNome ? "opv3-p-gry" : "opv3-p-red")
+/** Na Genealogia, sem órgão vinculado é o TRABALHO em curso (é isso que
+ *  "Localizar registro" descobre), nunca falso alarme — "a definir", neutro.
+ *  Bloqueio de verdade (vermelho) fica só na Emissão Documental, onde o órgão
+ *  já devia estar resolvido antes de enviar o requerimento (mandato
+ *  "Operação/Antão", correção pós-conferência 29/09/2026). */
+export const orgaoTxt = (l: LinhaOperacaoV3): string =>
+  l.terceiroNome ?? (l.faseMacroKey === "genealogia" ? "a definir" : "não vinculado")
+export const orgaoCls = (l: LinhaOperacaoV3): string =>
+  l.terceiroNome ? "opv3-p-gry" : l.faseMacroKey === "genealogia" ? "opv3-p-gry" : "opv3-p-red"
 
 export const cobrancasTxt = (l: LinhaOperacaoV3): string =>
   l.totalCobrancas === 0 ? "0" : `${l.totalCobrancas}${l.escalada ? " · escalada" : ""}`
@@ -139,9 +145,22 @@ export interface GrupoDeLinhas {
   lote: boolean
 }
 
+/** NASCIMENTO → ÓBITO → CASAMENTO → (sem categoria) — a ordem dentro do grupo
+ *  da pessoa (mandato "Operação/Antão", correção pós-conferência 29/09/2026:
+ *  "certidão de casamento no grupo da pessoa da linha reta, APÓS nascimento e
+ *  óbito"). */
+const ORDEM_CATEGORIA: Record<string, number> = { NASCIMENTO: 0, OBITO: 1, CASAMENTO: 2 }
+const ordemCategoria = (l: LinhaOperacaoV3): number => (l.categoriaDoc ? ORDEM_CATEGORIA[l.categoriaDoc] ?? 3 : 3)
+
 /** Agrupa (dentro de uma família) por pessoa/órgão/passo — mesma régua do seletor "Por família, depois por".
  *  ORDENADO por G1→Gn (`numeroLinhagem` crescente — mandato "Operação/Antão",
- *  29/09/2026): quem não tem número calculado (ainda) vai ao fim, nunca some. */
+ *  29/09/2026): quem não tem número calculado (ainda) vai ao fim, nunca some.
+ *
+ *  CASAMENTO ENTRA NO GRUPO DA PESSOA (correção pós-conferência, 29/09/2026):
+ *  `pessoaId`/`pessoaNome` de uma tarefa de União já são os da pessoa da
+ *  linha reta (`tarefa-projecoes.ts::projetar`) — agrupar por `pessoaId` funde
+ *  a certidão de casamento no MESMO grupo do nascimento/óbito dessa pessoa,
+ *  nunca um grupo "Fulano e Fulana" à parte. */
 export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "pessoa" | "orgao" | "passo"): GrupoDeLinhas[] {
   const linhas = [...linhasEntrada].sort((a, b) => (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity))
   const ordem: string[] = []
@@ -149,7 +168,7 @@ export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "p
   const chaveDe = (l: LinhaOperacaoV3): string => {
     if (por === "orgao") return l.terceiroNome ?? "não vinculado"
     if (por === "passo") return passoLabelDe(l).label
-    return `${l.pessoaNome ?? l.casalNomes ?? "—"}|${l.origem === "TRANSVERSAL" ? "tr" : l.faseMacroKey === "genealogia" ? "gen" : "em"}`
+    return `${l.pessoaId ?? l.pessoaNome ?? "—"}|${l.origem === "TRANSVERSAL" ? "tr" : l.faseMacroKey === "genealogia" ? "gen" : "em"}`
   }
   for (const l of linhas) {
     const k = chaveDe(l)
@@ -157,18 +176,18 @@ export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "p
     mapa.get(k)!.push(l)
   }
   return ordem.map((k) => {
-    const rs = mapa.get(k)!
+    const rsBrutas = mapa.get(k)!
+    const rs = por === "pessoa" ? [...rsBrutas].sort((a, b) => ordemCategoria(a) - ordemCategoria(b)) : rsBrutas
     const f = rs[0]
     let titulo = k, sub = "", pill = "", pillCls = "opv3-p-blu"
     if (por === "pessoa") {
-      titulo = f.casalNomes ?? f.pessoaNome ?? "—"
+      titulo = f.pessoaNome ?? f.casalNomes ?? "—"
       sub = `${rs.length} tarefa(s)`
-      // "Fase anterior" só quando a tarefa É de uma fase anterior à fase ATUAL
-      // do processo (achado real, mandato "Operação/Antão", 29/09/2026: o selo
-      // ligava por `faseMacroKey === "genealogia"` sozinho — um processo que
-      // está EM Genealogia via o selo errado nas próprias tarefas dele).
-      pill = f.origem === "TRANSVERSAL" ? "Transversal" : f.faseAnteriorAFaseAtual ? "Fase anterior" : f.faseAtualDoProcessoLabel ? `Fase atual: ${f.faseAtualDoProcessoLabel}` : "Emissão documental"
-      pillCls = f.origem === "TRANSVERSAL" ? "opv3-p-gry" : f.faseAnteriorAFaseAtual ? "opv3-p-amb" : "opv3-p-blu"
+      // Selo "FASE" do grupo — mesma régua neutra da coluna por linha (`faseLabelDe`,
+      // item 17 do mandato "Operação/Antão"): "Fase atual: X" saiu daqui também
+      // ("não por pessoa nem por linha", correção pós-conferência 29/09/2026).
+      const fl = faseLabelDe(f)
+      pill = fl.texto; pillCls = fl.cls
     } else if (por === "orgao") {
       titulo = f.terceiroNome ?? "não vinculado"
       sub = `${rs.length} certidões`
@@ -179,7 +198,13 @@ export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "p
       sub = `${rs.length} tarefas`
       pill = "Passo"; pillCls = "opv3-p-gry"
     }
-    const lote = rs.filter((r) => r.aIniciar).length > 1
+    // "MESMO REQUERIMENTO" só quando o órgão vinculado é o MESMO em todas as
+    // "a iniciar" do grupo — achado real, mandato acima: nascimento (Espanha)
+    // e óbito (Brasil) da mesma pessoa nunca são o mesmo requerimento, mesmo
+    // as duas "a iniciar" juntas.
+    const aIniciarDoGrupo = rs.filter((r) => r.aIniciar)
+    const orgaosDoGrupo = new Set(aIniciarDoGrupo.map((r) => r.terceiroNome ?? null))
+    const lote = aIniciarDoGrupo.length > 1 && orgaosDoGrupo.size === 1 && aIniciarDoGrupo[0].terceiroNome != null
     return { chave: k, titulo, sub, pill, pillCls, linhas: rs, lote }
   })
 }
@@ -187,19 +212,29 @@ export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "p
 export interface FamiliaComGrupos {
   fam: string
   pais: string | null
+  /** Fase atual do processo — para o cabeçalho mostrar "Fase atual: X" UMA vez (item 5 do mandato "Operação/Antão"). `null` sem fase corrente. */
+  faseAtualLabel: string | null
   linhas: LinhaOperacaoV3[]
 }
 
-/** Agrupa por família — usado em Aguardando/Acompanhamento/Feito/Fila (nível externo). */
+/** Agrupa por família — usado em Aguardando/Acompanhamento/Feito/Fila (nível externo).
+ *  Sem `Familia` cadastrada (`familiaNome` nulo), cai no NOME DO PROCESSO —
+ *  nunca no país (achado real, mandato "Operação/Antão", correção
+ *  pós-conferência 29/09/2026: processo 675/Antão sem `Familia` vinculada
+ *  mostrava "—" no lugar do nome e o país ("Espanha", a nacionalidade
+ *  buscada) sobrava como se fosse o rótulo da família). */
 export function agruparPorFamilia(linhas: LinhaOperacaoV3[]): FamiliaComGrupos[] {
   const ordem: string[] = []
   const mapa = new Map<string, LinhaOperacaoV3[]>()
   for (const l of linhas) {
-    const k = l.familiaNome ?? "—"
+    const k = l.familiaNome ?? l.processoNome ?? "—"
     if (!mapa.has(k)) { mapa.set(k, []); ordem.push(k) }
     mapa.get(k)!.push(l)
   }
-  return ordem.map((k) => ({ fam: k, pais: mapa.get(k)![0].pais, linhas: mapa.get(k)! }))
+  return ordem.map((k) => {
+    const rs = mapa.get(k)!
+    return { fam: k, pais: rs[0].pais, faseAtualLabel: rs[0].faseAtualDoProcessoLabel, linhas: rs }
+  })
 }
 
 /** Agrupa por órgão — "Aguardando: Agrupar por Órgão (cobrar juntos)". */
@@ -211,5 +246,5 @@ export function agruparPorOrgao(linhas: LinhaOperacaoV3[]): FamiliaComGrupos[] {
     if (!mapa.has(k)) { mapa.set(k, []); ordem.push(k) }
     mapa.get(k)!.push(l)
   }
-  return ordem.map((k) => ({ fam: k, pais: null, linhas: mapa.get(k)! }))
+  return ordem.map((k) => ({ fam: k, pais: null, faseAtualLabel: null, linhas: mapa.get(k)! }))
 }

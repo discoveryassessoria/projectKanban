@@ -34,18 +34,36 @@ function podeVerEscopoDeEquipe(usuario: { tipo: string; permissoes: MapaPermisso
   return usuario.tipo === 'admin' || temPermissao(usuario.permissoes, 'operacao.distribuirTarefas')
 }
 
-/** Os filtros de escopo de equipe, quando autorizados — `undefined` em qualquer outro caso. */
+/**
+ * Os filtros de escopo de equipe, quando autorizados — só as chaves que a
+ * query REALMENTE mandou, nunca `undefined` explícito.
+ *
+ * Achado real (mandato "Operação/Antão", correção pós-conferência,
+ * 29/09/2026): `?escopo=equipe&processoId=675` devolvia 675 E 651 juntos.
+ * Causa dupla — (a) esta função lia só a chave `processoId`, divergente da
+ * convenção do resto do código (`parseFiltrosGerenciais`/`/api/operacao/
+ * central` leem `processo`); (b) o objeto sempre retornava TODAS as 5 chaves,
+ * mesmo as não pedidas, como `undefined` — e `{ ...filtrosDaQuery(sp),
+ * ...filtrosDeEquipe }` faz um `undefined` explícito APAGAR um valor real já
+ * resolvido do outro lado do spread (`{a:1}` + `{a:undefined}` = `{a:
+ * undefined}`, não `{a:1}`). Um caller que mandasse `?processo=675` (a
+ * convenção certa) tinha o `processoId:675` de `filtrosDaQuery` zerado pelo
+ * `processoId:undefined` desta função. Aceita as duas chaves e só inclui o
+ * que veio, pra nenhum filtro real ser apagado no merge.
+ */
 function filtrosDeEquipeDaQuery(sp: URLSearchParams): Pick<FiltrosGerenciais, 'responsavelId' | 'pais' | 'faseMacroKey' | 'processoId' | 'estadoOperacao'> {
+  const out: Pick<FiltrosGerenciais, 'responsavelId' | 'pais' | 'faseMacroKey' | 'processoId' | 'estadoOperacao'> = {}
   const responsavelId = sp.get('responsavelId')
-  const processoId = sp.get('processoId')
+  if (responsavelId) out.responsavelId = Number(responsavelId)
+  const pais = sp.get('pais')
+  if (pais) out.pais = pais
+  const faseMacroKey = sp.get('faseMacroKey')
+  if (faseMacroKey) out.faseMacroKey = faseMacroKey
+  const processoId = sp.get('processoId') ?? sp.get('processo')
+  if (processoId) out.processoId = Number(processoId)
   const estado = sp.get('estadoOperacao')
-  return {
-    responsavelId: responsavelId ? Number(responsavelId) : undefined,
-    pais: sp.get('pais') || undefined,
-    faseMacroKey: sp.get('faseMacroKey') || undefined,
-    processoId: processoId ? Number(processoId) : undefined,
-    estadoOperacao: estado === 'FILA' || estado === 'AGUARDANDO' || estado === 'CONCLUIDA' ? estado : undefined,
-  }
+  if (estado === 'FILA' || estado === 'AGUARDANDO' || estado === 'CONCLUIDA') out.estadoOperacao = estado
+  return out
 }
 
 /**

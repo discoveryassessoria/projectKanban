@@ -24,7 +24,7 @@ import { RegistrarContatoModal, type DadosDeContato } from "./RegistrarContatoMo
 import { AdiarAcompanhamentoModal } from "./AdiarAcompanhamentoModal"
 import type { LinhaOperacaoV3, RespostaTarefas, Vista, AgruparFilaPor, FiltroRadar, FiltroQuick } from "./operacao-v3-tipos"
 import {
-  relCls, acompTxtCompleto, passoLabelDe, porQueAquiDe, orgaoTxt, orgaoCls,
+  relCls, acompTxtCompleto, passoLabelDe, faseLabelDe, orgaoTxt, orgaoCls,
   cobrancasTxt, prazoTarefaCls, acaoDe, concluirLabelDe, aplicarBusca, aplicarVista,
   agruparDentroDaFamilia, agruparPorFamilia, docTipoTxt, type GrupoDeLinhas,
 } from "./operacao-v3-derivacoes"
@@ -116,7 +116,11 @@ export function OperacaoV3() {
   // sempre `false` para Genealogia até a correção em `tarefa-projecoes.ts`
   // (sem subtarefa, `aIniciar` nunca considerava "ninguém tocou ainda"); "4
   // certidões sem órgão" na tela contra as 13 reais do Antão sozinho.
-  const noOrg = useMemo(() => abertosVisiveis.filter((l) => !l.terceiroNome), [abertosVisiveis])
+  // Genealogia sem órgão vinculado é o trabalho em curso (descobrir ONDE
+  // registrar), nunca bloqueio de verdade — "bloqueio só na Emissão" (item 8,
+  // mandato "Operação/Antão", correção pós-conferência 29/09/2026). O banner
+  // "Bloqueio" e o radar "Sem órgão" herdam esta mesma exclusão.
+  const noOrg = useMemo(() => abertosVisiveis.filter((l) => !l.terceiroNome && l.faseMacroKey !== "genealogia"), [abertosVisiveis])
   const genOpen = useMemo(() => abertosVisiveis.filter((l) => l.faseMacroKey === "genealogia" && l.origem !== "TRANSVERSAL"), [abertosVisiveis])
 
   const qf = useCallback((l: LinhaOperacaoV3) => {
@@ -129,13 +133,13 @@ export function OperacaoV3() {
 
   const fila = useMemo(() => {
     let f = filaBase.filter(qf)
-    if (radar === "noorg") f = f.filter((l) => l.aIniciar && !l.terceiroNome)
+    if (radar === "noorg") f = f.filter((l) => l.aIniciar && !l.terceiroNome && l.faseMacroKey !== "genealogia")
     if (radar === "faseant") f = f.filter((l) => l.faseMacroKey === "genealogia")
     return f
   }, [filaBase, qf, radar])
   const aguard = useMemo(() => aguardBase.filter(qf), [aguardBase, qf])
 
-  const nFam = useMemo(() => new Set(abertosVisiveis.map((l) => l.familiaNome ?? "—")).size, [abertosVisiveis])
+  const nFam = useMemo(() => new Set(abertosVisiveis.map((l) => l.familiaNome ?? l.processoNome ?? "—")).size, [abertosVisiveis])
   const nRadar = (atras.length ? 1 : 0) + (acompVenc.length ? 1 : 0) + (decis.length ? 1 : 0) + (noOrg.length ? 1 : 0) + (genOpen.length ? 1 : 0) + 1
 
   const notifs = useMemo(() => {
@@ -498,7 +502,7 @@ function AbaFila({
   const statsPorFamilia = useMemo(() => {
     const m = new Map<string, { aguardando: number; vencidos: number }>()
     for (const l of todosAbertos) {
-      const k = l.familiaNome ?? "—"
+      const k = l.familiaNome ?? l.processoNome ?? "—"
       const s = m.get(k) ?? { aguardando: 0, vencidos: 0 }
       if (l.estadoOperacao === "AGUARDANDO") s.aguardando++
       if (l.acompanhamentoVencido || l.atrasada) s.vencidos++
@@ -574,7 +578,7 @@ function AbaFila({
               <button className="opv3-btn opv3-sm" onClick={() => toggleCol(fk)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{aberta ? "▾" : "▸"}</button>
               <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{F.fam}</b>
               <span style={{ color: "#5b6478" }}>
-                {F.pais} · {F.linhas.length} na fila · {statsPorFamilia.get(F.fam)?.aguardando ?? 0} aguardando · {statsPorFamilia.get(F.fam)?.vencidos ?? 0} vencido{(statsPorFamilia.get(F.fam)?.vencidos ?? 0) === 1 ? "" : "s"}
+                {F.faseAtualLabel ? `Fase atual: ${F.faseAtualLabel} · ` : ""}{F.pais ? `${F.pais} · ` : ""}{F.linhas.length} na fila · {statsPorFamilia.get(F.fam)?.aguardando ?? 0} aguardando · {statsPorFamilia.get(F.fam)?.vencidos ?? 0} vencido{(statsPorFamilia.get(F.fam)?.vencidos ?? 0) === 1 ? "" : "s"}
               </span>
               <div style={{ flexGrow: 1 }} />
               <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(F.fam)}>Ver família</button>
@@ -628,36 +632,35 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
       </div>
       {aberto && (
         <>
-          <div className="opv3-hd opv3-gF"><span /><span>Documento</span><span>Pessoa</span><span>Por que aqui</span><span>Passo atual</span><span>Acompanhamento</span><span>Órgão</span><span>Ação</span></div>
+          <div className="opv3-hd opv3-gF"><span /><span>Documento</span><span>Pessoa</span><span>Fase</span><span>Passo atual</span><span>Acompanhamento</span><span>Órgão</span><span>Ação</span></div>
           {grupo.linhas.map((t) => {
             const passo = passoLabelDe(t)
-            const why = porQueAquiDe(t)
+            const fase = faseLabelDe(t)
             const acao = acaoDe(t)
             return (
               <div key={t.taskId} className={`opv3-row opv3-gF ${sel[t.taskId] ? "opv3-sel" : ""}`}>
                 <button className={`opv3-chk ${sel[t.taskId] ? "on" : ""}`} onClick={() => toggleLinha(t.taskId)} aria-label="Selecionar" />
-                <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pais}</div></div>
+                <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
                 <div>
                   {t.pessoaId != null && t.processoId != null ? (
                     <a href={urlArvoreDoProcesso(t.processoId, t.pessoaId)} style={{ color: "inherit", textDecoration: "underline" }} onClick={(e) => e.stopPropagation()}>
-                      {t.casalNomes ?? t.pessoaNome ?? "—"}
+                      {t.pessoaNome ?? t.casalNomes ?? "—"}
                     </a>
                   ) : (
-                    t.casalNomes ?? t.pessoaNome ?? "—"
+                    t.pessoaNome ?? t.casalNomes ?? "—"
                   )}
                   <div style={{ fontSize: 11, color: "#7a8296" }}>
-                    {t.casalNomes && t.linhaReta ? "Linha reta · " : ""}
-                    {t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}
+                    {t.numeroLinhagem != null ? `${t.linhaReta === false ? "Cônjuge" : "Linha reta"} · G${t.numeroLinhagem}` : ""}
                   </div>
                 </div>
-                <div><span className={`opv3-pill ${why.cls}`}>{why.texto}</span></div>
+                <div><span className={`opv3-pill ${fase.cls}`}>{fase.texto}</span></div>
                 <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span><div style={{ fontSize: 11, color: "#7a8296" }}>{t.rotuloDoPrazo}</div></div>
                 <div>
                   {t.terceiroNome ? (
                     <span className={`opv3-pill ${orgaoCls(t)}`}>{orgaoTxt(t)}</span>
                   ) : (
-                    <button className="opv3-pill opv3-p-red" style={{ border: 0, cursor: "pointer" }} onClick={() => onVincular(t.taskId)} title="Vincular órgão desta certidão">
+                    <button className={`opv3-pill ${orgaoCls(t)}`} style={{ border: 0, cursor: "pointer" }} onClick={() => onVincular(t.taskId)} title="Vincular órgão desta certidão">
                       {orgaoTxt(t)}
                     </button>
                   )}

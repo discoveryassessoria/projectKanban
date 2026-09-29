@@ -224,6 +224,15 @@ export interface LinhaDeFila {
    */
   casalNomes: string | null
   /**
+   * O CÔNJUGE — só quando a obrigação é de UNIÃO (certidão de casamento):
+   * quem NÃO é a pessoa da linha reta ("com <cônjuge>"). Mandato "Operação/
+   * Antão" (correção pós-conferência, 29/09/2026): a certidão de casamento
+   * pertence ao GRUPO da pessoa da linha reta (não a um grupo "casal"
+   * separado) — `pessoaId`/`pessoaNome`/`numeroLinhagem` abaixo já passam a
+   * apontar para ela; `conjugeNome` é só o rótulo "com quem".
+   */
+  conjugeNome: string | null
+  /**
    * A TAREFA É DE UMA FASE ANTERIOR À FASE ATUAL DO PROCESSO? (`fasesAnterioresA`,
    * catálogo canônico — mesma régua de `whereFasesAnteriores` acima, por linha
    * em vez de filtro de query). Achado real (mandato "Operação/Antão",
@@ -402,8 +411,8 @@ const SELECT = {
       // então lê os dois cônjuges direto daqui (mandato "Operação/Antão",
       // 29/09/2026: "Edison Nás Antão e Evanir Teixeira da Silva").
       uniao: { select: {
-        pessoa1: { select: { nome: true, sobrenome: true, linhaReta: true } },
-        pessoa2: { select: { nome: true, sobrenome: true, linhaReta: true } },
+        pessoa1: { select: { id: true, nome: true, sobrenome: true, linhaReta: true, numeroLinhagem: true } },
+        pessoa2: { select: { id: true, nome: true, sobrenome: true, linhaReta: true, numeroLinhagem: true } },
       } },
     },
   },
@@ -486,6 +495,16 @@ function projetar(
   const aguardandoDependencia = t.dependeDe.some(
     (d) => d.obrigatoria && !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa),
   )
+  // CASAMENTO PERTENCE À PESSOA DA LINHA RETA (mandato "Operação/Antão",
+  // correção pós-conferência 29/09/2026: "a lógica correta pra certidão de
+  // casamento é a pessoa da linha reta, o cônjuge que tem a linha de
+  // transmissão de cidadania" — a tela agrupava por CASAL, um grupo à parte
+  // de "Certidão de Nascimento" da mesma pessoa). Entre os dois cônjuges da
+  // União, o que é `linhaReta` EMPRESTA sua identidade (id/nome/geração) para
+  // esta linha — o outro vira só `conjugeNome`, o rótulo "com quem".
+  const uniao = t.necessidade?.uniao
+  const conjugeLinhaReta = uniao ? (uniao.pessoa1.linhaReta ? uniao.pessoa1 : uniao.pessoa2.linhaReta ? uniao.pessoa2 : null) : null
+  const outroConjuge = uniao ? (conjugeLinhaReta === uniao.pessoa1 ? uniao.pessoa2 : uniao.pessoa1) : null
   return {
     taskId: t.id,
     titulo: t.titulo,
@@ -495,17 +514,18 @@ function projetar(
     pais: t.processo?.paisCanonico?.countryLabel ?? null,
     familiaNome: t.processo?.familia?.nome ?? null,
     origem: t.origem ?? null,
-    pessoaId: t.pessoaId ?? null,
-    pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
-    numeroLinhagem: t.pessoaId != null ? linhagem?.get(t.pessoaId)?.numeroLinhagem ?? null : null,
+    pessoaId: t.pessoaId ?? conjugeLinhaReta?.id ?? null,
+    pessoaNome: t.pessoaId != null
+      ? nomes?.get(t.pessoaId) ?? null
+      : conjugeLinhaReta ? nomeCompleto(conjugeLinhaReta) : null,
+    numeroLinhagem: t.pessoaId != null
+      ? linhagem?.get(t.pessoaId)?.numeroLinhagem ?? null
+      : conjugeLinhaReta?.numeroLinhagem ?? null,
     linhaReta: t.pessoaId != null
       ? linhagem?.get(t.pessoaId)?.linhaReta ?? null
-      : t.necessidade?.uniao
-        ? (t.necessidade.uniao.pessoa1.linhaReta || t.necessidade.uniao.pessoa2.linhaReta)
-        : null,
-    casalNomes: t.necessidade?.uniao
-      ? `${nomeCompleto(t.necessidade.uniao.pessoa1)} e ${nomeCompleto(t.necessidade.uniao.pessoa2)}`
-      : null,
+      : uniao ? conjugeLinhaReta != null : null,
+    casalNomes: uniao ? `${nomeCompleto(uniao.pessoa1)} e ${nomeCompleto(uniao.pessoa2)}` : null,
+    conjugeNome: outroConjuge ? nomeCompleto(outroConjuge) : null,
     faseAnteriorAFaseAtual: faseEhAnteriorA(t.faseMacroKey, t.processo?.faseAtualKey),
     faseAtualDoProcessoLabel: labelDaFasePorPhaseKey(t.processo?.faseAtualKey),
     categoriaDoc: categoriaDocumento(t.documento?.tipo) ?? categoriaDocumentoDoTitulo(t.titulo),
@@ -741,7 +761,12 @@ async function totalDePassos(
   const instanciaIds = [...new Set(linhas.map((l) => l.workflowInstanceId).filter((x): x is number => x != null))]
   if (instanciaIds.length === 0) return new Map()
   const passos = await db.phaseWorkflowStepInstance.findMany({
-    where: { workflowInstanceId: { in: instanciaIds } },
+    // SÓ PASSOS ATIVOS (mesma régua de WF-100, `lib/saude/verificacoes/
+    // workflow.ts`): achado real, processo 675, 29/09/2026 — um passo
+    // duplicado CANCELADO (reparo do WF-100) ainda contava no total, "2" em
+    // vez de "1" com só 1 ativo. `SUPERSEDIDO`/`DISPENSADO` são o mesmo caso
+    // — nunca "quantos passos existem no banco", sempre "quantos ainda valem".
+    where: { workflowInstanceId: { in: instanciaIds }, status: { notIn: ['CANCELADO', 'SUPERSEDIDO', 'DISPENSADO'] } },
     select: { id: true, workflowInstanceId: true, documentoId: true },
   })
   const totais = new Map<string, number>()
