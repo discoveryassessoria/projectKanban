@@ -336,6 +336,7 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // Cada um limpa o que ele mesmo criou. Nenhum é caminho de runtime.
   "scripts/lancamento-manual.integration.ts": "integração: limpa a base antes do cenário",
   "scripts/cancelamento-avancado.test.ts": "integração financeira: limpa participantes do cenário",
+  "scripts/cartorio-orgao-painel-documento.test.ts": "campo Cartório do painel do documento: monta e derruba a PRÓPRIA árvore, pessoa e documentos (marca CARTPAINEL) só no banco de teste",
   "scripts/custo-documental.test.ts": "integração de custo documental: limpa documentos do cenário",
   "scripts/excluir-receita.test.ts": "integração: limpa participantes das receitas do cenário",
   "scripts/int-adversarial-db.test.ts": "integração adversarial: limpa participantes e requerentes do cenário",
