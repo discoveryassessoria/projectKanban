@@ -54,10 +54,15 @@ export function passoLabelDe(l: LinhaOperacaoV3): { label: string; sub: string }
  *  `numeroLinhagem` sozinho NUNCA basta pra dizer "Linha reta": é calculado
  *  pra toda a árvore, cônjuges inclusive (achado 26/09/2026 — Zenir/Isonia
  *  apareciam como "Linha reta" por terem número, mesmo sendo cônjuges).
- *  `linhaReta` (`Pessoa.linhaReta`) é quem decide o rótulo. */
+ *  `linhaReta` (`Pessoa.linhaReta`) é quem decide o rótulo.
+ *
+ *  "Trava a família" (mandato "Operação/Antão", 29/09/2026): dizia sempre a
+ *  mesma frase pra QUALQUER tarefa de Genealogia, mesmo quando o processo já
+ *  está em Genealogia de verdade (não é mais "trava" nada, é o trabalho
+ *  ATUAL). Agora diz a fase atual do processo — real e verificável. */
 export function porQueAquiDe(l: LinhaOperacaoV3): { texto: string; cls: string } {
   if (l.origem === "TRANSVERSAL") return { texto: "Transversal", cls: "opv3-p-gry" }
-  if (l.faseMacroKey === "genealogia") return { texto: "Trava a família", cls: "opv3-p-red" }
+  if (l.faseMacroKey === "genealogia") return { texto: `Fase atual: ${l.faseAtualDoProcessoLabel ?? "Genealogia"}`, cls: "opv3-p-red" }
   if (l.numeroLinhagem != null) {
     const geracao = ` · G${l.numeroLinhagem}`
     return l.linhaReta === false
@@ -65,6 +70,17 @@ export function porQueAquiDe(l: LinhaOperacaoV3): { texto: string; cls: string }
       : { texto: `Linha reta${geracao}`, cls: "opv3-p-blu" }
   }
   return { texto: l.servico ?? "—", cls: "opv3-p-gry" }
+}
+
+/** Só o TIPO do documento ("Certidão de Nascimento") — sem "- Inteiro Teor" e
+ *  sem o nome da pessoa (que já tem coluna própria). Mandato "Operação/Antão",
+ *  29/09/2026: `t.titulo` vem pronto do servidor como
+ *  "{Tipo} - Inteiro Teor · {Pessoa}" (ver `nomeDaTarefa`) — "Inteiro Teor" é
+ *  jargão de cartório, não informação que falta aqui, e a pessoa duplicava a
+ *  coluna ao lado. */
+export function docTipoTxt(l: LinhaOperacaoV3): string {
+  const semPessoa = l.titulo.split(" · ")[0]
+  return semPessoa.replace(/\s*-\s*Inteiro Teor\s*$/i, "").trim()
 }
 
 export const orgaoTxt = (l: LinhaOperacaoV3): string => l.terceiroNome ?? "não vinculado"
@@ -123,14 +139,17 @@ export interface GrupoDeLinhas {
   lote: boolean
 }
 
-/** Agrupa (dentro de uma família) por pessoa/órgão/passo — mesma régua do seletor "Por família, depois por". */
-export function agruparDentroDaFamilia(linhas: LinhaOperacaoV3[], por: "pessoa" | "orgao" | "passo"): GrupoDeLinhas[] {
+/** Agrupa (dentro de uma família) por pessoa/órgão/passo — mesma régua do seletor "Por família, depois por".
+ *  ORDENADO por G1→Gn (`numeroLinhagem` crescente — mandato "Operação/Antão",
+ *  29/09/2026): quem não tem número calculado (ainda) vai ao fim, nunca some. */
+export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "pessoa" | "orgao" | "passo"): GrupoDeLinhas[] {
+  const linhas = [...linhasEntrada].sort((a, b) => (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity))
   const ordem: string[] = []
   const mapa = new Map<string, LinhaOperacaoV3[]>()
   const chaveDe = (l: LinhaOperacaoV3): string => {
     if (por === "orgao") return l.terceiroNome ?? "não vinculado"
     if (por === "passo") return passoLabelDe(l).label
-    return `${l.pessoaNome ?? "—"}|${l.origem === "TRANSVERSAL" ? "tr" : l.faseMacroKey === "genealogia" ? "gen" : "em"}`
+    return `${l.pessoaNome ?? l.casalNomes ?? "—"}|${l.origem === "TRANSVERSAL" ? "tr" : l.faseMacroKey === "genealogia" ? "gen" : "em"}`
   }
   for (const l of linhas) {
     const k = chaveDe(l)
@@ -142,10 +161,14 @@ export function agruparDentroDaFamilia(linhas: LinhaOperacaoV3[], por: "pessoa" 
     const f = rs[0]
     let titulo = k, sub = "", pill = "", pillCls = "opv3-p-blu"
     if (por === "pessoa") {
-      titulo = f.pessoaNome ?? "—"
+      titulo = f.casalNomes ?? f.pessoaNome ?? "—"
       sub = `${rs.length} tarefa(s)`
-      pill = f.origem === "TRANSVERSAL" ? "Transversal" : f.faseMacroKey === "genealogia" ? "Fase anterior" : "Emissão documental"
-      pillCls = f.origem === "TRANSVERSAL" ? "opv3-p-gry" : f.faseMacroKey === "genealogia" ? "opv3-p-amb" : "opv3-p-blu"
+      // "Fase anterior" só quando a tarefa É de uma fase anterior à fase ATUAL
+      // do processo (achado real, mandato "Operação/Antão", 29/09/2026: o selo
+      // ligava por `faseMacroKey === "genealogia"` sozinho — um processo que
+      // está EM Genealogia via o selo errado nas próprias tarefas dele).
+      pill = f.origem === "TRANSVERSAL" ? "Transversal" : f.faseAnteriorAFaseAtual ? "Fase anterior" : f.faseAtualDoProcessoLabel ? `Fase atual: ${f.faseAtualDoProcessoLabel}` : "Emissão documental"
+      pillCls = f.origem === "TRANSVERSAL" ? "opv3-p-gry" : f.faseAnteriorAFaseAtual ? "opv3-p-amb" : "opv3-p-blu"
     } else if (por === "orgao") {
       titulo = f.terceiroNome ?? "não vinculado"
       sub = `${rs.length} certidões`

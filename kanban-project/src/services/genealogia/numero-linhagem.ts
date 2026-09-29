@@ -138,6 +138,18 @@ export function calcularNumerosLinhagem(
     numeroFinal.set(conjugeId, Math.min(...candidatos)) // caso 1 — determinístico
   }
 
+  // QUEM SOBROU: nem sangue, nem cônjuge REGISTRADO (por União) de alguém de
+  // sangue — colateral de apoio sem parentesco direto, ou cônjuge cadastrado
+  // sem a União ligada ainda. "Fora da linhagem" não é motivo pra ficar sem
+  // número pra sempre (achado real, mandato "Operação/Antão", 29/09/2026:
+  // Emerson/Priscila/Bruno, processo 675, geração nula indefinidamente — sem
+  // este fallback, a Central e a Operação não tinham como ordenar a fila).
+  // Entra no FIM da sequência, mesma régua das raízes remanescentes acima
+  // (ordem de nascimento, id como desempate) — nunca é confundido com quem
+  // está na linha de sangue: o número dele só é maior que todo mundo que é.
+  const semNumero = pessoas.map((p) => p.id).filter((id) => !numeroFinal.has(id)).sort(porNascimento)
+  for (const id of semNumero) numeroFinal.set(id, contador++)
+
   return numeroFinal
 }
 

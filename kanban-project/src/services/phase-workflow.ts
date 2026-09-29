@@ -562,10 +562,20 @@ async function materializarAlvos(
   for (let i = 0; i < alvos.length; i++) {
     const a = alvos[i]
     const chavePasso = chaves[i]
+    // A CHAVE DE BUSCA PRECISA SER LETRA POR LETRA IGUAL À CHAVE QUE FOI GRAVADA
+    // (linha ~465: `${e.stepKey}|p-|n${e.necessidadeId}|d-|r-`) — sem o `|r-` no
+    // final, as duas strings nunca batiam e este fallback nunca encontrava nada.
+    // Era exatamente esse "achar nada" que fazia este laço criar um SEGUNDO passo
+    // para a mesma necessidade sempre que o primeiro (`matdoc|...`, criado por
+    // `materializarGenealogia` ANTES do Documento existir) já estava na base —
+    // produção real, processo 675: toda certidão de PESSOA em Genealogia com dois
+    // "localizar_registro" ativos (lotes 2963–2987 e 2988–3006); certidões de
+    // UNIÃO não duplicavam porque o Documento delas já existia ANTES da primeira
+    // materialização da instância, e este fallback nunca precisava ser tentado.
     const existente =
       porChave.get(chavePasso) ??
       porChave.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId, retificacaoPacoteId: a.retificacaoPacoteId })) ??
-      (a.necessidadeId != null ? porChave.get(`${a.def.key}|p-|n${a.necessidadeId}|d-`) : undefined)
+      (a.necessidadeId != null ? porChave.get(`${a.def.key}|p-|n${a.necessidadeId}|d-|r-`) : undefined)
     if (existente) { existentes.push(existente); continue }
 
     // INVARIANTE DOCUMENTAL — workflow que declarou exigir documento não

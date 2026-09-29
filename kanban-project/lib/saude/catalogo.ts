@@ -24,9 +24,12 @@ import { DOMINIOS } from './tipos'
 // 5 passos, pré-unificação, de estado atual inválido) e EMI-022 (Tarefa
 // aberta sem próxima ação determinável) — correção "4 passos operacionais"
 // + "Minha Operação" (14-15/09/2026).
-// 1.10.0 — 29/09/2026: entrou NEC-001 (árvore + matriz + Pessoa.documentacao
+// 1.10.0 — 29/09/2026: entraram NEC-001 (árvore + matriz + Pessoa.documentacao
 // coerentes com NecessidadeDocumental/Documento/PhaseWorkflowStepInstance/
-// Tarefa) — mandato "nunca mais árvore ↔ documentação", processo 675.
+// Tarefa) — mandato "nunca mais árvore ↔ documentação", processo 675 — e
+// WF-100 (documento sem passo duplicado ativo) — mandato "Operação/Antão",
+// processo 675: chave de fallback quebrada em materializarAlvos deixava a
+// Genealogia criar um segundo PhaseWorkflowStepInstance por certidão.
 export const VERSAO_CATALOGO = '1.10.0'
 
 export interface ContextoVerificacao {

@@ -385,3 +385,61 @@ registrar({
     }
   },
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WF-100 — UM DOCUMENTO, NO MÁXIMO UM STEP ATIVO POR PASSO
+// ═══════════════════════════════════════════════════════════════════════════
+registrar({
+  id: 'saude.workflow.step-duplicado-por-documento',
+  codigo: 'WF-100',
+  nome: 'Documento sem passo duplicado ativo',
+  descricao: 'Achado real (processo 675, 29/09/2026): duas chaves de identidade diferentes para o mesmo passo (a materialização local da Genealogia, `matdoc|...`, e a do Workflow Interno publicado, `wfi...`) deixavam de convergir quando a busca por "já existe" usava uma string que nunca batia com a gravada — cada rematerialização da fase criava um SEGUNDO PhaseWorkflowStepInstance ativo para a mesma obrigação. A tela mostrava o mesmo passo duas vezes ("1. Localizar registro" repetido, progresso "1/2" em vez de "1/1").',
+  dominio: 'WORKFLOW',
+  modulo: 'Materialização',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.10.0',
+  timeoutMs: 30_000,
+  orientacao: 'Supersede/cancele os passos duplicados, mantendo vivo o que a Tarefa.workflowStepInstanceId referencia (ou, na ausência, o mais recente). Confirme que a chave de identidade lógica em src/services/phase-workflow.ts (materializarAlvos) está convergindo — não crie um terceiro passo.',
+  rotaCorrecao: '/operacao',
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const ativos = await prisma.phaseWorkflowStepInstance.findMany({
+      where: { documentoId: { not: null }, status: { notIn: ['SUPERSEDIDO', 'CANCELADO', 'DISPENSADO'] } },
+      select: { id: true, documentoId: true, stepKey: true, processoId: true, necessidadeId: true, status: true, ciclo: true, workflowInstanceId: true },
+      take: 5000,
+    })
+    const porChave = new Map<string, typeof ativos>()
+    for (const s of ativos) {
+      const chave = `${s.documentoId}|${s.stepKey}|${s.ciclo}|${s.workflowInstanceId ?? '-'}`
+      const lista = porChave.get(chave) ?? []
+      lista.push(s)
+      porChave.set(chave, lista)
+    }
+    const duplicados = [...porChave.entries()].filter(([, lista]) => lista.length > 1)
+    if (!duplicados.length) {
+      return { achados: [], metricas: { documentosVerificados: porChave.size, duplicados: 0 }, resumo: `${porChave.size} documento(s)/passo verificado(s) — nenhum com mais de um step ativo.` }
+    }
+    return {
+      achados: duplicados.map(([chave, lista]): Achado => {
+        const [documentoId, stepKey] = chave.split('|')
+        return {
+          chave: `wf100-step-duplicado:${chave}`,
+          severidade: 'ERRO',
+          titulo: `Documento #${documentoId}: ${lista.length} PhaseWorkflowStepInstance ativos para o passo "${stepKey}"`,
+          descricao: `O passo "${stepKey}" deste documento tem ${lista.length} instâncias ativas simultâneas (ids ${lista.map((s) => s.id).join(', ')}) — só uma deveria existir.`,
+          explicacao: 'Chaves de identidade lógica divergentes entre materializadores (materializarGenealogia local × instanciarWorkflowDaFase/materializarAlvos) deixaram de reconhecer o passo já existente.',
+          impacto: 'A tela mostra o mesmo passo duplicado ("1/2" em vez de "1/1") e a Tarefa pode ficar órfã apontando para um dos dois quando o outro é cancelado.',
+          entidade: 'PhaseWorkflowStepInstance', registroId: lista.map((s) => s.id).join(','),
+          quantidade: lista.length,
+          link: '/operacao',
+          recomendacao: 'Supersede/cancele os duplicados, preservando o que a Tarefa da unidade referencia.',
+          evidencia: { documentoId: Number(documentoId), stepKey, processoId: lista[0].processoId, necessidadeId: lista[0].necessidadeId, stepInstanceIds: lista.map((s) => s.id), statuses: lista.map((s) => s.status) },
+        }
+      }),
+      metricas: { documentosVerificados: porChave.size, duplicados: duplicados.length },
+    }
+  },
+})

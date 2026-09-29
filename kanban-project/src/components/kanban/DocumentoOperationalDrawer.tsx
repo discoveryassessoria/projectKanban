@@ -21,13 +21,16 @@ import { RepactuarPrazoModal } from "@/src/components/operacao/RepactuarPrazoMod
 // ============================================================
 // LABELS (mantidos no componente porque o GET retorna o documento cru)
 // ============================================================
+// "(IT)" lia-se como sigla de Itália (achado real, mandato "Operação/Antão",
+// 29/09/2026) — "Inteiro Teor" por extenso, mesmo termo que a Central e a
+// Operação usam (jargão de cartório, não abreviação de país).
 const TIPO_LABELS: Record<string, string> = {
   CERTIDAO_NASCIMENTO: "Certidão de Nascimento",
-  CERTIDAO_NASCIMENTO_INTEIRO_TEOR: "Certidão de Nascimento (IT)",
+  CERTIDAO_NASCIMENTO_INTEIRO_TEOR: "Certidão de Nascimento - Inteiro Teor",
   CERTIDAO_CASAMENTO: "Certidão de Casamento",
-  CERTIDAO_CASAMENTO_INTEIRO_TEOR: "Certidão de Casamento (IT)",
+  CERTIDAO_CASAMENTO_INTEIRO_TEOR: "Certidão de Casamento - Inteiro Teor",
   CERTIDAO_OBITO: "Certidão de Óbito",
-  CERTIDAO_OBITO_INTEIRO_TEOR: "Certidão de Óbito (IT)",
+  CERTIDAO_OBITO_INTEIRO_TEOR: "Certidão de Óbito - Inteiro Teor",
   CERTIDAO_BATISMO: "Certidão de Batismo",
   CNN: "CNN",
   CARTA_NATURALIZACAO: "Carta de Naturalização",

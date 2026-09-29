@@ -337,6 +337,10 @@ function nucleoTemporal(n: {
  * Este prazo NÃO se move quando a subtarefa corrente avança — ver
  * `estadoTemporalSubtarefa` para o relógio operacional, mais fino.
  */
+/** "30/09" — só dia/mês, no fuso operacional. Usado só para o rótulo de "iniciar até". */
+const dataCurta = (iso: string): string =>
+  new Date(iso).toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL, day: '2-digit', month: '2-digit' })
+
 export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
   const concluida = paraData(e.dataConclusao)
   // QUEM DIZ QUE ACABOU É O STATUS, não a data de conclusão.
@@ -350,7 +354,7 @@ export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
   const encerrada = e.statusTarefa != null
     ? ENCERRADOS.has(e.statusTarefa)
     : concluida != null
-  return nucleoTemporal({
+  const nucleo = nucleoTemporal({
     dataPrazo: e.dataPrazo,
     dataConclusao: e.dataConclusao,
     encerrada,
@@ -360,6 +364,28 @@ export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
     criadaEm: e.criadaEm,
     agora: e.agora,
   })
+
+  // "VENCE" É DO TRABALHO EM CURSO; TAREFA NÃO INICIADA TEM OUTRO PRAZO — O DE
+  // COMEÇAR. `nucleoTemporal` é o núcleo COMPARTILHADO (Tarefa e Subtarefa) e
+  // não conhece "iniciar" — essa distinção é só da Tarefa, então mora aqui, por
+  // cima do rótulo genérico, não dentro do núcleo. Achado real (mandato
+  // "Operação/Antão", 29/09/2026): a fila e o painel do documento mostravam
+  // "Vence amanhã" para uma certidão que ninguém tinha começado — o mesmo texto
+  // que uma tarefa EM ANDAMENTO legitimamente mostra. O prazo é o mesmo
+  // (`dataPrazo`); o que muda é SÓ a palavra, e só quando ainda não há trabalho
+  // em curso.
+  if (!encerrada && !nucleo.semPrazo && e.statusTarefa === 'NAO_INICIADA') {
+    const dias = nucleo.diasParaPrazo ?? 0
+    const dataFmt = nucleo.dueAt ? dataCurta(nucleo.dueAt) : ''
+    return {
+      ...nucleo,
+      rotulo: nucleo.atrasado
+        ? `Deveria ter iniciado há ${Math.abs(dias)} dia${Math.abs(dias) === 1 ? '' : 's'}`
+        : `Iniciar até ${dataFmt}`,
+    }
+  }
+
+  return nucleo
 }
 
 /** Estados de `SubtaskExecution` em que o relógio da subtarefa já não corre. */

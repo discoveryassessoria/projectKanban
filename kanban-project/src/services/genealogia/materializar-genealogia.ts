@@ -331,9 +331,11 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       // DISPENSADA por decisão manual do operador NÃO ganha Documento (ela não deveria
       // nem existir mais como trabalho a fazer).
       const necessidadeDispensadaManual = !criada && necessidade.status === "DISPENSADA" && necessidade.dispensaManual
+      let documentoId: number | null = null
       if (!necessidadeDispensadaManual && recebeWorkflowOperacional(tipoDoc)) {
-        const { criado: documentoCriado } = await garantirDocumentoDaNecessidade(processoId, necessidade.id, db)
-        if (documentoCriado) res.documentosCriados++
+        const r = await garantirDocumentoDaNecessidade(processoId, necessidade.id, db)
+        documentoId = r.documentoId
+        if (r.criado) res.documentosCriados++
       }
 
       // PASSO OPERACIONAL — só para documento cujo PERFIL declara workflow.
@@ -410,7 +412,8 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
                 // notificações, sem erro e sem aviso. O valor abaixo é só o
                 // default do modelo, e nada o lê para decidir tarefa.
                 obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
-                status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: slaDaysLocalizarRegistro,
+                status: "DISPONIVEL", necessidadeId: necessidade.id, documentoId,
+                papel: "equipe_documental", slaDays: slaDaysLocalizarRegistro,
                 chaveIdempotencia: chave,
                 snapshot: { stepKey: STEP_LOCALIZAR, label: labelLocalizarRegistro, requisito: snapshot } as Prisma.InputJsonValue,
                 snapshotSchemaVersion: 1,

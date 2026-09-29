@@ -217,6 +217,24 @@ export interface LinhaDeFila {
    */
   linhaReta: boolean | null
   /**
+   * OS DOIS NOMES, quando a obrigação é de uma UNIÃO (certidão de casamento) —
+   * "Fulano e Fulana". `null` para obrigação de PESSOA (a coluna usa
+   * `pessoaNome` normalmente). `linhaReta` acima já responde "a união está na
+   * linha reta?" pra este caso (um dos dois cônjuges é `linhaReta`).
+   */
+  casalNomes: string | null
+  /**
+   * A TAREFA É DE UMA FASE ANTERIOR À FASE ATUAL DO PROCESSO? (`fasesAnterioresA`,
+   * catálogo canônico — mesma régua de `whereFasesAnteriores` acima, por linha
+   * em vez de filtro de query). Achado real (mandato "Operação/Antão",
+   * 29/09/2026): o selo "Fase anterior" era ligado só por `faseMacroKey ===
+   * "genealogia"`, sem comparar com a fase ATUAL do processo — um processo
+   * que está EM Genealogia via o próprio selo errado nas próprias tarefas.
+   */
+  faseAnteriorAFaseAtual: boolean
+  /** Rótulo canônico da fase ATUAL do processo (`labelDaFasePorPhaseKey`) — nunca a phaseKey crua ("Fase atual: Genealogia", não "Fase atual: genealogia"). `null` sem fase ou fase fora do catálogo. */
+  faseAtualDoProcessoLabel: string | null
+  /**
    * NASCIMENTO/CASAMENTO/OBITO — resumo do `Documento.tipo` (enum legado,
    * espelho de `documentType.legacyEnumKey`) para agrupar/ordenar a sequência
    * genealógica de uma pessoa (Minha Operação, achado 25/09/2026). `null` para
@@ -366,7 +384,7 @@ const SELECT = {
   // O ESTADO TEMPORAL precisa destes: conclusão congela o atraso, e a pausa de
   // SLA é o que separa "parado esperando o cartório" de "parado devendo".
   dataConclusao: true, slaPausadoEm: true, slaPausaAcumuladaMin: true,
-  processo: { select: { nome: true, familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } } } },
+  processo: { select: { nome: true, faseAtualKey: true, familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } } } },
   responsavel: { select: { nome: true } },
   // Discrimina a NATUREZA da tarefa ADMINISTRATIVA (ex.: "obrigacao-atribuicao")
   // — quem projeta essa tarefa genericamente (Tarefas Administrativas) precisa
@@ -376,7 +394,19 @@ const SELECT = {
   // resolvido em lote por quem projeta, nunca com uma consulta por linha.
   pessoaId: true,
   createdAt: true, dataAtribuicao: true,
-  necessidade: { select: { itemCatalogo: { select: { name: true } } } },
+  necessidade: {
+    select: {
+      itemCatalogo: { select: { name: true } },
+      // CASAMENTO É ATO DE DUAS PESSOAS — a necessidade de União não tem
+      // `pessoaId` (não há UM titular), mas a fila precisa mostrar QUEM,
+      // então lê os dois cônjuges direto daqui (mandato "Operação/Antão",
+      // 29/09/2026: "Edison Nás Antão e Evanir Teixeira da Silva").
+      uniao: { select: {
+        pessoa1: { select: { nome: true, sobrenome: true, linhaReta: true } },
+        pessoa2: { select: { nome: true, sobrenome: true, linhaReta: true } },
+      } },
+    },
+  },
   workflowStepInstance: { select: { id: true, stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true, createdAt: true } },
   // Par que identifica a CADEIA de passos da obrigação — várias Tarefas
   // (documentos distintos) podem compartilhar a mesma `workflowInstanceId`
@@ -418,6 +448,22 @@ function categoriaDocumentoDoTitulo(titulo: string): "NASCIMENTO" | "CASAMENTO" 
 
 type Bruta = Prisma.TarefaGetPayload<{ select: typeof SELECT }>
 
+const nomeCompleto = (p: { nome: string; sobrenome: string | null } | null | undefined): string | null =>
+  p ? `${p.nome}${p.sobrenome ? ` ${p.sobrenome}` : ""}` : null
+
+/** `fasesAnterioresA` lança se a chave não pertence ao catálogo oficial — uma
+ * fase fora do catálogo não é "anterior", é desconhecida; nunca derruba a
+ * projeção da fila por isso. */
+function faseEhAnteriorA(faseDaTarefa: string | null, faseAtualDoProcesso: string | null | undefined): boolean {
+  if (!faseDaTarefa || !faseAtualDoProcesso || faseDaTarefa === faseAtualDoProcesso) return false
+  try {
+    const anteriores = fasesAnterioresA(faseAtualDoProcesso).map((c) => faseCodeToPhaseKey(c))
+    return anteriores.includes(faseDaTarefa)
+  } catch {
+    return false
+  }
+}
+
 function projetar(
   t: Bruta, agora: Date,
   nomes?: Map<number, string>,
@@ -452,7 +498,16 @@ function projetar(
     pessoaId: t.pessoaId ?? null,
     pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
     numeroLinhagem: t.pessoaId != null ? linhagem?.get(t.pessoaId)?.numeroLinhagem ?? null : null,
-    linhaReta: t.pessoaId != null ? linhagem?.get(t.pessoaId)?.linhaReta ?? null : null,
+    linhaReta: t.pessoaId != null
+      ? linhagem?.get(t.pessoaId)?.linhaReta ?? null
+      : t.necessidade?.uniao
+        ? (t.necessidade.uniao.pessoa1.linhaReta || t.necessidade.uniao.pessoa2.linhaReta)
+        : null,
+    casalNomes: t.necessidade?.uniao
+      ? `${nomeCompleto(t.necessidade.uniao.pessoa1)} e ${nomeCompleto(t.necessidade.uniao.pessoa2)}`
+      : null,
+    faseAnteriorAFaseAtual: faseEhAnteriorA(t.faseMacroKey, t.processo?.faseAtualKey),
+    faseAtualDoProcessoLabel: labelDaFasePorPhaseKey(t.processo?.faseAtualKey),
     categoriaDoc: categoriaDocumento(t.documento?.tipo) ?? categoriaDocumentoDoTitulo(t.titulo),
     faseMacroKey: t.faseMacroKey,
     // O NOME DO PASSO, na ordem da fonte mais próxima do que foi publicado:
@@ -567,7 +622,16 @@ function projetar(
     aIniciar: (() => {
       const porSubtarefa = t.workflowStepInstance ? progressoSubtarefa?.get(t.workflowStepInstance.id) : null
       const atual = porSubtarefa?.atual
-      if (!atual || atual.status === 'AGUARDANDO_EXTERNO') return false
+      if (!atual) {
+        // SEM SUBTAREFA (ex.: Genealogia "Localizar registro" — passo único,
+        // nunca decomposto em subtarefas): "a iniciar" aqui é só "ninguém
+        // tocou ainda". Achado real (mandato "Operação/Antão", 29/09/2026):
+        // toda tarefa de Genealogia mostrava o botão "Continuar" mesmo NUNCA
+        // iniciada, porque este cálculo só sabia responder para passos COM
+        // subtarefa — sem isto, `aIniciar` fica sempre `false` pra elas.
+        return t.statusTarefa === 'NAO_INICIADA'
+      }
+      if (atual.status === 'AGUARDANDO_EXTERNO') return false
       const pontoDeEntrada = atual.dependeDe.length === 0
       const aindaNaoTocada = atual.startedAt == null
       return pontoDeEntrada && aindaNaoTocada

@@ -73,8 +73,12 @@ export function urlOperacionalDoProcesso(processoId: number): string {
  * "Continuar" leva à aba Árvore do processo, onde a Genealogia realmente
  * acontece — nunca ao drawer documental.
  */
-export function urlArvoreDoProcesso(processoId: number): string {
+export function urlArvoreDoProcesso(processoId: number, pessoaId?: number | null): string {
   const p = new URLSearchParams({ processoId: String(processoId), tab: 'arvore' })
+  // `pessoaId` seleciona a pessoa na árvore ao abrir — mesmo parâmetro que
+  // `src/app/genealogy/page.tsx` (`abrirPessoa`) já usa; nenhum esquema de URL
+  // novo (mandato "Operação/Antão", 29/09/2026: nome da pessoa → árvore).
+  if (pessoaId != null) p.set('pessoaId', String(pessoaId))
   return `/kanban?${p.toString()}`
 }
 

@@ -26,7 +26,7 @@ import type { LinhaOperacaoV3, RespostaTarefas, Vista, AgruparFilaPor, FiltroRad
 import {
   relCls, acompTxtCompleto, passoLabelDe, porQueAquiDe, orgaoTxt, orgaoCls,
   cobrancasTxt, prazoTarefaCls, acaoDe, concluirLabelDe, aplicarBusca, aplicarVista,
-  agruparDentroDaFamilia, agruparPorFamilia, type GrupoDeLinhas,
+  agruparDentroDaFamilia, agruparPorFamilia, docTipoTxt, type GrupoDeLinhas,
 } from "./operacao-v3-derivacoes"
 import {
   AbaAguardando, AbaAcompanhamento, AbaFamilias, AbaRadar, AbaFeito,
@@ -110,7 +110,13 @@ export function OperacaoV3() {
   const acompVenc = useMemo(() => abertosVisiveis.filter((l) => l.acompanhamentoVencido), [abertosVisiveis])
   const atras = useMemo(() => abertosVisiveis.filter((l) => l.atrasada), [abertosVisiveis])
   const decis = useMemo(() => abertosVisiveis.filter((l) => l.escalada), [abertosVisiveis])
-  const noOrg = useMemo(() => abertosVisiveis.filter((l) => l.aIniciar && !l.terceiroNome), [abertosVisiveis])
+  // MESMO CRITÉRIO DA COLUNA ÓRGÃO (`agruparDentroDaFamilia` "orgao": toda
+  // linha sem `terceiroNome`, não só as `aIniciar`) — achado real (mandato
+  // "Operação/Antão", 29/09/2026): o aviso filtrava por `aIniciar`, que ficava
+  // sempre `false` para Genealogia até a correção em `tarefa-projecoes.ts`
+  // (sem subtarefa, `aIniciar` nunca considerava "ninguém tocou ainda"); "4
+  // certidões sem órgão" na tela contra as 13 reais do Antão sozinho.
+  const noOrg = useMemo(() => abertosVisiveis.filter((l) => !l.terceiroNome), [abertosVisiveis])
   const genOpen = useMemo(() => abertosVisiveis.filter((l) => l.faseMacroKey === "genealogia" && l.origem !== "TRANSVERSAL"), [abertosVisiveis])
 
   const qf = useCallback((l: LinhaOperacaoV3) => {
@@ -314,7 +320,7 @@ export function OperacaoV3() {
         <section style={{ flexGrow: 1, minWidth: 0, padding: "14px 24px", overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
           {tab === "fila" && (
             <AbaFila
-              linhas={fila} todasSelecionaveis={filaBase}
+              linhas={fila} todasSelecionaveis={filaBase} todosAbertos={abertosVisiveis}
               group={group} setGroup={setGroup}
               radar={radar} clearRadar={() => setRadar(null)}
               quick={quick} clearQuick={() => setQuick(null)}
@@ -456,12 +462,17 @@ export function OperacaoV3() {
 // ABA FILA — a mais rica: seleção em lote, agrupamento, faixa de bloqueio.
 // ============================================================================
 function AbaFila({
-  linhas, todasSelecionaveis, group, setGroup, radar, clearRadar, quick, clearQuick,
+  linhas, todasSelecionaveis, todosAbertos, group, setGroup, radar, clearRadar, quick, clearQuick,
   sel, setSel, col, setCol, nAguard, nAcompVenc, noOrgTotal,
   onAbrir, onIniciarFoco, onIniciarSelecionadas, onVincularTodos, onAddTransversal, onNaoLigado, onVerFamilia,
 }: {
   linhas: LinhaOperacaoV3[]
   todasSelecionaveis: LinhaOperacaoV3[]
+  /** TODAS as tarefas abertas (fila+aguardando, qualquer família) — só para os
+   *  totais por família no cabeçalho ("Antão · 13 na fila · 2 aguardando · 1
+   *  vencido"), mandato "Operação/Antão", 29/09/2026. Nunca filtrado pela
+   *  vista/aba atual: o total é da família, não desta lista. */
+  todosAbertos: LinhaOperacaoV3[]
   group: AgruparFilaPor
   setGroup: (g: AgruparFilaPor) => void
   radar: FiltroRadar
@@ -484,6 +495,17 @@ function AbaFila({
   onVerFamilia: (fam: string) => void
 }) {
   const familias = useMemo(() => agruparPorFamilia(linhas), [linhas])
+  const statsPorFamilia = useMemo(() => {
+    const m = new Map<string, { aguardando: number; vencidos: number }>()
+    for (const l of todosAbertos) {
+      const k = l.familiaNome ?? "—"
+      const s = m.get(k) ?? { aguardando: 0, vencidos: 0 }
+      if (l.estadoOperacao === "AGUARDANDO") s.aguardando++
+      if (l.acompanhamentoVencido || l.atrasada) s.vencidos++
+      m.set(k, s)
+    }
+    return m
+  }, [todosAbertos])
   const selCount = Object.keys(sel).length
   const toggleCol = (k: string) => setCol(col[k] ? Object.fromEntries(Object.entries(col).filter(([x]) => x !== k)) : { ...col, [k]: true })
   const toggleLinha = (id: number) => setSel(sel[id] ? Object.fromEntries(Object.entries(sel).filter(([x]) => Number(x) !== id)) : { ...sel, [id]: true })
@@ -550,12 +572,15 @@ function AbaFila({
             <div className="opv3-grp" style={{ borderTop: 0, borderRadius: "12px 12px 0 0", background: "#e3e8f2", padding: "13px 16px" }}>
               <button className={`opv3-chk ${todosMarcados ? "on" : ""}`} onClick={() => toggleGrupo(F.linhas)} aria-label="Selecionar família" />
               <button className="opv3-btn opv3-sm" onClick={() => toggleCol(fk)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{aberta ? "▾" : "▸"}</button>
-              <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{F.fam}</b><span style={{ color: "#5b6478" }}>{F.pais} · {F.linhas.length} tarefa(s) na fila</span>
+              <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{F.fam}</b>
+              <span style={{ color: "#5b6478" }}>
+                {F.pais} · {F.linhas.length} na fila · {statsPorFamilia.get(F.fam)?.aguardando ?? 0} aguardando · {statsPorFamilia.get(F.fam)?.vencidos ?? 0} vencido{(statsPorFamilia.get(F.fam)?.vencidos ?? 0) === 1 ? "" : "s"}
+              </span>
               <div style={{ flexGrow: 1 }} />
               <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(F.fam)}>Ver família</button>
             </div>
             {aberta && grupos.map((g) => (
-              <GrupoFila key={g.chave} grupo={g} col={col} setCol={setCol} sel={sel} toggleLinha={toggleLinha} toggleGrupo={toggleGrupo} onAbrir={onAbrir} famKey={F.fam} />
+              <GrupoFila key={g.chave} grupo={g} col={col} setCol={setCol} sel={sel} toggleLinha={toggleLinha} toggleGrupo={toggleGrupo} onAbrir={onAbrir} onVincular={(id) => onVincularTodos([id])} famKey={F.fam} />
             ))}
           </div>
         )
@@ -564,7 +589,7 @@ function AbaFila({
   )
 }
 
-function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir, famKey }: {
+function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir, onVincular, famKey }: {
   grupo: GrupoDeLinhas
   col: Record<string, true>
   setCol: (c: Record<string, true>) => void
@@ -572,6 +597,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
   toggleLinha: (id: number) => void
   toggleGrupo: (rs: LinhaOperacaoV3[]) => void
   onAbrir: (id: number) => void
+  onVincular: (taskId: number) => void
   famKey: string
 }) {
   const router = useRouter()
@@ -610,12 +636,32 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
             return (
               <div key={t.taskId} className={`opv3-row opv3-gF ${sel[t.taskId] ? "opv3-sel" : ""}`}>
                 <button className={`opv3-chk ${sel[t.taskId] ? "on" : ""}`} onClick={() => toggleLinha(t.taskId)} aria-label="Selecionar" />
-                <div style={{ fontWeight: 600 }}>{t.titulo}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pais}</div></div>
-                <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
+                <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pais}</div></div>
+                <div>
+                  {t.pessoaId != null && t.processoId != null ? (
+                    <a href={urlArvoreDoProcesso(t.processoId, t.pessoaId)} style={{ color: "inherit", textDecoration: "underline" }} onClick={(e) => e.stopPropagation()}>
+                      {t.casalNomes ?? t.pessoaNome ?? "—"}
+                    </a>
+                  ) : (
+                    t.casalNomes ?? t.pessoaNome ?? "—"
+                  )}
+                  <div style={{ fontSize: 11, color: "#7a8296" }}>
+                    {t.casalNomes && t.linhaReta ? "Linha reta · " : ""}
+                    {t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}
+                  </div>
+                </div>
                 <div><span className={`opv3-pill ${why.cls}`}>{why.texto}</span></div>
                 <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span><div style={{ fontSize: 11, color: "#7a8296" }}>{t.rotuloDoPrazo}</div></div>
-                <div><span className={`opv3-pill ${orgaoCls(t)}`}>{orgaoTxt(t)}</span></div>
+                <div>
+                  {t.terceiroNome ? (
+                    <span className={`opv3-pill ${orgaoCls(t)}`}>{orgaoTxt(t)}</span>
+                  ) : (
+                    <button className="opv3-pill opv3-p-red" style={{ border: 0, cursor: "pointer" }} onClick={() => onVincular(t.taskId)} title="Vincular órgão desta certidão">
+                      {orgaoTxt(t)}
+                    </button>
+                  )}
+                </div>
                 <div style={{ display: "flex", gap: 4 }}><button className={`opv3-btn opv3-sm ${acao.accent ? "opv3-acc" : ""}`} onClick={() => abrirLinha(t)}>{acao.label}</button></div>
               </div>
             )

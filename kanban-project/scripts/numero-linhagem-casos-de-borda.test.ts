@@ -65,5 +65,24 @@ function pessoa(o: { id: number; paiId?: number | null; maeId?: number | null; d
   chk(r.get(98) === r.get(5), "o número herdado é exatamente o do parceiro de sangue")
 }
 
+// ── 3) COLATERAL/APOIO SEM UNIÃO CADASTRADA — nunca fica sem número (mandato
+//    "Operação/Antão", 29/09/2026, processo 675: Emerson/Priscila/Bruno com
+//    geração nula indefinidamente — nem linhaReta, nem cônjuge de alguém que é,
+//    por não terem União cadastrada) ────────────────────────────────────────
+{
+  const pessoas: PessoaParaLinhagem[] = [
+    pessoa({ id: 1, linhaReta: true, data_nasc: new Date("1900-01-01") }),
+    pessoa({ id: 2, linhaReta: true, paiId: 1, data_nasc: new Date("1925-01-01") }),
+    // Fora da linhagem, SEM União cadastrada com ninguém de sangue — o caso real.
+    pessoa({ id: 50, linhaReta: false, data_nasc: new Date("1927-01-01") }),
+    pessoa({ id: 51, linhaReta: false, data_nasc: new Date("1980-01-01") }),
+  ]
+  const r = calcularNumerosLinhagem(pessoas, [])
+  chk(r.get(50) != null && r.get(51) != null, "colateral/apoio sem União cadastrada recebe número (nunca fica null pra sempre)")
+  chk((r.get(50) ?? 0) > (r.get(2) ?? 0) && (r.get(51) ?? 0) > (r.get(2) ?? 0), "entra DEPOIS de toda a linha de sangue — nunca se confunde com ela")
+  chk(r.get(50) !== r.get(51), "duas pessoas fora da linhagem sem união entre si recebem números DIFERENTES")
+  chk((r.get(50) ?? 0) < (r.get(51) ?? 0), "ordem determinística entre elas: nascimento mais antigo primeiro")
+}
+
 console.log(`\n${ok} passaram, ${fail} falharam`)
 process.exit(fail ? 1 : 0)
