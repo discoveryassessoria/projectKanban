@@ -582,6 +582,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // Torre de Controle, Bloco C (29/09/2026): Tarefa.orgaoId — o órgão/terceiro
   // que a Tarefa aguarda, espelhando Documento.orgaoId (OrgaoProtocolo).
   '20260929150000_tarefa_orgao_id',
+  // Correção do reconciliador NEC-001 (29/09/2026): trava física contra dois
+  // PhaseWorkflowStepInstance ativos para a mesma obrigação (workflowInstanceId +
+  // stepKey + ciclo + documentoId) — mesmo padrão de
+  // trava_instancia_ativa_unica_por_fase (20260928200000).
+  '20260929220300_step_instance_unico_por_documento',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
