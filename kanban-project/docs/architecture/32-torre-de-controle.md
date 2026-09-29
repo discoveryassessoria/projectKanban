@@ -150,3 +150,50 @@ Bloco B (não introduzidos por ele, mas expostos pela primeira leitura de
   concordando entre si e com a data real (`SubtaskExecution.
   proximoAcompanhamentoEm` = 27/09), nas duas rotas de leitura (fila em lote e
   dossiê de uma tarefa).
+
+## Bloco C — Órgão como cadastro (29/09/2026)
+
+Decisão do usuário: `OrgaoProtocolo` é o cadastro (não criar `Orgao` novo, não
+estender campos — `type` já cobre CARTORIO/CONSULADO/JUIZO/OUTRO como texto
+livre). Adiciona só `Tarefa.orgaoId` + `/estatisticas`; migração dos dados
+existentes por nome, mostrada antes de aplicar.
+
+- **`Tarefa.orgaoId`** (`Int?`, `onDelete: SetNull`, migração
+  `20260929150000_tarefa_orgao_id`) — espelha `Documento.orgaoId` (mesmo
+  cadastro, mesma FK), mas é campo PRÓPRIO da Tarefa: existe mesmo quando não
+  há documento. `vincular-orgao-lote` (a porta operacional que já existia)
+  passa a gravar os dois campos na MESMA chamada — `Documento.orgaoId`
+  continua o dono para o motor de subtarefas (`fornecedorId`); `Tarefa.orgaoId`
+  é o que a Torre e `/estatisticas` leem. `whereGerencial` ganha o filtro
+  `orgaoId` (por ID, canônico) — separado do `terceiro` (texto, legado,
+  intocado).
+- **`GET /api/gerenciamento/orgaos-protocolo/[id]/estatisticas`** — reaproveita
+  `visaoGerencial({ orgaoId })` (tarefas por `estadoOperacao`/atrasadas/
+  escaladas/status) e `ContatoTerceiro.groupBy({ by: ['resultado'], where:
+  { orgaoId } })` (cobranças por resultado) — nenhum contador novo, nenhuma
+  tabela nova. `incluirEncerradas:true` de propósito: canceladas/supersedidas
+  também são fato sobre o órgão.
+- **Migração dos dados existentes** (`scripts/backfill-tarefa-orgao-id.ts`,
+  `--dry` por padrão, mesma trava de `backfill-orgao-cartorio-brasileiro.ts`
+  para `--aplicar --prod`): duas fontes, nunca um chute —
+  1. Cópia direta de `Documento.orgaoId` já resolvido (sem ambiguidade).
+  2. Casar por nome (`chaveDeNome`/`similaridade`,
+     `src/services/organizacao-identidade.ts` — o mesmo motor anti-duplicidade
+     do cadastro de Órgãos) contra `Documento.cartorio` livre, só quando o
+     melhor candidato tem score ≥ 0.5 e margem ≥ 0.15 sobre o segundo; o resto
+     fica gap documentado, nunca gravado sem confiança.
+  - **Lista mostrada antes de aplicar** (57 tarefas com documento,
+    produção): 39 vinculadas por cópia direta; 16 tarefas / 3 nomes de texto
+    livre distintos ("Sarandí del Yi, 9 Durazno", "Bage", "Santa Clara do
+    Sul" — nomes de CIDADE, não de instituição) sem candidato confiável — 0
+    aplicadas, todas viraram gap documentado; 2 tarefas sem `orgaoId` nem
+    `cartorio` — inalteradas. Aplicado: 39 tarefas vinculadas, 18 gaps reais
+    (confirmado em produção: `COUNT(Tarefa.orgaoId IS NOT NULL) = 39`).
+  - Órgãos com gap ficam disponíveis para vínculo manual pela porta que já
+    existia (`vincular-orgao-lote`) — nenhuma tela nova para isso neste bloco.
+- **Evidência ao vivo**: `GET .../orgaos-protocolo/292/estatisticas`
+  (#3853/Porto Alegre - 6ª Zona) → `tarefas.total:1,
+  porEstadoOperacao.AGUARDANDO:1`; `GET .../orgaos-protocolo/290/estatisticas`
+  (Porto Alegre - 4ª Zona, 10 tarefas históricas) →
+  `porStatusTarefa:{AGUARDANDO_TERCEIRO:1,SUPERSEDIDA:6,CANCELADA:2,
+  NAO_INICIADA:1}` — números batendo com o histórico real do processo 651.

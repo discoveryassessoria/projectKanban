@@ -223,6 +223,9 @@ async function main() {
   ok("2b.1) 200, 1 vinculada", respOrgaoValido.status === 200 && jsonOrgaoValido.vinculadas === 1, JSON.stringify(jsonOrgaoValido))
   const docDepoisValido = await prisma.documento.findUnique({ where: { id: itemSemOrgao.documentoId }, select: { orgaoId: true } })
   ok("2b.2) Documento agora tem o órgão", docDepoisValido?.orgaoId === orgao.id, JSON.stringify(docDepoisValido))
+  // Torre de Controle, Bloco C (29/09/2026): a mesma porta grava Tarefa.orgaoId.
+  const tarefaDepoisValido = await prisma.tarefa.findUnique({ where: { id: itemSemOrgao.tarefaId }, select: { orgaoId: true } })
+  ok("2b.3) Tarefa também tem o órgão", tarefaDepoisValido?.orgaoId === orgao.id, JSON.stringify(tarefaDepoisValido))
 
   // ══════════════════════════════════════════════════════════════════════
   secao("3) COBRAR-TODOS-VENCIDOS — 1 ContatoTerceiro por chamada, escala na 2ª")
