@@ -1,19 +1,25 @@
-// SONDA TEMPORÁRIA (branch ci/sonda-ambiente) — descobre o que o build da Vercel oferece.
-import { execSync } from 'node:child_process'
-const sh = (c) => { try { return execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() } catch (e) { return `ERRO: ${(e.stderr || e.message).toString().trim().slice(0, 300)}` } }
-console.log('=== SONDA DO AMBIENTE DE BUILD ===')
-for (const c of ['id', 'uname -a', 'nproc', 'free -m | head -2', 'node -v', 'df -h /tmp | tail -1', 'which postgres psql pg_ctl initdb docker || true', 'cat /etc/os-release | head -3', 'echo VERCEL=$VERCEL VERCEL_ENV=$VERCEL_ENV VERCEL_GIT_COMMIT_SHA=$VERCEL_GIT_COMMIT_SHA']) console.log(`$ ${c}\n${sh(c)}\n`)
-console.log('=== embedded-postgres ===')
-console.log(sh('npm ls embedded-postgres 2>&1 | head -5'))
+// SONDA TEMPORÁRIA (branch ci/sonda-ambiente) — sobe Postgres real no build da Vercel, à mão.
+import { execSync, spawnSync } from 'node:child_process'
+import { existsSync, readdirSync } from 'node:fs'
+const sh = (c) => { try { return execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() } catch (e) { return `ERRO: ${(e.stderr || e.message).toString().trim().slice(0, 400)}` } }
+const p = (c) => console.log(`$ ${c}\n${sh(c)}\n`)
+console.log('=== SONDA v3 ===')
+p('which useradd runuser su setpriv adduser || true')
+const nat = 'node_modules/@embedded-postgres/linux-x64/native'
+console.log('native existe:', existsSync(nat), existsSync(nat) ? readdirSync(nat).join(',') : '')
+p(`ls ${nat}/bin | tr '\\n' ' '`)
+p('rm -rf /opt/pgnative && cp -r ' + nat + ' /opt/pgnative && chmod -R a+rX /opt/pgnative && ls /opt/pgnative/bin | tr "\\n" " "')
+p('id pgtest || useradd -m pgtest; id pgtest')
+p('rm -rf /tmp/pgdata && mkdir -p /tmp/pgdata /tmp/pgsock && chown -R pgtest /tmp/pgdata /tmp/pgsock && chmod 700 /tmp/pgdata')
+const uid = Number(sh('id -u pgtest')); const gid = Number(sh('id -g pgtest'))
+const run = (cmd, args) => { const r = spawnSync(cmd, args, { uid, gid, encoding: 'utf8', env: { PATH: process.env.PATH, LC_ALL: 'C', LD_LIBRARY_PATH: '/opt/pgnative/lib' } }); return `exit=${r.status}\n${(r.stdout || '').slice(-500)}\n${(r.stderr || '').slice(-700)}` }
+console.log('initdb:', run('/opt/pgnative/bin/initdb', ['-D', '/tmp/pgdata', '-U', 'postgres', '--auth=trust', '--encoding=UTF8', '--locale=C']))
+console.log('pg_ctl start:', run('/opt/pgnative/bin/pg_ctl', ['-D', '/tmp/pgdata', '-o', '-p 55432 -k /tmp/pgsock -c listen_addresses=127.0.0.1', '-w', '-l', '/tmp/pg.log', 'start']))
+const { default: pg } = await import('pg')
 try {
-  const { default: EmbeddedPostgres } = await import('embedded-postgres')
-  const pg = new EmbeddedPostgres({ databaseDir: '/tmp/pgdata-sonda', user: 'postgres', password: 'x', port: 55433, persistent: false, createPostgresUser: true, initdbFlags: ['--encoding=UTF8', '--locale=C'] })
-  await pg.initialise(); await pg.start()
-  await pg.createDatabase('sonda')
-  const c = pg.getPgClient('sonda'); await c.connect()
-  console.log('SELECT version():', (await c.query('select version()')).rows[0].version)
-  console.log('SELECT pg_advisory_xact_lock ok:', JSON.stringify((await c.query('select 1 as ok')).rows[0]))
-  await c.end(); await pg.stop()
-  console.log('✅ POSTGRES REAL SOBE NO BUILD')
-} catch (e) { console.log('❌ embedded-postgres falhou:', String(e).slice(0, 600)) }
-process.exit(1) // a sonda nunca deixa o build passar
+  const c = new pg.Client({ host: '127.0.0.1', port: 55432, user: 'postgres', database: 'postgres' }); await c.connect()
+  console.log('version:', (await c.query('select version()')).rows[0].version)
+  await c.end(); console.log('✅ POSTGRES REAL SOBE NO BUILD DA VERCEL')
+} catch (e) { console.log('❌ conexão falhou:', String(e).slice(0, 300)); p('tail -20 /tmp/pg.log') }
+run('/opt/pgnative/bin/pg_ctl', ['-D', '/tmp/pgdata', '-m', 'immediate', 'stop'])
+process.exit(1)
