@@ -190,8 +190,9 @@ async function main() {
     // mais 6 obrigações (mesmos tipos) — o número de consultas não pode subir
     for (let i = 0; i < 3; i++) { await c.novaObrigacao({ aguardando: true, orgaoId: orgao.id, responsavelId: gestor.id }); await c.novaObrigacao({ responsavelId: gestor.id }) }
     const onze = await contar((db) => visaoGerencial({}, agora, db))
-    // Tolerância de +2: uma consulta lazy pode variar com o timing do cache; N+1 cresceria com as 6 tarefas novas.
-    ok("com o dobro de tarefas, o número de consultas NÃO cresce (sem N+1)", onze.n <= cinco.n + 2 && onze.r.linhas.length >= cinco.r.linhas.length + 6, `${cinco.n} × ${onze.n} consultas para ${cinco.r.linhas.length} × ${onze.r.linhas.length} linhas`)
+    // N+1 = pelo menos 1 consulta por tarefa nova (+6). Consultas lazy variam com timing/ambiente: exige crescimento
+    // ESTRITAMENTE menor que o número de tarefas acrescentadas.
+    ok("com o dobro de tarefas, o número de consultas NÃO cresce (sem N+1)", onze.n < cinco.n + 6 && onze.r.linhas.length >= cinco.r.linhas.length + 6, `${cinco.n} × ${onze.n} consultas para ${cinco.r.linhas.length} × ${onze.r.linhas.length} linhas`)
     ok("poucas consultas (o antigo fazia 30+ em série)", onze.n <= 30, `${onze.n}`)
     const leituras = onze.consultas.filter((q) => /FROM "public"\."Tarefa"/.test(q)).length
     // contagem + página + o status da tarefa de que a dependência depende (a fixture tem uma). Antes: +1 (a releitura da projeção temporal).

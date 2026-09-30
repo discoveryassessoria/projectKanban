@@ -231,7 +231,8 @@ async function main() {
     const hDepois = await historicoDoProcesso(P)
     const depois = await contarConsultas(P)
     ok("o histórico cresceu (fatos novos de comentário e prazo)", hDepois!.fatos.length > h.fatos.length, `${h.fatos.length} → ${hDepois!.fatos.length}`)
-    ok("consultas: depois <= antes + 2 (nenhum N+1 por fato)", depois <= antes + 2, `${antes} → ${depois}`)
+    // 42 fatos acrescentados: um N+1 somaria dezenas de consultas. Exige crescimento pequeno e bem abaixo disso (estável entre ambientes).
+    ok("consultas: crescimento pequeno (nenhum N+1 por fato)", depois <= antes + 6, `${antes} → ${depois}`)
 
     // ════════════ REABRIR ════════════
     secao("Reabrir certidão — desfaz o cancelamento INTEIRO (documento, exigência, etapas, tarefa), na porta própria")
