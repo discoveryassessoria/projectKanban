@@ -221,6 +221,16 @@ export async function processarOutbox(opts?: {
 
   const resumo: OutboxProcessResumo = { lidos: pendentes.length, processados: 0, falhos: 0, ignorados: 0, detalhes: [] }
   const staleAntes = new Date(Date.now() - CLAIM_STALE_MS)
+  // COALESCÊNCIA DA RECONCILIAÇÃO REGISTRAL (processo 675, 29/09/2026: 3, 6, 3 e 3 pares de
+  // `registral_reconciliacao_documental` + `registral_linhagem_recalculada` no mesmo segundo, a cada
+  // 15 minutos). Cada certidão alterada publica UM evento `registral.reconciliar.processo` (a janela de
+  // idempotência do publicador é de 1 minuto), e o cron da fila só os drena de 15 em 15 minutos —
+  // então N eventos do MESMO processo chegavam juntos e o mesmo cálculo rodava N vezes, gravando N
+  // auditorias idênticas. A reconciliação lê o estado ATUAL do processo (não o payload do evento), então
+  // UMA execução depois de todos terem sido publicados cobre todos: os demais eventos do lote, do mesmo
+  // processo, são arquivados como cobertos. Só conta como coberto o que já tinha sido publicado antes
+  // desta execução começar (todo evento deste lote foi lido antes dela) e só depois de ela ter dado certo.
+  const reconciliadosNoLote = new Set<number>()
 
   for (const evt of pendentes) {
     // CLAIM ATÔMICO: reserva a linha antes de processar. Dois workers concorrentes → só um
@@ -248,7 +258,9 @@ export async function processarOutbox(opts?: {
         // reprocessar o mesmo evento não duplica proposta nem reabre necessidade
         // atendida. Uma falha transitória PROPAGA → o evento volta a PENDENTE.
         const p = (evt.payload ?? {}) as { processoId?: number; motivo?: string; usuarioId?: number | null }
-        if (p.processoId) {
+        if (p.processoId && reconciliadosNoLote.has(p.processoId)) {
+          // já reconciliado neste lote, DEPOIS deste evento ter sido publicado: nada a recalcular.
+        } else if (p.processoId) {
           const docs = await reconciliarDocumentalDoProcesso({
             processoId: p.processoId,
             usuarioId: p.usuarioId ?? null,
@@ -261,6 +273,7 @@ export async function processarOutbox(opts?: {
               `${linhagem.elegibilidade.resultado} · ${linhagem.inconsistencias.length} inconsistência(s) · ${docs.necessidadesAtendidas} necessidade(s) atendida(s) · motivo=${p.motivo ?? "-"}`,
             )
           }
+          reconciliadosNoLote.add(p.processoId)
         }
       } else if (evt.tipo === "step.concluido") {
         // EFEITO: projetar os custos documentais previstos do documento cujo

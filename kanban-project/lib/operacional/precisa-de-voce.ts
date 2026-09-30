@@ -30,6 +30,8 @@ import { FUSO_OPERACIONAL } from './tempo-operacional'
 import { conferirCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 import { ordensDeFase } from '@/src/services/documento-operacao'
 import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
+import { equipeExigida } from './elegibilidade'
+import { achadosVigentesDaParede } from '@/lib/saude/parede-a-frente'
 import { pessoasNoLimite } from './torre-equipe'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
@@ -105,6 +107,179 @@ export interface SugestaoDeResponsavel {
   usuarioId: number
   nome: string
   motivo: string
+  /**
+   * `true` = NINGUÉM tem aptidão cadastrada para esta tarefa (nem a unidade de trabalho, nem a equipe exigida
+   * definem quem é apto): o nome é só o de MENOR CARGA entre quem tem permissão de executar — nunca uma aptidão
+   * inventada. A tela diz isso com todas as letras.
+   */
+  fallback?: boolean
+  /** As ativas de quem foi sugerido (a carga que decidiu o fallback). */
+  ativas?: number
+}
+
+/** O que da TAREFA decide quem é apto: a unidade de trabalho e a equipe exigida (ambas do cadastro). */
+export interface AlvoDaSugestao {
+  unidadeOperacionalId: number | null
+  equipeExigida: string | null
+}
+
+/**
+ * Lê, em lote, o que decide a aptidão de cada tarefa: a unidade de trabalho (cadeia canônica) e a equipe
+ * exigida (da tarefa ou do passo publicado — a MESMA `equipeExigida` da recomendação).
+ */
+export async function alvosDeSugestao(tarefaIds: number[], db: Db = prisma): Promise<Map<number, AlvoDaSugestao>> {
+  const saida = new Map<number, AlvoDaSugestao>()
+  if (tarefaIds.length === 0) return saida
+  const [unidades, tarefas] = await Promise.all([
+    unidadesDasTarefas(tarefaIds),
+    db.tarefa.findMany({
+      where: { id: { in: tarefaIds } },
+      select: { id: true, equipeKey: true, workflowStepInstance: { select: { papel: true, equipe: true } } },
+    }),
+  ])
+  const porId = new Map(tarefas.map((t) => [t.id, t]))
+  for (const id of tarefaIds) {
+    const t = porId.get(id)
+    saida.set(id, {
+      unidadeOperacionalId: unidades.get(id) ?? null,
+      equipeExigida: t ? equipeExigida({ equipeKey: t.equipeKey, equipeDoPasso: t.workflowStepInstance?.equipe ?? null, papelDoPasso: t.workflowStepInstance?.papel ?? null }) : null,
+    })
+  }
+  return saida
+}
+
+/**
+ * O QUE A SUGESTÃO PRECISA SABER DO SISTEMA — lido UMA vez por requisição e reaproveitado por
+ * todos os itens (achado de desempenho, 30/09/2026: a lista chamava a sugestão item a item e cada
+ * chamada refazia ~9 leituras idênticas — usuários, organização, cargas, log de 30 dias, rótulos).
+ * A regra em si (`escolherResponsavel`) é pura sobre este contexto.
+ */
+export interface ContextoDeSugestao {
+  organizacao: Awaited<ReturnType<typeof lerOrganizacao>>
+  usuarios: Array<{ id: number; nome: string; tipo: string; permissoesCustom: unknown; perfil: { permissoes: unknown } | null }>
+  ativasPorUsuario: Map<number, number>
+  atribuicoes30dPorUsuario: Map<number, number>
+  unidadesComAptidao: Set<number>
+  rotulos: Awaited<ReturnType<typeof rotulosDasUnidades>>
+  /** Equipes ATIVAS do cadastro (código em minúsculas → membros): só elas restringem quem é apto. */
+  equipes: Map<string, Set<number>>
+}
+
+export async function carregarContextoDeSugestao(
+  agora = new Date(), db: Db = prisma, organizacaoJaLida?: ContextoDeSugestao['organizacao'],
+): Promise<ContextoDeSugestao> {
+  const trintaDiasAtras = new Date(agora.getTime() - 30 * 86_400_000)
+  const [organizacao, usuarios, ativas, atribuicoesRecentes, rotulos, grupos] = await Promise.all([
+    organizacaoJaLida ?? lerOrganizacao(agora),
+    db.usuario.findMany({
+      select: { id: true, nome: true, tipo: true, permissoesCustom: true, perfil: { select: { permissoes: true } } },
+    }),
+    db.tarefa.groupBy({
+      by: ['responsavelId'],
+      where: { responsavelId: { not: null }, statusTarefa: { in: ['NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE', 'BLOQUEADA'] } },
+      _count: { _all: true },
+    }),
+    db.logAuditoria.findMany({
+      where: { acao: { in: ['TAREFA_ATRIBUIDA', 'TAREFA_TRANSFERIDA'] }, criadoEm: { gte: trintaDiasAtras } },
+      select: { detalhes: true },
+    }),
+    rotulosDasUnidades(),
+    db.grupoUsuario.findMany({ where: { ativo: true }, select: { code: true, membros: { select: { usuarioId: true } } } }),
+  ])
+  const equipes = new Map<string, Set<number>>()
+  for (const g of grupos) if (g.code) equipes.set(g.code.trim().toLowerCase(), new Set(g.membros.map((m) => m.usuarioId)))
+  const ativasPorUsuario = new Map<number, number>()
+  for (const g of ativas) if (g.responsavelId != null) ativasPorUsuario.set(g.responsavelId, g._count._all)
+  const atribuicoes30dPorUsuario = new Map<number, number>()
+  for (const l of atribuicoesRecentes) {
+    const para = (l.detalhes as { para?: number } | null)?.para
+    if (para == null) continue
+    atribuicoes30dPorUsuario.set(para, (atribuicoes30dPorUsuario.get(para) ?? 0) + 1)
+  }
+  return {
+    organizacao, usuarios, ativasPorUsuario, atribuicoes30dPorUsuario, rotulos, equipes,
+    unidadesComAptidao: new Set([...organizacao.values()].flatMap((o) => o.aptidoes)),
+  }
+}
+
+/**
+ * A regra pura. QUEM PODE SER SUGERIDO é decidido em camadas — cada uma só TIRA gente, nenhuma inventa aptidão:
+ *   1. permissão de executar tarefa (`tarefas.iniciar_concluir`);
+ *   2. a EQUIPE exigida pela tarefa, quando ela existe como equipe ativa no cadastro (só membros);
+ *   3. a APTIDÃO da unidade de trabalho, quando alguém já foi declarado apto a ela (só os declarados).
+ * Se (2) ou (3) definiram quem é apto, o ranking é entre os aptos: menos ativas → empate 30 d → ausente vai
+ * para o sucessor sugerido (que também precisa ser apto e estar disponível).
+ *
+ * Se NENHUMA das duas definiu aptidão, ninguém tem aptidão cadastrada para esta tarefa: a sugestão é um
+ * FALLBACK explícito por menor carga, e nunca recai sobre administrador — ser administrador dá todas as
+ * permissões, não prova que a pessoa executa este trabalho (achado real, 30/09/2026: "Sugiro Marco Rovatti:
+ * 0 ativa(s)" só porque o gestor tinha carga zero). Sem ninguém que execute, não há sugestão (`null`).
+ */
+export function escolherResponsavel(
+  ctx: ContextoDeSugestao, alvo: AlvoDaSugestao | number | null, extraAtivas?: ReadonlyMap<number, number>,
+): SugestaoDeResponsavel | null {
+  const { unidadeOperacionalId, equipeExigida: exigida }: AlvoDaSugestao =
+    alvo != null && typeof alvo === 'object' ? alvo : { unidadeOperacionalId: alvo, equipeExigida: null }
+  const { organizacao } = ctx
+  const aptidaoEhRegra = unidadeOperacionalId != null && ctx.unidadesComAptidao.has(unidadeOperacionalId)
+  const membrosDaEquipe = exigida != null ? ctx.equipes.get(exigida) ?? null : null
+  const equipeEhRegra = membrosDaEquipe != null
+  // NOME DA UNIDADE — como no protótipo ("apta a Espanha"), nunca só "apto".
+  const nomeDaUnidade = aptidaoEhRegra ? ctx.rotulos.get(unidadeOperacionalId!)?.nome ?? null : null
+  const semAptidaoCadastrada = !aptidaoEhRegra && !equipeEhRegra
+
+  // DISPONIBILIDADE NÃO É PRÉ-FILTRO AQUI, DE PROPÓSITO: o mandato pede
+  // "apto → menos ativas → empate 30 d → AUSENTE vai para o sucessor
+  // sugerido" — ausente pode legitimamente vencer o ranking (0 ativas,
+  // porque não está recebendo trabalho novo) e só então é redirecionado
+  // para quem ele mesmo sugeriu como sucessor (Bloco E2).
+  const elegiveis = ctx.usuarios.filter((u) => {
+    const permissoes = calcularPermissoes(u.tipo, u.perfil?.permissoes as MapaPermissoes | null, u.permissoesCustom as MapaPermissoes | null)
+    if (!temPermissao(permissoes, 'tarefas.iniciar_concluir')) return false
+    if (equipeEhRegra && !membrosDaEquipe!.has(u.id)) return false
+    const org = organizacao.get(u.id)
+    if (aptidaoEhRegra && !(org?.aptidoes ?? []).includes(unidadeOperacionalId!)) return false
+    // Sem aptidão cadastrada, o administrador não é candidato: a permissão dele vem do tipo, não de executar este trabalho.
+    if (semAptidaoCadastrada && u.tipo === 'admin') return false
+    return true
+  })
+  if (elegiveis.length === 0) return null
+  const idsElegiveis = new Set(elegiveis.map((u) => u.id))
+
+  const ordenados = elegiveis
+    .map((u) => ({
+      id: u.id, nome: u.nome,
+      ativas: (ctx.ativasPorUsuario.get(u.id) ?? 0) + (extraAtivas?.get(u.id) ?? 0),
+      atribuicoes30d: ctx.atribuicoes30dPorUsuario.get(u.id) ?? 0,
+    }))
+    .sort((a, b) => (a.ativas - b.ativas) || (a.atribuicoes30d - b.atribuicoes30d) || (a.id - b.id))
+
+  // PERCORRE o ranking na ordem: se o candidato está disponível, é ele. Se
+  // está ausente, a sugestão vira o SUCESSOR SUGERIDO dele (Bloco E2,
+  // `Indisponibilidade.sucessorSugerido` — sem consulta extra) — desde que o
+  // sucessor também seja APTO e esteja disponível; ausente SEM sucessor válido
+  // não é uma sugestão, e o ranking segue para o próximo — nunca sugere
+  // alguém que não vai ver o trabalho nem alguém que não é apto.
+  for (const c of ordenados) {
+    const indisponivel = organizacao.get(c.id)?.indisponivelPor
+    if (!indisponivel) {
+      return {
+        usuarioId: c.id, nome: c.nome, ativas: c.ativas,
+        ...(semAptidaoCadastrada
+          ? { fallback: true, motivo: `ninguém com aptidão cadastrada para esta tarefa; menor carga (${c.ativas} ativa(s))` }
+          : { motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}${equipeEhRegra ? `, da equipe ${exigida}` : ''}` }),
+      }
+    }
+    const sucessor = indisponivel.sucessorSugerido
+    if (sucessor && idsElegiveis.has(sucessor.usuarioId) && !organizacao.get(sucessor.usuarioId)?.indisponivelPor) {
+      return {
+        usuarioId: sucessor.usuarioId, nome: sucessor.nome,
+        motivo: `${c.nome} está ausente — sucessor sugerido para a carteira.`,
+        ...(semAptidaoCadastrada ? { fallback: true } : {}),
+      }
+    }
+  }
+  return null
 }
 
 /**
@@ -122,84 +297,8 @@ export async function sugerirResponsavelPrecisaDeVoce(
    */
   extraAtivas?: ReadonlyMap<number, number>,
 ): Promise<SugestaoDeResponsavel | null> {
-  const unidades = await unidadesDasTarefas([tarefaId])
-  const unidadeOperacionalId = unidades.get(tarefaId) ?? null
-
-  const organizacao = await lerOrganizacao(agora)
-
-  const usuarios = await db.usuario.findMany({
-    select: { id: true, nome: true, tipo: true, permissoesCustom: true, perfil: { select: { permissoes: true } } },
-  })
-  const unidadesComAptidao = new Set([...organizacao.values()].flatMap((o) => o.aptidoes))
-  const aptidaoEhRegra = unidadeOperacionalId != null && unidadesComAptidao.has(unidadeOperacionalId)
-  // NOME DA UNIDADE — como no protótipo ("apta a Espanha"), nunca só "apto".
-  const nomeDaUnidade = aptidaoEhRegra ? (await rotulosDasUnidades()).get(unidadeOperacionalId!)?.nome ?? null : null
-
-  // DISPONIBILIDADE NÃO É PRÉ-FILTRO AQUI, DE PROPÓSITO: o mandato pede
-  // "apto → menos ativas → empate 30 d → AUSENTE vai para o sucessor
-  // sugerido" — ausente pode legitimamente vencer o ranking (0 ativas,
-  // porque não está recebendo trabalho novo) e só então é redirecionado
-  // para quem ele mesmo sugeriu como sucessor (Bloco E2).
-  const elegiveis = usuarios.filter((u) => {
-    const permissoes = calcularPermissoes(u.tipo, u.perfil?.permissoes as MapaPermissoes | null, u.permissoesCustom as MapaPermissoes | null)
-    if (!temPermissao(permissoes, 'tarefas.iniciar_concluir')) return false
-    const org = organizacao.get(u.id)
-    if (aptidaoEhRegra && !(org?.aptidoes ?? []).includes(unidadeOperacionalId!)) return false
-    return true
-  })
-  if (elegiveis.length === 0) return null
-
-  const ids = elegiveis.map((u) => u.id)
-  const trintaDiasAtras = new Date(agora.getTime() - 30 * 86_400_000)
-  const [ativas, atribuicoesRecentes] = await Promise.all([
-    db.tarefa.findMany({
-      where: { responsavelId: { in: ids }, statusTarefa: { in: ['NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE', 'BLOQUEADA'] } },
-      select: { responsavelId: true },
-    }),
-    db.logAuditoria.findMany({
-      where: { acao: { in: ['TAREFA_ATRIBUIDA', 'TAREFA_TRANSFERIDA'] }, criadoEm: { gte: trintaDiasAtras } },
-      select: { detalhes: true },
-    }),
-  ])
-  const ativasPorUsuario = new Map<number, number>()
-  for (const t of ativas) {
-    if (t.responsavelId == null) continue
-    ativasPorUsuario.set(t.responsavelId, (ativasPorUsuario.get(t.responsavelId) ?? 0) + 1)
-  }
-  const atribuicoes30dPorUsuario = new Map<number, number>()
-  for (const l of atribuicoesRecentes) {
-    const para = (l.detalhes as { para?: number } | null)?.para
-    if (para == null) continue
-    atribuicoes30dPorUsuario.set(para, (atribuicoes30dPorUsuario.get(para) ?? 0) + 1)
-  }
-
-  const ordenados = elegiveis
-    .map((u) => ({
-      id: u.id, nome: u.nome,
-      ativas: (ativasPorUsuario.get(u.id) ?? 0) + (extraAtivas?.get(u.id) ?? 0),
-      atribuicoes30d: atribuicoes30dPorUsuario.get(u.id) ?? 0,
-    }))
-    .sort((a, b) => (a.ativas - b.ativas) || (a.atribuicoes30d - b.atribuicoes30d) || (a.id - b.id))
-
-  // PERCORRE o ranking na ordem: se o candidato está disponível, é ele. Se
-  // está ausente, a sugestão vira o SUCESSOR SUGERIDO dele (Bloco E2,
-  // `Indisponibilidade.sucessorSugerido` — sem consulta extra); ausente SEM
-  // sucessor sugerido não é uma sugestão válida, e o ranking segue para o
-  // próximo — nunca sugere alguém que não vai ver o trabalho.
-  for (const c of ordenados) {
-    const indisponivel = organizacao.get(c.id)?.indisponivelPor
-    if (!indisponivel) {
-      return { usuarioId: c.id, nome: c.nome, motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}` }
-    }
-    const sucessor = indisponivel.sucessorSugerido
-    if (sucessor) {
-      return {
-        usuarioId: sucessor.usuarioId, nome: sucessor.nome,
-        motivo: `${c.nome} está ausente — sucessor sugerido para a carteira.`,
-      }
-    }
-  }
-  return null
+  const [alvos, ctx] = await Promise.all([alvosDeSugestao([tarefaId], db), carregarContextoDeSugestao(agora, db)])
+  return escolherResponsavel(ctx, alvos.get(tarefaId) ?? null, extraAtivas)
 }
 
 // ─── OS 7 TIPOS ──────────────────────────────────────────────────────────────
@@ -237,7 +336,7 @@ const rotuloDaFamilia = (l: LinhaGerencial) => l.familiaNome ?? l.processoNome ?
  * relógio real.
  */
 export async function itensPrecisaDeVoce(
-  opts: { agora?: Date; linhas?: LinhaGerencial[]; db?: Db } = {},
+  opts: { agora?: Date; linhas?: LinhaGerencial[]; db?: Db; organizacao?: ContextoDeSugestao['organizacao']; adiantadas?: LeiturasAdiantadas } = {},
 ): Promise<ItemPrecisaDeVoceTorre[]> {
   const agora = opts.agora ?? new Date()
   const db = opts.db ?? prisma
@@ -266,9 +365,10 @@ export async function itensPrecisaDeVoce(
     for (const p of processos) { tipoPorProcesso.set(p.id, p.tipoProcessoMotorId); faseAtualPorProcesso.set(p.id, p.faseAtualKey) }
   }
   const ordensPorTipo = new Map<number, Map<string, number>>()
-  for (const tipoId of new Set([...tipoPorProcesso.values()].filter((t): t is number => t != null))) {
-    ordensPorTipo.set(tipoId, await ordensDeFase(tipoId))
-  }
+  const tiposDistintos = [...new Set([...tipoPorProcesso.values()].filter((t): t is number => t != null))]
+  // Um tipo não depende do outro: as leituras de ordem correm juntas (achado de desempenho, 30/09/2026).
+  const ordens = await Promise.all(tiposDistintos.map((tipoId) => ordensDeFase(tipoId)))
+  tiposDistintos.forEach((tipoId, i) => ordensPorTipo.set(tipoId, ordens[i]))
   const ehFaseFutura = (l: LinhaGerencial): boolean => {
     if (l.processoId == null || l.faseMacroKey == null) return false
     const tipoId = tipoPorProcesso.get(l.processoId)
@@ -282,16 +382,24 @@ export async function itensPrecisaDeVoce(
   }
   const linhas = brutas.filter((l) => STATUS_ATIVOS.includes(l.statusTarefa) && !ehFaseFutura(l))
 
-  const fasesEspeciais = await fasesApostilamentoOuRetificacao(db)
-
+  // As leituras abaixo são independentes entre si: correm juntas, uma ida ao banco de espera só.
   // DIVERGÊNCIA — mesmo comparador que trava a transação de projeção
   // (`paresCoerentes`), em lote, contra os passos das tarefas ativas.
-  const tarefasComStep = await db.tarefa.findMany({
-    where: { id: { in: linhas.map((l) => l.taskId) }, workflowStepInstanceId: { not: null } },
-    select: { workflowStepInstanceId: true },
-  })
-  const stepInstanceIds = [...new Set(tarefasComStep.map((t) => t.workflowStepInstanceId as number))]
-  const divergencias = await conferirCoerenciaPassoTarefa(db as Prisma.TransactionClient, stepInstanceIds)
+  const lerDivergencias = async () => {
+    const tarefasComStep = await db.tarefa.findMany({
+      where: { id: { in: linhas.map((l) => l.taskId) }, workflowStepInstanceId: { not: null } },
+      select: { workflowStepInstanceId: true },
+    })
+    const stepInstanceIds = [...new Set(tarefasComStep.map((t) => t.workflowStepInstanceId as number))]
+    return conferirCoerenciaPassoTarefa(db as Prisma.TransactionClient, stepInstanceIds)
+  }
+  const adiantadas = opts.adiantadas ?? iniciarLeiturasIndependentes(agora, db, opts.organizacao)
+  const [fasesEspeciais, divergencias, noLimite, achados] = await Promise.all([
+    adiantadas.fasesEspeciais,
+    lerDivergencias(),
+    adiantadas.noLimite,
+    adiantadas.achadosDaParede,
+  ])
   const tarefasDivergentes = new Set(divergencias.map((d) => d.tarefaId))
 
   const itens: ItemPrecisaDeVoceTorre[] = []
@@ -376,8 +484,13 @@ export async function itensPrecisaDeVoce(
   // CARGA — pessoa no limite (executáveis ≥ limite do cadastro). A MESMA conta da aba Equipe e da
   // regra r3 (`pessoasNoLimite`, sobre as linhas da Operação) — nunca uma segunda contagem sobre
   // `Tarefa` cru, que divergia da Operação nas certidões (status/prazo são projeção).
-  for (const u of (await pessoasNoLimite(agora)).values()) {
-    const capacidadeMedida = (await capacidadeMedidaPorUsuario([u.usuarioId], new Map([[u.usuarioId, u.executaveis]]), agora)).get(u.usuarioId)
+  const pessoasCarga = [...noLimite.values()]
+  // Uma leitura só para todas as pessoas no limite (a função já é em lote; antes era uma ida por pessoa).
+  const capacidades = await capacidadeMedidaPorUsuario(
+    pessoasCarga.map((u) => u.usuarioId), new Map(pessoasCarga.map((u) => [u.usuarioId, u.executaveis])), agora,
+  )
+  for (const u of pessoasCarga) {
+    const capacidadeMedida = capacidades.get(u.usuarioId)
     const score = 3 // ATENÇÃO — carga é achado estrutural, não soma de fatores por tarefa.
     itens.push({
       tipo: 'CARGA', score, faixa: faixaDoScore(score), tarefaId: null, processoId: null, familiaNome: u.nome,
@@ -390,16 +503,7 @@ export async function itensPrecisaDeVoce(
     })
   }
 
-  // PAREDE À FRENTE — achados CAD-012/WF-004, abertos e não ignorados agora.
-  const achados = await db.saudeAchado.findMany({
-    where: {
-      codigo: { in: ['CAD-012', 'WF-004'] },
-      status: { notIn: ['RESOLVIDO'] },
-      OR: [{ status: { not: 'IGNORADO' } }, { ignoradoAte: { lt: agora } }],
-    },
-    orderBy: { ultimaDeteccao: 'desc' },
-    take: 20,
-  })
+  // PAREDE À FRENTE — achados CAD-012/WF-004, abertos e não ignorados agora (lidos acima, junto das demais leituras).
   for (const a of achados) {
     const score = 3 // ATENÇÃO — achado preventivo do painel de Saúde, ainda não bloqueou ninguém.
     itens.push({
@@ -418,27 +522,79 @@ export async function itensPrecisaDeVoce(
   return itens
 }
 
+/** O texto que a tela mostra: com aptidão, "Sugiro X: motivo"; sem aptidão cadastrada, o FALLBACK dito com todas as letras. */
+export function textoDaSugestao(s: SugestaoDeResponsavel | null): string {
+  if (!s) return 'Nenhum candidato apto e disponível encontrado.'
+  if (s.fallback) return `Ninguém com aptidão cadastrada para esta tarefa; sugiro ${s.nome} por menor carga${s.ativas != null ? ` (${s.ativas} ativa(s))` : ''}.`
+  return `Sugiro ${s.nome}: ${s.motivo}`
+}
+
+/**
+ * As leituras que NÃO dependem das linhas da Operação. Quem monta a resposta as dispara ANTES de esperar as
+ * linhas (a leitura mais lenta) e passa aqui: correm durante essa espera em vez de depois dela. O resultado
+ * é o mesmo — só muda quando a leitura começa.
+ */
+export interface LeiturasAdiantadas {
+  fasesEspeciais: Promise<Set<string>>
+  noLimite: ReturnType<typeof pessoasNoLimite>
+  achadosDaParede: ReturnType<typeof lerAchadosDaParede>
+}
+
+export function iniciarLeiturasIndependentes(agora: Date, db: Db, organizacao?: ContextoDeSugestao['organizacao'] | Promise<ContextoDeSugestao['organizacao']>): LeiturasAdiantadas {
+  const l: LeiturasAdiantadas = {
+    fasesEspeciais: fasesApostilamentoOuRetificacao(db),
+    noLimite: Promise.resolve(organizacao).then((org) => pessoasNoLimite(agora, undefined, org)),
+    achadosDaParede: lerAchadosDaParede(db, agora),
+  }
+  // Se quem chamou falhar antes de esperar por elas, a rejeição não vira "não tratada" — quem as espera continua vendo o erro.
+  for (const p of Object.values(l)) p.catch(() => undefined)
+  return l
+}
+
+/** Achados CAD-012/WF-004 abertos e não ignorados agora — a matéria-prima da "Parede à frente". */
+async function lerAchadosDaParede(db: Db, agora: Date) {
+  // Só o que a verificação de HOJE ainda acusa (ver `lib/saude/parede-a-frente.ts`): o achado antigo de uma
+  // verificação já corrigida continua aberto no banco até a Saúde rodar de novo, mas não é decisão do gestor.
+  return achadosVigentesDaParede(db, agora)
+}
+
 /**
  * PREENCHE `sugestao` dos itens FASE_DEIXADA/SEM_DONO — feito depois da lista
  * pronta porque a sugestão é uma leitura assíncrona por item (não vale a pena
  * pagar o custo pra quem só quer o número, ex. o KPI de "sem dono").
  */
-export async function comSugestoes(itens: ItemPrecisaDeVoceTorre[], agora = new Date(), db: Db = prisma): Promise<ItemPrecisaDeVoceTorre[]> {
-  const saida: ItemPrecisaDeVoceTorre[] = []
-  for (const it of itens) {
+export async function comSugestoes(
+  itens: ItemPrecisaDeVoceTorre[], agora = new Date(), db: Db = prisma,
+  opts: { organizacao?: ContextoDeSugestao['organizacao'] } = {},
+): Promise<ItemPrecisaDeVoceTorre[]> {
+  const precisam = itens.filter((it) => (it.tipo === 'FASE_DEIXADA' || it.tipo === 'SEM_DONO') && it.tarefaId != null)
+  // UMA leitura do sistema e UMA das unidades para a lista toda; a sugestão só depende da unidade,
+  // então cada unidade distinta é decidida uma vez e reaproveitada pelos itens dela.
+  const [ctx, alvos] = precisam.length
+    ? await Promise.all([
+        carregarContextoDeSugestao(agora, db, opts.organizacao),
+        alvosDeSugestao(precisam.map((it) => it.tarefaId as number), db),
+      ])
+    : [null, null]
+  const porAlvo = new Map<string, SugestaoDeResponsavel | null>()
+  const sugestaoDe = (tarefaId: number): SugestaoDeResponsavel | null => {
+    const alvo = alvos!.get(tarefaId) ?? { unidadeOperacionalId: null, equipeExigida: null }
+    const chave = `${alvo.unidadeOperacionalId ?? '-'}|${alvo.equipeExigida ?? '-'}`
+    if (!porAlvo.has(chave)) porAlvo.set(chave, escolherResponsavel(ctx!, alvo))
+    return porAlvo.get(chave) ?? null
+  }
+  return itens.map((it) => {
     if ((it.tipo === 'FASE_DEIXADA' || it.tipo === 'SEM_DONO') && it.tarefaId != null) {
-      const s = await sugerirResponsavelPrecisaDeVoce(it.tarefaId, agora, db)
-      saida.push({
+      const s = sugestaoDe(it.tarefaId)
+      return {
         ...it,
-        sugestao: s ? `Sugiro ${s.nome}: ${s.motivo}` : 'Nenhum candidato apto e disponível encontrado.',
+        sugestao: textoDaSugestao(s),
         acao1: { ...it.acao1, rotulo: s ? `Atribuir a ${s.nome}` : it.acao1.rotulo },
         contexto: { ...it.contexto, sugeridoId: s?.usuarioId ?? null, sugeridoNome: s?.nome ?? null },
-      })
-    } else {
-      saida.push(it)
+      }
     }
-  }
-  return saida
+    return it
+  })
 }
 
 // ─── BRIEFING DO DIA ────────────────────────────────────────────────────────
@@ -480,4 +636,36 @@ export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date(
 
   return `${cumprimento}. Hoje, ${dataFmt}: ${resumoFaixas} precisam de você` +
     (detalhes.length ? ` (${detalhes.join(' · ')}).` : '.')
+}
+
+// ─── A RESPOSTA DO ENDPOINT, MONTADA EM UM LUGAR ────────────────────────────
+
+export interface RespostaPrecisaDeVoce {
+  itens: ItemPrecisaDeVoceTorre[]
+  briefing: string
+  resumo: { total: number; criticos: number; atencao: number }
+}
+
+/**
+ * O que `GET /api/torre/precisa-de-voce` devolve. As leituras que a lista e as sugestões
+ * compartilham (linhas da Operação, organização) são feitas UMA vez aqui e passadas adiante —
+ * o resultado é o mesmo de encadear `itensPrecisaDeVoce` + `comSugestoes` + `briefingDoDia`.
+ */
+export async function montarPrecisaDeVoce(agora = new Date(), db: Db = prisma): Promise<RespostaPrecisaDeVoce> {
+  const organizacaoP = lerOrganizacao(agora)
+  organizacaoP.catch(() => undefined)
+  // As leituras que não dependem das linhas começam já, enquanto a mais lenta (as linhas) é esperada.
+  const adiantadas = iniciarLeiturasIndependentes(agora, db, organizacaoP)
+  const [organizacao, linhas] = await Promise.all([organizacaoP, lerLinhasOperacionais(agora, db)])
+  const brutos = await itensPrecisaDeVoce({ agora, db, linhas, organizacao, adiantadas })
+  const itens = await comSugestoes(brutos, agora, db, { organizacao })
+  return {
+    itens,
+    briefing: briefingDoDia(itens, agora),
+    resumo: {
+      total: itens.length,
+      criticos: itens.filter((i) => i.faixa === 'CRITICO').length,
+      atencao: itens.filter((i) => i.faixa === 'ATENCAO').length,
+    },
+  }
 }

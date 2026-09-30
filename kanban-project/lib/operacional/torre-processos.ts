@@ -10,6 +10,7 @@
 //   • "sem passos": fase futura com achado aberto CAD-012/WF-004 do Saúde (a "parede à frente").
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { achadosVigentesDaParede } from '@/lib/saude/parede-a-frente'
 import { labelDaFasePorPhaseKey } from '@/src/lib/process-stage/fases-catalog'
 import { ordensDeFase } from '@/src/services/documento-operacao'
 import { listarTarefasDaTorre, type LinhaDaTorre } from '@/src/services/torre-tarefas'
@@ -69,10 +70,8 @@ export async function fasesDoRadar(): Promise<ColunaDoRadar[]> {
 }
 
 async function fasesSemPassos(agora: Date): Promise<Set<string>> {
-  const achados = await prisma.saudeAchado.findMany({
-    where: { codigo: { in: ['CAD-012', 'WF-004'] }, status: { not: 'RESOLVIDO' }, OR: [{ status: { not: 'IGNORADO' } }, { ignoradoAte: { lt: agora } }] },
-    select: { evidencia: true },
-  })
+  // A MESMA leitura do "Precisa de você": só o achado que a verificação de hoje ainda acusa (limite alto: aqui é um conjunto de fases, não uma lista de decisões).
+  const achados = await achadosVigentesDaParede(prisma, agora, { limite: 500 })
   const fases = new Set<string>()
   for (const a of achados) {
     const e = (a.evidencia ?? {}) as { fase?: string; phaseKey?: string }

@@ -701,7 +701,14 @@ export function DistribuicaoTarefas() {
   }
 
   const devolverAFila = async (tarefaId: number) => {
-    await fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify({ acao: "devolver_a_fila" }) })
+    const enviar = (corpo: Record<string, unknown>) =>
+      fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
+    let r = await enviar({ acao: "devolver_a_fila" })
+    // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
+    if (r.status === 428) {
+      const d = await r.json().catch(() => ({}))
+      if (d?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(d.error)) r = await enviar({ acao: "devolver_a_fila", confirmarTarefaEmAndamento: true })
+    }
     setRecarga((n) => n + 1)
   }
 

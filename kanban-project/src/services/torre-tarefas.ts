@@ -11,6 +11,7 @@
 import { prisma } from '@/lib/prisma'
 import { visaoGerencial, ordenarFila, type LinhaGerencial, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
+import { semFaseFutura } from '@/lib/operacional/fase-futura'
 import { motivoDeNaoPoderIniciar } from '@/src/services/iniciar-envio'
 
 export interface LinhaDaTorre extends LinhaGerencial {
@@ -33,7 +34,9 @@ export async function listarTarefasDaTorre(
     if (pagina * 500 >= total || linhas.length === 0) break
   }
   // O mesmo recorte de `minhaFila`: encerradas não são fila.
-  const abertas = ordenarFila(todas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
+  // E tarefa de FASE FUTURA também não é fila (regra única do Bloco F — `fase-futura.ts`): lista, KPIs,
+  // Radar, Processos, Foco e Equipe leem daqui, então a exclusão vale para todos de uma vez.
+  const abertas = ordenarFila(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA'))) as LinhaGerencial[]
 
   const tarefaIds = abertas.map((l) => l.taskId)
   const processoIds = [...new Set(abertas.map((l) => l.processoId).filter((id): id is number => id != null))]

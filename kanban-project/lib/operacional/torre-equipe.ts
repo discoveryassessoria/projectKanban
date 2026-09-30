@@ -49,9 +49,25 @@ export interface LinhaDaEquipe {
   fila: { semanas: number | null; faixa: FaixaDaFila }
 }
 
+export interface LinhaDaPrevisao {
+  usuarioId: number | null
+  nome: string
+  porSemana: Array<{ n: number; nivel: 0 | 1 | 2 | 3 }>
+  /**
+   * O QUE FICA FORA DAS 4 SEMANAS — e por isso precisa estar na tela para a soma FECHAR (achado real, 30/09/2026:
+   * a previsão somava 19 contra 31 abertas porque as tarefas sem prazo, as já vencidas e as de depois da 4ª semana
+   * ficavam de fora sem aviso). `total` = as abertas da pessoa (a mesma conta de `ativas`):
+   * soma das 4 semanas + vencidas + depois + sem prazo = total.
+   */
+  vencidas: number
+  depois: number
+  semPrazo: number
+  total: number
+}
+
 export interface PrevisaoDeCarga {
   semanas: Array<{ inicio: string; fim: string }>
-  linhas: Array<{ usuarioId: number | null; nome: string; porSemana: Array<{ n: number; nivel: 0 | 1 | 2 | 3 }> }>
+  linhas: LinhaDaPrevisao[]
 }
 
 const ROTULO_AUSENCIA: Record<string, string> = { FERIAS: 'férias', AFASTAMENTO: 'afastamento', AUSENCIA: 'ausência', BLOQUEIO_OPERACIONAL: 'bloqueio operacional' }
@@ -65,6 +81,31 @@ export function semanasDaPrevisao(agora: Date, quantas = 4): Array<{ inicio: Dat
     inicio: new Date(hoje.getTime() + i * 7 * DIA_MS),
     fim: new Date(hoje.getTime() + (i * 7 + 7) * DIA_MS - 1),
   }))
+}
+
+/**
+ * Onde cada tarefa ABERTA de um responsável cai: numa das semanas, antes de hoje (vencida), depois da última
+ * semana, ou sem prazo. Cada tarefa cai em EXATAMENTE um balde — a soma dos baldes é o total de abertas.
+ */
+export function distribuirNaPrevisao(
+  linhas: ReadonlyArray<Pick<LinhaDaTorre, 'responsavelId' | 'dataPrazo' | 'estadoOperacao'>>,
+  responsavelId: number | null,
+  semanas: ReadonlyArray<{ inicio: Date; fim: Date }>,
+): { porSemana: number[]; vencidas: number; depois: number; semPrazo: number; total: number } {
+  const porSemana = semanas.map(() => 0)
+  let vencidas = 0, depois = 0, semPrazo = 0, total = 0
+  const inicioDaJanela = semanas[0].inicio.getTime()
+  const fimDaJanela = semanas[semanas.length - 1].fim.getTime()
+  for (const l of linhas) {
+    if (l.responsavelId !== responsavelId || l.estadoOperacao === 'CONCLUIDA') continue
+    total++
+    const prazo = l.dataPrazo != null ? Date.parse(l.dataPrazo) : NaN
+    if (Number.isNaN(prazo)) { semPrazo++; continue }
+    if (prazo < inicioDaJanela) { vencidas++; continue }
+    if (prazo > fimDaJanela) { depois++; continue }
+    porSemana[semanas.findIndex((s) => prazo >= s.inicio.getTime() && prazo <= s.fim.getTime())]++
+  }
+  return { porSemana, vencidas, depois, semPrazo, total }
 }
 
 export async function quadroDaEquipe(
@@ -108,15 +149,20 @@ export async function quadroDaEquipe(
 
   // ── H2: PREVISÃO DE 4 SEMANAS — vencimentos (prazo da linha) por pessoa por semana ──
   const semanas = semanasDaPrevisao(agora)
-  const conta = (responsavelId: number | null) => semanas.map((s) =>
-    linhas.filter((l) => l.responsavelId === responsavelId && l.dataPrazo != null && l.estadoOperacao !== 'CONCLUIDA'
-      && Date.parse(l.dataPrazo) >= s.inicio.getTime() && Date.parse(l.dataPrazo) <= s.fim.getTime()).length)
+  const linhaDaPrevisao = (usuarioId: number | null, nome: string): LinhaDaPrevisao => {
+    const d = distribuirNaPrevisao(linhas, usuarioId, semanas)
+    return {
+      usuarioId, nome,
+      porSemana: d.porSemana.map((n) => ({ n, nivel: nivelDaPrevisao(n) })),
+      vencidas: d.vencidas, depois: d.depois, semPrazo: d.semPrazo, total: d.total,
+    }
+  }
   const previsao: PrevisaoDeCarga = {
     semanas: semanas.map((s) => ({ inicio: s.inicio.toISOString(), fim: s.fim.toISOString() })),
     linhas: [
-      ...pessoas.map((p) => ({ usuarioId: p.usuarioId as number | null, nome: p.nome, porSemana: conta(p.usuarioId).map((n) => ({ n, nivel: nivelDaPrevisao(n) })) })),
+      ...pessoas.map((p) => linhaDaPrevisao(p.usuarioId, p.nome)),
       // O que vence sem dono também é carga que vem — sem esta linha a soma da tela não fecha com a Operação.
-      { usuarioId: null, nome: 'Sem responsável', porSemana: conta(null).map((n) => ({ n, nivel: nivelDaPrevisao(n) })) },
+      linhaDaPrevisao(null, 'Sem responsável'),
     ],
   }
   return { pessoas, previsao }
@@ -133,8 +179,10 @@ export interface PessoaNoLimite { usuarioId: number; nome: string; executaveis: 
  * Equipe (`cargaPorPessoa`, sobre as linhas da Operação) — r3 e a tela nunca
  * discordam sobre "quem está no limite".
  */
-export async function cargasComLimite(agora = new Date(), linhas?: LinhaDaTorre[]): Promise<Map<number, PessoaNoLimite>> {
-  const organizacao = await lerOrganizacao(agora)
+export async function cargasComLimite(
+  agora = new Date(), linhas?: LinhaDaTorre[], organizacaoJaLida?: Awaited<ReturnType<typeof lerOrganizacao>>,
+): Promise<Map<number, PessoaNoLimite>> {
+  const organizacao = organizacaoJaLida ?? await lerOrganizacao(agora)
   const comLimite = [...organizacao.values()].filter((o) => o.limiteExecutaveis != null)
   const saida = new Map<number, PessoaNoLimite>()
   if (comLimite.length === 0) return saida
@@ -146,8 +194,10 @@ export async function cargasComLimite(agora = new Date(), linhas?: LinhaDaTorre[
 }
 
 /** Quem JÁ atingiu o limite do cadastro (executáveis ≥ limite). */
-export async function pessoasNoLimite(agora = new Date(), linhas?: LinhaDaTorre[]): Promise<Map<number, PessoaNoLimite>> {
-  const todas = await cargasComLimite(agora, linhas)
+export async function pessoasNoLimite(
+  agora = new Date(), linhas?: LinhaDaTorre[], organizacaoJaLida?: Awaited<ReturnType<typeof lerOrganizacao>>,
+): Promise<Map<number, PessoaNoLimite>> {
+  const todas = await cargasComLimite(agora, linhas, organizacaoJaLida)
   return new Map([...todas].filter(([, p]) => p.executaveis >= p.limite))
 }
 

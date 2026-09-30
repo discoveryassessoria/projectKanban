@@ -120,7 +120,13 @@ export async function reancorarTarefaNaUnidade(
   // PARA SEMPRE com `statusTarefa: SUPERSEDIDA` — "0/4, Disponível, Iniciar" ao
   // lado de "STATUS: SUPERSEDIDA", uma contradição visível na Central
   // Operacional.
-  const atual = await tx.tarefa.findUniqueOrThrow({ where: { id: args.tarefaId }, select: { statusTarefa: true } })
+  const atual = await tx.tarefa.findUniqueOrThrow({
+    where: { id: args.tarefaId },
+    select: {
+      statusTarefa: true, workflowInstanceId: true, workflowStepInstanceId: true, faseMacroKey: true,
+      chaveIdempotencia: true, necessidadeId: true, documentoId: true, pessoaId: true,
+    },
+  })
   // SUPERSEDIDA NUNCA é um status operacional legítimo para quem está sendo
   // reancorada — ela está, por definição, seguindo o trabalho para o roteiro
   // que agora vale. Restaura como NAO_INICIADA: o MESMO estado que uma tarefa
@@ -134,6 +140,25 @@ export async function reancorarTarefaNaUnidade(
   // republicado, por exemplo) não pode apagar trabalho em andamento — só o
   // status impossível-de-legitimar (SUPERSEDIDA) é corrigido aqui.
   const restaurarStatus = atual.statusTarefa === 'SUPERSEDIDA'
+
+  // IDEMPOTÊNCIA — reancorar o que JÁ está ancorado ali não é um acontecimento.
+  // Achado real (processo 676, 29/09/2026): 93 `TAREFA_REANCORADA` em 12 minutos, com
+  // `deInstancia == paraInstancia` e `chaveAnterior == chaveAtual` — cada chamada
+  // reescrevia a mesma âncora, subia o `lockVersion` (derrubando quem editava a tarefa
+  // ao mesmo tempo) e gravava uma linha de auditoria contando uma "mudança" que não houve.
+  // Sem nada a mudar (mesma instância, mesmo passo, mesma fase, mesma chave, nenhum vínculo a
+  // completar, nenhum status a restaurar) devolve a tarefa como está: sem UPDATE, sem log.
+  const mesmaAncora =
+    atual.workflowInstanceId === args.workflowInstanceId &&
+    atual.workflowStepInstanceId === args.workflowStepInstanceId &&
+    (atual.faseMacroKey ?? null) === (args.faseMacroKey ?? null) &&
+    atual.chaveIdempotencia === args.chaveIdempotencia &&
+    (args.necessidadeId == null || atual.necessidadeId === args.necessidadeId) &&
+    (args.documentoId == null || atual.documentoId === args.documentoId) &&
+    (args.pessoaId == null || atual.pessoaId === args.pessoaId)
+  if (mesmaAncora && !restaurarStatus) {
+    return tx.tarefa.findUniqueOrThrow({ where: { id: args.tarefaId } })
+  }
 
   const tarefa = await tx.tarefa.update({
     where: { id: args.tarefaId },

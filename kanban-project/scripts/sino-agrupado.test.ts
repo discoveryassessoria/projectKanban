@@ -188,7 +188,7 @@ async function main() {
   ok("caso 1 (removida): sai do CHEGOU_TRABALHO na hora (5)", chC?.contagem === 5 && !chC.tarefaIds.includes(c[0]), chC?.titulo)
   ok("caso 1 (removida): sai do PRECISA_AGIR na hora (5 vencidas)", agC?.titulo === `${MARCA} FamC — 5 vencidas` && !agC.tarefaIds.includes(c[0]), agC?.titulo)
   let mudou = (await avisos(daniela.id, { tipo: "MUDOU_DE_MAO", processoId: famC }))[0]
-  ok("caso 1: nasce MUDOU_DE_MAO '1 tarefa saiu da sua fila'", mudou?.titulo === `${MARCA} FamC — 1 tarefa saiu da sua fila`, mudou?.titulo)
+  ok("caso 1: nasce MUDOU_DE_MAO '1 tarefa saiu do seu A fazer'", mudou?.titulo === `${MARCA} FamC — 1 tarefa saiu do seu A fazer`, mudou?.titulo)
   ok("MUDOU_DE_MAO → /operacao?processo=<id> (sem aba)", mudou?.link === `/operacao?processo=${famC}`, mudou?.link ?? "")
 
   // caso 2: REATRIBUÍDA a outra pessoa
@@ -198,7 +198,7 @@ async function main() {
   agC = (await avisos(daniela.id, { tipo: "PRECISA_AGIR", processoId: famC, lidaEm: null }))[0]
   ok("caso 2 (reatribuída): some do aviso da anterior (4)", chC?.contagem === 4 && agC?.titulo === `${MARCA} FamC — 4 vencidas`, `${chC?.titulo} | ${agC?.titulo}`)
   mudou = (await avisos(daniela.id, { tipo: "MUDOU_DE_MAO", processoId: famC }))[0]
-  ok("caso 2: o MUDOU_DE_MAO soma: '2 tarefas saíram da sua fila'", mudou?.titulo === `${MARCA} FamC — 2 tarefas saíram da sua fila`, mudou?.titulo)
+  ok("caso 2: o MUDOU_DE_MAO soma: '2 tarefas saíram do seu A fazer'", mudou?.titulo === `${MARCA} FamC — 2 tarefas saíram do seu A fazer`, mudou?.titulo)
   const chJoao = (await avisos(joao.id, { tipo: "CHEGOU_TRABALHO", processoId: famC, lidaEm: null }))[0]
   ok("caso 2: quem recebeu ganha o CHEGOU_TRABALHO", chJoao?.contagem === 1 && chJoao.tarefaIds.includes(c[1]))
 
@@ -340,8 +340,8 @@ async function main() {
   const red2 = await redistribuirTarefas({ tarefaIds: lote.slice(0, 4), novoResponsavelId: daniela.id, autorId: marco.id })
   ok("passar 4 adiante", red2.sucesso === 4)
   const chI2 = (await avisos(joao.id, { tipo: "CHEGOU_TRABALHO", processoId: famI, lidaEm: null }))[0]
-  ok("da anterior saem 4 (8) e nasce o MUDOU_DE_MAO '4 tarefas saíram da sua fila'",
-    chI2?.contagem === 8 && (await avisos(joao.id, { tipo: "MUDOU_DE_MAO", processoId: famI }))[0]?.titulo === `${MARCA} FamI — 4 tarefas saíram da sua fila`)
+  ok("da anterior saem 4 (8) e nasce o MUDOU_DE_MAO '4 tarefas saíram do seu A fazer'",
+    chI2?.contagem === 8 && (await avisos(joao.id, { tipo: "MUDOU_DE_MAO", processoId: famI }))[0]?.titulo === `${MARCA} FamI — 4 tarefas saíram do seu A fazer`)
 
   await limpar()
   console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)

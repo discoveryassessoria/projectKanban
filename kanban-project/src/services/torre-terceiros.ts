@@ -16,6 +16,7 @@ import { prisma } from '@/lib/prisma'
 import { visaoGerencial, ordenarFila, type LinhaGerencial } from '@/lib/operacional/tarefa-projecoes'
 import { lerReguaDeCobranca, reguaResumida, type LinhaDaRegua } from '@/lib/operacional/regras-torre'
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
+import { semFaseFutura } from '@/lib/operacional/fase-futura'
 import { cobrarTarefas, canaisCadastrados, CANAIS_VALIDOS, RESULTADOS_VALIDOS } from '@/src/services/cobranca-terceiros'
 
 export interface OrgaoTerceiro {
@@ -40,7 +41,7 @@ async function tarefasAbertasDoOrgao(orgaoId: number, agora: Date): Promise<Linh
     todas.push(...linhas)
     if (pagina * 500 >= total || linhas.length === 0) break
   }
-  return ordenarFila(todas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
+  return ordenarFila(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA'))) as LinhaGerencial[]
 }
 
 /** A régua que o CADASTRO define para cada órgão: a regra temporal DELE, senão a dos passos. */

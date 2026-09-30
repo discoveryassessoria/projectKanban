@@ -12,6 +12,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { rotuloStatusTarefa, rotuloMotivoPendencia } from "@/src/lib/home/rotulo-status-tarefa"
 import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
 import { estadoTemporal, estadoTemporalSubtarefa } from "@/lib/operacional/tempo-operacional"
 import {
@@ -720,7 +721,7 @@ export async function listarFila(
       return {
         id: `tarefa-${t.id}`,
         titulo: t.titulo,
-        subtitulo: [responsavel ?? "Sem responsável", t.statusTarefa?.replace(/_/g, " ").toLowerCase()]
+        subtitulo: [responsavel ?? "Sem responsável", rotuloStatusTarefa(t.statusTarefa)]
           .filter(Boolean)
           .join(" · "),
         processoId: t.processoId,
@@ -778,7 +779,7 @@ export async function listarFila(
     return {
       id: `pendencia-${pe.id}`,
       titulo: pe.detalhe,
-      subtitulo: `${pe.motivo.replace(/_/g, " ").toLowerCase()} · ${rotuloFase(pe.phaseKey) ?? pe.phaseKey}`,
+      subtitulo: `${rotuloMotivoPendencia(pe.motivo)} · ${rotuloFase(pe.phaseKey) ?? pe.phaseKey}`,
       processoId: pe.processoId,
       processoCodigo: pr?.codigo ?? null,
       processoNome: pr?.nome ?? null,

@@ -60,7 +60,7 @@ export function textoDoAviso(
     case 'CHEGOU_TRABALHO':
       return `${f} — ${q(n, 'tarefa atribuída', 'tarefas atribuídas')} a você`
     case 'MUDOU_DE_MAO':
-      return `${f} — ${n === 1 ? '1 tarefa saiu' : `${n} tarefas saíram`} da sua fila`
+      return `${f} — ${n === 1 ? '1 tarefa saiu' : `${n} tarefas saíram`} do seu A fazer`
     case 'PRECISA_AGIR': {
       const r = d.resumo ?? {}
       const partes: string[] = []

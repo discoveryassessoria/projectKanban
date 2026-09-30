@@ -8,7 +8,7 @@
 // ============================================================================
 import { useEffect, useState } from "react"
 import { RepactuarPrazoModal } from "@/src/components/operacao/RepactuarPrazoModal"
-import { acompTxtCompleto } from "@/src/components/operacao/operacao-v3-derivacoes"
+import { acompTxtCompleto, statusTarefaTxt, statusTarefaCls } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, Modal, ModalTexto, Campo, useTorre } from "./torre-base"
 import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
 import { bolaDe, temAcompanhamento } from "./tipos"
@@ -58,6 +58,7 @@ export function PainelTorreTarefa({ linha }: { linha: LinhaOperacaoV3 }) {
     <div className="tor tor-painel" data-testid="painel-torre">
       <div className="tor-kv">
         <div><b>Bola com</b><span className={`tor-p ${bola.cls}`}>{bola.txt}</span></div>
+        <div><b>Status</b><span className={`tor-p ${statusTarefaCls(linha).replace("opv3-p-", "")}`}>{statusTarefaTxt(linha)}</span></div>
         <div><b>Prazo da tarefa</b>{linha.rotuloDoPrazo || "—"}</div>
         <div><b>Próximo acompanhamento</b>{acompTxtCompleto(linha.acompanhamentoPasso)}</div>
         <div><b>Responsável</b>{linha.responsavelNome ?? "sem responsável"}</div>

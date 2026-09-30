@@ -19,7 +19,7 @@ export interface ResumoPersistencia {
 }
 
 /** Identidade estável do problema entre execuções. */
-const chaveGlobal = (codigo: string, chaveLocal: string) => `${codigo}::${chaveLocal}`.slice(0, 300)
+export const chaveGlobal = (codigo: string, chaveLocal: string) => `${codigo}::${chaveLocal}`.slice(0, 300)
 
 export async function persistirDiagnostico(
   r: ResultadoDiagnostico,

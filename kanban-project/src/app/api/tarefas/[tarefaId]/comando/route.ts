@@ -32,7 +32,7 @@ const HTTP: Record<string, number> = {
   TERMINAL: 409, NAO_TERMINAL: 409, CONFLITO: 409,
   TAREFA_TERMINAL: 409, TAREFA_BLOQUEADA: 409, TAREFA_AGUARDANDO: 409, ETAPA_NAO_EXECUTAVEL: 409,
   SEM_MOTIVO: 422, INVALIDO: 422, SEM_RESPONSAVEL: 422, MESMO_RESPONSAVEL: 422, RESPONSAVEL_INDISPONIVEL: 422,
-  SEM_PENDENCIA: 409, JA_DECIDIDA: 409,
+  SEM_PENDENCIA: 409, JA_DECIDIDA: 409, CONFIRMACAO_NECESSARIA: 428,
   DEPENDENCIA_PENDENTE: 422, EVIDENCIA_FALTANDO: 422, ETAPA_DE_OUTRA_TAREFA: 422,
 }
 
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
         return atribuirTarefa({ tarefaId, responsavelId, autorId, motivo: motivo || null, lockVersion })
       }
       case 'devolver_a_fila':
-        return devolverAFila({ tarefaId, autorId, motivo: motivo || null })
+        return devolverAFila({ tarefaId, autorId, motivo: motivo || null, confirmarTarefaEmAndamento: body?.confirmarTarefaEmAndamento === true })
       case 'iniciar':
         // Gestor pode destravar a fila iniciando por outro; o executor, só a sua.
         return iniciarTarefa({ tarefaId, autorId, permiteDeTerceiro: usuario.tipo === 'admin' })

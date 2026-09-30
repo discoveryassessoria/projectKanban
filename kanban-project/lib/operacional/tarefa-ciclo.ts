@@ -31,7 +31,7 @@ export { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 
 export type Falha =
   | 'NAO_ENCONTRADA' | 'TERMINAL' | 'NAO_TERMINAL' | 'CONFLITO' | 'SEM_MOTIVO' | 'INVALIDO'
-  | 'SEM_PENDENCIA' | 'JA_DECIDIDA'
+  | 'SEM_PENDENCIA' | 'JA_DECIDIDA' | 'CONFIRMACAO_NECESSARIA'
 
 export type Resultado<T = { tarefaId: number }> =
   | ({ ok: true } & T)
@@ -456,7 +456,16 @@ async function desbloquearTarefaNucleo(args: { tarefaId: number; autorId: number
  * Férias, afastamento, redistribuição. A tarefa continua a mesma, no mesmo
  * ponto do workflow, com o mesmo prazo; só volta a esperar distribuição.
  */
-export async function devolverAFila(args: { tarefaId: number; autorId: number; motivo?: string | null }): Promise<Resultado> {
+export async function devolverAFila(args: {
+  tarefaId: number; autorId: number; motivo?: string | null
+  /**
+   * TIRAR O DONO DE UMA TAREFA EM ANDAMENTO EXIGE CONFIRMAÇÃO EXPLÍCITA (achado 30/09/2026, processo 651:
+   * #3834/#3845/#3850 ficaram EM_ANDAMENTO sem responsável depois de um "devolver à fila" em lote, e a tela
+   * as mostrava como "A iniciar"). O status NÃO muda ao devolver — quem já começou não "des-começa" — então
+   * o que sobra é trabalho em curso sem dono; por isso o pedido sem esta flag é recusado com código próprio.
+   */
+  confirmarTarefaEmAndamento?: boolean
+}): Promise<Resultado> {
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
@@ -469,6 +478,12 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
     if (t.responsavelId == null) {
       return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'A tarefa já está na fila.' }
     }
+    if (t.statusTarefa === 'EM_ANDAMENTO' && args.confirmarTarefaEmAndamento !== true) {
+      return {
+        ok: false as const, codigo: 'CONFIRMACAO_NECESSARIA' as const,
+        mensagem: 'Esta tarefa está EM ANDAMENTO. Tirar o responsável a deixa em andamento e sem dono. Confirme para devolvê-la à fila.',
+      }
+    }
     await tx.tarefa.update({
       where: { id: t.id },
       data: { responsavelId: null, dataAtribuicao: null, atribuidoPorId: null, lockVersion: { increment: 1 } },
@@ -476,7 +491,8 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
     await auditar(tx, 'TAREFA_DEVOLVIDA_A_FILA', t.id, args.autorId,
       `Tarefa "${t.titulo}" devolvida à fila${t.equipeKey ? ` da ${t.equipeKey}` : ''} (era do usuário ${t.responsavelId}).` +
       (args.motivo ? ` Motivo: ${args.motivo}` : ''),
-      { tarefaId: t.id, de: t.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null })
+      { tarefaId: t.id, de: t.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null,
+        statusTarefa: t.statusTarefa, confirmouTarefaEmAndamento: t.statusTarefa === 'EM_ANDAMENTO' })
     // O SINO (redesenho 29/09/2026) — os avisos de quem tinha a tarefa somem na hora e
     // nasce o MUDOU_DE_MAO ("N tarefas saíram da sua fila").
     await aoMudarDeDono(tx, { tarefas: [{ id: t.id, processoId: t.processoId }], de: t.responsavelId, para: null, autorId: args.autorId })
@@ -520,6 +536,8 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
  */
 export async function alterarPrazo(args: {
   tarefaId: number; autorId: number; novoPrazo: Date | null; motivo: string
+  /** DESFAZER: grava UMA linha (esta), no lugar de `TAREFA_PRAZO_ALTERADO` — o desfazer não é uma segunda repactuação. */
+  desfazer?: AuditoriaDeDesfazer
 }): Promise<Resultado> {
   if (!args.motivo?.trim()) return { ok: false, codigo: 'SEM_MOTIVO', mensagem: 'Informe o motivo da mudança de prazo.' }
   return prisma.$transaction(async (tx) => {
@@ -559,23 +577,40 @@ export async function alterarPrazo(args: {
     }
     await tx.tarefa.update({ where: { id: t.id }, data: { dataPrazo: args.novoPrazo, lockVersion: { increment: 1 } } })
 
-    await auditar(tx, 'TAREFA_PRAZO_ALTERADO', t.id, args.autorId,
-      `Prazo de "${t.titulo}" alterado de ${deEfetivo?.toISOString().slice(0, 10) ?? 'sem prazo'} para ${args.novoPrazo?.toISOString().slice(0, 10) ?? 'sem prazo'}. Motivo: ${args.motivo}`,
-      { tarefaId: t.id, de: deEfetivo?.toISOString() ?? null, para: args.novoPrazo?.toISOString() ?? null, motivo: args.motivo, fonte })
+    const detalhesDoPrazo = { tarefaId: t.id, de: deEfetivo?.toISOString() ?? null, para: args.novoPrazo?.toISOString() ?? null, motivo: args.motivo, fonte }
+    if (args.desfazer) {
+      await auditar(tx, args.desfazer.acao, t.id, args.autorId, args.desfazer.descricao({ titulo: t.titulo, de: detalhesDoPrazo.de, para: detalhesDoPrazo.para }),
+        { ...detalhesDoPrazo, revertidoDe: detalhesDoPrazo.de, revertidoPara: detalhesDoPrazo.para })
+    } else {
+      await auditar(tx, 'TAREFA_PRAZO_ALTERADO', t.id, args.autorId,
+        `Prazo de "${t.titulo}" alterado de ${deEfetivo?.toISOString().slice(0, 10) ?? 'sem prazo'} para ${args.novoPrazo?.toISOString().slice(0, 10) ?? 'sem prazo'}. Motivo: ${args.motivo}`,
+        detalhesDoPrazo)
+    }
     return { ok: true as const, tarefaId: t.id }
   })
 }
 
+/** A linha ÚNICA que o Desfazer grava (acao própria + texto), no lugar da linha `..._ALTERADO` de uma mudança comum. */
+export interface AuditoriaDeDesfazer { acao: string; descricao: (i: { titulo: string; de: string | null; para: string | null }) => string }
+
 export async function alterarPrioridade(args: {
   tarefaId: number; autorId: number; prioridade: 'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE'; motivo?: string | null
+  /** DESFAZER: grava UMA linha (esta), no lugar de `TAREFA_PRIORIDADE_ALTERADA`. */
+  desfazer?: AuditoriaDeDesfazer
 }): Promise<Resultado> {
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({ where: { id: args.tarefaId }, select: { id: true, titulo: true, prioridade: true } })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     await tx.tarefa.update({ where: { id: t.id }, data: { prioridade: args.prioridade, lockVersion: { increment: 1 } } })
-    await auditar(tx, 'TAREFA_PRIORIDADE_ALTERADA', t.id, args.autorId,
-      `Prioridade de "${t.titulo}" alterada de ${t.prioridade} para ${args.prioridade}.` + (args.motivo ? ` Motivo: ${args.motivo}` : ''),
-      { tarefaId: t.id, de: t.prioridade, para: args.prioridade, motivo: args.motivo ?? null })
+    const detalhes = { tarefaId: t.id, de: t.prioridade, para: args.prioridade, motivo: args.motivo ?? null }
+    if (args.desfazer) {
+      await auditar(tx, args.desfazer.acao, t.id, args.autorId, args.desfazer.descricao({ titulo: t.titulo, de: t.prioridade, para: args.prioridade }),
+        { ...detalhes, revertidoDe: t.prioridade, revertidoPara: args.prioridade })
+    } else {
+      await auditar(tx, 'TAREFA_PRIORIDADE_ALTERADA', t.id, args.autorId,
+        `Prioridade de "${t.titulo}" alterada de ${t.prioridade} para ${args.prioridade}.` + (args.motivo ? ` Motivo: ${args.motivo}` : ''),
+        detalhes)
+    }
     return { ok: true as const, tarefaId: t.id }
   })
 }

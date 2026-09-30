@@ -399,7 +399,7 @@ const SELECT_SIMULACAO = {
  * Vem da tarefa (`equipeKey`) ou do passo publicado (`equipe`/`papel`) — nessa
  * ordem, porque a tarefa é a unidade de trabalho e o passo é o detalhe dela.
  */
-function equipeExigida(t: TarefaParaSimular): string | null {
+export function equipeExigida(t: Pick<TarefaParaSimular, 'equipeKey' | 'equipeDoPasso' | 'papelDoPasso'>): string | null {
   const bruta = t.equipeKey ?? t.equipeDoPasso ?? t.papelDoPasso
   return bruta ? bruta.trim().toLowerCase() : null
 }

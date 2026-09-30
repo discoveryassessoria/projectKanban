@@ -109,17 +109,7 @@ function dataCurta(iso: string | null): string {
  * que espera por ele. "Não iniciada" descreve o passado da tarefa, não o que
  * ela pede.
  */
-export const ROTULO_STATUS: Record<string, string> = {
-  NAO_INICIADA: "A fazer",
-  EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
-  AGUARDANDO_CLIENTE: "Aguardando cliente",
-  BLOQUEADA: "Bloqueada",
-  CONCLUIDO_RECEBIDO: "Concluída",
-  CONCLUIDO_NAO_POSSUI: "Concluída",
-  CANCELADA: "Cancelada",
-  SUPERSEDIDA: "Substituída",
-}
+export { ROTULO_STATUS } from "@/src/lib/home/rotulo-status-tarefa"
 export const ROTULO_PRIORIDADE: Record<string, string> = { URGENTE: "Urgente", ALTA: "Alta", MEDIA: "Média", BAIXA: "Baixa" }
 
 /**

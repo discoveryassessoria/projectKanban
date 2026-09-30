@@ -47,6 +47,7 @@
 
 import type { Prisma, PrismaClient } from "@prisma/client"
 import { estadoTemporal, diasEntreDiasOperacionais, diaOperacional } from "./tempo-operacional"
+import { escolherSubtarefaCorrente, definicoesDasSubtarefas, acompanhamentoVenceuNoDia } from "./subtarefa-corrente"
 import { lerAndamento, previsaoEfetiva, type AndamentoEtapa } from "@/src/lib/process-stage/andamento-etapa"
 
 type Leitor = PrismaClient | Prisma.TransactionClient
@@ -161,8 +162,9 @@ export interface EntradaOperacao {
   agora: Date
   /**
    * DIMENSÃO D, fonte canônica (ajuste pós-Bloco-B, 29/09/2026):
-   * `SubtaskExecution.proximoAcompanhamentoEm` da subtarefa CORRENTE em
-   * `AGUARDANDO_EXTERNO`, quando o passo usa o motor de subtarefas
+   * `SubtaskExecution.proximoAcompanhamentoEm` da subtarefa CORRENTE (a de
+   * `escolherSubtarefaCorrente`, em qualquer status não encerrado — inclusive
+   * "a iniciar"), quando o passo usa o motor de subtarefas
    * (`subtarefas-da-etapa.ts`/`registrarCobranca`/`adiarAcompanhamento` —
    * quem de fato grava esta data hoje). `null` = passo sem subtarefas
    * (motor mais antigo) ou nenhuma subtarefa em espera agora — cai no
@@ -325,8 +327,7 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
   // "acompanhamento atrasado" separada de "acompanhar hoje" em Minha
   // Operação). O horário em si continua preservado em `proximoAcompanhamentoData`
   // pra quem ordena/exibe — só a CLASSIFICAÇÃO passou a ser por dia.
-  const acompanhamentoVencido = !encerrada && !!proximoAcompanhamentoData
-    && diasEntreDiasOperacionais(proximoAcompanhamentoData, e.agora) <= 0
+  const acompanhamentoVencido = !encerrada && acompanhamentoVenceuNoDia(proximoAcompanhamentoData, e.agora)
 
   // ── DETERMINAÇÃO DO PRÓXIMO ACONTECIMENTO ────────────────────────────────
   let proximoAcontecimento: ProximoAcontecimento
@@ -469,7 +470,7 @@ export function computarProximoAcontecimento(e: EntradaOperacao): EstadoTemporal
 const SELECT_TAREFA_TEMPORAL = {
   id: true, statusTarefa: true, motivoCodigo: true, dataPrazo: true, dataConclusao: true, dataInicio: true,
   slaPausadoEm: true, slaPausaAcumuladaMin: true, responsavelId: true, createdAt: true,
-  workflowStepInstanceId: true,
+  workflowStepInstanceId: true, workflowInstanceId: true,
 } satisfies Prisma.TarefaSelect
 
 /**
@@ -512,20 +513,34 @@ export async function estadosTemporaisDasOperacoes(
     : []
   const stepPorId = new Map(steps.map((s) => [s.id, s]))
 
-  // DIMENSÃO D, fonte canônica — a subtarefa vigente (não substituída) em
-  // `AGUARDANDO_EXTERNO` de cada passo, quando o passo usa o motor de
-  // subtarefas. No máximo uma por `stepInstanceId` (só a corrente espera por
-  // vez) — sem `progressoPorSubtarefa` (tarefa-projecoes.ts) de propósito:
-  // aquele módulo IMPORTA este arquivo, importar de volta criaria ciclo.
-  const subtarefasEmEspera = stepIds.length
+  // DIMENSÃO D, fonte canônica — a subtarefa CORRENTE de cada passo (a MESMA
+  // escolha de `progressoPorSubtarefa`/`acompanhamentoPasso.rotulo`, via
+  // `escolherSubtarefaCorrente`), em QUALQUER status não encerrado. Achado
+  // real (30/09/2026, processo 651): antes só lia `AGUARDANDO_EXTERNO`, e uma
+  // subtarefa "a iniciar" (DISPONIVEL) com acompanhamento no passado mostrava
+  // "Atrasada há N dias" sem entrar em "Acompanhamentos vencidos". Sem
+  // `progressoPorSubtarefa` de propósito (aquele módulo IMPORTA este — ciclo).
+  const execucoesVigentes = stepIds.length
     ? await db.subtaskExecution.findMany({
-        where: { stepInstanceId: { in: stepIds }, supersededAt: null, status: "AGUARDANDO_EXTERNO" },
-        select: { stepInstanceId: true, proximoAcompanhamentoEm: true },
+        where: { stepInstanceId: { in: stepIds }, supersededAt: null },
+        select: { stepInstanceId: true, subtaskKey: true, status: true, proximoAcompanhamentoEm: true },
       })
     : []
-  const proximoAcompanhamentoPorStepInstance = new Map(
-    subtarefasEmEspera.map((s) => [s.stepInstanceId, s.proximoAcompanhamentoEm]),
+  const definicoesDoPasso = await definicoesDasSubtarefas(
+    db,
+    tarefas.flatMap((t) => {
+      const st = t.workflowStepInstanceId != null ? stepPorId.get(t.workflowStepInstanceId) : null
+      return st ? [{ stepInstanceId: st.id, stepKey: st.stepKey, workflowInstanceId: t.workflowInstanceId }] : []
+    }),
   )
+  const execucoesPorStep = new Map<number, typeof execucoesVigentes>()
+  for (const x of execucoesVigentes) execucoesPorStep.set(x.stepInstanceId, [...(execucoesPorStep.get(x.stepInstanceId) ?? []), x])
+  const proximoAcompanhamentoPorStepInstance = new Map<number, Date | null>()
+  for (const [stepInstanceId, execs] of execucoesPorStep) {
+    const def = definicoesDoPasso.get(stepInstanceId)
+    const corrente = escolherSubtarefaCorrente(execs, def?.defs, def?.ordens)
+    if (corrente) proximoAcompanhamentoPorStepInstance.set(stepInstanceId, corrente.proximoAcompanhamentoEm)
+  }
 
   // O RÓTULO PUBLICADO DO PASSO — batched pelo `stepDefinitionId` (mesmo
   // padrão de `rotulosDosPassos` em `tarefa-projecoes.ts`; não importado

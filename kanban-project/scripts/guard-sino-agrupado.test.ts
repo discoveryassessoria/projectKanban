@@ -100,8 +100,8 @@ check("o horário está documentado na rota do resumo diário", /07:00/.test(ler
 console.log("6. texto do aviso")
 check("1 tarefa atribuída", textoDoAviso("CHEGOU_TRABALHO", "Cibils", { contagem: 1 }) === "Cibils — 1 tarefa atribuída a você")
 check("3 tarefas atribuídas", textoDoAviso("CHEGOU_TRABALHO", "Cibils", { contagem: 3 }) === "Cibils — 3 tarefas atribuídas a você")
-check("1 tarefa saiu da fila", textoDoAviso("MUDOU_DE_MAO", "Cibils", { contagem: 1 }) === "Cibils — 1 tarefa saiu da sua fila")
-check("N tarefas saíram da fila", textoDoAviso("MUDOU_DE_MAO", "Cibils", { contagem: 4 }) === "Cibils — 4 tarefas saíram da sua fila")
+check("1 tarefa saiu da fila", textoDoAviso("MUDOU_DE_MAO", "Cibils", { contagem: 1 }) === "Cibils — 1 tarefa saiu do seu A fazer")
+check("N tarefas saíram da fila", textoDoAviso("MUDOU_DE_MAO", "Cibils", { contagem: 4 }) === "Cibils — 4 tarefas saíram do seu A fazer")
 check("PRECISA_AGIR completo, partes zeradas omitidas",
   textoDoAviso("PRECISA_AGIR", "Antão", { contagem: 6, resumo: { vencidas: [1, 2], hoje: [3], amanha: [4], cobrancas: [5, 6], modo: "FOTO" } })
     === "Antão — 2 vencidas · 1 vence hoje · 1 vence amanhã · 2 cobranças a fazer")

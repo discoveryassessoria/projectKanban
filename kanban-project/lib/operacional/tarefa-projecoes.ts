@@ -24,6 +24,8 @@ import {
 } from '@/lib/operacional/tempo-operacional'
 import { estadosTemporaisDasOperacoes, ehEsperaExterna, type EstadoTemporalDaOperacao } from '@/lib/operacional/proximo-acontecimento'
 import { lerVersaoPublicada } from '@/src/services/versao-publicada'
+import { escolherSubtarefaCorrente } from './subtarefa-corrente'
+import { ehFaseFutura, semFaseFutura } from './fase-futura'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoDocumento, TipoTarefa } from '@prisma/client'
 
 /**
@@ -241,6 +243,14 @@ export interface LinhaDeFila {
    * que está EM Genealogia via o próprio selo errado nas próprias tarefas.
    */
   faseAnteriorAFaseAtual: boolean
+  /**
+   * A tarefa é de uma fase FUTURA (ordem MAIOR que a da fase atual do
+   * processo, pelo cadastro do tipo — `fase-futura.ts`). Nasce `false` em
+   * `projetar` e é resolvida em `enriquecerLinhas` (precisa do cadastro em
+   * lote). As filas (`minhaFila`, `semResponsavel`, `filaDaEquipe`), a lista
+   * e os KPIs da Torre e os avisos removem estas linhas por `semFaseFutura`.
+   */
+  faseFutura: boolean
   /** Rótulo canônico da fase ATUAL do processo (`labelDaFasePorPhaseKey`) — nunca a phaseKey crua ("Fase atual: Genealogia", não "Fase atual: genealogia"). `null` sem fase ou fase fora do catálogo. */
   faseAtualDoProcessoLabel: string | null
   /**
@@ -393,7 +403,7 @@ const SELECT = {
   // O ESTADO TEMPORAL precisa destes: conclusão congela o atraso, e a pausa de
   // SLA é o que separa "parado esperando o cartório" de "parado devendo".
   dataConclusao: true, slaPausadoEm: true, slaPausaAcumuladaMin: true,
-  processo: { select: { nome: true, faseAtualKey: true, familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } } } },
+  processo: { select: { nome: true, faseAtualKey: true, tipoProcessoMotorId: true, familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } } } },
   responsavel: { select: { nome: true } },
   // Discrimina a NATUREZA da tarefa ADMINISTRATIVA (ex.: "obrigacao-atribuicao")
   // — quem projeta essa tarefa genericamente (Tarefas Administrativas) precisa
@@ -527,6 +537,7 @@ function projetar(
     casalNomes: uniao ? `${nomeCompleto(uniao.pessoa1)} e ${nomeCompleto(uniao.pessoa2)}` : null,
     conjugeNome: outroConjuge ? nomeCompleto(outroConjuge) : null,
     faseAnteriorAFaseAtual: faseEhAnteriorA(t.faseMacroKey, t.processo?.faseAtualKey),
+    faseFutura: false,
     faseAtualDoProcessoLabel: labelDaFasePorPhaseKey(t.processo?.faseAtualKey),
     categoriaDoc: categoriaDocumento(t.documento?.tipo) ?? categoriaDocumentoDoTitulo(t.titulo),
     faseMacroKey: t.faseMacroKey,
@@ -652,6 +663,9 @@ function projetar(
         return t.statusTarefa === 'NAO_INICIADA'
       }
       if (atual.status === 'AGUARDANDO_EXTERNO') return false
+      // EM_ANDAMENTO sem responsável (devolvida à fila depois de iniciada) NÃO é "a iniciar": a tela dizia
+      // "A iniciar (enviar ao cartório)" sobre uma tarefa que já foi iniciada (auditoria 30/09/2026).
+      if (t.statusTarefa === 'EM_ANDAMENTO' && t.responsavelId == null) return false
       const pontoDeEntrada = atual.dependeDe.length === 0
       const aindaNaoTocada = atual.startedAt == null
       return pontoDeEntrada && aindaNaoTocada
@@ -869,7 +883,6 @@ async function progressoPorSubtarefa(
   // TODAS as execuções vigentes (não substituídas) — uma consulta, nunca uma
   // por linha. Dá o "X/Y" (CONCLUIDO) e a subtarefa CORRENTE (a primeira não
   // encerrada, pela ordem da definição — não pela ordem de criação da linha).
-  const ENCERRADOS = new Set(['CONCLUIDO', 'CANCELADO', 'INVALIDADO', 'FALHOU'])
   const execucoes = await db.subtaskExecution.findMany({
     where: { stepInstanceId: { in: stepInstanceIds }, supersededAt: null },
     select: {
@@ -929,11 +942,9 @@ async function progressoPorSubtarefa(
     // nunca a `ordem`, que é só display); uma subtarefa cuja dependência
     // ainda não concluiu NUNCA pode ser "atual", não importa o que `ordem`
     // diga.
-    const concluidasKeys = new Set(execs.filter((e) => e.status === 'CONCLUIDO').map((e) => e.subtaskKey))
-    const atual = execs
-      .filter((e) => !ENCERRADOS.has(e.status))
-      .filter((e) => (defs?.get(e.subtaskKey)?.dependeDe ?? []).every((dep) => concluidasKeys.has(dep)))
-      .sort((a, b) => (ordens?.get(a.subtaskKey) ?? 0) - (ordens?.get(b.subtaskKey) ?? 0))[0] ?? null
+    // REGRA ÚNICA (`subtarefa-corrente.ts`): a MESMA escolha que
+    // `estadosTemporaisDasOperacoes` usa para `acompanhamentoVencido`.
+    const atual = escolherSubtarefaCorrente(execs, defs, ordens)
     const defAtual = atual ? defs?.get(atual.subtaskKey) : null
     resultado.set(stepInstanceId, {
       concluidas, total,
@@ -1060,7 +1071,8 @@ export async function minhaFila(
   const responsavelId = usuarioId !== null ? usuarioId : filtrosExtra.responsavelId
   const { linhas } = await visaoGerencial({ ...filtrosParaWhere, responsavelId, porPagina: 500 }, agora, db)
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
-  const semConcluidas = linhas.filter((l) => l.coluna !== 'CONCLUIDA') as LinhaGerencial[]
+  // E tarefa de FASE FUTURA não é fila (regra única — `fase-futura.ts`).
+  const semConcluidas = semFaseFutura(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
   return ordenarFila(filtrarPorEstadoOperacao(semConcluidas, estadoOperacao)) as LinhaGerencial[]
 }
 
@@ -1138,7 +1150,7 @@ export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promi
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
   const enriquecidas = await enriquecerLinhas(linhas, agora)
-  return ordenarFila(enriquecidas) as LinhaGerencial[]
+  return ordenarFila(semFaseFutura(enriquecidas)) as LinhaGerencial[]
 }
 
 /**
@@ -1208,7 +1220,7 @@ export async function semResponsavel(
   if (filtro.equipeKey) where.equipeKey = filtro.equipeKey
   const linhas = await prisma.tarefa.findMany({ where, select: SELECT_GERENCIAL })
   const enriquecidas = await enriquecerLinhas(linhas, agora)
-  return filtrarPorEstadoOperacao(ordenarFila(enriquecidas) as LinhaGerencial[], filtro.estadoOperacao)
+  return filtrarPorEstadoOperacao(ordenarFila(semFaseFutura(enriquecidas)) as LinhaGerencial[], filtro.estadoOperacao)
 }
 
 /**
@@ -2152,19 +2164,32 @@ async function repactuacoesDePrazo(
   const mapa = new Map<number, { total: number; ultima: { de: string | null; para: string | null; quando: string; quem: string | null } }>()
   if (ids.length === 0) return mapa
   const logs = await db.logAuditoria.findMany({
-    where: { entidade: { in: ['Tarefa', 'TAREFA'] }, entidadeId: { in: ids }, acao: 'TAREFA_PRAZO_ALTERADO' },
+    where: { entidade: { in: ['Tarefa', 'TAREFA'] }, entidadeId: { in: ids }, acao: { in: ['TAREFA_PRAZO_ALTERADO', 'TAREFA_PRAZO_REPACTUACAO_DESFEITA'] } },
     orderBy: { criadoEm: 'asc' },
-    select: { entidadeId: true, criadoEm: true, usuarioId: true, detalhes: true },
+    select: { entidadeId: true, acao: true, criadoEm: true, usuarioId: true, detalhes: true },
   })
   const idsUsuario = [...new Set(logs.map((l) => l.usuarioId).filter((id): id is number => id != null))]
   const usuarios = idsUsuario.length
     ? await db.usuario.findMany({ where: { id: { in: idsUsuario } }, select: { id: true, nome: true } })
     : []
   const nomePorUsuarioId = new Map(usuarios.map((u) => [u.id, u.nome]))
+  const pilhas = new Map<number, Array<{ de: string | null; para: string | null; quando: string; quem: string | null }>>()
   for (const l of logs) {
     if (l.entidadeId == null) continue
     const det = (l.detalhes ?? {}) as { de?: string | null; para?: string | null }
     const atual = mapa.get(l.entidadeId) ?? { total: 0, ultima: { de: null, para: null, quando: l.criadoEm.toISOString(), quem: null } }
+    if (l.acao === 'TAREFA_PRAZO_REPACTUACAO_DESFEITA') {
+      // Um Desfazer grava UMA linha (a DESFEITA): tira uma repactuação da conta; o "última" volta a ser a anterior.
+      const pilha = pilhas.get(l.entidadeId) ?? []
+      pilha.pop()
+      pilhas.set(l.entidadeId, pilha)
+      atual.total = Math.max(0, atual.total - 1)
+      const anterior = pilha[pilha.length - 1]
+      if (anterior) atual.ultima = anterior
+      if (atual.total === 0 && !anterior) { mapa.delete(l.entidadeId); continue }
+      mapa.set(l.entidadeId, atual)
+      continue
+    }
     atual.total += 1
     atual.ultima = {
       de: typeof det.de === 'string' ? det.de : null,
@@ -2172,6 +2197,9 @@ async function repactuacoesDePrazo(
       quando: l.criadoEm.toISOString(),
       quem: l.usuarioId != null ? (nomePorUsuarioId.get(l.usuarioId) ?? `Usuário #${l.usuarioId}`) : null,
     }
+    const pilha = pilhas.get(l.entidadeId) ?? []
+    pilha.push(atual.ultima)
+    pilhas.set(l.entidadeId, pilha)
     mapa.set(l.entidadeId, atual)
   }
   return mapa
@@ -2326,6 +2354,29 @@ const SELECT_GERENCIAL = {
 type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL }>
 
 /**
+ * `phaseKey → ordem` do macrofluxo de cada tipo de processo das linhas — UMA
+ * consulta (mesma fonte de `ordensDeFase`: `FaseMacro` do `MacroWorkflow` do
+ * tipo), com o leitor recebido (transação inclusive).
+ */
+async function ordensDeFasePorTipo(
+  brutas: Array<{ processo: { tipoProcessoMotorId: number | null } | null }>, db: Leitor,
+): Promise<Map<number, Map<string, number>>> {
+  const tipos = [...new Set(brutas.map((t) => t.processo?.tipoProcessoMotorId).filter((x): x is number => x != null))]
+  const mapa = new Map<number, Map<string, number>>()
+  if (tipos.length === 0) return mapa
+  const fases = await db.faseMacro.findMany({
+    where: { macroWorkflow: { tipoProcessoId: { in: tipos } } },
+    select: { phaseKey: true, ordem: true, macroWorkflow: { select: { tipoProcessoId: true } } },
+  })
+  for (const f of fases) {
+    const m = mapa.get(f.macroWorkflow.tipoProcessoId) ?? new Map<string, number>()
+    m.set(f.phaseKey, f.ordem)
+    mapa.set(f.macroWorkflow.tipoProcessoId, m)
+  }
+  return mapa
+}
+
+/**
  * A MESMA ENRIQUECEDORA PARA TODA FILA GERENCIAL — `coluna`/`esperandoDe`/
  * `esperandoDesde`/`esperandoHaDias`/`motivoBloqueio` nascem AQUI, uma vez só.
  *
@@ -2356,9 +2407,14 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
     repactuacoesDePrazo(brutas.map((t) => t.id), db),
   ])
   const hoje = diaOperacional(agora)
+  const ordensPorTipo = await ordensDeFasePorTipo(brutas, db)
 
   const linhas = brutas.map((t): LinhaGerencial => {
     const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, linhagem)
+    base.faseFutura = ehFaseFutura(
+      t.faseMacroKey, t.processo?.faseAtualKey,
+      t.processo?.tipoProcessoMotorId != null ? ordensPorTipo.get(t.processo.tipoProcessoMotorId) : null,
+    )
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = ehEsperaExterna(t.statusTarefa, t.motivoCodigo)

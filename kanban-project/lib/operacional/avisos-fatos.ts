@@ -48,7 +48,7 @@ export async function avisarChegouTrabalho(
   return { avisoIds }
 }
 
-/** "<Família> — N tarefas saíram da sua fila". */
+/** "<Família> — N tarefas saíram do seu A fazer". */
 export async function avisarMudouDeMao(
   db: Db, args: { destinatarioId: number; tarefas: TarefaDoFato[]; autorId?: number | null },
 ): Promise<{ avisoIds: number[] }> {

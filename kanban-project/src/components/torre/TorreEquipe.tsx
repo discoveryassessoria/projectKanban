@@ -12,7 +12,8 @@ interface Pessoa {
   ativas: number; atrasadas: number; aguardando: number
   fila: { semanas: number | null; faixa: "vermelho" | "ambar" | "livre" | "sem_base" }
 }
-interface Previsao { semanas: Array<{ inicio: string; fim: string }>; linhas: Array<{ usuarioId: number | null; nome: string; porSemana: Array<{ n: number; nivel: 0 | 1 | 2 | 3 }> }> }
+interface LinhaPrevisao { usuarioId: number | null; nome: string; porSemana: Array<{ n: number; nivel: 0 | 1 | 2 | 3 }>; vencidas: number; depois: number; semPrazo: number; total: number }
+interface Previsao { semanas: Array<{ inicio: string; fim: string }>; linhas: LinhaPrevisao[] }
 interface Simulacao { usuarioId: number; nome: string; dias: number; texto: string; sucessor: { nome: string } | null }
 
 const TIPOS_AUSENCIA: Array<[string, string]> = [["FERIAS", "Férias"], ["AFASTAMENTO", "Afastamento"], ["AUSENCIA", "Ausência"], ["BLOQUEIO_OPERACIONAL", "Bloqueio operacional"]]
@@ -116,13 +117,16 @@ export function TorreEquipe({ versao }: { versao: number }) {
 
       <div className="tor-card pad">
         <h2 className="font-extrabold">Previsão de carga · próximas 4 semanas (vencimentos por pessoa)</h2>
-        <div className="tor-prev mt-3">
+        <div style={{ overflowX: "auto" }}>
+        <div className="tor-prev com-extras mt-3">
           <div />{dados.previsao.semanas.map((s) => <div key={s.inicio} className="small">{curto(s.inicio)}–{curto(s.fim)}</div>)}
+          <div className="small">Vencidas</div><div className="small">Depois</div><div className="small">Sem prazo</div><div className="small"><b>Abertas</b></div>
           {dados.previsao.linhas.map((l) => (
-            <PrevisaoLinha key={l.usuarioId ?? "sem"} nome={l.nome} celulas={l.porSemana} />
+            <PrevisaoLinha key={l.usuarioId ?? "sem"} linha={l} />
           ))}
         </div>
-        <div className="small mt-2">Conta os prazos das tarefas abertas de cada pessoa em cada semana, a partir de hoje.</div>
+        </div>
+        <div className="small mt-2">Conta os prazos das tarefas abertas de cada pessoa em cada semana, a partir de hoje. O que fica fora das 4 semanas aparece ao lado (vencidas, depois da 4ª semana, sem prazo): as quatro semanas + essas três colunas fecham com o total de abertas da pessoa.</div>
       </div>
 
       {ausencia && <AusenciaModal pessoa={ausencia} onFechar={() => setAusencia(null)} onFeito={(msg) => { setAusencia(null); avisar(msg); atualizar() }} />}
@@ -131,11 +135,15 @@ export function TorreEquipe({ versao }: { versao: number }) {
   )
 }
 
-function PrevisaoLinha({ nome, celulas }: { nome: string; celulas: Array<{ n: number; nivel: 0 | 1 | 2 | 3 }> }) {
+function PrevisaoLinha({ linha }: { linha: LinhaPrevisao }) {
   return (
     <>
-      <div><b>{nome}</b></div>
-      {celulas.map((c, i) => <div key={i} className={`tor-cell h${c.nivel}`}>{c.n || "·"}</div>)}
+      <div><b>{linha.nome}</b></div>
+      {linha.porSemana.map((c, i) => <div key={i} className={`tor-cell h${c.nivel}`}>{c.n || "·"}</div>)}
+      <div className={`tor-cell ${linha.vencidas > 0 ? "h3" : "h0"}`}>{linha.vencidas || "·"}</div>
+      <div className="tor-cell h0">{linha.depois || "·"}</div>
+      <div className="tor-cell h0">{linha.semPrazo > 0 ? `sem prazo (${linha.semPrazo})` : "·"}</div>
+      <div className="tor-cell h0"><b>{linha.total}</b></div>
     </>
   )
 }

@@ -8,8 +8,9 @@
 import { useMemo } from "react"
 import type { LinhaOperacaoV3 } from "./operacao-v3-tipos"
 import {
-  fmtData, acompTxtCompleto, relCls, passoLabelDe, orgaoTxt, cobrancasTxt, prazoTarefaCls,
-  concluirLabelDe, agruparPorFamilia, agruparPorOrgao, type FamiliaComGrupos,
+  fmtData, acompTxtCompleto, relCls, passoLabelDe, orgaoTxt, cobrancasTxt, prazoTarefaCls, docTipoTxt,
+  concluirLabelDe, aIniciarEfetivo, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
+  chaveDaFamilia, familiasDaAba, faseAtualDaFamilia, gargaloDaFamilia, proximoMarcoDaFamilia, type FamiliaComGrupos,
 } from "./operacao-v3-derivacoes"
 
 const toggle = (col: Record<string, true>, setCol: (c: Record<string, true>) => void, k: string) =>
@@ -53,7 +54,7 @@ export function AbaAguardando({
       {linhas.length === 0 && (
         <div className="opv3-card" style={{ padding: 40, textAlign: "center", color: "#5b6478" }}>
           <b style={{ color: "#0b1f4b" }}>{quick ? "Nenhuma com esse filtro." : "Nada com terceiros."}</b><br />
-          {quick ? "Tire o filtro para ver todas." : "Inicie uma certidão na Fila (enviar ao cartório) e ela aparece aqui."}
+          {quick ? "Tire o filtro para ver todas." : "Inicie uma certidão em A fazer (enviar ao cartório) e ela aparece aqui."}
         </div>
       )}
 
@@ -86,14 +87,15 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
       </div>
       {aberto && (
         <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
-          <div className="opv3-hd opv3-gA"><span>Documento</span><span>Com quem</span><span>Passo atual</span><span>Desde</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo da tarefa</span><span>Ação</span></div>
+          <div className="opv3-hd opv3-gA"><span>Documento</span><span>Com quem</span><span>Passo atual</span><span>Status</span><span>Desde</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo da tarefa</span><span>Ação</span></div>
           {grupo.linhas.map((t) => {
             const passo = passoLabelDe(t)
             return (
               <div key={t.taskId} className="opv3-row opv3-gA" style={{ boxShadow: `inset 4px 0 0 ${t.atrasada ? "#b3261e" : "transparent"}` }}>
-                <div style={{ fontWeight: 600 }}>{t.titulo}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pessoaNome}</div></div>
+                <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pessoaNome}</div></div>
                 <div>{orgaoTxt(t)}</div>
-                <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
+                <div>{passo.label}</div>
+                <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                 <div>{fmtData(t.atribuidaEm)}</div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                 <div>{cobrancasTxt(t)}</div>
@@ -159,7 +161,7 @@ export function AbaAcompanhamento({
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>O que precisa de controle</div>
-        <span style={{ fontSize: 12, color: "#5b6478" }}>só acompanhamentos vencidos, de hoje, de amanhã e dos próximos 7 dias — de qualquer passo, esteja na Fila ou em Aguardando</span>
+        <span style={{ fontSize: 12, color: "#5b6478" }}>só acompanhamentos vencidos, de hoje, de amanhã e dos próximos 7 dias — de qualquer passo, esteja em A fazer ou em Aguardando</span>
         <div style={{ flexGrow: 1 }} />
         <button className="opv3-btn opv3-sm" onClick={() => setAcompDepois(!acompDepois)}>{acompDepois ? "Ocultar depois de 7 dias" : "Mostrar depois de 7 dias"}</button>
         <button className="opv3-btn" onClick={onCobrarTodosVencidos}>Cobrar todos os vencidos de terceiro</button>
@@ -191,14 +193,15 @@ export function AbaAcompanhamento({
               </div>
               {!col[`ac|${b.title}|${g.fam}`] && (
                 <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
-                  <div className="opv3-hd opv3-gC"><span>Documento</span><span>Passo</span><span>Com quem / de onde veio a data</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo tarefa</span><span>Ação</span></div>
+                  <div className="opv3-hd opv3-gC"><span>Documento</span><span>Passo atual</span><span>Status</span><span>Com quem / de onde veio a data</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo tarefa</span><span>Ação</span></div>
                   {g.linhas.map((t) => {
                     const passo = passoLabelDe(t)
                     const terceiro = t.estadoOperacao === "AGUARDANDO"
                     return (
                       <div key={t.taskId} className="opv3-row opv3-gC">
-                        <div style={{ fontWeight: 600 }}>{t.titulo}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pessoaNome}</div></div>
-                        <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{terceiro ? "espera de terceiro" : "ação interna"}</div></div>
+                        <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pessoaNome}</div></div>
+                        <div>{passo.label}</div>
+                        <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                         <div>{orgaoTxt(t)}</div>
                         <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                         <div>{cobrancasTxt(t)}</div>
@@ -226,9 +229,9 @@ export function AbaAcompanhamento({
 // FAMÍLIAS
 // ============================================================================
 const ESTAGIOS: Array<{ chave: string; label: string; pred: (l: LinhaOperacaoV3) => boolean; cor: string }> = [
-  { chave: "iniciar", label: "A iniciar", pred: (l) => l.aIniciar, cor: "#141a2b" },
+  { chave: "iniciar", label: "A iniciar", pred: (l) => aIniciarEfetivo(l), cor: "#141a2b" },
   { chave: "cartorio", label: "Com o cartório", pred: (l) => l.estadoOperacao === "AGUARDANDO", cor: "#141a2b" },
-  { chave: "conferir", label: "A conferir", pred: (l) => l.estadoOperacao === "FILA" && !l.aIniciar, cor: "#141a2b" },
+  { chave: "conferir", label: "A conferir", pred: (l) => l.estadoOperacao === "FILA" && !aIniciarEfetivo(l), cor: "#141a2b" },
   { chave: "concluidas", label: "Concluídas", pred: (l) => l.estadoOperacao === "CONCLUIDA", cor: "#155e39" },
   { chave: "atrasadas", label: "Atrasadas", pred: (l) => l.atrasada && l.estadoOperacao !== "CONCLUIDA", cor: "#8f1d17" },
   { chave: "vencidos", label: "Acomp. vencidos", pred: (l) => l.acompanhamentoVencido && l.estadoOperacao !== "CONCLUIDA", cor: "#7a4a00" },
@@ -247,20 +250,21 @@ export function AbaFamilias({
   onNaoLigado: () => void
 }) {
   const todas = useMemo(() => [...abertos, ...feito], [abertos, feito])
+  // UMA lista de famílias (`familiasDaAba`) — a mesma que dá o número da aba. Fase = a FASE ATUAL REAL do processo
+  // (`faseAtualDoProcessoLabel`), gargalo = a MESMA `precisaDeOrgaoEmissor` do cartão do Radar, marco = próxima fase
+  // do caminho do processo (só quando a linha a traz).
   const familias = useMemo(() => {
-    const chave = (l: LinhaOperacaoV3) => l.familiaNome ?? l.processoNome ?? "—"
-    const nomes = [...new Set(todas.map(chave))]
-    return nomes.map((nome) => {
-      const ts = todas.filter((l) => chave(l) === nome)
-      const abertosDaFam = abertos.filter((l) => chave(l) === nome)
-      const escaladaPorOrgao = new Map<string, number>()
-      for (const l of abertosDaFam) if (l.escalada && l.terceiroNome) escaladaPorOrgao.set(l.terceiroNome, (escaladaPorOrgao.get(l.terceiroNome) ?? 0) + 1)
-      const gargaloEntry = [...escaladaPorOrgao.entries()].sort((a, b) => b[1] - a[1])[0]
-      const semOrgao = abertosDaFam.filter((l) => l.aIniciar && l.documentoId != null && !l.terceiroNome).length
-      const gargalo = gargaloEntry ? `${gargaloEntry[0]} (escalada)` : semOrgao > 0 ? "órgão emissor não vinculado" : "—"
-      return { nome, ts, pais: ts[0]?.pais ?? "—", fase: ts[0]?.faseMacroKey ?? "—", gargalo }
+    return familiasDaAba(abertos, feito).map((nome) => {
+      const ts = todas.filter((l) => chaveDaFamilia(l) === nome)
+      const abertosDaFam = abertos.filter((l) => chaveDaFamilia(l) === nome)
+      return {
+        nome, ts, pais: ts[0]?.pais ?? "—",
+        fase: faseAtualDaFamilia(abertosDaFam.length ? abertosDaFam : ts),
+        gargalo: gargaloDaFamilia(abertosDaFam),
+        marco: proximoMarcoDaFamilia(abertosDaFam.length ? abertosDaFam : ts),
+      }
     })
-  }, [todas, abertos])
+  }, [todas, abertos, feito])
 
   return (
     <>
@@ -295,7 +299,7 @@ export function AbaFamilias({
                 )
               })}
             </div>
-            <div style={{ fontSize: 12, color: "#5b6478" }}>Gargalo: <b>{f.gargalo}</b> · Próximo marco: <b>Análise documental</b></div>
+            <div style={{ fontSize: 12, color: "#5b6478" }}>Gargalo: <b>{f.gargalo}</b>{f.marco ? <> · Próximo marco: <b>{f.marco}</b></> : null}</div>
             {aberto && (
               <div style={{ border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
                 <div className="opv3-grp" style={{ borderTop: 0 }}>
@@ -303,17 +307,18 @@ export function AbaFamilias({
                   <div style={{ flexGrow: 1 }} />
                   <button className="opv3-btn opv3-sm" onClick={() => setFamOpen(null)}>Recolher ▴</button>
                 </div>
-                <div className="opv3-hd" style={{ gridTemplateColumns: "1.5fr 1.1fr 1fr 1fr 0.9fr 0.8fr 120px" }}><span>Documento</span><span>Pessoa</span><span>Passo atual</span><span>Acompanhamento</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
+                <div className="opv3-hd" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,0.8fr) 90px" }}><span>Documento</span><span>Pessoa</span><span>Passo atual</span><span>Status</span><span>Acompanhamento</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
                 {(cards.find((c) => c.chave === aberto.chave)?.rows.length ?? 0) === 0 && (
                   <div style={{ padding: 20, textAlign: "center", color: "#5b6478", fontSize: 12 }}>Nenhuma tarefa neste estágio.</div>
                 )}
                 {cards.find((c) => c.chave === aberto.chave)?.rows.map((t) => {
                   const passo = passoLabelDe(t)
                   return (
-                    <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "1.5fr 1.1fr 1fr 1fr 0.9fr 0.8fr 120px", boxShadow: `inset 4px 0 0 ${t.atrasada ? "#b3261e" : "transparent"}` }}>
-                      <div style={{ fontWeight: 600 }}>{t.titulo}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
+                    <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.1fr) minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.9fr) minmax(0,0.8fr) 90px", boxShadow: `inset 4px 0 0 ${t.atrasada ? "#b3261e" : "transparent"}` }}>
+                      <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
                       <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
-                      <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
+                      <div>{passo.label}</div>
+                      <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                       <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                       <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>
                       <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
@@ -333,14 +338,23 @@ export function AbaFamilias({
 // ============================================================================
 // RADAR
 // ============================================================================
+/** O texto do cartão "Escaladas ao gestor": a REGRA, não uma contagem solta. */
+export const textoDaEscalada = (limiar: number): string => `escala após ${limiar} cobranças sem resposta`
+/** O texto do cartão "Pendência de fase anterior" — o primeiro item da lista, sem afirmar o que a regra não prova. */
+export const textoDaPendenciaDeFaseAnterior = (primeiro: LinhaOperacaoV3 | undefined): string =>
+  primeiro ? `${primeiro.familiaNome ?? primeiro.processoNome ?? "—"} · ${docTipoTxt(primeiro)} · ${primeiro.pessoaNome ?? "—"} · fase anterior ainda aberta` : "nenhuma"
 export function AbaRadar({
-  atras, acompVenc, decis, noOrg, genOpen, onKAtras, onGoAcomp, onKEsc, onNoOrg, onFaseAnterior, onNaoLigado,
+  atras, acompVenc, decis, noOrg, genOpen, verEscaladas, escaladaLimiar, onKAtras, onGoAcomp, onKEsc, onNoOrg, onFaseAnterior, onNaoLigado,
 }: {
   atras: LinhaOperacaoV3[]
   acompVenc: LinhaOperacaoV3[]
   decis: LinhaOperacaoV3[]
   noOrg: LinhaOperacaoV3[]
   genOpen: LinhaOperacaoV3[]
+  /** "Escaladas ao gestor" é cartão de GESTOR (admin ou `operacao.distribuirTarefas`): para os demais não existe. */
+  verEscaladas: boolean
+  /** Quantas cobranças sem resposta escalam (`escalarApos`). A linha da projeção ainda não traz o do passo: valor padrão da tela. */
+  escaladaLimiar: number
   onKAtras: () => void
   onGoAcomp: () => void
   onKEsc: () => void
@@ -366,17 +380,19 @@ export function AbaRadar({
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Acompanhamentos vencidos</b><span className={`opv3-pill ${cls(acompVenc.length)}`}>{acompVenc.length}</span></div>
           <div style={{ fontSize: 12, color: "#5b6478" }}>despertador tocou e ninguém agiu — controle, não atraso</div>
         </button>
-        <button className="opv3-radar" style={{ borderLeftColor: cor(decis.length) }} onClick={onKEsc}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}><b>Escaladas ao gestor</b><span className={`opv3-pill ${cls(decis.length)}`}>{decis.length}</span></div>
-          <div style={{ fontSize: 12, color: "#5b6478" }}>2 cobranças sem resposta</div>
-        </button>
+        {verEscaladas && (
+          <button className="opv3-radar" style={{ borderLeftColor: cor(decis.length) }} onClick={onKEsc}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><b>Escaladas ao gestor</b><span className={`opv3-pill ${cls(decis.length)}`}>{decis.length}</span></div>
+            <div style={{ fontSize: 12, color: "#5b6478" }}>{textoDaEscalada(escaladaLimiar)}</div>
+          </button>
+        )}
         <button className="opv3-radar" style={{ borderLeftColor: cor(noOrg.length) }} onClick={onNoOrg}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Sem órgão emissor</b><span className={`opv3-pill ${cls(noOrg.length)}`}>{noOrg.length}</span></div>
           <div style={{ fontSize: 12, color: "#5b6478" }}>não dá pra iniciar sem destino</div>
         </button>
         <button className="opv3-radar" style={{ borderLeftColor: cor(genOpen.length) }} onClick={onFaseAnterior}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Pendência de fase anterior</b><span className={`opv3-pill ${cls(genOpen.length)}`}>{genOpen.length}</span></div>
-          <div style={{ fontSize: 12, color: "#5b6478" }}>{primeiro ? `${primeiro.familiaNome} · ${primeiro.titulo} · ${primeiro.pessoaNome} · trava a família` : "nenhuma"}</div>
+          <div style={{ fontSize: 12, color: "#5b6478" }}>{textoDaPendenciaDeFaseAnterior(primeiro)}</div>
         </button>
         <button className="opv3-radar" style={{ borderLeftColor: "#1f7a4d" }} onClick={onNaoLigado}>
           <div style={{ display: "flex", justifyContent: "space-between" }}><b>Dados inconsistentes</b><span className="opv3-pill opv3-p-grn">0</span></div>
@@ -442,7 +458,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
                   <div className="opv3-hd" style={{ gridTemplateColumns: "1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px" }}><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
                   {g.linhas.map((t) => (
                     <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px" }}>
-                      <div style={{ fontWeight: 600 }}>{t.titulo}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
+                      <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
                       <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
                       <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
                       <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>

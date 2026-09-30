@@ -9,7 +9,7 @@
 // conta própria sobre `Tarefa.createdAt`.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
-import { resolverCompletudeDocumental } from '@/src/lib/process-stage/completude-documental'
+import { documentacaoRequeridaDoProcesso } from '@/src/lib/process-stage/documentacao-requerida'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { ordensDeFase } from '@/src/services/documento-operacao'
 
@@ -21,8 +21,8 @@ export interface ProgressoReal {
 
 /** E9 · progresso real = certidões recebidas ÷ requeridas, na fase ATIVA. */
 export async function progressoRealDoProcesso(processoId: number): Promise<ProgressoReal> {
-  const c = await resolverCompletudeDocumental(processoId)
-  return { required: c.required, completed: c.completed, percentage: c.percentage }
+  const c = await documentacaoRequeridaDoProcesso(processoId)
+  return { required: c.requeridos, completed: c.recebidos, percentage: c.percentual }
 }
 
 /**

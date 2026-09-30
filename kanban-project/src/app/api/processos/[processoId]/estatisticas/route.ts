@@ -2,7 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { whereSituacaoSolicitacao } from "@/src/lib/relatorios/motor/dominios/certidoes"
+import { documentacaoRequeridaDoProcesso } from "@/src/lib/process-stage/documentacao-requerida"
 
 type AlertaSev = "crit" | "warn" | "info"
 
@@ -16,6 +16,7 @@ interface EstatisticasResponse {
     recebidos: number
     total: number
     percentual: number
+    aplicavel: boolean
   }
   risco: {
     bloqueantes: number
@@ -90,48 +91,15 @@ export async function GET(
     // 3) Conta documentos das pessoas da árvore
     const pessoaIds = pessoas.map((p) => p.id)
 
-    // CANCELADO/INVALIDO fora da conta — a exigência acabou (cancelada) ou está
-    // sendo refeita por outra via (invalidada); nenhum dos dois é "documento a
-    // receber" pendente. Sem isto, um documento corretamente dispensado
-    // continuava contando no denominador desta tela (achado real: Antonio,
-    // óbito; Edithe, ambas certidões — "3 de 6" com só 3 documentos de verdade
-    // exigidos). CANCELADO/INVALIDO são as exceções vivas do campo (memória
-    // "documento-status-legado") — o resto do estado vem da Tarefa
-    // (`documento-estado.ts`), nunca de `Documento.status === "RECEBIDO"`
-    // (congelado: um documento cuja Tarefa já concluiu não voltava a mexer
-    // nesse campo, então "recebido" ficava contando errado assim que a Tarefa
-    // avançava sem que ninguém tivesse tocado no campo do Documento).
-    // "RECEBIDO" SIGNIFICA A CERTIDÃO TER CHEGADO — não o registro ter sido
-    // localizado (Genealogia) nem uma Tarefa ter fechado.
-    //
-    // Correção anterior (28/09/2026, mesma sessão) tinha trocado esta conta por
-    // `documentoTemDadosPreenchidos` (cartório/livro/folha) — mas esse é o marco
-    // de Genealogia ("localizar registro"), não o de Emissão Documental
-    // ("receber certidão"). São marcos diferentes: um documento pode estar
-    // LOCALIZADO (dado preenchido) e ainda não ter sido RECEBIDO (a via física
-    // ainda não chegou). Usar o marco errado inflava o card. A régua certa é a
-    // MESMA que a coluna "Situação" do Relatório de Certidões usa —
-    // `whereSituacaoSolicitacao("RECEBIDA")`, exportada de lá pra nunca haver
-    // duas implementações do mesmo critério.
-    let totalDocs = 0
-    let recebidosDocs = 0
-    if (pessoaIds.length) {
-      const docsValidos = await prisma.documento.findMany({
-        where: { pessoaId: { in: pessoaIds }, status: { notIn: ["CANCELADO", "INVALIDO"] } },
-        select: { id: true },
-      })
-      totalDocs = docsValidos.length
-      if (totalDocs > 0) {
-        recebidosDocs = await prisma.necessidadeDocumental.count({
-          where: {
-            documentos: { some: { id: { in: docsValidos.map((d) => d.id) } } },
-            ...whereSituacaoSolicitacao("RECEBIDA"),
-          },
-        })
-      }
-    }
-
-    const percentual = totalDocs > 0 ? Math.round((recebidosDocs / totalDocs) * 100) : 0
+    // FONTE ÚNICA (documentacao-requerida.ts): o requisito é a NECESSIDADE de
+    // certidão obrigatória e "recebida" é o predicado canônico da projeção
+    // operacional — o MESMO "12 de 13" da Central, Home e Torre. Antes: o
+    // denominador contava DOCUMENTO (14, com um órfão) e o numerador contava
+    // NECESSIDADE por outro filtro (0) — "0 de 14 (0%)" no processo 675.
+    const doc = await documentacaoRequeridaDoProcesso(id)
+    const totalDocs = doc.requeridos
+    const recebidosDocs = doc.recebidos
+    const percentual = doc.percentual
 
     // 4) Risco — ainda não existe conceito de "divergência" no schema.
     //    Mantemos zerado até o modelo ser implementado.
@@ -194,7 +162,7 @@ export async function GET(
       alertas.push({ sev: "info", label: "Origem da linhagem não identificada" })
     }
 
-    const pendentes = totalDocs - recebidosDocs
+    const pendentes = doc.pendentes
     if (pendentes > 0) {
       alertas.push({
         sev: "info",
@@ -224,6 +192,7 @@ export async function GET(
         recebidos: recebidosDocs,
         total: totalDocs,
         percentual,
+        aplicavel: doc.aplicavel,
       },
       risco,
       protocolo,

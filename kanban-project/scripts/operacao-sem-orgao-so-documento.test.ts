@@ -28,7 +28,7 @@ ok("a coluna Órgão da tarefa de gestor mostra '—' neutro, não 'não vincula
 ok("a certidão sem órgão continua 'não vinculado' vermelho", orgaoTxt(certidaoSemOrgao) === "não vinculado" && orgaoCls(certidaoSemOrgao) === "opv3-p-red")
 
 const v3 = readFileSync("src/components/operacao/operacao-v3.tsx", "utf8")
-ok("card e lista do radar usam a MESMA função (número = lista)", /const noOrg = useMemo\(\(\) => abertosVisiveis\.filter\(precisaDeOrgaoEmissor\)/.test(v3) && /radar === "noorg"\) f = f\.filter\(precisaDeOrgaoEmissor\)/.test(v3))
+ok("card e lista do radar usam a MESMA função (número = lista)", /const noOrg = useMemo\(\(\) => abertosVisiveis\.filter\(precisaDeOrgaoEmissor\)/.test(v3) && /linhasDoRadar\(radar, abertosVisiveis, filaBase/.test(v3) && /if \(radar === "noorg"\) return fila\.filter\(precisaDeOrgaoEmissor\)/.test(readFileSync("src/components/operacao/operacao-v3-derivacoes.ts", "utf8")))
 ok("nenhuma definição paralela '!l.terceiroNome && l.faseMacroKey !== \"genealogia\"' sobrou", !/!l\.terceiroNome && l\.faseMacroKey !== "genealogia"/.test(v3))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)

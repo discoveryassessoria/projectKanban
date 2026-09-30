@@ -30,9 +30,10 @@
 .opv3-row.opv3-sel { background: #fff6f0; }
 .opv3-hd { display: grid; gap: 8px; padding: 5px 12px; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #7a8296; font-weight: 600; }
 
-.opv3-gF { grid-template-columns: 22px 1.5fr 1.1fr 0.9fr 1fr 1fr 0.8fr 110px; }
-.opv3-gA { grid-template-columns: 1.4fr 1fr 1.1fr 0.9fr 1fr 0.7fr 0.8fr 190px; }
-.opv3-gC { grid-template-columns: 1.4fr 1fr 1.1fr 1fr 1fr 0.7fr 210px; }
+/* Colunas com minmax(0, …): o conteúdo nunca alarga a linha — sem rolagem horizontal em ~1280px. Coluna "Status" logo depois de "Passo atual". */
+.opv3-gF { grid-template-columns: 22px minmax(0,1.4fr) minmax(0,1.1fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,0.8fr) 96px; }
+.opv3-gA { grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,0.6fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,0.8fr) 170px; }
+.opv3-gC { grid-template-columns: minmax(0,1.4fr) minmax(0,1.1fr) minmax(0,0.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,0.6fr) minmax(0,0.8fr) 190px; }
 
 .opv3-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 7px; font-size: 11px; font-weight: 600; white-space: nowrap; }
 .opv3-p-red { background: #fbe7e6; color: #8f1d17; }

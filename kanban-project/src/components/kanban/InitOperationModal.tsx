@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import {
@@ -115,13 +116,15 @@ function ConteudoModal({
   // Documento e usuários pela camada oficial: duas leituras independentes, cada uma
   // com o seu cache, em lugar do `Promise.all` dentro de um efeito. A lista de
   // usuários aceita os dois formatos que a rota já devolvia.
+  const { pode } = usePermissoes()
   const docReq = useApi<Documento>(documentoId ? `/api/documentos/${documentoId}` : null)
-  const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>("/api/usuarios")
+  // QUEM PODE RECEBER TRABALHO — rota de atribuíveis (tarefas.editar), nunca /api/usuarios
+  // (usuarios.gerenciar: 403 para a assistente). Sem permissão, nem chama.
+  const usuariosReq = useApi<{ funcionarios?: Usuario[] }>(pode("tarefas.editar") ? "/api/operacao/atribuiveis" : null)
   const doc = docReq.dados ?? null
   const usuarios = useMemo<Usuario[]>(() => {
     const d = usuariosReq.dados
-    if (!d) return []
-    return Array.isArray(d) ? d : (d.usuarios ?? [])
+    return d?.funcionarios ?? []
   }, [usuariosReq.dados])
   const loading = docReq.carregando || usuariosReq.carregando
   // A falha que interessa é a do documento — sem ele o modal não tem o que abrir.

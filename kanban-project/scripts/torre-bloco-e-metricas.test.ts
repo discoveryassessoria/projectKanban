@@ -58,8 +58,11 @@ async function main() {
 
   const proc2 = await prisma.processo.create({ data: { nome: `${MARCA}proc2-sem-log`, faseAtualKey: "coleta_de_dados", dataInicio: diasAtras(7) } })
   const d2 = await diasNaFaseAtual(proc2.id, agora)
-  ok("SEM log de avanço, cai para a data do cadastro (nunca inventa)", d2.origem === "CADASTRO_DO_PROCESSO")
-  ok("dias = 7 (desde o cadastro)", d2.dias === 7, `got ${d2.dias}`)
+  // CONTRATO desde 30/09/2026 (correção do "0 d"): a abertura do processo só vale como entrada na PRIMEIRA fase do
+  // macrofluxo. Este processo não tem macrofluxo → não dá para afirmar que a fase é a primeira → sem data, sem número
+  // (a tela mostra "—"). O caso "primeira fase → cadastro" é provado em torre-bloco-j-tempo-na-fase.test.ts.
+  ok("SEM log de avanço e sem como provar que é a 1ª fase: sem data (nunca inventa)", d2.origem === null && d2.desde === null)
+  ok("dias = null (nunca um número inventado)", d2.dias === null && d2.horas === null, `got ${d2.dias}`)
 
   const proc3 = await prisma.processo.create({ data: { nome: `${MARCA}proc3-sem-fase` } })
   const d3 = await diasNaFaseAtual(proc3.id, agora)

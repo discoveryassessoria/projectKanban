@@ -28,9 +28,8 @@ interface ProcessoEstatisticasProps {
 //   • linhagem.origem         = Pessoa onde numeroLinhagem é o MENOR (ancestral mais antigo)
 //   • linhagem.requerentePrincipal = Pessoa onde requerente='maior'
 //
-//   • documentacao.total      = Documento.count({ where: { pessoa: { arvore: { processos: { some: { id } } } } } })
-//   • documentacao.recebidos  = mesmo filtro + status='RECEBIDO'
-//   • documentacao.percentual = round(recebidos/total * 100)
+//   • documentacao.total/recebidos/percentual = FONTE ÚNICA (src/lib/process-stage/documentacao-requerida.ts):
+//     necessidades de certidão obrigatórias, predicado canônico — o mesmo número da Central, Home e Torre.
 //
 //   • risco e protocolo       = ainda não modelados no schema (divergências e
 //                               protocol readiness). Por enquanto retornar 0/false.
@@ -50,6 +49,8 @@ interface Estatisticas {
     recebidos: number
     total: number
     percentual: number
+    /** false = a fase ativa não trabalha certidões: não há "N de M" a mostrar. */
+    aplicavel?: boolean
   }
   risco: {
     bloqueantes: number
@@ -187,7 +188,9 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
             {documentacao.percentual}%
           </div>
           <div className={subCls}>
-            {documentacao.recebidos} de {documentacao.total} documentos recebidos
+            {documentacao.aplicavel === false
+              ? "Sem certidões exigidas na fase atual"
+              : `${documentacao.recebidos} de ${documentacao.total} documentos recebidos`}
           </div>
         </div>
 

@@ -2,7 +2,7 @@
 // src/components/torre/TorreTarefas.tsx — aba TAREFAS (Bloco G1–G3, G6 + absorção da Operação).
 // A MESMA projeção da Operação (/api/torre/tarefas). Lote com toast de 6 s + Desfazer, ação rápida por linha, "Cobrar todos os
 // vencidos (N)", painel espelhado da tarefa, visões fixas (inclui Minhas, Acompanhamentos vencidos e Feito), subagrupamento dentro
-// da família, "Adiar acompanhamento", "Vincular órgão nas N", "novas", "Trabalhar a fila", tarefa transversal e iniciar em lote.
+// da família, "Adiar acompanhamento", "Vincular órgão nas N", "novas", "Fazer agora", tarefa transversal e iniciar em lote.
 // Nenhuma regra nova: cada botão chama a porta que a Operação já usa. Nada de dado de exemplo.
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
@@ -10,7 +10,7 @@ import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOpe
 import { TarefaTransversalModal } from "@/src/components/kanban/TarefaTransversalModal"
 import { RegistrarContatoModal } from "@/src/components/operacao/RegistrarContatoModal"
 import {
-  passoLabelDe, acompTxtCompleto, aplicarBusca, docTipoTxt, acaoDe, concluirLabelDe, precisaDeOrgaoEmissor, agruparDentroDaFamilia,
+  passoLabelDe, statusTarefaTxt, statusTarefaCls, acompTxtCompleto, aplicarBusca, docTipoTxt, acaoDe, concluirLabelDe, aIniciarEfetivo, precisaDeOrgaoEmissor, agruparDentroDaFamilia,
 } from "@/src/components/operacao/operacao-v3-derivacoes"
 import type { LinhaOperacaoV3, RespostaTarefas } from "@/src/components/operacao/operacao-v3-tipos"
 import { urlArvoreDoProcesso } from "@/lib/operacional/navegacao"
@@ -224,11 +224,11 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
     setAberta(l)
   }
 
-  // ▶ Trabalhar a fila: o drawer da 1ª tarefa da lista visível + Anterior/Próxima com "i de N".
+  // ▶ Fazer agora: o drawer da 1ª tarefa da lista visível + Anterior/Próxima com "i de N".
   const linhaPorId = useMemo(() => new Map<number, LinhaOperacaoV3>([...(feito ?? []).map((l) => [l.taskId, l] as const), ...linhas.map((l) => [l.taskId, l] as const)]), [feito, linhas])
   const iniciarFoco = () => {
     const ordem = grupos.flatMap(([, itens]) => itens)
-    if (!ordem.length) { avisar("Fila vazia."); return }
+    if (!ordem.length) { avisar("Nada a fazer."); return }
     setFocoIds(ordem.map((l) => l.taskId)); abrirLinha(ordem[0])
   }
   const navFoco = (dir: 1 | -1) => {
@@ -265,7 +265,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   const renderLinha = (l: LinhaTorre) => {
     const bola = bolaDe(l); const risco = riscoDe(l); const acao = acaoDe(l)
-    const iniciavel = l.aIniciar && l.podeIniciar && !!permissoes?.iniciar
+    const iniciavel = aIniciarEfetivo(l) && l.podeIniciar && !!permissoes?.iniciar
     return (
       <div key={l.taskId} className={`tor-row tor-gT ${sel[l.taskId] ? "sel" : ""}`}>
         <button className={`tor-chk ${sel[l.taskId] ? "on" : ""}`} aria-label={`Selecionar a tarefa ${l.taskId}`} onClick={() => alternar([l.taskId], !sel[l.taskId])} />
@@ -275,6 +275,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
         </div>
         <div><span className={`tor-p ${bola.cls}`}>{bola.txt}</span>{l.esperandoHaDias != null && <div className="small">há {l.esperandoHaDias} d</div>}</div>
         <div className="small">{passoLabelDe(l).label}</div>
+        <div><span className={`tor-p ${statusTarefaCls(l).replace("opv3-p-", "")}`}>{statusTarefaTxt(l)}</span></div>
         <div className={l.responsavelId ? "" : "small"}>{l.responsavelNome ?? "sem responsável"}</div>
         <div className="small">{l.rotuloDoPrazo || "—"}</div>
         <div className="small">{acompTxtCompleto(l.acompanhamentoPasso)}</div>
@@ -282,8 +283,8 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
         <div className="flex flex-wrap gap-1">
           {iniciavel
             ? <button className="tor-btn pri" onClick={() => void iniciarRapido(l)}>Iniciar</button>
-            : <button className="tor-btn pri" onClick={() => abrirLinha(l)}>{l.aIniciar ? "Abrir" : acao.label}</button>}
-          {!l.aIniciar && <button className="tor-btn" onClick={() => abrirLinha(l)}>{concluirLabelDe(l)}</button>}
+            : <button className="tor-btn pri" onClick={() => abrirLinha(l)}>{aIniciarEfetivo(l) ? "Abrir" : acao.label}</button>}
+          {!aIniciarEfetivo(l) && <button className="tor-btn" onClick={() => abrirLinha(l)}>{concluirLabelDe(l)}</button>}
           {podeEditar && l.responsavelId == null && <button className="tor-btn" onClick={() => void atribuirRapido(l)}>Atribuir</button>}
           {l.estadoOperacao === "AGUARDANDO" && <button className="tor-btn" onClick={() => setCobrarLinha(l)}>Cobrar</button>}
           {temAcompanhamento(l) && <button className="tor-btn" onClick={() => adiar.abrir(l.taskId)}>Adiar</button>}
@@ -301,7 +302,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
       <div className="tor-bar">
         {visao !== "feito" && (
           <>
-            <button className="tor-btn pri" onClick={iniciarFoco}>▶ Trabalhar a fila ({visiveis.length})</button>
+            <button className="tor-btn pri" onClick={iniciarFoco}>▶ Fazer agora ({visiveis.length})</button>
             <label className="flex items-center gap-1.5 small">Agrupar por
               <select className="tor-in" aria-label="Agrupar por" value={agrupar} onChange={(e) => setAgrupar(e.target.value as Agrupar)}>
                 <option value="fam">Família</option><option value="resp">Responsável</option><option value="org">Cartório</option><option value="fase">Fase</option><option value="none">Sem agrupamento</option>
@@ -380,7 +381,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
                 ? <button className="tor-linkbtn" aria-label={`Abrir o foco da família ${nome}`} onClick={() => abrirFoco(itens[0].processoId as number)}>{nome}</button>
                 : <b>{nome}</b>}<div style={{ flexGrow: 1 }} /><span className="tor-p gry">{itens.length} tarefas</span>
             </div>
-            <div className="tor-hd tor-gT"><span /><span>Certidão · pessoa</span><span>Bola com</span><span>Etapa</span><span>Responsável</span><span>Prazo</span><span>Acomp.</span><span>Risco</span><span /></div>
+            <div className="tor-hd tor-gT"><span /><span>Certidão · pessoa</span><span>Bola com</span><span>Etapa</span><span>Status</span><span>Responsável</span><span>Prazo</span><span>Acomp.</span><span>Risco</span><span /></div>
             {subgrupos
               ? subgrupos.map((g) => {
                 const ls = g.linhas as LinhaTorre[]
@@ -445,7 +446,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
           barraSuperiorExtra={painel}
           rodapeExtra={posFoco >= 0 ? (
             <div className="tor-bar" style={{ margin: 0, padding: "10px 18px", background: "var(--surface-secondary)", borderTop: "1px solid var(--border-default)" }}>
-              <span className="small">Navegação da fila</span><div style={{ flexGrow: 1 }} />
+              <span className="small">Navegação do A fazer</span><div style={{ flexGrow: 1 }} />
               <button className="tor-btn" onClick={() => navFoco(-1)}>← Anterior</button>
               <button className="tor-btn" onClick={() => navFoco(1)}>Próxima →</button>
             </div>

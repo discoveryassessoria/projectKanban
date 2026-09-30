@@ -35,25 +35,48 @@ export const relCls = (et: EstadoTemporalApi | null): string => {
   return "opv3-p-gry"
 }
 
-/** Rótulo do passo/subtarefa corrente — "X/N · Rótulo" no mesmo padrão do protótipo.
- *  Genealogia não tem subtarefa (`passoCorrente` sempre `null`) — o rótulo real do
- *  passo vem de `etapaAtual` (achado real, mandato "Operação/Antão", correção
- *  pós-conferência 29/09/2026: toda tarefa "a iniciar" de Genealogia mostrava o
- *  texto fixo da Emissão, "A iniciar (enviar ao cartório)", porque este fallback
- *  nunca olhava `etapaAtual` — o nome real do passo, "Localizar registro", ficava
- *  sem uso nenhum aqui). */
-export function passoLabelDe(l: LinhaOperacaoV3): { label: string; sub: string } {
-  if (l.estadoOperacao === "CONCLUIDA") {
-    return { label: `Concluída${l.passoAtual ? ` · ${l.passoAtual.total}/${l.passoAtual.total}` : ""}`, sub: "" }
-  }
-  if (l.origem === "TRANSVERSAL") return { label: "Transversal · ação interna", sub: "não muda a fase" }
-  const rotulo = l.passoCorrente?.label ?? l.etapaAtual ?? "—"
-  if (l.aIniciar) {
-    const label = l.faseMacroKey === "genealogia" ? `A iniciar · ${rotulo}` : "A iniciar (enviar ao cartório)"
-    return { label, sub: l.faseMacroKey === "genealogia" ? "fase Genealogia" : (l.passoCorrente?.label ?? "passo 1 acontece ao iniciar") }
-  }
-  const posicao = l.passoAtual ? `${l.passoAtual.ordem + 1}/${l.passoAtual.total} · ` : ""
-  return { label: `${posicao}${rotulo}`, sub: l.faseMacroKey === "genealogia" ? "fase Genealogia" : "" }
+/**
+ * EM ANDAMENTO SEM DONO — a tarefa já foi iniciada (statusTarefa EM_ANDAMENTO) e hoje ninguém responde por ela.
+ * Achado real 30/09/2026 (processo 651: #3834/#3845/#3850): depois de "devolver à fila" o status seguia EM_ANDAMENTO
+ * e a tela dizia "A iniciar (enviar ao cartório)" — mentira sobre o estado — sem oferecer ação.
+ * `aIniciar` (projeção da subtarefa) não conhece o status da Tarefa; a tela NUNCA o mostra para quem já iniciou sem dono.
+ */
+export const emAndamentoSemDono = (l: Pick<LinhaOperacaoV3, "statusTarefa" | "responsavelId">): boolean =>
+  l.statusTarefa === "EM_ANDAMENTO" && l.responsavelId == null
+
+/** `aIniciar` da projeção, corrigido: tarefa EM ANDAMENTO sem dono nunca é "a iniciar". */
+export const aIniciarEfetivo = (l: Pick<LinhaOperacaoV3, "aIniciar" | "statusTarefa" | "responsavelId">): boolean =>
+  l.aIniciar && !emAndamentoSemDono(l)
+
+/** COLUNA "PASSO ATUAL" — SOMENTE o nome do passo (ex.: "Localizar registro da certidão"). Sem "A iniciar ·", sem
+ *  "(enviar ao cartório)", sem "fase Genealogia" (a fase tem coluna própria) e sem "2/4" (a posição do passo fica dentro
+ *  do painel). O ESTADO da tarefa não mora aqui: vai na coluna "Status" (`statusTarefaTxt`), sempre do `statusTarefa`
+ *  real. O nome vem do cadastro (`passoCorrente.label`, senão `etapaAtual`) — nunca de literal no código.
+ *  `sub` fica sempre vazio (mantido só para não quebrar quem lê `{ label, sub }`). */
+export function passoLabelDe(l: Pick<LinhaOperacaoV3, "passoCorrente" | "etapaAtual">): { label: string; sub: string } {
+  return { label: l.passoCorrente?.label ?? l.etapaAtual ?? "—", sub: "" }
+}
+
+/** O MAPA ÚNICO DE STATUS DA TAREFA em português claro — coluna "Status" da Operação e da Torre. Cobre TODO o enum
+ *  `StatusTarefa` (prisma/schema.prisma). É o `statusTarefa` REAL da linha; nunca inferido do passo. */
+export const ROTULO_STATUS_TAREFA: Readonly<Record<string, string>> = {
+  NAO_INICIADA: "A iniciar",
+  EM_ANDAMENTO: "Em andamento",
+  AGUARDANDO_TERCEIRO: "Aguardando cartório",
+  AGUARDANDO_CLIENTE: "Aguardando cliente",
+  BLOQUEADA: "Bloqueada",
+  CONCLUIDO_RECEBIDO: "Concluída",
+  CONCLUIDO_NAO_POSSUI: "Concluída",
+  CANCELADA: "Cancelada",
+  SUPERSEDIDA: "Substituída",
+}
+export const statusTarefaTxt = (l: Pick<LinhaOperacaoV3, "statusTarefa">): string => ROTULO_STATUS_TAREFA[l.statusTarefa] ?? l.statusTarefa
+/** Cor da pílula do status — neutro por padrão; âmbar só para o que pede atenção humana. */
+export const statusTarefaCls = (l: Pick<LinhaOperacaoV3, "statusTarefa">): string => {
+  if (l.statusTarefa === "BLOQUEADA") return "opv3-p-red"
+  if (l.statusTarefa === "EM_ANDAMENTO") return "opv3-p-blu"
+  if (l.statusTarefa === "CONCLUIDO_RECEBIDO" || l.statusTarefa === "CONCLUIDO_NAO_POSSUI") return "opv3-p-grn"
+  return "opv3-p-gry"
 }
 
 /** A FASE da tarefa — coluna "Fase" (renomeada de "Por que aqui", mandato
@@ -77,8 +100,9 @@ export function faseLabelDe(l: LinhaOperacaoV3): { texto: string; cls: string } 
  *  "{Tipo} - Inteiro Teor · {Pessoa}" (ver `nomeDaTarefa`) — "Inteiro Teor" é
  *  jargão de cartório, não informação que falta aqui, e a pessoa duplicava a
  *  coluna ao lado. */
-export function docTipoTxt(l: LinhaOperacaoV3): string {
+export function docTipoTxt(l: Pick<LinhaOperacaoV3, "titulo">): string {
   const semPessoa = l.titulo.split(" · ")[0]
+  // Nunca "· com {cônjuge}": a pessoa (e o cônjuge) ficam na coluna "Pessoa".
   return semPessoa.replace(/\s*-\s*Inteiro Teor\s*$/i, "").trim()
 }
 
@@ -100,6 +124,69 @@ export const orgaoCls = (l: LinhaOperacaoV3): string =>
 export const precisaDeOrgaoEmissor = (l: Pick<LinhaOperacaoV3, "documentoId" | "terceiroNome" | "faseMacroKey">): boolean =>
   l.documentoId != null && !l.terceiroNome && l.faseMacroKey !== "genealogia"
 
+/** PENDÊNCIA DE FASE ANTERIOR — a UMA definição do cartão, da lista que ele abre (`radar === "faseant"`) e do número
+ *  da aba. Só conta tarefa cuja fase é ANTERIOR à fase atual do processo (`faseAnteriorAFaseAtual`, calculado no
+ *  servidor por `faseEhAnteriorA`). Tarefa da fase ATUAL (ex.: Genealogia com o processo em Genealogia) nunca entra.
+ *  Achado real (30/09/2026, Antão): "Certidão de Casamento · Maria del Consuelo" é da fase atual e aparecia como
+ *  "trava a família". Transversal não muda a fase, nunca é "de fase anterior". */
+export const pendenciaDeFaseAnterior = (l: Pick<LinhaOperacaoV3, "faseAnteriorAFaseAtual" | "origem">): boolean =>
+  l.faseAnteriorAFaseAtual === true && l.origem !== "TRANSVERSAL"
+
+/** A lista que um cartão do radar abre — número do cartão = tamanho desta lista. `faseant` olha TODAS as abertas
+ *  (o cartão conta abertas, não só as "a fazer"); `noorg` mantém a base da fila. */
+export function linhasDoRadar<T extends Pick<LinhaOperacaoV3, "faseAnteriorAFaseAtual" | "origem" | "documentoId" | "terceiroNome" | "faseMacroKey">>(
+  radar: "noorg" | "faseant" | null, abertas: readonly T[], fila: readonly T[],
+): T[] {
+  if (radar === "faseant") return abertas.filter(pendenciaDeFaseAnterior)
+  if (radar === "noorg") return fila.filter(precisaDeOrgaoEmissor)
+  return [...fila]
+}
+
+/** Quem é GESTOR para ver o cartão "Escaladas ao gestor": administrador ou quem tem `operacao.distribuirTarefas`
+ *  (src/lib/permissoes.ts). A escalada é decisão de gestão — a assistente não a vê nem a conta. */
+export const ehGestorDaOperacao = (a: { isAdmin: boolean; pode: (chave: string) => boolean }): boolean =>
+  a.isAdmin || a.pode("operacao.distribuirTarefas")
+
+/** O NÚMERO DA ABA "RADAR" — a SOMA dos números dos cartões que têm valor (> 0) e que a pessoa VÊ. Os quatro cartões
+ *  fixos ("Dados inconsistentes", "Sem responsável", "Anexo faltando", "Erro do sistema") são 0 por definição e não
+ *  somam. "Escaladas ao gestor" só soma para o gestor (para os demais o cartão não existe). Nada a mostrar = 0.
+ *  Achados reais (30/09/2026, Daniela): um `+ 1` fixo fazia a aba dizer 2 com a soma dos cartões = 1. */
+export const somaDosCartoesDoRadar = (
+  c: { atras: readonly unknown[]; acompVenc: readonly unknown[]; decis: readonly unknown[]; noOrg: readonly unknown[]; genOpen: readonly unknown[] },
+  opcoes: { verEscaladas: boolean },
+): number => c.atras.length + c.acompVenc.length + (opcoes.verEscaladas ? c.decis.length : 0) + c.noOrg.length + c.genOpen.length
+
+/** A ABA "FAMÍLIAS": UMA função dá os itens listados E o número da aba (número = itens). Chave = família cadastrada,
+ *  senão o nome do processo. Entram as famílias com tarefa aberta OU concluída recente (o card "Concluídas"). */
+export const chaveDaFamilia = (l: Pick<LinhaOperacaoV3, "familiaNome" | "processoNome">): string => l.familiaNome ?? l.processoNome ?? "—"
+export function familiasDaAba<T extends Pick<LinhaOperacaoV3, "familiaNome" | "processoNome">>(abertos: readonly T[], feito: readonly T[]): string[] {
+  return [...new Set([...abertos, ...feito].map(chaveDaFamilia))]
+}
+
+/** A FASE ATUAL REAL do processo para a família — `faseAtualDoProcessoLabel` (rótulo canônico), nunca a fase da
+ *  tarefa (`faseMacroKey`) nem a da primeira linha sem conferir. Achado real: Cibils, em Emissão documental,
+ *  aparecia como "genealogia" porque a UI lia `ts[0].faseMacroKey`. Sem rótulo em nenhuma linha → "—". */
+export function faseAtualDaFamilia(linhas: ReadonlyArray<Pick<LinhaOperacaoV3, "faseAtualDoProcessoLabel">>): string {
+  return linhas.find((l) => l.faseAtualDoProcessoLabel)?.faseAtualDoProcessoLabel ?? "—"
+}
+
+/** O GARGALO da família (linha "Gargalo:" da aba Famílias) — o órgão com mais escaladas, senão "órgão emissor não
+ *  vinculado" pela MESMA `precisaDeOrgaoEmissor` do cartão "Sem órgão emissor" (o passo "Localizar registro" da
+ *  Genealogia não exige órgão), senão "—". */
+export function gargaloDaFamilia(abertosDaFamilia: ReadonlyArray<Pick<LinhaOperacaoV3, "escalada" | "terceiroNome" | "documentoId" | "faseMacroKey">>): string {
+  const porOrgao = new Map<string, number>()
+  for (const l of abertosDaFamilia) if (l.escalada && l.terceiroNome) porOrgao.set(l.terceiroNome, (porOrgao.get(l.terceiroNome) ?? 0) + 1)
+  const topo = [...porOrgao.entries()].sort((a, b) => b[1] - a[1])[0]
+  if (topo) return `${topo[0]} (escalada)`
+  return abertosDaFamilia.some(precisaDeOrgaoEmissor) ? "órgão emissor não vinculado" : "—"
+}
+
+/** O PRÓXIMO MARCO — a próxima fase do caminho do processo, quando a linha a traz (`proximaFaseDoProcessoLabel`,
+ *  derivada de `ordensDeFase(tipoProcesso)` no servidor). Sem o dado, `null`: a tela OMITE o marco — nunca um
+ *  literal ("Análise documental") que só serve a um tipo de processo. */
+export const proximoMarcoDaFamilia = (linhas: ReadonlyArray<Pick<LinhaOperacaoV3, "proximaFaseDoProcessoLabel">>): string | null =>
+  linhas.find((l) => l.proximaFaseDoProcessoLabel)?.proximaFaseDoProcessoLabel ?? null
+
 export const cobrancasTxt = (l: LinhaOperacaoV3): string =>
   l.totalCobrancas === 0 ? "0" : `${l.totalCobrancas}${l.escalada ? " · escalada" : ""}`
 
@@ -107,6 +194,7 @@ export const prazoTarefaCls = (l: LinhaOperacaoV3): string => (l.dataPrazo == nu
 
 /** O rótulo do botão de ação, por estado — "Iniciar"/"Conferir"/"Continuar"/"Confirmado ✓"/"Recebi ✓"/"Abrir". */
 export function acaoDe(l: LinhaOperacaoV3): { label: string; accent: boolean } {
+  if (emAndamentoSemDono(l)) return { label: "Continuar", accent: true }
   if (l.aIniciar) return { label: "Iniciar", accent: true }
   if (l.faseMacroKey === "genealogia") return { label: "Continuar", accent: true }
   if (l.estadoOperacao === "FILA" && l.passoAtual && l.passoAtual.ordem + 1 === l.passoAtual.total) return { label: "Conferir", accent: true }
@@ -210,7 +298,7 @@ export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "p
     // "a iniciar" do grupo — achado real, mandato acima: nascimento (Espanha)
     // e óbito (Brasil) da mesma pessoa nunca são o mesmo requerimento, mesmo
     // as duas "a iniciar" juntas.
-    const aIniciarDoGrupo = rs.filter((r) => r.aIniciar)
+    const aIniciarDoGrupo = rs.filter(aIniciarEfetivo)
     const orgaosDoGrupo = new Set(aIniciarDoGrupo.map((r) => r.terceiroNome ?? null))
     const lote = aIniciarDoGrupo.length > 1 && orgaosDoGrupo.size === 1 && aIniciarDoGrupo[0].terceiroNome != null
     return { chave: k, titulo, sub, pill, pillCls, linhas: rs, lote }

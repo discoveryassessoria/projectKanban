@@ -39,6 +39,9 @@ export interface LinhaOperacaoV3 {
   faseAnteriorAFaseAtual: boolean
   /** Rótulo canônico da fase atual do processo — "Genealogia", nunca "genealogia". */
   faseAtualDoProcessoLabel: string | null
+  /** Rótulo da PRÓXIMA fase do caminho do processo (macrofluxo do tipo, `ordensDeFase`). AINDA NÃO vem da projeção
+   *  (`tarefa-projecoes.ts`): opcional — ausente, a aba Famílias omite o "Próximo marco". */
+  proximaFaseDoProcessoLabel?: string | null
   categoriaDoc: "NASCIMENTO" | "CASAMENTO" | "OBITO" | null
   origem: string | null
   faseMacroKey: string | null

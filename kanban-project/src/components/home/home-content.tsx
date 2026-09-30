@@ -361,9 +361,9 @@ export function HomeContent({ data }: { data: HomeData }) {
         <>
           <MinhaAtencaoBloco data={data} />
 
-          {/* Meus Processos ~70-75% · Agenda ~25-30% */}
+          {/* Processos abertos ~70-75% · Agenda ~25-30%. NÃO é "Meus processos": a lista segue a permissão de módulo (processos.ver), não ownership de tarefa (CLAUDE.md §14; escopoProcesso). */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]">
-            <ProcessosEmAndamento {...(data.usuario.tipo === "admin" ? {} : { titulo: "Meus processos" })} />
+            <ProcessosEmAndamento />
             <AgendaBloco data={data} />
           </div>
 

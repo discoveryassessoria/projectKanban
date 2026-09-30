@@ -25,6 +25,7 @@ import type { Prisma } from '@prisma/client'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { diaOperacional, estadoTemporal } from './tempo-operacional'
 import { visaoGerencial, type LinhaGerencial } from './tarefa-projecoes'
+import { semFaseFutura } from './fase-futura'
 import { motivosAtivos } from './atencao-operacional'
 import { urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia, LINK_SEM_RESPONSAVEL_NA_TORRE } from './navegacao'
 import {
@@ -59,7 +60,8 @@ export async function lerLinhasOperacionais(agora: Date, db: Db = prisma): Promi
         })
       : []
     const ids = new Set(admin.map((a) => a.id))
-    for (const l of linhas) if (!ids.has(l.taskId)) todas.push(l)
+    // Tarefa de FASE FUTURA não gera aviso (regra única — `fase-futura.ts`).
+    for (const l of semFaseFutura(linhas)) if (!ids.has(l.taskId)) todas.push(l)
     if (pagina * porPagina >= total) break
   }
   return todas

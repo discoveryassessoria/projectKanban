@@ -546,8 +546,13 @@ export function FamiliaTabelaExpandida({
     setOcupado(true)
     setErroComando(null)
     try {
-      const r = await fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
-      const d = await r.json().catch(() => ({}))
+      let r = await fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify(corpo) })
+      let d = await r.json().catch(() => ({}))
+      // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
+      if (r.status === 428 && d?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(d.error)) {
+        r = await fetch(`/api/tarefas/${tarefaId}/comando`, { method: "POST", headers: auth(), body: JSON.stringify({ ...corpo, confirmarTarefaEmAndamento: true }) })
+        d = await r.json().catch(() => ({}))
+      }
       if (!r.ok) {
         const porStatus: Record<number, string> = {
           401: "Sua sessão expirou. Entre de novo.",

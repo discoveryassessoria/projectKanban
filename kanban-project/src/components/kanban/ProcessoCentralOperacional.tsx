@@ -663,15 +663,6 @@ export function ProcessoCentralOperacional({
     void abrirOperacao(doc.documentoId ?? 0, doc.necessidadeId)
   }, [abrirOperacao])
 
-  // Lista de funcionários para os seletores "Delegar" (carrega uma vez).
-  const [usuarios, setUsuarios] = useState<Array<{ id: number; nome: string; publicCode?: string | null }>>([])
-  useEffect(() => {
-    fetch("/api/usuarios", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
-      .then((r) => r.json())
-      .then((d) => setUsuarios((d.usuarios || d || []).map((u: { id: number; nome: string; publicCode?: string | null }) => ({ id: u.id, nome: u.nome, publicCode: u.publicCode ?? null }))))
-      .catch(() => {})
-  }, [])
-
   // ────────────────────────────────────────────────────────────────────────────
   // GESTÃO DE RESPONSABILIDADE, AQUI DENTRO — pelas MESMAS portas da Operação.
   //
@@ -725,16 +716,22 @@ export function ProcessoCentralOperacional({
       setSalvandoResp(taskId)
       setErroOperacao(null)
       try {
-        const r = await fetch(`/api/tarefas/${taskId}/comando`, {
+        const enviar = (c: Record<string, unknown>) => fetch(`/api/tarefas/${taskId}/comando`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("authToken")}`,
           },
-          body: JSON.stringify(corpo),
+          body: JSON.stringify(c),
         })
+        let r = await enviar(corpo)
+        let j = await r.json().catch(() => ({}))
+        // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
+        if (r.status === 428 && j?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(j.error)) {
+          r = await enviar({ ...corpo, confirmarTarefaEmAndamento: true })
+          j = await r.json().catch(() => ({}))
+        }
         if (!r.ok) {
-          const j = await r.json().catch(() => ({}))
           setErroOperacao(
             r.status === 409
               ? "Esta tarefa foi alterada por outra pessoa. A tela foi atualizada."
@@ -1255,7 +1252,7 @@ export function ProcessoCentralOperacional({
                     necessidadeId: alvoAntecipada.necessidadeId,
                     pessoaId: alvoAntecipada.pessoaId,
                     faseAtivaCode: faseKeyAtiva ? String(faseKeyAtiva) : null,
-                    usuarios,
+                    usuarios: atribuiveis,
                     onAbrirOperacaoAlvo: readOnly ? undefined : abrirOperacaoAlvo,
                     readOnly,
                   }
@@ -1288,7 +1285,7 @@ export function ProcessoCentralOperacional({
             necessidadeId={novaTransversalCtx.necessidadeId}
             necessidadeLabel={novaTransversalCtx.label}
             pessoaId={novaTransversalCtx.pessoaId}
-            usuarios={usuarios}
+            usuarios={atribuiveis}
             onClose={() => setNovaTransversalCtx(null)}
             onCreated={() => { setNovaTransversalCtx(null); carregar(true) }}
           />

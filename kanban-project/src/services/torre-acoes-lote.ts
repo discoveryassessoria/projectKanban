@@ -215,47 +215,45 @@ export async function desfazerLote(args: { tipo: TipoDesfazer; tarefaIds: number
     const tarefa = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { id: true, titulo: true, prioridade: true, dataPrazo: true } })
     if (!tarefa) { itens.push({ tarefaId, ok: false, mensagem: 'tarefa não encontrada' }); continue }
 
+    // O Desfazer grava UMA linha só — a `..._DESFEITA`, com de/para no detalhe (item 11, 30/09/2026): a
+    // primitiva (`alterarPrioridade`/`alterarPrazo`) recebe `desfazer` e grava a linha de desfazer NO LUGAR da
+    // `..._ALTERADO`. Consequência: a "última mudança" fica sendo a original; se a última linha do par
+    // (mudança, desfeita) é a DESFEITA, a ação já foi desfeita e um segundo clique é recusado.
     if (args.tipo === 'PRIORIDADE') {
       const log = await prisma.logAuditoria.findFirst({
-        where: { entidade: 'Tarefa', entidadeId: tarefaId, acao: 'TAREFA_PRIORIDADE_ALTERADA' },
-        orderBy: { criadoEm: 'desc' }, select: { detalhes: true },
+        where: { entidade: 'Tarefa', entidadeId: tarefaId, acao: { in: ['TAREFA_PRIORIDADE_ALTERADA', 'TAREFA_PRIORIDADE_DESFEITA'] } },
+        orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }], select: { acao: true, detalhes: true },
       })
       const d = log?.detalhes as { de?: string; para?: string } | null
-      if (!d?.de || !d?.para) { itens.push({ tarefaId, ok: false, mensagem: 'nenhuma mudança de prioridade para desfazer' }); continue }
+      if (!log || log.acao !== 'TAREFA_PRIORIDADE_ALTERADA' || !d?.de || !d?.para) { itens.push({ tarefaId, ok: false, mensagem: 'nenhuma mudança de prioridade para desfazer' }); continue }
       if (d.para !== tarefa.prioridade) { itens.push({ tarefaId, ok: false, mensagem: 'a prioridade mudou desde então — desfazer recusado' }); continue }
-      const r = await alterarPrioridade({ tarefaId, autorId: args.autorId, prioridade: d.de as 'BAIXA', motivo: 'desfazer prioridade em lote (Torre)' })
-      if (!r.ok) { itens.push({ tarefaId, ok: false, mensagem: r.mensagem }); continue }
-      await prisma.logAuditoria.create({
-        data: {
-          acao: 'TAREFA_PRIORIDADE_DESFEITA', entidade: 'Tarefa', entidadeId: tarefaId, usuarioId: args.autorId,
-          descricao: `Prioridade de "${tarefa.titulo}" restaurada: ${d.para} → ${d.de}.`, detalhes: { tarefaId, revertidoDe: d.para, revertidoPara: d.de },
-        },
+      const r = await alterarPrioridade({
+        tarefaId, autorId: args.autorId, prioridade: d.de as 'BAIXA', motivo: 'desfazer prioridade em lote (Torre)',
+        desfazer: { acao: 'TAREFA_PRIORIDADE_DESFEITA', descricao: (i) => `Prioridade de "${i.titulo}" restaurada: ${i.de} → ${i.para}.` },
       })
+      if (!r.ok) { itens.push({ tarefaId, ok: false, mensagem: r.mensagem }); continue }
       itens.push({ tarefaId, ok: true, mensagem: 'desfeita' })
       continue
     }
 
     // PRAZO
     const log = await prisma.logAuditoria.findFirst({
-      where: { entidade: 'Tarefa', entidadeId: tarefaId, acao: 'TAREFA_PRAZO_ALTERADO' },
-      orderBy: { criadoEm: 'desc' }, select: { detalhes: true },
+      where: { entidade: 'Tarefa', entidadeId: tarefaId, acao: { in: ['TAREFA_PRAZO_ALTERADO', 'TAREFA_PRAZO_REPACTUACAO_DESFEITA'] } },
+      orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }], select: { acao: true, detalhes: true },
     })
     const d = log?.detalhes as { de?: string | null; para?: string | null } | null
-    if (!log || d == null || !('de' in d) || !('para' in d)) { itens.push({ tarefaId, ok: false, mensagem: 'nenhuma repactuação para desfazer' }); continue }
+    if (!log || log.acao !== 'TAREFA_PRAZO_ALTERADO' || d == null || !('de' in d) || !('para' in d)) { itens.push({ tarefaId, ok: false, mensagem: 'nenhuma repactuação para desfazer' }); continue }
     const atual = tarefa.dataPrazo?.toISOString() ?? null
     if ((d.para ?? null) !== atual) { itens.push({ tarefaId, ok: false, mensagem: 'o prazo mudou desde então — desfazer recusado' }); continue }
     const r = await alterarPrazo({
       tarefaId, autorId: args.autorId, novoPrazo: d.de ? new Date(d.de) : null,
       motivo: 'desfazer repactuação em lote (Torre)',
-    })
-    if (!r.ok) { itens.push({ tarefaId, ok: false, mensagem: r.mensagem }); continue }
-    await prisma.logAuditoria.create({
-      data: {
-        acao: 'TAREFA_PRAZO_REPACTUACAO_DESFEITA', entidade: 'Tarefa', entidadeId: tarefaId, usuarioId: args.autorId,
-        descricao: `Repactuação de prazo de "${tarefa.titulo}" desfeita: volta para ${d.de ? d.de.slice(0, 10) : 'sem prazo'}.`,
-        detalhes: { tarefaId, revertidoDe: d.para, revertidoPara: d.de },
+      desfazer: {
+        acao: 'TAREFA_PRAZO_REPACTUACAO_DESFEITA',
+        descricao: (i) => `Repactuação de prazo de "${i.titulo}" desfeita: ${i.de ? i.de.slice(0, 10) : 'sem prazo'} → ${i.para ? i.para.slice(0, 10) : 'sem prazo'}.`,
       },
     })
+    if (!r.ok) { itens.push({ tarefaId, ok: false, mensagem: r.mensagem }); continue }
     itens.push({ tarefaId, ok: true, mensagem: 'desfeita' })
   }
   return { total: itens.length, desfeitas: itens.filter((i) => i.ok).length, ausenciaEncerrada, itens }

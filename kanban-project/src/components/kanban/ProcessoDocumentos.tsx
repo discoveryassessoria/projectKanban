@@ -90,6 +90,8 @@ interface ProcessoDocumentosData {
     emOperacao: number
     pendentes: number
   }
+  /** FONTE ÚNICA de requeridos/recebidos/pendentes (rota /documentos → documentacao-requerida.ts). */
+  documentacao: { aplicavel: boolean; requeridos: number; recebidos: number; pendentes: number; percentual: number }
   linhaPrincipal: PersonRow[]
   conjuges: PersonRow[]
   outros: PersonRow[]
@@ -254,13 +256,15 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
   const allDocs = todos.flatMap((g) => g.documents)
   const kpis: BibKpis = {
     pessoas: todos.filter((g) => g.documents.length > 0).length,
-    obrig: allDocs.length,
-    certRec: allDocs.filter((d) => d.certificate.status === "recebida" || d.certificate.status === "validada").length,
+    // Os 3 números da documentação vêm da FONTE ÚNICA (necessidade obrigatória) —
+    // NUNCA de contar as linhas de Documento (inclui órfão, placeholder, cancelado).
+    obrig: data.documentacao.requeridos,
+    certRec: data.documentacao.recebidos,
     certRetif: allDocs.filter((d) => d.retifiedCertificate.status === "validada").length,
     trad: allDocs.filter((d) => d.translation.status === "recebida" || d.translation.status === "validada").length,
     apost: allDocs.filter((d) => d.apostille.status === "recebida" || d.apostille.status === "validada").length,
     pronto: allDocs.filter((d) => d.finalStatus === "pronta_protocolo").length,
-    pend: allDocs.filter((d) => d.finalStatus === "pendente").length,
+    pend: data.documentacao.pendentes,
   }
 
   return { kpis, linhaPrincipal, foraDaLinha }

@@ -37,7 +37,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
           onClick={() => router.push("/dashboard")}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:text-white"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Centro Operacional
+          <ArrowLeft className="h-3.5 w-3.5" /> Voltar à Operação
         </button>
 
         <BlocoCard>

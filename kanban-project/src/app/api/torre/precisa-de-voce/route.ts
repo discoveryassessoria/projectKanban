@@ -11,23 +11,11 @@
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { itensPrecisaDeVoce, comSugestoes, briefingDoDia } from '@/lib/operacional/precisa-de-voce'
+import { montarPrecisaDeVoce } from '@/lib/operacional/precisa-de-voce'
 
 export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
 
-  const agora = new Date()
-  const brutos = await itensPrecisaDeVoce({ agora })
-  const itens = await comSugestoes(brutos, agora)
-
-  return NextResponse.json({
-    itens,
-    briefing: briefingDoDia(itens, agora),
-    resumo: {
-      total: itens.length,
-      criticos: itens.filter((i) => i.faixa === 'CRITICO').length,
-      atencao: itens.filter((i) => i.faixa === 'ATENCAO').length,
-    },
-  })
+  return NextResponse.json(await montarPrecisaDeVoce(new Date()))
 }

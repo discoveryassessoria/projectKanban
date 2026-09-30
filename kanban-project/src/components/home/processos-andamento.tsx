@@ -59,7 +59,7 @@ const buscar = (url: string) => {
   })
 }
 
-export function ProcessosEmAndamento({ titulo = "Processos em andamento" }: { titulo?: string } = {}) {
+export function ProcessosEmAndamento({ titulo = "Processos abertos" }: { titulo?: string } = {}) {
   const { data, error, isLoading } = useSWR<{ total: number; processos: LinhaProcesso[] }>(
     "/api/home/processos?limite=6",
     buscar,

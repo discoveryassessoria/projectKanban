@@ -18,6 +18,7 @@
 
 "use client"
 
+import { rotuloGrupoPessoa } from "@/src/lib/documentos/rotulo-grupo-pessoa"
 import { useState } from "react"
 import { FileText, Filter, Search, CheckCircle2, Clock, ChevronDown } from "lucide-react"
 
@@ -282,7 +283,7 @@ function PersonGroup({
   if (g.documents.length > 0 && docs.length === 0) return null
 
   const ini = (g.personName || "").split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()
-  const genTxt = g.lineage === "Linha reta" ? `Geração ${g.generation}` : "Fora da linha"
+  const subtituloPessoa = rotuloGrupoPessoa({ lineage: g.lineage, generation: g.generation, role: g.role })
 
   return (
     <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-2xl mb-3 overflow-hidden">
@@ -296,7 +297,7 @@ function PersonGroup({
         </span>
         <div className="flex-1 min-w-0">
           <b className="text-[14.5px] text-white/95">{g.personName}</b>
-          <span className="block text-[12px] text-[var(--text-secondary)] mt-px">{genTxt} · {g.lineage} · {g.role}</span>
+          <span className="block text-[12px] text-[var(--text-secondary)] mt-px">{subtituloPessoa}</span>
         </div>
         <div className="flex gap-2.5">
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">

@@ -295,6 +295,32 @@ export async function garantirTarefaDePasso(
             stepKey: step.stepKey,
           }])
         }
+        // IRMÃO VIVO NÃO É "SEGUIR O TRABALHO". Duas instâncias-de-passo VIVAS da MESMA obrigação na
+        // MESMA instância (mesma stepKey e ciclo) são uma duplicata — o defeito de chaves divergentes
+        // (`matdoc|…` × `wfi…|stepdef…`), tratado na origem em `materializarAlvos` (phase-workflow.ts) e reparado pela
+        // supersessão de um dos dois. Enquanto os dois vivem, cada chamada de materialização puxava a
+        // tarefa para o passo que estava sendo materializado: a MESMA tarefa pulava de um para o outro
+        // (processo 676, 29/09/2026: 93 reancoragens em 12 minutos, uma tarefa 17 vezes). "Seguir o
+        // trabalho" é ir para o roteiro que VALE quando o anterior fechou; aqui o atual continua vivo, então a
+        // tarefa fica onde está e o irmão é resolvido pela supersessão — nunca por vai-e-vem.
+        if (
+          daUnidade.workflowInstanceId === step.workflowInstanceId &&
+          daUnidade.workflowStepInstanceId != null
+        ) {
+          const passoAtual = await tx.phaseWorkflowStepInstance.findUnique({
+            where: { id: daUnidade.workflowStepInstanceId },
+            select: { stepKey: true, ciclo: true, status: true },
+          })
+          if (
+            passoAtual != null &&
+            passoAtual.stepKey === step.stepKey &&
+            passoAtual.ciclo === step.ciclo &&
+            !["SUPERSEDIDO", "CANCELADO"].includes(passoAtual.status)
+          ) {
+            const inteira = porChave ?? await tx.tarefa.findUniqueOrThrow({ where: { id: daUnidade.id } })
+            return { success: true, created: false, tarefa: inteira, warnings, correlationId }
+          }
+        }
         const reancorada = await reancorarTarefaNaUnidade(tx, {
           tarefaId: daUnidade.id,
           workflowInstanceId: step.workflowInstanceId,

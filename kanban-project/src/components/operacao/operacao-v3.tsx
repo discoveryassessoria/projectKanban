@@ -25,8 +25,9 @@ import { AdiarAcompanhamentoModal } from "./AdiarAcompanhamentoModal"
 import type { LinhaOperacaoV3, RespostaTarefas, Vista, AgruparFilaPor, FiltroRadar, FiltroQuick } from "./operacao-v3-tipos"
 import {
   relCls, acompTxtCompleto, passoLabelDe, faseLabelDe, orgaoTxt, orgaoCls,
-  cobrancasTxt, prazoTarefaCls, acaoDe, concluirLabelDe, aplicarBusca, aplicarVista,
-  agruparDentroDaFamilia, agruparPorFamilia, docTipoTxt, precisaDeOrgaoEmissor, type GrupoDeLinhas,
+  prazoTarefaCls, acaoDe, aplicarBusca, aplicarVista, statusTarefaTxt, statusTarefaCls,
+  agruparDentroDaFamilia, agruparPorFamilia, docTipoTxt, precisaDeOrgaoEmissor, somaDosCartoesDoRadar, pendenciaDeFaseAnterior,
+  linhasDoRadar, familiasDaAba, type GrupoDeLinhas,
 } from "./operacao-v3-derivacoes"
 import {
   AbaAguardando, AbaAcompanhamento, AbaFamilias, AbaRadar, AbaFeito,
@@ -92,7 +93,9 @@ function useNovasDaFamilia(processoId: number | null): Set<number> {
   return useMemo(() => new Set(estado && estado.processoId === processoId ? estado.ids : []), [estado, processoId])
 }
 
-export function OperacaoV3() {
+/** `gestor`: administrador ou quem tem `operacao.distribuirTarefas` (`ehGestorDaOperacao`) — decidido na página, que já lê as
+ *  permissões. Só ele vê o cartão "Escaladas ao gestor" no Radar (e só ele o soma no número da aba). */
+export function OperacaoV3({ gestor = false }: { gestor?: boolean }) {
   const usuario = useJsonLocalStorage<{ nome?: string }>("user")
   const router = useRouter()
   const dados = useOperacaoV3Dados()
@@ -171,7 +174,9 @@ export function OperacaoV3() {
   // mandato "Operação/Antão", correção pós-conferência 29/09/2026). O banner
   // "Bloqueio" e o radar "Sem órgão" herdam esta mesma exclusão.
   const noOrg = useMemo(() => abertosVisiveis.filter(precisaDeOrgaoEmissor), [abertosVisiveis])
-  const genOpen = useMemo(() => abertosVisiveis.filter((l) => l.faseMacroKey === "genealogia" && l.origem !== "TRANSVERSAL"), [abertosVisiveis])
+  // PENDÊNCIA DE FASE ANTERIOR: só tarefa de fase ANTERIOR à fase atual do processo (`pendenciaDeFaseAnterior`) —
+  // a MESMA função dá o cartão, o número da aba e a lista que o cartão abre.
+  const genOpen = useMemo(() => abertosVisiveis.filter(pendenciaDeFaseAnterior), [abertosVisiveis])
 
   const qf = useCallback((l: LinhaOperacaoV3) => {
     if (!quick) return true
@@ -182,17 +187,17 @@ export function OperacaoV3() {
   }, [quick])
 
   const fila = useMemo(() => {
-    let f = filaBase.filter(qf)
-    if (radar === "noorg") f = f.filter(precisaDeOrgaoEmissor)
-    if (radar === "faseant") f = f.filter((l) => l.faseMacroKey === "genealogia")
+    // Com um cartão do radar aberto, a lista é EXATAMENTE a do cartão (`linhasDoRadar`): número = lista.
+    let f = radar === "faseant" ? linhasDoRadar(radar, abertosVisiveis, filaBase).filter(qf) : linhasDoRadar(radar, abertosVisiveis, filaBase.filter(qf))
     // As NOVAS (último aviso "chegou trabalho") sobem ao topo; o resto mantém a ordem.
     if (novasIds.size) f = [...f].sort((a, b) => Number(novasIds.has(b.taskId)) - Number(novasIds.has(a.taskId)))
     return f
-  }, [filaBase, qf, radar, novasIds])
+  }, [filaBase, abertosVisiveis, qf, radar, novasIds])
   const aguard = useMemo(() => aguardBase.filter(qf), [aguardBase, qf])
 
-  const nFam = useMemo(() => new Set(abertosVisiveis.map((l) => l.familiaNome ?? l.processoNome ?? "—")).size, [abertosVisiveis])
-  const nRadar = (atras.length ? 1 : 0) + (acompVenc.length ? 1 : 0) + (decis.length ? 1 : 0) + (noOrg.length ? 1 : 0) + (genOpen.length ? 1 : 0) + 1
+  // FAMÍLIAS: o número da aba é o de famílias LISTADAS na aba (abertas + concluídas recentes) — UMA função.
+  const nFam = useMemo(() => familiasDaAba(abertosVisiveis, feitoVisivel).length, [abertosVisiveis, feitoVisivel])
+  const nRadar = somaDosCartoesDoRadar({ atras, acompVenc, decis, noOrg, genOpen }, { verEscaladas: gestor })
 
 
   const linhaPorId = useMemo(() => new Map(todos.map((l) => [l.taskId, l])), [todos])
@@ -209,7 +214,7 @@ export function OperacaoV3() {
   }, [fila, abertosVisiveis, drawerTaskId, focus])
 
   const iniciarFoco = useCallback(() => {
-    if (!fila.length) { avisar("Fila vazia."); return }
+    if (!fila.length) { avisar("Nada a fazer."); return }
     setFocus(0); setDrawerTaskId(fila[0].taskId)
   }, [fila, avisar])
 
@@ -297,7 +302,7 @@ export function OperacaoV3() {
         <div style={{ flexGrow: 1 }} />
         <div style={{ display: "flex", gap: 8, paddingBottom: 12, alignItems: "center" }}>
           <button className="opv3-kpi" onClick={() => irPara("fila")} style={{ borderColor: "#c9622b", textAlign: "left" }}>
-            <b style={{ color: "#c9622b" }}>{filaBase.length}</b><span>Fila</span>
+            <b style={{ color: "#c9622b" }}>{filaBase.length}</b><span>A fazer</span>
           </button>
           <button className="opv3-kpi" onClick={() => irPara("aguard")} style={{ textAlign: "left" }}>
             <b>{aguardBase.length}</b><span>Aguardando</span>
@@ -325,7 +330,7 @@ export function OperacaoV3() {
 
       {/* ===== ABAS + VISTA/BUSCA ===== */}
       <div style={{ display: "flex", gap: 2, padding: "0 24px", background: "#fff", borderBottom: "1px solid #dfe4ee", alignItems: "center", flexWrap: "wrap" }}>
-        <button className={`opv3-tab ${tab === "fila" ? "on" : ""}`} onClick={() => irPara("fila")}>Fila <span className="opv3-n">{filaBase.length}</span></button>
+        <button className={`opv3-tab ${tab === "fila" ? "on" : ""}`} onClick={() => irPara("fila")}>A fazer <span className="opv3-n">{filaBase.length}</span></button>
         <button className={`opv3-tab ${tab === "aguard" ? "on" : ""}`} onClick={() => irPara("aguard")}>Aguardando <span className="opv3-n">{aguardBase.length}</span></button>
         <button className={`opv3-tab ${tab === "acomp" ? "on" : ""}`} onClick={() => irPara("acomp")}>Acompanhamento <span className="opv3-n opv3-warn">{acompVenc.length} vencidos</span></button>
         <button className={`opv3-tab ${tab === "fam" ? "on" : ""}`} onClick={() => irPara("fam")}>Famílias <span className="opv3-n">{nFam}</span></button>
@@ -336,7 +341,7 @@ export function OperacaoV3() {
           <label className="opv3-field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <span>Vista</span>
             <select aria-label="Vista salva" value={vista} onChange={(e) => setVista(e.target.value as Vista)} style={{ width: "auto" }}>
-              <option value="minha">Minha fila</option>
+              <option value="minha">A fazer</option>
               <option value="es">Só Espanha</option>
               <option value="it">Só Itália</option>
               <option value="urg">Só urgentes (vencidos + atrasadas)</option>
@@ -367,7 +372,7 @@ export function OperacaoV3() {
               onVincularTodos={vincularOrgaoTodos}
               onAddTransversal={() => {
                 const primeira = filaBase[0]
-                if (!primeira?.processoId) { avisar("Nenhuma família na fila para anexar a tarefa transversal."); return }
+                if (!primeira?.processoId) { avisar("Nenhuma família em A fazer para anexar a tarefa transversal."); return }
                 setTransversalProcessoId(primeira.processoId)
               }}
               onNaoLigado={naoLigado}
@@ -405,7 +410,7 @@ export function OperacaoV3() {
           )}
           {tab === "radar" && (
             <AbaRadar
-              atras={atras} acompVenc={acompVenc} decis={decis} noOrg={noOrg} genOpen={genOpen}
+              atras={atras} acompVenc={acompVenc} decis={decis} noOrg={noOrg} genOpen={genOpen} verEscaladas={gestor} escaladaLimiar={ESCALADA_LIMIAR}
               onKAtras={() => { const emFila = filaBase.some((l) => l.atrasada); setTab(emFila ? "fila" : "aguard"); setQuick("atrasadas") }}
               onGoAcomp={() => setTab("acomp")}
               onKEsc={() => { setTab("aguard"); setQuick("escaladas") }}
@@ -448,7 +453,7 @@ export function OperacaoV3() {
             ) : undefined}
             rodapeExtra={(
               <div style={{ background: "var(--surface-secondary)", borderTop: "1px solid var(--border-default)", padding: "10px 18px", display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "#7a8296", flexShrink: 0 }}>
-                <span>Navegação da fila (só na Operação)</span>
+                <span>Navegação do A fazer (só na Operação)</span>
                 <div style={{ flexGrow: 1 }} />
                 <button className="opv3-btn opv3-sm" onClick={() => navFoco(-1)}>← Anterior</button>
                 <button className="opv3-btn opv3-sm" onClick={() => navFoco(1)}>Próxima →</button>
@@ -555,7 +560,7 @@ function AbaFila({
   return (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <button className="opv3-btn opv3-acc" onClick={onIniciarFoco}>▶ Trabalhar a fila ({linhas.length})</button>
+        <button className="opv3-btn opv3-acc" onClick={onIniciarFoco}>▶ Fazer agora ({linhas.length})</button>
         <label className="opv3-field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <span>Por família, depois por</span>
           <select aria-label="Agrupar por" value={group} onChange={(e) => setGroup(e.target.value as AgruparFilaPor)} style={{ width: "auto" }}>
@@ -580,7 +585,7 @@ function AbaFila({
           </div>
         )}
       </div>
-      <div style={{ fontSize: 12, color: "#5b6478" }}>Fila = o que depende de você agora: certidões <b>a iniciar</b> (enviar ao cartório) e no <b>passo 4</b> (conferir e validar). O que está com o cartório fica em Aguardando.</div>
+      <div style={{ fontSize: 12, color: "#5b6478" }}>A fazer = o que depende de você agora: certidões a iniciar (enviar ao cartório) e no passo 4 (conferir e validar). O que está com o cartório fica em Aguardando.</div>
 
       {noOrgTotal.length > 0 && !radar && !quick && (
         <div className="opv3-card" style={{ borderLeft: "4px solid #b3261e", padding: "10px 14px", display: "flex", gap: 12, alignItems: "center", fontSize: 12 }}>
@@ -593,7 +598,7 @@ function AbaFila({
 
       {linhas.length === 0 && (
         <div className="opv3-card" style={{ padding: 40, textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
-          <b style={{ fontSize: 14, color: "#155e39" }}>{quick || radar ? "Nenhuma na fila com esse filtro." : "Nada na fila."}</b>
+          <b style={{ fontSize: 14, color: "#155e39" }}>{quick || radar ? "Nenhuma a fazer com esse filtro." : "Nada a fazer."}</b>
           <span style={{ color: "#5b6478" }}>{nAguard} certidões com o cartório · {nAcompVenc} acompanhamentos vencidos.</span>
         </div>
       )}
@@ -610,7 +615,7 @@ function AbaFila({
               <button className="opv3-btn opv3-sm" onClick={() => toggleCol(fk)} aria-label="Expandir ou recolher família" style={{ minWidth: 32 }}>{aberta ? "▾" : "▸"}</button>
               <span className="opv3-pill opv3-p-gry">Família</span><b style={{ fontSize: 12.5 }}>{F.fam}</b>
               <span style={{ color: "#5b6478" }}>
-                {F.faseAtualLabel ? `Fase atual: ${F.faseAtualLabel} · ` : ""}{F.pais ? `${F.pais} · ` : ""}{F.linhas.length} na fila · {statsPorFamilia.get(F.fam)?.aguardando ?? 0} aguardando · {statsPorFamilia.get(F.fam)?.vencidos ?? 0} vencido{(statsPorFamilia.get(F.fam)?.vencidos ?? 0) === 1 ? "" : "s"}
+                {F.faseAtualLabel ? `Fase atual: ${F.faseAtualLabel} · ` : ""}{F.pais ? `${F.pais} · ` : ""}{F.linhas.length} a fazer · {statsPorFamilia.get(F.fam)?.aguardando ?? 0} aguardando · {statsPorFamilia.get(F.fam)?.vencidos ?? 0} vencido{(statsPorFamilia.get(F.fam)?.vencidos ?? 0) === 1 ? "" : "s"}
               </span>
               <div style={{ flexGrow: 1 }} />
               <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(F.fam)}>Ver família</button>
@@ -665,7 +670,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
       </div>
       {aberto && (
         <>
-          <div className="opv3-hd opv3-gF"><span /><span>Documento</span><span>Pessoa</span><span>Fase</span><span>Passo atual</span><span>Acompanhamento</span><span>Órgão</span><span>Ação</span></div>
+          <div className="opv3-hd opv3-gF"><span /><span>Documento</span><span>Pessoa</span><span>Fase</span><span>Passo atual</span><span>Status</span><span>Acompanhamento</span><span>Órgão</span><span>Ação</span></div>
           {grupo.linhas.map((t) => {
             const passo = passoLabelDe(t)
             const fase = faseLabelDe(t)
@@ -673,7 +678,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
             return (
               <div key={t.taskId} className={`opv3-row opv3-gF ${sel[t.taskId] ? "opv3-sel" : ""}`}>
                 <button className={`opv3-chk ${sel[t.taskId] ? "on" : ""}`} onClick={() => toggleLinha(t.taskId)} aria-label="Selecionar" />
-                <div style={{ fontWeight: 600 }}>{novasIds.has(t.taskId) && <span className="opv3-pill opv3-p-amb" style={{ marginRight: 6 }}>Nova</span>}{docTipoTxt(t)}{t.conjugeNome ? ` · com ${t.conjugeNome}` : ""}</div>
+                <div style={{ fontWeight: 600 }}>{novasIds.has(t.taskId) && <span className="opv3-pill opv3-p-amb" style={{ marginRight: 6 }}>Nova</span>}{docTipoTxt(t)}</div>
                 <div>
                   {t.pessoaId != null && t.processoId != null ? (
                     <a href={urlArvoreDoProcesso(t.processoId, t.pessoaId)} style={{ color: "inherit", textDecoration: "underline" }} onClick={(e) => e.stopPropagation()}>
@@ -687,7 +692,8 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
                   </div>
                 </div>
                 <div><span className={`opv3-pill ${fase.cls}`}>{fase.texto}</span></div>
-                <div>{passo.label}<div style={{ fontSize: 11, color: "#7a8296" }}>{passo.sub}</div></div>
+                <div>{passo.label}</div>
+                <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span><div style={{ fontSize: 11, color: "#7a8296" }}>{t.rotuloDoPrazo}</div></div>
                 <div>
                   {t.terceiroNome ? (

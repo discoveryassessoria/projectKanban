@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     novoResponsavelId,
     autorId: usuario.userId,
     motivo: typeof b?.motivo === 'string' ? b.motivo.slice(0, 300) : null,
+    confirmarTarefaEmAndamento: b?.confirmarTarefaEmAndamento === true,
   })
   return NextResponse.json(r, { status: r.falha > 0 ? 207 : 200 })
 }

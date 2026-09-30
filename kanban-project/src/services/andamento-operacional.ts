@@ -116,6 +116,9 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   TAREFA_DEVOLVIDA_A_FILA: "Devolvida à fila",
   TAREFA_PRAZO_ALTERADO: "Prazo alterado",
   TAREFA_PRIORIDADE_ALTERADA: "Prioridade alterada",
+  // O Desfazer da Torre grava UMA linha só (item 11, 30/09/2026), com de/para no detalhe.
+  TAREFA_PRIORIDADE_DESFEITA: "Prioridade desfeita",
+  TAREFA_PRAZO_REPACTUACAO_DESFEITA: "Repactuação de prazo desfeita",
   TAREFA_AGUARDANDO_TERCEIRO: "Aguardando terceiro",
   TAREFA_RETOMADA_DE_ESPERA: "Retomada da espera",
   TAREFA_CONCLUIDA: "Tarefa concluída",
@@ -308,7 +311,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
   for (const l of logs) {
     const det = (l.detalhes ?? {}) as Record<string, unknown>
     const ehResponsabilidade = CATEGORIA_LOG_ACAO(l.acao) === "responsabilidade"
-    const ehPrazo = l.acao === "TAREFA_PRAZO_ALTERADO"
+    const ehPrazo = l.acao === "TAREFA_PRAZO_ALTERADO" || l.acao === "TAREFA_PRAZO_REPACTUACAO_DESFEITA"
     eventos.push({
       id: `log:${l.id}`,
       tipo: l.acao,

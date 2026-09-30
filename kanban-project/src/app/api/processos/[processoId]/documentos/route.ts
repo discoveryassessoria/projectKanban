@@ -1,5 +1,6 @@
 // src/app/api/processos/[processoId]/documentos/route.ts
 
+import { documentacaoRequeridaDoProcesso, type DocumentacaoRequerida } from "@/src/lib/process-stage/documentacao-requerida"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
@@ -95,6 +96,8 @@ interface ProcessoDocumentosResponse {
     emOperacao: number
     pendentes: number
   }
+  /** Requeridos/recebidos/pendentes — FONTE ÚNICA (documentacao-requerida.ts), a mesma de Geral/Central/Home/Torre. `stats` acima é grain DOCUMENTO e NÃO alimenta os cards. */
+  documentacao: DocumentacaoRequerida
   linhaPrincipal: PersonRow[]
   conjuges: PersonRow[]
   outros: PersonRow[]
@@ -603,6 +606,7 @@ export async function GET(
 
     const response: ProcessoDocumentosResponse = {
       stats,
+      documentacao: await documentacaoRequeridaDoProcesso(id),
       linhaPrincipal,
       conjuges,
       outros,

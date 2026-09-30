@@ -393,10 +393,17 @@ export function VisaoGlobal() {
       setOcupado(true)
       setErroComando(null)
       try {
-        const r = await fetch(`/api/tarefas/${tarefaId}/comando`, {
+        let r = await fetch(`/api/tarefas/${tarefaId}/comando`, {
           method: "POST", headers: auth(), body: JSON.stringify(corpo),
         })
-        const d = await r.json().catch(() => ({}))
+        let d = await r.json().catch(() => ({}))
+        // Tirar o responsável de uma tarefa EM ANDAMENTO pede confirmação explícita (o servidor recusa sem ela).
+        if (r.status === 428 && d?.codigo === "CONFIRMACAO_NECESSARIA" && window.confirm(d.error)) {
+          r = await fetch(`/api/tarefas/${tarefaId}/comando`, {
+            method: "POST", headers: auth(), body: JSON.stringify({ ...corpo, confirmarTarefaEmAndamento: true }),
+          })
+          d = await r.json().catch(() => ({}))
+        }
         if (!r.ok) {
           setErroComando(
             r.status === 409 ? "Outra pessoa mexeu nesta tarefa agora. Recarregamos a lista."

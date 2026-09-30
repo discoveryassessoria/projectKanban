@@ -499,11 +499,12 @@ function ConteudoDrawer({
     : consulta.erro
 
   // Usuários para delegação — leitura independente, com o seu cache.
-  const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>("/api/usuarios")
+  // QUEM PODE RECEBER TRABALHO — rota de atribuíveis (tarefas.editar), nunca /api/usuarios
+  // (usuarios.gerenciar: 403 para a assistente). Sem permissão, nem chama.
+  const usuariosReq = useApi<{ funcionarios?: Usuario[] }>(pode("tarefas.editar") ? "/api/operacao/atribuiveis" : null)
   const usuarios = useMemo<Usuario[]>(() => {
     const d = usuariosReq.dados
-    if (!d) return []
-    return Array.isArray(d) ? d : (d.usuarios ?? [])
+    return d?.funcionarios ?? []
   }, [usuariosReq.dados])
 
   // MÁQUINA DE ESTADOS EXPLÍCITA do Drawer — nunca inferir "sem operação" só porque a

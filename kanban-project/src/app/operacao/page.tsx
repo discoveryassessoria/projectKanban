@@ -29,6 +29,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { OperacaoV3 } from "@/src/components/operacao/operacao-v3"
+import { ehGestorDaOperacao } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { destinoDaOperacaoParaAdmin } from "@/src/lib/torre-absorcao"
 
 const CARREGANDO = (
@@ -57,7 +58,7 @@ export default function OperacaoPage() {
 
 function OperacaoPageConteudo() {
   const router = useRouter()
-  const { pode, carregando } = usePermissoes()
+  const { pode, isAdmin, carregando } = usePermissoes()
   const mounted = useIsClient()
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
   const user = userSalvo ?? { nome: "Usuário" }
@@ -91,7 +92,7 @@ function OperacaoPageConteudo() {
           notificações, usuário, sair) são os mesmos do resto do sistema. */}
       <HeaderBarApp
         title="Operação"
-        subtitle="Fila, aguardando, acompanhamento, famílias, radar e feito."
+        subtitle="A fazer, aguardando, acompanhamento, famílias, radar e feito."
         userName={user.nome}
         userRole={user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"}
         onLogout={() => void encerrarSessao("manual")}
@@ -109,7 +110,7 @@ function OperacaoPageConteudo() {
       <main className="flex max-h-[calc(100vh-80px)] flex-col px-6 pb-16 pt-6">
         <div className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-page)] p-4">
           <div className="min-w-0 flex-1">
-            <OperacaoV3 />
+            <OperacaoV3 gestor={ehGestorDaOperacao({ isAdmin, pode })} />
           </div>
         </div>
       </main>

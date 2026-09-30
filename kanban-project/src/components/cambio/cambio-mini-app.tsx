@@ -24,6 +24,8 @@ import Link from "next/link"
 import useSWR from "swr"
 import { AlertTriangle } from "lucide-react"
 import { fetcherComAuth } from "@/src/components/home/use-home"
+import { useLocalStorage } from "@/src/lib/cliente"
+import { FUSO_OPERACIONAL } from "@/lib/operacional/tempo-operacional"
 
 type MoedaSnap = {
   moeda: "EUR" | "USD"
@@ -37,11 +39,11 @@ const CHAVE_CACHE = "discovery:cambio:ultimo-snapshot"
 const fmt = (v: number | null) =>
   v == null ? "—" : v.toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })
 
-function lerCacheLocal(): { moedas: MoedaSnap[] } | undefined {
-  if (typeof window === "undefined") return undefined
+/** Interpreta o texto cru do cache — nunca lança (cache corrompido = sem cache). */
+export function interpretarCacheCambio(bruto: string | null): { moedas: MoedaSnap[] } | undefined {
+  if (!bruto) return undefined
   try {
-    const bruto = window.localStorage.getItem(CHAVE_CACHE)
-    return bruto ? JSON.parse(bruto) : undefined
+    return JSON.parse(bruto)
   } catch {
     return undefined
   }
@@ -57,10 +59,13 @@ function gravarCacheLocal(dados: { moedas: MoedaSnap[] } | undefined) {
 }
 
 export function CambioMiniApp() {
-  // `fallbackData` lido do cache local SÓ na primeira renderização deste
-  // componente — nunca sobrescreve um fetch em andamento nem finge ser dado
-  // fresco: é só o que evita a tela piscar "—" numa navegação normal.
-  const [fallback] = React.useState(() => lerCacheLocal())
+  // `fallbackData` vem do cache local por `useSyncExternalStore` (`useLocalStorage`): no SERVIDOR e no
+  // primeiro render da HIDRATAÇÃO o snapshot é `null` (igual nos dois lados, o skeleton); logo depois do
+  // mount o React relê o storage e o último valor válido aparece. Achado real (30/09/2026): ler o
+  // localStorage num `useState(() => ...)` fazia o cliente hidratar com o valor e o servidor ter
+  // renderizado o skeleton → React #418 em TODA tela com o cabeçalho, para quem já tinha cache.
+  const brutoCache = useLocalStorage(CHAVE_CACHE)
+  const fallback = React.useMemo(() => interpretarCacheCambio(brutoCache), [brutoCache])
 
   const { data, isLoading, error } = useSWR<{ moedas: MoedaSnap[] }>("/api/cambio/snapshot", fetcherComAuth, {
     revalidateOnFocus: false,
@@ -119,7 +124,7 @@ export function CambioMiniApp() {
       <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
         {defasado && <AlertTriangle className="h-3 w-3 text-amber-800" aria-hidden="true" />}
         {atualizacao
-          ? new Date(atualizacao).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+          ? new Date(atualizacao).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: FUSO_OPERACIONAL })
           : "—"}
       </span>
     </Link>

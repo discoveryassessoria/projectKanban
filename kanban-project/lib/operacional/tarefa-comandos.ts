@@ -333,6 +333,8 @@ export async function redistribuirTarefas(args: {
   novoResponsavelId: number | null
   autorId: number
   motivo?: string | null
+  /** Só vale para `novoResponsavelId: null`: devolver à fila uma tarefa EM ANDAMENTO exige confirmação explícita (`devolverAFila`). */
+  confirmarTarefaEmAndamento?: boolean
 }): Promise<{ total: number; sucesso: number; falha: number; itens: ItemDaRedistribuicao[] }> {
   const itens: ItemDaRedistribuicao[] = []
   // Só um FLAG interno para `atribuirTarefa` suprimir o aviso individual — não
@@ -343,7 +345,7 @@ export async function redistribuirTarefas(args: {
   for (const tarefaId of [...new Set(args.tarefaIds)]) {
     if (args.novoResponsavelId == null) {
       const { devolverAFila } = await import('./tarefa-ciclo')
-      const r = await devolverAFila({ tarefaId, autorId: args.autorId, motivo: args.motivo ?? 'redistribuição em lote' })
+      const r = await devolverAFila({ tarefaId, autorId: args.autorId, motivo: args.motivo ?? 'redistribuição em lote', confirmarTarefaEmAndamento: args.confirmarTarefaEmAndamento === true })
       itens.push(r.ok ? { tarefaId, ok: true } : { tarefaId, ok: false, codigo: r.codigo, mensagem: r.mensagem })
       continue
     }

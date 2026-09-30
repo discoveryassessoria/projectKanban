@@ -75,7 +75,7 @@ async function main() {
   console.log("\nPáginas e Torre")
   const pg = readFileSync("src/app/operacao/page.tsx", "utf8")
   ok("/operacao continua existindo e só redireciona quem é admin", existsSync("src/app/operacao/page.tsx") && /user\.tipo === "admin" \? destinoDaOperacaoParaAdmin\(parametros\) : null/.test(pg) && /router\.replace\(paraTorre\)/.test(pg))
-  ok("a tela da Operação (OperacaoV3) continua montada para o não-admin", pg.includes("<OperacaoV3 />"))
+  ok("a tela da Operação (OperacaoV3) continua montada para o não-admin", pg.includes("<OperacaoV3 gestor="))
   const sino = readFileSync("src/components/sino-notificacoes.tsx", "utf8")
   ok("o clique do sino traduz o link só para admin", /linkDoAvisoParaAdmin\(a\.link, usuarioSalvo\?\.tipo\)/.test(sino))
   const torre = readFileSync("src/components/torre/Torre.tsx", "utf8")
