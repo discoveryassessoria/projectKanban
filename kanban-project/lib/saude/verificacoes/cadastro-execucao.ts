@@ -168,9 +168,12 @@ registrar({
   responsavel: 'Workflow',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
+    // A CASCA DE UM MODELO DA BIBLIOTECA (`origemBiblioteca`, fase "biblioteca") não é workflow de FASE: o
+    // modelo é copiado para uma fase real ao ser usado, e é lá que a competência se confere. Conferi-la aqui
+    // gerava ~28 ERROS falsos que não somem (Torre, Bloco I, 30/09/2026).
     const acoes = await prisma.stepAction.findMany({
-      where: { ativo: true },
-      select: { id: true, key: true, label: true, effectKey: true, step: { select: { key: true, workflow: { select: { phaseKey: true, name: true } } } } },
+      where: { ativo: true, step: { workflow: { origemBiblioteca: false } } },
+      select: { id: true, key: true, label: true, effectKey: true, subtask: { select: { key: true } }, step: { select: { key: true, workflow: { select: { wfUid: true, phaseKey: true, name: true } } } } },
     })
     const fases = new Map((await prisma.catalogoFase.findMany({ select: { phaseKey: true, efeitosPermitidos: true } }))
       .map((f) => [f.phaseKey, f.efeitosPermitidos]))
@@ -181,7 +184,9 @@ registrar({
     if (!fora.length) return vazio({ acoes: acoes.length, foraDeCompetencia: 0 }, 'Nenhuma ação executa efeito fora da competência da fase.')
     return {
       achados: fora.map((a): Achado => ({
-        chave: `acao-fora-competencia:${a.id}`,
+        // CHAVE ESTÁVEL: workflow (âncora `wfUid`) + passo + subtarefa + ação (a chave da ação se repete entre subtarefas). O id da ação muda a cada republicação — com ele
+        // o achado era "resolvido" e reaberto com outro id, e a lista nunca esvaziava.
+        chave: `acao-fora-competencia:${a.step.workflow.wfUid}:${a.step.key}:${a.subtask?.key ?? '-'}:${a.key}`,
         severidade: 'ERRO',
         titulo: `"${a.label}" usa ${a.effectKey}, fora da competência de ${a.step.workflow.phaseKey}`,
         descricao: `O passo "${a.step.key}" de "${a.step.workflow.name}" oferece um resultado que a fase não deveria poder tomar.`,
@@ -1114,8 +1119,9 @@ registrar({
   responsavel: 'Workflow',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
+    // Cascas de Modelo da Biblioteca não disputam fase com ninguém (Torre, Bloco I, 30/09/2026).
     const wfs = await prisma.phaseInternalWorkflow.findMany({
-      where: { arquivado: false, active: true },
+      where: { arquivado: false, active: true, origemBiblioteca: false },
       select: { id: true, name: true, phaseKey: true, tipoProcessoId: true },
     })
     const tipos = new Set((await prisma.tipoProcessoNacionalidade.findMany({ select: { id: true } })).map((t) => t.id))

@@ -103,7 +103,9 @@
    "scripts/torre-bloco-g-lote-e-desfazer.test.ts",
    "scripts/torre-bloco-g-terceiros-acoes-e-permissoes.test.ts",
    "scripts/torre-bloco-h-equipe.test.ts",
-   "scripts/torre-bloco-h-regras.test.ts"
+   "scripts/torre-bloco-h-regras.test.ts",
+   "scripts/saude-biblioteca-nao-e-fase.test.ts",
+   "scripts/torre-bloco-i-integridade-auditoria-foco.test.ts"
   ]
  },
  "arquivos": [
@@ -188,6 +190,8 @@
   "scripts/torre-bloco-g-lote-e-desfazer.test.ts",
   "scripts/torre-bloco-g-terceiros-acoes-e-permissoes.test.ts",
   "scripts/torre-bloco-h-equipe.test.ts",
-  "scripts/torre-bloco-h-regras.test.ts"
+  "scripts/torre-bloco-h-regras.test.ts",
+  "scripts/saude-biblioteca-nao-e-fase.test.ts",
+  "scripts/torre-bloco-i-integridade-auditoria-foco.test.ts"
  ]
 }

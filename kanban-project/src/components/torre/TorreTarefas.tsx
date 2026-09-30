@@ -11,6 +11,7 @@ import { api, erroDe, Campo, Modal, resumoDoLote, useTorre, type Desfazer } from
 import { bolaDe, riscoDe, type LinhaTorre } from "./tipos"
 import { PainelTorreTarefa } from "./PainelTorreTarefa"
 import { CobrarTodosVencidos } from "./CobrarTodosVencidos"
+import { FocoFamilia } from "./FocoFamilia"
 
 type Agrupar = "fam" | "resp" | "org" | "fase" | "none"
 type Visao = "todas" | "vencidas" | "semdono" | "aguard" | "cobranca"
@@ -45,6 +46,7 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
   const [cobrarLinha, setCobrarLinha] = useState<LinhaTorre | null>(null)
   const [aberta, setAberta] = useState<LinhaTorre | null>(null)
   const [ocupado, setOcupado] = useState(false)
+  const [foco, setFoco] = useState<number | null>(null)
 
   const podeEditar = !!permissoes?.editar
   useEffect(() => {
@@ -140,7 +142,9 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
           <div key={nome} className="tor-card tor-scroll">
             <div className="tor-grp">
               <button className={`tor-chk ${todas ? "on" : alguma ? "mid" : ""}`} aria-label={`Selecionar o grupo ${nome}`} onClick={() => alternar(itens.map((l) => l.taskId), !todas)} />
-              <b>{nome}</b><div style={{ flexGrow: 1 }} /><span className="tor-p gry">{itens.length} tarefas</span>
+              {agrupar === "fam" && itens[0]?.processoId != null
+                ? <button className="tor-linkbtn" aria-label={`Abrir o foco da família ${nome}`} onClick={() => setFoco(itens[0].processoId as number)}>{nome}</button>
+                : <b>{nome}</b>}<div style={{ flexGrow: 1 }} /><span className="tor-p gry">{itens.length} tarefas</span>
             </div>
             <div className="tor-hd tor-gT"><span /><span>Certidão · pessoa</span><span>Bola com</span><span>Etapa</span><span>Responsável</span><span>Prazo</span><span>Acomp.</span><span>Risco</span><span /></div>
             {itens.map((l) => {
@@ -167,6 +171,8 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
           </div>
         )
       })}
+
+      {foco != null && <FocoFamilia processoId={foco} onFechar={() => setFoco(null)} />}
 
       {repactuar && <RepactuarLoteModal n={selIds.length} onFechar={() => setRepactuar(false)} onEnviar={async (novoPrazo, justificativa) => {
         const r = await lote("REPACTUAR", { novoPrazo, justificativa })

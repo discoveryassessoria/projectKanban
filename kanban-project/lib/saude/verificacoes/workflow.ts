@@ -302,6 +302,7 @@ registrar({
               COUNT(*)::int AS quantos, string_agg(w.id::text, ', ' ORDER BY w.id) AS ids
          FROM "PhaseInternalWorkflow" w
         WHERE w.active = true AND w.arquivado = false
+          AND w."origemBiblioteca" = false
         GROUP BY w."phaseKey", w."tipoProcessoId"
        HAVING COUNT(*) > 1
         LIMIT 100`,

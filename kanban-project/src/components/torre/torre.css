@@ -55,3 +55,14 @@
 .tor-kv b { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
 .tor-gaveta { position: fixed; inset: 0; z-index: 10001; display: flex; justify-content: flex-end; background: var(--overlay-modal); }
 .tor-gaveta > div { width: min(560px, 100%); background: var(--surface-popover); height: 100%; overflow-y: auto; }
+.tor-modal-g { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--overlay-modal); }
+.tor-modal-g > div { width: min(1100px, 100%); max-height: 92vh; overflow-y: auto; background: var(--surface-popover); border-radius: 16px; box-shadow: var(--elev-3); padding: 20px; }
+.tor-num { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+.tor-num > div { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; padding: 10px 12px; }
+.tor-num b { display: block; font-size: 22px; }
+.tor-num span { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.tor-gI { grid-template-columns: 110px minmax(260px, 2fr) 1.3fr 1.6fr; align-items: start; }
+.tor-gA { grid-template-columns: 130px 1fr 1.2fr 2fr 1.5fr; align-items: start; }
+.tor-gF { grid-template-columns: minmax(220px, 2fr) 1.2fr 1.2fr 1fr 1fr; }
+.tor-mention { color: var(--info-text); font-weight: 600; }
+.tor-linkbtn { background: transparent; border: 0; padding: 0; font-weight: 800; color: var(--text-primary); text-decoration: underline dotted; cursor: pointer; }
