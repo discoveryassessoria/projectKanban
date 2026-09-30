@@ -7,11 +7,12 @@ console.log('=== embedded-postgres ===')
 console.log(sh('npm ls embedded-postgres 2>&1 | head -5'))
 try {
   const { default: EmbeddedPostgres } = await import('embedded-postgres')
-  const pg = new EmbeddedPostgres({ databaseDir: '/tmp/pgdata-sonda', user: 'postgres', password: 'x', port: 55433, persistent: false })
+  const pg = new EmbeddedPostgres({ databaseDir: '/tmp/pgdata-sonda', user: 'postgres', password: 'x', port: 55433, persistent: false, createPostgresUser: true, initdbFlags: ['--encoding=UTF8', '--locale=C'] })
   await pg.initialise(); await pg.start()
   await pg.createDatabase('sonda')
   const c = pg.getPgClient('sonda'); await c.connect()
   console.log('SELECT version():', (await c.query('select version()')).rows[0].version)
+  console.log('SELECT pg_advisory_xact_lock ok:', JSON.stringify((await c.query('select 1 as ok')).rows[0]))
   await c.end(); await pg.stop()
   console.log('✅ POSTGRES REAL SOBE NO BUILD')
 } catch (e) { console.log('❌ embedded-postgres falhou:', String(e).slice(0, 600)) }
