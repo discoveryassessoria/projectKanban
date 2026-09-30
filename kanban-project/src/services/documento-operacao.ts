@@ -226,7 +226,7 @@ export async function identificarImpactoDownstream(documentoId: number): Promise
  * uma `phaseKey` fora do catálogo deste tipo — fase desconhecida não é "mais
  * à frente" nem "mais atrás", é neutra (nunca exclui um candidato por engano).
  */
-async function ordensDeFase(tipoProcessoMotorId: number): Promise<Map<string, number>> {
+export async function ordensDeFase(tipoProcessoMotorId: number): Promise<Map<string, number>> {
   const fases = await prisma.faseMacro.findMany({
     where: { macroWorkflow: { tipoProcessoId: tipoProcessoMotorId } },
     select: { phaseKey: true, ordem: true },

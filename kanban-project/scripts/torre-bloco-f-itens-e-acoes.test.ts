@@ -16,6 +16,7 @@ exigirBancoDeTeste("torre-bloco-f-itens-e-acoes.test.ts")
 import { prisma } from "../lib/prisma"
 import { itensPrecisaDeVoce } from "../lib/operacional/precisa-de-voce"
 import * as acoes from "../src/services/precisa-de-voce-acoes"
+import { garantirOferta } from "./_fixture-oferta"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -38,6 +39,11 @@ async function limpar() {
   await prisma.saudeAchado.deleteMany({ where: { chave: { startsWith: MARCA } } })
   await prisma.logAuditoria.deleteMany({ where: { descricao: { contains: MARCA } } })
   await prisma.usuario.deleteMany({ where: { email: { startsWith: MARCA } } })
+  const tipos = await prisma.tipoProcessoNacionalidade.findMany({ where: { code: { startsWith: MARCA } }, select: { id: true } })
+  await prisma.tipoProcessoModalidadeHabilitada.deleteMany({ where: { tipoProcessoId: { in: tipos.map((t) => t.id) } } })
+  await prisma.faseMacro.deleteMany({ where: { macroWorkflow: { tipoProcessoId: { in: tipos.map((t) => t.id) } } } })
+  await prisma.macroWorkflow.deleteMany({ where: { tipoProcessoId: { in: tipos.map((t) => t.id) } } })
+  await prisma.tipoProcessoNacionalidade.deleteMany({ where: { id: { in: tipos.map((t) => t.id) } } })
 }
 
 async function main() {
@@ -61,6 +67,33 @@ async function main() {
   })
   const tarefaBloqueada = await prisma.tarefa.create({
     data: { titulo: `${MARCA}bloqueada`, processoId: procOutros.id, faseMacroKey: "emissao_documental", statusTarefa: "BLOQUEADA", responsavelId: alguem.id, justificativa: `${MARCA}motivo do bloqueio` },
+  })
+
+  secao("SÓ TAREFA ABERTA — achado real 30/09: CONCLUIDO_RECEBIDO não é 'aberta'")
+  // Mesma forma de fase-deixada e sem-dono, mas CONCLUIDA — não pode aparecer
+  // em NENHUM dos 7 tipos (a tarefa foi entregue; "continua aberta" seria falso).
+  const tarefaConcluidaFaseAnterior = await prisma.tarefa.create({
+    data: { titulo: `${MARCA}concluida-fase-anterior`, processoId: procFase.id, faseMacroKey: "genealogia", statusTarefa: "CONCLUIDO_RECEBIDO", dataConclusao: agora },
+  })
+  const tarefaConcluidaSemDono = await prisma.tarefa.create({
+    data: { titulo: `${MARCA}concluida-sem-dono`, processoId: procOutros.id, faseMacroKey: "emissao_documental", statusTarefa: "CONCLUIDO_RECEBIDO", dataConclusao: agora },
+  })
+
+  secao("NUNCA FASE FUTURA — a fase da tarefa ainda não chegou, pela ordem do cadastro")
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}pais`, modalityKey: "administrativa" })
+  const tipoFuturo = await prisma.tipoProcessoNacionalidade.create({
+    data: { code: `${MARCA}tipo`, name: `${MARCA}tipo`, paisId: oferta.paisId, processFamily: "cidadania", serviceNature: "main_process" },
+  })
+  await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipoFuturo.id, modalidadeId: oferta.modalidadeId } })
+  const macroFuturo = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipoFuturo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA}macro`, versao: 1 } })
+  await prisma.faseMacro.create({ data: { macroWorkflowId: macroFuturo.id, phaseKey: `${MARCA}fase_atual`, label: "atual", ordem: 0, versao: 1, required: true, conditional: false } })
+  await prisma.faseMacro.create({ data: { macroWorkflowId: macroFuturo.id, phaseKey: `${MARCA}fase_futura`, label: "futura", ordem: 1, versao: 1, required: true, conditional: false } })
+  const procComFuturo = await prisma.processo.create({ data: { nome: `${MARCA}proc-com-futuro`, tipoProcessoMotorId: tipoFuturo.id, faseAtualKey: `${MARCA}fase_atual` } })
+  const tarefaFaseFutura = await prisma.tarefa.create({
+    data: { titulo: `${MARCA}fase-futura`, processoId: procComFuturo.id, faseMacroKey: `${MARCA}fase_futura`, statusTarefa: "NAO_INICIADA" },
+  })
+  const tarefaFaseAtualMesmoProc = await prisma.tarefa.create({
+    data: { titulo: `${MARCA}fase-atual-mesmo-proc`, processoId: procComFuturo.id, faseMacroKey: `${MARCA}fase_atual`, statusTarefa: "NAO_INICIADA" },
   })
 
   secao("DIVERGÊNCIA — passo CONCLUIDO, tarefa NAO_INICIADA (contradição real)")
@@ -102,6 +135,11 @@ async function main() {
   ok("CARGA detectada para quem está no limite", porTipo("CARGA").some((i) => i.familiaNome === noLimite.nome))
   ok("PAREDE_A_FRENTE devolve o achado CAD-012 aberto", porTipo("PAREDE_A_FRENTE").some((i) => (i.contexto as { achadoId?: number }).achadoId === achado.id))
   ok("lista ordenada por score, maior primeiro", itens.every((it, i) => i === 0 || itens[i - 1].score >= it.score))
+
+  ok("tarefa CONCLUIDA nunca aparece (nem como fase deixada)", !itens.some((i) => i.tarefaId === tarefaConcluidaFaseAnterior.id))
+  ok("tarefa CONCLUIDA nunca aparece (nem como sem dono)", !itens.some((i) => i.tarefaId === tarefaConcluidaSemDono.id))
+  ok("tarefa de fase FUTURA nunca aparece (a fase ainda não chegou, pela ordem do cadastro)", !itens.some((i) => i.tarefaId === tarefaFaseFutura.id))
+  ok("...mas a tarefa da fase ATUAL do mesmo processo aparece normalmente", itens.some((i) => i.tarefaId === tarefaFaseAtualMesmoProc.id))
 
   secao("AÇÕES — Fase deixada / Sem dono")
   const rAtribui = await acoes.atribuirSugerido(tarefaSemDono.id, admin.id)

@@ -26,7 +26,15 @@ const MARCA = "TORRE_F_SUG_"
 async function limpar() {
   await prisma.indisponibilidadeOperacional.deleteMany({ where: { usuario: { email: { startsWith: MARCA } } } })
   await prisma.logAuditoria.deleteMany({ where: { descricao: { contains: MARCA } } })
+  await prisma.aptidaoOperacional.deleteMany({ where: { perfilOperacional: { code: { startsWith: MARCA } } } })
   await prisma.tarefa.deleteMany({ where: { titulo: { startsWith: MARCA } } })
+  const docs = await prisma.documento.findMany({ where: { descricao: { startsWith: MARCA } }, select: { id: true, pessoaId: true } })
+  await prisma.documento.deleteMany({ where: { id: { in: docs.map((d) => d.id) } } })
+  await prisma.tipoDocumentoCadastro.deleteMany({ where: { code: { startsWith: MARCA } } })
+  await prisma.perfilOperacionalDocumento.deleteMany({ where: { code: { startsWith: MARCA } } })
+  const arvoreIds = [...new Set((await prisma.pessoa.findMany({ where: { id: { in: docs.map((d) => d.pessoaId) } }, select: { arvoreId: true } })).map((p) => p.arvoreId).filter((id): id is number => id != null))]
+  await prisma.pessoa.deleteMany({ where: { id: { in: docs.map((d) => d.pessoaId) } } })
+  await prisma.arvore.deleteMany({ where: { id: { in: arvoreIds } } })
   await prisma.usuario.deleteMany({ where: { email: { startsWith: MARCA } } })
 }
 
@@ -89,6 +97,31 @@ async function main() {
   const s2 = await sugerirResponsavelPrecisaDeVoce(alvo.id)
   ok("Leve está ausente → sugestão vira o sucessor dele", s2?.usuarioId === sucessorDoLeve.id, `got ${s2?.nome}`)
   ok("o motivo explica a substituição", /ausente/i.test(s2?.motivo ?? ""), s2?.motivo)
+
+  secao("SUGESTÃO — o texto cita a UNIDADE quando ela é regra (\"apto a Espanha\", achado real 30/09)")
+  const perfil = await prisma.perfilOperacionalDocumento.create({ data: { code: `${MARCA}PERFIL`, name: `${MARCA}Espanha` } })
+  const tipoDoc = await prisma.tipoDocumentoCadastro.create({ data: { code: `${MARCA}TIPO`, name: `${MARCA}Certidão`, perfilOperacionalId: perfil.id } })
+  const arvore = await prisma.arvore.create({ data: { nome: `${MARCA}arvore` }, select: { id: true } })
+  const pessoa = await prisma.pessoa.create({ data: { arvoreId: arvore.id, nome: `${MARCA}Pessoa`, sobrenome: "Teste", linhaReta: true, requerente: "nao" }, select: { id: true } })
+  const doc = await prisma.documento.create({ data: { pessoaId: pessoa.id, descricao: `${MARCA}doc`, documentTypeId: tipoDoc.id }, select: { id: true } })
+  const tarefaComUnidade = await prisma.tarefa.create({ data: { titulo: `${MARCA}com-unidade`, statusTarefa: "NAO_INICIADA", documentoId: doc.id } })
+
+  const aptoUnico = await prisma.usuario.create({ data: { nome: `${MARCA}AptoUnico`, email: `${MARCA}aptounico@teste.com`, senha: "x", tipo: "assistente", permissoesCustom: { "tarefas.iniciar_concluir": true } } })
+  await prisma.aptidaoOperacional.create({ data: { usuarioId: aptoUnico.id, perfilOperacionalId: perfil.id } })
+
+  const s3 = await sugerirResponsavelPrecisaDeVoce(tarefaComUnidade.id)
+  ok("sugere o único apto à unidade", s3?.usuarioId === aptoUnico.id, `got ${s3?.nome}`)
+  ok('o motivo cita a unidade ("apto a <nome>"), nunca só "apto"', new RegExp(`apto a ${MARCA}Espanha`).test(s3?.motivo ?? ""), s3?.motivo)
+
+  secao("BRIEFING — saudação pelo relógio de São Paulo, nunca o do servidor (achado real 30/09)")
+  // 29/09 02:00 UTC = 28/09 23:00 em SP (America/Sao_Paulo = UTC-3, fixo) → noite.
+  ok("madrugada em SP → Boa noite", /^Boa noite/.test(briefingDoDia([], new Date("2026-09-29T02:00:00.000Z"))))
+  // 10:00 UTC = 07:00 em SP → manhã.
+  ok("07h em SP → Bom dia", /^Bom dia/.test(briefingDoDia([], new Date("2026-09-29T10:00:00.000Z"))))
+  // 16:00 UTC = 13:00 em SP → tarde.
+  ok("13h em SP → Boa tarde", /^Boa tarde/.test(briefingDoDia([], new Date("2026-09-29T16:00:00.000Z"))))
+  // 23:40 UTC = 20:40 em SP → noite (o caso real que disparou a correção).
+  ok("20h40 em SP → Boa noite (nunca Bom dia por rodar em UTC)", /^Boa noite/.test(briefingDoDia([], new Date("2026-09-29T23:40:00.000Z"))))
 
   await limpar()
 

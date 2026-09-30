@@ -25,8 +25,11 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { lerLinhasOperacionais } from './avisos-sino'
 import type { LinhaGerencial } from './tarefa-projecoes'
+import { STATUS_ATIVOS } from './tarefa-canonica'
+import { FUSO_OPERACIONAL } from './tempo-operacional'
 import { conferirCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
-import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario } from './organizacao'
+import { ordensDeFase } from '@/src/services/documento-operacao'
+import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
 import { classificarCarga, type Carga } from './elegibilidade'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
@@ -122,6 +125,8 @@ export async function sugerirResponsavelPrecisaDeVoce(
   })
   const unidadesComAptidao = new Set([...organizacao.values()].flatMap((o) => o.aptidoes))
   const aptidaoEhRegra = unidadeOperacionalId != null && unidadesComAptidao.has(unidadeOperacionalId)
+  // NOME DA UNIDADE — como no protótipo ("apta a Espanha"), nunca só "apto".
+  const nomeDaUnidade = aptidaoEhRegra ? (await rotulosDasUnidades()).get(unidadeOperacionalId!)?.nome ?? null : null
 
   // DISPONIBILIDADE NÃO É PRÉ-FILTRO AQUI, DE PROPÓSITO: o mandato pede
   // "apto → menos ativas → empate 30 d → AUSENTE vai para o sucessor
@@ -177,7 +182,7 @@ export async function sugerirResponsavelPrecisaDeVoce(
   for (const c of ordenados) {
     const indisponivel = organizacao.get(c.id)?.indisponivelPor
     if (!indisponivel) {
-      return { usuarioId: c.id, nome: c.nome, motivo: `${c.ativas} ativa(s)${aptidaoEhRegra ? ', apto' : ''}` }
+      return { usuarioId: c.id, nome: c.nome, motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}` }
     }
     const sucessor = indisponivel.sucessorSugerido
     if (sucessor) {
@@ -229,7 +234,47 @@ export async function itensPrecisaDeVoce(
 ): Promise<ItemPrecisaDeVoceTorre[]> {
   const agora = opts.agora ?? new Date()
   const db = opts.db ?? prisma
-  const linhas = opts.linhas ?? await lerLinhasOperacionais(agora, db)
+  const brutas = opts.linhas ?? await lerLinhasOperacionais(agora, db)
+
+  // SÓ TAREFA ABERTA (achado real, 30/09/2026): `lerLinhasOperacionais` usa a
+  // MESMA leitura do Kanban (`visaoGerencial` sem filtro de status devolve
+  // ativas + concluídas — é o padrão certo pra um board com coluna
+  // "Concluído", errado pra uma lista de DECISÕES pendentes). Filtra pelo
+  // MESMO `STATUS_ATIVOS` que a Operação usa em toda parte — nunca uma
+  // segunda definição de "aberta".
+  //
+  // E NUNCA TAREFA DE FASE FUTURA: uma tarefa cuja fase ainda não chegou
+  // (ordem maior que a fase atual do processo, pelo CADASTRO — mesma leitura
+  // de `ordensDeFase`, a correção do reconciliador NEC-001) não é uma
+  // decisão de hoje. `null` (fase fora do cadastro do tipo) nunca exclui —
+  // fase desconhecida é neutra, não "no futuro".
+  const tipoPorProcesso = new Map<number, number | null>()
+  const faseAtualPorProcesso = new Map<number, string | null>()
+  const processoIds = [...new Set(brutas.map((l) => l.processoId).filter((id): id is number => id != null))]
+  if (processoIds.length) {
+    const processos = await db.processo.findMany({
+      where: { id: { in: processoIds } },
+      select: { id: true, tipoProcessoMotorId: true, faseAtualKey: true },
+    })
+    for (const p of processos) { tipoPorProcesso.set(p.id, p.tipoProcessoMotorId); faseAtualPorProcesso.set(p.id, p.faseAtualKey) }
+  }
+  const ordensPorTipo = new Map<number, Map<string, number>>()
+  for (const tipoId of new Set([...tipoPorProcesso.values()].filter((t): t is number => t != null))) {
+    ordensPorTipo.set(tipoId, await ordensDeFase(tipoId))
+  }
+  const ehFaseFutura = (l: LinhaGerencial): boolean => {
+    if (l.processoId == null || l.faseMacroKey == null) return false
+    const tipoId = tipoPorProcesso.get(l.processoId)
+    const faseAtual = faseAtualPorProcesso.get(l.processoId)
+    if (tipoId == null || faseAtual == null) return false
+    const ordens = ordensPorTipo.get(tipoId)
+    const ordemTarefa = ordens?.get(l.faseMacroKey)
+    const ordemAtual = ordens?.get(faseAtual)
+    if (ordemTarefa == null || ordemAtual == null) return false
+    return ordemTarefa > ordemAtual
+  }
+  const linhas = brutas.filter((l) => STATUS_ATIVOS.includes(l.statusTarefa) && !ehFaseFutura(l))
+
   const fasesEspeciais = await fasesApostilamentoOuRetificacao(db)
 
   // DIVERGÊNCIA — mesmo comparador que trava a transação de projeção
@@ -400,6 +445,16 @@ export async function comSugestoes(itens: ItemPrecisaDeVoceTorre[], agora = new 
 
 // ─── BRIEFING DO DIA ────────────────────────────────────────────────────────
 
+/** A saudação pelo relógio de SÃO PAULO, nunca o do servidor (achado real,
+ * 30/09/2026: em UTC "23h40 de terça" virava "Bom dia" — o servidor não
+ * mora no fuso da operação). Bom dia 5h–12h, boa tarde 12h–18h, boa noite depois. */
+function saudacao(agora: Date): string {
+  const hora = Number(agora.toLocaleString('en-US', { timeZone: FUSO_OPERACIONAL, hour: 'numeric', hourCycle: 'h23' }))
+  if (hora >= 5 && hora < 12) return 'Bom dia'
+  if (hora >= 12 && hora < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
 export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date()): string {
   const criticos = itens.filter((i) => i.faixa === 'CRITICO').length
   const atencao = itens.filter((i) => i.faixa === 'ATENCAO').length
@@ -409,8 +464,9 @@ export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date(
   const carga = itens.filter((i) => i.tipo === 'CARGA').length
   const parede = itens.filter((i) => i.tipo === 'PAREDE_A_FRENTE').length
 
-  const dataFmt = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })
-  if (itens.length === 0) return `Bom dia. Hoje, ${dataFmt}: nada precisa de você agora.`
+  const cumprimento = saudacao(agora)
+  const dataFmt = agora.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL, weekday: 'long', day: '2-digit', month: 'long' })
+  if (itens.length === 0) return `${cumprimento}. Hoje, ${dataFmt}: nada precisa de você agora.`
 
   const partes: string[] = []
   if (criticos > 0) partes.push(`${criticos} crítica(s)`)
@@ -424,6 +480,6 @@ export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date(
   if (carga > 0) detalhes.push(`${carga} pessoa(s) no limite`)
   if (parede > 0) detalhes.push(`${parede} parede(s) à frente`)
 
-  return `Bom dia. Hoje, ${dataFmt}: ${resumoFaixas} precisam de você` +
+  return `${cumprimento}. Hoje, ${dataFmt}: ${resumoFaixas} precisam de você` +
     (detalhes.length ? ` (${detalhes.join(' · ')}).` : '.')
 }

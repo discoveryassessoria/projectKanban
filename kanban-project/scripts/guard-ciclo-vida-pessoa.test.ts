@@ -397,6 +397,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "que deixa passos de fases futuras em_andamento (processo 651, mandato NEC-001)",
   "scripts/fluxo-distribuicao.test.ts":
     "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
+  "scripts/torre-bloco-f-score-e-sugestao.test.ts":
+    "Torre de Controle, Bloco F: sugestão de responsável cita a UNIDADE (\"apto a Espanha\") — monta e " +
+    "derruba a PRÓPRIA árvore/pessoa/documento (marca TORRE_F_SUG_), só no banco de teste — a unidade " +
+    "operacional de uma tarefa só se resolve via Documento.documentType.perfilOperacionalId, que exige pessoa",
   "scripts/obrigacao-atribuicao.test.ts":
     "obrigação administrativa ATRIBUIR_RESPONSAVEL (17/09/2026, mandato Grisotto): monta e derruba os PRÓPRIOS processos/árvores/pessoas (marca OBRIG), só no banco de teste — o cenário precisa de tarefas reais sem responsável, materializadas por reconciliarTarefas (o caminho oficial), para provar que N tarefas sem dono virem UMA obrigação administrativa; só o `deleteMany` de limpeza é direto",
   "scripts/palco-distribuicao.ts":
