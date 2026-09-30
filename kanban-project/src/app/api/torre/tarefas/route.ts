@@ -13,6 +13,7 @@ import { exigirTorre } from '@/src/lib/torre-acesso'
 import { temPermissao } from '@/src/lib/permissoes'
 import { parseFiltrosGerenciais } from '@/lib/operacional/parse-filtros-gerenciais'
 import { listarTarefasDaTorre } from '@/src/services/torre-tarefas'
+import { processosCriticos, anotarRisco } from '@/lib/operacional/torre-processos'
 
 export async function GET(request: NextRequest) {
   const { usuario, erro } = await exigirTorre(request, 'tarefas.ver')
@@ -26,10 +27,12 @@ export async function GET(request: NextRequest) {
   if (sp.get('faseMacroKey')) semPagina.faseMacroKey = sp.get('faseMacroKey')
   const processoId = sp.get('processoId') ?? sp.get('processo')
   if (processoId) semPagina.processoId = Number(processoId)
-  const r = await listarTarefasDaTorre(semPagina)
+  const [r, criticos] = await Promise.all([listarTarefasDaTorre(semPagina), processosCriticos()])
   const pode = (p: Parameters<typeof temPermissao>[1]) => temPermissao(usuario.permissoes, p)
   return NextResponse.json({
     ...r,
+    // Cada linha diz se o processo dela está em risco CRÍTICO (o cartão "Processos em risco" e o filtro dele usam isto).
+    linhas: anotarRisco(r.linhas, criticos),
     permissoes: {
       editar: pode('tarefas.editar'),
       bloquear: pode('tarefas.bloquear'),

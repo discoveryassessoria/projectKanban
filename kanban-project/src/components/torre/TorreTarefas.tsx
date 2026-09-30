@@ -11,7 +11,8 @@ import { api, erroDe, Campo, Modal, resumoDoLote, useTorre, type Desfazer } from
 import { bolaDe, riscoDe, type LinhaTorre } from "./tipos"
 import { PainelTorreTarefa } from "./PainelTorreTarefa"
 import { CobrarTodosVencidos } from "./CobrarTodosVencidos"
-import { FocoFamilia } from "./FocoFamilia"
+import { VisoesSalvas, type SpecDaVisao } from "./VisoesSalvas"
+import { linhasDoKpi, KPIS, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 
 type Agrupar = "fam" | "resp" | "org" | "fase" | "none"
 type Visao = "todas" | "vencidas" | "semdono" | "aguard" | "cobranca"
@@ -23,6 +24,7 @@ const PREDICADO: Record<Visao, (l: LinhaTorre) => boolean> = {
   todas: () => true, vencidas: (l) => l.atrasada, semdono: (l) => l.responsavelId == null,
   aguard: (l) => l.estadoOperacao === "AGUARDANDO", cobranca: (l) => l.cobravelVencida,
 }
+const AGRUPAR_VALIDOS: Agrupar[] = ["fam", "resp", "org", "fase", "none"]
 const CHAVE: Record<Agrupar, (l: LinhaTorre) => string> = {
   fam: (l) => l.familiaNome ?? l.processoNome ?? "Sem família",
   resp: (l) => l.responsavelNome ?? "Sem responsável",
@@ -34,11 +36,22 @@ const CHAVE: Record<Agrupar, (l: LinhaTorre) => string> = {
 interface Funcionario { id: number; nome: string; email?: string; tarefasAtivas: number }
 interface RespLote { total?: number; sucesso?: number; falha?: number; itens?: Array<{ ok: boolean; mensagem?: string }>; desfazer?: Desfazer | null; error?: string }
 
-export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[]; carregando: boolean; erro: boolean }) {
-  const { permissoes, avisar, recarregar } = useTorre()
+export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, visaoInicial, onAplicarSpec }: {
+  linhas: LinhaTorre[]; carregando: boolean; erro: boolean
+  /** Filtro do KPI clicado no cabeçalho (o MESMO predicado que dá o número do cartão). */
+  kpi: ChaveKpi | null
+  /** A busca do cabeçalho. */
+  busca: string
+  /** A nacionalidade escolhida (chave) — só para a visão salva. */
+  paisChave: string
+  visaoInicial?: string
+  /** Uma visão salva com KPI/país/busca próprios: o casco os adota. */
+  onAplicarSpec: (s: { kpi: ChaveKpi | null; pais: string; busca: string }) => void
+}) {
+  const { permissoes, avisar, recarregar, abrirFoco } = useTorre()
   const [agrupar, setAgrupar] = useState<Agrupar>("fam")
-  const [visao, setVisao] = useState<Visao>("todas")
-  const [busca, setBusca] = useState("")
+  const [visaoSel, setVisaoSel] = useState<string>(visaoInicial ?? "todas")
+  const [visaoSalva, setVisaoSalva] = useState<Visao>("todas")
   const [sel, setSel] = useState<Record<number, true>>({})
   const [pessoas, setPessoas] = useState<Funcionario[]>([])
   const [pessoaId, setPessoaId] = useState<number | null>(null)
@@ -46,7 +59,6 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
   const [cobrarLinha, setCobrarLinha] = useState<LinhaTorre | null>(null)
   const [aberta, setAberta] = useState<LinhaTorre | null>(null)
   const [ocupado, setOcupado] = useState(false)
-  const [foco, setFoco] = useState<number | null>(null)
 
   const podeEditar = !!permissoes?.editar
   useEffect(() => {
@@ -58,7 +70,11 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
     return () => { vivo = false }
   }, [podeEditar])
 
-  const visiveis = useMemo(() => aplicarBusca(linhas.filter(PREDICADO[visao]), busca) as LinhaTorre[], [linhas, visao, busca])
+  // A visão em vigor: uma das fixas, ou a `visao` guardada dentro da visão salva escolhida.
+  const visao: Visao = (VISOES.some(([v]) => v === visaoSel) ? visaoSel : visaoSalva) as Visao
+  const base = useMemo(() => (kpi ? linhasDoKpi(kpi, linhas) : linhas), [linhas, kpi])
+  const visiveis = useMemo(() => aplicarBusca(base.filter(PREDICADO[visao]), busca) as LinhaTorre[], [base, visao, busca])
+  const specAtual: SpecDaVisao = { visao, agrupar, kpi, pais: paisChave || null, busca: busca.trim() || null }
   const grupos = useMemo(() => {
     const m = new Map<string, LinhaTorre[]>()
     for (const l of visiveis) { const k = CHAVE[agrupar](l); m.set(k, [...(m.get(k) ?? []), l]) }
@@ -108,12 +124,17 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
             <option value="fam">Família</option><option value="resp">Responsável</option><option value="org">Cartório</option><option value="fase">Fase</option><option value="none">Sem agrupamento</option>
           </select>
         </label>
-        <label className="flex items-center gap-1.5 small">Visão
-          <select className="tor-in" aria-label="Visão" value={visao} onChange={(e) => setVisao(e.target.value as Visao)}>
-            {VISOES.map(([v, l]) => <option key={v} value={v}>{l}{v === "cobranca" ? ` (${linhas.filter(PREDICADO.cobranca).length})` : ""}</option>)}
-          </select>
-        </label>
-        <input className="tor-in" placeholder="Buscar família, pessoa, certidão, cartório…" aria-label="Buscar" value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <VisoesSalvas
+          fixas={VISOES.map(([v, l]) => [v, `${l}${v === "cobranca" ? ` (${linhas.filter(PREDICADO.cobranca).length})` : ""}`] as [string, string])}
+          valor={visaoSel} atual={specAtual}
+          onEscolherFixa={(v) => setVisaoSel(v)}
+          onAplicar={(spec, id) => {
+            setVisaoSel(id)
+            setVisaoSalva((VISOES.some(([v]) => v === spec.visao) ? spec.visao : "todas") as Visao)
+            if (AGRUPAR_VALIDOS.includes(spec.agrupar as Agrupar)) setAgrupar(spec.agrupar as Agrupar)
+            onAplicarSpec({ kpi: KPIS.some((k) => k.chave === spec.kpi && k.filtra) ? (spec.kpi as ChaveKpi) : null, pais: spec.pais ?? "", busca: spec.busca ?? "" })
+          }}
+        />
         <div style={{ flexGrow: 1 }} />
         <CobrarTodosVencidos linhas={linhas} />
         {selIds.length > 0 && (
@@ -143,7 +164,7 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
             <div className="tor-grp">
               <button className={`tor-chk ${todas ? "on" : alguma ? "mid" : ""}`} aria-label={`Selecionar o grupo ${nome}`} onClick={() => alternar(itens.map((l) => l.taskId), !todas)} />
               {agrupar === "fam" && itens[0]?.processoId != null
-                ? <button className="tor-linkbtn" aria-label={`Abrir o foco da família ${nome}`} onClick={() => setFoco(itens[0].processoId as number)}>{nome}</button>
+                ? <button className="tor-linkbtn" aria-label={`Abrir o foco da família ${nome}`} onClick={() => abrirFoco(itens[0].processoId as number)}>{nome}</button>
                 : <b>{nome}</b>}<div style={{ flexGrow: 1 }} /><span className="tor-p gry">{itens.length} tarefas</span>
             </div>
             <div className="tor-hd tor-gT"><span /><span>Certidão · pessoa</span><span>Bola com</span><span>Etapa</span><span>Responsável</span><span>Prazo</span><span>Acomp.</span><span>Risco</span><span /></div>
@@ -171,8 +192,6 @@ export function TorreTarefas({ linhas, carregando, erro }: { linhas: LinhaTorre[
           </div>
         )
       })}
-
-      {foco != null && <FocoFamilia processoId={foco} onFechar={() => setFoco(null)} />}
 
       {repactuar && <RepactuarLoteModal n={selIds.length} onFechar={() => setRepactuar(false)} onEnviar={async (novoPrazo, justificativa) => {
         const r = await lote("REPACTUAR", { novoPrazo, justificativa })

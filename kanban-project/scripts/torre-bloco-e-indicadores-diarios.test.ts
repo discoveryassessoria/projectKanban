@@ -10,6 +10,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 exigirBancoDeTeste("torre-bloco-e-indicadores-diarios.test.ts")
 
 import { prisma } from "../lib/prisma"
+import { montarCenario } from "./_fixture-torre-gh"
 import { calcularIndicadoresDoDia, gravarIndicadoresDoDia, serieDeIndicadores } from "../lib/operacional/indicadores-diarios"
 
 let passou = 0, falhou = 0
@@ -25,6 +26,7 @@ const MARCA = "TORRE_E10_"
 async function limpar() {
   await prisma.tarefa.deleteMany({ where: { titulo: { startsWith: MARCA } } })
   await prisma.torreIndicadorDiario.deleteMany({})
+  await (await montarCenario("TORREE10FX")).limpar()
 }
 
 async function main() {
@@ -42,7 +44,10 @@ async function main() {
     data: { titulo: `${MARCA}vence-em-3-dias`, statusTarefa: "NAO_INICIADA", dataPrazo: new Date(agora.getTime() + 3 * 86_400_000) },
   })
   await prisma.tarefa.create({ data: { titulo: `${MARCA}sem-dono`, statusTarefa: "NAO_INICIADA", responsavelId: null } })
-  await prisma.tarefa.create({ data: { titulo: `${MARCA}com-cartorio`, statusTarefa: "AGUARDANDO_TERCEIRO" } })
+  // "Com o cartório" é a projeção `estadoOperacao: AGUARDANDO` (Bloco J3: cartão e lista usam a MESMA definição) —
+  // um status cru sem passo por trás não é "com o cartório". Uma obrigação real, materializada pelo motor, é.
+  const cenario = await montarCenario("TORREE10FX")
+  await cenario.novaObrigacao({ aguardando: true })
   await prisma.tarefa.create({ data: { titulo: `${MARCA}criada-esta-semana`, createdAt: agora } })
   await prisma.tarefa.create({
     data: { titulo: `${MARCA}concluida-esta-semana`, statusTarefa: "CONCLUIDO_RECEBIDO", dataConclusao: agora },

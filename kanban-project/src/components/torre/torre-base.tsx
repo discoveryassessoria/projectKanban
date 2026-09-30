@@ -17,7 +17,7 @@ export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO"; tarefaI
 export interface RespostaApi<T = Record<string, unknown>> { status: number; ok: boolean; data: T }
 
 /** Uma chamada às portas — devolve sempre o corpo (mesmo em erro), nunca lança. */
-export async function api<T = Record<string, unknown>>(url: string, metodo: "GET" | "POST" | "PATCH" = "GET", corpo?: unknown): Promise<RespostaApi<T>> {
+export async function api<T = Record<string, unknown>>(url: string, metodo: "GET" | "POST" | "PATCH" | "DELETE" = "GET", corpo?: unknown): Promise<RespostaApi<T>> {
   try {
     const r = await fetch(url, { method: metodo, headers: auth(), ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}) })
     const data = (await r.json().catch(() => ({}))) as T
@@ -34,10 +34,17 @@ export function erroDe(d: unknown, padrao = "Não foi possível concluir a açã
   return padrao
 }
 
+/** O que o Relatório de controle precisa saber de uma família. */
+export interface AlvoDoRelatorio { processoId: number; familiaId: number | null; familiaNome: string; codigo: string | null }
+
 interface Ctx {
   permissoes: PermissoesTorre | null
   avisar: (msg: string, desfazer?: Desfazer | null) => void
   recarregar: () => void
+  /** Abre o Foco da família (Bloco I3) — de qualquer aba (Tarefas, Radar, Processos). Implementado pelo casco (Torre.tsx). */
+  abrirFoco: (processoId: number) => void
+  /** Abre o Relatório de controle (Bloco I4) — de qualquer aba. Implementado pelo casco (Torre.tsx). */
+  abrirRelatorio: (alvo: AlvoDoRelatorio) => void
 }
 const TorreCtx = createContext<Ctx | null>(null)
 export const useTorre = (): Ctx => {
@@ -46,7 +53,10 @@ export const useTorre = (): Ctx => {
   return c
 }
 
-export function TorreProvider({ permissoes, recarregar, children }: { permissoes: PermissoesTorre | null; recarregar: () => void; children: ReactNode }) {
+export function TorreProvider({ permissoes, recarregar, abrirFoco = () => {}, abrirRelatorio = () => {}, children }: {
+  permissoes: PermissoesTorre | null; recarregar: () => void
+  abrirFoco?: (processoId: number) => void; abrirRelatorio?: (alvo: AlvoDoRelatorio) => void; children: ReactNode
+}) {
   const [toast, setToast] = useState<{ msg: string; desfazer: Desfazer | null } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
@@ -71,7 +81,7 @@ export function TorreProvider({ permissoes, recarregar, children }: { permissoes
   }
 
   return (
-    <TorreCtx.Provider value={{ permissoes, avisar, recarregar }}>
+    <TorreCtx.Provider value={{ permissoes, avisar, recarregar, abrirFoco, abrirRelatorio }}>
       {children}
       {toast && (
         <div className="tor-toast" role="status">

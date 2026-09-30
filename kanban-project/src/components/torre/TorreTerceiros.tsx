@@ -7,6 +7,7 @@ import { RegistrarContatoModal, CANAL_CADASTRADO } from "@/src/components/operac
 import { api, erroDe, fmtDataHora, fmtDia, Modal, useTorre } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
 import { CobrarTodosVencidos } from "./CobrarTodosVencidos"
+import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 
 interface OrgaoTerceiro {
   orgaoId: number; nome: string; uf: string | null; canal: string; emAberto: number; aguardando: number
@@ -48,7 +49,7 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
         <CobrarTodosVencidos linhas={linhas} />
       </div>
       <div className="tor-card tor-scroll">
-        <div className="tor-hd tor-gC"><span>Cartório / órgão</span><span>Em aberto</span><span>Sem resposta</span><span>Régua</span><span>Não localizada</span><span>Próx. cobrança</span><span /></div>
+        <div className="tor-hd tor-gC"><span>Cartório / órgão (UF · canal)</span><span>Em aberto</span><span>Sem resposta (dias)</span><span>Régua</span><span>Não localizada</span><span>Próx. cobrança</span><span /></div>
         {orgaos.length === 0 && <div className="p-4 small">Nenhum cartório/órgão com trabalho em aberto vinculado.</div>}
         {orgaos.map((o) => (
           <div key={o.orgaoId} className="tor-row tor-gC">
@@ -96,6 +97,59 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
           </ul>
         </Modal>
       )}
+      <CartoesDeMetricas versao={versao} />
     </div>
+  )
+}
+
+interface TempoPorFase { fase: string; amostras: number; mediaDias: number }
+const humanizar = (k: string) => k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
+
+/** "Tempo médio real por fase" (E11, log de transição) e "Backlog" (abre/fecha na semana) — Bloco J4. */
+function CartoesDeMetricas({ versao }: { versao: number }) {
+  const [fases, setFases] = useState<TempoPorFase[] | null>(null)
+  const [erroFases, setErroFases] = useState<string | null>(null)
+  const [backlog, setBacklog] = useState<{ abertas: number; fechadas: number } | null>(null)
+  const [erroBacklog, setErroBacklog] = useState<string | null>(null)
+  useEffect(() => {
+    let vivo = true
+    void api<{ porFase: TempoPorFase[] }>("/api/operacao/tempo-medio-por-fase").then((r) => {
+      if (!vivo) return
+      if (r.ok) { setFases(r.data.porFase); setErroFases(null) } else setErroFases(erroDe(r.data, "Não foi possível carregar o tempo médio por fase."))
+    })
+    void api<{ backlog: { abertas: number; fechadas: number } }>("/api/torre/tendencias").then((r) => {
+      if (!vivo) return
+      if (r.ok) { setBacklog(r.data.backlog); setErroBacklog(null) } else setErroBacklog(erroDe(r.data, "Não foi possível carregar o backlog."))
+    })
+    return () => { vivo = false }
+  }, [versao])
+  const sentido = backlog ? (backlog.abertas > backlog.fechadas ? "cresce" : backlog.abertas < backlog.fechadas ? "encolhe" : "estável") : null
+  return (
+    <>
+      <div className="tor-card pad">
+        <h2 className="font-extrabold">Tempo médio real por fase</h2>
+        {erroFases && <div className="small mt-1">{erroFases}</div>}
+        {!erroFases && fases == null && <div className="small mt-1">Carregando…</div>}
+        {fases?.length === 0 && <div className="small mt-1">Sem fase concluída no log de transição ainda — nada a mostrar.</div>}
+        {fases && fases.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {fases.map((f) => (
+              <li key={f.fase} className="text-[13px]"><b>{labelDaFasePorPhaseKey(f.fase) ?? humanizar(f.fase)}</b> · {String(f.mediaDias).replace(".", ",")} dias <span className="small">(n={f.amostras})</span></li>
+            ))}
+          </ul>
+        )}
+        <div className="small mt-2">Só permanências completas (entrada e saída registradas no log de transição); fase ainda em curso não entra na média.</div>
+      </div>
+      <div className="tor-card pad">
+        <h2 className="font-extrabold">Backlog</h2>
+        {erroBacklog && <div className="small mt-1">{erroBacklog}</div>}
+        {!erroBacklog && backlog == null && <div className="small mt-1">Carregando…</div>}
+        {backlog && (
+          <div className="mt-1 text-[13px]">Abre <b>{backlog.abertas}</b> / fecha <b>{backlog.fechadas}</b> tarefas nesta semana — <b>{sentido}</b>.
+            <div className="small">Abre = tarefas criadas na semana; fecha = concluídas com sucesso na semana (cancelada nunca conta).</div>
+          </div>
+        )}
+      </div>
+    </>
   )
 }

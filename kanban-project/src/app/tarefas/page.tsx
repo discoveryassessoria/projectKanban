@@ -22,6 +22,7 @@ import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
+import { destinoDaAbsorcao } from "@/src/lib/torre-absorcao"
 import { VisaoGlobal } from "@/src/components/operacao/visao-global"
 
 const FUNDO =
@@ -41,11 +42,15 @@ export default function TarefasEProjetosPage() {
   // esconder a tela não é controle de acesso.
   const autorizado = pode("tarefas.editar") && user.tipo === "admin"
 
-  useEffect(() => {
-    if (mounted && !carregando && !autorizado) router.push("/operacao")
-  }, [mounted, carregando, autorizado, router])
+  // ABSORÇÃO PELA TORRE (Bloco J5): SÓ o administrador é levado à Torre. Quem não é continua NESTA tela, como hoje.
+  const paraTorre = destinoDaAbsorcao("/tarefas", user.tipo)
 
-  if (!mounted || carregando || !autorizado) {
+  useEffect(() => {
+    if (mounted && !carregando && paraTorre) { router.replace(paraTorre); return }
+    if (mounted && !carregando && !autorizado) router.push("/operacao")
+  }, [mounted, carregando, autorizado, paraTorre, router])
+
+  if (!mounted || carregando || !autorizado || paraTorre) {
     return (
       <div className="relative min-h-screen [overflow-x:clip] text-white">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />

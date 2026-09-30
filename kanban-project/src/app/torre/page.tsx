@@ -43,24 +43,26 @@ function TorrePageConteudo() {
   const autorizado = user.tipo === "admin" || pode("operacao.distribuirTarefas")
 
   useEffect(() => {
-    if (mounted && !carregando && !autorizado) router.push("/")
+    if (mounted && !carregando && !autorizado) router.push("/operacao")
   }, [mounted, carregando, autorizado, router])
 
   if (!mounted || carregando || !autorizado) return CARREGANDO
 
-  const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })
+  // Data por extenso NO FUSO DA OPERAÇÃO (nunca o do navegador/servidor) · usuário · perfil · a fonte dos números.
+  const hoje = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" })
+  const perfil = user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"
   return (
     <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-[var(--text-primary)]">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[var(--app-background)]" />
       <HeaderBarApp
         title="Torre de Controle"
-        subtitle={`${hoje} · fonte: projeção da Operação`}
+        subtitle={`${hoje} · ${user.nome ?? "Usuário"} · ${perfil} · fonte: projeção da Operação`}
         userName={user.nome}
-        userRole={user.tipo === "admin" ? "Administrador" : user.tipo || "Usuário"}
+        userRole={perfil}
         onLogout={() => void encerrarSessao("manual")}
       />
-      <main className="flex max-h-[calc(100vh-80px)] flex-col px-6 pb-16 pt-6">
-        <div className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-page)] p-4">
+      <main className="flex max-h-[calc(100vh-80px)] flex-col px-3 pb-16 pt-4 sm:px-6 sm:pt-6">
+        <div className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-page)] p-2 sm:p-4">
           <div className="min-w-0 flex-1"><Torre /></div>
         </div>
       </main>

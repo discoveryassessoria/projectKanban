@@ -19,6 +19,7 @@ import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
+import { destinoDaAbsorcao } from "@/src/lib/torre-absorcao"
 import { DistribuicaoTarefas } from "@/src/components/operacao/distribuicao-tarefas"
 
 const CARREGANDO = (
@@ -54,11 +55,15 @@ function DistribuicaoPageConteudo() {
   // decide quem é gestor de verdade em cada porta que este componente chama.
   const autorizado = pode("tarefas.editar")
 
-  useEffect(() => {
-    if (mounted && !carregando && !autorizado) router.push("/operacao")
-  }, [mounted, carregando, autorizado, router])
+  // ABSORÇÃO PELA TORRE (Bloco J5): SÓ o administrador é levado à Torre. Quem não é continua NESTA tela, como hoje.
+  const paraTorre = destinoDaAbsorcao("/operacao/distribuicao", user.tipo)
 
-  if (!mounted || carregando || !autorizado) return CARREGANDO
+  useEffect(() => {
+    if (mounted && !carregando && paraTorre) { router.replace(paraTorre); return }
+    if (mounted && !carregando && !autorizado) router.push("/operacao")
+  }, [mounted, carregando, autorizado, paraTorre, router])
+
+  if (!mounted || carregando || !autorizado || paraTorre) return CARREGANDO
 
   return (
     <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-[var(--text-primary)]">

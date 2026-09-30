@@ -58,3 +58,6 @@ reset-password.mjs
 /test-results/
 /playwright-report/
 .suite-logs
+
+# snapshots de leitura (J.0 da Torre) — ficam no disco, nunca no deploy
+/snapshots/

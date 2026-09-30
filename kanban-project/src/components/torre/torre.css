@@ -66,3 +66,41 @@
 .tor-gF { grid-template-columns: minmax(220px, 2fr) 1.2fr 1.2fr 1fr 1fr; }
 .tor-mention { color: var(--info-text); font-weight: 600; }
 .tor-linkbtn { background: transparent; border: 0; padding: 0; font-weight: 800; color: var(--text-primary); text-decoration: underline dotted; cursor: pointer; }
+
+/* ── BLOCO J — casco: cabeçalho, KPIs, abas com contadores, responsivo ─────────────────────────────── */
+.tor { min-width: 0; max-width: 100%; }
+.tor-cab { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.tor-cab .tor-in { min-width: 0; max-width: 100%; }
+.tor-cab-busca { flex: 1 1 260px; }
+.tor-cab-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.tor-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+@media (min-width: 640px) { .tor-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .tor-kpis { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+.tor-kpi { display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border-default); background: var(--surface-secondary); color: var(--text-primary); cursor: pointer; }
+.tor-kpi:hover { background: var(--surface-tertiary); }
+.tor-kpi.on { border-color: var(--action-primary); box-shadow: 0 0 0 2px var(--info-tile); }
+.tor-kpi-n { font-size: 24px; line-height: 1.1; }
+.tor-kpi-n.red { color: var(--danger-text); }
+.tor-kpi-n.amb { color: var(--warning-text); }
+.tor-kpi-n.blu { color: var(--info-text); }
+.tor-kpi-l { font-size: 11.5px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.tor-kpi-t { font-size: 11px; font-style: normal; color: var(--text-muted); }
+.tor-kpi-t.up { color: var(--danger-text); }
+.tor-kpi-t.down { color: var(--success-text); }
+.tor-kpi-t.igual { color: var(--text-muted); }
+.tor-kpi-t.sem { color: var(--text-muted); font-style: italic; }
+.tor-tabs-linha { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--border-default); margin-bottom: 14px; }
+.tor-tabs-linha .tor-tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0; border-bottom: 0; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.tor-tab { white-space: nowrap; flex: 0 0 auto; }
+.tor-tab .n.red { background: var(--danger-tile); color: var(--danger-text); }
+.tor-tab .n.warn { background: var(--warning-tile); color: var(--warning-text); }
+.tor-filtro { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 6px; max-width: 100%; }
+.tor-x { background: transparent; border: 0; padding: 0 4px; cursor: pointer; color: inherit; font-weight: 700; }
+.tor-gP { grid-template-columns: 130px minmax(240px, 2fr) minmax(200px, 1.6fr) minmax(220px, 1.2fr); align-items: start; }
+@media (max-width: 720px) {
+  .tor-hd, .tor-row { min-width: 760px; }
+  .tor-toast { bottom: 12px; }
+  .tor-modal-g { padding: 8px; }
+  .tor-modal-g > div { padding: 14px; }
+  .tor-prev { grid-template-columns: 110px repeat(4, minmax(56px, 1fr)); }
+}

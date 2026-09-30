@@ -23,6 +23,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ManagementIcon } from "@/src/components/icons/management-icon"
 import { ScrollIcon } from "@/src/components/icons/scroll-icon"
 import { ReportIcon } from "@/src/components/icons/report-icon"
+import { RadarIcon } from "@/src/components/icons/radar-icon"
 
 const menuItems = [
   {
@@ -48,6 +49,18 @@ const menuItems = [
     textOffset: "",
     iconOffset: "translate-y-[0.5px]",
     permissao: "tarefas.ver",
+  },
+  {
+    // TORRE DE CONTROLE — a tela do ADMINISTRADOR que responde pela operação inteira (Bloco J, 30/09/2026):
+    // decisões do dia, radar, tarefas, equipe, terceiros, regras, integridade e auditoria. Entre Operação e
+    // Calendário; só para administrador (a API confere de novo em toda chamada).
+    title: "Torre de Controle",
+    url: "/torre",
+    icon: RadarIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "tarefas.ver",
+    soAdmin: true,
   },
   {
     // TAREFAS E PROJETOS — a MESMA Tarefa canônica, vista por quem responde
@@ -223,7 +236,7 @@ export function BitrixSidebar() {
   }
 
   // Função para renderizar o ícone corretamente
-  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof BoardIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
+  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof BoardIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon | typeof RadarIcon, isActive: boolean, iconOffset: string = "") => {
     // Trilho colapsado: ícone ativo ganha uma bolha verde (destaque Bitrix),
     // ícone atrás fica branco pra contrastar. Painel expandido: pill de
     // fundo translúcido claro sobre o azul-marinho (ver `getIconClasses`).

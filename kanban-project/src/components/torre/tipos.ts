@@ -7,6 +7,8 @@ export interface LinhaTorre extends LinhaOperacaoV3 {
   podeIniciar: boolean
   motivoNaoIniciar: string | null
   cobravelVencida: boolean
+  /** O processo desta linha está em risco CRÍTICO (mesmo score do Radar) — base do cartão "Processos em risco". */
+  processoEmRisco?: boolean
 }
 export type Pill = "red" | "amb" | "grn" | "blu" | "gry"
 
