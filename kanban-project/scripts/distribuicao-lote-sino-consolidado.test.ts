@@ -19,7 +19,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { signAuthToken } from "@/lib/auth-jwt"
 import { criarTarefaManual } from "@/lib/operacional/tarefa-ciclo"
 import { redistribuirTarefas } from "@/lib/operacional/tarefa-comandos"
-import { reconciliarObrigacaoDeAtribuicao, usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
+import { usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
 import { marcarNotificacaoComoLida } from "@/lib/operacional/notificacao-canonica"
 import { avisarGestores } from "@/lib/operacional/avisos-sino"
 import { GET as getNotificacoes } from "@/src/app/api/notificacoes/route"
@@ -101,15 +101,10 @@ async function corpo() {
     if (!r.ok) throw new Error(`falha ao criar tarefa #${i}: ${r.mensagem}`)
     tarefaIds.push(r.tarefaId)
   }
-  await reconciliarObrigacaoDeAtribuicao(prisma, proc.id)
 
   const donoId = await usuarioResponsavelPelaDistribuicao(prisma)
   const admin = await prisma.usuario.findUniqueOrThrow({ where: { id: donoId! }, select: { id: true, email: true, tipo: true } })
-  const obrigacao = await prisma.tarefa.findFirstOrThrow({
-    where: { processoId: proc.id, tipo: "ADMINISTRATIVA", origem: "obrigacao-atribuicao", concluida: false },
-    select: { id: true, responsavelId: true },
-  })
-  ok("A) a obrigação pertence ao Admin resolvido", obrigacao.responsavelId === admin.id)
+  ok("A) nenhuma tarefa administrativa 'Atribuir tarefas' foi criada (descontinuada em 30/09/2026)", (await prisma.tarefa.count({ where: { processoId: proc.id, tipo: "ADMINISTRATIVA" } })) === 0)
 
   // "Sem responsável há mais de 1 dia": recua a criação das 15 (como sino-agrupado.test.ts).
   await prisma.tarefa.updateMany({ where: { id: { in: tarefaIds } }, data: { createdAt: new Date(Date.now() - 2 * 86_400_000) } })
@@ -117,8 +112,8 @@ async function corpo() {
   const sinoAdminAntes = await sinoDe(admin.id, admin.email, admin.tipo)
   const distribAntes = sinoAdminAntes.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)
   ok("A) sino do Admin tem exatamente 1 aviso de distribuição (SEM_RESPONSAVEL) para esta família, não 15", distribAntes.length === 1, String(distribAntes.length))
-  ok("A) diz '15 tarefas sem responsável há mais de 1 dia' e leva à distribuição da família",
-    distribAntes[0]?.titulo === `${MARCA} Grisotto — 15 tarefas sem responsável há mais de 1 dia` && distribAntes[0].link === `/operacao/distribuicao?processo=${proc.id}`,
+  ok("A) diz '15 tarefas sem responsável há mais de 1 dia' e leva à Torre (aba Tarefas, visão Sem responsável)",
+    distribAntes[0]?.titulo === `${MARCA} Grisotto — 15 tarefas sem responsável há mais de 1 dia` && distribAntes[0].link === "/torre?aba=tarefas&visao=semdono",
     distribAntes[0]?.titulo)
   const pessoalAntes = sinoAdminAntes.avisos.filter((a) => a.familiaId === proc.id && a.tipo !== "SEM_RESPONSAVEL")
   ok("B) a tarefa administrativa e as 15 sem dono NÃO viram aviso pessoal do Admin (sem redundância)", pessoalAntes.length === 0, String(pessoalAntes.length))
@@ -136,10 +131,8 @@ async function corpo() {
   ok("A) histórico/auditoria preservado — 1 entrada por tarefa", historico === 15, String(historico))
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("B) SINO DO MARCO DEPOIS — a obrigação se resolveu, sem notificação redundante")
+  secao("B) SINO DO MARCO DEPOIS — o aviso se resolveu, sem notificação redundante")
   // ══════════════════════════════════════════════════════════════════════
-  const obrigacaoDepois = await prisma.tarefa.findUniqueOrThrow({ where: { id: obrigacao.id }, select: { concluida: true } })
-  ok("B) a obrigação administrativa foi concluída pela reconciliação canônica", obrigacaoDepois.concluida === true)
 
   const sinoAdminDepois = await sinoDe(admin.id, admin.email, admin.tipo)
   const distribDepois = sinoAdminDepois.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)

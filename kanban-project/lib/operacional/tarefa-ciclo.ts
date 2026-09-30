@@ -27,7 +27,6 @@ import { reabrirPassoTx } from '@/src/services/task-step-sync'
 import { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 import { marcarAtribuicaoComoLidaAoProgredir, sincronizarAvisosDeTarefas } from './notificacao-canonica'
 import { aoMudarDeDono } from './avisos-fatos'
-import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
 export { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 
 export type Falha =
@@ -478,9 +477,6 @@ export async function devolverAFila(args: { tarefaId: number; autorId: number; m
       `Tarefa "${t.titulo}" devolvida à fila${t.equipeKey ? ` da ${t.equipeKey}` : ''} (era do usuário ${t.responsavelId}).` +
       (args.motivo ? ` Motivo: ${args.motivo}` : ''),
       { tarefaId: t.id, de: t.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null })
-    // OBRIGAÇÃO ADMINISTRATIVA — devolver à fila pode ter feito o processo
-    // voltar a ter tarefa sem responsável. Ver lib/operacional/obrigacao-atribuicao.ts.
-    if (t.processoId != null) await reconciliarObrigacaoDeAtribuicao(tx, t.processoId)
     // O SINO (redesenho 29/09/2026) — os avisos de quem tinha a tarefa somem na hora e
     // nasce o MUDOU_DE_MAO ("N tarefas saíram da sua fila").
     await aoMudarDeDono(tx, { tarefas: [{ id: t.id, processoId: t.processoId }], de: t.responsavelId, para: null, autorId: args.autorId })

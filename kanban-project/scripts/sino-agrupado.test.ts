@@ -319,7 +319,7 @@ async function main() {
   await avisarGestores({ agora })
   const sr = (await avisos(marco.id, { tipo: "SEM_RESPONSAVEL", processoId: famH, lidaEm: null }))[0]
   ok("aviso do gestor: '<Família> — 2 tarefas sem responsável há mais de 1 dia'", sr?.titulo === `${MARCA} FamH — 2 tarefas sem responsável há mais de 1 dia`, sr?.titulo)
-  ok("link do gestor → /operacao/distribuicao?processo=<id>", sr?.link === `/operacao/distribuicao?processo=${famH}`, sr?.link ?? "")
+  ok("link do gestor → Torre, aba Tarefas, visão Sem responsável (Distribuição foi absorvida pela Torre)", sr?.link === "/torre?aba=tarefas&visao=semdono", sr?.link ?? "")
   ok("operador NÃO recebe aviso de gestor", (await avisos(daniela.id, { tipo: "SEM_RESPONSAVEL" })).length === 0)
   await atribuir(h1, daniela.id, marco.id)
   const sr2 = (await avisos(marco.id, { tipo: "SEM_RESPONSAVEL", processoId: famH, lidaEm: null }))[0]

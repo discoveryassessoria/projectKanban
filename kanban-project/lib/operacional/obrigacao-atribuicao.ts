@@ -1,59 +1,29 @@
 // lib/operacional/obrigacao-atribuicao.ts
 // ============================================================================
-// OBRIGAÇÃO ADMINISTRATIVA — ATRIBUIR_RESPONSAVEL.
+// OBRIGAÇÃO ADMINISTRATIVA "Atribuir tarefas — {família}" — DESCONTINUADA (30/09/2026).
 //
-// "15 tarefas sem responsável na Grisotto" não é 15 interrupções, e também
-// não é uma pendência FANTASMA calculada por fora: é UMA Tarefa canônica real
-// — TAREFA é a unidade canônica de trabalho operacional do Discovery (regra
-// suprema #1) — só que de OUTRA natureza: `tipo: ADMINISTRATIVA`. Ela
-// representa o trabalho de GERIR a distribuição, nunca o trabalho de obter a
-// certidão. Por isso aparece em Minha Operação, Tarefas e Projetos, Home e no
-// sino pelos MESMOS mecanismos que qualquer Tarefa — nenhuma projeção nova.
+// Decisão do usuário: a Torre de Controle mostra quem está sem dono (KPI/visão "Sem responsável", Precisa de
+// você, Distribuição absorvida), então NENHUMA tarefa administrativa é mais criada para "gerir a distribuição".
+// A criação (`reconciliarObrigacaoDeAtribuicao`, chamada em passo-tarefa, atribuirTarefa, devolverAFila e no
+// reconciliador de tarefas) foi REMOVIDA. As duas que estavam abertas (#3980 no 651, #3928 no 676) foram
+// canceladas com auditoria e o motivo "substituída pela Torre de Controle"
+// (`scripts/encerrar-obrigacoes-atribuicao.ts`). As já CONCLUÍDAS (histórico) continuam existindo com
+// `origem = ORIGEM_OBRIGACAO_ATRIBUICAO` — por isso os leitores (Distribuição, Central, tabela por família) ainda
+// filtram por essa origem: são fatos históricos, nunca apagados.
 //
-// IDENTIDADE: `processoId + ATRIBUIR_RESPONSAVEL`. No máximo UMA obrigação
-// ABERTA por processo — nunca uma cópia por tarefa sem responsável, nunca uma
-// cópia por usuário competente. `chaveIdempotencia` é o mesmo mecanismo que
-// `passo-tarefa.ts` já usa para nunca duplicar uma unidade de trabalho — aqui
-// versionada (`:v${n}`) porque, ao contrário de uma certidão, esta obrigação
-// pode abrir, fechar e abrir de novo várias vezes na vida do processo (uma
-// tarefa encerrada não ressuscita — a mesma regra de `passo-tarefa.ts` — por
-// isso o reabrir nasce OUTRA linha, nunca um `update` na antiga).
-//
-// SEM CIRCULARIDADE: esta Tarefa nasce SEMPRE com `responsavelId` já
-// resolvido (`usuarioResponsavelPelaDistribuicao`). Ela nunca entra na
-// contagem de "sem responsável" que ela própria existe para resolver —
-// `contarSemResponsavelDistribuivel` também filtra `tipo: NORMAL`,
-// pertencimento e pertencimento algum a esta obrigação, por reforço.
-//
-// PROJEÇÃO DA VERDADE ATUAL, NÃO EVENTO. `reconciliarObrigacaoDeAtribuicao`
-// não é disparada só no avanço de fase: é chamada em TODO ponto que muda
-// quantas tarefas de um processo estão sem responsável — materialização
-// (`passo-tarefa.ts`), atribuição/transferência (`atribuirTarefa`) e devolução
-// à fila (`devolverAFila`). Cada chamada faz a MESMA pergunta ("quantas
-// tarefas distribuíveis deste processo estão sem responsável agora?") e ajusta
-// a obrigação para bater com a resposta — nunca confia no evento que a
-// chamou. Por isso funciona igual para cadastro inicial, avanço, retrocesso,
-// operação antecipada e reconciliação: nenhum desses caminhos precisa saber
-// que esta obrigação existe, e todos convergem para o mesmo resultado.
-//
-// O CONTADOR NUNCA É ESCRITO NA LINHA. "15 aguardando distribuição" é
-// recalculado na leitura (mesma `contarSemResponsavelDistribuivel`) sempre
-// que a obrigação é apresentada — nunca uma coluna que possa ficar velha.
+// O que fica aqui: a marca da origem, "quem é o responsável pela distribuição" (competência
+// `operacao.distribuirTarefas`) e a contagem de tarefas distribuíveis sem responsável.
 // ============================================================================
 
 import { type Prisma, TipoTarefa, type StatusTarefa } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { STATUS_ATIVOS, STATUS_TERMINAIS } from "./tarefa-canonica"
+import { STATUS_ATIVOS } from "./tarefa-canonica"
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from "@/src/lib/permissoes"
-import { urlDistribuicaoDoProcesso } from "./navegacao"
-import { criarTarefaAdministrativa, concluirTarefaAdministrativa } from "./tarefa-ciclo"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
 /** Marca só desta obrigação — nunca confundir com origem "workflow" (certidões). */
 export const ORIGEM_OBRIGACAO_ATRIBUICAO = "obrigacao-atribuicao"
-
-const CHAVE_BASE = (processoId: number) => `obrigacao-atribuicao:${processoId}`
 
 /**
  * QUEM está resolvido HOJE para receber a obrigação — pela COMPETÊNCIA
@@ -95,114 +65,4 @@ export async function contarSemResponsavelDistribuivel(db: DB, processoId: numbe
       statusTarefa: { in: STATUS_ATIVOS as StatusTarefa[] },
     },
   })
-}
-
-/** A obrigação ABERTA deste processo, se existir — nunca mais de uma por desenho. */
-async function obrigacaoAtribuicaoAberta(db: DB, processoId: number) {
-  return db.tarefa.findFirst({
-    where: {
-      processoId,
-      tipo: TipoTarefa.ADMINISTRATIVA,
-      origem: ORIGEM_OBRIGACAO_ATRIBUICAO,
-      concluida: false,
-      statusTarefa: { notIn: STATUS_TERMINAIS as StatusTarefa[] },
-    },
-    orderBy: { id: "desc" },
-  })
-}
-
-/**
- * RECONCILIA a obrigação de atribuição do processo com o estado real AGORA.
- *
- * Chamar depois de QUALQUER mudança que possa ter alterado quantas tarefas
- * deste processo estão sem responsável — nunca só no avanço de fase.
- * Idempotente: chamar de novo sem nada ter mudado não faz nada.
- */
-export async function reconciliarObrigacaoDeAtribuicao(db: DB, processoId: number): Promise<void> {
-  const semResponsavel = await contarSemResponsavelDistribuivel(db, processoId)
-  const aberta = await obrigacaoAtribuicaoAberta(db, processoId)
-
-  if (semResponsavel > 0) {
-    if (aberta) return // já existe, e o contador é lido na apresentação — nada a escrever.
-    await abrirObrigacaoDeAtribuicao(db, processoId, semResponsavel)
-    return
-  }
-
-  // Zero sem responsável: se havia obrigação aberta, ela terminou — concluir,
-  // nunca cancelar (o trabalho de distribuir foi feito, não abandonado).
-  if (aberta) await concluirObrigacaoDeAtribuicao(db, aberta.id)
-}
-
-async function abrirObrigacaoDeAtribuicao(db: DB, processoId: number, quantidadeAgora: number): Promise<void> {
-  const responsavelId = await usuarioResponsavelPelaDistribuicao(db)
-  // NINGUÉM tem a competência hoje: não cria a obrigação sem dono — isso
-  // reabriria exatamente a circularidade que este desenho existe para evitar.
-  // É uma lacuna de configuração real; melhor a obrigação faltar visivelmente
-  // (nenhuma tarefa administrativa aparece) do que nascer quebrada.
-  if (responsavelId == null) return
-
-  const processo = await db.processo.findUnique({ where: { id: processoId }, select: { nome: true } })
-  const nomeProcesso = processo?.nome ?? `Processo ${processoId}`
-
-  // VERSIONADA — reabrir depois de uma conclusão é OUTRA linha (mesma regra
-  // de `passo-tarefa.ts`: tarefa encerrada não ressuscita), nunca um update na
-  // antiga. `n` = quantas vezes esta obrigação já existiu para este processo.
-  const jaExistiram = await db.tarefa.count({
-    where: { processoId, tipo: TipoTarefa.ADMINISTRATIVA, origem: ORIGEM_OBRIGACAO_ATRIBUICAO },
-  })
-  const chave = `${CHAVE_BASE(processoId)}:v${jaExistiram + 1}`
-
-  // A ESCRITA mora em tarefa-ciclo.ts (dono único de estado operacional de
-  // Tarefa) — SEM workflowInstanceId/workflowStepInstanceId/necessidadeId/
-  // documentoId/faseMacroKey/dataPrazo, DE PROPÓSITO: esta tarefa não
-  // pertence ao Workflow Interno de nenhuma certidão, não participa de
-  // progresso de fase, e não herda SLA operacional automaticamente.
-  const criada = await criarTarefaAdministrativa(db, {
-    processoId,
-    titulo: `Atribuir tarefas — ${nomeProcesso}`,
-    responsavelId,
-    chaveIdempotencia: chave,
-    origem: ORIGEM_OBRIGACAO_ATRIBUICAO,
-  })
-  // `null` = corrida: outra chamada criou a MESMA chave entre a leitura e
-  // esta escrita. Idempotente — a que já existe é a verdade, não um erro.
-  if (!criada) return
-  const tarefaId = criada.tarefaId
-
-  // O SINO (redesenho 29/09/2026): DISTRIBUICAO_NECESSARIA foi fundida em SEM_RESPONSAVEL
-  // do gestor — "<Família> — N tarefas sem responsável há mais de 1 dia", recomposto pelas
-  // varreduras (`precisaDeVoce`, em avisos-sino.ts). A OBRIGAÇÃO (a Tarefa
-  // administrativa acima) continua existindo na fila do responsável pela distribuição;
-  // só o aviso deixou de nascer aqui, um por abertura.
-
-  await db.logAuditoria.create({
-    data: {
-      acao: "OBRIGACAO_ATRIBUICAO_ABERTA",
-      entidade: "Tarefa",
-      entidadeId: tarefaId,
-      usuarioId: null,
-      descricao: `Obrigação administrativa aberta: distribuir ${quantidadeAgora} tarefa(s) sem responsável de "${nomeProcesso}".`,
-      detalhes: { processoId, responsavelId, quantidadeNaAbertura: quantidadeAgora } as never,
-    },
-  }).catch(() => null)
-}
-
-async function concluirObrigacaoDeAtribuicao(db: DB, tarefaId: number): Promise<void> {
-  // A ESCRITA mora em tarefa-ciclo.ts (dono único de estado operacional de Tarefa).
-  await concluirTarefaAdministrativa(db, tarefaId)
-  // Item 7 do mandato: "com zero, deixa de existir como pendência" — vale para o sino
-  // também: cada tarefa atribuída já saiu do SEM_RESPONSAVEL do gestor na mesma transação
-  // em que foi atribuída (`aoMudarDeDono` → `sincronizarAvisosDeTarefas`), então não há
-  // nada a limpar aqui.
-
-  await db.logAuditoria.create({
-    data: {
-      acao: "OBRIGACAO_ATRIBUICAO_CONCLUIDA",
-      entidade: "Tarefa",
-      entidadeId: tarefaId,
-      usuarioId: null,
-      descricao: "Obrigação administrativa concluída: todas as tarefas do processo já têm responsável.",
-      detalhes: {} as never,
-    },
-  }).catch(() => null)
 }

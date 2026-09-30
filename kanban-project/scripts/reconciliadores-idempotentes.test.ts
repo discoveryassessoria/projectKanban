@@ -72,8 +72,6 @@ const RECONCILIADORES: Array<{ arquivo: string; fn: string; oQueConverge: string
   // Publicar versão nova do workflow da fase atualiza a instância já materializada (ou se recusa
   // inteira quando há conflito) — sem isto, processo em andamento ficaria na definição antiga.
   { arquivo: "src/services/phase-workflow.ts", fn: "reconciliarNovaVersaoNaInstanciaAtual", oQueConverge: "instância da fase atual × nova versão publicada do workflow" },
-  // A obrigação administrativa "Atribuir tarefas" acompanha quantas tarefas estão sem responsável.
-  { arquivo: "lib/operacional/obrigacao-atribuicao.ts", fn: "reconciliarObrigacaoDeAtribuicao", oQueConverge: "obrigação de atribuição × tarefas sem responsável do processo" },
   { arquivo: "src/services/subtarefas-da-etapa.ts", fn: "reconciliarSubtarefas", oQueConverge: "execução da subtarefa × dependências e condições" },
 ]
 

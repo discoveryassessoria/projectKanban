@@ -25,3 +25,69 @@ export const DESTINO_NA_TORRE: Record<RotaAbsorvida, string> = {
 export function destinoDaAbsorcao(rota: RotaAbsorvida, tipoUsuario: string | null | undefined): string | null {
   return tipoUsuario === 'admin' ? DESTINO_NA_TORRE[rota] : null
 }
+
+// ─── A OPERAÇÃO INTEIRA DO ADMIN MORA NA TORRE (30/09/2026) ─────────────────────────────────────────────────
+// `/operacao` deixa de ser destino do ADMINISTRADOR: a página o leva à Torre traduzindo o que o link carregava
+// (família, aba, tarefa). Os avisos JÁ GRAVADOS continuam funcionando — a tradução é feita na chegada em
+// `/operacao` e no clique do sino, nunca reescrevendo o que está no banco. Não-admin: tudo igual ao de antes.
+
+/** A aba da Operação (`?aba=`) → onde isso fica na Torre. */
+const ABA_DA_OPERACAO_NA_TORRE: Record<string, { aba: string; visao?: string }> = {
+  fila: { aba: 'tarefas', visao: 'minhas' },
+  aguardando: { aba: 'tarefas', visao: 'aguard' },
+  acompanhamento: { aba: 'tarefas', visao: 'acompvenc' },
+  familias: { aba: 'radar' },
+  radar: { aba: 'precisa' },
+  feito: { aba: 'tarefas', visao: 'feito' },
+}
+
+const inteiro = (v: string | null | undefined): string | null => (v && /^\d+$/.test(v) ? v : null)
+
+/**
+ * `/operacao?...` → `/torre?...` PARA O ADMIN. Preserva: `processo` (família → Foco), `aba` (traduzida), e a
+ * tarefa (`taskId` ou `tarefa` → drawer). Sem nada disso: a visão "Minhas tarefas".
+ */
+export function destinoDaOperacaoParaAdmin(query: URLSearchParams | string): string {
+  const q = typeof query === 'string' ? new URLSearchParams(query.replace(/^\?/, '')) : query
+  const processo = inteiro(q.get('processo') ?? q.get('processoId'))
+  const tarefa = inteiro(q.get('tarefa') ?? q.get('taskId'))
+  const destino = new URLSearchParams()
+  if (tarefa) {
+    destino.set('aba', 'tarefas')
+    destino.set('tarefa', tarefa)
+  } else {
+    const alvo = ABA_DA_OPERACAO_NA_TORRE[q.get('aba') ?? ''] ?? { aba: 'tarefas', visao: 'minhas' }
+    destino.set('aba', alvo.aba)
+    if (alvo.visao) destino.set('visao', alvo.visao)
+  }
+  if (processo) destino.set('processo', processo)
+  return `/torre?${destino.toString()}`
+}
+
+/**
+ * O LINK DE UM AVISO, para quem é ADMIN. Aviso de família → Foco da família; de tarefa → drawer da tarefa;
+ * de distribuição → Sem responsável. Qualquer outro link (e TODO link de não-admin) volta como veio.
+ */
+export function linkDoAvisoParaAdmin(link: string | null | undefined, tipoUsuario: string | null | undefined): string | null {
+  if (!link) return null
+  if (tipoUsuario !== 'admin') return link
+  const [caminho, qs = ''] = link.split('?')
+  const q = new URLSearchParams(qs)
+  if (caminho === '/operacao') return destinoDaOperacaoParaAdmin(q)
+  if (caminho === '/operacao/distribuicao') {
+    const processo = inteiro(q.get('processo'))
+    return `/torre?aba=tarefas&visao=semdono${processo ? `&processo=${processo}` : ''}`
+  }
+  if (caminho === '/tarefas') {
+    const processo = inteiro(q.get('processo'))
+    return `/torre?aba=tarefas${processo ? `&processo=${processo}` : ''}`
+  }
+  // Aviso de tarefa/fase que apontava para o Kanban do processo (Central): tarefa → drawer; fase → Foco da família.
+  if (caminho === '/kanban' && q.get('tab') === 'central') {
+    const processo = inteiro(q.get('processoId'))
+    const tarefa = inteiro(q.get('taskId'))
+    if (tarefa) return `/torre?aba=tarefas&tarefa=${tarefa}${processo ? `&processo=${processo}` : ''}`
+    if (processo) return `/torre?processo=${processo}`
+  }
+  return link
+}

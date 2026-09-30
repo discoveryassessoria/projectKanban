@@ -18,6 +18,8 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { Bell } from "lucide-react"
+import { useJsonLocalStorage } from "@/src/lib/cliente"
+import { linkDoAvisoParaAdmin } from "@/src/lib/torre-absorcao"
 
 interface AvisoDoSino {
   id: number
@@ -71,6 +73,7 @@ function haQuanto(iso: string, agora = Date.now()): string {
 
 export function SinoNotificacoes() {
   const router = useRouter()
+  const usuarioSalvo = useJsonLocalStorage<{ tipo?: string }>("user")
   const [aberto, setAberto] = useState(false)
   const [verAnteriores, setVerAnteriores] = useState(false)
   const raiz = useRef<HTMLDivElement>(null)
@@ -106,7 +109,9 @@ export function SinoNotificacoes() {
         .catch(() => {})
         .finally(() => void mutate())
     }
-    if (a.link) router.push(a.link)
+    // ADMIN: o link do aviso é traduzido para o lugar equivalente na Torre (aviso já gravado continua valendo).
+    const destino = linkDoAvisoParaAdmin(a.link, usuarioSalvo?.tipo)
+    if (destino) router.push(destino)
   }
 
   const marcarTodas = () => {

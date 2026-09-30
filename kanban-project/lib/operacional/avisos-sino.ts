@@ -26,7 +26,7 @@ import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { diaOperacional, estadoTemporal } from './tempo-operacional'
 import { visaoGerencial, type LinhaGerencial } from './tarefa-projecoes'
 import { motivosAtivos } from './atencao-operacional'
-import { urlOperacaoDaFamilia, urlDistribuicaoDoProcesso, urlVisaoGlobalDaFamilia } from './navegacao'
+import { urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia, LINK_SEM_RESPONSAVEL_NA_TORRE } from './navegacao'
 import {
   gravarFotoDoAviso, sincronizarAvisosDeTarefas, expurgarAvisos, removerAviso,
   rotuloDaFamilia, SELECT_ROTULO_FAMILIA,
@@ -321,7 +321,7 @@ export async function precisaDeVoce(
     for (const [processoId, g] of porProc) {
       itens.push({
         tipo: 'SEM_RESPONSAVEL', processoId, familiaNome: g.nome, tarefaIds: sv(g.ids), itens: [],
-        link: processoId != null ? urlDistribuicaoDoProcesso(processoId) : '/operacao/distribuicao',
+        link: LINK_SEM_RESPONSAVEL_NA_TORRE,
       })
     }
   }

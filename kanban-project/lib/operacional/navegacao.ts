@@ -213,3 +213,9 @@ export async function resolverAlvoDaTarefa(
     },
   }
 }
+
+/**
+ * O AVISO "SEM_RESPONSAVEL" do gestor (30/09/2026) — leva à TORRE, aba Tarefas, visão "Sem responsável"
+ * (onde estão o Atribuir, o lote e a sugestão). A Distribuição foi absorvida pela Torre; o aviso só é do gestor.
+ */
+export const LINK_SEM_RESPONSAVEL_NA_TORRE = '/torre?aba=tarefas&visao=semdono'

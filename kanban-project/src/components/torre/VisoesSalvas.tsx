@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { api, erroDe, Campo, Modal, useTorre } from "./torre-base"
 
-export interface SpecDaVisao { visao: string | null; agrupar: string | null; kpi: string | null; pais: string | null; busca: string | null }
+export interface SpecDaVisao { visao: string | null; agrupar: string | null; dentro?: string | null; kpi: string | null; pais: string | null; busca: string | null }
 interface Minha { id: number; nome: string; spec: SpecDaVisao; compartilhada: boolean }
 interface DaEquipe { id: number; nome: string; spec: SpecDaVisao; donoNome: string }
 

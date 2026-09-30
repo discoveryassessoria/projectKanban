@@ -18,7 +18,7 @@ import { TorreBriefing } from "./TorreBriefing"
 import { TorreRevisao } from "./TorreRevisao"
 import { TorreRadar } from "./TorreRadar"
 import { TorreProcessos } from "./TorreProcessos"
-import { TorreTarefas } from "./TorreTarefas"
+import { TorreTarefas, CHAVES_DE_VISAO } from "./TorreTarefas"
 import { TorreTerceiros } from "./TorreTerceiros"
 import { TorreEquipe } from "./TorreEquipe"
 import { TorreRegras } from "./TorreRegras"
@@ -39,12 +39,32 @@ const KPIS_QUE_FILTRAM = KPIS.filter((k) => k.filtra).map((k) => k.chave)
 const hojeSP = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" })
 const semAcento = (x: string | null | undefined) => String(x ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
 
+const numeroDaUrl = (v: string | null): number | null => {
+  const n = Number(v)
+  return v != null && Number.isInteger(n) && n > 0 ? n : null
+}
+/** O CONTRATO DE URL da Torre: `?aba=` · `?kpi=` · `?visao=` (aba Tarefas) · `?processo=` (Foco da família) · `?tarefa=` (drawer da tarefa). */
+function lerUrl(params: URLSearchParams) {
+  const abaUrl = params.get("aba") as Aba | null
+  const visaoUrl = params.get("visao")
+  const visao = visaoUrl && CHAVES_DE_VISAO.includes(visaoUrl) ? visaoUrl : null
+  const processo = numeroDaUrl(params.get("processo"))
+  const tarefa = numeroDaUrl(params.get("tarefa"))
+  const abaValida = abaUrl && ABAS_VALIDAS.includes(abaUrl) ? abaUrl : null
+  // `?tarefa=` sempre vai para Tarefas; `?visao=`/`?processo=` sem `?aba=` também; com `?aba=` a aba é respeitada.
+  const aba: Aba | null = tarefa != null ? "tarefas" : abaValida ?? (visao || processo != null ? "tarefas" : null)
+  return { aba, visao, processo, tarefa }
+}
+
 export function Torre() {
   const params = useSearchParams()
-  const abaDaUrl = params.get("aba") as Aba | null
   const kpiDaUrl = params.get("kpi") as ChaveKpi | null
+  const urlInicial = lerUrl(params)
 
-  const [aba, setAba] = useState<Aba>(abaDaUrl && ABAS_VALIDAS.includes(abaDaUrl) ? abaDaUrl : "precisa")
+  const [aba, setAba] = useState<Aba>(urlInicial.aba ?? "precisa")
+  const [visaoPedida, setVisaoPedida] = useState<string | null>(urlInicial.visao)
+  const [tarefaPedida, setTarefaPedida] = useState<number | null>(urlInicial.tarefa)
+  const [processoDaUrl, setProcessoDaUrl] = useState<number | null>(urlInicial.processo)
   const [kpi, setKpi] = useState<ChaveKpi | null>(kpiDaUrl && KPIS_QUE_FILTRAM.includes(kpiDaUrl) ? kpiDaUrl : null)
   const [pais, setPais] = useState("")
   const [busca, setBusca] = useState("")
@@ -64,10 +84,21 @@ export function Torre() {
   const [nEquipe, setNEquipe] = useState<number | null>(null)
   const [divergencias, setDivergencias] = useState<number | null>(null)
 
-  const [foco, setFoco] = useState<number | null>(null)
+  const [foco, setFoco] = useState<number | null>(urlInicial.processo)
   const [relatorio, setRelatorio] = useState<AlvoDoRelatorio | null>(null)
   const [briefingAberto, setBriefingAberto] = useState(false)
   const [revisao, setRevisao] = useState<ItemPrecisa[] | null>(null)
+
+  // A URL pode mudar depois de montada (link do sino, do Foco…): o que ela pede entra no estado (ajuste durante a renderização, sem efeito).
+  const paramsChave = params.toString()
+  const [paramsAplicados, setParamsAplicados] = useState(paramsChave)
+  if (paramsAplicados !== paramsChave) {
+    setParamsAplicados(paramsChave)
+    const u = lerUrl(params)
+    if (u.aba) setAba(u.aba)
+    setVisaoPedida(u.visao); setTarefaPedida(u.tarefa); setProcessoDaUrl(u.processo)
+    if (u.processo != null) setFoco(u.processo)
+  }
 
   // 1) As tarefas (a projeção da Operação) e as decisões do dia — o que a tela precisa para abrir.
   useEffect(() => {
@@ -185,7 +216,9 @@ export function Torre() {
         {aba === "radar" && <TorreRadar colunas={procs?.colunas ?? []} processos={processosFiltrados} carregando={!procs && !erroProcs} erro={erroProcs} />}
         {aba === "tarefas" && (
           <TorreTarefas
-            linhas={linhasPais} carregando={linhas == null && !erro} erro={!!erro} kpi={kpi} busca={busca} paisChave={pais}
+            linhas={linhasPais} carregando={linhas == null && !erro} erro={!!erro} kpi={kpi} busca={busca} paisChave={pais} paisRotulo={paisRotulo}
+            visaoPedida={visaoPedida} tarefaPedida={tarefaPedida} onTarefaAtendida={() => setTarefaPedida(null)}
+            processos={procs?.processos} processoFoco={foco ?? processoDaUrl} versao={versao}
             onAplicarSpec={(s) => { setKpi(s.kpi); setPais(s.pais); setBusca(s.busca) }}
           />
         )}

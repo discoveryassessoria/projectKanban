@@ -113,7 +113,9 @@
    "scripts/operacao-sem-orgao-so-documento.test.ts",
    "scripts/tarefa-nasce-com-prazo-do-sla.test.ts",
    "scripts/saude-cad012-passo-da-biblioteca.test.ts",
-   "scripts/saude-pendencias-mtr-cob-tor.test.ts"
+   "scripts/saude-pendencias-mtr-cob-tor.test.ts",
+   "scripts/torre-admin-absorve-operacao.test.ts",
+   "scripts/torre-tarefas-recursos-da-operacao.test.ts"
   ]
  },
  "arquivos": [
@@ -208,6 +210,8 @@
   "scripts/operacao-sem-orgao-so-documento.test.ts",
   "scripts/tarefa-nasce-com-prazo-do-sla.test.ts",
   "scripts/saude-cad012-passo-da-biblioteca.test.ts",
-  "scripts/saude-pendencias-mtr-cob-tor.test.ts"
+  "scripts/saude-pendencias-mtr-cob-tor.test.ts",
+  "scripts/torre-admin-absorve-operacao.test.ts",
+  "scripts/torre-tarefas-recursos-da-operacao.test.ts"
  ]
 }

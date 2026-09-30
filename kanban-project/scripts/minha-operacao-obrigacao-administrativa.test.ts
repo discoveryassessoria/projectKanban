@@ -1,6 +1,8 @@
 // scripts/minha-operacao-obrigacao-administrativa.test.ts
 // ============================================================================
-// A TAREFA ADMINISTRATIVA DENTRO DE MINHA OPERAÇÃO — correção 17/09/2026.
+// SEM TAREFA ADMINISTRATIVA "Atribuir tarefas" EM MINHA OPERAÇÃO — descontinuada em 30/09/2026 (era: correção 17/09).
+// A obrigação foi substituída pela Torre de Controle: 15 tarefas sem dono NÃO geram tarefa administrativa; o gestor é
+// avisado (1 SEM_RESPONSAVEL por família, que leva à Torre) e a fila de quem recebe continua exata.
 // Rodar: PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/minha-operacao-obrigacao-administrativa.test.ts
 //
 // ACHADO REAL (prod, leitura): a Grisotto tinha 15 Tarefa NORMAL sem
@@ -20,9 +22,9 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { signAuthToken } from "@/lib/auth-jwt"
 import { criarTarefaManual } from "@/lib/operacional/tarefa-ciclo"
 import { redistribuirTarefas } from "@/lib/operacional/tarefa-comandos"
-import { reconciliarObrigacaoDeAtribuicao, usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
+import { usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
 import { avisarGestores } from "@/lib/operacional/avisos-sino"
-import { urlDistribuicaoDoProcesso } from "@/lib/operacional/navegacao"
+import { LINK_SEM_RESPONSAVEL_NA_TORRE } from "@/lib/operacional/navegacao"
 import { GET as getTarefasOperacao } from "@/src/app/api/operacao/tarefas/route"
 import { GET as getHome } from "@/src/app/api/home/route"
 import { GET as getNotificacoes } from "@/src/app/api/notificacoes/route"
@@ -117,7 +119,7 @@ async function corpo() {
   const proc = await prisma.processo.create({ data: { nome: `${MARCA} Grisotto`, arvoreId: arv.id }, select: { id: true } })
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("A) 15 tarefas NORMAL sem responsável → 1 tarefa ADMINISTRATIVA")
+  secao("A) 15 tarefas NORMAL sem responsável → NENHUMA tarefa administrativa")
   // ══════════════════════════════════════════════════════════════════════
   const tarefaIds: number[] = []
   for (let i = 0; i < 15; i++) {
@@ -128,107 +130,50 @@ async function corpo() {
     if (!r.ok) throw new Error(`falha ao criar tarefa de teste #${i}: ${r.mensagem}`)
     tarefaIds.push(r.tarefaId)
   }
-  // A RECONCILIAÇÃO É DISPARADA POR EVENTO — aqui simula o evento que criou
-  // as 15 (o mesmo `reconciliarObrigacaoDeAtribuicao` que `passo-tarefa.ts`/
-  // `reconciliar-tarefas.ts`/`atribuirTarefa`/`devolverAFila` já chamam).
-  await reconciliarObrigacaoDeAtribuicao(prisma, proc.id)
-
   const dono = await usuarioResponsavelPelaDistribuicao(prisma)
   const admin = await prisma.usuario.findUniqueOrThrow({ where: { id: dono! }, select: { id: true, email: true, tipo: true } })
-
-  const obrigacao = await prisma.tarefa.findFirst({
-    where: { processoId: proc.id, tipo: "ADMINISTRATIVA", origem: "obrigacao-atribuicao", concluida: false },
-    select: { id: true, responsavelId: true, titulo: true },
-  })
-  ok("A) a tarefa administrativa nasceu, atribuída ao competente", obrigacao?.responsavelId === admin.id)
+  const administrativas = () => prisma.tarefa.count({ where: { processoId: proc.id, tipo: "ADMINISTRATIVA" } })
+  ok("A) nenhuma tarefa administrativa 'Atribuir tarefas' nasceu", (await administrativas()) === 0)
 
   const filaAdmin = await minhaFilaDe(admin.id, admin.email, admin.tipo)
-  const linhaAdmin = filaAdmin.linhas.find((l) => l.taskId === obrigacao?.id)
-  ok("A) Minha Operação do Admin CONTÉM a tarefa administrativa", linhaAdmin != null)
-  ok("A) com origem identificável (obrigacao-atribuicao)", linhaAdmin?.origem === "obrigacao-atribuicao")
-  ok("A) e contexto de família/processo (Grisotto)", (linhaAdmin?.familiaNome ?? linhaAdmin?.processoNome ?? "").includes("Grisotto"))
+  ok("A) Minha Operação do Admin não ganha item administrativo desta família", !filaAdmin.linhas.some((l) => l.processoId === proc.id))
+  ok("A) as 15 sem dono NÃO aparecem na fila pessoal do Admin (não são dele)", tarefaIds.every((id) => !filaAdmin.linhas.some((l) => l.taskId === id)))
 
-  const somaAtencao = (h: { centralOperacional?: { indicadores?: { executavelAgora?: number; atrasadas?: number; bloqueadas?: number } } }) => {
-    const i = h?.centralOperacional?.indicadores
-    return (i?.executavelAgora ?? 0) + (i?.atrasadas ?? 0) + (i?.bloqueadas ?? 0)
-  }
-  const homeAdmin = await homeDe(admin.id, admin.email, admin.tipo)
-  const atencaoA = somaAtencao(homeAdmin)
-  ok("A) Home do Admin conta pelo menos 1 (executavelAgora+atrasadas+bloqueadas) — a obrigação exige atenção", atencaoA >= 1, String(atencaoA))
-
-  // A tarefa sem dono só vira aviso do gestor (SEM_RESPONSAVEL) depois de MAIS DE 1 DIA sem dono:
-  // envelhece as 15 e recompõe a lista do gestor (a mesma função que o cron horário chama).
   await prisma.tarefa.updateMany({ where: { id: { in: tarefaIds } }, data: { createdAt: new Date(Date.now() - 2 * 86_400_000) } })
   await avisarGestores({ agora: new Date() })
   const sinoAntes = await sinoDe(admin.id, admin.email, admin.tipo)
-  const avisosDaFamiliaAntes = sinoAntes.avisos.filter((a) => a.familiaId === proc.id)
   const pessoaisDaFamilia = await prisma.notificacaoOperacional.findMany({
     where: { destinatarioId: admin.id, agrupado: true, tipo: { in: ["PRECISA_AGIR", "CHEGOU_TRABALHO"] }, tarefaIds: { hasSome: tarefaIds } },
   })
   ok("A) nenhuma das 15 certidões vaza como aviso pessoal (PRECISA_AGIR/CHEGOU_TRABALHO) do Admin", pessoaisDaFamilia.length === 0, String(pessoaisDaFamilia.length))
-  const distribNotifAntes = avisosDaFamiliaAntes.filter((a) => a.tipo === "SEM_RESPONSAVEL")
-  ok("A) existe exatamente o aviso administrativo pertinente (UM SEM_RESPONSAVEL da família, cobrindo as 15)",
-    distribNotifAntes.length === 1 && distribNotifAntes[0].contagem === 15, String(distribNotifAntes.length))
-  ok("A) o link do aviso leva à Distribuição, escopado à Grisotto", distribNotifAntes[0]?.link === urlDistribuicaoDoProcesso(proc.id))
-  ok("A) a tarefa administrativa não gera aviso próprio (nem DISTRIBUICAO_NECESSARIA)",
-    (await prisma.notificacaoOperacional.count({ where: { OR: [{ tarefaId: obrigacao?.id }, { processoId: proc.id, tipo: "DISTRIBUICAO_NECESSARIA" }] } })) === 0)
+  const distribNotifAntes = sinoAntes.avisos.filter((a) => a.familiaId === proc.id && a.tipo === "SEM_RESPONSAVEL")
+  ok("A) o gestor recebe exatamente UM SEM_RESPONSAVEL da família, cobrindo as 15", distribNotifAntes.length === 1 && distribNotifAntes[0].contagem === 15, String(distribNotifAntes.length))
+  ok("A) o link do aviso leva à TORRE (aba Tarefas, visão Sem responsável)", distribNotifAntes[0]?.link === LINK_SEM_RESPONSAVEL_NA_TORRE, distribNotifAntes[0]?.link ?? "")
+  ok("A) nem DISTRIBUICAO_NECESSARIA existe mais", (await prisma.notificacaoOperacional.count({ where: { processoId: proc.id, tipo: "DISTRIBUICAO_NECESSARIA" } })) === 0)
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("B) Admin distribui 10 para Daniela — mesma obrigação, contador vira 5")
+  secao("B) Admin distribui 10 para Daniela — nada administrativo, fila dela exata")
   // ══════════════════════════════════════════════════════════════════════
   const dez = tarefaIds.slice(0, 10)
   const resB = await redistribuirTarefas({ tarefaIds: dez, novoResponsavelId: daniela.id, autorId: admin.id, motivo: "teste — parcial" })
   ok("B) as 10 foram atribuídas a Daniela", resB.sucesso === 10, `${resB.sucesso}/${resB.total}`)
-
-  const obrigacaoDepoisB = await prisma.tarefa.findUnique({ where: { id: obrigacao!.id }, select: { id: true, concluida: true } })
-  ok("B) a MESMA obrigação continua aberta (não criou outra)", obrigacaoDepoisB?.concluida === false)
-  const abertasB = await prisma.tarefa.count({ where: { processoId: proc.id, tipo: "ADMINISTRATIVA", origem: "obrigacao-atribuicao", concluida: false } })
-  ok("B) só 1 obrigação aberta para este processo", abertasB === 1)
-
-  const filaAdminB = await minhaFilaDe(admin.id, admin.email, admin.tipo)
-  ok("B) Minha Operação do Admin continua com a MESMA tarefa administrativa (mesmo taskId)", filaAdminB.linhas.some((l) => l.taskId === obrigacao?.id))
-
+  ok("B) continua sem tarefa administrativa", (await administrativas()) === 0)
   const filaDanielaB = await minhaFilaDe(daniela.id, daniela.email, daniela.tipo)
   const idsDanielaB = filaDanielaB.linhas.map((l) => l.taskId)
   ok("B) Minha Operação da Daniela já projeta as 10 tarefas dela", dez.every((id) => idsDanielaB.includes(id)))
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("C) Admin distribui as últimas 5 — obrigação conclui")
+  secao("C) Admin distribui as últimas 5 — aviso resolvido, fila da Daniela com as 15")
   // ══════════════════════════════════════════════════════════════════════
   const cinco = tarefaIds.slice(10)
   const resC = await redistribuirTarefas({ tarefaIds: cinco, novoResponsavelId: daniela.id, autorId: admin.id, motivo: "teste — final" })
   ok("C) as últimas 5 foram atribuídas a Daniela", resC.sucesso === 5, `${resC.sucesso}/${resC.total}`)
-
-  const obrigacaoDepoisC = await prisma.tarefa.findUnique({ where: { id: obrigacao!.id }, select: { concluida: true } })
-  ok("C) a obrigação administrativa foi CONCLUÍDA", obrigacaoDepoisC?.concluida === true)
-
-  const filaAdminC = await minhaFilaDe(admin.id, admin.email, admin.tipo)
-  ok("C) a tarefa administrativa NÃO aparece mais em Minha Operação do Admin", !filaAdminC.linhas.some((l) => l.taskId === obrigacao?.id))
-
-  // COMPARATIVO, nunca zero absoluto — o banco de teste é compartilhado
-  // entre suítes, e outro admin (mesmo id resolvido por competência) pode
-  // ter uma obrigação de OUTRO processo/OUTRA suíte ainda pendente. O que
-  // esta obrigação especificamente resolvida precisa provar é QUEDA de pelo
-  // menos 1 — a fatia que era dela.
-  const homeAdminC = await homeDe(admin.id, admin.email, admin.tipo)
-  const atencaoC = somaAtencao(homeAdminC)
-  ok("C) Home do Admin caiu em pelo menos 1 (a fatia desta obrigação resolvida)", atencaoC <= atencaoA - 1, `${atencaoA} → ${atencaoC}`)
-
+  ok("C) continua sem tarefa administrativa", (await administrativas()) === 0)
   const sinoDepoisC = await sinoDe(admin.id, admin.email, admin.tipo)
-  const aindaPendenteC = sinoDepoisC.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)
-  ok("C) o aviso administrativo foi resolvido (não fica pendente)", aindaPendenteC.length === 0)
-
+  ok("C) o aviso SEM_RESPONSAVEL foi resolvido (não fica pendente)", sinoDepoisC.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id).length === 0)
   const filaDanielaC = await minhaFilaDe(daniela.id, daniela.email, daniela.tipo)
-  const idsDanielaC = filaDanielaC.linhas.map((l) => l.taskId)
-  ok("C) Minha Operação da Daniela projeta as 15 tarefas operacionais", tarefaIds.every((id) => idsDanielaC.includes(id)))
-
-  // ══════════════════════════════════════════════════════════════════════
-  secao("E) Deep-link — a URL da obrigação leva direto à Distribuição, no contexto da Grisotto")
-  // ══════════════════════════════════════════════════════════════════════
-  const url = urlDistribuicaoDoProcesso(proc.id)
-  // Decisão 24/09/2026: Distribuição é tela PRÓPRIA sob Operação (/operacao/distribuicao), não aba.
-  ok("E) a URL aponta para Operação → Distribuição", url.startsWith("/operacao/distribuicao?"))
-  ok("E) a URL carrega o processoId da Grisotto (nunca nome/posição)", url.includes(`processo=${proc.id}`))
+  ok("C) Minha Operação da Daniela projeta as 15 tarefas operacionais", tarefaIds.every((id) => filaDanielaC.linhas.some((l) => l.taskId === id)))
+  ok("C) nenhuma tarefa foi duplicada: 15 continuam sendo 15", (await prisma.tarefa.count({ where: { processoId: proc.id, tipo: "NORMAL" } })) === 15)
 
   console.log(`\n${passou} passaram, ${falhou} falharam`)
   if (falhou > 0) { console.log("Falhas:", falhas.join(", ")); process.exitCode = 1 }

@@ -1,7 +1,8 @@
 // lib/operacional/torre-visoes.ts — a validação das VISÕES SALVAS da Torre (Bloco J4). Puro: valores fora da lista
 // fechada são recusados/normalizados; a visão guarda a PERGUNTA, nunca o resultado. Tabela: `RelatorioVisao` (sem migration).
 export const DOMINIO_VISAO_TORRE = 'torre-tarefas'
-export const VISOES_TORRE = ['todas', 'vencidas', 'semdono', 'aguard', 'cobranca'] as const
+export const VISOES_TORRE = ['todas', 'minhas', 'vencidas', 'semdono', 'aguard', 'acompvenc', 'cobranca', 'feito'] as const
+export const DENTRO_TORRE = ['none', 'pessoa', 'orgao', 'passo'] as const
 export const AGRUPAR_TORRE = ['fam', 'resp', 'org', 'fase', 'none'] as const
 export const KPIS_TORRE = ['venc', 'v7', 'semdono', 'aguard', 'cob', 'esc', 'risco'] as const
 
@@ -10,6 +11,7 @@ export function limparSpec(b: Record<string, unknown>) {
   return {
     visao: em(b.visao, VISOES_TORRE, 'todas'),
     agrupar: em(b.agrupar, AGRUPAR_TORRE, 'fam'),
+    dentro: em(b.dentro, DENTRO_TORRE, 'none'),
     kpi: em(b.kpi, KPIS_TORRE, null),
     pais: typeof b.pais === 'string' && b.pais.trim() ? b.pais.trim().slice(0, 40) : null,
     busca: typeof b.busca === 'string' && b.busca.trim() ? b.busca.trim().slice(0, 120) : null,

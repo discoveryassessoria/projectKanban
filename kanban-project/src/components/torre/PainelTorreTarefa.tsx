@@ -10,7 +10,9 @@ import { useEffect, useState } from "react"
 import { RepactuarPrazoModal } from "@/src/components/operacao/RepactuarPrazoModal"
 import { acompTxtCompleto } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, Modal, ModalTexto, Campo, useTorre } from "./torre-base"
-import { bolaDe, type LinhaTorre } from "./tipos"
+import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
+import { bolaDe, temAcompanhamento } from "./tipos"
+import { useAdiarAcompanhamento } from "./adiar-acompanhamento"
 
 const CANAIS_SOLICITACAO = ["CRC", "ECARTORIO", "EMAIL", "WHATSAPP", "BALCAO", "COMUNE", "CORREIOS", "CONSULADO"]
 const RESULTADOS_LIGACAO = [
@@ -20,12 +22,14 @@ const RESULTADOS_LIGACAO = [
 
 type Aberto = null | "repactuar" | "bloquear" | "reabrir" | "ligacao" | "canal"
 
-export function PainelTorreTarefa({ linha }: { linha: LinhaTorre }) {
+export function PainelTorreTarefa({ linha }: { linha: LinhaOperacaoV3 }) {
   const { permissoes, avisar, recarregar } = useTorre()
   const [sugerido, setSugerido] = useState<{ usuarioId: number; nome: string; motivo: string } | null>(null)
   const [aberto, setAberto] = useState<Aberto>(null)
   const [ocupado, setOcupado] = useState(false)
   const bola = bolaDe(linha)
+  const concluida = linha.estadoOperacao === "CONCLUIDA"
+  const adiar = useAdiarAcompanhamento()
 
   useEffect(() => {
     let vivo = true
@@ -68,14 +72,15 @@ export function PainelTorreTarefa({ linha }: { linha: LinhaTorre }) {
         </div>
       )}
       <div className="flex flex-wrap gap-2">
-        {permissoes?.editar && !linha.responsavelId && sugerido && (
+        {!concluida && permissoes?.editar && !linha.responsavelId && sugerido && (
           <button className="tor-btn pri" disabled={ocupado} onClick={() => void atribuirSugerido()} title={sugerido.motivo}>Atribuir a {sugerido.nome}</button>
         )}
-        {permissoes?.editar && <button className="tor-btn" onClick={() => setAberto("repactuar")}>Repactuar prazo</button>}
-        {permissoes?.bloquear && linha.statusTarefa !== "BLOQUEADA" && <button className="tor-btn" onClick={() => setAberto("bloquear")}>Bloquear com motivo</button>}
+        {!concluida && permissoes?.editar && <button className="tor-btn" onClick={() => setAberto("repactuar")}>Repactuar prazo</button>}
+        {!concluida && permissoes?.bloquear && linha.statusTarefa !== "BLOQUEADA" && <button className="tor-btn" onClick={() => setAberto("bloquear")}>Bloquear com motivo</button>}
         {permissoes?.editar && <button className="tor-btn" onClick={() => setAberto("reabrir")}>Reabrir passo</button>}
+        {temAcompanhamento(linha) && !concluida && <button className="tor-btn" onClick={() => adiar.abrir(linha.taskId)}>Adiar acompanhamento</button>}
         <button className="tor-btn" onClick={() => setAberto("ligacao")}>Registrar ligação</button>
-        {permissoes?.editar && <button className="tor-btn" onClick={() => setAberto("canal")}>Trocar canal</button>}
+        {!concluida && permissoes?.editar && <button className="tor-btn" onClick={() => setAberto("canal")}>Trocar canal</button>}
       </div>
 
       {aberto === "repactuar" && (
@@ -98,6 +103,7 @@ export function PainelTorreTarefa({ linha }: { linha: LinhaTorre }) {
       )}
       {aberto === "ligacao" && <LigacaoModal taskId={linha.taskId} onFechar={() => setAberto(null)} />}
       {aberto === "canal" && <CanalModal taskId={linha.taskId} onFechar={() => setAberto(null)} />}
+      {adiar.modal}
     </div>
   )
 }

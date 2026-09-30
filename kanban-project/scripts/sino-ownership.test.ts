@@ -28,7 +28,7 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { signAuthToken } from "@/lib/auth-jwt"
 import { criarTarefaManual } from "@/lib/operacional/tarefa-ciclo"
 import { redistribuirTarefas } from "@/lib/operacional/tarefa-comandos"
-import { reconciliarObrigacaoDeAtribuicao, usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
+import { usuarioResponsavelPelaDistribuicao } from "@/lib/operacional/obrigacao-atribuicao"
 import { marcarNotificacaoComoLida } from "@/lib/operacional/notificacao-canonica"
 import { avisarGestores, rodarResumoDiario } from "@/lib/operacional/avisos-sino"
 import { GET as getNotificacoes } from "@/src/app/api/notificacoes/route"
@@ -107,7 +107,6 @@ async function main() {
     if (!r.ok) throw new Error(`falha ao criar tarefa de teste #${i}: ${r.mensagem}`)
     tarefaIds.push(r.tarefaId)
   }
-  await reconciliarObrigacaoDeAtribuicao(prisma, proc.id)
 
   // QUEM a competência resolveu — nunca assumido por posição/id fixo (achado
   // real desta mesma rodada: banco de teste compartilhado pode ter admin
@@ -117,12 +116,9 @@ async function main() {
   const admin = await prisma.usuario.findUniqueOrThrow({ where: { id: responsavelDistribuicaoId! }, select: { id: true, email: true, tipo: true } })
   ok("o resolvido é Admin", admin.tipo === "admin", admin.email)
 
-  const obrigacao = await prisma.tarefa.findFirst({
-    where: { processoId: proc.id, tipo: "ADMINISTRATIVA", origem: "obrigacao-atribuicao", concluida: false },
-    select: { id: true, responsavelId: true },
-  })
-  ok("a obrigação administrativa nasceu", obrigacao != null)
-  ok("a obrigação já pertence ao Admin resolvido (sem circularidade)", obrigacao?.responsavelId === admin.id)
+  // A obrigação "Atribuir tarefas" foi DESCONTINUADA (30/09/2026): o sem dono vive na Torre. O que este teste
+  // protege é o SINO do gestor (SEM_RESPONSAVEL, 1 por família) — e que nenhuma tarefa administrativa nasce.
+  ok("nenhuma obrigação administrativa 'Atribuir tarefas' foi criada", (await prisma.tarefa.count({ where: { processoId: proc.id, tipo: "ADMINISTRATIVA" } })) === 0)
 
   // ══════════════════════════════════════════════════════════════════════
   secao("3/4) SINO do Admin ANTES da atribuição")
@@ -146,8 +142,8 @@ async function main() {
   ok("4) exatamente 1 aviso de gestor SEM_RESPONSAVEL DESTA família no sino do Admin (não 15)", distribuicaoDesteProcesso.length === 1, String(distribuicaoDesteProcesso.length))
   ok("4) o aviso diz '<Família> — 15 tarefas sem responsável há mais de 1 dia'",
     distribuicaoDesteProcesso[0]?.titulo === `${MARCA} Grisotto — 15 tarefas sem responsável há mais de 1 dia` && distribuicaoDesteProcesso[0].contagem === 15, distribuicaoDesteProcesso[0]?.titulo)
-  ok("4) o aviso leva direto para o contexto de execução da distribuição da família",
-    distribuicaoDesteProcesso[0]?.link === `/operacao/distribuicao?processo=${proc.id}`, distribuicaoDesteProcesso[0]?.link ?? "")
+  ok("4) o aviso leva à TORRE (aba Tarefas, visão Sem responsável)",
+    distribuicaoDesteProcesso[0]?.link === "/torre?aba=tarefas&visao=semdono", distribuicaoDesteProcesso[0]?.link ?? "")
   ok("4) a antiga DISTRIBUICAO_NECESSARIA não nasce mais (fundida em SEM_RESPONSAVEL)",
     (await prisma.notificacaoOperacional.count({ where: { processoId: proc.id, tipo: "DISTRIBUICAO_NECESSARIA" } })) === 0)
   ok("4) nem um aviso por tarefa (tarefaId preenchido) para o Admin",
@@ -160,13 +156,12 @@ async function main() {
   ok("5) as 15 foram atribuídas", resDistrib.sucesso === 15, `${resDistrib.sucesso}/${resDistrib.total}`)
 
   // ══════════════════════════════════════════════════════════════════════
-  secao("6) SINO do Admin DEPOIS — a obrigação se resolveu")
+  secao("6) SINO do Admin DEPOIS — o aviso se resolveu")
   // ══════════════════════════════════════════════════════════════════════
   const sinoAdminDepois = await sinoDe(admin.id, admin.email, admin.tipo)
   const aindaPendenteDesteProcesso = sinoAdminDepois.avisos.filter((a) => a.tipo === "SEM_RESPONSAVEL" && a.familiaId === proc.id)
   ok("6) o aviso de distribuição DESTA família não fica mais pendente no sino do Admin", aindaPendenteDesteProcesso.length === 0, String(aindaPendenteDesteProcesso.length))
-  const obrigacaoDepois = await prisma.tarefa.findUnique({ where: { id: obrigacao!.id }, select: { concluida: true } })
-  ok("6) a obrigação administrativa foi concluída", obrigacaoDepois?.concluida === true)
+  ok("6) e continua sem nenhuma obrigação administrativa", (await prisma.tarefa.count({ where: { processoId: proc.id, tipo: "ADMINISTRATIVA" } })) === 0)
   // Ela mesma reconcilia sem novo aviso: rodar o gestor de novo não ressuscita nada.
   await avisarGestores({ agora: new Date() })
   ok("6) e rodar a lista do gestor de novo não ressuscita o aviso",

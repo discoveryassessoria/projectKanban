@@ -421,3 +421,15 @@ Formatação única (`textoTempoNaFase`, `torre-predicados.ts`): "—" sem data;
 Legenda do Radar: "parado 7+ dias" NÃO é regra (o score do Precisa de você não a tem); a legenda descreve a pontuação real (atenção 3–5, crítico ≥ 6 ou fase sem passos). Teste: `scripts/torre-bloco-j-tempo-na-fase.test.ts` (na suíte crítica).
 
 Distribuição: o redirecionamento de quem não tem `tarefas.editar` para `/operacao` já existia antes do Bloco J (`src/app/operacao/distribuicao/page.tsx`); o J não o alterou (o teste acima o trava).
+
+### Tudo do administrador mora na Torre (30/09/2026)
+
+**Decisão:** para o ADMIN, a Operação (`/operacao`) deixa de ser destino; tudo passa a viver na Torre. Não-admin (Daniela e demais): menu, `/operacao`, abas, números e links **exatamente como antes**. Nada é apagado — a rota continua existindo.
+
+- **Menu:** "Operação" some para o admin (`escondeParaAdmin`, `itemDeMenuVisivel`).
+- **Redirecionamento na própria `/operacao`** (`destinoDaOperacaoParaAdmin`, `src/lib/torre-absorcao.ts`): traduz `processo` (família → Foco), `aba` (fila→Minhas tarefas, aguardando→Com o cartório, acompanhamento→Acompanhamentos vencidos, feito→Feito, famílias→Radar, radar→Precisa de você) e `taskId`/`tarefa` (→ drawer). Avisos JÁ GRAVADOS continuam funcionando.
+- **Sino:** `linkDoAvisoParaAdmin` traduz no clique — `/operacao?…` (CHEGOU_TRABALHO, PRECISA_AGIR, MUDOU_DE_MAO, ESCALADA…), `/kanban?…tab=central&taskId=` (tarefa → drawer), `/kanban?…tab=central` (fase concluída → Foco), `/operacao/distribuicao` e `/tarefas`. Link de não-admin nunca muda.
+- **A Torre lê** `?visao=` (todas|minhas|vencidas|semdono|aguard|acompvenc|cobranca|feito), `?processo=` (abre o Foco) e `?tarefa=` (abre o drawer; procura nas abertas e nas concluídas recentes).
+- **Aba Tarefas ganhou** (reaproveitando componentes/rotas da Operação, sem regra nova): Minhas tarefas; Acompanhamentos vencidos (`acompanhamentoVencido`, o número da Operação) **e** Cobranças a fazer (`cobravelVencida`) — dois números, dois nomes, cada um = sua lista; Feito (`/api/operacao/tarefas?visao=feito&escopo=equipe`, 14 dias); subagrupamento Família → Pessoa/Órgão/Passo (persistido nas visões salvas); Adiar acompanhamento (linha e drawer); Vincular órgão nas N (lote); marcador de novas; rótulos de conclusão rápida (abrem o drawer, onde estão validação e auditoria); ▶ Trabalhar a fila; + Tarefa transversal; Iniciar em lote.
+- **"Atribuir tarefas — {família}" descontinuada:** a criação foi removida dos 4 pontos (`passo-tarefa`, `atribuirTarefa`, `devolverAFila`, `reconciliar-tarefas`); as duas abertas (#3980/651, #3928/676) foram CANCELADAS (não "concluídas") com auditoria e o motivo "substituída pela Torre de Controle" (`scripts/encerrar-obrigacoes-atribuicao.ts`). O aviso SEM_RESPONSAVEL do gestor leva à Torre (`/torre?aba=tarefas&visao=semdono`). As concluídas históricas ficam (origem `obrigacao-atribuicao`).
+- **Testes:** `torre-admin-absorve-operacao`, `torre-tarefas-recursos-da-operacao`, e os 7 que assumiam a obrigação foram ajustados.

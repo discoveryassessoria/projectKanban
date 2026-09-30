@@ -124,6 +124,9 @@ async function main() {
     ok("filtro por período (a de 10 dias atrás fica de fora)", porPeriodo.itens.every((l) => l.acao !== "TAREFA_PRIORIDADE_ALTERADA") && porPeriodo.itens.some((l) => l.acao === "=EVIL()"))
     const porAcao = await consultarAuditoria({ acao: "prazo_alterado", processoId: o1.processoId })
     ok("filtro por ação", porAcao.itens.length === 1)
+    // A paginação precisa de linhas suficientes POR CONTA PRÓPRIA (antes dependia, sem declarar, dos logs que a
+    // criação da obrigação "Atribuir tarefas" gerava — descontinuada em 30/09/2026).
+    for (let i = 0; i < 4; i++) await mkLog("TAREFA_ATRIBUIDA", o2.tarefaId, admin.id, hoje)
     const p1 = await consultarAuditoria({}, 1, 2), p2 = await consultarAuditoria({}, 2, 2)
     ok("paginação no servidor: 2 por página, total real, páginas distintas", p1.itens.length === 2 && p2.itens.length === 2 && p1.total === p2.total && p1.total >= 6 && p1.itens[0].id !== p2.itens[0].id)
     ok("nunca traz outra entidade", (await consultarAuditoria({}, 1, 200)).itens.every((l) => l.acao !== "ACAO_DE_OUTRA_ENTIDADE"))

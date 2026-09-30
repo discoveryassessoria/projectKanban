@@ -13,7 +13,7 @@ export interface LinhaTorre extends LinhaOperacaoV3 {
 export type Pill = "red" | "amb" | "grn" | "blu" | "gry"
 
 /** DE QUEM É A BOLA — só campos reais da linha. */
-export function bolaDe(l: LinhaTorre): { txt: string; cls: Pill } {
+export function bolaDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
   if (l.esperandoDe === "terceiro") return { txt: l.terceiroNome ?? "Cartório", cls: "amb" }
   if (l.esperandoDe === "cliente") return { txt: "Cliente", cls: "amb" }
   if (l.statusTarefa === "BLOQUEADA") return { txt: "Bloqueada", cls: "red" }
@@ -22,8 +22,12 @@ export function bolaDe(l: LinhaTorre): { txt: string; cls: Pill } {
 }
 
 /** RISCO — derivado dos indicadores que a Operação já calcula (nada recalculado). */
-export function riscoDe(l: LinhaTorre): { txt: string; cls: Pill } {
+export function riscoDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
   if (l.atrasada || l.escalada) return { txt: "Crítico", cls: "red" }
   if (l.emRisco || l.acompanhamentoVencido || l.statusTarefa === "BLOQUEADA") return { txt: "Atenção", cls: "amb" }
   return { txt: "No ritmo", cls: "grn" }
 }
+
+/** A tarefa tem acompanhamento a adiar — a MESMA condição da aba Acompanhamento da Operação (`acompanhamentoPasso` com prazo). */
+export const temAcompanhamento = (l: Pick<LinhaOperacaoV3, "acompanhamentoPasso">): boolean =>
+  !!l.acompanhamentoPasso && !l.acompanhamentoPasso.semPrazo

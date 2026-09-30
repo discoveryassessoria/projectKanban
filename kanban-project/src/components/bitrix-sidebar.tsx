@@ -50,6 +50,7 @@ const menuItems = [
     textOffset: "",
     iconOffset: "translate-y-[0.5px]",
     permissao: "tarefas.ver",
+    escondeParaAdmin: true, // a Torre de Controle absorve a Operação do administrador; /operacao segue existindo e o leva à Torre
   },
   {
     // TORRE DE CONTROLE — a tela do ADMINISTRADOR que responde pela operação inteira (Bloco J, 30/09/2026):

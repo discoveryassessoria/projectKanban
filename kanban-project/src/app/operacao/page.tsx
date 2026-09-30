@@ -23,12 +23,13 @@
 "use client"
 
 import { Suspense, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { OperacaoV3 } from "@/src/components/operacao/operacao-v3"
+import { destinoDaOperacaoParaAdmin } from "@/src/lib/torre-absorcao"
 
 const CARREGANDO = (
   <div className="relative min-h-screen [overflow-x:clip] text-[var(--text-primary)]">
@@ -67,11 +68,18 @@ function OperacaoPageConteudo() {
   // de obrigação administrativa acima — nunca uma aba misturada aqui dentro.
   const autorizado = pode("tarefas.ver")
 
-  useEffect(() => {
-    if (mounted && !carregando && !autorizado) router.push("/")
-  }, [mounted, carregando, autorizado, router])
+  // TUDO DO ADMIN MORA NA TORRE (30/09/2026): o administrador é levado à Torre, com o que o link carregava
+  // (família → Foco, aba → visão equivalente, tarefa → drawer) traduzido — os avisos já gravados continuam
+  // funcionando. Não-admin: esta tela, exatamente como hoje. A rota NÃO é apagada.
+  const parametros = useSearchParams()
+  const paraTorre = user.tipo === "admin" ? destinoDaOperacaoParaAdmin(parametros) : null
 
-  if (!mounted || carregando || !autorizado) return CARREGANDO
+  useEffect(() => {
+    if (mounted && !carregando && paraTorre) { router.replace(paraTorre); return }
+    if (mounted && !carregando && !autorizado) router.push("/")
+  }, [mounted, carregando, autorizado, paraTorre, router])
+
+  if (!mounted || carregando || !autorizado || paraTorre) return CARREGANDO
 
   return (
     <div className="relative min-h-screen [overflow-x:clip] overscroll-none text-[var(--text-primary)]">

@@ -27,7 +27,6 @@ import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
 import { marcarAtribuicaoComoLidaAoProgredir } from './notificacao-canonica'
 import { aoMudarDeDono, avisarChegouTrabalho } from './avisos-fatos'
-import { reconciliarObrigacaoDeAtribuicao } from './obrigacao-atribuicao'
 
 export type ResultadoComando =
   /** `jaEstavaIniciada` distingue "fiz agora" de "já estava feito" sem virar erro. */
@@ -169,11 +168,6 @@ export async function atribuirTarefa(args: {
       { tarefaId: t.id, de: anterior, para: args.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null },
     )
 
-    // OBRIGAÇÃO ADMINISTRATIVA — esta atribuição pode ter zerado o "sem
-    // responsável" do processo (a última das N), ou pode ter sido a própria
-    // obrigação sendo reatribuída — nos dois casos, reconciliar contra o
-    // estado real agora. Ver lib/operacional/obrigacao-atribuicao.ts.
-    if (t.processoId != null) await reconciliarObrigacaoDeAtribuicao(tx, t.processoId)
 
     // O SINO (redesenho 29/09/2026) — na MESMA transação: os avisos da pessoa
     // anterior sobre esta tarefa somem, nasce o MUDOU_DE_MAO para ela e o
