@@ -125,6 +125,31 @@ export async function ultimaExecucao() {
   return prisma.saudeExecucao.findFirst({ orderBy: { criadoEm: 'desc' } })
 }
 
+/**
+ * IGNORA um achado por N dias — Torre de Controle, Bloco F ("Parede à
+ * frente", 29/09/2026). O achado CONTINUA visível no painel de Saúde
+ * (`status: 'IGNORADO'` já é lido por `achadosAbertos`, "problema ignorado
+ * continua visível" — comentário do model): só some da lista de decisões da
+ * Torre enquanto `ignoradoAte` não passar. Justificativa obrigatória.
+ */
+export async function ignorarAchado(args: {
+  achadoId: number
+  dias: number
+  justificativa: string
+  autorId: number
+}): Promise<{ ok: true; ignoradoAte: Date } | { ok: false; erro: string }> {
+  if (!args.justificativa?.trim()) return { ok: false, erro: 'informe a justificativa' }
+  if (!Number.isInteger(args.dias) || args.dias <= 0) return { ok: false, erro: 'dias precisa ser um inteiro positivo' }
+  const achado = await prisma.saudeAchado.findUnique({ where: { id: args.achadoId }, select: { id: true, status: true } })
+  if (!achado) return { ok: false, erro: 'achado não encontrado' }
+  const ignoradoAte = new Date(Date.now() + args.dias * 86_400_000)
+  await prisma.saudeAchado.update({
+    where: { id: args.achadoId },
+    data: { status: 'IGNORADO', ignoradoAte, ignoradoPorId: args.autorId, justificativa: args.justificativa.slice(0, 2000) },
+  })
+  return { ok: true, ignoradoAte }
+}
+
 /** Achados vivos, do pior para o menos grave. */
 export async function achadosAbertos(limite = 500) {
   const ordem = { CRITICO: 0, ERRO: 1, ALERTA: 2, INFORMATIVO: 3 } as Record<string, number>
