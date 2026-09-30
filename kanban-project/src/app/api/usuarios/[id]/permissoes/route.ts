@@ -130,17 +130,13 @@ export async function PUT(
     const usuario = await prisma.usuario.update({
       where: { id },
       data: updateData,
+      // A resposta do PUT não devolve permissoesCustom nem perfil.permissoes (quem edita já as tem;
+      // a tela ignora este corpo). Só o GET, do editor de permissões, as entrega.
       select: {
         id: true,
         nome: true,
         perfilId: true,
-        permissoesCustom: true,
-        perfil: {
-          select: {
-            nome: true,
-            permissoes: true,
-          },
-        },
+        perfil: { select: { nome: true } },
       },
     })
 

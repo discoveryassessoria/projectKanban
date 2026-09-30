@@ -10,6 +10,7 @@ import { removerFamiliaSeOrfa } from "@/src/services/familia"
 import { excluirProcesso } from "@/src/services/processo-ciclo-vida"
 import { limparArvoreOrfaAposExclusaoDeProcesso } from "@/src/services/pessoa-ciclo-vida"
 import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
+import { USUARIO_PUBLICO_SELECT, removerSegredosDeUsuario } from "@/src/lib/seguranca/usuario-publico"
 
 // GET - Buscar processo por ID
 export async function GET(
@@ -59,7 +60,8 @@ export async function GET(
         },
         tarefas: {
           include: {
-            responsavel: true
+            // Só o público: `true` traria a linha inteira do Usuario (hash da senha, permissoesCustom).
+            responsavel: { select: USUARIO_PUBLICO_SELECT }
           },
           orderBy: { createdAt: "desc" }
         },
@@ -90,7 +92,7 @@ export async function GET(
       requerentes: processo.requerentes.map(r => r.requerente)
     }
 
-    return NextResponse.json({ processo: processoFormatado })
+    return NextResponse.json({ processo: removerSegredosDeUsuario(processoFormatado) })
   } catch (error) {
     console.error("Erro ao buscar processo:", error)
     return NextResponse.json(
@@ -232,7 +234,8 @@ export async function PUT(
         },
         tarefas: {
           include: {
-            responsavel: true
+            // Só o público: `true` traria a linha inteira do Usuario (hash da senha, permissoesCustom).
+            responsavel: { select: USUARIO_PUBLICO_SELECT }
           },
           orderBy: { createdAt: "desc" }
         }
@@ -250,7 +253,7 @@ export async function PUT(
       requerentes: processoAtualizado?.requerentes.map(r => r.requerente) || []
     }
 
-    return NextResponse.json({ processo: processoFormatado })
+    return NextResponse.json({ processo: removerSegredosDeUsuario(processoFormatado) })
   } catch (error) {
     console.error("Erro ao atualizar processo:", error)
     return NextResponse.json(

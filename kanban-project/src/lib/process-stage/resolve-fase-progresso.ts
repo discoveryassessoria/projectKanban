@@ -16,6 +16,7 @@ import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-c
 import { normalizarUnidade, chaveDaUnidade, tarefasVivasDasUnidades, type UnidadeDeTrabalho } from "@/lib/operacional/identidade-da-tarefa"
 import { subtarefasDaEtapa } from "@/src/services/subtarefas-da-etapa"
 import type { FaseCode } from "@prisma/client"
+import { documentoAtivo } from "@/src/lib/documentos/status-inativos"
 
 /**
  * PASSO FEITO — a régua do MOTOR, a mesma do gate e da tabela da fase.
@@ -132,14 +133,14 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
   // denominador são as certidões da linha reta que participam da fase (têm workflow na fase).
   const docIdsComWf = new Set(wfPorDoc.keys())
   // Denominador = documentos obrigatórios da LINHA RETA (mesma régua da Central:
-  // linhaRetaDocs), excluindo CANCELADO. Doc sem workflow materializado ainda conta no
+  // linhaRetaDocs), excluindo CANCELADO/NAO_EXIGIDO. Doc sem workflow materializado ainda conta no
   // total (e como NÃO concluído) — não infla nem esconde o denominador.
   const linhaRetaDocIds: number[] = []
   // A OBRIGAÇÃO QUE CADA DOCUMENTO ATENDE — é por ela que um passo sem
   // `documentoId` encontra o documento a que pertence.
   const docsPorNecessidade = new Map<number, number[]>()
   for (const p of pessoas) for (const d of p.documentos) {
-    if (d.status === "CANCELADO") continue
+    if (!documentoAtivo(d.status)) continue
     linhaRetaDocIds.push(d.id)
     if (d.necessidadeId != null) {
       const arr = docsPorNecessidade.get(d.necessidadeId) ?? []

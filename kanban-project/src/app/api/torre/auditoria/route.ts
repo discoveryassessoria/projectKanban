@@ -2,11 +2,11 @@
 // LogAuditoria de processo e tarefa, paginado no servidor. SÓ ADMINISTRADOR (auditoria é sensível; mesma régua de
 // `/api/operacao/auditoria-processo`).
 import { type NextRequest, NextResponse } from 'next/server'
-import { exigirTorre } from '@/src/lib/torre-acesso'
+import { exigirGerenciamento } from '@/src/lib/torre-acesso'
 import { consultarAuditoria, filtroDaQuery } from '@/lib/operacional/torre-auditoria'
 
 export async function GET(request: NextRequest) {
-  const { usuario, erro } = await exigirTorre(request, 'tarefas.ver')
+  const { usuario, erro } = await exigirGerenciamento(request, 'tarefas.ver')
   if (erro) return erro
   if (usuario.tipo !== 'admin') return NextResponse.json({ error: 'A auditoria é só para administradores.' }, { status: 403 })
   const sp = request.nextUrl.searchParams

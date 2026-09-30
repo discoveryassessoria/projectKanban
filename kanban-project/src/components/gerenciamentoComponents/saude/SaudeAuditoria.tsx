@@ -1,13 +1,14 @@
 "use client"
-// src/components/torre/TorreAuditoria.tsx — aba AUDITORIA (Bloco I2): LogAuditoria de processo e tarefa,
+// SaudeAuditoria.tsx — sub-aba AUDITORIA de Gerenciamento › Saúde do sistema (era a aba Auditoria da Torre, Bloco I2; movida 01/10/2026).
+// LogAuditoria classificado em SISTEMA × PROCESSO/TAREFA (`NATUREZA_DA_ACAO`, padrão: Sistema),
 // paginado e filtrado no servidor; "Exportar CSV" gerado pelo servidor com os mesmos filtros.
 import { useEffect, useState } from "react"
 import { auth } from "@/src/components/operacao/kit-operacional"
-import { api, erroDe, useTorre } from "./torre-base"
+import { api, erroDe, useTorre } from "@/src/components/torre/torre-base"
 
 interface Linha { id: number; quando: string; autor: string; acao: string; alvo: string; justificativa: string | null; descricao: string }
-interface Filtros { de: string; ate: string; autorId: string; processoId: string; acao: string }
-const VAZIO: Filtros = { de: "", ate: "", autorId: "", processoId: "", acao: "" }
+interface Filtros { de: string; ate: string; autorId: string; processoId: string; acao: string; natureza: string }
+const VAZIO: Filtros = { de: "", ate: "", autorId: "", processoId: "", acao: "", natureza: "SISTEMA" }
 const quando = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
 const consulta = (f: Filtros) => {
   const p = new URLSearchParams()
@@ -15,7 +16,7 @@ const consulta = (f: Filtros) => {
   return p
 }
 
-export function TorreAuditoria() {
+export function SaudeAuditoria() {
   const { avisar } = useTorre()
   const [form, setForm] = useState<Filtros>(VAZIO)
   const [aplicados, setAplicados] = useState<Filtros>(VAZIO)
@@ -55,10 +56,11 @@ export function TorreAuditoria() {
   const set = (k: keyof Filtros) => (e: { target: { value: string } }) => setForm((f) => ({ ...f, [k]: e.target.value }))
   return (
     <div>
-      <div className="small mb-2">Tudo o que o sistema gravou de verdade sobre processos e tarefas — quem, quando, o quê, em quê e por quê.</div>
+      <div className="small mb-2">Fatos de SISTEMA gravados de verdade (regras, diagnóstico, visões, exclusão de processo, manutenção em lote…) — quem, quando, o quê, em quê e por quê. Os fatos de um processo ou tarefa ficam no Histórico do processo; o filtro «Tipo» mostra também esses.</div>
       <div className="tor-bar">
         <label className="small">De <input type="date" className="tor-in" value={form.de} onChange={set("de")} /></label>
         <label className="small">Até <input type="date" className="tor-in" value={form.ate} onChange={set("ate")} /></label>
+        <label className="small">Tipo <select className="tor-in" value={form.natureza} onChange={set("natureza")}><option value="SISTEMA">Sistema</option><option value="PROCESSO_TAREFA">Processo e tarefa</option><option value="TODOS">Todos</option></select></label>
         <label className="small">Autor <select className="tor-in" value={form.autorId} onChange={set("autorId")}><option value="">Todos</option>{pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></label>
         <label className="small">Processo nº <input type="number" min={1} className="tor-in" style={{ width: 100 }} value={form.processoId} onChange={set("processoId")} /></label>
         <label className="small">Ação <input className="tor-in" placeholder="ex.: PRAZO" value={form.acao} onChange={set("acao")} /></label>

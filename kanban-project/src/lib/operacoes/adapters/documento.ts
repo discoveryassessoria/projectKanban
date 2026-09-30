@@ -12,6 +12,7 @@ import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vige
 import { Prisma } from "@prisma/client"
 import { montarWorkflowV2, atualizarPassoV2 } from "@/src/services/documento-operacao"
 import type { ExecutionAdapter } from "../tipos"
+import { STATUS_DOCUMENTO_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 const PASSO_TERMINAL = ["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO", "CANCELADO"]
 
@@ -19,9 +20,9 @@ const STATUS_LABELS: Record<string, string> = {
   PENDENTE: "Pendente", SOLICITAR: "Solicitar", SOLICITADO: "Solicitado", EM_BUSCA: "Em busca",
   RECEBIDO: "Recebido", EM_ANALISE: "Em análise", RETIFICANDO: "Retificando", EM_TRADUCAO: "Em tradução",
   TRADUZIDO: "Traduzido", EM_APOSTILAMENTO: "Em apostilamento", APOSTILADO: "Apostilado", ENTREGUE: "Entregue",
-  INVALIDO: "Invalidado", CANCELADO: "Cancelado",
+  INVALIDO: "Invalidado", CANCELADO: "Cancelado", NAO_EXIGIDO: "Não exigido",
 }
-const DOC_MORTO = ["INVALIDO", "CANCELADO"] // não reutilizar / não considerar vivo
+const DOC_MORTO = ["INVALIDO", ...STATUS_DOCUMENTO_INATIVOS] // não reutilizar / não considerar vivo
 const num = (v: unknown): number | null => (v == null ? null : Number.isFinite(Number(v)) ? Number(v) : null)
 
 /** Compatibilidade documento-alvo ↔ necessidade: mesmo ItemCatalogo mestre + mesma pessoa. */

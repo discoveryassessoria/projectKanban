@@ -13,7 +13,10 @@ import { prisma } from "@/lib/prisma"
 import type { DominioDef } from "../tipos"
 import { contem, porCampo } from "./_comuns"
 
-const INCLUDE = {
+// SELECT (não include): `include` num findMany de Usuario traz TODAS as colunas — inclusive `senha` e
+// `permissoesCustom` — para a memória do relatório. Só o que as colunas leem.
+const SELECT = {
+  id: true, nome: true, email: true, tipo: true,
   perfil: { select: { id: true, nome: true } },
   tarefas: {
     select: { id: true, concluida: true, dataPrazo: true, dataConclusao: true, createdAt: true, statusTarefa: true },
@@ -104,7 +107,7 @@ export const DOMINIO_EQUIPE: DominioDef = {
 
   contar: (where) => prisma.usuario.count({ where }),
   carregar: (where, orderBy, pular, levar) =>
-    prisma.usuario.findMany({ where, orderBy, skip: pular, take: levar, include: INCLUDE }),
+    prisma.usuario.findMany({ where, orderBy, skip: pular, take: levar, select: SELECT }),
 
   visoesDoSistema: [
     { key: "com-atraso", nome: "Com tarefa atrasada",

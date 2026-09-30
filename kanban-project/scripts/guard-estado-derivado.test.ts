@@ -73,7 +73,7 @@ secao("1) A remoção RECONCILIA os três domínios donos")
 // domínio de fora da lista é um domínio que ninguém reconcilia.
 // ═══════════════════════════════════════════════════════════════════════════
 const RECONCILIADORES: [string, RegExp][] = [
-  ["documental (materialização da árvore)", /dispararMaterializacaoPorArvore\(/],
+  ["documental — efeitos pós-commit da árvore (a reavaliação em si roda DENTRO da transação da remoção)", /efeitosPosCommitDaArvore\(/],
   ["econômico por documento (Matriz)", /reconciliarEconomicoDoProcesso\(/],
   ["econômico por requerente", /reconciliarAutomacaoPorRequerente\(/],
 ]
@@ -81,6 +81,8 @@ const corpoReconciliar = ciclo.slice(ciclo.indexOf("export async function reconc
 for (const [nome, re] of RECONCILIADORES) {
   ok(`reconciliarAposRemocao chama o reconciliador ${nome}`, re.test(corpoReconciliar))
 }
+ok("a reavaliação documental roda DENTRO da transação da remoção (propagarNaTransacao) — §37",
+  /propagarNaTransacao\(tx,/.test(ciclo))
 ok("a reconciliação é do SERVIÇO, chamada dentro de removerPessoaDaArvore",
   /if \(resultado\.ok\)[\s\S]{0,120}reconciliarAposRemocao\(/.test(ciclo),
   "duas portas de entrada não podem produzir dois estados finais")

@@ -1,8 +1,8 @@
 "use client"
-// src/components/torre/TorreIntegridade.tsx — aba INTEGRIDADE (Bloco I1). O MESMO motor do painel de Saúde
+// SaudeIntegridade.tsx — sub-aba INTEGRIDADE de Gerenciamento › Saúde do sistema (era a aba Integridade da Torre, Bloco I1; movida 01/10/2026). O MESMO motor do painel de Saúde
 // (/api/torre/integridade lê SaudeAchado); "Rodar diagnóstico agora" chama a rota de execução do Saúde.
 import { useCallback, useEffect, useState } from "react"
-import { api, erroDe, fmtDia, ModalTexto, useTorre } from "./torre-base"
+import { api, erroDe, fmtDia, ModalTexto, useTorre } from "@/src/components/torre/torre-base"
 
 interface Item {
   id: number; chave: string; codigo: string; severidade: string; titulo: string; achado: string; efeito: string | null
@@ -17,7 +17,7 @@ interface Quadro {
 const SEV: Record<string, [string, "red" | "amb" | "gry"]> = { CRITICO: ["Crítico", "red"], ERRO: ["Erro", "red"], ALERTA: ["Alerta", "amb"], INFORMATIVO: ["Informativo", "gry"] }
 const quando = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" })
 
-export function TorreIntegridade({ onContagem }: { onContagem?: (n: number) => void }) {
+export function SaudeIntegridade({ onContagem }: { onContagem?: (n: number) => void }) {
   const { avisar } = useTorre()
   const [q, setQ] = useState<Quadro | null>(null)
   const [erro, setErro] = useState<string | null>(null)

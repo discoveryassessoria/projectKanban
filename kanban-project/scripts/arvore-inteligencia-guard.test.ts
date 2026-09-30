@@ -384,7 +384,7 @@ if (/aplicarHonorarios\s*\(/.test(codigoSimulador)) {
 // certidão de casamento. Este elo faltava e é o que fecha o §14.
 console.log("\n9) união dispara o materializador oficial")
 for (const rota of ["src/app/api/unioes/route.ts", "src/app/api/unioes/[id]/route.ts"]) {
-  if (/dispararMaterializacaoPorArvore/.test(ler(rota))) ok(`${rota.split("/api/")[1]} conectada`)
+  if (/aplicarMudancaNaArvore/.test(ler(rota))) ok(`${rota.split("/api/")[1]} conectada`)
   else falhar(`${rota} não dispara o materializador`, "casar deixaria a exigência sem nascer")
 }
 

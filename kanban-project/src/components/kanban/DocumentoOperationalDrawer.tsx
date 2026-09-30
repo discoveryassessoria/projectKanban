@@ -68,6 +68,7 @@ const STATUS_LABELS: Record<string, string> = {
   INVALIDO: "Inválido",
   NAO_ENCONTRADO: "Não encontrado",
   CANCELADO: "Cancelado",
+  NAO_EXIGIDO: "Não exigido",
 }
 
 // Mapeamento de cor da pílula por status (mockup): Solicitado = amber,
@@ -81,6 +82,7 @@ const STATUS_PILL_CLS: Record<string, string> = {
   INVALIDO: "bg-[var(--surface-secondary)] text-red-700",
   NAO_ENCONTRADO: "bg-[var(--surface-secondary)] text-red-700",
   CANCELADO: "bg-[var(--surface-secondary)] text-red-700",
+  NAO_EXIGIDO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
 }
 
 // ============================================================

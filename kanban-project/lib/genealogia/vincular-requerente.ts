@@ -52,7 +52,9 @@ import {
   TIPO_EVENTO_REQUERENTE,
 } from "@/src/services/genealogia/emitir-evento-requerente"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import {
+  autorLegivel, efeitosPosCommitDaArvore, propagarNaTransacao, OPCOES_TX_ARVORE,
+} from "@/src/services/genealogia/propagar-arvore"
 
 export type VincularRequerenteErro =
   | "ARVORE_NAO_ENCONTRADA"
@@ -274,51 +276,29 @@ export async function efeitosDoVinculoPosCommit(
   const erros: string[] = []
   if (args.arvoreId == null) return { drenado: false, materializado: false, erros }
 
+  // A fila é DURÁVEL: se a drenagem falhar, o evento continua PENDENTE e o
+  // dispatcher reprocessa — registrar e seguir é o contrato do Outbox.
   let drenado = false
   try {
     await processarOutbox({ tipos: [TIPO_EVENTO_REQUERENTE], limite: 20 })
     drenado = true
   } catch (e) {
     erros.push(`drenagem do evento: ${e instanceof Error ? e.message : String(e)}`)
+    console.error("[vínculo de requerente → drenagem]", erros.join(" ; "))
   }
 
-  let materializado = false
-  try {
-    await dispararMaterializacaoPorArvore(args.arvoreId)
-    materializado = true
-  } catch (e) {
-    erros.push(`materialização da árvore ${args.arvoreId}: ${e instanceof Error ? e.message : String(e)}`)
-  }
-
-  if (erros.length) console.error("[vínculo de requerente → efeitos]", erros.join(" ; "))
-  return { drenado, materializado, erros }
+  // O que NÃO aceita `tx` (workflow publicado da fase, honorários, avanço): o erro
+  // SOBE (PropagacaoPosCommitError) — a resposta HTTP devolve erro, nunca 200 com
+  // falha engolida. A reavaliação documental em si já rodou ATOMICAMENTE antes.
+  await efeitosPosCommitDaArvore(args.arvoreId)
+  return { drenado, materializado: true, erros }
 }
 
 /**
- * Agenda os efeitos SEM travar a resposta — para quem chama de dentro de uma
- * rota HTTP (App Router), onde `after()` mantém a função viva até o efeito
- * terminar, sem o cliente esperar. `dispararMaterializacaoPorArvore` percorre
- * TODOS os processos e pessoas da árvore (não só o vínculo desta chamada) —
- * é lento (pode passar de 1s numa árvore de 15-20 pessoas) e nunca precisou
- * bloquear a resposta: o vínculo já está commitado, o efeito é reavaliação.
- *
- * `after()` exige contexto de requisição — por isso é OPCIONAL (`opts?.after`)
- * e nunca o padrão: quem chama fora de rota (script, teste, seed) continua
- * recebendo o comportamento de sempre — aguarda o efeito antes de retornar.
+ * DEPRECADO e ignorado: os efeitos são SEMPRE síncronos (CLAUDE.md §20/§37) —
+ * `after()` deixava a árvore e os derivados divergirem entre a resposta e a
+ * convergência. Mantido só para não quebrar assinaturas antigas.
  */
-function rodarEfeitosDoVinculo(arvoreId: number | null, opts?: DeferirEfeitosOpts): Promise<void> {
-  if (opts?.after) {
-    opts.after(() => {
-      efeitosDoVinculoPosCommit({ arvoreId }).catch((e) =>
-        console.error(`[vínculo de requerente → efeitos adiados] árvore ${arvoreId}:`, e),
-      )
-    })
-    return Promise.resolve()
-  }
-  return efeitosDoVinculoPosCommit({ arvoreId }).then(() => undefined)
-}
-
-/** `after` do `next/server` (App Router) — ou qualquer função com a mesma forma. */
 export interface DeferirEfeitosOpts {
   after?: (fn: () => void | Promise<void>) => void
 }
@@ -329,10 +309,18 @@ export interface DeferirEfeitosOpts {
  */
 export async function vincularRequerente(
   input: VincularRequerenteInput,
-  opts?: DeferirEfeitosOpts,
+  _opts?: DeferirEfeitosOpts,
 ): Promise<VincularRequerenteResult> {
-  const resultado = await prisma.$transaction((tx) => vincularRequerenteTx(tx, input))
-  if (resultado.ok) await rodarEfeitosDoVinculo(input.arvoreId, opts)
+  // UMA transação: vínculo + evento + reavaliação documental da árvore.
+  const resultado = await prisma.$transaction(async (tx) => {
+    const r = await vincularRequerenteTx(tx, input)
+    if (r.ok) {
+      const autor = await autorLegivel(tx, input.actorId)
+      await propagarNaTransacao(tx, { arvoreId: input.arvoreId, motivo: "pessoa passou a ser requerente", autor })
+    }
+    return r
+  }, OPCOES_TX_ARVORE)
+  if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
   return resultado
 }
 
@@ -451,7 +439,7 @@ async function aplicarVinculoAPessoaExistenteTx(
  */
 export async function vincularPessoaExistenteAoRequerente(
   input: VincularPessoaExistenteInput,
-  opts?: DeferirEfeitosOpts,
+  _opts?: DeferirEfeitosOpts,
 ): Promise<VincularPessoaExistenteResult> {
   const resultado = await prisma.$transaction(async (tx) => {
     const r = await aplicarVinculoAPessoaExistenteTx(tx, input)
@@ -462,8 +450,10 @@ export async function vincularPessoaExistenteAoRequerente(
       actorId: input.actorId ?? null,
       correlationId: input.correlationId ?? null,
     })
+    const autor = await autorLegivel(tx, input.actorId)
+    await propagarNaTransacao(tx, { arvoreId: input.arvoreId, motivo: "pessoa passou a ser requerente", autor })
     return r
-  })
-  if (resultado.ok) await rodarEfeitosDoVinculo(input.arvoreId, opts)
+  }, OPCOES_TX_ARVORE)
+  if (resultado.ok) await efeitosDoVinculoPosCommit({ arvoreId: input.arvoreId })
   return resultado
 }

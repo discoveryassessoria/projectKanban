@@ -2,12 +2,12 @@
 // Só r1/r2/r3. A descrição de r2 é LIDA do cadastro real (diasAposCobranca / escalarApos / esperas
 // dos passos publicados); a de r3, dos limites cadastrados em Capacidade Operacional.
 import { type NextRequest, NextResponse } from 'next/server'
-import { exigirTorre } from '@/src/lib/torre-acesso'
+import { exigirGerenciamento } from '@/src/lib/torre-acesso'
 import { lerRegras, lerReguaDeCobranca, textoDaRegua } from '@/lib/operacional/regras-torre'
 import { lerOrganizacao } from '@/lib/operacional/organizacao'
 
 export async function GET(request: NextRequest) {
-  const { erro } = await exigirTorre(request, 'usuarios.gerenciar')
+  const { erro } = await exigirGerenciamento(request, 'usuarios.gerenciar')
   if (erro) return erro
   const [regras, regua, org] = await Promise.all([lerRegras(), lerReguaDeCobranca(), lerOrganizacao()])
   const limites = [...org.values()].filter((o) => o.limiteExecutaveis != null).map((o) => `${o.nome} ${o.limiteExecutaveis}`)

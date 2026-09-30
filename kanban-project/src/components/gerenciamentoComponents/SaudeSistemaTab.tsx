@@ -9,6 +9,12 @@
 
 import { useCallback, useMemo, useState } from "react"
 import { useApi } from "@/src/lib/dados"
+import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { TorreProvider } from "@/src/components/torre/torre-base"
+import "@/src/components/torre/torre.css"
+import { SaudeRegras } from "./saude/SaudeRegras"
+import { SaudeIntegridade } from "./saude/SaudeIntegridade"
+import { SaudeAuditoria } from "./saude/SaudeAuditoria"
 
 type Estado = "SAUDAVEL" | "ATENCAO" | "DEGRADADO" | "CRITICO" | "DIAGNOSTICO_INCOMPLETO" | "INDISPONIVEL"
 type Severidade = "CRITICO" | "ERRO" | "ALERTA" | "INFORMATIVO"
@@ -133,7 +139,7 @@ function Kpi({ valor, label, cor, destaque }: { valor: React.ReactNode; label: s
 
 type Aba = "visao" | "prontidao" | "falta" | "plano" | "problemas" | "capacidades" | "dominios" | "cobertura" | "execucao" | "historico"
 
-export function SaudeSistemaTab() {
+function PainelDeSaude() {
   const { dados, carregando, erro: erroApi, recarregar } = useApi<Resposta>("/api/gerenciamento/saude")
   const [aba, setAba] = useState<Aba>("visao")
   const [executando, setExecutando] = useState(false)
@@ -711,6 +717,46 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             </pre>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── SUB-ABAS (01/10/2026): Saúde · Regras · Integridade · Auditoria ─────────────────────────────────────────────────
+// Regras, Integridade e Auditoria saíram da Torre (que serve só à gestão de processo) e moram aqui, com o MESMO motor e as
+// MESMAS portas (/api/torre/regras, /integridade, /auditoria — permissão do Gerenciamento, `usuarios.gerenciar`; a Auditoria
+// é só de administrador). Deep-link: `?screen=syshealth&sub=regras|integridade|auditoria`.
+type SubAba = "saude" | "regras" | "integridade" | "auditoria"
+function subAbaDaUrl(): SubAba {
+  try {
+    const v = new URLSearchParams(window.location.search).get("sub")
+    return v === "regras" || v === "integridade" || v === "auditoria" ? v : "saude"
+  } catch { return "saude" }
+}
+
+export function SaudeSistemaTab() {
+  const { isAdmin, carregando } = usePermissoes()
+  const [sub, setSub] = useState<SubAba>(subAbaDaUrl)
+  const [versao] = useState(0)
+  const subs: Array<[SubAba, string]> = [["saude", "Saúde"], ["regras", "Regras"], ["integridade", "Integridade"], ...(isAdmin ? [["auditoria", "Auditoria"] as [SubAba, string]] : [])]
+  const ativa: SubAba = sub === "auditoria" && !isAdmin && !carregando ? "saude" : sub
+  return (
+    <div className="space-y-4">
+      <div role="tablist" className="flex flex-wrap gap-1 border-b border-[var(--border-default)] text-sm">
+        {subs.map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={ativa === k} onClick={() => setSub(k)}
+            className={`px-3 py-2 ${ativa === k ? "border-b-2 border-[var(--border-default)] font-semibold text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>{l}</button>
+        ))}
+      </div>
+      {ativa === "saude" && <PainelDeSaude />}
+      {ativa !== "saude" && (
+        <TorreProvider permissoes={null} recarregar={() => {}}>
+          <div className="tor">
+            {ativa === "regras" && <SaudeRegras versao={versao} />}
+            {ativa === "integridade" && <SaudeIntegridade />}
+            {ativa === "auditoria" && (isAdmin ? <SaudeAuditoria /> : <div className="tor-card pad">A auditoria é só para administradores.</div>)}
+          </div>
+        </TorreProvider>
       )}
     </div>
   )

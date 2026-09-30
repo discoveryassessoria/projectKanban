@@ -76,7 +76,10 @@
 .tor-cab-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .tor-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
 @media (min-width: 640px) { .tor-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (min-width: 1100px) { .tor-kpis { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .tor-kpis-sit { grid-template-columns: repeat(5, minmax(0, 1fr)); } .tor-kpis-agenda { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+.tor-frase { margin: 0 0 10px; font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+.tor-faixa-titulo { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); margin: 0 0 4px; }
+.tor-selo { align-self: flex-start; margin-top: 2px; cursor: pointer; }
 .tor-kpi { display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border-default); background: var(--surface-secondary); color: var(--text-primary); cursor: pointer; }
 .tor-kpi:hover { background: var(--surface-tertiary); }
 .tor-kpi.on { border-color: var(--action-primary); box-shadow: 0 0 0 2px var(--info-tile); }
@@ -107,3 +110,6 @@
   .tor-prev.com-extras { grid-template-columns: 110px repeat(8, minmax(56px, 1fr)); min-width: 640px; }
 }
 .tor-gFe { grid-template-columns: minmax(220px, 2fr) 1fr 1fr 1.2fr 100px; }
+
+.tor-kpi-proc { cursor: default; }
+.tor-kpi-inner { display: flex; flex-direction: column; gap: 2px; text-align: left; background: transparent; border: 0; padding: 0; color: inherit; cursor: pointer; min-width: 0; }

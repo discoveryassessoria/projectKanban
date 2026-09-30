@@ -13,14 +13,19 @@ const RISCO: Record<RiscoDoProcesso, { txt: string; cls: string }> = {
   critico: { txt: "Crítico", cls: "red" }, atencao: { txt: "Atenção", cls: "amb" }, ok: { txt: "No ritmo", cls: "grn" },
 }
 
-export function TorreProcessos({ processos, carregando, erro }: { processos: ProcessoDaTorre[]; carregando: boolean; erro: string | null }) {
+export function TorreProcessos({ processos, carregando, erro, backlog }: { processos: ProcessoDaTorre[]; carregando: boolean; erro: string | null; backlog?: { abertas: number; fechadas: number } | null }) {
   const { abrirFoco, abrirRelatorio } = useTorre()
   const { pode } = usePermissoes()
   const podeRelatorio = pode("relatorios.ver")
   if (erro) return <div className="tor-card pad">{erro}</div>
   if (carregando) return <div className="tor-card pad small">Carregando processos…</div>
-  if (processos.length === 0) return <div className="tor-card pad small">Nenhum processo ativo.</div>
+  const linhaSemana = backlog ? (
+    <div className="small mb-2" title="Abertas = tarefas criadas desde segunda-feira; fechadas = concluídas com sucesso desde segunda-feira (cancelada não conta como fechada).">Semana: {backlog.abertas} abertas · {backlog.fechadas} fechadas</div>
+  ) : null
+  if (processos.length === 0) return <div>{linhaSemana}<div className="tor-card pad small">Nenhum processo ativo.</div></div>
   return (
+    <div>
+    {linhaSemana}
     <div className="tor-card tor-scroll">
       <div className="tor-hd tor-gProc"><span>Família</span><span>Fase</span><span>Progresso real</span><span>Dias na fase</span><span>Bola com</span><span>Risco</span><span>Próximo marco</span><span /></div>
       {processos.map((p) => {
@@ -54,6 +59,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
           </div>
         )
       })}
+    </div>
     </div>
   )
 }

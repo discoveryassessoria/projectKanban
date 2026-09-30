@@ -14,6 +14,7 @@ import { assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-proje
 import { MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { randomUUID } from "crypto"
 import { aoMudarDeDono } from "@/lib/operacional/avisos-fatos"
+import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 
 export { montarChaveIdempotencia, sujeitoValido } from "@/src/services/necessidade-documental-helpers"
 
@@ -203,16 +204,18 @@ export async function atenderNecessidade(necessidadeId: number, db: DB = prisma)
 }
 
 /** → DISPENSADA (requisito deixou de ser exigido). Idempotente. */
-export async function dispensarNecessidade(necessidadeId: number, motivo?: string, db: DB = prisma, manual = false) {
+export async function dispensarNecessidade(
+  necessidadeId: number, motivo?: string, db: DB = prisma, manual = false,
+): Promise<{ dispensada: boolean; documentoIds: number[] }> {
   const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true, dispensaManual: true } })
-  if (!n) return
+  if (!n) return { dispensada: false, documentoIds: [] }
   if (n.status === "DISPENSADA") {
     // Já dispensada — se a chamada é MANUAL e ela ainda não carrega a marca, sobe a
     // marca agora (dispensa que era automática vira sticky por decisão de operador).
     if (manual && !n.dispensaManual) {
       await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { dispensaManual: true } })
     }
-    return
+    return { dispensada: false, documentoIds: [] }
   }
   await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "DISPENSADA", dispensaManual: manual } })
   await evento(db, necessidadeId, "DISPENSADA", motivo ? { motivo } : undefined)
@@ -262,18 +265,24 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
   // pessoa ainda precisava do documento que a Genealogia já disse que não
   // precisa (achado real: Edithe, processo "Teste", reaparecia em Emissão
   // Documental depois de dispensada em Genealogia).
+  //
+  // O DOCUMENTO DERIVADO NÃO É APAGADO NEM "CANCELADO": vira NAO_EXIGIDO (a árvore
+  // deixou de exigi-lo). CANCELADO é decisão humana sobre o papel; aqui ninguém
+  // invalidou nada — a obrigação é que deixou de existir. Anexos, solicitações e
+  // histórico ficam; se a exigência voltar, `reativarNecessidade` reabre ESTE mesmo
+  // Documento (nunca cria outro).
   const docsParaCancelar = await db.documento.findMany({
-    where: { necessidadeId, status: { notIn: ["ENTREGUE", "INVALIDO", "CANCELADO"] } },
+    where: { necessidadeId, status: { notIn: ["ENTREGUE", "INVALIDO", "CANCELADO", "NAO_EXIGIDO"] } },
     select: { id: true },
   })
-  if (docsParaCancelar.length === 0) return
+  if (docsParaCancelar.length === 0) return { dispensada: true, documentoIds: [] }
   const documentoIds = docsParaCancelar.map((d) => d.id)
   await db.documento.updateMany({
     where: { id: { in: documentoIds } },
-    data: { status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO, ultimaMovimentacao: new Date() },
+    data: { status: "NAO_EXIGIDO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO, ultimaMovimentacao: new Date() },
   })
 
-  // REGRA DO SISTEMA, NÃO CONSERTO PONTUAL: um Documento CANCELADO nunca tem
+  // REGRA DO SISTEMA, NÃO CONSERTO PONTUAL: um Documento CANCELADO/NAO_EXIGIDO nunca tem
   // passo ativo em NENHUMA fase — não só na fase que o cancelou. Achado real:
   // outras fases (Emissão Documental) já tinham materializado os PRÓPRIOS passos
   // pra este documento (solicitar/aguardar/receber/conferir/validar certidão,
@@ -298,6 +307,7 @@ export async function dispensarNecessidade(necessidadeId: number, motivo?: strin
   }
   // Mesma nota acima: a Tarefa converge pela varredura de `reconciliarTarefas`,
   // não por projeção direta aqui.
+  return { dispensada: true, documentoIds }
 }
 
 /** Exportado para NEC-001 (Saúde) reconhecer um cancelamento AUTOMÁTICO (por
@@ -316,8 +326,16 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
   // invalidou por outro motivo real (documento errado, ilegível). A regra
   // voltou a valer; a decisão humana sobre um documento específico não se
   // desfaz sozinha.
+  // NAO_EXIGIDO é o estado atual da dispensa pela árvore; CANCELADO + este motivo é o
+  // que a dispensa gravava antes de existir NAO_EXIGIDO (dado legado que também volta).
   const docsReabertos = await db.documento.findMany({
-    where: { necessidadeId, status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO },
+    where: {
+      necessidadeId,
+      OR: [
+        { status: "NAO_EXIGIDO" },
+        { status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO },
+      ],
+    },
     select: { id: true },
   })
   if (docsReabertos.length) {
@@ -560,4 +578,48 @@ export async function removerNecessidadesDoSujeito(
   const passos = await db.phaseWorkflowStepInstance.deleteMany({ where: { necessidadeId: { in: ids } } })
   const necessidades = await db.necessidadeDocumental.deleteMany({ where: { id: { in: ids } } })
   return { necessidades: necessidades.count, passos: passos.count }
+}
+
+/**
+ * Remove as necessidades de UMA união que deixou de existir (o casal desfeito na
+ * árvore) — a mesma regra de "exclusão não deixa órfão" da remoção de pessoa.
+ *
+ * Existe porque `NecessidadeDocumental.uniaoId` é FK `SetNull` e a tabela tem
+ * CHECK `sujeito_xor` (pessoaId XOR uniaoId): apagar a União com necessidade
+ * apontando para ela viola o CHECK. Quem apaga a União chama isto ANTES.
+ *
+ * Só remove o que é seguro: necessidade PENDENTE/DISPENSADA (nada foi atendido).
+ * Necessidade que já andou (EM_ATENDIMENTO/ATENDIDA/NAO_LOCALIZADA) é FATO — a
+ * função devolve `bloqueadas` e NÃO remove nada, para o chamador recusar com uma
+ * mensagem legível em vez de apagar histórico. O Documento derivado NÃO é apagado:
+ * sai de jogo (NAO_EXIGIDO) e sua FK `necessidadeId` vira null (SetNull), com anexos
+ * e solicitações preservados; passos e tarefas ABERTAS dele são cancelados.
+ */
+export async function removerNecessidadesDaUniao(
+  uniaoId: number,
+  db: DB = prisma,
+  motivo = "necessidade removida pela árvore: a união foi desfeita",
+): Promise<{ removidas: number; bloqueadas: { id: number; status: string }[]; documentoIds: number[] }> {
+  const alvos = await db.necessidadeDocumental.findMany({ where: { uniaoId }, select: { id: true, status: true } })
+  const bloqueadas = alvos.filter((n) => n.status !== "PENDENTE" && n.status !== "DISPENSADA")
+  if (bloqueadas.length > 0) return { removidas: 0, bloqueadas, documentoIds: [] }
+  const documentoIds: number[] = []
+  for (const n of alvos) {
+    // Dispensa primeiro: cancela passos, tira o Documento de jogo, deixa o motivo
+    // no evento (a varredura de tarefas lê dali).
+    const r = await dispensarNecessidade(n.id, motivo, db)
+    documentoIds.push(...r.documentoIds)
+  }
+  if (alvos.length === 0) return { removidas: 0, bloqueadas: [], documentoIds }
+  const ids = alvos.map((n) => n.id)
+  // A TAREFA NÃO É ESCRITA AQUI (dono: motor operacional). As necessidades acabaram de
+  // ser dispensadas (DISPENSADA + Documento NAO_EXIGIDO): a varredura canônica, na MESMA
+  // transação, cancela a tarefa nunca iniciada e só marca a já iniciada — com o motivo
+  // gravado no evento DISPENSADA. Isso precisa rodar ANTES de apagar as necessidades,
+  // porque depois elas (a causa) deixam de existir.
+  const processos = [...new Set((await db.necessidadeDocumental.findMany({ where: { id: { in: ids } }, select: { processoId: true } })).map((n) => n.processoId))]
+  for (const processoId of processos) await reconciliarTarefas({ processoId, db })
+  await db.phaseWorkflowStepInstance.deleteMany({ where: { necessidadeId: { in: ids } } })
+  const r = await db.necessidadeDocumental.deleteMany({ where: { id: { in: ids } } })
+  return { removidas: r.count, bloqueadas: [], documentoIds }
 }

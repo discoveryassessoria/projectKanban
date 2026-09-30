@@ -1,11 +1,13 @@
 "use client"
 // src/components/torre/Torre.tsx — o CASCO da Torre de Controle (Bloco J).
-// Cabeçalho (nacionalidade, busca, briefing, revisar o dia) · 8 KPIs clicáveis · 9 abas com contadores.
+// Cabeçalho (nacionalidade, busca, briefing, revisar o dia) · topo (frase + faixas Situação e Agenda) · 6 abas com contadores.
+// Regras, Integridade e Auditoria NÃO são da Torre (ela serve só à gestão de processo): moram em Gerenciamento › Saúde do sistema.
 // Uma fonte por dado: as linhas de tarefa vêm de UMA leitura (`/api/torre/tarefas`, a projeção da Operação) e alimentam os KPIs,
 // a aba Tarefas, os contadores e a aba Terceiros — o número do cartão é sempre o tamanho da lista que ele filtra.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useSearchParams } from "next/navigation"
-import { KPIS, linhasDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { useRouter, useSearchParams } from "next/navigation"
+import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { destinoDaAbaAntigaDaTorre } from "@/lib/operacional/navegacao"
 import { aplicarBusca } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, TorreProvider, type PermissoesTorre, type AlvoDoRelatorio } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
@@ -21,17 +23,14 @@ import { TorreProcessos } from "./TorreProcessos"
 import { TorreTarefas, CHAVES_DE_VISAO } from "./TorreTarefas"
 import { TorreTerceiros } from "./TorreTerceiros"
 import { TorreEquipe } from "./TorreEquipe"
-import { TorreRegras } from "./TorreRegras"
-import { TorreIntegridade } from "./TorreIntegridade"
-import { TorreAuditoria } from "./TorreAuditoria"
 import { FocoFamilia } from "./FocoFamilia"
 import { RelatorioControle } from "./RelatorioControle"
 import "./torre.css"
 
-export type Aba = "precisa" | "radar" | "tarefas" | "equipe" | "processos" | "terceiros" | "regras" | "integridade" | "auditoria"
-const ABAS: Array<[Aba, string]> = [
-  ["precisa", "Precisa de você"], ["radar", "Radar"], ["tarefas", "Tarefas"], ["equipe", "Equipe"], ["processos", "Processos"],
-  ["terceiros", "Terceiros"], ["regras", "Regras"], ["integridade", "Integridade"], ["auditoria", "Auditoria"],
+export type Aba = "precisa" | "radar" | "tarefas" | "equipe" | "processos" | "terceiros"
+/** As SEIS abas da Torre, na ordem. */
+export const ABAS: Array<[Aba, string]> = [
+  ["precisa", "Precisa de você"], ["radar", "Radar"], ["tarefas", "Tarefas"], ["equipe", "Equipe"], ["processos", "Processos"], ["terceiros", "Terceiros"],
 ]
 const ABAS_VALIDAS = ABAS.map(([k]) => k)
 const KPIS_QUE_FILTRAM = KPIS.filter((k) => k.filtra).map((k) => k.chave)
@@ -58,6 +57,7 @@ function lerUrl(params: URLSearchParams) {
 
 export function Torre() {
   const params = useSearchParams()
+  const router = useRouter()
   const kpiDaUrl = params.get("kpi") as ChaveKpi | null
   const urlInicial = lerUrl(params)
 
@@ -69,6 +69,10 @@ export function Torre() {
   const [pais, setPais] = useState("")
   const [busca, setBusca] = useState("")
   const [versao, setVersao] = useState(0)
+  // O instante que o topo e a aba Tarefas usam para contar a AGENDA (dia operacional) — o mesmo nos dois, renovado a cada recarga.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const agora = useMemo(() => new Date(), [versao])
+  const [filtroProc, setFiltroProc] = useState<"risco" | null>(null)
   const recarregar = useCallback(() => setVersao((n) => n + 1), [])
   const briefingChecado = useRef(false)
 
@@ -82,12 +86,15 @@ export function Torre() {
   const [procs, setProcs] = useState<{ colunas: ColunaDoRadar[]; processos: ProcessoDaTorre[] } | null>(null)
   const [erroProcs, setErroProcs] = useState<string | null>(null)
   const [nEquipe, setNEquipe] = useState<number | null>(null)
-  const [divergencias, setDivergencias] = useState<number | null>(null)
 
   const [foco, setFoco] = useState<number | null>(urlInicial.processo)
   const [relatorio, setRelatorio] = useState<AlvoDoRelatorio | null>(null)
   const [briefingAberto, setBriefingAberto] = useState(false)
   const [revisao, setRevisao] = useState<ItemPrecisa[] | null>(null)
+
+  // Endereço antigo de aba que saiu da Torre (`?aba=regras|integridade|auditoria`): leva ao Gerenciamento equivalente.
+  const destinoAntigo = destinoDaAbaAntigaDaTorre(params.get("aba"))
+  useEffect(() => { if (destinoAntigo) router.replace(destinoAntigo) }, [destinoAntigo, router])
 
   // A URL pode mudar depois de montada (link do sino, do Foco…): o que ela pede entra no estado (ajuste durante a renderização, sem efeito).
   const paramsChave = params.toString()
@@ -138,7 +145,6 @@ export function Torre() {
     })
     if (permissoes?.equipe) {
       void api<{ pessoas: unknown[] }>("/api/torre/equipe").then((r) => { if (vivo && r.ok) setNEquipe(r.data.pessoas.length) })
-      void api<{ divergencias: number }>("/api/torre/integridade").then((r) => { if (vivo && r.ok) setDivergencias(r.data.divergencias) })
     }
     return () => { vivo = false }
   }, [pronto, versao, permissoes?.equipe])
@@ -157,25 +163,26 @@ export function Torre() {
     return (procs?.processos ?? []).filter((p) => (!pais || !paisRotulo || p.pais === paisRotulo) && (!b || semAcento(`${p.familiaNome} ${p.codigo ?? ""}`).includes(b)))
   }, [procs, pais, paisRotulo, busca])
 
-  const base = kpi ? linhasDoKpi(kpi, linhasPais) : linhasPais
+  const processosPais = useMemo(() => (procs?.processos ?? []).filter((p) => !pais || !paisRotulo || p.pais === paisRotulo), [procs, pais, paisRotulo])
+  const processosDaAba = useMemo(() => (filtroProc === "risco" ? processosFiltrados.filter(emRiscoCritico) : processosFiltrados), [processosFiltrados, filtroProc])
+  const base = kpi ? linhasDoKpi(kpi, linhasPais, agora) : linhasPais
   const nTarefas = aplicarBusca(base, busca).length
+  const filtrandoBacklogPais = !!pais // o backlog da semana é do total, não por nacionalidade
   const nCobrar = linhasPais.filter((l) => l.cobravelVencida).length
-  const rotuloKpi = KPIS.find((k) => k.chave === kpi)?.rotulo
+  const rotuloKpi = kpi ? KPI_POR_CHAVE[kpi].rotulo : undefined
 
   const escolherKpi = (k: ChaveKpi) => {
-    if (k === "back") { setAba("terceiros"); return } // o backlog é agregado: não filtra; o detalhe fica na aba Terceiros
+    if (k === "abertas") { setKpi(null); setAba("tarefas"); return } // "Tarefas abertas" = a lista inteira da aba Tarefas
     setKpi((atual) => (atual === k ? null : k)); setAba("tarefas")
   }
   const irParaAba = (a: "equipe") => setAba(a)
 
-  const abaVisivel = (k: Aba) => (k !== "integridade" || !permissoes || permissoes.equipe) && (k !== "auditoria" || !permissoes || permissoes.admin)
   const n = (k: Aba): { txt: string; cls: string } | null => {
     if (k === "precisa") return precisa ? { txt: String(precisa.itens.length), cls: "red" } : null
     if (k === "tarefas") return linhas ? { txt: String(nTarefas), cls: "" } : null
     if (k === "equipe") return nEquipe != null ? { txt: String(nEquipe), cls: "" } : null
-    if (k === "processos") return procs ? { txt: String(processosFiltrados.length), cls: "" } : null
+    if (k === "processos") return procs ? { txt: String(processosDaAba.length), cls: "" } : null
     if (k === "terceiros") return linhas ? { txt: `${nCobrar} a cobrar`, cls: nCobrar ? "warn" : "" } : null
-    if (k === "integridade") return divergencias != null ? { txt: String(divergencias), cls: divergencias ? "red" : "" } : null
     return null
   }
 
@@ -191,11 +198,16 @@ export function Torre() {
           onBriefing={() => setBriefingAberto(true)}
           onRevisar={() => precisa && setRevisao([...precisa.itens])}
         />
-        {linhas && <TorreKpis linhas={linhasPais} tend={tend} ativo={kpi} filtrandoPais={!!pais} onEscolher={escolherKpi} />}
+        {linhas && (
+          <TorreKpis
+            linhas={linhasPais} processos={procs ? processosPais : null} agora={agora} tend={tend} ativo={kpi} filtrandoPais={!!pais} onEscolher={escolherKpi}
+            onProcessos={() => { setFiltroProc(null); setAba("processos") }} onRisco={() => { setFiltroProc("risco"); setAba("processos") }}
+          />
+        )}
 
         <div className="tor-tabs-linha">
           <div className="tor-tabs" role="tablist">
-            {ABAS.filter(([k]) => abaVisivel(k)).map(([k, l]) => {
+            {ABAS.map(([k, l]) => {
               const c = n(k)
               return (
                 <button key={k} role="tab" aria-selected={aba === k} className="tor-tab" onClick={() => setAba(k)}>
@@ -210,6 +222,12 @@ export function Torre() {
               <button className="tor-x" aria-label="Limpar o filtro do indicador" onClick={() => setKpi(null)}>✕</button>
             </span>
           )}
+          {filtroProc && (
+            <span className="tor-p red tor-filtro">
+              Filtro: Processos em risco ({processosDaAba.length})
+              <button className="tor-x" aria-label="Limpar o filtro de processos" onClick={() => setFiltroProc(null)}>✕</button>
+            </span>
+          )}
         </div>
 
         {aba === "precisa" && <TorrePrecisaDeVoce itens={precisa?.itens ?? null} carregando={!precisa && !erroPrecisa} erro={erroPrecisa} irParaAba={irParaAba} />}
@@ -218,16 +236,13 @@ export function Torre() {
           <TorreTarefas
             linhas={linhasPais} carregando={linhas == null && !erro} erro={!!erro} kpi={kpi} busca={busca} paisChave={pais} paisRotulo={paisRotulo}
             visaoPedida={visaoPedida} tarefaPedida={tarefaPedida} onTarefaAtendida={() => setTarefaPedida(null)}
-            processos={procs?.processos} processoFoco={foco ?? processoDaUrl} versao={versao}
+            processos={procs?.processos} processoFoco={foco ?? processoDaUrl} versao={versao} agora={agora}
             onAplicarSpec={(s) => { setKpi(s.kpi); setPais(s.pais); setBusca(s.busca) }}
           />
         )}
         {aba === "equipe" && <TorreEquipe versao={versao} />}
-        {aba === "processos" && <TorreProcessos processos={processosFiltrados} carregando={!procs && !erroProcs} erro={erroProcs} />}
+        {aba === "processos" && <TorreProcessos processos={processosDaAba} carregando={!procs && !erroProcs} erro={erroProcs} backlog={filtrandoBacklogPais ? null : tend?.backlog ?? null} />}
         {aba === "terceiros" && <TorreTerceiros linhas={linhasPais} versao={versao} />}
-        {aba === "regras" && <TorreRegras versao={versao} />}
-        {aba === "integridade" && (permissoes?.equipe ? <TorreIntegridade onContagem={setDivergencias} /> : <div className="tor-card pad">A Integridade exige a permissão de gerenciar usuários e acessos (<code>usuarios.gerenciar</code>).</div>)}
-        {aba === "auditoria" && (permissoes?.admin ? <TorreAuditoria /> : <div className="tor-card pad">A auditoria é só para administradores.</div>)}
         {erro && aba !== "tarefas" && <div className="small mt-2">{erro}</div>}
 
         {briefingAberto && precisa && (

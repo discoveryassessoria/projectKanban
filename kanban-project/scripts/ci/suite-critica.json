@@ -101,6 +101,7 @@
   ],
   "torre de controle — blocos G e H (ações, terceiros, equipe, regras)": [
    "scripts/torre-bloco-g-lote-e-desfazer.test.ts",
+   "scripts/arvore-preview-tarefas-abertas.test.ts",
    "scripts/torre-desfazer-uma-linha-e-devolver-em-andamento.test.ts",
    "scripts/torre-bloco-g-terceiros-acoes-e-permissoes.test.ts",
    "scripts/torre-bloco-h-equipe.test.ts",
@@ -125,6 +126,7 @@
    "scripts/operacao-tela-ajustes-b-c.test.ts",
    "scripts/torre-parede-achado-obsoleto.test.ts",
    "scripts/documentacao-requerida-fonte-unica.test.ts",
+  "scripts/saude-arv002-arvore-e-derivados.test.ts",
    "scripts/home-fila-rotulos-e-processos-abertos.test.ts",
    "scripts/central-sem-usuarios-403-e-rotulo-grupo.test.ts",
    "scripts/login-destino-padrao-home.test.ts",
@@ -136,7 +138,19 @@
    "scripts/torre-r1-so-atribui-a-apto.test.ts",
    "scripts/rotulo-status-tarefa-fonte-unica.test.ts",
    "scripts/torre-devolvida-a-equipe-texto.test.ts",
-   "scripts/cancelar-operacao-dispara-avanco.test.ts"
+   "scripts/torre-topo-e-abas-movidas.test.ts",
+   "scripts/cancelar-operacao-dispara-avanco.test.ts",
+   "scripts/usuario-publico-sem-segredo-estatico.test.ts",
+   "scripts/usuario-publico-sem-segredo-dinamico.test.ts",
+   "scripts/arvore-fonte-da-verdade-a-casado.test.ts",
+   "scripts/arvore-fonte-da-verdade-b-falecido.test.ts",
+   "scripts/arvore-fonte-da-verdade-c-pai-mae.test.ts",
+   "scripts/arvore-fonte-da-verdade-d-requerente.test.ts",
+   "scripts/arvore-fonte-da-verdade-e-incluir-remover.test.ts",
+   "scripts/arvore-fonte-da-verdade-f-linha-reta.test.ts",
+   "scripts/arvore-fonte-da-verdade-g-regra.test.ts",
+   "scripts/arvore-fonte-da-verdade-contagens.test.ts",
+   "scripts/arvore-caso-edison-junior.test.ts"
   ]
  },
  "arquivos": [
@@ -254,6 +268,20 @@
   "scripts/torre-r1-so-atribui-a-apto.test.ts",
   "scripts/rotulo-status-tarefa-fonte-unica.test.ts",
   "scripts/torre-devolvida-a-equipe-texto.test.ts",
-  "scripts/cancelar-operacao-dispara-avanco.test.ts"
+  "scripts/torre-topo-e-abas-movidas.test.ts",
+  "scripts/cancelar-operacao-dispara-avanco.test.ts",
+  "scripts/usuario-publico-sem-segredo-estatico.test.ts",
+  "scripts/usuario-publico-sem-segredo-dinamico.test.ts",
+   "scripts/arvore-fonte-da-verdade-a-casado.test.ts",
+   "scripts/arvore-fonte-da-verdade-b-falecido.test.ts",
+   "scripts/arvore-fonte-da-verdade-c-pai-mae.test.ts",
+   "scripts/arvore-fonte-da-verdade-d-requerente.test.ts",
+   "scripts/arvore-fonte-da-verdade-e-incluir-remover.test.ts",
+   "scripts/arvore-fonte-da-verdade-f-linha-reta.test.ts",
+   "scripts/arvore-fonte-da-verdade-g-regra.test.ts",
+   "scripts/arvore-fonte-da-verdade-contagens.test.ts",
+   "scripts/arvore-caso-edison-junior.test.ts",
+  "scripts/saude-arv002-arvore-e-derivados.test.ts",
+  "scripts/arvore-preview-tarefas-abertas.test.ts"
  ]
 }

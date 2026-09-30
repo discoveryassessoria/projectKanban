@@ -57,6 +57,7 @@ import {
   type ColunaMatriz, type ConfigCandidata, type ResolucaoMatriz,
 } from './planilha-matriz'
 import { overridesDoProcesso } from '../planilha-celula-override'
+import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 // ── DINHEIRO EM CENTAVOS ────────────────────────────────────────────────────
 // Soma de dinheiro não se faz em float: 146.24 + 7.64 + 151.05 já erra o
@@ -405,7 +406,7 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
           unioesComoPessoa2: { select: { pessoa1: { select: { nome: true, sobrenome: true } } } },
           documentos: {
             where: {
-              status: { notIn: ['CANCELADO', 'INVALIDO'] },
+              status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, 'INVALIDO'] },
               ...(idsTipo.length || enumsTipo.length
                 ? { OR: [
                     ...(idsTipo.length ? [{ documentTypeId: { in: idsTipo } }] : []),

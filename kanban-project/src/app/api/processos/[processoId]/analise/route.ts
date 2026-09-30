@@ -12,6 +12,7 @@ import {
   type PessoaParaAnalise,
   type DocumentoParaAnalise,
 } from "@/src/lib/process-stage/analise-engine"
+import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 // Rótulos dos tipos que entram na análise (e a lista pro filtro)
 const DOC_LABEL: Record<string, string> = {
@@ -95,7 +96,7 @@ export async function POST(
             pai: { select: { nome: true, sobrenome: true } },
             mae: { select: { nome: true, sobrenome: true } },
             documentos: {
-              where: { tipo: { in: TIPOS_ANALISADOS }, status: { notIn: ["CANCELADO", "INVALIDO"] } },
+              where: { tipo: { in: TIPOS_ANALISADOS }, status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, "INVALIDO"] } },
               select: {
                 id: true, tipo: true,
                 nome_registrado: true, pai_registrado: true, mae_registrada: true,

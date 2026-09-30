@@ -16,6 +16,7 @@ import { processarOutbox } from '@/src/services/outbox-dispatcher'
 import { resolveOperationalProjectionBatch } from '@/src/lib/process-stage/operational-projection'
 import { ondePaisEh } from "@/src/lib/identidade/canonica"
 import { escopoProcesso } from "@/src/lib/autorizacao/escopo-operacional"
+import { USUARIO_PUBLICO_SELECT, removerSegredosDeUsuario } from "@/src/lib/seguranca/usuario-publico"
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -86,7 +87,8 @@ export async function GET(request: Request) {
         },
         tarefas: {
           include: {
-            responsavel: true
+            // Só o público: `true` traria a linha inteira do Usuario (hash da senha, permissoesCustom).
+            responsavel: { select: USUARIO_PUBLICO_SELECT }
           },
           orderBy: { createdAt: "desc" }
         },
@@ -125,7 +127,7 @@ export async function GET(request: Request) {
       faseAtualLabel: projByProc.get(p.id)?.activePhase?.name ?? null,
     }))
 
-    return NextResponse.json({ processos: processosFormatados })
+    return NextResponse.json({ processos: removerSegredosDeUsuario(processosFormatados) })
   } catch (error) {
     console.error("Erro ao buscar processos:", error)
     return NextResponse.json(

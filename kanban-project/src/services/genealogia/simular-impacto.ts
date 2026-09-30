@@ -32,6 +32,7 @@
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { materializarGenealogia } from "@/src/services/genealogia/materializar-genealogia"
+import { removerNecessidadesDaUniao } from "@/src/services/necessidade-documental"
 
 type DB = Prisma.TransactionClient
 
@@ -66,6 +67,30 @@ export interface EntradaSimulacao {
   pessoaId: number
   mudancas?: MudancasPropostas
   uniao?: UniaoProposta
+  /**
+   * Simula a REMOÇÃO da pessoa da árvore. Dentro do rollback: as uniões dela saem
+   * (com as necessidades de casamento, como na remoção real) e o nó é marcado
+   * `removidaEm` — que é o recorte que o motor lê. Não reusa `removerPessoaDaArvore`
+   * (abre transação própria e commitaria); o efeito que o motor enxerga é o mesmo.
+   */
+  removerPessoa?: boolean
+}
+
+/** Tarefa ABERTA que a mudança vai tirar da fila (ou marcar para decisão). */
+export interface TarefaAfetada {
+  tarefaId: number
+  titulo: string
+  pessoaNome: string | null
+  responsavelNome: string | null
+  /** CANCELADA = nunca iniciada, sai da fila. DECISAO = já iniciada: fica marcada para decisão humana, não é destruída. */
+  efeito: "CANCELADA" | "DECISAO"
+}
+
+/** Documento que passará a NAO_EXIGIDO (a árvore deixou de exigi-lo). */
+export interface DocumentoAfetado {
+  documentoId: number
+  documento: string
+  pessoaNome: string | null
 }
 
 export interface ItemDocumental {
@@ -131,6 +156,10 @@ export interface ResultadoSimulacao {
   pessoaId: number
   documental: DeltaDocumental
   operacional: DeltaOperacional
+  /** Tarefas abertas que serão canceladas / marcadas para decisão — o que o operador precisa ver ANTES de confirmar. */
+  tarefasAfetadas: TarefaAfetada[]
+  /** Documentos que passarão a "Não exigido". */
+  documentosNaoExigidos: DocumentoAfetado[]
   financeiro: DeltaFinanceiro
   /** Avisos do materializador (regra não publicada, item sem catálogo etc.). */
   pendencias: string[]
@@ -148,7 +177,15 @@ class RollbackDaSimulacao extends Error {
   }
 }
 
+interface TarefaRetrato {
+  id: number; titulo: string; pessoaNome: string | null; responsavelNome: string | null
+  statusTarefa: string; causaRemovidaEm: Date | null
+}
+interface DocumentoRetrato { id: number; status: string; documento: string; pessoaNome: string | null }
+
 interface Retrato {
+  tarefas: Map<number, TarefaRetrato>
+  documentos: Map<number, DocumentoRetrato>
   necessidades: Map<number, ItemDocumental>
   passos: Set<number>
   passosQueGeramTarefa: number
@@ -156,6 +193,23 @@ interface Retrato {
 }
 
 async function retratar(db: DB, processoId: number): Promise<Retrato> {
+  const nomeDe = (p: { nome: string; sobrenome: string | null } | null | undefined) =>
+    p ? `${p.nome}${p.sobrenome ? ` ${p.sobrenome}` : ""}` : null
+  const proc = await db.processo.findUnique({ where: { id: processoId }, select: { arvoreId: true } })
+  const tarefasRaw = await db.tarefa.findMany({
+    where: { processoId, statusTarefa: { notIn: ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] }, OR: [{ necessidadeId: { not: null } }, { documentoId: { not: null } }] },
+    select: { id: true, titulo: true, pessoaId: true, statusTarefa: true, causaRemovidaEm: true, responsavel: { select: { nome: true } } },
+  })
+  const pessoasDasTarefas = tarefasRaw.length
+    ? await db.pessoa.findMany({ where: { id: { in: tarefasRaw.map((t) => t.pessoaId).filter((x): x is number => x != null) } }, select: { id: true, nome: true, sobrenome: true } })
+    : []
+  const pessoaPorId = new Map(pessoasDasTarefas.map((p) => [p.id, p]))
+  const docsRaw = proc?.arvoreId
+    ? await db.documento.findMany({
+        where: { pessoa: { arvoreId: proc.arvoreId } },
+        select: { id: true, status: true, descricao: true, documentType: { select: { name: true } }, pessoa: { select: { nome: true, sobrenome: true } } },
+      })
+    : []
   const [necessidades, passos] = await Promise.all([
     db.necessidadeDocumental.findMany({
       where: { processoId },
@@ -193,6 +247,13 @@ async function retratar(db: DB, processoId: number): Promise<Retrato> {
   }
 
   return {
+    tarefas: new Map(tarefasRaw.map((t) => [t.id, {
+      id: t.id, titulo: t.titulo, pessoaNome: nomeDe(t.pessoaId != null ? pessoaPorId.get(t.pessoaId) : null),
+      responsavelNome: t.responsavel?.nome ?? null, statusTarefa: t.statusTarefa, causaRemovidaEm: t.causaRemovidaEm,
+    }])),
+    documentos: new Map(docsRaw.map((d) => [d.id, {
+      id: d.id, status: d.status, documento: d.documentType?.name ?? d.descricao ?? `Documento #${d.id}`, pessoaNome: nomeDe(d.pessoa),
+    }])),
     necessidades: mapa,
     passos: new Set(passos.map((p) => p.id)),
     passosQueGeramTarefa: passos.filter((p) => p.geraTarefa).length,
@@ -218,9 +279,10 @@ export async function simularImpactoPessoa(
         await aplicarMudancaProposta(tx, entrada)
 
         // O MOTOR OFICIAL. Mesma função do save real, com o tx no lugar do prisma.
-        const relatorio = await materializarGenealogia(entrada.processoId, tx)
+        const relatorio = await materializarGenealogia(entrada.processoId, tx, { motivo: "simulação de impacto (nada é gravado)" })
 
         const depois = await retratar(tx, entrada.processoId)
+        const { tarefasAfetadas, documentosNaoExigidos } = compararTarefasEDocumentos(antes, depois)
 
         throw new RollbackDaSimulacao({
           processoId: entrada.processoId,
@@ -235,6 +297,8 @@ export async function simularImpactoPessoa(
             bloqueiosAdicionados: Math.max(0, depois.bloqueios - antes.bloqueios),
             bloqueiosRemovidos: Math.max(0, antes.bloqueios - depois.bloqueios),
           },
+          tarefasAfetadas,
+          documentosNaoExigidos,
           financeiro: avaliarFinanceiro(entrada, financeiroVisivel),
           pendencias: relatorio.pendencias,
           semImpacto: false, // recalculado abaixo, com o delta em mãos
@@ -251,7 +315,9 @@ export async function simularImpactoPessoa(
         p.documental.reativados.length === 0 &&
         p.operacional.passosAdicionados === 0 &&
         p.operacional.bloqueiosAdicionados === 0 &&
-        p.operacional.bloqueiosRemovidos === 0
+        p.operacional.bloqueiosRemovidos === 0 &&
+        p.tarefasAfetadas.length === 0 &&
+        p.documentosNaoExigidos.length === 0
       return { ...p, semImpacto, somenteLeitura: true }
     }
     throw e
@@ -261,6 +327,32 @@ export async function simularImpactoPessoa(
   // que uma refatoração que remova o `throw` quebre aqui, em vez de silenciosamente
   // passar a COMMITAR a simulação.
   throw new Error("simulação não produziu resultado — o rollback foi removido?")
+}
+
+/**
+ * Tarefa aberta ANTES que sumiu da fila (CANCELADA) ou ganhou `causaRemovidaEm`
+ * (já iniciada — marcada para decisão) DEPOIS; e Documento que virou NAO_EXIGIDO.
+ * Delta do MESMO motor — nenhuma regra recalculada aqui.
+ */
+function compararTarefasEDocumentos(antes: Retrato, depois: Retrato): { tarefasAfetadas: TarefaAfetada[]; documentosNaoExigidos: DocumentoAfetado[] } {
+  const tarefasAfetadas: TarefaAfetada[] = []
+  for (const [id, t] of antes.tarefas) {
+    const d = depois.tarefas.get(id)
+    if (!d) tarefasAfetadas.push({ tarefaId: id, titulo: t.titulo, pessoaNome: t.pessoaNome, responsavelNome: t.responsavelNome, efeito: "CANCELADA" })
+    else if (t.causaRemovidaEm == null && d.causaRemovidaEm != null) {
+      tarefasAfetadas.push({ tarefaId: id, titulo: t.titulo, pessoaNome: t.pessoaNome, responsavelNome: t.responsavelNome, efeito: "DECISAO" })
+    }
+  }
+  const documentosNaoExigidos: DocumentoAfetado[] = []
+  for (const [id, d] of depois.documentos) {
+    const a = antes.documentos.get(id)
+    if (a && a.status !== "NAO_EXIGIDO" && d.status === "NAO_EXIGIDO") {
+      documentosNaoExigidos.push({ documentoId: id, documento: d.documento, pessoaNome: d.pessoaNome })
+    }
+  }
+  tarefasAfetadas.sort((x, y) => x.titulo.localeCompare(y.titulo) || x.tarefaId - y.tarefaId)
+  documentosNaoExigidos.sort((x, y) => x.documento.localeCompare(y.documento) || x.documentoId - y.documentoId)
+  return { tarefasAfetadas, documentosNaoExigidos }
 }
 
 function compararDocumental(antes: Retrato, depois: Retrato): DeltaDocumental {
@@ -336,7 +428,19 @@ async function aplicarMudancaProposta(db: DB, entrada: EntradaSimulacao): Promis
   }
 
   if (uniao?.acao === "remover" && uniao.uniaoId) {
+    // Como na remoção real: as necessidades da união saem ANTES (o CHECK
+    // `sujeito_xor` recusaria apagar a união com necessidade apontando para ela).
+    await removerNecessidadesDaUniao(uniao.uniaoId, db)
     await db.uniao.delete({ where: { id: uniao.uniaoId } })
+  }
+
+  if (entrada.removerPessoa) {
+    const unioes = await db.uniao.findMany({ where: { OR: [{ pessoa1Id: pessoaId }, { pessoa2Id: pessoaId }] }, select: { id: true } })
+    for (const u of unioes) {
+      await removerNecessidadesDaUniao(u.id, db)
+      await db.uniao.delete({ where: { id: u.id } })
+    }
+    await db.pessoa.update({ where: { id: pessoaId }, data: { removidaEm: new Date(), requerente: "nao" } })
   }
 }
 

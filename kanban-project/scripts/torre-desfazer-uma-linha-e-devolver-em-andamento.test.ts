@@ -85,7 +85,7 @@ async function main() {
     ok("segundo Desfazer do prazo é recusado", dp2.desfeitas === 0 && (await linhasDe([t3, t4], "TAREFA_PRAZO_REPACTUACAO_DESFEITA")).length === 2)
 
     secao("ITEM 11 — leitores da auditoria não quebram")
-    const aud = await consultarAuditoria({ processoId: o1.processoId }, 1, 100)
+    const aud = await consultarAuditoria({ processoId: o1.processoId, natureza: "PROCESSO_TAREFA" }, 1, 100)
     ok("consultarAuditoria lista a DESFEITA com autor e descrição", aud.itens.some((l) => l.acao === "TAREFA_PRIORIDADE_DESFEITA" && l.autor === `${MARCA} Admin` && /restaurada/.test(l.descricao)))
     const doc = await prisma.tarefa.findUnique({ where: { id: t3 }, select: { documentoId: true } })
     if (doc?.documentoId) {

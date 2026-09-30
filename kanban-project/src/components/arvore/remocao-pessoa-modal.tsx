@@ -18,6 +18,7 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { AlertTriangle, Loader2, Shield, Trash2, X } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { ListaCancelamentos, type DocumentoNaoExigidoUI, type TarefaAfetadaUI } from "@/src/components/arvore/inteligencia/preview-impacto"
 
 export interface FatoProtegidoUI {
   tipo: string
@@ -45,6 +46,7 @@ const ROTULO: Record<string, string> = {
   unioes: "união/casamento",
   necessidades: "necessidade documental",
   documentos: "documento operacional",
+  documentosDeUniaoDoOutroConjuge: "documento da união no nome do outro cônjuge (ex.: certidão de casamento)",
   passos: "passo de workflow",
   tarefas: "tarefa",
   participantesFinanceiros: "participante financeiro",
@@ -76,6 +78,25 @@ export function RemocaoPessoaModal({
   const [carregando, setCarregando] = useState(true)
   const [executando, setExecutando] = useState<"HARD" | "DESATIVAR" | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [cancelamentos, setCancelamentos] = useState<{ tarefas: TarefaAfetadaUI[]; documentos: DocumentoNaoExigidoUI[] } | null>(null)
+
+  // "Isso vai cancelar": o MESMO motor do preview de edição, simulando a remoção
+  // (transação revertida, nada é gravado). Falha do preview não impede a remoção.
+  useEffect(() => {
+    const processoId = plano?.processoIds?.[0]
+    if (processoId == null) return
+    let vivo = true
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+    fetch(`/api/processos/${processoId}/genealogia/simular-impacto`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ pessoaId, removerPessoa: true }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => { if (vivo && res) setCancelamentos({ tarefas: res.tarefasAfetadas ?? [], documentos: res.documentosNaoExigidos ?? [] }) })
+      .catch(() => {})
+    return () => { vivo = false }
+  }, [plano, pessoaId])
 
   useEffect(() => {
     let cancelado = false
@@ -166,6 +187,10 @@ export function RemocaoPessoaModal({
                   </ul>
                 )}
               </section>
+
+              {cancelamentos && (
+                <ListaCancelamentos tarefas={cancelamentos.tarefas} documentos={cancelamentos.documentos} />
+              )}
 
               {/* ── SERÃO PRESERVADOS ──────────────────────────────────── */}
               {plano.fatosProtegidos.length > 0 && (

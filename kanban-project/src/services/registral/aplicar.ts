@@ -16,6 +16,7 @@
 // Nada aqui "avisa depois". Estado parcialmente atualizado não existe: ou a
 // operação inteira vale, ou nada vale.
 
+import { autorLegivel, efeitosPosCommitDaArvore, propagarNaTransacao, OPCOES_TX_ARVORE } from "@/src/services/genealogia/propagar-arvore"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { permissaoDaProposta, type PermissaoRegistral } from "@/src/lib/genealogia/registral/campos"
@@ -409,8 +410,22 @@ export async function aplicarProposta(p: {
         chaveIdempotencia: `mrg:evt:aplicada:${proposta.id}:${versaoDepois.versao}`,
       })
 
+      // A ÁRVORE É A ÚNICA FONTE DE VERDADE DOCUMENTAL (§37): a proposta escreveu
+      // Pessoa/filiação (paiId/maeId/vivo/casado…) — a reavaliação das necessidades
+      // e o que derivou delas acontece NESTA transação. Falhou → a aplicação inteira
+      // desfaz (a proposta fica ABORTADA com o motivo, nunca "aplicada pela metade").
+      await propagarNaTransacao(tx, {
+        arvoreId, autor: await autorLegivel(tx, p.ator.usuarioId),
+        motivo: `dados da árvore alterados pelo motor registral (proposta #${proposta.id}, ${proposta.tipo})`,
+      })
+
       return { versaoDepois: versaoDepois.versao, falhas: rev.falhas.map((f) => `${f.verificacao}: ${f.detalhe}`) }
-    })
+    }, OPCOES_TX_ARVORE)
+
+    // Efeitos que não aceitam `tx` (fase/honorários/avanço): DEPOIS do commit. Um erro
+    // aqui NÃO desfaz nem marca ABORTADA a proposta já aplicada — sobe como aviso.
+    try { await efeitosPosCommitDaArvore(arvoreId) }
+    catch (e) { resultado.falhas.push(`efeitos pós-commit da árvore: ${e instanceof Error ? e.message : String(e)}`) }
 
     await auditar(prisma, {
       acao: ACOES_AUDITORIA.PROPOSTA_APLICADA,

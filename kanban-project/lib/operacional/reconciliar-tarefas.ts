@@ -21,6 +21,8 @@
 // inventa responsável nem prazo. Só materializa e sincroniza a TAREFA.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
+import { STATUS_DOCUMENTO_INATIVOS } from '@/src/lib/documentos/status-inativos'
 import { nomeDaTarefa } from './nome-da-tarefa'
 import {
   materializarTarefaOperacional, sincronizarTarefaComWorkflow, STATUS_TERMINAIS,
@@ -73,9 +75,48 @@ function slaDoTrabalho(steps: Array<{ slaDays: number | null; obrigatorio: boole
   return dias.length ? Math.max(...dias) : null
 }
 
+type DB = typeof prisma | Prisma.TransactionClient
+
+/**
+ * Executa `fn` numa transação. Se quem chamou JÁ está numa transação (`db` é um
+ * tx), participa dela — nunca abre uma segunda, e nunca escreve fora dela
+ * (invariante transação × conexão). Só com o client global abre a sua própria.
+ * É isto que permite à propagação da árvore convergir necessidade, documento,
+ * passo E tarefa numa transação só.
+ */
+async function emTx<T>(db: DB, fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  return db === prisma ? prisma.$transaction(fn) : fn(db as Prisma.TransactionClient)
+}
+
+/**
+ * Por que a obrigação deixou de valer, em palavras — o que fica gravado na tarefa e
+ * na auditoria. Vem do FATO que a árvore registrou ao dispensar a necessidade
+ * (evento DISPENSADA, `dados.motivo`, ex.: "necessidade removida pela árvore:
+ * pessoa deixou de ser casada"); sem ele, um texto honesto e genérico.
+ */
+async function motivoDaCausaPerdida(
+  db: DB,
+  t: { necessidadeId: number | null; documentoId: number | null },
+): Promise<string> {
+  let necessidadeId = t.necessidadeId
+  if (necessidadeId == null && t.documentoId != null) {
+    necessidadeId = (await db.documento.findUnique({ where: { id: t.documentoId }, select: { necessidadeId: true } }))?.necessidadeId ?? null
+  }
+  if (necessidadeId != null) {
+    const ev = await db.necessidadeDocumentalEvento.findFirst({
+      where: { necessidadeId, tipo: 'DISPENSADA' }, orderBy: { id: 'desc' }, select: { dados: true },
+    })
+    const m = (ev?.dados as { motivo?: string } | null)?.motivo
+    if (m) return m.startsWith('necessidade removida pela árvore') ? m : `necessidade removida pela árvore: ${m}`
+    return 'necessidade removida pela árvore: a necessidade foi dispensada'
+  }
+  return 'necessidade removida pela árvore: o documento deste trabalho não tem mais necessidade ativa'
+}
+
 export async function reconciliarTarefas(
-  opts: { processoId?: number; dryRun?: boolean } = {},
+  opts: { processoId?: number; dryRun?: boolean; db?: DB } = {},
 ): Promise<ResultadoReconciliacao> {
+  const db: DB = opts.db ?? prisma
   const dryRun = opts.dryRun ?? false
   const agora = new Date()
   const res: ResultadoReconciliacao = {
@@ -83,7 +124,7 @@ export async function reconciliarTarefas(
     tarefasEncerradasSemCausa: 0, tarefasAguardandoDecisao: 0, semTitulo: 0, detalhes: [],
   }
 
-  const instancias = await prisma.phaseWorkflowInstance.findMany({
+  const instancias = await db.phaseWorkflowInstance.findMany({
     where: { status: 'ATIVO', ...(opts.processoId ? { processoId: opts.processoId } : {}) },
     select: {
       id: true, processoId: true, faseMacroKey: true, ciclo: true,
@@ -148,7 +189,7 @@ export async function reconciliarTarefas(
     }
     for (const t of inst.tarefas) {
       if (!dryRun) {
-        const r = await prisma.$transaction((tx) => sincronizarTarefaComWorkflow(tx, t.id, agora))
+        const r = await emTx(db, (tx) => sincronizarTarefaComWorkflow(tx, t.id, agora))
         if (r.mudou) res.tarefasSincronizadas++
       }
       res.detalhes.push({ instanciaId: inst.id, tarefaId: t.id, acao: 'já tinha tarefa · sincronizada' })
@@ -169,14 +210,14 @@ export async function reconciliarTarefas(
     const documentoId = vivos.find((s) => s.documentoId != null)?.documentoId ?? null
 
     const nec = necessidadeId
-      ? await prisma.necessidadeDocumental.findUnique({
+      ? await db.necessidadeDocumental.findUnique({
           where: { id: necessidadeId },
           select: { pessoaId: true, itemCatalogo: { select: { name: true } } },
         })
       : null
     const pessoaId = nec?.pessoaId ?? vivos.find((s) => s.pessoaId != null)?.pessoaId ?? null
     const pessoa = pessoaId
-      ? await prisma.pessoa.findUnique({ where: { id: pessoaId }, select: { nome: true, sobrenome: true } })
+      ? await db.pessoa.findUnique({ where: { id: pessoaId }, select: { nome: true, sobrenome: true } })
       : null
 
     // SEM CAUSA, A TAREFA NÃO NASCE.
@@ -194,8 +235,27 @@ export async function reconciliarTarefas(
     }
 
     const doc = documentoId != null
-      ? await prisma.documento.findUnique({ where: { id: documentoId }, select: { descricao: true, documentType: { select: { name: true } } } })
+      ? await db.documento.findUnique({
+          where: { id: documentoId },
+          select: { descricao: true, status: true, necessidadeId: true, necessidade: { select: { status: true } }, documentType: { select: { name: true } } },
+        })
       : null
+
+    // DOCUMENTO SEM NECESSIDADE ATIVA NÃO É CAUSA DE TAREFA (árvore = única fonte de
+    // verdade documental). Trabalho que só tem o Documento como âncora — sem
+    // necessidade própria — só nasce se esse Documento ainda tem necessidade viva
+    // por trás e não foi tirado de jogo (CANCELADO/NAO_EXIGIDO).
+    if (necessidadeId == null && documentoId != null) {
+      const docSemCausa = !doc
+        || (STATUS_DOCUMENTO_INATIVOS as readonly string[]).includes(doc.status)
+        || doc.necessidadeId == null
+        || doc.necessidade?.status === 'DISPENSADA'
+      if (docSemCausa) {
+        res.semTitulo++
+        res.detalhes.push({ instanciaId: inst.id, tarefaId: 0, acao: `documento ${documentoId} sem necessidade ativa · trabalho sem causa · tarefa não nasce` })
+        continue
+      }
+    }
     const nome = nomeDaTarefa({
       itemDaNecessidade: nec?.itemCatalogo?.name ?? null,
       nomeDoDocumento: doc?.documentType?.name ?? doc?.descricao ?? null,
@@ -216,7 +276,7 @@ export async function reconciliarTarefas(
       continue
     }
 
-    const criada = await prisma.$transaction(async (tx) => {
+    const criada = await emTx(db, async (tx) => {
       const r = await materializarTarefaOperacional(tx, {
         titulo: nome,
         processoId: inst.processoId,
@@ -253,7 +313,7 @@ export async function reconciliarTarefas(
   //
   // Tarefa MANUAL nunca entra aqui: ela não nasceu de obrigação automática, e
   // foi uma pessoa que decidiu que o trabalho existe.
-  const semCausa = await prisma.tarefa.findMany({
+  const semCausa = await db.tarefa.findMany({
     where: {
       workflowInstanceId: { not: null },
       statusTarefa: { notIn: STATUS_TERMINAIS },
@@ -288,13 +348,23 @@ export async function reconciliarTarefas(
         { necessidadeId: null, workflowInstance: { status: { in: ['CANCELADO', 'SUPERSEDIDO'] } } },
         { necessidade: { OR: [{ status: 'DISPENSADA' }, { supersedePorId: { not: null } }] } },
         // Tarefa de Emissão Documental liga por `documentoId`, não `necessidadeId`
-        // — `dispensarNecessidade` cancela o Documento (status CANCELADO) no mesmo
-        // ato que dispensa a necessidade; é o sinal equivalente para este lado.
-        { documento: { status: 'CANCELADO' } },
+        // — `dispensarNecessidade` tira o Documento de jogo (NAO_EXIGIDO; CANCELADO
+        // nos legados) no mesmo ato que dispensa a necessidade; é o sinal equivalente
+        // para este lado. UMA definição de "documento inativo": status-inativos.ts.
+        { documento: { status: { in: [...STATUS_DOCUMENTO_INATIVOS] } } },
+        // A ÁRVORE É A ÚNICA FONTE DE VERDADE DOCUMENTAL (30/09/2026). Trabalho cujo
+        // Documento não tem NECESSIDADE ativa por trás — sem necessidade nenhuma
+        // (necessidadeId nulo: a necessidade foi apagada, ex.: o cônjuge saiu da
+        // árvore e levou a união) ou com a necessidade DISPENSADA — é trabalho SEM
+        // CAUSA. Achado real (processo 675, tarefa 3984): o Documento do titular
+        // sobreviveu à remoção do cônjuge com necessidadeId nulo, e a abertura da
+        // Emissão criou passo e tarefa a partir do DOCUMENTO solto. Um Documento
+        // sem necessidade nunca é causa de tarefa.
+        { documentoId: { not: null }, documento: { OR: [{ necessidadeId: null }, { necessidade: { status: 'DISPENSADA' } }] } },
       ],
       ...(opts.processoId ? { processoId: opts.processoId } : {}),
     },
-    select: { id: true, workflowInstanceId: true, titulo: true, dataInicio: true, statusTarefa: true, causaRemovidaEm: true },
+    select: { id: true, workflowInstanceId: true, titulo: true, dataInicio: true, statusTarefa: true, causaRemovidaEm: true, necessidadeId: true, documentoId: true },
   })
 
   for (const t of semCausa) {
@@ -307,10 +377,11 @@ export async function reconciliarTarefas(
       res.tarefasAguardandoDecisao++
       res.detalhes.push({ instanciaId: t.workflowInstanceId ?? 0, tarefaId: t.id, acao: 'causa removida · trabalho já iniciado · aguarda decisão' })
       if (dryRun) continue
-      await prisma.$transaction(async (tx) => {
+      const motivoCausa = await motivoDaCausaPerdida(db, t)
+      await emTx(db, async (tx) => {
         await tx.tarefa.update({
           where: { id: t.id },
-          data: { causaRemovidaEm: agora, causaRemovidaMotivo: 'O workflow que originou este trabalho foi encerrado.' },
+          data: { causaRemovidaEm: agora, causaRemovidaMotivo: motivoCausa.slice(0, 300) },
         })
         await tx.logAuditoria.create({
           data: {
@@ -330,10 +401,11 @@ export async function reconciliarTarefas(
     res.tarefasEncerradasSemCausa++
     res.detalhes.push({ instanciaId: t.workflowInstanceId ?? 0, tarefaId: t.id, acao: 'causa removida · nunca iniciada · cancelada' })
     if (dryRun) continue
-    await prisma.$transaction(async (tx) => {
+    const motivoCausa = await motivoDaCausaPerdida(db, t)
+    await emTx(db, async (tx) => {
       await tx.tarefa.update({
         where: { id: t.id },
-        data: { statusTarefa: 'CANCELADA', motivoCodigo: 'CAUSA_REMOVIDA', dataConclusao: agora, causaRemovidaEm: agora },
+        data: { statusTarefa: 'CANCELADA', motivoCodigo: 'CAUSA_REMOVIDA', dataConclusao: agora, causaRemovidaEm: agora, causaRemovidaMotivo: motivoCausa.slice(0, 300) },
       })
       // O SINO (regra 5): cancelada sai dos avisos na hora.
       await sincronizarAvisosDeTarefas(tx, [t.id])
@@ -342,8 +414,8 @@ export async function reconciliarTarefas(
           acao: 'TAREFA_CANCELADA',
           entidade: 'Tarefa',
           entidadeId: t.id,
-          descricao: `Tarefa "${t.titulo}" retirada da fila: o workflow que a originou foi encerrado e o trabalho nunca começou. Histórico preservado.`,
-          detalhes: { workflowInstanceId: t.workflowInstanceId, origem: 'RECONCILIADOR', motivo: 'CAUSA_REMOVIDA' },
+          descricao: `Tarefa "${t.titulo}" cancelada — ${motivoCausa}. O trabalho nunca começou; histórico preservado.`,
+          detalhes: { workflowInstanceId: t.workflowInstanceId, origem: 'RECONCILIADOR', motivo: 'CAUSA_REMOVIDA', motivoDetalhado: motivoCausa, necessidadeId: t.necessidadeId, documentoId: t.documentoId },
         },
       })
     })

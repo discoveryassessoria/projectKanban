@@ -240,7 +240,7 @@ console.log("\n6) preview × execução: uma regra só")
 const simulador = ler("src/services/genealogia/simular-impacto.ts")
 const codSim = codigo(simulador)
 
-if (/materializarGenealogia\s*\(\s*entrada\.processoId\s*,\s*tx\s*\)/.test(codSim)) {
+if (/materializarGenealogia\s*\(\s*entrada\.processoId\s*,\s*tx\s*[,)]/.test(codSim)) {
   ok("a simulação chama o materializador OFICIAL, com o transaction client")
 } else {
   falhar("a simulação não usa mais o materializador oficial", "seria a segunda implementação da regra documental")

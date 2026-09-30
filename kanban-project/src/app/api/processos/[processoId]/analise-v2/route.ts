@@ -19,6 +19,7 @@ import {
   type TreePerson,
   type DocTipo,
 } from "@/src/lib/process-stage/ad-v2-engine"
+import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 const DOC_LABEL: Record<string, string> = {
   CERTIDAO_NASCIMENTO: "Certidão de Nascimento",
@@ -81,7 +82,7 @@ async function carregarPessoas(processoId: number) {
       unioesComoPessoa1: { select: { pessoa2: { select: { nome: true, sobrenome: true } } } },
       unioesComoPessoa2: { select: { pessoa1: { select: { nome: true, sobrenome: true } } } },
       documentos: {
-        where: { tipo: { in: TIPOS_ANALISADOS }, status: { notIn: ["CANCELADO", "INVALIDO"] } },
+        where: { tipo: { in: TIPOS_ANALISADOS }, status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, "INVALIDO"] } },
         orderBy: { id: "asc" },
         select: {
           id: true, tipo: true, status: true,

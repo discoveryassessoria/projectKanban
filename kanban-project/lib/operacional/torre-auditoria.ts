@@ -19,7 +19,29 @@ export interface FiltroDeAuditoria {
   processoId?: number | null
   /** Só ações cujo código contém este texto (ex.: "PRAZO"). */
   acao?: string | null
+  /** SISTEMA (padrão) · PROCESSO_TAREFA · TODOS — ver `NATUREZA_DA_ACAO`. */
+  natureza?: FiltroDeNatureza | null
 }
+
+// ─── SISTEMA × PROCESSO/TAREFA — UM mapa único, por `acao` (01/10/2026) ─────────────────────────────────────────────
+// A Auditoria mora em Gerenciamento › Saúde do sistema e mostra, por padrão, fatos de SISTEMA. Fatos de processo/tarefa
+// vão ao Histórico do processo. Uma `acao` é de SISTEMA se estiver em `ACOES_DE_SISTEMA`; é de PROCESSO/TAREFA se a
+// entidade for Tarefa/Processo e a `acao` NÃO estiver nessa lista (a lista vence: `processo_excluido_definitivo` é de
+// entidade Processo mas é fato de sistema). Toda `acao` gravada pelo código da Torre tem que estar aqui (o teste confere).
+export type NaturezaDaAuditoria = 'SISTEMA' | 'PROCESSO_TAREFA'
+export type FiltroDeNatureza = 'SISTEMA' | 'PROCESSO_TAREFA' | 'TODOS'
+export const ACOES_DE_SISTEMA: readonly string[] = [
+  // regras da Torre · visões · exportação · saúde/diagnóstico
+  'REGRA_TORRE_ATIVADA', 'REGRA_TORRE_DESATIVADA', 'REGRA_TORRE_EXECUTADA', 'REGRA_TORRE_SIMULADA',
+  'VISAO_TORRE_SALVA', 'VISAO_TORRE_REMOVIDA', 'VISAO_COMPARTILHADA', 'VISAO_DESCOMPARTILHADA',
+  'AUDITORIA_EXPORTADA', 'SAUDE_ACHADO_IGNORADO', 'SAUDE_INCIDENTE', 'CORRECAO_AUTOMATICA', 'CORRECAO_AUTOMATICA_FALHOU',
+  // exclusão de processo e manutenção de dados em lote
+  'processo_excluido_definitivo',
+  'BACKFILL_PASSOS_PUBLICADOS', 'BACKFILL_REMOVE_PASSO_SEM_VINCULO', 'BACKFILL_SOLICITACAO_DOCUMENTO', 'BACKFILL_PHASEKEY_CATALOGO',
+  'ACOMPANHAMENTO_A_INICIAR_BACKFILL', 'REPARO_MANUAL', 'PROC005_REMEDIACAO_MANUAL',
+]
+export const NATUREZA_DA_ACAO = (acao: string, entidade: string): NaturezaDaAuditoria | null =>
+  ACOES_DE_SISTEMA.includes(acao) ? 'SISTEMA' : (ENTIDADES_DA_AUDITORIA as readonly string[]).includes(entidade) ? 'PROCESSO_TAREFA' : null
 
 export interface LinhaDeAuditoria {
   id: number
@@ -35,7 +57,9 @@ export interface LinhaDeAuditoria {
 /** Os filtros da query string — a MESMA leitura para a tela e para o CSV. */
 export function filtroDaQuery(sp: URLSearchParams): FiltroDeAuditoria {
   const n = (k: string) => { const v = sp.get(k); return v && Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : null }
-  return { de: sp.get('de'), ate: sp.get('ate'), autorId: n('autorId'), processoId: n('processoId'), acao: sp.get('acao') }
+  const nat = (sp.get('natureza') ?? '').toUpperCase()
+  const natureza: FiltroDeNatureza = nat === 'PROCESSO_TAREFA' || nat === 'TODOS' ? nat : 'SISTEMA'
+  return { de: sp.get('de'), ate: sp.get('ate'), autorId: n('autorId'), processoId: n('processoId'), acao: sp.get('acao'), natureza }
 }
 
 export const ENTIDADES_DA_AUDITORIA = ['Tarefa', 'Processo'] as const
@@ -52,11 +76,13 @@ function fimDoDia(s: string): Date | null {
 
 export async function whereDaAuditoria(f: FiltroDeAuditoria): Promise<Prisma.LogAuditoriaWhereInput> {
   const e: Prisma.LogAuditoriaWhereInput[] = []
+  const natureza = f.natureza ?? 'SISTEMA'
+  const sistema: Prisma.LogAuditoriaWhereInput = { acao: { in: [...ACOES_DE_SISTEMA] } }
+  const deProcessoTarefa: Prisma.LogAuditoriaWhereInput = { entidade: { in: [...ENTIDADES_DA_AUDITORIA] }, acao: { notIn: [...ACOES_DE_SISTEMA] } }
+  e.push(natureza === 'SISTEMA' ? sistema : natureza === 'PROCESSO_TAREFA' ? deProcessoTarefa : { OR: [sistema, deProcessoTarefa] })
   if (f.processoId != null) {
     const tarefaIds = (await prisma.tarefa.findMany({ where: { processoId: f.processoId }, select: { id: true } })).map((t) => t.id)
     e.push({ OR: [{ entidade: 'Tarefa', entidadeId: { in: tarefaIds } }, { entidade: 'Processo', entidadeId: f.processoId }] })
-  } else {
-    e.push({ entidade: { in: [...ENTIDADES_DA_AUDITORIA] } })
   }
   const de = f.de ? inicioDoDia(f.de) : null
   const ate = f.ate ? fimDoDia(f.ate) : null
@@ -83,9 +109,11 @@ async function montar(linhas: Array<{ id: number; acao: string; entidade: string
     if (l.entidade === 'Tarefa') {
       const t = l.entidadeId ? tarefaPorId.get(l.entidadeId) : null
       alvo = !l.entidadeId ? 'Tarefas (lote)' : t ? `Tarefa #${t.id} · ${t.titulo}${t.processo ? ` · ${t.processo.nome}` : ''}` : `Tarefa #${l.entidadeId} (removida)`
-    } else {
+    } else if (l.entidade === 'Processo') {
       const p = l.entidadeId ? procPorId.get(l.entidadeId) : null
-      alvo = p ? `Processo #${p.id} · ${p.nome}` : `Processo #${l.entidadeId ?? '—'}`
+      alvo = p ? `Processo #${p.id} · ${p.nome}` : `Processo #${l.entidadeId ?? '—'}${l.acao === 'processo_excluido_definitivo' ? ' (excluído)' : ''}`
+    } else {
+      alvo = `${l.entidade}${l.entidadeId ? ` #${l.entidadeId}` : ''}`
     }
     return {
       id: l.id, quando: l.criadoEm.toISOString(), autor: l.usuario?.nome ?? 'Sistema', acao: l.acao, alvo,

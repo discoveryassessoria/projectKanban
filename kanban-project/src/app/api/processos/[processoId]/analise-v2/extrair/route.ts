@@ -20,6 +20,7 @@ import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { TipoDocumento } from "@prisma/client"
 import { transcreverDocumento } from "@/src/services/registral/ocr"
 import { extrairNascimento, extrairCasamento, extrairObito, extrairRegistral } from "@/src/lib/documentos/extrator-inteiro-teor"
+import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 // Vários documentos, cada um com download + tentativa de transcrição — pode
 // passar do limite padrão em árvore grande.
@@ -65,7 +66,7 @@ export async function POST(
     where: {
       pessoa: { arvoreId: processo.arvoreId, linhaReta: true },
       tipo: { in: TIPOS_ANALISADOS },
-      status: { notIn: ["CANCELADO", "INVALIDO"] },
+      status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, "INVALIDO"] },
     },
     select: {
       id: true, tipo: true, dataStatus: true, cidade_registro: true, arquivo_url: true,

@@ -49,7 +49,7 @@ async function main() {
     ok("WF-004 residual não é vigente", !vigentes.some((a) => a.id === velhoWf.id))
     const itens = await itensPrecisaDeVoce({ agora, linhas: [] })
     const idsNaParede = itens.filter((i) => i.tipo === "PAREDE_A_FRENTE").map((i) => (i.contexto as { achadoId?: number }).achadoId)
-    ok("o 'Precisa de você' não devolve PAREDE_A_FRENTE para o achado residual", !idsNaParede.includes(velho.id) && !idsNaParede.includes(velhoWf.id))
+    ok("o 'Precisa de você' não devolve PAREDE_A_FRENTE (nem do achado residual, nem de nenhum: cadastro não é decisão de processo)", idsNaParede.length === 0)
 
     secao("SÓ LEITURA — o achado antigo continua aberto para a Saúde resolver na próxima rodada")
     const depois = await prisma.saudeAchado.findUniqueOrThrow({ where: { id: velho.id } })

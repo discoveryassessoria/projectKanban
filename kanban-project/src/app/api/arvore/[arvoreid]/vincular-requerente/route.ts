@@ -11,7 +11,8 @@
 // para dentro de `vincularRequerente`, onde toda porta os herda.
 // ============================================================================
 
-import { type NextRequest, NextResponse, after } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { vincularRequerente, vincularPessoaExistenteAoRequerente } from "@/lib/genealogia/vincular-requerente"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
@@ -57,13 +58,10 @@ export async function POST(
       return NextResponse.json({ error: "pessoaId inválido" }, { status: 400 })
     }
 
-    // `deferirEfeitos: after` — o vínculo em si (rápido, na transação) já está
-    // completo quando respondemos; a reavaliação de TODA a árvore (materializar
-    // genealogia + regras documentais) roda depois de responder, sem o cliente
-    // esperar. `after()` mantém a função viva até o efeito terminar — não é
-    // "atirar e esquecer": só não trava a resposta.
+    // SÍNCRONO (CLAUDE.md §20/§37): o vínculo e a reavaliação documental da árvore
+    // acontecem na MESMA transação; a resposta só sai depois. Falhou → erro HTTP.
     const result = pessoaId != null
-      ? await vincularPessoaExistenteAoRequerente({ arvoreId, requerenteId, pessoaId, actorId }, { after })
+      ? await vincularPessoaExistenteAoRequerente({ arvoreId, requerenteId, pessoaId, actorId })
       : await vincularRequerente({
           arvoreId,
           requerenteId,
@@ -72,7 +70,7 @@ export async function POST(
           paiId: body?.paiId ?? undefined,
           maeId: body?.maeId ?? undefined,
           actorId,
-        }, { after })
+        })
 
     if (!result.ok) {
       const status = STATUS_POR_ERRO[result.code] ?? 400
@@ -81,6 +79,9 @@ export async function POST(
 
     return NextResponse.json({ pessoaId: result.pessoaId, criada: "criada" in result ? result.criada : false })
   } catch (error) {
+    if (error instanceof PropagacaoPosCommitError) {
+      return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
+    }
     console.error("[POST /api/arvore/[arvoreid]/vincular-requerente]", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }

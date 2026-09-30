@@ -138,14 +138,13 @@ ok("o enfileiramento vem DEPOIS do vínculo, e só quando ele deu certo",
 // `opts.after` ela chama `efeitosDoVinculoPosCommit` e aguarda como sempre.
 // Em ambos os casos o efeito é SEMPRE disparado por dentro do serviço — nunca
 // pela rota, nunca esquecido.
-ok("`vincularRequerente` faz o ato inteiro: transação + pós-commit (direto ou adiado via after())",
-  /prisma\.\$transaction\(\(tx\) => vincularRequerenteTx\(tx, input\)\)/.test(canonico) &&
-  /if \(resultado\.ok\) await rodarEfeitosDoVinculo\(/.test(canonico) &&
-  /function rodarEfeitosDoVinculo\(/.test(canonico) &&
-  /opts\.after\(/.test(canonico) &&
-  /return efeitosDoVinculoPosCommit\(/.test(canonico))
-ok("o pós-commit drena a fila E reavalia as Regras Documentais",
-  /processarOutbox\(/.test(canonico) && /dispararMaterializacaoPorArvore\(/.test(canonico))
+ok("`vincularRequerente` faz o ato inteiro: UMA transação (vínculo + evento + reavaliação documental da árvore) + pós-commit SÍNCRONO",
+  /prisma\.\$transaction\(async \(tx\) => \{[\s\S]{0,200}vincularRequerenteTx\(tx, input\)/.test(canonico) &&
+  /propagarNaTransacao\(tx,/.test(canonico) &&
+  /if \(resultado\.ok\) await efeitosDoVinculoPosCommit\(/.test(canonico) &&
+  !/opts\.after\(/.test(canonico) && !/rodarEfeitosDoVinculo/.test(canonico))
+ok("o pós-commit drena a fila E converge o que não aceita tx (fase, honorários, avanço) — erro sobe",
+  /processarOutbox\(/.test(canonico) && /efeitosPosCommitDaArvore\(/.test(canonico))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("5) Quem compõe com transação própria não pode parar no meio")

@@ -594,6 +594,9 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   // série diária dos indicadores (E10). Só ADITIVO — nenhuma coluna existente
   // mudou de tipo, nenhuma tabela existente perdeu coluna.
   '20260930010000_torre_bloco_e_sucessor_comentarios_visao_compartilhada_indicadores',
+  // Árvore = única fonte de verdade documental (30/09/2026): novo valor de enum
+  // StatusDocumento.NAO_EXIGIDO. Só ADITIVO (ALTER TYPE ... ADD VALUE IF NOT EXISTS).
+  '20260930020000_documento_status_nao_exigido',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

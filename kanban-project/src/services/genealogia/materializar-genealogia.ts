@@ -20,7 +20,10 @@ import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { prisma } from "@/lib/prisma"
 import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
-import { garantirNecessidade, dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
+import { garantirNecessidade, dispensarNecessidade, reativarNecessidade, MOTIVO_DOCUMENTO_DISPENSADO } from "@/src/services/necessidade-documental"
+import { transicionarPassoTx } from "@/src/services/task-step-sync"
+import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
+import { randomUUID } from "crypto"
 import { garantirDocumentoDaNecessidade } from "@/src/services/genealogia/operacao-necessidade"
 import { recalcularNumerosLinhagemDaArvore } from "@/src/services/genealogia/numero-linhagem"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
@@ -137,11 +140,16 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
   for (const t of tiposPorId.values()) if (t.code) tipoPorCode.set(t.code, t)
 
   const pessoaIds = pessoas.map((p) => p.id)
+  // UNIÃO VIVA = os DOIS cônjuges são nós ATIVOS desta árvore. Cônjuge removido da
+  // árvore (modo "desativar", que preserva a linha por causa de fato histórico)
+  // desfaz o casal para fins de exigência: a união com um lado fora da árvore não
+  // sustenta certidão de casamento (achado real: processo 675, Luana removida).
+  const ativosSet = new Set(todasIds)
   const uniõesRaw = pessoaIds.length
-    ? await db.uniao.findMany({
+    ? (await db.uniao.findMany({
         where: { OR: [{ pessoa1Id: { in: pessoaIds } }, { pessoa2Id: { in: pessoaIds } }] },
         select: { id: true, pessoa1Id: true, pessoa2Id: true },
-      })
+      })).filter((u) => ativosSet.has(u.pessoa1Id) && ativosSet.has(u.pessoa2Id))
     : []
   const uniõesPorPessoa = new Map<number, number[]>()
   for (const u of uniõesRaw) {
@@ -221,6 +229,26 @@ export interface MaterializarResultado {
   reativadas: number
   pendencias: string[]
   semInstanciaWorkflow: boolean
+  /** FATOS desta rodada, legíveis — alimentam a auditoria e o preview. */
+  fatos: FatoNecessidade[]
+  /** Necessidades já ATENDIDAS/EM_ATENDIMENTO/NAO_LOCALIZADA cuja causa sumiu: NUNCA dispensadas sozinhas (fato acontecido). */
+  preservadasSemCausa: Array<{ necessidadeId: number; status: string; rotulo: string }>
+}
+
+export interface FatoNecessidade {
+  tipo: "REMOVIDA" | "CRIADA" | "REATIVADA"
+  necessidadeId: number
+  /** "Certidão de casamento · Edison Nás Antão Junior" */
+  rotulo: string
+  documentoIds: number[]
+  tarefasAbertas: number
+}
+
+export interface OpcoesMaterializarGenealogia {
+  /** O QUE MUDOU na árvore, em palavras ("pessoa deixou de ser casada"). Sem isto não há auditoria de fato. */
+  motivo?: string
+  /** Quem alterou (nome legível) e o id — vão na linha de auditoria. */
+  autor?: { id: number | null; nome: string | null } | null
 }
 
 // ---- contexto canônico da Pessoa (sem legado) ----
@@ -273,16 +301,19 @@ function chaveStep(necessidadeId: number, ciclo: number): string {
 }
 
 // ---- núcleo: materializa a Genealogia de UM processo (idempotente) ----
-export async function materializarGenealogia(processoId: number, db: DB = prisma): Promise<MaterializarResultado> {
+export async function materializarGenealogia(processoId: number, db: DB = prisma, opts: OpcoesMaterializarGenealogia = {}): Promise<MaterializarResultado> {
   const res: MaterializarResultado = {
     processoId, aplicaveis: 0, necessidadesCriadas: 0, necessidadesReusadas: 0, documentosCriados: 0,
     stepsCriados: 0, stepsReusados: 0, dispensadas: 0, reativadas: 0, pendencias: [], semInstanciaWorkflow: false,
+    fatos: [], preservadasSemCausa: [],
   }
 
   const calculo = await calcularExigenciasDaGenealogia(processoId, db)
   if (!calculo) { res.pendencias.push("processo sem árvore vinculada"); return res }
   res.pendencias.push(...calculo.pendencias)
-  if (calculo.exigencias.length === 0 && calculo.pendencias.some((p) => p.includes("nenhuma Regra Documental"))) return res
+  // SEM REGRA PUBLICADA NÃO É "NADA A FAZER": é exigência zero. Retornar aqui deixava
+  // as necessidades órfãs (regra inativada/arquivada) vivas para sempre — a
+  // reconciliação abaixo as dispensa (PENDENTE) ou as aponta (já andaram).
 
   const { arvoreId, tipoProcessoId, instancia, labelLocalizarRegistro, slaDaysLocalizarRegistro, tipoPorCode } = calculo
   if (!instancia) res.semInstanciaWorkflow = true
@@ -311,6 +342,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
         matrizSnapshot: snapshot, motivoAplicabilidade: ap.justificativa, arvoreId, ruleCode: codigo.slice(0, 20),
       }, db)
       criada ? res.necessidadesCriadas++ : res.necessidadesReusadas++
+      if (criada) res.fatos.push({ tipo: "CRIADA", necessidadeId: necessidade.id, rotulo: "", documentoIds: [], tarefasAbertas: 0 })
 
       // reativa se estava DISPENSADA (voltou a ser aplicável) — via serviço canônico.
       // NUNCA quando a dispensa foi MANUAL (decisão de operador, ex.: cancelar a
@@ -320,6 +352,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       if (!criada && necessidade.status === "DISPENSADA" && !necessidade.dispensaManual) {
         await reativarNecessidade(necessidade.id, db)
         res.reativadas++
+        res.fatos.push({ tipo: "REATIVADA", necessidadeId: necessidade.id, rotulo: "", documentoIds: [], tarefasAbertas: 0 })
       }
 
       // DOCUMENTO OPERACIONAL — nasce JUNTO com a necessidade, não mais só no clique
@@ -426,18 +459,26 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       }
   }
 
-  const finalizado = await reconciliarEfinalizar(res, processoId, aplicaveisVariante, db)
+  const finalizado = await reconciliarEfinalizar(res, processoId, aplicaveisVariante, db, opts)
+
+  // DOCUMENTO AUTOMÁTICO SEM NECESSIDADE (órfão) sai de jogo, com os passos dele.
+  await tirarDocumentosOrfaosDeJogo(processoId, db, opts.motivo ? `necessidade removida pela árvore: ${opts.motivo}` : undefined)
 
   // A TAREFA DO TRABALHO converge junto com a materialização: sair daqui com
   // workflow ativo e sem tarefa é exatamente o estado em que o Ademir ficou.
-  // Fora de transação de propósito — o reconciliador abre as suas próprias, e
-  // aninhar transação do Prisma dentro de outra não é suportado.
-  await reconciliarTarefas({ processoId })
+  // Participa da transação de quem chamou (`db`): o reconciliador é tx-aware e
+  // nunca escreve fora dela.
+  await contarTarefasAbertasDosFatos(finalizado, db)
+  await reconciliarTarefas({ processoId, db })
+  await auditarFatos(finalizado, processoId, db, opts)
 
   return finalizado
 }
 
-async function reconciliarEfinalizar(res: MaterializarResultado, processoId: number, aplicaveisVariante: Set<string>, db: DB): Promise<MaterializarResultado> {
+async function reconciliarEfinalizar(
+  res: MaterializarResultado, processoId: number, aplicaveisVariante: Set<string>, db: DB,
+  opts: OpcoesMaterializarGenealogia = {},
+): Promise<MaterializarResultado> {
   // ---- reconciliação: necessidades desta origem que deixaram de ser aplicáveis ----
   const existentes = await db.necessidadeDocumental.findMany({
     where: { processoId, origem: "MATRIZ", varianteKey: { startsWith: "rd:" } },
@@ -449,14 +490,133 @@ async function reconciliarEfinalizar(res: MaterializarResultado, processoId: num
     const chaveAplic = n.pessoaId != null ? `p${n.pessoaId}::${n.varianteKey}` : `u${n.uniaoId}::${n.varianteKey}`
     if (aplicaveisVariante.has(chaveAplic)) continue
     // deixou de ser aplicável: se ainda não começou (PENDENTE), DISPENSA (reversível);
-    // se já em atendimento/atendida/não localizada → preserva histórico, não mexe.
+    // se já em atendimento/atendida/não localizada → preserva histórico, não mexe
+    // (DECISÃO CONSERVADORA: o que já foi atendido é fato acontecido; o sistema só
+    // APONTA — ARV-001 — e nunca dispensa sozinho).
     if (n.status === "PENDENTE") {
-      await dispensarNecessidade(n.id, "Regra deixou de ser aplicável (reconciliação)", db)
+      const motivo = opts.motivo ? `necessidade removida pela árvore: ${opts.motivo}` : "Regra deixou de ser aplicável (reconciliação)"
+      const r = await dispensarNecessidade(n.id, motivo, db)
       res.dispensadas++
+      res.fatos.push({ tipo: "REMOVIDA", necessidadeId: n.id, rotulo: "", documentoIds: r.documentoIds, tarefasAbertas: 0 })
+    } else if (n.status === "EM_ATENDIMENTO" || n.status === "ATENDIDA" || n.status === "NAO_LOCALIZADA") {
+      res.preservadasSemCausa.push({ necessidadeId: n.id, status: n.status, rotulo: "" })
     }
   }
 
   return res
+}
+
+/** "Certidão de casamento · Edison Nás Antão Junior" — nome do Cadastro Mestre + pessoa (titular, se união). */
+export async function rotuloDaNecessidade(db: DB, necessidadeId: number): Promise<string> {
+  const n = await db.necessidadeDocumental.findUnique({
+    where: { id: necessidadeId },
+    select: {
+      itemCatalogo: { select: { name: true } },
+      pessoa: { select: { nome: true, sobrenome: true } },
+      uniao: { select: { ...SELECT_UNIAO_PARA_TITULAR } },
+    },
+  })
+  if (!n) return `Necessidade #${necessidadeId}`
+  let nome = n.pessoa ? [n.pessoa.nome, n.pessoa.sobrenome].filter(Boolean).join(" ") : null
+  if (!nome && n.uniao) {
+    const tid = titularDaUniao(n.uniao)
+    const p = tid ? await db.pessoa.findUnique({ where: { id: tid }, select: { nome: true, sobrenome: true } }) : null
+    nome = p ? [p.nome, p.sobrenome].filter(Boolean).join(" ") : null
+  }
+  return `${n.itemCatalogo?.name ?? "Documento"}${nome ? ` · ${nome}` : ""}`
+}
+
+const STATUS_NAO_ABERTA_TAREFA = ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] as const
+
+/** Preenche rótulo e conta as tarefas ABERTAS de cada fato REMOVIDO (antes de a varredura cancelá-las). */
+async function contarTarefasAbertasDosFatos(res: MaterializarResultado, db: DB): Promise<void> {
+  for (const f of res.fatos) {
+    f.rotulo = await rotuloDaNecessidade(db, f.necessidadeId)
+    if (f.tipo !== "REMOVIDA") continue
+    f.tarefasAbertas = await db.tarefa.count({
+      where: {
+        OR: [{ necessidadeId: f.necessidadeId }, ...(f.documentoIds.length ? [{ documentoId: { in: f.documentoIds } }] : [])],
+        statusTarefa: { notIn: [...STATUS_NAO_ABERTA_TAREFA] },
+      },
+    })
+  }
+  for (const pv of res.preservadasSemCausa) pv.rotulo = await rotuloDaNecessidade(db, pv.necessidadeId)
+}
+
+/** UMA linha de auditoria legível por fato — dentro da mesma transação da mudança. */
+async function auditarFatos(res: MaterializarResultado, processoId: number, db: DB, opts: OpcoesMaterializarGenealogia): Promise<void> {
+  if (!opts.motivo) return
+  const quem = opts.autor?.nome ? ` (alterado por ${opts.autor.nome})` : ""
+  const usuarioId = opts.autor?.id ?? null
+  for (const f of res.fatos) {
+    const acao = f.tipo === "REMOVIDA" ? "NECESSIDADE_REMOVIDA_PELA_ARVORE" : f.tipo === "CRIADA" ? "NECESSIDADE_CRIADA_PELA_ARVORE" : "NECESSIDADE_REATIVADA_PELA_ARVORE"
+    const verbo = f.tipo === "REMOVIDA" ? "removida" : f.tipo === "CRIADA" ? "criada" : "reativada"
+    const cauda = f.tipo === "REMOVIDA" && f.tarefasAbertas > 0 ? `; ${f.tarefasAbertas} tarefa(s) aberta(s) tratada(s)` : ""
+    await db.logAuditoria.create({
+      data: {
+        acao, entidade: "NecessidadeDocumental", entidadeId: f.necessidadeId, usuarioId,
+        descricao: `Necessidade '${f.rotulo}' ${verbo}: ${opts.motivo}${quem}${cauda}`,
+        detalhes: { processoId, documentoIds: f.documentoIds, tarefasAbertas: f.tarefasAbertas, motivo: opts.motivo } as Prisma.InputJsonValue,
+      },
+    })
+  }
+  for (const pv of res.preservadasSemCausa) {
+    await db.logAuditoria.create({
+      data: {
+        acao: "NECESSIDADE_ATENDIDA_SEM_CAUSA", entidade: "NecessidadeDocumental", entidadeId: pv.necessidadeId, usuarioId,
+        descricao: `Necessidade '${pv.rotulo}' (${pv.status}) deixou de ser exigida pela árvore (${opts.motivo})${quem}, mas já andou — NÃO foi dispensada; requer decisão humana.`,
+        detalhes: { processoId, status: pv.status, motivo: opts.motivo } as Prisma.InputJsonValue,
+      },
+    })
+  }
+}
+
+const STATUS_DOC_NAO_RECEBIDO = ["PENDENTE", "SOLICITAR", "SOLICITADO", "EM_BUSCA", "NAO_ENCONTRADO"] as const
+
+/**
+ * DOCUMENTO AUTOMÁTICO SEM NECESSIDADE (órfão) sai de jogo: NAO_EXIGIDO + passos
+ * abertos cancelados (a tarefa converge pela varredura). Só documentos de origem
+ * `automatica` ainda NÃO recebidos — documento que já tem papel/recebimento nunca é
+ * mexido aqui (ARV-001 apenas o aponta). Idempotente.
+ */
+export async function tirarDocumentosOrfaosDeJogo(processoId: number, db: DB, motivo = "necessidade removida pela árvore: o documento não tem necessidade ativa"): Promise<number[]> {
+  const proc = await db.processo.findUnique({ where: { id: processoId }, select: { arvoreId: true } })
+  if (!proc?.arvoreId) return []
+  const orfaos = await db.documento.findMany({
+    where: {
+      pessoa: { arvoreId: proc.arvoreId }, origem: "automatica", necessidadeId: null,
+      status: { in: [...STATUS_DOC_NAO_RECEBIDO] },
+    },
+    select: { id: true },
+  })
+  if (orfaos.length === 0) return []
+  const ids = orfaos.map((d) => d.id)
+  await db.documento.updateMany({
+    where: { id: { in: ids } },
+    data: { status: "NAO_EXIGIDO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO, ultimaMovimentacao: new Date() },
+  })
+  const passos = await db.phaseWorkflowStepInstance.findMany({
+    where: { documentoId: { in: ids }, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO", "DISPENSADO"] } },
+    select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
+  })
+  const correlationId = randomUUID()
+  for (const p of passos) {
+    await transicionarPassoTx(db as Prisma.TransactionClient, p.id, "CANCELADO", {
+      correlationId, operacao: "documento-orfao-fora-de-jogo", ciclo: p.ciclo,
+      processoId: p.processoId, workflowInstanceId: p.workflowInstanceId,
+      extra: { cancelledAt: new Date(), motivo },
+    })
+  }
+  for (const id of ids) {
+    await db.logAuditoria.create({
+      data: {
+        acao: "DOCUMENTO_ORFAO_NAO_EXIGIDO", entidade: "Documento", entidadeId: id,
+        descricao: `Documento #${id} sem necessidade ativa passou a NAO_EXIGIDO — ${motivo}.`,
+        detalhes: { processoId } as Prisma.InputJsonValue,
+      },
+    })
+  }
+  return ids
 }
 
 // ---- gatilho best-effort: ao criar/editar Pessoa, reavalia a Genealogia dos

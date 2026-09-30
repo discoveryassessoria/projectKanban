@@ -100,6 +100,7 @@ export const ROTULO_CURTO_ESTADO: Record<string, string> = {
   INVALIDO: "inválido",
   NAO_ENCONTRADO: "não encontrado",
   CANCELADO: "cancelado",
+  NAO_EXIGIDO: "não exigido",
   // Vocabulário de `ColunaKanban` — a Tarefa VIVA do documento, não o campo
   // congelado. Mesmos rótulos usados em Minha Operação/Tarefas e Projetos.
   SEM_RESPONSAVEL: "sem responsável",
@@ -113,7 +114,7 @@ export function classeCompactaDoEstado(status: string): string {
   if (status === "PENDENTE") return "pending"
   if (status === "RECEBIDO") return "received"
   if (["INVALIDO", "NAO_ENCONTRADO"].includes(status)) return "returned"
-  if (status === "CANCELADO") return "returned"
+  if (status === "CANCELADO" || status === "NAO_EXIGIDO") return "returned"
   if (status === "AGUARDANDO_TERCEIRO") return "searching"
   if (status === "SEM_RESPONSAVEL" || status === "A_FAZER") return "requesting"
   if (status === "EM_ANDAMENTO") return "waiting"
@@ -129,7 +130,7 @@ export function classeCompactaDoEstado(status: string): string {
  * (SOLICITADO/EM_BUSCA/EM_ANALISE/RETIFICANDO/...) é congelado e precisa vir
  * da Tarefa viva — nunca do campo.
  */
-export const OVERRIDES_AINDA_VIVOS = new Set(["INVALIDO", "NAO_ENCONTRADO", "CANCELADO"])
+export const OVERRIDES_AINDA_VIVOS = new Set(["INVALIDO", "NAO_ENCONTRADO", "CANCELADO", "NAO_EXIGIDO"])
 
 export interface RotuloDoEstado {
   status: string

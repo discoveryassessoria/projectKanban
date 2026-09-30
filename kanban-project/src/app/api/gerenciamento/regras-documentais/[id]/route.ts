@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { propagarMudancaDeRegra, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { podePublicarRegraDocumental } from "@/src/services/financeiro/pendencias-parametrizacao"
 import { matrizParaRegra, regraInputParaData } from "@/src/lib/documentos/regras-documentais/mapear"
 import {
@@ -80,8 +81,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
     await auditar(prisma, { acao: "REGRA_EDITADA", entidadeId: row.id, descricao: `Regra editada no lugar: ${row.nome ?? row.documentTypeCode} (v${row.versao}, ${row.status})`, detalhes: { antes: matrizParaRegra(atual), depois: matrizParaRegra(row) }, usuarioId })
+    // Regra PUBLICADA editada no lugar muda o que se exige: reconcilia os processos abertos que a têm.
+    if (row.status === "PUBLICADA" || atual.status === "PUBLICADA") {
+      await propagarMudancaDeRegra({ regraId: row.id, motivo: `regra documental '${row.nome ?? row.documentTypeCode}' foi editada`, autorId: usuarioId })
+    }
     return NextResponse.json({ regra: row })
   } catch (e) {
+    if (e instanceof PropagacaoPosCommitError) return NextResponse.json({ error: e.message, salvo: true }, { status: 500 })
     console.error("PUT regras-documentais/[id]", e)
     return NextResponse.json({ error: "Erro ao salvar a regra." }, { status: 500 })
   }
@@ -166,27 +172,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           await auditar(tx, { acao: "REGRA_PUBLICADA", entidadeId: r.id, descricao: `Regra publicada: ${r.nome} (v${r.versao})`, detalhes: { codigo: r.codigo, versao: r.versao }, usuarioId })
           return r
         })
+        await propagarMudancaDeRegra({ regraId: row.id, motivo: `regra documental '${row.nome}' foi publicada`, autorId: usuarioId })
         return NextResponse.json({ regra: row })
       }
       case "inativar": {
         const row = await prisma.matrizDocumental.update({ where: { id: atual.id }, data: { status: "INATIVA" } })
         await auditar(prisma, { acao: "REGRA_INATIVADA", entidadeId: row.id, descricao: `Regra inativada: ${row.nome ?? row.documentTypeCode}`, usuarioId })
+        await propagarMudancaDeRegra({ regraId: row.id, motivo: `regra documental '${row.nome ?? row.documentTypeCode}' foi inativada`, autorId: usuarioId })
         return NextResponse.json({ regra: row })
       }
       case "arquivar": {
         const row = await prisma.matrizDocumental.update({ where: { id: atual.id }, data: { status: "ARQUIVADA", arquivado: true } })
         await auditar(prisma, { acao: "REGRA_ARQUIVADA", entidadeId: row.id, descricao: `Regra arquivada: ${row.nome ?? row.documentTypeCode}`, usuarioId })
+        await propagarMudancaDeRegra({ regraId: row.id, motivo: `regra documental '${row.nome ?? row.documentTypeCode}' foi arquivada`, autorId: usuarioId })
         return NextResponse.json({ regra: row })
       }
       case "reativar": {
         const row = await prisma.matrizDocumental.update({ where: { id: atual.id }, data: { status: "RASCUNHO", arquivado: false } })
         await auditar(prisma, { acao: "REGRA_REATIVADA", entidadeId: row.id, descricao: `Regra reaberta como rascunho: ${row.nome ?? row.documentTypeCode}`, usuarioId })
+        if (atual.status === "PUBLICADA") await propagarMudancaDeRegra({ regraId: row.id, motivo: `regra documental '${row.nome ?? row.documentTypeCode}' voltou a rascunho`, autorId: usuarioId })
         return NextResponse.json({ regra: row })
       }
       default:
         return NextResponse.json({ error: `Ação desconhecida: "${acao}".` }, { status: 400 })
     }
   } catch (e) {
+    if (e instanceof PropagacaoPosCommitError) return NextResponse.json({ error: e.message, salvo: true }, { status: 500 })
     console.error("POST regras-documentais/[id]", e)
     return NextResponse.json({ error: "Erro ao processar a ação." }, { status: 500 })
   }

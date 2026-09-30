@@ -31,6 +31,7 @@ import type { Achado, ResultadoVerificacao } from '../tipos'
 import { lerAndamento } from '@/src/lib/process-stage/andamento-etapa'
 import type { StatusTarefa } from '@prisma/client'
 import { projecoesDeCertidaoPorNecessidade, statusEPrazoEfetivos } from '@/src/lib/process-stage/projecao-certidao'
+import { STATUS_DOCUMENTO_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 /** Mesma categoria do Cadastro Mestre que define "certidão" em `certidoes.ts` (Relatório). */
 const CATEGORIA_CERTIDAO = 'REGISTRO_CIVIL'
@@ -56,7 +57,7 @@ const STATUS_TAREFA_AGUARDANDO: StatusTarefa[] = ['AGUARDANDO_TERCEIRO', 'AGUARD
  */
 const STEP_STATUS_ATIVO = ['DISPONIVEL', 'EM_ANDAMENTO', 'AGUARDANDO', 'BLOQUEADO', 'EXECUTADO', 'AGUARDANDO_APROVACAO']
 /** Documento que não serve mais como via vigente da necessidade. */
-const DOC_STATUS_INVALIDO = ['INVALIDO', 'CANCELADO']
+const DOC_STATUS_INVALIDO = ['INVALIDO', ...STATUS_DOCUMENTO_INATIVOS]
 
 const vazio = (metricas: Record<string, number>, resumo: string): ResultadoVerificacao => ({ achados: [], metricas, resumo })
 

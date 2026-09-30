@@ -172,6 +172,12 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/casamento-por-uniao.test.ts":
     "casamento materializado por UNIÃO: monta e derruba as PRÓPRIAS árvores/pessoas/uniões " +
     "(marca UNIAOCAS) só no banco de teste",
+  "scripts/_fixture-arvore-fonte.ts":
+    "fixture compartilhada dos testes \"árvore = única fonte de verdade documental\" (30/09/2026, CLAUDE.md §37): monta e derruba " +
+    "as PRÓPRIAS árvores/pessoas/uniões/necessidades (marca de teste) só no banco de TESTE; as mudanças de negócio passam " +
+    "pelas ROTAS REAIS (PUT /api/pessoas, /api/unioes, regras) — só o `deleteMany` de limpeza é direto",
+  "scripts/saude-arv002-arvore-e-derivados.test.ts":
+    "fixture da verificação ARV-002 (Saúde): cria/apaga Pessoa, Uniao, Necessidade e Documento no banco de TESTE para provar que a verificação acusa cada divergência; nunca produção",
   "scripts/necessidade-dispensada-cancela-tarefa.test.ts":
     "Unidade 1 do plano de consolidação (10/09/2026): monta e derruba as PRÓPRIAS " +
     "árvores/pessoas (marca DISPTASK) só no banco de teste",
@@ -594,12 +600,12 @@ ok("a reconciliação roda DEPOIS do commit",
   "materialização e reconcile abrem transações próprias")
 for (const [arquivo, texto] of [["pessoas/[id]", rota], ["arvore/[arvoreid]", rotaArvore]] as const) {
   ok(`rota ${arquivo} não tem reconciliação própria`,
-    !/dispararMaterializacaoPorArvore\(|reconciliarEconomicoDoProcesso\(/.test(
+    !/dispararMaterializacaoPorArvore\(|propagarNaTransacao\(|reconciliarEconomicoDoProcesso\(/.test(
       texto.slice(texto.indexOf("export async function DELETE")),
     ))
 }
 ok("a reconciliação reusa os serviços canônicos existentes",
-  /dispararMaterializacaoPorArvore\(/.test(servico) && /reconciliarEconomicoDoProcesso\(/.test(servico),
+  /propagarNaTransacao\(/.test(servico) && /efeitosPosCommitDaArvore\(/.test(servico) && /reconciliarEconomicoDoProcesso\(/.test(servico),
   "sem versão alternativa deles")
 
 // ── 5) O recorte "ativo" tem fonte única ───────────────────────────────────

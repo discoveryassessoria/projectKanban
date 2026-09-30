@@ -24,7 +24,7 @@ import { TorreFeito } from "./TorreFeito"
 import { VincularOrgaoLoteModal } from "./VincularOrgaoLoteModal"
 import { useAdiarAcompanhamento } from "./adiar-acompanhamento"
 import { useNovasDaFamilia } from "./novas-da-familia"
-import { linhasDoKpi, KPIS, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { linhasDoKpi, KPIS, PREDICADO_DO_KPI, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 
 type Agrupar = "fam" | "resp" | "org" | "fase" | "none"
 type Dentro = "none" | "pessoa" | "orgao" | "passo"
@@ -36,11 +36,12 @@ const VISOES: Array<[VisaoTarefas, string]> = [
 ]
 /** As chaves aceitas em `?visao=` (a Torre valida a URL com esta lista). */
 export const CHAVES_DE_VISAO: string[] = VISOES.map(([v]) => v)
-const predicadoDe = (v: VisaoTarefas, usuarioId: number | null): ((l: LinhaTorre) => boolean) => {
+// "Vencidas", "Sem responsável" e "Com o cartório" usam os MESMOS predicados dos cartões do topo (torre-kpis.ts) — uma definição só.
+const predicadoDe = (v: VisaoTarefas, usuarioId: number | null, agora: Date = new Date()): ((l: LinhaTorre) => boolean) => {
   switch (v) {
-    case "vencidas": return (l) => l.atrasada
-    case "semdono": return (l) => l.responsavelId == null
-    case "aguard": return (l) => l.estadoOperacao === "AGUARDANDO"
+    case "vencidas": return (l) => PREDICADO_DO_KPI.venc!(l, agora)
+    case "semdono": return (l) => PREDICADO_DO_KPI.ninguem!(l, agora)
+    case "aguard": return (l) => PREDICADO_DO_KPI.cartorio!(l, agora)
     case "cobranca": return (l) => l.cobravelVencida
     case "acompvenc": return (l) => l.acompanhamentoVencido === true
     case "minhas": return (l) => usuarioId != null && l.responsavelId === usuarioId
@@ -59,7 +60,7 @@ const CHAVE: Record<Agrupar, (l: LinhaTorre) => string> = {
 interface Funcionario { id: number; nome: string; email?: string; tarefasAtivas: number }
 interface RespLote { total?: number; sucesso?: number; falha?: number; itens?: Array<{ ok: boolean; mensagem?: string }>; desfazer?: Desfazer | null; error?: string }
 
-export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec }: {
+export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec, agora }: {
   linhas: LinhaTorre[]; carregando: boolean; erro: boolean
   /** Filtro do KPI clicado no cabeçalho (o MESMO predicado que dá o número do cartão). */
   kpi: ChaveKpi | null
@@ -82,6 +83,8 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   versao?: number
   /** Uma visão salva com KPI/país/busca próprios: o casco os adota. */
   onAplicarSpec: (s: { kpi: ChaveKpi | null; pais: string; busca: string }) => void
+  /** O instante da leitura — o MESMO que o topo usa para contar a AGENDA (dia operacional). */
+  agora?: Date
 }) {
   const router = useRouter()
   const { permissoes, avisar, recarregar, abrirFoco } = useTorre()
@@ -151,12 +154,12 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   // A visão em vigor: uma das fixas, ou a `visao` guardada dentro da visão salva escolhida.
   const visao: VisaoTarefas = (VISOES.some(([v]) => v === visaoSel) ? visaoSel : visaoSalva) as VisaoTarefas
-  const base = useMemo(() => (kpi ? linhasDoKpi(kpi, linhas) : linhas), [linhas, kpi])
+  const base = useMemo(() => (kpi ? linhasDoKpi(kpi, linhas, agora) : linhas), [linhas, kpi, agora])
   const visiveis = useMemo(() => {
-    const l = aplicarBusca(base.filter(predicadoDe(visao, usuarioId)), busca) as LinhaTorre[]
+    const l = aplicarBusca(base.filter(predicadoDe(visao, usuarioId, agora)), busca) as LinhaTorre[]
     // As NOVAS (último aviso "chegou trabalho") sobem ao topo; o resto mantém a ordem.
     return novas.size ? [...l].sort((a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
-  }, [base, visao, usuarioId, busca, novas])
+  }, [base, visao, usuarioId, busca, novas, agora])
   const feitoVisiveis = useMemo(
     () => aplicarBusca((feito ?? []).filter((l) => !paisRotulo || l.pais === paisRotulo), busca),
     [feito, paisRotulo, busca],

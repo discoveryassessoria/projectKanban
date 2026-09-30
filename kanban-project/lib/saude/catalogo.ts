@@ -30,7 +30,9 @@ import { DOMINIOS } from './tipos'
 // WF-100 (documento sem passo duplicado ativo) — mandato "Operação/Antão",
 // processo 675: chave de fallback quebrada em materializarAlvos deixava a
 // Genealogia criar um segundo PhaseWorkflowStepInstance por certidão.
-export const VERSAO_CATALOGO = '1.10.0'
+// 1.11.0 — 30/09/2026: entrou ARV-002 (a árvore e seus derivados concordam) —
+// mandato "árvore = única fonte de verdade documental" (CLAUDE.md §37).
+export const VERSAO_CATALOGO = '1.11.0'
 
 export interface ContextoVerificacao {
   /** agora, congelado no início da rodada (execuções são comparáveis) */

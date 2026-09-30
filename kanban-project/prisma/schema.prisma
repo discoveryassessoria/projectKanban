@@ -6000,6 +6000,12 @@ enum StatusDocumento {
   INVALIDO
   NAO_ENCONTRADO
   CANCELADO
+  /// A árvore deixou de exigir este documento (pessoa deixou de ser casada,
+  /// morreu, saiu da linha reta, regra inativada…). NÃO é CANCELADO: ninguém
+  /// invalidou o papel — a OBRIGAÇÃO é que deixou de existir. Anexos, solicitações
+  /// e histórico permanecem; se a árvore voltar a exigir, o mesmo Documento é
+  /// reativado (nunca duplicado). Ver src/lib/documentos/status-inativos.ts.
+  NAO_EXIGIDO
 }
 
 enum TipoEvento {

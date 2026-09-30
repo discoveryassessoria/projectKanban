@@ -152,10 +152,13 @@ async function main() {
   // Todo Processo nasce com a Tarefa ADMINISTRATIVA "Atribuir tarefas" (origem obrigacao-atribuicao);
   // a tarefa de emissão é a do workflow desta instância, por identidade (não pela contagem do processo).
   const r3criacao = await reconciliarTarefas({ processoId: proc3.id })
-  const tarefa3 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc3.id, workflowInstanceId: inst3.id }, select: { id: true, necessidadeId: true, documentoId: true, statusTarefa: true } })
-  ok("3a) tarefa de emissão liga por documentoId, não necessidadeId", tarefa3.necessidadeId === null && tarefa3.documentoId === doc3.id)
-  ok("3b) já na criação, a tarefa nasce e é encerrada por documento cancelado na mesma passagem", r3criacao.tarefasEncerradasSemCausa === 1, String(r3criacao.tarefasEncerradasSemCausa))
-  ok("3c) TAREFA DE EMISSÃO TAMBÉM FOI CANCELADA", tarefa3.statusTarefa === "CANCELADA")
+  const tarefa3 = await prisma.tarefa.findFirst({ where: { processoId: proc3.id, workflowInstanceId: inst3.id }, select: { id: true, necessidadeId: true, documentoId: true, statusTarefa: true } })
+  // ÁRVORE = ÚNICA FONTE DE VERDADE DOCUMENTAL (30/09/2026): Documento fora de jogo
+  // (CANCELADO/NAO_EXIGIDO) — e/ou sem necessidade ativa — NUNCA é causa de tarefa.
+  // Antes a tarefa nascia e era encerrada na mesma passagem; agora nem chega a nascer.
+  ok("3a) documento cancelado/sem necessidade NÃO gera tarefa de emissão", tarefa3 === null, String(tarefa3?.id))
+  ok("3b) a passagem registra o trabalho sem causa (não cria, não cancela nada)", r3criacao.semTitulo >= 1 && r3criacao.tarefasCriadas === 0, JSON.stringify({ semTitulo: r3criacao.semTitulo, criadas: r3criacao.tarefasCriadas }))
+  ok("3c) nenhuma tarefa aberta de emissão sobra para este documento", (await prisma.tarefa.count({ where: { documentoId: doc3.id, statusTarefa: { notIn: ["CANCELADA", "CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "SUPERSEDIDA"] } } })) === 0)
 
   // ══════════════════════════════════════════════════════════════════════════
   secao("4) Reconciliação repetida é idempotente")
@@ -212,7 +215,7 @@ async function main() {
   const necPosDispensa = await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: nec6.id }, select: { status: true } })
   ok("6a) dispensada", necPosDispensa.status === "DISPENSADA")
   const docPosDispensa = await prisma.documento.findUniqueOrThrow({ where: { id: doc6.id }, select: { status: true, motivoBloqueio: true } })
-  ok("6b) documento cancelado com o motivo automático", docPosDispensa.status === "CANCELADO" && docPosDispensa.motivoBloqueio === "Necessidade dispensada — não se aplica em nenhuma fase")
+  ok("6b) documento NAO_EXIGIDO (a árvore deixou de exigir) com o motivo automático", docPosDispensa.status === "NAO_EXIGIDO" && docPosDispensa.motivoBloqueio === "Necessidade dispensada — não se aplica em nenhuma fase")
   const stepPosDispensa = await prisma.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: step6.id }, select: { status: true } })
   ok("6c) passo cancelado", stepPosDispensa.status === "CANCELADO")
 

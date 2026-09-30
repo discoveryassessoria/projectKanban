@@ -26,7 +26,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Verificar se o usuário a ser atualizado existe
     const usuarioExistente = await prisma.usuario.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      select: { id: true, email: true }
     })
 
     if (!usuarioExistente) {
@@ -41,7 +42,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Verificar se o email já está em uso por outro usuário
     if (email && email !== usuarioExistente.email) {
       const emailEmUso = await prisma.usuario.findUnique({
-        where: { email }
+        where: { email },
+        select: { id: true }
       })
 
       if (emailEmUso) {
@@ -103,7 +105,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     // Verificar se o usuário a ser deletado existe
     const usuarioExistente = await prisma.usuario.findUnique({
-      where: { id: userId }
+      where: { id: userId },
+      select: { id: true, tipo: true }
     })
 
     if (!usuarioExistente) {

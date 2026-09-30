@@ -31,7 +31,8 @@ export async function PUT(request: NextRequest) {
 
     // Verificar se o email já existe em outro usuário
     const existingUser = await prisma.usuario.findUnique({
-      where: { email: newEmail }
+      where: { email: newEmail },
+      select: { id: true }
     })
 
     if (existingUser && existingUser.id !== userId) {

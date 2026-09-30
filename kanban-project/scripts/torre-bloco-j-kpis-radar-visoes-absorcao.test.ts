@@ -20,7 +20,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "../lib/prisma"
 import { signAuthToken } from "../lib/auth-jwt"
 import { montarCenario } from "./_fixture-torre-gh"
-import { KPIS, kpisDasLinhas, linhasDoKpi, processosEmRisco, vence7, tendenciaDe, fotoDeReferencia, CAMPO_DA_FOTO, type ChaveKpi } from "../lib/operacional/torre-kpis"
+import { KPIS, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, kpisDasLinhas, linhasDoKpi, processosEmRisco, vence7, tendenciaDe, fotoDeReferencia, CAMPO_DA_FOTO, type ChaveKpi } from "../lib/operacional/torre-kpis"
 import { calcularIndicadoresDoDia } from "../lib/operacional/indicadores-diarios"
 import { tendenciasDaTorre } from "../lib/operacional/torre-tendencias"
 import { processosDaTorre, bolaDoProcesso, processosCriticos, anotarRisco } from "../lib/operacional/torre-processos"
@@ -56,7 +56,7 @@ async function main() {
     // ═══════════ J3 — KPIs ═══════════
     secao("J3 — as fronteiras dos predicados (puro)")
     ok("vence7: hoje (0) e 7 dias entram; 8 não; atrasada nunca; sem prazo nunca", vence7({ atrasada: false, diasParaPrazo: 0 }) && vence7({ atrasada: false, diasParaPrazo: 7 }) && !vence7({ atrasada: false, diasParaPrazo: 8 }) && !vence7({ atrasada: true, diasParaPrazo: -2 }) && !vence7({ atrasada: false, diasParaPrazo: null }))
-    ok("8 cartões na ordem do protótipo; só o Backlog não filtra (Decisão 5)", KPIS.map((k) => k.chave).join(",") === "venc,v7,semdono,aguard,cob,esc,risco,back" && KPIS.filter((k) => !k.filtra).map((k) => k.chave).join() === "back")
+    ok("o topo novo tem 4+6 cartões de tarefa (+ o selo de risco); as chaves antigas seguem válidas (URL, visões, foto); só 'abertas' e 'back' não filtram", CARTOES_DA_SITUACAO.join() === "abertas,equipe,cartorio,ninguem" && CARTOES_DA_AGENDA.join() === "venc,hoje,amanha,prox7,sprazo,cob" && ["v7", "semdono", "aguard", "esc", "back", "risco"].every((c) => KPIS.some((k) => k.chave === c)) && KPIS.filter((k) => !k.filtra).map((k) => k.chave).sort().join() === "abertas,back")
 
     secao("J3 — o número bate com a lista que o cartão filtra")
     const ontem = new Date(Date.now() - 2 * DIA)
@@ -80,10 +80,10 @@ async function main() {
     ok("'Atrasadas' não repete o que vence em 7 dias", !linhasDoKpi("v7", linhas).some((l) => l.taskId === vencida.tarefaId))
     ok("o backlog NÃO filtra (devolve a lista inteira)", linhasDoKpi("back", linhas).length === linhas.length)
     const foto = await calcularIndicadoresDoDia()
-    ok("a foto diária (E10) usa a MESMA função: cada campo = o número do cartão", (Object.keys(CAMPO_DA_FOTO) as Array<keyof typeof CAMPO_DA_FOTO>).every((k) => foto[CAMPO_DA_FOTO[k]] === K[CAMPO_DA_FOTO[k]]))
+    ok("a foto diária (E10) usa a MESMA função: cada campo = o número do cartão", (Object.keys(CAMPO_DA_FOTO) as Array<keyof typeof CAMPO_DA_FOTO>).every((k) => { const c = CAMPO_DA_FOTO[k]!; return foto[c] === K[c] }))
 
     secao("J3 — a tendência é REAL ou 'sem histórico'")
-    ok("sem foto de referência: null (a tela escreve 'sem histórico')", tendenciaDe(5, null) === null && tendenciaDe(5, undefined) === null)
+    ok("sem foto de referência: null (a tela não mostra tendência alguma)", tendenciaDe(5, null) === null && tendenciaDe(5, undefined) === null)
     ok("subiu / desceu / igual, com o delta", tendenciaDe(8, 6)!.rotulo === "▲ +2 vs semana passada" && tendenciaDe(8, 6)!.direcao === "up" && tendenciaDe(3, 8)!.rotulo === "▼ −5 vs semana passada" && tendenciaDe(3, 8)!.direcao === "down" && tendenciaDe(6, 6)!.direcao === "igual")
     const hoje = new Date("2026-10-10T12:00:00Z")
     const f = (d: string) => ({ data: d })

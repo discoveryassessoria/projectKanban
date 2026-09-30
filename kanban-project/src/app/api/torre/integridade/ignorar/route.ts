@@ -2,11 +2,11 @@
 // Grava quem, quando (atualizadoEm) e até quando (ignoradoAte) no achado, e uma linha de LogAuditoria.
 // O achado segue visível no painel de Saúde; só sai da lista da Torre até o prazo vencer.
 import { type NextRequest, NextResponse } from 'next/server'
-import { exigirTorre } from '@/src/lib/torre-acesso'
+import { exigirGerenciamento } from '@/src/lib/torre-acesso'
 import { ignorar7Dias } from '@/src/services/precisa-de-voce-acoes'
 
 export async function POST(request: NextRequest) {
-  const { usuario, erro } = await exigirTorre(request, 'usuarios.gerenciar')
+  const { usuario, erro } = await exigirGerenciamento(request, 'usuarios.gerenciar')
   if (erro) return erro
   const b = await request.json().catch(() => ({}))
   const achadoId = Number(b?.achadoId)

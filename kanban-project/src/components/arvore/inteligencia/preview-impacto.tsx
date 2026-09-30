@@ -21,7 +21,7 @@
 //      trocar um problema de informação por um problema de operação.
 // ============================================================================
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AlertTriangle, ArrowDown, Loader2, X } from "lucide-react"
 import {
   compararEstados,
@@ -48,7 +48,23 @@ interface ItemDocumental {
   obrigatoriedade: string
 }
 
-interface Resultado {
+/** Tarefa aberta que a alteração tira da fila (ou marca para decisão). */
+export interface TarefaAfetadaUI {
+  tarefaId: number
+  titulo: string
+  pessoaNome: string | null
+  responsavelNome: string | null
+  efeito: "CANCELADA" | "DECISAO"
+}
+export interface DocumentoNaoExigidoUI {
+  documentoId: number
+  documento: string
+  pessoaNome: string | null
+}
+
+export interface Resultado {
+  tarefasAfetadas?: TarefaAfetadaUI[]
+  documentosNaoExigidos?: DocumentoNaoExigidoUI[]
   documental: {
     adicionados: ItemDocumental[]
     dispensados: ItemDocumental[]
@@ -78,6 +94,8 @@ export interface PropostaImpacto {
   pessoaId: number
   mudancas?: Record<string, unknown>
   uniao?: { acao: "criar" | "remover"; conjugeId?: number; uniaoId?: number }
+  /** Simula a remoção da pessoa da árvore. */
+  removerPessoa?: boolean
   alteracoes: AlteracaoDescrita[]
   /** Requerentes afetados, calculados no cliente pelo motor puro de linhagem. */
   requerentesAfetados?: string[]
@@ -89,12 +107,61 @@ interface Props {
   proposta: PropostaImpacto
   onCancelar: () => void
   onConfirmar: () => void
+  /**
+   * O preview só INFORMA quando há o que informar: se o motor respondeu que a
+   * alteração não muda nada (sem tarefa, documento, passo nem exigência), o
+   * modal não pede um "OK" vazio — chama isto e a tela salva.
+   */
+  onSemImpacto?: () => void
 }
 
-export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props) {
+/**
+ * O QUE SERÁ CANCELADO — a lista que o operador precisa ler ANTES de confirmar.
+ * Compartilhada com o modal de remoção de pessoa. Só exibe o que o motor devolveu.
+ */
+export function ListaCancelamentos({
+  tarefas, documentos,
+}: { tarefas: TarefaAfetadaUI[]; documentos: DocumentoNaoExigidoUI[] }) {
+  if (tarefas.length === 0 && documentos.length === 0) return null
+  return (
+    <section
+      data-testid="preview-isso-vai-cancelar"
+      className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3"
+    >
+      <p className="flex items-start gap-2 text-[13px] font-semibold text-amber-900">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+        Isso vai cancelar:
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {tarefas.map((t) => (
+          <li key={t.tarefaId} className="text-[13px] text-gray-800">
+            {t.titulo}{" "}
+            <span className="text-gray-500">
+              (tarefa aberta{t.responsavelNome ? `, com ${t.responsavelNome}` : ", sem responsável"}
+              {t.efeito === "DECISAO" ? " — já iniciada: não é cancelada sozinha, fica marcada para decisão" : ""})
+            </span>
+          </li>
+        ))}
+        {documentos.map((d) => (
+          <li key={d.documentoId} className="text-[13px] text-gray-800">
+            {d.documento}
+            {d.pessoaNome ? <span className="text-gray-500"> — {d.pessoaNome}</span> : null}{" "}
+            <span className="text-gray-500">(documento passa a &quot;Não exigido&quot;; anexos e histórico ficam)</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[13px] font-medium text-gray-900">Confirmar?</p>
+    </section>
+  )
+}
+
+export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar, onSemImpacto }: Props) {
   const [resultado, setResultado] = useState<Resultado | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [carregando, setCarregando] = useState(true)
+  const semImpactoDisparado = useRef(false)
+  const onSemImpactoRef = useRef(onSemImpacto)
+  useEffect(() => { onSemImpactoRef.current = onSemImpacto })
 
   useEffect(() => {
     let vivo = true
@@ -111,6 +178,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
               pessoaId: proposta.pessoaId,
               mudancas: proposta.mudancas ?? {},
               uniao: proposta.uniao,
+              removerPessoa: proposta.removerPessoa === true ? true : undefined,
             }),
           },
         )
@@ -120,7 +188,12 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
           setErro(corpo.error || "Não foi possível prever o impacto desta alteração.")
           return
         }
-        setResultado(await r.json())
+        const corpo: Resultado = await r.json()
+        setResultado(corpo)
+        if (corpo.semImpacto && onSemImpactoRef.current && !semImpactoDisparado.current) {
+          semImpactoDisparado.current = true
+          onSemImpactoRef.current()
+        }
       } catch {
         if (vivo) setErro("Não foi possível prever o impacto desta alteração.")
       } finally {
@@ -206,6 +279,11 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
                   })}
                 />
               )}
+
+              <ListaCancelamentos
+                tarefas={resultado.tarefasAfetadas ?? []}
+                documentos={resultado.documentosNaoExigidos ?? []}
+              />
 
               {resultado.semImpacto ? (
                 <p className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-[13px] text-gray-700">
@@ -330,7 +408,9 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
             disabled={carregando}
             className="rounded-lg bg-[var(--action-primary)] px-3 py-2 text-[13px] font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary-hover)] disabled:opacity-50"
           >
-            Confirmar alteração
+            {(resultado?.tarefasAfetadas?.length ?? 0) > 0 || (resultado?.documentosNaoExigidos?.length ?? 0) > 0
+              ? "Confirmar e cancelar"
+              : "Confirmar alteração"}
           </button>
         </div>
       </div>

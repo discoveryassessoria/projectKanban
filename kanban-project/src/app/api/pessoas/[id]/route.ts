@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/requerente-flag"
 import { registrarTransicaoParaRequerenteTx, efeitosDoVinculoPosCommit } from "@/lib/genealogia/vincular-requerente"
+import { aplicarMudancaNaArvore, descreverMudancaPessoa, SELECT_PESSOA_COMPARAVEL, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { removerPessoaDaArvore, type ModoRemocao } from "@/src/services/pessoa-ciclo-vida"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
@@ -150,58 +151,53 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // re-save ou reorder). Atualização + enfileiramento do evento na MESMA transação.
     const houveTransicao = body.requerente !== undefined && houveTransicaoParaRequerente(antes?.requerente, body.requerente)
     const actorId = houveTransicao ? (await extrairUsuarioComPermissoes(request))?.userId ?? null : null
-    const pessoaAtualizada = await prisma.$transaction(async (tx) => {
-      const p = await tx.pessoa.update({
-        where: { id },
-        data: dataToUpdate,
-        include: { pai: true, mae: true, arvore: true, documentos: { orderBy: { createdAt: 'desc' } } },
-      })
-      // "maior"/"menor" são classificação de MAIORIDADE de CADA requerente — fato
-      // independente por pessoa (idade, não liderança). Havia aqui um rebaixamento
-      // automático ("só um 'maior' por árvore") que emprestava esse campo pra
-      // simular "o principal da árvore" — conceito que já tem fonte própria
-      // (`Arvore.pessoaPrincipalId`, mantida à parte). O empréstimo derrubava a
-      // classificação de quem já estava correto: marcar um SEGUNDO requerente
-      // como maior de idade apagava o "maior" do primeiro, sem nenhuma regra de
-      // negócio (SLA, financeiro, documentos) depender dessa exclusividade — só
-      // essa rota fingia que dependia.
-      // MESMA transação da atualização. Quem sabe o que "virar requerente"
-      // significa é o serviço canônico — a rota só informa que a transição
-      // ocorreu. Ela não conhece a DomainOutbox.
-      if (houveTransicao && p.arvoreId) {
-        await registrarTransicaoParaRequerenteTx(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
-      }
-      return p
-    })
+    // Só posição no canvas (x/y)? Não muda nada que a árvore documental leia.
+    const soPosicao = Object.keys(body).every((k) => k === "x" || k === "y")
 
-    // ============================================================
-    // LEGADO_INATIVO: editar Pessoa NÃO reconcilia mais Documento (DOCUMENT_RULES
-    // desligado). ARQUITETURA NOVA (Fatia 2): ao mudar atributos relevantes
-    // (documentacao/casado/vivo/requerente/linhaReta), reavalia as Regras
-    // Documentais e reconcilia as NecessidadeDocumental da Genealogia (best-effort,
-    // idempotente, sem criar Documento, sem avançar fase). Nunca quebra a edição.
-    // ============================================================
-    // Os DOIS efeitos pós-commit ("virou requerente") vêm do serviço canônico, no
-    // mesmo par que a porta de vínculo usa — drenar a fila e reavaliar as Regras.
-    // Chamar sempre é de propósito: a materialização é necessária em qualquer
-    // edição de atributo relevante, e drenar fila vazia não custa nada.
-    //
-    // SÍNCRONO — não pela fila (mandato "nunca mais árvore ↔ documentação",
-    // 29/09/2026). Era `after()`: a resposta saía antes de a Genealogia
-    // reavaliar, e o recálculo real (materializar genealogia + regras
-    // documentais) rodava minutos depois, sem nenhuma garantia de ordem contra
-    // OUTRA edição da mesma árvore em voo — foi essa janela que produziu o
-    // achado real (processo 675: `documentacao` ligado e desligado em sequência
-    // rápida, necessidade/Documento/Tarefa convergindo para o estado ERRADO
-    // porque uma reconciliação tardia lia a árvore no meio da corrida da
-    // seguinte). Esperar aqui custa uma resposta um pouco mais lenta; não
-    // esperar já custou dado errado em produção duas vezes.
-    await efeitosDoVinculoPosCommit({ arvoreId: pessoaAtualizada.arvoreId }).catch((e) =>
-      console.error(`[PUT /api/pessoas/${id}] efeitos pós-commit falharam:`, e),
-    )
+    // A ÁRVORE É A ÚNICA FONTE DE VERDADE DOCUMENTAL (§37): a mudança da Pessoa e a
+    // propagação para necessidade → documento → passo → tarefa acontecem na MESMA
+    // transação (`aplicarMudancaNaArvore`). Falhou qualquer parte → nada é gravado e
+    // a resposta é ERRO (não 200 com falha engolida).
+    const { resultado } = await aplicarMudancaNaArvore({
+      arvoreId: null,
+      autorId: (await extrairUsuarioComPermissoes(request))?.userId ?? null,
+      fn: async (tx) => {
+        const estadoAntes = await tx.pessoa.findUnique({ where: { id }, select: SELECT_PESSOA_COMPARAVEL })
+        const p = await tx.pessoa.update({
+          where: { id },
+          data: dataToUpdate,
+          include: { pai: true, mae: true, arvore: true, documentos: { orderBy: { createdAt: 'desc' } } },
+        })
+        // "maior"/"menor" são classificação de MAIORIDADE de CADA requerente — fato
+        // independente por pessoa (idade, não liderança). (Sem rebaixamento
+        // automático: ver histórico desta rota.)
+        // MESMA transação da atualização. Quem sabe o que "virar requerente"
+        // significa é o serviço canônico — a rota só informa que a transição
+        // ocorreu. Ela não conhece a DomainOutbox.
+        if (houveTransicao && p.arvoreId) {
+          await registrarTransicaoParaRequerenteTx(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
+        }
+        return { pessoa: p, estadoAntes }
+      },
+      arvoreIdDe: (r) => (soPosicao ? null : r.pessoa.arvoreId),
+      motivo: (r) => {
+        if (soPosicao) return ""
+        const mudou = descreverMudancaPessoa(r.estadoAntes, r.pessoa)
+        return mudou.length ? mudou.join("; ") : "dados da pessoa alterados"
+      },
+    })
+    const pessoaAtualizada = resultado.pessoa
+
+    // Drena a fila do evento "virou requerente" (durável — falha aqui fica PENDENTE).
+    // As convergências que não aceitam `tx` já rodaram em `aplicarMudancaNaArvore`
+    // e, se falharem, o erro sobe (catch abaixo).
+    if (houveTransicao) await efeitosDoVinculoPosCommit({ arvoreId: pessoaAtualizada.arvoreId })
 
     return NextResponse.json(pessoaAtualizada)
   } catch (error) {
+    if (error instanceof PropagacaoPosCommitError) {
+      return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
+    }
     console.error("Erro ao atualizar pessoa:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }

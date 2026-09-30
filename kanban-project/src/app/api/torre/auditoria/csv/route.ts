@@ -1,12 +1,12 @@
 // GET /api/torre/auditoria/csv?<mesmos filtros> — "Exportar CSV" (Bloco I2): o que está filtrado, gerado pelo
 // SERVIDOR, só administrador. A exportação também fica registrada (quem exportou, com quais filtros).
 import { type NextRequest, NextResponse } from 'next/server'
-import { exigirTorre } from '@/src/lib/torre-acesso'
+import { exigirGerenciamento } from '@/src/lib/torre-acesso'
 import { csvDaAuditoria, filtroDaQuery } from '@/lib/operacional/torre-auditoria'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
-  const { usuario, erro } = await exigirTorre(request, 'tarefas.ver')
+  const { usuario, erro } = await exigirGerenciamento(request, 'tarefas.ver')
   if (erro) return erro
   if (usuario.tipo !== 'admin') return NextResponse.json({ error: 'A exportação da auditoria é só para administradores.' }, { status: 403 })
   const filtro = filtroDaQuery(request.nextUrl.searchParams)

@@ -1,8 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { aplicarMudancaNaArvore, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
+import { removerNecessidadesDaUniao } from "@/src/services/necessidade-documental"
+
+/** União com certidão já em atendimento/atendida: fato acontecido — não se apaga por um clique. */
+class UniaoComFatoError extends Error {
+  constructor(readonly bloqueadas: { id: number; status: string }[]) {
+    super("Esta união tem certidão de casamento já em atendimento ou atendida — não pode ser excluída. Resolva a certidão antes (dispensar/cancelar a operação).")
+  }
+}
 
 // GET - Buscar união por ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -86,27 +94,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.pessoa1Id !== undefined) dataToUpdate.pessoa1 = { connect: { id: Number(body.pessoa1Id) } }
     if (body.pessoa2Id !== undefined) dataToUpdate.pessoa2 = { connect: { id: Number(body.pessoa2Id) } }
 
-    const uniaoAtualizada = await prisma.uniao.update({
-      where: { id },
-      data: dataToUpdate,
-      include: {
-        pessoa1: true,
-        pessoa2: true,
-      },
-    })
-
+    const autorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
     // Editar a união muda o fato que sustenta a exigência de casamento (trocar
-    // cônjuge muda de QUEM é a certidão). Mesmo elo causal do POST — reusando o
-    // materializador ÚNICO, nunca reimplementado aqui.
-    //
-    // SÍNCRONO — não pela fila (mandato "nunca mais árvore ↔ documentação", 29/09/2026).
-    const arvoreIdAfetadaPut = uniaoAtualizada.pessoa1?.arvoreId ?? uniaoAtualizada.pessoa2?.arvoreId
-    await dispararMaterializacaoPorArvore(arvoreIdAfetadaPut).catch((e) =>
-      console.error(`[PUT /api/unioes/[id]] materialização falhou (árvore ${arvoreIdAfetadaPut}):`, e),
-    )
+    // cônjuge muda de QUEM é a certidão). União + reavaliação documental na MESMA
+    // transação (§37) — falhou → nada gravado, resposta de erro.
+    const { resultado: uniaoAtualizada } = await aplicarMudancaNaArvore({
+      arvoreId: null, autorId,
+      arvoreIdDe: (u: { pessoa1: { arvoreId: number | null } | null; pessoa2: { arvoreId: number | null } | null }) => u.pessoa1?.arvoreId ?? u.pessoa2?.arvoreId,
+      motivo: () => "união alterada",
+      fn: (tx) => tx.uniao.update({
+        where: { id },
+        data: dataToUpdate,
+        include: { pessoa1: true, pessoa2: true },
+      }),
+    })
 
     return NextResponse.json(uniaoAtualizada)
   } catch (error) {
+    if (error instanceof PropagacaoPosCommitError) {
+      return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
+    }
     console.error("Erro ao atualizar união:", error)
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -132,28 +139,38 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // A árvore precisa ser lida ANTES do delete: depois dele não há mais como
-    // saber a qual árvore a união pertencia, e o materializador ficaria sem alvo.
+    const autorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
+    // A árvore é lida ANTES do delete (depois não há como saber a qual pertencia).
     const antes = await prisma.uniao.findUnique({
       where: { id },
       select: { pessoa1: { select: { arvoreId: true } }, pessoa2: { select: { arvoreId: true } } },
     })
+    if (!antes) return NextResponse.json({ error: "União não encontrada" }, { status: 404 })
 
-    await prisma.uniao.delete({
-      where: { id },
+    // DESFAZER O CASAMENTO É MUDANÇA DE ESTADO CIVIL (§37): numa transação só — as
+    // necessidades da união saem (certidão → NAO_EXIGIDO, tarefa aberta cancelada,
+    // passos cancelados; sem isso o CHECK `sujeito_xor` recusa apagar a união),
+    // a união é apagada e a árvore é reavaliada. União com certidão já andada
+    // (atendida/em atendimento) é FATO: recusa com 409, não apaga histórico.
+    await aplicarMudancaNaArvore({
+      arvoreId: antes.pessoa1?.arvoreId ?? antes.pessoa2?.arvoreId ?? null, autorId,
+      motivo: () => "união desfeita (pessoa deixou de ser casada)",
+      fn: async (tx) => {
+        const r = await removerNecessidadesDaUniao(id, tx, "necessidade removida pela árvore: união desfeita (pessoa deixou de ser casada)")
+        if (r.bloqueadas.length > 0) throw new UniaoComFatoError(r.bloqueadas)
+        await tx.uniao.delete({ where: { id } })
+        return r
+      },
     })
-
-    // Desfazer o casamento também é mudança de estado civil: a exigência da
-    // certidão deixa de ser aplicável e o motor oficial precisa reconciliar.
-    //
-    // SÍNCRONO — não pela fila (mandato "nunca mais árvore ↔ documentação", 29/09/2026).
-    const arvoreIdAfetadaDelete = antes?.pessoa1?.arvoreId ?? antes?.pessoa2?.arvoreId
-    await dispararMaterializacaoPorArvore(arvoreIdAfetadaDelete).catch((e) =>
-      console.error(`[DELETE /api/unioes/[id]] materialização falhou (árvore ${arvoreIdAfetadaDelete}):`, e),
-    )
 
     return NextResponse.json({ message: "União excluída com sucesso" })
   } catch (error) {
+    if (error instanceof UniaoComFatoError) {
+      return NextResponse.json({ error: error.message, code: "UNIAO_COM_FATO", bloqueadas: error.bloqueadas }, { status: 409 })
+    }
+    if (error instanceof PropagacaoPosCommitError) {
+      return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
+    }
     console.error("Erro ao excluir união:", error)
 
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

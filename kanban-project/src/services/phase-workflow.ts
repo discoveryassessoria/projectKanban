@@ -6,6 +6,8 @@
 // Idempotente (chaves determinísticas). Snapshot imutável/versionado. Transação única.
 // NÃO cria Tarefa, NÃO sincroniza, NÃO avança fase, NÃO toca legado.
 
+import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
+import { PESSOA_ATIVA } from "@/src/lib/genealogia/vinculo-ativo"
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { Prisma, type PhaseWorkflowInstance, type PhaseWorkflowStepInstance, type StepInstanceStatus } from "@prisma/client"
@@ -401,8 +403,18 @@ async function carregarContextoEscopo(
   }
 
   if (cards.has("DOCUMENTO") && proc?.arvoreId) {
+    // A ÁRVORE É A ÚNICA FONTE DE VERDADE DOCUMENTAL (30/09/2026): passo e tarefa só
+    // nascem de NECESSIDADE ativa, nunca de Documento solto. Um Documento sem
+    // necessidade (órfão — ex.: processo 675, doc 2303 do titular que sobreviveu à
+    // remoção do cônjuge), com necessidade DISPENSADA, fora de jogo (CANCELADO /
+    // NAO_EXIGIDO) ou de pessoa removida da árvore NÃO é alvo de passo.
     const docs = await db.documento.findMany({
-      where: { pessoa: { arvoreId: proc.arvoreId }, status: { not: "CANCELADO" } },
+      where: {
+        pessoa: { arvoreId: proc.arvoreId, ...PESSOA_ATIVA },
+        status: { notIn: DOCUMENTO_STATUS_NOT_IN_INATIVOS },
+        necessidadeId: { not: null },
+        necessidade: { status: { not: "DISPENSADA" } },
+      },
       select: { id: true }, orderBy: { id: "asc" },
     })
     ctx.documentoIds = docs.map((d) => d.id)

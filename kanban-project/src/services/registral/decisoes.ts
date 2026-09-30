@@ -10,6 +10,7 @@
 // versão anterior e cria uma versão nova. Pessoa jamais é excluída — reverter a
 // criação de uma pessoa devolve pendência humana, não um DELETE.
 
+import { autorLegivel, efeitosPosCommitDaArvore, propagarNaTransacao, OPCOES_TX_ARVORE } from "@/src/services/genealogia/propagar-arvore"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { permissaoDaProposta, type PermissaoRegistral } from "@/src/lib/genealogia/registral/campos"
@@ -338,7 +339,13 @@ export async function reverterProposta(p: {
       correlationId: proposta.correlationId,
       criadoPorId: p.ator.usuarioId,
     })
-  })
+    // §37: reverter restaura Pessoa/filiação — a árvore documental reavalia NA MESMA transação.
+    await propagarNaTransacao(tx, {
+      arvoreId: proposta.arvoreId as number, autor: await autorLegivel(tx, p.ator.usuarioId),
+      motivo: `reversão da proposta registral #${p.propostaId}`,
+    })
+  }, OPCOES_TX_ARVORE)
+  await efeitosPosCommitDaArvore(proposta.arvoreId)
 
   await auditar(prisma, {
     acao: ACOES_AUDITORIA.PROPOSTA_REVERTIDA,

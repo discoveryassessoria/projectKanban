@@ -66,7 +66,8 @@ export async function POST(
       uniao = { acao: "remover", uniaoId: Number(body.uniao.uniaoId) }
     }
 
-    if (Object.keys(mudancas).length === 0 && !uniao) {
+    const removerPessoa = body?.removerPessoa === true
+    if (Object.keys(mudancas).length === 0 && !uniao && !removerPessoa) {
       return NextResponse.json(
         { error: "Nenhuma mudança proposta para simular." },
         { status: 400 },
@@ -78,7 +79,7 @@ export async function POST(
       usuario && temPermissao(usuario.permissoes, "financeiro.ver"),
     )
 
-    const entrada: EntradaSimulacao = { processoId, pessoaId, mudancas, uniao }
+    const entrada: EntradaSimulacao = { processoId, pessoaId, mudancas, uniao, removerPessoa }
     const resultado = await simularImpactoPessoa(entrada, financeiroVisivel)
 
     return NextResponse.json(resultado)

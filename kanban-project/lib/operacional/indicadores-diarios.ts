@@ -60,7 +60,7 @@ export async function calcularIndicadoresDoDia(agora = new Date()): Promise<Indi
     prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioSemana } } }),
   ])
   const linhas = anotarRisco(brutas, criticos)
-  return { ...kpisDasLinhas(linhas), backlogAbertas, backlogFechadasNaSemana: backlogFechadas }
+  return { ...kpisDasLinhas(linhas, agora), backlogAbertas, backlogFechadasNaSemana: backlogFechadas }
 }
 
 /** GRAVA a foto do dia — idempotente por `data` (`@@unique`): reexecutar o

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { propagarMudancaDeRegra, PropagacaoPosCommitError } from '@/src/services/genealogia/propagar-arvore'
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
@@ -28,8 +29,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         arquivado: b.arquivado !== undefined ? !!b.arquivado : atual.arquivado,
       },
     })
+    // Edição (inclusive arquivar) de regra PUBLICADA muda o que se exige: reconcilia os processos que a têm.
+    if (atual.status === 'PUBLICADA' || regra.status === 'PUBLICADA') {
+      await propagarMudancaDeRegra({
+        regraId: regra.id, motivo: `regra documental '${regra.nome ?? regra.documentTypeCode}' foi alterada`,
+        autorId: (await extrairUsuarioComPermissoes(request))?.userId ?? null,
+      })
+    }
     return NextResponse.json({ regra })
   } catch (e) {
+    if (e instanceof PropagacaoPosCommitError) return NextResponse.json({ error: e.message, salvo: true }, { status: 500 })
     console.error('PUT matriz-documental/[id]', e)
     return NextResponse.json({ error: 'Erro ao salvar a regra.' }, { status: 500 })
   }

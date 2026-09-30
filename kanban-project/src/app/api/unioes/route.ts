@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { aplicarMudancaNaArvore, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 
 // GET - Listar todas as uniões
 export async function GET(request: NextRequest) {
@@ -111,7 +111,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const novaUniao = await prisma.uniao.create({
+    const autorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
+    // Casar É mudança de estado civil: a união e a reavaliação documental da árvore
+    // acontecem na MESMA transação (§37); falhou → nada é gravado e a resposta é erro.
+    const { resultado: novaUniao } = await aplicarMudancaNaArvore({
+      arvoreId: null, autorId,
+      arvoreIdDe: (u: { pessoa1: { arvoreId: number | null } | null; pessoa2: { arvoreId: number | null } | null }) => u.pessoa1?.arvoreId ?? u.pessoa2?.arvoreId,
+      motivo: () => "união criada (casal registrado na árvore)",
+      fn: (tx) => tx.uniao.create({
       data: {
         pessoa1Id: Number(pessoa1Id),
         pessoa2Id: Number(pessoa2Id),
@@ -144,36 +151,14 @@ export async function POST(request: NextRequest) {
           }
         },
       },
+    }),
     })
-
-    // ELO CAUSAL QUE FALTAVA — casar É mudança de estado civil.
-    //
-    // Editar Pessoa já convergia a fase e reavaliava as Regras Documentais
-    // (`dispararMaterializacaoPorArvore` em /api/pessoas). Criar, editar ou
-    // excluir UNIÃO não disparava nada — e é a união que produz a exigência de
-    // certidão de casamento. Resultado: casar alguém na árvore deixava a
-    // exigência sem nascer até que outra edição qualquer disparasse o motor.
-    //
-    // A correção é AQUI, no domínio da união, e reusa o materializador ÚNICO.
-    // Fazer isto dentro da árvore seria criar o segundo materializador que a
-    // Constituição proíbe.
-    //
-    // Best-effort e idempotente, como nos demais gatilhos: falha do motor
-    // documental não pode impedir o registro do casamento.
-    //
-    // SÍNCRONO — não pela fila (mandato "nunca mais árvore ↔ documentação",
-    // 29/09/2026). Era `after()`; a mesma janela de corrida que produziu o
-    // achado real do processo 675 (edições em sequência na mesma árvore
-    // convergindo fora de ordem) vale aqui também — casar alguém pode ligar
-    // a exigência de certidão de casamento, e a resposta precisa refletir
-    // isso, não uma foto de minutos atrás.
-    const arvoreIdAfetada = novaUniao.pessoa1?.arvoreId ?? novaUniao.pessoa2?.arvoreId
-    await dispararMaterializacaoPorArvore(arvoreIdAfetada).catch((e) =>
-      console.error(`[POST /api/unioes] materialização falhou (árvore ${arvoreIdAfetada}):`, e),
-    )
 
     return NextResponse.json(novaUniao, { status: 201 })
   } catch (error) {
+    if (error instanceof PropagacaoPosCommitError) {
+      return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
+    }
     console.error("Erro ao criar união:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }

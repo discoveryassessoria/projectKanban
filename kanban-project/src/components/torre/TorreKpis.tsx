@@ -1,9 +1,11 @@
 "use client"
-// src/components/torre/TorreKpis.tsx — os 8 KPIs clicáveis (Bloco J3).
-// O NÚMERO de cada cartão é a contagem da lista que o clique filtra (`linhasDoKpi`, o MESMO predicado que a aba Tarefas
-// aplica); a TENDÊNCIA vem da foto diária real (E10). Sem foto de referência → "sem histórico". Nada é estimado.
-import { KPIS, linhasDoKpi, processosEmRisco, tendenciaDe, CAMPO_DA_FOTO, type ChaveKpi } from "@/lib/operacional/torre-kpis"
-import type { LinhaTorre } from "./tipos"
+// src/components/torre/TorreKpis.tsx — o TOPO da Torre (01/10/2026): a frase fixa + duas faixas, SITUAÇÃO e AGENDA.
+// O NÚMERO de cada cartão é `numeroDoKpi` (torre-kpis.ts): o tamanho da lista que o clique filtra na aba Tarefas (mesmo predicado).
+// "Processos ativos" (e o selo "N em risco") vêm da aba Processos. A tendência (▲/▼ vs semana passada) só existe quando há
+// foto de 7 dias E a definição do cartão é a mesma da foto; sem isso o cartão não mostra nada (nenhum texto de ausência).
+import { KPI_POR_CHAVE, CAMPO_DA_FOTO, tendenciaDe, numeroDoKpi, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, emRiscoCritico, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { fraseDoDia, distribuicaoPorFase, type LinhaParaTopo } from "@/lib/operacional/torre-topo"
+import type { ProcessoDaTorre } from "./tipos-processos"
 
 export interface FotoDoDia {
   data: string; vencidas: number; vencemEm7Dias: number; semDono: number; aguardandoTerceiro: number
@@ -11,41 +13,48 @@ export interface FotoDoDia {
 }
 export interface Tendencias { backlog: { abertas: number; fechadas: number }; referencia: FotoDoDia | null; fotosNaSerie: number }
 
-/** O número que o cartão mostra — exportado para o casco e para o teste usarem a MESMA conta. */
-export function numeroDoKpi(chave: ChaveKpi, linhas: LinhaTorre[]): number | null {
-  if (chave === "back") return null
-  if (chave === "risco") return processosEmRisco(linhas).size
-  return linhasDoKpi(chave, linhas).length
-}
-
-export function TorreKpis({ linhas, tend, ativo, filtrandoPais, onEscolher }: {
-  linhas: LinhaTorre[]; tend: Tendencias | null; ativo: ChaveKpi | null; filtrandoPais: boolean; onEscolher: (k: ChaveKpi) => void
+export function TorreKpis({ linhas, processos, agora, tend, ativo, filtrandoPais, onEscolher, onProcessos, onRisco }: {
+  linhas: LinhaParaTopo[]; processos: ProcessoDaTorre[] | null; agora: Date; tend: Tendencias | null; ativo: ChaveKpi | null
+  filtrandoPais: boolean; onEscolher: (k: ChaveKpi) => void; onProcessos: () => void; onRisco: () => void
 }) {
+  const tendencia = (k: ChaveKpi, n: number) => {
+    const campo = CAMPO_DA_FOTO[k]
+    if (filtrandoPais || !campo || !tend?.referencia) return null
+    return tendenciaDe(n, tend.referencia[campo])
+  }
+  const cartao = (k: ChaveKpi) => {
+    const def = KPI_POR_CHAVE[k]
+    const n = numeroDoKpi(k, linhas, agora)
+    const t = tendencia(k, n)
+    return (
+      <button key={k} type="button" className={`tor-kpi ${ativo === k ? "on" : ""}`} aria-pressed={ativo === k} title={def.regra} onClick={() => onEscolher(k)}>
+        <b className={`tor-kpi-n ${def.cor}`}>{n}</b>
+        <span className="tor-kpi-l">{def.rotulo}</span>
+        {t && <i className={`tor-kpi-t ${t.direcao}`}>{t.rotulo}</i>}
+      </button>
+    )
+  }
+  const nRisco = processos ? processos.filter(emRiscoCritico).length : null
+  const rotuloRisco = KPI_POR_CHAVE.risco
   return (
-    <div className="tor-kpis" role="group" aria-label="Indicadores">
-      {KPIS.map((k) => {
-        const n = numeroDoKpi(k.chave, linhas)
-        let valor: string
-        let trend: { txt: string; cls: string }
-        if (k.chave === "back") {
-          valor = tend ? `${tend.backlog.abertas} / ${tend.backlog.fechadas}` : "…"
-          const t = tend?.referencia ? tendenciaDe(tend.backlog.abertas, tend.referencia.backlogAbertas) : null
-          trend = filtrandoPais ? { txt: "tendência só no total", cls: "sem" } : t ? { txt: t.rotulo, cls: t.direcao } : { txt: "sem histórico", cls: "sem" }
-        } else {
-          valor = String(n)
-          const ref = tend?.referencia ? tend.referencia[CAMPO_DA_FOTO[k.chave]] : null
-          const t = tend ? tendenciaDe(n as number, ref) : null
-          trend = filtrandoPais ? { txt: "tendência só no total", cls: "sem" } : !tend ? { txt: "…", cls: "sem" } : t ? { txt: t.rotulo, cls: t.direcao } : { txt: "sem histórico", cls: "sem" }
-        }
-        return (
-          <button key={k.chave} type="button" className={`tor-kpi ${ativo === k.chave ? "on" : ""}`} aria-pressed={ativo === k.chave} onClick={() => onEscolher(k.chave)}
-            title={k.filtra ? "Filtra a aba Tarefas" : "Abre a aba Terceiros, onde está o backlog"}>
-            <b className={`tor-kpi-n ${k.cor}`}>{valor}</b>
-            <span className="tor-kpi-l">{k.rotulo}</span>
-            <i className={`tor-kpi-t ${trend.cls}`}>{trend.txt}</i>
+    <div className="tor-topo">
+      <p className="tor-frase" data-testid="torre-frase">{fraseDoDia(linhas, agora)}</p>
+      <div className="tor-faixa-titulo">Situação</div>
+      <div className="tor-kpis tor-kpis-sit" role="group" aria-label="Situação">
+        <div className="tor-kpi tor-kpi-proc">
+          <button type="button" className="tor-kpi-inner" title="Processos que ainda não foram concluídos (a lista da aba Processos)." onClick={onProcessos}>
+            <b className="tor-kpi-n blu">{processos ? processos.length : "…"}</b>
+            <span className="tor-kpi-l">Processos ativos</span>
+            {processos && processos.length > 0 && <i className="tor-kpi-t">{distribuicaoPorFase(processos).split(" · ").slice(1).join(" · ")}</i>}
           </button>
-        )
-      })}
+          {nRisco != null && nRisco > 0 && (
+            <button type="button" className="tor-p red tor-selo" title={rotuloRisco.regra} onClick={onRisco}>{nRisco} em risco</button>
+          )}
+        </div>
+        {CARTOES_DA_SITUACAO.map(cartao)}
+      </div>
+      <div className="tor-faixa-titulo">Agenda</div>
+      <div className="tor-kpis tor-kpis-agenda" role="group" aria-label="Agenda">{CARTOES_DA_AGENDA.map(cartao)}</div>
     </div>
   )
 }

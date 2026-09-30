@@ -1,32 +1,29 @@
 "use client"
-// src/components/torre/TorreRegras.tsx — aba REGRAS (Bloco H3). SÓ r1, r2 e r3.
+// SaudeRegras.tsx — sub-aba REGRAS de Gerenciamento › Saúde do sistema (era a aba Regras da Torre, Bloco H3; movida 01/10/2026). SÓ r1, r2 e r3.
 // Simular (dados de hoje, sem gravar), Ativar/Desativar (auditado). Sem r4, sem r5, sem "tempo aprendido".
 import { useEffect, useState } from "react"
-import { api, erroDe, useTorre } from "./torre-base"
+import { api, erroDe, useTorre } from "@/src/components/torre/torre-base"
 
 interface Regra { chave: "r1" | "r2" | "r3"; nome: string; ativa: boolean; padrao: boolean; descricao: string }
 interface Simulacao { chave: string; titulo: string; ativaAgora: boolean; texto: string; itens: Array<{ tarefaId: number | null; texto: string }> }
 
-export function TorreRegras({ versao }: { versao: number }) {
-  const { permissoes, avisar } = useTorre()
+export function SaudeRegras({ versao }: { versao: number }) {
+  const { avisar } = useTorre()
   const [regras, setRegras] = useState<Regra[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [sim, setSim] = useState<Simulacao | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
 
-  const permitido = !!permissoes?.equipe
   useEffect(() => {
-    if (!permitido) return
     let vivo = true
     void api<{ regras: Regra[] }>("/api/torre/regras").then((r) => {
       if (!vivo) return
       if (r.ok) { setRegras(r.data.regras); setErro(null) } else setErro(erroDe(r.data, "Não foi possível carregar as regras."))
     })
     return () => { vivo = false }
-  }, [tick, versao, permitido])
+  }, [tick, versao])
 
-  if (!permitido) return <div className="tor-card pad">As regras exigem a permissão de gerenciar usuários e acessos (<code>usuarios.gerenciar</code>).</div>
   if (erro) return <div className="tor-card pad">{erro}</div>
   if (!regras) return <div className="tor-card pad small">Carregando regras…</div>
 
@@ -40,7 +37,7 @@ export function TorreRegras({ versao }: { versao: number }) {
     setOcupado(r.chave)
     const res = await api<{ ok?: boolean; erro?: string }>(`/api/torre/regras/${r.chave}/ativar`, "POST", { ativa })
     setOcupado(null)
-    if (res.ok && res.data.ok !== false) { avisar(`Regra "${r.nome}" ${ativa ? "ativada" : "desativada"} (gravada no Gerenciamento).`); setSim(null); setTick((n) => n + 1) }
+    if (res.ok && res.data.ok !== false) { avisar(`Regra "${r.nome}" ${ativa ? "ativada" : "desativada"} (auditado).`); setSim(null); setTick((n) => n + 1) }
     else avisar(erroDe(res.data))
   }
   const aplicarAgora = async () => {
@@ -53,7 +50,7 @@ export function TorreRegras({ versao }: { versao: number }) {
 
   return (
     <div>
-      <div className="small mb-2">Tudo aqui é gravado no Gerenciamento. A Torre abre a porta e permite <b>simular</b> antes de ativar. Regra desligada não executa nada.</div>
+      <div className="small mb-2">Tudo aqui é gravado no Gerenciamento e vale para a Torre. Dá para <b>simular</b> antes de ativar. Regra desligada não executa nada.</div>
       {regras.map((r) => (
         <div key={r.chave} className="tor-card pad flex flex-wrap items-center gap-3">
           <div style={{ flex: 1, minWidth: 260 }}><b>{r.chave} · {r.nome}</b><div className="small">{r.descricao}</div></div>

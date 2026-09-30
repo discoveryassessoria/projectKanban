@@ -118,7 +118,7 @@ function certStatusFromDoc(
   // "invalidar"). Nenhum dos dois é "ainda não fiz" — sem isto, um documento
   // cancelado (não se aplica em nenhuma fase) continuava contando como
   // pendente aqui (achado real: Antonio, óbito; Edithe, ambas certidões).
-  if (s === "cancelado" || s === "invalido") return "nao_aplica"
+  if (s === "cancelado" || s === "invalido" || s === "nao_exigido") return "nao_aplica"
   return "pendente"
 }
 
@@ -204,7 +204,7 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
     // pendente aqui (achado real: Antonio, óbito; Edithe, ambas certidões).
     const docsAplicaveis = row.docs.filter((d) => {
       const s = d.status.toLowerCase()
-      return s !== "cancelado" && s !== "invalido"
+      return s !== "cancelado" && s !== "invalido" && s !== "nao_exigido"
     })
     // Nasce, casa, morre — nunca alfabética (fonte única: ordem-evento-vida.ts).
     const docsOrdenados = [...docsAplicaveis].sort((a, b) =>

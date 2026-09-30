@@ -27,7 +27,7 @@ import { diaOperacional, estadoTemporal } from './tempo-operacional'
 import { visaoGerencial, type LinhaGerencial } from './tarefa-projecoes'
 import { semFaseFutura } from './fase-futura'
 import { motivosAtivos } from './atencao-operacional'
-import { urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia, LINK_SEM_RESPONSAVEL_NA_TORRE } from './navegacao'
+import { urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia, LINK_SEM_RESPONSAVEL_NA_TORRE, urlDaSaudeDoSistema } from './navegacao'
 import {
   gravarFotoDoAviso, sincronizarAvisosDeTarefas, expurgarAvisos, removerAviso,
   rotuloDaFamilia, SELECT_ROTULO_FAMILIA,
@@ -339,7 +339,7 @@ export async function precisaDeVoce(
     itens.push({
       tipo: 'INTEGRIDADE', processoId: null, familiaNome: 'Sistema', tarefaIds: [],
       itens: Array.from({ length: d!.criticos! }, (_, i) => `saude::${d!.assinatura ?? 'incidente'}::${i}`),
-      link: '/administrator?screen=syshealth',
+      link: urlDaSaudeDoSistema('integridade'),
     })
   }
   return itens

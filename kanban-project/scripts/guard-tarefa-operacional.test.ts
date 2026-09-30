@@ -112,7 +112,7 @@ secao("2) Nenhum materializador decide sozinho se gera tarefa")
 ok("a genealogia não escreve mais geraTarefa: false",
   !/geraTarefa:\s*false/.test(semComentarios(genealogia)))
 ok("e converge a tarefa ao final da materialização",
-  /await reconciliarTarefas\(\{ processoId \}\)/.test(genealogia))
+  /await reconciliarTarefas\(\{ processoId(, db)? \}\)/.test(genealogia))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("3) Uma porta só cria tarefa operacional")

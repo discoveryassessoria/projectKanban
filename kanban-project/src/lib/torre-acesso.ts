@@ -32,3 +32,21 @@ export async function exigirTorre(
   }
   return { usuario, erro: null }
 }
+
+/**
+ * QUEM ENTRA NAS PORTAS QUE MORAM NO GERENCIAMENTO (Regras e Integridade — Saúde do sistema, 01/10/2026): a régua da tela de
+ * Saúde é `usuarios.gerenciar`; estas portas exigem o MESMO, sem exigir também ser gestor operacional da Torre (quem gerencia
+ * usuários e acessos abre a tela e precisa que as sub-abas funcionem). As permissões extras de cada ação continuam valendo.
+ */
+export async function exigirGerenciamento(
+  request: Request, ...permissoes: PermissaoChave[]
+): Promise<{ usuario: UsuarioDaTorre; erro: null } | { usuario: null; erro: NextResponse }> {
+  const usuario = await extrairUsuarioComPermissoes(request)
+  if (!usuario) return { usuario: null, erro: NextResponse.json({ error: 'Não autorizado' }, { status: 401 }) }
+  for (const p of ['usuarios.gerenciar' as PermissaoChave, ...permissoes]) {
+    if (!temPermissao(usuario.permissoes, p)) {
+      return { usuario: null, erro: NextResponse.json({ error: 'Sem permissão para esta ação', permissao: p }, { status: 403 }) }
+    }
+  }
+  return { usuario, erro: null }
+}

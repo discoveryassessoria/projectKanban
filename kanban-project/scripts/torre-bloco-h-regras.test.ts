@@ -129,7 +129,10 @@ async function main() {
     ok("nenhuma das três simulações gravou nada", (await foto()) === f0)
     for (const k of ["r1", "r2", "r3"]) {
       const rs = await postSimular(req("POST", `/api/torre/regras/${k}/simular`, tAdmin), { params: Promise.resolve({ chave: k }) })
-      ok(`rota simular ${k}: 200 e sem escrita`, rs.status === 200 && (await foto()) === f0)
+      // Desde 01/10/2026 a simulação deixa UMA linha de auditoria (quem simulou) — e nada mais muda.
+      const simuladas = await prisma.logAuditoria.count({ where: { acao: "REGRA_TORRE_SIMULADA" } })
+      await prisma.logAuditoria.deleteMany({ where: { acao: "REGRA_TORRE_SIMULADA" } })
+      ok(`rota simular ${k}: 200, só a auditoria da simulação e nenhuma outra escrita`, rs.status === 200 && simuladas === 1 && (await foto()) === f0)
     }
 
     secao("ATIVAR / DESATIVAR: auditado, idempotente")

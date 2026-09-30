@@ -42,7 +42,7 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { removerNecessidadesDoSujeito } from "@/src/services/necessidade-documental"
 import { removerDocumentosDoSujeito } from "@/src/services/documento-operacional"
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { autorLegivel, efeitosPosCommitDaArvore, propagarNaTransacao, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 import { reconciliarAutomacaoPorRequerente } from "@/src/lib/motor/reconciliar-requerente-economico"
 import { CONTA } from "@/lib/financeiro/ledger/plano-contas"
@@ -96,6 +96,8 @@ export interface RemoviveisPessoa {
   unioes: number
   necessidades: number
   documentos: number
+  /** Destes `documentos`, quantos estão no nome de OUTRA pessoa (o titular da união) e só existem por necessidade desta — ex.: certidão de casamento do cônjuge. */
+  documentosDeUniaoDoOutroConjuge: number
   passos: number
   tarefas: number
   participantesFinanceiros: number
@@ -152,7 +154,7 @@ export interface ResultadoRemocao {
 }
 
 const vazio = (): RemoviveisPessoa => ({
-  vinculoArvore: 0, vinculoProcesso: 0, unioes: 0, necessidades: 0, documentos: 0,
+  vinculoArvore: 0, vinculoProcesso: 0, unioes: 0, necessidades: 0, documentos: 0, documentosDeUniaoDoOutroConjuge: 0,
   passos: 0, tarefas: 0, participantesFinanceiros: 0, receitasPrevistas: 0,
   custosPrevistos: 0, obrigacoesPrevistas: 0, distribuicoes: 0,
 })
@@ -169,6 +171,8 @@ interface ContextoPessoa {
   requerenteNome: string | null
   uniaoIds: number[]
   documentoIds: number[]
+  /** Documentos de OUTRA pessoa (titular da união) que só existem por necessidade desta. */
+  documentoIdsDeOutros: number[]
   necessidadeIds: number[]
   passoIds: number[]
   tarefaIds: number[]
@@ -202,14 +206,23 @@ async function carregarContexto(pessoaId: number, db: DB): Promise<ContextoPesso
   })
   const uniaoIds = unioes.map((u) => u.id)
 
-  const documentos = await db.documento.findMany({ where: { pessoaId }, select: { id: true } })
-  const documentoIds = documentos.map((d) => d.id)
-
   const necessidades = await db.necessidadeDocumental.findMany({
     where: { OR: [{ pessoaId }, ...(uniaoIds.length ? [{ uniaoId: { in: uniaoIds } }] : [])] },
     select: { id: true },
   })
   const necessidadeIds = necessidades.map((n) => n.id)
+
+  // DOCUMENTOS DA PESSOA + DOCUMENTOS DAS NECESSIDADES QUE ELA SUSTENTA. A
+  // certidão de casamento é da UNIÃO e o Documento nasce no nome do TITULAR (um dos
+  // cônjuges): remover o outro cônjuge leva a união e a necessidade — e o Documento
+  // do titular, que só existia por elas, ficava órfão (PENDENTE, necessidadeId nulo)
+  // e depois virava tarefa fantasma na Emissão (achado real: processo 675, doc 2303).
+  const documentos = await db.documento.findMany({
+    where: { OR: [{ pessoaId }, ...(necessidadeIds.length ? [{ necessidadeId: { in: necessidadeIds } }] : [])] },
+    select: { id: true, pessoaId: true },
+  })
+  const documentoIds = documentos.map((d) => d.id)
+  const documentoIdsDeOutros = documentos.filter((d) => d.pessoaId !== pessoaId).map((d) => d.id)
 
   // Passos de QUALQUER um dos três escopos que a pessoa origina.
   const passos = await db.phaseWorkflowStepInstance.findMany({
@@ -280,6 +293,7 @@ async function carregarContexto(pessoaId: number, db: DB): Promise<ContextoPesso
     requerenteNome: requerente?.nome ?? null,
     uniaoIds,
     documentoIds,
+    documentoIdsDeOutros,
     necessidadeIds,
     passoIds,
     tarefaIds,
@@ -430,6 +444,7 @@ export async function analisarRemocaoPessoa(
     unioes: ctx.uniaoIds.length,
     necessidades: ctx.necessidadeIds.length,
     documentos: ctx.documentoIds.length,
+    documentosDeUniaoDoOutroConjuge: ctx.documentoIdsDeOutros.length,
     passos: ctx.passoIds.length,
     tarefas: ctx.tarefaIds.length,
     participantesFinanceiros: ctx.participanteIds.length,
@@ -531,7 +546,14 @@ export async function desvincularRequerenteMantendoPessoa(
         usuarioId: actorUserId,
       },
     }).catch(() => null)
-  })
+    // Deixar de ser requerente muda quem está NA linhagem (e o que a árvore exige):
+    // reavalia as necessidades na MESMA transação (§37).
+    if (plano.arvoreId != null) {
+      const autor = await autorLegivel(tx, actorUserId)
+      await propagarNaTransacao(tx, { arvoreId: plano.arvoreId, motivo: "pessoa deixou de ser requerente", autor })
+    }
+  }, { timeout: 60_000, maxWait: 20_000 })
+  await efeitosPosCommitDaArvore(plano.arvoreId)
 
   return { ok: true }
 }
@@ -569,7 +591,7 @@ export async function analisarExclusaoArvore(
   const pessoas = await db.pessoa.findMany({ where: { arvoreId }, select: { id: true } })
 
   const removiveis: RemoviveisPessoa = {
-    vinculoArvore: 0, vinculoProcesso: 0, unioes: 0, necessidades: 0, documentos: 0,
+    vinculoArvore: 0, vinculoProcesso: 0, unioes: 0, necessidades: 0, documentos: 0, documentosDeUniaoDoOutroConjuge: 0,
     passos: 0, tarefas: 0, participantesFinanceiros: 0, receitasPrevistas: 0,
     custosPrevistos: 0, obrigacoesPrevistas: 0, distribuicoes: 0,
   }
@@ -692,8 +714,23 @@ export async function removerPessoaDaArvore(input: RemocaoInput): Promise<Result
       },
     })
 
+    // A ÁRVORE É A ÚNICA FONTE DE VERDADE DOCUMENTAL (§37): a reavaliação das
+    // necessidades de quem SOBROU (e o cancelamento do que só existia por quem saiu)
+    // acontece NESTA transação — remover e reconciliar são o mesmo ato. Falhou →
+    // rollback da remoção inteira.
+    // (`forcar` = limpeza de árvore ÓRFÃ de processo: não há derivado a reconciliar.)
+    if (arvoreOrigem != null && !input.forcar) {
+      const autor = await autorLegivel(tx, input.actorUserId)
+      await propagarNaTransacao(tx, {
+        arvoreId: arvoreOrigem, autor,
+        motivo: efetivo === "HARD"
+          ? `pessoa '${plano.pessoaNome}' foi removida da árvore`
+          : `pessoa '${plano.pessoaNome}' saiu da árvore ativa`,
+      })
+    }
+
     return { ok: true, modoExecutado: efetivo, plano, removidos, processosAfetados: plano.processoIds }
-  }, { timeout: 60_000, maxWait: 15_000 })
+  }, { timeout: 60_000, maxWait: 20_000 })
 
   // RECONCILIAÇÃO PÓS-COMMIT — parte do ato, não da rota.
   //
@@ -705,7 +742,7 @@ export async function removerPessoaDaArvore(input: RemocaoInput): Promise<Result
   // Fora da transação porque materialização e reconciliação abrem as suas
   // próprias; dentro, o `tx` já estaria fechado quando elas commitassem.
   if (resultado.ok) {
-    await reconciliarAposRemocao({ arvoreId: arvoreOrigem, processoIds: resultado.processosAfetados })
+    await reconciliarAposRemocao({ arvoreId: input.forcar ? null : arvoreOrigem, processoIds: resultado.processosAfetados })
   }
   return resultado
 }
@@ -725,11 +762,16 @@ export async function reconciliarAposRemocao(
   // (1) Documental: reavalia as Regras Documentais publicadas contra quem SOBROU
   //     na árvore. É o mesmo serviço que a criação e a edição de pessoa chamam.
   //     Pessoa removida não volta: a leitura já é escopada por `pessoasAtivasDaArvore`.
+  //     A reavaliação DOCUMENTAL já rodou DENTRO da transação da remoção. Aqui ficam
+  //     só os efeitos que não aceitam `tx` (workflow publicado da fase, honorários,
+  //     avanço) — e o erro deles SOBE, não é engolido.
+  let erroPosCommit: PropagacaoPosCommitError | null = null
   if (args.arvoreId != null) {
     try {
-      await dispararMaterializacaoPorArvore(args.arvoreId)
+      await efeitosPosCommitDaArvore(args.arvoreId)
     } catch (e) {
-      erros.push(`materialização da árvore ${args.arvoreId}: ${e instanceof Error ? e.message : String(e)}`)
+      if (e instanceof PropagacaoPosCommitError) erroPosCommit = e
+      erros.push(`efeitos pós-commit da árvore ${args.arvoreId}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -769,6 +811,7 @@ export async function reconciliarAposRemocao(
   }
 
   if (erros.length) console.error("[pessoa removida → reconciliação]", erros.join(" ; "))
+  if (erroPosCommit) throw erroPosCommit
   return { arvore: args.arvoreId != null, processos: reconciliados, erros }
 }
 
@@ -877,7 +920,7 @@ async function executarHard(ctx: ContextoPessoa, tx: Prisma.TransactionClient): 
   }
 
   // 3) Documental — pelos serviços canônicos, que respondem pelos guards.
-  const doc = await removerDocumentosDoSujeito({ pessoaId: ctx.pessoa.id }, tx)
+  const doc = await removerDocumentosDoSujeito({ pessoaId: ctx.pessoa.id, documentoIdsExtras: ctx.documentoIdsDeOutros }, tx)
   out.documentos = doc.documentos
   const nec = await removerNecessidadesDoSujeito({ pessoaId: ctx.pessoa.id, uniaoIds: ctx.uniaoIds }, tx)
   out.necessidades = nec.necessidades

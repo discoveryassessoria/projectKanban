@@ -42,6 +42,7 @@ import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sy
 import { passoPodeConcluir, concluirSubtarefaCorrentePeloPasso, subtarefasDaEtapa } from "@/src/services/subtarefas-da-etapa"
 import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
+import { documentoAtivo } from "@/src/lib/documentos/status-inativos"
 
 // Transição de estado do passo → evento operacional do motor. Fonte única desta
 // tradução para a operação por-documento; espelha o vocabulário de WorkflowEventoTipo.
@@ -508,7 +509,7 @@ export async function montarWorkflowV2(
     where: { id: documentoId },
     select: { status: true, ultimaMovimentacao: true, motivoBloqueio: true, orgaoId: true },
   })
-  const cancelado = documento?.status === "CANCELADO"
+  const cancelado = documento != null && !documentoAtivo(documento.status) // CANCELADO ou NAO_EXIGIDO
   // Cancelada: lê TODOS os passos da visita (inclusive os cancelados) — é o que
   // permite mostrar o que realmente aconteceu, não só o que sobrou do filtro.
   const passos = await passosOperacaoV2(documentoId, { incluirEncerrados: cancelado, escopoOverride })

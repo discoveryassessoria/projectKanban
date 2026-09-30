@@ -92,6 +92,16 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "casamento materializado por UNIÃO, não por pessoa: monta e derruba os PRÓPRIOS " +
     "processos/árvores/uniões (marca UNIAOCAS) só no banco de teste — só o `deleteMany` " +
     "de limpeza da própria marca; a criação passa pelo materializador oficial",
+  "scripts/_fixture-arvore-fonte.ts":
+    "fixture compartilhada dos testes \"árvore = única fonte de verdade documental\" (30/09/2026, CLAUDE.md §37): monta e derruba " +
+    "as PRÓPRIAS árvores/pessoas/uniões/necessidades (marca de teste) só no banco de TESTE; as mudanças de negócio passam " +
+    "pelas ROTAS REAIS (PUT /api/pessoas, /api/unioes, regras) — só o `deleteMany` de limpeza é direto",
+  "scripts/arvore-fonte-da-verdade-a-casado.test.ts":
+    "árvore = única fonte de verdade documental (30/09/2026, CLAUDE.md §37): monta e derruba os PRÓPRIOS processos/árvores/pessoas (marca de teste) só no banco de TESTE; a mudança sob prova passa pelas rotas reais, só a limpeza é `deleteMany` direto",
+  "scripts/arvore-fonte-da-verdade-b-falecido.test.ts":
+    "árvore = única fonte de verdade documental (30/09/2026, CLAUDE.md §37): monta e derruba os PRÓPRIOS processos/árvores/pessoas (marca de teste) só no banco de TESTE; a mudança sob prova passa pelas rotas reais, só a limpeza é `deleteMany` direto",
+  "scripts/saude-arv002-arvore-e-derivados.test.ts":
+    "fixture da verificação ARV-002 (Saúde): cria/apaga Pessoa, Uniao, Necessidade e Documento no banco de TESTE para provar que a verificação acusa cada divergência; nunca produção",
   "scripts/necessidade-dispensada-cancela-tarefa.test.ts":
     "Unidade 1 do plano de consolidação (10/09/2026): prova que necessidade dispensada " +
     "cancela a Tarefa correspondente via reconciliarTarefas — monta e derruba os PRÓPRIOS " +

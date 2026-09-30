@@ -133,7 +133,7 @@ async function main() {
   ok("BLOQUEADA detectada, com o motivo no detalhe", porTipo("BLOQUEADA").some((i) => i.tarefaId === tarefaBloqueada.id && i.detalhe.includes(`${MARCA}motivo`)))
   ok("DIVERGENCIA detectada (passo CONCLUIDO × tarefa NAO_INICIADA)", porTipo("DIVERGENCIA").some((i) => i.tarefaId === tarefaDivergente.id))
   ok("CARGA detectada para quem está no limite", porTipo("CARGA").some((i) => i.familiaNome === noLimite.nome))
-  ok("PAREDE_A_FRENTE devolve o achado CAD-012 aberto", porTipo("PAREDE_A_FRENTE").some((i) => (i.contexto as { achadoId?: number }).achadoId === achado.id))
+  ok("achado de CADASTRO (CAD-012 aberto) NÃO entra no 'Precisa de você' (a Torre é só gestão de processo)", porTipo("PAREDE_A_FRENTE").length === 0 && !itens.some((i) => (i.contexto as { achadoId?: number }).achadoId === achado.id))
   ok("lista ordenada por score, maior primeiro", itens.every((it, i) => i === 0 || itens[i - 1].score >= it.score))
 
   ok("tarefa CONCLUIDA nunca aparece (nem como fase deixada)", !itens.some((i) => i.tarefaId === tarefaConcluidaFaseAnterior.id))

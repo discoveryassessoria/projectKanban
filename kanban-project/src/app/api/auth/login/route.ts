@@ -104,8 +104,16 @@ export async function POST(request: NextRequest) {
       console.warn("[login] resposta lenta", JSON.stringify(marcos))
     }
 
-    // Retornar dados do usuário (sem a senha)
-    const { senha: _, ...usuarioSemSenha } = usuario
+    // Retornar dados do usuário (sem a senha e sem permissões)
+    // Projeção EXPLÍCITA (não "tudo menos a senha"): nem permissoesCustom nem coluna futura vazam.
+    const usuarioSemSenha = {
+      id: usuario.id,
+      publicCode: usuario.publicCode,
+      nome: usuario.nome,
+      email: usuario.email,
+      tipo: usuario.tipo,
+      perfilId: usuario.perfilId,
+    }
 
     console.log("✅ Login bem-sucedido para:", usuario.email)
     return NextResponse.json({

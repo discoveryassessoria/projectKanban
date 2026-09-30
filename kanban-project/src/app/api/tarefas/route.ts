@@ -235,7 +235,8 @@ export async function POST(request: Request) {
 
     if (responsavelId) {
       const responsavel = await prisma.usuario.findUnique({
-        where: { id: responsavelId }
+        where: { id: responsavelId },
+        select: { id: true }
       })
 
       if (!responsavel) {

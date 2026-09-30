@@ -85,11 +85,12 @@ export async function removerDocumentosPorId(
  * Usado por `pessoa-ciclo-vida`. Simétrico a `removerNecessidadesDoSujeito`.
  */
 export async function removerDocumentosDoSujeito(
-  args: { pessoaId: number },
+  args: { pessoaId: number; /** Documentos de OUTRAS pessoas que só existiam por necessidade deste sujeito (ex.: certidão de casamento da união, no nome do outro cônjuge). */ documentoIdsExtras?: number[] },
   db: DB = prisma,
 ): Promise<ResultadoRemocaoDocumento> {
   const docs = await db.documento.findMany({ where: { pessoaId: args.pessoaId }, select: { id: true } })
-  return removerDocumentosPorId(docs.map((d) => d.id), db)
+  const ids = [...new Set([...docs.map((d) => d.id), ...(args.documentoIdsExtras ?? [])])]
+  return removerDocumentosPorId(ids, db)
 }
 
 /** Remoção de UM documento (porta da rota `DELETE /api/documentos/[id]`). */

@@ -31,7 +31,6 @@ import { conferirCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projec
 import { ordensDeFase } from '@/src/services/documento-operacao'
 import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
 import { equipeExigida } from './elegibilidade'
-import { achadosVigentesDaParede } from '@/lib/saude/parede-a-frente'
 import { pessoasNoLimite } from './torre-equipe'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
@@ -394,11 +393,10 @@ export async function itensPrecisaDeVoce(
     return conferirCoerenciaPassoTarefa(db as Prisma.TransactionClient, stepInstanceIds)
   }
   const adiantadas = opts.adiantadas ?? iniciarLeiturasIndependentes(agora, db, opts.organizacao)
-  const [fasesEspeciais, divergencias, noLimite, achados] = await Promise.all([
+  const [fasesEspeciais, divergencias, noLimite] = await Promise.all([
     adiantadas.fasesEspeciais,
     lerDivergencias(),
     adiantadas.noLimite,
-    adiantadas.achadosDaParede,
   ])
   const tarefasDivergentes = new Set(divergencias.map((d) => d.tarefaId))
 
@@ -503,20 +501,8 @@ export async function itensPrecisaDeVoce(
     })
   }
 
-  // PAREDE À FRENTE — achados CAD-012/WF-004, abertos e não ignorados agora (lidos acima, junto das demais leituras).
-  for (const a of achados) {
-    const score = 3 // ATENÇÃO — achado preventivo do painel de Saúde, ainda não bloqueou ninguém.
-    itens.push({
-      tipo: 'PAREDE_A_FRENTE', score, faixa: faixaDoScore(score), tarefaId: null, processoId: null,
-      familiaNome: a.registroNome ?? null,
-      titulo: a.titulo,
-      detalhe: a.descricao,
-      sugestao: a.recomendacao ?? null,
-      acao1: { rotulo: 'Abrir Gerenciamento', acao: 'ABRIR_GERENCIAMENTO' },
-      acao2: { rotulo: 'Ignorar 7 d', acao: 'IGNORAR_7_DIAS' },
-      link: a.link ?? '/administrator?screen=syshealth', contexto: { achadoId: a.id, chave: a.chave },
-    })
-  }
+  // PAREDE À FRENTE / achados de CADASTRO (CAD-*): NÃO entram aqui (01/10/2026). Cadastro e saúde do sistema moram no
+  // Gerenciamento › Saúde do sistema; a Torre serve só à gestão de processo. O tipo continua existindo, mas nunca é produzido.
 
   itens.sort((a, b) => b.score - a.score || a.tipo.localeCompare(b.tipo) || (a.tarefaId ?? 0) - (b.tarefaId ?? 0))
   return itens
@@ -537,25 +523,16 @@ export function textoDaSugestao(s: SugestaoDeResponsavel | null): string {
 export interface LeiturasAdiantadas {
   fasesEspeciais: Promise<Set<string>>
   noLimite: ReturnType<typeof pessoasNoLimite>
-  achadosDaParede: ReturnType<typeof lerAchadosDaParede>
 }
 
 export function iniciarLeiturasIndependentes(agora: Date, db: Db, organizacao?: ContextoDeSugestao['organizacao'] | Promise<ContextoDeSugestao['organizacao']>): LeiturasAdiantadas {
   const l: LeiturasAdiantadas = {
     fasesEspeciais: fasesApostilamentoOuRetificacao(db),
     noLimite: Promise.resolve(organizacao).then((org) => pessoasNoLimite(agora, undefined, org)),
-    achadosDaParede: lerAchadosDaParede(db, agora),
   }
   // Se quem chamou falhar antes de esperar por elas, a rejeição não vira "não tratada" — quem as espera continua vendo o erro.
   for (const p of Object.values(l)) p.catch(() => undefined)
   return l
-}
-
-/** Achados CAD-012/WF-004 abertos e não ignorados agora — a matéria-prima da "Parede à frente". */
-async function lerAchadosDaParede(db: Db, agora: Date) {
-  // Só o que a verificação de HOJE ainda acusa (ver `lib/saude/parede-a-frente.ts`): o achado antigo de uma
-  // verificação já corrigida continua aberto no banco até a Saúde rodar de novo, mas não é decisão do gestor.
-  return achadosVigentesDaParede(db, agora)
 }
 
 /**

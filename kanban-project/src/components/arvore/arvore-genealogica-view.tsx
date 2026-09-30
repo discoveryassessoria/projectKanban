@@ -2125,7 +2125,15 @@ function EditPersonModal({
   const obitoMudou = (pessoa.vivo === false || !!pessoa.data_obito) !== isFalecido
   const requerenteMudou = (pessoa.requerente || 'nao') !== (requerente || 'nao')
 
+  // Tudo que a árvore documental lê: linha reta, filiação (pai/mãe) e "precisa de
+  // documentação" também mudam o que é exigido — e o que já tem tarefa aberta.
+  const linhaRetaMudou = ((pessoa as any).linhaReta ?? true) !== isLinhaReta
+  const documentacaoMudou = ((pessoa as any).documentacao ?? true) !== precisaDocumentacao
+  const paiMudou = ((pessoa as any).paiId ?? null) !== (paiSelecionadoId || null)
+  const maeMudou = ((pessoa as any).maeId ?? null) !== (maeSelecionadaId || null)
+
   const mudancaRelevante = obitoMudou || requerenteMudou || casamentoNasceu || casamentoAcabou
+    || linhaRetaMudou || documentacaoMudou || paiMudou || maeMudou
 
   const descreverAlteracoes = (): AlteracaoDescrita[] => {
     const lista: AlteracaoDescrita[] = []
@@ -2143,6 +2151,14 @@ function EditPersonModal({
         para: isCasado ? 'Casado' : 'Solteiro',
       })
     }
+    if (linhaRetaMudou) {
+      lista.push({ campo: 'Linha reta', de: isLinhaReta ? 'Fora' : 'Dentro', para: isLinhaReta ? 'Dentro' : 'Fora' })
+    }
+    if (documentacaoMudou) {
+      lista.push({ campo: 'Precisa de documentação', de: precisaDocumentacao ? 'Não' : 'Sim', para: precisaDocumentacao ? 'Sim' : 'Não' })
+    }
+    if (paiMudou) lista.push({ campo: 'Pai', de: 'alterado', para: paiSelecionadoId ? (pessoas.find(p => p.id === Number(paiSelecionadoId))?.nome ?? 'outro') : 'nenhum' })
+    if (maeMudou) lista.push({ campo: 'Mãe', de: 'alterada', para: maeSelecionadaId ? (pessoas.find(p => p.id === Number(maeSelecionadaId))?.nome ?? 'outra') : 'nenhuma' })
     if (requerenteMudou) {
       lista.push({
         campo: 'Requerente',
@@ -2162,6 +2178,8 @@ function EditPersonModal({
       requerente: requerente || 'nao',
       linhaReta: isLinhaReta,
       documentacao: precisaDocumentacao,
+      paiId: paiSelecionadoId || null,
+      maeId: maeSelecionadaId || null,
       data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
     },
     // A união entra na simulação porque é dela que nasce a exigência de
@@ -2187,6 +2205,14 @@ function EditPersonModal({
       return
     }
     await persistir()
+  }
+
+  /** Uma resposta de união que não é ok NUNCA vira sucesso: mostra o erro do servidor e PARA. */
+  const uniaoOk = async (resp: Response, padrao: string): Promise<boolean> => {
+    if (resp.ok) return true
+    const corpo = await resp.json().catch(() => ({}))
+    alert(corpo?.error || padrao)
+    return false
   }
 
   const persistir = async () => {
@@ -2218,7 +2244,7 @@ function EditPersonModal({
       })
 
       if (!response.ok) {
-        const error = await response.json()
+        const error = await response.json().catch(() => ({}))
         alert(error.error || 'Erro ao atualizar pessoa')
         return
       }
@@ -2231,7 +2257,7 @@ function EditPersonModal({
 
           if (Number(conjugeId) !== conjugeAtualId) {
             // Cônjuge mudou: atualiza via PUT
-            await authFetch(`/api/unioes/${uniaoExistente.id}`, {
+            const rUniao = await authFetch(`/api/unioes/${uniaoExistente.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -2241,9 +2267,10 @@ function EditPersonModal({
                 local: localCasamento.trim() || null
               })
             })
+            if (!(await uniaoOk(rUniao, 'Erro ao atualizar a união'))) return
           } else {
             // Mesmo cônjuge: só atualiza data/local
-            await authFetch(`/api/unioes/${uniaoExistente.id}`, {
+            const rUniao = await authFetch(`/api/unioes/${uniaoExistente.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -2251,9 +2278,10 @@ function EditPersonModal({
                 local: localCasamento.trim() || null
               })
             })
+            if (!(await uniaoOk(rUniao, 'Erro ao atualizar a união'))) return
           }
         } else {
-          await authFetch('/api/unioes', {
+          const rUniao = await authFetch('/api/unioes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -2264,9 +2292,14 @@ function EditPersonModal({
               tipo: 'casamento'
             })
           })
+          if (!(await uniaoOk(rUniao, 'Erro ao registrar a união'))) return
         }
       } else if (!isCasado && uniaoExistente) {
-        await authFetch(`/api/unioes/${uniaoExistente.id}`, { method: 'DELETE' })
+        const rDel = await authFetch(`/api/unioes/${uniaoExistente.id}`, { method: 'DELETE' })
+        // response.ok OBRIGATÓRIO: a remoção pode ser recusada (409 UNIAO_COM_FATO —
+        // certidão já atendida) ou falhar; nesse caso NÃO é sucesso, e o erro do
+        // servidor é o que o operador lê.
+        if (!(await uniaoOk(rDel, 'Erro ao desfazer a união'))) return
       }
 
       onSuccess()
@@ -2304,6 +2337,7 @@ function EditPersonModal({
           proposta={proposta}
           onCancelar={() => setProposta(null)}
           onConfirmar={persistir}
+          onSemImpacto={persistir}
         />
       )}
       <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10003]" onClick={onClose} />

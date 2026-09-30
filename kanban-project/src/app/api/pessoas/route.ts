@@ -7,9 +7,9 @@
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { aplicarMudancaNaArvore, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
-import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 // LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
 // Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
 // Import de reconcileDocsForPessoa removido de propósito — não reintroduzir.
@@ -209,8 +209,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Árvore não encontrada" }, { status: 404 })
     }
 
-    // Criar a pessoa com todos os campos
-    const pessoa = await prisma.pessoa.create({
+    // Criar a pessoa com todos os campos — e propagar para a árvore documental NA MESMA
+    // transação (§37: incluir pessoa é mudança de árvore). Falhou → nada gravado, erro HTTP.
+    const autorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
+    const { resultado: pessoa } = await aplicarMudancaNaArvore({
+      arvoreId, autorId,
+      motivo: () => "pessoa incluída na árvore",
+      fn: async (tx) => {
+    const pessoa = await tx.pessoa.create({
       data: {
         // Campos existentes
         nome,
@@ -287,32 +293,27 @@ export async function POST(request: NextRequest) {
         updateData.maeId = pessoa.id
       }
 
-      await prisma.pessoa.update({
+      await tx.pessoa.update({
         where: { id: filhoId },
         data: updateData
       })
     }
 
     // Se é a primeira pessoa da árvore, definir como pessoa principal
-    const countPessoas = await prisma.pessoa.count({
+    const countPessoas = await tx.pessoa.count({
       where: { arvoreId }
     })
 
     if (countPessoas === 1 && !arvore.pessoaPrincipalId) {
-      await prisma.arvore.update({
+      await tx.arvore.update({
         where: { id: arvoreId },
         data: { pessoaPrincipalId: pessoa.id }
       })
     }
 
-    // ============================================================
-    // LEGADO_INATIVO: a auto-geração de Documento (reconcileDocsForPessoa /
-    // DOCUMENT_RULES) segue DESATIVADA — criar Pessoa NÃO cria Documento.
-    // ARQUITETURA NOVA (Fatia 2): reavalia as Regras Documentais publicadas e
-    // materializa as NecessidadeDocumental da Genealogia (best-effort, idempotente,
-    // não cria Documento, não avança fase). Nunca quebra o cadastro da Pessoa.
-    // ============================================================
-    await dispararMaterializacaoPorArvore(pessoa.arvoreId)
+    return pessoa
+      },
+    })
 
     // Recarrega a pessoa (documentos existentes, se houver — nada é gerado aqui)
     const pessoaFinal = await prisma.pessoa.findUnique({
@@ -328,6 +329,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(pessoaFinal, { status: 201 })
   } catch (error) {
+    if (error instanceof PropagacaoPosCommitError) {
+      return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })
+    }
     console.error("Erro ao criar pessoa:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }

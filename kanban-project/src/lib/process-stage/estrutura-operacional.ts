@@ -51,6 +51,7 @@ import {
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 import { versaoDaInstancia } from "@/src/services/versao-publicada"
 import { subtarefasDaEtapa } from "@/src/services/subtarefas-da-etapa"
+import { documentoAtivo } from "@/src/lib/documentos/status-inativos"
 
 // ============================================================
 // RÓTULOS DE TIPO DOCUMENTAL — fonte única desta camada de leitura.
@@ -657,7 +658,7 @@ export async function getPhaseOperationalStructure(
   // aparece ali. `documentos` já foi lido no passo 3 com `status` incluído (para
   // o casamento por documentTypeId); é a MESMA leitura, sem consulta nova.
   // ------------------------------------------------------------
-  const documentoCanceladoPorId = new Map<number, boolean>(documentos.map((d) => [d.id, d.status === "CANCELADO"]))
+  const documentoCanceladoPorId = new Map<number, boolean>(documentos.map((d) => [d.id, !documentoAtivo(d.status)]))
   const canceladoPorChave = new Map<string, boolean>()
   for (const a of alvos) {
     if (a.documentoId != null && documentoCanceladoPorId.get(a.documentoId)) canceladoPorChave.set(a.chave, true)

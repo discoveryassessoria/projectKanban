@@ -40,6 +40,7 @@
 import { prisma } from '@/lib/prisma'
 import { avaliarConjunto } from '@/src/lib/documentos/regras-documentais/condicoes'
 import type { ConjuntoCondicoes, SujeitoContexto } from '@/src/lib/documentos/regras-documentais/tipos'
+import { DOCUMENTO_STATUS_NOT_IN_INATIVOS } from "@/src/lib/documentos/status-inativos"
 
 /** Um lançamento que DEVE existir: pessoa × documento × componente econômico. */
 export interface ItemElegivel {
@@ -155,7 +156,7 @@ export async function resolverElegibilidadeDocumental(
     select: { arvore: { select: { pessoas: { select: {
       id: true, nome: true, sobrenome: true, linhaReta: true, casado: true, vivo: true,
       documentos: {
-        where: { status: { notIn: ['CANCELADO', 'INVALIDO'] } },
+        where: { status: { notIn: [...DOCUMENTO_STATUS_NOT_IN_INATIVOS, 'INVALIDO'] } },
         select: { id: true, tipo: true, documentTypeId: true },
       },
     } } } } },
