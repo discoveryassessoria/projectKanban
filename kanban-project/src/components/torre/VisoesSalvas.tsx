@@ -1,10 +1,11 @@
 "use client"
 // src/components/torre/VisoesSalvas.tsx — VISÕES SALVAS da aba Tarefas (Bloco J4). Guardadas em `RelatorioVisao`
-// (`dominio: torre-tarefas`, sem migration). A visão guarda a PERGUNTA (visão, agrupamento, KPI, país, busca), nunca o resultado.
+// (`dominio: torre-tarefas`, sem migration). A visão guarda a PERGUNTA (visão, agrupamento, KPI, país, busca e filtros da barra), nunca o resultado.
 import { useCallback, useEffect, useState } from "react"
+import type { FiltrosTorre } from "@/lib/operacional/torre-filtros"
 import { api, erroDe, Campo, Modal, useTorre } from "./torre-base"
 
-export interface SpecDaVisao { visao: string | null; agrupar: string | null; dentro?: string | null; kpi: string | null; pais: string | null; busca: string | null }
+export interface SpecDaVisao { visao: string | null; agrupar: string | null; dentro?: string | null; kpi: string | null; pais: string | null; busca: string | null; /** Os filtros da barra (ausente nas visões salvas antes dela = nenhum filtro). */ filtros?: FiltrosTorre | null }
 interface Minha { id: number; nome: string; spec: SpecDaVisao; compartilhada: boolean }
 interface DaEquipe { id: number; nome: string; spec: SpecDaVisao; donoNome: string }
 
@@ -75,7 +76,7 @@ export function VisoesSalvas({ fixas, valor, atual, onEscolherFixa, onAplicar }:
         </>
       )}
       {salvar && (
-        <Modal titulo="Salvar visão" subtitulo="Guarda os filtros de agora (visão, agrupamento, indicador, nacionalidade e busca) — nunca o resultado." onFechar={() => setSalvar(false)} ocupado={env} rodape={<>
+        <Modal titulo="Salvar visão" subtitulo="Guarda os filtros de agora (visão, agrupamento, indicador, nacionalidade, busca e todos os filtros da barra) — nunca o resultado." onFechar={() => setSalvar(false)} ocupado={env} rodape={<>
           <button className="tor-btn" onClick={() => setSalvar(false)} disabled={env}>Cancelar</button>
           <button className="tor-btn pri" onClick={() => void gravar()} disabled={env || !nome.trim()}>{env ? "Salvando…" : "Salvar"}</button>
         </>}>

@@ -14,7 +14,10 @@ import { concluirSubtarefaCorrentePeloPasso } from "../src/services/subtarefas-d
 
 export interface Obrigacao { processoId: number; tarefaId: number; stepInstanceId: number }
 
-export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: number; escalarApos?: number; slaDays?: number } = {}) {
+export interface SubtarefaDaFixture { key: string; label: string; ordem: number; espera: boolean; dependeDe: string[] }
+
+/** `subs` (opcional) troca as duas subtarefas padrão — p.ex. pelas chaves reais da Emissão (enviar → confirmar → receber → validar). */
+export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: number; escalarApos?: number; slaDays?: number; subs?: SubtarefaDaFixture[] } = {}) {
   const TIPO_CODE = "TST-" + MARCA.replace(/[^A-Z0-9]/gi, "").slice(0, 30)
   const PHASE_KEY = `${MARCA.toLowerCase()}_fase`
 
@@ -72,7 +75,7 @@ export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: 
     },
     select: { id: true },
   })
-  const SUBS = [
+  const SUBS: SubtarefaDaFixture[] = opcoes.subs ?? [
     { key: "enviar_requerimento", label: "Enviar requerimento", ordem: 0, espera: false, dependeDe: [] as string[] },
     { key: "aguardar_retorno", label: "Aguardar retorno do cartório", ordem: 1, espera: true, dependeDe: ["enviar_requerimento"] },
   ]

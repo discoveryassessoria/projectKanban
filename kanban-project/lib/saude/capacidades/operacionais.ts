@@ -162,13 +162,13 @@ registrarCapacidade({
     dependeDePermissao('permissao-criar', 'Permissão de criar processo', 'processos.criar'),
     {
       codigo: 'timeline', nome: 'Timeline registrando movimentação', tipo: 'TECNICA', obrigatoria: true,
-      acao: 'A rota do Diário Operacional precisa existir para o processo ter histórico.',
+      acao: 'A rota do Histórico do processo precisa existir para o processo ter histórico.',
       avaliar: async () => {
-        const existe = arquivo('src/app/api/processos/[processoId]/logs/route.ts')
+        const existe = arquivo('src/app/api/processos/[processoId]/historico/route.ts')
         const eventos = await prisma.workflowEvento.count()
         return {
           ok: existe,
-          detalhe: existe ? `Diário Operacional ativo (${eventos} evento(s) registrados)` : 'rota do Diário Operacional ausente',
+          detalhe: existe ? `Histórico do processo ativo (${eventos} evento(s) registrados)` : 'rota do Histórico do processo ausente',
           quantidade: eventos,
         }
       },

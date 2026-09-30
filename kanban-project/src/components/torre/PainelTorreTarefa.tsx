@@ -8,11 +8,12 @@
 // ============================================================================
 import { useEffect, useState } from "react"
 import { RepactuarPrazoModal } from "@/src/components/operacao/RepactuarPrazoModal"
-import { acompTxtCompleto, statusTarefaTxt, statusTarefaCls } from "@/src/components/operacao/operacao-v3-derivacoes"
+import { acompTxtCompleto, statusTarefaTxt, statusTarefaCls, relTxt, fmtData } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, Modal, ModalTexto, Campo, useTorre } from "./torre-base"
 import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
 import { bolaDe, temAcompanhamento } from "./tipos"
 import { useAdiarAcompanhamento } from "./adiar-acompanhamento"
+import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 
 const CANAIS_SOLICITACAO = ["CRC", "ECARTORIO", "EMAIL", "WHATSAPP", "BALCAO", "COMUNE", "CORREIOS", "CONSULADO"]
 const RESULTADOS_LIGACAO = [
@@ -53,13 +54,15 @@ export function PainelTorreTarefa({ linha }: { linha: LinhaOperacaoV3 }) {
     if (r.ok) { avisar(r.data.mensagem ?? "Atribuída.", r.data.desfazer ?? null); recarregar() } else avisar(erroDe(r.data))
   }
 
+  // O prazo/regra do PASSO ("Espera do passo") mora SÓ aqui — a coluna Prazo das tabelas é sempre o prazo da TAREFA.
   const passos = linha.passoAtual
   return (
     <div className="tor tor-painel" data-testid="painel-torre">
       <div className="tor-kv">
         <div><b>Bola com</b><span className={`tor-p ${bola.cls}`}>{bola.txt}</span></div>
         <div><b>Status</b><span className={`tor-p ${statusTarefaCls(linha).replace("opv3-p-", "")}`}>{statusTarefaTxt(linha)}</span></div>
-        <div><b>Prazo da tarefa</b>{linha.rotuloDoPrazo || "—"}</div>
+        <div><b>Prazo da tarefa</b>{textoPrazoDaTarefa(linha) || "—"}</div>
+        {linha.regraTemporalPasso && !linha.regraTemporalPasso.semPrazo && <div><b>Espera do passo</b>{relTxt(linha.regraTemporalPasso)} · {fmtData(linha.regraTemporalPasso.dueAt)}</div>}
         <div><b>Próximo acompanhamento</b>{acompTxtCompleto(linha.acompanhamentoPasso)}</div>
         <div><b>Responsável</b>{linha.responsavelNome ?? "sem responsável"}</div>
       </div>

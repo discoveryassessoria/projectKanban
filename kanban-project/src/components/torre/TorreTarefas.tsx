@@ -25,6 +25,9 @@ import { VincularOrgaoLoteModal } from "./VincularOrgaoLoteModal"
 import { useAdiarAcompanhamento } from "./adiar-acompanhamento"
 import { useNovasDaFamilia } from "./novas-da-familia"
 import { linhasDoKpi, KPIS, PREDICADO_DO_KPI, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { aplicarFiltros, filtrosVazios, normalizarFiltros, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
+import { TorreFiltros } from "./TorreFiltros"
+import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 
 type Agrupar = "fam" | "resp" | "org" | "fase" | "none"
 type Dentro = "none" | "pessoa" | "orgao" | "passo"
@@ -60,7 +63,7 @@ const CHAVE: Record<Agrupar, (l: LinhaTorre) => string> = {
 interface Funcionario { id: number; nome: string; email?: string; tarefasAtivas: number }
 interface RespLote { total?: number; sucesso?: number; falha?: number; itens?: Array<{ ok: boolean; mensagem?: string }>; desfazer?: Desfazer | null; error?: string }
 
-export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec, agora }: {
+export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec, agora, filtros, onFiltros, onLimparPais, onLimparBusca, agruparPedido, dentroPedido, onEstadoUrl }: {
   linhas: LinhaTorre[]; carregando: boolean; erro: boolean
   /** Filtro do KPI clicado no cabeçalho (o MESMO predicado que dá o número do cartão). */
   kpi: ChaveKpi | null
@@ -85,11 +88,24 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   onAplicarSpec: (s: { kpi: ChaveKpi | null; pais: string; busca: string }) => void
   /** O instante da leitura — o MESMO que o topo usa para contar a AGENDA (dia operacional). */
   agora?: Date
+  /** Os filtros da barra (estado do casco: vive na URL e na visão salva). */
+  filtros: FiltrosTorre
+  onFiltros: (f: FiltrosTorre) => void
+  /** ✕ do chip de nacionalidade / da busca (o seletor e a caixa do topo continuam sendo os donos). */
+  onLimparPais: () => void
+  onLimparBusca: () => void
+  /** `?agrupar=` / `?dentro=` da URL (já validados pelo casco). */
+  agruparPedido?: string | null
+  dentroPedido?: string | null
+  /** O que a aba escolheu e a URL deve guardar (só visões FIXAS — visão salva não é endereço). */
+  onEstadoUrl?: (e: { visao: string | null; agrupar: string | null; dentro: string | null }) => void
 }) {
   const router = useRouter()
   const { permissoes, avisar, recarregar, abrirFoco } = useTorre()
-  const [agrupar, setAgrupar] = useState<Agrupar>("fam")
-  const [dentro, setDentro] = useState<Dentro>("none")
+  const [agrupar, setAgrupar] = useState<Agrupar>(AGRUPAR_VALIDOS.includes(agruparPedido as Agrupar) ? (agruparPedido as Agrupar) : "fam")
+  const [dentro, setDentro] = useState<Dentro>((["pessoa", "orgao", "passo"] as string[]).includes(dentroPedido ?? "") ? (dentroPedido as Dentro) : "none")
+  const [agruparVisto, setAgruparVisto] = useState<string | null>(agruparPedido ?? null)
+  const [dentroVisto, setDentroVisto] = useState<string | null>(dentroPedido ?? null)
   const [visaoSel, setVisaoSel] = useState<string>(visaoPedida ?? "todas")
   const [visaoVista, setVisaoVista] = useState<string | null>(visaoPedida ?? null)
   const [visaoSalva, setVisaoSalva] = useState<VisaoTarefas>("todas")
@@ -111,6 +127,8 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   // A URL pode mudar depois de montado: a visão nova entra no estado (ajuste durante a renderização, sem efeito).
   if ((visaoPedida ?? null) !== visaoVista) { setVisaoVista(visaoPedida ?? null); if (visaoPedida) setVisaoSel(visaoPedida) }
+  if ((agruparPedido ?? null) !== agruparVisto) { setAgruparVisto(agruparPedido ?? null); setAgrupar(AGRUPAR_VALIDOS.includes(agruparPedido as Agrupar) ? (agruparPedido as Agrupar) : "fam") }
+  if ((dentroPedido ?? null) !== dentroVisto) { setDentroVisto(dentroPedido ?? null); setDentro((["pessoa", "orgao", "passo"] as string[]).includes(dentroPedido ?? "") ? (dentroPedido as Dentro) : "none") }
 
   const podeEditar = !!permissoes?.editar
   const usuarioId = permissoes?.usuarioId ?? null
@@ -155,11 +173,16 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   // A visão em vigor: uma das fixas, ou a `visao` guardada dentro da visão salva escolhida.
   const visao: VisaoTarefas = (VISOES.some(([v]) => v === visaoSel) ? visaoSel : visaoSalva) as VisaoTarefas
   const base = useMemo(() => (kpi ? linhasDoKpi(kpi, linhas, agora) : linhas), [linhas, kpi, agora])
+  const ctxFiltro = useMemo(() => ({ usuarioId, agora: agora ?? new Date() }), [usuarioId, agora])
+  // A lista BASE (indicador + visão + busca) e, sobre ela, os filtros da barra: UMA função (`aplicarFiltros`) dá a lista que a
+  // tabela desenha, o "Mostrando N de M" e os contadores dos chips de prazo.
+  const listaBase = useMemo(() => aplicarBusca(base.filter(predicadoDe(visao, usuarioId, agora)), busca) as LinhaTorre[], [base, visao, usuarioId, busca, agora])
+  const resumo = useMemo(() => aplicarFiltros(listaBase, filtros, ctxFiltro), [listaBase, filtros, ctxFiltro])
   const visiveis = useMemo(() => {
-    const l = aplicarBusca(base.filter(predicadoDe(visao, usuarioId, agora)), busca) as LinhaTorre[]
-    // As NOVAS (último aviso "chegou trabalho") sobem ao topo; o resto mantém a ordem.
-    return novas.size ? [...l].sort((a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
-  }, [base, visao, usuarioId, busca, novas, agora])
+    const l = resumo.linhas
+    // As NOVAS (último aviso "chegou trabalho") sobem ao topo — só quando a pessoa não escolheu uma ordenação; o resto mantém a ordem.
+    return novas.size && !filtros.ordenar ? [...l].sort((a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
+  }, [resumo, filtros.ordenar, novas])
   const feitoVisiveis = useMemo(
     () => aplicarBusca((feito ?? []).filter((l) => !paisRotulo || l.pais === paisRotulo), busca),
     [feito, paisRotulo, busca],
@@ -171,7 +194,12 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
     if (v === "minhas" || v === "acompvenc" || v === "cobranca") return linhas.filter(predicadoDe(v, usuarioId)).length
     return null
   }
-  const specAtual: SpecDaVisao = { visao, agrupar, dentro, kpi, pais: paisChave || null, busca: busca.trim() || null }
+  const specAtual: SpecDaVisao = { visao, agrupar, dentro, kpi, pais: paisChave || null, busca: busca.trim() || null, filtros }
+  // A URL guarda a visão FIXA escolhida e o agrupamento (visão salva não é endereço: o que ela traz entra nos próprios campos).
+  const visaoFixaDaUrl = VISOES.some(([v]) => v === visaoSel) && visaoSel !== "todas" ? visaoSel : null
+  useEffect(() => {
+    onEstadoUrl?.({ visao: visaoFixaDaUrl, agrupar: agrupar !== "fam" ? agrupar : null, dentro: dentro !== "none" ? dentro : null })
+  }, [visaoFixaDaUrl, agrupar, dentro, onEstadoUrl])
   const grupos = useMemo(() => {
     const m = new Map<string, LinhaTorre[]>()
     for (const l of visiveis) { const k = CHAVE[agrupar](l); m.set(k, [...(m.get(k) ?? []), l]) }
@@ -280,7 +308,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
         <div className="small">{passoLabelDe(l).label}</div>
         <div><span className={`tor-p ${statusTarefaCls(l).replace("opv3-p-", "")}`}>{statusTarefaTxt(l)}</span></div>
         <div className={l.responsavelId ? "" : "small"}>{l.responsavelNome ?? "sem responsável"}</div>
-        <div className="small">{l.rotuloDoPrazo || "—"}</div>
+        <div className="small">{textoPrazoDaTarefa(l) || "—"}</div>
         <div className="small">{acompTxtCompleto(l.acompanhamentoPasso)}</div>
         <div><span className={`tor-p ${risco.cls}`}>{risco.txt}</span></div>
         <div className="flex flex-wrap gap-1">
@@ -329,6 +357,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
             setVisaoSalva((VISOES.some(([v]) => v === spec.visao) ? spec.visao : "todas") as VisaoTarefas)
             if (AGRUPAR_VALIDOS.includes(spec.agrupar as Agrupar)) setAgrupar(spec.agrupar as Agrupar)
             setDentro(((["none", "pessoa", "orgao", "passo"] as string[]).includes(spec.dentro ?? "") ? spec.dentro : "none") as Dentro)
+            onFiltros(normalizarFiltros(spec.filtros as unknown as Record<string, unknown> | undefined))
             onAplicarSpec({ kpi: KPIS.some((k) => k.chave === spec.kpi && k.filtra) ? (spec.kpi as ChaveKpi) : null, pais: spec.pais ?? "", busca: spec.busca ?? "" })
           }}
         />
@@ -356,6 +385,15 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
           </div>
         )}
       </div>
+
+      {visao !== "feito" && (
+        <TorreFiltros
+          linhasTodas={linhas} linhasBase={listaBase} filtros={filtros} onFiltros={onFiltros} ctx={ctxFiltro}
+          mostrando={resumo.mostrando} total={linhas.length}
+          paisRotulo={paisRotulo ?? null} onLimparPais={onLimparPais} busca={busca} onLimparBusca={onLimparBusca}
+          onLimparTudo={() => { onFiltros(filtrosVazios()); onLimparPais(); onLimparBusca() }}
+        />
+      )}
 
       {visao !== "feito" && semOrgao.length > 0 && (
         <div className="tor-card pad flex flex-wrap items-center gap-3 small">

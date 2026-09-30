@@ -22,6 +22,8 @@ import { achadosAbertos } from "../lib/saude"
 import { quadroDeIntegridade } from "../lib/operacional/torre-integridade"
 import { consultarAuditoria, csvDaAuditoria } from "../lib/operacional/torre-auditoria"
 import { focoDaFamilia, numerosDoFoco } from "../lib/operacional/torre-foco"
+import { historicoDoProcesso } from "../src/services/historico-processo"
+import { GET as getFocoHistorico } from "../src/app/api/torre/foco/[processoId]/historico/route"
 import { progressoRealDoProcesso } from "../lib/operacional/metricas-processo"
 import { listarTarefasDaTorre } from "../src/services/torre-tarefas"
 import { registrarLigacao } from "../src/services/precisa-de-voce-acoes"
@@ -169,8 +171,14 @@ async function main() {
     ok("a tabela traz as linhas da Operação (cartório, bola, prazo, responsável)", foco!.tarefas.length === linhasAba.length && foco!.tarefas.every((t) => "terceiroNome" in t && "responsavelNome" in t && "rotuloDoPrazo" in t))
     await registrarLigacao(f1.tarefaId, admin.id, `${MARCA} ligou`, "EM_BUSCA")
     const foco2 = await focoDaFamilia(f1.processoId)
-    ok("linha do tempo REAL: auditoria e contatos do banco, mais recente primeiro", foco2!.linhaDoTempo.length > 0 && foco2!.linhaDoTempo.some((e) => e.tipo === "CONTATO" && /EM_BUSCA/.test(e.texto ?? "")) && foco2!.linhaDoTempo.every((e, i, a) => i === 0 || a[i - 1].quando >= e.quando))
-    ok("nada inventado: cada evento tem id de origem", foco2!.linhaDoTempo.every((e) => /^(log|fase|contato):\d+$/.test(e.id)))
+    // A linha do tempo do Foco É o Histórico do processo (um registro por fato real, mesma fonte da aba Histórico):
+    // o Foco não monta mais uma lista própria. O contato REAL (ligação) aparece como fato redigido, mais recente primeiro.
+    const hist = await historicoDoProcesso(f1.processoId)
+    ok("o Foco não carrega mais linha do tempo própria (ela é o Histórico do processo)", !("linhaDoTempo" in foco2!))
+    ok("histórico REAL: a ligação ao cartório do banco vira fato redigido (em busca), mais recente primeiro", !!hist && hist.fatos.some((x) => x.subtipo === "cobranca" && /em busca/.test(x.frase)) && hist.fatos.every((x, i, a) => i === 0 || a[i - 1].quando >= x.quando))
+    ok("nada inventado: cada fato tem id de origem (log/contato/…)", !!hist && hist.fatos.every((x) => /^(log|wf|fase|nec|contato|coment|sub|passo|solic|obs|hist):\d+$/.test(x.id) || x.id.startsWith("g:")))
+    const rHist = await getFocoHistorico(req("GET", `/api/torre/foco/${f1.processoId}/historico`, tGestor), ctx({ processoId: String(f1.processoId) }))
+    ok("rota do histórico dentro do Foco: gestor da Torre lê (200) e vem a MESMA lista", rHist.status === 200 && (await rHist.json()).fatos.length === hist!.fatos.length)
     ok("rota: gestor da Torre lê o Foco", (await getFoco(req("GET", `/api/torre/foco/${f1.processoId}`, tGestor), ctx({ processoId: String(f1.processoId) }))).status === 200)
     ok("rota: processo inexistente 404, id inválido 400, sem token 401",
       (await getFoco(req("GET", "/api/torre/foco/99999999", tAdmin), ctx({ processoId: "99999999" }))).status === 404

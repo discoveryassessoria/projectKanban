@@ -209,7 +209,8 @@ function main() {
   // foi extraído/fundido em `tabela-familia.tsx` (fusão Central Operacional +
   // Minha Operação, 25/09/2026) — é lá que a linha da fila vive agora.
   const fila = semComentarios(ler('src/components/operacao/tabela-familia.tsx'))
-  ok('§16) a fila mostra a frase canônica', /l\.rotuloDoPrazo/.test(fila))
+  // A coluna Prazo passou a usar a função única `textoPrazoDaTarefa` (Seção 3.17), que parte de `rotuloDoPrazo` — a frase do servidor.
+  ok('§16) a fila mostra a frase canônica', /textoPrazoDaTarefa\(l\)/.test(fila) && /l\.rotuloDoPrazo/.test(semComentarios(ler('src/lib/tarefa/texto-prazo.ts'))))
   const painel = semComentarios(ler('src/components/kanban/PainelDaFase.tsx'))
   ok('§16) a tabela da fase também', /const texto = f\.rotuloDoPrazo/.test(painel))
   // A régua migrou para o servidor (document-operational-projection.ts) — o

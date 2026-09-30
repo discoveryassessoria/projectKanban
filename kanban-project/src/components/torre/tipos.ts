@@ -1,5 +1,6 @@
 // Tipos da Torre no cliente — espelho de `LinhaDaTorre` (src/services/torre-tarefas.ts) em JSON.
 import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
+import { nivelDeRisco } from "@/lib/operacional/torre-filtros"
 
 export interface LinhaTorre extends LinhaOperacaoV3 {
   orgaoId: number | null
@@ -23,9 +24,9 @@ export function bolaDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
 
 /** RISCO — derivado dos indicadores que a Operação já calcula (nada recalculado). */
 export function riscoDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
-  if (l.atrasada || l.escalada) return { txt: "Crítico", cls: "red" }
-  if (l.emRisco || l.acompanhamentoVencido || l.statusTarefa === "BLOQUEADA") return { txt: "Atenção", cls: "amb" }
-  return { txt: "No ritmo", cls: "grn" }
+  // O NÍVEL vem de UMA função (`nivelDeRisco`): a coluna Risco e o filtro Risco da barra nunca discordam.
+  const n = nivelDeRisco(l)
+  return n === "critico" ? { txt: "Crítico", cls: "red" } : n === "atencao" ? { txt: "Atenção", cls: "amb" } : { txt: "No ritmo", cls: "grn" }
 }
 
 /** A tarefa tem acompanhamento a adiar — a MESMA condição da aba Acompanhamento da Operação (`acompanhamentoPasso` com prazo). */

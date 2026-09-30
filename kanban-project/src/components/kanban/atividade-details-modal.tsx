@@ -256,6 +256,8 @@ function ConteudoModal({
   // Vindos do deep-link: valor inicial desta abertura. Como o conteúdo desmonta ao
   // fechar, não existe mais o efeito que os limpava.
   const [pessoaIdParaFocar, setPessoaIdParaFocar] = useState<number | undefined>(initialPessoaId)
+  // Tarefa que a Central deve localizar ao abrir — vem do deep-link OU de um clique no Histórico do processo.
+  const [taskAlvoLocal, setTaskAlvoLocal] = useState<number | null>(null)
   const [sidebarTabParaFocar, setSidebarTabParaFocar] = useState<string | undefined>(initialSidebarTab)
   
   // ✅ NOVO: Estados para o modal de detalhes do cliente
@@ -1069,7 +1071,7 @@ function ConteudoModal({
             <div className="h-full min-h-0 overflow-y-auto">
               <ProcessoCentralOperacional
                 processo={processo}
-                taskIdAlvo={initialTaskId ?? null}
+                taskIdAlvo={taskAlvoLocal ?? initialTaskId ?? null}
                 onProcessoMudou={() => {
                   // Retorno de fase (ou outra mudança da fase ATIVA): invalida a
                   // projeção — Header (refreshKey) + Kanban/Drawer (onSave).
@@ -1137,6 +1139,9 @@ function ConteudoModal({
             <ProcessoHistorico
             processoId={processo.id}
             onUpdate={onSave}
+            // Cada fato do histórico abre o lugar onde o trabalho acontece: a certidão na Central, a pessoa na Árvore.
+            onAbrirCertidao={(l) => { if (l.tarefaId != null) { setTaskAlvoLocal(l.tarefaId); setActiveTab("central") } }}
+            onAbrirPessoa={(pessoaId) => { setPessoaIdParaFocar(pessoaId); setActiveTab("arvore") }}
             />
           )}
         </div>

@@ -123,6 +123,8 @@
    "scripts/processos-lista-traz-pais-canonico.test.ts",
    "scripts/hidratacao-cabecalho-cambio.test.ts",
    "scripts/duplicidade-reconciliacao-e-reancoragem.test.ts",
+   "scripts/avanco-fase-ponta-a-ponta.test.ts",
+   "scripts/hidratacao-torre.test.ts",
    "scripts/operacao-tela-ajustes-b-c.test.ts",
    "scripts/torre-parede-achado-obsoleto.test.ts",
    "scripts/documentacao-requerida-fonte-unica.test.ts",
@@ -139,6 +141,9 @@
    "scripts/rotulo-status-tarefa-fonte-unica.test.ts",
    "scripts/torre-devolvida-a-equipe-texto.test.ts",
    "scripts/torre-topo-e-abas-movidas.test.ts",
+   "scripts/torre-filtros-predicados.test.ts",
+   "scripts/tarefa-texto-prazo.test.ts",
+   "scripts/torre-filtros-visao-e-linhas-reais.test.ts",
    "scripts/cancelar-operacao-dispara-avanco.test.ts",
    "scripts/usuario-publico-sem-segredo-estatico.test.ts",
    "scripts/usuario-publico-sem-segredo-dinamico.test.ts",
@@ -151,8 +156,11 @@
    "scripts/arvore-fonte-da-verdade-g-regra.test.ts",
    "scripts/arvore-fonte-da-verdade-contagens.test.ts",
    "scripts/arvore-caso-edison-junior.test.ts",
+   "scripts/geral-documentacao-diz-a-fase.test.ts",
    "scripts/gate-avanco-cancelado-e-fora-da-linha.test.ts",
-   "scripts/geral-documentacao-diz-a-fase.test.ts"
+   "scripts/historico-processo-servico.test.ts",
+   "scripts/central-certidao-cancelada-continua-na-lista.test.ts",
+   "scripts/historico-processo-puro.test.ts"
   ]
  },
  "arquivos": [
@@ -271,6 +279,9 @@
   "scripts/rotulo-status-tarefa-fonte-unica.test.ts",
   "scripts/torre-devolvida-a-equipe-texto.test.ts",
   "scripts/torre-topo-e-abas-movidas.test.ts",
+  "scripts/torre-filtros-predicados.test.ts",
+  "scripts/tarefa-texto-prazo.test.ts",
+  "scripts/torre-filtros-visao-e-linhas-reais.test.ts",
   "scripts/cancelar-operacao-dispara-avanco.test.ts",
   "scripts/usuario-publico-sem-segredo-estatico.test.ts",
   "scripts/usuario-publico-sem-segredo-dinamico.test.ts",
@@ -285,7 +296,12 @@
   "scripts/arvore-caso-edison-junior.test.ts",
   "scripts/saude-arv002-arvore-e-derivados.test.ts",
   "scripts/arvore-preview-tarefas-abertas.test.ts",
+  "scripts/geral-documentacao-diz-a-fase.test.ts",
   "scripts/gate-avanco-cancelado-e-fora-da-linha.test.ts",
-  "scripts/geral-documentacao-diz-a-fase.test.ts"
+  "scripts/avanco-fase-ponta-a-ponta.test.ts",
+  "scripts/hidratacao-torre.test.ts",
+  "scripts/historico-processo-servico.test.ts",
+  "scripts/central-certidao-cancelada-continua-na-lista.test.ts",
+  "scripts/historico-processo-puro.test.ts"
  ]
 }

@@ -1,7 +1,9 @@
 "use client"
 // src/components/torre/FocoFamilia.tsx — FOCO DA FAMÍLIA (Bloco I3). Só leitura das fontes existentes:
-// /api/torre/foco/{processoId}; comentários em /api/comentarios (E4); relatório no motor de Relatórios.
+// /api/torre/foco/{processoId}; linha do tempo = Histórico do processo (mesma fonte da aba, /api/torre/foco/{id}/historico);
+// comentários em /api/comentarios (E4); relatório no motor de Relatórios.
 import { textoTempoNaFase } from "@/lib/operacional/torre-predicados"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useState } from "react"
 import { docTipoTxt } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -9,6 +11,8 @@ import { LAYER } from "@/src/lib/ui/layers"
 import { api, erroDe, fmtDataHora, useTorre } from "./torre-base"
 import { bolaDe, type LinhaTorre } from "./tipos"
 import { RelatorioControle } from "./RelatorioControle"
+import { HistoricoDoProcesso } from "@/src/components/historico/HistoricoDoProcesso"
+import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 
 interface Foco {
   processoId: number; familiaId: number | null; familiaNome: string; pais: string | null; codigo: string | null
@@ -16,10 +20,9 @@ interface Foco {
   certidoes: { recebidas: number; requeridas: number }
   numeros: { abertas: number; vencidas: number; comCartorio: number; semResponsavel: number }
   tarefas: LinhaTorre[]
-  linhaDoTempo: Array<{ id: string; quando: string; tipo: "AUDITORIA" | "FASE" | "CONTATO"; autor: string | null; titulo: string; texto: string | null }>
+  encerradas: Array<{ documentoId: number; titulo: string; pessoa: string | null; tipo: "CANCELADA" | "NAO_EXIGIDA"; encerramento: { quando: string | null; quandoRotulo: string | null; porNome: string | null; motivo: string | null; justificativa: string | null } | null }>
 }
 interface Comentario { id: number; texto: string; autorNome: string; criadoEm: string }
-const TIPO = { AUDITORIA: "Auditoria", FASE: "Fase", CONTATO: "Contato" } as const
 
 function comMencoes(texto: string) {
   const partes: Array<string | { nome: string }> = []
@@ -34,6 +37,7 @@ function comMencoes(texto: string) {
 export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFechar: () => void }) {
   const { permissoes } = useTorre()
   const { pode } = usePermissoes()
+  const router = useRouter()
   const [foco, setFoco] = useState<Foco | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [comentarios, setComentarios] = useState<Comentario[] | null>(null)
@@ -115,15 +119,32 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
                 </div>
               ) })}
             </div>
-            <h3 className="font-extrabold mt-3">Linha do tempo</h3>
-            {foco.linhaDoTempo.length === 0 ? <div className="small">Nada registrado ainda para esta família.</div> : (
-              <ul className="space-y-1.5 mt-1">{foco.linhaDoTempo.map((e) => (
-                <li key={e.id} className="border-b border-[var(--border-default)] pb-1.5">
-                  <div><span className="tor-p gry">{TIPO[e.tipo]}</span> <b>{e.titulo}</b> <span className="small">· {fmtDataHora(e.quando)}{e.autor ? ` · ${e.autor}` : ""}</span></div>
-                  {e.texto && <div className="small">{e.texto}</div>}
-                </li>
-              ))}</ul>
+            {foco.encerradas.length > 0 && (
+              <div className="tor-card pad mt-3" aria-label="Certidões canceladas e não exigidas">
+                <b>Canceladas e não exigidas</b> <span className="small">— ficam na pasta, mas não são trabalho (não entram nos números acima)</span>
+                <ul className="mt-2 space-y-1">
+                  {foco.encerradas.map((c) => (
+                    <li key={c.documentoId} className="opacity-70" data-encerrada={c.tipo === "NAO_EXIGIDA" ? "nao_exigida" : "cancelada"}>
+                      <span className="line-through">{c.titulo}{c.pessoa ? ` · ${c.pessoa}` : ""}</span>{" "}
+                      <span className="small">
+                        {c.tipo === "NAO_EXIGIDA"
+                          ? `Não exigida${c.encerramento?.motivo ? `: ${c.encerramento.motivo}` : " pela árvore"}`
+                          : `Cancelada${c.encerramento?.quandoRotulo ? ` ${c.encerramento.quandoRotulo}` : ""}${c.encerramento?.porNome ? ` por ${c.encerramento.porNome}` : ""}${c.encerramento?.motivo ? ` · ${c.encerramento.motivo}` : ""}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
+            <div className="mt-4">
+              {/* A MESMA linha do tempo da aba Histórico do processo (um registro por fato real) — mesma fonte, rota da Torre. */}
+              <HistoricoDoProcesso
+                processoId={foco.processoId}
+                url={`/api/torre/foco/${foco.processoId}/historico`}
+                compacto
+                onAbrirCertidao={(l) => { if (l.tarefaId != null) router.push(urlOperacionalDaTarefa({ taskId: l.tarefaId, processoId: foco.processoId })) }}
+              />
+            </div>
             <h3 className="font-extrabold mt-4">Comentários</h3>
             {familiaId == null ? <div className="small">Processo sem família cadastrada — comentário indisponível.</div> : (
               <>

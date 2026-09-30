@@ -10,11 +10,13 @@
 // ============================================================================
 import type { LinhaOperacaoV3, EstadoTemporalApi } from "./operacao-v3-tipos"
 import { ROTULO_STATUS as ROTULO_STATUS_TAREFA } from "@/src/lib/home/rotulo-status-tarefa"
+import { FUSO_OPERACIONAL } from "@/lib/operacional/tempo-operacional"
 
 export const fmtData = (iso: string | null): string => {
   if (!iso) return "—"
   const d = new Date(iso)
-  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`
+  // dia/mês no fuso da OPERAÇÃO (America/Sao_Paulo), nunca no do navegador (`getDate()/getMonth()` usavam o local).
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: FUSO_OPERACIONAL })
 }
 
 /** "vencido há N d" / "hoje" / "amanhã" / "em N d" — a partir do EstadoTemporal já computado. */

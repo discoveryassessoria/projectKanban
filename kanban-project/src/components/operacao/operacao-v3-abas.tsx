@@ -6,6 +6,7 @@
 // Ver operacao-v3.tsx (shell + aba Fila) e docs/design/operacao-v3-prototipo.html.
 // ============================================================================
 import { useMemo } from "react"
+import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import type { LinhaOperacaoV3 } from "./operacao-v3-tipos"
 import {
   fmtData, acompTxtCompleto, relCls, passoLabelDe, orgaoTxt, cobrancasTxt, prazoTarefaCls, docTipoTxt,
@@ -99,7 +100,7 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
                 <div>{fmtData(t.atribuidaEm)}</div>
                 <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                 <div>{cobrancasTxt(t)}</div>
-                <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>
+                <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {t.acompanhamentoVencido && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onCobrar(t.taskId)}>Cobrar</button>}
                   <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>{concluirLabelDe(t)}</button>
@@ -205,7 +206,7 @@ export function AbaAcompanhamento({
                         <div>{orgaoTxt(t)}</div>
                         <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                         <div>{cobrancasTxt(t)}</div>
-                        <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>
+                        <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                           {terceiro && t.acompanhamentoVencido && <button className="opv3-btn opv3-sm opv3-acc" onClick={() => onCobrar(t.taskId)}>Cobrar</button>}
                           <button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>{concluirLabelDe(t)}</button>
@@ -320,7 +321,7 @@ export function AbaFamilias({
                       <div>{passo.label}</div>
                       <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                       <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
-                      <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>
+                      <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                       <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
                       <div><button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button></div>
                     </div>
@@ -461,7 +462,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
                       <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
                       <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
                       <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
-                      <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{t.rotuloDoPrazo}</span></div>
+                      <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
                       <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
                       <div><button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button></div>
                     </div>

@@ -315,7 +315,17 @@ export async function dispensarNecessidade(
 export const MOTIVO_DOCUMENTO_DISPENSADO = "Necessidade dispensada — não se aplica em nenhuma fase"
 
 /** Reativa uma necessidade DISPENSADA (voltou a ser aplicável) → PENDENTE. */
-export async function reativarNecessidade(necessidadeId: number, db: DB = prisma) {
+export async function reativarNecessidade(
+  necessidadeId: number,
+  db: DB = prisma,
+  /**
+   * `reabrirDocumentoIds`: Documentos que uma PESSOA cancelou (status CANCELADO, motivo dela) e que OUTRA pessoa
+   * está reabrindo AGORA, de propósito — "Reabrir certidão" (`reabrirCertidaoCancelada`). Sem isto a reativação
+   * preserva o cancelamento humano (a regra voltar a valer não desfaz uma decisão sobre o papel); com isto, e só
+   * para estes ids, o espelho é completo: documento, passos (de qualquer fase) e tarefa voltam juntos.
+   */
+  opcoes: { reabrirDocumentoIds?: number[] } = {},
+) {
   const n = await db.necessidadeDocumental.findUnique({ where: { id: necessidadeId }, select: { status: true } })
   if (!n || n.status !== "DISPENSADA") return
   await db.necessidadeDocumental.update({ where: { id: necessidadeId }, data: { status: "PENDENTE" } })
@@ -334,6 +344,7 @@ export async function reativarNecessidade(necessidadeId: number, db: DB = prisma
       OR: [
         { status: "NAO_EXIGIDO" },
         { status: "CANCELADO", motivoBloqueio: MOTIVO_DOCUMENTO_DISPENSADO },
+        ...(opcoes.reabrirDocumentoIds?.length ? [{ id: { in: opcoes.reabrirDocumentoIds }, status: "CANCELADO" as const }] : []),
       ],
     },
     select: { id: true },

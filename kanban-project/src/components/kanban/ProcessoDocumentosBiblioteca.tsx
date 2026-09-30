@@ -20,14 +20,16 @@
 
 import { rotuloGrupoPessoa } from "@/src/lib/documentos/rotulo-grupo-pessoa"
 import { useState } from "react"
-import { FileText, Filter, Search, CheckCircle2, Clock, ChevronDown } from "lucide-react"
+import { FileText, Filter, Search, CheckCircle2, Clock, ChevronDown, Ban } from "lucide-react"
+import type { EncerramentoDoDocumento } from "@/src/lib/process-stage/estrutura-operacional-core"
+import { dataHoraSP } from "@/lib/operacional/historico-filtros"
 
 // ============================================================
 // TIPOS
 // ============================================================
 
 type CellStatus = "validada" | "recebida" | "pendente" | "nao_aplica"
-type FinalStatus = "pronta_protocolo" | "pendente" | "aguardando"
+type FinalStatus = "pronta_protocolo" | "pendente" | "aguardando" | "cancelada" | "nao_exigida"
 
 export interface BibDocItem {
   id: number
@@ -39,6 +41,8 @@ export interface BibDocItem {
   translation: { status: CellStatus; date?: string | null }
   apostille: { status: CellStatus; date?: string | null }
   finalStatus: FinalStatus
+  /** Cancelada / não exigida: quem, quando e por quê. `null` = ativa. */
+  encerramento?: EncerramentoDoDocumento | null
   arquivoUrl: string | null
   arquivoNome: string | null
   arquivoMimeType: string | null
@@ -64,7 +68,8 @@ export interface BibPersonGroup {
   role: string
   lineage: "Linha reta" | "Fora da linha"
   generation: number | string
-  stats: { totalDocuments: number; readyForProtocol: number; pending: number }
+  /** `totalDocuments` = requeridas (só as ativas); canceladas e não exigidas ficam à parte e fora da conta. */
+  stats: { totalDocuments: number; readyForProtocol: number; pending: number; cancelled: number; notRequired: number }
   documents: BibDocItem[]
 }
 
@@ -84,6 +89,8 @@ export interface ProcessoDocumentosBibliotecaProps {
   linhaPrincipal: BibPersonGroup[]
   foraDaLinha: BibPersonGroup[]
   onAbrirDetalhes: (docId: number) => void
+  /** "Reabrir" da certidão cancelada (porta canônica). Ausente ⇒ só "Ver motivo". Devolve a mensagem de erro, ou null. */
+  onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
 }
 
 const FILTERS = [
@@ -95,7 +102,16 @@ const FINAL_LABEL: Record<FinalStatus, string> = {
   pronta_protocolo: "Pronto para protocolo",
   pendente: "Pendente",
   aguardando: "Aguardando",
+  cancelada: "Cancelada",
+  nao_exigida: "Não exigida",
 }
+
+/** Filtro de STATUS: o padrão MOSTRA as canceladas (cancelar nunca esconde); "Só ativas" as tira; "Cancelada" lista só elas. */
+const STATUS_FILTROS = [
+  ["todos", "Todos os status (incl. canceladas)"], ["ativas", "Só ativas"], ["cancelada", "Cancelada"], ["nao_exigida", "Não exigida"],
+] as const
+type StatusFiltro = (typeof STATUS_FILTROS)[number][0]
+const ehEncerrada = (it: BibDocItem) => it.finalStatus === "cancelada" || it.finalStatus === "nao_exigida"
 
 // ============================================================
 // COMPONENTE PRINCIPAL
@@ -106,8 +122,10 @@ export function ProcessoDocumentosBiblioteca({
   linhaPrincipal,
   foraDaLinha,
   onAbrirDetalhes,
+  onReabrirCertidao,
 }: ProcessoDocumentosBibliotecaProps) {
   const [filtro, setFiltro] = useState<string>("Todos")
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("todos")
   const [busca, setBusca] = useState("")
 
   const kpiCards: Array<[string, number, string, string]> = [
@@ -122,6 +140,9 @@ export function ProcessoDocumentosBiblioteca({
   ]
 
   const matchFilter = (it: BibDocItem, lineage: string): boolean => {
+    if (statusFiltro === "ativas" && ehEncerrada(it)) return false
+    if (statusFiltro === "cancelada" && it.finalStatus !== "cancelada") return false
+    if (statusFiltro === "nao_exigida" && it.finalStatus !== "nao_exigida") return false
     if (filtro === "Linha reta" && lineage !== "Linha reta") return false
     if (filtro === "Fora da linha" && lineage === "Linha reta") return false
     if (filtro === "Pendentes" && it.finalStatus !== "pendente") return false
@@ -189,6 +210,14 @@ export function ProcessoDocumentosBiblioteca({
                 </button>
               ))}
             </div>
+            <select
+              aria-label="Filtrar por status"
+              value={statusFiltro}
+              onChange={(e) => setStatusFiltro(e.target.value as StatusFiltro)}
+              className="border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-[var(--text-secondary)]"
+            >
+              {STATUS_FILTROS.map(([v, r]) => <option key={v} value={v}>{r}</option>)}
+            </select>
             <div className="flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
               <Search className="w-[15px] h-[15px] text-[var(--text-muted)]" />
               <input
@@ -210,7 +239,7 @@ export function ProcessoDocumentosBiblioteca({
               <div className="p-[18px] text-center text-[var(--text-muted)] text-[13px]">Nenhuma pessoa nesta seção.</div>
             ) : (
               linhaPrincipal.map((g) => (
-                <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} />
+                <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} onReabrirCertidao={onReabrirCertidao} />
               ))
             )}
           </div>
@@ -225,7 +254,7 @@ export function ProcessoDocumentosBiblioteca({
               <div className="p-[18px] text-center text-[var(--text-muted)] text-[13px]">Nenhuma pessoa nesta seção.</div>
             ) : (
               foraDaLinha.map((g) => (
-                <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} />
+                <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} onReabrirCertidao={onReabrirCertidao} />
               ))
             )}
           </div>
@@ -269,10 +298,12 @@ function PersonGroup({
   g,
   matchFilter,
   onAbrirDetalhes,
+  onReabrirCertidao,
 }: {
   g: BibPersonGroup
   matchFilter: (it: BibDocItem, lineage: string) => boolean
   onAbrirDetalhes: (docId: number) => void
+  onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
 }) {
   const [aberto, setAberto] = useState(true)
   const docs = g.documents.filter((it) => matchFilter(it, g.lineage))
@@ -301,7 +332,7 @@ function PersonGroup({
         </div>
         <div className="flex gap-2.5">
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
-            <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} documentos
+            <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} requerida{g.stats.totalDocuments === 1 ? "" : "s"}
           </span>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green-800 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> {g.stats.readyForProtocol} pronto{g.stats.readyForProtocol === 1 ? "" : "s"}
@@ -309,6 +340,16 @@ function PersonGroup({
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent-text)] bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-[11px] py-1.5">
             <Clock className="w-3.5 h-3.5" /> {g.stats.pending} pendentes
           </span>
+          {g.stats.cancelled > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-red-700 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
+              <Ban className="w-3.5 h-3.5" /> {g.stats.cancelled} cancelada{g.stats.cancelled === 1 ? "" : "s"}
+            </span>
+          )}
+          {g.stats.notRequired > 0 && (
+            <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
+              <Ban className="w-3.5 h-3.5" /> {g.stats.notRequired} não exigida{g.stats.notRequired === 1 ? "" : "s"}
+            </span>
+          )}
         </div>
         <ChevronDown className={`w-[18px] h-[18px] text-[var(--text-muted)] transition-transform ${aberto ? "" : "-rotate-90"}`} />
       </div>
@@ -341,11 +382,87 @@ function PersonGroup({
                   <span>AÇÕES</span>
                 </div>
                 {docs.map((it) => (
-                  <DocRow key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} />
+                  ehEncerrada(it)
+                    ? <DocRowEncerrada key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} onReabrirCertidao={onReabrirCertidao} />
+                    : <DocRow key={it.id} it={it} onAbrirDetalhes={onAbrirDetalhes} />
                 ))}
               </div>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Certidão CANCELADA / NÃO EXIGIDA: continua na lista da pessoa, esmaecida, no fim, com quem/quando/por quê.
+ * "Ver motivo" sempre; "Reabrir" só para cancelamento humano de tarefa ainda cancelada e com a permissão da porta —
+ * para NÃO EXIGIDA a árvore decide, e o painel diz por quê.
+ */
+function DocRowEncerrada({ it, onAbrirDetalhes, onReabrirCertidao }: {
+  it: BibDocItem; onAbrirDetalhes: (docId: number) => void; onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
+}) {
+  const [motivoAberto, setMotivoAberto] = useState(false)
+  const [reabrindo, setReabrindo] = useState(false)
+  const [justificativa, setJustificativa] = useState("")
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const e = it.encerramento ?? null
+  const naoExigida = it.finalStatus === "nao_exigida"
+  const quando = e?.quandoRotulo ?? null
+  const resumo = naoExigida
+    ? `Não exigida${e?.motivo ? `: ${e.motivo}` : " pela árvore"}`
+    : `Cancelada${quando ? ` ${quando}` : ""}${e?.porNome ? ` por ${e.porNome}` : ""}${e?.motivo ? ` · ${e.motivo}` : ""}`
+  const tarefaReabrivel = !naoExigida && e?.tarefaReabrivelId != null && onReabrirCertidao ? e.tarefaReabrivelId : null
+  const confirmar = async () => {
+    if (tarefaReabrivel == null || !onReabrirCertidao) return
+    setEnviando(true); setErro(null)
+    const m = await onReabrirCertidao(tarefaReabrivel, justificativa.trim())
+    setEnviando(false)
+    if (m) setErro(m); else { setReabrindo(false); setJustificativa("") }
+  }
+  return (
+    <div className="border-t border-[var(--border-default)] bg-[var(--surface-secondary)]/40" data-encerrada={naoExigida ? "nao_exigida" : "cancelada"}>
+      <div className="grid gap-2.5 items-center px-[18px] py-[13px] text-[12.5px] text-[var(--text-muted)]" style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}>
+        <span className="flex items-center gap-2.5 min-w-0">
+          <span className="w-5 h-5 flex-none"><Ban className="w-5 h-5" /></span>
+          <span className="min-w-0">
+            <b className="text-[13px] block line-through decoration-[var(--border-strong)]">{it.documentType}</b>
+            <small className="text-[11px] block truncate" title={resumo}>{resumo}</small>
+          </span>
+        </span>
+        <span className="text-[12px]">{it.documentFormat}</span>
+        <span>—</span><span>—</span><span>—</span><span>—</span>
+        <span>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-md border border-dashed border-[var(--border-strong)] bg-[var(--surface-tertiary)] text-[var(--text-secondary)] whitespace-nowrap">{FINAL_LABEL[it.finalStatus]}</span>
+        </span>
+        <span className="flex flex-wrap gap-x-3 gap-y-1 text-[12px]">
+          <button type="button" onClick={() => setMotivoAberto((v) => !v)} aria-expanded={motivoAberto} className="font-semibold text-[var(--accent-text)] hover:underline">Ver motivo</button>
+          {tarefaReabrivel != null && !reabrindo && <button type="button" onClick={() => setReabrindo(true)} className="font-semibold text-[var(--accent-text)] hover:underline">Reabrir</button>}
+          <button type="button" onClick={() => onAbrirDetalhes(it.id)} className="font-semibold text-[var(--text-secondary)] hover:underline">Detalhes</button>
+        </span>
+      </div>
+      {motivoAberto && (
+        <div className="mx-[18px] mb-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3.5 py-2.5 text-[12.5px] text-[var(--text-primary)]">
+          <div><span className="text-[var(--text-secondary)]">{naoExigida ? "Situação:" : "Decisão:"}</span> {naoExigida ? "não exigida pela árvore" : "cancelada"}{e?.porNome ? ` por ${e.porNome}` : naoExigida ? " (a árvore mudou)" : ""}{e?.quando ? ` em ${dataHoraSP(e.quando)}` : ""}</div>
+          {e?.motivo && <div><span className="text-[var(--text-secondary)]">Motivo:</span> {e.motivo}</div>}
+          {e?.justificativa && <div><span className="text-[var(--text-secondary)]">Justificativa:</span> “{e.justificativa}”</div>}
+          {!e && <div className="text-[var(--text-secondary)]">Nenhuma fonte guardou quem, quando e por quê.</div>}
+          {naoExigida && e?.observacao && <div className="mt-1 text-[var(--text-secondary)]">{e.observacao}</div>}
+          {!naoExigida && tarefaReabrivel == null && <div className="mt-1 text-[var(--text-secondary)]">Reabrir depende da permissão de editar tarefas e de a tarefa continuar cancelada.</div>}
+        </div>
+      )}
+      {reabrindo && tarefaReabrivel != null && (
+        <div className="mx-[18px] mb-3 flex flex-col gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] p-3">
+          <label htmlFor={`reabrir-doc-${it.id}`} className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Por que reabrir? (fica no histórico)</label>
+          <textarea id={`reabrir-doc-${it.id}`} value={justificativa} onChange={(ev) => setJustificativa(ev.target.value)} rows={2} maxLength={300}
+            className="w-full resize-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
+          {erro && <div role="alert" className="text-[12.5px] text-[var(--danger-text)]">{erro}</div>}
+          <div className="flex gap-2">
+            <button type="button" disabled={enviando || justificativa.trim().length < 5} onClick={() => void confirmar()} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-tertiary)] px-3 py-1.5 text-[12px] font-bold disabled:opacity-50">{enviando ? "Reabrindo…" : "Confirmar reabertura"}</button>
+            <button type="button" disabled={enviando} onClick={() => { setReabrindo(false); setErro(null) }} className="rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-[12px]">Cancelar</button>
+          </div>
         </div>
       )}
     </div>
@@ -491,6 +608,7 @@ function Legenda() {
     ["bg-[var(--surface-secondary)]", "Não se aplica", "Não aplicável para este documento"],
     ["bg-[var(--surface-secondary)]", "Pronto para protocolo", "Certidão + Análise Documental + Tradução + Apostila concluídas"],
     ["bg-[var(--accent-primary)]/120", "Aguardando", "Certidão recebida, aguardando Análise Documental ou outra etapa"],
+    ["bg-[var(--surface-secondary)]", "Cancelada / Não exigida", "Continua na pasta, esmaecida, e não conta nas exigidas"],
   ]
   return (
     <div className="flex flex-col gap-[11px]">

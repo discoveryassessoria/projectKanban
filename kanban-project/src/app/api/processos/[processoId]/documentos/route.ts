@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { estadoOperacionalDosDocumentos, rotularEstadoDoDocumento } from "@/lib/operacional/documento-estado"
 import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from "@/src/services/genealogia/titular-uniao"
+import { encerramentosDosDocumentos } from "@/src/services/encerramento-documental"
+import type { EncerramentoDoDocumento } from "@/src/lib/process-stage/estrutura-operacional-core"
 
 // ============================================================
 // TIPOS DE RESPOSTA
@@ -21,6 +23,11 @@ interface DocCompact {
   statusShort: string     // "recebido", "não iniciado", "em busca", etc.
   statusClass: string     // "received" | "pending" | "searching" | "requesting" | "waiting" | "returned" | "other"
   isRecebido: boolean
+  /**
+   * CANCELAR NUNCA ESCONDE, SÓ MARCA: documento CANCELADO ou NÃO EXIGIDO (a árvore deixou de exigir) continua na lista da
+   * pessoa — `encerramento` diz quem, quando e por quê. `null` = documento ativo.
+   */
+  encerramento: EncerramentoDoDocumento | null
   /**
    * Passou pela Análise Documental (comparação com a árvore) SEM divergência
    * em aberto. Documento recebido não é o mesmo que documento analisado —
@@ -343,6 +350,8 @@ export async function GET(
     // congelado. Placeholders (id negativo) não têm Tarefa nenhuma: resolvem
     // sozinhos para "nunca iniciado", sem consulta extra nem caso especial.
     const estadosPorDocumento = await estadoOperacionalDosDocumentos([...allDocs, ...placeholders].map((d) => d.id))
+    // Quem/quando/por quê dos documentos cancelados ou não exigidos (uma leitura em lote; só processa os inativos).
+    const encerramentos = await encerramentosDosDocumentos(allDocs.map((d) => d.id))
 
     // -- Constroi cada linha
     const buildRow = (p: typeof pessoas[number]): PersonRow => {
@@ -368,6 +377,7 @@ export async function GET(
         statusShort: derivado.statusShort,
         statusClass: derivado.statusClass,
         isRecebido: derivado.isRecebido,
+        encerramento: encerramentos.get(d.id) ?? null,
         analiseOk: analiseConcluida && d.analysisStatus === "ready" && !idsComDivergenciaAberta.has(d.id),
         arquivoUrl: d.arquivo_url ?? null,
         arquivoNome: d.arquivo_nome ?? null,

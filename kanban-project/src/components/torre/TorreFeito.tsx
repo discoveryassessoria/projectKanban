@@ -2,15 +2,17 @@
 // src/components/torre/TorreFeito.tsx — visão FEITO: concluídas dos últimos 14 dias (GET /api/operacao/tarefas?visao=feito&escopo=equipe),
 // agrupadas Hoje / Ontem / Antes por `concluidaEm` e depois por família — a mesma derivação de `AbaFeito` da Operação. Somente leitura + Abrir.
 import { useMemo } from "react"
+import { diaOperacional } from "@/lib/operacional/tempo-operacional"
 import { agruparPorFamilia, docTipoTxt, orgaoTxt, fmtData } from "@/src/components/operacao/operacao-v3-derivacoes"
 import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
 
 export function TorreFeito({ linhas, onAbrir }: { linhas: LinhaOperacaoV3[]; onAbrir: (l: LinhaOperacaoV3) => void }) {
   const blocos = useMemo(() => {
+    // Hoje / Ontem no DIA OPERACIONAL (America/Sao_Paulo) — nunca no fuso do navegador (`toDateString()` usava o local).
     const agora = new Date()
-    const hojeStr = agora.toDateString(); const ontemStr = new Date(agora.getTime() - 86_400_000).toDateString()
-    const hoje = linhas.filter((l) => l.concluidaEm && new Date(l.concluidaEm).toDateString() === hojeStr)
-    const ontem = linhas.filter((l) => l.concluidaEm && new Date(l.concluidaEm).toDateString() === ontemStr)
+    const hojeStr = diaOperacional(agora); const ontemStr = diaOperacional(new Date(agora.getTime() - 86_400_000))
+    const hoje = linhas.filter((l) => l.concluidaEm && diaOperacional(new Date(l.concluidaEm)) === hojeStr)
+    const ontem = linhas.filter((l) => l.concluidaEm && diaOperacional(new Date(l.concluidaEm)) === ontemStr)
     const antes = linhas.filter((l) => !hoje.includes(l) && !ontem.includes(l))
     return [{ titulo: "Hoje", rows: hoje }, { titulo: "Ontem", rows: ontem }, { titulo: "Antes", rows: antes }].filter((b) => b.rows.length > 0)
   }, [linhas])

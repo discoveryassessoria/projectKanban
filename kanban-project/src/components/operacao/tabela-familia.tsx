@@ -15,6 +15,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import { useRouter } from "next/navigation"
 import {
   Play, CalendarClock, AlertTriangle, Clock3, CheckCircle2,
@@ -365,8 +366,8 @@ function LinhaOperacaoTabela({
         <div className="truncate text-[10px] text-[var(--text-muted)]">{textoDaProximaAcao(l)}</div>
       </td>
       <td className="px-3 py-2.5">
-        <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{l.rotuloDoPrazo}</div>
-        {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
+        {/* O prazo da TAREFA, UMA vez só (texto-prazo.ts) — nunca o rótulo + a data por extenso numa segunda linha. */}
+        <div className={`text-[11.5px] ${l.atrasada ? "text-[var(--danger-text)]" : "text-[var(--text-secondary)]"}`}>{textoPrazoDaTarefa(l)}</div>
       </td>
       <td className="px-3 py-2.5">
         <span className="flex items-center gap-1.5 text-[11.5px] text-[var(--text-secondary)]">

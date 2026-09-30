@@ -286,7 +286,7 @@ for (const exigido of ["progresso", "etapaAtual", "responsavelNome", "prazo", "e
 check("uma linha por documento, com identidade por ID", idxDe(3).documentos.length === 2 && idxDe(3).documentos.every((d) => d.necessidadeId != null))
 check("todas as pessoas continuam no índice", linhasIdx.length === 4)
 check("pessoa sem documento aplicável é marcada, não removida", idxDe(4).semDocumentoAplicavel === true && idxDe(4).documentos.length === 0)
-check("contadores por pessoa vêm do domínio", JSON.stringify(idxDe(3).totais) === JSON.stringify({ documentos: 2, prontos: 0, pendentes: 2, divergentes: 0, cancelados: 0 }))
+check("contadores por pessoa vêm do domínio", JSON.stringify(idxDe(3).totais) === JSON.stringify({ documentos: 2, prontos: 0, pendentes: 2, divergentes: 0, cancelados: 0, naoExigidos: 0 }))
 check("documento concluído vira status final PRONTO", idxDe(1).documentos[0].statusFinal === "PRONTO")
 check("documento parcialmente executado vira EM_ANDAMENTO", (() => {
   const d = idxDe(3).documentos.find((x) => x.chave === "necessidade:13")!

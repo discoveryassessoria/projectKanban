@@ -191,6 +191,30 @@ export function criarPalco(MARCA: string) {
     return { workflowId: wf.id }
   }
 
+  /**
+   * MACROFLUXO DE DUAS FASES (Genealogia ordem 0 → Emissão Documental ordem 1) para o tipo/modalidade do palco,
+   * com CatalogoFase ativas e a Emissão publicada (`montarEmissao`). É o mínimo que o `advance` aceita para o
+   * processo SAIR da Genealogia de verdade (Processo.faseAtualKey muda + PhaseAdvanceLog AVANCADO).
+   * Chame DEPOIS de `montar()` e ANTES de `novoCenario()`. Idempotente no mesmo palco.
+   */
+  async function montarMacroDuasFases() {
+    await prisma.catalogoFase.upsert({ where: { phaseKey: "genealogia" }, update: {}, create: { phaseKey: "genealogia", label: "Genealogia" } })
+    await prisma.catalogoFase.upsert({ where: { phaseKey: "emissao_documental" }, update: {}, create: { phaseKey: "emissao_documental", label: "Emissão Documental" } })
+    const macro = await prisma.macroWorkflow.upsert({
+      where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipoId, modalidadeId } },
+      update: {}, create: { tipoProcessoId: tipoId, modalidadeId, name: `${M} macro` }, select: { id: true },
+    })
+    await prisma.faseMacro.upsert({
+      where: { macroWorkflowId_phaseKey: { macroWorkflowId: macro.id, phaseKey: "genealogia" } },
+      update: { ordem: 0 }, create: { macroWorkflowId: macro.id, phaseKey: "genealogia", label: "Genealogia", ordem: 0 },
+    })
+    await prisma.faseMacro.upsert({
+      where: { macroWorkflowId_phaseKey: { macroWorkflowId: macro.id, phaseKey: "emissao_documental" } },
+      update: { ordem: 1 }, create: { macroWorkflowId: macro.id, phaseKey: "emissao_documental", label: "Emissão Documental", ordem: 1 },
+    })
+    return montarEmissao()
+  }
+
   // ── chamadas às ROTAS REAIS ────────────────────────────────────────────────
   const req = (url: string, method: string, body?: unknown) =>
     new NextRequest(`http://localhost${url}`, {
@@ -283,7 +307,7 @@ export function criarPalco(MARCA: string) {
   const DOC_INATIVO = ["CANCELADO", "NAO_EXIGIDO"]
 
   return {
-    M, COD, RULE, regraIds, limpar, montar, montarEmissao, novoCenario,
+    M, COD, RULE, regraIds, limpar, montar, montarEmissao, montarMacroDuasFases, novoCenario,
     get adminId() { return adminId }, get token() { return token }, get tipoId() { return tipoId },
     putPessoa, postPessoa, deletePessoa, postUniao, deleteUniao, postRegra, putMatrizLegada,
     postVincularRequerente, postDesvincularRequerente, foto, derivados, req, ctx,

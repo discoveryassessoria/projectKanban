@@ -50,6 +50,7 @@ import type {
   StatusResumo,
 } from "@/src/lib/process-stage/estrutura-operacional-core"
 import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
+import { dataHoraSP } from "@/lib/operacional/historico-filtros"
 
 // ============================================================
 // TIPOS
@@ -76,6 +77,7 @@ const LADRILHO_KPI: Record<string, { tile: string; ink: string; Icone: LucideIco
   Pendentes:   { tile: "var(--warning-tile)", ink: "var(--warning)", Icone: Clock },
   Divergentes: { tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: AlertTriangle },
   Cancelados:  { tile: "var(--danger-tile)",  ink: "var(--danger)",  Icone: Ban },
+  "Não exigidos": { tile: "var(--info-tile)", ink: "var(--info)", Icone: Ban },
 }
 
 export interface PainelDaFaseProps {
@@ -121,6 +123,8 @@ export interface PainelDaFaseProps {
   usuarios?: Array<{ id: number; nome: string }>
   /** taskId em gravação — trava só a linha que está mudando. */
   salvandoResponsavel?: number | null
+  /** "Reabrir" da certidão cancelada (porta canônica). Ausente ⇒ a linha cancelada só oferece "Ver motivo". */
+  onReabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
   /** Consulta de fase passada: mesmo layout, sem ações de mutação. */
   readOnly?: boolean
   /**
@@ -158,6 +162,7 @@ export function PainelDaFase({
   onRetirarResponsavel,
   usuarios,
   salvandoResponsavel = null,
+  onReabrirCertidao,
   readOnly = false,
   documentoDestacadoId = null,
   modoReestruturacao = false,
@@ -308,7 +313,7 @@ export function PainelDaFase({
           indice={indice}
           chaveExpansao={chaveExpansao}
           onAbrirDetalhes={onAbrirDetalhes}
-          gestao={{ onAtribuirResponsavel, onRetirarResponsavel, usuarios, salvandoResponsavel }}
+          gestao={{ onAtribuirResponsavel, onRetirarResponsavel, usuarios, salvandoResponsavel, reabrirCertidao: onReabrirCertidao }}
           readOnly={readOnly}
           documentoDestacadoId={documentoDestacadoId}
           recorte={recorte}
@@ -343,12 +348,13 @@ const LINHAS_POR_PESSOA = 25
 // consulta nada, nenhum filtro grava nada: são recortes do mesmo conjunto, e é
 // por isso que os números do topo e os da tabela nunca podem discordar.
 
-export type RecorteRapido = "todos" | "prontos" | "pendentes" | "divergentes" | "cancelados" | "atrasados" | "sem_responsavel"
+export type RecorteRapido = "todos" | "prontos" | "pendentes" | "divergentes" | "cancelados" | "nao_exigidos" | "atrasados" | "sem_responsavel"
 
 export interface Recorte {
   rapido: RecorteRapido
   busca: string
-  estado: EstadoOperacionalDaLinha | ""
+  /** "" = Todos os status (incluindo as canceladas); "ATIVAS" = só o que ainda é trabalho. */
+  estado: EstadoOperacionalDaLinha | "ATIVAS" | ""
   responsavelId: number | "" | "sem"
   etapa: string
   ordem: OrdemDaTabela
@@ -372,6 +378,7 @@ export function recorteDoKpi(label: string): RecorteRapido | null {
   if (t.includes("pronto") || t.includes("valida")) return "prontos"
   if (t.includes("pendente")) return "pendentes"
   if (t.includes("divergen") || t.includes("invalid")) return "divergentes"
+  if (t.includes("nao exigid")) return "nao_exigidos"
   if (t.includes("cancelad") || t.includes("substitu")) return "cancelados"
   if (t.includes("atrasad") || t.includes("vencid")) return "atrasados"
   if (t.includes("sem responsavel")) return "sem_responsavel"
@@ -396,10 +403,13 @@ export function passaNoRecorte(doc: DocumentoDoIndice, r: Recorte, pessoaNome: s
   if (r.rapido === "pendentes" && doc.statusFinal !== "PENDENTE" && doc.statusFinal !== "EM_ANDAMENTO") return false
   if (r.rapido === "divergentes" && doc.statusFinal !== "DIVERGENTE" && doc.statusFinal !== "INVALIDADO") return false
   if (r.rapido === "cancelados" && doc.statusFinal !== "CANCELADO" && doc.statusFinal !== "SUPERSEDIDO") return false
+  if (r.rapido === "nao_exigidos" && doc.statusFinal !== "NAO_EXIGIDO") return false
   if (r.rapido === "atrasados" && !f.atrasado) return false
-  if (r.rapido === "sem_responsavel" && (f.responsavelId != null || f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA")) return false
+  if (r.rapido === "sem_responsavel" && (f.responsavelId != null || f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA" || f.estado === "NAO_EXIGIDA")) return false
 
-  if (r.estado !== "" && f.estado !== r.estado) return false
+  // "Só ativas": cancelada, substituída e não exigida NÃO são trabalho (CANCELAR NUNCA ESCONDE: o padrão as mostra).
+  if (r.estado === "ATIVAS" && (f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA" || f.estado === "NAO_EXIGIDA")) return false
+  if (r.estado !== "" && r.estado !== "ATIVAS" && f.estado !== r.estado) return false
   if (r.responsavelId === "sem" && f.responsavelId != null) return false
   if (typeof r.responsavelId === "number" && f.responsavelId !== r.responsavelId) return false
   if (r.etapa !== "" && f.etapaAtual !== r.etapa) return false
@@ -441,7 +451,7 @@ function urgenciaDaLinha(doc: DocumentoDoIndice): number {
  * (progresso, prazo, etapa...) continuam como o nome diz - escolha deliberada
  * de quem clicou - e usam o evento de vida só como desempate, como sempre foi.
  */
-export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
+function ordenarPorCriterio(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
   const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) => compararPorEventoDeVida(a.titulo, b.titulo)
   const copia = [...docs]
   switch (ordem) {
@@ -467,6 +477,18 @@ export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabel
   }
 }
 
+/** Certidão cancelada / substituída / não exigida: continua na pasta, mas não é trabalho. */
+export const estaEncerrada = (d: DocumentoDoIndice): boolean => d.naFase.estado === "CANCELADA" || d.naFase.estado === "SUPERSEDIDA" || d.naFase.estado === "NAO_EXIGIDA"
+
+/**
+ * CANCELAR NUNCA ESCONDE, SÓ MARCA: as encerradas vão para o FIM da lista da pessoa (esmaecidas), em qualquer ordem
+ * escolhida — o trabalho vem primeiro. Dentro de cada grupo vale a ordem do critério.
+ */
+export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
+  const ordenados = ordenarPorCriterio(docs, ordem)
+  return [...ordenados.filter((d) => !estaEncerrada(d)), ...ordenados.filter(estaEncerrada)]
+}
+
 /**
  * O QUE A LINHA PRECISA PARA SER GERIDA — repassado inteiro, nunca por prop solta.
  *
@@ -479,6 +501,11 @@ export interface GestaoDeResponsavel {
   onRetirarResponsavel?: (taskId: number) => void | Promise<void>
   usuarios?: Array<{ id: number; nome: string }>
   salvandoResponsavel?: number | null
+  /**
+   * "Reabrir" de uma certidão CANCELADA — a porta canônica (`/reabrir-certidao`), só para quem tem a permissão da porta.
+   * Devolve a mensagem de erro (ou null quando reabriu). Ausente ⇒ a linha não oferece o botão.
+   */
+  reabrirCertidao?: (tarefaId: number, motivo: string) => Promise<string | null>
 }
 
 interface Expansao {
@@ -567,6 +594,8 @@ function IndiceView({
     ],
     [indiceBruto],
   )
+  // Canceladas, substituídas e não exigidas continuam na pasta, mas ficam FORA DA CONTA (não são requeridas nem trabalho).
+  const foraDaConta = useMemo(() => todosOsDocs.filter(estaEncerrada).length, [todosOsDocs])
   const visiveis = useMemo(
     () => [
       ...indice.linhaPrincipal.flatMap((p) => p.documentos),
@@ -653,17 +682,19 @@ function IndiceView({
 
       <select
         value={recorte.estado}
-        onChange={(e) => setRecorte((r) => ({ ...r, estado: e.target.value as EstadoOperacionalDaLinha | "" }))}
+        onChange={(e) => setRecorte((r) => ({ ...r, estado: e.target.value as EstadoOperacionalDaLinha | "ATIVAS" | "" }))}
         className={campo}
         aria-label="Filtrar por status"
       >
-        <option value="">Todos os status</option>
+        <option value="">Todos os status (incl. canceladas)</option>
+        <option value="ATIVAS">Só ativas</option>
         <option value="A_FAZER">A fazer</option>
         <option value="EM_ANDAMENTO">Em andamento</option>
         <option value="AGUARDANDO_TERCEIRO">Aguardando terceiro</option>
         <option value="BLOQUEADA">Bloqueada</option>
         <option value="CONCLUIDA">Concluída</option>
         <option value="CANCELADA">Cancelada</option>
+        <option value="NAO_EXIGIDA">Não exigida</option>
         <option value="SUPERSEDIDA">Substituída</option>
       </select>
 
@@ -804,7 +835,7 @@ function IndiceView({
         <span className="ml-auto text-[11px] font-bold text-[var(--text-muted)] bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
           {recortando
             ? `${visiveis} de ${indiceBruto.resumo.documentos} documento(s)`
-            : `${indiceBruto.resumo.documentos} documento(s)`}
+            : `${indiceBruto.resumo.documentos} documento(s)${foraDaConta > 0 ? ` · +${foraDaConta} cancelada${foraDaConta === 1 ? "" : "s"}/não exigida${foraDaConta === 1 ? "" : "s"} na pasta` : ""}`}
         </span>
       </div>
 
@@ -905,11 +936,13 @@ function PessoaCard({
           <span className="text-[12px] text-[var(--text-muted)] flex-none">Nenhum documento aplicável nesta fase</span>
         ) : (
           <span className="flex items-center gap-5 flex-none">
-            <Pilula valor={t.documentos} rotulo="documentos" />
-            <Pilula valor={t.prontos} rotulo="prontos" tone="ok" />
+            {/* REQUERIDAS = o que ainda é exigido: cancelada e não exigida NÃO entram (nem em prontas/pendentes) — aparecem à parte. */}
+            <Pilula valor={t.documentos - t.cancelados - t.naoExigidos} rotulo="requeridas" />
+            <Pilula valor={t.prontos} rotulo="prontas" tone="ok" />
             <Pilula valor={t.pendentes} rotulo="pendentes" tone="busca" />
             {t.divergentes > 0 && <Pilula valor={t.divergentes} rotulo="divergentes" tone="late" />}
-            {t.cancelados > 0 && <Pilula valor={t.cancelados} rotulo="cancelados" tone="late" />}
+            {t.cancelados > 0 && <Pilula valor={t.cancelados} rotulo={t.cancelados === 1 ? "cancelada" : "canceladas"} tone="late" />}
+            {t.naoExigidos > 0 && <Pilula valor={t.naoExigidos} rotulo={t.naoExigidos === 1 ? "não exigida" : "não exigidas"} />}
           </span>
         )}
 
@@ -1003,7 +1036,16 @@ function TabelaDocumentos({
           <div>Status</div>
           <div className="text-right">Ação</div>
         </div>
-        {visiveis.map((d) => (
+        {visiveis.map((d) => estaEncerrada(d) ? (
+          <LinhaEncerrada
+            key={d.chave}
+            doc={d}
+            onAbrirDetalhes={onAbrirDetalhes}
+            gestao={gestao}
+            readOnly={readOnly}
+            destacado={documentoDestacadoId != null && d.documentoId === documentoDestacadoId}
+          />
+        ) : (
           <LinhaDocumento
             key={d.chave}
             doc={d}
@@ -1036,6 +1078,7 @@ const CLS_ARTEFATO: Record<StatusResumo, string> = {
   NAO_APLICAVEL: "text-[var(--text-muted)]",
   CANCELADO: "text-red-700",
   SUPERSEDIDO: "text-[var(--text-muted)]",
+  NAO_EXIGIDO: "text-[var(--text-muted)]",
 }
 
 // ------------------------------------------------------------
@@ -1061,7 +1104,7 @@ function CelulaProgresso({ p, estado }: { p: DocumentoDoIndice["naFase"]["progre
   // feito antes de parar. Um número ali lido rápido lê como "quanto falta",
   // e nada falta: a operação acabou. (O detalhe continua no drawer, com o
   // texto explícito "X% do roteiro tinha sido concluído antes do cancelamento".)
-  if (estado === "CANCELADA" || estado === "SUPERSEDIDA") {
+  if (estado === "CANCELADA" || estado === "SUPERSEDIDA" || estado === "NAO_EXIGIDA") {
     return <span className="text-[11px] text-[var(--text-muted)]">—</span>
   }
   const completo = p.pct >= 100
@@ -1098,6 +1141,7 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
   // projeto "cancelada-diferente-de-concluida".
   CANCELADA: "bg-[var(--surface-secondary)] text-red-700",
   SUPERSEDIDA: "bg-[var(--surface-tertiary)] text-white/68",
+  NAO_EXIGIDA: "bg-[var(--surface-tertiary)] text-white/68",
 }
 
 /**
@@ -1112,7 +1156,7 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
  * reescrever um SLA de cinco.
  */
 function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
-  if (f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA")
+  if (f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA" || f.estado === "NAO_EXIGIDA")
     return <span className="text-[11px] text-[var(--text-muted)]">—</span>
   if (f.prazo == null) return <span className="text-[11px] text-[var(--text-muted)]">{f.rotuloDoPrazo}</span>
   // A FRASE VEM DO SERVIDOR. Cada tela montando a sua produzia "Vence em 1
@@ -1140,6 +1184,7 @@ function rotuloDaAcao(f: DocumentoDoIndice["naFase"]): string {
     case "CONCLUIDA": return "Ver detalhes"
     case "CANCELADA": return "Ver detalhes"
     case "SUPERSEDIDA": return "Ver detalhes"
+    case "NAO_EXIGIDA": return "Ver motivo"
   }
 }
 
@@ -1183,7 +1228,7 @@ function CelulaResponsavel({
   // CANCELADA/SUPERSEDIDA também não se redistribui — a operação acabou, e
   // reatribuir responsável por um trabalho encerrado por cancelamento não faz
   // sentido operacional (mesma régua de CONCLUIDA).
-  const encerrada = f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA"
+  const encerrada = f.estado === "CONCLUIDA" || f.estado === "CANCELADA" || f.estado === "SUPERSEDIDA" || f.estado === "NAO_EXIGIDA"
   const podeGerir =
     !readOnly
     && taskId != null
@@ -1238,6 +1283,112 @@ function CelulaResponsavel({
       >
         {salvando ? "salvando…" : f.responsavelId != null ? "alterar" : "atribuir"}
       </button>
+    </div>
+  )
+}
+
+/**
+ * CERTIDÃO CANCELADA / NÃO EXIGIDA — CANCELAR NUNCA ESCONDE, SÓ MARCA.
+ *
+ * Continua na lista da pessoa, no fim, esmaecida e com o título riscado; diz QUEM decidiu, QUANDO e POR QUÊ
+ * ("Cancelada hoje 12:15 por Marco Rovatti · Documento não necessário" / "Não exigida: pessoa deixou de ser casada na
+ * árvore"). Não conta em requeridas, pendentes nem prontas. Ações: "Ver motivo" (sempre) e "Reabrir" (só cancelamento
+ * humano de tarefa ainda cancelada, com a permissão da porta — para NÃO EXIGIDA a árvore decide, e o painel diz por quê).
+ */
+function LinhaEncerrada({
+  doc,
+  onAbrirDetalhes,
+  gestao,
+  readOnly,
+  destacado,
+}: {
+  doc: DocumentoDoIndice
+  onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
+  gestao?: GestaoDeResponsavel
+  readOnly: boolean
+  destacado?: boolean
+}) {
+  const [motivoAberto, setMotivoAberto] = useState(false)
+  const [reabrindo, setReabrindo] = useState(false)
+  const [justificativa, setJustificativa] = useState("")
+  const [enviando, setEnviando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const e = doc.encerramento
+  const naoExigida = doc.naFase.estado === "NAO_EXIGIDA"
+  const substituida = doc.naFase.estado === "SUPERSEDIDA"
+  const quando = e?.quandoRotulo ?? null
+  const resumo = naoExigida
+    ? `Não exigida${e?.motivo ? `: ${e.motivo}` : " pela árvore"}`
+    : substituida
+      ? "Substituída por outra via"
+      : `Cancelada${quando ? ` ${quando}` : ""}${e?.porNome ? ` por ${e.porNome}` : ""}${e?.motivo ? ` · ${e.motivo}` : ""}`
+  const tarefaReabrivel = !readOnly && !naoExigida && e?.tarefaReabrivelId != null && gestao?.reabrirCertidao ? e.tarefaReabrivelId : null
+  const pode = !!onAbrirDetalhes && doc.podeAbrirDetalhes
+
+  const confirmar = async () => {
+    if (tarefaReabrivel == null || !gestao?.reabrirCertidao) return
+    setEnviando(true); setErro(null)
+    const m = await gestao.reabrirCertidao(tarefaReabrivel, justificativa.trim())
+    setEnviando(false)
+    if (m) setErro(m); else { setReabrindo(false); setJustificativa("") }
+  }
+
+  return (
+    <div
+      className={`border-b border-white/[0.07] last:border-b-0 ${destacado ? "bg-[var(--surface-secondary)] ring-1 ring-inset ring-[var(--border-strong)]" : "bg-[var(--surface-secondary)]/40"}`}
+      data-encerrada={naoExigida ? "nao_exigida" : "cancelada"}
+    >
+      <div className="grid items-center gap-3 px-4 py-3 text-[var(--text-muted)]" style={{ gridTemplateColumns: COLUNAS }}>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="w-7 h-7 rounded-lg grid place-items-center border border-dashed border-[var(--border-default)] text-[var(--text-muted)] flex-none">
+            <Ban className="w-3.5 h-3.5" />
+          </span>
+          <div className="min-w-0">
+            <b className="text-[13px] font-bold block leading-tight truncate line-through decoration-[var(--border-strong)]">{doc.titulo}</b>
+            <span className="text-[11px] block truncate" title={resumo}>{resumo}</span>
+          </div>
+        </div>
+        <span className="text-[11px]">—</span>
+        <span className="text-[11px]">—</span>
+        <span className="text-[11px]">—</span>
+        <span className="text-[11px]">—</span>
+        <div>
+          <span className="text-[11px] font-bold px-2.5 py-1 rounded-md border border-dashed border-[var(--border-strong)] bg-[var(--surface-tertiary)] text-[var(--text-secondary)] whitespace-nowrap">
+            {doc.naFase.estadoLabel}
+          </span>
+        </div>
+        <div className="flex justify-end gap-3 text-[12px]">
+          <button type="button" onClick={() => setMotivoAberto((v) => !v)} aria-expanded={motivoAberto} className="font-semibold text-[var(--accent-text)] hover:underline">Ver motivo</button>
+          {tarefaReabrivel != null && !reabrindo && (
+            <button type="button" onClick={() => setReabrindo(true)} className="font-semibold text-[var(--accent-text)] hover:underline">Reabrir</button>
+          )}
+          {pode && (
+            <button type="button" onClick={() => onAbrirDetalhes!(doc)} className="font-semibold text-[var(--text-secondary)] hover:underline">Detalhes</button>
+          )}
+        </div>
+      </div>
+      {motivoAberto && (
+        <div className="mx-4 mb-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3.5 py-2.5 text-[12.5px] text-[var(--text-primary)]">
+          <div><span className="text-[var(--text-secondary)]">{naoExigida ? "Situação:" : "Decisão:"}</span> {naoExigida ? "não exigida pela árvore" : substituida ? "substituída" : "cancelada"}{e?.porNome ? ` por ${e.porNome}` : naoExigida ? " (a árvore mudou)" : ""}{e?.quando ? ` em ${dataHoraSP(e.quando)}` : ""}</div>
+          {e?.motivo && <div><span className="text-[var(--text-secondary)]">Motivo:</span> {e.motivo}</div>}
+          {e?.justificativa && <div><span className="text-[var(--text-secondary)]">Justificativa:</span> “{e.justificativa}”</div>}
+          {!e && <div className="text-[var(--text-secondary)]">Nenhuma fonte guardou quem, quando e por quê.</div>}
+          {naoExigida && e?.observacao && <div className="mt-1 text-[var(--text-secondary)]">{e.observacao}</div>}
+          {!naoExigida && !substituida && tarefaReabrivel == null && <div className="mt-1 text-[var(--text-secondary)]">{readOnly ? "Fase consultada em somente leitura." : "Reabrir depende da permissão de editar tarefas e de a tarefa continuar cancelada."}</div>}
+        </div>
+      )}
+      {reabrindo && tarefaReabrivel != null && (
+        <div className="mx-4 mb-3 flex flex-col gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] p-3">
+          <label htmlFor={`reabrir-${doc.chave}`} className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">Por que reabrir? (fica no histórico)</label>
+          <textarea id={`reabrir-${doc.chave}`} value={justificativa} onChange={(ev) => setJustificativa(ev.target.value)} rows={2} maxLength={300}
+            className="w-full resize-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-2 text-[13px] text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)]" />
+          {erro && <div role="alert" className="text-[12.5px] text-[var(--danger-text)]">{erro}</div>}
+          <div className="flex gap-2">
+            <button type="button" disabled={enviando || justificativa.trim().length < 5} onClick={() => void confirmar()} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-tertiary)] px-3 py-1.5 text-[12px] font-bold disabled:opacity-50">{enviando ? "Reabrindo…" : "Confirmar reabertura"}</button>
+            <button type="button" disabled={enviando} onClick={() => { setReabrindo(false); setErro(null) }} className="rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-[12px]">Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

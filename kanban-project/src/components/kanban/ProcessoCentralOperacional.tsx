@@ -373,6 +373,8 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         // contagem dita por extenso, como no mockup aprovado.
         { label: "Pessoas", value: resumo.pessoasComTrabalho,
           sub: resumo.pessoasComTrabalho === 1 ? "1 vinculada" : `${resumo.pessoasComTrabalho} vinculadas` },
+        // `resumo.documentos` já chega da FONTE ÚNICA de requeridos (a rota o sobrescreve com a completude documental):
+        // cancelada e não exigida NÃO entram nele — elas vêm em seus próprios cartões e continuam na lista da pessoa.
         { label: "Documentos", value: resumo.documentos,
           sub: resumo.documentos === 1 ? "1 solicitado" : `${resumo.documentos} solicitados` },
         { label: "Prontos", value: resumo.prontos, tone: "ok",
@@ -384,6 +386,10 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         // a maioria das fases nunca teve uma operação cancelada.
         ...(resumo.cancelados > 0
           ? [{ label: "Cancelados", value: resumo.cancelados, tone: "late" as const, sub: "Operação encerrada" }]
+          : []),
+        // NÃO EXIGIDOS: a árvore deixou de exigir (CLAUDE.md §37). Ficam na pasta, fora da conta.
+        ...(resumo.naoExigidos > 0
+          ? [{ label: "Não exigidos", value: resumo.naoExigidos, sub: "A árvore não exige" }]
           : []),
       ]
     : // Janela de deploy (back sem `estrutura`): números da matriz oficial, sem
@@ -416,13 +422,18 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     ? (data.materializacao?.motivos ?? [])
     : []
 
+  // "12 de 12 validadas · 1 cancelada (não conta)": a cancelada continua na pasta, mas fica fora da conta.
+  const foraDaConta = resumo ? resumo.cancelados + resumo.naoExigidos : 0
+  const sufixoForaDaConta = foraDaConta > 0
+    ? ` · ${resumo!.cancelados > 0 ? `${resumo!.cancelados} cancelada${resumo!.cancelados === 1 ? "" : "s"}` : ""}${resumo!.cancelados > 0 && resumo!.naoExigidos > 0 ? " e " : ""}${resumo!.naoExigidos > 0 ? `${resumo!.naoExigidos} não exigida${resumo!.naoExigidos === 1 ? "" : "s"}` : ""} (não conta)`
+    : ""
   const progressoTexto =
     total === 0
       ? (explicacaoMaterializacao
         ?? `Nenhum documento obrigatório configurado para a ${faseNome}. Defina as regras em Gerenciamento › Documentos e Protocolos › Matriz Documental.`)
       : validados >= total
-        ? `${faseNome} concluída — todos os documentos validados.`
-        : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
+        ? `${faseNome} concluída — todos os documentos validados${sufixoForaDaConta}.`
+        : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}${sufixoForaDaConta}.`
 
   return { kpis, pct, validados, total, progressoTexto, oQueFazer }
 }
@@ -430,7 +441,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
 // Back sem `indice` (janela de deploy): a tela renderiza o índice VAZIO, que diz que
 // não há trabalho materializado — nunca uma lista montada de outra fonte.
 const INDICE_VAZIO: IndiceOperacional = {
-  resumo: { documentos: 0, prontos: 0, pendentes: 0, divergentes: 0, cancelados: 0, pessoasComTrabalho: 0 },
+  resumo: { documentos: 0, prontos: 0, pendentes: 0, divergentes: 0, cancelados: 0, naoExigidos: 0, pessoasComTrabalho: 0 },
   linhaPrincipal: [], foraDaLinha: [], pendenteClassificacao: [], semDono: [],
 }
 
@@ -762,6 +773,23 @@ export function ProcessoCentralOperacional({
     (taskId: number) => comandarTarefa(taskId, { acao: "devolver_a_fila" }),
     [comandarTarefa],
   )
+
+  /**
+   * "Reabrir" uma certidão CANCELADA — a porta `/reabrir-certidao` (mesma tarefa; documento, exigência e etapas voltam
+   * juntos; auditado). Devolve a mensagem de erro, ou null quando reabriu. A permissão é conferida no servidor.
+   */
+  const reabrirCertidao = useCallback(async (tarefaId: number, motivo: string): Promise<string | null> => {
+    try {
+      const r = await fetch(`/api/processos/${processo.id}/reabrir-certidao`, {
+        method: "POST", headers: { ...authHeaders(), "Content-Type": "application/json" }, body: JSON.stringify({ tarefaId, motivo }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) return d?.mensagem || d?.error || "Não foi possível reabrir a certidão."
+      carregar(true)
+      onProcessoMudou?.()
+      return null
+    } catch { return "Não foi possível reabrir a certidão." }
+  }, [processo.id, carregar, onProcessoMudou])
 
   // "Abrir operação" de uma antecipada: reusa a MESMA tela oficial (drawer) + banner.
   const abrirOperacaoAlvo = useCallback((documentoId: number, necessidadeId: number | null, objetivo: string | null) => {
@@ -1207,6 +1235,7 @@ export function ProcessoCentralOperacional({
             onRetirarResponsavel={pode("tarefas.editar") ? retirarResponsavel : undefined}
             usuarios={atribuiveis}
             salvandoResponsavel={salvandoResp}
+            onReabrirCertidao={pode("tarefas.editar") ? reabrirCertidao : undefined}
             documentoDestacadoId={alvo?.documentoId ?? null}
             readOnly={readOnly}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}

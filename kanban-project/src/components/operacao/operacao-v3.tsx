@@ -14,6 +14,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import { useRouter, useSearchParams } from "next/navigation"
 import { urlArvoreDoProcesso, ABAS_DA_OPERACAO, type AbaDaOperacao } from "@/lib/operacional/navegacao"
 import { auth } from "./kit-operacional"
@@ -694,7 +695,7 @@ function GrupoFila({ grupo, col, setCol, sel, toggleLinha, toggleGrupo, onAbrir,
                 <div><span className={`opv3-pill ${fase.cls}`}>{fase.texto}</span></div>
                 <div>{passo.label}</div>
                 <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
-                <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span><div style={{ fontSize: 11, color: "#7a8296" }}>{t.rotuloDoPrazo}</div></div>
+                <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span><div style={{ fontSize: 11, color: "#7a8296" }}>{textoPrazoDaTarefa(t)}</div></div>
                 <div>
                   {t.terceiroNome ? (
                     <span className={`opv3-pill ${orgaoCls(t)}`}>{orgaoTxt(t)}</span>

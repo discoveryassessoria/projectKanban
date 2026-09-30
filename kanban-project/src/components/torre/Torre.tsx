@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 import { destinoDaAbaAntigaDaTorre } from "@/lib/operacional/navegacao"
+import { aplicarFiltros, aplicarFiltrosNaQuery, filtrosDaQuery, filtrosIguais, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
+import { AGRUPAR_TORRE, DENTRO_TORRE } from "@/lib/operacional/torre-visoes"
 import { aplicarBusca } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, TorreProvider, type PermissoesTorre, type AlvoDoRelatorio } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
@@ -42,7 +44,12 @@ const numeroDaUrl = (v: string | null): number | null => {
   const n = Number(v)
   return v != null && Number.isInteger(n) && n > 0 ? n : null
 }
-/** O CONTRATO DE URL da Torre: `?aba=` · `?kpi=` · `?visao=` (aba Tarefas) · `?processo=` (Foco da família) · `?tarefa=` (drawer da tarefa). */
+/**
+ * O CONTRATO DE URL da Torre: `?aba=` · `?kpi=` · `?visao=` (aba Tarefas) · `?processo=` (Foco da família) · `?tarefa=` (drawer da tarefa)
+ * · `?pais=` (nacionalidade) · `?q=` (busca) · `?agrupar=` · `?dentro=` · e os filtros da barra (`resp`, `prazo`, `prazo_de`, `prazo_ate`,
+ * `quando`, `quando_de`, `quando_ate`, `familia`, `status`, `certidao`, `fase`, `passo`, `orgao`, `prio`, `risco`, `linha_reta`, `acomp`,
+ * `cobranca`, `ordem` — lib/operacional/torre-filtros.ts). O ESTADO INICIAL vem da URL e a URL acompanha o estado: o endereço é compartilhável.
+ */
 function lerUrl(params: URLSearchParams) {
   const abaUrl = params.get("aba") as Aba | null
   const visaoUrl = params.get("visao")
@@ -50,24 +57,41 @@ function lerUrl(params: URLSearchParams) {
   const processo = numeroDaUrl(params.get("processo"))
   const tarefa = numeroDaUrl(params.get("tarefa"))
   const abaValida = abaUrl && ABAS_VALIDAS.includes(abaUrl) ? abaUrl : null
+  const kpiUrl = params.get("kpi") as ChaveKpi | null
+  const agrupar = params.get("agrupar"); const dentro = params.get("dentro")
   // `?tarefa=` sempre vai para Tarefas; `?visao=`/`?processo=` sem `?aba=` também; com `?aba=` a aba é respeitada.
   const aba: Aba | null = tarefa != null ? "tarefas" : abaValida ?? (visao || processo != null ? "tarefas" : null)
-  return { aba, visao, processo, tarefa }
+  return {
+    aba, visao, processo, tarefa,
+    kpi: kpiUrl && KPIS_QUE_FILTRAM.includes(kpiUrl) ? kpiUrl : null,
+    pais: params.get("pais") ?? "",
+    busca: params.get("q") ?? "",
+    agrupar: agrupar && (AGRUPAR_TORRE as readonly string[]).includes(agrupar) && agrupar !== "fam" ? agrupar : null,
+    dentro: dentro && (DENTRO_TORRE as readonly string[]).includes(dentro) && dentro !== "none" ? dentro : null,
+    filtros: filtrosDaQuery(params),
+  }
 }
+/** Comparação de querystrings sem depender da ordem das chaves. */
+const canonicaDaQuery = (q: URLSearchParams): string => [...q.entries()].map(([k, v]) => `${k}=${v}`).sort().join("&")
 
 export function Torre() {
   const params = useSearchParams()
   const router = useRouter()
-  const kpiDaUrl = params.get("kpi") as ChaveKpi | null
   const urlInicial = lerUrl(params)
 
   const [aba, setAba] = useState<Aba>(urlInicial.aba ?? "precisa")
-  const [visaoPedida, setVisaoPedida] = useState<string | null>(urlInicial.visao)
+  // O que a aba Tarefas escolheu (visão fixa, agrupamento) e a URL guarda; ela também o recebe de volta quando a URL muda de fora.
+  const [estadoTarefas, setEstadoTarefas] = useState<{ visao: string | null; agrupar: string | null; dentro: string | null }>({ visao: urlInicial.visao, agrupar: urlInicial.agrupar, dentro: urlInicial.dentro })
+  const visaoPedida = estadoTarefas.visao
   const [tarefaPedida, setTarefaPedida] = useState<number | null>(urlInicial.tarefa)
   const [processoDaUrl, setProcessoDaUrl] = useState<number | null>(urlInicial.processo)
-  const [kpi, setKpi] = useState<ChaveKpi | null>(kpiDaUrl && KPIS_QUE_FILTRAM.includes(kpiDaUrl) ? kpiDaUrl : null)
-  const [pais, setPais] = useState("")
-  const [busca, setBusca] = useState("")
+  const [kpi, setKpi] = useState<ChaveKpi | null>(urlInicial.kpi)
+  const [pais, setPais] = useState(urlInicial.pais)
+  const [busca, setBusca] = useState(urlInicial.busca)
+  const [filtros, setFiltros] = useState<FiltrosTorre>(urlInicial.filtros)
+  // As querystrings que ESTA tela escreveu (as últimas): quando a URL muda por causa delas, o estado não é relido (evita perder o que
+  // se digita entre a escrita e a releitura). Só a URL que veio de fora (link, sino, Foco) é aplicada ao estado.
+  const [escritas, setEscritas] = useState<string[]>([])
   const [versao, setVersao] = useState(0)
   // O instante que o topo e a aba Tarefas usam para contar a AGENDA (dia operacional) — o mesmo nos dois, renovado a cada recarga.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,11 +125,43 @@ export function Torre() {
   const [paramsAplicados, setParamsAplicados] = useState(paramsChave)
   if (paramsAplicados !== paramsChave) {
     setParamsAplicados(paramsChave)
-    const u = lerUrl(params)
-    if (u.aba) setAba(u.aba)
-    setVisaoPedida(u.visao); setTarefaPedida(u.tarefa); setProcessoDaUrl(u.processo)
-    if (u.processo != null) setFoco(u.processo)
+    if (!escritas.includes(paramsChave)) {
+      const u = lerUrl(params)
+      if (u.aba) setAba(u.aba)
+      setEstadoTarefas((e) => (e.visao === u.visao && e.agrupar === u.agrupar && e.dentro === u.dentro ? e : { visao: u.visao, agrupar: u.agrupar, dentro: u.dentro }))
+      setTarefaPedida(u.tarefa); setProcessoDaUrl(u.processo)
+      if (u.processo != null) setFoco(u.processo)
+      setKpi(u.kpi); setPais(u.pais); setBusca(u.busca)
+      setFiltros((f) => (filtrosIguais(f, u.filtros) ? f : u.filtros))
+    }
   }
+
+  // O ESTADO → A URL (replaceState: não refaz a rota nem empilha histórico). Debounce curto para não gravar a cada tecla da busca.
+  const onEstadoUrl = useCallback((e: { visao: string | null; agrupar: string | null; dentro: string | null }) => {
+    setEstadoTarefas((a) => (a.visao === e.visao && a.agrupar === e.agrupar && a.dentro === e.dentro ? a : e))
+  }, [])
+  useEffect(() => {
+    if (destinoAntigo || typeof window === "undefined") return
+    const t = window.setTimeout(() => {
+      const atual = new URLSearchParams(window.location.search)
+      const q = new URLSearchParams(atual.toString())
+      for (const k of ["aba", "kpi", "visao", "pais", "q", "agrupar", "dentro"]) q.delete(k)
+      if (aba !== "precisa") q.set("aba", aba)
+      if (kpi) q.set("kpi", kpi)
+      if (pais) q.set("pais", pais)
+      if (busca.trim()) q.set("q", busca.trim())
+      if (aba === "tarefas") {
+        if (estadoTarefas.visao) q.set("visao", estadoTarefas.visao)
+        if (estadoTarefas.agrupar) q.set("agrupar", estadoTarefas.agrupar)
+        if (estadoTarefas.dentro) q.set("dentro", estadoTarefas.dentro)
+      }
+      const novo = aplicarFiltrosNaQuery(q, filtros)
+      if (canonicaDaQuery(novo) === canonicaDaQuery(atual)) return
+      setEscritas((e) => [...e.slice(-11), novo.toString()])
+      window.history.replaceState(window.history.state, "", novo.toString() ? `${window.location.pathname}?${novo.toString()}` : window.location.pathname)
+    }, 250)
+    return () => window.clearTimeout(t)
+  }, [aba, kpi, pais, busca, filtros, estadoTarefas, destinoAntigo])
 
   // 1) As tarefas (a projeção da Operação) e as decisões do dia — o que a tela precisa para abrir.
   useEffect(() => {
@@ -166,7 +222,8 @@ export function Torre() {
   const processosPais = useMemo(() => (procs?.processos ?? []).filter((p) => !pais || !paisRotulo || p.pais === paisRotulo), [procs, pais, paisRotulo])
   const processosDaAba = useMemo(() => (filtroProc === "risco" ? processosFiltrados.filter(emRiscoCritico) : processosFiltrados), [processosFiltrados, filtroProc])
   const base = kpi ? linhasDoKpi(kpi, linhasPais, agora) : linhasPais
-  const nTarefas = aplicarBusca(base, busca).length
+  // O número da aba = a lista que os filtros da barra deixam passar (a MESMA `aplicarFiltros` da tabela).
+  const nTarefas = aplicarFiltros(aplicarBusca(base, busca) as LinhaTorre[], filtros, { usuarioId: permissoes?.usuarioId ?? null, agora }).mostrando
   const filtrandoBacklogPais = !!pais // o backlog da semana é do total, não por nacionalidade
   const nCobrar = linhasPais.filter((l) => l.cobravelVencida).length
   const rotuloKpi = kpi ? KPI_POR_CHAVE[kpi].rotulo : undefined
@@ -238,6 +295,8 @@ export function Torre() {
             visaoPedida={visaoPedida} tarefaPedida={tarefaPedida} onTarefaAtendida={() => setTarefaPedida(null)}
             processos={procs?.processos} processoFoco={foco ?? processoDaUrl} versao={versao} agora={agora}
             onAplicarSpec={(s) => { setKpi(s.kpi); setPais(s.pais); setBusca(s.busca) }}
+            filtros={filtros} onFiltros={setFiltros} onLimparPais={() => setPais("")} onLimparBusca={() => setBusca("")}
+            agruparPedido={estadoTarefas.agrupar} dentroPedido={estadoTarefas.dentro} onEstadoUrl={onEstadoUrl}
           />
         )}
         {aba === "equipe" && <TorreEquipe versao={versao} />}

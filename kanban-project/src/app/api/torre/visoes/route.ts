@@ -2,7 +2,7 @@
 // tabela genérica das visões de relatório (`dominio: "torre-tarefas"`, spec JSON, `compartilhada` do Bloco E7).
 //
 //   GET     as minhas + as compartilhadas com a equipe
-//   POST    cria/atualiza pelo nome        { nome, visao, agrupar, kpi, pais, busca, compartilhada? }
+//   POST    cria/atualiza pelo nome        { nome, visao, agrupar, dentro, kpi, pais, busca, filtros, compartilhada? }
 //   PATCH   (des)compartilha               { id, compartilhada }   — só o dono; auditado
 //   DELETE  ?id=                           — só o dono
 //
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
   const b = await request.json().catch(() => ({}))
   const nome = String(b?.nome ?? '').trim().slice(0, 80)
   if (!nome) return NextResponse.json({ error: 'Dê um nome à visão.' }, { status: 400 })
-  const spec = limparSpec(b as Record<string, unknown>)
+  // Os filtros da barra entram validados (`normalizarFiltros`, dentro de `limparSpec`); o JSON é só o formato de gravação.
+  const spec = JSON.parse(JSON.stringify(limparSpec(b as Record<string, unknown>)))
   const visao = await prisma.relatorioVisao.upsert({
     where: { usuarioId_dominio_nome: { usuarioId: usuario.userId, dominio: DOMINIO_VISAO_TORRE, nome } },
     update: { spec, usadaEm: new Date(), ...(b?.compartilhada !== undefined ? { compartilhada: !!b.compartilhada } : {}) },

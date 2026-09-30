@@ -13,7 +13,7 @@ export function TorreCabecalho({ paises, pais, onPais, busca, onBusca, nPrecisa,
         <option value="">Todas as nacionalidades</option>
         {paises.map((p) => <option key={p.chave} value={p.chave}>{p.bandeira ? `${p.bandeira} ` : ""}{p.rotulo}</option>)}
       </select>
-      <input className="tor-in tor-cab-busca" aria-label="Buscar" placeholder="Buscar família, pessoa, cartório, tarefa…" value={busca} onChange={(e) => onBusca(e.target.value)} />
+      <input className="tor-in tor-cab-busca" aria-label="Buscar" placeholder="Buscar pessoa, cartório ou tarefa…" value={busca} onChange={(e) => onBusca(e.target.value)} />
       <div className="tor-cab-btns">
         <button className="tor-btn" onClick={onBriefing}>☀ Briefing do dia</button>
         <button className="tor-btn" onClick={onRevisar} disabled={!nPrecisa}>▶ Revisar o dia ({nPrecisa ?? "…"})</button>

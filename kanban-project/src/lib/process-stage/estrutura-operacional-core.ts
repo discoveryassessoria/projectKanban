@@ -133,6 +133,12 @@ export interface EstruturaInput {
    * que a atende — senão a mesma certidão apareceria em dois lugares.
    */
   necessidadePorDocumento?: Map<number, number>
+  /**
+   * CHAVES de alvos que devem existir MESMO sem nenhum passo ativo: a certidão CANCELADA (ou NÃO EXIGIDA pela
+   * árvore) cujo roteiro inteiro foi encerrado. Cancelar não esconde, só marca — a linha fica na pasta da pessoa.
+   * Cada chave precisa ter o metadado correspondente em `alvos`.
+   */
+  alvosSemPasso?: string[]
 }
 
 // ============================================================
@@ -266,6 +272,9 @@ export type StatusResumo =
   // na memória do projeto (achado real: Certidão de Óbito, doc 2131).
   | "CANCELADO"
   | "SUPERSEDIDO"
+  // NAO_EXIGIDO: a ÁRVORE deixou de exigir o documento (CLAUDE.md §37). Não é cancelamento humano
+  // e também não é pendência: fica na pasta, esmaecido, e não conta em requeridas/pendentes/prontas.
+  | "NAO_EXIGIDO"
 
 export const ROTULO_STATUS_RESUMO: Record<StatusResumo, string> = {
   PENDENTE: "Pendente",
@@ -276,6 +285,7 @@ export const ROTULO_STATUS_RESUMO: Record<StatusResumo, string> = {
   NAO_APLICAVEL: "Não aplicável",
   CANCELADO: "Cancelado",
   SUPERSEDIDO: "Substituído",
+  NAO_EXIGIDO: "Não exigido",
 }
 
 /** Estado dos artefatos do documento — uma coluna cada na tabela do índice. */
@@ -368,6 +378,7 @@ export type EstadoOperacionalDaLinha =
   | "CONCLUIDA"
   | "CANCELADA"
   | "SUPERSEDIDA"
+  | "NAO_EXIGIDA"
 
 // Os rótulos vêm do MAPA ÚNICO de statusTarefa (src/lib/home/rotulo-status-tarefa.ts): o estado da linha é o
 // status da Tarefa projetado — sem dicionário próprio ("A fazer" aqui era NAO_INICIADA; agora "A iniciar").
@@ -379,6 +390,8 @@ export const ROTULO_ESTADO_LINHA: Record<EstadoOperacionalDaLinha, string> = {
   CONCLUIDA: ROTULO_STATUS_TAREFA_FONTE.CONCLUIDO_RECEBIDO,
   CANCELADA: ROTULO_STATUS_TAREFA_FONTE.CANCELADA,
   SUPERSEDIDA: ROTULO_STATUS_TAREFA_FONTE.SUPERSEDIDA,
+  // Não é status de Tarefa (a tarefa some da fila quando a árvore deixa de exigir): é o estado da OBRIGAÇÃO.
+  NAO_EXIGIDA: "Não exigida",
 }
 
 /**
@@ -428,6 +441,28 @@ export interface EstadoNaFase {
   statusDocumentalLabel: string | null
 }
 
+/**
+ * POR QUE A CERTIDÃO FICOU FORA DO TRABALHO — quem, quando, motivo. Cancelar NUNCA esconde, só marca: a linha
+ * continua na pasta da pessoa, esmaecida, com isto. Vem do LogAuditoria (TAREFA_CANCELADA /
+ * NECESSIDADE_REMOVIDA_PELA_ARVORE) e de Documento.motivoBloqueio/ultimaMovimentacao — nenhuma fonte nova.
+ */
+export interface EncerramentoDoDocumento {
+  tipo: "CANCELADA" | "NAO_EXIGIDA"
+  /** ISO; null = nenhuma fonte guardou o instante. */
+  quando: string | null
+  /** "hoje 12:15" / "ontem 18:00" / "29/09 18:00" (fuso de São Paulo) — montado no SERVIDOR, na hora da leitura: a tela não consulta relógio. */
+  quandoRotulo: string | null
+  /** Quem decidiu; null = Sistema (ou ninguém registrado). */
+  porId: number | null
+  porNome: string | null
+  motivo: string | null
+  justificativa: string | null
+  /** A tarefa cuja reabertura a porta canônica (`reabrir`) permite — só cancelamento humano de tarefa ainda CANCELADA. */
+  tarefaReabrivelId: number | null
+  /** Para NÃO EXIGIDA: quem decide é a árvore; diz por quê não há "Reabrir". */
+  observacao: string | null
+}
+
 /** Uma LINHA da tabela de documentos da pessoa. Sem nada de execução. */
 export interface DocumentoDoIndice {
   chave: string
@@ -447,6 +482,8 @@ export interface DocumentoDoIndice {
   podeAbrirDetalhes: boolean
   /** Falta de configuração, dita em texto. O documento nunca é escondido. */
   impedimento: string | null
+  /** Só para CANCELADA / NÃO EXIGIDA: quem, quando e por quê. `null` = documento ativo. */
+  encerramento: EncerramentoDoDocumento | null
 }
 
 export interface PessoaDoIndice {
@@ -458,7 +495,7 @@ export interface PessoaDoIndice {
    * Um cancelado não é pronto nem pendente; sem o próprio balde ele silenciosamente
    * desaparecia da soma, mesmo continuando na lista.
    */
-  totais: { documentos: number; prontos: number; pendentes: number; divergentes: number; cancelados: number }
+  totais: { documentos: number; prontos: number; pendentes: number; divergentes: number; cancelados: number; naoExigidos: number }
   semDocumentoAplicavel: boolean
 }
 
@@ -469,6 +506,8 @@ export interface ResumoDoIndice {
   divergentes: number
   /** CANCELADO/SUPERSEDIDO — nunca somado em prontos, nunca em pendentes, nunca ausente. */
   cancelados: number
+  /** A árvore deixou de exigir — fica na pasta, fora de requeridas/pendentes/prontas. `documentos` também o soma. */
+  naoExigidos: number
   pessoasComTrabalho: number
 }
 
@@ -731,7 +770,7 @@ function montarPasso(p: PassoBruto, irmaos: PassoBruto[]): PassoDaEstrutura {
  * não tem dono no roster sai em `semDono`, o que é da fase inteira sai em `globais`.
  */
 export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOperacional {
-  const { pessoas, passos, alvos, necessidadePorDocumento } = input
+  const { pessoas, passos, alvos, necessidadePorDocumento, alvosSemPasso = [] } = input
 
   const alvoPorChave = new Map(alvos.map((a) => [a.chave, a]))
 
@@ -743,6 +782,9 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
     if (lista) lista.push(p)
     else porAlvo.set(chave, [p])
   }
+
+  // 1b) Alvos ENCERRADOS sem nenhum passo ativo (certidão cancelada / não exigida): continuam na pasta, com roteiro vazio.
+  for (const chave of alvosSemPasso) if (!porAlvo.has(chave) && alvoPorChave.has(chave)) porAlvo.set(chave, [])
 
   // 2) Passos de escopo PROCESSO — pertencem à fase, não a uma pessoa.
   const brutosGlobaisOrdenados = ordenar(porAlvo.get("processo") ?? [])
@@ -768,11 +810,12 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
     const passosDoAlvo = expandirComSubtarefas(ordenados, ordenados.map((p) => montarPasso(p, brutos)))
     const prog = progresso(passosDoAlvo)
     const meta = alvoPorChave.get(chave)
-    const primeiro = ordenados[0]
+    // Sem passo ativo (alvo encerrado) a identidade vem só do metadado do alvo.
+    const primeiro = ordenados[0] ?? { necessidadeId: null, documentoId: null, pessoaId: null }
 
     blocos.push({
       chave,
-      escopo: meta?.escopo ?? escopoDoAlvo(primeiro),
+      escopo: meta?.escopo ?? (ordenados[0] ? escopoDoAlvo(ordenados[0]) : "DOCUMENTO"),
       necessidadeId: meta?.necessidadeId ?? primeiro.necessidadeId,
       documentoId: meta?.documentoId ?? primeiro.documentoId,
       pessoaId: meta?.pessoaId ?? primeiro.pessoaId,
@@ -1028,23 +1071,29 @@ function montarDocumentoDoIndice(
    * alcançada, porque a tarefa cancelada simplesmente não vinha no mapa.
    */
   canceladoPorChave?: Map<string, boolean>,
+  /** CHAVE → o Documento por trás do alvo está `NAO_EXIGIDO` (a árvore deixou de exigir). */
+  naoExigidoPorChave?: Map<string, boolean>,
+  /** CHAVE → quem/quando/por quê (só para alvos encerrados). */
+  encerramentoPorChave?: Map<string, EncerramentoDoDocumento>,
 ): DocumentoDoIndice {
   const tarefa = tarefas?.get(alvo.chave) ?? null
   const documentoCancelado = canceladoPorChave?.get(alvo.chave) === true
+  const documentoNaoExigido = naoExigidoPorChave?.get(alvo.chave) === true
   // Defesa em profundidade: se um dia `tarefasVivasDasUnidades` passar a devolver
   // tarefa terminal, o estado dela também vence — nunca fica pior que hoje.
   const estadoDaTarefaEncerrada: EstadoOperacionalDaLinha | undefined =
     tarefa != null && (tarefa.statusTarefa === "CANCELADA" || tarefa.statusTarefa === "SUPERSEDIDA")
       ? estadoDaTarefa(tarefa)
       : undefined
-  const estadoForcado: EstadoOperacionalDaLinha | undefined = documentoCancelado ? "CANCELADA" : estadoDaTarefaEncerrada
+  const estadoForcado: EstadoOperacionalDaLinha | undefined = documentoNaoExigido ? "NAO_EXIGIDA" : documentoCancelado ? "CANCELADA" : estadoDaTarefaEncerrada
   // CANCELADA ≠ CONCLUÍDA (regra permanente, ver memória do projeto). A consulta
   // que monta `alvo.passos` já exclui os passos CANCELADO/SUPERSEDIDO — quando o
   // cancelamento acontece NO MEIO do roteiro, só sobram os passos que já tinham
   // sido concluídos, e `statusFinalDoAlvo` bateria "PRONTO" para uma operação
   // encerrada por cancelamento.
   const statusFinal: StatusResumo =
-    estadoForcado === "CANCELADA" ? "CANCELADO"
+    estadoForcado === "NAO_EXIGIDA" ? "NAO_EXIGIDO"
+    : estadoForcado === "CANCELADA" ? "CANCELADO"
     : estadoForcado === "SUPERSEDIDA" ? "SUPERSEDIDO"
     : statusFinalDoAlvo(alvo)
   // PROGRESSO REAL antes do cancelamento — a fração completa, incluindo os passos
@@ -1056,7 +1105,8 @@ function montarDocumentoDoIndice(
   // Sem executor em NENHUM passo do documento não há o que abrir — e isso é falta de
   // configuração, que precisa ser dita, não escondida.
   const comExecutor = alvo.passos.some((p) => p.executor != null)
-  const impedimento = comExecutor
+  const encerrada = estadoForcado === "CANCELADA" || estadoForcado === "NAO_EXIGIDA"
+  const impedimento = comExecutor || (encerrada && alvo.passos.length === 0)
     ? null
     : alvo.passos.find((p) => p.erroAdministrativo)?.erroAdministrativo ??
       "Sem executor configurado para os passos deste documento."
@@ -1079,6 +1129,7 @@ function montarDocumentoDoIndice(
     naFase: estadoNaFase(alvoEfetivo, tarefa, extra.statusDocumentalLabel ?? null, estadoForcado),
     podeAbrirDetalhes: comExecutor,
     impedimento,
+    encerramento: estadoForcado === "CANCELADA" || estadoForcado === "NAO_EXIGIDA" ? encerramentoPorChave?.get(alvo.chave) ?? null : null,
   }
 }
 
@@ -1088,8 +1139,10 @@ function montarPessoaDoIndice(
   tarefas: TarefasPorChave | undefined,
   progressoRealPorChave?: Map<string, ProgressoEstrutura>,
   canceladoPorChave?: Map<string, boolean>,
+  naoExigidoPorChave?: Map<string, boolean>,
+  encerramentoPorChave?: Map<string, EncerramentoDoDocumento>,
 ): PessoaDoIndice {
-  const documentos = linha.documentos.map((d) => montarDocumentoDoIndice(d, artefatos, tarefas, progressoRealPorChave, canceladoPorChave))
+  const documentos = linha.documentos.map((d) => montarDocumentoDoIndice(d, artefatos, tarefas, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, encerramentoPorChave))
   return {
     pessoa: linha.pessoa,
     documentos,
@@ -1099,6 +1152,7 @@ function montarPessoaDoIndice(
       pendentes: documentos.filter((d) => d.statusFinal === "PENDENTE" || d.statusFinal === "EM_ANDAMENTO").length,
       divergentes: documentos.filter((d) => d.statusFinal === "DIVERGENTE" || d.statusFinal === "INVALIDADO").length,
       cancelados: documentos.filter((d) => d.statusFinal === "CANCELADO" || d.statusFinal === "SUPERSEDIDO").length,
+      naoExigidos: documentos.filter((d) => d.statusFinal === "NAO_EXIGIDO").length,
     },
     // Passos de escopo PESSOA continuam existindo no domínio e são executados pelo
     // modal do alvo deles; no ÍNDICE eles não viram linha, porque não são documento.
@@ -1121,11 +1175,15 @@ export function montarIndiceOperacional(
   progressoRealPorChave?: Map<string, ProgressoEstrutura>,
   /** Ver `montarDocumentoDoIndice` — CHAVE → Documento por trás do alvo está CANCELADO. */
   canceladoPorChave?: Map<string, boolean>,
+  /** Ver `montarDocumentoDoIndice` — CHAVE → o Documento está NAO_EXIGIDO (a árvore deixou de exigir). */
+  naoExigidoPorChave?: Map<string, boolean>,
+  /** Ver `montarDocumentoDoIndice` — CHAVE → quem/quando/por quê do encerramento. */
+  encerramentoPorChave?: Map<string, EncerramentoDoDocumento>,
 ): IndiceOperacional {
-  const linhaPrincipal = estrutura.linhaPrincipal.map((l) => montarPessoaDoIndice(l, artefatos, tarefas, progressoRealPorChave, canceladoPorChave))
-  const foraDaLinha = estrutura.foraDaLinha.map((l) => montarPessoaDoIndice(l, artefatos, tarefas, progressoRealPorChave, canceladoPorChave))
-  const pendenteClassificacao = estrutura.pendenteClassificacao.map((l) => montarPessoaDoIndice(l, artefatos, tarefas, progressoRealPorChave, canceladoPorChave))
-  const semDono = estrutura.semDono.map((d) => montarDocumentoDoIndice(d, artefatos, tarefas, progressoRealPorChave, canceladoPorChave))
+  const linhaPrincipal = estrutura.linhaPrincipal.map((l) => montarPessoaDoIndice(l, artefatos, tarefas, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, encerramentoPorChave))
+  const foraDaLinha = estrutura.foraDaLinha.map((l) => montarPessoaDoIndice(l, artefatos, tarefas, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, encerramentoPorChave))
+  const pendenteClassificacao = estrutura.pendenteClassificacao.map((l) => montarPessoaDoIndice(l, artefatos, tarefas, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, encerramentoPorChave))
+  const semDono = estrutura.semDono.map((d) => montarDocumentoDoIndice(d, artefatos, tarefas, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, encerramentoPorChave))
 
   const todos = [
     ...linhaPrincipal.flatMap((p) => p.documentos),
@@ -1141,6 +1199,7 @@ export function montarIndiceOperacional(
       pendentes: todos.filter((d) => d.statusFinal === "PENDENTE" || d.statusFinal === "EM_ANDAMENTO").length,
       divergentes: todos.filter((d) => d.statusFinal === "DIVERGENTE" || d.statusFinal === "INVALIDADO").length,
       cancelados: todos.filter((d) => d.statusFinal === "CANCELADO" || d.statusFinal === "SUPERSEDIDO").length,
+      naoExigidos: todos.filter((d) => d.statusFinal === "NAO_EXIGIDO").length,
       pessoasComTrabalho: [...linhaPrincipal, ...foraDaLinha, ...pendenteClassificacao]
         .filter((p) => !p.semDocumentoAplicavel).length,
     },

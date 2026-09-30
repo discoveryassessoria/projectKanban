@@ -2,13 +2,16 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
 import { Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { jsonHeaders } from "@/src/lib/financeiro/http"
+import type { EncerramentoDoDocumento } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
 import { PessoaOperacionalDrawer } from "./PessoaOperacionalDrawer"
 import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
+import { documentoAtivo } from "@/src/lib/documentos/status-inativos"
 import {
   ProcessoDocumentosBiblioteca,
   type BibPersonGroup,
@@ -32,6 +35,8 @@ interface DocCompact {
   statusShort: string
   statusClass: string
   isRecebido: boolean
+  /** Cancelado ou não exigido: continua na lista, esmaecido, com quem/quando/por quê. `null` = ativo. */
+  encerramento: EncerramentoDoDocumento | null
   analiseOk: boolean
   arquivoUrl: string | null
   arquivoNome: string | null
@@ -197,27 +202,26 @@ function deriveRetificacao(status: string): ColunaStatus {
 
 function mapearBiblioteca(data: ProcessoDocumentosData) {
   const toGroup = (row: PersonRow): BibPersonGroup => {
-    // CANCELADO/INVALIDO fora da biblioteca — a exigência acabou (cancelada) ou
-    // está sendo refeita por outra via (invalidado reabre a etapa em separado);
-    // nenhum dos dois é "documento a entregar" pendente. Sem isto, um documento
-    // cancelado (não se aplica em nenhuma fase) continuava contando como
-    // pendente aqui (achado real: Antonio, óbito; Edithe, ambas certidões).
-    const docsAplicaveis = row.docs.filter((d) => {
-      const s = d.status.toLowerCase()
-      return s !== "cancelado" && s !== "invalido" && s !== "nao_exigido"
-    })
+    // CANCELAR NUNCA ESCONDE, SÓ MARCA. O documento INVALIDADO (reaberto por outra via) continua fora da entrega; o
+    // CANCELADO e o NÃO EXIGIDO (a árvore deixou de exigir) ficam na lista da pessoa, esmaecidos, no fim — e NÃO contam
+    // em requeridas, pendentes nem prontas (os contadores saem só dos ativos).
+    const aplicaveis = row.docs.filter((d) => d.status.toLowerCase() !== "invalido")
+    const ativos = aplicaveis.filter((d) => documentoAtivo(d.status))
+    const encerrados = aplicaveis.filter((d) => !documentoAtivo(d.status))
     // Nasce, casa, morre — nunca alfabética (fonte única: ordem-evento-vida.ts).
-    const docsOrdenados = [...docsAplicaveis].sort((a, b) =>
-      compararPorEventoDeVida(NOME_COMPLETO[a.tipoShort] ?? a.tipoShort, NOME_COMPLETO[b.tipoShort] ?? b.tipoShort),
-    )
+    const porEventoDeVida = (a: DocCompact, b: DocCompact) =>
+      compararPorEventoDeVida(NOME_COMPLETO[a.tipoShort] ?? a.tipoShort, NOME_COMPLETO[b.tipoShort] ?? b.tipoShort)
+    const docsOrdenados = [...[...ativos].sort(porEventoDeVida), ...[...encerrados].sort(porEventoDeVida)]
     const docs: BibDocItem[] = docsOrdenados.map((d) => {
+      const encerrado = !documentoAtivo(d.status)
       const certSt = certStatusFromDoc(d.status, d.isRecebido)
       // Certidão recebida não é certidão liberada: falta a Análise Documental
       // (comparação com a árvore) confirmar que não há divergência em aberto.
       // Sem isto, "pronto para protocolo" virava verdade só de o arquivo ter
       // chegado — mesmo com a Análise Documental ainda nem rodada.
-      const finalStatus: "pronta_protocolo" | "pendente" | "aguardando" =
-        certSt !== "validada" ? "pendente" : d.analiseOk ? "pronta_protocolo" : "aguardando"
+      const finalStatus: BibDocItem["finalStatus"] = encerrado
+        ? (d.status.toLowerCase() === "nao_exigido" ? "nao_exigida" : "cancelada")
+        : certSt !== "validada" ? "pendente" : d.analiseOk ? "pronta_protocolo" : "aguardando"
       return {
         id: d.id,
         documentType: NOME_COMPLETO[d.tipoShort] ?? d.tipoShort,
@@ -229,21 +233,27 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
         translation: { status: deriveTraducao(d.status) },
         apostille: { status: deriveApostila(d.status) },
         finalStatus,
+        encerramento: d.encerramento,
         arquivoUrl: d.arquivoUrl,
         arquivoNome: d.arquivoNome,
         arquivoMimeType: d.arquivoMimeType,
         registro: d.registro,
       }
     })
-    const ready = docs.filter((x) => x.finalStatus === "pronta_protocolo").length
-    const pend = docs.filter((x) => x.finalStatus === "pendente").length
+    const vivos = docs.filter((x) => x.finalStatus !== "cancelada" && x.finalStatus !== "nao_exigida")
+    const ready = vivos.filter((x) => x.finalStatus === "pronta_protocolo").length
+    const pend = vivos.filter((x) => x.finalStatus === "pendente").length
     return {
       personId: row.pessoaId,
       personName: row.nome,
       role: row.papel,
       lineage: row.isDirectLine ? "Linha reta" : "Fora da linha",
       generation: row.geracao ?? "—",
-      stats: { totalDocuments: docs.length, readyForProtocol: ready, pending: pend },
+      stats: {
+        totalDocuments: vivos.length, readyForProtocol: ready, pending: pend,
+        cancelled: docs.filter((x) => x.finalStatus === "cancelada").length,
+        notRequired: docs.filter((x) => x.finalStatus === "nao_exigida").length,
+      },
       documents: docs,
     }
   }
@@ -320,6 +330,20 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
 
   const bib = mapearBiblioteca(data)
 
+  // "Reabrir" uma certidão CANCELADA: a porta `/reabrir-certidao` (mesma tarefa; documento, exigência e etapas voltam
+  // juntos; auditado). Só quem tem a permissão da porta recebe o botão; o servidor confere de novo.
+  const reabrirCertidao = pode("tarefas.editar")
+    ? async (tarefaId: number, motivo: string): Promise<string | null> => {
+        try {
+          const r = await fetch(`/api/processos/${processo.id}/reabrir-certidao`, { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ tarefaId, motivo }) })
+          const d = await r.json().catch(() => ({}))
+          if (!r.ok) return d?.mensagem || d?.error || "Não foi possível reabrir a certidão."
+          await carregar()
+          return null
+        } catch { return "Não foi possível reabrir a certidão." }
+      }
+    : undefined
+
   // Localiza o documento selecionado (e o contexto da pessoa) para o drawer claro.
   let drawerDoc: BibDocItem | null = null
   let drawerCtx: DocumentoBibliotecaContext | undefined
@@ -341,6 +365,7 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
         linhaPrincipal={bib.linhaPrincipal}
         foraDaLinha={bib.foraDaLinha}
         onAbrirDetalhes={(docId) => setDrawerDocId(docId)}
+        onReabrirCertidao={reabrirCertidao}
       />
 
       {/* Drawer da pessoa (Central Operacional) */}

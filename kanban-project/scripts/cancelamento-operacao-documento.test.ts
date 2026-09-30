@@ -217,21 +217,17 @@ async function main() {
   check("6b) status = cancelado", depois2?.status === "cancelado")
   check("6c) progress = 0 (nada foi concluído antes)", depois2?.progress === 0, String(depois2?.progress))
   check("6d) NUNCA 'concluido' mesmo com progress 0", depois2?.status !== "concluido")
-  // LIMITAÇÃO CONHECIDA, PRÉ-EXISTENTE, FORA DO ESCOPO DESTA CORREÇÃO: quando TODOS
-  // os passos do alvo são cancelados (nenhum jamais chegou a ser concluído),
-  // `getPhaseOperationalStructure` cai no early-return "fase sem instância
-  // materializada" (`instancias.length === 0`, ANTES de `alvos` existir) — o
-  // documento nem chega a aparecer na Central Operacional. Isso já acontecia antes
-  // desta correção (é o MESMO comportamento para qualquer fase sem instância ativa)
-  // e é diferente do bug relatado (que tinha 1 passo concluído sobrevivendo ao
-  // filtro). Decidir se um cancelamento "do zero" deve gerar uma linha fantasma
-  // 0%/Cancelada é decisão de produto, não bug — registrado aqui para não
-  // desaparecer da memória do projeto.
+  // CANCELAR NUNCA ESCONDE, SÓ MARCA (30/09/2026). Isto era uma "limitação conhecida": quando TODOS os passos do alvo são
+  // cancelados (nenhum chegou a ser concluído), a consulta caía no early-return "fase sem instância ativa" e a certidão nem
+  // aparecia na Central — o filtro "Cancelada" ficava vazio. Agora o alvo ENCERRADO entra na estrutura (roteiro vazio): a
+  // linha fica na pasta da pessoa, como Cancelada, com quem/quando/por quê. Ver `alvosSemPasso` em estrutura-operacional*.ts
+  // e `scripts/central-certidao-cancelada-continua-na-lista.test.ts`.
   const { indice: indiceControle } = await getPhaseOperationalSummary({ processoId: p2.processoId, faseMacroKey: FASE_DOC })
   const linhaControle = [...indiceControle.linhaPrincipal, ...indiceControle.foraDaLinha, ...indiceControle.pendenteClassificacao]
     .flatMap((p) => p.documentos).find((d) => d.documentoId === p2.documentoId)
-  check("6e) LIMITAÇÃO CONHECIDA (documentada, não corrigida agora): cancelamento sem NENHUM passo jamais concluído não gera linha na Central — early-return por falta de instância ativa",
-    linhaControle === undefined)
+  check("6e) o cancelamento sem NENHUM passo concluído TAMBÉM continua na Central, como Cancelada (nunca some)",
+    linhaControle?.naFase.estado === "CANCELADA" && linhaControle.statusFinal === "CANCELADO" && linhaControle.encerramento?.tipo === "CANCELADA",
+    JSON.stringify({ e: linhaControle?.naFase.estado, s: linhaControle?.statusFinal, t: linhaControle?.encerramento?.tipo }))
 
   console.log(`\n${ok} passaram, ${falhas.length} falharam`)
   if (falhas.length) console.log("Falhas:", falhas.join(", "))

@@ -40,7 +40,9 @@ import {
   type ProgressoEstrutura,
   type StatusResumo,
   type TarefasPorChave,
+  type EncerramentoDoDocumento,
 } from "./estrutura-operacional-core"
+import { encerramentosDosDocumentos } from "@/src/services/encerramento-documental"
 import { getStepDef, phaseKeyToFaseCode, rotuloDoPasso } from "./fases-catalog"
 import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
 import {
@@ -174,6 +176,8 @@ export interface EstruturaFaseResultado {
   progressoRealPorChave: Map<string, ProgressoEstrutura>
   /** Ver `montarDocumentoDoIndice` — CHAVE → Documento por trás do alvo está CANCELADO. */
   canceladoPorChave: Map<string, boolean>
+  /** Ver `montarDocumentoDoIndice` — CHAVE → Documento por trás do alvo está NAO_EXIGIDO (a árvore deixou de exigir). */
+  naoExigidoPorChave: Map<string, boolean>
   /**
    * A INSTÂNCIA que esta leitura escopou (`ctx.workflowInstanceId` ou a VIGENTE
    * resolvida). `null` só quando a fase nunca foi materializada.
@@ -233,7 +237,7 @@ export async function getPhaseOperationalStructure(
     registrar(d)
   }
 
-  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map(), instanciaId: null }
+  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map(), naoExigidoPorChave: new Map(), instanciaId: null }
 
   // ------------------------------------------------------------
   // 1) ROSTER — vínculo oficial com a árvore. A pessoa existe na Central por estar
@@ -301,16 +305,32 @@ export async function getPhaseOperationalStructure(
   const INSTANCIAS_ENCERRADAS = new Set(["SUPERSEDIDO", "CANCELADO"])
   const instancias = todasInstancias.filter((s) => !INSTANCIAS_ENCERRADAS.has(s.status))
 
-  // Fase sem instância materializada: as PESSOAS continuam aparecendo (o roster não
-  // depende de trabalho). O que falta é workflow publicado, e isso a tela diz.
-  if (instancias.length === 0) {
-    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map(), instanciaId: instanciaAlvo }
+  // DOCUMENTOS de TODAS as instâncias (ativas e encerradas): é deles que sai "este roteiro foi encerrado porque a certidão
+  // foi CANCELADA / deixou de ser EXIGIDA pela árvore" — e é isso que mantém a certidão na pasta da pessoa.
+  const docIdsTodos = [...new Set(todasInstancias.map((s) => s.documentoId).filter((x): x is number => x != null))]
+  const documentos = docIdsTodos.length
+    ? await db.documento.findMany({
+        where: { id: { in: docIdsTodos } },
+        // `documentTypeId` é o que permite casar Documento com Necessidade por ID quando a FK
+        // `necessidadeId` não foi gravada — sem ele, a mesma obrigação virava duas linhas.
+        select: { id: true, pessoaId: true, tipo: true, status: true, necessidadeId: true, documentTypeId: true },
+      })
+    : []
+  const documentoInativoPorId = new Map(documentos.map((d) => [d.id, !documentoAtivo(d.status)]))
+  // CANCELAR NUNCA ESCONDE, SÓ MARCA: o roteiro cancelado de um documento inativo entra na estrutura como ALVO ENCERRADO,
+  // mesmo quando nenhum passo dele sobreviveu ao filtro acima (cancelado antes de concluir qualquer etapa — o caso que sumia
+  // da Central e deixava o filtro "Cancelada" vazio). SUPERSEDIDO (ciclo antigo/duplicata) continua fora: não é decisão sobre a certidão.
+  const encerradasDeDocumentoInativo = todasInstancias.filter((s) => s.status === "CANCELADO" && s.documentoId != null && documentoInativoPorId.get(s.documentoId) === true)
+
+  // Fase sem NADA a mostrar: as PESSOAS continuam aparecendo (o roster não depende de trabalho). O que falta é
+  // workflow publicado, e isso a tela diz.
+  if (instancias.length === 0 && encerradasDeDocumentoInativo.length === 0) {
+    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map(), progressoRealPorChave: new Map(), canceladoPorChave: new Map(), naoExigidoPorChave: new Map(), instanciaId: instanciaAlvo }
   }
 
   // ------------------------------------------------------------
   // 3) ALVOS — as entidades reais que as instâncias apontam.
   // ------------------------------------------------------------
-  const docIds = [...new Set(instancias.map((s) => s.documentoId).filter((x): x is number => x != null))]
   const respIds = [...new Set(instancias.map((s) => s.responsavelId).filter((x): x is number => x != null))]
 
   const SELECT_NECESSIDADE = {
@@ -330,20 +350,9 @@ export async function getPhaseOperationalStructure(
     documentos: { select: { id: true } },
   } as const
 
-  const [documentos, responsaveis] = await Promise.all([
-    docIds.length
-      ? db.documento.findMany({
-          where: { id: { in: docIds } },
-          // `documentTypeId` é o que permite casar Documento com Necessidade por
-          // ID quando a FK `necessidadeId` não foi gravada — sem ele, a mesma
-          // obrigação virava duas linhas.
-          select: { id: true, pessoaId: true, tipo: true, status: true, necessidadeId: true, documentTypeId: true },
-        })
-      : Promise.resolve([]),
-    respIds.length
-      ? db.usuario.findMany({ where: { id: { in: respIds } }, select: { id: true, nome: true } })
-      : Promise.resolve([]),
-  ])
+  const responsaveis = respIds.length
+    ? await db.usuario.findMany({ where: { id: { in: respIds } }, select: { id: true, nome: true } })
+    : []
 
   // `esperaExternaAoLiberar` É CADASTRO DO PASSO PUBLICADO — a mesma flag que
   // `aplicarEsperaExternaSeConfigurado` (task-step-sync) usa para saber se um
@@ -367,6 +376,7 @@ export async function getPhaseOperationalStructure(
   const necIds = [
     ...new Set([
       ...instancias.map((s) => s.necessidadeId).filter((x): x is number => x != null),
+      ...encerradasDeDocumentoInativo.map((s) => s.necessidadeId).filter((x): x is number => x != null),
       ...documentos.map((d) => d.necessidadeId).filter((x): x is number => x != null),
     ]),
   ]
@@ -575,6 +585,9 @@ export async function getPhaseOperationalStructure(
   // ------------------------------------------------------------
   const alvos: AlvoBruto[] = []
   const chavesUsadas = new Set(passos.map((p) => chaveDoAlvo(p, necessidadePorDocumento)))
+  // Alvos ENCERRADOS (certidão cancelada / não exigida) que não têm nenhum passo ativo: continuam na pasta (roteiro vazio).
+  const alvosSemPasso = [...new Set(encerradasDeDocumentoInativo.map((s) => chaveDoAlvo(s, necessidadePorDocumento)))].filter((c) => !chavesUsadas.has(c))
+  for (const c of alvosSemPasso) chavesUsadas.add(c)
 
   for (const n of necessidades) {
     const chave = `necessidade:${n.id}`
@@ -619,7 +632,7 @@ export async function getPhaseOperationalStructure(
     })
   }
 
-  const estrutura = montarEstruturaOperacional({ pessoas, passos, alvos, necessidadePorDocumento })
+  const estrutura = montarEstruturaOperacional({ pessoas, passos, alvos, necessidadePorDocumento, alvosSemPasso })
 
   for (const a of estrutura.semDono) {
     diag("ALVO_SEM_DONO", { chave: a.chave, necessidadeId: a.necessidadeId, documentoId: a.documentoId })
@@ -658,10 +671,16 @@ export async function getPhaseOperationalStructure(
   // aparece ali. `documentos` já foi lido no passo 3 com `status` incluído (para
   // o casamento por documentTypeId); é a MESMA leitura, sem consulta nova.
   // ------------------------------------------------------------
-  const documentoCanceladoPorId = new Map<number, boolean>(documentos.map((d) => [d.id, !documentoAtivo(d.status)]))
+  const statusDoDocumento = new Map<number, string>(documentos.map((d) => [d.id, String(d.status)]))
   const canceladoPorChave = new Map<string, boolean>()
+  const naoExigidoPorChave = new Map<string, boolean>()
   for (const a of alvos) {
-    if (a.documentoId != null && documentoCanceladoPorId.get(a.documentoId)) canceladoPorChave.set(a.chave, true)
+    if (a.documentoId == null) continue
+    const st = statusDoDocumento.get(a.documentoId)
+    if (st == null || documentoAtivo(st)) continue
+    // NAO_EXIGIDO (a árvore deixou de exigir) ≠ CANCELADO (decisão humana sobre o papel): dois estados, dois rótulos.
+    if (st === "NAO_EXIGIDO") naoExigidoPorChave.set(a.chave, true)
+    else canceladoPorChave.set(a.chave, true)
   }
 
   return {
@@ -670,6 +689,7 @@ export async function getPhaseOperationalStructure(
     cicloDaObrigacao: new Map(necessidades.map((n) => [n.id, n.ciclo])),
     progressoRealPorChave,
     canceladoPorChave,
+    naoExigidoPorChave,
     instanciaId: instanciaAlvo,
   }
 }
@@ -703,7 +723,7 @@ export async function getPhaseOperationalSummary(
   opcoes: EstruturaFaseOpcoes = {},
 ): Promise<IndiceFaseResultado> {
   const db = opcoes.db ?? prisma
-  const { estrutura, diagnosticos, cicloDaObrigacao, progressoRealPorChave, canceladoPorChave, instanciaId } = await getPhaseOperationalStructure(ctx, opcoes)
+  const { estrutura, diagnosticos, cicloDaObrigacao, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, instanciaId } = await getPhaseOperationalStructure(ctx, opcoes)
 
   // ARTEFATOS — colunas "Certidão retificada", "Tradução" e "Apostila" da tabela.
   // Vêm dos registros OFICIAIS do documento; o que o domínio não registra fica
@@ -817,5 +837,11 @@ export async function getPhaseOperationalSummary(
     }
   }
 
-  return { indice: montarIndiceOperacional(estrutura, artefatos, tarefas, progressoRealPorChave, canceladoPorChave), diagnosticos }
+  // CANCELAR NUNCA ESCONDE, SÓ MARCA: quem/quando/por quê de cada certidão cancelada ou não exigida (uma leitura em lote).
+  const encerradas = alvos.filter((a) => a.documentoId != null && (canceladoPorChave.get(a.chave) || naoExigidoPorChave.get(a.chave)))
+  const porDocumento = encerradas.length ? await encerramentosDosDocumentos(encerradas.map((a) => a.documentoId as number), db, opcoes.agora ?? new Date()) : new Map()
+  const encerramentoPorChave = new Map<string, EncerramentoDoDocumento>()
+  for (const a of encerradas) { const e = porDocumento.get(a.documentoId as number); if (e) encerramentoPorChave.set(a.chave, e) }
+
+  return { indice: montarIndiceOperacional(estrutura, artefatos, tarefas, progressoRealPorChave, canceladoPorChave, naoExigidoPorChave, encerramentoPorChave), diagnosticos }
 }
