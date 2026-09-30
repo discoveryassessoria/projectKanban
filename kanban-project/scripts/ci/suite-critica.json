@@ -107,7 +107,8 @@
    "scripts/saude-biblioteca-nao-e-fase.test.ts",
    "scripts/torre-bloco-i-integridade-auditoria-foco.test.ts",
    "scripts/torre-bloco-j-kpis-radar-visoes-absorcao.test.ts",
-   "scripts/torre-bloco-e-indicadores-diarios.test.ts"
+   "scripts/torre-bloco-e-indicadores-diarios.test.ts",
+   "scripts/torre-bloco-j-tempo-na-fase.test.ts"
   ]
  },
  "arquivos": [
@@ -196,6 +197,7 @@
   "scripts/saude-biblioteca-nao-e-fase.test.ts",
   "scripts/torre-bloco-i-integridade-auditoria-foco.test.ts",
   "scripts/torre-bloco-j-kpis-radar-visoes-absorcao.test.ts",
-  "scripts/torre-bloco-e-indicadores-diarios.test.ts"
+  "scripts/torre-bloco-e-indicadores-diarios.test.ts",
+  "scripts/torre-bloco-j-tempo-na-fase.test.ts"
  ]
 }

@@ -11,6 +11,7 @@
 import { prisma } from '@/lib/prisma'
 import { resolverCompletudeDocumental } from '@/src/lib/process-stage/completude-documental'
 import { STATUS_ATIVOS } from './tarefa-canonica'
+import { ordensDeFase } from '@/src/services/documento-operacao'
 
 export interface ProgressoReal {
   required: number
@@ -24,34 +25,68 @@ export async function progressoRealDoProcesso(processoId: number): Promise<Progr
   return { required: c.required, completed: c.completed, percentage: c.percentage }
 }
 
+/**
+ * OS RESULTADOS DO LOG QUE SIGNIFICAM "O PROCESSO CHEGOU EM `fasePretendida`": movimentação manual (MOVIDO), avanço pelo
+ * gate (AVANCADO) e avanço forçado (FORCADO). BLOQUEADO/IDEMPOTENTE/CONFLITO não moveram nada. (RETORNADO/REABERTO
+ * ainda não existem no log de produção e a semântica do destino deles não está provada — ficam de fora até existirem.)
+ * A MESMA constante serve a "Dias na fase" e ao "Tempo médio real por fase": uma fonte para "quando entrou".
+ */
+export const RESULTADOS_QUE_MOVEM_DE_FASE = ['MOVIDO', 'AVANCADO', 'FORCADO'] as const
+
 export interface DiasNaFase {
   faseAtual: string | null
-  /** Quando entrou — vem de PhaseAdvanceLog (avanço real) OU, na ausência de
-   * qualquer avanço registrado, da abertura do processo (cadastro já em
-   * andamento). `origem` diz qual dos dois, para nunca fingir precisão que
-   * não existe. */
+  /** Quando entrou na fase ATUAL — só de registro REAL (nunca "agora"). `null` = não há registro: a tela mostra "—". */
   desde: string | null
-  origem: 'AVANCO_DE_FASE' | 'CADASTRO_DO_PROCESSO' | null
+  /**
+   * De onde veio `desde`:
+   *   AVANCO_DE_FASE       o último avanço/movimentação registrado para esta fase (PhaseAdvanceLog);
+   *   CADASTRO_DO_PROCESSO a abertura do processo — VÁLIDA só quando a fase atual é a PRIMEIRA do macrofluxo (entrou nela ao nascer);
+   *   INSTANCIA_DA_FASE    a criação do workflow da fase (PhaseWorkflowInstance) — último recurso registrado.
+   */
+  origem: 'AVANCO_DE_FASE' | 'CADASTRO_DO_PROCESSO' | 'INSTANCIA_DA_FASE' | null
+  /** Dias COMPLETOS (0 = menos de 24 h). `null` quando não há data. */
   dias: number | null
+  /** Horas completas desde a entrada — para "há 5 h" quando ainda não fechou 1 dia. `null` quando não há data. */
+  horas: number | null
 }
 
-/** E9 · dias na fase — pela data REAL de entrada, no log de transição. */
+/**
+ * E9 · dias na fase — pela data REAL de entrada. Ordem das fontes, da mais precisa para a menos (nenhuma inventa data):
+ *   1. o último avanço/movimentação registrado PARA a fase atual (`PhaseAdvanceLog`, `RESULTADOS_QUE_MOVEM_DE_FASE`);
+ *   2. se a fase atual é a PRIMEIRA do macrofluxo do tipo, a abertura do processo (ele nasceu nela);
+ *   3. a criação do workflow daquela fase (`PhaseWorkflowInstance`);
+ *   4. nada disso existe → `desde: null` (a tela mostra "—"). Jamais o relógio de agora.
+ */
 export async function diasNaFaseAtual(processoId: number, agora = new Date()): Promise<DiasNaFase> {
   const proc = await prisma.processo.findUnique({
-    where: { id: processoId }, select: { faseAtualKey: true, dataInicio: true, createdAt: true },
+    where: { id: processoId }, select: { faseAtualKey: true, dataInicio: true, createdAt: true, tipoProcessoMotorId: true },
   })
-  if (!proc?.faseAtualKey) return { faseAtual: null, desde: null, origem: null, dias: null }
+  if (!proc?.faseAtualKey) return { faseAtual: null, desde: null, origem: null, dias: null, horas: null }
+  const fase = proc.faseAtualKey
+  const monta = (desde: Date, origem: NonNullable<DiasNaFase['origem']>): DiasNaFase => {
+    const ms = Math.max(0, agora.getTime() - desde.getTime())
+    return { faseAtual: fase, desde: desde.toISOString(), origem, dias: Math.floor(ms / 86_400_000), horas: Math.floor(ms / 3_600_000) }
+  }
 
   const ultimoAvanco = await prisma.phaseAdvanceLog.findFirst({
-    where: { processoId, resultado: 'MOVIDO', fasePretendida: proc.faseAtualKey },
-    orderBy: { criadoEm: 'desc' },
-    select: { criadoEm: true },
+    where: { processoId, resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, fasePretendida: fase },
+    orderBy: { criadoEm: 'desc' }, select: { criadoEm: true },
   })
+  if (ultimoAvanco) return monta(ultimoAvanco.criadoEm, 'AVANCO_DE_FASE')
 
-  const desde = ultimoAvanco?.criadoEm ?? proc.dataInicio ?? proc.createdAt
-  const origem: DiasNaFase['origem'] = ultimoAvanco ? 'AVANCO_DE_FASE' : 'CADASTRO_DO_PROCESSO'
-  const dias = Math.max(0, Math.floor((agora.getTime() - desde.getTime()) / 86_400_000))
-  return { faseAtual: proc.faseAtualKey, desde: desde.toISOString(), origem, dias }
+  if (proc.tipoProcessoMotorId != null) {
+    const ordens = await ordensDeFase(proc.tipoProcessoMotorId)
+    const ordemAtual = ordens.get(fase)
+    const primeira = ordens.size ? Math.min(...ordens.values()) : null
+    if (ordemAtual != null && primeira != null && ordemAtual === primeira) return monta(proc.dataInicio ?? proc.createdAt, 'CADASTRO_DO_PROCESSO')
+  }
+
+  const instancia = await prisma.phaseWorkflowInstance.findFirst({
+    where: { processoId, faseMacroKey: fase }, orderBy: { createdAt: 'desc' }, select: { createdAt: true },
+  })
+  if (instancia) return monta(instancia.createdAt, 'INSTANCIA_DA_FASE')
+
+  return { faseAtual: fase, desde: null, origem: null, dias: null, horas: null }
 }
 
 /**
@@ -111,7 +146,7 @@ export interface TempoPorFase {
  */
 export async function tempoMedioRealPorFase(processoId?: number): Promise<TempoPorFase[]> {
   const logs = await prisma.phaseAdvanceLog.findMany({
-    where: { resultado: 'MOVIDO', ...(processoId != null ? { processoId } : {}) },
+    where: { resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, ...(processoId != null ? { processoId } : {}) },
     orderBy: [{ processoId: 'asc' }, { criadoEm: 'asc' }],
     select: { processoId: true, faseAtual: true, fasePretendida: true, criadoEm: true },
   })

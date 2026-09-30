@@ -32,7 +32,7 @@ export interface FocoDaFamilia {
   familiaNome: string
   pais: string | null
   codigo: string | null
-  faseAtual: { key: string | null; label: string | null; dias: number | null }
+  faseAtual: { key: string | null; label: string | null; dias: number | null; horas: number | null; desde: string | null; origem: string | null }
   certidoes: { recebidas: number; requeridas: number }
   numeros: { abertas: number; vencidas: number; comCartorio: number; semResponsavel: number }
   tarefas: LinhaDaTorre[]
@@ -109,7 +109,7 @@ export async function focoDaFamilia(processoId: number, agora = new Date(), limi
   return {
     processoId, familiaId: proc.familiaId, familiaNome: proc.familia?.nome ?? proc.nome,
     pais: proc.paisCanonico?.countryLabel ?? null, codigo: proc.codigo,
-    faseAtual: { key: proc.faseAtualKey, label: rot(proc.faseAtualKey), dias: dias.dias },
+    faseAtual: { key: proc.faseAtualKey, label: rot(proc.faseAtualKey), dias: dias.dias, horas: dias.horas, desde: dias.desde, origem: dias.origem },
     certidoes: { recebidas: progresso.completed, requeridas: progresso.required },
     numeros: numerosDoFoco(linhas), tarefas: linhas, linhaDoTempo: eventos,
   }

@@ -78,3 +78,12 @@ export function faixaDaFila(semanas: number | null, ativas: number): FaixaDaFila
 
 /** Previsão de carga: n ≥ 5 → 3, ≥ 3 → 2, > 0 → 1, senão 0 (a escala do protótipo). */
 export const nivelDaPrevisao = (n: number): 0 | 1 | 2 | 3 => (n >= 5 ? 3 : n >= 3 ? 2 : n > 0 ? 1 : 0)
+
+// ─── HÁ QUANTO TEMPO NA FASE ────────────────────────────────────────────────
+
+/** O texto de "há quanto tempo" — `—` sem data (NUNCA "0 d" fingindo precisão), horas até completar 1 dia, depois dias. */
+export function textoTempoNaFase(t: { dias: number | null; horas: number | null } | null | undefined): string {
+  if (!t || t.dias == null || t.horas == null) return '—'
+  if (t.dias >= 1) return `${t.dias} d`
+  return t.horas >= 1 ? `${t.horas} h` : '< 1 h'
+}

@@ -2,6 +2,7 @@
 // src/components/torre/TorreRadar.tsx — aba RADAR (Bloco J4): família × fases do CADASTRO.
 // A célula da fase atual mostra com quem está a bola e há quantos dias; cor = risco (o score do "Precisa de você").
 // Clique numa família ou numa célula abre o Foco. Nada fixo no código: as colunas são as fases ativas do cadastro.
+import { textoTempoNaFase } from "@/lib/operacional/torre-predicados"
 import { useTorre } from "./torre-base"
 import type { CelulaDoRadar, ColunaDoRadar, ProcessoDaTorre } from "./tipos-processos"
 import "./torre-radar.css"
@@ -14,7 +15,7 @@ function Celula({ c, onAbrir }: { c: CelulaDoRadar; onAbrir: () => void }) {
   if (c.estado === "atual") {
     return (
       <button type="button" className={`tor-rc atual ${c.risco ?? "ok"}`} onClick={onAbrir} title="Fase atual">
-        <span>{c.bola ?? "—"} · {c.dias ?? "—"} d</span>
+        <span>{c.bola ?? "—"} · {textoTempoNaFase({ dias: c.dias ?? null, horas: c.horas ?? null })}</span>
         <small>{ROTULO_RISCO[c.risco ?? "ok"]}</small>
       </button>
     )
@@ -48,8 +49,8 @@ export function TorreRadar({ colunas, processos, carregando, erro }: { colunas: 
         </div>
         <div className="tor-legenda">
           <span className="tor-p grn">no ritmo</span>
-          <span className="tor-p amb">atenção: cobrança vencida ou parado 7+ dias</span>
-          <span className="tor-p red">crítico: atraso nosso, sem dono ou fase sem passos</span>
+          <span className="tor-p amb" title="A mesma pontuação do Precisa de você: sem responsável +3, atrasada +4, acompanhamento vencido +2, 2+ cobranças sem resposta +2, fase deixada +3, divergência +3, bloqueada +2">atenção: pontuação 3 a 5 (ex.: sem responsável, acompanhamento vencido, cobranças sem resposta)</span>
+          <span className="tor-p red">crítico: pontuação 6 ou mais (ex.: atraso nosso + sem dono, fase deixada, divergência) ou fase sem passos</span>
           <span className="tor-p gry">fase atual</span>
         </div>
       </div>

@@ -405,3 +405,19 @@ Simular usa os dados de hoje e **nunca grava** (nem com a regra ligada). Ativar/
 **Países (J2)**: `GET /api/torre/paises` = países com Tipo de Processo ativo (a mesma lista dos Relatórios). **Briefing** e **Revisar o dia** reaproveitam `GET /api/torre/precisa-de-voce` e o dispatcher de ações do F; a revisão não tem estado no servidor.
 
 **Testes**: `torre-bloco-j-kpis-radar-visoes-absorcao` (e o E10, ajustado à definição única), na suíte crítica.
+
+### Correção pós-conferência do Bloco J — "há quanto tempo na fase" (30/09/2026)
+
+Radar e Foco mostravam "0 d" nas três famílias. Os zeros eram reais (entradas há menos de 24 h), mas o texto não dizia isso e a fonte estava errada em dois pontos: só `MOVIDO` era lido como entrada de fase (`AVANCADO`/`FORCADO` eram ignorados) e a abertura do processo (`dataInicio`) valia como entrada em QUALQUER fase.
+
+Fonte única: `diasNaFaseAtual` (`lib/operacional/metricas-processo.ts`), lida pela aba Processos ("Dias na fase"), pela célula do Radar e pelo Foco. Ordem:
+1. último `PhaseAdvanceLog` com resultado em `RESULTADOS_QUE_MOVEM_DE_FASE` (`MOVIDO`, `AVANCADO`, `FORCADO`) e `fasePretendida` = fase atual → origem `AVANCO_DE_FASE`;
+2. se a fase atual é a PRIMEIRA do macrofluxo: `dataInicio ?? createdAt` do processo → `CADASTRO_DO_PROCESSO`;
+3. `PhaseWorkflowInstance` mais recente da fase → `INSTANCIA_DA_FASE`;
+4. nada disso: `desde/dias/horas = null` e a tela mostra "—". Nunca "agora", nunca "0 d".
+
+Formatação única (`textoTempoNaFase`, `torre-predicados.ts`): "—" sem data; "N d" a partir de 1 dia; "N h" antes disso; "< 1 h" abaixo de 1 hora. `tempoMedioRealPorFase` (E11) usa o mesmo conjunto de resultados.
+
+Legenda do Radar: "parado 7+ dias" NÃO é regra (o score do Precisa de você não a tem); a legenda descreve a pontuação real (atenção 3–5, crítico ≥ 6 ou fase sem passos). Teste: `scripts/torre-bloco-j-tempo-na-fase.test.ts` (na suíte crítica).
+
+Distribuição: o redirecionamento de quem não tem `tarefas.editar` para `/operacao` já existia antes do Bloco J (`src/app/operacao/distribuicao/page.tsx`); o J não o alterou (o teste acima o trava).

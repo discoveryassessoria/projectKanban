@@ -26,6 +26,7 @@ export interface CelulaDoRadar {
   /** Só na atual: com quem está a bola e há quantos dias. */
   bola?: string
   dias?: number | null
+  horas?: number | null
   risco?: RiscoDoProcesso
   /** Só nas futuras: a fase não tem passo executável (achado aberto CAD-012/WF-004). */
   semPassos?: boolean
@@ -40,6 +41,8 @@ export interface ProcessoDaTorre {
   faseAtual: { key: string | null; label: string | null }
   progresso: { recebidas: number; requeridas: number; percentual: number }
   diasNaFase: number | null
+  /** Quando entrou na fase atual (de registro real) — `null` = sem registro, a tela mostra "—". */
+  naFase: { desde: string | null; origem: string | null; dias: number | null; horas: number | null }
   bola: { rotulo: string; dias: number | null }
   risco: RiscoDoProcesso
   scoreMaximo: number
@@ -125,7 +128,7 @@ export async function processosDaTorre(agora = new Date(), linhasEntrada?: Linha
     const celulas: CelulaDoRadar[] = colunas.map((c): CelulaDoRadar => {
       const ordem = ordens?.get(c.key)
       if (ordem == null) return { estado: 'na' }
-      if (c.key === p.faseAtualKey) return { estado: 'atual', bola: bola.rotulo, dias: dias.dias, risco }
+      if (c.key === p.faseAtualKey) return { estado: 'atual', bola: bola.rotulo, dias: dias.dias, horas: dias.horas, risco }
       if (ordemAtual != null && ordem < ordemAtual) return { estado: 'feita' }
       return { estado: 'futura', semPassos: semPassos.has(c.key) }
     })
@@ -133,7 +136,7 @@ export async function processosDaTorre(agora = new Date(), linhasEntrada?: Linha
       processoId: p.id, familiaId: p.familiaId, familiaNome: p.familia?.nome ?? p.nome, pais: p.paisCanonico?.countryLabel ?? null, codigo: p.codigo,
       faseAtual: { key: p.faseAtualKey, label: p.faseAtualKey ? labelDaFasePorPhaseKey(p.faseAtualKey) ?? p.faseAtualKey : null },
       progresso: { recebidas: prog.completed, requeridas: prog.required, percentual: prog.percentage },
-      diasNaFase: dias.dias, bola, risco, scoreMaximo: score, proximoMarco: marco,
+      diasNaFase: dias.dias, naFase: { desde: dias.desde, origem: dias.origem, dias: dias.dias, horas: dias.horas }, bola, risco, scoreMaximo: score, proximoMarco: marco,
       numeros: {
         abertas: ls.length, vencidas: ls.filter((l) => l.atrasada).length,
         comCartorio: ls.filter((l) => l.estadoOperacao === 'AGUARDANDO').length, semResponsavel: ls.filter((l) => l.responsavelId == null).length,

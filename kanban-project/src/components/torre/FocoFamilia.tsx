@@ -1,6 +1,7 @@
 "use client"
 // src/components/torre/FocoFamilia.tsx — FOCO DA FAMÍLIA (Bloco I3). Só leitura das fontes existentes:
 // /api/torre/foco/{processoId}; comentários em /api/comentarios (E4); relatório no motor de Relatórios.
+import { textoTempoNaFase } from "@/lib/operacional/torre-predicados"
 import { useCallback, useEffect, useState } from "react"
 import { docTipoTxt } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -11,7 +12,7 @@ import { RelatorioControle } from "./RelatorioControle"
 
 interface Foco {
   processoId: number; familiaId: number | null; familiaNome: string; pais: string | null; codigo: string | null
-  faseAtual: { label: string | null; dias: number | null }
+  faseAtual: { label: string | null; dias: number | null; horas: number | null; desde: string | null; origem: string | null }
   certidoes: { recebidas: number; requeridas: number }
   numeros: { abertas: number; vencidas: number; comCartorio: number; semResponsavel: number }
   tarefas: LinhaTorre[]
@@ -85,7 +86,7 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
               <>
                 <h2 className="font-extrabold" style={{ fontSize: 18 }}>{foco.familiaNome} · {foco.pais ?? "—"} · {foco.codigo ?? "—"}</h2>
                 <div>{foco.faseAtual.label ?? "—"} · {foco.certidoes.recebidas} de {foco.certidoes.requeridas} certidões recebidas
-                  {foco.faseAtual.dias != null && <span className="small"> · há {foco.faseAtual.dias} dia(s) na fase</span>}</div>
+                  <span className="small"> · {foco.faseAtual.desde ? `na fase há ${textoTempoNaFase(foco.faseAtual)}` : "sem registro de quando entrou na fase"}</span></div>
               </>
             ) : <h2 className="font-extrabold" style={{ fontSize: 18 }}>Foco da família</h2>}
           </div>

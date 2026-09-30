@@ -1,6 +1,9 @@
 "use client"
 // src/components/torre/TorreProcessos.tsx — aba PROCESSOS (Bloco J4).
 // Família, Fase, Progresso real (E9), Dias na fase, Bola com, Risco (score do "Precisa de você"), Próximo marco, Foco e Relatório.
+import { textoTempoNaFase } from "@/lib/operacional/torre-predicados"
+
+const ORIGEM_NA_FASE: Record<string, string> = { AVANCO_DE_FASE: "último avanço de fase registrado", CADASTRO_DO_PROCESSO: "abertura do processo — nasceu nesta fase", INSTANCIA_DA_FASE: "criação do workflow da fase" }
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { useTorre } from "./torre-base"
 import type { ProcessoDaTorre, RiscoDoProcesso } from "./tipos-processos"
@@ -35,10 +38,10 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
               <div className="tor-bar-p"><i style={{ width: `${Math.min(100, Math.max(0, p.progresso.percentual))}%` }} /></div>
               <div className="small">{p.progresso.recebidas} de {p.progresso.requeridas} certidões recebidas</div>
             </div>
-            <div>{p.diasNaFase != null ? `${p.diasNaFase} d` : "—"}</div>
+            <div title={p.naFase.desde ? `Na fase desde ${new Date(p.naFase.desde).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} (${ORIGEM_NA_FASE[p.naFase.origem ?? ""] ?? "registro"})` : "Sem registro de quando entrou nesta fase"}>{textoTempoNaFase(p.naFase)}</div>
             <div>
               <span className={`tor-p ${p.bola.rotulo === "Nossa" ? "amb" : "blu"}`}>{p.bola.rotulo}</span>
-              {p.bola.dias != null && <div className="small">há {p.bola.dias} d</div>}
+              {p.bola.dias != null && <div className="small">{p.bola.dias === 0 ? "desde hoje" : `há ${p.bola.dias} d`}</div>}
             </div>
             <div><span className={`tor-p ${r.cls}`}>{r.txt}</span></div>
             <div className="small">{p.proximoMarco ?? "—"}</div>
