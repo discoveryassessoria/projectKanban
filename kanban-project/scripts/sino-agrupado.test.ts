@@ -90,7 +90,6 @@ async function main() {
   exigirBancoDeTeste("prova o sino agrupado (um aviso por pessoa/família/tipo)")
   await limpar()
   console.log("O SINO AGRUPADO\n")
-  ok("PROVA DO GATE — quebra de propósito (este commit será revertido)", false)
 
   const marco = await usuario("Marco", "admin")
   const daniela = await usuario("Daniela", "assistente")
