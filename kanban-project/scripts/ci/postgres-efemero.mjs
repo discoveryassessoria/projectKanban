@@ -12,9 +12,9 @@
 // Não escuta em nada além de 127.0.0.1 e morre com o processo (`parar()` + saída do node).
 // ============================================================================
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, mkdtempSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, mkdtempSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -28,8 +28,27 @@ export function localizarBinarios() {
   return nativo
 }
 
+/**
+ * Recria os symlinks das bibliotecas (`libpq.so.5 → libpq.so.5.x` etc.). O pacote os grava em
+ * `native/pg-symlinks.json` e os recria num `postinstall`; quando as dependências vêm de CACHE
+ * (build da Vercel) o postinstall não roda e o `initdb` morre com "libpq.so.5: cannot open shared
+ * object file". Idempotente: o que já existe é ignorado.
+ */
+export function hidratarSymlinks(nativo) {
+  const arquivo = join(nativo, 'pg-symlinks.json')
+  if (!existsSync(arquivo)) return 0
+  const raizPacote = dirname(nativo)
+  let criados = 0
+  for (const { source, target } of JSON.parse(readFileSync(arquivo, 'utf8'))) {
+    const destino = join(raizPacote, target)
+    try { symlinkSync(basename(source), destino); criados++ } catch { /* já existe */ }
+  }
+  return criados
+}
+
 export async function subirPostgresEfemero({ porta = 55432 } = {}) {
   let nativo = localizarBinarios()
+  hidratarSymlinks(nativo)
   const root = typeof process.getuid === 'function' && process.getuid() === 0
   const usuarioSo = 'pgci'
   let uid, gid
@@ -40,7 +59,7 @@ export async function subirPostgresEfemero({ porta = 55432 } = {}) {
     // Fora de /vercel/path0 (o usuário sem privilégio não lê lá) e legível por todos.
     const copia = '/opt/pg-efemero-nativo'
     rmSync(copia, { recursive: true, force: true })
-    cpSync(nativo, copia, { recursive: true })
+    cpSync(nativo, copia, { recursive: true, verbatimSymlinks: true })
     execFileSync('chmod', ['-R', 'a+rX', copia])
     nativo = copia
     try { execFileSync('id', [usuarioSo], { stdio: 'ignore' }) } catch { execFileSync('useradd', ['-m', usuarioSo]) }
