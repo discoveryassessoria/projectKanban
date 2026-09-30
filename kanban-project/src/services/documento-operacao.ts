@@ -1637,6 +1637,20 @@ export async function controlarOperacaoV2(
   } else {
     return { ok: false, error: "action inválido", status: 400 }
   }
+  // CANCELAR A OPERAÇÃO pode ser a ÚLTIMA pendência da fase (achado real 30/09/2026, processo 675 Antão: a
+  // certidão de casamento que travava Genealogia foi cancelada, o gate ficou liberado — `canAdvance = true`, sem
+  // nenhuma pendência — e o processo NÃO avançou, porque este era um dos caminhos que mudam a entrada do gate sem
+  // chamar o gancho de auto-avanço; só o cron horário recuperaria, até uma hora depois). Só cancelar libera pendência
+  // (invalidar/pausar/retomar mantêm ou reabrem). Best-effort e escopado à fase ATUAL: nunca derruba o comando.
+  if (action === "cancelar") {
+    try {
+      const p0 = passos[0]
+      const { tentarAvancoAutomaticoSeFaseAtual } = await import("@/src/lib/motor/auto-avanco")
+      await tentarAvancoAutomaticoSeFaseAtual(p0.processoId, p0.faseMacroKey, "documento-cancelar-operacao")
+    } catch (e) {
+      console.error("[documento-operacao] auto-avanço após cancelar falhou (o cron horário recupera):", e)
+    }
+  }
   return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
 }
 

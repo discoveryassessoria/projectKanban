@@ -473,15 +473,15 @@ export async function devolverAFila(args: {
     })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
-      return { ok: false as const, codigo: 'TERMINAL' as const, mensagem: 'Tarefa encerrada não volta para a fila.' }
+      return { ok: false as const, codigo: 'TERMINAL' as const, mensagem: 'Tarefa encerrada não volta para a equipe.' }
     }
     if (t.responsavelId == null) {
-      return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'A tarefa já está na fila.' }
+      return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'A tarefa já está com a equipe, sem responsável.' }
     }
     if (t.statusTarefa === 'EM_ANDAMENTO' && args.confirmarTarefaEmAndamento !== true) {
       return {
         ok: false as const, codigo: 'CONFIRMACAO_NECESSARIA' as const,
-        mensagem: 'Esta tarefa está EM ANDAMENTO. Tirar o responsável a deixa em andamento e sem dono. Confirme para devolvê-la à fila.',
+        mensagem: 'Esta tarefa está EM ANDAMENTO. Tirar o responsável a deixa em andamento e sem dono. Confirme para devolvê-la à equipe.',
       }
     }
     await tx.tarefa.update({
@@ -489,7 +489,7 @@ export async function devolverAFila(args: {
       data: { responsavelId: null, dataAtribuicao: null, atribuidoPorId: null, lockVersion: { increment: 1 } },
     })
     await auditar(tx, 'TAREFA_DEVOLVIDA_A_FILA', t.id, args.autorId,
-      `Tarefa "${t.titulo}" devolvida à fila${t.equipeKey ? ` da ${t.equipeKey}` : ''} (era do usuário ${t.responsavelId}).` +
+      `Tarefa "${t.titulo}" devolvida à equipe (sem responsável)${t.equipeKey ? ` — ${t.equipeKey}` : ''} (era do usuário ${t.responsavelId}).` +
       (args.motivo ? ` Motivo: ${args.motivo}` : ''),
       { tarefaId: t.id, de: t.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null,
         statusTarefa: t.statusTarefa, confirmouTarefaEmAndamento: t.statusTarefa === 'EM_ANDAMENTO' })

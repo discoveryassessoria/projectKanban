@@ -20,7 +20,7 @@
 // ============================================================================
 import type { Prisma, PrismaClient } from '@prisma/client'
 import { diasEntreDiasOperacionais } from './tempo-operacional'
-import { lerVersaoPublicada } from '@/src/services/versao-publicada'
+import { lerVersaoPublicada, type VersaoPublicada } from '@/src/services/versao-publicada'
 
 type Leitor = PrismaClient | Prisma.TransactionClient
 
@@ -71,14 +71,12 @@ export function acompanhamentoVenceuNoDia(data: Date | string | null | undefined
 export async function definicoesDasSubtarefas(
   db: Leitor,
   passos: Array<{ stepInstanceId: number; stepKey: string; workflowInstanceId: number | null }>,
+  cache: CacheDeLeitura = criarCacheDeLeitura(db),
 ): Promise<Map<number, { ordens: Map<string, number>; defs: Map<string, DefinicaoDeSubtarefa> }>> {
   const saida = new Map<number, { ordens: Map<string, number>; defs: Map<string, DefinicaoDeSubtarefa> }>()
   const instanciaIds = [...new Set(passos.map((p) => p.workflowInstanceId).filter((x): x is number => x != null))]
   if (instanciaIds.length === 0) return saida
-  const instancias = await db.phaseWorkflowInstance.findMany({
-    where: { id: { in: instanciaIds } },
-    select: { id: true, workflowDefinitionId: true, workflowVersion: true },
-  })
+  const instancias = await cache.instancias(instanciaIds)
   const instanciaPorId = new Map(instancias.map((i) => [i.id, i]))
   const pares = new Map<string, { workflowDefinitionId: number; workflowVersion: number }>()
   for (const i of instancias) {
@@ -86,7 +84,7 @@ export async function definicoesDasSubtarefas(
     pares.set(`${i.workflowDefinitionId}:${i.workflowVersion}`, { workflowDefinitionId: i.workflowDefinitionId, workflowVersion: i.workflowVersion })
   }
   const versoes = new Map(await Promise.all(
-    [...pares.entries()].map(async ([chave, p]) => [chave, await lerVersaoPublicada(p.workflowDefinitionId, p.workflowVersion, db)] as const),
+    [...pares.entries()].map(async ([chave, p]) => [chave, await cache.versao(p.workflowDefinitionId, p.workflowVersion)] as const),
   ))
   for (const p of passos) {
     if (p.workflowInstanceId == null) continue
@@ -101,4 +99,123 @@ export async function definicoesDasSubtarefas(
     })
   }
   return saida
+}
+
+// ============================================================================
+// O CACHE DE LEITURA DE UMA REQUISIÇÃO (Torre, D2, 30/09/2026).
+//
+// ACHADO: a visão gerencial lia as MESMAS linhas em várias funções — as
+// instâncias de workflow e as versões congeladas (progresso por subtarefa E
+// definições das subtarefas), as execuções vigentes (idem), o cadastro de
+// rótulos dos passos (rótulo da etapa E rótulo do próximo acontecimento), os
+// passos e as pessoas (nome E linhagem) — e cada uma esperava a anterior.
+// Com ~130 ms por ida ao banco, cada leitura repetida ou em série é tempo puro.
+//
+// Isto NÃO é cache entre requisições nem fonte nova: vive o tempo de UMA
+// chamada, guarda a PROMESSA por chave (duas funções que pedem a mesma linha ao
+// mesmo tempo fazem UMA consulta) e consulta só o que ainda não foi pedido.
+// Nenhuma regra mora aqui — quem decide o que fazer com a linha é quem a pede.
+// ============================================================================
+export type InstanciaLida = { id: number; workflowDefinitionId: number | null; workflowVersion: number | null }
+export type PassoLido = {
+  id: number; stepKey: string; snapshot: Prisma.JsonValue; stepDefinitionId: number | null; ordem: number
+  createdAt: Date; prazo: Date | null; startedAt: Date | null; metadata: Prisma.JsonValue
+}
+export type ExecucaoLida = {
+  id: number; stepInstanceId: number; subtaskKey: string; status: string; criadoEm: Date; startedAt: Date | null
+  previstoPara: Date | null; proximoAcompanhamentoEm: Date | null; escalada: boolean
+}
+export type ContatoLido = { subtaskExecutionId: number; resultado: string }
+export type PessoaLida = { id: number; nome: string; sobrenome: string | null; numeroLinhagem: number | null; linhaReta: boolean }
+
+export interface CacheDeLeitura {
+  instancias(ids: number[]): Promise<InstanciaLida[]>
+  versao(workflowDefinitionId: number, workflowVersion: number): Promise<VersaoPublicada | null>
+  passos(ids: number[]): Promise<PassoLido[]>
+  execucoes(stepInstanceIds: number[]): Promise<ExecucaoLida[]>
+  /** Todos os contatos das execuções vigentes desses passos (ordem crescente de id). A chave é o CONJUNTO. */
+  contatos(stepInstanceIds: number[]): Promise<ContatoLido[]>
+  rotulosDeDefinicao(ids: number[]): Promise<Array<{ id: number; label: string }>>
+  pessoas(ids: number[]): Promise<PessoaLida[]>
+}
+
+/** Uma consulta por LOTE do que falta; o que já foi pedido (mesmo em andamento) é reaproveitado. `agrupar` = várias linhas por chave. */
+function carregadorPorChave<K, R>(buscar: (faltam: K[]) => Promise<R[]>, chaveDe: (r: R) => K) {
+  const memo = new Map<K, Promise<R[]>>()
+  return async (ids: K[]): Promise<R[]> => {
+    const unicos = [...new Set(ids)]
+    const faltam = unicos.filter((id) => !memo.has(id))
+    if (faltam.length > 0) {
+      const lote = buscar(faltam).then((rows) => {
+        const porChave = new Map<K, R[]>()
+        for (const r of rows) { const k = chaveDe(r); const a = porChave.get(k); if (a) a.push(r); else porChave.set(k, [r]) }
+        return porChave
+      })
+      for (const id of faltam) memo.set(id, lote.then((m) => m.get(id) ?? []))
+    }
+    return (await Promise.all(unicos.map((id) => memo.get(id)!))).flat()
+  }
+}
+
+export function criarCacheDeLeitura(db: Leitor): CacheDeLeitura {
+  const instancias = carregadorPorChave<number, InstanciaLida>(
+    (ids) => db.phaseWorkflowInstance.findMany({ where: { id: { in: ids } }, select: { id: true, workflowDefinitionId: true, workflowVersion: true } }),
+    (r) => r.id,
+  )
+  const versoes = new Map<string, Promise<VersaoPublicada | null>>()
+  const passos = carregadorPorChave<number, PassoLido>(
+    (ids) => db.phaseWorkflowStepInstance.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, stepKey: true, snapshot: true, stepDefinitionId: true, ordem: true, createdAt: true, prazo: true, startedAt: true, metadata: true },
+    }),
+    (r) => r.id,
+  )
+  const execucoes = carregadorPorChave<number, ExecucaoLida>(
+    (ids) => db.subtaskExecution.findMany({
+      where: { stepInstanceId: { in: ids }, supersededAt: null },
+      select: {
+        id: true, stepInstanceId: true, subtaskKey: true, status: true, criadoEm: true, startedAt: true,
+        previstoPara: true, proximoAcompanhamentoEm: true, escalada: true,
+      },
+    }),
+    (r) => r.stepInstanceId,
+  )
+  const contatosMemo = new Map<string, Promise<ContatoLido[]>>()
+  const rotulos = carregadorPorChave<number, { id: number; label: string }>(
+    (ids) => db.phaseInternalWorkflowStep.findMany({ where: { id: { in: ids } }, select: { id: true, label: true } }),
+    (r) => r.id,
+  )
+  const pessoas = carregadorPorChave<number, PessoaLida>(
+    (ids) => db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, sobrenome: true, numeroLinhagem: true, linhaReta: true } }),
+    (r) => r.id,
+  )
+  return {
+    instancias: (ids) => (ids.length ? instancias(ids) : Promise.resolve([])),
+    versao: (workflowDefinitionId, workflowVersion) => {
+      const chave = `${workflowDefinitionId}:${workflowVersion}`
+      let p = versoes.get(chave)
+      if (!p) { p = lerVersaoPublicada(workflowDefinitionId, workflowVersion, db); versoes.set(chave, p) }
+      return p
+    },
+    passos: (ids) => (ids.length ? passos(ids) : Promise.resolve([])),
+    execucoes: (ids) => (ids.length ? execucoes(ids) : Promise.resolve([])),
+    // Direto na tabela de contatos, pela execução vigente do passo — UMA consulta que não espera as execuções
+    // (antes: execuções → contagem por grupo → contatos, três idas em série; a contagem é o tamanho da lista).
+    contatos: (ids) => {
+      if (ids.length === 0) return Promise.resolve([])
+      const chave = [...new Set(ids)].sort((a, b) => a - b).join(',')
+      let p = contatosMemo.get(chave)
+      if (!p) {
+        p = db.contatoTerceiro.findMany({
+          where: { subtaskExecution: { stepInstanceId: { in: [...new Set(ids)] }, supersededAt: null } },
+          orderBy: { id: 'asc' },
+          select: { subtaskExecutionId: true, resultado: true },
+        })
+        contatosMemo.set(chave, p)
+      }
+      return p
+    },
+    rotulosDeDefinicao: (ids) => (ids.length ? rotulos(ids) : Promise.resolve([])),
+    pessoas: (ids) => (ids.length ? pessoas(ids) : Promise.resolve([])),
+  }
 }

@@ -673,9 +673,9 @@ async function main() {
   // UM ESTADO, UM NOME. O cartão dizia "Não iniciada", o filtro logo acima dizia
   // "A fazer" e a Central dizia "A fazer" — sobre a mesma tarefa.
   ok('o vocabulário de estado é o MESMO da Central e do filtro',
-    ROTULO_STATUS.NAO_INICIADA === 'A fazer'
+    ROTULO_STATUS.NAO_INICIADA === 'A iniciar'
     && ROTULO_STATUS.EM_ANDAMENTO === 'Em andamento'
-    && ROTULO_STATUS.AGUARDANDO_TERCEIRO === 'Aguardando terceiro',
+    && ROTULO_STATUS.AGUARDANDO_TERCEIRO === 'Aguardando cartório',
     ROTULO_STATUS.NAO_INICIADA)
   ok('e ele cobre todo estado que a fila pode mostrar',
     ['NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE', 'BLOQUEADA']

@@ -204,7 +204,16 @@ export interface PropostaDeAtribuicao {
   /** `true` = seria atribuída; `false` = fica sem dono (sem apto, ou segurada por r3). */
   atribui: boolean
   seguradaPorLimite: boolean
+  /**
+   * `true` = NENHUM candidato com aptidão COMPROVADA (unidade com aptidão cadastrada ou equipe exigida que existe).
+   * A sugestão manual pode mostrar o fallback por menor carga a um humano; a regra automática NUNCA o usa.
+   * A tarefa continua sem dono e aparecendo em "Precisa de você".
+   */
+  semApto: boolean
 }
+
+/** O motivo gravado no plano/simulação quando a r1 não encontra apto (mesma regra da sugestão: só atribui a quem tem aptidão). */
+export const MOTIVO_SEM_APTO = 'sem apto — fica no Precisa de você'
 
 /**
  * O PLANO DA r1: para cada tarefa SEM DONO que o "Precisa de você" lista (mesma
@@ -222,8 +231,9 @@ export async function planoDaR1(agora = new Date(), respeitarR3: boolean): Promi
   for (const it of itens) {
     const tarefaId = it.tarefaId as number
     const s = await sugerirResponsavelPrecisaDeVoce(tarefaId, agora, prisma, jaDistribuido)
-    if (!s) {
-      plano.push({ tarefaId, titulo: it.titulo, paraId: null, paraNome: null, motivo: 'nenhum candidato apto e disponível', atribui: false, seguradaPorLimite: false })
+    // Sem sugestão, ou só o FALLBACK (ninguém com aptidão cadastrada): a regra automática não atribui a quem não é apto.
+    if (!s || s.fallback) {
+      plano.push({ tarefaId, titulo: it.titulo, paraId: null, paraNome: null, motivo: MOTIVO_SEM_APTO, atribui: false, seguradaPorLimite: false, semApto: true })
       continue
     }
     const c = cargas.get(s.usuarioId)
@@ -231,21 +241,21 @@ export async function planoDaR1(agora = new Date(), respeitarR3: boolean): Promi
       plano.push({
         tarefaId, titulo: it.titulo, paraId: s.usuarioId, paraNome: s.nome,
         motivo: `${s.nome} está no limite (${c.executaveis}/${c.limite}) — segurada para decisão em "Precisa de você"`,
-        atribui: false, seguradaPorLimite: true,
+        atribui: false, seguradaPorLimite: true, semApto: false,
       })
       continue
     }
     // Quem ainda cabe recebe UMA a mais na memória: o plano de um lote não pode estourar o limite de ninguém no meio.
     if (c) c.executaveis++
     jaDistribuido.set(s.usuarioId, (jaDistribuido.get(s.usuarioId) ?? 0) + 1)
-    plano.push({ tarefaId, titulo: it.titulo, paraId: s.usuarioId, paraNome: s.nome, motivo: s.motivo, atribui: true, seguradaPorLimite: false })
+    plano.push({ tarefaId, titulo: it.titulo, paraId: s.usuarioId, paraNome: s.nome, motivo: s.motivo, atribui: true, seguradaPorLimite: false, semApto: false })
   }
   return plano
 }
 
 export type ResultadoR1 =
   | { executou: false; motivo: 'REGRA_DESLIGADA' }
-  | { executou: true; atribuidas: number; seguradas: number; falhas: number; itens: Array<{ tarefaId: number; ok: boolean; para?: string; mensagem?: string }> }
+  | { executou: true; atribuidas: number; seguradas: number; semApto: number; falhas: number; itens: Array<{ tarefaId: number; ok: boolean; para?: string; mensagem?: string }> }
 
 /**
  * EXECUTA A r1. É AQUI que "regra desligada não executa nada" é garantido:
@@ -257,9 +267,9 @@ export async function executarR1(autorId: number | null, agora = new Date()): Pr
   const respeitarR3 = await regraAtiva('r3')
   const plano = await planoDaR1(agora, respeitarR3)
   const itens: Array<{ tarefaId: number; ok: boolean; para?: string; mensagem?: string }> = []
-  let atribuidas = 0, seguradas = 0, falhas = 0
+  let atribuidas = 0, seguradas = 0, semApto = 0, falhas = 0
   for (const p of plano) {
-    if (!p.atribui || p.paraId == null) { if (p.seguradaPorLimite) seguradas++; continue }
+    if (!p.atribui || p.paraId == null) { if (p.seguradaPorLimite) seguradas++; else if (p.semApto) semApto++; continue }
     const r = await atribuirTarefa({
       tarefaId: p.tarefaId, responsavelId: p.paraId, autorId,
       motivo: `auto-atribuição (regra r1): ${p.motivo}`,
@@ -270,11 +280,11 @@ export async function executarR1(autorId: number | null, agora = new Date()): Pr
   await prisma.logAuditoria.create({
     data: {
       acao: 'REGRA_TORRE_EXECUTADA', entidade: 'RegraTorre', entidadeId: null, usuarioId: autorId ?? undefined,
-      descricao: `Regra r1 executada: ${atribuidas} atribuída(s), ${seguradas} segurada(s) pelo limite (r3), ${falhas} falha(s).`,
-      detalhes: { chave: 'r1', respeitouR3: respeitarR3, atribuidas, seguradas, falhas, itens } as unknown as Prisma.InputJsonValue,
+      descricao: `Regra r1 executada: ${atribuidas} atribuída(s), ${seguradas} segurada(s) pelo limite (r3), ${semApto} sem apto (ficam no "Precisa de você"), ${falhas} falha(s).`,
+      detalhes: { chave: 'r1', respeitouR3: respeitarR3, atribuidas, seguradas, semApto, falhas, itens } as unknown as Prisma.InputJsonValue,
     },
   })
-  return { executou: true, atribuidas, seguradas, falhas, itens }
+  return { executou: true, atribuidas, seguradas, semApto, falhas, itens }
 }
 
 // ─── SIMULAÇÃO — SÓ LEITURA, NUNCA GRAVA ────────────────────────────────────
@@ -296,7 +306,7 @@ export async function simularRegra(chave: ChaveRegra, agora = new Date()): Promi
     const plano = await planoDaR1(agora, await regraAtiva('r3'))
     const atribuiria = plano.filter((p) => p.atribui)
     const seguradas = plano.filter((p) => p.seguradaPorLimite)
-    const semApto = plano.filter((p) => !p.atribui && !p.seguradaPorLimite)
+    const semApto = plano.filter((p) => p.semApto)
     const porPessoa = new Map<string, number>()
     for (const p of atribuiria) porPessoa.set(p.paraNome as string, (porPessoa.get(p.paraNome as string) ?? 0) + 1)
     const dist = [...porPessoa.entries()].map(([n, q]) => `${q} para ${n}`).join('; ')
@@ -306,7 +316,7 @@ export async function simularRegra(chave: ChaveRegra, agora = new Date()): Promi
         ? 'Hoje: nenhuma tarefa aberta está sem dono — a regra não teria o que atribuir.'
         : `Hoje: ${atribuiria.length} tarefa(s) sem dono seriam atribuídas${dist ? ` (${dist})` : ''}` +
           `${seguradas.length ? `; ${seguradas.length} ficariam seguradas pelo limite de carga` : ''}` +
-          `${semApto.length ? `; ${semApto.length} continuariam sem dono por falta de apto disponível` : ''}.`,
+          `${semApto.length ? `; ${semApto.length} seguradas por falta de apto (continuam em "Precisa de você")` : ''}.`,
       numeros: { semDono: plano.length, atribuiria: atribuiria.length, seguradas: seguradas.length, semApto: semApto.length },
       itens: plano.map((p) => ({ tarefaId: p.tarefaId, texto: `${p.titulo} → ${p.paraNome ?? 'ninguém'} (${p.motivo})` })),
     }

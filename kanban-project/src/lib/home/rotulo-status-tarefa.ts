@@ -6,11 +6,16 @@
 // "use client", e por isso a fila da Home montava o subtítulo com
 // `statusTarefa.replace(/_/g," ").toLowerCase()` -> "nao iniciada" cru na tela.
 // O kit passa a REEXPORTAR este mapa; nenhuma tela tem dicionário próprio.
+//
+// FONTE ÚNICA de statusTarefa -> rótulo (item B8, 30/09/2026): a coluna "Status" da Operação e da Torre
+// (operacao-v3-derivacoes.ts reexporta como ROTULO_STATUS_TAREFA), a Home/fila, os avisos, o drawer do
+// documento e a Central da fase leem ESTE mapa. Cobre os 9 valores do enum StatusTarefa (prisma/schema.prisma).
+// NAO_INICIADA = "A iniciar". "A fazer" continua sendo o NOME DA ABA da Operação, não rótulo de status.
 // ============================================================================
-export const ROTULO_STATUS: Record<string, string> = {
-  NAO_INICIADA: "A fazer",
+export const ROTULO_STATUS: Readonly<Record<string, string>> = {
+  NAO_INICIADA: "A iniciar",
   EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  AGUARDANDO_TERCEIRO: "Aguardando cartório",
   AGUARDANDO_CLIENTE: "Aguardando cliente",
   BLOQUEADA: "Bloqueada",
   CONCLUIDO_RECEBIDO: "Concluída",

@@ -22,6 +22,10 @@ const APLICAR = process.argv.includes("--aplicar")
 const PROD = process.argv.includes("--prod")
 const PROCESSO = 651
 const TAREFAS = [3834, 3845, 3850, 3864, 3866, 3868, 3869, 3870, 3871]
+// CORREÇÃO (30/09/2026, auditoria): o backfill original gravou datas NO PASSADO (criação + 2 d = 28/09), fazendo 6 tarefas
+// nascerem "com acompanhamento vencido" sem ninguém ter atrasado. `--rebase-agora` regrava SÓ essas 6, com base = AGORA.
+const REBASE = process.argv.includes("--rebase-agora")
+const REBASE_ALVOS = [3864, 3866, 3868, 3869, 3870, 3871]
 
 async function main() {
   const url = process.env.PRISMA_DATABASE_URL ?? process.env.DATABASE_URL ?? ""
@@ -43,6 +47,30 @@ async function main() {
   if (tarefas.length !== TAREFAS.length) { console.error(`Esperava ${TAREFAS.length} tarefas do processo ${PROCESSO}, achei ${tarefas.length}. Abortando.`); process.exit(1) }
 
   let feitas = 0
+  if (REBASE) {
+    for (const t of tarefas.filter((x) => REBASE_ALVOS.includes(x.id))) {
+      const stepKey = t.workflowStepInstance?.stepKey, wfId = t.workflowStepInstance?.workflowInstance?.workflowDefinitionId
+      const vivo = wfId && stepKey ? await prisma.phaseInternalWorkflowStep.findFirst({ where: { workflowId: wfId, key: stepKey }, select: { diasParaIniciar: true } }) : null
+      const dias = vivo?.diasParaIniciar ?? null
+      const exec = await prisma.subtaskExecution.findFirst({ where: { stepInstanceId: t.workflowStepInstanceId!, supersededAt: null, status: "DISPONIVEL", startedAt: null, proximoAcompanhamentoEm: { lt: new Date() } }, select: { id: true, proximoAcompanhamentoEm: true, subtaskKey: true }, orderBy: { id: "asc" } })
+      if (dias == null || !exec) { console.log(`  #${t.id}: nada a rebasear (sem data no passado ou sem cadastro) — idempotente`); continue }
+      const agora = new Date()
+      const novo = prazoOperacional(dias, agora)!
+      console.log(`  #${t.id}: execução ${exec.id} ${exec.proximoAcompanhamentoEm?.toISOString()} → ${novo.toISOString()} (agora + ${dias} d)`)
+      if (!APLICAR) continue
+      await prisma.$transaction([
+        prisma.subtaskExecution.update({ where: { id: exec.id }, data: { proximoAcompanhamentoEm: novo } }),
+        prisma.logAuditoria.create({ data: {
+          acao: "ACOMPANHAMENTO_A_INICIAR_REBASEADO", entidade: "Tarefa", entidadeId: t.id,
+          descricao: `Relógio "a iniciar" regravado a partir de AGORA: o backfill de 30/09 tinha gravado uma data no passado (${exec.proximoAcompanhamentoEm?.toISOString().slice(0, 10)}), o que fazia a tarefa nascer com acompanhamento vencido sem ninguém ter atrasado.`,
+          detalhes: { antes: exec.proximoAcompanhamentoEm?.toISOString() ?? null, depois: novo.toISOString(), diasParaIniciar: dias, subtarefa: exec.subtaskKey, execucaoId: exec.id, origem: "scripts/backfill-a-iniciar-651.ts --rebase-agora" } as never,
+        } }),
+      ])
+      feitas++
+    }
+    console.log(`\n${APLICAR ? `${feitas} tarefa(s) rebaseada(s).` : "[dry-run] nada foi escrito."}`)
+    await prisma.$disconnect(); return
+  }
   for (const t of tarefas) {
     const stepKey = t.workflowStepInstance?.stepKey
     const wfId = t.workflowStepInstance?.workflowInstance?.workflowDefinitionId

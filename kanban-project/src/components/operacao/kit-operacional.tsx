@@ -27,6 +27,7 @@ import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 // em vez de perpetuá-la numa terceira tela.
 export type { LinhaDeFila } from "@/lib/operacional/tarefa-projecoes"
 import type { ColunaKanban, LinhaDeFila } from "@/lib/operacional/tarefa-projecoes"
+import { ROTULO_STATUS as ROTULO_STATUS_FONTE } from "@/src/lib/home/rotulo-status-tarefa"
 
 /**
  * A LINHA ENRIQUECIDA DA OPERAÇÃO — a MESMA leitura de Minha Fila/Distribuição/
@@ -105,9 +106,9 @@ function dataCurta(iso: string | null): string {
  * fazer". Três nomes para um estado obrigam cada pessoa a montar o próprio
  * dicionário — e quem monta dicionário erra.
  *
- * "A fazer" ganha porque é o que o operador faz com a informação: é trabalho
- * que espera por ele. "Não iniciada" descreve o passado da tarefa, não o que
- * ela pede.
+ * Vocabulário de NAO_INICIADA (B8, 30/09/2026): "A iniciar" — o MESMO da coluna
+ * Status da Operação. "A fazer" é o NOME DA ABA da Operação, não o rótulo do estado.
+ * A fonte é única (`src/lib/home/rotulo-status-tarefa.ts`); nada aqui é cópia.
  */
 export { ROTULO_STATUS } from "@/src/lib/home/rotulo-status-tarefa"
 export const ROTULO_PRIORIDADE: Record<string, string> = { URGENTE: "Urgente", ALTA: "Alta", MEDIA: "Média", BAIXA: "Baixa" }
@@ -125,12 +126,12 @@ export const ROTULO_PRIORIDADE: Record<string, string> = { URGENTE: "Urgente", A
  */
 export const ROTULO_COLUNA: Record<ColunaKanban, string> = {
   SEM_RESPONSAVEL: "Sem responsável",
-  A_FAZER: "A fazer",
-  EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
-  BLOQUEADA: "Bloqueada",
-  CONCLUIDA: "Concluída",
-  CANCELADA: "Cancelada",
+  A_FAZER: ROTULO_STATUS_FONTE.NAO_INICIADA,
+  EM_ANDAMENTO: ROTULO_STATUS_FONTE.EM_ANDAMENTO,
+  AGUARDANDO_TERCEIRO: ROTULO_STATUS_FONTE.AGUARDANDO_TERCEIRO,
+  BLOQUEADA: ROTULO_STATUS_FONTE.BLOQUEADA,
+  CONCLUIDA: ROTULO_STATUS_FONTE.CONCLUIDO_RECEBIDO,
+  CANCELADA: ROTULO_STATUS_FONTE.CANCELADA,
 }
 
 // CADASTRO DO GERENCIAMENTO, em cache compartilhado — mesma precedência do

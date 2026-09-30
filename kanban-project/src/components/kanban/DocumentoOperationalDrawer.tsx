@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
+import { rotuloStatusTarefa } from "@/src/lib/home/rotulo-status-tarefa"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
@@ -290,25 +291,10 @@ const fmtDateTime = (s: string | null): string => {
  *
  * A conta e a frase vêm da régua canônica; aqui fica só a cor.
  */
-/**
- * O STATUS OPERACIONAL DA TAREFA em português — o MESMO vocabulário da tabela da
- * fase e da Minha Fila. O cabeçalho mostrava o estado DOCUMENTAL ("Solicitado")
- * no campo "Status", e por isso a mesma certidão era "Em andamento" na linha e
- * "Solicitado" no painel.
- */
-const ROTULO_STATUS_TAREFA: Record<string, string> = {
-  NAO_INICIADA: "A fazer",
-  EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_CLIENTE: "Aguardando terceiro",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
-  BLOQUEADA: "Bloqueada",
-  CONCLUIDO_RECEBIDO: "Concluída",
-  CONCLUIDO_NAO_POSSUI: "Concluída",
-  // CANCELADA != CONCLUÍDA — precisa do próprio rótulo, senão cai no `?? tarefa.statusTarefa`
-  // (a string crua do enum) em vez de dizer "Operação cancelada" com clareza.
-  CANCELADA: "Operação cancelada",
-}
-
+// O STATUS OPERACIONAL DA TAREFA em português vem do MAPA ÚNICO (`rotuloStatusTarefa`,
+// src/lib/home/rotulo-status-tarefa.ts) — o mesmo da coluna Status da Operação, da Home e da Central.
+// O cabeçalho já mostrou o estado DOCUMENTAL ("Solicitado") no campo "Status"; e o drawer tinha o próprio
+// dicionário ("A fazer", "Aguardando terceiro" para AGUARDANDO_CLIENTE, "Operação cancelada").
 
 // Relativo "há Xmin/Xh/N dias" para a última movimentação.
 const relativeTime = (s: string | null): string => {
@@ -620,7 +606,7 @@ function ConteudoDrawer({
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
   const statusDocumentalLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
-  const statusLabel = tarefa ? ROTULO_STATUS_TAREFA[tarefa.statusTarefa] ?? tarefa.statusTarefa : "Sem tarefa"
+  const statusLabel = tarefa ? rotuloStatusTarefa(tarefa.statusTarefa) ?? tarefa.statusTarefa : "Sem tarefa"
 
   const tabsAll: Array<{ id: TabId; label: string; count?: number; danger?: boolean }> = [
     { id: "workflow", label: "Workflow" },

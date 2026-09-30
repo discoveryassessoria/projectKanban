@@ -47,7 +47,7 @@
 
 import type { Prisma, PrismaClient } from "@prisma/client"
 import { estadoTemporal, diasEntreDiasOperacionais, diaOperacional } from "./tempo-operacional"
-import { escolherSubtarefaCorrente, definicoesDasSubtarefas, acompanhamentoVenceuNoDia } from "./subtarefa-corrente"
+import { escolherSubtarefaCorrente, definicoesDasSubtarefas, acompanhamentoVenceuNoDia, criarCacheDeLeitura, type CacheDeLeitura } from "./subtarefa-corrente"
 import { lerAndamento, previsaoEfetiva, type AndamentoEtapa } from "@/src/lib/process-stage/andamento-etapa"
 
 type Leitor = PrismaClient | Prisma.TransactionClient
@@ -473,6 +473,18 @@ const SELECT_TAREFA_TEMPORAL = {
   workflowStepInstanceId: true, workflowInstanceId: true,
 } satisfies Prisma.TarefaSelect
 
+export type TarefaTemporal = Prisma.TarefaGetPayload<{ select: typeof SELECT_TAREFA_TEMPORAL }>
+
+/**
+ * O QUE QUEM CHAMA JÁ TEM EM MÃOS (Torre, D2, 30/09/2026) — `tarefas`: as linhas
+ * da Tarefa já lidas (com ao menos os campos de `SELECT_TAREFA_TEMPORAL`), para
+ * NÃO relê-las; `cache`: o cache de leitura da requisição, para não repetir a
+ * leitura de passos/instâncias/versões/execuções/rótulos que a projeção já fez.
+ * O CÁLCULO é o mesmo (`computarProximoAcontecimento`); só a origem dos dados
+ * muda. Sem `pre`, a função lê tudo sozinha, como sempre (cron, saúde, dossiê).
+ */
+export interface PreCarga { tarefas?: TarefaTemporal[]; cache?: CacheDeLeitura }
+
 /**
  * Projeção temporal de N tarefas — poucas queries agregadas (custo constante
  * em número de queries, mesmo desenho de `resolveSlaProjectionBatch`).
@@ -481,18 +493,22 @@ export async function estadosTemporaisDasOperacoes(
   db: Leitor,
   tarefaIds: number[],
   agora: Date = new Date(),
+  pre: PreCarga = {},
 ): Promise<Map<number, EstadoTemporalDaOperacao>> {
   const resultado = new Map<number, EstadoTemporalDaOperacao>()
   if (tarefaIds.length === 0) return resultado
+  const cache = pre.cache ?? criarCacheDeLeitura(db)
 
-  // `tarefas` e `solicitacoes` não dependem uma da outra (as duas só
-  // precisam de `tarefaIds`) — buscadas juntas, nunca uma depois da outra
-  // (achado real 26/09/2026, Etapa B: perf de /api/operacao/tarefas).
-  const [tarefas, solicitacoes] = await Promise.all([
-    db.tarefa.findMany({
-      where: { id: { in: tarefaIds } },
-      select: SELECT_TAREFA_TEMPORAL,
-    }),
+  // `tarefas`, `solicitacoes`, os passos e as execuções vigentes só dependem dos ids (ou da linha da Tarefa) —
+  // buscados juntos, nunca um depois do outro (achado real 26/09/2026, Etapa B: perf de /api/operacao/tarefas;
+  // D2 30/09/2026: passos e execuções também saíram da fila).
+  const tarefasPre = pre.tarefas
+  const tarefasP = tarefasPre
+    ? Promise.resolve(tarefasPre)
+    : db.tarefa.findMany({ where: { id: { in: tarefaIds } }, select: SELECT_TAREFA_TEMPORAL })
+  const idsDePasso = (ts: TarefaTemporal[]) => [...new Set(ts.map((t) => t.workflowStepInstanceId).filter((id): id is number => id != null))]
+  const [tarefas, solicitacoes, steps, execucoesVigentes] = await Promise.all([
+    tarefasP,
     db.solicitacaoDocumento.findMany({
       where: { tarefaId: { in: tarefaIds } },
       select: {
@@ -502,37 +518,32 @@ export async function estadosTemporaisDasOperacoes(
       },
       orderBy: { createdAt: "desc" },
     }),
+    tarefasP.then((ts) => cache.passos(idsDePasso(ts))),
+    // DIMENSÃO D, fonte canônica — a subtarefa CORRENTE de cada passo (a MESMA
+    // escolha de `progressoPorSubtarefa`/`acompanhamentoPasso.rotulo`, via
+    // `escolherSubtarefaCorrente`), em QUALQUER status não encerrado. Achado
+    // real (30/09/2026, processo 651): antes só lia `AGUARDANDO_EXTERNO`, e uma
+    // subtarefa "a iniciar" (DISPONIVEL) com acompanhamento no passado mostrava
+    // "Atrasada há N dias" sem entrar em "Acompanhamentos vencidos". Sem
+    // `progressoPorSubtarefa` de propósito (aquele módulo IMPORTA este — ciclo).
+    tarefasP.then((ts) => cache.execucoes(idsDePasso(ts))),
   ])
-
-  const stepIds = [...new Set(tarefas.map((t) => t.workflowStepInstanceId).filter((id): id is number => id != null))]
-  const steps = stepIds.length
-    ? await db.phaseWorkflowStepInstance.findMany({
-        where: { id: { in: stepIds } },
-        select: { id: true, prazo: true, startedAt: true, metadata: true, stepKey: true, stepDefinitionId: true, snapshot: true },
-      })
-    : []
   const stepPorId = new Map(steps.map((s) => [s.id, s]))
-
-  // DIMENSÃO D, fonte canônica — a subtarefa CORRENTE de cada passo (a MESMA
-  // escolha de `progressoPorSubtarefa`/`acompanhamentoPasso.rotulo`, via
-  // `escolherSubtarefaCorrente`), em QUALQUER status não encerrado. Achado
-  // real (30/09/2026, processo 651): antes só lia `AGUARDANDO_EXTERNO`, e uma
-  // subtarefa "a iniciar" (DISPONIVEL) com acompanhamento no passado mostrava
-  // "Atrasada há N dias" sem entrar em "Acompanhamentos vencidos". Sem
-  // `progressoPorSubtarefa` de propósito (aquele módulo IMPORTA este — ciclo).
-  const execucoesVigentes = stepIds.length
-    ? await db.subtaskExecution.findMany({
-        where: { stepInstanceId: { in: stepIds }, supersededAt: null },
-        select: { stepInstanceId: true, subtaskKey: true, status: true, proximoAcompanhamentoEm: true },
-      })
-    : []
-  const definicoesDoPasso = await definicoesDasSubtarefas(
-    db,
-    tarefas.flatMap((t) => {
-      const st = t.workflowStepInstanceId != null ? stepPorId.get(t.workflowStepInstanceId) : null
-      return st ? [{ stepInstanceId: st.id, stepKey: st.stepKey, workflowInstanceId: t.workflowInstanceId }] : []
-    }),
-  )
+  const execucoesDefinicoes = await Promise.all([
+    definicoesDasSubtarefas(
+      db,
+      tarefas.flatMap((t) => {
+        const st = t.workflowStepInstanceId != null ? stepPorId.get(t.workflowStepInstanceId) : null
+        return st ? [{ stepInstanceId: st.id, stepKey: st.stepKey, workflowInstanceId: t.workflowInstanceId }] : []
+      }),
+      cache,
+    ),
+    // O RÓTULO PUBLICADO DO PASSO — batched pelo `stepDefinitionId` (mesmo cadastro que `rotulosDosPassos` em
+    // `tarefa-projecoes.ts` lê, agora pelo MESMO cache: uma leitura só).
+    cache.rotulosDeDefinicao([...new Set(steps.map((s) => s.stepDefinitionId).filter((id): id is number => id != null))]),
+  ])
+  const definicoesDoPasso = execucoesDefinicoes[0]
+  const definicoes = execucoesDefinicoes[1]
   const execucoesPorStep = new Map<number, typeof execucoesVigentes>()
   for (const x of execucoesVigentes) execucoesPorStep.set(x.stepInstanceId, [...(execucoesPorStep.get(x.stepInstanceId) ?? []), x])
   const proximoAcompanhamentoPorStepInstance = new Map<number, Date | null>()
@@ -542,13 +553,6 @@ export async function estadosTemporaisDasOperacoes(
     if (corrente) proximoAcompanhamentoPorStepInstance.set(stepInstanceId, corrente.proximoAcompanhamentoEm)
   }
 
-  // O RÓTULO PUBLICADO DO PASSO — batched pelo `stepDefinitionId` (mesmo
-  // padrão de `rotulosDosPassos` em `tarefa-projecoes.ts`; não importado
-  // daqui para não criar ciclo de import — este arquivo é importado por ele).
-  const defIds = [...new Set(steps.map((s) => s.stepDefinitionId).filter((id): id is number => id != null))]
-  const definicoes = defIds.length
-    ? await db.phaseInternalWorkflowStep.findMany({ where: { id: { in: defIds } }, select: { id: true, label: true } })
-    : []
   const labelPorDefId = new Map(definicoes.map((d) => [d.id, d.label]))
   const etapaLabelDoStep = (s: { snapshot: unknown; stepDefinitionId: number | null; stepKey: string } | null): string | null => {
     if (!s) return null

@@ -40,6 +40,7 @@ import { baldeDoPasso, rotuloStatusPasso, type BaldeTarefa } from "./central-ope
 import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
 import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-core"
+import { ROTULO_STATUS as ROTULO_STATUS_TAREFA_FONTE } from "@/src/lib/home/rotulo-status-tarefa"
 
 /**
  * PASSO FEITO — a régua do MOTOR, não uma parecida.
@@ -368,14 +369,16 @@ export type EstadoOperacionalDaLinha =
   | "CANCELADA"
   | "SUPERSEDIDA"
 
+// Os rótulos vêm do MAPA ÚNICO de statusTarefa (src/lib/home/rotulo-status-tarefa.ts): o estado da linha é o
+// status da Tarefa projetado — sem dicionário próprio ("A fazer" aqui era NAO_INICIADA; agora "A iniciar").
 export const ROTULO_ESTADO_LINHA: Record<EstadoOperacionalDaLinha, string> = {
-  A_FAZER: "A fazer",
-  EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
-  BLOQUEADA: "Bloqueada",
-  CONCLUIDA: "Concluída",
-  CANCELADA: "Cancelada",
-  SUPERSEDIDA: "Substituída",
+  A_FAZER: ROTULO_STATUS_TAREFA_FONTE.NAO_INICIADA,
+  EM_ANDAMENTO: ROTULO_STATUS_TAREFA_FONTE.EM_ANDAMENTO,
+  AGUARDANDO_TERCEIRO: ROTULO_STATUS_TAREFA_FONTE.AGUARDANDO_TERCEIRO,
+  BLOQUEADA: ROTULO_STATUS_TAREFA_FONTE.BLOQUEADA,
+  CONCLUIDA: ROTULO_STATUS_TAREFA_FONTE.CONCLUIDO_RECEBIDO,
+  CANCELADA: ROTULO_STATUS_TAREFA_FONTE.CANCELADA,
+  SUPERSEDIDA: ROTULO_STATUS_TAREFA_FONTE.SUPERSEDIDA,
 }
 
 /**

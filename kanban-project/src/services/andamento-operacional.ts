@@ -113,7 +113,7 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   TAREFA_REABERTA: "Tarefa reaberta",
   TAREFA_BLOQUEADA: "Tarefa bloqueada",
   TAREFA_DESBLOQUEADA: "Tarefa desbloqueada",
-  TAREFA_DEVOLVIDA_A_FILA: "Devolvida à fila",
+  TAREFA_DEVOLVIDA_A_FILA: "Devolvida à equipe (sem responsável)",
   TAREFA_PRAZO_ALTERADO: "Prazo alterado",
   TAREFA_PRIORIDADE_ALTERADA: "Prioridade alterada",
   // O Desfazer da Torre grava UMA linha só (item 11, 30/09/2026), com de/para no detalhe.

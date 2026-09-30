@@ -68,6 +68,16 @@ async function main() {
     const ana = await mk("Ana", "assistente", EXEC)
     const beto = await mk("Beto", "assistente", EXEC)
     const tAdmin = await tokenDe(admin), tGestor = await tokenDe(gestor)
+    // A r1 SÓ atribui a quem tem aptidão comprovada (A7): aqui a aptidão vem da EQUIPE exigida pela tarefa (Ana e Beto).
+    const EQUIPE = "torreh2eq"
+    await prisma.grupoUsuario.deleteMany({ where: { code: EQUIPE } })
+    await prisma.grupoUsuario.create({ data: { code: EQUIPE, nome: `${MARCA} equipe`, ativo: true, membros: { create: [{ usuarioId: ana.id }, { usuarioId: beto.id }] } } })
+    /** Obrigação sem dono cuja equipe exigida existe → Ana e Beto são os APTOS. */
+    const novaApta = async (o: Parameters<typeof c.novaObrigacao>[0] = {}) => {
+      const r = await c.novaObrigacao(o)
+      await prisma.tarefa.update({ where: { id: r.tarefaId }, data: { equipeKey: EQUIPE } })
+      return r
+    }
 
     secao("SÓ TRÊS REGRAS, com o estado inicial do mandato")
     ok("as chaves são exatamente r1, r2, r3 (nada de r4, r5 nem 'tempo aprendido')", JSON.stringify([...CHAVES_REGRA]) === '["r1","r2","r3"]')
@@ -96,7 +106,7 @@ async function main() {
 
     secao("REGRA DESLIGADA NÃO EXECUTA NADA — r1")
     // Três tarefas SEM DONO, na fase atual dos processos.
-    await c.novaObrigacao({}); await c.novaObrigacao({}); await c.novaObrigacao({})
+    await novaApta(); await novaApta(); await novaApta()
     const f0 = await foto()
     const semExecutar = await executarR1(admin.id)
     ok("executarR1 com a regra desligada devolve REGRA_DESLIGADA", semExecutar.executou === false && semExecutar.motivo === "REGRA_DESLIGADA")
@@ -136,8 +146,8 @@ async function main() {
     ok("a simulação com r1 ligada mostra o que seria feito", plano.ativaAgora === true && plano.numeros.atribuiria === 3)
     const exec1 = await executarR1(admin.id)
     ok("executa: 3 atribuídas", exec1.executou === true && exec1.atribuidas === 3, JSON.stringify(exec1).slice(0, 160))
-    // Candidatos = quem tem permissão de executar (o administrador tem todas — inclusive o do seed do banco de teste).
-    const candidatos = (await prisma.usuario.findMany({ where: { OR: [{ tipo: "admin" }, { id: { in: [ana.id, beto.id] } }] }, select: { id: true } })).map((u) => u.id)
+    // Candidatos = os APTOS (membros da equipe exigida).
+    const candidatos = [ana.id, beto.id]
     const donos = await prisma.tarefa.findMany({ where: { workflowStepInstanceId: { not: null }, processo: { nome: { startsWith: MARCA } }, responsavelId: { not: null } }, select: { responsavelId: true } })
     ok("as 3 tarefas têm dono, e é sempre alguém apto e disponível", donos.length === 3 && donos.every((d) => candidatos.includes(d.responsavelId as number)), JSON.stringify({ donos, candidatos, gestor: gestor.id }))
     ok("a regra balanceia por carga (não empilha as 3 numa pessoa só)", new Set(donos.map((d) => d.responsavelId)).size >= 2, JSON.stringify(donos.map((d) => d.responsavelId)))
@@ -154,10 +164,10 @@ async function main() {
       await definirCapacidade({ usuarioId: uid, limiteExecutaveis: 1, autorId: admin.id })
       await c.novaObrigacao({ responsavelId: uid })
     }
-    await c.novaObrigacao({}); await c.novaObrigacao({})
+    await novaApta(); await novaApta()
     const r3Off = await executarR1(admin.id)
     ok("r3 DESLIGADA: o limite é ignorado e as novas são atribuídas mesmo a quem está no limite", r3Off.executou === true && r3Off.atribuidas === 2 && r3Off.seguradas === 0, JSON.stringify(r3Off).slice(0, 120))
-    await c.novaObrigacao({}); await c.novaObrigacao({})
+    await novaApta(); await novaApta()
     await definirRegra("r3", true, admin.id)
     const simR3 = await simularRegra("r3")
     ok("r3: a simulação diz quem está no limite e quantas novas seriam seguradas", simR3.numeros.noLimite === candidatos.length && simR3.numeros.seguradas === 2 && /Precisa de você/.test(simR3.texto), simR3.texto)
@@ -197,6 +207,7 @@ async function main() {
     ok("religar r2: a régua volta a agir (escala com as sem resposta acumuladas)", o4.ok && o4.escalada === true)
     ok("a simulação de r2 informa quantas já estão escaladas hoje", (await simularRegra("r2")).numeros.escaladas >= 2)
   } finally {
+    await prisma.grupoUsuario.deleteMany({ where: { code: "torreh2eq" } })
     await c.limpar()
   }
   console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)

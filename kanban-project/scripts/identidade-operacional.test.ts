@@ -219,8 +219,11 @@ async function main() {
     !comPasso.some((l) => /^[a-z]+(_[a-z]+)+$/.test(l.etapaAtual ?? '')),
     comPasso.map((l) => l.etapaAtual).join(' | ') || 'nenhuma etapa em tela')
   const projecoes = semComentarios(ler('lib/operacional/tarefa-projecoes.ts'))
+  // O cadastro dos rótulos é lido pelo CACHE de leitura da requisição (D2, 30/09/2026) — uma leitura para a etapa e o
+  // próximo acontecimento — e continua em lote.
+  const cacheDeLeitura = semComentarios(ler('lib/operacional/subtarefa-corrente.ts'))
   ok('§9) a projeção resolve o rótulo publicado do passo',
-    /rotulosDePasso\?\.get\(/.test(projecoes) && /phaseInternalWorkflowStep\.findMany/.test(projecoes))
+    /rotulosDePasso\?\.get\(/.test(projecoes) && /rotulosDeDefinicao\(/.test(projecoes) && /phaseInternalWorkflowStep\.findMany/.test(cacheDeLeitura))
   ok('§9) e o faz em LOTE, não por linha',
     !/for[\s\S]{0,120}phaseInternalWorkflowStep\.find/.test(projecoes))
 

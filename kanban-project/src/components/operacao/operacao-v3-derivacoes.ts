@@ -9,6 +9,7 @@
 // aqui só se formata e agrupa, nunca se recalcula.
 // ============================================================================
 import type { LinhaOperacaoV3, EstadoTemporalApi } from "./operacao-v3-tipos"
+import { ROTULO_STATUS as ROTULO_STATUS_TAREFA } from "@/src/lib/home/rotulo-status-tarefa"
 
 export const fmtData = (iso: string | null): string => {
   if (!iso) return "—"
@@ -58,18 +59,9 @@ export function passoLabelDe(l: Pick<LinhaOperacaoV3, "passoCorrente" | "etapaAt
 }
 
 /** O MAPA ÚNICO DE STATUS DA TAREFA em português claro — coluna "Status" da Operação e da Torre. Cobre TODO o enum
- *  `StatusTarefa` (prisma/schema.prisma). É o `statusTarefa` REAL da linha; nunca inferido do passo. */
-export const ROTULO_STATUS_TAREFA: Readonly<Record<string, string>> = {
-  NAO_INICIADA: "A iniciar",
-  EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando cartório",
-  AGUARDANDO_CLIENTE: "Aguardando cliente",
-  BLOQUEADA: "Bloqueada",
-  CONCLUIDO_RECEBIDO: "Concluída",
-  CONCLUIDO_NAO_POSSUI: "Concluída",
-  CANCELADA: "Cancelada",
-  SUPERSEDIDA: "Substituída",
-}
+ *  `StatusTarefa` (prisma/schema.prisma). É o `statusTarefa` REAL da linha; nunca inferido do passo.
+ *  NÃO é uma cópia: é o MESMO mapa de `src/lib/home/rotulo-status-tarefa.ts` (fonte única, módulo puro). */
+export { ROTULO_STATUS_TAREFA }
 export const statusTarefaTxt = (l: Pick<LinhaOperacaoV3, "statusTarefa">): string => ROTULO_STATUS_TAREFA[l.statusTarefa] ?? l.statusTarefa
 /** Cor da pílula do status — neutro por padrão; âmbar só para o que pede atenção humana. */
 export const statusTarefaCls = (l: Pick<LinhaOperacaoV3, "statusTarefa">): string => {

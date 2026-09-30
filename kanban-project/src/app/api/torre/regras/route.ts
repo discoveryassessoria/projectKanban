@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const [regras, regua, org] = await Promise.all([lerRegras(), lerReguaDeCobranca(), lerOrganizacao()])
   const limites = [...org.values()].filter((o) => o.limiteExecutaveis != null).map((o) => `${o.nome} ${o.limiteExecutaveis}`)
   const descricao: Record<string, string> = {
-    r1: 'Atribui sozinha cada tarefa aberta sem dono à pessoa apta (pela aptidão de país e fase cadastrada) de menor carga, com o desempate do "Precisa de você". Desligada, não atribui nada.',
+    r1: 'Atribui sozinha cada tarefa aberta sem dono à pessoa apta (pela aptidão de país e fase cadastrada) de menor carga, com o desempate do "Precisa de você". Sem apto comprovado, não atribui: a tarefa fica em "Precisa de você". Desligada, não atribui nada.',
     r2: `Lida do cadastro dos passos publicados no Gerenciamento: ${textoDaRegua(regua)}. Desligada, o contato continua sendo registrado, mas a régua não reagenda o acompanhamento nem escala.`,
     r3: limites.length
       ? `Limites cadastrados em Capacidade Operacional: ${limites.join(' · ')}. Ao atingir o limite, a nova tarefa não é atribuída automaticamente a essa pessoa e vai para a fila de decisão ("Precisa de você").`

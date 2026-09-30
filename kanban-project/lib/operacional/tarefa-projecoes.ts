@@ -23,8 +23,7 @@ import {
   type EstadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
 import { estadosTemporaisDasOperacoes, ehEsperaExterna, type EstadoTemporalDaOperacao } from '@/lib/operacional/proximo-acontecimento'
-import { lerVersaoPublicada } from '@/src/services/versao-publicada'
-import { escolherSubtarefaCorrente } from './subtarefa-corrente'
+import { escolherSubtarefaCorrente, criarCacheDeLeitura, type CacheDeLeitura } from './subtarefa-corrente'
 import { ehFaseFutura, semFaseFutura } from './fase-futura'
 import type { AdvanceResultado, Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa, TipoDocumento, TipoTarefa } from '@prisma/client'
 
@@ -40,6 +39,7 @@ import { STATUS_ATIVOS, STATUS_TERMINAIS, STATUS_EM_ESPERA, executavelAgora as t
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
 import { phaseKeyToFaseCode, faseCodeToPhaseKey, rotuloDoPasso, labelDaFasePorPhaseKey, getOrdemFase } from '@/src/lib/process-stage/fases-catalog'
 import { fasesAnterioresA } from '@/src/services/regularizacao-historica'
+import { proximaFaseDoCaminho, type FaseOrdenada } from '@/src/lib/motor/phase-advance-helpers'
 
 /** Estados concluídos — fora deles, "atrasada"/"sem movimentação"/etc. deixam de fazer sentido. */
 const STATUS_CONCLUIDOS: StatusTarefa[] = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI']
@@ -734,14 +734,12 @@ function aplicarEstadosTemporais<T extends LinhaDeFila>(linhas: T[], estados: Ma
  * `stepDefinitionId` é FK solta (sem relation no modelo), então o join não vem
  * de graça no `select`: resolve-se em lote, como os nomes de pessoa.
  */
-async function rotulosDosPassos(linhas: Bruta[], db: Leitor = prisma): Promise<Map<number, string>> {
+async function rotulosDosPassos(linhas: Bruta[], db: Leitor = prisma, cache: CacheDeLeitura = criarCacheDeLeitura(db)): Promise<Map<number, string>> {
   const ids = [...new Set(
     linhas.map((l) => l.workflowStepInstance?.stepDefinitionId).filter((x): x is number => x != null),
   )]
   if (ids.length === 0) return new Map()
-  const defs = await db.phaseInternalWorkflowStep.findMany({
-    where: { id: { in: ids } }, select: { id: true, label: true },
-  })
+  const defs = await cache.rotulosDeDefinicao(ids)
   return new Map(defs.map((d) => [d.id, d.label]))
 }
 
@@ -833,14 +831,24 @@ export interface ResumoSubtarefasDoPasso {
 async function progressoPorSubtarefa(
   linhas: Array<{ workflowStepInstance: { id: number; stepKey: string; createdAt: Date } | null; workflowInstanceId: number | null }>,
   db: Leitor = prisma,
+  cache: CacheDeLeitura = criarCacheDeLeitura(db),
 ): Promise<Map<number, ResumoSubtarefasDoPasso>> {
   const instanciaIds = [...new Set(linhas.map((l) => l.workflowInstanceId).filter((x): x is number => x != null))]
   if (instanciaIds.length === 0) return new Map()
+  const stepInstanceIds: number[] = []
+  for (const l of linhas) {
+    const si = l.workflowStepInstance
+    if (!si || l.workflowInstanceId == null) continue
+    stepInstanceIds.push(si.id)
+  }
+  if (stepInstanceIds.length === 0) return new Map()
 
-  const instancias = await db.phaseWorkflowInstance.findMany({
-    where: { id: { in: instanciaIds } },
-    select: { id: true, workflowDefinitionId: true, workflowVersion: true },
-  })
+  // As instâncias, as execuções vigentes e os contatos NÃO dependem uns dos outros (só dos ids que as linhas já
+  // trazem) — uma ida só (D2, 30/09/2026: eram cinco em série). Pelo cache, o que a projeção temporal já pediu
+  // (execuções, instâncias, versões) não é lido de novo.
+  const [instancias, execucoes, contatos] = await Promise.all([
+    cache.instancias(instanciaIds), cache.execucoes(stepInstanceIds), cache.contatos(stepInstanceIds),
+  ])
   const instanciaPorId = new Map(instancias.map((i) => [i.id, i]))
 
   const paresUnicos = new Map<string, { workflowDefinitionId: number; workflowVersion: number }>()
@@ -849,7 +857,7 @@ async function progressoPorSubtarefa(
     paresUnicos.set(`${i.workflowDefinitionId}:${i.workflowVersion}`, { workflowDefinitionId: i.workflowDefinitionId, workflowVersion: i.workflowVersion })
   }
   const versoes = await Promise.all(
-    [...paresUnicos.entries()].map(async ([chave, p]) => [chave, await lerVersaoPublicada(p.workflowDefinitionId, p.workflowVersion, db)] as const),
+    [...paresUnicos.entries()].map(async ([chave, p]) => [chave, await cache.versao(p.workflowDefinitionId, p.workflowVersion)] as const),
   )
   const versaoPorChave = new Map(versoes)
 
@@ -861,11 +869,9 @@ async function progressoPorSubtarefa(
   const ordemPorStepInstance = new Map<number, Map<string, number>>()
   const definicaoPorStepInstance = new Map<number, Map<string, { label: string; dependeDe: string[] }>>()
   const createdAtPorStepInstance = new Map<number, Date>()
-  const stepInstanceIds: number[] = []
   for (const l of linhas) {
     const si = l.workflowStepInstance
     if (!si || l.workflowInstanceId == null) continue
-    stepInstanceIds.push(si.id)
     createdAtPorStepInstance.set(si.id, si.createdAt)
     const inst = instanciaPorId.get(l.workflowInstanceId)
     if (!inst?.workflowDefinitionId || inst.workflowVersion == null) continue
@@ -878,48 +884,25 @@ async function progressoPorSubtarefa(
       definicaoPorStepInstance.set(si.id, new Map(subtarefasAtivas.map((s) => [s.key, { label: s.label, dependeDe: s.dependeDe ?? [] }])))
     }
   }
-  if (stepInstanceIds.length === 0) return new Map()
 
-  // TODAS as execuções vigentes (não substituídas) — uma consulta, nunca uma
-  // por linha. Dá o "X/Y" (CONCLUIDO) e a subtarefa CORRENTE (a primeira não
+  // TODAS as execuções vigentes (não substituídas) — lidas acima, uma consulta,
+  // nunca uma por linha. Dá o "X/Y" (CONCLUIDO) e a subtarefa CORRENTE (a primeira não
   // encerrada, pela ordem da definição — não pela ordem de criação da linha).
-  const execucoes = await db.subtaskExecution.findMany({
-    where: { stepInstanceId: { in: stepInstanceIds }, supersededAt: null },
-    select: {
-      id: true, stepInstanceId: true, subtaskKey: true, status: true, criadoEm: true, startedAt: true,
-      previstoPara: true, proximoAcompanhamentoEm: true, escalada: true,
-    },
-  })
   const execucoesPorStepInstance = new Map<number, typeof execucoes>()
   for (const e of execucoes) execucoesPorStepInstance.set(e.stepInstanceId, [...(execucoesPorStepInstance.get(e.stepInstanceId) ?? []), e])
 
-  // TOTAL DE COBRANÇAS por execução vigente — uma consulta em lote (groupBy),
-  // nunca uma por linha. Só interessa a contagem, nunca o conteúdo aqui.
-  const execucaoIds = execucoes.map((e) => e.id)
-  const contagensDeContato = execucaoIds.length
-    ? await db.contatoTerceiro.groupBy({ by: ['subtaskExecutionId'], where: { subtaskExecutionId: { in: execucaoIds } }, _count: { _all: true } })
-    : []
-  const totalCobrancasPorExecucaoId = new Map(contagensDeContato.map((c) => [c.subtaskExecutionId, c._count._all]))
-
-  // COBRANÇAS SEM RESPOSTA por execução vigente (Bloco B, Torre de Controle,
-  // 29/09/2026) — uma consulta em lote, `contarCobrancasSemResposta` (a MESMA
-  // função pura que `registrarCobranca` usa) aplicada por grupo em memória.
-  // Precisa do CONTEÚDO (`resultado`, em ordem), não só da contagem — por
-  // isso não dá pra ser um `groupBy`.
+  // COBRANÇAS por execução vigente — uma consulta em lote (a de contatos, lida acima), nunca uma por linha.
+  // TOTAL = quantos contatos; SEM RESPOSTA (Bloco B, Torre de Controle, 29/09/2026) = `contarCobrancasSemResposta`
+  // (a MESMA função pura que `registrarCobranca` usa) aplicada por execução, em memória, sobre os resultados em
+  // ordem — por isso a lista de contatos, não só uma contagem.
   const { contarCobrancasSemResposta } = await import('@/src/services/subtarefas-da-etapa')
-  const todosOsContatos = execucaoIds.length
-    ? await db.contatoTerceiro.findMany({
-        where: { subtaskExecutionId: { in: execucaoIds } },
-        orderBy: { id: 'asc' },
-        select: { subtaskExecutionId: true, resultado: true },
-      })
-    : []
   const resultadosPorExecucaoId = new Map<number, string[]>()
-  for (const c of todosOsContatos) {
+  for (const c of contatos) {
     const arr = resultadosPorExecucaoId.get(c.subtaskExecutionId) ?? []
     arr.push(c.resultado)
     resultadosPorExecucaoId.set(c.subtaskExecutionId, arr)
   }
+  const totalCobrancasPorExecucaoId = new Map([...resultadosPorExecucaoId.entries()].map(([id, resultados]) => [id, resultados.length]))
   const cobrancasSemRespostaPorExecucaoId = new Map(
     [...resultadosPorExecucaoId.entries()].map(([id, resultados]) => [id, contarCobrancasSemResposta(resultados)]),
   )
@@ -995,10 +978,10 @@ async function progressoPorSubtarefa(
 }
 
 /** Os nomes das pessoas das linhas — UMA consulta, nunca uma por tarefa. */
-async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma): Promise<Map<number, string>> {
+async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma, cache: CacheDeLeitura = criarCacheDeLeitura(db)): Promise<Map<number, string>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
   if (ids.length === 0) return new Map()
-  const pessoas = await db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, sobrenome: true } })
+  const pessoas = await cache.pessoas(ids)
   return new Map(pessoas.map((p) => [p.id, [p.nome, p.sobrenome].filter(Boolean).join(' ')]))
 }
 
@@ -1015,11 +998,11 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: L
  * `linhaReta`, nunca a presença do número.
  */
 async function linhagemDasPessoas(
-  linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma,
+  linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma, cache: CacheDeLeitura = criarCacheDeLeitura(db),
 ): Promise<Map<number, { numeroLinhagem: number | null; linhaReta: boolean }>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
   if (ids.length === 0) return new Map()
-  const pessoas = await db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, numeroLinhagem: true, linhaReta: true } })
+  const pessoas = await cache.pessoas(ids)
   return new Map(pessoas.map((p) => [p.id, { numeroLinhagem: p.numeroLinhagem ?? null, linhaReta: p.linhaReta }]))
 }
 
@@ -1144,12 +1127,10 @@ export async function concluidasRecentesDoUsuario(
  * não uma execução. Tarefa com responsável sai daqui e aparece na fila dele.
  */
 export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promise<LinhaGerencial[]> {
-  const linhas = await prisma.tarefa.findMany({
+  const { linhas: enriquecidas } = await lerLinhasGerenciais({
     where: { equipeKey, responsavelId: null, statusTarefa: { in: STATUS_ATIVOS } },
-    select: SELECT_GERENCIAL,
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
-  })
-  const enriquecidas = await enriquecerLinhas(linhas, agora)
+  }, agora)
   return ordenarFila(semFaseFutura(enriquecidas)) as LinhaGerencial[]
 }
 
@@ -1218,8 +1199,7 @@ export async function semResponsavel(
     agora,
   )
   if (filtro.equipeKey) where.equipeKey = filtro.equipeKey
-  const linhas = await prisma.tarefa.findMany({ where, select: SELECT_GERENCIAL })
-  const enriquecidas = await enriquecerLinhas(linhas, agora)
+  const { linhas: enriquecidas } = await lerLinhasGerenciais({ where }, agora)
   return filtrarPorEstadoOperacao(ordenarFila(semFaseFutura(enriquecidas)) as LinhaGerencial[], filtro.estadoOperacao)
 }
 
@@ -1854,6 +1834,12 @@ function whereColuna(coluna: ColunaKanban): Prisma.TarefaWhereInput {
 }
 
 export interface LinhaGerencial extends LinhaDeFila {
+  /**
+   * O RÓTULO da PRÓXIMA fase do caminho do processo (Torre/Operação, "Próximo marco") — a fase seguinte do Workflow
+   * Macro dele (tipo + modalidade), pulando as condicionais que a Análise não pediu (`proximaFaseDoCaminho`, a regra
+   * do avanço). Mesmo rótulo de `faseAtualDoProcessoLabel`. `null` na última fase, sem processo/fase ou fora do catálogo.
+   */
+  proximaFaseDoProcessoLabel: string | null
   /** Derivado do prazo no fuso operacional — não é status. */
   venceHoje: boolean
   coluna: ColunaKanban
@@ -2354,26 +2340,39 @@ const SELECT_GERENCIAL = {
 type BrutaGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_GERENCIAL }>
 
 /**
- * `phaseKey → ordem` do macrofluxo de cada tipo de processo das linhas — UMA
- * consulta (mesma fonte de `ordensDeFase`: `FaseMacro` do `MacroWorkflow` do
- * tipo), com o leitor recebido (transação inclusive).
+ * `phaseKey → ordem` do macrofluxo de cada tipo de processo das linhas (mesma
+ * fonte de `ordensDeFase`: `FaseMacro` do `MacroWorkflow` do tipo) E as fases de
+ * cada Workflow Macro `tipo:modalidade` (o que o motor de avanço resolve por
+ * processo — para a PRÓXIMA fase do caminho) — UMA consulta, com o leitor
+ * recebido (transação inclusive).
  */
-async function ordensDeFasePorTipo(
-  brutas: Array<{ processo: { tipoProcessoMotorId: number | null } | null }>, db: Leitor,
-): Promise<Map<number, Map<string, number>>> {
-  const tipos = [...new Set(brutas.map((t) => t.processo?.tipoProcessoMotorId).filter((x): x is number => x != null))]
-  const mapa = new Map<number, Map<string, number>>()
-  if (tipos.length === 0) return mapa
+async function fasesDosMacrosDosProcessos(
+  processoIds: number[], db: Leitor,
+): Promise<{
+  ordensPorTipo: Map<number, Map<string, number>>
+  /** As fases (ordenadas) de cada Workflow Macro `tipo:modalidade` — o que o motor de avanço resolve por processo. */
+  fasesPorMacro: Map<string, FaseOrdenada[]>
+}> {
+  const ordensPorTipo = new Map<number, Map<string, number>>()
+  const fasesPorMacro = new Map<string, FaseOrdenada[]>()
+  if (processoIds.length === 0) return { ordensPorTipo, fasesPorMacro }
+  // Pelo VÍNCULO dos processos (não pela lista de tipos): não espera a leitura do processo — as fases dos tipos
+  // desses processos são o mesmo conjunto, lidas na mesma ida em que o processo é lido.
   const fases = await db.faseMacro.findMany({
-    where: { macroWorkflow: { tipoProcessoId: { in: tipos } } },
-    select: { phaseKey: true, ordem: true, macroWorkflow: { select: { tipoProcessoId: true } } },
+    where: { macroWorkflow: { tipoProcesso: { processosVinculados: { some: { id: { in: processoIds } } } } } },
+    orderBy: { ordem: 'asc' },
+    select: { phaseKey: true, ordem: true, conditional: true, required: true, macroWorkflow: { select: { tipoProcessoId: true, modalidadeId: true } } },
   })
   for (const f of fases) {
-    const m = mapa.get(f.macroWorkflow.tipoProcessoId) ?? new Map<string, number>()
+    const m = ordensPorTipo.get(f.macroWorkflow.tipoProcessoId) ?? new Map<string, number>()
     m.set(f.phaseKey, f.ordem)
-    mapa.set(f.macroWorkflow.tipoProcessoId, m)
+    ordensPorTipo.set(f.macroWorkflow.tipoProcessoId, m)
+    const chave = `${f.macroWorkflow.tipoProcessoId}:${f.macroWorkflow.modalidadeId}`
+    const lista = fasesPorMacro.get(chave) ?? []
+    lista.push({ phaseKey: f.phaseKey, ordem: f.ordem, conditional: f.conditional, required: f.required })
+    fasesPorMacro.set(chave, lista)
   }
-  return mapa
+  return { ordensPorTipo, fasesPorMacro }
 }
 
 /**
@@ -2388,26 +2387,209 @@ async function ordensDeFasePorTipo(
  * `motivoCodigo === "AGUARDANDO_TERCEIRO"` é espera de terceiro em QUALQUER
  * fila — nunca só na visão gerencial.
  */
-async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leitor = prisma): Promise<LinhaGerencial[]> {
-  // TUDO NUMA SÓ IDA REDONDA — `contextoDeParada` e `estadosTemporaisDasOperacoes`
-  // não dependem de nomes/rótulos/subtarefas/linhagem (só de `brutas`, já em
-  // mãos), mas eram buscados DEPOIS, em série (achado real 26/09/2026, Etapa
-  // B: /api/operacao/tarefas — 7 idas sequenciais ao banco por causa disso).
-  // `estadosTemporaisDasOperacoes` some do fim (era `comAtencaoTemporal`
-  // depois de `linhas` pronta) e entra aqui; o merge dela roda no MESMO
-  // `.map()` que já aplica `paradas`, sem consulta extra.
-  const [nomes, rotulos, totais, subtarefas, linhagem, paradas, estados, repactuacoes] = await Promise.all([
-    nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db), totalDePassos(brutas, db), progressoPorSubtarefa(brutas, db),
-    linhagemDasPessoas(brutas, db),
+/**
+ * A LEITURA DA LINHA GERENCIAL, EM PARALELO (Torre, D2, 30/09/2026).
+ *
+ * ACHADO (medido em produção, ~250 ms por ida): `tarefa.findMany` com o
+ * `SELECT_GERENCIAL` aninhado (processo → família → país, responsável,
+ * necessidade → item/união → pessoas, passo, dependências, documento → órgão)
+ * fazia o Prisma executar ~15 consultas UMA DEPOIS DA OUTRA — 3,2 s dos 7 s —, e
+ * depois a projeção lia de novo passos, instâncias, versões, execuções e
+ * rótulos em funções diferentes, também em série.
+ *
+ * Agora a Tarefa vem só com os escalares e cada relação é um lote independente,
+ * disparado no mesmo instante (o caminho mais longo são 3 idas depois da
+ * Tarefa: processo → país/família/fases; necessidade → união → pessoas). A
+ * linha hidratada tem EXATAMENTE a forma de `BrutaGerencial` — `projetar` e o
+ * resto do enriquecimento não mudaram uma vírgula, e o cache de leitura da
+ * requisição (subtarefa-corrente.ts) impede que a mesma tabela seja lida duas
+ * vezes por funções diferentes. Sem `visaoGerencial` com `db` de transação a
+ * semântica é a mesma: o leitor recebido faz todas as leituras.
+ */
+const SELECT_ESCALAR_GERENCIAL = {
+  id: true, titulo: true, processoId: true, faseMacroKey: true, statusTarefa: true,
+  equipeKey: true, responsavelId: true, prioridade: true, dataPrazo: true, causaRemovidaEm: true,
+  dataConclusao: true, slaPausadoEm: true, slaPausaAcumuladaMin: true, origem: true, pessoaId: true,
+  createdAt: true, dataAtribuicao: true, workflowInstanceId: true, documentoId: true,
+  justificativa: true, motivoCodigo: true,
+  // FKs das relações que `SELECT_GERENCIAL` aninhava + o que a projeção temporal lê da Tarefa
+  // (`SELECT_TAREFA_TEMPORAL`) + o órgão (a Torre o usa por linha).
+  workflowStepInstanceId: true, necessidadeId: true, dataInicio: true, orgaoId: true,
+} satisfies Prisma.TarefaSelect
+
+type EscalarGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_ESCALAR_GERENCIAL }>
+
+/** O que a Torre precisa por linha e a projeção (JSON) não carrega: o órgão e a fase em que o processo está. */
+export interface ExtraDaLinha { orgaoId: number | null; faseAtualKey: string | null }
+
+const unicos = <T,>(xs: Array<T | null | undefined>): T[] => [...new Set(xs.filter((x): x is T => x != null))]
+
+async function carregarBrutas(
+  esc: EscalarGerencial[], db: Leitor, cache: CacheDeLeitura,
+): Promise<{ brutas: BrutaGerencial[]; ordensPorTipo: Map<number, Map<string, number>>; extras: Map<number, ExtraDaLinha>; proximaFasePorProcesso: Map<number, string | null> }> {
+  const semLinhas = <T,>(ids: number[], ler: () => Promise<T[]>): Promise<T[]> => (ids.length ? ler() : Promise.resolve([]))
+  const processoIds = unicos(esc.map((t) => t.processoId))
+  const responsavelIds = unicos(esc.map((t) => t.responsavelId))
+  const necessidadeIds = unicos(esc.map((t) => t.necessidadeId))
+  const documentoIds = unicos(esc.map((t) => t.documentoId))
+  const passoIds = unicos(esc.map((t) => t.workflowStepInstanceId))
+  const tarefaIds = esc.map((t) => t.id)
+
+  const processosP = semLinhas(processoIds, () => db.processo.findMany({
+    where: { id: { in: processoIds } },
+    select: { id: true, nome: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true, familiaId: true, paisId: true },
+  }))
+  // Depois do processo: família, país e as ordens das fases do tipo — os três de uma vez.
+  const fasesP = fasesDosMacrosDosProcessos(processoIds, db)
+  // A decisão da Análise que faz as fases condicionais entrarem (ou não) no caminho — a MESMA que o avanço lê.
+  const retificacaoP = semLinhas(processoIds, () => db.analiseDocumental.findMany({
+    where: { processoId: { in: processoIds } }, select: { processoId: true, requerRetificacao: true },
+  }))
+  const doProcessoP = processosP.then(async (procs) => {
+    const familiaIds = unicos(procs.map((p) => p.familiaId))
+    const paisIds = unicos(procs.map((p) => p.paisId))
+    const [familias, paises, { ordensPorTipo, fasesPorMacro }] = await Promise.all([
+      semLinhas(familiaIds, () => db.familia.findMany({ where: { id: { in: familiaIds } }, select: { id: true, nome: true } })),
+      semLinhas(paisIds, () => db.catalogoPais.findMany({ where: { id: { in: paisIds } }, select: { id: true, countryLabel: true } })),
+      fasesP,
+    ])
+    return { familias, paises, ordensPorTipo, fasesPorMacro }
+  })
+  const necessidadesP = semLinhas(necessidadeIds, () => db.necessidadeDocumental.findMany({
+    where: { id: { in: necessidadeIds } }, select: { id: true, itemCatalogoId: true, uniaoId: true },
+  }))
+  // A união (casamento) é lida pelo vínculo das necessidades — na mesma ida em que elas são lidas —, e só
+  // depois as duas pessoas; o item do catálogo depende da necessidade.
+  const unioesP = semLinhas(necessidadeIds, () => db.uniao.findMany({
+    where: { necessidades: { some: { id: { in: necessidadeIds } } } }, select: { id: true, pessoa1Id: true, pessoa2Id: true },
+  }))
+  const daNecessidadeP = Promise.all([
+    necessidadesP.then((necs) => {
+      const itemIds = unicos(necs.map((n) => n.itemCatalogoId))
+      return semLinhas(itemIds, () => db.itemCatalogo.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true } }))
+    }),
+    unioesP.then(async (unioes) => ({ unioes, pessoas: await cache.pessoas(unicos(unioes.flatMap((u) => [u.pessoa1Id, u.pessoa2Id]))) })),
+  ]).then(([itens, { unioes, pessoas }]) => ({ itens, unioes, pessoas }))
+  // O rótulo publicado de cada passo entra no cache assim que o passo chega (o rótulo da etapa e o do
+  // próximo acontecimento leem a mesma linha).
+  const passosP = cache.passos(passoIds)
+  const rotulosP = passosP.then((ps) => cache.rotulosDeDefinicao(unicos(ps.map((x) => x.stepDefinitionId))))
+
+  const [procs, doProcesso, retificacoes, responsaveis, necessidades, daNecessidade, passos, , dependencias, documentos] = await Promise.all([
+    processosP, doProcessoP, retificacaoP,
+    semLinhas(responsavelIds, () => db.usuario.findMany({ where: { id: { in: responsavelIds } }, select: { id: true, nome: true } })),
+    necessidadesP, daNecessidadeP, passosP, rotulosP,
+    db.tarefaDependencia.findMany({
+      where: { tarefaId: { in: tarefaIds } },
+      select: { tarefaId: true, obrigatoria: true, dependeDe: { select: { statusTarefa: true } } },
+    }),
+    semLinhas(documentoIds, () => db.documento.findMany({
+      where: { id: { in: documentoIds } },
+      select: { id: true, tipo: true, orgaoId: true, orgao: { select: { name: true, email: true, telefone: true } } },
+    })),
+  ])
+
+  const processoPorId = new Map(procs.map((p) => [p.id, p]))
+  const familiaPorId = new Map(doProcesso.familias.map((f) => [f.id, f]))
+  const paisPorId = new Map(doProcesso.paises.map((c) => [c.id, c]))
+  const responsavelPorId = new Map(responsaveis.map((u) => [u.id, u]))
+  const necessidadePorId = new Map(necessidades.map((n) => [n.id, n]))
+  const itemPorId = new Map(daNecessidade.itens.map((i) => [i.id, i]))
+  const uniaoPorId = new Map(daNecessidade.unioes.map((u) => [u.id, u]))
+  const pessoaPorId = new Map(daNecessidade.pessoas.map((p) => [p.id, p]))
+  const passoPorId = new Map(passos.map((x) => [x.id, x]))
+  const documentoPorId = new Map(documentos.map((d) => [d.id, d]))
+  const dependenciasPorTarefa = new Map<number, Array<{ obrigatoria: boolean; dependeDe: { statusTarefa: StatusTarefa } }>>()
+  for (const d of dependencias) {
+    const arr = dependenciasPorTarefa.get(d.tarefaId) ?? []
+    arr.push({ obrigatoria: d.obrigatoria, dependeDe: d.dependeDe })
+    dependenciasPorTarefa.set(d.tarefaId, arr)
+  }
+  const dadosDaPessoa = (id: number) => {
+    const p = pessoaPorId.get(id)!
+    return { id: p.id, nome: p.nome, sobrenome: p.sobrenome, linhaReta: p.linhaReta, numeroLinhagem: p.numeroLinhagem }
+  }
+
+  // A PRÓXIMA FASE do caminho de cada processo: a fase seguinte do Workflow Macro dele (tipo + modalidade), pulando
+  // as condicionais que a Análise não pediu — a regra do avanço (`proximaFaseDoCaminho`), não uma segunda.
+  const requerRetificacaoPorProcesso = new Map(retificacoes.map((r) => [r.processoId, r.requerRetificacao === true]))
+  const proximaFasePorProcesso = new Map<number, string | null>()
+  for (const p of procs) {
+    const fases = p.tipoProcessoMotorId != null && p.modalidadeId != null ? doProcesso.fasesPorMacro.get(`${p.tipoProcessoMotorId}:${p.modalidadeId}`) : undefined
+    proximaFasePorProcesso.set(
+      p.id,
+      fases && p.faseAtualKey ? proximaFaseDoCaminho(fases, p.faseAtualKey, requerRetificacaoPorProcesso.get(p.id) ?? false) : null,
+    )
+  }
+
+  const extras = new Map<number, ExtraDaLinha>()
+  const brutas = esc.map((e): BrutaGerencial => {
+    const { workflowStepInstanceId, necessidadeId, dataInicio: _dataInicio, orgaoId, ...resto } = e
+    void _dataInicio
+    const proc = e.processoId != null ? processoPorId.get(e.processoId) ?? null : null
+    const nec = necessidadeId != null ? necessidadePorId.get(necessidadeId) ?? null : null
+    const uniao = nec?.uniaoId != null ? uniaoPorId.get(nec.uniaoId) ?? null : null
+    const passo = workflowStepInstanceId != null ? passoPorId.get(workflowStepInstanceId) ?? null : null
+    const doc = e.documentoId != null ? documentoPorId.get(e.documentoId) ?? null : null
+    extras.set(e.id, { orgaoId: orgaoId ?? doc?.orgaoId ?? null, faseAtualKey: proc?.faseAtualKey ?? null })
+    return {
+      ...resto,
+      processo: proc ? {
+        nome: proc.nome, faseAtualKey: proc.faseAtualKey, tipoProcessoMotorId: proc.tipoProcessoMotorId,
+        familia: proc.familiaId != null && familiaPorId.has(proc.familiaId) ? { nome: familiaPorId.get(proc.familiaId)!.nome } : null,
+        paisCanonico: proc.paisId != null && paisPorId.has(proc.paisId) ? { countryLabel: paisPorId.get(proc.paisId)!.countryLabel } : null,
+      } : null,
+      responsavel: e.responsavelId != null && responsavelPorId.has(e.responsavelId) ? { nome: responsavelPorId.get(e.responsavelId)!.nome } : null,
+      necessidade: nec ? {
+        itemCatalogo: { name: itemPorId.get(nec.itemCatalogoId)!.name },
+        uniao: uniao ? { pessoa1: dadosDaPessoa(uniao.pessoa1Id), pessoa2: dadosDaPessoa(uniao.pessoa2Id) } : null,
+      } : null,
+      workflowStepInstance: passo ? {
+        id: passo.id, stepKey: passo.stepKey, snapshot: passo.snapshot, stepDefinitionId: passo.stepDefinitionId,
+        ordem: passo.ordem, createdAt: passo.createdAt,
+      } : null,
+      dependeDe: dependenciasPorTarefa.get(e.id) ?? [],
+      documento: doc ? { tipo: doc.tipo, orgao: doc.orgao } : null,
+    }
+  })
+  return { brutas, ordensPorTipo: doProcesso.ordensPorTipo, extras, proximaFasePorProcesso }
+}
+
+async function enriquecerEscalares(
+  esc: EscalarGerencial[], agora: Date, db: Leitor = prisma,
+): Promise<{ linhas: LinhaGerencial[]; extras: Map<number, ExtraDaLinha> }> {
+  if (esc.length === 0) return { linhas: [], extras: new Map() }
+  const cache = criarCacheDeLeitura(db)
+  // ARRANQUE ANTECIPADO: o que só depende dos ids da própria Tarefa começa já (o cache guarda a promessa; quem
+  // pedir depois recebe a mesma). Ninguém aqui espera o outro.
+  const nada = () => undefined
+  const passoIds = unicos(esc.map((t) => t.workflowStepInstanceId))
+  const passoIdsComInstancia = unicos(esc.filter((t) => t.workflowInstanceId != null).map((t) => t.workflowStepInstanceId))
+  void cache.execucoes(passoIds).catch(nada)
+  void cache.contatos(passoIdsComInstancia).catch(nada)
+  void cache.instancias(unicos(esc.map((t) => t.workflowInstanceId)))
+    .then((ins) => Promise.all(
+      unicos(ins.map((i) => (i.workflowDefinitionId != null && i.workflowVersion != null ? `${i.workflowDefinitionId}:${i.workflowVersion}` : null)))
+        .map((par) => { const [d, v] = par.split(':').map(Number); return cache.versao(d, v) }),
+    )).catch(nada)
+  void cache.pessoas(unicos(esc.map((t) => t.pessoaId))).catch(nada)
+
+  const [carga, nomes, linhagem, totais, paradas, estados, repactuacoes] = await Promise.all([
+    carregarBrutas(esc, db, cache),
+    nomesDasPessoas(esc, db, cache),
+    linhagemDasPessoas(esc, db, cache),
+    totalDePassos(esc, db),
     contextoDeParada(
-      brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
+      esc.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
       db,
     ),
-    brutas.length > 0 ? estadosTemporaisDasOperacoes(db, brutas.map((t) => t.id), agora) : Promise.resolve(new Map<number, EstadoTemporalDaOperacao>()),
-    repactuacoesDePrazo(brutas.map((t) => t.id), db),
+    // A projeção temporal recebe as linhas da Tarefa que já estão aqui (nada de reler a Tarefa) e o mesmo cache.
+    estadosTemporaisDasOperacoes(db, esc.map((t) => t.id), agora, { tarefas: esc, cache }),
+    repactuacoesDePrazo(esc.map((t) => t.id), db),
   ])
+  const { brutas, ordensPorTipo, extras, proximaFasePorProcesso } = carga
+  const [rotulos, subtarefas] = await Promise.all([rotulosDosPassos(brutas, db, cache), progressoPorSubtarefa(brutas, db, cache)])
   const hoje = diaOperacional(agora)
-  const ordensPorTipo = await ordensDeFasePorTipo(brutas, db)
 
   const linhas = brutas.map((t): LinhaGerencial => {
     const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, linhagem)
@@ -2430,9 +2612,36 @@ async function enriquecerLinhas(brutas: BrutaGerencial[], agora: Date, db: Leito
       concluidaEm: t.dataConclusao?.toISOString() ?? null,
       repactuacoes: repactuacao?.total ?? 0,
       ultimaRepactuacao: repactuacao?.ultima ?? null,
+      proximaFaseDoProcessoLabel: t.processoId != null ? labelDaFasePorPhaseKey(proximaFasePorProcesso.get(t.processoId)) : null,
     }
   })
-  return aplicarEstadosTemporais(linhas, estados) as LinhaGerencial[]
+  return { linhas: aplicarEstadosTemporais(linhas, estados) as LinhaGerencial[], extras }
+}
+
+/**
+ * SÓ PARA A PROVA DE EQUIVALÊNCIA (scripts/torre-visao-gerencial-leitura-paralela.test.ts): a hidratação em
+ * paralelo (`carregarBrutas`) e o `SELECT_GERENCIAL` aninhado que ela substitui — o teste compara as duas leituras
+ * das MESMAS tarefas. Nenhuma tela usa isto.
+ */
+export const provaDaLeituraParalela = {
+  SELECT_GERENCIAL,
+  SELECT_ESCALAR_GERENCIAL,
+  async hidratar(ids: number[], db: Leitor): Promise<{ escalares: EscalarGerencial[]; brutas: BrutaGerencial[]; cache: CacheDeLeitura }> {
+    const escalares = await db.tarefa.findMany({ where: { id: { in: ids } }, orderBy: { id: 'asc' }, select: SELECT_ESCALAR_GERENCIAL })
+    const cache = criarCacheDeLeitura(db)
+    const { brutas } = await carregarBrutas(escalares, db, cache)
+    return { escalares, brutas, cache }
+  },
+  progressoPorSubtarefa,
+}
+
+/** Lê as Tarefas do `where` (só escalares) e devolve a linha gerencial enriquecida — ver `carregarBrutas`. */
+async function lerLinhasGerenciais(
+  args: { where: Prisma.TarefaWhereInput; orderBy?: Prisma.TarefaOrderByWithRelationInput[]; skip?: number; take?: number },
+  agora: Date, db: Leitor = prisma,
+): Promise<{ linhas: LinhaGerencial[]; extras: Map<number, ExtraDaLinha> }> {
+  const escalares = await db.tarefa.findMany({ ...args, select: SELECT_ESCALAR_GERENCIAL })
+  return enriquecerEscalares(escalares, agora, db)
 }
 
 /**
@@ -2447,30 +2656,38 @@ export async function visaoGerencial(
   agora = new Date(),
   db: Leitor = prisma,
 ): Promise<{ linhas: LinhaGerencial[]; total: number; pagina: number; porPagina: number }> {
+  const { extras: _extras, ...visao } = await visaoGerencialComExtras(f, agora, db)
+  void _extras
+  return visao
+}
+
+/**
+ * A MESMA `visaoGerencial`, mais o que a Torre precisa por linha e a projeção
+ * não carrega (`orgaoId`, `faseAtualKey`) — lido junto, sem ida extra ao banco.
+ * `visaoGerencial` é esta função sem o mapa: um caminho só.
+ */
+export async function visaoGerencialComExtras(
+  f: FiltrosGerenciais = {},
+  agora = new Date(),
+  db: Leitor = prisma,
+): Promise<{ linhas: LinhaGerencial[]; total: number; pagina: number; porPagina: number; extras: Map<number, ExtraDaLinha> }> {
   const porPagina = Math.min(Math.max(f.porPagina ?? 200, 1), 500)
   const pagina = Math.max(f.pagina ?? 1, 1)
   const where = await mergeFiltrosAssincronos(f, whereGerencial(f, agora), agora, db)
 
-  const [total, brutas] = await Promise.all([
+  const [total, { linhas, extras }] = await Promise.all([
     db.tarefa.count({ where }),
-    db.tarefa.findMany({
+    lerLinhasGerenciais({
       where,
-      select: SELECT_GERENCIAL,
       orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
       skip: (pagina - 1) * porPagina,
       take: porPagina,
-    }),
+    }, agora, db),
   ])
-
-  // TUDO EM LOTE, e o número de consultas NÃO depende do número de linhas:
-  // uma contagem, uma página de tarefas, os nomes das pessoas, os rótulos dos
-  // passos e o contexto de parada. Cinco idas ao banco para 10 tarefas e cinco
-  // para 500.
-  //
   // `coluna` já entrou no `where` (ver `whereGerencial`) — total/página/lista
-  // batem sobre o MESMO universo lógico, sem recorte pós-paginação.
-  const linhas = await enriquecerLinhas(brutas, agora, db)
-  return { linhas: ordenarFila(linhas) as LinhaGerencial[], total, pagina, porPagina }
+  // batem sobre o MESMO universo lógico, sem recorte pós-paginação. O número de
+  // consultas NÃO depende do número de linhas (ver `carregarBrutas`).
+  return { linhas: ordenarFila(linhas) as LinhaGerencial[], total, pagina, porPagina, extras }
 }
 
 /**

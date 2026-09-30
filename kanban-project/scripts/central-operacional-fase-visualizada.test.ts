@@ -174,7 +174,7 @@ async function main() {
     .flatMap((p) => p.documentos).find((d) => d.necessidadeId === p.necessidadeId)!
   check("4a) taskId = o da Emissão (nada foi escondido demais)", linhaEmi.naFase.taskId === tarefaEmissao.id, `taskId=${linhaEmi.naFase.taskId}`)
   check("4b) estado = A_FAZER (tarefa nova, ninguém começou)", linhaEmi.naFase.estado === "A_FAZER", linhaEmi.naFase.estado)
-  check("4c) estadoLabel = 'A fazer' (o botão 'Iniciar' É legítimo AQUI)", linhaEmi.naFase.estadoLabel === "A fazer", linhaEmi.naFase.estadoLabel)
+  check("4c) estadoLabel = 'A iniciar' (mapa único de statusTarefa; o botão 'Iniciar' É legítimo AQUI)", linhaEmi.naFase.estadoLabel === "A iniciar", linhaEmi.naFase.estadoLabel)
 
   // ══════════════════════════════════════════════════════════════════════════
   secao("5) UMA fase futura (nunca materializada) não mostra nada, e não quebra")

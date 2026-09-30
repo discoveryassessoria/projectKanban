@@ -46,6 +46,7 @@ import {
   montarChaveAdvance,
   montarChaveAdvanceBloqueio,
   proximaFaseAplicavel,
+  proximaFaseDoCaminho,
   faseAlvoEhAnterior,
   montarEventoEntered,
   montarEventoCompleted,
@@ -771,11 +772,7 @@ async function proximaFaseComCondicional(processoId: number, fases: FaseOrdenada
     where: { processoId },
     select: { requerRetificacao: true },
   }).catch(() => null)
-  const requerRetificacao = analise?.requerRetificacao === true
-  const condicionais = new Set(fases.filter((f) => f.conditional).map((f) => f.phaseKey))
-  const ehAplicavel = (phaseKey: string): boolean =>
-    condicionais.has(phaseKey) ? requerRetificacao : true
-  return proximaFaseAplicavel(fases, faseAtual, ehAplicavel)
+  return proximaFaseDoCaminho(fases, faseAtual, analise?.requerRetificacao === true)
 }
 
 /** Avanço NORMAL: só avança com zero pendências BLOCKING. Transação atômica. */

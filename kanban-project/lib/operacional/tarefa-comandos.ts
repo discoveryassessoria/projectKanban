@@ -379,7 +379,7 @@ export async function redistribuirTarefas(args: {
       usuarioId: args.autorId,
       descricao:
         `Redistribuição em lote: ${sucesso} de ${itens.length} tarefa(s) ` +
-        `${args.novoResponsavelId == null ? 'devolvidas à fila da equipe' : `passadas ao usuário ${args.novoResponsavelId}`}.` +
+        `${args.novoResponsavelId == null ? 'devolvidas à equipe (sem responsável)' : `passadas ao usuário ${args.novoResponsavelId}`}.` +
         (args.motivo ? ` Motivo: ${args.motivo}` : ''),
       detalhes: JSON.parse(JSON.stringify({ novoResponsavelId: args.novoResponsavelId, motivo: args.motivo ?? null, itens })),
     },

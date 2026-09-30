@@ -8,8 +8,7 @@
 // "aberta" da Operação. Acrescenta, por linha, só o que a AÇÃO precisa e a
 // projeção não traz: o órgão (id) e `podeIniciar`.
 // ============================================================================
-import { prisma } from '@/lib/prisma'
-import { visaoGerencial, ordenarFila, type LinhaGerencial, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
+import { visaoGerencialComExtras, ordenarFila, type LinhaGerencial, type FiltrosGerenciais } from '@/lib/operacional/tarefa-projecoes'
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
 import { semFaseFutura } from '@/lib/operacional/fase-futura'
 import { motivoDeNaoPoderIniciar } from '@/src/services/iniciar-envio'
@@ -27,33 +26,27 @@ export interface LinhaDaTorre extends LinhaGerencial {
 export async function listarTarefasDaTorre(
   filtros: Omit<FiltrosGerenciais, 'porPagina' | 'pagina'> = {}, agora = new Date(),
 ): Promise<{ linhas: LinhaDaTorre[]; total: number; cobrancasVencidas: number }> {
-  const todas: LinhaGerencial[] = []
-  for (let pagina = 1; ; pagina++) {
-    const { linhas, total } = await visaoGerencial({ ...filtros, pagina, porPagina: 500 }, agora)
-    todas.push(...linhas)
-    if (pagina * 500 >= total || linhas.length === 0) break
-  }
+  // A primeira página diz o total; as demais (só existem acima de 500 tarefas) vão juntas, não uma depois da
+  // outra. A ordem das páginas é preservada.
+  const primeira = await visaoGerencialComExtras({ ...filtros, pagina: 1, porPagina: 500 }, agora)
+  const restantes = primeira.linhas.length === 0
+    ? []
+    : await Promise.all(
+        Array.from({ length: Math.max(0, Math.ceil(primeira.total / 500) - 1) }, (_, i) =>
+          visaoGerencialComExtras({ ...filtros, pagina: i + 2, porPagina: 500 }, agora)),
+      )
+  const paginas = [primeira, ...restantes]
+  const todas: LinhaGerencial[] = paginas.flatMap((p) => p.linhas)
+  // O órgão e a fase do processo vêm da MESMA leitura da projeção (uma ida só, sem reler Tarefa/Processo).
+  const extras = new Map(paginas.flatMap((p) => [...p.extras]))
   // O mesmo recorte de `minhaFila`: encerradas não são fila.
   // E tarefa de FASE FUTURA também não é fila (regra única do Bloco F — `fase-futura.ts`): lista, KPIs,
   // Radar, Processos, Foco e Equipe leem daqui, então a exclusão vale para todos de uma vez.
   const abertas = ordenarFila(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA'))) as LinhaGerencial[]
 
-  const tarefaIds = abertas.map((l) => l.taskId)
-  const processoIds = [...new Set(abertas.map((l) => l.processoId).filter((id): id is number => id != null))]
-  const [orgaos, processos] = await Promise.all([
-    tarefaIds.length
-      ? prisma.tarefa.findMany({ where: { id: { in: tarefaIds } }, select: { id: true, orgaoId: true, documento: { select: { orgaoId: true } } } })
-      : Promise.resolve([]),
-    processoIds.length
-      ? prisma.processo.findMany({ where: { id: { in: processoIds } }, select: { id: true, faseAtualKey: true } })
-      : Promise.resolve([]),
-  ])
-  const orgaoDaTarefa = new Map(orgaos.map((t) => [t.id, t.orgaoId ?? t.documento?.orgaoId ?? null]))
-  const faseDoProcesso = new Map(processos.map((p) => [p.id, p.faseAtualKey]))
-
   const linhas: LinhaDaTorre[] = abertas.map((l) => {
-    const orgaoId = orgaoDaTarefa.get(l.taskId) ?? null
-    const faseAtualKey = l.processoId != null ? faseDoProcesso.get(l.processoId) ?? null : null
+    const orgaoId = extras.get(l.taskId)?.orgaoId ?? null
+    const faseAtualKey = l.processoId != null ? extras.get(l.taskId)?.faseAtualKey ?? null : null
     const motivo = motivoDeNaoPoderIniciar({
       statusTarefa: l.statusTarefa, aIniciar: l.aIniciar, faseMacroKey: l.faseMacroKey, faseAtualKey,
       aguardandoDependencia: l.aguardandoDependencia, temOrgao: orgaoId != null,

@@ -45,9 +45,9 @@ export function TorreRegras({ versao }: { versao: number }) {
   }
   const aplicarAgora = async () => {
     setOcupado("r1")
-    const res = await api<{ executou?: boolean; atribuidas?: number; seguradas?: number; falhas?: number; motivo?: string }>("/api/torre/regras/r1/executar", "POST")
+    const res = await api<{ executou?: boolean; atribuidas?: number; seguradas?: number; semApto?: number; falhas?: number; motivo?: string }>("/api/torre/regras/r1/executar", "POST")
     setOcupado(null)
-    if (res.data?.executou) avisar(`Regra r1 aplicada: ${res.data.atribuidas} atribuída(s), ${res.data.seguradas} segurada(s) pelo limite, ${res.data.falhas} falha(s).`)
+    if (res.data?.executou) avisar(`Regra r1 aplicada: ${res.data.atribuidas} atribuída(s), ${res.data.seguradas} segurada(s) pelo limite, ${res.data.semApto ?? 0} sem apto (ficam no Precisa de você), ${res.data.falhas} falha(s).`)
     else avisar(res.status === 409 ? "A regra r1 está desligada — nada foi feito." : erroDe(res.data))
   }
 

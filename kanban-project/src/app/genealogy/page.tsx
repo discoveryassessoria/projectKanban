@@ -22,6 +22,7 @@ import { HeaderBarApp } from "@/src/components/header-bar-app"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { gravarLocal, useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
 import { useApi } from "@/src/lib/dados"
+import { ROTULO_STATUS } from "@/src/lib/home/rotulo-status-tarefa"
 import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 interface Usuario {
@@ -37,9 +38,10 @@ interface Usuario {
 const ROTULO_STATUS_DOCUMENTO: Record<string, string> = {
   PENDENTE: "Pendente",
   SEM_RESPONSAVEL: "Sem responsável",
-  A_FAZER: "A fazer",
-  EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  // Estados que vêm da TAREFA usam o MAPA ÚNICO de statusTarefa (A_FAZER = NAO_INICIADA = "A iniciar").
+  A_FAZER: ROTULO_STATUS.NAO_INICIADA,
+  EM_ANDAMENTO: ROTULO_STATUS.EM_ANDAMENTO,
+  AGUARDANDO_TERCEIRO: ROTULO_STATUS.AGUARDANDO_TERCEIRO,
   BLOQUEADA: "Bloqueado",
   RECEBIDO: "Recebido",
   CANCELADO: "Cancelado",

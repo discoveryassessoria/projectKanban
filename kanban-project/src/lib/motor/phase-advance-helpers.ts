@@ -155,6 +155,19 @@ export function proximaFaseAplicavel(
   return null
 }
 
+/**
+ * A PRÓXIMA FASE DO CAMINHO de um processo, respeitando o DESVIO CONDICIONAL — a regra ÚNICA do avanço
+ * (`proximaFaseComCondicional`, phase-advance.ts) e de quem só PERGUNTA qual é o próximo marco (a Torre/Operação,
+ * `proximaFaseDoProcessoLabel`): fase marcada `conditional` só entra no caminho quando a decisão da Análise diz
+ * `requerRetificacao === true`; senão é PULADA. Pura — quem chama lê `requerRetificacao`
+ * (`AnaliseDocumental.requerRetificacao`) e as fases do Workflow Macro do processo.
+ */
+export function proximaFaseDoCaminho(fases: FaseOrdenada[], faseAtualKey: string, requerRetificacao: boolean): string | null {
+  if (!fases.some((f) => f.conditional)) return proximaFaseAplicavel(fases, faseAtualKey, () => true)
+  const condicionais = new Set(fases.filter((f) => f.conditional).map((f) => f.phaseKey))
+  return proximaFaseAplicavel(fases, faseAtualKey, (phaseKey) => (condicionais.has(phaseKey) ? requerRetificacao : true))
+}
+
 /** Índice de ordenação de uma fase (para validar retorno "para trás"). */
 export function ordemDaFase(fases: FaseOrdenada[], phaseKey: string): number | null {
   const ord = [...fases].sort((a, b) => a.ordem - b.ordem)
