@@ -88,9 +88,17 @@ export function docTipoTxt(l: LinhaOperacaoV3): string {
  *  já devia estar resolvido antes de enviar o requerimento (mandato
  *  "Operação/Antão", correção pós-conferência 29/09/2026). */
 export const orgaoTxt = (l: LinhaOperacaoV3): string =>
-  l.terceiroNome ?? (l.faseMacroKey === "genealogia" ? "a definir" : "não vinculado")
+  l.terceiroNome ?? (l.documentoId == null ? "—" : l.faseMacroKey === "genealogia" ? "a definir" : "não vinculado")
 export const orgaoCls = (l: LinhaOperacaoV3): string =>
-  l.terceiroNome ? "opv3-p-gry" : l.faseMacroKey === "genealogia" ? "opv3-p-gry" : "opv3-p-red"
+  l.terceiroNome || l.documentoId == null ? "opv3-p-gry" : l.faseMacroKey === "genealogia" ? "opv3-p-gry" : "opv3-p-red"
+
+/** "SEM ÓRGÃO EMISSOR" — a UMA definição do card do radar, do aviso "Vincular órgão nas N" e da lista que o
+ *  card abre (número = lista). Só conta TAREFA DE DOCUMENTO (tem `documentoId`) que precisa de órgão: a tarefa
+ *  de gestor ("Atribuir tarefas — <família>"), manual ou administrativa não tem documento nem cartório por
+ *  natureza, e nunca poderia ser "vinculada" a um órgão (achado real 30/09/2026: #3980 e #3928 entravam na
+ *  contagem). Genealogia fica de fora: sem órgão é o trabalho em curso (descobrir ONDE registrar). */
+export const precisaDeOrgaoEmissor = (l: Pick<LinhaOperacaoV3, "documentoId" | "terceiroNome" | "faseMacroKey">): boolean =>
+  l.documentoId != null && !l.terceiroNome && l.faseMacroKey !== "genealogia"
 
 export const cobrancasTxt = (l: LinhaOperacaoV3): string =>
   l.totalCobrancas === 0 ? "0" : `${l.totalCobrancas}${l.escalada ? " · escalada" : ""}`

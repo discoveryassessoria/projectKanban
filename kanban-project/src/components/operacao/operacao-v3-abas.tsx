@@ -256,7 +256,7 @@ export function AbaFamilias({
       const escaladaPorOrgao = new Map<string, number>()
       for (const l of abertosDaFam) if (l.escalada && l.terceiroNome) escaladaPorOrgao.set(l.terceiroNome, (escaladaPorOrgao.get(l.terceiroNome) ?? 0) + 1)
       const gargaloEntry = [...escaladaPorOrgao.entries()].sort((a, b) => b[1] - a[1])[0]
-      const semOrgao = abertosDaFam.filter((l) => l.aIniciar && !l.terceiroNome).length
+      const semOrgao = abertosDaFam.filter((l) => l.aIniciar && l.documentoId != null && !l.terceiroNome).length
       const gargalo = gargaloEntry ? `${gargaloEntry[0]} (escalada)` : semOrgao > 0 ? "órgão emissor não vinculado" : "—"
       return { nome, ts, pais: ts[0]?.pais ?? "—", fase: ts[0]?.faseMacroKey ?? "—", gargalo }
     })

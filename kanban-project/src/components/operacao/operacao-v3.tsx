@@ -26,7 +26,7 @@ import type { LinhaOperacaoV3, RespostaTarefas, Vista, AgruparFilaPor, FiltroRad
 import {
   relCls, acompTxtCompleto, passoLabelDe, faseLabelDe, orgaoTxt, orgaoCls,
   cobrancasTxt, prazoTarefaCls, acaoDe, concluirLabelDe, aplicarBusca, aplicarVista,
-  agruparDentroDaFamilia, agruparPorFamilia, docTipoTxt, type GrupoDeLinhas,
+  agruparDentroDaFamilia, agruparPorFamilia, docTipoTxt, precisaDeOrgaoEmissor, type GrupoDeLinhas,
 } from "./operacao-v3-derivacoes"
 import {
   AbaAguardando, AbaAcompanhamento, AbaFamilias, AbaRadar, AbaFeito,
@@ -170,7 +170,7 @@ export function OperacaoV3() {
   // registrar), nunca bloqueio de verdade — "bloqueio só na Emissão" (item 8,
   // mandato "Operação/Antão", correção pós-conferência 29/09/2026). O banner
   // "Bloqueio" e o radar "Sem órgão" herdam esta mesma exclusão.
-  const noOrg = useMemo(() => abertosVisiveis.filter((l) => !l.terceiroNome && l.faseMacroKey !== "genealogia"), [abertosVisiveis])
+  const noOrg = useMemo(() => abertosVisiveis.filter(precisaDeOrgaoEmissor), [abertosVisiveis])
   const genOpen = useMemo(() => abertosVisiveis.filter((l) => l.faseMacroKey === "genealogia" && l.origem !== "TRANSVERSAL"), [abertosVisiveis])
 
   const qf = useCallback((l: LinhaOperacaoV3) => {
@@ -183,7 +183,7 @@ export function OperacaoV3() {
 
   const fila = useMemo(() => {
     let f = filaBase.filter(qf)
-    if (radar === "noorg") f = f.filter((l) => l.aIniciar && !l.terceiroNome && l.faseMacroKey !== "genealogia")
+    if (radar === "noorg") f = f.filter(precisaDeOrgaoEmissor)
     if (radar === "faseant") f = f.filter((l) => l.faseMacroKey === "genealogia")
     // As NOVAS (último aviso "chegou trabalho") sobem ao topo; o resto mantém a ordem.
     if (novasIds.size) f = [...f].sort((a, b) => Number(novasIds.has(b.taskId)) - Number(novasIds.has(a.taskId)))
