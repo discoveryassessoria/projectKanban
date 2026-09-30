@@ -115,7 +115,8 @@
    "scripts/saude-cad012-passo-da-biblioteca.test.ts",
    "scripts/saude-pendencias-mtr-cob-tor.test.ts",
    "scripts/torre-admin-absorve-operacao.test.ts",
-   "scripts/torre-tarefas-recursos-da-operacao.test.ts"
+   "scripts/torre-tarefas-recursos-da-operacao.test.ts",
+   "scripts/processos-lista-traz-pais-canonico.test.ts"
   ]
  },
  "arquivos": [
@@ -212,6 +213,7 @@
   "scripts/saude-cad012-passo-da-biblioteca.test.ts",
   "scripts/saude-pendencias-mtr-cob-tor.test.ts",
   "scripts/torre-admin-absorve-operacao.test.ts",
-  "scripts/torre-tarefas-recursos-da-operacao.test.ts"
+  "scripts/torre-tarefas-recursos-da-operacao.test.ts",
+  "scripts/processos-lista-traz-pais-canonico.test.ts"
  ]
 }

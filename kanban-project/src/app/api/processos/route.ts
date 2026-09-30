@@ -75,6 +75,9 @@ export async function GET(request: Request) {
         },
         arvore: true,
         familia: { select: { id: true, nome: true } }, // CP-1 dual-read
+        // O país CANÔNICO vai junto: a aba Geral e o cabeçalho do modal do processo leem `processo.paisCanonico`
+        // e o modal não busca de novo — sem isto o país saía "—" quando o processo vinha da lista.
+        paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true, language: true } },
         requerentes: {
           where: VINCULO_PROCESSO_ATIVO,
           include: {
@@ -193,6 +196,9 @@ export async function POST(request: Request) {
         contratantes: { include: { contratante: true } },
         arvore: true,
         familia: { select: { id: true, nome: true } }, // CP-1 dual-read
+        // O país CANÔNICO vai junto: a aba Geral e o cabeçalho do modal do processo leem `processo.paisCanonico`
+        // e o modal não busca de novo — sem isto o país saía "—" quando o processo vinha da lista.
+        paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true, language: true } },
         requerentes: { where: VINCULO_PROCESSO_ATIVO, include: { requerente: true } },
       },
     })
