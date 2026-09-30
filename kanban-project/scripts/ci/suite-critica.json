@@ -108,7 +108,8 @@
    "scripts/torre-bloco-i-integridade-auditoria-foco.test.ts",
    "scripts/torre-bloco-j-kpis-radar-visoes-absorcao.test.ts",
    "scripts/torre-bloco-e-indicadores-diarios.test.ts",
-   "scripts/torre-bloco-j-tempo-na-fase.test.ts"
+   "scripts/torre-bloco-j-tempo-na-fase.test.ts",
+   "scripts/menu-admin-sem-tarefas-distribuicao.test.ts"
   ]
  },
  "arquivos": [
@@ -198,6 +199,7 @@
   "scripts/torre-bloco-i-integridade-auditoria-foco.test.ts",
   "scripts/torre-bloco-j-kpis-radar-visoes-absorcao.test.ts",
   "scripts/torre-bloco-e-indicadores-diarios.test.ts",
-  "scripts/torre-bloco-j-tempo-na-fase.test.ts"
+  "scripts/torre-bloco-j-tempo-na-fase.test.ts",
+  "scripts/menu-admin-sem-tarefas-distribuicao.test.ts"
  ]
 }

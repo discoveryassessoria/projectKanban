@@ -24,6 +24,7 @@ import { ManagementIcon } from "@/src/components/icons/management-icon"
 import { ScrollIcon } from "@/src/components/icons/scroll-icon"
 import { ReportIcon } from "@/src/components/icons/report-icon"
 import { RadarIcon } from "@/src/components/icons/radar-icon"
+import { itemDeMenuVisivel } from "@/src/lib/menu-visibilidade"
 
 const menuItems = [
   {
@@ -75,6 +76,7 @@ const menuItems = [
     iconOffset: "",
     permissao: "tarefas.editar",
     soAdmin: true,
+    escondeParaAdmin: true, // a Torre de Controle substitui esta tela; a rota /tarefas segue existindo e redireciona
   },
   {
     // DISTRIBUIÇÃO — tela própria de "quem decide de quem é o trabalho"
@@ -87,6 +89,7 @@ const menuItems = [
     textOffset: "",
     iconOffset: "",
     permissao: "tarefas.editar",
+    escondeParaAdmin: true, // a Torre substitui a tela para o admin; não-admin com tarefas.editar segue vendo
   },
   {
     // CALENDÁRIO — agendamentos consulares (mandato 24/09/2026). Item PRÓPRIO,
@@ -321,7 +324,7 @@ export function BitrixSidebar() {
             </div>
           )}
           <nav className="space-y-1">
-            {menuItems.filter((item) => (!item.permissao || pode(item.permissao)) && (!item.soAdmin || isAdmin)).map((item) => {
+            {menuItems.filter((item) => itemDeMenuVisivel(item, { pode, isAdmin })).map((item) => {
               const isActive = pathname === item.url
 
               return (
