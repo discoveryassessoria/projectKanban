@@ -128,3 +128,21 @@ Depois: E → F → G → H → I → J, um bloco por vez. Em cada bloco:
 5. PARAR e aguardar "próximo".
 
 Ao fim do J: URL da Torre + checklist item por item do protótipo (elemento → fonte do dado → como testar).
+
+---
+
+## Decisões do Passo 0 (29/09)
+
+Valem sobre o texto deste mandato E JUNTO sobre o protótipo (`docs/torre-controle-prototipo.html`) sempre que os dois divergirem do que segue.
+
+1. **E8 removido.** Não existe "tempo aprendido por cartório" — nunca dá para estipular prazo de cartório. A coluna "Tempo aprendido" da aba Terceiros vira **"Régua"** e mostra só a régua do Gerenciamento. A regra r5 sai da aba Regras. Nenhuma mediana/pior-caso em lugar nenhum.
+2. **r4 (ausência redireciona carteira) não existe.** Ausência é só registro (E2, com sucessor sugerido). Mover tarefas é ação manual do gestor ("Mover carteira"), auditada — nunca automática.
+3. **Item "Torre de Controle" no menu só no Bloco J.** Até lá, "Distribuição" e "Tarefas e Projetos" continuam exatamente como estão.
+4. **Score do "Precisa de você" = exatamente o do protótipo** (não o texto original do Bloco F): sem dono +3, vencida +4, acompanhamento vencido +2, 2+ cobranças sem resposta +2, fase deixada +3, divergência +3, bloqueada +2, fase Apostilamento/Retificação +1 (baseline). Faixas: ≥6 crítico, ≥3 atenção, senão ok.
+5. **KPI "Backlog" não filtra a lista** (é agregado, abre/fecha por semana) — os outros 7 KPIs filtram a aba Tarefas normalmente.
+6. **Toast/Desfazer: 6 segundos** (igual ao protótipo).
+7. **Rótulo de tarefa não iniciada sem prazo: "Iniciar até DD/MM"** — o mesmo da Operação (`tempo-operacional.ts`), nunca "nasce no envio" (texto do protótipo, descartado por conflitar com a régua única já em produção).
+8. **"Cobrar" na aba Terceiros** cobra só o cartório daquela linha — criar endpoint de cobrança por órgão (o existente, `cobrar-todos-vencidos`, cobra tudo, sem filtro por órgão).
+9. **Auditoria mostra só o que o sistema grava de verdade.** As linhas semeadas no protótipo (inclusive a de "retrocesso... instâncias supersedidas", que o código real de `retrocesso-de-fase.ts` nunca produz) eram ilustração — nunca replicar esse texto como se fosse real.
+10. **#3827 (Atahualpa, Cibils/651) é a tarefa real** por trás do exemplo "Fase deixada" do protótipo — serve de caso de teste real do Bloco F, decisão de atribuição fica para o usuário quando o Bloco F estiver no ar.
+11. **Cores: tokens do Discovery Design System**, mantendo o significado (vermelho/âmbar/azul/cinza/verde) e os mesmos estados do protótipo — nunca a paleta própria do HTML do protótipo.

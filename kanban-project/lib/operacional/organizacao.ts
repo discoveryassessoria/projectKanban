@@ -29,7 +29,7 @@
 // o que o perfil já é.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
-import type { TipoIndisponibilidade } from '@prisma/client'
+import type { TipoIndisponibilidade, StatusTarefa } from '@prisma/client'
 
 /** Uma unidade de trabalho executável — o que se cadastra como aptidão. */
 export interface UnidadeOperacional {
@@ -73,6 +73,8 @@ export interface Indisponibilidade {
   inicio: string
   fim: string | null
   motivo: string | null
+  /** SÓ SUGESTÃO (Bloco E2) — nunca redireciona carteira automaticamente. */
+  sucessorSugerido: { usuarioId: number; nome: string } | null
 }
 
 export interface OrganizacaoDoUsuario {
@@ -91,8 +93,12 @@ export interface OrganizacaoDoUsuario {
   observacaoCapacidade: string | null
 }
 
-const serializar = (i: { id: number; tipo: TipoIndisponibilidade; inicio: Date; fim: Date | null; motivo: string | null }): Indisponibilidade => ({
+const serializar = (i: {
+  id: number; tipo: TipoIndisponibilidade; inicio: Date; fim: Date | null; motivo: string | null
+  sucessorSugeridoId?: number | null; sucessorSugerido?: { id: number; nome: string } | null
+}): Indisponibilidade => ({
   id: i.id, tipo: i.tipo, inicio: i.inicio.toISOString(), fim: i.fim?.toISOString() ?? null, motivo: i.motivo,
+  sucessorSugerido: i.sucessorSugerido ? { usuarioId: i.sucessorSugerido.id, nome: i.sucessorSugerido.nome } : null,
 })
 
 /** Vigente = já começou e ainda não terminou. `fim` nulo é indisponibilidade em aberto. */
@@ -121,7 +127,10 @@ export async function lerOrganizacao(agora = new Date()): Promise<Map<number, Or
       },
     }),
     prisma.indisponibilidadeOperacional.findMany({
-      select: { id: true, usuarioId: true, tipo: true, inicio: true, fim: true, motivo: true },
+      select: {
+        id: true, usuarioId: true, tipo: true, inicio: true, fim: true, motivo: true,
+        sucessorSugeridoId: true, sucessorSugerido: { select: { id: true, nome: true } },
+      },
       orderBy: { inicio: 'desc' },
     }),
     prisma.capacidadeOperacional.findMany({ select: { usuarioId: true, limiteExecutaveis: true, observacao: true } }),
@@ -214,7 +223,19 @@ export async function definirAptidoes(
   return { ok: true }
 }
 
-/** Abre uma indisponibilidade. Encerrar é preencher `fim`, nunca apagar. */
+/**
+ * Abre uma indisponibilidade. Encerrar é preencher `fim`, nunca apagar.
+ *
+ * `sucessorSugeridoId` (Torre de Controle, Bloco E2, 29/09/2026) é SÓ
+ * REGISTRO da sugestão — quem chama já decidiu quem sugerir (ver
+ * `sugerirSucessor`, `lib/operacional/elegibilidade.ts`; não é recalculado
+ * aqui para não importar aquele módulo de volta, o que criaria um ciclo,
+ * já que ele importa deste arquivo). Não há redireção automática de
+ * carteira: decisão do inventário de 29/09 eliminou a regra r4 do
+ * protótipo. Mover tarefas continua sendo `redistribuirTarefas`
+ * (`lib/operacional/tarefa-comandos.ts`), ação manual do gestor, auditada
+ * por aquela porta.
+ */
 export async function abrirIndisponibilidade(args: {
   usuarioId: number
   tipo: TipoIndisponibilidade
@@ -222,12 +243,15 @@ export async function abrirIndisponibilidade(args: {
   fim?: Date | null
   motivo?: string | null
   autorId: number
+  sucessorSugeridoId?: number | null
 }): Promise<{ ok: true; id: number } | { ok: false; erro: string }> {
   if (args.fim && args.fim <= args.inicio) return { ok: false, erro: 'o fim tem de ser depois do início' }
+  if (args.sucessorSugeridoId === args.usuarioId) return { ok: false, erro: 'o sucessor sugerido não pode ser a própria pessoa ausente' }
   const criada = await prisma.indisponibilidadeOperacional.create({
     data: {
       usuarioId: args.usuarioId, tipo: args.tipo, inicio: args.inicio,
       fim: args.fim ?? null, motivo: args.motivo?.slice(0, 300) ?? null, criadoPorId: args.autorId,
+      sucessorSugeridoId: args.sucessorSugeridoId ?? null,
     },
     select: { id: true },
   })
@@ -337,4 +361,73 @@ export async function unidadesDasTarefas(tarefaIds: number[]): Promise<Map<numbe
 /** Nome e família de cada unidade, para a explicação e a tela. */
 export async function rotulosDasUnidades(): Promise<Map<number, UnidadeOperacional>> {
   return new Map((await unidadesOperacionais()).map((u) => [u.perfilOperacionalId, u]))
+}
+
+// ─── CAPACIDADE MEDIDA E FILA EM SEMANAS (Torre de Controle, Bloco E1, 29/09/2026) ──
+
+/** Semanas da janela de medição — 4, exatamente como o mandato pede. */
+const SEMANAS_CAPACIDADE_MEDIDA = 4
+
+/** Mesmo recorte de "sucesso" que `/api/operacao/analytics` já usa: nunca
+ * `CANCELADA`/`SUPERSEDIDA` — cancelamento não é conclusão, em nenhuma tela. */
+const STATUS_CONCLUIDOS_SUCESSO: StatusTarefa[] = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI']
+
+export interface CapacidadeMedida {
+  /** Quantas tarefas esta pessoa concluiu nas últimas 4 semanas — o dado bruto. */
+  concluidasUltimasSemanas: number
+  /** A MÉDIA real por semana — é o número que a Torre chama de "capacidade medida". */
+  mediaSemanal: number
+  /**
+   * ATIVAS ÷ CAPACIDADE MEDIDA. `null` quando a média é zero: dividir por
+   * zero não é "fila infinita" nem "sem fila" — é "não há dado suficiente
+   * para estimar", e a Torre mostra isso, nunca um número inventado.
+   */
+  filaEmSemanas: number | null
+}
+
+/**
+ * A CAPACIDADE MEDIDA DE UM LOTE DE PESSOAS, de uma vez — mesmo padrão de
+ * `classificarCarga`: uma consulta, não uma por pessoa.
+ *
+ * `ativasPorUsuario` é o numerador de "fila em semanas" — normalmente
+ * `carga.executaveis` de `classificarCarga` (o mesmo número que a
+ * recomendação e a tela de capacidade já mostram); passar `null`/omitir
+ * devolve só a capacidade medida, sem a fila.
+ */
+export async function capacidadeMedidaPorUsuario(
+  usuarioIds: number[],
+  ativasPorUsuario?: Map<number, number>,
+  agora = new Date(),
+): Promise<Map<number, CapacidadeMedida>> {
+  const resultado = new Map<number, CapacidadeMedida>()
+  if (usuarioIds.length === 0) return resultado
+
+  const inicio = new Date(agora)
+  inicio.setDate(inicio.getDate() - SEMANAS_CAPACIDADE_MEDIDA * 7)
+
+  const concluidas = await prisma.tarefa.findMany({
+    where: {
+      responsavelId: { in: usuarioIds },
+      statusTarefa: { in: STATUS_CONCLUIDOS_SUCESSO },
+      dataConclusao: { gte: inicio },
+    },
+    select: { responsavelId: true },
+  })
+  const porUsuario = new Map<number, number>()
+  for (const t of concluidas) {
+    if (t.responsavelId == null) continue
+    porUsuario.set(t.responsavelId, (porUsuario.get(t.responsavelId) ?? 0) + 1)
+  }
+
+  for (const id of usuarioIds) {
+    const total = porUsuario.get(id) ?? 0
+    const mediaSemanal = Math.round((total / SEMANAS_CAPACIDADE_MEDIDA) * 100) / 100
+    const ativas = ativasPorUsuario?.get(id) ?? null
+    resultado.set(id, {
+      concluidasUltimasSemanas: total,
+      mediaSemanal,
+      filaEmSemanas: ativas != null && mediaSemanal > 0 ? Math.round((ativas / mediaSemanal) * 100) / 100 : null,
+    })
+  }
+  return resultado
 }

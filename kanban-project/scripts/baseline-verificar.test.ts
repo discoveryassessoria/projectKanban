@@ -589,6 +589,11 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260929220300_step_instance_unico_por_documento',
   '20260929230000_sino_aviso_agrupado',
   '20260930000000_contato_terceiro_resultado_sem_default',
+  // Torre de Controle, Bloco E (29/09/2026): sucessor sugerido na ausência
+  // (E2), comentário + menção (E4), visão de relatório compartilhável (E7),
+  // série diária dos indicadores (E10). Só ADITIVO — nenhuma coluna existente
+  // mudou de tipo, nenhuma tabela existente perdeu coluna.
+  '20260930010000_torre_bloco_e_sucessor_comentarios_visao_compartilhada_indicadores',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')

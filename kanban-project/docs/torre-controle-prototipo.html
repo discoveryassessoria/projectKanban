@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torre de Controle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: sidebar fixa à esquerda, pulso + caixa de decisões no topo, abas de trabalho abaixo. Desktop-first (1280+), empilha em telas estreitas. */
+:root{
+  --bg:#eef1f6; --surface:#ffffff; --surface-2:#f7f9fc; --line:#dfe4ee; --line-soft:#edf0f5;
+  --fg:#141a2b; --muted:#5b6478; --muted-2:#7a8296;
+  --navy:#0b1f4b; --navy-2:#1d3466; --accent:#c9622b; --accent-soft:#fff6f0; --accent-line:#f0c9b3;
+  --red:#8f1d17; --red-bg:#fbe7e6; --amb:#7a4a00; --amb-bg:#fff1d6; --grn:#155e39; --grn-bg:#e1f3e8; --blu:#1d3f8f; --blu-bg:#e3ebfa; --gry:#4c5568; --gry-bg:#eceff4; --pur:#5b2a8a; --pur-bg:#f1e8fb;
+  --font:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f1524; --surface:#171f33; --surface-2:#1d2740; --line:#2b3550; --line-soft:#232d47;
+  --fg:#e7ebf5; --muted:#a3acc2; --muted-2:#7f8aa6; --navy:#0b1f4b; --navy-2:#1d3466; --accent:#e07a43; --accent-soft:#2a1e18; --accent-line:#5a3a28;
+  --red:#ff9b94; --red-bg:#3a1a18; --amb:#ffcf7a; --amb-bg:#3a2a10; --grn:#8fe0b0; --grn-bg:#153125; --blu:#9fb8ff; --blu-bg:#1b2747; --gry:#c3cadb; --gry-bg:#2a3247; --pur:#d6b8f5; --pur-bg:#2c1f3d; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f1524; --surface:#171f33; --surface-2:#1d2740; --line:#2b3550; --line-soft:#232d47;
+  --fg:#e7ebf5; --muted:#a3acc2; --muted-2:#7f8aa6; --navy:#0b1f4b; --navy-2:#1d3466; --accent:#e07a43; --accent-soft:#2a1e18; --accent-line:#5a3a28;
+  --red:#ff9b94; --red-bg:#3a1a18; --amb:#ffcf7a; --amb-bg:#3a2a10; --grn:#8fe0b0; --grn-bg:#153125; --blu:#9fb8ff; --blu-bg:#1b2747; --gry:#c3cadb; --gry-bg:#2a3247; --pur:#d6b8f5; --pur-bg:#2c1f3d; color-scheme:dark }
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px}
+*{box-sizing:border-box}
+button{font-family:inherit;cursor:pointer;color:inherit}
+input,select,textarea{font-family:inherit;font-size:13px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:36px}
+#app{display:flex;min-height:100%}
+.side{width:200px;flex-shrink:0;background:var(--navy);padding:20px 12px;display:flex;flex-direction:column;gap:4px}
+.side a{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:8px;color:#c9d2e6;text-decoration:none;font-size:14px;font-weight:500}
+.side a.on{background:var(--navy-2);color:#fff}
+main{flex-grow:1;min-width:0;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:14px;padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+h1{margin:0;font-size:22px;font-weight:700;color:var(--fg)}
+.sub{font-size:13px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--line)}
+.kpi{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;text-align:left;min-height:44px}
+.kpi.on{border-color:var(--accent);background:var(--accent-soft)}
+.kpi b{font-size:24px;line-height:1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.kpi i{font-style:normal;font-size:11px;color:var(--muted-2)}
+.kpi .up{color:var(--red)}.kpi .down{color:var(--grn)}
+.tabs{display:flex;gap:2px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.tab{border:0;background:transparent;padding:12px 12px;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;display:flex;gap:8px;align-items:center;min-height:44px}
+.tab.on{color:var(--fg);border-bottom-color:var(--accent)}
+.tab .n{background:var(--gry-bg);color:var(--fg);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700}
+.tab.on .n{background:var(--accent);color:#fff}
+.tab .n.warn{background:var(--amb-bg);color:var(--amb)}
+.tab .n.red{background:var(--red-bg);color:var(--red)}
+section.body{padding:18px 24px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 9px;font-size:12px;font-weight:600;white-space:nowrap}
+.p-red{background:var(--red-bg);color:var(--red)}.p-amb{background:var(--amb-bg);color:var(--amb)}.p-grn{background:var(--grn-bg);color:var(--grn)}.p-blu{background:var(--blu-bg);color:var(--blu)}.p-gry{background:var(--gry-bg);color:var(--gry)}.p-ex{background:var(--pur-bg);color:var(--pur);border:1px dashed var(--pur)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;min-height:36px;white-space:nowrap}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--navy);color:#fff;border-color:var(--navy)}.btn.acc{background:var(--accent);color:#fff;border-color:var(--accent)}.btn.sm{padding:4px 9px;min-height:30px;font-size:12px}
+.btn:focus-visible,.tab:focus-visible,.kpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:grid;gap:10px;align-items:center;padding:9px 14px;border-top:1px solid var(--line-soft);font-size:13px;min-height:44px}
+.row:hover{background:var(--surface-2)}.row.sel{background:var(--accent-soft)}
+.hd{display:grid;gap:10px;padding:8px 14px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);font-weight:600}
+.scroll{overflow-x:auto}
+.gT{grid-template-columns:26px 1.6fr 1fr .9fr 1fr .9fr .8fr .8fr 150px;min-width:1100px}
+.gA{grid-template-columns:110px 1.8fr 1.2fr 220px;min-width:900px}
+.gE{grid-template-columns:1.2fr 1fr 80px 80px 80px 90px 180px;min-width:900px}
+.gP{grid-template-columns:1.4fr .9fr 1fr .8fr .8fr .9fr 1fr 140px;min-width:1100px}
+.gC{grid-template-columns:1.4fr .7fr .8fr .8fr .8fr .8fr 190px;min-width:1000px}
+.gL{grid-template-columns:130px 1fr 1.6fr 1fr;min-width:800px}
+.grp{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--surface-2);border-top:1px solid var(--line);font-size:13px}
+.chk{width:18px;height:18px;border:2px solid var(--muted-2);border-radius:4px;display:inline-block;background:var(--surface);padding:0}
+.chk.on{background:var(--accent);border-color:var(--accent)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
+.bar{height:8px;background:var(--gry-bg);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar i.red{background:var(--red)}.bar i.grn{background:var(--grn)}
+.heat{display:grid;gap:4px;font-size:12px}
+.cell{border-radius:6px;padding:8px 6px;text-align:center;min-height:44px;display:flex;flex-direction:column;justify-content:center;gap:2px;border:1px solid var(--line)}
+.h0{background:var(--surface-2);color:var(--muted-2)}.h1{background:var(--grn-bg);color:var(--grn)}.h2{background:var(--amb-bg);color:var(--amb)}.h3{background:var(--red-bg);color:var(--red);font-weight:700}
+.hx{background:var(--surface);color:var(--fg);border-color:var(--navy)}
+.mono{font-family:var(--mono);font-size:12px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:50;display:flex;gap:12px;align-items:center;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+.overlay{position:fixed;inset:0;background:rgba(11,31,75,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border-radius:14px;width:min(760px,100%);max-height:90vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.modal .top{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.modal .cnt{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.ex{font-size:11px;color:var(--pur);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.brief{border-left:4px solid var(--accent);padding:12px 16px;font-size:14px;line-height:1.55}
+.brief b{color:var(--fg)}
+.step{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;font-size:13px}
+.step.cur{border-color:var(--accent);background:var(--accent-soft)}.step.done{background:var(--grn-bg)}
+.small{font-size:12px;color:var(--muted)}
+h2{margin:0;font-size:15px;font-weight:700}
+@media (max-width:900px){ .side{display:none} header,.kpis,.tabs,section.body{padding-left:16px;padding-right:16px} }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<script type="text/template" id="tpl">
+<nav class="side">
+  <div style="color:#fff;font-weight:700;font-size:16px;padding:6px 12px 18px">Grupo Discovery</div>
+  <a href="#">Página Inicial</a><a href="#">Processos</a><a href="#">Operação</a><a href="#" class="on">Torre de Controle</a><a href="#">Calendário</a><a href="#">Árvore Genealógica</a><a href="#">Relatórios</a><a href="#">Gerenciamento</a>
+  <div style="flex-grow:1"></div>
+  <div style="color:#8fa0c8;font-size:11px;padding:8px 12px">Acesso: Administrador · gerência operacional</div>
+</nav>
+<main>
+  <header>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <h1>Torre de Controle</h1>
+      <div class="sub">Segunda, 28 de setembro · Marco Rovatti · Administrador · <span class="mono">fonte: projeção da Operação</span></div>
+    </div>
+    <div style="flex-grow:1"></div>
+    <select id="nac" aria-label="Nacionalidade" value="{{ nac }}" onChange="{{ setNac }}" style="width:auto"><option value="todas">Todas as nacionalidades</option><option value="Espanha">🇪🇸 Espanha</option><option value="Itália">🇮🇹 Itália</option><option value="Alemanha">🇩🇪 Alemanha</option><option value="Portugal">🇵🇹 Portugal</option></select>
+    <input id="busca" aria-label="Buscar" placeholder="Buscar família, pessoa, cartório, tarefa…" value="{{ busca }}" onChange="{{ setBusca }}" style="min-width:260px">
+    <button class="btn" onClick="{{ openBrief }}">☀ Briefing do dia</button>
+    <button class="btn" onClick="{{ openRevisao }}">▶ Revisar o dia ({{ nAtt }})</button>
+    <sc-if value="{{ hasUndo }}" hint-placeholder-val="{{ false }}"><button class="btn sm" onClick="{{ doUndo }}">↶ Desfazer: {{ undoLabel }}</button></sc-if>
+  </header>
+
+  <div class="kpis">
+    <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="8">
+      <button class="kpi {{ k.on }}" onClick="{{ k.go }}"><b style="color:{{ k.color }}">{{ k.n }}</b><span>{{ k.label }}</span><i class="{{ k.trendCls }}">{{ k.trend }}</i></button>
+    </sc-for>
+  </div>
+
+  <div class="tabs">
+    <button class="tab {{ onAtt }}" onClick="{{ goAtt }}">Precisa de você <span class="n red">{{ nAtt }}</span></button>
+    <button class="tab {{ onRadar }}" onClick="{{ goRadar }}">Radar</button>
+    <button class="tab {{ onTar }}" onClick="{{ goTar }}">Tarefas <span class="n">{{ nTar }}</span></button>
+    <button class="tab {{ onEq }}" onClick="{{ goEq }}">Equipe <span class="n">3</span></button>
+    <button class="tab {{ onProc }}" onClick="{{ goProc }}">Processos <span class="n">{{ nProc }}</span></button>
+    <button class="tab {{ onTer }}" onClick="{{ goTer }}">Terceiros <span class="n warn">{{ nCobVenc }} a cobrar</span></button>
+    <button class="tab {{ onReg }}" onClick="{{ goReg }}">Regras</button>
+    <button class="tab {{ onInt }}" onClick="{{ goInt }}">Integridade <span class="n {{ intCls }}">{{ nInt }}</span></button>
+    <button class="tab {{ onAud }}" onClick="{{ goAud }}">Auditoria</button>
+    <div style="flex-grow:1"></div>
+    <sc-if value="{{ hasKpi }}" hint-placeholder-val="{{ false }}"><span class="pill p-red">Filtro: {{ kpiLabel }} <button class="btn sm" onClick="{{ clearKpi }}" style="border:0;background:transparent;min-height:20px;padding:0 4px">✕</button></span></sc-if>
+  </div>
+
+  <section class="body">
+
+    <!-- ===== PRECISA DE VOCÊ ===== -->
+    <sc-if value="{{ tabAtt }}" hint-placeholder-val="{{ true }}">
+      <div class="small">Decisões que só o Administrador toma. Cada linha tem a ação embutida. O score ordena: maior risco primeiro.</div>
+      <sc-if value="{{ emptyAtt }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding:40px;text-align:center"><b style="font-size:16px;color:var(--grn)">Nada depende de você agora.</b></div></sc-if>
+      <div class="card scroll">
+        <div class="hd gA"><span>Tipo</span><span>O que está acontecendo</span><span>Sugestão do sistema</span><span>Ação</span></div>
+        <sc-for list="{{ att }}" as="a" hint-placeholder-count="6">
+          <div class="row gA">
+            <span class="pill {{ a.cls }}">{{ a.tipo }}</span>
+            <div><b>{{ a.titulo }}</b><div class="small">{{ a.det }}</div></div>
+            <div class="small">{{ a.sug }}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn acc sm" onClick="{{ a.go1 }}">{{ a.b1 }}</button><button class="btn sm" onClick="{{ a.go2 }}">{{ a.b2 }}</button></div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ===== RADAR ===== -->
+    <sc-if value="{{ tabRadar }}" hint-placeholder-val="{{ false }}">
+      <div class="small">Família × fase. A célula da fase atual mostra de quem é a bola e há quantos dias. Cor = risco (atraso nosso, cobrança vencida, sem dono). Clique numa família para abrir o foco.</div>
+      <div class="card" style="padding:14px">
+        <div class="heat" style="grid-template-columns:180px repeat(9,1fr)">
+          <div></div>
+          <sc-for list="{{ fases }}" as="f" hint-placeholder-count="9"><div class="small" style="text-align:center;font-weight:600">{{ f }}</div></sc-for>
+          <sc-for list="{{ radar }}" as="r" hint-placeholder-count="5">
+            <button onClick="{{ r.go }}" style="text-align:left;border:0;background:transparent;font-family:inherit;padding:6px 4px;min-height:44px"><b>{{ r.fam }}</b><div class="small">{{ r.pais }} · {{ r.ex }}</div></button>
+            <sc-for list="{{ r.cells }}" as="c" hint-placeholder-count="9"><div class="cell {{ c.cls }}"><span>{{ c.txt }}</span><span class="small" style="color:inherit">{{ c.sub }}</span></div></sc-for>
+          </sc-for>
+        </div>
+        <div style="display:flex;gap:14px;margin-top:12px;flex-wrap:wrap" class="small"><span class="pill h1">no ritmo</span><span class="pill h2">atenção: cobrança vencida ou parado 7+ dias</span><span class="pill h3">crítico: atraso nosso, sem dono ou fase sem passos</span><span class="pill hx">fase atual</span></div>
+      </div>
+    </sc-if>
+
+    <!-- ===== TAREFAS ===== -->
+    <sc-if value="{{ tabTar }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="field" style="flex-direction:row;align-items:center;gap:6px"><span>Agrupar por</span><select id="grp" aria-label="Agrupar por" value="{{ group }}" onChange="{{ setGroup }}" style="width:auto"><option value="fam">Família</option><option value="resp">Responsável</option><option value="org">Cartório</option><option value="fase">Fase</option><option value="none">Sem agrupamento</option></select></label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:6px"><span>Visão</span><select id="vista" aria-label="Visão salva" value="{{ vista }}" onChange="{{ setVista }}" style="width:auto"><option value="todas">Todas as abertas</option><option value="vencidas">Vencidas</option><option value="semdono">Sem responsável</option><option value="aguard">Com o cartório</option><option value="minha">Minha visão · Espanha atrasadas</option></select></label>
+        <button class="btn sm" onClick="{{ saveVista }}">Salvar visão</button>
+        <div style="flex-grow:1"></div>
+        <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;gap:6px;align-items:center;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:10px;padding:5px 8px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:600">{{ selCount }} sel.</span>
+            <button class="btn acc sm" onClick="{{ atribuirSel }}">Atribuir a Gabriel</button>
+            <button class="btn sm" onClick="{{ prioSel }}">Prioridade alta</button>
+            <button class="btn sm" onClick="{{ repactSel }}">Repactuar prazo</button>
+            <button class="btn sm" onClick="{{ cobrarSel }}">Cobrar cartório</button>
+            <button class="btn sm" onClick="{{ clearSel }}">Limpar</button>
+          </div>
+        </sc-if>
+      </div>
+      <sc-for list="{{ grupos }}" as="G" hint-placeholder-count="2">
+        <div class="card scroll" style="border-left:4px solid var(--navy)">
+          <div class="grp" style="border-top:0;border-radius:12px 12px 0 0"><button class="chk {{ G.chkCls }}" onClick="{{ G.toggleAll }}" aria-label="Selecionar grupo"></button><b>{{ G.nome }}</b><span class="small">{{ G.sub }}</span><div style="flex-grow:1"></div><span class="pill p-gry">{{ G.n }} tarefas</span></div>
+          <div class="hd gT"><span></span><span>Certidão · pessoa</span><span>Bola com</span><span>Etapa</span><span>Responsável</span><span>Prazo</span><span>Acomp.</span><span>Risco</span><span></span></div>
+          <sc-for list="{{ G.items }}" as="t" hint-placeholder-count="4">
+            <div class="row gT {{ t.selCls }}">
+              <button class="chk {{ t.chkCls }}" onClick="{{ t.toggle }}" aria-label="Selecionar"></button>
+              <div><b>{{ t.doc }}</b><div class="small">{{ t.pessoa }} · {{ t.fam }} · <span class="mono">#{{ t.id }}</span></div></div>
+              <div><span class="pill {{ t.bolaCls }}">{{ t.bola }}</span><div class="small">{{ t.bolaDias }}</div></div>
+              <div class="small">{{ t.etapa }}</div>
+              <div><span class="{{ t.respCls }}">{{ t.resp }}</span></div>
+              <div><span class="{{ t.prazoCls }}">{{ t.prazo }}</span><div class="small">{{ t.prazoSub }}</div></div>
+              <div class="small">{{ t.acomp }}</div>
+              <div><span class="pill {{ t.riscoCls }}">{{ t.risco }}</span></div>
+              <div style="display:flex;gap:4px"><button class="btn sm pri" onClick="{{ t.open }}">Abrir</button><button class="btn sm" onClick="{{ t.quick }}">{{ t.quickLabel }}</button></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </sc-if>
+
+    <!-- ===== EQUIPE ===== -->
+    <sc-if value="{{ tabEq }}" hint-placeholder-val="{{ false }}">
+      <div class="small">Capacidade medida = quanto a pessoa fecha por semana. Fila em semanas = ativas ÷ capacidade. Limite e aptidões vêm do cadastro Capacidade Operacional (hoje vazios).</div>
+      <div class="card scroll">
+        <div class="hd gE"><span>Pessoa</span><span>Carga</span><span>Ativas</span><span>Atrasadas</span><span>Aguard.</span><span>Fila</span><span>Ações</span></div>
+        <sc-for list="{{ team }}" as="p" hint-placeholder-count="3">
+          <div class="row gE">
+            <div><b>{{ p.nome }}</b><div class="small">{{ p.papel }} · aptidões: {{ p.apt }} · {{ p.aus }}</div></div>
+            <div><div class="bar"><i class="{{ p.barCls }}" style="width:{{ p.pct }}%"></i></div><div class="small">{{ p.ativas }} de {{ p.limite }} · fecha {{ p.cap }}/sem</div></div>
+            <div><b>{{ p.ativas }}</b></div><div><b style="color:{{ p.atrColor }}">{{ p.atr }}</b></div><div>{{ p.aguard }}</div><div><span class="pill {{ p.filaCls }}">{{ p.fila }}</span></div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn sm" onClick="{{ p.ausencia }}">{{ p.ausLabel }}</button><button class="btn sm" onClick="{{ p.sucessao }}">Mover carteira</button><button class="btn sm" onClick="{{ p.simular }}">Simular saída</button></div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ hasSim }}" hint-placeholder-val="{{ false }}">
+        <div class="card" style="padding:14px;border-left:4px solid var(--amb)"><h2>Simulação: {{ sim.titulo }}</h2><div style="margin-top:8px;line-height:1.6">{{ sim.texto }}</div><div style="margin-top:10px;display:flex;gap:8px"><button class="btn acc" onClick="{{ sim.aplicar }}">Aplicar: {{ sim.acao }}</button><button class="btn" onClick="{{ closeSim }}">Fechar</button></div></div>
+      </sc-if>
+      <div class="card" style="padding:14px"><h2>Previsão de carga · próximas 4 semanas (vencimentos por pessoa)</h2>
+        <div style="display:grid;grid-template-columns:140px repeat(4,1fr);gap:6px;margin-top:10px;font-size:13px">
+          <div></div><div class="small">29/09–05/10</div><div class="small">06/10–12/10</div><div class="small">13/10–19/10</div><div class="small">20/10–26/10</div>
+          <sc-for list="{{ carga }}" as="c" hint-placeholder-count="3"><div><b>{{ c.nome }}</b></div><sc-for list="{{ c.sem }}" as="s" hint-placeholder-count="4"><div class="cell {{ s.cls }}">{{ s.n }}</div></sc-for></sc-for>
+        </div></div>
+    </sc-if>
+
+    <!-- ===== PROCESSOS ===== -->
+    <sc-if value="{{ tabProc }}" hint-placeholder-val="{{ false }}">
+      <div class="card scroll">
+        <div class="hd gP"><span>Família</span><span>Fase</span><span>Progresso real</span><span>Dias na fase</span><span>Bola com</span><span>Risco</span><span>Próximo marco</span><span></span></div>
+        <sc-for list="{{ procs }}" as="p" hint-placeholder-count="5">
+          <div class="row gP">
+            <div><b>{{ p.fam }}</b><div class="small">{{ p.pais }} · {{ p.codigo }} · <span class="ex">{{ p.ex }}</span></div></div>
+            <div>{{ p.fase }}</div>
+            <div><div class="bar"><i class="grn" style="width:{{ p.pct }}%"></i></div><div class="small">{{ p.rec }} de {{ p.req }} certidões recebidas</div></div>
+            <div>{{ p.diasFase }} d</div>
+            <div><span class="pill {{ p.bolaCls }}">{{ p.bola }}</span></div>
+            <div><span class="pill {{ p.riscoCls }}">{{ p.risco }}</span></div>
+            <div class="small">{{ p.marco }}</div>
+            <div style="display:flex;gap:4px"><button class="btn sm pri" onClick="{{ p.foco }}">Foco</button><button class="btn sm" onClick="{{ p.rel }}">Relatório</button></div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ===== TERCEIROS ===== -->
+    <sc-if value="{{ tabTer }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="small">Tempo aprendido = mediana e pior caso do histórico real de cada cartório. Sem histórico suficiente, usa a régua do Gerenciamento (10 dias).</div><div style="flex-grow:1"></div><button class="btn acc" onClick="{{ cobrarTodos }}">Cobrar todos os vencidos ({{ nCobVenc }})</button></div>
+      <div class="card scroll">
+        <div class="hd gC"><span>Cartório / órgão</span><span>Em aberto</span><span>Sem resposta</span><span>Tempo aprendido</span><span>Não localizada</span><span>Próx. cobrança</span><span></span></div>
+        <sc-for list="{{ cartorios }}" as="c" hint-placeholder-count="6">
+          <div class="row gC">
+            <div><b>{{ c.nome }}</b><div class="small">{{ c.uf }} · canal: {{ c.canal }}</div></div>
+            <div>{{ c.aberto }}</div>
+            <div><span class="{{ c.semCls }}">{{ c.sem }}</span></div>
+            <div class="small">{{ c.tempo }}</div>
+            <div class="small">{{ c.naoLoc }}</div>
+            <div><span class="pill {{ c.proxCls }}">{{ c.prox }}</span></div>
+            <div style="display:flex;gap:4px"><button class="btn sm acc" onClick="{{ c.cobrar }}">Cobrar</button><button class="btn sm" onClick="{{ c.hist }}">Contatos</button></div>
+          </div>
+        </sc-for>
+      </div>
+      <div class="card" style="padding:14px"><h2>Tempo médio real por fase (Cibils · 1 processo)</h2>
+        <div class="small" style="margin-top:6px">Genealogia: 2 dias (24/09 → 26/09) · Emissão Documental: 2 dias e contando · demais fases: sem dado. Backlog: abre 9,9 tarefas/semana, fecha 2,1 — cresce.</div></div>
+    </sc-if>
+
+    <!-- ===== REGRAS ===== -->
+    <sc-if value="{{ tabReg }}" hint-placeholder-val="{{ false }}">
+      <div class="small">Tudo aqui é gravado no Gerenciamento. A Torre abre a porta e permite <b>simular</b> antes de ativar.</div>
+      <sc-for list="{{ regras }}" as="r" hint-placeholder-count="5">
+        <div class="card" style="padding:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px"><b>{{ r.nome }}</b><div class="small">{{ r.desc }}</div></div>
+          <span class="pill {{ r.stCls }}">{{ r.st }}</span>
+          <button class="btn sm" onClick="{{ r.simular }}">Simular</button><button class="btn sm pri" onClick="{{ r.toggle }}">{{ r.btn }}</button>
+        </div>
+      </sc-for>
+      <sc-if value="{{ hasSim }}" hint-placeholder-val="{{ false }}">
+        <div class="card" style="padding:14px;border-left:4px solid var(--amb)"><h2>Simulação: {{ sim.titulo }}</h2><div style="margin-top:8px;line-height:1.6">{{ sim.texto }}</div><div style="margin-top:10px;display:flex;gap:8px"><button class="btn acc" onClick="{{ sim.aplicar }}">{{ sim.acao }}</button><button class="btn" onClick="{{ closeSim }}">Fechar</button></div></div>
+      </sc-if>
+    </sc-if>
+
+    <!-- ===== INTEGRIDADE ===== -->
+    <sc-if value="{{ tabInt }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="small">O sistema se vigia. Meta: divergências = 0. Cada linha vem com a correção do lado.</div><div style="flex-grow:1"></div><button class="btn" onClick="{{ rodarDiag }}">Rodar diagnóstico agora</button></div>
+      <div class="card scroll">
+        <div class="hd gA"><span>Gravidade</span><span>Achado</span><span>Efeito</span><span>Ação</span></div>
+        <sc-for list="{{ integ }}" as="i" hint-placeholder-count="5">
+          <div class="row gA"><span class="pill {{ i.cls }}">{{ i.sev }}</span><div><b>{{ i.titulo }}</b><div class="small">{{ i.det }}</div></div><div class="small">{{ i.efeito }}</div><div style="display:flex;gap:6px"><button class="btn sm acc" onClick="{{ i.fix }}">{{ i.btn }}</button><button class="btn sm" onClick="{{ i.ign }}">Ignorar 7 d</button></div></div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <!-- ===== AUDITORIA ===== -->
+    <sc-if value="{{ tabAud }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><div class="small">Tudo que mudou o estado de um processo ou tarefa, com autor e justificativa.</div><div style="flex-grow:1"></div><button class="btn" onClick="{{ exportar }}">Exportar CSV</button></div>
+      <div class="card scroll">
+        <div class="hd gL"><span>Quando</span><span>Autor</span><span>Ação</span><span>Justificativa</span></div>
+        <sc-for list="{{ audit }}" as="a" hint-placeholder-count="8">
+          <div class="row gL"><span class="mono">{{ a.quando }}</span><span>{{ a.autor }}</span><div><b>{{ a.acao }}</b><div class="small">{{ a.alvo }}</div></div><span class="small">{{ a.just }}</span></div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </section>
+</main>
+
+<!-- ===== BRIEFING ===== -->
+<sc-if value="{{ briefOpen }}" hint-placeholder-val="{{ true }}">
+  <div class="overlay" onClick="{{ closeBrief }}"><div class="modal" onClick="{{ stop }}">
+    <div class="top"><h2>Briefing · segunda, 28/09</h2><button class="btn sm" onClick="{{ closeBrief }}">Fechar</button></div>
+    <div class="cnt"><div class="brief">{{ briefTxt }}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn acc" onClick="{{ openRevisao }}">▶ Revisar o dia ({{ nAtt }} decisões)</button><button class="btn" onClick="{{ closeBrief }}">Ver a Torre</button></div></div>
+  </div></div>
+</sc-if>
+
+<!-- ===== REVISÃO GUIADA ===== -->
+<sc-if value="{{ revOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="overlay"><div class="modal" onClick="{{ stop }}">
+    <div class="top"><h2>Revisar o dia · {{ revPos }} de {{ nAtt }}</h2><button class="btn sm" onClick="{{ closeRev }}">Sair</button></div>
+    <sc-if value="{{ revDone }}" hint-placeholder-val="{{ false }}"><div class="cnt"><b style="color:var(--grn);font-size:16px">Revisão concluída.</b><div>{{ revResumo }}</div><button class="btn pri" onClick="{{ closeRev }}" style="align-self:flex-start">Fechar</button></div></sc-if>
+    <sc-if value="{{ revItem }}" hint-placeholder-val="{{ true }}"><div class="cnt">
+      <span class="pill {{ rev.cls }}" style="align-self:flex-start">{{ rev.tipo }}</span>
+      <b style="font-size:16px">{{ rev.titulo }}</b><div>{{ rev.det }}</div>
+      <div class="card" style="padding:10px 12px;background:var(--surface-2)"><b>Sugestão:</b> {{ rev.sug }}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn acc" onClick="{{ rev.go1 }}">{{ rev.b1 }}</button><button class="btn" onClick="{{ rev.go2 }}">{{ rev.b2 }}</button><button class="btn" onClick="{{ revSkip }}">Pular</button></div>
+    </div></sc-if>
+  </div></div>
+</sc-if>
+
+<!-- ===== FOCO NA FAMÍLIA ===== -->
+<sc-if value="{{ focoOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="overlay" onClick="{{ closeFoco }}"><div class="modal" style="width:min(1000px,100%)" onClick="{{ stop }}">
+    <div class="top"><div><h2>{{ foco.fam }} · {{ foco.pais }} · {{ foco.codigo }}</h2><div class="small">{{ foco.fase }} · {{ foco.rec }} de {{ foco.req }} certidões recebidas · <span class="ex">{{ foco.ex }}</span></div></div><div style="display:flex;gap:6px"><button class="btn sm" onClick="{{ foco.rel }}">Relatório de controle</button><button class="btn sm" onClick="{{ closeFoco }}">Fechar</button></div></div>
+    <div class="cnt">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div class="kpi"><b>{{ foco.n }}</b><span>tarefas abertas</span></div><div class="kpi"><b style="color:var(--red)">{{ foco.venc }}</b><span>vencidas</span></div><div class="kpi"><b>{{ foco.cart }}</b><span>com o cartório</span></div><div class="kpi"><b>{{ foco.semDono }}</b><span>sem responsável</span></div></div>
+      <div class="card scroll"><div class="hd" style="grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;min-width:760px"><span>Certidão</span><span>Cartório</span><span>Bola com</span><span>Prazo</span><span>Responsável</span></div>
+        <sc-for list="{{ foco.items }}" as="t" hint-placeholder-count="6"><div class="row" style="grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;min-width:760px"><div><b>{{ t.doc }}</b><div class="small">{{ t.pessoa }}</div></div><span class="small">{{ t.org }}</span><span class="pill {{ t.bolaCls }}">{{ t.bola }}</span><span class="{{ t.prazoCls }}">{{ t.prazo }}</span><span class="{{ t.respCls }}">{{ t.resp }}</span></div></sc-for>
+      </div>
+      <div><b>Linha do tempo</b><div class="small" style="margin-top:6px;line-height:1.7">{{ foco.timeline }}</div></div>
+      <div><b>Comentários</b> <span class="ex">campo novo</span><div style="display:flex;gap:8px;margin-top:6px"><input id="cmt" aria-label="Comentário" placeholder="Escreva e use @Daniela para mencionar…" style="flex:1"><button class="btn pri" onClick="{{ note }}">Comentar</button></div></div>
+    </div>
+  </div></div>
+</sc-if>
+
+<!-- ===== DETALHE DA TAREFA (painel real espelhado) ===== -->
+<sc-if value="{{ drawerOpen }}" hint-placeholder-val="{{ false }}">
+  <div class="overlay" onClick="{{ closeDrawer }}"><div class="modal" onClick="{{ stop }}">
+    <div class="top"><div><h2>{{ dr.doc }}</h2><div class="small">{{ dr.pessoa }} · {{ dr.fam }} · <span class="mono">#{{ dr.id }}</span> · painel espelhado do processo (Workflow / Dados registrais / Andamento / Anexos)</div></div><button class="btn sm" onClick="{{ closeDrawer }}">Fechar</button></div>
+    <div class="cnt">
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"><div class="kpi"><b style="font-size:16px">{{ dr.bola }}</b><span>bola com</span></div><div class="kpi"><b style="font-size:16px">{{ dr.prazo }}</b><span>prazo da tarefa</span></div><div class="kpi"><b style="font-size:16px">{{ dr.acomp }}</b><span>próx. acompanhamento</span></div><div class="kpi"><b style="font-size:16px">{{ dr.resp }}</b><span>responsável</span></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><sc-for list="{{ dr.passos }}" as="s" hint-placeholder-count="4"><div class="step {{ s.cls }}"><span class="mono">{{ s.n }}</span><div><b>{{ s.nome }}</b><div class="small">{{ s.sub }}</div></div></div></sc-for></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn acc" onClick="{{ dr.acao1 }}">{{ dr.acao1Label }}</button><button class="btn" onClick="{{ dr.atribuir }}">Atribuir a Gabriel</button><button class="btn" onClick="{{ dr.repact }}">Repactuar prazo</button><button class="btn" onClick="{{ dr.bloquear }}">Bloquear com motivo</button><button class="btn" onClick="{{ dr.reabrir }}">Reabrir passo</button></div>
+      <div class="small">Repactuação e bloqueio exigem justificativa e ficam no histórico (campos novos, ver inventário).</div>
+    </div>
+  </div></div>
+</sc-if>
+
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}"><div class="toast" role="status">{{ toast }}<sc-if value="{{ hasUndo }}" hint-placeholder-val="{{ false }}"><button class="btn sm" onClick="{{ doUndo }}" style="background:transparent;color:#fff;border-color:#8fa0c8">Desfazer</button></sc-if><button class="btn sm" onClick="{{ closeToast }}" style="background:transparent;color:#fff;border:0">✕</button></div></sc-if>
+</script>
+
+<script>
+(function(){
+  var TEMPLATE = document.getElementById('tpl').innerHTML;
+  var handlers = [];
+  function lookup(scope, path){
+    var parts = path.trim().split('.');
+    if (parts[0]==='true') return true; if (parts[0]==='false') return false;
+    for (var i=scope.length-1;i>=0;i--){ var o = scope[i];
+      if (o && Object.prototype.hasOwnProperty.call(o, parts[0])){ var v = o[parts[0]]; for (var j=1;j<parts.length && v!=null;j++) v = v[parts[j]]; return v; } }
+    return undefined;
+  }
+  function findClose(s, tag, from){ var open='<'+tag, close='</'+tag+'>', depth=0, i=from;
+    while (i < s.length){ var a=s.indexOf(open,i), b=s.indexOf(close,i); if (b<0) return -1;
+      if (a>=0 && a<b){ depth++; i=a+open.length; } else { if (depth===0) return b; depth--; i=b+close.length; } }
+    return -1; }
+  function esc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function render(s, scope){ var out='', i=0;
+    while (i < s.length){ var m=/<(sc-if|sc-for)\b([^>]*)>/.exec(s.slice(i)); if (!m){ out+=fill(s.slice(i),scope); break; }
+      var start=i+m.index, tag=m[1], attrs=m[2]; out+=fill(s.slice(i,start),scope);
+      var innerStart=start+m[0].length, end=findClose(s,tag,innerStart), inner=s.slice(innerStart,end);
+      if (tag==='sc-if'){ var vm=/value="\{\{\s*([^}]+?)\s*\}\}"/.exec(attrs); if (vm && lookup(scope,vm[1])) out+=render(inner,scope); }
+      else { var lm=/list="\{\{\s*([^}]+?)\s*\}\}"/.exec(attrs), am=/as="([^"]+)"/.exec(attrs); var list=(lm && lookup(scope,lm[1]))||[];
+        for (var k=0;k<list.length;k++){ var sc={}; sc[am[1]]=list[k]; sc.$index=k; out+=render(inner,scope.concat([sc])); } }
+      i=end+('</'+tag+'>').length; }
+    return out; }
+  function fill(s, scope){
+    s = s.replace(/\s(onClick|onChange)="\{\{\s*([^}]+?)\s*\}\}"/g, function(_,ev,path){ var fn=lookup(scope,path); var id=handlers.push(fn)-1; return ' data-'+(ev==='onClick'?'click':'change')+'="'+id+'"'; });
+    s = s.replace(/\svalue="\{\{\s*([^}]+?)\s*\}\}"/g, function(_,path){ return ' data-value="'+esc(lookup(scope,path))+'"'; });
+    s = s.replace(/\shint-placeholder-(?:val|count)="[^"]*"/g, '');
+    return s.replace(/\{\{\s*([^}]+?)\s*\}\}/g, function(_,path){ return esc(lookup(scope,path)); }); }
+  var root=document.getElementById('app'), instance=null;
+  function DCLogic(props){ this.props=props||{}; }
+  DCLogic.prototype.setState=function(o){ Object.assign(this.state,o); mount(); };
+  window.DCLogic=DCLogic;
+  function mount(){ handlers=[]; var vals=instance.renderVals();
+    var sy=window.scrollY; root.innerHTML=render(TEMPLATE,[vals]);
+    root.querySelectorAll('[data-click]').forEach(function(el){ el.addEventListener('click', function(e){ var fn=handlers[+el.getAttribute('data-click')]; if (typeof fn==='function') fn(e); }); });
+    root.querySelectorAll('[data-change]').forEach(function(el){ el.addEventListener('change', function(e){ var fn=handlers[+el.getAttribute('data-change')]; if (typeof fn==='function') fn(e); }); });
+    root.querySelectorAll('[data-value]').forEach(function(el){ el.value=el.getAttribute('data-value'); });
+    window.scrollTo(0,sy); }
+  window.__boot=function(C){ instance=new C(); mount(); };
+})();
+</script>
+
+<script>
+var HOJE = new Date(2026,8,28);
+function d(s){ var p=s.split('/'); return new Date(2026, +p[1]-1, +p[0]); }
+function dias(a,b){ return Math.round((b-a)/86400000); }
+
+class Component extends DCLogic {
+  constructor(){ super();
+    this.state = { tab:'att', kpi:null, sel:{}, group:'fam', vista:'todas', busca:'', nac:'todas', toast:null, undo:null, sim:null, brief:true, rev:false, revIdx:0, revLog:[], foco:null, drawer:null, aus:{}, regrasOn:{r2:true,r4:true}, ignorados:{}, resolvidos:{},
+      tasks: this.seedTasks(), procs: this.seedProcs(), audit: this.seedAudit() };
+  }
+  // ---- dados reais do Cibils (levantados ao vivo em 28/09) + exemplos marcados ----
+  seedTasks(){
+    var T=(id,fam,pais,doc,pessoa,fase,etapa,st,resp,prazo,org,env,acomp,extra)=>Object.assign({id,fam,pais,doc,pessoa,fase,etapa,st,resp,prazo,org,env,acomp,ex:false,prio:'Média',cob:0,bloq:null},extra||{});
+    return [
+      T(3827,'Cibils','Espanha','Certidão de casamento · inteiro teor','Atahualpa Irineo Cibils Revello','Genealogia','Localizar registro','EM_ANDAMENTO',null,'25/09',null,null,null,{presa:true,naoLoc:true}),
+      T(3834,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Atahualpa Irineo Cibils Revello','Emissão Documental','Solicitar certidão · 1/4 enviar','EM_ANDAMENTO','Daniela Brait',null,'Bundesverwaltungsamt',null,null,{naoLoc:true}),
+      T(3845,'Cibils','Espanha','Certidão de óbito · inteiro teor','José Civils Martí','Emissão Documental','Solicitar certidão · 1/4 enviar','EM_ANDAMENTO',null,null,null,null,null,{naoLoc:true}),
+      T(3850,'Cibils','Espanha','Certidão de casamento · inteiro teor','Ruben Cibils','Emissão Documental','Solicitar certidão · 1/4 enviar','EM_ANDAMENTO','Daniela Brait',null,'Porto Alegre · 4ª Zona',null,null),
+      T(3853,'Cibils','Espanha','Certidão de casamento · inteiro teor','Itiberê Barreto Cibils','Emissão Documental','Solicitar certidão · 3/4 receber','AGUARDANDO_TERCEIRO','Daniela Brait','06/10','Porto Alegre · 6ª Zona','26/09','03/10'),
+      T(3859,'Cibils','Espanha','Certidão de casamento · inteiro teor','José Civils Martí','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Registro religioso',null,null),
+      T(3860,'Cibils','Espanha','Certidão de casamento · inteiro teor','Ignacio Cibils','Emissão Documental','Solicitar certidão · 2/4 confirmado','NAO_INICIADA','Daniela Brait',null,'Durazno (UY)','28/09',null,{diverge:true}),
+      T(3861,'Cibils','Espanha','Certidão de óbito · inteiro teor','Atahualpa Irineo Cibils Revello','Emissão Documental','Solicitar certidão · 3/4 receber','AGUARDANDO_TERCEIRO','Daniela Brait','06/10','Porto Alegre · 4ª Zona','26/09','03/10'),
+      T(3863,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Ignacio Cibils','Emissão Documental','Solicitar certidão · 3/4 receber','AGUARDANDO_TERCEIRO','Daniela Brait','06/10','Registro religioso','26/09','03/10'),
+      T(3865,'Cibils','Espanha','Certidão de óbito · inteiro teor','Ruben Cibils','Emissão Documental','Solicitar certidão · 3/4 receber','AGUARDANDO_TERCEIRO','Daniela Brait','06/10','Porto Alegre · 1ª Zona','26/09','03/10'),
+      T(3867,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Patrícia Maldaner Cibils','Emissão Documental','Solicitar certidão · 3/4 receber','AGUARDANDO_TERCEIRO','Daniela Brait','06/10','Porto Alegre · 2ª Zona','26/09','03/10'),
+      T(3866,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Ruben Cibils','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Tapes',null,null),
+      T(3868,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Itiberê Barreto Cibils','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Porto Alegre · 4ª Zona',null,null),
+      T(3869,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Zenir Cunha Barreto','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Bagé',null,null),
+      T(3870,'Cibils','Espanha','Certidão de nascimento · inteiro teor','Isonia Terezinha Maldaner','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Santa Clara do Sul',null,null),
+      T(3871,'Cibils','Espanha','Certidão de nascimento · inteiro teor','José Civils Martí','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Registro religioso',null,null),
+      T(3873,'Cibils','Espanha','Certidão de óbito · inteiro teor','Ignacio Cibils','Emissão Documental','Solicitar certidão · 1/4 enviar','NAO_INICIADA','Daniela Brait',null,'Sarandí del Yi (UY)',null,null),
+      T(3872,'Cibils','Espanha','Atribuir tarefas — Cibils (administrativa)','—','Emissão Documental','Administrativa','NAO_INICIADA','Marco Rovatti',null,null,null,null),
+      // exemplos (marcados)
+      T(9101,'Álvarez Pérez','Espanha','Certidão de nascimento · inteiro teor','José Benito Álvarez Pérez','Análise Documental','Registrar análise','EM_ANDAMENTO','Daniela Brait','30/09',null,null,null,{ex:true}),
+      T(9102,'Álvarez Pérez','Espanha','Certidão de casamento · inteiro teor','Manuel Álvarez','Emissão Documental','Solicitar certidão · 3/4 receber','AGUARDANDO_TERCEIRO','Daniela Brait','22/09','A Guarda (ES)','12/09','19/09',{ex:true,cob:2}),
+      T(9201,'Fogli','Itália','Certidão de nascimento · inteiro teor','Rodolfo Giovanni Fogli','Apostilamento','Apostilar documento','NAO_INICIADA',null,null,'Cartório 1º Ofício Campinas',null,null,{ex:true}),
+      T(9202,'Fogli','Itália','Certidão de casamento · inteiro teor','Maria Serpa','Apostilamento','Apostilar documento','NAO_INICIADA',null,null,'Cartório 1º Ofício Campinas',null,null,{ex:true}),
+      T(9301,'Panza','Itália','Certidão de nascimento · inteiro teor','Francesco Panza','Genealogia','Localizar registro','EM_ANDAMENTO','Daniela Brait','02/10','Comune di Cirò (IT)',null,null,{ex:true}),
+      T(9401,'Alonso Puigdomenech','Espanha','Acompanhar decisão do pedido','—','Protocolado','Acompanhar decisão','AGUARDANDO_TERCEIRO','Marco Rovatti',null,'Consulado da Espanha · SP','16/07','13/10',{ex:true,juiz:false}),
+      T(9501,'Medina Olivares','Espanha','Retificação judicial · averbação','Antonio Medina Olivares','Retificação de Registros','Acompanhar decisão judicial','AGUARDANDO_TERCEIRO','Marco Rovatti',null,'2ª Vara de Registros Públicos · SP','15/07',null,{ex:true,juiz:true,bloq:'Aguardando pagamento de custas pelo cliente'}),
+    ];
+  }
+  seedProcs(){ return [
+    {fam:'Cibils',pais:'Espanha',codigo:'ES-1',fase:'Emissão Documental',idx:1,req:17,rec:0,desde:'26/09',ex:false,marco:'17 pedidos ao cartório; 6 enviados, 11 a enviar'},
+    {fam:'Álvarez Pérez',pais:'Espanha',codigo:'ES-2',fase:'Análise Documental',idx:2,req:12,rec:11,desde:'20/09',ex:true,marco:'1 certidão com A Guarda há 16 dias · 2 cobranças sem resposta'},
+    {fam:'Fogli',pais:'Itália',codigo:'IT-1',fase:'Apostilamento',idx:5,req:9,rec:9,desde:'21/09',ex:true,marco:'Fase sem como concluir (CAD-012) · 2 sem responsável'},
+    {fam:'Panza',pais:'Itália',codigo:'IT-2',fase:'Genealogia',idx:0,req:14,rec:0,desde:'25/09',ex:true,marco:'Localizar registro em Cirò · prazo 02/10'},
+    {fam:'Alonso Puigdomenech',pais:'Espanha',codigo:'ES-3',fase:'Protocolado',idx:7,req:10,rec:10,desde:'16/07',ex:true,marco:'Consulado há 74 dias · próximo acompanhamento 13/10'},
+    {fam:'Medina Olivares',pais:'Espanha',codigo:'ES-4',fase:'Retificação de Registros',idx:3,req:8,rec:7,desde:'15/07',ex:true,marco:'Com o juiz há 75 dias · bloqueada: custas do cliente'},
+  ]; }
+  seedAudit(){ return [
+    {quando:'28/09 20:51',autor:'Claude (auditoria)',acao:'Moveu fase',alvo:'Cibils · emissao_documental → apostilamento (teste)',just:'PROCESSO_JA_EM_ANDAMENTO · teste de auditoria'},
+    {quando:'28/09 21:12',autor:'Motor (rollback)',acao:'Retrocedeu fase',alvo:'Cibils · apostilamento → emissao_documental',just:'Restauração: instâncias 498–501 supersedidas'},
+    {quando:'28/09 18:10',autor:'Marco Rovatti',acao:'Registrou solicitação',alvo:'#3860 · Casamento Ignacio · Durazno · canal e-mail · protocolo informado',just:'—'},
+    {quando:'26/09 13:31',autor:'Marco Rovatti',acao:'Atribuiu em lote (7)',alvo:'Cibils · certidões → Daniela Brait',just:'"redistribuição em lote"'},
+    {quando:'26/09 13:28',autor:'Marco Rovatti',acao:'Moveu fase (kanban)',alvo:'Cibils · emissao_documental → genealogia → emissao_documental',just:'PROCESSO_JA_EM_ANDAMENTO / CORRECAO_DE_FASE'},
+    {quando:'24/09 17:02',autor:'Marco Rovatti',acao:'Avanço forçado',alvo:'Cibils · genealogia → emissao_documental',just:'OPERACAO_ADMINISTRATIVA (após 40+ bloqueios)'},
+    {quando:'24/09 16:37',autor:'Motor',acao:'Criou 18 necessidades',alvo:'Cibils · Genealogia · instância #485',just:'materialização da árvore'},
+  ]; }
+
+  // ---- derivações ----
+  bola(t){ if (t.bloq) return {txt:'Bloqueada',cls:'p-red',dias:t.bloq}; if (t.juiz) return {txt:'Juiz',cls:'p-gry',dias:'há '+dias(d(t.env),HOJE)+' dias'}; if (t.st==='AGUARDANDO_TERCEIRO') return {txt:/Consulado/.test(t.org||'')?'Consulado':'Cartório',cls:'p-blu',dias:'há '+dias(d(t.env),HOJE)+' dias · '+(t.org||'')}; if (t.st==='CONCLUIDO') return {txt:'Concluída',cls:'p-grn',dias:''}; return {txt:'Nossa',cls:'p-amb',dias:t.resp?'com '+t.resp.split(' ')[0]:'sem responsável'}; }
+  risco(t){ var s=0, why=[]; if (!t.resp && t.st!=='CONCLUIDO'){s+=3;why.push('sem dono');} if (t.prazo && d(t.prazo)<HOJE){s+=4;why.push('vencida');} if (t.acomp && d(t.acomp)<HOJE){s+=2;why.push('acomp. vencido');} if (t.cob>=2){s+=2;why.push('2 cobranças');} if (t.presa){s+=3;why.push('fase deixada');} if (t.diverge){s+=3;why.push('divergência');} if (t.bloq){s+=2;why.push('bloqueada');} if (t.fase==='Apostilamento'||t.fase==='Retificação de Registros'){s+=1;} return {s,why}; }
+  riscoPill(s){ return s>=6?{t:'crítico',c:'p-red'}:s>=3?{t:'atenção',c:'p-amb'}:{t:'ok',c:'p-grn'}; }
+  visiveis(){ var st=this.state; return st.tasks.filter(t=>t.st!=='CONCLUIDO').filter(t=> st.nac==='todas'||t.pais===st.nac).filter(t=>{ var q=st.busca.trim().toLowerCase(); if(!q) return true; return [t.fam,t.pessoa,t.doc,t.org||'',String(t.id),t.resp||''].join(' ').toLowerCase().includes(q); }); }
+  toast(msg, undo){ var self=this; this.setState({toast:msg, undo:undo||null}); clearTimeout(this._tt); this._tt=setTimeout(function(){ self.setState({toast:null}); }, 6000); }
+  atribuir(ids, quem, label){ var self=this, prev={}; ids.forEach(id=>{ var t=self.state.tasks.find(x=>x.id===id); if(t){prev[id]=t.resp; t.resp=quem;} }); this.state.audit.unshift({quando:'28/09 agora',autor:'Marco Rovatti',acao:'Atribuiu ('+ids.length+')',alvo:ids.map(i=>'#'+i).join(', ')+' → '+quem,just:label||'via Torre'}); this.setState({sel:{}}); this.toast(ids.length+' tarefa(s) atribuída(s) a '+quem+'.', {label:'atribuição', fn:()=>{ Object.keys(prev).forEach(id=>{ var t=self.state.tasks.find(x=>x.id==id); if(t) t.resp=prev[id]; }); self.state.audit.shift(); self.setState({}); }}); }
+
+  renderVals(){
+    var st=this.state, self=this, vis=this.visiveis();
+    var kpiF = st.kpi;
+    // ---- KPIs ----
+    var venc=vis.filter(t=>t.prazo&&d(t.prazo)<HOJE), v7=vis.filter(t=>t.prazo&&d(t.prazo)>=HOJE&&dias(HOJE,d(t.prazo))<=7), semDono=vis.filter(t=>!t.resp), aguard=vis.filter(t=>t.st==='AGUARDANDO_TERCEIRO'&&!t.juiz), cobV=vis.filter(t=>t.acomp&&d(t.acomp)<HOJE), esc=vis.filter(t=>t.cob>=2), procsV=st.procs.filter(p=>st.nac==='todas'||p.pais===st.nac);
+    var procRisco=procsV.filter(p=>{ var ts=vis.filter(t=>t.fam===p.fam); return ts.some(t=>self.risco(t).s>=6); });
+    var K=(key,n,label,color,trend,cls)=>({key,n,label,color,trend,trendCls:cls,on:st.kpi===key?'on':'',go:()=>self.setState({kpi:st.kpi===key?null:key,tab:'tar'})});
+    var kpis=[K('venc',venc.length,'Atrasadas','var(--red)','▲ +1 vs semana passada','up'),K('v7',v7.length,'Vencem em 7 dias','var(--amb)','= 6','' ),K('semdono',semDono.length,'Sem responsável','var(--red)','▼ −5 (atribuição 26/09)','down'),K('aguard',aguard.length,'Com o cartório','var(--blu)','▲ +5','up'),K('cob',cobV.length,'Cobranças vencidas','var(--amb)','▲ +1','up'),K('esc',esc.length,'Escaladas pra mim','var(--red)','= 1',''),K('risco',procRisco.length,'Processos em risco','var(--red)','▲ +2','up'),K('back','9,9 / 2,1','Backlog: abre / fecha por sem.','var(--amb)','cresce','up')];
+    // ---- atenção ----
+    var att=[];
+    vis.forEach(t=>{ var r=self.risco(t); if (st.resolvidos[t.id]) return;
+      if (t.presa) att.push({s:r.s+5,tipo:'Fase deixada',cls:'p-red',titulo:'#'+t.id+' · '+t.doc+' · '+t.pessoa,det:'Tarefa continua aberta em '+t.fase+' e o processo já está em Emissão Documental. Vencida em '+t.prazo+', sem responsável.',sug:'Registro ainda não localizado. Atribuir a Daniela para concluir a pesquisa (aptidão: Espanha).',b1:'Atribuir a Daniela',b2:'Encerrar (não devida)',go1:()=>self.atribuir([t.id],'Daniela Brait','fase deixada'),go2:()=>{t.st='CONCLUIDO';self.setState({});self.toast('#'+t.id+' encerrada como não devida (registrado na auditoria).');}});
+      else if (t.diverge) att.push({s:r.s+4,tipo:'Divergência',cls:'p-red',titulo:'#'+t.id+' · '+t.doc+' · '+t.pessoa,det:'Solicitação registrada em '+t.env+' com protocolo (cartório de '+t.org+'), mas a tarefa está "Não iniciada" sem prazo. Relatório e Central mostram "Solicitado".',sug:'Reconciliar: tarefa deveria estar Aguardando terceiro com prazo 08/10.',b1:'Reconciliar',b2:'Ver 3 fontes',go1:()=>{t.st='AGUARDANDO_TERCEIRO';t.prazo='08/10';t.acomp='05/10';t.diverge=false;t.etapa='Solicitar certidão · 3/4 receber';self.setState({});self.toast('#'+t.id+' reconciliada: Aguardando terceiro, prazo 08/10.');},go2:()=>self.setState({drawer:t.id})});
+      else if (!t.resp && t.st!=='CONCLUIDO') att.push({s:r.s,tipo:'Sem dono',cls:'p-amb',titulo:'#'+t.id+' · '+t.doc+' · '+t.pessoa,det:t.fam+' · '+t.fase+' · '+t.etapa+(t.ex?' · exemplo':''),sug:(t.pais==='Espanha'?'Sugiro Gabriel Gerbi: 0 ativas, apto a Espanha. Daniela está com 15 ativas (2,5 semanas de fila).':'Sugiro Daniela Brait: única apta a Itália hoje.'),b1:'Atribuir a '+(t.pais==='Espanha'?'Gabriel':'Daniela'),b2:'Escolher outro',go1:()=>self.atribuir([t.id],t.pais==='Espanha'?'Gabriel Gerbi':'Daniela Brait','sugestão aceita'),go2:()=>self.setState({tab:'tar',drawer:t.id})});
+      if (t.cob>=2) att.push({s:r.s+2,tipo:'Escalada',cls:'p-red',titulo:t.org+' · '+t.doc+' · '+t.pessoa,det:'2 cobranças sem resposta (última 24/09). Pedido enviado em '+t.env+'. Com o cartório há '+dias(d(t.env),HOJE)+' dias.',sug:'Ligar hoje. Se sem retorno até sexta, abrir pedido por outro canal (correio registrado).',b1:'Registrar ligação',b2:'Trocar canal',go1:()=>{t.cob=3;self.setState({});self.toast('Contato registrado: ligação para '+t.org+'. Próxima cobrança 30/09.');},go2:()=>self.toast('Canal alterado para correio registrado (gravado na solicitação).')});
+      if (t.bloq) att.push({s:r.s+1,tipo:'Bloqueada',cls:'p-amb',titulo:t.doc+' · '+t.pessoa,det:'Motivo: '+t.bloq+'. Quem desbloqueia: financeiro/cliente.',sug:'Cobrar o cliente pelo canal cadastrado. O prazo continua contando.',b1:'Cobrar cliente',b2:'Desbloquear',go1:()=>self.toast('Cobrança ao cliente registrada (comunicação enviada em 28/09).'),go2:()=>{t.bloq=null;self.setState({});self.toast('Desbloqueada.');}});
+    });
+    // carga
+    var dan=vis.filter(t=>t.resp==='Daniela Brait').length; if (dan>=15) att.push({s:5,tipo:'Carga',cls:'p-amb',titulo:'Daniela Brait no limite: '+dan+' ativas, fecha ~6 por semana',det:'Fila estimada de 2,5 semanas. Gabriel Gerbi com 0 ativas e apto a Espanha.',sug:'Mover as 5 certidões "a enviar" de Espanha para Gabriel.',b1:'Redistribuir 5',b2:'Ver equipe',go1:()=>{var ids=vis.filter(t=>t.resp==='Daniela Brait'&&t.st==='NAO_INICIADA'&&t.pais==='Espanha'&&!t.ex).slice(0,5).map(t=>t.id);self.atribuir(ids,'Gabriel Gerbi','redistribuição por carga');},go2:()=>self.setState({tab:'eq'})});
+    // fase sem passos
+    if (st.nac==='todas'||st.nac==='Itália') att.push({s:4,tipo:'Parede à frente',cls:'p-amb',titulo:'Fogli entra em Apostilamento e a fase não tem como ser concluída',det:'Cadastro "Apostilar documento" sem resultado nem executor (CAD-012). Aguardando Protocolo / Protocolado / Finalizado sem passos (WF-004).',sug:'Cadastrar os passos no Gerenciamento antes que o processo chegue lá.',b1:'Abrir Gerenciamento',b2:'Ignorar 7 d',go1:()=>self.toast('Abriria Gerenciamento → Workflow Interno → Apostilamento.'),go2:()=>self.toast('Ignorado por 7 dias.')});
+    if (kpiF==='esc') att=att.filter(a=>a.tipo==='Escalada'); if (kpiF==='semdono') att=att.filter(a=>a.tipo==='Sem dono');
+    att.sort((a,b)=>b.s-a.s);
+    // ---- tarefas filtradas ----
+    var list=vis.slice();
+    if (kpiF==='venc') list=venc; else if (kpiF==='v7') list=v7; else if (kpiF==='semdono') list=semDono; else if (kpiF==='aguard') list=aguard; else if (kpiF==='cob') list=cobV; else if (kpiF==='esc') list=esc; else if (kpiF==='risco') list=list.filter(t=>procRisco.some(p=>p.fam===t.fam));
+    if (st.vista==='vencidas') list=list.filter(t=>t.prazo&&d(t.prazo)<HOJE); if (st.vista==='semdono') list=list.filter(t=>!t.resp); if (st.vista==='aguard') list=list.filter(t=>t.st==='AGUARDANDO_TERCEIRO'); if (st.vista==='minha') list=list.filter(t=>t.pais==='Espanha'&&self.risco(t).s>=3);
+    list.sort((a,b)=>self.risco(b).s-self.risco(a).s);
+    var row=t=>{ var b=self.bola(t), r=self.risco(t), rp=self.riscoPill(r.s); var vencida=t.prazo&&d(t.prazo)<HOJE;
+      return {id:t.id,doc:t.doc+(t.ex?' (exemplo)':''),pessoa:t.pessoa,fam:t.fam,bola:b.txt,bolaCls:b.cls,bolaDias:b.dias,etapa:t.etapa,resp:t.resp||'Sem responsável',respCls:t.resp?'':'pill p-red',prazo:t.prazo||'—',prazoCls:vencida?'pill p-red':'',prazoSub:t.prazo?(vencida?'vencida há '+dias(d(t.prazo),HOJE)+' d':'em '+dias(HOJE,d(t.prazo))+' d'):(t.st==='AGUARDANDO_TERCEIRO'?'':'nasce no envio'),acomp:t.acomp?(d(t.acomp)<HOJE?'vencido '+t.acomp:t.acomp):'—',risco:rp.t+(r.why.length?' · '+r.why.join(', '):''),riscoCls:rp.c,selCls:st.sel[t.id]?'sel':'',chkCls:st.sel[t.id]?'on':'',toggle:()=>{var s=Object.assign({},st.sel); if(s[t.id]) delete s[t.id]; else s[t.id]=true; self.setState({sel:s});},open:()=>self.setState({drawer:t.id}),quickLabel:!t.resp?'Atribuir':t.st==='AGUARDANDO_TERCEIRO'?'Cobrar':'Iniciar',quick:()=>{ if(!t.resp) self.atribuir([t.id],t.pais==='Espanha'?'Gabriel Gerbi':'Daniela Brait','ação rápida'); else if(t.st==='AGUARDANDO_TERCEIRO'){t.cob++;self.setState({});self.toast('Cobrança registrada para '+t.org+'.');} else {t.st='AGUARDANDO_TERCEIRO';t.env='28/09';t.prazo='08/10';t.acomp='29/09';t.etapa='Solicitar certidão · 2/4 confirmar';self.setState({});self.toast('#'+t.id+' iniciada: pedido enviado ao cartório. Prazo 08/10.');} }}; };
+    var keyOf=t=> st.group==='fam'?t.fam:st.group==='resp'?(t.resp||'Sem responsável'):st.group==='org'?(t.org||'Sem cartório'):st.group==='fase'?t.fase:'Todas';
+    var gmap={}; list.forEach(t=>{ var k=keyOf(t); (gmap[k]=gmap[k]||[]).push(t); });
+    var grupos=Object.keys(gmap).map(k=>{ var items=gmap[k]; var all=items.every(t=>st.sel[t.id]); var p=st.procs.find(x=>x.fam===k);
+      return {nome:k,sub:p?(p.pais+' · '+p.fase+(p.ex?' · exemplo':'')):'',n:items.length,chkCls:all?'on':'',toggleAll:()=>{var s=Object.assign({},st.sel); items.forEach(t=>{ if(all) delete s[t.id]; else s[t.id]=true; }); self.setState({sel:s});},items:items.map(row)}; });
+    var selIds=Object.keys(st.sel).map(Number);
+    // ---- equipe ----
+    var people=[{nome:'Daniela Brait',papel:'Assistente · operacional',apt:'Espanha, Itália (a declarar)',cap:6,limite:15},{nome:'Gabriel Gerbi',papel:'Assistente · operacional',apt:'Espanha (a declarar)',cap:6,limite:12},{nome:'Marco Rovatti',papel:'Administrador',apt:'todas',cap:3,limite:8}];
+    var team=people.map(p=>{ var mine=vis.filter(t=>t.resp===p.nome); var atr=mine.filter(t=>t.prazo&&d(t.prazo)<HOJE).length, ag=mine.filter(t=>t.st==='AGUARDANDO_TERCEIRO').length, ativas=mine.length; var fila=ativas?(ativas/p.cap):0; var pct=Math.min(100,Math.round(ativas/p.limite*100));
+      return {nome:p.nome,papel:p.papel,apt:p.apt,aus:st.aus[p.nome]?'ausente 29/09–08/10 → carteira para '+(p.nome==='Daniela Brait'?'Gabriel':'Daniela'):'disponível',ativas,limite:p.limite,cap:p.cap,pct,barCls:pct>=100?'red':pct>=70?'':'grn',atr,atrColor:atr?'var(--red)':'inherit',aguard:ag,fila:fila?fila.toFixed(1)+' sem':'livre',filaCls:fila>=2?'p-red':fila>=1?'p-amb':'p-grn',ausLabel:st.aus[p.nome]?'Cancelar ausência':'Marcar ausência',ausencia:()=>{var a=Object.assign({},st.aus); a[p.nome]=!a[p.nome]; self.setState({aus:a}); self.toast(a[p.nome]?p.nome+': ausência 29/09–08/10 registrada; carteira será redirecionada automaticamente.':'Ausência cancelada.');},sucessao:()=>{var ids=mine.map(t=>t.id); if(!ids.length){self.toast('Nada a mover.');return;} self.atribuir(ids,p.nome==='Daniela Brait'?'Gabriel Gerbi':'Daniela Brait','sucessão em massa');},simular:()=>self.setState({sim:{titulo:'se '+p.nome+' sair 10 dias',texto:ativas?('Ficam sem dono '+ativas+' tarefas; '+ag+' com o cartório continuam correndo. Vencem no período: '+mine.filter(t=>t.prazo&&dias(HOJE,d(t.prazo))<=10).length+'. Gabriel absorve tudo de Espanha ('+mine.filter(t=>t.pais==='Espanha').length+'); sobra '+mine.filter(t=>t.pais!=='Espanha').length+' de outras nacionalidades sem apto.'):'Sem impacto: nenhuma tarefa ativa.',acao:'redirecionar carteira e marcar ausência',aplicar:()=>{var a=Object.assign({},st.aus); a[p.nome]=true; self.setState({aus:a,sim:null}); self.atribuir(mine.map(t=>t.id),p.nome==='Daniela Brait'?'Gabriel Gerbi':'Daniela Brait','ausência simulada e aplicada');}}})}; });
+    var carga=people.map(p=>{ var mine=vis.filter(t=>t.resp===p.nome); var sem=[0,0,0,0]; mine.forEach(t=>{ if(!t.prazo) return; var k=Math.floor(dias(HOJE,d(t.prazo))/7); if(k>=0&&k<4) sem[k]++; }); return {nome:p.nome.split(' ')[0],sem:sem.map(n=>({n:n||'·',cls:n>=5?'h3':n>=3?'h2':n?'h1':'h0'}))}; });
+    // ---- processos + radar ----
+    var fases=['Genealogia','Emissão Doc.','Análise','Retificação','Emissão Ret.','Apostilamento','Ag. Protocolo','Protocolado','Finalizado'];
+    var procRow=p=>{ var ts=vis.filter(t=>t.fam===p.fam); var maxR=Math.max(0,...ts.map(t=>self.risco(t).s)); var rp=self.riscoPill(maxR); var ag=ts.filter(t=>t.st==='AGUARDANDO_TERCEIRO'); var bola=ts.some(t=>t.juiz)?{t:'Juiz',c:'p-gry'}:ts.some(t=>/Consulado/.test(t.org||'')&&t.st==='AGUARDANDO_TERCEIRO')?{t:'Consulado',c:'p-blu'}:ag.length>=ts.length/2&&ts.length?{t:'Cartório',c:'p-blu'}:{t:'Nossa',c:'p-amb'};
+      return {fam:p.fam,pais:p.pais,codigo:p.codigo,fase:p.fase,pct:p.req?Math.round(p.rec/p.req*100):0,rec:p.rec,req:p.req,diasFase:dias(d(p.desde),HOJE),bola:bola.t,bolaCls:bola.c,risco:rp.t,riscoCls:rp.c,marco:p.marco,ex:p.ex?'exemplo':'',foco:()=>self.setState({foco:p.fam}),rel:()=>self.toast('Relatório de controle de '+p.fam+' gerado (versão interna).'),maxR,bolaTxt:bola.t}; };
+    var procs=procsV.map(procRow).sort((a,b)=>b.maxR-a.maxR);
+    var radar=procs.map(pr=>{ var p=st.procs.find(x=>x.fam===pr.fam); var cls=pr.maxR>=6?'h3':pr.maxR>=3?'h2':'h1';
+      return {fam:pr.fam,pais:pr.pais,ex:pr.ex||'real',go:()=>self.setState({foco:pr.fam}),cells:fases.map((f,i)=>{ if(i<p.idx) return {cls:'h1',txt:'✓',sub:''}; if(i===p.idx) return {cls:cls+' hx',txt:pr.bolaTxt+' · '+pr.diasFase+' d',sub:pr.risco}; if((i===3||i===4)) return {cls:'h0',txt:'cond.',sub:''}; if(i>=6&&i<=8) return {cls:'h0',txt:'sem passos',sub:''}; return {cls:'h0',txt:'—',sub:''}; })}; });
+    // ---- terceiros ----
+    var cmap={}; vis.forEach(t=>{ if(!t.org) return; var c=cmap[t.org]=cmap[t.org]||{nome:t.org,aberto:0,sem:0,aguard:[],naoLoc:0,cob:0}; c.aberto++; if(t.st==='AGUARDANDO_TERCEIRO'){ c.aguard.push(t); c.sem=Math.max(c.sem,dias(d(t.env),HOJE)); } if(t.naoLoc) c.naoLoc++; c.cob+=t.cob; });
+    var tempos={'Porto Alegre · 4ª Zona':'8–25 d (n=3)','A Guarda (ES)':'21–45 d (n=4)','Durazno (UY)':'sem histórico · régua 10 d','Consulado da Espanha · SP':'60–120 d (n=2)'};
+    var cartorios=Object.values(cmap).map(c=>{ var venc=c.aguard.some(t=>t.acomp&&d(t.acomp)<HOJE); var prox=c.aguard.length?(venc?'vencida':c.aguard[0].acomp||'—'):'—'; return {nome:c.nome,uf:/UY|ES|IT/.test(c.nome)?'exterior':/Consulado|Vara/.test(c.nome)?'—':'RS / SP',canal:/religioso/i.test(c.nome)?'balcão':/Consulado/.test(c.nome)?'portal':'e-mail',aberto:c.aberto,sem:c.sem?c.sem+' d':'—',semCls:c.sem>=10?'pill p-red':c.sem>=7?'pill p-amb':'',tempo:tempos[c.nome]||'sem histórico · régua 10 d',naoLoc:c.naoLoc?c.naoLoc+' registro(s) não localizado(s)':'0',prox,proxCls:venc?'p-red':'p-gry',cobrar:()=>{c.aguard.forEach(t=>t.cob++); self.setState({}); self.toast('Cobrança enviada a '+c.nome+' pelo canal cadastrado ('+c.aguard.length+' pedido(s)).');},hist:()=>self.toast(c.nome+': '+c.cob+' contato(s) registrados.'),venc}; }).sort((a,b)=>(b.venc?1:0)-(a.venc?1:0)||b.aberto-a.aberto);
+    // ---- regras ----
+    var R=(k,nome,desc,sim,acao)=>({nome,desc,st:st.regrasOn[k]?'ativa':'inativa',stCls:st.regrasOn[k]?'p-grn':'p-gry',btn:st.regrasOn[k]?'Desativar':'Ativar',toggle:()=>{var r=Object.assign({},st.regrasOn); r[k]=!r[k]; self.setState({regrasOn:r}); self.toast('Regra "'+nome+'" '+(r[k]?'ativada':'desativada')+' (gravada no Gerenciamento).');},simular:()=>self.setState({sim:{titulo:nome,texto:sim,acao:acao,aplicar:()=>{var r=Object.assign({},st.regrasOn); r[k]=true; self.setState({regrasOn:r,sim:null}); self.toast('Regra ativada.');}}})});
+    var regras=[R('r1','Atribuição automática por país e fase','Espanha → Gabriel (Emissão Doc.); Itália → Daniela. Balanceia por carga quando ambos aptos.','Hoje: 5 tarefas de Espanha "a enviar" iriam para Gabriel; 2 de Itália para Daniela. Ninguém ultrapassa o limite.','Ativar regra'),R('r2','Régua de cobrança','Iniciar em 2 d · confirmar 1 d · receber 10 d · conferir 1 d · cobrar a cada 1 d · escalar na 2ª sem resposta.','Aplicada às 6 solicitações abertas: 5 com acompanhamento em 03/10, 1 vencida (A Guarda) já escalada.','Já ativa'),R('r3','Limite de carga por pessoa','Daniela 15 · Gabriel 12 · Marco 8. Ao atingir, novas tarefas vão para a fila de decisão do administrador.','Daniela está em 15/15: a próxima tarefa cairia na caixa "Precisa de você".','Ativar regra'),R('r4','Ausência redireciona carteira','Ao marcar ausência, tarefas abertas vão para a pessoa apta com menor carga; voltam no retorno.','Se Daniela sair: 15 → Gabriel (Espanha: 13; Itália: 2 ficam com Marco).','Já ativa'),R('r5','Tempo por cartório aprendido','Após 3 pedidos concluídos, a previsão usa a mediana do cartório em vez de 10 dias.','Porto Alegre 4ª Zona passaria de 10 para 14 dias; A Guarda para 30 dias.','Ativar regra')];
+    // ---- integridade ----
+    var I=(k,sev,cls,titulo,det,efeito,btn,fix)=>({sev,cls,titulo,det,efeito,btn,fix:()=>{fix(); var r=Object.assign({},st.resolvidos); r[k]=true; self.setState({resolvidos:r});},ign:()=>{var g=Object.assign({},st.ignorados); g[k]=true; self.setState({ignorados:g}); self.toast('Ignorado por 7 dias.');}});
+    var integ=[I('fila','crítico','p-red','Fila de eventos parada','57 eventos pendentes; processador sem rodar há 104 min (cron a cada 15 min não executou).','Efeitos automáticos do motor não são aplicados.','Reprocessar fila',()=>self.toast('Fila reprocessada: 57 eventos despachados.')),I('t3860','crítico','p-red','Status divergente entre telas · #3860','Tarefa: Não iniciada · Central: Solicitado 08/10 · Relatório: Solicitado 08/10.','Operador vê botão de pedir de novo uma certidão já pedida.','Reconciliar',()=>{var t=st.tasks.find(x=>x.id===3860); if(t){t.st='AGUARDANDO_TERCEIRO';t.prazo='08/10';t.acomp='05/10';t.diverge=false;} self.toast('#3860 reconciliada.');}),I('t3827','alerta','p-amb','Tarefa em fase que o processo deixou · #3827','Genealogia, Em andamento, sem responsável, vencida 25/09. Processo em Emissão Documental.','Invisível na Capacidade Operacional (sem dono).','Atribuir a Daniela',()=>self.atribuir([3827],'Daniela Brait','integridade')),I('wf','alerta','p-amb','3 fases sem passos cadastrados','Aguardando Protocolo · Protocolado · Finalizado (WF-004). Apostilamento e Retificação sem como concluir (CAD-012).','Nenhum processo consegue entrar ou concluir essas fases.','Abrir Gerenciamento',()=>self.toast('Abriria Gerenciamento → Workflow Interno.')),I('cad11','info','p-gry','5 workflows com alteração não publicada','Genealogia, Apostilamento, Retificação, Emissão Retificada, Análise.','Rascunho difere da versão publicada.','Revisar prévias',()=>self.toast('Abriria a prévia de cada workflow.'))].filter(i=>!st.ignorados[i.titulo]&&!st.resolvidos[i.titulo]);
+    var integVis=integ.filter(i=>!st.resolvidos[['fila','t3860','t3827','wf','cad11'][integ.indexOf(i)]]);
+    // ---- foco ----
+    var focoP=st.foco?st.procs.find(p=>p.fam===st.foco):null, foco=null;
+    if (focoP){ var ts=vis.filter(t=>t.fam===focoP.fam); foco={fam:focoP.fam,pais:focoP.pais,codigo:focoP.codigo,fase:focoP.fase,rec:focoP.rec,req:focoP.req,ex:focoP.ex?'exemplo':'',n:ts.length,venc:ts.filter(t=>t.prazo&&d(t.prazo)<HOJE).length,cart:ts.filter(t=>t.st==='AGUARDANDO_TERCEIRO').length,semDono:ts.filter(t=>!t.resp).length,items:ts.map(t=>{var b=self.bola(t); return {doc:t.doc,pessoa:t.pessoa,org:t.org||'—',bola:b.txt,bolaCls:b.cls,prazo:t.prazo||'—',prazoCls:t.prazo&&d(t.prazo)<HOJE?'pill p-red':'',resp:t.resp||'Sem responsável',respCls:t.resp?'':'pill p-red'};}),timeline:focoP.fam==='Cibils'?'24/09 16:37 · 18 necessidades criadas pela árvore · 24/09 17:02 · avanço forçado para Emissão Documental (40+ bloqueios) · 26/09 13:28 · retrocesso e correção de fase (kanban) · 26/09 13:31 · 7 certidões atribuídas a Daniela · 26/09 · 5 pedidos enviados aos cartórios · 28/09 18:10 · pedido de Durazno registrado com protocolo':'Linha do tempo de exemplo.',rel:()=>self.toast('Relatório de controle de '+focoP.fam+' gerado.')}; }
+    // ---- drawer ----
+    var dt=st.drawer?st.tasks.find(t=>t.id===st.drawer):null, dr=null;
+    if (dt){ var b=self.bola(dt); var idx=/1\/4/.test(dt.etapa)?0:/2\/4/.test(dt.etapa)?1:/3\/4/.test(dt.etapa)?2:/4\/4/.test(dt.etapa)?3:-1; var nomes=['Enviar requerimento ao cartório','Receber confirmação do pedido','Receber certidão','Conferir e validar'];
+      dr={id:dt.id,doc:dt.doc,pessoa:dt.pessoa,fam:dt.fam,bola:b.txt,prazo:dt.prazo||'nasce no envio',acomp:dt.acomp||'—',resp:dt.resp||'sem',passos:nomes.map((n,i)=>({n:(i+1)+'/4',nome:n,sub:i<idx?'concluído':i===idx?'etapa atual · acompanhamento '+(dt.acomp||'—'):'pendente',cls:i<idx?'done':i===idx?'cur':''})),acao1Label:dt.st==='AGUARDANDO_TERCEIRO'?'Registrar recebimento':dt.st==='NAO_INICIADA'?'Iniciar (enviar ao cartório)':'Continuar',acao1:()=>{ if(dt.st==='AGUARDANDO_TERCEIRO'){dt.st='EM_ANDAMENTO';dt.etapa='Solicitar certidão · 4/4 conferir';dt.prazo=null;} else if(dt.st==='NAO_INICIADA'){dt.st='AGUARDANDO_TERCEIRO';dt.env='28/09';dt.prazo='08/10';dt.acomp='29/09';dt.etapa='Solicitar certidão · 2/4 confirmar';} self.setState({drawer:null}); self.toast('#'+dt.id+' atualizada pelo painel real.'); },atribuir:()=>{self.atribuir([dt.id],'Gabriel Gerbi','painel');self.setState({drawer:null});},repact:()=>{var old=dt.prazo; dt.prazo='13/10'; st.audit.unshift({quando:'28/09 agora',autor:'Marco Rovatti',acao:'Repactuou prazo',alvo:'#'+dt.id+' · '+(old||'—')+' → 13/10',just:'cartório sem resposta; aguardando 2ª via'}); self.setState({drawer:null}); self.toast('Prazo de #'+dt.id+' repactuado para 13/10 (histórico gravado).');},bloquear:()=>{dt.bloq='Aguardando documento do cliente'; self.setState({drawer:null}); self.toast('#'+dt.id+' bloqueada com motivo. O prazo continua contando.');},reabrir:()=>self.toast('Reabrir exige justificativa (campo obrigatório).')}; }
+    // ---- briefing ----
+    var briefTxt='Bom dia, Marco. '+venc.length+' tarefa(s) vencida(s) e '+semDono.length+' sem responsável. '+aguard.length+' certidões estão com cartórios; '+cobV.length+' cobrança(s) vencida(s) e '+esc.length+' escalada(s) para você. Daniela está no limite ('+dan+' ativas, ~2,5 semanas de fila); Gabriel livre e apto a Espanha. Integridade: '+integVis.length+' achado(s), sendo '+integVis.filter(i=>i.sev==='crítico').length+' crítico(s): fila de eventos parada e a #3860 divergente. À frente: Fogli entra em Apostilamento, fase que hoje não tem como ser concluída. '+att.length+' decisão(ões) esperam você.';
+    // ---- revisão ----
+    var rev=att[st.revIdx]||null;
+    var wrap=a=>a&&Object.assign({},a,{go1:()=>{a.go1(); self.setState({revIdx:st.revIdx+1,revLog:st.revLog.concat([a.b1])});},go2:()=>{a.go2(); self.setState({revIdx:st.revIdx+1,revLog:st.revLog.concat([a.b2])});}});
+    var tabs=['att','radar','tar','eq','proc','ter','reg','int','aud'];
+    var vals={
+      nac:st.nac,setNac:e=>self.setState({nac:e.target.value}),busca:st.busca,setBusca:e=>self.setState({busca:e.target.value}),
+      kpis,hasKpi:!!st.kpi,kpiLabel:(kpis.find(k=>k.key===st.kpi)||{}).label||'',clearKpi:()=>self.setState({kpi:null}),
+      nAtt:att.length,nTar:vis.length,nProc:procsV.length,nCobVenc:cobV.length+esc.length,nInt:integVis.length,intCls:integVis.some(i=>i.sev==='crítico')?'red':'warn',
+      att,emptyAtt:!att.length,fases,radar,grupos,hasSel:selIds.length>0,selCount:selIds.length,
+      atribuirSel:()=>self.atribuir(selIds,'Gabriel Gerbi','lote'),prioSel:()=>{selIds.forEach(id=>{var t=st.tasks.find(x=>x.id===id); if(t) t.prio='Alta';}); self.setState({sel:{}}); self.toast(selIds.length+' tarefa(s) com prioridade alta.');},repactSel:()=>{selIds.forEach(id=>{var t=st.tasks.find(x=>x.id===id); if(t&&t.prazo) t.prazo='13/10';}); st.audit.unshift({quando:'28/09 agora',autor:'Marco Rovatti',acao:'Repactuou prazo em lote ('+selIds.length+')',alvo:selIds.map(i=>'#'+i).join(', ')+' → 13/10',just:'justificativa única: cartórios sem resposta'}); self.setState({sel:{}}); self.toast('Prazos repactuados para 13/10 com uma justificativa.');},cobrarSel:()=>{selIds.forEach(id=>{var t=st.tasks.find(x=>x.id===id); if(t&&t.st==='AGUARDANDO_TERCEIRO') t.cob++;}); self.setState({sel:{}}); self.toast('Cobranças enviadas aos cartórios das selecionadas.');},clearSel:()=>self.setState({sel:{}}),
+      group:st.group,setGroup:e=>self.setState({group:e.target.value}),vista:st.vista,setVista:e=>self.setState({vista:e.target.value}),saveVista:()=>self.toast('Visão salva: "'+st.vista+'" (compartilhável com a equipe).'),
+      team,carga,procs,cartorios,cobrarTodos:()=>{vis.filter(t=>t.acomp&&d(t.acomp)<HOJE).forEach(t=>t.cob++); self.setState({}); self.toast('Cobrança enviada a todos os cartórios com acompanhamento vencido.');},
+      regras,integ:integVis,rodarDiag:()=>self.toast('Diagnóstico completo executado: 124 verificações, '+integVis.length+' achado(s).'),audit:st.audit,exportar:()=>self.toast('CSV da auditoria gerado ('+st.audit.length+' linhas).'),
+      hasSim:!!st.sim,sim:st.sim||{},closeSim:()=>self.setState({sim:null}),
+      briefOpen:st.brief,briefTxt,openBrief:()=>self.setState({brief:true}),closeBrief:()=>self.setState({brief:false}),stop:e=>e.stopPropagation(),
+      revOpen:st.rev,openRevisao:()=>self.setState({rev:true,brief:false,revIdx:0,revLog:[]}),closeRev:()=>self.setState({rev:false}),revPos:Math.min(st.revIdx+1,att.length),revDone:st.rev&&!rev,revItem:!!rev,rev:wrap(rev)||{},revSkip:()=>self.setState({revIdx:st.revIdx+1,revLog:st.revLog.concat(['pulou'])}),revResumo:'Decisões tomadas: '+(st.revLog.length?st.revLog.join(' · '):'nenhuma')+'.',
+      focoOpen:!!foco,foco:foco||{},closeFoco:()=>self.setState({foco:null}),note:()=>self.toast('Comentário gravado e Daniela mencionada.'),
+      drawerOpen:!!dr,dr:dr||{},closeDrawer:()=>self.setState({drawer:null}),
+      hasToast:!!st.toast,toast:st.toast||'',closeToast:()=>self.setState({toast:null}),hasUndo:!!st.undo,undoLabel:st.undo?st.undo.label:'',doUndo:()=>{ if(st.undo){ st.undo.fn(); self.setState({undo:null}); self.toast('Desfeito.'); } },
+    };
+    tabs.forEach(t=>{ var cap=t.charAt(0).toUpperCase()+t.slice(1); vals['on'+cap]=st.tab===t?'on':''; vals['tab'+cap]=st.tab===t; vals['go'+cap]=()=>self.setState({tab:t,sim:null}); });
+    return vals;
+  }
+}
+__boot(Component);
+</script>
+
+</body>
+</html>

@@ -684,6 +684,57 @@ function explicar(
   return linhas
 }
 
+// ─── SUCESSOR SUGERIDO NUMA AUSÊNCIA (Torre de Controle, Bloco E2, 29/09/2026) ──
+
+/**
+ * QUEM A REGRA SUGERIRIA para a carteira de uma pessoa ausente — SÓ
+ * SUGESTÃO, nunca redireciona nada (decisão do inventário de 29/09: a regra
+ * r4 do protótipo, "ausência redireciona carteira" automaticamente, NÃO
+ * EXISTE). Mover tarefas de fato continua sendo `redistribuirTarefas`
+ * (`tarefa-comandos.ts`), ação manual do gestor, auditada por aquela porta.
+ *
+ * O critério é o MESMO da recomendação de tarefa: entre quem tem permissão
+ * de executar, está disponível agora e — só quando a pessoa ausente tem
+ * aptidão declarada em alguma unidade — é apto para AO MENOS UMA das mesmas
+ * unidades, escolhe quem tem o menor custo operacional (`pontuar`). Sem
+ * aptidão declarada para o ausente, a régua de unidade não se aplica (mesma
+ * lógica opt-in de `aptidaoEhRegra`): a sugestão considera todo mundo com
+ * permissão e disponível.
+ */
+export async function sugerirSucessor(
+  usuarioAusenteId: number,
+  agora = new Date(),
+): Promise<{ usuarioId: number; nome: string; score: number } | null> {
+  const universo = await lerUniverso(agora)
+  const unidadesDoAusente = new Set(universo.organizacao.get(usuarioAusenteId)?.aptidoes ?? [])
+
+  const candidatos = universo.usuarios.filter((u) => {
+    if (u.id === usuarioAusenteId) return false
+    if (!temPermissao(u.permissoes, PERMISSAO_EXECUTAR)) return false
+    if (universo.organizacao.get(u.id)?.indisponivelPor) return false
+    if (unidadesDoAusente.size > 0) {
+      const aptidoesDoCandidato = universo.organizacao.get(u.id)?.aptidoes ?? []
+      if (!aptidoesDoCandidato.some((a) => unidadesDoAusente.has(a))) return false
+    }
+    return true
+  })
+  if (candidatos.length === 0) return null
+
+  const avaliados = candidatos
+    .map((u) => {
+      const carga = universo.cargas.get(u.id) ?? { ...CARGA_ZERO }
+      return { usuarioId: u.id, nome: u.nome, score: pontuar(carga).score, carga }
+    })
+    .sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score
+      if (a.carga.atrasadas !== b.carga.atrasadas) return a.carga.atrasadas - b.carga.atrasadas
+      return a.usuarioId - b.usuarioId
+    })
+
+  const { usuarioId, nome, score } = avaliados[0]
+  return { usuarioId, nome, score }
+}
+
 // ─── AS DUAS ENTRADAS PÚBLICAS ──────────────────────────────────────────────
 
 async function carregarTarefas(ids: number[]): Promise<TarefaParaSimular[]> {

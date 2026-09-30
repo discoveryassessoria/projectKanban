@@ -31,11 +31,27 @@ export async function GET(request: Request) {
     const visoes = await prisma.relatorioVisao.findMany({
       where: { usuarioId, ...(dominio ? { dominio } : {}) },
       orderBy: [{ favorita: "desc" }, { usadaEm: "desc" }, { nome: "asc" }],
-      select: { id: true, dominio: true, nome: true, spec: true, favorita: true, usadaEm: true, criadoEm: true },
+      select: { id: true, dominio: true, nome: true, spec: true, favorita: true, usadaEm: true, criadoEm: true, compartilhada: true },
     })
     // RECENTES saem da mesma tabela: `usadaEm` já responde, sem log paralelo.
     const recentes = visoes.filter((v) => v.usadaEm).slice(0, 5)
-    return NextResponse.json({ visoes, favoritas: visoes.filter((v) => v.favorita), recentes })
+
+    // COMPARTILHADAS COM A EQUIPE (Bloco E7, 29/09/2026) — de QUALQUER dono,
+    // mesmo domínio, `compartilhada = true`. Nunca inclui as próprias (já
+    // estão em `visoes`) — ninguém vê a própria visão duplicada numa segunda lista.
+    const compartilhadas = await prisma.relatorioVisao.findMany({
+      where: { compartilhada: true, usuarioId: { not: usuarioId }, ...(dominio ? { dominio } : {}) },
+      orderBy: [{ nome: "asc" }],
+      select: {
+        id: true, dominio: true, nome: true, spec: true, criadoEm: true,
+        usuario: { select: { nome: true } },
+      },
+    })
+
+    return NextResponse.json({
+      visoes, favoritas: visoes.filter((v) => v.favorita), recentes,
+      compartilhadas: compartilhadas.map((v) => ({ ...v, donoNome: v.usuario.nome, usuario: undefined })),
+    })
   } catch (e) {
     console.error("GET relatorios/visoes", e)
     return NextResponse.json({ error: "Erro ao carregar visões." }, { status: 500 })
@@ -90,15 +106,28 @@ export async function PATCH(request: Request) {
     const id = Number(b?.id)
     if (!Number.isInteger(id)) return NextResponse.json({ error: "Visão inválida." }, { status: 400 })
 
-    // O `where` inclui o dono: ninguém favorita a visão de outro operador.
+    // O `where` inclui o dono: ninguém favorita OU (des)compartilha a visão
+    // de outro operador. Só o dono decide se a equipe vê a visão dele.
     const r = await prisma.relatorioVisao.updateMany({
       where: { id, usuarioId },
       data: {
         ...(b?.favorita !== undefined ? { favorita: !!b.favorita } : {}),
         ...(b?.usar ? { usadaEm: new Date() } : {}),
+        ...(b?.compartilhada !== undefined ? { compartilhada: !!b.compartilhada } : {}),
       },
     })
     if (r.count === 0) return NextResponse.json({ error: "Visão não encontrada." }, { status: 404 })
+    if (b?.compartilhada !== undefined) {
+      const v = await prisma.relatorioVisao.findUnique({ where: { id }, select: { nome: true } })
+      await prisma.logAuditoria.create({
+        data: {
+          acao: b.compartilhada ? "VISAO_COMPARTILHADA" : "VISAO_DESCOMPARTILHADA",
+          entidade: "RelatorioVisao", entidadeId: id, usuarioId,
+          descricao: `Visão "${v?.nome ?? id}" ${b.compartilhada ? "passou a ser compartilhada com a equipe" : "deixou de ser compartilhada"}.`,
+          detalhes: { visaoId: id, compartilhada: !!b.compartilhada },
+        },
+      })
+    }
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error("PATCH relatorios/visoes", e)

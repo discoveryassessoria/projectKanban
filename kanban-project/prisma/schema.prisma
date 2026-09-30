@@ -65,12 +65,15 @@ model Usuario {
 
   // CAMADA OPERACIONAL — organização, aptidão, disponibilidade e capacidade.
   // Nenhuma delas concede permissão: autorização continua em Perfil/permissoesCustom.
-  aptidoes                      AptidaoOperacional[]
-  indisponibilidades            IndisponibilidadeOperacional[] @relation("IndisponibilidadeDoUsuario")
-  indisponibilidadesRegistradas IndisponibilidadeOperacional[] @relation("IndisponibilidadeAutor")
-  capacidadeOperacional         CapacidadeOperacional?
-  capacidadesDefinidas          CapacidadeOperacional[]        @relation("CapacidadeAutor")
-  visoesDeRelatorio             RelatorioVisao[]               @relation("VisoesDeRelatorio")
+  aptidoes                           AptidaoOperacional[]
+  indisponibilidades                 IndisponibilidadeOperacional[] @relation("IndisponibilidadeDoUsuario")
+  indisponibilidadesRegistradas      IndisponibilidadeOperacional[] @relation("IndisponibilidadeAutor")
+  indisponibilidadesSucessorSugerido IndisponibilidadeOperacional[] @relation("IndisponibilidadeSucessorSugerido")
+  capacidadeOperacional              CapacidadeOperacional?
+  capacidadesDefinidas               CapacidadeOperacional[]        @relation("CapacidadeAutor")
+  visoesDeRelatorio                  RelatorioVisao[]               @relation("VisoesDeRelatorio")
+  comentarios                        ComentarioTarefa[]             @relation("ComentarioAutor")
+  mencoesRecebidas                   ComentarioMencao[]             @relation("ComentarioMencaoUsuario")
 
   assistenteParametrizacaoProgresso_usuario AssistenteParametrizacaoProgresso[] @relation("AssistenteParametrizacaoProgresso_usuarioId")
   creditoMovimento_usuario                  CreditoMovimento[]                  @relation("CreditoMovimento_usuarioId")
@@ -248,14 +251,15 @@ model Arvore {
 // CP-1 â FamÃ­lia: entidade administrativa prÃ³pria (Regras 10/11/12).
 // Agrupa Processos e Ãrvores. Backfill inicial: 1 FamÃ­lia por Ãrvore.
 model Familia {
-  id          Int        @id @default(autoincrement())
-  nome        String     @db.VarChar(150)
-  descricao   String?    @db.VarChar(300)
+  id          Int                @id @default(autoincrement())
+  nome        String             @db.VarChar(150)
+  descricao   String?            @db.VarChar(300)
   observacoes String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   processos   Processo[]
   arvores     Arvore[]
+  comentarios ComentarioTarefa[]
 }
 
 model Documento {
@@ -354,8 +358,8 @@ model Documento {
   analysisStatus String @default("not_ready") // not_ready | ready
   registral      Json? // dados registrais revisados (verdade canÃ´nica)
 
-  custosFin   Custo[]
-  receitasFin Receita[]
+  custosFin           Custo[]
+  receitasFin         Receita[]
   /// As cobranças registradas sobre este documento. Ver `ContatoTerceiro`.
   contatosRegistrados ContatoTerceiro[]
 
@@ -478,24 +482,24 @@ model CodeSequence {
 }
 
 model Processo {
-  id                          Int                    @id @default(autoincrement())
+  id                          Int                      @id @default(autoincrement())
   // CÃDIGO PÃBLICO (humano) gerado pelo CodeGeneratorService: IT-1, ES-1, DE-1...
   // (sequÃªncia por paÃ­s). UNIQUE, imutÃ¡vel, nunca reusado. O identificador tÃ©cnico segue id.
-  codigo                      String?                @unique @db.VarChar(20)
-  nome                        String                 @db.VarChar(100)
-  descricao                   String?                @db.VarChar(500)
+  codigo                      String?                  @unique @db.VarChar(20)
+  nome                        String                   @db.VarChar(100)
+  descricao                   String?                  @db.VarChar(500)
   observacoes                 String?
   /// IDENTIDADE CANÔNICA da nacionalidade. Fonte: Países e Regiões.
   paisId                      Int?
-  paisCanonico                CatalogoPais?          @relation("ProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
+  paisCanonico                CatalogoPais?            @relation("ProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
   arvoreId                    Int?
   familiaId                   Int?
-  dataInicio                  DateTime               @default(now())
+  dataInicio                  DateTime                 @default(now())
   previsaoTermino             DateTime?
   dataConclusao               DateTime?
-  createdAt                   DateTime               @default(now())
-  updatedAt                   DateTime               @updatedAt
-  percentualImposto           Decimal                @default(12.00) @db.Decimal(5, 2)
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+  percentualImposto           Decimal                  @default(12.00) @db.Decimal(5, 2)
   anexos                      AnexoProcesso[]
   counterRecibo               CounterRecibo?
   custos                      Custo[]
@@ -507,22 +511,22 @@ model Processo {
   faturas                     Fatura[]
   mensagens                   Mensagem[]
   outrosCustos                OutroCusto[]
-  arvore                      Arvore?                @relation(fields: [arvoreId], references: [id])
-  familia                     Familia?               @relation(fields: [familiaId], references: [id], onDelete: SetNull)
+  arvore                      Arvore?                  @relation(fields: [arvoreId], references: [id])
+  familia                     Familia?                 @relation(fields: [familiaId], references: [id], onDelete: SetNull)
   analise                     AnaliseDocumental?
   faseAtualKey                String?
   // ---- REGULARIZACAO HISTORICA ----
   // faseAtualKey continua sendo a FASE OPERACIONAL DE REFERENCIA: a mais avancada
   // liberada para operar. Ela NAO representa sozinha a situacao do processo - cada
   // instancia de fase carrega o seu proprio estado, workflow, tarefas e datas.
-  regularizacaoHistorica      RegularizacaoHistorica @default(NAO_NECESSARIA)
+  regularizacaoHistorica      RegularizacaoHistorica   @default(NAO_NECESSARIA)
   regularizacaoConcluidaEm    DateTime?
   regularizacaoConcluidaPorId Int?
-  regularizacaoConcluidaPor   Usuario?               @relation("ProcessoRegularizadoPor", fields: [regularizacaoConcluidaPorId], references: [id], onDelete: SetNull)
+  regularizacaoConcluidaPor   Usuario?                 @relation("ProcessoRegularizadoPor", fields: [regularizacaoConcluidaPorId], references: [id], onDelete: SetNull)
   /**
    * Por que o processo foi cadastrado ja em fase avancada.
    */
-  motivoCadastroEmAndamento   String?                @db.Text
+  motivoCadastroEmAndamento   String?                  @db.Text
   contratantes                ProcessoContratante[]
   requerentes                 ProcessoRequerente[]
   receitas                    Receita[]
@@ -740,6 +744,7 @@ model Tarefa {
 
   solicitacaoDocumento_tarefa SolicitacaoDocumento[] @relation("SolicitacaoDocumento_tarefaId")
   workflowEvento_tarefa       WorkflowEvento[]       @relation("WorkflowEvento_tarefaId")
+  comentarios                 ComentarioTarefa[]
 
   @@index([tipo])
   @@index([pessoaId])
@@ -1017,14 +1022,14 @@ model RequisitoCadastral {
   publicoAlvo     PublicoAlvoRegra     @default(REQUERENTE)
 
   // ── ESCOPO (null = qualquer) ─────────────────────────────────────────────
-  paisId            Int?
-  pais              CatalogoPais?    @relation(fields: [paisId], references: [id], onDelete: Restrict)
-  itemCatalogoId    Int?
-  itemCatalogo      ItemCatalogo?    @relation("RequisitoCadastralItem", fields: [itemCatalogoId], references: [id], onDelete: Restrict)
+  paisId         Int?
+  pais           CatalogoPais? @relation(fields: [paisId], references: [id], onDelete: Restrict)
+  itemCatalogoId Int?
+  itemCatalogo   ItemCatalogo? @relation("RequisitoCadastralItem", fields: [itemCatalogoId], references: [id], onDelete: Restrict)
   /// Faixa etária em anos completos, calculada na LEITURA a partir da data de
   /// nascimento. Idade não é persistida: ela muda sozinha todo ano.
-  idadeMinima       Int?
-  idadeMaxima       Int?
+  idadeMinima    Int?
+  idadeMaxima    Int?
 
   // ── SEM VIGÊNCIA, DE PROPÓSITO ───────────────────────────────────────────
   /// Cadastro vale até ser INATIVADO; data é para FATO — é a regra do produto, e
@@ -3292,20 +3297,20 @@ model Bandeira {
 // MOTOR â Fase 1A: Tipos de Processo (Processos de Nacionalidade)
 // ============================================================
 model TipoProcessoNacionalidade {
-  id                  Int                 @id @default(autoincrement())
-  code                String              @unique @db.VarChar(40)
-  name                String              @db.VarChar(200)
+  id                     Int                                @id @default(autoincrement())
+  code                   String                             @unique @db.VarChar(40)
+  name                   String                             @db.VarChar(200)
   /// IDENTIDADE do país desta oferta, OBRIGATÓRIA. É a EXISTÊNCIA de um tipo
   /// ativo aqui que torna a nacionalidade ofertada — não a existência do país
   /// no cadastro. Sem país não existe oferta: por isso não admite nulo.
-  paisId              Int
-  pais                CatalogoPais        @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
-  processFamily       String              @default("cidadania") @db.VarChar(40)
-  serviceNature       String              @default("main_process") @db.VarChar(40)
-  ativo               Boolean             @default(true)
-  arquivado           Boolean             @default(false)
-  criadoEm            DateTime            @default(now())
-  atualizadoEm        DateTime            @updatedAt
+  paisId                 Int
+  pais                   CatalogoPais                       @relation("TipoProcessoPais", fields: [paisId], references: [id], onDelete: Restrict)
+  processFamily          String                             @default("cidadania") @db.VarChar(40)
+  serviceNature          String                             @default("main_process") @db.VarChar(40)
+  ativo                  Boolean                            @default(true)
+  arquivado              Boolean                            @default(false)
+  criadoEm               DateTime                           @default(now())
+  atualizadoEm           DateTime                           @updatedAt
   /// QUAIS MODALIDADES este Tipo habilita — N:N de verdade (mandato
   /// "Reconstrução da hierarquia", 22/09/2026). Um Tipo ("Nacionalidade
   /// Italiana") pode habilitar só Administrativa, só Judicial, ou ambas; cada
@@ -3313,9 +3318,9 @@ model TipoProcessoNacionalidade {
   /// Substitui o antigo FK único `modalidadeId` (uma nacionalidade só podia
   /// ter UMA modalidade) — ver TipoProcessoModalidadeHabilitada.
   modalidadesHabilitadas TipoProcessoModalidadeHabilitada[]
-  macroWorkflows      MacroWorkflow[]
-  processosVinculados Processo[]          @relation("ProcessoTipoMotor")
-  configFinanceiras   ProdutoFinanceiro[] @relation("ConfigFinTipoProcesso")
+  macroWorkflows         MacroWorkflow[]
+  processosVinculados    Processo[]                         @relation("ProcessoTipoMotor")
+  configFinanceiras      ProdutoFinanceiro[]                @relation("ConfigFinTipoProcesso")
 
   regrasDocumentaisRef MatrizDocumental[] @relation("MatrizTipoProcessoCanonico")
 
@@ -3379,7 +3384,7 @@ model ModalidadePais {
   /// TipoProcessoModalidadeHabilitada) e os Workflow Macro publicados sob ela.
   tiposHabilitados   TipoProcessoModalidadeHabilitada[]
   macroWorkflows     MacroWorkflow[]
-  processos          Processo[]                    @relation("ProcessoModalidade")
+  processos          Processo[]                         @relation("ProcessoModalidade")
 
   @@unique([paisId, modalityKey])
   @@index([paisId])
@@ -3468,11 +3473,11 @@ model CatalogoFase {
   /// Substitui `ativo` como fonte de decisão a partir desta revisão — `ativo`
   /// permanece por compatibilidade de leitura e é mantido em sincronia
   /// (`ativo = status !== INATIVA`) por quem escreve `status`.
-  status        CatalogoFaseStatus @default(PUBLICADA)
+  status       CatalogoFaseStatus @default(PUBLICADA)
   /// Número da última revisão CONGELADA em `CatalogoFaseRevisao`. Incrementa a
   /// cada publicação; não confundir com `ordemPadrao` (posição), que nunca é
   /// chave funcional.
-  revisaoAtual  Int                @default(1)
+  revisaoAtual Int                @default(1)
 
   naturezasPermitidas FaseNaturezaPermitida[]
   revisoes            CatalogoFaseRevisao[]
@@ -3535,31 +3540,31 @@ model CatalogoFaseRevisao {
 
 // Workflow Macro â 1:1 com o tipo de processo
 model MacroWorkflow {
-  id             Int                       @id @default(autoincrement())
-  tipoProcessoId Int
-  tipoProcesso   TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
+  id                        Int                       @id @default(autoincrement())
+  tipoProcessoId            Int
+  tipoProcesso              TipoProcessoNacionalidade @relation(fields: [tipoProcessoId], references: [id], onDelete: Cascade)
   /// A COMBINAÇÃO País/Tipo/MODALIDADE é o que identifica um Workflow Macro
   /// (mandato "Reconstrução da hierarquia", 22/09/2026) — não mais o Tipo
   /// sozinho. País é alcançado transitivamente via `tipoProcesso.paisId`;
   /// aqui só a modalidade, que é o que desambigua entre os workflows do
   /// mesmo Tipo (ex.: "Nacionalidade Italiana" tem um MacroWorkflow
   /// Administrativo e outro Judicial, cada um com esta FK diferente).
-  modalidadeId   Int
-  modalidade     ModalidadePais            @relation(fields: [modalidadeId], references: [id], onDelete: Restrict)
-  name           String                    @db.VarChar(200)
+  modalidadeId              Int
+  modalidade                ModalidadePais            @relation(fields: [modalidadeId], references: [id], onDelete: Restrict)
+  name                      String                    @db.VarChar(200)
   /// COMO O PROTOCOLO DESTE WORKFLOW É ARQUIVADO — INDIVIDUAL (um por
   /// requerente) ou COLETIVO (um por família/processo). Migrado de
   /// `ModalidadeLegal.cardinalidadeRequerimento` (removida): é o Workflow
   /// Macro PUBLICADO, não uma base jurídica à parte, a fonte canônica desta
   /// regra — decisão do usuário, mandato 22/09/2026. Lido por
   /// `protocolo-canonico.ts` para decidir a granularidade do Protocolo.
-  cardinalidadeRequerimento String          @default("INDIVIDUAL") @db.VarChar(20)
-  ativo          Boolean                   @default(true)
-  versao         Int                       @default(1) // CP-4A â versionamento
-  criadoEm       DateTime                  @default(now())
-  atualizadoEm   DateTime                  @updatedAt
-  fases          FaseMacro[]
-  versoes        MacroWorkflowVersao[]
+  cardinalidadeRequerimento String                    @default("INDIVIDUAL") @db.VarChar(20)
+  ativo                     Boolean                   @default(true)
+  versao                    Int                       @default(1) // CP-4A â versionamento
+  criadoEm                  DateTime                  @default(now())
+  atualizadoEm              DateTime                  @updatedAt
+  fases                     FaseMacro[]
+  versoes                   MacroWorkflowVersao[]
 
   @@unique([tipoProcessoId, modalidadeId])
   @@index([modalidadeId])
@@ -3578,16 +3583,16 @@ model MacroWorkflowVersao {
   macroWorkflow   MacroWorkflow @relation(fields: [macroWorkflowId], references: [id], onDelete: Cascade)
   versao          Int
 
-  tipoProcessoId Int
+  tipoProcessoId            Int
   /// Modalidade e cardinalidade como estavam NESTA versão — mesmo motivo de
   /// congelar `fases`: publicações futuras não podem reescrever o que uma
   /// versão anterior realmente declarava.
   modalidadeId              Int
   cardinalidadeRequerimento String @db.VarChar(20)
-  name           String @db.VarChar(200)
+  name                      String @db.VarChar(200)
   /// Fases como estavam nesta versão: phaseKey, ordem, required, conditional,
   /// showInKanban, entryRule. Lido como conjunto, sempre inteiro.
-  fases          Json
+  fases                     Json
 
   congeladoEm    DateTime @default(now())
   congeladoPorId Int?
@@ -3640,9 +3645,9 @@ model PhaseInternalWorkflow {
   criadoEm       DateTime                   @default(now())
   atualizadoEm   DateTime                   @updatedAt
 
-  passos  PhaseInternalWorkflowStep[]
+  passos           PhaseInternalWorkflowStep[]
   /// Versões congeladas desta definição (ver PhaseInternalWorkflowVersao).
-  versoes PhaseInternalWorkflowVersao[]
+  versoes          PhaseInternalWorkflowVersao[]
   /// Presente só quando `origemBiblioteca=true`: o Modelo da biblioteca do
   /// qual esta linha é a casca.
   modeloBiblioteca BibliotecaModeloTarefa?
@@ -3804,7 +3809,7 @@ model PhaseInternalWorkflowStep {
   /// `SubtaskExecution.escalada = true` (some ao gestor). `null` = nunca
   /// escala automaticamente por contagem.
   escalarApos      Int? @default(2)
-  versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
+  versao           Int  @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
 
   // TRAVA: cada chave sÃ³ existe UMA vez por workflow (impede duplicaÃ§Ã£o silenciosa)
 
@@ -3875,11 +3880,11 @@ model PhaseInternalWorkflowStep {
   /// `resolverConteudoDaBiblioteca` (versao-publicada.ts). `null` = passo
   /// autorado localmente à moda antiga (compatibilidade — nenhum cadastro
   /// existente perde o editor que já tinha).
-  bibliotecaModeloId      Int?
-  bibliotecaModelo        BibliotecaModeloTarefa? @relation(fields: [bibliotecaModeloId], references: [id], onDelete: Restrict)
+  bibliotecaModeloId     Int?
+  bibliotecaModelo       BibliotecaModeloTarefa? @relation(fields: [bibliotecaModeloId], references: [id], onDelete: Restrict)
   /// Versão do Modelo PINADA no momento da seleção — nunca implícita. Trocar
   /// de versão é uma decisão própria (reselecionar), não uma leitura automática.
-  bibliotecaModeloVersao  Int?
+  bibliotecaModeloVersao Int?
 
   /// `dependeDe` (acima) continua sendo do PASSO desta fase — é a única
   /// configuração que o Workflow Interno mantém para um passo vinculado à
@@ -3995,30 +4000,30 @@ model StepSubtaskDefinition {
   /// ACOMPANHAMENTO — "quando esta espera volta à atenção de quem é dono da
   /// tarefa". NÃO é vencimento: só materializa `SubtaskExecution.
   /// proximoAcompanhamentoEm`, nunca `prazo`.
-  acompanhamentoAtivo         Boolean @default(false)
+  acompanhamentoAtivo        Boolean @default(false)
   /// Dias CORRIDOS (`prazoOperacional`, decisão definitiva 23/09/2026 — nunca
   /// pula fim de semana/feriado; o comentário deste campo dizia "dias úteis"
   /// até 25/09/2026, desatualizado desde a unificação, nunca foi essa a conta
   /// de verdade), contados da liberação desta espera, até o primeiro
   /// acompanhamento. `null` enquanto `acompanhamentoAtivo` não tiver essa
   /// decisão de negócio definida — nunca inventado pelo motor.
-  acompanhamentoPrimeiroDias  Int?
+  acompanhamentoPrimeiroDias Int?
   ///
   /// REGRA TEMPORAL — "limite/expectativa temporal desta espera". Materializa
   /// `SubtaskExecution.previstoPara`. Vencida ⇒ TERCEIRO_ATRASADO — que
   /// nunca é, por si só, a Tarefa atrasada (essa comparação é sempre contra
   /// `Tarefa.dataPrazo`, à parte).
-  regraTemporalAtiva          Boolean @default(false)
+  regraTemporalAtiva         Boolean @default(false)
   /// Duração em dias CORRIDOS (mesma correção do campo acima) da regra
   /// temporal, a partir do gatilho.
-  regraTemporalDias           Int?
+  regraTemporalDias          Int?
   /// GATILHO — a `key` de OUTRA subtarefa do MESMO passo cuja CONCLUSÃO
   /// inicia a contagem (lida em `SubtaskExecution.completedAt` dela — nenhum
   /// evento novo, reaproveita o que a execução já grava). `null` = o gatilho
   /// é a própria liberação desta subtarefa (ela mesma virando corrente).
   /// Genérico de propósito — nunca "confirmação de cartório" no motor, só
   /// "conclusão da subtarefa X", seja X o que o cadastro apontar.
-  regraTemporalGatilhoChave   String? @db.VarChar(60)
+  regraTemporalGatilhoChave  String? @db.VarChar(60)
 
   /// ═══ PRAZO DA TAREFA NASCE NUMA SUBTAREFA (mandato "motor de prazo,
   /// acompanhamento e cobrança", 25/09/2026) — decisão de negócio nova:
@@ -4107,22 +4112,22 @@ enum BibliotecaModeloStatus {
 /// tabela só dá a ele um nome estável e um ciclo de vida (rascunho/publicado/
 /// inativo) que não é o mesmo vocabulário do Workflow Interno de uma fase real.
 model BibliotecaModeloTarefa {
-  id       Int                    @id @default(autoincrement())
+  id              Int                    @id @default(autoincrement())
   /// Identidade estável, gerada do nome na criação (mesmo padrão de
   /// `CatalogoFase.phaseKey`). Nunca muda de sentido.
-  chave    String                 @unique @db.VarChar(60)
-  workflowId Int                  @unique
-  workflow PhaseInternalWorkflow  @relation(fields: [workflowId], references: [id], onDelete: Restrict)
-  nome      String                @db.VarChar(200)
-  descricao String?               @db.Text
-  status    BibliotecaModeloStatus @default(RASCUNHO)
+  chave           String                 @unique @db.VarChar(60)
+  workflowId      Int                    @unique
+  workflow        PhaseInternalWorkflow  @relation(fields: [workflowId], references: [id], onDelete: Restrict)
+  nome            String                 @db.VarChar(200)
+  descricao       String?                @db.Text
+  status          BibliotecaModeloStatus @default(RASCUNHO)
   /// Última versão de `workflow` CONGELADA (`PhaseInternalWorkflowVersao`) sob
   /// este Modelo. `null` = nunca publicado — nenhum Vínculo pode referenciá-lo.
   versaoPublicada Int?
-  ativo     Boolean               @default(true)
-  criadoEm     DateTime           @default(now())
-  atualizadoEm DateTime           @updatedAt
-  criadoPorId  Int?
+  ativo           Boolean                @default(true)
+  criadoEm        DateTime               @default(now())
+  atualizadoEm    DateTime               @updatedAt
+  criadoPorId     Int?
 
   /// Passos de Workflows Internos REAIS que selecionaram este Modelo — nunca
   /// tocado por criar/editar o Modelo; só existe quando alguém, na tela do
@@ -5594,22 +5599,22 @@ model SubtaskExecution {
   payload   Json?
 
   /// OPERAÇÃO EXTERNA — quando a subtarefa espera um terceiro.
-  fornecedorId Int?
-  fornecedor   OrgaoProtocolo? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
-  canalKey     String?         @db.VarChar(40)
+  fornecedorId            Int?
+  fornecedor              OrgaoProtocolo? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
+  canalKey                String?         @db.VarChar(40)
   /// PROJEÇÃO TEXTUAL histórica do número. Continua sendo escrita para não quebrar
   /// leitor nenhum; a verdade passou a ser `protocoloId`. Removível quando os
   /// leitores migrarem.
-  protocolo    String?         @db.VarChar(120)
+  protocolo               String?         @db.VarChar(120)
   /// PROTOCOLO CANÔNICO desta execução de subtarefa. Mesma regra do passo.
-  protocoloId  Int?
-  protocoloRef Protocolo?      @relation("ProtocoloDaSubtarefa", fields: [protocoloId], references: [id], onDelete: SetNull)
-  enviadoEm    DateTime?
+  protocoloId             Int?
+  protocoloRef            Protocolo?      @relation("ProtocoloDaSubtarefa", fields: [protocoloId], references: [id], onDelete: SetNull)
+  enviadoEm               DateTime?
   /// LIMITE/EXPECTATIVA da REGRA TEMPORAL desta espera (StepSubtaskDefinition.
   /// regraTemporalDias, a partir do gatilho configurado) — nunca o prazo
   /// oficial da Tarefa, nunca acompanhamento. `null` = sem regra temporal
   /// aplicável a esta execução.
-  previstoPara DateTime?
+  previstoPara            DateTime?
   /// PRÓXIMO ACOMPANHAMENTO desta execução — quando ela volta à atenção de
   /// quem é dono da tarefa, se a espera continuar. Materializado a partir de
   /// StepSubtaskDefinition.acompanhamentoPrimeiroDias; nunca um prazo, nunca
@@ -5622,10 +5627,10 @@ model SubtaskExecution {
   /// do terceiro. `escaladaEm` é quando isso aconteceu; zera (`false`/`null`)
   /// quando a espera termina (a subtarefa conclui) — nunca fica escalada pra
   /// sempre depois de resolvida.
-  escalada   Boolean   @default(false)
+  escalada   Boolean           @default(false)
   escaladaEm DateTime?
   /// AS TENTATIVAS DE CONTATO com o terceiro, durante esta espera.
-  contatos ContatoTerceiro[]
+  contatos   ContatoTerceiro[]
 
   supersededAt      DateTime?
   supersededPorId   Int?
@@ -5668,7 +5673,7 @@ model ContatoTerceiro {
   /// EMAIL | TELEFONE | WHATSAPP | OFICIO | PRESENCIAL — vocabulário fechado,
   /// conferido na porta (não no banco: mesmo padrão de `canalKey` solto que
   /// `SubtaskExecution` já usa).
-  canal       String  @db.VarChar(20)
+  canal      String  @db.VarChar(20)
   /// SEM_RESPOSTA | CONFIRMOU_PEDIDO | PEDIU_DOCUMENTO | EM_BUSCA |
   /// NAO_LOCALIZOU | ENVIOU (Torre de Controle, Bloco B, 29/09/2026) — o que
   /// de fato aconteceu no contato, não só que ele existiu. É o que faz
@@ -5676,8 +5681,8 @@ model ContatoTerceiro {
   /// `SEM_RESPOSTA` não seguido de outro resultado é quem conta pra escalada
   /// (ver `cobrancasSemRespostaDesde`, subtarefas-da-etapa.ts). `ENVIOU`
   /// nunca conclui nada sozinho — só o passo "Receber certidão" recebe.
-  resultado   String  @db.VarChar(20)
-  observacao  String? @db.Text
+  resultado  String  @db.VarChar(20)
+  observacao String? @db.Text
 
   /// Protegido pelo banco: ON DELETE SET NULL — quem registrou não trava a
   /// exclusão da própria conta.
@@ -8647,6 +8652,20 @@ model IndisponibilidadeOperacional {
   usuario     Usuario               @relation("IndisponibilidadeDoUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
   criadoPor   Usuario?              @relation("IndisponibilidadeAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
 
+  /**
+   * SUCESSOR SUGERIDO (Torre de Controle, Bloco E2, 29/09/2026) — quem a regra
+   * indicaria para a carteira desta pessoa durante a ausência: apto para as
+   * mesmas unidades de trabalho, com o menor custo operacional entre os aptos
+   * disponíveis (mesmo critério de `lib/operacional/elegibilidade.ts`).
+   * É SÓ SUGESTÃO. Decisão do inventário de 29/09: não existe redireção
+   * automática de carteira (regra r4 do protótipo foi eliminada) — mover
+   * tarefas continua sendo `redistribuirTarefas` (`tarefa-comandos.ts`),
+   * acionado manualmente pelo gestor e auditado por aquela porta, nunca por
+   * esta abertura de ausência.
+   */
+  sucessorSugeridoId Int?
+  sucessorSugerido   Usuario? @relation("IndisponibilidadeSucessorSugerido", fields: [sucessorSugeridoId], references: [id], onDelete: SetNull)
+
   @@index([usuarioId, inicio])
   @@index([fim])
 }
@@ -8695,10 +8714,95 @@ model RelatorioVisao {
   criadoEm     DateTime  @default(now())
   atualizadoEm DateTime  @updatedAt
 
+  /// COMPARTILHADA COM A EQUIPE (Torre de Controle, Bloco E7, 29/09/2026) —
+  /// visível para qualquer usuário no MESMO domínio, não só o dono. A visão
+  /// continua pertencendo a quem a criou (`usuarioId`, `@@unique` abaixo): só
+  /// quem é dono pode compartilhar, deixar de compartilhar, renomear ou
+  /// apagar. Ler uma visão compartilhada de outra pessoa nunca grava nada.
+  compartilhada Boolean @default(false)
+
   @@unique([usuarioId, dominio, nome])
   @@index([usuarioId, dominio])
   @@index([usuarioId, favorita])
   @@index([usuarioId, usadaEm])
+  @@index([dominio, compartilhada])
+}
+
+/// COMENTÁRIO — Torre de Controle, Bloco E4 (29/09/2026).
+///
+/// Escopo é UMA das duas âncoras, nunca as duas: `tarefaId` (comentário sobre
+/// a unidade de trabalho) OU `familiaId` (comentário sobre a família — o
+/// `Familia` do cadastro, "Cibils" etc.; é a mesma família que o protótipo
+/// agrupa por `fam`, e que pode ter mais de um `Processo` embaixo). A porta
+/// de escrita (`src/services/comentario-tarefa.ts`) recusa as duas nulas e
+/// as duas preenchidas; o banco não tem CHECK porque a única escritora é
+/// essa porta — mesmo padrão de `NotificacaoOperacional`.
+model ComentarioTarefa {
+  id        Int      @id @default(autoincrement())
+  tarefaId  Int?
+  tarefa    Tarefa?  @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  familiaId Int?
+  familia   Familia? @relation(fields: [familiaId], references: [id], onDelete: Cascade)
+
+  autorId Int
+  autor   Usuario @relation("ComentarioAutor", fields: [autorId], references: [id])
+  texto   String  @db.Text
+
+  criadoEm DateTime @default(now())
+
+  mencoes ComentarioMencao[]
+
+  @@index([tarefaId, criadoEm])
+  @@index([familiaId, criadoEm])
+  @@index([autorId])
+}
+
+/// MENÇÃO — quem foi citado num comentário com `@nome`, e se já viu.
+///
+/// É A NOTIFICAÇÃO DA MENÇÃO (Bloco E4): decidido separado do "sino"
+/// (`lib/operacional/notificacao-canonica.ts`, em redesenho paralelo nesta
+/// mesma janela, 29/09/2026) de propósito — misturar aqui um catálogo que
+/// está mudando embaixo teria acoplado Bloco E a um módulo instável. Ligar a
+/// menção ao sino é decisão do Bloco H/I/J, quando o redesenho estiver
+/// assentado.
+model ComentarioMencao {
+  id           Int              @id @default(autoincrement())
+  comentarioId Int
+  comentario   ComentarioTarefa @relation(fields: [comentarioId], references: [id], onDelete: Cascade)
+  usuarioId    Int
+  usuario      Usuario          @relation("ComentarioMencaoUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+  lidaEm       DateTime?
+
+  @@unique([comentarioId, usuarioId])
+  @@index([usuarioId, lidaEm])
+}
+
+/// SÉRIE DIÁRIA DOS INDICADORES DA TORRE — Bloco E10 (29/09/2026).
+///
+/// UMA foto por dia (snapshot 1×/dia, `@@unique([data])`), dos mesmos 8 KPIs
+/// do protótipo + o par do Backlog (abertas/fechadas na semana). Nasce só
+/// pelo cron (`/api/cron/torre-indicadores`) — nenhuma tela escreve aqui.
+/// Serve exclusivamente a tendência ("▲/▼ vs semana passada"); nunca é lida
+/// para o número DE HOJE, que a Torre sempre calcula ao vivo (Regra 5: uma
+/// fonte por dado, mesmas projeções da Operação).
+model TorreIndicadorDiario {
+  id   Int      @id @default(autoincrement())
+  data DateTime @db.Date
+
+  vencidas                Int
+  vencemEm7Dias           Int
+  semDono                 Int
+  aguardandoTerceiro      Int
+  cobrancasPendentes      Int
+  escaladas               Int
+  emRisco                 Int
+  backlogAbertas          Int
+  backlogFechadasNaSemana Int
+
+  criadoEm DateTime @default(now())
+
+  @@unique([data])
+  @@index([data])
 }
 
 /// BASE NACIONAL DE CARTÓRIOS DE REGISTRO CIVIL — sincronizada automaticamente da
@@ -8715,25 +8819,25 @@ model Cartorio {
 
   /// IDENTIDADE ESTÁVEL da fonte — `cartorio_id`, nunca o nome (nome pode mudar).
   /// Único ponto de verdade pra saber "já existe" numa nova sincronização.
-  sourceId String @unique @db.VarChar(40)
+  sourceId String  @unique @db.VarChar(40)
   /// De onde veio — hoje só "REGISTRO_CIVIL_TRANSPARENCIA", campo existe pra
   /// permitir uma segunda fonte um dia sem migração.
-  source   String @default("REGISTRO_CIVIL_TRANSPARENCIA") @db.VarChar(40)
+  source   String  @default("REGISTRO_CIVIL_TRANSPARENCIA") @db.VarChar(40)
   /// `num_cnj` da fonte — código oficial (CNJ), quando fornecido. Não é chave
   /// primária de identidade porque a fonte já dá um `sourceId` mais estável.
   cns      String? @db.VarChar(20)
 
-  nome           String @db.VarChar(300)
+  nome            String  @db.VarChar(300)
   /// Normalizado (minúsculo, sem acento) só para busca textual — nunca exibido.
-  nomeNormalizado String @db.VarChar(300)
-  uf             String @db.VarChar(2)
-  municipio      String @db.VarChar(150)
-  endereco       String? @db.VarChar(400)
-  telefone       String? @db.VarChar(60)
-  email          String? @db.VarChar(200)
-  responsavel    String? @db.VarChar(200)
-  regiao         String? @db.VarChar(20)
-  entidade       String? @db.VarChar(60)
+  nomeNormalizado String  @db.VarChar(300)
+  uf              String  @db.VarChar(2)
+  municipio       String  @db.VarChar(150)
+  endereco        String? @db.VarChar(400)
+  telefone        String? @db.VarChar(60)
+  email           String? @db.VarChar(200)
+  responsavel     String? @db.VarChar(200)
+  regiao          String? @db.VarChar(20)
+  entidade        String? @db.VarChar(60)
 
   /// Espelha `flag_ativo` da fonte — nunca inferido por ausência isolada
   /// (ver `missingSince`/`consecutiveMissingSyncs` abaixo).
@@ -8741,9 +8845,9 @@ model Cartorio {
 
   /// Visto pela 1ª vez / pela última vez numa sincronização — nunca sobrescritos
   /// um pelo outro.
-  firstSeenAt  DateTime  @default(now())
-  lastSeenAt   DateTime  @default(now())
-  lastSyncedAt DateTime  @default(now())
+  firstSeenAt             DateTime  @default(now())
+  lastSeenAt              DateTime  @default(now())
+  lastSyncedAt            DateTime  @default(now())
   /// Desde quando este cartório PAROU de aparecer na fonte (`null` = está vindo
   /// normalmente). Não inativa sozinho: só depois de N sincronizações COMPLETAS
   /// consecutivas confirmando a ausência (ver CartorioSyncService).
@@ -8791,11 +8895,11 @@ model Pais {
 /// com população ≥ 5000, o piso que cobre comuni pequenos de processos de
 /// cidadania italiana/espanhola sem inflar a base com todo povoado do mundo).
 model Cidade {
-  id              Int    @id @default(autoincrement())
+  id              Int     @id @default(autoincrement())
   /// geonameid — identidade estável da fonte.
-  sourceId        String @unique @db.VarChar(20)
-  nome            String @db.VarChar(200)
-  nomeNormalizado String @db.VarChar(200)
+  sourceId        String  @unique @db.VarChar(20)
+  nome            String  @db.VarChar(200)
+  nomeNormalizado String  @db.VarChar(200)
   /// Região/estado/província (ex.: "Lombardia", "Andaluzia") — livre da fonte,
   /// só para exibição/desambiguação, nunca chave de busca própria.
   regiao          String? @db.VarChar(200)

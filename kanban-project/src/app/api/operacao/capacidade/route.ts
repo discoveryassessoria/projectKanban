@@ -25,9 +25,9 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
   lerOrganizacao, unidadesOperacionais, definirAptidoes, definirCapacidade,
-  abrirIndisponibilidade, encerrarIndisponibilidade,
+  abrirIndisponibilidade, encerrarIndisponibilidade, capacidadeMedidaPorUsuario,
 } from '@/lib/operacional/organizacao'
-import { classificarCarga } from '@/lib/operacional/elegibilidade'
+import { classificarCarga, sugerirSucessor } from '@/lib/operacional/elegibilidade'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { STATUS_ATIVOS } from '@/lib/operacional/tarefa-canonica'
 
@@ -75,6 +75,14 @@ export async function GET(request: NextRequest) {
   // tarefas. Quem define o que é carga é quem define o que é elegibilidade.
   const carga = classificarCarga(usuarios.map((u) => u.id), ativas, agora)
 
+  // CAPACIDADE MEDIDA E FILA EM SEMANAS (Torre de Controle, Bloco E1,
+  // 29/09/2026) — "quantas tarefas esta pessoa concluiu por semana, média
+  // real das últimas 4 semanas" e "ativas ÷ capacidade medida". Nunca o teto
+  // CONFIGURADO (`limiteExecutaveis`, que é política declarada): é o
+  // throughput REAL observado.
+  const ativasPorUsuario = new Map(usuarios.map((u) => [u.id, carga.get(u.id)?.executaveis ?? 0]))
+  const capacidadeMedida = await capacidadeMedidaPorUsuario(usuarios.map((u) => u.id), ativasPorUsuario, agora)
+
   const linhas = usuarios.map((u) => {
     const permissoes = calcularPermissoes(
       u.tipo, u.perfil?.permissoes as MapaPermissoes | null, u.permissoesCustom as MapaPermissoes | null,
@@ -97,6 +105,7 @@ export async function GET(request: NextRequest) {
       limiteExecutaveis: org?.limiteExecutaveis ?? null,
       observacaoCapacidade: org?.observacaoCapacidade ?? null,
       carga: carga.get(u.id) ?? { ativas: 0, executaveis: 0, atrasadas: 0, urgentes: 0, aguardandoTerceiro: 0, bloqueadas: 0 },
+      capacidadeMedida: capacidadeMedida.get(u.id) ?? { concluidasUltimasSemanas: 0, mediaSemanal: 0, filaEmSemanas: null },
     }
   })
 
@@ -189,19 +198,28 @@ export async function PATCH(request: NextRequest) {
       if (Number.isNaN(inicio.getTime()) || (fim && Number.isNaN(fim.getTime()))) {
         return NextResponse.json({ error: 'data inválida' }, { status: 422 })
       }
+      // SUCESSOR SUGERIDO (Bloco E2) — só para AUSENCIA/FERIAS/AFASTAMENTO:
+      // BLOQUEIO_OPERACIONAL não é "a pessoa não está", é "a pessoa não deve
+      // receber", e sugerir sucessor aí não faz sentido de negócio.
+      const sugestao = tipo !== 'BLOQUEIO_OPERACIONAL' ? await sugerirSucessor(usuarioId) : null
       const r = await abrirIndisponibilidade({
         usuarioId, tipo, inicio, fim,
         motivo: typeof b?.motivo === 'string' ? b.motivo : null, autorId: autor.userId,
+        sucessorSugeridoId: sugestao?.usuarioId ?? null,
       })
       if (!r.ok) return NextResponse.json({ error: r.erro }, { status: 422 })
       await registrarAuditoria(request, {
         acao: 'CRIAR', entidade: ENTIDADE_AUDITADA, entidadeId: usuarioId,
         descricao: `${quem} indisponível por ${ROTULO_TIPO[tipo] ?? tipo} desde ${inicio.toISOString().slice(0, 10)}` +
           `${fim ? ` até ${fim.toISOString().slice(0, 10)}` : ' (sem data de retorno)'}` +
-          `${b?.motivo ? ` — ${String(b.motivo).slice(0, 120)}` : ''}`,
-        detalhes: { indisponibilidadeId: r.id, tipo, inicio: inicio.toISOString(), fim: fim?.toISOString() ?? null },
+          `${b?.motivo ? ` — ${String(b.motivo).slice(0, 120)}` : ''}` +
+          `${sugestao ? ` · sucessor sugerido: ${sugestao.nome} (só sugestão — mover carteira é ação manual, à parte)` : ''}`,
+        detalhes: {
+          indisponibilidadeId: r.id, tipo, inicio: inicio.toISOString(), fim: fim?.toISOString() ?? null,
+          sucessorSugeridoId: sugestao?.usuarioId ?? null,
+        },
       })
-      return NextResponse.json({ ok: true, id: r.id })
+      return NextResponse.json({ ok: true, id: r.id, sucessorSugerido: sugestao ? { usuarioId: sugestao.usuarioId, nome: sugestao.nome } : null })
     }
     case 'encerrar_indisponibilidade': {
       const id = Number(b?.indisponibilidadeId)
