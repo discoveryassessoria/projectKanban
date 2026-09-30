@@ -2,6 +2,7 @@
 
 "use client"
 
+import { textoDoCartaoDeDocumentacao } from "@/src/lib/process-stage/texto-documentacao"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
@@ -51,6 +52,8 @@ interface Estatisticas {
     percentual: number
     /** false = a fase ativa não trabalha certidões: não há "N de M" a mostrar. */
     aplicavel?: boolean
+    /** A fase cujas certidões estão sendo contadas (a fase ATIVA). */
+    faseLabel?: string | null
   }
   risco: {
     bloqueantes: number
@@ -190,7 +193,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           <div className={subCls}>
             {documentacao.aplicavel === false
               ? "Sem certidões exigidas na fase atual"
-              : `${documentacao.recebidos} de ${documentacao.total} documentos recebidos`}
+              : textoDoCartaoDeDocumentacao({ recebidos: documentacao.recebidos, total: documentacao.total, faseLabel: documentacao.faseLabel ?? null })}
           </div>
         </div>
 

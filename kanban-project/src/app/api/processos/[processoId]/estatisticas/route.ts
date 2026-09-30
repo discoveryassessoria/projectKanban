@@ -3,6 +3,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { documentacaoRequeridaDoProcesso } from "@/src/lib/process-stage/documentacao-requerida"
+import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
+import { textoDoAlertaDeDocumentos } from "@/src/lib/process-stage/texto-documentacao"
 
 type AlertaSev = "crit" | "warn" | "info"
 
@@ -17,6 +19,8 @@ interface EstatisticasResponse {
     total: number
     percentual: number
     aplicavel: boolean
+    /** A fase ATIVA, cujas certidões estão sendo contadas. */
+    faseLabel: string | null
   }
   risco: {
     bloqueantes: number
@@ -44,7 +48,7 @@ export async function GET(
     // 1) Carrega o processo (precisa do arvoreId e pais)
     const processo = await prisma.processo.findUnique({
       where: { id },
-      select: { id: true, arvoreId: true, paisId: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
+      select: { id: true, arvoreId: true, paisId: true, faseAtualKey: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } },
     })
 
     if (!processo) {
@@ -162,13 +166,13 @@ export async function GET(
       alertas.push({ sev: "info", label: "Origem da linhagem não identificada" })
     }
 
+    // A contagem é DA FASE ATIVA (certidões que a fase atual trabalha) — o texto diz qual fase, e o alerta só fala de
+    // certidão a receber quando a fase é a que trabalha certidões (nunca "não recebidos" genérico para o que já foi
+    // localizado/validado em outra fase).
     const pendentes = doc.pendentes
-    if (pendentes > 0) {
-      alertas.push({
-        sev: "info",
-        label: `${pendentes} documento(s) ainda não recebido(s)`,
-      })
-    }
+    const faseLabelDocs = labelDaFasePorPhaseKey(processo?.faseAtualKey ?? null)
+    const alertaDocs = textoDoAlertaDeDocumentos({ aplicavel: doc.aplicavel, pendentes, faseLabel: faseLabelDocs })
+    if (alertaDocs) alertas.push({ sev: "info", label: alertaDocs })
     if (divergenciasAbertas > 0) {
       alertas.push({
         sev: "warn",
@@ -193,6 +197,7 @@ export async function GET(
         total: totalDocs,
         percentual,
         aplicavel: doc.aplicavel,
+        faseLabel: faseLabelDocs,
       },
       risco,
       protocolo,

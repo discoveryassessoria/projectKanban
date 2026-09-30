@@ -222,7 +222,11 @@ function obrigacaoConcluidaNaFase(
 function passosPorObrigacao(input: ProjectionInput): Map<number, GateStepData[]> {
   const docsPorNec = new Map<number, Set<number>>()
   const necPorDoc = new Map<number, number>()
-  for (const d of input.documentos) {
+  // TODOS os documentos, não só os da linha reta: o passo de um cônjuge/apoio FORA da linhagem (ex.: a certidão de
+  // nascimento de Evanir Teixeira da Silva, Antão) nomeia o documento dele, e sem este mapa o passo concluído não
+  // ligava à necessidade — `emitida` ficava falso e o gate acusava CERTIDAO_OBRIGATORIA_PENDENTE para sempre (achado
+  // real 30/09/2026, processo 675). É o mesmo conjunto que `computeGate` já usa para achar a necessidade de um passo.
+  for (const d of (input.documentosTodos ?? input.documentos)) {
     if (d.necessidadeId == null) continue
     necPorDoc.set(d.id, d.necessidadeId)
     const set = docsPorNec.get(d.necessidadeId) ?? new Set<number>()

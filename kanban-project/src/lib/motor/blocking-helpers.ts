@@ -30,7 +30,11 @@ export interface BlockingIssue {
 export type Policy = "ALL_REQUIRED_COMPLETED"
 
 // Estados terminais que NÃO bloqueiam
-const PASSO_OK = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"])
+// CANCELADO entra aqui: passo cancelado é uma decisão HUMANA de que aquela obrigação não vale (operação cancelada,
+// documento não exigido) — NÃO é trabalho em aberto. Sem isto, o passo cancelado da certidão do Edison Nás Antão Junior
+// bloqueava o avanço do Antão como "obrigatório aberto" para sempre (achado real 30/09/2026). Cancelada continua ≠
+// concluída: isto só impede o BLOQUEIO; nenhum progresso/contador passa a contar cancelamento como sucesso.
+const PASSO_OK = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO", "CANCELADO"])
 const TAREFA_CONCLUIDA = new Set(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
 const TAREFA_INATIVA = new Set(["SUPERSEDIDA", "DISPENSADA"])
 const NECESSIDADE_OK = new Set(["ATENDIDA", "DISPENSADA"])
