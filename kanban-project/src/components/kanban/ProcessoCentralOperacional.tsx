@@ -1001,9 +1001,8 @@ export function ProcessoCentralOperacional({
   // ("Solicitar certid\u00e3o") j\u00e1 fazia. Sem branch aqui, as duas caem sozinhas no
   // corpo GEN\u00c9RICO da Central (mesmo caminho de emissao_documental), que j\u00e1
   // sabe renderizar passo com subtarefas. As rotas bespoke antigas
-  // (.../traducao/etapas, .../apostilamento/etapas) continuam existindo s\u00f3
-  // para recusar com mensagem clara (`recusarSeCanonicoAssumiu`), nunca mais
-  // para conduzir.
+  // (.../traducao/etapas, .../apostilamento/etapas) e os dois motores foram
+  // REMOVIDOS (30/09/2026); as tabelas Pasta* ficam.
   //
   // O painel de KPIs abaixo (`ResumoFaseDocumental`) é ADITIVO — some, o corpo
   // genérico continua completo sozinho — nunca um branch concorrente.

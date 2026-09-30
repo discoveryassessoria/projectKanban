@@ -69,8 +69,6 @@ const auto = read("src/lib/motor/auto-avanco.ts")
 check("concluirFaseBespokeEAvancar (conclui gate + avança)", auto.includes("concluirFaseBespokeEAvancar") && auto.includes("concluirWorkflowInternoDaFase"))
 const bespoke: Array<[string, string]> = [
   ["Análise", "src/app/api/processos/[processoId]/analise/concluir/route.ts"],
-  ["Tradução", "src/app/api/processos/[processoId]/traducao/etapas/[stepId]/route.ts"],
-  ["Apostilamento", "src/app/api/processos/[processoId]/apostilamento/etapas/[stepId]/route.ts"],
   ["Retificação", "src/app/api/processos/[processoId]/retificacao/pacotes/[pkgId]/etapas/[stepId]/route.ts"],
   ["Emissão Retificada", "src/app/api/processos/[processoId]/emissao-retificada/documentos/[docId]/etapas/[stepId]/route.ts"],
   ["Fase Final", "src/app/api/processos/[processoId]/fase-final/etapas/[stepId]/route.ts"],

@@ -22,6 +22,8 @@ import { executorEfetivo } from '@/src/services/validacao-de-publicacao'
 import { alvoDoCampo, alvoDeReferencia, idReferenciado } from '@/src/lib/motor/fontes-de-campo'
 import { resolverReferencias } from '@/src/services/referencia-canonica'
 import { motorVigenteDaFase } from '@/src/services/motor-da-fase'
+import { resolverConteudoDaBiblioteca } from '@/src/services/versao-publicada'
+import { temCadastroOperacional } from './cadastro-do-passo'
 import { Prisma } from '@prisma/client'
 
 const ROTA_INTERNO = '/administrator?screen=phaseiwf'
@@ -1201,6 +1203,7 @@ registrar({
       where: { workflow: { arquivado: false, active: true } },
       select: {
         id: true, key: true, label: true, executorKey: true, createsTask: true,
+        bibliotecaModeloId: true, bibliotecaModeloVersao: true,
         workflow: { select: { id: true, name: true, phaseKey: true } },
         acoes: { where: { ativo: true }, select: { id: true } },
         campos: { where: { ativo: true }, select: { id: true } },
@@ -1216,8 +1219,19 @@ registrar({
         .filter((i) => i._count._all > 0).map((i) => i.faseMacroKey),
     )
 
-    const semCadastro = passos.filter((p) =>
+    // PASSO DA BIBLIOTECA: o conteúdo é o da versão CONGELADA que a seleção pinou (as linhas locais ficam vazias
+    // por desenho) — ver `cadastro-do-passo.ts`. Só resolve para quem tem cadastro local vazio.
+    const semCadastroLocal = passos.filter((p) =>
       !p.acoes.length && !p.campos.length && !p.checkItens.length && !p.subtarefas.length)
+    const semCadastro: typeof semCadastroLocal = []
+    let daBiblioteca = 0
+    for (const p of semCadastroLocal) {
+      const congelado = p.bibliotecaModeloId != null && p.bibliotecaModeloVersao != null
+        ? await resolverConteudoDaBiblioteca(p.bibliotecaModeloId, p.bibliotecaModeloVersao)
+        : null
+      if (temCadastroOperacional({ acoes: p.acoes, campos: p.campos, checkItens: p.checkItens, subtarefas: p.subtarefas }, congelado)) { daBiblioteca++; continue }
+      semCadastro.push(p)
+    }
 
     // MOTOR VIGENTE POR FASE — uma consulta por phaseKey distinta, não por passo.
     const fasesDistintas = [...new Set(semCadastro.map((p) => p.workflow.phaseKey))]
@@ -1257,7 +1271,7 @@ registrar({
 
     const metricas = {
       passos: passos.length, semCadastro: semCadastro.length,
-      incompletos: achados.length, placeholders, especializados, legados,
+      incompletos: achados.length, placeholders, especializados, legados, daBiblioteca,
     }
     if (!achados.length) {
       return {
@@ -1530,8 +1544,6 @@ registrar({
     // sistema, e ela encolhe: cada linha some no dia em que a tela for removida.
     const TELAS_ANTERIORES: Record<string, string> = {
       analise_documental: 'ProcessoAnalise',
-      traducao_juramentada: 'ProcessoTraducao',
-      apostilamento: 'ProcessoApostilamento',
       emissao_documental_retificada: 'ProcessoEmissaoRetificada',
     }
     const achados: Achado[] = []

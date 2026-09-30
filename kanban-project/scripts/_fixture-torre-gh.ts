@@ -14,7 +14,7 @@ import { concluirSubtarefaCorrentePeloPasso } from "../src/services/subtarefas-d
 
 export interface Obrigacao { processoId: number; tarefaId: number; stepInstanceId: number }
 
-export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: number; escalarApos?: number } = {}) {
+export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: number; escalarApos?: number; slaDays?: number } = {}) {
   const TIPO_CODE = "TST-" + MARCA.replace(/[^A-Z0-9]/gi, "").slice(0, 30)
   const PHASE_KEY = `${MARCA.toLowerCase()}_fase`
 
@@ -67,7 +67,7 @@ export async function montarCenario(MARCA: string, opcoes: { diasAposCobranca?: 
   })
   const step = await prisma.phaseInternalWorkflowStep.create({
     data: {
-      workflowId: wf.id, key: "solicitar_certidao", label: `${MARCA} Solicitar certidão`, ordem: 1, slaDays: 0, cardinalidade: "PROCESSO",
+      workflowId: wf.id, key: "solicitar_certidao", label: `${MARCA} Solicitar certidão`, ordem: 1, slaDays: opcoes.slaDays ?? 0, cardinalidade: "PROCESSO",
       diasParaIniciar: 2, diasAposCobranca: opcoes.diasAposCobranca ?? 1, escalarApos: opcoes.escalarApos ?? 2,
     },
     select: { id: true },

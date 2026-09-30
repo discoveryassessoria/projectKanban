@@ -110,7 +110,10 @@
    "scripts/torre-bloco-e-indicadores-diarios.test.ts",
    "scripts/torre-bloco-j-tempo-na-fase.test.ts",
    "scripts/menu-admin-sem-tarefas-distribuicao.test.ts",
-   "scripts/operacao-sem-orgao-so-documento.test.ts"
+   "scripts/operacao-sem-orgao-so-documento.test.ts",
+   "scripts/tarefa-nasce-com-prazo-do-sla.test.ts",
+   "scripts/saude-cad012-passo-da-biblioteca.test.ts",
+   "scripts/saude-pendencias-mtr-cob-tor.test.ts"
   ]
  },
  "arquivos": [
@@ -202,6 +205,9 @@
   "scripts/torre-bloco-e-indicadores-diarios.test.ts",
   "scripts/torre-bloco-j-tempo-na-fase.test.ts",
   "scripts/menu-admin-sem-tarefas-distribuicao.test.ts",
-  "scripts/operacao-sem-orgao-so-documento.test.ts"
+  "scripts/operacao-sem-orgao-so-documento.test.ts",
+  "scripts/tarefa-nasce-com-prazo-do-sla.test.ts",
+  "scripts/saude-cad012-passo-da-biblioteca.test.ts",
+  "scripts/saude-pendencias-mtr-cob-tor.test.ts"
  ]
 }

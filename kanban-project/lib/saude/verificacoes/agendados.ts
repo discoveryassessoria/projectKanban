@@ -343,3 +343,75 @@ registrar({
     }
   },
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOR-001 — OS DOIS CRONS DA TORRE (indicadores e regras) — vigilância (30/09/2026, autorizado)
+// ═══════════════════════════════════════════════════════════════════════════
+// COB-001 acusava `/api/cron/torre-indicadores` e `/api/cron/torre-regras` como jobs sem vigia. Vigiar não é
+// citar o nome: é provar que o job deixou o RASTRO que só ele deixa.
+//   · torre-indicadores (diário 09:00 UTC) grava a foto do dia em `TorreIndicadorDiario` — a tendência dos KPIs
+//     da Torre depende dela. Foto mais nova com mais de 2 dias = o cron não está rodando.
+//   · torre-regras (de hora em hora) só deixa rastro (`REGRA_TORRE_EXECUTADA`) quando a regra r1 está LIGADA.
+//     Com r1 desligada (o padrão) o cron é inofensivo e não escreve nada — não há o que cobrar. Com r1 ligada,
+//     nenhuma execução nas últimas 3 h = o cron parou.
+registrar({
+  id: 'saude.cron.torre',
+  codigo: 'TOR-001',
+  nome: 'Os crons da Torre estão rodando',
+  descricao: 'Vigia /api/cron/torre-indicadores (foto diária dos KPIs em TorreIndicadorDiario) e /api/cron/torre-regras (execução horária da regra r1, quando ligada).',
+  dominio: 'OBSERVABILIDADE',
+  modulo: 'Plataforma / Jobs agendados',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '2.1.0',
+  timeoutMs: 20_000,
+  orientacao: 'Confira na Vercel os crons /api/cron/torre-indicadores e /api/cron/torre-regras; rode ?ensaio=1 para ver o que fariam.',
+  rotaCorrecao: '/torre',
+  responsavel: 'Plataforma',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const agora = Date.now()
+    const achados: Achado[] = []
+    const ultima = await prisma.torreIndicadorDiario.findFirst({ orderBy: { data: 'desc' }, select: { data: true } })
+    const idadeDias = ultima ? Math.floor((agora - ultima.data.getTime()) / 86_400_000) : null
+    if (ultima && idadeDias! > 2) {
+      achados.push({
+        chave: 'torre-indicadores-parado',
+        severidade: 'ALERTA',
+        titulo: `A foto diária dos KPIs da Torre está ${idadeDias} dias atrasada`,
+        descricao: `A última foto gravada é de ${ultima.data.toISOString().slice(0, 10)}; o cron /api/cron/torre-indicadores roda todo dia às 09:00 UTC.`,
+        explicacao: 'A tendência (▲/▼ vs semana passada) dos KPIs da Torre é lida dessa foto. Sem o cron, ela envelhece e passa a comparar com um passado que não é o de ontem.',
+        impacto: 'Os KPIs continuam corretos; só a tendência fica defasada.',
+        entidade: 'TorreIndicadorDiario', quantidade: 1, link: '/torre',
+        recomendacao: 'Verifique o cron /api/cron/torre-indicadores na Vercel (e o bloqueio de crons no middleware).',
+        evidencia: { ultimaFoto: ultima.data.toISOString(), idadeDias },
+      })
+    }
+    const { lerRegras } = await import('@/lib/operacional/regras-torre')
+    const r1 = (await lerRegras()).find((r) => r.chave === 'r1')
+    let ultimaExecucaoR1: Date | null = null
+    if (r1?.ativa) {
+      const e = await prisma.logAuditoria.findFirst({ where: { acao: 'REGRA_TORRE_EXECUTADA', entidade: 'RegraTorre' }, orderBy: { id: 'desc' }, select: { criadoEm: true } })
+      ultimaExecucaoR1 = e?.criadoEm ?? null
+      if (!ultimaExecucaoR1 || agora - ultimaExecucaoR1.getTime() > 3 * 3_600_000) {
+        achados.push({
+          chave: 'torre-regras-parado',
+          severidade: 'ALERTA',
+          titulo: 'A regra r1 está LIGADA mas o cron horário não a executa',
+          descricao: ultimaExecucaoR1 ? `A última execução registrada é de ${ultimaExecucaoR1.toISOString()}.` : 'Nenhuma execução registrada.',
+          explicacao: 'Com r1 ligada, /api/cron/torre-regras roda de hora em hora e grava REGRA_TORRE_EXECUTADA a cada execução.',
+          impacto: 'Tarefas sem dono deixam de ser atribuídas automaticamente por país e fase.',
+          entidade: 'RegraTorre', registroId: 'r1', quantidade: 1, link: '/torre',
+          recomendacao: 'Verifique o cron /api/cron/torre-regras na Vercel (e o bloqueio de crons no middleware).',
+          evidencia: { ultimaExecucaoR1: ultimaExecucaoR1?.toISOString() ?? null },
+        })
+      }
+    }
+    return {
+      achados,
+      metricas: { idadeFotoDias: idadeDias ?? -1, r1Ligada: r1?.ativa ? 1 : 0 },
+      resumo: `Foto dos KPIs ${ultima ? `de ${ultima.data.toISOString().slice(0, 10)}` : 'ainda não gravada (o primeiro cron roda às 09:00 UTC)'}; regra r1 ${r1?.ativa ? 'ligada' : 'desligada — o cron não tem o que fazer'}.`,
+    }
+  },
+})
