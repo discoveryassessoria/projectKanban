@@ -118,7 +118,7 @@ async function main() {
     for (let i = 0; i < 5; i++) await processoEm(i % 2 ? "genealogia" : "emissao_documental", { requerRetificacao: i % 2 === 0 })
     const depois = await contar((db) => visaoGerencial({}, new Date(), db))
     // Tolerância de +2: uma consulta lazy pode variar com o timing do cache por requisição; N+1 cresceria com as 5 linhas novas.
-    ok("com mais processos, o número de consultas NÃO cresce com as linhas (sem N+1)", Math.abs(depois.n - antes.n) <= 2 && depois.r.linhas.length >= antes.r.linhas.length + 5, `${antes.n} × ${depois.n} consultas para ${antes.r.linhas.length} × ${depois.r.linhas.length} linhas`)
+    ok("com mais processos, o número de consultas NÃO cresce com as linhas (sem N+1)", depois.n <= antes.n + 2 && depois.r.linhas.length >= antes.r.linhas.length + 5, `${antes.n} × ${depois.n} consultas para ${antes.r.linhas.length} × ${depois.r.linhas.length} linhas`)
 
     secao("(7) A aba Famílias mostra 'Próximo marco: <fase>' com o campo, e omite sem ele")
     const abas = readFileSync("src/components/operacao/operacao-v3-abas.tsx", "utf8")
