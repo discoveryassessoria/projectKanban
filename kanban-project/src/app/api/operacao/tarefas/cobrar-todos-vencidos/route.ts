@@ -10,12 +10,8 @@
 //   body: { tarefaIds: number[], canal?: string, resultado?: string, observacao?: string, dataContato?: string }
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
-import { registrarCobranca, subtarefaCorrenteDaTarefa, CANAIS_DE_CONTATO, RESULTADOS_DE_CONTATO } from "@/src/services/subtarefas-da-etapa"
-
-const CANAIS_VALIDOS = new Set<string>(CANAIS_DE_CONTATO)
-const RESULTADOS_VALIDOS = new Set<string>(RESULTADOS_DE_CONTATO)
+import { cobrarTarefas, CANAIS_VALIDOS, RESULTADOS_VALIDOS } from "@/src/services/cobranca-terceiros"
 
 export async function POST(request: NextRequest) {
   const erro = await verificarPermissao(request, "tarefas.ver")
@@ -26,8 +22,10 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({} as Record<string, unknown>))
   const tarefaIds = Array.isArray(body.tarefaIds) ? body.tarefaIds.map(Number).filter(Number.isInteger) : []
   if (tarefaIds.length === 0) return NextResponse.json({ ok: false, code: "SEM_TAREFAS", mensagem: "Nenhuma tarefa vencida para cobrar." }, { status: 400 })
-  const canalRaw = String(body.canal ?? "EMAIL").toUpperCase()
-  const canal = CANAIS_VALIDOS.has(canalRaw) ? canalRaw : "EMAIL"
+  // Canal ausente/inválido = o CANAL CADASTRADO de cada tarefa (Bloco G) — antes
+  // era EMAIL fixo. A tela sempre manda o canal escolhido no formulário.
+  const canalRaw = typeof body.canal === "string" ? body.canal.toUpperCase() : ""
+  const canal = CANAIS_VALIDOS.has(canalRaw) ? canalRaw : null
   // Default SEM_RESPOSTA — mesmo raciocínio de /cobrar (Bloco B, 29/09/2026).
   const resultadoRaw = String(body.resultado ?? "SEM_RESPOSTA").toUpperCase()
   const resultado = RESULTADOS_VALIDOS.has(resultadoRaw) ? resultadoRaw : "SEM_RESPOSTA"
@@ -35,22 +33,8 @@ export async function POST(request: NextRequest) {
   const dataContatoRaw = typeof body.dataContato === "string" && body.dataContato.trim() ? new Date(body.dataContato) : null
   const dataContato = dataContatoRaw && !Number.isNaN(dataContatoRaw.getTime()) ? dataContatoRaw : null
 
-  const tarefas = await prisma.tarefa.findMany({ where: { id: { in: tarefaIds } }, select: { id: true, responsavelId: true } })
-  const cobradas: number[] = []
-  const ignoradas: Array<{ tarefaId: number; motivo: string }> = []
-  const encontrados = new Set(tarefas.map((t) => t.id))
-  for (const id of tarefaIds) if (!encontrados.has(id)) ignoradas.push({ tarefaId: id, motivo: "tarefa não encontrada" })
-
-  for (const t of tarefas) {
-    if (usuario.tipo !== "admin" && t.responsavelId !== usuario.userId) {
-      ignoradas.push({ tarefaId: t.id, motivo: "não é o responsável" }); continue
-    }
-    const corrente = await subtarefaCorrenteDaTarefa(t.id)
-    if (!corrente) { ignoradas.push({ tarefaId: t.id, motivo: "sem subtarefa em aberto" }); continue }
-    const r = await registrarCobranca({ stepInstanceId: corrente.stepInstanceId, subtaskKey: corrente.subtaskKey, canal, resultado, observacao, registradoPorId: usuario.userId, dataContato })
-    if (r.ok) cobradas.push(t.id)
-    else ignoradas.push({ tarefaId: t.id, motivo: r.motivo })
-  }
-
+  const { cobradas, ignoradas } = await cobrarTarefas({
+    tarefaIds, autor: { userId: usuario.userId, tipo: usuario.tipo }, canal, resultado, observacao, dataContato,
+  })
   return NextResponse.json({ ok: true, cobradas: cobradas.length, ignoradas })
 }

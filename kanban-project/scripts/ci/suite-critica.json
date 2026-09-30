@@ -98,6 +98,12 @@
    "scripts/tempo-operacional.test.ts",
    "scripts/workflow-controls-permissao.test.ts",
    "scripts/guard-gate-build.test.ts"
+  ],
+  "torre de controle — blocos G e H (ações, terceiros, equipe, regras)": [
+   "scripts/torre-bloco-g-lote-e-desfazer.test.ts",
+   "scripts/torre-bloco-g-terceiros-acoes-e-permissoes.test.ts",
+   "scripts/torre-bloco-h-equipe.test.ts",
+   "scripts/torre-bloco-h-regras.test.ts"
   ]
  },
  "arquivos": [
@@ -178,6 +184,10 @@
   "scripts/relatorios-coluna-restrita.test.ts",
   "scripts/seletor-css-valido.test.ts",
   "scripts/workflow-controls-permissao.test.ts",
-  "scripts/guard-gate-build.test.ts"
+  "scripts/guard-gate-build.test.ts",
+  "scripts/torre-bloco-g-lote-e-desfazer.test.ts",
+  "scripts/torre-bloco-g-terceiros-acoes-e-permissoes.test.ts",
+  "scripts/torre-bloco-h-equipe.test.ts",
+  "scripts/torre-bloco-h-regras.test.ts"
  ]
 }

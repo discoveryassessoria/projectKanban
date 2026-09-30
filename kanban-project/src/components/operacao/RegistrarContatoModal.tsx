@@ -35,6 +35,9 @@ export const RESULTADOS_DE_CONTATO_UI = [
   { v: "ENVIOU", l: "Enviou (ainda não recebido)" },
 ] as const
 
+/** Valor especial do seletor de canal: "use o canal cadastrado" — o chamador o OMITE do corpo da requisição. */
+export const CANAL_CADASTRADO = "CADASTRADO"
+
 export interface DadosDeContato {
   canal: string
   resultado: string
@@ -43,17 +46,20 @@ export interface DadosDeContato {
 }
 
 export function RegistrarContatoModal({
-  titulo, subtitulo, canalInicial = "EMAIL", resultadoInicial = "SEM_RESPOSTA",
+  titulo, subtitulo, canalInicial, resultadoInicial = "SEM_RESPOSTA", opcaoCanalCadastrado = false,
   onFechar, onEnviar,
 }: {
   titulo: string
   subtitulo?: string
   canalInicial?: string
+  /** Cobrança em lote/por órgão (Torre, Bloco G): oferece "Canal cadastrado de cada pedido" — o servidor resolve
+   *  o canal de CADA tarefa (solicitação → cadastro do órgão). Chega ao chamador como `canal: CANAL_CADASTRADO`. */
+  opcaoCanalCadastrado?: boolean
   resultadoInicial?: string
   onFechar: () => void
   onEnviar: (dados: DadosDeContato) => Promise<{ ok: boolean; mensagem?: string }>
 }) {
-  const [canal, setCanal] = useState(canalInicial)
+  const [canal, setCanal] = useState(canalInicial ?? (opcaoCanalCadastrado ? CANAL_CADASTRADO : "EMAIL"))
   const [resultado, setResultado] = useState(resultadoInicial)
   const [observacao, setObservacao] = useState("")
   const [dataContato, setDataContato] = useState("")
@@ -88,6 +94,7 @@ export function RegistrarContatoModal({
           <label className="block space-y-1">
             <span className={rot}>Canal</span>
             <select value={canal} onChange={(e) => setCanal(e.target.value)} className={inp}>
+              {opcaoCanalCadastrado && <option value={CANAL_CADASTRADO}>Canal cadastrado de cada pedido</option>}
               {CANAIS_DE_CONTATO_UI.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
             </select>
           </label>

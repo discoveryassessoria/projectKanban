@@ -35,6 +35,10 @@
     {
       "path": "/api/cron/torre-indicadores",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/torre-regras",
+      "schedule": "0 * * * *"
     }
   ]
 }

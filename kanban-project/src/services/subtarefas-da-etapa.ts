@@ -877,6 +877,19 @@ export async function registrarCobranca(args: {
 
   const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id } })
   const cobrancasSemResposta = await cobrancasSemRespostaDesde(vigente.id)
+
+  // RÉGUA DESLIGADA (regra r2 da Torre, Bloco H3): o contato continua sendo
+  // REGISTRADO — é fato histórico, e nenhum interruptor apaga fato — mas a régua
+  // não age: não reagenda o acompanhamento e não liga a escalada. Ligada (o
+  // padrão), o comportamento é exatamente o de sempre.
+  const { regraAtiva } = await import("@/lib/operacional/regras-torre")
+  if (!(await regraAtiva("r2"))) {
+    return {
+      ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta,
+      escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: vigente.proximoAcompanhamentoEm ?? null,
+    }
+  }
+
   const escalada = cobrancasSemResposta >= escalarApos
   const proximoAcompanhamentoEm = prazoOperacional(diasAposCobranca, new Date())
 

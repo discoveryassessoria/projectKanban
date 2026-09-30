@@ -14,9 +14,8 @@
 // sempre "mesmo requerimento, mesmo canal").
 // ============================================================================
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
-import { subtarefasDaEtapa, concluirSubtarefaCorrentePeloPasso } from "@/src/services/subtarefas-da-etapa"
+import { iniciarEnvioDaTarefa } from "@/src/services/iniciar-envio"
 
 export async function POST(request: NextRequest) {
   const erro = await verificarPermissao(request, "tarefas.ver")
@@ -30,49 +29,14 @@ export async function POST(request: NextRequest) {
   const canalKey = typeof body.canalKey === "string" ? body.canalKey : undefined
   const protocolo = typeof body.protocolo === "string" ? body.protocolo : undefined
 
-  const tarefas = await prisma.tarefa.findMany({
-    where: { id: { in: tarefaIds } },
-    select: {
-      id: true, responsavelId: true, workflowStepInstanceId: true,
-      workflowStepInstance: { select: { documentoId: true, documento: { select: { orgaoId: true } } } },
-    },
-  })
-
+  // A execução vive em `iniciar-envio.ts` — a MESMA que a ação rápida "Iniciar"
+  // da Torre usa (Bloco G2). Aqui só o laço do lote.
   const iniciadas: number[] = []
   const ignoradas: Array<{ tarefaId: number; motivo: string }> = []
-  const encontrados = new Set(tarefas.map((t) => t.id))
-  for (const id of tarefaIds) if (!encontrados.has(id)) ignoradas.push({ tarefaId: id, motivo: "tarefa não encontrada" })
-
-  for (const t of tarefas) {
-    if (usuario.tipo !== "admin" && t.responsavelId !== usuario.userId) {
-      ignoradas.push({ tarefaId: t.id, motivo: "não é o responsável" }); continue
-    }
-    if (!t.workflowStepInstanceId) { ignoradas.push({ tarefaId: t.id, motivo: "sem etapa de workflow" }); continue }
-    const fornecedorId = t.workflowStepInstance?.documento?.orgaoId ?? null
-    if (!fornecedorId) { ignoradas.push({ tarefaId: t.id, motivo: "sem órgão vinculado — vincule antes de iniciar" }); continue }
-
-    const subs = await subtarefasDaEtapa({ stepInstanceId: t.workflowStepInstanceId, fornecedorId })
-    const corrente = subs.find((s) => !s.concluida)
-    if (!corrente) { ignoradas.push({ tarefaId: t.id, motivo: "sem subtarefa em aberto" }); continue }
-    const pontoDeEntrada = (corrente.dependeDe ?? []).length === 0
-    const jaTocada = corrente.execucao?.startedAt != null
-    if (!pontoDeEntrada || jaTocada || !corrente.disponivel) {
-      ignoradas.push({ tarefaId: t.id, motivo: "não está 'a iniciar' — já foi enviada ou não é o ponto de entrada" }); continue
-    }
-
-    const r = await concluirSubtarefaCorrentePeloPasso({
-      stepInstanceId: t.workflowStepInstanceId,
-      executadoPorId: usuario.userId,
-      payload: { canalKey, protocolo, enviadoEmLote: true },
-      resultado: "enviado_lote",
-      canalKey,
-      protocolo,
-      fornecedorId,
-      subtarefaKeyEsperada: corrente.key,
-    })
-    if (r.aplicavel) iniciadas.push(t.id)
-    else ignoradas.push({ tarefaId: t.id, motivo: "estado mudou entre a leitura e a execução — tente de novo" })
+  for (const tarefaId of [...new Set<number>(tarefaIds)]) {
+    const r = await iniciarEnvioDaTarefa({ tarefaId, usuario: { userId: usuario.userId, tipo: usuario.tipo }, canalKey, protocolo })
+    if (r.ok) iniciadas.push(tarefaId)
+    else ignoradas.push({ tarefaId, motivo: r.motivo })
   }
-
   return NextResponse.json({ ok: true, iniciadas: iniciadas.length, ignoradas })
 }

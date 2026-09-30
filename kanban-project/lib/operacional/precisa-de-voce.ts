@@ -30,7 +30,7 @@ import { FUSO_OPERACIONAL } from './tempo-operacional'
 import { conferirCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 import { ordensDeFase } from '@/src/services/documento-operacao'
 import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
-import { classificarCarga, type Carga } from './elegibilidade'
+import { pessoasNoLimite } from './torre-equipe'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
   urlDistribuicaoDoProcesso, urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia,
@@ -114,6 +114,13 @@ export interface SugestaoDeResponsavel {
  */
 export async function sugerirResponsavelPrecisaDeVoce(
   tarefaId: number, agora = new Date(), db: Db = prisma,
+  /**
+   * Tarefas que JÁ FORAM decididas para cada pessoa mas ainda não gravadas — quem planeja um
+   * LOTE (regra r1, Bloco H3) soma aqui o que já distribuiu, para o plano balancear como a
+   * execução sequencial balancearia, em vez de mandar tudo para quem está com menos AGORA.
+   * Ausente = comportamento de sempre.
+   */
+  extraAtivas?: ReadonlyMap<number, number>,
 ): Promise<SugestaoDeResponsavel | null> {
   const unidades = await unidadesDasTarefas([tarefaId])
   const unidadeOperacionalId = unidades.get(tarefaId) ?? null
@@ -169,7 +176,7 @@ export async function sugerirResponsavelPrecisaDeVoce(
   const ordenados = elegiveis
     .map((u) => ({
       id: u.id, nome: u.nome,
-      ativas: ativasPorUsuario.get(u.id) ?? 0,
+      ativas: (ativasPorUsuario.get(u.id) ?? 0) + (extraAtivas?.get(u.id) ?? 0),
       atribuicoes30d: atribuicoes30dPorUsuario.get(u.id) ?? 0,
     }))
     .sort((a, b) => (a.ativas - b.ativas) || (a.atribuicoes30d - b.atribuicoes30d) || (a.id - b.id))
@@ -366,30 +373,21 @@ export async function itensPrecisaDeVoce(
     }
   }
 
-  // CARGA — pessoa no limite (ativas ≥ limite do cadastro).
-  const organizacao = await lerOrganizacao(agora)
-  const usuarios = [...organizacao.values()].filter((o) => o.limiteExecutaveis != null)
-  if (usuarios.length) {
-    const ativasBrutas = await db.tarefa.findMany({
-      where: { responsavelId: { in: usuarios.map((u) => u.usuarioId) }, statusTarefa: { in: ['NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE', 'BLOQUEADA'] } },
-      select: { responsavelId: true, statusTarefa: true, dataPrazo: true, prioridade: true, motivoCodigo: true },
+  // CARGA — pessoa no limite (executáveis ≥ limite do cadastro). A MESMA conta da aba Equipe e da
+  // regra r3 (`pessoasNoLimite`, sobre as linhas da Operação) — nunca uma segunda contagem sobre
+  // `Tarefa` cru, que divergia da Operação nas certidões (status/prazo são projeção).
+  for (const u of (await pessoasNoLimite(agora)).values()) {
+    const capacidadeMedida = (await capacidadeMedidaPorUsuario([u.usuarioId], new Map([[u.usuarioId, u.executaveis]]), agora)).get(u.usuarioId)
+    const score = 3 // ATENÇÃO — carga é achado estrutural, não soma de fatores por tarefa.
+    itens.push({
+      tipo: 'CARGA', score, faixa: faixaDoScore(score), tarefaId: null, processoId: null, familiaNome: u.nome,
+      titulo: `${u.nome} no limite: ${u.executaveis} ativas, fecha ~${capacidadeMedida?.mediaSemanal ?? '?'} por semana`,
+      detalhe: `Fila estimada de ${capacidadeMedida?.filaEmSemanas ?? '?'} semana(s).`,
+      sugestao: 'Redistribuir as tarefas "a enviar" para quem tem carga menor.',
+      acao1: { rotulo: 'Redistribuir N', acao: 'REDISTRIBUIR_CARGA' },
+      acao2: { rotulo: 'Ver equipe', acao: 'VER_EQUIPE' },
+      link: '/operacao/distribuicao', contexto: { usuarioId: u.usuarioId },
     })
-    const cargas = classificarCarga(usuarios.map((u) => u.usuarioId), ativasBrutas, agora)
-    for (const u of usuarios) {
-      const c: Carga | undefined = cargas.get(u.usuarioId)
-      if (!c || u.limiteExecutaveis == null || c.executaveis < u.limiteExecutaveis) continue
-      const capacidadeMedida = (await capacidadeMedidaPorUsuario([u.usuarioId], new Map([[u.usuarioId, c.executaveis]]), agora)).get(u.usuarioId)
-      const score = 3 // ATENÇÃO — carga é achado estrutural, não soma de fatores por tarefa.
-      itens.push({
-        tipo: 'CARGA', score, faixa: faixaDoScore(score), tarefaId: null, processoId: null, familiaNome: u.nome,
-        titulo: `${u.nome} no limite: ${c.executaveis} ativas, fecha ~${capacidadeMedida?.mediaSemanal ?? '?'} por semana`,
-        detalhe: `Fila estimada de ${capacidadeMedida?.filaEmSemanas ?? '?'} semana(s).`,
-        sugestao: 'Redistribuir as tarefas "a enviar" para quem tem carga menor.',
-        acao1: { rotulo: 'Redistribuir N', acao: 'REDISTRIBUIR_CARGA' },
-        acao2: { rotulo: 'Ver equipe', acao: 'VER_EQUIPE' },
-        link: '/operacao/distribuicao', contexto: { usuarioId: u.usuarioId },
-      })
-    }
   }
 
   // PAREDE À FRENTE — achados CAD-012/WF-004, abertos e não ignorados agora.

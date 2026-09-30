@@ -324,3 +324,54 @@ este mesmo repositório sem coordenação (trabalho do Bloco D em progresso,
 não commitado). Regra now em vigor: **detectar sessão concorrente → PARAR e
 avisar o usuário**, nunca decidir sozinho revisar/completar o trabalho
 alheio. `ListAgents` deve ser checado antes de iniciar qualquer bloco novo.
+
+
+## Bloco G — Ações sobre tarefas (30/09/2026)
+
+**Nada de regra nova**: toda ação é a porta individual repetida, item a item, com a **sua** linha de `LogAuditoria` por tarefa.
+
+| Ação | Porta reaproveitada | Permissão (a da porta individual) |
+|---|---|---|
+| Atribuir a {pessoa} (lote) | `redistribuirTarefas` (`tarefa-comandos.ts`) | `tarefas.editar` |
+| Prioridade alta (lote) | `redistribuirPrioridade` — pula quem já é ALTA/URGENTE (nunca rebaixa) | `tarefas.editar` |
+| Repactuar prazo (lote, UMA justificativa) | `alterarPrazo` (`tarefa-ciclo.ts`) — mesma validação da individual (motivo obrigatório; encerrada recusada; certidão com solicitação grava `previsaoRetorno` **e** espelha `dataPrazo`). O lote exige uma data (não remove prazo em massa). | `tarefas.editar` |
+| Cobrar cartório (lote) / por linha | `registrarCobranca` via `src/services/cobranca-terceiros.ts` | `tarefas.ver` (não-admin só as próprias) |
+| Iniciar (ação rápida) | `src/services/iniciar-envio.ts` → `concluirSubtarefaCorrentePeloPasso` (pelo motor) | `tarefas.iniciar_concluir` |
+| Cobrar todos os vencidos (N) | rota existente `cobrar-todos-vencidos` (refatorada para o serviço; canal ausente = canal cadastrado) | `tarefas.ver` |
+| Cobrar por cartório / Contatos | `POST/GET /api/torre/terceiros/{orgaoId}/cobrar|contatos` | `tarefas.ver` |
+
+Além da permissão de cada ação, **toda** rota `/api/torre/*` exige ser gestor da Torre (`src/lib/torre-acesso.ts`: `tipo admin` ou `operacao.distribuirTarefas`). A tela só mostra o botão que a API aceitaria; a API confere sempre.
+
+**Desfazer (6 s no toast, 30 s no servidor).** Lê o **próprio** `LogAuditoria` da ação (`de`/`para` por tarefa — nenhuma tabela paralela), restaura o estado anterior real e audita a reversão (`TAREFA_ATRIBUICAO_DESFEITA`, `TAREFA_PRIORIDADE_DESFEITA`, `TAREFA_PRAZO_REPACTUACAO_DESFEITA`). Só desfaz a ação **recente, do próprio autor**, e só se a tarefa ainda está como a ação a deixou (mexida depois = recusa). **Cobrar não tem Desfazer**: `ContatoTerceiro` é fato histórico append-only.
+
+**"Iniciar" só para quem realmente pode** (`motivoDeNaoPoderIniciar`, mesmo predicado na lista e na API): status `NAO_INICIADA`, ponto de entrada não tocado, **fase atual do processo** (fase deixada/futura não), sem dependência aberta (`podeExecutar`) e com órgão vinculado. Bloqueada não inicia.
+
+**"Cobrar todos os vencidos (N)"**: `ehCobravelVencido` (`lib/operacional/torre-predicados.ts`) é o predicado do botão da Operação (`acompanhamentoVencido`, fora da Genealogia, sem encerrada) e é o **mesmo** do filtro "Cobranças vencidas" — o N do botão é a contagem da lista.
+
+**G5 — ligar ao histórico sem duplicar.** Um `ContatoTerceiro` (agora **sempre** com `orgaoId`/`documentoId` da tarefa, por todas as portas de cobrança e pela ligação) aparece no Andamento da tarefa (`andamento-operacional.ts` passou a ler `ContatoTerceiro`) **e** em "Contatos" do órgão — um registro, duas projeções. `Trocar canal` grava na `SolicitacaoDocumento` e **uma** linha `SOLICITACAO_CANAL_ALTERADO` sob a **Tarefa** (com `solicitacaoId`/`orgaoId`), lida pelo Andamento e pelos Contatos do órgão.
+
+**Canal cadastrado** (`canaisCadastrados`): canal da solicitação mais recente (com equivalente de contato) → e-mail/telefone do órgão → e-mail (padrão histórico). O formulário de cobrança em lote/por órgão oferece "Canal cadastrado de cada pedido".
+
+**G6 — painel espelhado**: `DocumentoOperationalDrawer` real, com o painel da Torre injetado por `barraSuperiorExtra` (bola com, prazo, próximo acompanhamento, responsável, passos X/N, **Atribuir a {sugerido}** — o nome vem de `GET /api/torre/tarefas/{id}/sugestao` —, Repactuar, Bloquear com motivo, Reabrir passo, Registrar ligação, Trocar canal). Nenhum botão novo grava por fora: cada um chama a porta existente.
+
+## Bloco H — Equipe e Regras (30/09/2026)
+
+**Equipe (`lib/operacional/torre-equipe.ts`).** Os números vêm das **mesmas linhas da Operação** (`listarTarefasDaTorre` → `cargaPorPessoa`, conta única também usada pela regra r3). Carga = **executáveis** (fora as que esperam terceiro/cliente e as bloqueadas) ÷ `limiteExecutaveis` do cadastro; verde < 70 %, âmbar ≥ 70 %, vermelha ≥ 100 %; sem limite cadastrado não há barra ("sem limite"). Fila em semanas = executáveis ÷ capacidade medida (E1); ≥ 2 vermelho, ≥ 1 âmbar, senão "livre"; sem conclusão medida e com trabalho = "sem base" (nunca "livre" inventado). Bate com `/api/operacao/capacidade` (provado em teste).
+
+**Ausência não move nada.** Marcar/Cancelar ausência reusa `PATCH /api/operacao/capacidade` (só registro + sucessor sugerido, E2). **Mover carteira** é ação manual (`redistribuirTarefas`), só o que o destino é apto a executar (mesma regra opt-in de aptidão da sugestão). **Simular saída** só lê (provado: tarefas, auditoria e ausências idênticas antes e depois); "Aplicar" registra a ausência com o sucessor sugerido **e** move a carteira — um clique deliberado sobre um impacto já mostrado; o Desfazer dele encerra a ausência junto (senão o motor recusa devolver trabalho a quem está ausente).
+
+**Previsão de 4 semanas**: vencimentos (prazo da linha) por pessoa por semana, semanas calculadas de hoje no fuso operacional; a linha "Sem responsável" fecha a soma com a Operação.
+
+**Regras — só r1, r2, r3** (`lib/operacional/regras-torre.ts`, estado em `ConfiguracaoSistema` grupo `torre`, **sem migration**; ausência de linha = padrão). Não existem r4, r5 nem "tempo aprendido".
+
+| Regra | Nasce | Onde executa | Desligada |
+|---|---|---|---|
+| r1 Atribuição automática | **desligada** | `executarR1` (cron horário `/api/cron/torre-regras` e "Aplicar agora") — para cada SEM_DONO do "Precisa de você", atribui à sugestão, balanceando o que o próprio plano já distribuiu | devolve `REGRA_DESLIGADA` sem calcular nem escrever |
+| r2 Régua de cobrança | **ativa** | `registrarCobranca` (reagenda o acompanhamento e liga a escalada) — texto lido do cadastro publicado (`diasAposCobranca`/`escalarApos`/esperas), nunca números fixos | o contato continua **registrado** (fato histórico), mas a régua não reagenda nem escala |
+| r3 Limite de carga | **desligada** | dentro de `executarR1`: quem está no limite (executáveis ≥ limite) não recebe atribuição automática; a tarefa fica sem dono para decisão em "Precisa de você" | limite ignorado |
+
+Simular usa os dados de hoje e **nunca grava** (nem com a regra ligada). Ativar/Desativar é auditado (`REGRA_TORRE_ATIVADA/DESATIVADA`, `de`/`para`, autor) e idempotente. Esta unidade **não altera** o item "Carga" do "Precisa de você" (Bloco F), que segue lendo `Tarefa` cru — ver a nota do relatório sobre a divergência possível com a aba Equipe para certidões.
+
+**Interface provisória**: `/torre` (sem item de menu — Decisão 3) com Tarefas · Terceiros · Equipe · Regras. As demais abas e o shell final são dos Blocos I e J, que reaproveitam estes componentes (`src/components/torre/`).
+
+**Testes** (na suíte crítica): `torre-bloco-g-lote-e-desfazer`, `torre-bloco-g-terceiros-acoes-e-permissoes`, `torre-bloco-h-equipe`, `torre-bloco-h-regras`.

@@ -194,6 +194,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // O backfill de resíduos NÃO entra aqui: ele não remove nenhum dos quatro
   // modelos protegidos (só Tarefa, Passo e Necessidade — esta pelo serviço dono).
   "scripts/guard-ciclo-vida-pessoa.test.ts": "este guard (cita os padrões que procura)",
+  "scripts/_fixture-torre-gh.ts":
+    "fixture compartilhada dos testes da Torre de Controle (Blocos G e H, 30/09/2026): monta e derruba " +
+    "os PRÓPRIOS processos, árvores, pessoas e documentos (marca de cada teste, ex.: TORREG2) só no " +
+    "banco de teste — nenhuma pessoa real é removida por ela",
   "scripts/invalidacao-downstream.test.ts":
     "cadeia de impacto downstream de invalidação pós-validação (mandato Emissão Documental): " +
     "monta e derruba a PRÓPRIA árvore/pessoa/documento (marca INVDOWN) só no banco de teste — " +

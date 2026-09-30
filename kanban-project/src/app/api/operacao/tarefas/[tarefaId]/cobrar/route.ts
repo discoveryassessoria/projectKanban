@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { negarSeNaoForDonoDaTarefaPorId } from "@/src/lib/tarefa-acesso"
+import { prisma } from "@/lib/prisma"
 import { registrarCobranca, subtarefaCorrenteDaTarefa, CANAIS_DE_CONTATO, RESULTADOS_DE_CONTATO } from "@/src/services/subtarefas-da-etapa"
 
 const CANAIS_VALIDOS = new Set<string>(CANAIS_DE_CONTATO)
@@ -57,14 +58,20 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   }
   const dataContato = typeof body.dataContato === "string" && body.dataContato.trim() ? new Date(body.dataContato) : null
 
+  // O ÓRGÃO E O DOCUMENTO DO CONTATO vêm da própria tarefa quando o corpo não
+  // os traz (Bloco G5): é o que faz o histórico do órgão enxergar a cobrança
+  // feita por ESTA porta, sem um segundo registro.
+  const daTarefa = await prisma.tarefa.findUnique({
+    where: { id: tarefaId }, select: { orgaoId: true, documentoId: true, documento: { select: { orgaoId: true } } },
+  })
   const r = await registrarCobranca({
     stepInstanceId: corrente.stepInstanceId,
     subtaskKey: corrente.subtaskKey,
     canal,
     resultado,
     observacao: typeof body.observacao === "string" ? body.observacao.trim() || null : null,
-    documentoId: Number.isFinite(Number(body.documentoId)) ? Number(body.documentoId) : null,
-    orgaoId: Number.isFinite(Number(body.orgaoId)) ? Number(body.orgaoId) : null,
+    documentoId: Number.isFinite(Number(body.documentoId)) ? Number(body.documentoId) : (daTarefa?.documentoId ?? null),
+    orgaoId: Number.isFinite(Number(body.orgaoId)) ? Number(body.orgaoId) : (daTarefa?.orgaoId ?? daTarefa?.documento?.orgaoId ?? null),
     registradoPorId: usuario.userId,
     dataContato: dataContato && !Number.isNaN(dataContato.getTime()) ? dataContato : null,
   })

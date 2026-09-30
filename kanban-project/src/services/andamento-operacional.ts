@@ -131,6 +131,9 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   // é a etapa que reabre, por instância, não a tarefa inteira). Sem entrada
   // aqui, a timeline mostrava o código bruto como título.
   STEP_EXECUTION_REOPENED: "Etapa reaberta",
+  // Torre de Controle, Bloco G5 — a troca de canal da solicitação é gravada
+  // sob a TAREFA (uma linha só), para aparecer aqui e no histórico do órgão.
+  SOLICITACAO_CANAL_ALTERADO: "Canal da solicitação alterado",
 }
 
 // ── Tradução das ações de TarefaHistorico já escritas hoje (Torre de
@@ -143,10 +146,19 @@ const TITULO_HISTORICO_ACAO: Record<string, string> = {
 const CATEGORIA_HISTORICO_ACAO = (acao: string): EventoAndamento["categoria"] =>
   acao === "COMENTARIO" ? "observacao" : "prazo"
 const CATEGORIA_LOG_ACAO = (acao: string): EventoAndamento["categoria"] => {
+  if (acao === "SOLICITACAO_CANAL_ALTERADO") return "solicitacao"
   if (acao.includes("PRAZO")) return "prazo"
   if (acao.includes("ATRIBU") || acao.includes("TRANSFER") || acao.includes("REDISTRIB") || acao.includes("DEVOLVIDA")) return "responsabilidade"
   if (acao.includes("CANCEL") || acao.includes("CAUSA_DECIDIDA") || acao.includes("REABERT") || acao.includes("REOPENED")) return "decisao"
   return "execucao"
+}
+
+const ROTULO_CANAL_CONTATO: Record<string, string> = {
+  EMAIL: "e-mail", TELEFONE: "telefone", WHATSAPP: "WhatsApp", OFICIO: "ofício", PRESENCIAL: "presencial",
+}
+const ROTULO_RESULTADO_CONTATO: Record<string, string> = {
+  SEM_RESPOSTA: "sem resposta", CONFIRMOU_PEDIDO: "confirmou o pedido", PEDIU_DOCUMENTO: "pediu documento",
+  EM_BUSCA: "em busca", NAO_LOCALIZOU: "não localizou", ENVIOU: "enviou",
 }
 
 interface EscopoTarefa {
@@ -201,7 +213,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
   const stepIds = stepsDaObrigacao.map((s) => s.id)
   const tituloDoStep = new Map(stepsDaObrigacao.map((s) => [s.id, s.stepKey]))
 
-  const [logs, historicoTarefa, workflowEventosTarefa, workflowEventosStep, necEventos, anexos, observacoes] = await Promise.all([
+  const [logs, historicoTarefa, workflowEventosTarefa, workflowEventosStep, necEventos, anexos, observacoes, contatosTerceiro] = await Promise.all([
     escopo.tarefaId != null
       ? prisma.logAuditoria.findMany({
           where: { entidade: { in: ["Tarefa", "TAREFA"] }, entidadeId: escopo.tarefaId },
@@ -237,6 +249,16 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
           orderBy: { createdAt: "desc" },
         })
       : Promise.resolve([]),
+    // CONTATOS COM O TERCEIRO (cobranças, ligações) — o MESMO registro
+    // `ContatoTerceiro` que o histórico do órgão lê (Torre, Bloco G5): um fato,
+    // duas projeções. Nunca uma segunda gravação.
+    escopo.tarefaId != null
+      ? prisma.contatoTerceiro.findMany({
+          where: { tarefaId: escopo.tarefaId },
+          select: { id: true, canal: true, resultado: true, observacao: true, registradoPorId: true, registradoEm: true, orgao: { select: { name: true } } },
+          orderBy: { registradoEm: "desc" },
+        })
+      : Promise.resolve([]),
   ])
 
   // Todos os IDs de usuário referenciados — UMA consulta, nunca N+1 por evento.
@@ -253,6 +275,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
   for (const a of anexos) if (a.criadoPorId != null) idsUsuario.add(a.criadoPorId)
   for (const o of observacoes) if (o.criadoPorId != null) idsUsuario.add(o.criadoPorId)
   for (const h of historicoTarefa) if (h.usuarioId != null) idsUsuario.add(h.usuarioId)
+  for (const c of contatosTerceiro) if (c.registradoPorId != null) idsUsuario.add(c.registradoPorId)
   const usuarios = idsUsuario.size
     ? await prisma.usuario.findMany({ where: { id: { in: [...idsUsuario] } }, select: { id: true, nome: true } })
     : []
@@ -320,6 +343,20 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       de: null, para: null,
       etapa: typeof dados.subtaskKey === "string" ? dados.subtaskKey : null,
       motivo: h.acao !== "COMENTARIO" ? h.descricao : null,
+      referencias: { tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined },
+    })
+  }
+
+  for (const c of contatosTerceiro) {
+    eventos.push({
+      id: `contato:${c.id}`,
+      tipo: "CONTATO_TERCEIRO",
+      categoria: "solicitacao",
+      data: c.registradoEm.toISOString(),
+      autor: autorDe(c.registradoPorId, nomesUsuario),
+      titulo: c.canal === "TELEFONE" ? "Ligação ao terceiro" : "Cobrança ao terceiro",
+      descricao: `${c.orgao?.name ? `${c.orgao.name} · ` : ""}${ROTULO_CANAL_CONTATO[c.canal] ?? c.canal} · ${ROTULO_RESULTADO_CONTATO[c.resultado] ?? c.resultado}${c.observacao ? ` — ${c.observacao}` : ""}`,
+      de: null, para: null, etapa: null, motivo: null,
       referencias: { tarefaId: escopo.tarefaId ?? undefined, documentoId: escopo.documentoId ?? undefined },
     })
   }

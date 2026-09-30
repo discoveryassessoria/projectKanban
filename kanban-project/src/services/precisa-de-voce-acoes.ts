@@ -17,7 +17,7 @@ import { atribuirTarefa, redistribuirTarefas } from '@/lib/operacional/tarefa-co
 import { cancelarTarefa, desbloquearTarefa, devolverAFila } from '@/lib/operacional/tarefa-ciclo'
 import { sugerirResponsavelPrecisaDeVoce } from '@/lib/operacional/precisa-de-voce'
 import { ignorarAchado } from '@/lib/saude/persistencia'
-import { subtarefaCorrenteDaTarefa, registrarCobranca } from '@/src/services/subtarefas-da-etapa'
+import { subtarefaCorrenteDaTarefa, registrarCobranca, RESULTADOS_DE_CONTATO } from '@/src/services/subtarefas-da-etapa'
 import { projetarTarefaDoPasso, paresCoerentes, STATUS_TAREFA_POR_PASSO } from '@/src/services/passo-tarefa-projecao'
 
 type Resultado = { ok: true; mensagem: string; [k: string]: unknown } | { ok: false; erro: string }
@@ -99,16 +99,24 @@ export async function ver3Fontes(tarefaId: number): Promise<Resultado> {
 
 // ─── ESCALADA ────────────────────────────────────────────────────────────────
 
-export async function registrarLigacao(tarefaId: number, autorId: number, observacao?: string | null): Promise<Resultado> {
+export async function registrarLigacao(
+  tarefaId: number, autorId: number, observacao?: string | null, resultado = 'SEM_RESPOSTA',
+): Promise<Resultado> {
+  if (!(RESULTADOS_DE_CONTATO as readonly string[]).includes(resultado)) return { ok: false, erro: `resultado inválido; use um de ${RESULTADOS_DE_CONTATO.join(', ')}` }
   const corrente = await subtarefaCorrenteDaTarefa(tarefaId)
   if (!corrente) return { ok: false, erro: 'sem subtarefa corrente — nada para registrar' }
+  // O ÓRGÃO E O DOCUMENTO DO CONTATO vêm da própria tarefa (Bloco G5): o MESMO
+  // `ContatoTerceiro` aparece no Andamento da tarefa (por `tarefaId`) e no
+  // histórico do órgão (por `orgaoId`) — um registro, duas projeções.
+  const t = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { orgaoId: true, documentoId: true, documento: { select: { orgaoId: true } } } })
   const r = await registrarCobranca({
     stepInstanceId: corrente.stepInstanceId, subtaskKey: corrente.subtaskKey,
-    canal: 'TELEFONE', resultado: 'SEM_RESPOSTA', observacao: observacao ?? 'Ligação registrada pelo Precisa de você.',
+    canal: 'TELEFONE', resultado, observacao: observacao ?? 'Ligação registrada pela Torre.',
+    documentoId: t?.documentoId ?? null, orgaoId: t?.orgaoId ?? t?.documento?.orgaoId ?? null,
     registradoPorId: autorId,
   })
   if (!r.ok) return { ok: false, erro: r.motivo }
-  return { ok: true, mensagem: 'Ligação registrada.', tarefaId, cobrancasSemResposta: r.cobrancasSemResposta }
+  return { ok: true, mensagem: 'Ligação registrada.', tarefaId, contatoId: r.contatoId, cobrancasSemResposta: r.cobrancasSemResposta }
 }
 
 const CANAIS_SOLICITACAO = ['CRC', 'ECARTORIO', 'EMAIL', 'WHATSAPP', 'BALCAO', 'COMUNE', 'CORREIOS', 'CONSULADO'] as const
@@ -118,11 +126,15 @@ export async function trocarCanal(tarefaId: number, novoCanal: string, autorId: 
   const solicitacao = await prisma.solicitacaoDocumento.findFirst({ where: { tarefaId }, orderBy: { createdAt: 'desc' }, select: { id: true, canal: true } })
   if (!solicitacao) return { ok: false, erro: 'nenhuma solicitação vinculada a esta tarefa' }
   const de = solicitacao.canal
+  if (de === novoCanal) return { ok: false, erro: 'a solicitação já usa este canal' }
+  const t = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { orgaoId: true, documento: { select: { orgaoId: true } } } })
   await prisma.solicitacaoDocumento.update({ where: { id: solicitacao.id }, data: { canal: novoCanal as never } })
+  // UMA linha de auditoria, gravada sob a TAREFA (Bloco G5): é dali que o
+  // Andamento da tarefa lê, e o histórico do órgão a encontra por `detalhes.orgaoId`.
   await registrarAuditoriaSimples({
-    acao: 'SOLICITACAO_CANAL_ALTERADO', entidade: 'SolicitacaoDocumento', entidadeId: solicitacao.id, usuarioId: autorId,
-    descricao: `Canal da solicitação #${solicitacao.id} (tarefa #${tarefaId}) alterado: ${de} → ${novoCanal} (Precisa de você).`,
-    detalhes: { tarefaId, de, para: novoCanal },
+    acao: 'SOLICITACAO_CANAL_ALTERADO', entidade: 'Tarefa', entidadeId: tarefaId, usuarioId: autorId,
+    descricao: `Canal da solicitação #${solicitacao.id} (tarefa #${tarefaId}) alterado: ${de} → ${novoCanal}.`,
+    detalhes: { tarefaId, solicitacaoId: solicitacao.id, orgaoId: t?.orgaoId ?? t?.documento?.orgaoId ?? null, de, para: novoCanal },
   })
   return { ok: true, mensagem: `Canal alterado para ${novoCanal}.`, tarefaId }
 }
@@ -206,7 +218,7 @@ export async function ignorar7Dias(achadoId: number, justificativa: string, auto
  * (ou para a fila, se `de` era nulo). Se algo mudou depois, recusa — desfazer
  * uma decisão que já foi sobreposta por outra apagaria a mais recente.
  */
-export async function desfazerAtribuicao(tarefaIds: number[], autorId: number): Promise<{
+export async function desfazerAtribuicao(tarefaIds: number[], autorId: number, origem = 'Precisa de você'): Promise<{
   total: number; desfeitas: number; itens: Array<{ tarefaId: number; ok: boolean; mensagem: string }>
 }> {
   const itens: Array<{ tarefaId: number; ok: boolean; mensagem: string }> = []
@@ -226,8 +238,8 @@ export async function desfazerAtribuicao(tarefaIds: number[], autorId: number): 
     }
 
     const r = detalhes.de == null
-      ? await devolverAFila({ tarefaId, autorId, motivo: 'desfazer atribuição (Precisa de você)' })
-      : await atribuirTarefa({ tarefaId, responsavelId: detalhes.de, autorId, motivo: 'desfazer atribuição (Precisa de você)' })
+      ? await devolverAFila({ tarefaId, autorId, motivo: `desfazer atribuição (${origem})` })
+      : await atribuirTarefa({ tarefaId, responsavelId: detalhes.de, autorId, motivo: `desfazer atribuição (${origem})` })
     if (!r.ok) { itens.push({ tarefaId, ok: false, mensagem: r.mensagem }); continue }
 
     await registrarAuditoriaSimples({

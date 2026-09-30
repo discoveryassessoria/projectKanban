@@ -89,6 +89,9 @@ const API_PUBLICA: string[] = [
   // Foto diária dos indicadores da Torre (06:00 SP, Bloco E10, 29/09/2026).
   // Auto-verifica: x-vercel-cron, CRON_SECRET ou operador com usuarios.gerenciar.
   "/api/cron/torre-indicadores",
+  // Execução das regras da Torre (de hora em hora, Bloco H3, 30/09/2026). Auto-verifica como o
+  // anterior; com r1 desligada (padrão) não faz nada.
+  "/api/cron/torre-regras",
 ]
 
 function isApiPublica(pathname: string): boolean {

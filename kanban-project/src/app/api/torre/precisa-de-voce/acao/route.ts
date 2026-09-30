@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(r, { status: r.ok ? 200 : 404 })
       }
       case 'REGISTRAR_LIGACAO': {
-        const r = await acoes.registrarLigacao(tarefaId, autorId, typeof b?.observacao === 'string' ? b.observacao : null)
+        const r = await acoes.registrarLigacao(tarefaId, autorId, typeof b?.observacao === 'string' ? b.observacao : null, typeof b?.resultado === 'string' ? b.resultado.toUpperCase() : undefined)
         return NextResponse.json(r, { status: r.ok ? 200 : 422 })
       }
       case 'TROCAR_CANAL': {

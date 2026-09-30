@@ -1,0 +1,57 @@
+/* Torre de Controle — estilos (tokens do Discovery Design System; nenhuma cor fora deles). */
+.tor { font-size: 13px; color: var(--text-primary); }
+.tor .small { font-size: 11.5px; color: var(--text-secondary); }
+.tor-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border-default); margin-bottom: 14px; }
+.tor-tab { padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--text-secondary); border-bottom: 2px solid transparent; background: transparent; cursor: pointer; }
+.tor-tab[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--action-primary); }
+.tor-tab .n { margin-left: 6px; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface-tertiary); }
+.tor-faixa { font-size: 11.5px; color: var(--text-secondary); background: var(--surface-secondary); border: 1px dashed var(--border-default); border-radius: 8px; padding: 6px 10px; margin-bottom: 12px; }
+.tor-card { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+.tor-card.pad { padding: 14px; }
+.tor-scroll { overflow-x: auto; }
+.tor-hd, .tor-row { display: grid; align-items: center; gap: 10px; padding: 8px 12px; min-width: 980px; }
+.tor-hd { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); background: var(--surface-tertiary); }
+.tor-row { border-top: 1px solid var(--border-default); }
+.tor-row.sel { background: var(--info-tile); }
+.tor-gT { grid-template-columns: 28px minmax(220px, 2.2fr) 1.1fr 1.3fr 1fr 1fr 1fr .9fr 190px; }
+.tor-gC { grid-template-columns: minmax(200px, 1.6fr) .6fr .9fr 2fr .8fr 1fr 190px; }
+.tor-gE { grid-template-columns: minmax(230px, 2fr) 1.5fr .5fr .6fr .5fr .8fr 260px; }
+.tor-grp { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-tertiary); }
+.tor-chk { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border-default); background: var(--surface-popover); cursor: pointer; padding: 0; }
+.tor-chk.on { background: var(--action-primary); border-color: var(--action-primary); }
+.tor-chk.mid { background: var(--info-tile); border-color: var(--info); }
+.tor-p { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; }
+.tor-p.red { background: var(--danger-tile); color: var(--danger-text); }
+.tor-p.amb { background: var(--warning-tile); color: var(--warning-text); }
+.tor-p.grn { background: var(--success-tile); color: var(--success-text); }
+.tor-p.blu { background: var(--info-tile); color: var(--info-text); }
+.tor-p.gry { background: var(--surface-tertiary); color: var(--text-secondary); }
+.tor-btn { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); cursor: pointer; }
+.tor-btn:hover:not(:disabled) { background: var(--surface-tertiary); }
+.tor-btn:disabled { opacity: .55; cursor: not-allowed; }
+.tor-btn.pri { background: var(--action-primary); color: var(--action-primary-ink); border-color: transparent; }
+.tor-btn.pri:hover:not(:disabled) { background: var(--action-primary-hover); }
+.tor-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.tor-sel { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; background: var(--info-tile); border: 1px solid var(--info); border-radius: 10px; padding: 5px 8px; }
+.tor-in { font-size: 13px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); }
+.tor-meter { height: 8px; border-radius: 6px; background: var(--surface-tertiary); overflow: hidden; margin-bottom: 3px; }
+.tor-meter i { display: block; height: 100%; }
+.tor-meter i.verde { background: var(--success); }
+.tor-meter i.ambar { background: var(--warning); }
+.tor-meter i.vermelha { background: var(--danger); }
+.tor-prev { display: grid; grid-template-columns: 160px repeat(4, minmax(80px, 1fr)); gap: 6px; font-size: 13px; align-items: center; }
+.tor-cell { border-radius: 6px; padding: 8px 6px; text-align: center; min-height: 36px; border: 1px solid var(--border-default); }
+.tor-cell.h0 { color: var(--text-muted); }
+.tor-cell.h1 { background: var(--info-tile); color: var(--info-text); }
+.tor-cell.h2 { background: var(--warning-tile); color: var(--warning-text); }
+.tor-cell.h3 { background: var(--danger-tile); color: var(--danger-text); font-weight: 700; }
+.tor-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10080; display: flex; gap: 10px; align-items: center; max-width: min(92vw, 720px); background: var(--surface-popover); color: var(--text-primary); border: 1px solid var(--border-default); box-shadow: var(--elev-3); border-radius: 12px; padding: 10px 14px; }
+.tor-passos { display: flex; gap: 6px; flex-wrap: wrap; }
+.tor-passo { flex: 1; min-width: 70px; border: 1px solid var(--border-default); border-radius: 8px; padding: 6px 8px; font-size: 11.5px; background: var(--surface-popover); }
+.tor-passo.done { background: var(--success-tile); color: var(--success-text); }
+.tor-passo.cur { background: var(--info-tile); color: var(--info-text); border-color: var(--info); font-weight: 700; }
+.tor-painel { background: var(--surface-secondary); border-bottom: 1px solid var(--border-default); padding: 12px 18px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; max-height: 45vh; overflow-y: auto; }
+.tor-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tor-kv b { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+.tor-gaveta { position: fixed; inset: 0; z-index: 10001; display: flex; justify-content: flex-end; background: var(--overlay-modal); }
+.tor-gaveta > div { width: min(560px, 100%); background: var(--surface-popover); height: 100%; overflow-y: auto; }
