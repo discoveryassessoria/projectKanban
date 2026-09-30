@@ -85,7 +85,7 @@ async function palco(sufixo: string, statusWorkflow: "ATIVO" | "CONCLUIDO" | "CA
     },
   })
   await reconciliarTarefas({ processoId: proc.id })
-  const t = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc.id }, select: { id: true } })
+  const t = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc.id, workflowInstanceId: inst.id }, select: { id: true } })
   return { processoId: proc.id, pessoaId: pes.id, necessidadeId: nec.id, tarefaId: t.id, workflowInstanceId: inst.id }
 }
 
@@ -149,8 +149,10 @@ async function main() {
   // tarefa (porque o passo está DISPONIVEL) já a encontra sem causa e a encerra.
   // Não são duas rodadas: é uma só, criação e encerramento na mesma passagem —
   // ainda mais forte que "encerra depois": prova que nem chega a ficar aberta.
+  // Todo Processo nasce com a Tarefa ADMINISTRATIVA "Atribuir tarefas" (origem obrigacao-atribuicao);
+  // a tarefa de emissão é a do workflow desta instância, por identidade (não pela contagem do processo).
   const r3criacao = await reconciliarTarefas({ processoId: proc3.id })
-  const tarefa3 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc3.id }, select: { id: true, necessidadeId: true, documentoId: true, statusTarefa: true } })
+  const tarefa3 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc3.id, workflowInstanceId: inst3.id }, select: { id: true, necessidadeId: true, documentoId: true, statusTarefa: true } })
   ok("3a) tarefa de emissão liga por documentoId, não necessidadeId", tarefa3.necessidadeId === null && tarefa3.documentoId === doc3.id)
   ok("3b) já na criação, a tarefa nasce e é encerrada por documento cancelado na mesma passagem", r3criacao.tarefasEncerradasSemCausa === 1, String(r3criacao.tarefasEncerradasSemCausa))
   ok("3c) TAREFA DE EMISSÃO TAMBÉM FOI CANCELADA", tarefa3.statusTarefa === "CANCELADA")
@@ -203,7 +205,7 @@ async function main() {
     select: { id: true },
   })
   await reconciliarTarefas({ processoId: proc6.id })
-  const tarefa6 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc6.id }, select: { id: true } })
+  const tarefa6 = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc6.id, workflowInstanceId: inst6.id }, select: { id: true } })
 
   // documentacao=false (Priscila-like): dispensa tudo.
   await dispensarNecessidade(nec6.id, "teste: fora da linhagem, documentacao=false")

@@ -303,8 +303,15 @@ async function main() {
   ok("O) as legítimas passaram apesar da inválida",
     (await ler(l1.tarefaId)).responsavelId === joao.id && (await ler(l2.tarefaId)).responsavelId === joao.id)
   ok("O) e a inválida veio com o motivo", lote.itens.find((i) => i.tarefaId === l3.tarefaId)?.codigo === "TERMINAL")
-  ok("O) nenhuma tarefa foi duplicada",
-    (await prisma.tarefa.count({ where: { processoId: { in: [l1.processoId, l2.processoId, l3.processoId] } } })) === 3)
+  // O processo também ganha a obrigação ADMINISTRATIVA "Atribuir tarefas"
+  // (lib/operacional/obrigacao-atribuicao.ts: UMA por processo, natureza
+  // própria — nunca trabalho duplicado). O invariante aqui: o TRABALHO
+  // (tipo NORMAL) segue 1 por processo, e a obrigação administrativa nunca passa de 1.
+  const procsLote = [l1.processoId, l2.processoId, l3.processoId]
+  ok("O) nenhuma tarefa de trabalho foi duplicada",
+    (await prisma.tarefa.count({ where: { processoId: { in: procsLote }, tipo: "NORMAL" } })) === 3)
+  const adminPorProc = await prisma.tarefa.groupBy({ by: ["processoId"], where: { processoId: { in: procsLote }, tipo: "ADMINISTRATIVA" }, _count: { _all: true } })
+  ok("O) a obrigação administrativa é no máximo UMA por processo", adminPorProc.every((g) => g._count._all === 1))
   const devolve = await redistribuirTarefas({ tarefaIds: [l1.tarefaId], novoResponsavelId: null, autorId: gestor.id })
   ok("O) responsável null devolve à fila", devolve.sucesso === 1 && (await ler(l1.tarefaId)).responsavelId === null)
 

@@ -72,8 +72,16 @@ console.log("\n(A2) Retrocesso manual NÃO é destrutivo")
 
 const trechoMover = advance.slice(advance.indexOf("export async function movePhaseManual"))
 check("movePhaseManual não apaga tarefa", !/deleteMany|\.delete\(/.test(trechoMover))
-check("movePhaseManual não reabre nem conclui passo", !/CONCLUIDO|reabrir/i.test(trechoMover))
-check("a fase de origem é SUPERSEDIDA, nunca concluída", trechoMover.includes('encerramento: "SUPERSEDER"'))
+// Mover não mexe em PASSO nem TAREFA (só na instância de fase): sem reabrir e sem
+// escrita em StepInstance/Tarefa dentro da função (comentários não contam).
+const codigoMover = semComentarios(trechoMover.slice(0, trechoMover.indexOf("async function materializarFasesPuladas")))
+check("movePhaseManual não reabre nem conclui passo",
+  !/reabrir|phaseWorkflowStepInstance\.(update|updateMany)|tarefa\.(update|updateMany)/i.test(codigoMover))
+// Decisão de produto (Catálogo de Fases, 20/09/2026): a origem só é CONCLUÍDA se o
+// MESMO gate canônico (snap.pend.canAdvance) diz que estava satisfeita; caso
+// contrário é SUPERSEDIDA — a conclusão nunca é forjada; preservarHistorico = NENHUM.
+check("a fase de origem só é concluída pelo gate canônico; senão é SUPERSEDIDA (nunca conclusão forjada)",
+  /encerramento:\s*preservarHistorico\s*\?\s*"NENHUM"\s*:\s*\(snap\.pend\.canAdvance\s*\?\s*"CONCLUIR"\s*:\s*"SUPERSEDER"\)/.test(codigoMover))
 check("o destino ganha um ciclo novo (a visita é outra)", trechoMover.includes("proximoCiclo"))
 
 // ============================================================

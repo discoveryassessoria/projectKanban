@@ -78,7 +78,7 @@ async function main() {
   await limpar()
 
   const admin = await prisma.usuario.create({ data: { nome: "Admin GateFin", email: "admin@gatefin.test", senha: "x", tipo: "admin" }, select: { id: true } })
-  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País GateFin", modalityKey: `${MARCA}_modal`, modalityLabel: "Modalidade GateFin" })
+  const oferta = await garantirOferta(prisma, { countryKey: `${MARCA}_pais`, countryLabel: "País GateFin", modalityKey: "administrativa", modalityLabel: "Modalidade GateFin" })
   const tipo = await prisma.tipoProcessoNacionalidade.create({ data: { code: `${MARCA}_TIPO`, name: `${MARCA} Tipo`, paisId: oferta.paisId }, select: { id: true } })
   await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, ativo: true } })
   const macro = await prisma.macroWorkflow.create({ data: { tipoProcessoId: tipo.id, modalidadeId: oferta.modalidadeId, name: `${MARCA} macro`, versao: 1 }, select: { id: true } })

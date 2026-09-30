@@ -154,6 +154,12 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/palco-central-500.ts":
     "palco visual de escala: monta 500 obrigações PRÓPRIAS (marca ESCALA500) só no banco de teste — " +
     "a validação visual precisa de uma tela de pé, e o teste de escala derruba a dele",
+  "scripts/prazo-solicitacao-documento.test.ts":
+    "prazo da solicitação documental: cria as PRÓPRIAS necessidades/documentos (marca PRAZOSOLDOC) só no banco de teste — " +
+    "antes lia dados reais de produção que o banco do gate não tem",
+  "scripts/situacao-solicitacao-certidao.test.ts":
+    "situação da solicitação de certidão: cria as PRÓPRIAS 8 necessidades (uma por situação) só no banco de teste — " +
+    "antes lia o processo 651 de produção, que o banco do gate não tem",
   "scripts/distribuicao-500-tarefas.test.ts":
     "escala da distribuição: cria as PRÓPRIAS tarefas (marca DIST500) só no banco de teste — " +
     "quinhentas tarefas para provar lote, concorrência e recomendação sob volume",

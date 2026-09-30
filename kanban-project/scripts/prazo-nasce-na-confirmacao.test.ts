@@ -58,6 +58,8 @@ async function limpar() {
   await prisma.faseMacro.deleteMany({ where: { phaseKey: PHASE_KEY } })
   await prisma.macroWorkflow.deleteMany({ where: { name: { startsWith: MARCA } } })
   await prisma.phaseInternalWorkflow.deleteMany({ where: { wfUid: { startsWith: MARCA } } })
+  await prisma.tipoProcessoModalidadeHabilitada.deleteMany({ where: { tipoProcesso: { code: { startsWith: MARCA } } } })
+  await prisma.tipoProcessoNacionalidade.deleteMany({ where: { code: { startsWith: MARCA } } })
 }
 
 async function main() {
@@ -66,14 +68,16 @@ async function main() {
   console.log("BUG 1 — prazo da Tarefa só nasce quando o passo 2 (confirmação) conclui\n")
 
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
-  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ select: { id: true, paisId: true } })
-  if (!tipo) throw new Error("Banco de teste sem nenhum TipoProcessoNacionalidade — rode o seed base primeiro.")
-  const pais = await prisma.catalogoPais.findUniqueOrThrow({ where: { id: tipo.paisId }, select: { countryKey: true } })
-  let habilitacao = await prisma.tipoProcessoModalidadeHabilitada.findFirst({ where: { tipoProcessoId: tipo.id } })
-  if (!habilitacao) {
-    const modalidade = await prisma.modalidadePais.findFirstOrThrow()
-    habilitacao = await prisma.tipoProcessoModalidadeHabilitada.create({ data: { tipoProcessoId: tipo.id, modalidadeId: modalidade.id, ativo: true } })
-  }
+  // O banco-modelo do gate não traz Tipo de Processo: o teste monta o próprio (marcado e limpo em limpar()).
+  const paisBase = await prisma.catalogoPais.findFirstOrThrow({ select: { id: true, countryKey: true } })
+  const modalidadeBase = await prisma.modalidadePais.findFirstOrThrow({ where: { paisId: paisBase.id }, select: { id: true } })
+  const tipo = await prisma.tipoProcessoNacionalidade.create({
+    data: { code: `${MARCA}_TIPO`, name: `${MARCA} tipo`, paisId: paisBase.id }, select: { id: true },
+  })
+  const pais = { countryKey: paisBase.countryKey }
+  const habilitacao = await prisma.tipoProcessoModalidadeHabilitada.create({
+    data: { tipoProcessoId: tipo.id, modalidadeId: modalidadeBase.id, ativo: true },
+  })
   const macro = await prisma.macroWorkflow.upsert({
     where: { tipoProcessoId_modalidadeId: { tipoProcessoId: tipo.id, modalidadeId: habilitacao.modalidadeId } },
     update: {}, create: { tipoProcessoId: tipo.id, modalidadeId: habilitacao.modalidadeId, name: `${MARCA} macro` },

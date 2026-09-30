@@ -59,21 +59,22 @@ async function processoComTarefasSemResponsavel(sufixo: string, n: number) {
     data: { nome: `${MARCA} ${sufixo}`, arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" },
     select: { id: true },
   })
+  // Produção tem único (processoId, faseMacroKey): UMA instância da fase por processo, com N passos (um por necessidade).
+  const inst = await prisma.phaseWorkflowInstance.create({
+    data: { processoId: proc.id, faseMacroKey: "genealogia", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-${sufixo}` },
+    select: { id: true },
+  })
   for (let i = 0; i < n; i++) {
     const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: `Pessoa${i}`, sobrenome: sufixo }, select: { id: true } })
     const nec = await prisma.necessidadeDocumental.create({
       data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-${sufixo}-${i}` },
       select: { id: true },
     })
-    const inst = await prisma.phaseWorkflowInstance.create({
-      data: { processoId: proc.id, faseMacroKey: "genealogia", ciclo: i + 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-${sufixo}-${i}` },
-      select: { id: true },
-    })
     await prisma.phaseWorkflowStepInstance.create({
       data: {
         workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: "genealogia", stepKey: `pesquisar_${sufixo}_${i}`,
         ordem: 1, tipo: "HUMANO", obrigatorio: true, status: "DISPONIVEL", necessidadeId: nec.id, pessoaId: pes.id,
-        papel: "equipe_documental", slaDays: 5, ciclo: i + 1,
+        papel: "equipe_documental", slaDays: 5, ciclo: 1,
         snapshot: { label: "Pesquisar registro" } as never,
         chaveIdempotencia: `${MARCA}-s-${sufixo}-${i}`,
       },
@@ -94,7 +95,13 @@ async function main() {
   exigirBancoDeTeste("prova a obrigação administrativa ATRIBUIR_RESPONSAVEL")
   await limpar()
 
-  const gestor = await prisma.usuario.create({ data: { nome: "Marco", email: "marco@obrig.test", senha: "x", tipo: "admin" }, select: { id: true } })
+  // O gestor é QUEM O SISTEMA RESOLVE pela competência (menor id com `operacao.distribuirTarefas`). O banco
+  // do gate já traz um admin de fixture, com id menor que qualquer usuário criado aqui: criar um "Marco"
+  // e esperar que ele seja o resolvido dependeria da ordem de ids. Só cria o Marco se ninguém tem a competência.
+  const idResolvido = await usuarioResponsavelPelaDistribuicao(prisma)
+  const gestor = idResolvido != null
+    ? { id: idResolvido }
+    : await prisma.usuario.create({ data: { nome: "Marco", email: "marco@obrig.test", senha: "x", tipo: "admin" }, select: { id: true } })
   const funcionario = await prisma.usuario.create({ data: { nome: "Ana Comum", email: "ana@obrig.test", senha: "x", tipo: "assistente" }, select: { id: true } })
   const daniela = await prisma.usuario.create({ data: { nome: "Daniela Brait", email: "daniela@obrig.test", senha: "x", tipo: "assistente" }, select: { id: true } })
 

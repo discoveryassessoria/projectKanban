@@ -13,10 +13,15 @@
 // Operacional, colunas "Prazo"/"Situação do prazo" do Relatório de Certidões)
 // passarem a ler essa fonte — SEM mexer em cadastro de workflow/step/subtarefa.
 //
-// SOMENTE LEITURA contra o banco real — nenhum teste aqui escreve.
+// Monta o PRÓPRIO cenário (processo/pessoa/certidão/solicitação marcados com
+// MARCA) num banco de teste e o remove no fim — nunca depende de dado de
+// produção (o antigo processo 651 / Documento 2260 não existe no banco do gate).
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+exigirBancoDeTeste("prazo-solicitacao-documento")
+
 import { prisma } from "@/lib/prisma"
 import { estadoTemporalSolicitacao } from "@/lib/operacional/tempo-operacional"
-import { situacaoDoPrazoSolicitacao, DOMINIO_CERTIDOES } from "@/src/lib/relatorios/motor/dominios/certidoes"
+import { situacaoDoPrazoSolicitacao, DOMINIO_CERTIDOES, CATEGORIA_CERTIDAO } from "@/src/lib/relatorios/motor/dominios/certidoes"
 import { executar } from "@/src/lib/relatorios/motor/executar"
 
 let ok = 0, falhou = 0
@@ -26,11 +31,63 @@ const t = (cond: boolean, nome: string, detalhe = "") => {
   else { falhou++; falhas.push(nome); console.log(`  ❌ ${nome}${detalhe ? ` — ${detalhe}` : ""}`) }
 }
 
-const PROCESSO_CIBILS = 651
-const DOC_COM_ENVIO = 2260 // Atahualpa Irineo Cibils Revello, Óbito — já enviado
-const DOC_SEM_ENVIO = 2263 // Ruben Cibils, Nascimento — ainda sem solicitação
+const MARCA = "PRAZOSOLDOC"
+const PRAZO_DIAS = 15
+
+async function limpar() {
+  const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
+  const procIds = procs.map((p) => p.id)
+  const arvIds = procs.map((p) => p.arvoreId).filter((x): x is number => x != null)
+  if (procIds.length) {
+    await prisma.solicitacaoDocumento.deleteMany({ where: { processoId: { in: procIds } } })
+    await prisma.documento.deleteMany({ where: { pessoa: { arvoreId: { in: arvIds } } } })
+    await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: procIds } } })
+    await prisma.processo.deleteMany({ where: { id: { in: procIds } } })
+  }
+  if (arvIds.length) {
+    await prisma.pessoa.deleteMany({ where: { arvoreId: { in: arvIds } } })
+    await prisma.arvore.deleteMany({ where: { id: { in: arvIds } } })
+  }
+  await prisma.tipoDocumentoCadastro.deleteMany({ where: { code: { startsWith: MARCA } } })
+  await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
+  await prisma.categoriaDocumental.deleteMany({ where: { name: { startsWith: MARCA } } })
+}
+
+async function montar() {
+  // A categoria "REGISTRO_CIVIL" é a que DEFINE o domínio Certidões; no banco
+  // de teste o cadastro vem vazio, então o teste garante a própria (reusa se já houver).
+  const cat = (await prisma.categoriaDocumental.findUnique({ where: { code: CATEGORIA_CERTIDAO_CODE } }))
+    ?? await prisma.categoriaDocumental.create({ data: { code: CATEGORIA_CERTIDAO_CODE, name: `${MARCA} Registro civil` } })
+  const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}-ITEM`, name: `${MARCA} Certidão de óbito`, natureza: "DOCUMENTO" }, select: { id: true } })
+  await prisma.tipoDocumentoCadastro.create({ data: { code: `${MARCA}-TIPO`, name: `${MARCA} tipo`, itemCatalogoId: item.id, categoriaDocumentalId: cat.id } })
+  const arv = await prisma.arvore.create({ data: { nome: `${MARCA} arvore` }, select: { id: true } })
+  const proc = await prisma.processo.create({ data: { nome: `${MARCA} processo`, arvoreId: arv.id }, select: { id: true } })
+  const mk = async (nome: string, tag: string, comEnvio: boolean) => {
+    const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome, sobrenome: MARCA }, select: { id: true } })
+    const nec = await prisma.necessidadeDocumental.create({
+      data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-nec-${tag}` }, select: { id: true },
+    })
+    const d = await prisma.documento.create({ data: { pessoaId: pes.id, necessidadeId: nec.id, tipo: "CERTIDAO_OBITO", status: "PENDENTE" }, select: { id: true } })
+    if (comEnvio) {
+      const dataEnvio = new Date(Date.now() - 2 * 86400000)
+      await prisma.solicitacaoDocumento.create({
+        data: {
+          documentoId: d.id, processoId: proc.id, pessoaId: pes.id, faseMacroKey: "prazosoldoc_fase", canal: "EMAIL",
+          dataEnvio, prazoEsperadoDias: PRAZO_DIAS, previsaoRetorno: new Date(dataEnvio.getTime() + PRAZO_DIAS * 86400000),
+          status: "AGUARDANDO_PROTOCOLO", chaveIdempotencia: `${MARCA}-sol-${tag}`,
+        },
+      })
+    }
+    return d.id
+  }
+  return { processoId: proc.id, docComEnvio: await mk("Atahualpa", "a", true), docSemEnvio: await mk("Ruben", "b", false) }
+}
+
+const CATEGORIA_CERTIDAO_CODE = CATEGORIA_CERTIDAO
 
 async function main() {
+  await limpar()
+  const { processoId: PROCESSO_CIBILS, docComEnvio: DOC_COM_ENVIO, docSemEnvio: DOC_SEM_ENVIO } = await montar()
   console.log("REGIME DE PRAZO DAS CERTIDÕES — SolicitacaoDocumento.previsaoRetorno\n")
 
   console.log("(1) estadoTemporalSolicitacao — função pura:")
@@ -90,12 +147,14 @@ async function main() {
     t(false, "achou uma linha do relatório com previsão preenchida pra comparar Prazo x Previsão")
   }
   t(Number.isFinite(r.total), "o relatório roda de ponta a ponta sem erro", `total=${r.total}`)
+  t(r.total === 2, "o relatório vê exatamente as 2 certidões do cenário montado", `total=${r.total}`)
 
   console.log(`\n${"=".repeat(70)}`)
   console.log(`✅ ${ok} passaram · ❌ ${falhou} falharam`)
+  await limpar()
   if (falhou > 0) { console.log("\nFalhas:", falhas.join(", ")); process.exit(1) }
 }
 
-main().catch((e) => { console.error(e); process.exit(1) }).finally(async () => {
+main().catch(async (e) => { console.error(e); try { await limpar() } catch { /* melhor esforço */ } process.exit(1) }).finally(async () => {
   await prisma.$disconnect()
 })

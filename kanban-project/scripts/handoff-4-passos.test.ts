@@ -85,7 +85,7 @@ async function palco4() {
     stepIds.push(s.id)
   }
   await reconciliarTarefas({ processoId: proc.id })
-  const t = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc.id }, select: { id: true, lockVersion: true } })
+  const t = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc.id, tipo: { not: "ADMINISTRATIVA" } }, select: { id: true, lockVersion: true } })
   return { processoId: proc.id, instanciaId: inst.id, stepIds, tarefaId: t.id }
 }
 
@@ -101,7 +101,7 @@ async function main() {
   const daniela = await usuario("Daniela")
   const p = await palco4()
 
-  const totalTarefasAntes = await prisma.tarefa.count({ where: { processoId: p.processoId } })
+  const totalTarefasAntes = await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: { not: "ADMINISTRATIVA" } } })
   ok("setup) exatamente 1 Tarefa nasceu para os 4 passos", totalTarefasAntes === 1, `${totalTarefasAntes}`)
 
   secao("1) Daniela assume e conclui os passos 1, 2 e 3")
@@ -150,7 +150,7 @@ async function main() {
   ok("8) a Tarefa ENTROU na fila do Marco", filaMarcoDepois.some((l) => l.taskId === p.tarefaId))
 
   secao("9) Zero Tarefa nova — a contagem não mudou do início ao fim")
-  const totalTarefasDepois = await prisma.tarefa.count({ where: { processoId: p.processoId } })
+  const totalTarefasDepois = await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: { not: "ADMINISTRATIVA" } } })
   ok("9) contagem de Tarefas do processo continua 1", totalTarefasDepois === 1, `${totalTarefasDepois}`)
 
   secao("10) Marco conclui o 4º e último passo — a MESMA Tarefa termina")
@@ -158,20 +158,24 @@ async function main() {
   ok("10) conclusão do passo 4 (Marco) sucede", r4.ok === true, JSON.stringify(r4).slice(0, 150))
   const final = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { id: true, statusTarefa: true } })
   ok("10) a MESMA Tarefa (id igual do início ao fim) termina concluída", final.id === p.tarefaId && ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"].includes(final.statusTarefa), final.statusTarefa)
-  const totalTarefasFinal = await prisma.tarefa.count({ where: { processoId: p.processoId } })
+  const totalTarefasFinal = await prisma.tarefa.count({ where: { processoId: p.processoId, tipo: { not: "ADMINISTRATIVA" } } })
   ok("10) ainda 1 única Tarefa no processo ao final", totalTarefasFinal === 1, `${totalTarefasFinal}`)
 
   secao("11) AVANÇO NORMAL (mesmo responsável) não deve gerar aviso de nova atribuição/mudança de mão")
   const avisosResp = await prisma.notificacaoOperacional.findMany({
-    where: { processoId: p.processoId, agrupado: true, tipo: { in: ["CHEGOU_TRABALHO", "MUDOU_DE_MAO"] } },
+    // Só avisos que cobrem a Tarefa da certidão: a obrigação administrativa "Atribuir tarefas" do
+    // processo é OUTRA Tarefa (tipo ADMINISTRATIVA) e tem o seu próprio aviso, legítimo.
+    where: { processoId: p.processoId, agrupado: true, tipo: { in: ["CHEGOU_TRABALHO", "MUDOU_DE_MAO"] }, tarefaIds: { has: p.tarefaId } },
     select: { destinatarioId: true, tipo: true },
   })
-  // Só o do handoff: o CHEGOU_TRABALHO do Marco (o inicial da Daniela saiu quando a tarefa saiu
-  // da mão dela; ela, autora do handoff, não é avisada). Os 4 concluirEtapa (3 da Daniela + 1 do
-  // Marco) NÃO criaram nenhum aviso a mais, e nunca é um por passo.
+  // Só o do handoff pode existir: o CHEGOU_TRABALHO do Marco (o inicial da Daniela saiu quando a
+  // tarefa saiu da mão dela; ela, autora do handoff, não é avisada). Regra 5 do sino: com a Tarefa
+  // CONCLUÍDA o aviso de tarefa viva é retirado (0 avisos é o estado correto no fim); o que NUNCA
+  // pode existir é aviso a mais — os 4 concluirEtapa (3 da Daniela + 1 do Marco) não criam nenhum,
+  // e nunca é um por passo. O aviso do handoff em si já foi provado no item 7 (antes da conclusão).
   const chaves = avisosResp.map((a) => `${a.destinatarioId}:${a.tipo}`)
-  ok("11) só 1 aviso de responsabilidade no total (chegou p/ Marco no handoff), nunca um por passo concluído",
-    avisosResp.length === 1 && chaves[0] === `${marco.id}:CHEGOU_TRABALHO`, chaves.join(","))
+  ok("11) no máximo o aviso do handoff (CHEGOU p/ Marco); nenhum aviso extra por passo concluído nem MUDOU_DE_MAO",
+    avisosResp.length <= 1 && chaves.every((c) => c === `${marco.id}:CHEGOU_TRABALHO`), chaves.join(","))
 
   await limpar()
 

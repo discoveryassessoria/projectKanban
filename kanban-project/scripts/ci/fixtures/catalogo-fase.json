@@ -1,0 +1,214 @@
+[
+ {
+  "phaseKey": "genealogia",
+  "label": "Genealogia",
+  "descricao": null,
+  "escopo": "NECESSIDADE",
+  "ordemPadrao": 1,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 1,
+  "conduzidaPeloWorkflowInterno": false
+ },
+ {
+  "phaseKey": "emissao_documental",
+  "label": "Emissão Documental",
+  "descricao": null,
+  "escopo": "DOCUMENTO",
+  "ordemPadrao": 2,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "MARK_DOCUMENT_RECEIVED",
+   "APPROVE_FOR_ANALYSIS",
+   "REQUEST_NEW_COPY",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 1,
+  "conduzidaPeloWorkflowInterno": false
+ },
+ {
+  "phaseKey": "analise_documental",
+  "label": "Análise Documental",
+  "descricao": null,
+  "escopo": "PROCESSO",
+  "ordemPadrao": 3,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "REGISTER_DIVERGENCE",
+   "GO_RETIFICATION",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "INVALIDATE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 1,
+  "conduzidaPeloWorkflowInterno": false
+ },
+ {
+  "phaseKey": "retificacao_registros",
+  "label": "Retificação de Registros",
+  "descricao": null,
+  "escopo": "DOCUMENTO",
+  "ordemPadrao": 4,
+  "requiredPadrao": false,
+  "conditionalPadrao": true,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY",
+   "REGISTER_PROTOCOL",
+   "REGISTER_RETIFICATION_PLAN"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 2,
+  "conduzidaPeloWorkflowInterno": true
+ },
+ {
+  "phaseKey": "emissao_documental_retificada",
+  "label": "Emissão Documental Retificada",
+  "descricao": null,
+  "escopo": "DOCUMENTO",
+  "ordemPadrao": 5,
+  "requiredPadrao": false,
+  "conditionalPadrao": true,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "MARK_DOCUMENT_RECEIVED",
+   "APPROVE_FOR_ANALYSIS",
+   "REQUEST_NEW_COPY",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 2,
+  "conduzidaPeloWorkflowInterno": false
+ },
+ {
+  "phaseKey": "traducao_juramentada",
+  "label": "Tradução Juramentada",
+  "descricao": null,
+  "escopo": "DOCUMENTO",
+  "ordemPadrao": 6,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 2,
+  "conduzidaPeloWorkflowInterno": true
+ },
+ {
+  "phaseKey": "apostilamento",
+  "label": "Apostilamento",
+  "descricao": null,
+  "escopo": "DOCUMENTO",
+  "ordemPadrao": 7,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 2,
+  "conduzidaPeloWorkflowInterno": true
+ },
+ {
+  "phaseKey": "aguardando_protocolo",
+  "label": "Aguardando Protocolo",
+  "descricao": null,
+  "escopo": "PROCESSO",
+  "ordemPadrao": 8,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY",
+   "REGISTER_PROTOCOL"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 1,
+  "conduzidaPeloWorkflowInterno": false
+ },
+ {
+  "phaseKey": "protocolado",
+  "label": "Protocolado",
+  "descricao": null,
+  "escopo": "PROCESSO",
+  "ordemPadrao": 9,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 1,
+  "conduzidaPeloWorkflowInterno": false
+ },
+ {
+  "phaseKey": "finalizado",
+  "label": "Finalizado",
+  "descricao": null,
+  "escopo": "PROCESSO",
+  "ordemPadrao": 10,
+  "requiredPadrao": true,
+  "conditionalPadrao": false,
+  "ativo": true,
+  "efeitosPermitidos": [
+   "COMPLETE_STEP",
+   "PAUSE_FOR_EXTERNAL_WAIT",
+   "RESUME",
+   "COMPLETE_DOCUMENT",
+   "REGISTER_ONLY"
+  ],
+  "status": "PUBLICADA",
+  "revisaoAtual": 1,
+  "conduzidaPeloWorkflowInterno": false
+ }
+]

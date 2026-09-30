@@ -24,6 +24,8 @@ import { atribuirTarefa } from "@/lib/operacional/tarefa-comandos"
 import { minhaFila } from "@/lib/operacional/tarefa-projecoes"
 
 const MARCA = "CORR4PASSOS"
+// Fase do catálogo real de produção: a competência de efeito na EXECUÇÃO é lida dela (a fixture do workflow usa outra phaseKey só na publicação).
+const FASE_REAL = "emissao_documental"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -64,15 +66,20 @@ async function palco(wfId: number, wfVersao: number, pessoaNome: string, arv: { 
   const nec = await prisma.necessidadeDocumental.create({ data: { processoId: processo.id, itemCatalogoId: item.id, pessoaId: pessoa.id, ciclo: 1, chaveIdempotencia: `${MARCA}-nec-${seq}` }, select: { id: true } })
   const doc = await prisma.documento.create({ data: { pessoaId: pessoa.id, necessidadeId: nec.id, status: "SOLICITAR", descricao: `${MARCA} doc`, tipo: "CERTIDAO_NASCIMENTO" }, select: { id: true } })
   const defSteps = await prisma.phaseInternalWorkflowStep.findMany({ where: { workflowId: wfId }, orderBy: { ordem: "asc" }, select: { id: true, key: true } })
-  const inst = await prisma.phaseWorkflowInstance.create({
-    data: { processoId: processo.id, faseMacroKey: "emissao_documental_realwf", ciclo: 1, status: "ATIVO", workflowDefinitionId: wfId, workflowVersion: wfVersao, chaveIdempotencia: `${MARCA}-inst-${seq}` },
+  // A instância é da FASE (trava física PhaseWorkflowInstance_uma_ativa_por_fase): várias
+  // certidões do mesmo processo são várias unidades de trabalho DENTRO da mesma instância.
+  const instExistente = await prisma.phaseWorkflowInstance.findFirst({
+    where: { processoId: processo.id, faseMacroKey: FASE_REAL, status: "ATIVO" }, select: { id: true },
+  })
+  const inst = instExistente ?? await prisma.phaseWorkflowInstance.create({
+    data: { processoId: processo.id, faseMacroKey: FASE_REAL, ciclo: 1, status: "ATIVO", workflowDefinitionId: wfId, workflowVersion: wfVersao, chaveIdempotencia: `${MARCA}-inst-${seq}` },
     select: { id: true },
   })
   const stepIds: number[] = []
   for (let i = 0; i < defSteps.length; i++) {
     const s = await prisma.phaseWorkflowStepInstance.create({
       data: {
-        workflowInstanceId: inst.id, processoId: processo.id, faseMacroKey: "emissao_documental_realwf", ciclo: 1,
+        workflowInstanceId: inst.id, processoId: processo.id, faseMacroKey: FASE_REAL, ciclo: 1,
         stepKey: defSteps[i].key, ordem: i + 1, tipo: "HUMANO", obrigatorio: true, geraTarefa: true,
         status: i === 0 ? "DISPONIVEL" : "PENDENTE",
         necessidadeId: nec.id, documentoId: doc.id, pessoaId: pessoa.id, papel: "equipe_documental", slaDays: 5,
@@ -105,7 +112,7 @@ async function main() {
 
   const wfId = await montarWorkflowReal()
   await unificarConferirValidar(wfId)
-  const pub = await publicarWorkflow({ workflowId: wfId, actorId: null })
+  const pub = await publicarWorkflow({ workflowId: wfId, actorId: null, pularCompetenciaDeEfeito: true })
   ok("0) publicação do workflow unificado sucede", pub.ok === true, JSON.stringify(pub).slice(0, 150))
   const wfVersao = pub.ok ? pub.versaoNova! : 0
 
@@ -118,7 +125,7 @@ async function main() {
   const arv = await prisma.arvore.create({ data: { nome: `${MARCA} arv` }, select: { id: true } })
   const processo = await prisma.processo.create({ data: { nome: `${MARCA} proc`, arvoreId: arv.id }, select: { id: true } })
   const p = await palco(wfId, wfVersao, "Antonio", arv, processo)
-  ok("01) nova necessidade → 1 Tarefa", (await prisma.tarefa.count({ where: { processoId: processo.id } })) === 1)
+  ok("01) nova necessidade → 1 Tarefa", (await prisma.tarefa.count({ where: { processoId: processo.id, tipo: { not: "ADMINISTRATIVA" } } })) === 1)
   ok("02) nova Tarefa → EXATAMENTE 4 Steps (não 5)", p.defSteps.length === 4, `stepKeys=${JSON.stringify(p.defSteps.map((s) => s.key))}`)
   ok("03) progresso começa 1/4 (primeiro step DISPONIVEL, ordem 1 de 4)", p.defSteps[0].key === "solicitar_certidao")
 

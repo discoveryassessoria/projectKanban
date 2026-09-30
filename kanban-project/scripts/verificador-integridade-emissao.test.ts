@@ -483,16 +483,17 @@ async function main() {
     ok("detecta responsável divergente entre Tarefa (canônico) e Documento (campo legado)", temAchado(exec, `emi-projecao-divergente:${f.tarefaId}`))
   }
 
-  // ── Catálogo: as 20 verificações existem, são únicas e cobrem os domínios certos ──
+  // ── Catálogo: as 22 verificações existem, são únicas e cobrem os domínios certos ──
   secao("Catálogo")
   {
     const { catalogo } = await import("../lib/saude/catalogo")
-    const codigos = Array.from({ length: 20 }, (_, i) => `EMI-${String(i + 1).padStart(3, "0")}`)
+    const codigos = Array.from({ length: 22 }, (_, i) => `EMI-${String(i + 1).padStart(3, "0")}`)
     const todas = catalogo()
     for (const c of codigos) {
       ok(`${c} está declarado no catálogo`, todas.some((v) => v.codigo === c))
     }
-    ok("nenhum código EMI duplicado", new Set(todas.filter((v) => v.codigo.startsWith("EMI-")).map((v) => v.codigo)).size === 20)
+    const emi = todas.filter((v) => v.codigo.startsWith("EMI-")).map((v) => v.codigo)
+    ok("nenhum código EMI duplicado (nem código fora da faixa EMI-001..022)", new Set(emi).size === emi.length && emi.length === codigos.length)
   }
 
   await limpar()

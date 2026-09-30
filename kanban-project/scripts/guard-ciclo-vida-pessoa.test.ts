@@ -371,6 +371,12 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "palco visual de escala: monta e derrubа a PRÓPRIA árvore (marca ESCALA500), só no banco de teste",
   "scripts/distribuicao-500-tarefas.test.ts":
     "escala da distribuição: monta e derruba a PRÓPRIA árvore (marca DIST500), só no banco de teste",
+  "scripts/prazo-solicitacao-documento.test.ts":
+    "prazo da solicitação documental: monta e derruba o PRÓPRIO cenário (marca PRAZOSOLDOC — processo, pessoas, " +
+    "necessidades, documentos e solicitação), só no banco de teste; antes lia dados reais de produção que o banco do gate não tem",
+  "scripts/situacao-solicitacao-certidao.test.ts":
+    "situação da solicitação de certidão: monta e derruba o PRÓPRIO processo (8 necessidades, uma por situação), só no banco " +
+    "de teste; antes lia o processo 651 de produção, que o banco do gate não tem",
   "scripts/avisos-prazo.test.ts":
     "varredura de prazos: monta e derruba a PRÓPRIA árvore (marca AVISO), só no banco de teste",
   "scripts/central-fase-500-docs.test.ts":

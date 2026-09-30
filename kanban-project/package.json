@@ -35,7 +35,7 @@
     "backfill:solicitacao": "tsx scripts/backfill-solicitacao-documental.ts --execute",
     "backfill:solicitacao:dry": "tsx scripts/backfill-solicitacao-documental.ts",
     "baseline:gerar": "node scripts/baseline-gerar.mjs",
-    "build": "node scripts/guard-env-producao.mjs && prisma generate && node scripts/migration-pendente-guard.mjs && node scripts/prod-migrate-guard.mjs && npm run test:baseline && npm run test:arquitetura-baseline && npm run test:guards-arquitetura && npm run test:crons && npm run test:baseline-retrocesso && npm run test:modelos && npm run test:modelos-guard && npm run test:tempo-operacional && next build --turbopack",
+    "build": "node scripts/guard-env-producao.mjs && prisma generate && node scripts/ci/gate-build.mjs && node scripts/migration-pendente-guard.mjs && node scripts/prod-migrate-guard.mjs && npm run test:baseline && npm run test:arquitetura-baseline && npm run test:guards-arquitetura && npm run test:crons && npm run test:baseline-retrocesso && npm run test:modelos && npm run test:modelos-guard && npm run test:tempo-operacional && next build --turbopack",
     "build:prod-migrate": "node scripts/guard-env-producao.mjs && prisma generate && node scripts/prod-migrate-guard.mjs && next build --turbopack",
     "build:safe": "node scripts/guard-env-producao.mjs && npm run guard:db && prisma generate && next build --turbopack",
     "catalogo:certidoes": "tsx scripts/catalogo-certidoes-vinculo.ts",
@@ -412,7 +412,11 @@
     "test:mandato-rascunho-publicacao": "tsx scripts/mandato-rascunho-publicacao.test.ts",
     "test:mandato-rbac-matriz": "tsx scripts/mandato-rbac-matriz.test.ts",
     "test:mandato-financeiro-cartorio-isolado": "tsx scripts/mandato-financeiro-cartorio-isolado.test.ts",
-    "test:cartorios-sync": "tsx scripts/cartorios-sync.test.ts"
+    "test:cartorios-sync": "tsx scripts/cartorios-sync.test.ts",
+    "test:critica": "node scripts/ci/gate-build.mjs",
+    "test:suite": "node scripts/ci/rodar-suite.mjs",
+    "test:guard-gate-build": "tsx scripts/guard-gate-build.test.ts",
+    "test:banco-de-teste": "node scripts/ci/criar-banco-de-teste.mjs"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"
@@ -502,9 +506,11 @@
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.4",
+    "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.9",
     "jsdom": "^30.0.1",
+    "pg": "^8.23.0",
     "playwright": "^1.62.1",
     "pngjs": "^7.0.0",
     "prisma": "^6.16.2",

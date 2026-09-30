@@ -57,3 +57,4 @@ reset-password.mjs
 /tests/ui/.auth/
 /test-results/
 /playwright-report/
+.suite-logs

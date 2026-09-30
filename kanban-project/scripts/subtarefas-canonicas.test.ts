@@ -201,7 +201,7 @@ async function main() {
     data: {
       stepId: passo.id, key: "arquivar_elemento_w", label: "Arquivar elemento W", ordem: 3,
       obrigatoria: true, modoExecucao: "MANUAL", responsavelRegra: "HERDA",
-      fonteDeCanais: "NENHUMA", dependeDe: ["conferir_elemento_y"] as never,
+      fonteDeCanais: "FORNECEDOR_RELACIONADO", dependeDe: ["conferir_elemento_y"] as never,
     },
     select: { id: true, key: true },
   })
@@ -288,8 +288,13 @@ async function main() {
   check("B está bloqueada por dependência", !b1.disponivel && b1.bloqueioCodigo === CAUSAS_DE_BLOQUEIO.DEPENDENCIA_PENDENTE)
   check("e o motivo diz o NOME da subtarefa que falta", (b1.bloqueioTexto ?? "").includes("Conferir elemento Y"))
   check("C também — e por A, não por B", !c1.disponivel && c1.bloqueioAlvo === "conferir_elemento_y")
-  check("A oferece os canais do FORNECEDOR daquele documento",
-    a1.canais.map((c) => c.key).sort().join(",") === "SUBCAN_BALCAO,SUBCAN_PORTAL")
+  // A é PONTO DE ENTRADA (sem dependência): é ela quem estabelece o contato com o órgão, então a
+  // projeção NÃO a trava nem lhe oferece lista de canais (decisão 15/09/2026 em subtarefas-da-etapa.ts).
+  check("A, ponto de entrada, não é travada por canal — o vínculo com o órgão nasce nela",
+    a1.disponivel && a1.canais.length === 0 && a1.bloqueioCodigo === null)
+  // Quem TEM dependência presume o órgão já resolvido e oferece os canais do FORNECEDOR daquele documento.
+  check("C oferece os canais do FORNECEDOR daquele documento (não de um cadastro do passo)",
+    c1.canais.map((c) => c.key).sort().join(",") === "SUBCAN_BALCAO,SUBCAN_PORTAL")
   check("B não oferece canal nenhum — ela não envia nada", b1.canais.length === 0)
 
   const gate0 = await passoPodeConcluir({ stepInstanceId: si.id, fornecedorId: fornecedorA.id })

@@ -31,7 +31,7 @@ ok(/export async function evoluirNecessidadePorPasso/.test(svc), "driver evoluir
 ok(/n\.status === "ATENDIDA" \|\| n\.status === "DISPENSADA"[\s\S]*?return/.test(svc), "atender é idempotente e não sobrescreve DISPENSADA")
 
 console.log("\n2) Evolução por EVENTO do Workflow (único gatilho), não por tela")
-ok(/if \(p\.necessidadeId != null\) \{[\s\S]*?evoluirNecessidadePorPasso\(p\.necessidadeId, novo\)/.test(op), "atualizarPassoV2 dispara o driver ao evoluir o passo vinculado")
+ok(/if \(p\.necessidadeId != null\) \{[\s\S]*?evoluirNecessidadePorPasso\(p\.necessidadeId, novo, tx\)/.test(op), "atualizarPassoV2 dispara o driver ao evoluir o passo vinculado")
 
 console.log("\n3) Nenhum componente escreve o status direto (usa o serviço)")
 ok(!/necessidadeDocumental\.update\(\{ where: \{ id \}, data: \{ status:/.test(apiRoute), "API route NÃO escreve status direto")
@@ -41,7 +41,8 @@ ok(/dispensarNecessidade\(|reativarNecessidade\(/.test(materializar), "materiali
 
 console.log("\n4) Resolver canônico consome o ESTADO OFICIAL da necessidade")
 ok(/n\.status === "ATENDIDA"/.test(core), "projeção NECESSIDADE considera n.status === ATENDIDA (estado oficial)")
-ok(/const esperadas = input\.necessidades\.filter\(\(n\) => n\.ehCertidao && n\.obrigatoria && n\.status !== "DISPENSADA"\)/.test(core), "gate de fase DOCUMENTO vazia = existência da certidão esperada (não o status ATENDIDA)")
+const corpoDocumento = (core.match(/export function certidoesObrigatoriasDocumento[\s\S]*?\n\}\n/) ?? [""])[0]
+ok(/input\.necessidades\.filter\(\(n\) => n\.ehCertidao && n\.obrigatoria && n\.status !== "DISPENSADA"\)/.test(corpoDocumento) && /obrigacaoConcluidaNaFase\(.*\?\? \[\],\s*false\)/.test(corpoDocumento) && !/n\.status === "ATENDIDA"/.test(corpoDocumento), "gate de fase DOCUMENTO vazia = existência da certidão esperada (não o status ATENDIDA)")
 
 console.log("\n5) Reconciliação (compat, idempotente, append-only)")
 ok(/export async function reconciliarNecessidadesPorPassos/.test(svc), "reconciliarNecessidadesPorPassos existe (backfill compat)")

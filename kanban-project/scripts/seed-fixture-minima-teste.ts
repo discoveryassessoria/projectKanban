@@ -36,9 +36,11 @@ async function main() {
     update: {},
     create: { countryKey: "ITALIA", countryLabel: "Itália", nationalityKey: "ITALIANA", nationalityLabel: "Italiana", defaultCurrency: "EUR", ativo: true },
   })
+  // `modalityKey` minúsculo e canônico: o banco de teste tem o MESMO CHECK de produção
+  // (`ModalidadePais_modalityKey_canonica_check`: só administrativa | judicial).
   const jaTemModalidade = await prisma.modalidadePais.findFirst({ where: { paisId: pais.id } })
   const modalidade = jaTemModalidade ?? await prisma.modalidadePais.create({
-    data: { paisId: pais.id, modalityKey: "JUDICIAL", modalityLabel: "Judicial", ordem: 1, ativo: true },
+    data: { paisId: pais.id, modalityKey: "judicial", modalityLabel: "Judicial", ordem: 1, ativo: true },
   })
   console.log(`✅ país #${pais.id} (${pais.countryLabel}) · modalidade #${modalidade.id} (${modalidade.modalityLabel})`)
 

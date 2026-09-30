@@ -74,8 +74,13 @@ check("  que respeita a permissão declarada no cadastro do passo", rotaReab.inc
 // ── ESCOPO DA UNIDADE: a regra que isola uma certidão das outras ──
 const canonica = semComentarios(ler("lib/operacional/tarefa-canonica.ts"))
 check("a unidade é a CONJUNÇÃO das âncoras, não a disjunção",
-  canonica.includes("AND: conjuncao") && !/OR: porObrigacao/.test(canonica),
-  "com OR, dois documentos da mesma necessidade caem na mesma unidade")
+  // Regra vigente (28/09/2026, EMI-001): NENHUMA âncora que o passo carrega pode divergir da unidade
+  // (AND de "bate ou é nula") E ao menos uma âncora real precisa bater. O que continua proibido é a
+  // disjunção crua, que juntava dois documentos da mesma necessidade.
+  canonica.includes("AND: semDivergencia") && canonica.includes("OR: algumaAncoraBate") &&
+  canonica.includes("{ OR: [{ documentoId: docId }, { documentoId: null }] }") &&
+  !/OR:\s*\[\s*\{\s*necessidadeId\s*\}\s*,\s*\{\s*documentoId\s*\}\s*\]/.test(canonica),
+  "com a disjunção crua, dois documentos da mesma necessidade caem na mesma unidade")
 
 // ════════════════════════════════════════════════════════════════
 console.log("\n(A2) A INTERFACE NÃO PERGUNTA REABERTURA NO RETROCESSO")
@@ -187,7 +192,7 @@ interface Palco {
  * quatro etapas encadeiam e uma quinta NÃO depende de nenhuma delas — é ela que prova
  * que ordem visual não é dependência.
  */
-async function montar(marca: string): Promise<Palco> {
+async function montar(marca: string, opts: { emissaoConcluida?: boolean } = {}): Promise<Palco> {
   // modalityKey é enumeração canônica (administrativa|judicial) desde o "hierarquia
   // congelada" 22/09 — este fixture ainda reusava a countryKey sintética "retro",
   // que nunca foi um valor válido; achado ao rodar esta suíte pela primeira vez
@@ -269,7 +274,10 @@ async function montar(marca: string): Promise<Palco> {
 
   const inst = await prisma.phaseWorkflowInstance.create({
     data: {
-      processoId: proc.id, faseMacroKey: fEmissao.phaseKey, ciclo: 1, status: "ATIVO",
+      // Quando o processo já AVANÇOU para a Análise (todas as etapas concluídas), a instância da
+      // Emissão está CONCLUIDA — é assim que o retrocesso encontra a fase em produção e abre uma
+      // VISITA nova (ciclo 2). Com `emissaoConcluida: false` ela segue ATIVA (a visita em aberto).
+      processoId: proc.id, faseMacroKey: fEmissao.phaseKey, ciclo: 1, status: opts.emissaoConcluida ? "CONCLUIDO" : "ATIVO",
       workflowDefinitionId: wf.id, workflowVersion: 1, chaveIdempotencia: `${M}-${marca}-ie`,
     },
     select: { id: true },
@@ -283,7 +291,11 @@ async function montar(marca: string): Promise<Palco> {
         workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: fEmissao.phaseKey, ciclo: 1,
         stepKey: k, ordem: i + 1, tipo: "HUMANO", obrigatorio: k !== "arquivar", geraTarefa: true,
         status: "CONCLUIDO", completedAt: concluidoEm, dependeDeStepKeys: DEPS[k] as never,
-        documentoId: doc.id, necessidadeId: nec.id,
+        // Passo de cardinalidade DOCUMENTO carrega SÓ o documentoId (phase-workflow-escopo.ts): o
+        // motor o reconhece por essa identidade lógica ao reentrar na fase. Gravar também a
+        // necessidade aqui produzia um passo que a materialização não reconhece como o mesmo
+        // trabalho (e o índice único parcial por documento, de produção, recusa o duplicado).
+        documentoId: doc.id,
         stepDefinitionId: wf.passos.find((p) => p.key === k)!.id, stepDefinitionVersion: 1,
         chaveIdempotencia: `${M}-${marca}-${k}`,
       },
@@ -434,7 +446,7 @@ async function main() {
   // ══════════════════════════════════════════════════════════════
   secao("(D) TESTE 3/5 — reabrir UMA tarefa, na Central, depois de estar na fase")
   // ══════════════════════════════════════════════════════════════
-  const p3 = await montar("reabrir")
+  const p3 = await montar("reabrir", { emissaoConcluida: true })
   await executarRetrocesso({
     processoId: p3.processoId, faseDestino: p3.faseEmissao, motivoCodigo: "CORRECAO_CADASTRO",
     justificativa: "Voltar para a Emissão.", actorId: p3.actorId,

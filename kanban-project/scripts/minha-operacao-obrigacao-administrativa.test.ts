@@ -226,7 +226,8 @@ async function corpo() {
   secao("E) Deep-link — a URL da obrigação leva direto à Distribuição, no contexto da Grisotto")
   // ══════════════════════════════════════════════════════════════════════
   const url = urlDistribuicaoDoProcesso(proc.id)
-  ok("E) a URL aponta para Operação → Distribuição", url.startsWith("/operacao?") && url.includes("aba=distribuicao"))
+  // Decisão 24/09/2026: Distribuição é tela PRÓPRIA sob Operação (/operacao/distribuicao), não aba.
+  ok("E) a URL aponta para Operação → Distribuição", url.startsWith("/operacao/distribuicao?"))
   ok("E) a URL carrega o processoId da Grisotto (nunca nome/posição)", url.includes(`processo=${proc.id}`))
 
   console.log(`\n${passou} passaram, ${falhou} falharam`)

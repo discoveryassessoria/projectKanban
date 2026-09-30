@@ -114,8 +114,12 @@ async function main() {
     tarefaAntes.dataPrazo != null && esperado != null && Math.abs(tarefaAntes.dataPrazo.getTime() - esperado.getTime()) < 60_000,
     tarefaAntes.dataPrazo?.toISOString())
 
+  // A criação da Tarefa (garantirTarefaDePasso, caminho standalone) já
+  // materializa as subtarefas; chamar de novo é idempotente (nada novo).
+  const exec0 = await prisma.subtaskExecution.count({ where: { stepInstanceId: si.id } })
+  ok("as duas subtarefas foram materializadas na criação da Tarefa", exec0 === 2, `${exec0}`)
   const mat = await materializarSubtarefas({ stepInstanceId: si.id })
-  ok("as duas subtarefas foram materializadas", mat.criadas === 2, `${mat.criadas}`)
+  ok("materializar de novo é idempotente (nenhuma execução nova, as 2 já existiam)", mat.criadas === 0 && mat.jaExistiam === 2, `${mat.criadas}/${mat.jaExistiam}`)
 
   const subs1 = await subtarefasDaEtapa({ stepInstanceId: si.id })
   ok("nenhuma subtarefa expõe slaDays (campo eliminado do schema)", subs1.every((s) => !("slaDays" in s)))

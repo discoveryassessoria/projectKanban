@@ -21,6 +21,7 @@ import {
 import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 
 const MARCA = "OPV3COBADIAR"
+const TIPO_CODE = "TST-"+String(MARCA).replace(/[^A-Z0-9]/gi,"").slice(0,30)
 const PHASE_KEY = `${MARCA.toLowerCase()}_fase`
 
 let passou = 0, falhou = 0
@@ -46,6 +47,8 @@ async function limpar() {
   await prisma.faseMacro.deleteMany({ where: { phaseKey: PHASE_KEY } })
   await prisma.macroWorkflow.deleteMany({ where: { name: { startsWith: MARCA } } })
   await prisma.phaseInternalWorkflow.deleteMany({ where: { wfUid: { startsWith: MARCA } } })
+  await prisma.tipoProcessoModalidadeHabilitada.deleteMany({ where: { tipoProcesso: { code: TIPO_CODE } } })
+  await prisma.tipoProcessoNacionalidade.deleteMany({ where: { code: TIPO_CODE } })
 }
 
 async function main() {
@@ -54,8 +57,13 @@ async function main() {
   console.log("ETAPA 3 — cobrar/adiar pela porta de tarefaId\n")
 
   await prisma.motorConfig.upsert({ where: { id: 1 }, update: { runtimeV2Habilitado: true }, create: { id: 1, runtimeV2Habilitado: true } })
-  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({ select: { id: true } })
-  if (!tipo) throw new Error("Banco de teste sem nenhum TipoProcessoNacionalidade — rode o seed base primeiro.")
+  // O banco-modelo de CI não traz Tipo de Processo: o teste cria o próprio (marcado, removido em limpar()).
+  const modalidadeBase = await prisma.modalidadePais.findFirstOrThrow({ where: { ativo: true }, orderBy: { id: "asc" } })
+  const tipo = await prisma.tipoProcessoNacionalidade.upsert({
+    where: { code: TIPO_CODE }, update: {},
+    create: { code: TIPO_CODE, name: `${MARCA} tipo`, paisId: modalidadeBase.paisId, processFamily: "cidadania", serviceNature: "main_process" },
+    select: { id: true },
+  })
   let habilitacao = await prisma.tipoProcessoModalidadeHabilitada.findFirst({ where: { tipoProcessoId: tipo.id } })
   if (!habilitacao) {
     const modalidade = await prisma.modalidadePais.findFirstOrThrow()

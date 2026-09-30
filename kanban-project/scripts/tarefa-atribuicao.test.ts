@@ -86,6 +86,12 @@ const notifs = (tarefaId: number, tipo?: string) =>
     orderBy: { id: "asc" },
   })
 
+/** Tarefas OPERACIONAIS do processo. A obrigação administrativa "Atribuir tarefas" (tipo ADMINISTRATIVA,
+ *  origem obrigacao-atribuicao) é uma Tarefa legítima e separada por contrato; o invariante protegido aqui
+ *  é que atribuir/transferir/atrasar/bloquear não duplica a tarefa DE TRABALHO. */
+const tarefasOperacionais = (processoId: number) =>
+  prisma.tarefa.count({ where: { processoId, tipo: { not: "ADMINISTRATIVA" } } })
+
 async function main() {
   exigirBancoDeTeste("prova atribuição, transferência e notificação canônicas")
   await limpar()
@@ -111,11 +117,11 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   secao("B) Atribuir muda a MESMA tarefa e não duplica")
   // ═════════════════════════════════════════════════════════════════════════
-  const antes = await prisma.tarefa.count({ where: { processoId: p.processoId } })
+  const antes = await tarefasOperacionais(p.processoId)
   const r1 = await atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: daniela.id, autorId: gestor.id })
   ok("a atribuição deu certo", r1.ok === true)
   ok("é a MESMA tarefa", r1.ok && r1.tarefaId === p.tarefaId)
-  ok("nenhuma tarefa nova foi criada", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === antes)
+  ok("nenhuma tarefa nova foi criada", (await tarefasOperacionais(p.processoId)) === antes)
   t = await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { responsavelId: true, equipeKey: true, statusTarefa: true } })
   ok("o responsável mudou", t.responsavelId === daniela.id)
   ok("a equipe foi preservada", t.equipeKey === "equipe_documental")
@@ -165,7 +171,7 @@ async function main() {
   const rt = await transferirTarefa({ tarefaId: p.tarefaId, responsavelId: joao.id, autorId: gestor.id, motivo: "férias" })
   ok("a transferência deu certo", rt.ok === true)
   ok("mesmo taskId", rt.ok && rt.tarefaId === p.tarefaId)
-  ok("uma tarefa só no processo", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
+  ok("uma tarefa só no processo", (await tarefasOperacionais(p.processoId)) === 1)
   ok("o responsável agora é o João",
     (await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { responsavelId: true } })).responsavelId === joao.id)
   const nt = await notifs(p.tarefaId, "CHEGOU_TRABALHO")
@@ -224,7 +230,7 @@ async function main() {
   ok("rodar de novo no mesmo dia não duplica", (await agirDaTarefa()).length === 1, `${(await agirDaTarefa()).length}`)
   ok("e a segunda varredura não conta ESTE aviso como novo nem o atualiza",
     (await agirDaTarefa())[0]?.id === agir1[0]?.id && v2.criados === 0, JSON.stringify({ criados: v2.criados, semMudanca: v2.semMudanca }))
-  ok("o atraso não criou tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
+  ok("o atraso não criou tarefa nova", (await tarefasOperacionais(p.processoId)) === 1)
   ok("o aviso é da família e aponta para a aba de acompanhamento dela",
     agir1[0]?.processoId === p.processoId && agir1[0]?.link === `/operacao?processo=${p.processoId}&aba=acompanhamento`, String(agir1[0]?.link))
 
@@ -243,7 +249,7 @@ async function main() {
   await reconciliarTarefas({ processoId: p.processoId })
   ok("a tarefa fica BLOQUEADA",
     (await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { statusTarefa: true } })).statusTarefa === "BLOQUEADA")
-  ok("e continua sendo UMA tarefa", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
+  ok("e continua sendo UMA tarefa", (await tarefasOperacionais(p.processoId)) === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("Tarefa encerrada não aceita mais mudança de dono")

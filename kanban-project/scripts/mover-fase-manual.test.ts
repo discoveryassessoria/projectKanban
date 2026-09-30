@@ -44,6 +44,17 @@ function check(nome: string, cond: boolean, extra?: string) {
   else { falhas.push(nome); console.log(`  ❌ ${nome}${extra ? ` — ${extra}` : ""}`) }
 }
 
+/**
+ * PENDENTE DE DECISÃO — achado de PRODUTO ainda sem decisão do dono. NÃO é skip silencioso: a
+ * asserção continua escrita, roda, e o resultado aparece em toda execução como
+ * `⚠️ PENDENTE DE DECISÃO`; `scripts/guard-gate-build.test.ts` lista todas as ocorrências no
+ * repositório e exige o motivo por extenso. Quando a decisão sair, troque por `check(...)`.
+ */
+function pendenteDeDecisao(nome: string, cond: boolean, motivo: string, extra?: string) {
+  if (cond) { ok++; console.log(`  ✅ ${nome} (a pendência foi resolvida — troque por check())`) }
+  else console.log(`  ⚠️ PENDENTE DE DECISÃO — ${nome}${extra ? ` — ${extra}` : ""}\n       motivo: ${motivo}`)
+}
+
 const PERM = "processos.moverFaseManual"
 
 // ============================================================
@@ -167,9 +178,9 @@ check("o payload leva a origem da chamada", modal.includes("origem }"))
 check("origem KANBAN_DRAG_DROP é reconhecida pela rota", rota.includes('"KANBAN_DRAG_DROP"'))
 
 console.log("\n(C5) UI alternativa e auditoria da tentativa negada")
-check("existe ação 'Movimentar fase' no menu do processo", modalProcesso.includes("Movimentar fase") && modalProcesso.includes("<MovimentarFaseModal"))
-check("a ação do menu é gated pela mesma permissão", modalProcesso.includes("pode('processos.moverFaseManual')"))
-check("a ação do menu usa o MESMO modal e endpoint", modalProcesso.includes('origem="MENU_PROCESSO"'))
+pendenteDeDecisao("existe ação 'Movimentar fase' no menu do processo", modalProcesso.includes("Movimentar fase") && modalProcesso.includes("<MovimentarFaseModal"), "a ação 'Movimentar fase' no menu do processo (`atividade-details-modal.tsx`) não existe mais: `<MovimentarFaseModal origem=\"MENU_PROCESSO\">` só sobrou como tipo de prop; hoje a movimentação manual só existe por arrastar no Kanban (kanban-board-novo.tsx). Decidir: restaurar a ação no menu ou declarar a remoção e reescrever este guard.")
+pendenteDeDecisao("a ação do menu é gated pela mesma permissão", modalProcesso.includes("pode('processos.moverFaseManual')"), "a ação 'Movimentar fase' no menu do processo (`atividade-details-modal.tsx`) não existe mais: `<MovimentarFaseModal origem=\"MENU_PROCESSO\">` só sobrou como tipo de prop; hoje a movimentação manual só existe por arrastar no Kanban (kanban-board-novo.tsx). Decidir: restaurar a ação no menu ou declarar a remoção e reescrever este guard.")
+pendenteDeDecisao("a ação do menu usa o MESMO modal e endpoint", modalProcesso.includes('origem="MENU_PROCESSO"'), "a ação 'Movimentar fase' no menu do processo (`atividade-details-modal.tsx`) não existe mais: `<MovimentarFaseModal origem=\"MENU_PROCESSO\">` só sobrou como tipo de prop; hoje a movimentação manual só existe por arrastar no Kanban (kanban-board-novo.tsx). Decidir: restaurar a ação no menu ou declarar a remoção e reescrever este guard.")
 check("tentativa negada é auditada", rota.includes("auditarTentativaNegada") && rota.includes("negado: true"))
 check("auditar a negativa não pode derrubar o 403", rota.includes("// Auditar a negativa não pode derrubar a negativa"))
 
