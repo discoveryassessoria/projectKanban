@@ -110,6 +110,11 @@ async function rodarUm(arq, banco) {
       PRISMA_DATABASE_URL: url, DIRECT_DATABASE_URL: url, DATABASE_URL: url,
       JWT_SECRET: 'ci-suite-critica-nao-usar-em-producao',
       ADMIN_SEED_PASSWORD: 'ci-suite-critica-senha-de-teste-123',
+      // `src/lib/r2.ts` exige estas variáveis JÁ NO IMPORT (só constrói o cliente S3). Valores
+      // FALSOS de propósito: nenhum teste do gate pode falar com o storage real — se um tentar,
+      // a chamada falha (credencial inválida, host `.invalid`) em vez de escrever em produção.
+      R2_ACCOUNT_ID: 'ci-nao-usar', R2_ACCESS_KEY_ID: 'ci-nao-usar', R2_SECRET_ACCESS_KEY: 'ci-nao-usar',
+      R2_BUCKET_NAME: 'ci-nao-usar', R2_PUBLIC_URL: 'https://ci.invalid',
       NODE_ENV: 'test', CI: '1',
     }
     const filho = spawn(tsx, [arq], { cwd: RAIZ, env, stdio: ['ignore', 'pipe', 'pipe'] })
