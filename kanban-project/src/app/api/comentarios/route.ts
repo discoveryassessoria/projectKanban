@@ -4,7 +4,8 @@
 //
 //   GET  /api/comentarios?tarefaId=123     lista os comentários da tarefa
 //   GET  /api/comentarios?familiaId=45     lista os comentários da família
-//   POST /api/comentarios                  cria (tarefaId XOR familiaId, texto)
+//   POST /api/comentarios                  cria (tarefaId XOR familiaId, texto, processoId? p/ o link da menção)
+//   Comentário de família sem familiaId (processo sem família) → 422; nunca cria família.
 //
 // Mesma régua de permissão de `tarefas.editar`/`tarefas.ver` que o resto da
 // operação: comentar é uma forma de trabalhar a tarefa, não uma ação
@@ -48,8 +49,9 @@ export async function POST(request: NextRequest) {
   const b = await request.json().catch(() => ({}))
   const { tarefaId, familiaId } = lerAncora(b, (k) => b?.[k])
 
+  const processoId = b?.processoId != null && b.processoId !== '' && Number.isInteger(Number(b.processoId)) ? Number(b.processoId) : null
   const r = await criarComentario({
-    tarefaId, familiaId, autorId: usuario.userId, texto: String(b?.texto ?? ''),
+    tarefaId, familiaId, processoId, autorId: usuario.userId, texto: String(b?.texto ?? ''),
   })
   if (!r.ok) return NextResponse.json({ error: r.erro }, { status: 422 })
   return NextResponse.json({ comentario: r.comentario }, { status: 201 })

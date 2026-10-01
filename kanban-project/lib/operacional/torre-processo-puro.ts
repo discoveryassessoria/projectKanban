@@ -1,0 +1,444 @@
+// lib/operacional/torre-processo-puro.ts
+// ============================================================================
+// O DETALHE DO PROCESSO (Torre nova, frente H, 01/10/2026) — a parte PURA: textos, ordenações, filtros, agrupamentos e a
+// resolução de @menções. Sem banco, sem relógio (`agora` entra por parâmetro), importável pela TELA e pelo servidor.
+//
+// Nenhuma regra de negócio mora aqui que já exista em outro lugar: o risco da tarefa é `nivelDeRisco` (torre-filtros), a bola é
+// `torre-bola`, o texto do prazo é `textoPrazoDaTarefa`, o rótulo do status é o mapa único `ROTULO_STATUS`. Aqui só se
+// ORGANIZA o que essas fontes já disseram para o desenho do protótipo (`prototipo-torre/torre-de-controle.html`, tela do Processo).
+// ============================================================================
+import { FUSO_OPERACIONAL, diaOperacional, diasEntreDiasOperacionais } from './tempo-operacional'
+import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
+import { diaMesDoPrazo, textoPrazoDaTarefa } from '@/src/lib/tarefa/texto-prazo'
+import { BOLA_NOSSA, type BolaCom } from './torre-bola'
+
+// ─── DATAS ───────────────────────────────────────────────────────────────────
+
+const hora = (d: Date): string => d.toLocaleTimeString('pt-BR', { timeZone: FUSO_OPERACIONAL, hour: '2-digit', minute: '2-digit', hour12: false })
+const diaMes = (d: Date): string => d.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL, day: '2-digit', month: '2-digit' })
+
+/** "Hoje 12:27" · "Ontem 18:00" · "29/09 14:16" (fuso operacional). `minusculo` → "hoje 12:27" · "ontem 15:30". `null`/inválido → "—". */
+export function rotuloQuando(iso: string | null | undefined, agora: Date, minusculo = false): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const dias = diasEntreDiasOperacionais(agora, d)
+  const baixo = (s: string) => (minusculo ? s.toLowerCase() : s)
+  if (dias === 0) return `${baixo('Hoje')} ${hora(d)}`
+  if (dias === 1) return `${baixo('Ontem')} ${hora(d)}`
+  return `${diaMes(d)} ${hora(d)}`
+}
+
+/** "hoje" · "ontem" · "29/09" — para frases ("cancelada hoje", "não exigida desde 29/09"). */
+export function rotuloDia(iso: string | null | undefined, agora: Date): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const dias = diasEntreDiasOperacionais(agora, d)
+  return dias === 0 ? 'hoje' : dias === 1 ? 'ontem' : diaMes(d)
+}
+
+/** "29/09" — dia/mês no fuso operacional. */
+export const rotuloDiaMes = (iso: string | null | undefined): string => (iso ? diaMesDoPrazo(iso) ?? '—' : '—')
+
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+/** "abr/2027" (mês/ano no fuso operacional). */
+export function rotuloMesAno(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  const [ano, mes] = diaOperacional(d).split('-')
+  return `${MESES[Number(mes) - 1]}/${ano}`
+}
+
+/** "7,1 meses" (30 dias = 1 mês, 1 casa decimal, vírgula); abaixo de 30 dias → "N dias". */
+export function rotuloDuracaoMedia(dias: number): string {
+  if (!(dias >= 0)) return '—'
+  if (dias < 30) return `${Math.round(dias)} ${Math.round(dias) === 1 ? 'dia' : 'dias'}`
+  return `${(dias / 30).toFixed(1).replace('.', ',')} meses`
+}
+
+// ─── STATUS DA LINHA DA TABELA ───────────────────────────────────────────────
+
+export type ChaveDeStatus = 'A_INICIAR' | 'EM_ANDAMENTO' | 'AGUARDANDO_TERCEIROS' | 'AGUARDANDO_CLIENTE' | 'BLOQUEADA' | 'CONCLUIDA' | 'CANCELADA' | 'NAO_EXIGIDA'
+
+/** O status da tarefa em português — o mapa único `ROTULO_STATUS`; só "Aguardando terceiros" é o termo oficial da Torre (o mapa global ainda diz "cartório"). */
+export function rotuloDoStatus(statusTarefa: string): string {
+  if (statusTarefa === 'AGUARDANDO_TERCEIRO') return 'Aguardando terceiros'
+  return ROTULO_STATUS[statusTarefa] ?? statusTarefa
+}
+
+export function chaveDoStatus(statusTarefa: string): ChaveDeStatus {
+  switch (statusTarefa) {
+    case 'NAO_INICIADA': return 'A_INICIAR'
+    case 'EM_ANDAMENTO': return 'EM_ANDAMENTO'
+    case 'AGUARDANDO_TERCEIRO': return 'AGUARDANDO_TERCEIROS'
+    case 'AGUARDANDO_CLIENTE': return 'AGUARDANDO_CLIENTE'
+    case 'BLOQUEADA': return 'BLOQUEADA'
+    case 'CONCLUIDO_RECEBIDO': case 'CONCLUIDO_NAO_POSSUI': return 'CONCLUIDA'
+    default: return 'A_INICIAR'
+  }
+}
+
+/** As opções do select "Status" — as do protótipo + as duas que o sistema real tem e o exemplo não tinha. */
+export const OPCOES_DE_STATUS: ReadonlyArray<{ valor: 'TODOS' | ChaveDeStatus | 'ENCERRADAS'; rotulo: string }> = [
+  { valor: 'TODOS', rotulo: 'Todos os status' },
+  { valor: 'A_INICIAR', rotulo: 'A iniciar' },
+  { valor: 'EM_ANDAMENTO', rotulo: 'Em andamento' },
+  { valor: 'AGUARDANDO_TERCEIROS', rotulo: 'Aguardando terceiros' },
+  { valor: 'AGUARDANDO_CLIENTE', rotulo: 'Aguardando cliente' },
+  { valor: 'BLOQUEADA', rotulo: 'Bloqueada' },
+  { valor: 'CONCLUIDA', rotulo: 'Concluída' },
+  { valor: 'ENCERRADAS', rotulo: 'Cancelada / não exigida' },
+]
+export const OPCOES_DE_ORDEM = [
+  { valor: 'arvore', rotulo: 'Ordem: geração na árvore' },
+  { valor: 'prazo', rotulo: 'Ordem: prazo' },
+  { valor: 'status', rotulo: 'Ordem: status' },
+] as const
+export type OrdemDaTabela = (typeof OPCOES_DE_ORDEM)[number]['valor']
+
+// ─── A LINHA DA TABELA "CERTIDÕES DA FASE ATUAL" ─────────────────────────────
+
+/** Uma linha da tabela — aberta, concluída ou fora do jogo (cancelada / não exigida). Montada no servidor, só desenhada na tela. */
+export interface LinhaDaTabela {
+  chave: string
+  tarefaId: number | null
+  documentoId: number | null
+  tipo: 'ABERTA' | 'CONCLUIDA' | 'CANCELADA' | 'NAO_EXIGIDA'
+  /** "Certidão de nascimento". */
+  titulo: string
+  pessoaId: number | null
+  pessoa: string | null
+  /** "G1 bisavó" (Nº de linhagem + posição na árvore); `null` = a pessoa não tem posição derivável. */
+  geracao: string | null
+  /** Ordem do Nº Linhagem na árvore (`null` vai para o fim). */
+  ordemArvore: number | null
+  /** Ordem do tipo da certidão: nascimento 0 · casamento 1 · óbito 2 · outro 3. */
+  ordemTipo: number
+  passo: { rotulo: string; ordem: number; total: number } | null
+  status: ChaveDeStatus | 'CANCELADA' | 'NAO_EXIGIDA'
+  statusRotulo: string
+  responsavelId: number | null
+  responsavelNome: string | null
+  iniciouEm: string | null
+  concluidaEm: string | null
+  dataPrazo: string | null
+  rotuloDoPrazo: string
+  /** Tom do prazo e do nome: o MESMO nível de risco da aba Tarefas (`nivelDeRisco`). */
+  risco: 'critico' | 'atencao' | 'ritmo' | null
+  atrasada: boolean
+  bola: BolaCom | null
+  /** "cancelada hoje 12:15 por Marco Rovatti · Documento não necessário" (já redigido) — só para as fora do jogo. */
+  encerramentoTexto: string | null
+  /** Motivo curto para o link "Motivo" — só para as fora do jogo. */
+  motivoTexto: string | null
+  /** Pode reabrir pela porta canônica (cancelada por decisão humana). */
+  reabrivel: boolean
+  podeAtribuir: boolean
+}
+
+const ORDEM_DE_STATUS: Record<LinhaDaTabela['status'], number> = {
+  BLOQUEADA: 0, A_INICIAR: 1, EM_ANDAMENTO: 2, AGUARDANDO_CLIENTE: 3, AGUARDANDO_TERCEIROS: 4, CONCLUIDA: 5, CANCELADA: 6, NAO_EXIGIDA: 7,
+}
+
+/** As pessoas que aparecem na tabela, para o select "Pessoa" (distintas, por ordem da árvore). */
+export function pessoasDaTabela(linhas: LinhaDaTabela[]): Array<{ id: number; nome: string }> {
+  const vistos = new Map<number, { id: number; nome: string; ordem: number | null }>()
+  for (const l of linhas) if (l.pessoaId != null && l.pessoa && !vistos.has(l.pessoaId)) vistos.set(l.pessoaId, { id: l.pessoaId, nome: l.pessoa, ordem: l.ordemArvore })
+  return [...vistos.values()].sort((a, b) => (a.ordem ?? 1e9) - (b.ordem ?? 1e9) || a.nome.localeCompare(b.nome, 'pt-BR')).map(({ id, nome }) => ({ id, nome }))
+}
+
+const GRUPO = (l: LinhaDaTabela): number => (l.tipo === 'ABERTA' ? 0 : l.tipo === 'CONCLUIDA' ? 1 : 2) // abertas, concluídas e, por último, fora do jogo
+
+function comparar(a: LinhaDaTabela, b: LinhaDaTabela, ordem: OrdemDaTabela): number {
+  const g = GRUPO(a) - GRUPO(b)
+  if (g !== 0) return g
+  const arvore = (a.ordemArvore ?? 1e9) - (b.ordemArvore ?? 1e9) || a.ordemTipo - b.ordemTipo || (a.tarefaId ?? a.documentoId ?? 0) - (b.tarefaId ?? b.documentoId ?? 0)
+  if (ordem === 'prazo') {
+    const pa = a.dataPrazo ? Date.parse(a.dataPrazo) : Number.POSITIVE_INFINITY
+    const pb = b.dataPrazo ? Date.parse(b.dataPrazo) : Number.POSITIVE_INFINITY
+    return pa === pb ? arvore : pa - pb
+  }
+  if (ordem === 'status') {
+    const d = ORDEM_DE_STATUS[a.status] - ORDEM_DE_STATUS[b.status]
+    return d !== 0 ? d : arvore
+  }
+  return arvore
+}
+
+/** Filtra por pessoa e status e ordena. Fora do jogo (cancelada / não exigida) só aparece em "Todos os status" e em "Cancelada / não exigida". */
+export function filtrarEOrdenar(
+  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: 'TODOS' | ChaveDeStatus | 'ENCERRADAS'; ordem: OrdemDaTabela },
+): LinhaDaTabela[] {
+  return linhas
+    .filter((l) => (f.pessoaId == null ? true : l.pessoaId === f.pessoaId))
+    .filter((l) => {
+      if (f.status === 'TODOS') return true
+      if (f.status === 'ENCERRADAS') return l.tipo === 'CANCELADA' || l.tipo === 'NAO_EXIGIDA'
+      return l.status === f.status
+    })
+    .sort((a, b) => comparar(a, b, f.ordem))
+}
+
+/** Quantas linhas contam no título "Certidões da fase atual · N": as que são trabalho (abertas + concluídas). Fora do jogo não conta. */
+export const totalDaFase = (linhas: LinhaDaTabela[]): number => linhas.filter((l) => l.tipo === 'ABERTA' || l.tipo === 'CONCLUIDA').length
+
+/** O rótulo do cartão: "Certidões da fase atual" quando TUDO é certidão; "Tarefas da fase atual" quando há tarefa de outro tipo (Análise, Tradução…). */
+export function tituloDaTabela(linhas: LinhaDaTabela[], ehCertidao: (l: LinhaDaTabela) => boolean): string {
+  const trabalho = linhas.filter((l) => l.tipo === 'ABERTA' || l.tipo === 'CONCLUIDA')
+  const soCertidoes = trabalho.length > 0 && trabalho.every(ehCertidao)
+  return `${soCertidoes ? 'Certidões' : 'Tarefas'} da fase atual · ${trabalho.length}`
+}
+
+// ─── LINHA-RESUMO ("+ 5 certidões iguais a estas") ───────────────────────────
+
+export const LINHAS_DETALHADAS = 7
+
+const assinatura = (l: LinhaDaTabela): string =>
+  [l.passo ? `${l.passo.rotulo}/${l.passo.ordem}/${l.passo.total}` : '', l.status, l.responsavelId ?? '', l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : '', l.bola ?? ''].join('|')
+
+export interface ResumoDasIguais { visiveis: LinhaDaTabela[]; ocultas: LinhaDaTabela[]; nomes: string[]; descricao: string }
+
+/**
+ * Como o protótipo: mostra as 7 primeiras e UMA linha-resumo para as que são IGUAIS a elas (mesmo passo, status, responsável,
+ * prazo e bola). Só colapsa quando TODAS as linhas de trabalho são iguais entre si e passam de 7 — senão mostra tudo (esconder
+ * linha diferente seria esconder informação). `ocultas` vazio = nada a resumir.
+ */
+export function resumirIguais(trabalho: LinhaDaTabela[], descricaoDe: (l: LinhaDaTabela) => string): ResumoDasIguais {
+  if (trabalho.length <= LINHAS_DETALHADAS) return { visiveis: trabalho, ocultas: [], nomes: [], descricao: '' }
+  const todasIguais = new Set(trabalho.map(assinatura)).size === 1
+  if (!todasIguais) return { visiveis: trabalho, ocultas: [], nomes: [], descricao: '' }
+  const ocultas = trabalho.slice(LINHAS_DETALHADAS)
+  const nomes: string[] = []
+  for (const l of ocultas) {
+    const n = (l.pessoa ?? '').trim().split(/\s+/)[0]
+    if (n && !nomes.includes(n)) nomes.push(n)
+  }
+  return { visiveis: trabalho.slice(0, LINHAS_DETALHADAS), ocultas, nomes, descricao: descricaoDe(trabalho[0]) }
+}
+
+// ─── CABEÇALHO ───────────────────────────────────────────────────────────────
+
+/** Os 4 níveis da regra única `torre-risco.ts` (repetidos aqui só para este módulo não importar nada de servidor). */
+export type NivelDeRiscoDoProcesso = 'no_ritmo' | 'atencao' | 'parado' | 'critico'
+
+/**
+ * O selo do cabeçalho: "Atenção · 12 sem responsável". O NÍVEL é o do risco do processo (a regra única `torre-risco.ts`); a RAZÃO é o fato
+ * mais grave que a tela já conhece (vencidas > sem responsável > aguardando terceiros). Pausado vence tudo ("Pausado").
+ */
+export function seloDoCabecalho(a: {
+  pausado: boolean; risco: NivelDeRiscoDoProcesso | null; numeros: { vencidas: number; semResponsavel: number; comCartorio: number }
+}): { rotulo: string; tom: 'cinza' | 'ambar' | 'vermelho' | 'verde' } {
+  if (a.pausado) return { rotulo: 'Pausado', tom: 'cinza' }
+  const razao = a.numeros.vencidas > 0
+    ? `${a.numeros.vencidas} ${a.numeros.vencidas === 1 ? 'vencida' : 'vencidas'}`
+    : a.numeros.semResponsavel > 0 ? `${a.numeros.semResponsavel} sem responsável` : null
+  if (a.risco === 'critico') return { rotulo: razao ? `Crítico · ${razao}` : 'Crítico', tom: 'vermelho' }
+  if (a.risco === 'parado') return { rotulo: razao ? `Parado · ${razao}` : 'Parado', tom: 'vermelho' }
+  if (a.risco === 'atencao') return { rotulo: razao ? `Atenção · ${razao}` : 'Atenção', tom: 'ambar' }
+  return { rotulo: 'No ritmo', tom: 'verde' }
+}
+
+// ─── PRÓXIMA AÇÃO (DERIVADA DAS TAREFAS ABERTAS) ─────────────────────────────
+
+/** O subconjunto da linha da Torre que as derivações dos cartões leem. */
+export interface LinhaParaDerivar {
+  taskId: number
+  titulo: string
+  documentoId: number | null
+  pessoaNome: string | null
+  statusTarefa: string
+  aIniciar: boolean
+  estadoOperacao: 'FILA' | 'AGUARDANDO' | 'CONCLUIDA'
+  responsavelId: number | null
+  responsavelNome: string | null
+  dataPrazo: string | null
+  rotuloDoPrazo: string
+  diasParaPrazo: number | null
+  atrasada: boolean
+  faseMacroKey: string | null
+  passoAtual: { ordem: number; total: number } | null
+  passoCorrente: { chave: string; label: string } | null
+  bolaCom: BolaCom
+  terceiroNome: string | null
+}
+
+const maisCedo = <T extends LinhaParaDerivar>(ls: T[]): T =>
+  [...ls].sort((a, b) => (a.dataPrazo ? Date.parse(a.dataPrazo) : Infinity) - (b.dataPrazo ? Date.parse(b.dataPrazo) : Infinity) || a.taskId - b.taskId)[0]
+
+/**
+ * O cartão "Próxima ação · obrigatória": a MESMA derivação da aba Processos (`torre-proxima-acao.ts`, decisão 3 do PROGRESSO.md —
+ * lida das tarefas abertas da fase, nunca digitada). Aqui só se REDIGE o cartão do protótipo:
+ *   título   "Distribuir as 12 certidões de Emissão documental" (a ação + a fase, quando a ação é distribuir);
+ *   detalhe  "responsável: nenhum · prazo: hoje · por isso este processo está em "Precisa de você"".
+ */
+export function cartaoDaProximaAcao(
+  a: { texto: string; tipo: string; urgencia: 'atrasada' | 'vence_em_breve' | null; responsavelNome: string | null },
+  prazoTexto: string | null, faseLabel: string | null, noPrecisaDeVoce: boolean,
+): { titulo: string; detalhe: string; urgente: boolean } {
+  const titulo = a.tipo === 'distribuir' && faseLabel && !a.texto.includes(faseLabel) && /^Distribuir as \d+ /.test(a.texto) ? `${a.texto} de ${faseLabel}` : a.texto
+  const prazo = prazoTexto ?? 'sem prazo'
+  return {
+    titulo,
+    detalhe: `responsável: ${a.responsavelNome ?? 'nenhum'} · prazo: ${prazo}${noPrecisaDeVoce ? ' · por isso este processo está em "Precisa de você"' : ''}`,
+    urgente: a.tipo === 'distribuir' || a.urgencia === 'atrasada',
+  }
+}
+
+// ─── OS CINCO CARTÕES ────────────────────────────────────────────────────────
+
+export interface CartaoSimples { rotulo: string; titulo: string; sub: string; tom: 'normal' | 'vermelho' | 'ambar' }
+
+const plural = (n: number, um: string, varios: string): string => (n === 1 ? um : varios)
+const nomeDoEstado = (l: LinhaParaDerivar): string =>
+  l.statusTarefa === 'BLOQUEADA' ? 'bloqueada' : l.statusTarefa === 'AGUARDANDO_CLIENTE' ? 'aguardando cliente'
+    : l.estadoOperacao === 'AGUARDANDO' ? 'aguardando terceiros' : l.aIniciar ? 'a iniciar' : 'em andamento'
+
+export function cartoesDaFase<L extends LinhaParaDerivar>(a: {
+  /** Tarefas ABERTAS da fase atual. */
+  linhas: L[]
+  encerradas: { canceladas: number; naoExigidas: number }
+  /** O nível de risco de cada tarefa (a mesma `nivelDeRisco` da aba Tarefas) — o chamador passa a função. */
+  riscoDe: (l: L) => 'critico' | 'atencao' | 'ritmo'
+}): CartaoSimples[] {
+  const ls = a.linhas
+  const n = ls.length
+
+  // PASSO ATUAL — o passo onde está a maioria das tarefas abertas.
+  let passo: CartaoSimples
+  if (n === 0) passo = { rotulo: 'Passo atual', titulo: '—', sub: 'nenhuma tarefa aberta nesta fase', tom: 'normal' }
+  else {
+    const por = new Map<string, LinhaParaDerivar[]>()
+    for (const l of ls) por.set(l.passoCorrente?.label ?? '—', [...(por.get(l.passoCorrente?.label ?? '—') ?? []), l])
+    const [rotulo, grupo] = [...por.entries()].sort((x, y) => y[1].length - x[1].length)[0]
+    const estados = new Set(grupo.map(nomeDoEstado))
+    // `passoAtual.ordem` da projeção = quantos passos já ficaram para trás; o passo em que está é o seguinte ("passo 1 de 4" = o primeiro).
+    const posicao = grupo[0].passoAtual ? `passo ${Math.min(grupo[0].passoAtual.ordem + 1, grupo[0].passoAtual.total)} de ${grupo[0].passoAtual.total} · ` : ''
+    const quantas = estados.size === 1 ? `${grupo.length} ${[...estados][0]}` : `${grupo.length} neste passo`
+    const outros = por.size > 1 ? ` · +${n - grupo.length} em outros passos` : ''
+    passo = { rotulo: 'Passo atual', titulo: rotulo, sub: `${posicao}${quantas}${outros}`, tom: 'normal' }
+  }
+
+  // COM QUEM
+  const semDono = ls.filter((l) => l.responsavelId == null).length
+  const comTerceiro = ls.filter((l) => l.responsavelId != null && l.bolaCom !== BOLA_NOSSA).length
+  const equipe = n - semDono - comTerceiro
+  const responsaveis = new Set(ls.filter((l) => l.responsavelId != null).map((l) => l.responsavelNome ?? ''))
+  const comQuem: CartaoSimples = {
+    rotulo: 'Com quem',
+    titulo: n === 0 ? '—' : semDono === n ? 'Sem responsável' : responsaveis.size === 1 ? [...responsaveis][0] : `${responsaveis.size} pessoas`,
+    sub: n === 0 ? 'nenhuma tarefa aberta nesta fase' : `${equipe} equipe · ${comTerceiro} ${plural(comTerceiro, 'terceiro', 'terceiros')} · ${semDono} sem dono`,
+    tom: n > 0 && semDono === n ? 'vermelho' : 'normal',
+  }
+
+  // PRAZO — o da tarefa aberta de prazo mais cedo.
+  let prazo: CartaoSimples
+  const comPrazo = ls.filter((l) => l.dataPrazo)
+  if (comPrazo.length === 0) prazo = { rotulo: 'Prazo', titulo: n === 0 ? '—' : 'Sem prazo', sub: n === 0 ? 'nenhuma tarefa aberta nesta fase' : 'nenhuma tarefa aberta tem prazo', tom: 'normal' }
+  else {
+    const cedo = maisCedo(comPrazo)
+    const iguais = comPrazo.filter((l) => l.dataPrazo === cedo.dataPrazo).length
+    const dias = cedo.diasParaPrazo
+    const quando = dias == null ? '' : dias < 0 ? ` · atrasado há ${-dias} ${plural(-dias, 'dia', 'dias')}` : dias === 0 ? ' · vence hoje' : ` · faltam ${dias} ${plural(dias, 'dia', 'dias')}`
+    const quantas = iguais === n ? `as ${n}` : `${iguais} de ${n}`
+    prazo = {
+      rotulo: 'Prazo',
+      titulo: cedo.aIniciar && cedo.estadoOperacao !== 'AGUARDANDO' && !cedo.atrasada ? `Iniciar até ${diaMesDoPrazo(cedo.dataPrazo)}` : textoPrazoDaTarefa(cedo),
+      sub: `${quantas}${quando}`,
+      tom: cedo.atrasada ? 'vermelho' : a.riscoDe(cedo) === 'ritmo' ? 'normal' : 'ambar',
+    }
+  }
+
+  // CARTÓRIOS — os órgãos já vinculados às tarefas abertas.
+  const orgaos = [...new Set(ls.map((l) => l.terceiroNome).filter((x): x is string => !!x))]
+  const comOrgao = ls.filter((l) => l.terceiroNome).length
+  const cartorios: CartaoSimples = orgaos.length === 0
+    ? { rotulo: 'Cartórios', titulo: 'Ainda não vinculados', sub: 'define-se ao iniciar cada pedido', tom: 'normal' }
+    : {
+        rotulo: 'Cartórios',
+        titulo: orgaos.length <= 2 ? orgaos.join(' · ') : `${orgaos.slice(0, 2).join(' · ')} +${orgaos.length - 2}`,
+        sub: comOrgao === n ? `as ${n} já vinculadas` : `${comOrgao} de ${n} vinculadas · ${n - comOrgao} a definir`,
+        tom: 'normal',
+      }
+
+  // FORA DO JOGO
+  const totalFora = a.encerradas.canceladas + a.encerradas.naoExigidas
+  const partes = [
+    a.encerradas.canceladas > 0 ? `${a.encerradas.canceladas} ${plural(a.encerradas.canceladas, 'cancelada', 'canceladas')}` : null,
+    a.encerradas.naoExigidas > 0 ? `${a.encerradas.naoExigidas} ${plural(a.encerradas.naoExigidas, 'não exigida', 'não exigidas')}` : null,
+  ].filter(Boolean)
+  const fora: CartaoSimples = {
+    rotulo: 'Fora do jogo',
+    titulo: totalFora === 0 ? 'Nenhuma' : `${totalFora} ${plural(totalFora, 'certidão', 'certidões')}`,
+    sub: partes.length ? partes.join(' · ') : 'nada cancelado nem dispensado pela árvore',
+    tom: 'normal',
+  }
+  return [passo, comQuem, prazo, cartorios, fora]
+}
+
+// ─── @MENÇÃO ─────────────────────────────────────────────────────────────────
+
+export interface PessoaMencionavel { id: number; nome: string }
+
+const semAcento = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+
+/**
+ * Do texto digitado ("@Daniela, pode distribuir…") para o texto GRAVADO (`@[Daniela Brait](12)` — o formato que o motor de
+ * comentários entende). Casa primeiro o NOME COMPLETO ("@Daniela Brait"), depois o PRIMEIRO NOME quando é único na equipe.
+ * "@" sem pessoa correspondente fica como texto (não vira menção). PURO.
+ */
+export function resolverMencoes(texto: string, equipe: PessoaMencionavel[]): { texto: string; mencionados: PessoaMencionavel[] } {
+  const mencionados: PessoaMencionavel[] = []
+  const ordenadas = [...equipe].sort((a, b) => b.nome.length - a.nome.length)
+  const primeiros = new Map<string, PessoaMencionavel[]>()
+  for (const p of equipe) {
+    const k = semAcento(p.nome.trim().split(/\s+/)[0])
+    primeiros.set(k, [...(primeiros.get(k) ?? []), p])
+  }
+  const saida = texto.replace(/@(?!\[)([^\s@,;:!?()]+(?:\s+[^\s@,;:!?()]+)*)/g, (casado, resto: string) => {
+    // 1. nome completo (o mais longo que abre o trecho)
+    const k = semAcento(resto)
+    for (const p of ordenadas) {
+      const nome = semAcento(p.nome.trim())
+      if (k === nome || k.startsWith(`${nome} `)) {
+        if (!mencionados.some((m) => m.id === p.id)) mencionados.push(p)
+        const consumido = p.nome.trim().split(/\s+/).length
+        const sobra = resto.split(/\s+/).slice(consumido).join(' ')
+        return `@[${p.nome}](${p.id})${sobra ? ` ${sobra}` : ''}`
+      }
+    }
+    // 2. primeiro nome único
+    const primeiraPalavra = resto.split(/\s+/)[0]
+    const candidatos = primeiros.get(semAcento(primeiraPalavra)) ?? []
+    if (candidatos.length === 1) {
+      const p = candidatos[0]
+      if (!mencionados.some((m) => m.id === p.id)) mencionados.push(p)
+      const sobra = resto.split(/\s+/).slice(1).join(' ')
+      return `@[${p.nome}](${p.id})${sobra ? ` ${sobra}` : ''}`
+    }
+    return casado
+  })
+  return { texto: saida, mencionados }
+}
+
+export interface PedacoDoComentario { tipo: 'texto' | 'mencao'; valor: string }
+
+/** Quebra o texto gravado em pedaços para destacar as menções (`@[Nome](id)` → "@Nome" em destaque). */
+export function pedacosDoComentario(texto: string): PedacoDoComentario[] {
+  const partes: PedacoDoComentario[] = []
+  let ultimo = 0
+  for (const m of texto.matchAll(/@\[([^\]]+)\]\(\d+\)/g)) {
+    const i = m.index ?? 0
+    if (i > ultimo) partes.push({ tipo: 'texto', valor: texto.slice(ultimo, i) })
+    partes.push({ tipo: 'mencao', valor: `@${m[1]}` })
+    ultimo = i + m[0].length
+  }
+  if (ultimo < texto.length) partes.push({ tipo: 'texto', valor: texto.slice(ultimo) })
+  return partes
+}
+
+/** As iniciais do avatar: "Marco Rovatti" → "MR". */
+export function iniciaisDe(nome: string): string {
+  return nome.trim().split(/\s+/).filter(Boolean).map((x) => x[0]).slice(0, 2).join('').toUpperCase() || '?'
+}

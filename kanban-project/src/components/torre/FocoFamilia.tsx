@@ -98,6 +98,7 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
               </>
             ) : <h2 className="font-extrabold" style={{ fontSize: 18 }}>Foco da família</h2>}
           </div>
+          {foco && <button className="tor-btn pri" onClick={() => router.push(`/torre/processo/${foco.processoId}`)}>Abrir o processo</button>}
           {foco && pode("relatorios.ver") && <button className="tor-btn pri" onClick={() => setRelatorio(true)}>Relatório de controle</button>}
           <button className="tor-btn" onClick={onFechar}>Fechar</button>
         </div>

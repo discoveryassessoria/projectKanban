@@ -37,7 +37,8 @@ import { novosDoResumo } from './aviso-texto'
 
 type Db = typeof prisma | Prisma.TransactionClient
 
-export { avisarChegouTrabalho, avisarMudouDeMao, aoMudarDeDono } from './avisos-fatos'
+export { avisarChegouTrabalho, avisarMudouDeMao, aoMudarDeDono, avisarMencao } from './avisos-fatos'
+import { avisarMencao } from './avisos-fatos'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // A LEITURA OPERACIONAL — uma varredura, dois consumidores
@@ -429,7 +430,59 @@ export async function rodarResumoDiario(opts: { agora?: Date; ensaio?: boolean }
   const linhas = await lerLinhasOperacionais(agora)
   const precisaAgir = await avaliarPrecisaAgir({ agora, modo: 'FOTO', ensaio: opts.ensaio, linhas })
   const gestor = await avisarGestores({ agora, ensaio: opts.ensaio, linhas })
-  return { precisaAgir, gestor }
+  const mencoes = await resumirMencoesNaoLidas({ ensaio: opts.ensaio })
+  return { precisaAgir, gestor, mencoes }
+}
+
+export interface RelatorioMencoes { grupos: number; mencoes: number; criados: number; somados: number }
+
+/**
+ * AS MENÇÕES NO RESUMO DIÁRIO (Torre nova, H): toda menção ainda NÃO LIDA (`ComentarioMencao.lidaEm = null`) tem de estar
+ * num aviso MENCAO aberto de (pessoa, família). Aviso aberto + mesmas menções = nada muda (idempotente, não renotifica);
+ * aviso que expirou/sumiu mas a menção segue sem leitura reaparece. Lida (pelo sino, "marcar todas" ou pela página do
+ * processo) nunca volta. `ensaio` só conta.
+ */
+export async function resumirMencoesNaoLidas(opts: { ensaio?: boolean; db?: Db } = {}): Promise<RelatorioMencoes> {
+  const db = opts.db ?? prisma
+  const pendentes = await db.comentarioMencao.findMany({
+    where: { lidaEm: null },
+    orderBy: { id: 'asc' },
+    select: {
+      usuarioId: true, usuario: { select: { tipo: true } },
+      comentario: {
+        select: {
+          id: true, texto: true, autorId: true, autor: { select: { nome: true } },
+          tarefa: { select: { processo: { select: { id: true, ...SELECT_ROTULO_FAMILIA.select } } } },
+          familia: { select: { nome: true, processos: { orderBy: { id: 'desc' }, take: 1, select: { id: true, ...SELECT_ROTULO_FAMILIA.select } } } },
+        },
+      },
+    },
+  })
+  const grupos = new Map<string, { usuarioId: number; admin: boolean; processoId: number | null; familia: string | null; itens: typeof pendentes }>()
+  for (const m of pendentes) {
+    const c = m.comentario
+    const proc = c.tarefa?.processo ?? c.familia?.processos[0] ?? null
+    const processoId = proc?.id ?? null
+    const k = `${m.usuarioId}|${processoId ?? 0}`
+    const g = grupos.get(k) ?? { usuarioId: m.usuarioId, admin: m.usuario.tipo === 'admin', processoId, familia: proc ? rotuloDaFamilia(proc) : c.familia?.nome ?? null, itens: [] }
+    g.itens.push(m)
+    grupos.set(k, g)
+  }
+  const r: RelatorioMencoes = { grupos: grupos.size, mencoes: pendentes.length, criados: 0, somados: 0 }
+  if (opts.ensaio) return r
+  for (const g of grupos.values()) {
+    let criou = false
+    for (const m of g.itens) {
+      const res = await avisarMencao(db, {
+        destinatarioId: g.usuarioId, destinatarioEhAdmin: g.admin, comentarioId: m.comentario.id, autorId: m.comentario.autorId,
+        autorNome: m.comentario.autor.nome, texto: m.comentario.texto, processoId: g.processoId, familiaNome: g.familia,
+      })
+      if (res.criado) criou = true
+    }
+    if (criou) r.criados++
+    else r.somados++
+  }
+  return r
 }
 
 /**

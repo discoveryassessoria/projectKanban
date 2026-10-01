@@ -46,7 +46,8 @@ async function executar(req: NextRequest) {
     console.log(
       `[cron/resumo-diario]${ensaio ? ' ENSAIO' : ''} precisaAgir grupos=${r.precisaAgir.grupos} criados=${r.precisaAgir.criados} ` +
       `atualizados=${r.precisaAgir.atualizados} removidos=${r.precisaAgir.removidos} | gestor itens=${r.gestor.itens} ` +
-      `criados=${r.gestor.criados} removidos=${r.gestor.removidos} `,
+      `criados=${r.gestor.criados} removidos=${r.gestor.removidos} | menções grupos=${r.mencoes.grupos} ` +
+      `menções=${r.mencoes.mencoes} avisos novos=${r.mencoes.criados}`,
     )
     return NextResponse.json(r)
   } catch (e) {
