@@ -195,7 +195,11 @@
    "scripts/torre-toast-escuro.test.ts",
    "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
    "scripts/torre-sem-responsavel-quatro-lugares.test.ts",
-   "scripts/torre-cobranca-estorno.test.ts"
+   "scripts/torre-cobranca-estorno.test.ts",
+   "scripts/fase-aguardando-fechamento-motor.test.ts",
+   "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
+   "scripts/ativar-fase-aguardando-fechamento.test.ts",
+   "scripts/catalogo-fases-aguardando-fechamento.test.ts"
   ]
  },
  "arquivos": [
@@ -372,6 +376,10 @@
   "scripts/torre-toast-escuro.test.ts",
   "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
   "scripts/torre-sem-responsavel-quatro-lugares.test.ts",
-  "scripts/torre-cobranca-estorno.test.ts"
+  "scripts/torre-cobranca-estorno.test.ts",
+  "scripts/fase-aguardando-fechamento-motor.test.ts",
+  "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
+  "scripts/ativar-fase-aguardando-fechamento.test.ts",
+  "scripts/catalogo-fases-aguardando-fechamento.test.ts"
  ]
 }

@@ -33,9 +33,8 @@ import { ordensDeFase } from '@/src/services/documento-operacao'
 import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
 import { equipeExigida } from './elegibilidade'
 import { pessoasNoLimite } from './torre-equipe'
-import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
+import { idsDeProcessosForaDaTorre, semProcessosForaDaTorre, ONDE_PROCESSO_NA_TORRE } from '@/src/services/processo-pre-contrato'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
-import { ONDE_PROCESSO_NAO_PAUSADO } from '@/src/services/processo-pausa'
 import { entradaNaFase, RESULTADOS_QUE_MOVEM_DE_FASE } from './metricas-processo'
 import { resolverMacroWorkflowDoProcesso } from '@/src/lib/motor/resolver-macro-workflow'
 import { proximaFaseDoCaminho } from '@/src/lib/motor/phase-advance-helpers'
@@ -402,10 +401,11 @@ export async function lerBaseDoPrecisa(
 ): Promise<BaseDoPrecisa> {
   const agora = opts.agora ?? new Date()
   const db = opts.db ?? prisma
-  // PROCESSO PAUSADO FICA FORA DA TORRE (M2, filtro canônico `semProcessosPausados`): a lista de decisões é da Torre, então
-  // não acusa nada de um processo que o gestor pausou. A Operação (sino, fila) lê as linhas por outro caminho e não muda.
-  const [brutasLidas, pausados] = await Promise.all([opts.linhas ?? lerLinhasOperacionais(agora, db), idsDeProcessosPausados(db)])
-  const brutas = semProcessosPausados(brutasLidas, pausados)
+  // PROCESSO PAUSADO — ou em AGUARDANDO FECHAMENTO (`a_iniciar`) — FICA FORA DA TORRE (filtro canônico `semProcessosForaDaTorre`): a lista
+  // de decisões é da Torre, então não acusa nada de um processo que o gestor pausou nem de um que ainda nem começou. A Operação (sino,
+  // fila) lê as linhas por outro caminho e não muda.
+  const [brutasLidas, foraDaTorre] = await Promise.all([opts.linhas ?? lerLinhasOperacionais(agora, db), idsDeProcessosForaDaTorre(db)])
+  const brutas = semProcessosForaDaTorre(brutasLidas, foraDaTorre)
 
   // SÓ TAREFA ABERTA (achado real, 30/09/2026): `lerLinhasOperacionais` usa a
   // MESMA leitura do Kanban (`visaoGerencial` sem filtro de status devolve
@@ -736,7 +736,10 @@ export async function processosSemProximaAcao(db: Db = prisma): Promise<Processo
   const v2Global = cfg?.runtimeV2Habilitado ?? false
   if (!v2Global) return []
   const procs = (await db.processo.findMany({
-    where: { dataConclusao: null, ...ONDE_PROCESSO_NAO_PAUSADO, faseAtualKey: { not: null }, tipoProcessoMotorId: { not: null }, modalidadeId: { not: null } },
+    // `AND` explícito: a chave `faseAtualKey: { not: null }` ao lado do filtro da Torre NÃO pode sobrescrevê-lo em silêncio (o filtro
+    // "fora de Aguardando fechamento" também fala de `faseAtualKey`) — e é ele que impede o falso positivo de "Fase deixada" para o processo
+    // que, por desenho, não tem tarefa aberta nenhuma.
+    where: { AND: [ONDE_PROCESSO_NA_TORRE, { dataConclusao: null, faseAtualKey: { not: null }, tipoProcessoMotorId: { not: null }, modalidadeId: { not: null } }] },
     orderBy: { id: 'asc' },
     select: {
       id: true, nome: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true, workflowRuntime: true,
@@ -1145,11 +1148,11 @@ async function extrasDoBriefing(base: BaseDoPrecisa, agora: Date, db: Db): Promi
   const ontem = diaOperacional(new Date(agora.getTime() - 86_400_000))
   const janela = janelaDoDiaOperacionalDe(ontem)
   const [ativos, fechadas, protocolados] = await Promise.all([
-    db.processo.count({ where: { dataConclusao: null, ...ONDE_PROCESSO_NAO_PAUSADO } }),
+    db.processo.count({ where: { AND: [ONDE_PROCESSO_NA_TORRE, { dataConclusao: null }] } }),
     db.tarefa.count({
       where: {
         statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] }, dataConclusao: { gte: janela.inicio, lt: janela.fim },
-        OR: [{ processoId: null }, { processo: ONDE_PROCESSO_NAO_PAUSADO }],
+        OR: [{ processoId: null }, { processo: ONDE_PROCESSO_NA_TORRE }],
       },
     }),
     db.phaseAdvanceLog.findMany({

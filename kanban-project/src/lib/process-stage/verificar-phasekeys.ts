@@ -13,7 +13,8 @@
 // equivalência é determinística — qual seria a chave canônica. Corrigir é ato
 // separado, transacional e auditado (`scripts/corrigir-phasekeys-macro.ts`).
 
-import { FASES, phaseKeyToFaseCode } from "./fases-catalog"
+import { FASES, phaseKeyConhecidaDoCatalogo } from "./fases-catalog"
+import { PHASEKEY_A_INICIAR, ehFaseAguardandoFechamento } from "./fase-pre-contrato"
 
 /**
  * Equivalências CONFIRMADAS entre chave legada e canônica. Fechado: uma chave que
@@ -90,7 +91,7 @@ export function verificarPhaseKeys(ctx: ContextoVerificacao): AchadoPhaseKey[] {
   const contar = (tipoId: number | null) => (tipoId != null ? ctx.processosPorTipo.get(tipoId) ?? 0 : 0)
 
   for (const f of ctx.fases) {
-    if (phaseKeyToFaseCode(f.phaseKey) != null) continue
+    if (phaseKeyConhecidaDoCatalogo(f.phaseKey)) continue
     const sugerida = EQUIVALENCIA_LEGADA[f.phaseKey] ?? null
     achados.push({
       tipo: "PHASEKEY_FORA_DO_CATALOGO",
@@ -139,7 +140,9 @@ export function verificarPhaseKeys(ctx: ContextoVerificacao): AchadoPhaseKey[] {
   // e não materializa nada. O motor recusa — mas o operador só descobre no impacto.
   for (const f of ctx.fases) {
     if (!f.required) continue
-    if (phaseKeyToFaseCode(f.phaseKey) == null) continue
+    if (!phaseKeyConhecidaDoCatalogo(f.phaseKey)) continue
+    // "Aguardando fechamento" é SEM workflow por desenho (pré-trabalho: nenhuma tarefa nasce nela) — não é lacuna de cadastro.
+    if (ehFaseAguardandoFechamento(f.phaseKey)) continue
     if (ctx.phaseKeysComWorkflow.has(f.phaseKey)) continue
     achados.push({
       tipo: "FASE_OBRIGATORIA_SEM_WORKFLOW",
@@ -159,7 +162,7 @@ export function verificarPhaseKeys(ctx: ContextoVerificacao): AchadoPhaseKey[] {
   // ORIGEM — o cadastro que serve de molde. Não trava processo nenhum HOJE; é o que
   // faz o defeito voltar amanhã, no próximo macro criado a partir dele.
   for (const c of ctx.catalogoFase ?? []) {
-    if (phaseKeyToFaseCode(c.phaseKey) != null) continue
+    if (phaseKeyConhecidaDoCatalogo(c.phaseKey)) continue
     const sugerida = EQUIVALENCIA_LEGADA[c.phaseKey] ?? null
     achados.push({
       tipo: "CATALOGO_FASE_COM_CHAVE_LEGADA",
@@ -188,5 +191,6 @@ export function verificarPhaseKeys(ctx: ContextoVerificacao): AchadoPhaseKey[] {
 
 /** Chaves canônicas, para quem precisa listar o vocabulário oficial. */
 export function phaseKeysCanonicas(): string[] {
-  return Object.values(FASES).map((f) => f.phaseKey)
+  // As fases do enum + a extensão "Aguardando fechamento" (`a_iniciar`, fora do enum — pré-trabalho, sem migration).
+  return [PHASEKEY_A_INICIAR, ...Object.values(FASES).map((f) => f.phaseKey)]
 }

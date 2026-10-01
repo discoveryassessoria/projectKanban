@@ -16,7 +16,7 @@
 //   backlog   → abertas nesta semana vs. concluídas com sucesso nesta semana
 //
 // TORRE NOVA (M4, 01/10/2026) — a foto ganhou os TOTAIS DA VISÃO GERAL, com a MESMA definição dos cartões:
-//   processosAtivos → processos não concluídos E não pausados (`ONDE_PROCESSO_ATIVO_DA_TORRE`, a lista do Radar/Processos)
+//   processosAtivos → processos não concluídos, não pausados E fora de "Aguardando fechamento" (`ONDE_PROCESSO_ATIVO_DA_TORRE`, a lista do Radar/Processos)
 //   tarefasAbertas  → `numeroDoKpi('abertas')`   comEquipe → 'equipe'   comCartorio → 'cartorio' (aguardando terceiros, COM responsável)
 //   O cartão "Sem responsável" é `semDono` (mesma definição: 'ninguem') e "Aguardando terceiros" com ou sem dono segue em `aguardandoTerceiro`.
 // Colunas NULLABLE: foto anterior à M4 não tem estes números e NUNCA é preenchida depois — sem tendência, não estimativa.
@@ -29,6 +29,7 @@ import { prisma } from '@/lib/prisma'
 import { kpisDasLinhas, totaisDaSituacao } from './torre-kpis'
 import { listarTarefasDaTorre } from '@/src/services/torre-tarefas'
 import { processosCriticos, anotarRisco, ONDE_PROCESSO_ATIVO_DA_TORRE } from './torre-processos'
+import { ONDE_TAREFA_DE_PROCESSO_NA_TORRE } from '@/src/services/processo-pre-contrato'
 
 const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
@@ -68,8 +69,9 @@ export async function calcularIndicadoresDoDia(agora = new Date()): Promise<Indi
     listarTarefasDaTorre({}, agora),
     processosCriticos(agora),
     prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_DA_TORRE }),
-    prisma.tarefa.count({ where: { createdAt: { gte: inicioSemana } } }),
-    prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioSemana } } }),
+    // Backlog da semana: também fora da Torre o processo pausado e o em Aguardando fechamento (o mesmo filtro das listas).
+    prisma.tarefa.count({ where: { createdAt: { gte: inicioSemana }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
+    prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioSemana }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
   ])
   const linhas = anotarRisco(brutas, criticos)
   return { ...kpisDasLinhas(linhas, agora), ...totaisDaSituacao(linhas, agora), processosAtivos, backlogAbertas, backlogFechadasNaSemana: backlogFechadas }

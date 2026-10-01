@@ -7,6 +7,7 @@
 import { prisma } from '@/lib/prisma'
 import { serieDeIndicadores } from './indicadores-diarios'
 import { fotoDeReferencia } from './torre-kpis'
+import { ONDE_TAREFA_DE_PROCESSO_NA_TORRE } from '@/src/services/processo-pre-contrato'
 
 const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
@@ -21,8 +22,10 @@ export const inicioDaSemana = (d: Date): Date => {
 export async function tendenciasDaTorre(agora = new Date()) {
   const [serie, abertas, fechadas] = await Promise.all([
     serieDeIndicadores(30),
-    prisma.tarefa.count({ where: { createdAt: { gte: inicioDaSemana(agora) } } }),
-    prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioDaSemana(agora) } } }),
+    // O backlog da semana também deixa de fora a tarefa de processo PAUSADO ou em AGUARDANDO FECHAMENTO (fora da Torre — o mesmo filtro
+    // das listas e da foto diária): "abre/fecha" nunca diverge do que a Torre mostra.
+    prisma.tarefa.count({ where: { createdAt: { gte: inicioDaSemana(agora) }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
+    prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioDaSemana(agora) }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
   ])
   const referencia = fotoDeReferencia(serie, agora)
   return {

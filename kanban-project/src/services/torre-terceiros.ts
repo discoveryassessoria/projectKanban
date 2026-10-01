@@ -17,7 +17,8 @@ import { lerReguaDeCobranca, reguaResumida, type LinhaDaRegua } from '@/lib/oper
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
 import { semFaseFutura } from '@/lib/operacional/fase-futura'
 import { textoDoContato, textoDoPedido } from '@/lib/operacional/terceiros-pedidos'
-import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
+import { idsDeProcessosPausados } from '@/src/services/processo-pausa'
+import { idsDeProcessosForaDaTorre, idsDeProcessosAguardandoFechamento, semProcessosForaDaTorre } from '@/src/services/processo-pre-contrato'
 import { cobrarTarefas, canaisCadastrados, CANAIS_VALIDOS, RESULTADOS_VALIDOS, type CobrancaIgnorada } from '@/src/services/cobranca-terceiros'
 import { proximaEmDiasValida, MAX_PROXIMA_COBRANCA_DIAS } from '@/src/services/subtarefas-da-etapa'
 
@@ -58,8 +59,8 @@ async function tarefasAbertasDoOrgao(orgaoId: number, agora: Date): Promise<Linh
     todas.push(...linhas)
     if (pagina * 500 >= total || linhas.length === 0) break
   }
-  // Processo PAUSADO fica fora da Torre — inclusive de "Cobrar este cartório" (filtro canônico `semProcessosPausados`).
-  return ordenarFila(semProcessosPausados(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), await idsDeProcessosPausados())) as LinhaGerencial[]
+  // Processo PAUSADO (ou em AGUARDANDO FECHAMENTO) fica fora da Torre — inclusive de "Cobrar este cartório" (filtro canônico `semProcessosForaDaTorre`).
+  return ordenarFila(semProcessosForaDaTorre(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), await idsDeProcessosForaDaTorre())) as LinhaGerencial[]
 }
 
 /** O que o toast precisa para oferecer "Desfazer" numa cobrança: os contatos que ESTA ação criou (estorno, não exclusão). */
@@ -81,12 +82,15 @@ export async function cobrarPedidos(args: { tarefaIds: number[]; autor: Autor } 
   const ids = [...new Set(args.tarefaIds)]
   if (ids.length === 0) return { ok: false, erro: 'nenhum pedido para cobrar', status: 400 }
 
-  const [tarefas, pausados] = await Promise.all([
+  const [tarefas, pausados, aguardandoFechamento] = await Promise.all([
     prisma.tarefa.findMany({ where: { id: { in: ids } }, select: { id: true, processoId: true } }),
     idsDeProcessosPausados(),
+    idsDeProcessosAguardandoFechamento(),
   ])
-  const pausadas = new Set(tarefas.filter((t) => t.processoId != null && pausados.has(t.processoId)).map((t) => t.id))
-  const ignoradasPorPausa: CobrancaIgnorada[] = [...pausadas].map((tarefaId) => ({ tarefaId, motivo: 'processo pausado — fora da Torre' }))
+  const pausadas = new Set(tarefas.filter((t) => t.processoId != null && (pausados.has(t.processoId) || aguardandoFechamento.has(t.processoId))).map((t) => t.id))
+  const ignoradasPorPausa: CobrancaIgnorada[] = tarefas
+    .filter((t) => pausadas.has(t.id))
+    .map((t) => ({ tarefaId: t.id, motivo: t.processoId != null && pausados.has(t.processoId) ? 'processo pausado — fora da Torre' : 'processo aguardando fechamento — fora da Torre' }))
 
   const { cobradas, ignoradas } = await cobrarTarefas({
     tarefaIds: ids.filter((id) => !pausadas.has(id)), autor: args.autor,

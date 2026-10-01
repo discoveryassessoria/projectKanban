@@ -6,11 +6,14 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { sentidoDoBacklog, hrefDaFase, type Funil, type SemanaDoFunil } from "@/lib/operacional/torre-funil-puro"
 import { milhar } from "@/lib/operacional/torre-topo"
+import { ROTULO_AGUARDANDO_FECHAMENTO } from "@/src/lib/process-stage/fase-pre-contrato"
 
 const SENTIDO_TEXTO = { cresce: "cresce", diminui: "diminui", estavel: "se mantém" } as const
 
-export function TorreFunil({ funil, semana, carregandoDados, erroDados }: {
+export function TorreFunil({ funil, semana, carregandoDados, erroDados, aguardandoFechamento }: {
   funil: Funil | null; semana: SemanaDoFunil | null; carregandoDados: boolean; erroDados: string | null
+  /** Processos em "Aguardando fechamento" (escopo atual) — linha PRÓPRIA, fora do total e da barra de risco; `null` = ainda sem dado. */
+  aguardandoFechamento: number | null
 }) {
   const url = useSearchParams()
   const manter = { pais: url.get("pais"), q: url.get("q") }
@@ -52,6 +55,11 @@ export function TorreFunil({ funil, semana, carregandoDados, erroDados }: {
           </Link>
         ))}
       </div>
+      {aguardandoFechamento != null && (
+        <p className="tvg-funil-nota" data-testid="torre-funil-aguardando-fechamento">
+          <b>{ROTULO_AGUARDANDO_FECHAMENTO}: {milhar(aguardandoFechamento)}</b> — ainda sem tarefas; fora do total e do risco acima.
+        </p>
+      )}
       {funil && funil.foraDoFunil > 0 && (
         <p className="tvg-funil-nota">{funil.foraDoFunil === 1 ? "1 processo ativo está" : `${funil.foraDoFunil} processos ativos estão`} numa fase fora desta lista e não aparece acima.</p>
       )}

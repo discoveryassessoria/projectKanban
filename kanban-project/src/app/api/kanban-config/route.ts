@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { rotuloOficialDaFase } from "@/src/lib/process-stage/fase-pre-contrato"
 
 export async function GET(request: Request) {
   const erro = await verificarPermissao(request, "processos.ver")
@@ -76,7 +77,8 @@ export async function GET(request: Request) {
     for (const wf of workflows) {
       const atuais = fasesPorTipo.get(wf.tipoProcessoId) ?? []
       const vistas = new Set(atuais.map((f) => f.phaseKey))
-      for (const f of wf.fases) { if (!vistas.has(f.phaseKey)) { vistas.add(f.phaseKey); atuais.push(f) } }
+      // Coluna do board = a fase do Workflow Macro, com o rótulo OFICIAL ("Aguardando fechamento" é a PRIMEIRA coluna, pela ordem do macro).
+      for (const f of wf.fases) { if (!vistas.has(f.phaseKey)) { vistas.add(f.phaseKey); atuais.push({ ...f, label: rotuloOficialDaFase(f.phaseKey, f.label) }) } }
       fasesPorTipo.set(wf.tipoProcessoId, atuais)
     }
 

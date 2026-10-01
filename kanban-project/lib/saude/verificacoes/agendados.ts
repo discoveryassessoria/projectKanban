@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 import { phaseKeyToFaseCode, isProcessoFase } from '@/src/lib/process-stage/fases-catalog'
+import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
 import { projecoesDeCertidaoPorNecessidade, statusEPrazoEfetivos } from '@/src/lib/process-stage/projecao-certidao'
 
 const HORA = 60 * 60 * 1000
@@ -299,7 +300,9 @@ registrar({
   executar: async (): Promise<ResultadoVerificacao> => {
     const { calcularPendencias } = await import('@/src/lib/motor/blocking-engine')
     const processos = await prisma.processo.findMany({
-      where: { workflowRuntime: 'v2', faseAtualKey: { not: null }, dataConclusao: null },
+      // "Aguardando fechamento" (`a_iniciar`) fora da amostra: ela só sai por decisão humana (sem tarefa, o gate é "0 exigido = 100%"),
+      // então "pode avançar e não avançou" seria falso positivo permanente para todo processo que ainda espera o fechamento.
+      where: { workflowRuntime: 'v2', faseAtualKey: { not: null, notIn: [PHASEKEY_A_INICIAR] }, dataConclusao: null },
       select: { id: true, nome: true, faseAtualKey: true, updatedAt: true },
       orderBy: { id: 'asc' },
       // AMOSTRA, não varredura: esta verificação roda a cada hora junto com dezenas de

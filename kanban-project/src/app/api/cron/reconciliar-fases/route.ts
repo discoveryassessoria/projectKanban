@@ -34,6 +34,7 @@ import { reconciliarMotorDeFases } from '@/src/lib/motor/reconciliar-motor-fases
 import { calcularPendencias } from '@/src/lib/motor/blocking-engine'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
+import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -57,9 +58,10 @@ async function executar(req: NextRequest) {
   const ensaio = new URL(req.url).searchParams.get('ensaio') === '1'
 
   // Só runtime v2 e só processo posicionado: o legado não tem motor de fases, e
-  // processo sem fase não tem de onde sair.
+  // processo sem fase não tem de onde sair. "Aguardando fechamento" (`a_iniciar`) fica de FORA da varredura: ela só sai por decisão
+  // humana (movimentação manual) — nem gasta vaga do lote. A trava de verdade mora em `advance()` (`AVANCO_MANUAL_OBRIGATORIO`).
   const processos = await prisma.processo.findMany({
-    where: { workflowRuntime: 'v2', faseAtualKey: { not: null } },
+    where: { workflowRuntime: 'v2', faseAtualKey: { not: null, notIn: [PHASEKEY_A_INICIAR] } },
     select: { id: true, faseAtualKey: true },
     orderBy: { id: 'asc' },
     take: LOTE,

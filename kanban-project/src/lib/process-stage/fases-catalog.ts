@@ -4,6 +4,7 @@
 // e a ordem do fluxo. Só DADOS + tipos. Não toca no banco.
 
 import type { FaseCode } from "@prisma/client"
+import { ehFaseAguardandoFechamento, rotuloDaFasePreContrato } from "./fase-pre-contrato"
 
 /**
  * ESCOPO OPERACIONAL DECLARADO da fase (fonte da verdade do progresso/gate).
@@ -209,10 +210,20 @@ export function getFaseByOrdem(ordem: number): FaseCode | null {
  * cadastro já ter sido corrigido.
  */
 export function fasesParaSelecao(): Array<{ phaseKey: string; label: string; code: FaseCode }> {
+  // DE PROPÓSITO só as fases do enum: "Aguardando fechamento" (`a_iniciar`) não tem tarefa nem regra por fase, então não é opção
+  // de filtro de tarefa nem de regra econômica/transversal (oferecê-la ali criaria regra que gera tarefa numa fase sem tarefas).
   return Object.values(FASES)
     .slice()
     .sort((a, b) => a.ordem - b.ordem)
     .map((f) => ({ phaseKey: f.phaseKey, label: f.label, code: f.code }))
+}
+
+/**
+ * A chave é CONHECIDA do catálogo canônico? Fase do enum (`FASES`) OU a extensão "Aguardando fechamento" (`a_iniciar`, fora do
+ * enum por desenho — sem migration). É a pergunta do guard de phaseKeys; `phaseKeyToFaseCode` continua só para o enum.
+ */
+export function phaseKeyConhecidaDoCatalogo(phaseKey: string | null | undefined): boolean {
+  return phaseKeyToFaseCode(phaseKey) != null || ehFaseAguardandoFechamento(phaseKey)
 }
 
 // ── Conversão canônica faseCode ⇄ phaseKey ─────────────────────────────────
@@ -341,6 +352,8 @@ export function rotuloDoPasso(args: {
  */
 export function labelDaFasePorPhaseKey(phaseKey: string | null | undefined): string | null {
   if (!phaseKey) return null
+  const daExtensao = rotuloDaFasePreContrato(phaseKey)
+  if (daExtensao) return daExtensao
   const chave = phaseKey.toLowerCase()
   const achada = Object.values(FASES).find((f) => f.phaseKey.toLowerCase() === chave)
   return achada?.label ?? null

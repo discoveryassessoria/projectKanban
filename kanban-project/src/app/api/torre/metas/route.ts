@@ -7,6 +7,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { exigirGerenciamento } from '@/src/lib/torre-acesso'
 import { definirMeta, excluirMeta, listarMetas } from '@/lib/operacional/torre-metas'
+import { rotuloOficialDaFase } from '@/src/lib/process-stage/fase-pre-contrato'
 
 export async function GET(request: NextRequest) {
   const { erro } = await exigirGerenciamento(request)
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
     prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: [{ ordemPadrao: 'asc' }, { id: 'asc' }], select: { phaseKey: true, label: true } }),
     prisma.catalogoPais.findMany({ where: { ativo: true }, orderBy: { countryLabel: 'asc' }, select: { id: true, countryLabel: true, flag: true } }),
   ])
-  return NextResponse.json({ metas, fases, paises })
+  return NextResponse.json({ metas, fases: fases.map((f) => ({ phaseKey: f.phaseKey, label: rotuloOficialDaFase(f.phaseKey, f.label) })), paises })
 }
 
 export async function PUT(request: NextRequest) {
