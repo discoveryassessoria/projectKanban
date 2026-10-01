@@ -22,6 +22,8 @@ import { UserPlus, Pencil, Trash2, Search, Shield, ChevronDown, ChevronUp, Lock,
 import { UserType, userTypeLabels } from "@/src/utils/userTypes"
 import { getUsers, createUser, updateUser, deleteUser } from "@/src/services/userService"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { PERMISSOES_EXCLUSIVAS } from "@/src/lib/permissoes"
+import { EXCLUSIVAS_DA_TELA, DESCRICAO_DA_EXCLUSIVA, exclusivasPerdidas } from "@/src/lib/usuarios-permissoes"
 
 // mesmo mapa de permissões da tela antiga
 const MODULOS_PERMISSOES = [
@@ -62,6 +64,8 @@ const MODULOS_PERMISSOES = [
     { chave: "usuarios.gerenciar", label: "Ver usuários" }, { chave: "usuarios.criar", label: "Criar usuários" },
     { chave: "usuarios.editar", label: "Editar usuários" }, { chave: "usuarios.excluir", label: "Excluir usuários" },
   ]},
+  // EXCLUSIVAS (01/10/2026): nem o Administrador as tem por padrão — só por concessão nominal, que a tela agora oferece.
+  { modulo: "Exclusivas (concessão nominal)", icone: "🔒", permissoes: EXCLUSIVAS_DA_TELA.map((e) => ({ chave: e.chave, label: e.label })) },
 ]
 const TODAS_CHAVES = MODULOS_PERMISSOES.flatMap(m => m.permissoes.map(p => p.chave))
 
@@ -108,6 +112,12 @@ export default function UsersTab() {
 
   const [selectedPerfilId, setSelectedPerfilId] = useState<number | null>(null)
   const [permissoesCustom, setPermissoesCustom] = useState<Record<string, boolean>>({})
+  // O que foi CARREGADO do servidor e o que o usuário da tela MEXEU: só o que foi mexido é enviado ao salvar.
+  // (Antes, salvar qualquer edição de um admin gravava `permissoesCustom: null` e apagava as concessões nominais.)
+  const [permissoesCustomOriginal, setPermissoesCustomOriginal] = useState<Record<string, boolean>>({})
+  const [permissoesCarregadas, setPermissoesCarregadas] = useState(true)
+  const [permissoesEditadas, setPermissoesEditadas] = useState(false)
+  const [perfilEditado, setPerfilEditado] = useState(false)
   const [showPermissoes, setShowPermissoes] = useState(false)
   const [expandedModulos, setExpandedModulos] = useState<string[]>([])
 
@@ -125,12 +135,13 @@ export default function UsersTab() {
     for (const c of TODAS_CHAVES) resultado[c] = false
     for (const [k, v] of Object.entries(perfilPerms)) if (k in resultado) resultado[k] = !!v
     for (const [k, v] of Object.entries(permissoesCustom)) if (k in resultado) resultado[k] = !!v
-    if (formData.tipo === "admin") for (const c of TODAS_CHAVES) resultado[c] = true
+    if (formData.tipo === "admin") for (const c of TODAS_CHAVES) if (!PERMISSOES_EXCLUSIVAS.has(c)) resultado[c] = true
     return resultado
   }, [selectedPerfilId, permissoesCustom, perfis, formData.tipo])
 
   const togglePermissao = (chave: string) => {
-    if (formData.tipo === "admin") return
+    if (formData.tipo === "admin" && !PERMISSOES_EXCLUSIVAS.has(chave)) return
+    setPermissoesEditadas(true)
     const perfil = perfis.find(p => p.id === selectedPerfilId)
     const valorPerfil = !!(perfil?.permissoes as Record<string, boolean>)?.[chave]
     const novoValor = !permissoesEfetivas[chave]
@@ -138,9 +149,10 @@ export default function UsersTab() {
     else setPermissoesCustom({ ...permissoesCustom, [chave]: novoValor })
   }
   const temOverride = (chave: string) => chave in permissoesCustom
-  const resetarCustom = () => setPermissoesCustom({})
+  const resetarCustom = () => { setPermissoesEditadas(true); setPermissoesCustom({}) }
   const toggleModulo = (modulo: typeof MODULOS_PERMISSOES[0]) => {
-    if (formData.tipo === "admin") return
+    if (formData.tipo === "admin" && !modulo.permissoes.every((p) => PERMISSOES_EXCLUSIVAS.has(p.chave))) return
+    setPermissoesEditadas(true)
     const todasAtivas = modulo.permissoes.every(p => permissoesEfetivas[p.chave])
     const novoValor = !todasAtivas
     const n = { ...permissoesCustom }
@@ -156,19 +168,19 @@ export default function UsersTab() {
   const handleCreate = () => {
     setIsEditing(false); setCurrentUser(null)
     setFormData({ nome: "", email: "", senha: "", tipo: "" })
-    setSelectedPerfilId(null); setPermissoesCustom({}); setShowPermissoes(false); setExpandedModulos([])
+    setSelectedPerfilId(null); setPermissoesCustom({}); setPermissoesCustomOriginal({}); setPermissoesCarregadas(true); setPermissoesEditadas(false); setPerfilEditado(false); setShowPermissoes(false); setExpandedModulos([])
     setError(""); setSuccess(""); setIsDialogOpen(true)
   }
   const handleEdit = async (u: Usuario) => {
     setIsEditing(true); setCurrentUser(u)
     setFormData({ nome: u.nome, email: u.email, senha: "", tipo: u.tipo })
-    setShowPermissoes(false); setExpandedModulos([]); setError(""); setSuccess("")
+    setShowPermissoes(false); setExpandedModulos([]); setError(""); setSuccess(""); setPermissoesEditadas(false); setPerfilEditado(false)
     try {
       const token = localStorage.getItem("authToken")
       const r = await fetch(`/api/usuarios/${u.id}/permissoes`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      if (r.ok) { const d = await r.json(); setSelectedPerfilId(d.usuario.perfilId || null); setPermissoesCustom(d.permissoesCustom || {}) }
-      else { setSelectedPerfilId(null); setPermissoesCustom({}) }
-    } catch { setSelectedPerfilId(null); setPermissoesCustom({}) }
+      if (r.ok) { const d = await r.json(); setSelectedPerfilId(d.usuario.perfilId || null); setPermissoesCustom(d.permissoesCustom || {}); setPermissoesCustomOriginal(d.permissoesCustom || {}); setPermissoesCarregadas(true) }
+      else { setSelectedPerfilId(null); setPermissoesCustom({}); setPermissoesCustomOriginal({}); setPermissoesCarregadas(false) }
+    } catch { setSelectedPerfilId(null); setPermissoesCustom({}); setPermissoesCustomOriginal({}); setPermissoesCarregadas(false) }
     setIsDialogOpen(true)
   }
   const handleDeleteClick = (u: Usuario) => { setUserToDelete(u); setIsDeleteDialogOpen(true); setError(""); setSuccess("") }
@@ -188,16 +200,37 @@ export default function UsersTab() {
     try {
       setIsSubmitting(true)
       if (isEditing && currentUser) {
+        // Permissões: só se o usuário da tela MEXEU nelas. Nada mexido = nada enviado (nunca mais `null` por padrão).
+        const mexeuNasPermissoes = permissoesEditadas || perfilEditado
+        const temCustom = Object.keys(permissoesCustom).length > 0
+        const perdidas = mexeuNasPermissoes && permissoesEditadas ? exclusivasPerdidas(permissoesCustomOriginal, temCustom ? permissoesCustom : null) : []
+        if (mexeuNasPermissoes && !permissoesCarregadas) {
+          setError("Não consegui carregar as permissões atuais deste usuário. Feche, abra a edição de novo e só então altere permissões."); return
+        }
+        if (perdidas.length > 0 && !window.confirm(`Esta alteração REMOVE a permissão exclusiva: ${perdidas.map((c) => EXCLUSIVAS_DA_TELA.find((e) => e.chave === c)?.label ?? c).join("; ")}.\n\nContinuar?`)) {
+          setError("Alteração cancelada: nada foi salvo."); return
+        }
         const dataToUpdate: any = { nome: formData.nome, email: formData.email, tipo: formData.tipo }
         if (formData.senha) dataToUpdate.senha = formData.senha
         await updateUser(currentUser.id, dataToUpdate)
-        const token = localStorage.getItem("authToken")
-        const temCustom = Object.keys(permissoesCustom).length > 0
-        await fetch(`/api/usuarios/${currentUser.id}/permissoes`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-          body: JSON.stringify({ perfilId: selectedPerfilId, permissoesCustom: formData.tipo === "admin" ? null : (temCustom ? permissoesCustom : null) }),
-        })
+        if (mexeuNasPermissoes) {
+          const token = localStorage.getItem("authToken")
+          const corpo: Record<string, unknown> = {}
+          if (perfilEditado) corpo.perfilId = selectedPerfilId
+          if (permissoesEditadas) {
+            corpo.permissoesCustom = temCustom ? permissoesCustom : null
+            if (perdidas.length > 0) corpo.confirmarRemocaoExclusivas = true
+          }
+          const resp = await fetch(`/api/usuarios/${currentUser.id}/permissoes`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify(corpo),
+          })
+          if (!resp.ok) {
+            const b = await resp.json().catch(() => null)
+            throw new Error(`Os dados do usuário foram salvos, mas as permissões NÃO: ${b?.error ?? "erro ao gravar as permissões"}`)
+          }
+        }
         setSuccess("Usuário atualizado com sucesso!")
       } else {
         await createUser({ nome: formData.nome, email: formData.email, senha: formData.senha, tipo: formData.tipo })
@@ -317,7 +350,7 @@ export default function UsersTab() {
                 <Label className="text-gray-700 flex items-center gap-2"><Shield className="h-4 w-4" /> Perfil de Permissões</Label>
                 <select value={selectedPerfilId || ""} onChange={e => {
                   const val = e.target.value ? parseInt(e.target.value) : null
-                  setSelectedPerfilId(val); setPermissoesCustom({})
+                  setSelectedPerfilId(val); setPermissoesCustom({}); setPerfilEditado(true); setPermissoesEditadas(true)
                   const ps = perfis.find(p => p.id === val)
                   if (ps) { const map: Record<string, string> = { Administrador: "admin", Gerente: "gerente", Assistente: "assistente", Estagiário: "estagiario" }; setFormData(prev => ({ ...prev, tipo: map[ps.nome] || "assistente" })) }
                   else setFormData(prev => ({ ...prev, tipo: "" }))
@@ -360,6 +393,9 @@ export default function UsersTab() {
                         </div>
                         {expanded && (
                           <div className="border-t border-gray-100 px-3 py-2 space-y-1">
+                            {modulo.permissoes.every((p) => PERMISSOES_EXCLUSIVAS.has(p.chave)) && (
+                              <p className="text-[11px] text-amber-800 px-2 pb-1">Valem só por concessão nominal: nem o Administrador as tem por padrão. Estão desligadas até você ligar. Ligar ou desligar fica registrado na auditoria.</p>
+                            )}
                             {modulo.permissoes.map(perm => {
                               const ativa = !!permissoesEfetivas[perm.chave]
                               const override = temOverride(perm.chave)
@@ -367,7 +403,7 @@ export default function UsersTab() {
                                 <div key={perm.chave} className={`flex items-center justify-between py-1.5 px-2 rounded ${override ? "bg-[var(--surface-secondary)]" : ""}`}>
                                   <div className="flex items-center gap-2">
                                     {override && <span className="w-1.5 h-1.5 rounded-full bg-[var(--action-primary)] flex-shrink-0" />}
-                                    <span className={`text-xs ${ativa ? "text-gray-700" : "text-[var(--text-muted)]"}`}>{perm.label}</span>
+                                    <span className={`text-xs ${ativa ? "text-gray-700" : "text-[var(--text-muted)]"}`}>{perm.label}{PERMISSOES_EXCLUSIVAS.has(perm.chave) && <span className="block text-[10px] text-[var(--text-muted)]">{DESCRICAO_DA_EXCLUSIVA(perm.chave)}</span>}</span>
                                   </div>
                                   <Switch checked={ativa} onCheckedChange={() => togglePermissao(perm.chave)} className="scale-75" />
                                 </div>
@@ -386,7 +422,7 @@ export default function UsersTab() {
               <div className="border-t border-gray-200 pt-4">
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
                   <Shield className="h-4 w-4 text-[var(--text-secondary)] flex-shrink-0" />
-                  <p className="text-xs text-[var(--text-secondary)]">Administradores têm acesso total ao sistema. Não é necessário configurar permissões.</p>
+                  <p className="text-xs text-[var(--text-secondary)]">Administradores têm acesso total ao sistema, exceto às permissões do grupo "Exclusivas (concessão nominal)", que ficam desligadas até você ligá-las.</p>
                 </div>
               </div>
             )}
