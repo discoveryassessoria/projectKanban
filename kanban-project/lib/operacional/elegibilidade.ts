@@ -736,6 +736,9 @@ export async function sugerirSucessor(
 ): Promise<{ usuarioId: number; nome: string; score: number } | null> {
   const universo = await lerUniverso(agora)
   const unidadesDoAusente = new Set(universo.organizacao.get(usuarioAusenteId)?.aptidoes ?? [])
+  // APTIDÃO POR PAÍS (Torre nova): a mesma lógica opt-in da unidade — se a pessoa ausente é apta em algum país, o sucessor
+  // precisa ser apto em ao menos um deles. Quem não declarou país não restringe (nunca atribui a quem não tem aptidão comprovada).
+  const paisesDoAusente = new Set(universo.organizacao.get(usuarioAusenteId)?.paisesAptos ?? [])
 
   const candidatos = universo.usuarios.filter((u) => {
     if (u.id === usuarioAusenteId) return false
@@ -744,6 +747,10 @@ export async function sugerirSucessor(
     if (unidadesDoAusente.size > 0) {
       const aptidoesDoCandidato = universo.organizacao.get(u.id)?.aptidoes ?? []
       if (!aptidoesDoCandidato.some((a) => unidadesDoAusente.has(a))) return false
+    }
+    if (paisesDoAusente.size > 0) {
+      const paisesDoCandidato = universo.organizacao.get(u.id)?.paisesAptos ?? []
+      if (!paisesDoCandidato.some((p) => paisesDoAusente.has(p))) return false
     }
     return true
   })

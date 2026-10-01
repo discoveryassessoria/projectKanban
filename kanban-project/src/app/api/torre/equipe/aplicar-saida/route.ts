@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
   const inicio = new Date()
   const fim = new Date(inicio.getTime() + dias * 86_400_000)
-  const motivo = typeof b?.motivo === 'string' && b.motivo.trim() ? b.motivo.trim().slice(0, 300) : `saída simulada e aplicada pela Torre (${dias} dias)`
+  const motivo = typeof b?.motivo === 'string' && b.motivo.trim() ? b.motivo.trim().slice(0, 300) : `saída simulada · ${dias} dias`
   const sucessor = await sugerirSucessor(usuarioId)
   const aus = await abrirIndisponibilidade({ usuarioId, tipo: 'AUSENCIA', inicio, fim, motivo, autorId: usuario.userId, sucessorSugeridoId: sucessor?.usuarioId ?? null })
   if (!aus.ok) return NextResponse.json({ ok: false, mensagem: aus.erro }, { status: 422 })

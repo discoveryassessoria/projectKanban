@@ -19,10 +19,12 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
-import { lerOrganizacao, capacidadeMedidaPorUsuario, unidadesDasTarefas, unidadesComAptidaoDeclarada, paisesDasTarefas, paisesComAptidaoDeclarada, type Indisponibilidade } from './organizacao'
+import { lerOrganizacao, capacidadeMedidaPorUsuario, unidadesDasTarefas, paisesDasTarefas, paisesComAptidaoDeclarada, unidadesComAptidaoDeclarada, rotulosDasUnidades, type Indisponibilidade } from './organizacao'
 import { sugerirSucessor } from './elegibilidade'
 import { redistribuirTarefas } from './tarefa-comandos'
-import { cargaPorPessoa, faixaDaCarga, faixaDaFila, nivelDaPrevisao, type FaixaDaCarga, type FaixaDaFila } from './torre-predicados'
+import { cargaPorPessoa, faixaDaCarga, faixaDaFila, nivelDaPrevisao, ehExecutavel, type FaixaDaCarga, type FaixaDaFila } from './torre-predicados'
+import { carregarContextoDeSugestao, escolherResponsavel, alvosDeSugestao } from './precisa-de-voce'
+import { quemAbsorve, sugestaoDeRedistribuicao, type SugestaoDeRedistribuicao } from './torre-equipe-distribuicao'
 import { inicioDoDiaOperacional } from './tempo-operacional'
 import { listarTarefasDaTorre, type LinhaDaTorre } from '@/src/services/torre-tarefas'
 
@@ -110,9 +112,16 @@ export function distribuirNaPrevisao(
   return { porSemana, vencidas, depois, semPrazo, total }
 }
 
+export interface LinhaSemResponsavel {
+  /** As abertas SEM DONO (a mesma conta de "Sem responsável" na aba Tarefas e na Visão geral). */
+  ativas: number
+  atrasadas: number
+  aguardando: number
+}
+
 export async function quadroDaEquipe(
   linhasEntrada?: LinhaDaTorre[], agora = new Date(),
-): Promise<{ pessoas: LinhaDaEquipe[]; previsao: PrevisaoDeCarga }> {
+): Promise<{ agora: string; pessoas: LinhaDaEquipe[]; semResponsavel: LinhaSemResponsavel; sugestao: SugestaoDeRedistribuicao; previsao: PrevisaoDeCarga }> {
   const linhas = linhasEntrada ?? (await listarTarefasDaTorre({}, agora)).linhas
   const [usuarios, organizacao] = await Promise.all([
     prisma.usuario.findMany({
@@ -129,7 +138,10 @@ export async function quadroDaEquipe(
     return temPermissao(perms, PERMISSAO_EXECUTAR) || (cargas.get(u.id)?.ativas ?? 0) > 0
   })
   const executaveisPorUsuario = new Map(executam.map((u) => [u.id, cargas.get(u.id)?.executaveis ?? 0]))
-  const medidas = await capacidadeMedidaPorUsuario(executam.map((u) => u.id), executaveisPorUsuario, agora)
+  const [medidas, sugestao] = await Promise.all([
+    capacidadeMedidaPorUsuario(executam.map((u) => u.id), executaveisPorUsuario, agora),
+    sugestaoDeRedistribuicao(linhas, organizacao, agora),
+  ])
 
   const pessoas: LinhaDaEquipe[] = executam.map((u) => {
     const org = organizacao.get(u.id)
@@ -150,6 +162,12 @@ export async function quadroDaEquipe(
     }
   })
 
+  // A linha-balde "Sem responsável": a MESMA conta das abertas sem dono da Operação (Tarefas e Visão geral leem das mesmas linhas).
+  const semDono = linhas.filter((l) => l.responsavelId == null && l.estadoOperacao !== 'CONCLUIDA')
+  const semResponsavel: LinhaSemResponsavel = {
+    ativas: semDono.length, atrasadas: semDono.filter((l) => l.atrasada).length, aguardando: semDono.filter((l) => l.estadoOperacao === 'AGUARDANDO').length,
+  }
+
   // ── H2: PREVISÃO DE 4 SEMANAS — vencimentos (prazo da linha) por pessoa por semana ──
   const semanas = semanasDaPrevisao(agora)
   const linhaDaPrevisao = (usuarioId: number | null, nome: string): LinhaDaPrevisao => {
@@ -168,7 +186,7 @@ export async function quadroDaEquipe(
       linhaDaPrevisao(null, 'Sem responsável'),
     ],
   }
-  return { pessoas, previsao }
+  return { agora: agora.toISOString(), pessoas, semResponsavel, sugestao, previsao }
 }
 
 export const rotuloDaSemana = (s: { inicio: string; fim: string }) => `${dataCurta(new Date(s.inicio))}–${dataCurta(new Date(s.fim))}`
@@ -226,26 +244,6 @@ export interface SimulacaoDeSaida {
   texto: string
 }
 
-/**
- * Regra de aptidão opt-in, a MESMA de `aptidaoEhRegra` (F) e de `sugerirSucessor`:
- * a unidade só restringe quando ALGUÉM declarou aptidão para ela; sem isso,
- * qualquer um é apto.
- */
-async function quemAbsorve(tarefaIds: number[], sucessorId: number | null, agora: Date): Promise<Set<number>> {
-  if (sucessorId == null || tarefaIds.length === 0) return new Set()
-  const [unidades, comAptidao, org, paises, paisesComApt] = await Promise.all([
-    unidadesDasTarefas(tarefaIds), unidadesComAptidaoDeclarada(), lerOrganizacao(agora), paisesDasTarefas(tarefaIds), paisesComAptidaoDeclarada(),
-  ])
-  const aptoA = new Set(org.get(sucessorId)?.aptidoes ?? [])
-  const aptoNosPaises = new Set(org.get(sucessorId)?.paisesAptos ?? [])
-  return new Set(tarefaIds.filter((id) => {
-    const u = unidades.get(id) ?? null
-    const p = paises.get(id) ?? null
-    // As duas aptidões são opt-in e SOMAM: só restringe onde já existe regra (unidade ou país com apto declarado).
-    return (u == null || !comAptidao.has(u) || aptoA.has(u)) && (p == null || !paisesComApt.has(p) || aptoNosPaises.has(p))
-  }))
-}
-
 export async function simularSaida(
   usuarioId: number, dias: number, linhasEntrada?: LinhaDaTorre[], agora = new Date(),
 ): Promise<SimulacaoDeSaida | null> {
@@ -257,22 +255,90 @@ export async function simularSaida(
   const limite = agora.getTime() + dias * DIA_MS
   const comOCartorio = minhas.filter((l) => l.estadoOperacao === 'AGUARDANDO')
   const vencem = minhas.filter((l) => l.dataPrazo != null && Date.parse(l.dataPrazo) <= limite)
+  // "Ficam sem toque": o que dependia DELA agora (executáveis) e ninguém toca enquanto ela estiver fora — a mesma conta da Carga.
+  const semToque = minhas.filter((l) => ehExecutavel(l.statusTarefa))
   const absorve = await quemAbsorve(minhas.map((l) => l.taskId), sucessor?.usuarioId ?? null, agora)
   const absorvidas = minhas.filter((l) => absorve.has(l.taskId)).length
   const semApto = minhas.length - absorvidas
 
-  const texto = minhas.length === 0
-    ? 'Sem impacto: nenhuma tarefa ativa.'
-    : `Ficam sem dono ${minhas.length} tarefa(s); ${comOCartorio.length} aguardando terceiros continuam correndo. Vencem no período: ${vencem.length}. ` +
-      (sucessor
-        ? `${sucessor.nome} (sucessor sugerido) absorve ${absorvidas}; sobram ${semApto} sem apto disponível.`
-        : 'Nenhum sucessor apto e disponível — as ' + minhas.length + ' ficam sem dono até alguém decidir.')
+  let texto: string
+  if (minhas.length === 0) {
+    texto = 'Sem impacto: nenhuma tarefa ativa.'
+  } else {
+    const inicio = `Vencem ${vencem.length} prazos nesses ${dias} dias e ${semToque.length} certidões ficam sem toque.`
+    if (!sucessor) {
+      texto = `${inicio} Nenhum sucessor apto e disponível — as ${minhas.length} ficam sem dono até alguém decidir.`
+    } else {
+      const [detalhe, fila] = await Promise.all([
+        detalheDoSucessor(usuarioId, sucessor.usuarioId, minhas, absorve, agora),
+        textoDaFilaDoSucessor(sucessor.usuarioId, semToque.filter((l) => absorve.has(l.taskId)).length, agora),
+      ])
+      texto = `${inicio} Sucessor sugerido: ${sucessor.nome}${detalhe}. ${fila}`
+    }
+  }
   return {
     usuarioId, nome: usuario.nome, dias,
     sucessor: sucessor ? { usuarioId: sucessor.usuarioId, nome: sucessor.nome } : null,
     ativas: minhas.length, comOCartorio: comOCartorio.length, vencemNoPeriodo: vencem.length,
     ficamSemDono: minhas.length, absorvidas, semApto, texto,
   }
+}
+
+const SEM_APTO_DISPONIVEL = 'sem apto disponível'
+
+/** "Depois da mudança, a fila do sucessor sobe 1.5 semana(s)." — absorvidas executáveis ÷ o que o sucessor fecha por semana. */
+async function textoDaFilaDoSucessor(sucessorId: number, executaveisAbsorvidas: number, agora: Date): Promise<string> {
+  const m = (await capacidadeMedidaPorUsuario([sucessorId], undefined, agora)).get(sucessorId)
+  if (executaveisAbsorvidas === 0) return 'Depois da mudança, a fila do sucessor não muda.'
+  if (!m || m.mediaSemanal <= 0) return `Depois da mudança, o sucessor passa a ter ${executaveisAbsorvidas} executáveis a mais e ainda não há base para estimar semanas (nenhuma conclusão nas últimas 4).`
+  return `Depois da mudança, a fila do sucessor sobe ${(executaveisAbsorvidas / m.mediaSemanal).toFixed(1)} semana(s).`
+}
+
+/**
+ * O parêntese do sucessor — "(apto em Espanha; Itália fica com Rafael)": onde o sucessor é apto e, para o que ele NÃO é apto,
+ * quem fica com cada parte (a MESMA `escolherResponsavel`, sem o ausente). Vazio quando o sucessor absorve tudo.
+ */
+async function detalheDoSucessor(
+  ausenteId: number, sucessorId: number, minhas: LinhaDaTorre[], absorve: Set<number>, agora: Date,
+): Promise<string> {
+  const naoAbsorvidas = minhas.filter((l) => !absorve.has(l.taskId))
+  if (naoAbsorvidas.length === 0) return ''
+  const ids = minhas.map((l) => l.taskId)
+  const [unidades, paises, comAptidaoU, comAptidaoP, rotulos, ctx, alvos] = await Promise.all([
+    unidadesDasTarefas(ids), paisesDasTarefas(ids), unidadesComAptidaoDeclarada(), paisesComAptidaoDeclarada(), rotulosDasUnidades(),
+    carregarContextoDeSugestao(agora), alvosDeSugestao(ids),
+  ])
+  const nomesDePais = new Map<number, string>()
+  const paisIds = [...new Set([...paises.values()].filter((p): p is number => p != null))]
+  if (paisIds.length) for (const p of await prisma.catalogoPais.findMany({ where: { id: { in: paisIds } }, select: { id: true, countryLabel: true } })) nomesDePais.set(p.id, p.countryLabel)
+  const aptoEm = new Set(ctx.organizacao.get(sucessorId)?.paisesAptos ?? [])
+  // O RÓTULO de onde a regra atua: o país (quando o país tem regra) ou a unidade de trabalho.
+  const rotuloDe = (taskId: number): string | null => {
+    const p = paises.get(taskId) ?? null, u = unidades.get(taskId) ?? null
+    if (p != null && comAptidaoP.has(p) && nomesDePais.has(p)) return nomesDePais.get(p)!
+    if (u != null && comAptidaoU.has(u)) return rotulos.get(u)?.nome ?? null
+    return null
+  }
+  const ondeApto = [...new Set(minhas.filter((l) => absorve.has(l.taskId)).map((l) => rotuloDe(l.taskId)).filter((r): r is string => r != null))]
+  // Sem o ausente na disputa, e sem o sucessor (que já se declarou não apto a essas): quem fica com cada parte.
+  const ctxSemAusente = { ...ctx, usuarios: ctx.usuarios.filter((u) => u.id !== ausenteId && u.id !== sucessorId) }
+  const fica = new Map<string, Set<string>>()
+  for (const l of naoAbsorvidas) {
+    const rotulo = rotuloDe(l.taskId) ?? 'sem classificação'
+    const s = escolherResponsavel(ctxSemAusente, alvos.get(l.taskId) ?? null)
+    const nome = s && !s.fallback ? s.nome : null
+    const conjunto = fica.get(rotulo) ?? new Set<string>()
+    conjunto.add(nome ?? SEM_APTO_DISPONIVEL)
+    fica.set(rotulo, conjunto)
+  }
+  void aptoEm
+  const partes: string[] = []
+  if (ondeApto.length) partes.push(`apto(a) em ${ondeApto.join(', ')}`)
+  for (const [rotulo, nomes] of fica) {
+    const lista = [...nomes]
+    partes.push(lista.length === 1 && lista[0] === SEM_APTO_DISPONIVEL ? `${rotulo}: sem apto disponível` : `${rotulo} fica com ${lista.join(' e ')}`)
+  }
+  return partes.length ? ` (${partes.join('; ')})` : ''
 }
 
 // ─── MOVER CARTEIRA — MANUAL ────────────────────────────────────────────────

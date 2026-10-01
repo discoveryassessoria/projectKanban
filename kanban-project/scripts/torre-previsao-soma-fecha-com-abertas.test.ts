@@ -78,10 +78,12 @@ async function main() {
     const foraDaAba = linhasDaTorre.filter((x) => x.estadoOperacao !== "CONCLUIDA" && x.responsavelId != null && !executam.has(x.responsavelId)).length
     ok("a soma da tela inteira fecha com as abertas da Operação (menos as de quem não é da aba)", totalDaTela + foraDaAba === abertasDaOperacao, `${totalDaTela} + ${foraDaAba} = ${abertasDaOperacao}`)
 
-    secao("A TELA MOSTRA 'sem prazo (N)' e as colunas que fazem fechar")
-    const tela = readFileSync("src/components/torre/TorreEquipe.tsx", "utf8")
-    ok("célula 'sem prazo (N)' por pessoa", /sem prazo \(\$\{linha\.semPrazo\}\)/.test(tela))
-    ok("colunas Vencidas · Depois · Sem prazo · Abertas no cabeçalho", ["Vencidas", "Depois", "Sem prazo", "Abertas"].every((t) => tela.includes(`>${t}<`) || tela.includes(`<b>${t}</b>`)))
+    secao("A TELA MOSTRA as colunas que fazem fechar: 4 semanas · Vencidas · Depois · Sem prazo · Abertas")
+    const tela = readFileSync("src/components/torre/EquipePrevisao.tsx", "utf8")
+    const visual = readFileSync("src/components/torre/equipe-visual.ts", "utf8")
+    ok("cabeçalho: Vencidas · Depois · Sem prazo · Abertas (texto do protótipo)", /COLUNAS_DA_PREVISAO = \['Vencidas', 'Depois', 'Sem prazo', 'Abertas'\]/.test(visual) && tela.includes("COLUNAS_DA_PREVISAO.map"))
+    ok("cada pessoa mostra as 7 células (4 semanas, vencidas, depois, sem prazo) e o TOTAL de abertas", /\[\.\.\.l\.porSemana\.map\(\(s\) => s\.n\), l\.vencidas, l\.depois, l\.semPrazo\]/.test(tela) && tela.includes("{l.total}"))
+    ok("a nota diz que as 4 semanas + vencidas + depois + sem prazo somam o total de abertas", visual.includes("As 4 semanas + vencidas + depois + sem prazo somam o total de abertas da pessoa."))
   } finally {
     await prisma.tarefa.deleteMany({ where: { titulo: { startsWith: MARCA } } })
     await c.limpar()

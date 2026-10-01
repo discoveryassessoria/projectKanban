@@ -40,6 +40,9 @@ export interface CargaDaPessoa {
 
 const ESPERA_OU_BLOQUEIO = ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE', 'BLOQUEADA']
 
+/** "Executável" = depende da PESSOA agora (não espera terceiro/cliente nem está bloqueada). O predicado ÚNICO da carga, da sugestão e da simulação. */
+export const ehExecutavel = (statusTarefa: string): boolean => !ESPERA_OU_BLOQUEIO.includes(statusTarefa)
+
 /**
  * A CARGA DE CADA PESSOA a partir das linhas da Operação. Uma conta só: a aba
  * Equipe, o item "Carga" e a regra r3 leem daqui — não pode haver duas contas
@@ -51,7 +54,7 @@ export function cargaPorPessoa(linhas: LinhaParaCarga[]): Map<number, CargaDaPes
     if (l.responsavelId == null || l.estadoOperacao === 'CONCLUIDA') continue
     const c = mapa.get(l.responsavelId) ?? { ativas: 0, executaveis: 0, atrasadas: 0, aguardando: 0 }
     c.ativas++
-    if (!ESPERA_OU_BLOQUEIO.includes(l.statusTarefa)) c.executaveis++
+    if (ehExecutavel(l.statusTarefa)) c.executaveis++
     if (l.atrasada) c.atrasadas++
     if (l.estadoOperacao === 'AGUARDANDO') c.aguardando++
     mapa.set(l.responsavelId, c)
