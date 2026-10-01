@@ -768,6 +768,11 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
   await reconciliarSubtarefas({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   await aplicarEsperaExternaDaSubtarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   await aplicarPrazoDaTarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+  // "INICIOU EM", DAQUI PARA FRENTE (Torre nova): a 1ª subtarefa entregue é o início real do trabalho. Grava o início do
+  // passo, da tentativa vigente e da Tarefa SE VAZIOS (o dono da escrita é task-step-sync); nunca sobrescreve, nunca
+  // preenche registro antigo. Iniciar pelo lote, pela Torre ou pelo editor do passo passa por aqui.
+  const { registrarInicioDoTrabalho } = await import("@/src/services/task-step-sync")
+  await registrarInicioDoTrabalho(args.stepInstanceId)
   const gate = await passoPodeConcluir({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   return { aplicavel: true, subtarefaKey: corrente.key, podeConcluirPasso: gate.pode, faltando: gate.faltando }
 }
@@ -799,12 +804,16 @@ export function contarCobrancasSemResposta(resultadosEmOrdem: readonly string[])
 
 export async function cobrancasSemRespostaDesde(subtaskExecutionId: number, db: typeof prisma = prisma): Promise<number> {
   const contatos = await db.contatoTerceiro.findMany({
-    where: { subtaskExecutionId },
+    where: { subtaskExecutionId, estornadoEm: null }, // cobrança ESTORNADA (Desfazer) não conta como sem resposta
     orderBy: { id: "asc" },
     select: { resultado: true },
   })
   return contarCobrancasSemResposta(contatos.map((c) => c.resultado))
 }
+
+/** Teto da "Próxima cobrança em (dias)": dois meses de dias corridos. */
+export const MAX_PROXIMA_COBRANCA_DIAS = 60
+export const proximaEmDiasValida = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= MAX_PROXIMA_COBRANCA_DIAS
 
 /**
  * REGISTRA UMA COBRANÇA (contato ao terceiro) — Etapa 2, item 5; `resultado`
@@ -841,12 +850,19 @@ export async function registrarCobranca(args: {
   registradoPorId?: number | null
   /** Quando o contato ACONTECEU, se diferente de agora (registro retroativo). */
   dataContato?: Date | null
+  /**
+   * "Próxima cobrança em (dias)" escolhida por quem cobra (Torre › Terceiros): dias CORRIDOS a partir de agora.
+   * Ausente = a régua do cadastro (`diasAposCobranca` do passo), como sempre. Inteiro de 1 a `MAX_PROXIMA_COBRANCA_DIAS`;
+   * valor fora disso é recusado (`PROXIMA_EM_DIAS_INVALIDO`) — nunca ajustado em silêncio.
+   */
+  proximaEmDias?: number | null
 }): Promise<
-  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" | "RESULTADO_INVALIDO" | "CANAL_INVALIDO" }
+  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" | "RESULTADO_INVALIDO" | "CANAL_INVALIDO" | "PROXIMA_EM_DIAS_INVALIDO" }
   | { ok: true; contatoId: number; totalContatos: number; cobrancasSemResposta: number; escalada: boolean; proximoAcompanhamentoEm: Date | null }
 > {
   if (!(RESULTADOS_DE_CONTATO as readonly string[]).includes(args.resultado)) return { ok: false, motivo: "RESULTADO_INVALIDO" }
   if (!(CANAIS_DE_CONTATO as readonly string[]).includes(args.canal)) return { ok: false, motivo: "CANAL_INVALIDO" }
+  if (args.proximaEmDias != null && !proximaEmDiasValida(args.proximaEmDias)) return { ok: false, motivo: "PROXIMA_EM_DIAS_INVALIDO" }
 
   const { execucaoVigente, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
   const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
@@ -858,7 +874,7 @@ export async function registrarCobranca(args: {
   if (!tarefa) return { ok: false, motivo: "SEM_TAREFA" }
 
   const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
-  const diasAposCobranca = hist?.passo.diasAposCobranca ?? 1
+  const diasAposCobranca = args.proximaEmDias ?? hist?.passo.diasAposCobranca ?? 1
   const escalarApos = hist?.passo.escalarApos ?? 2
 
   const contato = await prisma.contatoTerceiro.create({
@@ -875,7 +891,10 @@ export async function registrarCobranca(args: {
     },
   })
 
-  const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id } })
+  // O ESTADO DA EXECUÇÃO ANTES desta cobrança (e, abaixo, DEPOIS): é o que o ESTORNO (Desfazer) devolve e confere.
+  const antes = { antesProximoAcompanhamentoEm: vigente.proximoAcompanhamentoEm ?? null, antesEscalada: vigente.escalada ?? false, antesEscaladaEm: vigente.escaladaEm ?? null }
+  const gravarEstado = (depois: Date | null) => prisma.contatoTerceiro.update({ where: { id: contato.id }, data: { ...antes, depoisProximoAcompanhamentoEm: depois } })
+  const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id, estornadoEm: null } })
   const cobrancasSemResposta = await cobrancasSemRespostaDesde(vigente.id)
 
   // RÉGUA DESLIGADA (regra r2 da Torre, Bloco H3): o contato continua sendo
@@ -884,6 +903,15 @@ export async function registrarCobranca(args: {
   // padrão), o comportamento é exatamente o de sempre.
   const { regraAtiva } = await import("@/lib/operacional/regras-torre")
   if (!(await regraAtiva("r2"))) {
+    // A data ESCOLHIDA por quem cobrou (Torre › Terceiros) é decisão humana, não ação da régua: vale mesmo com a régua
+    // desligada. Sem escolha, nada é reagendado (comportamento de sempre). A escalada segue sendo só da régua.
+    if (args.proximaEmDias != null) {
+      const marcada = prazoOperacional(args.proximaEmDias, new Date())
+      await registrarNaExecucao(args.stepInstanceId, args.subtaskKey, { proximoAcompanhamentoEm: marcada })
+      await gravarEstado(marcada)
+      return { ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta, escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: marcada }
+    }
+    await gravarEstado(vigente.proximoAcompanhamentoEm ?? null)
     return {
       ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta,
       escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: vigente.proximoAcompanhamentoEm ?? null,
@@ -898,6 +926,7 @@ export async function registrarCobranca(args: {
     escalada,
     escaladaEm: escalada ? (vigente.escaladaEm ?? new Date()) : vigente.escaladaEm,
   })
+  await gravarEstado(proximoAcompanhamentoEm)
 
   return { ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta, escalada, proximoAcompanhamentoEm }
 }

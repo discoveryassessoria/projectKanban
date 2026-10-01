@@ -7,17 +7,18 @@
 // mesma que o protótipo agrupa por `fam`). O banco não tem CHECK para isso —
 // a única escritora é esta porta, mesmo padrão de `NotificacaoOperacional`.
 //
-// A MENÇÃO NÃO PASSA PELO SINO DE PROPÓSITO. `lib/operacional/
-// notificacao-canonica.ts` está em redesenho paralelo nesta mesma janela
-// (29/09/2026) — acoplar aqui um catálogo que está mudando embaixo teria
-// deixado o Bloco E dependente de um módulo instável. `ComentarioMencao`
-// carrega a própria notificação (quem foi citado, `lidaEm`); ligar isso ao
-// sino é decisão de um bloco posterior (H/I/J), quando o redesenho assentar.
+// A MENÇÃO ENTREGA PELO SINO (Torre nova, frente H, 01/10/2026): na MESMA transação do comentário, o mencionado
+// (≠ autor) recebe um aviso MENCAO no sino agrupado (`avisarMencao` → `somarAoAviso`, um aviso aberto por (pessoa,
+// família), idempotente por comentário) e a menção entra no resumo diário (`rodarResumoDiario`). `ComentarioMencao.lidaEm`
+// é o "lido": abrir o aviso do sino, "marcar todas" ou abrir a página do processo (#comentarios) o preenchem.
+// Comentário de FAMÍLIA exige familiaId: processo sem família não tem âncora (422) — nunca se cria família aqui.
 //
 // TODA AÇÃO GRAVA LogAuditoria (Regra 6 do mandato) — criar um comentário é
 // uma ação que muda estado (nasce uma menção, nasce uma notificação).
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { avisarMencao } from '@/lib/operacional/avisos-fatos'
+import { rotuloDaFamilia, SELECT_ROTULO_FAMILIA } from '@/lib/operacional/notificacao-canonica'
 
 export interface ComentarioCriado {
   id: number
@@ -46,6 +47,8 @@ export function idsMencionados(texto: string): number[] {
 export async function criarComentario(args: {
   tarefaId?: number | null
   familiaId?: number | null
+  /** Só para o link/rótulo do aviso: o processo da família que está aberto na tela (confere que pertence à família). */
+  processoId?: number | null
   autorId: number
   texto: string
 }): Promise<{ ok: true; comentario: ComentarioCriado } | { ok: false; erro: string }> {
@@ -68,8 +71,25 @@ export async function criarComentario(args: {
 
   const idsCitados = idsMencionados(texto).filter((id) => id !== args.autorId)
   const usuariosValidos = idsCitados.length
-    ? await prisma.usuario.findMany({ where: { id: { in: idsCitados } }, select: { id: true, nome: true } })
+    ? await prisma.usuario.findMany({ where: { id: { in: idsCitados } }, select: { id: true, nome: true, tipo: true } })
     : []
+
+  // O PROCESSO do aviso: tarefa → o dela; família → o informado (se for da família) ou o mais recente da família.
+  let processoDoAviso: { id: number; nome: string; familia: { nome: string } | null } | null = null
+  if (usuariosValidos.length) {
+    if (tarefaId != null) {
+      const t = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { processo: { select: { id: true, ...SELECT_ROTULO_FAMILIA.select } } } })
+      processoDoAviso = t?.processo ?? null
+    } else {
+      const sel = { id: true, ...SELECT_ROTULO_FAMILIA.select }
+      processoDoAviso = (args.processoId != null
+        ? await prisma.processo.findFirst({ where: { id: args.processoId, familiaId: familiaId! }, select: sel })
+        : null) ?? await prisma.processo.findFirst({ where: { familiaId: familiaId! }, orderBy: { id: 'desc' }, select: sel })
+    }
+  }
+  const nomeDaFamilia = processoDoAviso
+    ? rotuloDaFamilia(processoDoAviso)
+    : familiaId != null ? (await prisma.familia.findUnique({ where: { id: familiaId }, select: { nome: true } }))?.nome ?? null : null
 
   const autor = await prisma.usuario.findUnique({ where: { id: args.autorId }, select: { nome: true } })
   if (!autor) return { ok: false, erro: 'autor não encontrado' }
@@ -90,9 +110,16 @@ export async function criarComentario(args: {
         usuarioId: args.autorId,
         descricao: `${autor.nome} comentou em ${tarefaId != null ? `tarefa #${tarefaId}` : `família #${familiaId}`}` +
           (usuariosValidos.length ? ` — menções: ${usuariosValidos.map((u) => u.nome).join(', ')}` : ''),
-        detalhes: { comentarioId: comentario.id, tarefaId, familiaId, mencionados: usuariosValidos.map((u) => u.id) },
+        detalhes: { comentarioId: comentario.id, tarefaId, familiaId, processoId: processoDoAviso?.id ?? null, mencionados: usuariosValidos.map((u) => u.id) },
       },
     })
+    // O AVISO NO SINO de cada mencionado — mesma transação: ou o comentário e as menções nascem juntos, ou nada.
+    for (const u of usuariosValidos) {
+      await avisarMencao(tx, {
+        destinatarioId: u.id, destinatarioEhAdmin: u.tipo === 'admin', comentarioId: comentario.id,
+        autorId: args.autorId, autorNome: autor.nome, texto, processoId: processoDoAviso?.id ?? null, familiaNome: nomeDaFamilia,
+      })
+    }
     return comentario
   })
 

@@ -257,6 +257,8 @@ interface Universo {
   organizacao: Map<number, OrganizacaoDoUsuario>
   /** As unidades em que ALGUÉM já foi declarado apto — é o que liga a regra. */
   unidadesComAptidao: Set<number>
+  /** Os PAÍSES em que alguém já foi declarado apto (Torre nova, M3) — mesma política opt-in, derivada da organização lida. */
+  paisesComAptidao: Set<number>
   /** Nome e família de cada unidade, para a explicação. */
   rotulos: Map<number, UnidadeOperacional>
 }
@@ -365,10 +367,20 @@ async function lerUniverso(agora: Date): Promise<Universo> {
     equipes.set(chave, new Set(g.membros.map((m) => m.usuarioId)))
   }
 
-  return { usuarios, cargas, equipes, equipesCadastradas, organizacao, unidadesComAptidao, rotulos }
+  const paisesComAptidao = new Set([...organizacao.values()].flatMap((o) => o.paisesAptos))
+  return { usuarios, cargas, equipes, equipesCadastradas, organizacao, unidadesComAptidao, paisesComAptidao, rotulos }
 }
 
 // ─── A AVALIAÇÃO DE UMA TAREFA ──────────────────────────────────────────────
+
+/** O nome do país, lido da própria organização (quem foi declarado apto traz o nome) — sem consulta extra. */
+function usuariosPaisNome(u: Universo, paisId: number): string {
+  for (const o of u.organizacao.values()) {
+    const d = o.paisesAptosDetalhados.find((x) => x.paisId === paisId)
+    if (d) return d.nome
+  }
+  return `país #${paisId}`
+}
 
 interface TarefaParaSimular {
   id: number
@@ -380,6 +392,8 @@ interface TarefaParaSimular {
   faseMacroKey: string | null
   /** A unidade de trabalho, derivada da cadeia canônica. */
   unidadeOperacionalId: number | null
+  /** O país do processo da tarefa (`Processo.paisId`) — o que a aptidão por país compara; `null` = o critério não se aplica. */
+  paisId: number | null
   prioridade: string
   dataPrazo: Date | null
   /** Do passo corrente: o workflow publicado pode exigir uma equipe. */
@@ -391,6 +405,7 @@ const SELECT_SIMULACAO = {
   id: true, titulo: true, responsavelId: true, statusTarefa: true, equipeKey: true,
   faseMacroKey: true, prioridade: true, dataPrazo: true,
   workflowStepInstance: { select: { papel: true, equipe: true } },
+  processo: { select: { paisId: true } },
 } as const
 
 /**
@@ -466,6 +481,9 @@ function avaliar(
   const unidadeOperacional = unidade != null
     ? { id: unidade, nome: unidadeNome!, familia: u.rotulos.get(unidade)?.familia ?? null }
     : null
+  // APTIDÃO POR PAÍS (M3) — a MESMA política opt-in, por país: só restringe o país em que alguém já foi declarado apto.
+  const paisId = t.paisId
+  const paisEhRegra = paisId != null && u.paisesComAptidao.has(paisId)
 
   const avaliacoes: Avaliacao[] = u.usuarios.map((usr) => {
     const org = u.organizacao.get(usr.id)
@@ -505,19 +523,30 @@ function avaliar(
       })
     }
 
-    // 3 · APTIDÃO — só quando a UNIDADE DE TRABALHO tem aptidão declarada.
+    // 3 · APTIDÃO — a UNIDADE DE TRABALHO (quando tem aptidão declarada) E o PAÍS (quando tem aptidão declarada). Cada uma só restringe
+    // onde já existe regra; as duas somam (quem não passa numa regra que existe, não passa).
     const apto = unidade != null && (org?.aptidoes ?? []).includes(unidade)
+    const aptoNoPais = paisId != null && (org?.paisesAptos ?? []).includes(paisId)
+    const nomeDoPais = paisId != null ? usuariosPaisNome(u, paisId) : null
+    const aplicavel = aptidaoEhRegra || paisEhRegra
+    const reprova = (aptidaoEhRegra && !apto) || (paisEhRegra && !aptoNoPais)
+    const detalhesDaAptidao: string[] = []
+    if (aptidaoEhRegra) detalhesDaAptidao.push(apto ? `apto para "${unidadeNome}"` : `não é apto para "${unidadeNome}"`)
+    if (paisEhRegra) detalhesDaAptidao.push(aptoNoPais ? `apto em ${nomeDoPais}` : `não é apto em ${nomeDoPais}`)
     criterios.push({
       chave: 'APTIDAO',
-      veredito: !aptidaoEhRegra ? 'nao_aplicavel' : apto ? 'ok' : 'reprovado',
-      detalhe: !aptidaoEhRegra
-        ? unidade == null
-          ? 'a tarefa não tem unidade de trabalho definida no cadastro'
-          : `ninguém foi declarado apto para "${unidadeNome}" — a unidade ainda não tem regra de aptidão`
-        : apto ? `apto para "${unidadeNome}"` : `não é apto para "${unidadeNome}"`,
+      veredito: !aplicavel ? 'nao_aplicavel' : reprova ? 'reprovado' : 'ok',
+      detalhe: !aplicavel
+        ? unidade == null && paisId == null
+          ? 'a tarefa não tem unidade de trabalho nem país definidos no cadastro'
+          : `sem aptidão cadastrada para ${[unidade != null ? `"${unidadeNome}"` : null, paisId != null ? nomeDoPais : null].filter(Boolean).join(' / ')} — ainda não há regra de aptidão`
+        : detalhesDaAptidao.join('; '),
     })
     if (aptidaoEhRegra && !apto) {
       motivos.push({ codigo: 'SEM_APTIDAO', texto: `Não está declarado apto para "${unidadeNome}".` })
+    }
+    if (paisEhRegra && !aptoNoPais) {
+      motivos.push({ codigo: 'SEM_APTIDAO', texto: `Não está declarado apto em ${nomeDoPais}.` })
     }
 
     // 4 · EQUIPE / ESCOPO — só quando a tarefa exige uma equipe que existe.
@@ -583,7 +612,7 @@ function avaliar(
       }
     } else {
       const partes: string[] = []
-      if (porAptidao) partes.push(`${porAptidao} sem a aptidão exigida${unidadeNome ? ` ("${unidadeNome}")` : ''}`)
+      if (porAptidao) partes.push(`${porAptidao} sem a aptidão exigida${unidadeNome ? ` ("${unidadeNome}")` : ''}${paisEhRegra ? ` ou sem aptidão em ${usuariosPaisNome(u, paisId!)}` : ''}`)
       if (porEquipe) partes.push(`${porEquipe} fora da equipe "${exigida}"`)
       if (porDisponibilidade) partes.push(`${porDisponibilidade} indisponível(is)`)
       if (porCapacidade) partes.push(`${porCapacidade} com a capacidade esgotada`)
@@ -707,6 +736,9 @@ export async function sugerirSucessor(
 ): Promise<{ usuarioId: number; nome: string; score: number } | null> {
   const universo = await lerUniverso(agora)
   const unidadesDoAusente = new Set(universo.organizacao.get(usuarioAusenteId)?.aptidoes ?? [])
+  // APTIDÃO POR PAÍS (Torre nova): a mesma lógica opt-in da unidade — se a pessoa ausente é apta em algum país, o sucessor
+  // precisa ser apto em ao menos um deles. Quem não declarou país não restringe (nunca atribui a quem não tem aptidão comprovada).
+  const paisesDoAusente = new Set(universo.organizacao.get(usuarioAusenteId)?.paisesAptos ?? [])
 
   const candidatos = universo.usuarios.filter((u) => {
     if (u.id === usuarioAusenteId) return false
@@ -715,6 +747,10 @@ export async function sugerirSucessor(
     if (unidadesDoAusente.size > 0) {
       const aptidoesDoCandidato = universo.organizacao.get(u.id)?.aptidoes ?? []
       if (!aptidoesDoCandidato.some((a) => unidadesDoAusente.has(a))) return false
+    }
+    if (paisesDoAusente.size > 0) {
+      const paisesDoCandidato = universo.organizacao.get(u.id)?.paisesAptos ?? []
+      if (!paisesDoCandidato.some((p) => paisesDoAusente.has(p))) return false
     }
     return true
   })
@@ -745,6 +781,7 @@ async function carregarTarefas(ids: number[]): Promise<TarefaParaSimular[]> {
     id: t.id, titulo: t.titulo, responsavelId: t.responsavelId, statusTarefa: t.statusTarefa,
     equipeKey: t.equipeKey, faseMacroKey: t.faseMacroKey, prioridade: t.prioridade, dataPrazo: t.dataPrazo,
     unidadeOperacionalId: unidades.get(t.id) ?? null,
+    paisId: t.processo?.paisId ?? null,
     papelDoPasso: t.workflowStepInstance?.papel ?? null,
     equipeDoPasso: t.workflowStepInstance?.equipe ?? null,
   }))

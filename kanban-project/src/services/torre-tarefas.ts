@@ -12,8 +12,15 @@ import { visaoGerencialComExtras, ordenarFila, type LinhaGerencial, type Filtros
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
 import { semFaseFutura } from '@/lib/operacional/fase-futura'
 import { motivoDeNaoPoderIniciar } from '@/src/services/iniciar-envio'
+import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
+import { lerBolaEmLote, type CamposDaBola } from '@/lib/operacional/torre-bola'
 
-export interface LinhaDaTorre extends LinhaGerencial {
+/**
+ * A linha da Torre = a linha da Operação (`LinhaGerencial`, que já traz `iniciouEm`) + o que a AÇÃO precisa + os campos
+ * ADITIVOS da Torre nova (Etapa A): `bolaCom`, `bolaDesde`, `categoriaTerceiro`, `pedidaEm`, `cobrarEm`, `cobrarEmPadrao`
+ * (`torre-bola.ts` — função única, leitura em lote). Nenhum campo existente muda.
+ */
+export interface LinhaDaTorre extends LinhaGerencial, CamposDaBola {
   orgaoId: number | null
   /** A fase em que o PROCESSO está (chave) — para "Iniciar" e para o Radar. */
   faseAtualKey: string | null
@@ -23,12 +30,24 @@ export interface LinhaDaTorre extends LinhaGerencial {
   cobravelVencida: boolean
 }
 
+export interface OpcoesDaListaDaTorre {
+  /**
+   * Inclui as tarefas de processos PAUSADOS. Padrão `false`: processo pausado fica FORA da Torre (filtro canônico, M2).
+   * Só o detalhe do Processo (Foco) liga isto — ele continua acessível e mostra "Pausado".
+   */
+  incluirPausados?: boolean
+}
+
 export async function listarTarefasDaTorre(
-  filtros: Omit<FiltrosGerenciais, 'porPagina' | 'pagina'> = {}, agora = new Date(),
+  filtros: Omit<FiltrosGerenciais, 'porPagina' | 'pagina'> = {}, agora = new Date(), opcoes: OpcoesDaListaDaTorre = {},
 ): Promise<{ linhas: LinhaDaTorre[]; total: number; cobrancasVencidas: number }> {
   // A primeira página diz o total; as demais (só existem acima de 500 tarefas) vão juntas, não uma depois da
   // outra. A ordem das páginas é preservada.
-  const primeira = await visaoGerencialComExtras({ ...filtros, pagina: 1, porPagina: 500 }, agora)
+  const [primeira, pausados] = await Promise.all([
+    visaoGerencialComExtras({ ...filtros, pagina: 1, porPagina: 500 }, agora),
+    // Uma consulta, constante no volume: os processos com pausa vigente (nunca por linha).
+    opcoes.incluirPausados ? Promise.resolve(new Set<number>()) : idsDeProcessosPausados(),
+  ])
   const restantes = primeira.linhas.length === 0
     ? []
     : await Promise.all(
@@ -42,7 +61,14 @@ export async function listarTarefasDaTorre(
   // O mesmo recorte de `minhaFila`: encerradas não são fila.
   // E tarefa de FASE FUTURA também não é fila (regra única do Bloco F — `fase-futura.ts`): lista, KPIs,
   // Radar, Processos, Foco e Equipe leem daqui, então a exclusão vale para todos de uma vez.
-  const abertas = ordenarFila(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA'))) as LinhaGerencial[]
+  // E o processo PAUSADO fica fora da Torre inteira (filtro canônico `semProcessosPausados`): quem lê daqui — lista, KPIs,
+  // Terceiros, Equipe, Radar, Processos, Foco (que liga `incluirPausados`) e a foto diária — herda a exclusão de uma vez.
+  const abertas = ordenarFila(semProcessosPausados(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), pausados)) as LinhaGerencial[]
+  // A BOLA COM (função única da Torre): uma leitura em lote para todas as linhas.
+  const bolas = await lerBolaEmLote(abertas.map((l) => ({
+    taskId: l.taskId, estadoOperacao: l.estadoOperacao, esperandoDe: l.esperandoDe, esperandoDesde: l.esperandoDesde,
+    orgaoId: extras.get(l.taskId)?.orgaoId ?? null, passoId: extras.get(l.taskId)?.passoId ?? null,
+  })))
 
   const linhas: LinhaDaTorre[] = abertas.map((l) => {
     const orgaoId = extras.get(l.taskId)?.orgaoId ?? null
@@ -52,7 +78,7 @@ export async function listarTarefasDaTorre(
       aguardandoDependencia: l.aguardandoDependencia, temOrgao: orgaoId != null,
     })
     return {
-      ...l, orgaoId, faseAtualKey,
+      ...l, ...(bolas.get(l.taskId) as CamposDaBola), orgaoId, faseAtualKey,
       podeIniciar: motivo === null,
       // Só interessa explicar quem TERIA sentido iniciar (não iniciada e no ponto de entrada).
       motivoNaoIniciar: l.aIniciar && l.statusTarefa === 'NAO_INICIADA' ? motivo : null,

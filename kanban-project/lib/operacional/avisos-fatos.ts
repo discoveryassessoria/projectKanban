@@ -89,3 +89,28 @@ export async function aoMudarDeDono(
   return { chegouAvisoIds }
 }
 
+
+/** Aparas do comentário para o texto do aviso (sem o marcador @[Nome](id)). */
+export function trechoDoComentario(texto: string, max = 80): string {
+  const limpo = texto.replace(/@\[([^\]]+)\]\(\d+\)/g, '@$1').replace(/\s+/g, ' ').trim()
+  return limpo.length > max ? `${limpo.slice(0, max - 1).trimEnd()}\u2026` : limpo
+}
+
+/**
+ * "<Autor> mencionou você em <Família>" — soma no aviso MENCAO aberto da família (idempotente por comentário:
+ * o item é `mencao:<comentarioId>`). Admin vai para o processo na Torre; os demais, para a fila da família na Operação.
+ * Pode rodar dentro da transação do comentário (`db` = tx).
+ */
+export async function avisarMencao(
+  db: Db, args: { destinatarioId: number; destinatarioEhAdmin: boolean; comentarioId: number; autorId: number; autorNome: string; texto: string; processoId: number | null; familiaNome: string | null },
+): Promise<{ avisoId: number; criado: boolean }> {
+  const link = args.processoId == null
+    ? urlOperacaoDaFamilia(null, 'fila')
+    : args.destinatarioEhAdmin ? `/torre/processo/${args.processoId}#comentarios` : urlOperacaoDaFamilia(args.processoId, 'fila')
+  const r = await somarAoAviso(db, {
+    tipo: 'MENCAO', destinatarioId: args.destinatarioId, processoId: args.processoId, familiaNome: args.familiaNome,
+    itens: [`mencao:${args.comentarioId}`], autorId: args.autorId, link,
+    ultima: { autor: args.autorNome, trecho: trechoDoComentario(args.texto) },
+  })
+  return { avisoId: r.id, criado: r.criado }
+}

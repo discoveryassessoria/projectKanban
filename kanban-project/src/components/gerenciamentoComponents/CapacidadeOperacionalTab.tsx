@@ -176,7 +176,7 @@ export default function CapacidadeOperacionalTab() {
         <table className="w-full border-collapse text-left">
           <thead className="bg-[var(--surface-primary)]">
             <tr className="border-b border-white/[0.08]">
-              {["Funcionário", "Equipe(s)", "Aptidões", "Disponibilidade", "Capacidade", "Carga ativa", "Executável", "Atrasadas", "Aguardando terceiro", ""].map((h) => (
+              {["Funcionário", "Equipe(s)", "Aptidões", "Disponibilidade", "Capacidade", "Carga ativa", "Executável", "Atrasadas", "Aguardando terceiros", ""].map((h) => (
                 <th key={h} className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
               ))}
             </tr>

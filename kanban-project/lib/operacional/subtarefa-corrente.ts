@@ -207,7 +207,7 @@ export function criarCacheDeLeitura(db: Leitor): CacheDeLeitura {
       let p = contatosMemo.get(chave)
       if (!p) {
         p = db.contatoTerceiro.findMany({
-          where: { subtaskExecution: { stepInstanceId: { in: [...new Set(ids)] }, supersededAt: null } },
+          where: { estornadoEm: null, subtaskExecution: { stepInstanceId: { in: [...new Set(ids)] }, supersededAt: null } },
           orderBy: { id: 'asc' },
           select: { subtaskExecutionId: true, resultado: true },
         })

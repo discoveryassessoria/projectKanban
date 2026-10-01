@@ -123,9 +123,6 @@ function varrer(rel: string): { render: Achado[]; fuso: Achado[] } {
 const ALLOWLIST: Array<{ chave: string; porque: string }> = [
   { chave: "src/app/torre/page.tsx :: TorrePageConteudo :: new Date()", porque: "data por extenso do subtítulo; depois do portão `!mounted` (nunca no SSR) e com timeZone America/Sao_Paulo" },
   { chave: "src/components/torre/Torre.tsx :: Torre :: new Date()", porque: "`agora` (useMemo por recarga) é o instante único da AGENDA de KPIs e da aba Tarefas; a Torre só monta depois do portão" },
-  { chave: "src/components/torre/TorreBriefing.tsx :: TorreBriefing :: new Date()", porque: "modal aberto por clique/efeito depois do carregamento; data com timeZone America/Sao_Paulo" },
-  { chave: "src/components/torre/TorreFeito.tsx :: TorreFeito :: new Date()", porque: "Hoje/Ontem por `diaOperacional` (America/Sao_Paulo); aba só existe depois do portão" },
-  { chave: "src/components/torre/TorreTarefas.tsx :: TorreTarefas :: new Date()", porque: "fallback de `agora` quando o pai não passa (o pai, Torre, sempre passa); depois do portão" },
 ]
 const chaveDe = (a: Achado) => `${a.arquivo} :: ${a.componente} :: ${a.trecho.startsWith("new Date(") ? "new Date()" : a.trecho}`
 
@@ -157,14 +154,13 @@ check(todosFuso.length === 0, `toLocale* sem timeZone ou getter de fuso local (o
 
 // ── (d) datas independentes do fuso do processo ────────────────────────────
 async function datas() {
-  const { dataPorExtenso, fraseDoDia } = await import("../lib/operacional/torre-topo")
+  const { dataPorExtenso } = await import("../lib/operacional/torre-topo")
   const { diaMesDoPrazo, textoPrazoDaTarefa } = await import("../src/lib/tarefa/texto-prazo")
   const { fmtData } = await import("../src/components/operacao/operacao-v3-derivacoes")
   const { diaOperacional } = await import("../lib/operacional/tempo-operacional")
   // 01/10 02:30 UTC = 30/09 23:30 em São Paulo — a virada onde UTC e SP divergem
   const virada = new Date("2026-10-01T02:30:00.000Z")
   check(dataPorExtenso(virada) === "30 de setembro", `frase do topo no fuso da operação (30 de setembro), não no do ambiente — obtido "${dataPorExtenso(virada)}" (TZ=${process.env.TZ ?? "padrão"})`)
-  check(fraseDoDia([], virada).startsWith("Hoje, 30 de setembro:"), "fraseDoDia usa a mesma data")
   check(diaMesDoPrazo("2026-10-01T02:30:00.000Z") === "30/09", "prazo 'dd/mm' no fuso da operação")
   check(textoPrazoDaTarefa({ dataPrazo: "2026-10-01T02:30:00.000Z", rotuloDoPrazo: "Vence amanhã" }) === "Vence amanhã · 30/09", "texto do prazo estável entre fusos")
   check(fmtData("2026-10-01T02:30:00.000Z") === "30/09", `fmtData (colunas Prazo/Concluída em) no fuso da operação — obtido ${fmtData("2026-10-01T02:30:00.000Z")}`)

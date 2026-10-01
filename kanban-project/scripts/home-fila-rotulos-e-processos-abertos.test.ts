@@ -15,7 +15,7 @@ function ok(c: boolean, n: string) { if (c) console.log(`  ✅ ${n}`); else { fa
 
 // B8 — rótulos
 ok(rotuloStatusTarefa("NAO_INICIADA") === "A iniciar", "NAO_INICIADA -> rótulo do vocabulário oficial (A iniciar, igual à coluna Status da Operação), nunca 'nao iniciada'")
-ok(rotuloStatusTarefa("AGUARDANDO_TERCEIRO") === "Aguardando cartório", "AGUARDANDO_TERCEIRO em português (mesmo da coluna Status da Operação)")
+ok(rotuloStatusTarefa("AGUARDANDO_TERCEIRO") === "Aguardando terceiros", "AGUARDANDO_TERCEIRO em português (mesmo da coluna Status da Operação)")
 ok(rotuloStatusTarefa("CANCELADA") === "Cancelada", "CANCELADA != Concluída")
 ok(rotuloStatusTarefa("XPTO") === null && rotuloStatusTarefa(null) === null, "status desconhecido não vaza cru")
 ok(Object.values(ROTULO_STATUS).every((v) => !/_/.test(v) && v === v.charAt(0).toUpperCase() + v.slice(1)), "nenhum rótulo com underscore/minúscula")

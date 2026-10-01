@@ -106,7 +106,7 @@ export const ROTULO_CURTO_ESTADO: Record<string, string> = {
   SEM_RESPONSAVEL: "sem responsável",
   A_FAZER: "a fazer",
   EM_ANDAMENTO: "em andamento",
-  AGUARDANDO_TERCEIRO: "aguardando terceiro",
+  AGUARDANDO_TERCEIRO: "aguardando terceiros",
   BLOQUEADA: "bloqueado",
 }
 

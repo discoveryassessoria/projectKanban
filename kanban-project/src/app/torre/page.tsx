@@ -1,8 +1,8 @@
 // src/app/torre/page.tsx
 //
-// TORRE DE CONTROLE — casca provisória dos Blocos G/H (30/09/2026). SEM item no menu (Decisão 3
-// do Passo 0: o menu só entra no Bloco J). Mesmo shell da Operação; acesso só para administrador e
-// gerência operacional (`operacao.distribuirTarefas`) — a API confere de novo em cada chamada.
+// TORRE DE CONTROLE — a rota `/torre` (sete abas: Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros;
+// o Processo é a página `/torre/processo/[id]`). Mesmo shell da Operação; acesso só para administrador e gerência operacional
+// (`operacao.distribuirTarefas`) — a API confere de novo em cada chamada.
 
 "use client"
 

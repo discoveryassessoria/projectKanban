@@ -15,14 +15,20 @@
 //   risco     → PROCESSOS distintos com ao menos uma tarefa `emRisco`
 //   backlog   → abertas nesta semana vs. concluídas com sucesso nesta semana
 //
+// TORRE NOVA (M4, 01/10/2026) — a foto ganhou os TOTAIS DA VISÃO GERAL, com a MESMA definição dos cartões:
+//   processosAtivos → processos não concluídos E não pausados (`ONDE_PROCESSO_ATIVO_DA_TORRE`, a lista do Radar/Processos)
+//   tarefasAbertas  → `numeroDoKpi('abertas')`   comEquipe → 'equipe'   comCartorio → 'cartorio' (aguardando terceiros, COM responsável)
+//   O cartão "Sem responsável" é `semDono` (mesma definição: 'ninguem') e "Aguardando terceiros" com ou sem dono segue em `aguardandoTerceiro`.
+// Colunas NULLABLE: foto anterior à M4 não tem estes números e NUNCA é preenchida depois — sem tendência, não estimativa.
+//
 // `escalada`/`acompanhamentoVencido`/`emRisco` só existem depois do
 // enriquecimento temporal (`enriquecerLinhas`), que `visaoGerencial` já faz —
 // por isso o lote pagina por ela em vez de reimplementar o cálculo.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
-import { kpisDasLinhas } from './torre-kpis'
+import { kpisDasLinhas, totaisDaSituacao } from './torre-kpis'
 import { listarTarefasDaTorre } from '@/src/services/torre-tarefas'
-import { processosCriticos, anotarRisco } from './torre-processos'
+import { processosCriticos, anotarRisco, ONDE_PROCESSO_ATIVO_DA_TORRE } from './torre-processos'
 
 const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
@@ -36,6 +42,11 @@ export interface IndicadoresDoDia {
   emRisco: number
   backlogAbertas: number
   backlogFechadasNaSemana: number
+  /** Torre nova (M4) — totais da Visão geral, gravados na foto daqui para frente. */
+  processosAtivos: number
+  tarefasAbertas: number
+  comEquipe: number
+  comCartorio: number
 }
 
 const inicioDaSemana = (d: Date) => {
@@ -53,14 +64,15 @@ export async function calcularIndicadoresDoDia(agora = new Date()): Promise<Indi
 
   // OS 7 PRIMEIROS vêm de `kpisDasLinhas` sobre as MESMAS linhas da aba Tarefas — a mesma função que dá o número
   // do cartão e a lista que o clique filtra (Bloco J3): foto, cartão e lista nunca discordam.
-  const [{ linhas: brutas }, criticos, backlogAbertas, backlogFechadas] = await Promise.all([
+  const [{ linhas: brutas }, criticos, processosAtivos, backlogAbertas, backlogFechadas] = await Promise.all([
     listarTarefasDaTorre({}, agora),
     processosCriticos(agora),
+    prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_DA_TORRE }),
     prisma.tarefa.count({ where: { createdAt: { gte: inicioSemana } } }),
     prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioSemana } } }),
   ])
   const linhas = anotarRisco(brutas, criticos)
-  return { ...kpisDasLinhas(linhas, agora), backlogAbertas, backlogFechadasNaSemana: backlogFechadas }
+  return { ...kpisDasLinhas(linhas, agora), ...totaisDaSituacao(linhas, agora), processosAtivos, backlogAbertas, backlogFechadasNaSemana: backlogFechadas }
 }
 
 /** GRAVA a foto do dia — idempotente por `data` (`@@unique`): reexecutar o
@@ -78,12 +90,16 @@ export async function gravarIndicadoresDoDia(agora = new Date()): Promise<{ data
       aguardandoTerceiro: indicadores.aguardandoTerceiro, cobrancasPendentes: indicadores.cobrancasPendentes,
       escaladas: indicadores.escaladas, emRisco: indicadores.emRisco,
       backlogAbertas: indicadores.backlogAbertas, backlogFechadasNaSemana: indicadores.backlogFechadasNaSemana,
+      processosAtivos: indicadores.processosAtivos, tarefasAbertas: indicadores.tarefasAbertas,
+      comEquipe: indicadores.comEquipe, comCartorio: indicadores.comCartorio,
     },
     update: {
       vencidas: indicadores.vencidas, vencemEm7Dias: indicadores.vencemEm7Dias, semDono: indicadores.semDono,
       aguardandoTerceiro: indicadores.aguardandoTerceiro, cobrancasPendentes: indicadores.cobrancasPendentes,
       escaladas: indicadores.escaladas, emRisco: indicadores.emRisco,
       backlogAbertas: indicadores.backlogAbertas, backlogFechadasNaSemana: indicadores.backlogFechadasNaSemana,
+      processosAtivos: indicadores.processosAtivos, tarefasAbertas: indicadores.tarefasAbertas,
+      comEquipe: indicadores.comEquipe, comCartorio: indicadores.comCartorio,
     },
   })
   return { data: dia.toISOString().slice(0, 10), indicadores }
@@ -100,6 +116,11 @@ export interface TendenciaDoKpi {
   emRisco: number
   backlogAbertas: number
   backlogFechadasNaSemana: number
+  /** Torre nova (M4): `null` = foto anterior à M4 (não tem o número; sem tendência). */
+  processosAtivos: number | null
+  tarefasAbertas: number | null
+  comEquipe: number | null
+  comCartorio: number | null
 }
 
 /** A SÉRIE, mais recente primeiro — é o que alimenta "▲/▼ vs semana passada". */
@@ -114,5 +135,6 @@ export async function serieDeIndicadores(dias = 14): Promise<TendenciaDoKpi[]> {
     aguardandoTerceiro: l.aguardandoTerceiro, cobrancasPendentes: l.cobrancasPendentes,
     escaladas: l.escaladas, emRisco: l.emRisco,
     backlogAbertas: l.backlogAbertas, backlogFechadasNaSemana: l.backlogFechadasNaSemana,
+    processosAtivos: l.processosAtivos, tarefasAbertas: l.tarefasAbertas, comEquipe: l.comEquipe, comCartorio: l.comCartorio,
   }))
 }

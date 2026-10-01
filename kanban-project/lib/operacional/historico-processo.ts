@@ -31,6 +31,7 @@
 //     contrário — esperar o cartório é um estado da tarefa, não uma pausa.
 // ============================================================================
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
+import { apresentarTextoDoHistorico } from './historico-apresentacao'
 import {
   CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO, CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO, CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO, STEP_KEY_LOCALIZAR_REGISTRO,
 } from '@/src/lib/process-stage/situacao-solicitacao-certidao'
@@ -230,7 +231,7 @@ const ROTULO_PRIORIDADE: Record<string, string> = { BAIXA: 'baixa', MEDIA: 'méd
 /** Mecânica interna: nunca é fato e nunca é exibida (contada em `descartados`). */
 const DESCARTAR_LOG = new Set([
   'TAREFA_REANCORADA', 'TAREFA_SINCRONIZADA', 'TAREFA_RECONCILIADA_DIVERGENCIA', 'ACOMPANHAMENTO_A_INICIAR_BACKFILL',
-  'TAREFAS_REDISTRIBUIDAS', 'TAREFAS_REPRIORIZADAS', 'OBRIGACAO_ATRIBUICAO_ABERTA', 'OBRIGACAO_ATRIBUICAO_CONCLUIDA', 'OBRIGACAO_ATRIBUICAO_ENCERRADA_PELA_TORRE',
+  'TAREFAS_REDISTRIBUIDAS', 'TAREFAS_REPRIORIZADAS', 'COBRANCA_ESTORNADA', 'OBRIGACAO_ATRIBUICAO_ABERTA', 'OBRIGACAO_ATRIBUICAO_CONCLUIDA', 'OBRIGACAO_ATRIBUICAO_ENCERRADA_PELA_TORRE',
   'STEP_ACTION_EXECUTED', 'PASSO_ANDAMENTO', 'PASSO_FORCADO', 'PASSO_DUPLICADO_SUPERSEDIDO', 'PASSO_FASE_FUTURA_SUPERSEDIDO', 'PASSO_TAREFA_REPARADO',
   'COMENTARIO_CRIADO', 'SOLICITACAO_DOCUMENTO_REGISTRADA', 'AUDITORIA_EXPORTADA', 'HISTORICO_EXPORTADO', 'TAREFA_UNIFICADA',
   'RECONCILIACAO_SOLICITADA', 'RECONCILIACAO_FASE_MACRO', 'RECONCILIACAO_ESCOPO_FASE', 'RECONCILIACAO_ESCOPO_FALHOU', 'RECONCILIACAO_WORKFLOW_INTERNO_FASE_ATUAL',
@@ -521,7 +522,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
     case 'TAREFA_DESBLOQUEADA':
       return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'desbloqueada', verbo: 'desbloqueou' }, 'a', { motivo: txt(d.motivo) })]
     case 'TAREFA_AGUARDANDO_TERCEIRO':
-      return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar o retorno do cartório em' }, 'em', { motivo: txt(d.motivo) })]
+      return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar terceiros em' }, 'em', { motivo: txt(d.motivo) })]
     case 'TAREFA_RETOMADA_DE_ESPERA':
       return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'retomada', verbo: 'retomou o trabalho' }, 'de', { motivo: txt(d.motivo) })]
     case 'SOLICITACAO_CANAL_ALTERADO': {
@@ -557,7 +558,7 @@ function atomosDoWorkflow(w: Extract<LinhaCrua, { fonte: 'WORKFLOW' }>, ctx: Con
   // Espera por terceiro decidida pelo motor: a tarefa continua com o prazo correndo (o prazo nunca pausa por terceiro).
   if (w.tipo === 'TAREFA_BLOQUEADA' && txt(d.motivoCodigo) === 'AGUARDANDO_TERCEIRO') {
     const alvo = { tarefaId: w.tarefaId, documentoId: num(d.documentoId) }
-    const a = novoAtomo(ctx, { ...origem, rank: 1, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar o retorno do cartório em', chaveExtra: 'espera' }, alvo)
+    const a = novoAtomo(ctx, { ...origem, rank: 1, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar terceiros em', chaveExtra: 'espera' }, alvo)
     a.objeto = sobre(ctx, resolverAlvo(ctx, alvo), 'em')
     return [a]
   }
@@ -798,7 +799,20 @@ function redigir(quemNome: string, p: { verbo: string; objeto: string | null; co
   return `${nucleoDe(quemNome, p)}${cauda.length ? `. ${cauda.join('. ')}` : ''}`.replace(/\s+/g, ' ').trim()
 }
 
-function montarFato(ctx: ContextoDoHistorico, membros: Atomo[], reabriveis: Set<string>): FatoDoHistorico {
+/**
+ * Texto gerado pelo SISTEMA (auditoria, workflow, fase, necessidade) em linguagem de gente: "usuário 7" → nome, "equipe_documental" →
+ * "Equipe documental", "SLA 5d" → "prazo de 5 dias". Só na EXIBIÇÃO (nada é regravado). Texto DIGITADO por pessoa (comentário, observação,
+ * observação de tarefa) não é reescrito.
+ */
+const FONTES_DE_TEXTO_DO_SISTEMA = new Set<LinhaCrua['fonte']>(['LOG', 'WORKFLOW', 'FASE', 'NECESSIDADE'])
+function apresentavel(ctx: ContextoDoHistorico, a: Atomo): Atomo {
+  if (!FONTES_DE_TEXTO_DO_SISTEMA.has(a.fonte)) return a
+  const t = (v: string | null) => (v == null ? v : apresentarTextoDoHistorico(v, ctx.usuarios))
+  return { ...a, motivo: t(a.motivo), justificativa: t(a.justificativa), efeito: t(a.efeito), complemento: t(a.complemento), fraseLivre: t(a.fraseLivre) }
+}
+
+function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis: Set<string>): FatoDoHistorico {
+  const membros = membrosBrutos.map((m) => apresentavel(ctx, m))
   const ordenados = [...membros].sort((x, y) => y.t - x.t || (x.id < y.id ? 1 : -1))
   const a = ordenados[0]
   const n = membros.length
@@ -847,7 +861,7 @@ function montarFato(ctx: ContextoDoHistorico, membros: Atomo[], reabriveis: Set<
       case 'nao_exigida': objeto = certidoes; contexto = null; break
       case 'linhagem': fraseLivre = `Sistema recalculou a linhagem da árvore ${n} vezes`; break
       case 'conferencia': fraseLivre = `Sistema conferiu as exigências documentais com os registros da árvore ${n} vezes`; break
-      case 'espera_terceiro': verbo = 'passou a aguardar o retorno do cartório em'; objeto = certidoes; contexto = faseRot; break
+      case 'espera_terceiro': verbo = 'passou a aguardar terceiros em'; objeto = certidoes; contexto = faseRot; break
       case 'protocolo': verbo = 'informou protocolos de'; objeto = certidoes; contexto = null; break
       case 'prazo': verbo = 'repactuou o prazo de'; objeto = certidoes; contexto = null; break
       default: break

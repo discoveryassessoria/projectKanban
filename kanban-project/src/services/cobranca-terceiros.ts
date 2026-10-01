@@ -15,6 +15,7 @@
 // enxergar cobrança feita por qualquer porta, sem duplicar registro.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { dentroDaJanelaDoDesfazer } from '@/lib/operacional/torre-desfazer'
 import {
   registrarCobranca, subtarefaCorrenteDaTarefa, estadoOperacaoDaTarefa,
   CANAIS_DE_CONTATO, RESULTADOS_DE_CONTATO,
@@ -76,6 +77,8 @@ export async function cobrarTarefas(args: {
   resultado?: string
   observacao?: string | null
   dataContato?: Date | null
+  /** "Próxima cobrança em (dias)" (Torre › Terceiros): dias corridos a partir de agora. Ausente = a régua do cadastro. */
+  proximaEmDias?: number | null
   exigirAguardando?: boolean
 }): Promise<{ cobradas: Array<{ tarefaId: number; contatoId: number; canal: string; orgaoId: number | null }>; ignoradas: CobrancaIgnorada[] }> {
   const ids = [...new Set(args.tarefaIds)]
@@ -109,10 +112,71 @@ export async function cobrarTarefas(args: {
     const r = await registrarCobranca({
       stepInstanceId: corrente.stepInstanceId, subtaskKey: corrente.subtaskKey, canal, resultado,
       observacao: args.observacao ?? null, documentoId: t.documentoId ?? null, orgaoId,
-      registradoPorId: args.autor.userId, dataContato: args.dataContato ?? null,
+      registradoPorId: args.autor.userId, dataContato: args.dataContato ?? null, proximaEmDias: args.proximaEmDias ?? null,
     })
     if (r.ok) cobradas.push({ tarefaId: t.id, contatoId: r.contatoId, canal, orgaoId })
     else ignoradas.push({ tarefaId: t.id, motivo: r.motivo })
   }
   return { cobradas, ignoradas }
+}
+
+// ─── ESTORNO (DESFAZER "REGISTRAR COBRANÇA") ─────────────────────────────────
+
+export interface ResultadoDoEstorno { contatoId: number; tarefaId: number | null; ok: boolean; mensagem: string }
+
+const mesmoInstante = (a: Date | null | undefined, b: Date | null | undefined) => (a?.getTime() ?? null) === (b?.getTime() ?? null)
+
+/**
+ * ESTORNA uma cobrança — o "Desfazer" de "Registrar cobrança". `ContatoTerceiro` é fato append-only: o estorno NÃO apaga a linha,
+ * MARCA-A (`estornadoEm/estornadoPorId`) e devolve à execução da subtarefa o estado que a cobrança encontrou (próxima cobrança e escalada),
+ * guardado na própria linha ao cobrar. Todo leitor que conta "sem resposta", escalada, última cobrança ou histórico ignora (ou risca) o estornado.
+ *
+ * As MESMAS regras dos outros Desfazer da Torre: só o AUTOR da cobrança, só dentro da janela única (`lib/operacional/torre-desfazer.ts`) e só se
+ * NADA MUDOU DEPOIS — a cobrança é a última não estornada da execução, a execução é a vigente e ainda espera, e a próxima cobrança agendada
+ * ainda é a que esta cobrança marcou. Cobrança antiga (sem o estado guardado) não se desfaz. Grava a própria auditoria (`COBRANCA_ESTORNADA`).
+ */
+export async function estornarCobranca(args: { contatoId: number; autorId: number; agora?: Date }): Promise<ResultadoDoEstorno> {
+  const agora = args.agora ?? new Date()
+  const recusa = (mensagem: string, tarefaId: number | null = null): ResultadoDoEstorno => ({ contatoId: args.contatoId, tarefaId, ok: false, mensagem })
+  const contato = await prisma.contatoTerceiro.findUnique({ where: { id: args.contatoId } })
+  if (!contato) return recusa('cobrança não encontrada')
+  const tarefaId = contato.tarefaId
+  if (contato.estornadoEm) return recusa('esta cobrança já foi desfeita', tarefaId)
+  if (contato.registradoPorId !== args.autorId) return recusa('só se desfaz a ação recente, feita por você — passou o tempo do "Desfazer"', tarefaId)
+  if (!dentroDaJanelaDoDesfazer(contato.registradoEm, agora)) return recusa('só se desfaz a ação recente, feita por você — passou o tempo do "Desfazer"', tarefaId)
+  if (contato.antesEscalada == null) return recusa('cobrança anterior ao Desfazer — não há estado guardado para devolver', tarefaId)
+
+  const exec = await prisma.subtaskExecution.findUnique({
+    where: { id: contato.subtaskExecutionId },
+    select: { id: true, stepInstanceId: true, subtaskKey: true, supersededAt: true, status: true, proximoAcompanhamentoEm: true },
+  })
+  if (!exec || exec.supersededAt != null) return recusa('a etapa foi reaberta desde então — desfazer recusado', tarefaId)
+  if (exec.status === 'CONCLUIDO') return recusa('a etapa já foi concluída desde então — desfazer recusado', tarefaId)
+  const posterior = await prisma.contatoTerceiro.findFirst({
+    where: { subtaskExecutionId: contato.subtaskExecutionId, estornadoEm: null, id: { gt: contato.id } }, select: { id: true },
+  })
+  if (posterior) return recusa('houve outro contato com o terceiro depois desta cobrança — desfazer recusado', tarefaId)
+  if (!mesmoInstante(exec.proximoAcompanhamentoEm, contato.depoisProximoAcompanhamentoEm)) return recusa('a próxima cobrança foi reagendada desde então — desfazer recusado', tarefaId)
+
+  const { registrarNaExecucao } = await import('@/src/services/execucao-da-subtarefa')
+  const marcado = await prisma.contatoTerceiro.updateMany({ where: { id: contato.id, estornadoEm: null }, data: { estornadoEm: agora, estornadoPorId: args.autorId } })
+  if (marcado.count === 0) return recusa('esta cobrança já foi desfeita', tarefaId)
+  await registrarNaExecucao(exec.stepInstanceId, exec.subtaskKey, {
+    proximoAcompanhamentoEm: contato.antesProximoAcompanhamentoEm, escalada: contato.antesEscalada, escaladaEm: contato.antesEscaladaEm,
+  })
+  await prisma.logAuditoria.create({
+    data: {
+      acao: 'COBRANCA_ESTORNADA', entidade: 'Tarefa', entidadeId: tarefaId, usuarioId: args.autorId,
+      descricao: `Cobrança a terceiro desfeita (estornada): o contato #${contato.id} fica no histórico, riscado, e a próxima cobrança volta a ${contato.antesProximoAcompanhamentoEm ? contato.antesProximoAcompanhamentoEm.toISOString().slice(0, 10) : 'nenhuma data marcada'}.`,
+      detalhes: JSON.parse(JSON.stringify({ contatoId: contato.id, canal: contato.canal, resultado: contato.resultado, restaurado: { proximoAcompanhamentoEm: contato.antesProximoAcompanhamentoEm, escalada: contato.antesEscalada, escaladaEm: contato.antesEscaladaEm } })),
+    },
+  })
+  return { contatoId: contato.id, tarefaId, ok: true, mensagem: 'cobrança desfeita' }
+}
+
+export async function estornarCobrancas(args: { contatoIds: number[]; autorId: number; agora?: Date }): Promise<{ total: number; desfeitas: number; itens: ResultadoDoEstorno[] }> {
+  const itens: ResultadoDoEstorno[] = []
+  // Do mais novo ao mais antigo: o estorno de duas cobranças da mesma execução só passa na ordem inversa ("nada mudou depois").
+  for (const id of [...new Set(args.contatoIds)].sort((a, b) => b - a)) itens.push(await estornarCobranca({ contatoId: id, autorId: args.autorId, agora: args.agora }))
+  return { total: itens.length, desfeitas: itens.filter((i) => i.ok).length, itens }
 }

@@ -1,67 +1,54 @@
 "use client"
-// src/components/torre/TorreTarefas.tsx — aba TAREFAS (Bloco G1–G3, G6 + absorção da Operação).
-// A MESMA projeção da Operação (/api/torre/tarefas). Lote com toast de 6 s + Desfazer, ação rápida por linha, "Cobrar todos os
-// vencidos (N)", painel espelhado da tarefa, visões fixas (inclui Minhas, Acompanhamentos vencidos e Feito), subagrupamento dentro
-// da família, "Adiar acompanhamento", "Vincular órgão nas N", "novas", "Fazer agora", tarefa transversal e iniciar em lote.
-// Nenhuma regra nova: cada botão chama a porta que a Operação já usa. Nada de dado de exemplo.
+// src/components/torre/TorreTarefas.tsx — a aba TAREFAS da Torre nova (01/10/2026), igual ao protótipo `torre-de-controle.html › Tarefas`.
+// Cada linha é uma tarefa: a certidão de uma pessoa em uma fase, ou uma tarefa avulsa. Estrutura (na ordem do protótipo): cabeçalho com
+// "▶ Fazer agora (N)" e "+ Tarefa transversal" · VISÃO (8 visões com número) e SALVAS · painel de filtros · faixa Bloqueio · barra de lote ·
+// tabela agrupada por família · Feito · gaveta (e Modo foco) · modais com justificativa · toast com Desfazer.
+// A MESMA projeção da Operação (/api/torre/tarefas). Nenhuma regra nova: cada botão chama a porta que já existe (tarefa-comandos,
+// tarefa-ciclo, cobranca-terceiros, iniciar-envio, vincular-orgao-lote, atribuir). Toda regra de tela mora em
+// lib/operacional/torre-tarefas-tela.ts e torre-filtros.ts (puras, testadas). Nada de dado de exemplo.
 import { useEffect, useMemo, useState } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
-import { TarefaTransversalModal } from "@/src/components/kanban/TarefaTransversalModal"
-import { RegistrarContatoModal } from "@/src/components/operacao/RegistrarContatoModal"
-import {
-  passoLabelDe, statusTarefaTxt, statusTarefaCls, acompTxtCompleto, aplicarBusca, docTipoTxt, acaoDe, concluirLabelDe, aIniciarEfetivo, precisaDeOrgaoEmissor, agruparDentroDaFamilia,
-} from "@/src/components/operacao/operacao-v3-derivacoes"
-import type { LinhaOperacaoV3, RespostaTarefas } from "@/src/components/operacao/operacao-v3-tipos"
+import { agruparDentroDaFamilia, aplicarBusca, aIniciarEfetivo, precisaDeOrgaoEmissor, acaoDe, docTipoTxt } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { urlArvoreDoProcesso } from "@/lib/operacional/navegacao"
-import { api, erroDe, Campo, Modal, resumoDoLote, useTorre, type Desfazer } from "./torre-base"
-import { bolaDe, riscoDe, temAcompanhamento, type LinhaTorre } from "./tipos"
+import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
+import type { LinhaTorre } from "./tipos"
 import type { ProcessoDaTorre } from "./tipos-processos"
-import { PainelTorreTarefa } from "./PainelTorreTarefa"
-import { CobrarTodosVencidos } from "./CobrarTodosVencidos"
 import { VisoesSalvas, type SpecDaVisao } from "./VisoesSalvas"
 import { TorreFeito } from "./TorreFeito"
+import { TorreFiltros, type DentroDaFamilia, type PaisDoFiltro } from "./TorreFiltros"
+import { TarefasTabela } from "./TarefasTabela"
+import { TarefasGaveta } from "./TarefasGaveta"
+import { TarefasTransversal } from "./TarefasTransversal"
+import { PainelTorreTarefa } from "./PainelTorreTarefa"
 import { VincularOrgaoLoteModal } from "./VincularOrgaoLoteModal"
-import { useAdiarAcompanhamento } from "./adiar-acompanhamento"
+import { ModalDaAcao, ModalRepactuarLote, pessoaDaLinha } from "./TarefasModais"
 import { useNovasDaFamilia } from "./novas-da-familia"
-import { linhasDoKpi, KPIS, PREDICADO_DO_KPI, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { ehCancelada, type AcaoComModal, type LinhaDaTela, type LinhaDoFeito } from "./tarefas-tipos"
+import { linhasDoKpi, KPIS, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 import { aplicarFiltros, filtrosVazios, normalizarFiltros, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
-import { TorreFiltros } from "./TorreFiltros"
-import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
+import {
+  VISOES_DA_TELA, CHAVES_DE_VISAO_DA_TELA, predicadoDaVisao, contagemDaVisao, agruparParaTela, paginarGrupos, acoesDaLinha,
+  type Agrupar, type AcaoDaLinha, type VisaoTarefas,
+} from "@/lib/operacional/torre-tarefas-tela"
+import "./tarefas.css"
 
-type Agrupar = "fam" | "resp" | "org" | "fase" | "none"
-type Dentro = "none" | "pessoa" | "orgao" | "passo"
-export type VisaoTarefas = "todas" | "vencidas" | "semdono" | "aguard" | "cobranca" | "acompvenc" | "minhas" | "feito"
-
-const VISOES: Array<[VisaoTarefas, string]> = [
-  ["todas", "Todas as abertas"], ["minhas", "Minhas tarefas"], ["vencidas", "Vencidas"], ["semdono", "Sem responsável"], ["aguard", "Com o cartório"],
-  ["acompvenc", "Acompanhamentos vencidos"], ["cobranca", "Cobranças a fazer (vencidas)"], ["feito", "Feito"],
-]
+export type { VisaoTarefas }
 /** As chaves aceitas em `?visao=` (a Torre valida a URL com esta lista). */
-export const CHAVES_DE_VISAO: string[] = VISOES.map(([v]) => v)
-// "Vencidas", "Sem responsável" e "Com o cartório" usam os MESMOS predicados dos cartões do topo (torre-kpis.ts) — uma definição só.
-const predicadoDe = (v: VisaoTarefas, usuarioId: number | null, agora: Date = new Date()): ((l: LinhaTorre) => boolean) => {
-  switch (v) {
-    case "vencidas": return (l) => PREDICADO_DO_KPI.venc!(l, agora)
-    case "semdono": return (l) => PREDICADO_DO_KPI.ninguem!(l, agora)
-    case "aguard": return (l) => PREDICADO_DO_KPI.cartorio!(l, agora)
-    case "cobranca": return (l) => l.cobravelVencida
-    case "acompvenc": return (l) => l.acompanhamentoVencido === true
-    case "minhas": return (l) => usuarioId != null && l.responsavelId === usuarioId
-    default: return () => true
-  }
-}
+export const CHAVES_DE_VISAO: string[] = CHAVES_DE_VISAO_DA_TELA
 const AGRUPAR_VALIDOS: Agrupar[] = ["fam", "resp", "org", "fase", "none"]
-const CHAVE: Record<Agrupar, (l: LinhaTorre) => string> = {
-  fam: (l) => l.familiaNome ?? l.processoNome ?? "Sem família",
-  resp: (l) => l.responsavelNome ?? "Sem responsável",
-  org: (l) => l.terceiroNome ?? "Sem cartório",
-  fase: (l) => l.faseAtualDoProcessoLabel ?? l.faseMacroKey ?? "Sem fase",
-  none: () => "Todas",
-}
+const DENTRO_VALIDOS: DentroDaFamilia[] = ["pessoa", "orgao", "passo"]
+export const LINHAS_POR_PAGINA = 50
 
 interface Funcionario { id: number; nome: string; email?: string; tarefasAtivas: number }
 interface RespLote { total?: number; sucesso?: number; falha?: number; itens?: Array<{ ok: boolean; mensagem?: string }>; desfazer?: Desfazer | null; error?: string }
+
+/** Sufixo honesto de um lote em que algumas não passaram: "· 2 não passou(aram): <primeiro motivo>". */
+const sufixoDasFalhas = (itens: Array<{ ok: boolean; mensagem?: string }> | undefined): string => {
+  const falhas = (itens ?? []).filter((i) => !i.ok)
+  return falhas.length ? ` · ${falhas.length} não passou(aram): ${falhas[0].mensagem ?? "recusada"}` : ""
+}
 
 export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, paisRotulo, visaoPedida, tarefaPedida, onTarefaAtendida, processos, processoFoco, versao, onAplicarSpec, agora, filtros, onFiltros, onLimparPais, onLimparBusca, agruparPedido, dentroPedido, onEstadoUrl }: {
   linhas: LinhaTorre[]; carregando: boolean; erro: boolean
@@ -69,29 +56,29 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   kpi: ChaveKpi | null
   /** A busca do cabeçalho. */
   busca: string
-  /** A nacionalidade escolhida (chave) — só para a visão salva. */
+  /** A nacionalidade escolhida (chave) — o DONO é o seletor do topo; o campo do painel lê e escreve o mesmo estado. */
   paisChave: string
-  /** O rótulo da nacionalidade escolhida — filtra também o "Feito". */
+  /** O rótulo da nacionalidade escolhida. */
   paisRotulo?: string | null
   /** `?visao=` da URL (já validada pelo casco). */
   visaoPedida?: string | null
-  /** `?tarefa=` da URL: abre o drawer daquela tarefa (abertas, senão concluídas recentes). */
+  /** `?tarefa=` da URL: abre o trabalho daquela tarefa (abertas, senão concluídas recentes). */
   tarefaPedida?: number | null
   onTarefaAtendida?: () => void
-  /** Todos os processos da Torre — escolher a família da tarefa transversal. */
+  /** Todos os processos da Torre — o resumo do grupo e a família da tarefa transversal. */
   processos?: ProcessoDaTorre[]
   /** A família em foco (ou `?processo=`) — marca as "novas" e sugere a família da transversal. */
   processoFoco?: number | null
-  /** Sobe a cada recarga da Torre — o "Feito" acompanha. */
+  /** Sobe a cada recarga da Torre — o "Feito" e as canceladas acompanham. */
   versao?: number
   /** Uma visão salva com KPI/país/busca próprios: o casco os adota. */
   onAplicarSpec: (s: { kpi: ChaveKpi | null; pais: string; busca: string }) => void
   /** O instante da leitura — o MESMO que o topo usa para contar a AGENDA (dia operacional). */
-  agora?: Date
-  /** Os filtros da barra (estado do casco: vive na URL e na visão salva). */
+  agora: Date
+  /** Os filtros do painel (estado do casco: vive na URL e na visão salva). */
   filtros: FiltrosTorre
   onFiltros: (f: FiltrosTorre) => void
-  /** ✕ do chip de nacionalidade / da busca (o seletor e a caixa do topo continuam sendo os donos). */
+  /** ✕ da nacionalidade / da busca (o seletor e a caixa do topo continuam sendo os donos). */
   onLimparPais: () => void
   onLimparBusca: () => void
   /** `?agrupar=` / `?dentro=` da URL (já validados pelo casco). */
@@ -103,7 +90,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const router = useRouter()
   const { permissoes, avisar, recarregar, abrirFoco } = useTorre()
   const [agrupar, setAgrupar] = useState<Agrupar>(AGRUPAR_VALIDOS.includes(agruparPedido as Agrupar) ? (agruparPedido as Agrupar) : "fam")
-  const [dentro, setDentro] = useState<Dentro>((["pessoa", "orgao", "passo"] as string[]).includes(dentroPedido ?? "") ? (dentroPedido as Dentro) : "none")
+  const [dentro, setDentro] = useState<DentroDaFamilia>(DENTRO_VALIDOS.includes(dentroPedido as DentroDaFamilia) ? (dentroPedido as DentroDaFamilia) : "none")
   const [agruparVisto, setAgruparVisto] = useState<string | null>(agruparPedido ?? null)
   const [dentroVisto, setDentroVisto] = useState<string | null>(dentroPedido ?? null)
   const [visaoSel, setVisaoSel] = useState<string>(visaoPedida ?? "todas")
@@ -112,23 +99,26 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const [sel, setSel] = useState<Record<number, true>>({})
   const [pessoas, setPessoas] = useState<Funcionario[]>([])
   const [pessoaId, setPessoaId] = useState<number | null>(null)
-  const [repactuar, setRepactuar] = useState(false)
-  const [cobrarLinha, setCobrarLinha] = useState<LinhaTorre | null>(null)
-  const [aberta, setAberta] = useState<LinhaOperacaoV3 | null>(null)
-  const [focoIds, setFocoIds] = useState<number[] | null>(null)
+  const [paises, setPaises] = useState<PaisDoFiltro[]>([])
+  const [pagina, setPagina] = useState(0)
+  const [chaveDaLista, setChaveDaLista] = useState("")
+  const [modal, setModal] = useState<{ acao: AcaoComModal; linha: LinhaTorre } | null>(null)
+  const [repactuarLote, setRepactuarLote] = useState(false)
+  const [vincular, setVincular] = useState<{ ids: number[]; variante: "certidoes" | "lote" } | null>(null)
+  const [transversal, setTransversal] = useState(false)
   const [ocupado, setOcupado] = useState(false)
-  const [vincular, setVincular] = useState<number[] | null>(null)
-  const [escolhendoTransversal, setEscolhendoTransversal] = useState(false)
-  const [transversalProcessoId, setTransversalProcessoId] = useState<number | null>(null)
-  const [feito, setFeito] = useState<LinhaOperacaoV3[] | null>(null)
+  const [gavetaId, setGavetaId] = useState<number | null>(null)
+  const [focoIds, setFocoIds] = useState<number[] | null>(null)
+  const [trabalho, setTrabalho] = useState<LinhaTorre | null>(null)
+  const [feito, setFeito] = useState<LinhaDoFeito[] | null>(null)
   const [erroFeito, setErroFeito] = useState(false)
-  const adiar = useAdiarAcompanhamento()
+  const [canceladas, setCanceladas] = useState<LinhaDaTela[]>([])
   const novas = useNovasDaFamilia(processoFoco ?? null)
 
   // A URL pode mudar depois de montado: a visão nova entra no estado (ajuste durante a renderização, sem efeito).
   if ((visaoPedida ?? null) !== visaoVista) { setVisaoVista(visaoPedida ?? null); if (visaoPedida) setVisaoSel(visaoPedida) }
   if ((agruparPedido ?? null) !== agruparVisto) { setAgruparVisto(agruparPedido ?? null); setAgrupar(AGRUPAR_VALIDOS.includes(agruparPedido as Agrupar) ? (agruparPedido as Agrupar) : "fam") }
-  if ((dentroPedido ?? null) !== dentroVisto) { setDentroVisto(dentroPedido ?? null); setDentro((["pessoa", "orgao", "passo"] as string[]).includes(dentroPedido ?? "") ? (dentroPedido as Dentro) : "none") }
+  if ((dentroPedido ?? null) !== dentroVisto) { setDentroVisto(dentroPedido ?? null); setDentro(DENTRO_VALIDOS.includes(dentroPedido as DentroDaFamilia) ? (dentroPedido as DentroDaFamilia) : "none") }
 
   const podeEditar = !!permissoes?.editar
   const usuarioId = permissoes?.usuarioId ?? null
@@ -140,28 +130,93 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
     })
     return () => { vivo = false }
   }, [podeEditar])
-
-  // FEITO: concluídas dos últimos 14 dias, escopo equipe (a mesma leitura da aba Feito da Operação).
   useEffect(() => {
     let vivo = true
-    void api<RespostaTarefas>("/api/operacao/tarefas?visao=feito&escopo=equipe").then((r) => {
+    void api<{ paises: PaisDoFiltro[] }>("/api/torre/paises").then((r) => { if (vivo && r.ok) setPaises(r.data.paises ?? []) })
+    return () => { vivo = false }
+  }, [])
+
+  // FEITO: concluídas dos últimos 14 dias, de toda a equipe, e QUEM concluiu (a mesma leitura da aba Feito da Operação).
+  useEffect(() => {
+    let vivo = true
+    void api<{ linhas: LinhaDoFeito[] }>(`/api/torre/tarefas/feito${paisChave ? `?pais=${encodeURIComponent(paisChave)}` : ""}`).then((r) => {
       if (!vivo) return
       if (r.ok) { setFeito(r.data.linhas ?? []); setErroFeito(false) } else setErroFeito(true)
     })
     return () => { vivo = false }
-  }, [versao])
+  }, [versao, paisChave])
+  // CANCELADAS: só exibição (riscadas, no fim do grupo, com "Ver motivo") — nunca contador, seleção ou lote.
+  useEffect(() => {
+    let vivo = true
+    void api<{ linhas: LinhaDaTela[] }>(`/api/torre/tarefas/canceladas${paisChave ? `?pais=${encodeURIComponent(paisChave)}` : ""}`).then((r) => { if (vivo && r.ok) setCanceladas(r.data.linhas ?? []) })
+    return () => { vivo = false }
+  }, [versao, paisChave])
 
-  // ?tarefa=<id>: abre o drawer daquela tarefa — nas abertas; se não estiver, nas concluídas recentes; senão avisa.
+  // A visão em vigor: uma das fixas, ou a `visao` guardada dentro da visão salva escolhida.
+  const visao: VisaoTarefas = (CHAVES_DE_VISAO_DA_TELA.includes(visaoSel) ? visaoSel : visaoSalva) as VisaoTarefas
+  const base = useMemo(() => (kpi ? linhasDoKpi(kpi, linhas, agora) : linhas), [linhas, kpi, agora])
+  const ctxFiltro = useMemo(() => ({ usuarioId, agora }), [usuarioId, agora])
+  // A lista BASE (indicador + visão + busca) e, sobre ela, os filtros do painel: UMA função (`aplicarFiltros`) dá a lista que a tabela
+  // desenha, o "Mostrando N de M" e os números dentro do Prazo.
+  const listaBase = useMemo(() => aplicarBusca(base.filter(predicadoDaVisao(visao, usuarioId, agora)), busca) as LinhaTorre[], [base, visao, usuarioId, busca, agora])
+  const resumo = useMemo(() => aplicarFiltros(listaBase, filtros, ctxFiltro), [listaBase, filtros, ctxFiltro])
+  const trabalhoVisivel = useMemo(() => {
+    const l = resumo.linhas
+    // As NOVAS (último aviso "chegou trabalho") sobem ao topo — só quando a pessoa não escolheu uma ordenação; o resto mantém a ordem.
+    return novas.size && !filtros.ordenar ? [...l].sort((a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
+  }, [resumo, filtros.ordenar, novas])
+  // As canceladas aparecem na visão "Todas as abertas" (sem indicador do topo), passando pela busca e pelos filtros do painel.
+  const canceladasVisiveis = useMemo<LinhaDaTela[]>(() => {
+    if (visao !== "todas" || kpi) return []
+    return aplicarFiltros(aplicarBusca(canceladas, busca) as LinhaDaTela[], filtros, ctxFiltro).linhas
+  }, [visao, kpi, canceladas, busca, filtros, ctxFiltro])
+  const todasVisiveis = useMemo<LinhaDaTela[]>(() => [...trabalhoVisivel, ...canceladasVisiveis], [trabalhoVisivel, canceladasVisiveis])
+
+  const grupos = useMemo(() => {
+    const g = agruparParaTela(todasVisiveis, agrupar)
+    return filtros.ordenar === "familia" && agrupar === "fam" ? [...g].sort((a, b) => a[0].localeCompare(b[0], "pt-BR")) : g
+  }, [todasVisiveis, agrupar, filtros.ordenar])
+  const paginas = useMemo(() => paginarGrupos(grupos, LINHAS_POR_PAGINA), [grupos])
+  // Voltar à 1ª página quando a lista muda de verdade (filtro, visão, busca, agrupamento…) — ajuste durante a renderização.
+  const chave = JSON.stringify([visao, kpi, busca, filtros, agrupar, dentro])
+  if (chave !== chaveDaLista) { setChaveDaLista(chave); setPagina(0) }
+  const paginaEf = Math.min(pagina, Math.max(paginas.length - 1, 0))
+  const gruposDaPagina = paginas[paginaEf] ?? []
+
+  const processosPorId = useMemo(() => new Map((processos ?? []).map((p) => [p.processoId, p])), [processos])
+  const semOrgao = useMemo(() => listaBase.filter(precisaDeOrgaoEmissor), [listaBase])
+  const nVisao = (v: VisaoTarefas): number | null => (v === "feito" ? (feito ? feito.length : null) : contagemDaVisao(v, linhas, usuarioId, agora))
+  const specAtual: SpecDaVisao = { visao, agrupar, dentro, kpi, pais: paisChave || null, busca: busca.trim() || null, filtros }
+  // A URL guarda a visão FIXA escolhida e o agrupamento (visão salva não é endereço: o que ela traz entra nos próprios campos).
+  const visaoFixaDaUrl = CHAVES_DE_VISAO_DA_TELA.includes(visaoSel) && visaoSel !== "todas" ? visaoSel : null
+  useEffect(() => {
+    onEstadoUrl?.({ visao: visaoFixaDaUrl, agrupar: agrupar !== "fam" ? agrupar : null, dentro: dentro !== "none" ? dentro : null })
+  }, [visaoFixaDaUrl, agrupar, dentro, onEstadoUrl])
+
+  const selIds = useMemo(() => Object.keys(sel).map(Number).filter((id) => linhas.some((l) => l.taskId === id)), [sel, linhas])
+  const pessoa = pessoas.find((p) => p.id === pessoaId)
+  const alternar = (ids: number[], ligar: boolean) => setSel((s) => {
+    const n = { ...s }
+    for (const id of ids) { if (ligar) n[id] = true; else delete n[id] }
+    return n
+  })
+
+  // A ORDEM EM QUE AS LINHAS APARECEM (com o "Dentro da família" aplicado) — a lista do Modo foco, incluindo a cancelada.
+  const ordemVisual = useMemo<LinhaDaTela[]>(() => grupos.flatMap(([, itens]) =>
+    agrupar === "fam" && dentro !== "none" ? agruparDentroDaFamilia(itens, dentro).flatMap((g) => g.linhas as LinhaDaTela[]) : itens), [grupos, agrupar, dentro])
+  const linhaPorId = useMemo(() => new Map<number, LinhaDaTela>([...canceladas, ...linhas].map((l) => [l.taskId, l])), [canceladas, linhas])
+
+  // ?tarefa=<id>: abre o trabalho daquela tarefa — nas abertas; se não estiver, nas concluídas recentes; senão avisa.
   // A resolução acontece durante a renderização (sem efeito); o aviso e o "atendida" saem no efeito logo abaixo.
   const [tratada, setTratada] = useState<{ id: number; achou: boolean } | null>(null)
   if (tarefaPedida == null && tratada != null) setTratada(null)
   if (tarefaPedida != null && tratada?.id !== tarefaPedida && !carregando && !erro) {
     const l = linhas.find((x) => x.taskId === tarefaPedida)
-    if (l) { setTratada({ id: tarefaPedida, achou: true }); setAberta(l) }
+    if (l) { setTratada({ id: tarefaPedida, achou: true }); abrirTrabalho(l) }
     else if (feito != null || erroFeito) {
       const f = feito?.find((x) => x.taskId === tarefaPedida)
       setTratada({ id: tarefaPedida, achou: !!f })
-      if (f) { setVisaoSel("feito"); setAberta(f) }
+      if (f) { setVisaoSel("feito"); abrirTrabalho(f) }
     }
   }
   useEffect(() => {
@@ -170,59 +225,21 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
     onTarefaAtendida?.()
   }, [tarefaPedida, tratada, avisar, onTarefaAtendida])
 
-  // A visão em vigor: uma das fixas, ou a `visao` guardada dentro da visão salva escolhida.
-  const visao: VisaoTarefas = (VISOES.some(([v]) => v === visaoSel) ? visaoSel : visaoSalva) as VisaoTarefas
-  const base = useMemo(() => (kpi ? linhasDoKpi(kpi, linhas, agora) : linhas), [linhas, kpi, agora])
-  const ctxFiltro = useMemo(() => ({ usuarioId, agora: agora ?? new Date() }), [usuarioId, agora])
-  // A lista BASE (indicador + visão + busca) e, sobre ela, os filtros da barra: UMA função (`aplicarFiltros`) dá a lista que a
-  // tabela desenha, o "Mostrando N de M" e os contadores dos chips de prazo.
-  const listaBase = useMemo(() => aplicarBusca(base.filter(predicadoDe(visao, usuarioId, agora)), busca) as LinhaTorre[], [base, visao, usuarioId, busca, agora])
-  const resumo = useMemo(() => aplicarFiltros(listaBase, filtros, ctxFiltro), [listaBase, filtros, ctxFiltro])
-  const visiveis = useMemo(() => {
-    const l = resumo.linhas
-    // As NOVAS (último aviso "chegou trabalho") sobem ao topo — só quando a pessoa não escolheu uma ordenação; o resto mantém a ordem.
-    return novas.size && !filtros.ordenar ? [...l].sort((a, b) => Number(novas.has(b.taskId)) - Number(novas.has(a.taskId))) : l
-  }, [resumo, filtros.ordenar, novas])
-  const feitoVisiveis = useMemo(
-    () => aplicarBusca((feito ?? []).filter((l) => !paisRotulo || l.pais === paisRotulo), busca),
-    [feito, paisRotulo, busca],
-  )
-  const nNovas = useMemo(() => linhas.filter((l) => novas.has(l.taskId)).length, [linhas, novas])
-  const semOrgao = useMemo(() => visiveis.filter(precisaDeOrgaoEmissor), [visiveis])
-  const contagem = (v: VisaoTarefas): number | null => {
-    if (v === "feito") return feito ? feito.length : null
-    if (v === "minhas" || v === "acompvenc" || v === "cobranca") return linhas.filter(predicadoDe(v, usuarioId)).length
-    return null
-  }
-  const specAtual: SpecDaVisao = { visao, agrupar, dentro, kpi, pais: paisChave || null, busca: busca.trim() || null, filtros }
-  // A URL guarda a visão FIXA escolhida e o agrupamento (visão salva não é endereço: o que ela traz entra nos próprios campos).
-  const visaoFixaDaUrl = VISOES.some(([v]) => v === visaoSel) && visaoSel !== "todas" ? visaoSel : null
-  useEffect(() => {
-    onEstadoUrl?.({ visao: visaoFixaDaUrl, agrupar: agrupar !== "fam" ? agrupar : null, dentro: dentro !== "none" ? dentro : null })
-  }, [visaoFixaDaUrl, agrupar, dentro, onEstadoUrl])
-  const grupos = useMemo(() => {
-    const m = new Map<string, LinhaTorre[]>()
-    for (const l of visiveis) { const k = CHAVE[agrupar](l); m.set(k, [...(m.get(k) ?? []), l]) }
-    return [...m.entries()]
-  }, [visiveis, agrupar])
-  const selIds = useMemo(() => Object.keys(sel).map(Number).filter((id) => linhas.some((l) => l.taskId === id)), [sel, linhas])
-  const selSemOrgao = useMemo(() => linhas.filter((l) => sel[l.taskId] && precisaDeOrgaoEmissor(l)).map((l) => l.taskId), [linhas, sel])
-  const pessoa = pessoas.find((p) => p.id === pessoaId)
-
-  const alternar = (ids: number[], ligar: boolean) => setSel((s) => {
-    const n = { ...s }
-    for (const id of ids) { if (ligar) n[id] = true; else delete n[id] }
-    return n
-  })
-
-  const lote = async (acao: string, extra: Record<string, unknown> = {}) => {
+  // ─── AÇÕES EM LOTE (a barra) ─────────────────────────────────────────────
+  const lote = async (acao: "ATRIBUIR" | "PRIORIDADE_ALTA" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
+    const { limpar = true, ddmm = "" } = opcoes
     setOcupado(true)
     const r = await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
     setOcupado(false)
     if (r.data && typeof r.data.total === "number") {
-      const verbo = { ATRIBUIR: `atribuída(s) a ${pessoa?.nome ?? "a pessoa"}`, PRIORIDADE_ALTA: "com prioridade alta", REPACTUAR: "repactuada(s)", COBRAR: "cobrada(s) ao cartório" }[acao]
-      avisar(`${resumoDoLote(r.data)} — ${verbo}.`, r.data.desfazer ?? null)
-      setSel({}); recarregar()
+      const n = r.data.sucesso ?? 0
+      const msg = acao === "ATRIBUIR" ? `${n} ${n === 1 ? "tarefa atribuída" : "tarefas atribuídas"} a ${pessoa?.nome ?? "a pessoa"}`
+        : acao === "PRIORIDADE_ALTA" ? `Prioridade alta em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
+          : acao === "REPACTUAR" ? `${n} ${n === 1 ? "prazo repactuado" : "prazos repactuados"} para ${ddmm}`
+            : `Cobrança registrada em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
+      avisar(`${msg}${sufixoDasFalhas(r.data.itens)}`, r.data.desfazer ?? null)
+      if (limpar) setSel({})
+      recarregar()
       return { ok: true as const }
     }
     avisar(erroDe(r.data))
@@ -234,11 +251,14 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
     setOcupado(true)
     const r = await api<{ ok?: boolean; iniciadas?: number; ignoradas?: Array<{ motivo: string }>; mensagem?: string }>("/api/operacao/tarefas/iniciar-lote", "POST", { tarefaIds: selIds })
     setOcupado(false)
-    if (r.ok && r.data.ok) avisar(`${r.data.iniciadas} certidões enviadas.${r.data.ignoradas?.length ? ` (${r.data.ignoradas.length} ignorada(s): ${r.data.ignoradas[0]?.motivo})` : ""}`)
-    else avisar(r.data.mensagem ?? erroDe(r.data, "Não foi possível iniciar em lote."))
+    if (r.ok && r.data.ok) {
+      const n = r.data.iniciadas ?? 0
+      avisar(`Iniciadas ${n} ${n === 1 ? "tarefa" : "tarefas"} · enviadas ao cartório${r.data.ignoradas?.length ? ` · ${r.data.ignoradas.length} ignorada(s): ${r.data.ignoradas[0]?.motivo}` : ""}`)
+    } else avisar(r.data.mensagem ?? erroDe(r.data, "Não foi possível iniciar em lote."))
     setSel({}); recarregar()
   }
 
+  // ─── AÇÕES DA LINHA ──────────────────────────────────────────────────────
   const atribuirRapido = async (l: LinhaTorre) => {
     const r = await api<{ mensagem?: string; desfazer?: Desfazer }>(`/api/torre/tarefas/${l.taskId}/atribuir-sugerido`, "POST")
     if (r.ok) { avisar(r.data.mensagem ?? "Atribuída.", r.data.desfazer ?? null); recarregar() } else avisar(erroDe(r.data))
@@ -248,304 +268,197 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
     avisar(r.ok ? (r.data.mensagem ?? "Iniciada.") : erroDe(r.data))
     if (r.ok) recarregar()
   }
-
-  // Genealogia sem documento não abre o drawer documental: "Continuar" leva à Árvore do processo (igual à Operação).
-  const abrirLinha = (l: LinhaOperacaoV3) => {
+  // Genealogia sem documento não abre o drawer documental: "Continuar" leva à Árvore do processo (igual à Operação). Sem documento
+  // (transversal, administrativa) o trabalho acontece na própria gaveta.
+  function abrirTrabalho(l: LinhaTorre) {
     if (l.faseMacroKey === "genealogia" && l.documentoId == null && l.processoId != null) { router.push(urlArvoreDoProcesso(l.processoId)); return }
-    setAberta(l)
+    if (l.documentoId == null) { setGavetaId(l.taskId); return }
+    setGavetaId(null); setTrabalho(l)
   }
-
-  // ▶ Fazer agora: o drawer da 1ª tarefa da lista visível + Anterior/Próxima com "i de N".
-  const linhaPorId = useMemo(() => new Map<number, LinhaOperacaoV3>([...(feito ?? []).map((l) => [l.taskId, l] as const), ...linhas.map((l) => [l.taskId, l] as const)]), [feito, linhas])
-  const iniciarFoco = () => {
-    const ordem = grupos.flatMap(([, itens]) => itens)
-    if (!ordem.length) { avisar("Nada a fazer."); return }
-    setFocoIds(ordem.map((l) => l.taskId)); abrirLinha(ordem[0])
+  const verMotivo = (l: LinhaDaTela) => {
+    const e = l.encerramento
+    avisar(`Cancelada${e?.quandoRotulo ? ` em ${e.quandoRotulo}` : ""} por ${e?.porNome ?? "Sistema"}${e?.motivo ? ` · ${e.motivo}` : ""}`)
   }
-  const navFoco = (dir: 1 | -1) => {
-    if (!focoIds || !aberta) return
-    const i = focoIds.indexOf(aberta.taskId)
-    for (let k = 1; k <= focoIds.length; k++) {
-      const prox = linhaPorId.get(focoIds[(((i + dir * k) % focoIds.length) + focoIds.length) % focoIds.length])
-      if (prox) { setAberta(prox); return }
+  const executar = (acao: AcaoDaLinha, l: LinhaDaTela) => {
+    switch (acao) {
+      case "Atribuir": void atribuirRapido(l); break
+      case "Iniciar": void iniciarRapido(l); break
+      case "Cobrar": setModal({ acao: "cobrar", linha: l }); break
+      case "Cobrar cliente": setModal({ acao: "cobrarCliente", linha: l }); break
+      case "Adiar": setModal({ acao: "adiar", linha: l }); break
+      case "Desbloquear": setModal({ acao: "desbloquear", linha: l }); break
+      case "Ver motivo": verMotivo(l); break
+      default: abrirTrabalho(l)
     }
   }
-  const fecharAberta = () => { setAberta(null); setFocoIds(null) }
+
+  // ▶ Fazer agora: a gaveta da 1ª tarefa da lista visível + Anterior/Próxima com "i de N". A cancelada entra na lista.
+  const iniciarFoco = () => {
+    if (!ordemVisual.length) return // lista vazia: nada abre
+    setFocoIds(ordemVisual.map((l) => l.taskId)); setTrabalho(null); setGavetaId(ordemVisual[0].taskId)
+  }
+  const navFoco = (dir: 1 | -1) => {
+    if (!focoIds || gavetaId == null) return
+    const i = focoIds.indexOf(gavetaId)
+    const prox = focoIds[Math.min(Math.max(i + dir, 0), focoIds.length - 1)]
+    if (prox != null) setGavetaId(prox)
+  }
+  const fecharGaveta = () => { setGavetaId(null); setFocoIds(null) }
 
   if (erro) return <div className="tor-card pad">Não foi possível carregar as tarefas. Tente recarregar a página.</div>
   if (carregando) return <div className="tor-card pad small">Carregando tarefas…</div>
 
-  const linhaAberta: LinhaOperacaoV3 | null = aberta ? linhaPorId.get(aberta.taskId) ?? aberta : null
-  const posFoco = focoIds && linhaAberta ? focoIds.indexOf(linhaAberta.taskId) : -1
-  const painel = linhaAberta ? (
+  const linhaGaveta = gavetaId != null ? linhaPorId.get(gavetaId) ?? null : null
+  const posFoco = focoIds && gavetaId != null ? focoIds.indexOf(gavetaId) : -1
+  const acoesDaGaveta = linhaGaveta
+    ? acoesDaLinha({
+      statusTarefa: linhaGaveta.statusTarefa, coluna: linhaGaveta.coluna, responsavelId: linhaGaveta.responsavelId, esperandoDe: linhaGaveta.esperandoDe,
+      estadoOperacao: linhaGaveta.estadoOperacao, aIniciarEfetivo: aIniciarEfetivo(linhaGaveta), podeIniciar: linhaGaveta.podeIniciar && !!permissoes?.iniciar,
+      temAcompanhamento: !!linhaGaveta.acompanhamentoPasso && !linhaGaveta.acompanhamentoPasso.semPrazo, acaoPadrao: acaoDe(linhaGaveta).label,
+    })
+    : []
+  const nTrabalho = trabalhoVisivel.length
+  const rodape = (
     <>
-      {posFoco >= 0 && focoIds && (
-        <div className="tor-sel" role="toolbar" aria-label="Modo foco" style={{ borderRadius: 0 }}>
-          <span className="tor-p blu">Modo foco</span>
-          <b>{posFoco + 1} de {focoIds.length}</b>
-          <div className="tor-meter" style={{ width: 120, marginBottom: 0 }}><i className="ambar" style={{ width: `${Math.round(((posFoco + 1) / focoIds.length) * 100)}%` }} /></div>
-          <div style={{ flexGrow: 1 }} />
-          <button className="tor-btn" onClick={() => navFoco(-1)}>← Anterior</button>
-          <button className="tor-btn" onClick={() => navFoco(1)}>Próxima →</button>
-          <button className="tor-btn" onClick={fecharAberta}>Sair</button>
-        </div>
+      {nTrabalho} {nTrabalho === 1 ? "tarefa" : "tarefas"}{paginas.length > 1 ? ` · página ${paginaEf + 1} de ${paginas.length}` : ""} · {LINHAS_POR_PAGINA} por página{agrupar === "fam" ? ", sempre agrupadas por processo" : ""}. A certidão cancelada continua visível, riscada, no fim do grupo. Clique no nome da certidão para abrir a gaveta.
+      {paginas.length > 1 && (
+        <span style={{ display: "inline-flex", gap: 6, marginLeft: 12 }}>
+          <button type="button" className="tf-mini" disabled={paginaEf <= 0} onClick={() => setPagina(paginaEf - 1)}>← Anterior</button>
+          <button type="button" className="tf-mini" disabled={paginaEf >= paginas.length - 1} onClick={() => setPagina(paginaEf + 1)}>Próxima →</button>
+        </span>
       )}
-      <PainelTorreTarefa linha={linhaAberta} />
     </>
-  ) : null
-
-  const renderLinha = (l: LinhaTorre) => {
-    const bola = bolaDe(l); const risco = riscoDe(l); const acao = acaoDe(l)
-    const iniciavel = aIniciarEfetivo(l) && l.podeIniciar && !!permissoes?.iniciar
-    return (
-      <div key={l.taskId} className={`tor-row tor-gT ${sel[l.taskId] ? "sel" : ""}`}>
-        <button className={`tor-chk ${sel[l.taskId] ? "on" : ""}`} aria-label={`Selecionar a tarefa ${l.taskId}`} onClick={() => alternar([l.taskId], !sel[l.taskId])} />
-        <div>
-          <b>{novas.has(l.taskId) && <span className="tor-p amb" style={{ marginRight: 6 }}>nova</span>}{docTipoTxt(l)}</b>
-          <div className="small">{l.pessoaNome ?? l.casalNomes ?? "—"} · {l.familiaNome ?? l.processoNome ?? "—"} · #{l.taskId}</div>
-        </div>
-        <div><span className={`tor-p ${bola.cls}`}>{bola.txt}</span>{l.esperandoHaDias != null && <div className="small">há {l.esperandoHaDias} d</div>}</div>
-        <div className="small">{passoLabelDe(l).label}</div>
-        <div><span className={`tor-p ${statusTarefaCls(l).replace("opv3-p-", "")}`}>{statusTarefaTxt(l)}</span></div>
-        <div className={l.responsavelId ? "" : "small"}>{l.responsavelNome ?? "sem responsável"}</div>
-        <div className="small">{textoPrazoDaTarefa(l) || "—"}</div>
-        <div className="small">{acompTxtCompleto(l.acompanhamentoPasso)}</div>
-        <div><span className={`tor-p ${risco.cls}`}>{risco.txt}</span></div>
-        <div className="flex flex-wrap gap-1">
-          {iniciavel
-            ? <button className="tor-btn pri" onClick={() => void iniciarRapido(l)}>Iniciar</button>
-            : <button className="tor-btn pri" onClick={() => abrirLinha(l)}>{aIniciarEfetivo(l) ? "Abrir" : acao.label}</button>}
-          {!aIniciarEfetivo(l) && <button className="tor-btn" onClick={() => abrirLinha(l)}>{concluirLabelDe(l)}</button>}
-          {podeEditar && l.responsavelId == null && <button className="tor-btn" onClick={() => void atribuirRapido(l)}>Atribuir</button>}
-          {l.estadoOperacao === "AGUARDANDO" && <button className="tor-btn" onClick={() => setCobrarLinha(l)}>Cobrar</button>}
-          {temAcompanhamento(l) && <button className="tor-btn" onClick={() => adiar.abrir(l.taskId)}>Adiar</button>}
-        </div>
-      </div>
-    )
-  }
-
-  const opcoesTransversal = (processos ?? []).length
-    ? (processos ?? []).map((p) => ({ id: p.processoId, rotulo: `${p.familiaNome}${p.codigo ? ` · ${p.codigo}` : ""}` }))
-    : [...new Map(linhas.filter((l) => l.processoId != null).map((l) => [l.processoId as number, { id: l.processoId as number, rotulo: l.familiaNome ?? l.processoNome ?? `Processo ${l.processoId}` }])).values()]
+  )
 
   return (
-    <div>
-      <div className="tor-bar">
-        {visao !== "feito" && (
-          <>
-            <button className="tor-btn pri" onClick={iniciarFoco}>▶ Fazer agora ({visiveis.length})</button>
-            <label className="flex items-center gap-1.5 small">Agrupar por
-              <select className="tor-in" aria-label="Agrupar por" value={agrupar} onChange={(e) => setAgrupar(e.target.value as Agrupar)}>
-                <option value="fam">Família</option><option value="resp">Responsável</option><option value="org">Cartório</option><option value="fase">Fase</option><option value="none">Sem agrupamento</option>
-              </select>
-            </label>
-            {agrupar === "fam" && (
-              <label className="flex items-center gap-1.5 small">Dentro da família
-                <select className="tor-in" aria-label="Dentro da família" value={dentro} onChange={(e) => setDentro(e.target.value as Dentro)}>
-                  <option value="pessoa">Pessoa</option><option value="orgao">Órgão</option><option value="passo">Passo</option><option value="none">Nenhum</option>
-                </select>
-              </label>
-            )}
-          </>
-        )}
-        <VisoesSalvas
-          fixas={VISOES.map(([v, l]) => { const c = contagem(v); return [v, c == null ? l : `${l} (${c})`] as [string, string] })}
-          valor={visaoSel} atual={specAtual}
-          onEscolherFixa={(v) => setVisaoSel(v)}
-          onAplicar={(spec, id) => {
-            setVisaoSel(id)
-            setVisaoSalva((VISOES.some(([v]) => v === spec.visao) ? spec.visao : "todas") as VisaoTarefas)
-            if (AGRUPAR_VALIDOS.includes(spec.agrupar as Agrupar)) setAgrupar(spec.agrupar as Agrupar)
-            setDentro(((["none", "pessoa", "orgao", "passo"] as string[]).includes(spec.dentro ?? "") ? spec.dentro : "none") as Dentro)
-            onFiltros(normalizarFiltros(spec.filtros as unknown as Record<string, unknown> | undefined))
-            onAplicarSpec({ kpi: KPIS.some((k) => k.chave === spec.kpi && k.filtra) ? (spec.kpi as ChaveKpi) : null, pais: spec.pais ?? "", busca: spec.busca ?? "" })
-          }}
-        />
-        {nNovas > 0 && <span className="tor-p amb">{nNovas} {nNovas === 1 ? "nova" : "novas"}</span>}
-        <div style={{ flexGrow: 1 }} />
-        <button className="tor-btn" onClick={() => setEscolhendoTransversal(true)}>+ Tarefa transversal</button>
-        <CobrarTodosVencidos linhas={linhas} />
-        {visao !== "feito" && selIds.length > 0 && (
-          <div className="tor-sel" role="toolbar" aria-label="Ações em lote">
-            <b>{selIds.length} sel.</b>
-            {permissoes?.iniciar && <button className="tor-btn pri" disabled={ocupado} onClick={() => void iniciarSelecionadas()}>Iniciar (enviar ao cartório) as {selIds.length}</button>}
-            {podeEditar && (
-              <>
-                <select className="tor-in" aria-label="Pessoa" value={pessoaId ?? ""} onChange={(e) => setPessoaId(Number(e.target.value))}>
-                  {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.tarefasAtivas})</option>)}
-                </select>
-                <button className="tor-btn pri" disabled={ocupado || !pessoa} onClick={() => void lote("ATRIBUIR", { responsavelId: pessoaId })}>Atribuir a {pessoa?.nome ?? "…"}</button>
-                <button className="tor-btn" disabled={ocupado} onClick={() => void lote("PRIORIDADE_ALTA")}>Prioridade alta</button>
-                <button className="tor-btn" disabled={ocupado} onClick={() => setRepactuar(true)}>Repactuar prazo</button>
-                <button className="tor-btn" disabled={ocupado || selSemOrgao.length === 0} title={selSemOrgao.length === 0 ? "Nenhuma das selecionadas precisa de órgão emissor" : undefined} onClick={() => setVincular(selSemOrgao)}>Vincular órgão nas {selSemOrgao.length}</button>
-              </>
-            )}
-            <button className="tor-btn" disabled={ocupado} onClick={() => void lote("COBRAR")}>Cobrar cartório</button>
-            <button className="tor-btn" onClick={() => setSel({})}>Limpar</button>
-          </div>
-        )}
+    <div className="tf">
+      <div className="tf-head">
+        <div className="tf-bread"><Link href="/torre">Torre de Controle</Link> › Tarefas</div>
+        <div className="tf-titulo">
+          <h2>Tarefas</h2>
+          <div className="tf-sub">cada linha é uma tarefa: a certidão de uma pessoa em uma fase (emissão, tradução, apostila…) ou uma tarefa avulsa</div>
+          {visao !== "feito" && <button type="button" className="tf-btn pri" onClick={iniciarFoco}>▶ Fazer agora ({nTrabalho})</button>}
+          <button type="button" className="tf-btn" onClick={() => setTransversal(true)}>+ Tarefa transversal</button>
+        </div>
       </div>
+
+      <VisoesSalvas
+        fixas={VISOES_DA_TELA.map(([v, l]) => [v, l, nVisao(v)] as [string, string, number | null])}
+        valor={visaoSel} atual={specAtual}
+        onEscolherFixa={(v) => { setVisaoSel(v); setSel({}) }}
+        onAplicar={(spec, id) => {
+          setVisaoSel(id); setSel({})
+          setVisaoSalva((CHAVES_DE_VISAO_DA_TELA.includes(spec.visao ?? "") ? spec.visao : "todas") as VisaoTarefas)
+          if (AGRUPAR_VALIDOS.includes(spec.agrupar as Agrupar)) setAgrupar(spec.agrupar as Agrupar)
+          setDentro((DENTRO_VALIDOS.includes(spec.dentro as DentroDaFamilia) ? spec.dentro : "none") as DentroDaFamilia)
+          onFiltros(normalizarFiltros(spec.filtros as unknown as Record<string, unknown> | undefined))
+          onAplicarSpec({ kpi: KPIS.some((k) => k.chave === spec.kpi && k.filtra) ? (spec.kpi as ChaveKpi) : null, pais: spec.pais ?? "", busca: spec.busca ?? "" })
+        }}
+      />
 
       {visao !== "feito" && (
         <TorreFiltros
           linhasTodas={linhas} linhasBase={listaBase} filtros={filtros} onFiltros={onFiltros} ctx={ctxFiltro}
-          mostrando={resumo.mostrando} total={linhas.length}
-          paisRotulo={paisRotulo ?? null} onLimparPais={onLimparPais} busca={busca} onLimparBusca={onLimparBusca}
-          onLimparTudo={() => { onFiltros(filtrosVazios()); onLimparPais(); onLimparBusca() }}
+          mostrando={resumo.mostrando} total={listaBase.length} porPagina={LINHAS_POR_PAGINA}
+          paisChave={paisChave} paises={paises} onPais={(pais) => onAplicarSpec({ kpi, pais, busca })}
+          agrupar={agrupar} onAgrupar={setAgrupar} dentro={dentro} onDentro={setDentro}
+          onLimparTudo={() => { onFiltros(filtrosVazios()); setAgrupar("fam"); setDentro("none"); onAplicarSpec({ kpi: null, pais: "", busca: "" }) }}
         />
       )}
 
       {visao !== "feito" && semOrgao.length > 0 && (
-        <div className="tor-card pad flex flex-wrap items-center gap-3 small">
-          <span className="tor-p red">Bloqueio</span>
-          <span><b>{semOrgao.length} certidões sem órgão emissor.</b> Não dá pra enviar sem destino — vincule antes de iniciar.</span>
-          <div style={{ flexGrow: 1 }} />
-          {podeEditar && <button className="tor-btn pri" onClick={() => setVincular(semOrgao.map((l) => l.taskId))}>Vincular órgão nas {semOrgao.length}</button>}
+        <div className="tf-bloqueio">
+          <span className="selo">Bloqueio</span>
+          <span><b>{semOrgao.length} {semOrgao.length === 1 ? "certidão sem órgão emissor" : "certidões sem órgão emissor"}</b> {semOrgao.length === 1 ? "não pode ser pedida nem cobrada" : "não podem ser pedidas nem cobradas"} até você vincular o cartório.</span>
+          {podeEditar && <button type="button" onClick={() => setVincular({ ids: semOrgao.map((l) => l.taskId), variante: "certidoes" })}>Vincular órgão nas {semOrgao.length}</button>}
         </div>
       )}
 
-      {visao === "feito" && (
-        feito == null && !erroFeito ? <div className="tor-card pad small">Carregando concluídas…</div>
-          : erroFeito ? <div className="tor-card pad">Não foi possível carregar as tarefas concluídas.</div>
-            : <TorreFeito linhas={feitoVisiveis} onAbrir={(l) => abrirLinha(l)} />
+      {visao !== "feito" && selIds.length > 0 && (
+        <div className="tf-lote" role="toolbar" aria-label="Ações em lote">
+          <b>{selIds.length} selecionada(s)</b>
+          {permissoes?.iniciar && <button type="button" disabled={ocupado} onClick={() => void iniciarSelecionadas()}>Iniciar (enviar ao cartório)</button>}
+          {podeEditar && (
+            <>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Atribuir a
+                <select aria-label="Atribuir a" value={pessoaId ?? ""} onChange={(e) => setPessoaId(Number(e.target.value))}>
+                  {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome} ({p.tarefasAtivas} {p.tarefasAtivas === 1 ? "ativa" : "ativas"})</option>)}
+                </select>
+                <button type="button" disabled={ocupado || !pessoa} onClick={() => void lote("ATRIBUIR", { responsavelId: pessoaId })}>Atribuir</button>
+              </span>
+              <button type="button" disabled={ocupado} onClick={() => void lote("PRIORIDADE_ALTA")}>Prioridade alta</button>
+              <button type="button" disabled={ocupado} onClick={() => setRepactuarLote(true)}>Repactuar prazo</button>
+              <button type="button" disabled={ocupado} onClick={() => setVincular({ ids: selIds, variante: "lote" })}>Vincular órgão</button>
+            </>
+          )}
+          <button type="button" disabled={ocupado} onClick={() => void lote("COBRAR")}>Cobrar cartório</button>
+          <button type="button" className="limpar" onClick={() => setSel({})}>Limpar</button>
+        </div>
       )}
 
-      {visao !== "feito" && grupos.length === 0 && <div className="tor-card pad small">Nenhuma tarefa nesta visão.</div>}
-      {visao !== "feito" && grupos.map(([nome, itens]) => {
-        const todas = itens.every((l) => sel[l.taskId]); const alguma = itens.some((l) => sel[l.taskId])
-        const subgrupos = agrupar === "fam" && dentro !== "none" ? agruparDentroDaFamilia(itens, dentro) : null
-        return (
-          <div key={nome} className="tor-card tor-scroll">
-            <div className="tor-grp">
-              <button className={`tor-chk ${todas ? "on" : alguma ? "mid" : ""}`} aria-label={`Selecionar o grupo ${nome}`} onClick={() => alternar(itens.map((l) => l.taskId), !todas)} />
-              {agrupar === "fam" && itens[0]?.processoId != null
-                ? <button className="tor-linkbtn" aria-label={`Abrir o foco da família ${nome}`} onClick={() => abrirFoco(itens[0].processoId as number)}>{nome}</button>
-                : <b>{nome}</b>}<div style={{ flexGrow: 1 }} /><span className="tor-p gry">{itens.length} tarefas</span>
-            </div>
-            <div className="tor-hd tor-gT"><span /><span>Certidão · pessoa</span><span>Bola com</span><span>Etapa</span><span>Status</span><span>Responsável</span><span>Prazo</span><span>Acomp.</span><span>Risco</span><span /></div>
-            {subgrupos
-              ? subgrupos.map((g) => {
-                const ls = g.linhas as LinhaTorre[]
-                const todasG = ls.every((l) => sel[l.taskId]); const algumaG = ls.some((l) => sel[l.taskId])
-                return (
-                  <div key={g.chave}>
-                    <div className="tor-grp" style={{ background: "var(--surface-secondary)", borderTop: "1px solid var(--border-default)" }}>
-                      <button className={`tor-chk ${todasG ? "on" : algumaG ? "mid" : ""}`} aria-label={`Selecionar o subgrupo ${g.titulo}`} onClick={() => alternar(ls.map((l) => l.taskId), !todasG)} />
-                      <span className={`tor-p ${g.pillCls === "opv3-p-red" ? "red" : "gry"}`}>{g.pill}</span><b>{g.titulo}</b>
-                      <div style={{ flexGrow: 1 }} /><span className="tor-p gry">{ls.length} tarefas</span>
-                    </div>
-                    {ls.map(renderLinha)}
-                  </div>
-                )
-              })
-              : itens.map(renderLinha)}
-          </div>
-        )
-      })}
+      {visao === "feito"
+        ? (feito == null && !erroFeito ? <div className="tf-card"><span className="tf-vazio">Carregando concluídas…</span></div>
+          : erroFeito ? <div className="tf-card"><span className="tf-vazio">Não foi possível carregar as tarefas concluídas.</span></div>
+            : <TorreFeito linhas={(feito ?? []).filter((l) => !paisRotulo || l.pais === paisRotulo).filter((l) => aplicarBusca([l], busca).length > 0)} agora={agora} />)
+        : (
+          <TarefasTabela
+            grupos={gruposDaPagina} agrupar={agrupar} dentro={dentro} sel={sel} novas={novas} processos={processosPorId} agora={agora}
+            podeIniciar={!!permissoes?.iniciar} vazio={todasVisiveis.length === 0}
+            onSelecionar={alternar} onTodas={alternar}
+            onAbrirGaveta={(l) => { setFocoIds(null); setGavetaId(l.taskId) }}
+            onAcao={executar} onFocoDaFamilia={abrirFoco} rodape={rodape}
+          />
+        )}
 
-      {repactuar && <RepactuarLoteModal n={selIds.length} onFechar={() => setRepactuar(false)} onEnviar={async (novoPrazo, justificativa) => {
-        const r = await lote("REPACTUAR", { novoPrazo, justificativa })
-        if (r.ok) setRepactuar(false)
-        return r
-      }} />}
+      {modal && <ModalDaAcao acao={modal.acao} linha={modal.linha} agora={agora} onFechar={() => setModal(null)} />}
 
-      {cobrarLinha && (
-        <RegistrarContatoModal
-          titulo="Cobrar" subtitulo={`${cobrarLinha.terceiroNome ?? "Cartório"} · #${cobrarLinha.taskId}`}
-          onFechar={() => setCobrarLinha(null)}
-          onEnviar={async (dados) => {
-            const r = await api<{ ok?: boolean; mensagem?: string; escalada?: boolean }>(`/api/operacao/tarefas/${cobrarLinha.taskId}/cobrar`, "POST", dados)
-            if (!r.ok || !r.data.ok) return { ok: false, mensagem: r.data.mensagem ?? erroDe(r.data) }
-            setCobrarLinha(null); avisar(`Contato registrado${r.data.escalada ? " · escalada ao gestor" : ""}.`); recarregar()
-            return { ok: true }
+      {repactuarLote && (
+        <ModalRepactuarLote n={selIds.length} onFechar={() => setRepactuarLote(false)} onEnviar={async (novoPrazo, justificativa, ddmm) => {
+          const r = await lote("REPACTUAR", { novoPrazo, justificativa }, { limpar: false, ddmm })
+          if (r.ok) setRepactuarLote(false)
+          return r.ok ? { ok: true } : { ok: false, mensagem: r.mensagem }
+        }} />
+      )}
+
+      {vincular && <VincularOrgaoLoteModal tarefaIds={vincular.ids} variante={vincular.variante} onFechar={() => setVincular(null)} onFeito={() => { if (vincular.variante === "certidoes") setSel({}) }} />}
+
+      {transversal && (
+        <TarefasTransversal
+          opcoes={(processos ?? []).length
+            ? (processos ?? []).map((p) => ({ id: p.processoId, rotulo: `${p.familiaNome}${p.codigo ? ` · ${p.codigo}` : ""}` }))
+            : [...new Map(linhas.filter((l) => l.processoId != null).map((l) => [l.processoId as number, { id: l.processoId as number, rotulo: l.familiaNome ?? l.processoNome ?? `Processo ${l.processoId}` }])).values()]}
+          inicial={processoFoco ?? null}
+          onFechar={() => setTransversal(false)}
+          onCriada={() => { setTransversal(false); avisar("Tarefa transversal criada"); recarregar() }}
+        />
+      )}
+
+      {linhaGaveta && (
+        <TarefasGaveta
+          linha={linhaGaveta} agora={agora} acoes={acoesDaGaveta}
+          foco={posFoco >= 0 && focoIds ? { pos: posFoco + 1, total: focoIds.length, onAnterior: () => navFoco(-1), onProxima: () => navFoco(1) } : null}
+          onFechar={fecharGaveta}
+          onAcaoPrimaria={(a) => {
+            if (a === "Conferir" || a === "Continuar" || a === "Abrir") { abrirTrabalho(linhaGaveta); return }
+            executar(a, linhaGaveta)
           }}
+          onAcaoComModal={(a) => setModal({ acao: a, linha: linhaGaveta })}
         />
       )}
 
-      {vincular && <VincularOrgaoLoteModal tarefaIds={vincular} onFechar={() => setVincular(null)} onFeito={() => setSel({})} />}
-      {adiar.modal}
-
-      {escolhendoTransversal && (
-        <EscolherProcessoModal
-          opcoes={opcoesTransversal} inicial={processoFoco ?? grupos[0]?.[1][0]?.processoId ?? null}
-          onFechar={() => setEscolhendoTransversal(false)}
-          onEscolher={(id) => { setEscolhendoTransversal(false); setTransversalProcessoId(id) }}
-        />
-      )}
-      {transversalProcessoId != null && (
-        <TarefaTransversalModal
-          processoId={transversalProcessoId}
-          onClose={() => setTransversalProcessoId(null)}
-          onCreated={() => { setTransversalProcessoId(null); avisar("Tarefa transversal criada. Não muda a fase do processo."); recarregar() }}
-        />
-      )}
-
-      {linhaAberta && (linhaAberta.documentoId != null ? (
+      {trabalho && trabalho.documentoId != null && (
         <DocumentoOperationalDrawer
-          documentoId={linhaAberta.documentoId} isOpen onClose={fecharAberta} onSave={() => recarregar()}
+          documentoId={trabalho.documentoId} isOpen onClose={() => setTrabalho(null)} onSave={() => recarregar()}
           pilulaExtra="painel real do processo · espelhado"
-          barraSuperiorExtra={painel}
-          rodapeExtra={posFoco >= 0 ? (
+          barraSuperiorExtra={<PainelTorreTarefa linha={trabalho} agora={agora} />}
+          rodapeExtra={focoIds ? (
             <div className="tor-bar" style={{ margin: 0, padding: "10px 18px", background: "var(--surface-secondary)", borderTop: "1px solid var(--border-default)" }}>
-              <span className="small">Navegação do A fazer</span><div style={{ flexGrow: 1 }} />
-              <button className="tor-btn" onClick={() => navFoco(-1)}>← Anterior</button>
-              <button className="tor-btn" onClick={() => navFoco(1)}>Próxima →</button>
+              <span className="small">{`Modo foco · ${posFoco >= 0 ? posFoco + 1 : "…"} de ${focoIds.length} · ${docTipoTxt(trabalho)} · ${pessoaDaLinha(trabalho)}`}</span><div style={{ flexGrow: 1 }} />
+              <button className="tor-btn" onClick={() => { setGavetaId(trabalho.taskId); setTrabalho(null) }}>Voltar ao Modo foco</button>
             </div>
           ) : undefined}
         />
-      ) : (
-        <div className="tor tor-gaveta" onClick={fecharAberta}>
-          <div onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Painel da tarefa">
-            <div className="p-4 flex items-center gap-2"><b className="flex-1">{linhaAberta.titulo}</b><button className="tor-btn" onClick={fecharAberta}>Fechar</button></div>
-            {painel}
-            <p className="small p-4">Esta tarefa não tem documento vinculado: o painel completo do processo não se aplica.</p>
-          </div>
-        </div>
-      ))}
+      )}
     </div>
-  )
-}
-
-function EscolherProcessoModal({ opcoes, inicial, onFechar, onEscolher }: {
-  opcoes: Array<{ id: number; rotulo: string }>; inicial: number | null; onFechar: () => void; onEscolher: (processoId: number) => void
-}) {
-  const [id, setId] = useState<string>(String(inicial ?? opcoes[0]?.id ?? ""))
-  return (
-    <Modal titulo="Tarefa transversal" subtitulo="Escolha a família (processo) que receberá a tarefa. Ela não muda a fase do processo." onFechar={onFechar} rodape={<>
-      <button className="tor-btn" onClick={onFechar}>Cancelar</button>
-      <button className="tor-btn pri" disabled={!id} onClick={() => onEscolher(Number(id))}>Continuar</button>
-    </>}>
-      <Campo rotulo="Família / processo">
-        <select className="tor-in w-full" value={id} onChange={(e) => setId(e.target.value)}>
-          {opcoes.length === 0 && <option value="">Nenhum processo disponível</option>}
-          {opcoes.map((o) => <option key={o.id} value={o.id}>{o.rotulo}</option>)}
-        </select>
-      </Campo>
-    </Modal>
-  )
-}
-
-function RepactuarLoteModal({ n, onFechar, onEnviar }: { n: number; onFechar: () => void; onEnviar: (novoPrazoIso: string, justificativa: string) => Promise<{ ok: boolean; mensagem?: string }> }) {
-  const [data, setData] = useState("")
-  const [just, setJust] = useState("")
-  const [enviando, setEnviando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-  const valido = data !== "" && just.trim().length >= 5
-  const enviar = async () => {
-    setEnviando(true); setErro(null)
-    // Meio-dia UTC — nunca meia-noite, que vira o dia anterior no fuso operacional (mesma convenção do modal individual).
-    const r = await onEnviar(`${data}T12:00:00.000Z`, just.trim())
-    setEnviando(false)
-    if (!r.ok) setErro(r.mensagem ?? "Não foi possível repactuar.")
-  }
-  return (
-    <Modal titulo={`Repactuar prazo de ${n} tarefa(s)`} subtitulo="UMA justificativa para todas; cada tarefa grava a sua linha de auditoria." onFechar={onFechar} ocupado={enviando} rodape={<>
-      <button className="tor-btn" onClick={onFechar} disabled={enviando}>Cancelar</button>
-      <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !valido}>{enviando ? "Repactuando…" : "Repactuar prazo"}</button>
-    </>}>
-      <Campo rotulo="Novo prazo"><input type="date" className="tor-in w-full" value={data} onChange={(e) => setData(e.target.value)} /></Campo>
-      <Campo rotulo="Justificativa única (obrigatória)"><textarea className="tor-in w-full" rows={3} value={just} onChange={(e) => setJust(e.target.value)} /></Campo>
-      {erro && <div className="text-[12px] rounded-lg px-3 py-2 bg-[var(--danger-tile)] text-[var(--danger-text)]">{erro}</div>}
-    </Modal>
   )
 }

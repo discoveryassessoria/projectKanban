@@ -425,6 +425,33 @@ export async function transicionarPassoTx(
 }
 
 /**
+ * REGISTRA O INÍCIO DO TRABALHO — "Iniciou em", daqui para frente (Torre nova, Etapa A, 01/10/2026).
+ *
+ * Grava, SÓ SE ESTIVEREM VAZIOS, os três instantes de início de uma obrigação, sem tocar em status, lockVersion nem
+ * evento (não é transição — a transição continua nas portas acima):
+ *   • `PhaseWorkflowStepInstance.startedAt`   o início do passo;
+ *   • `StepExecution.startedAt`               o início da tentativa VIGENTE do passo (não cria tentativa nova);
+ *   • `Tarefa.dataInicio`                     o início da tarefa que aponta para este passo.
+ * O caminho "Iniciar" pelo motor de subtarefas (`iniciar-lote`, `iniciarEnvioDaTarefa`, qualquer 1ª entrega da subtarefa
+ * de entrada) conclui a subtarefa mas nunca movia o passo para EM_ANDAMENTO — por isso `startedAt` e `dataInicio` ficavam
+ * vazios (produção: 0/101 e 0/77). É idempotente: a 2ª chamada não muda nada, e o registro ANTIGO nunca é preenchido
+ * retroativamente (só quem passa por aqui, depois). Quem já está numa transação passa o `tx`.
+ */
+export async function registrarInicioDoTrabalhoTx(
+  tx: TX, stepInstanceId: number, quando: Date = new Date(),
+): Promise<{ passo: boolean; tentativa: boolean; tarefa: boolean }> {
+  const passo = await tx.phaseWorkflowStepInstance.updateMany({ where: { id: stepInstanceId, startedAt: null }, data: { startedAt: quando } })
+  const tentativa = await tx.stepExecution.updateMany({ where: { stepInstanceId, supersededAt: null, startedAt: null }, data: { startedAt: quando } })
+  const tarefa = await tx.tarefa.updateMany({ where: { workflowStepInstanceId: stepInstanceId, dataInicio: null }, data: { dataInicio: quando } })
+  return { passo: passo.count > 0, tentativa: tentativa.count > 0, tarefa: tarefa.count > 0 }
+}
+
+/** O mesmo registro de início, com a própria transação (para quem NÃO está numa). */
+export async function registrarInicioDoTrabalho(stepInstanceId: number, quando: Date = new Date()) {
+  return prisma.$transaction((tx) => registrarInicioDoTrabalhoTx(tx, stepInstanceId, quando), TX_OPTS)
+}
+
+/**
  * ATIVA A PRÓXIMA ETAPA EXECUTÁVEL — uma regra só, para as duas portas.
  *
  * Concluir um passo sem liberar o seguinte deixa o trabalho parado com tudo

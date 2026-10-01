@@ -66,6 +66,14 @@ model Usuario {
   // CAMADA OPERACIONAL — organização, aptidão, disponibilidade e capacidade.
   // Nenhuma delas concede permissão: autorização continua em Perfil/permissoesCustom.
   aptidoes                           AptidaoOperacional[]
+  /// APTIDÃO POR PAÍS (Torre nova, M3): "apto em Itália". Soma-se à aptidão por unidade de trabalho; nunca a substitui.
+  aptidoesPais                       AptidaoOperacionalPais[]       @relation("AptidaoPaisDoUsuario")
+  aptidoesPaisDefinidas              AptidaoOperacionalPais[]       @relation("AptidaoPaisAutor")
+  /// Metas de tempo por fase (Torre nova, M1) — só exibição.
+  metasTempoFase                     MetaTempoFase[]                @relation("MetaTempoFaseAutor")
+  /// Pausas de processo (Torre nova, M2) — append-only.
+  processoPausasFeitas               ProcessoPausa[]                @relation("ProcessoPausaAutor")
+  processoPausasRetomadas            ProcessoPausa[]                @relation("ProcessoPausaRetomadaPor")
   indisponibilidades                 IndisponibilidadeOperacional[] @relation("IndisponibilidadeDoUsuario")
   indisponibilidadesRegistradas      IndisponibilidadeOperacional[] @relation("IndisponibilidadeAutor")
   indisponibilidadesSucessorSugerido IndisponibilidadeOperacional[] @relation("IndisponibilidadeSucessorSugerido")
@@ -83,7 +91,8 @@ model Usuario {
   snapshotCambial_usuario                   SnapshotCambial[]                   @relation("SnapshotCambial_usuarioId")
   stepSubtaskDefinition_responsavel         StepSubtaskDefinition[]             @relation("StepSubtaskDefinition_responsavelId")
   subtaskExecution_responsavel              SubtaskExecution[]                  @relation("SubtaskExecution_responsavelId")
-  contatosTerceiroRegistrados               ContatoTerceiro[]
+  contatosTerceiroRegistrados               ContatoTerceiro[]                   @relation("ContatoTerceiroRegistradoPor")
+  contatosTerceiroEstornados                ContatoTerceiro[]                   @relation("ContatoTerceiroEstornadoPor")
 
   @@index([perfilId])
 }
@@ -591,6 +600,8 @@ model Processo {
   transacoes            Transacao[]                 @relation("transacoes")
   precosDoProcesso      TabelaValor[]               @relation("precosDoProcesso")
   obrigacoesEconomicas  ObrigacaoEconomica[]        @relation("obrigacoesEconomicas")
+  /// Pausas deste processo (Torre nova, M2): append-only; a vigente é a de `retomadoEm` nulo.
+  pausas                ProcessoPausa[]             @relation("PausasDoProcesso")
 
   @@index([arvoreId])
   @@index([familiaId])
@@ -3361,6 +3372,9 @@ model CatalogoPais {
   tiposDeProcesso        TipoProcessoNacionalidade[] @relation("TipoProcessoPais")
   modalidadePaisCanonico ModalidadePais[]            @relation("ModalidadePaisCanonico")
   orgaoPaisCanonico      OrgaoProtocolo[]            @relation("OrgaoPaisCanonico")
+  /// Torre nova (M1/M3): meta de tempo por fase e aptidão operacional por país.
+  metasTempoFase         MetaTempoFase[]             @relation("MetaTempoFasePais")
+  aptidoesOperacionais   AptidaoOperacionalPais[]    @relation("AptidaoPaisDoPais")
 }
 
 model ModalidadePais {
@@ -5686,12 +5700,23 @@ model ContatoTerceiro {
 
   /// Protegido pelo banco: ON DELETE SET NULL — quem registrou não trava a
   /// exclusão da própria conta.
-  registradoPor   Usuario? @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+  registradoPor   Usuario? @relation("ContatoTerceiroRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
   registradoPorId Int?
   /// QUANDO O CONTATO ACONTECEU — default agora, mas aceita registro
   /// retroativo (contato feito por telefone e só anotado depois). É o mesmo
   /// campo que já existia (`registradoEm`), não um `dataContato` duplicado.
   registradoEm    DateTime @default(now())
+
+  /// ESTORNO (Desfazer de "Registrar cobrança", Torre nova): o fato NÃO é apagado, é MARCADO. Leitor que conta cobrança
+  /// sem resposta/escalada/última cobrança ignora `estornadoEm != null`; o histórico exibe riscado.
+  estornadoEm                   DateTime?
+  estornadoPor                  Usuario?  @relation("ContatoTerceiroEstornadoPor", fields: [estornadoPorId], references: [id], onDelete: SetNull)
+  estornadoPorId                Int?
+  /// O estado da execução ANTES e DEPOIS desta cobrança: o estorno devolve o anterior e só vale se a execução ainda está como a cobrança a deixou.
+  antesProximoAcompanhamentoEm  DateTime?
+  antesEscalada                 Boolean?
+  antesEscaladaEm               DateTime?
+  depoisProximoAcompanhamentoEm DateTime?
 
   @@index([subtaskExecutionId])
   @@index([tarefaId])
@@ -6771,6 +6796,10 @@ model CategoriaOrganizacao {
   code         String                 @unique @db.VarChar(60)
   nome         String                 @db.VarChar(200)
   descricao    String?                @db.Text
+  /// "BOLA COM" (Torre nova, M5): quando uma tarefa espera uma organização desta categoria, com QUEM está a bola
+  /// (Cartório, Tradutor, Juízo, Consulado). É DADO de cadastro, nunca lista no código; `null` = a categoria não
+  /// diz — a Torre cai em "Cartório". Vocabulário fechado conferido na porta (`ROTULOS_DE_TERCEIRO`).
+  rotuloBola   String?                @db.VarChar(30)
   ordem        Int                    @default(0)
   ativo        Boolean                @default(true)
   criadoEm     DateTime               @default(now())
@@ -8805,10 +8834,73 @@ model TorreIndicadorDiario {
   backlogAbertas          Int
   backlogFechadasNaSemana Int
 
+  /// TORRE NOVA (M4) — totais da Visão geral para "vs semana passada". NULLABLE de propósito: foto antiga não
+  /// tem estes números e NUNCA é preenchida depois (sem tendência é "sem tendência", não estimativa).
+  processosAtivos Int?
+  tarefasAbertas  Int?
+  comEquipe       Int?
+  /// "Aguardando terceiros" do cartão (partição: COM responsável). Difere de `aguardandoTerceiro`, que conta com ou sem dono.
+  comCartorio     Int?
+
   criadoEm DateTime @default(now())
 
   @@unique([data])
   @@index([data])
+}
+
+/// META DE TEMPO POR FASE (e por país) — Torre nova (M1). SOMENTE EXIBIÇÃO: "tempo médio real × meta" e a cor
+/// do funil. NÃO é SLA, NÃO gera prazo, NÃO alimenta atraso, score nem notificação (o SLA de fase foi eliminado
+/// em 17/09/2026 e continua eliminado). `phaseKey` é chave solta validada contra o `CatalogoFase` na porta
+/// (sem relação: o Catálogo de Fases é módulo fechado). `paisId` nulo = meta padrão da fase.
+model MetaTempoFase {
+  id              Int           @id @default(autoincrement())
+  phaseKey        String        @db.VarChar(60)
+  paisId          Int?
+  pais            CatalogoPais? @relation("MetaTempoFasePais", fields: [paisId], references: [id], onDelete: Cascade)
+  metaDias        Int
+  ativo           Boolean       @default(true)
+  atualizadoPorId Int?
+  atualizadoPor   Usuario?      @relation("MetaTempoFaseAutor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  criadoEm        DateTime      @default(now())
+  atualizadoEm    DateTime      @updatedAt
+
+  @@unique([phaseKey, paisId])
+  @@index([phaseKey])
+}
+
+/// PAUSA DE PROCESSO — Torre nova (M2). APPEND-ONLY: pausar abre uma linha, reativar a FECHA (`retomadoEm`);
+/// nada é apagado. No máximo UMA pausa vigente por processo (índice parcial único, só no SQL). Efeito: o processo
+/// pausado sai das contagens/lista/Radar da Torre; a Operação não muda. Prazo de tarefa não pausa por isso.
+model ProcessoPausa {
+  id            Int       @id @default(autoincrement())
+  processoId    Int
+  processo      Processo  @relation("PausasDoProcesso", fields: [processoId], references: [id], onDelete: Cascade)
+  pausadoEm     DateTime  @default(now())
+  pausadoPorId  Int?
+  pausadoPor    Usuario?  @relation("ProcessoPausaAutor", fields: [pausadoPorId], references: [id], onDelete: SetNull)
+  motivo        String    @db.VarChar(300)
+  retomadoEm    DateTime?
+  retomadoPorId Int?
+  retomadoPor   Usuario?  @relation("ProcessoPausaRetomadaPor", fields: [retomadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([processoId, pausadoEm])
+}
+
+/// APTIDÃO OPERACIONAL POR PAÍS — Torre nova (M3): "apto em Itália". Mesma semântica opt-in de
+/// `AptidaoOperacional`: país sem nenhum apto declarado não restringe ninguém; com ao menos um, só os declarados
+/// passam — e, sem cadastro nenhum, a Torre diz "sem aptidão cadastrada" e NUNCA atribui sem aptidão comprovada.
+model AptidaoOperacionalPais {
+  id          Int          @id @default(autoincrement())
+  usuarioId   Int
+  usuario     Usuario      @relation("AptidaoPaisDoUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+  paisId      Int
+  pais        CatalogoPais @relation("AptidaoPaisDoPais", fields: [paisId], references: [id], onDelete: Cascade)
+  criadoPorId Int?
+  criadoPor   Usuario?     @relation("AptidaoPaisAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoEm    DateTime     @default(now())
+
+  @@unique([usuarioId, paisId])
+  @@index([paisId])
 }
 
 /// BASE NACIONAL DE CARTÓRIOS DE REGISTRO CIVIL — sincronizada automaticamente da

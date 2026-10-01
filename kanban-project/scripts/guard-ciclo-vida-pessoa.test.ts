@@ -111,6 +111,13 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/torre-nova-precisa-decisoes.test.ts":
+    "teste do Precisa de você (Torre nova): cria pessoas de marca própria na árvore de um processo " +
+    "do banco de teste efêmero para provar 'Sem responsável'/'Fase deixada' por processo — só o que o " +
+    "próprio teste criou, nenhuma pessoa real é removida",
+  "scripts/torre-relatorio-fase-passo-iniciou.test.ts":
+    "Relatório de controle (Torre nova): monta e derruba a PRÓPRIA pessoa/necessidade/documento (marca RELCTL), só no banco de teste, " +
+    "para provar as colunas Fase/Passo/Iniciou da certidão no motor de Relatórios — nenhuma pessoa real é removida",
   "scripts/verificador-integridade-emissao.test.ts":
     "verificador EMI-001..020 (Saúde do Sistema, fluxo Solicitar Certidão): monta e derruba " +
     "as PRÓPRIAS árvores/pessoas/documentos (marca EMIINTEG) só no banco de teste — nenhuma " +

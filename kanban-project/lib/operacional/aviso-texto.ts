@@ -14,6 +14,8 @@
 export type TipoAviso =
   | 'CHEGOU_TRABALHO' | 'PRECISA_AGIR' | 'MUDOU_DE_MAO'
   | 'ESCALADA' | 'SEM_RESPONSAVEL' | 'INTEGRIDADE' | 'FASE_CONCLUIDA'
+  /** Torre nova (H): alguém te mencionou (@) num comentário da família/tarefa. */
+  | 'MENCAO'
 
 export interface ResumoDoAviso {
   /** Ids das tarefas por categoria (PRECISA_AGIR, e as 3 primeiras também no gestor). */
@@ -27,6 +29,8 @@ export interface ResumoDoAviso {
   base?: { vencidas: number[]; cobrancas: number[] }
   /** Fatos que não são tarefa (fase concluída, alerta de integridade): chave estável de cada um. */
   itens?: string[]
+  /** MENCAO: quem mencionou por último e um trecho do comentário (o texto do aviso nasce daqui). */
+  ultima?: { autor: string; trecho: string }
 }
 
 export const FAMILIA_AVULSA = 'Tarefas avulsas'
@@ -85,6 +89,11 @@ export function textoDoAviso(
       return `${f} — ${q(n, 'alerta crítico de integridade', 'alertas críticos de integridade')}`
     case 'FASE_CONCLUIDA':
       return `${f} — ${q(n, 'fase concluída', 'fases concluídas')}`
+    case 'MENCAO': {
+      const u = d.resumo?.ultima
+      if (n <= 1 && u) return `${u.autor} mencionou você em ${f}: \u201c${u.trecho}\u201d`
+      return `${f} — ${q(n, 'menção a você', 'menções a você')}${u ? ` (a última de ${u.autor})` : ''}`
+    }
   }
 }
 

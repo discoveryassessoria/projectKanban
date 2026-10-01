@@ -182,7 +182,7 @@ export async function marcarNotificacaoComoLida(
 ): Promise<{ ok: true } | { ok: false; codigo: "NAO_ENCONTRADA" | "NAO_E_O_DESTINATARIO" }> {
   const n = await db.notificacaoOperacional.findUnique({
     where: { id: args.notificacaoId },
-    select: { id: true, destinatarioId: true, lidaEm: true },
+    select: { id: true, destinatarioId: true, lidaEm: true, tipo: true, processoId: true },
   })
   if (!n) return { ok: false, codigo: "NAO_ENCONTRADA" }
   // RBAC: só o próprio destinatário marca a sua notificação como lida — nunca
@@ -191,6 +191,8 @@ export async function marcarNotificacaoComoLida(
   if (n.lidaEm == null) {
     await db.notificacaoOperacional.update({ where: { id: n.id }, data: { lidaEm: new Date() } })
   }
+  // MENÇÃO (Torre nova, H): abrir/ler o aviso do sino marca as menções daquela família como lidas.
+  if (n.tipo === "MENCAO") await marcarMencoesDoProcessoComoLidas(db, { usuarioId: args.usuarioId, processoId: n.processoId })
   return { ok: true }
 }
 
@@ -252,9 +254,33 @@ export async function marcarAtribuicaoComoLidaAoProgredir(
 // fase ou histórico.
 // ============================================================================
 
-export const TIPOS_AVISO_OPERADOR = ["CHEGOU_TRABALHO", "PRECISA_AGIR", "MUDOU_DE_MAO"] as const
+export const TIPOS_AVISO_OPERADOR = ["CHEGOU_TRABALHO", "PRECISA_AGIR", "MUDOU_DE_MAO", "MENCAO"] as const
 export const TIPOS_AVISO_GESTOR = ["ESCALADA", "SEM_RESPONSAVEL", "INTEGRIDADE", "FASE_CONCLUIDA"] as const
 export const TIPOS_AVISO: readonly TipoAviso[] = [...TIPOS_AVISO_OPERADOR, ...TIPOS_AVISO_GESTOR]
+
+// ─── MENÇÃO (@) — Torre nova, frente H ───────────────────────────────────────
+// A menção entrega pelo MESMO sino agrupado (tipo MENCAO, um aviso aberto por (pessoa, família)); a leitura fecha o ciclo:
+// abrir o aviso (`marcarNotificacaoComoLida`), "marcar todas" ou abrir a página do processo (#comentarios →
+// PATCH /api/comentarios/mencoes { processoId }) marcam `ComentarioMencao.lidaEm` — o resumo diário só ressurge o que ainda não foi lido.
+
+/** Marca como lidas as menções do usuário que pertencem ao processo (comentário da família do processo ou de tarefa dele). `processoId` nulo = menções sem processo resolvível. */
+export async function marcarMencoesDoProcessoComoLidas(
+  db: Leitor, args: { usuarioId: number; processoId: number | null }, agora = new Date(),
+): Promise<{ quantidade: number }> {
+  const doProcesso: Prisma.ComentarioTarefaWhereInput = args.processoId != null
+    ? { OR: [{ tarefa: { processoId: args.processoId } }, { familia: { processos: { some: { id: args.processoId } } } }] }
+    : { OR: [{ tarefa: { processoId: null } }, { familia: { processos: { none: {} } } }] }
+  const r = await db.comentarioMencao.updateMany({
+    where: { usuarioId: args.usuarioId, lidaEm: null, comentario: doProcesso },
+    data: { lidaEm: agora },
+  })
+  // O aviso MENCAO daquela família deixa o sino junto (lido pela página ≡ lido pelo sino).
+  await db.notificacaoOperacional.updateMany({
+    where: { destinatarioId: args.usuarioId, tipo: "MENCAO", agrupado: true, lidaEm: null, processoId: args.processoId },
+    data: { lidaEm: agora },
+  })
+  return { quantidade: r.count }
+}
 
 /** Aviso não clicado expira em 7 dias. */
 export const VALIDADE_NAO_LIDO_DIAS = 7
@@ -302,6 +328,7 @@ function normalizarResumo(r: ResumoDoAviso | null | undefined): ResumoDoAviso | 
   if (r.modo) out.modo = r.modo
   if (r.base) out.base = { vencidas: ordenar(r.base.vencidas), cobrancas: ordenar(r.base.cobrancas) }
   if (r.itens) out.itens = [...new Set(r.itens)].sort()
+  if (r.ultima) out.ultima = r.ultima
   return out
 }
 
@@ -309,7 +336,7 @@ const chaveDeLinha = (dest: number, proc: number | null, tipo: string) =>
   `aviso::u${dest}::p${proc ?? 0}::${tipo}::${randomUUID()}`
 
 export interface FatoSomavel {
-  tipo: "CHEGOU_TRABALHO" | "MUDOU_DE_MAO" | "FASE_CONCLUIDA"
+  tipo: "CHEGOU_TRABALHO" | "MUDOU_DE_MAO" | "FASE_CONCLUIDA" | "MENCAO"
   destinatarioId: number
   /** A FAMÍLIA. Nulo = tarefa avulsa (sem processo). */
   processoId: number | null
@@ -320,6 +347,8 @@ export interface FatoSomavel {
   itens?: string[]
   autorId?: number | null
   link: string
+  /** MENCAO: quem mencionou por último + trecho (vira o texto do aviso). */
+  ultima?: { autor: string; trecho: string }
 }
 
 export interface ResultadoAviso {
@@ -352,12 +381,13 @@ export async function somarAoAviso(db: Leitor, f: FatoSomavel): Promise<Resultad
       if (contagem === aberto.contagem && ids.length === aberto.tarefaIds.length) {
         return { id: aberto.id, criado: false, contagem }
       }
+      const resumoNovo: ResumoDoAviso | null = itens.length ? { ...resumoAtual, itens, ...(f.ultima ? { ultima: f.ultima } : {}) } : null
       await tx.notificacaoOperacional.update({
         where: { id: aberto.id },
         data: {
           tarefaIds: ids, contagem,
-          resumo: (itens.length ? { ...resumoAtual, itens } : (aberto.resumo ?? undefined)) as Prisma.InputJsonValue | undefined,
-          titulo: textoDoAviso(f.tipo, f.familiaNome, { contagem }).slice(0, 200),
+          resumo: (resumoNovo ?? (aberto.resumo ?? undefined)) as Prisma.InputJsonValue | undefined,
+          titulo: textoDoAviso(f.tipo, f.familiaNome, { contagem, resumo: resumoNovo }).slice(0, 200),
           link: f.link, autorId: f.autorId ?? null, atualizadoEm: new Date(),
         },
       })
@@ -369,8 +399,8 @@ export async function somarAoAviso(db: Leitor, f: FatoSomavel): Promise<Resultad
       data: {
         tipo: f.tipo, destinatarioId: f.destinatarioId, processoId: f.processoId, tarefaId: null,
         agrupado: true, tarefaIds: novosIds, contagem,
-        resumo: (novosItens.length ? { itens: novosItens } : undefined) as Prisma.InputJsonValue | undefined,
-        titulo: textoDoAviso(f.tipo, f.familiaNome, { contagem }).slice(0, 200),
+        resumo: (novosItens.length ? { itens: novosItens, ...(f.ultima ? { ultima: f.ultima } : {}) } : undefined) as Prisma.InputJsonValue | undefined,
+        titulo: textoDoAviso(f.tipo, f.familiaNome, { contagem, resumo: f.ultima ? { ultima: f.ultima } : null }).slice(0, 200),
         link: f.link, autorId: f.autorId ?? null,
         chaveIdempotencia: chaveDeLinha(f.destinatarioId, f.processoId, f.tipo),
       },
@@ -466,6 +496,10 @@ export async function removerAviso(db: Leitor, id: number): Promise<void> {
  * (não expirados) do PRÓPRIO usuário.
  */
 export async function marcarTodasComoLidas(db: Leitor, usuarioId: number, agora = new Date()): Promise<{ quantidade: number }> {
+  const mencoes = await db.notificacaoOperacional.findMany({
+    where: { destinatarioId: usuarioId, agrupado: true, lidaEm: null, tipo: "MENCAO" }, select: { processoId: true },
+  })
+  for (const m of mencoes) await marcarMencoesDoProcessoComoLidas(db, { usuarioId, processoId: m.processoId }, agora)
   const r = await db.notificacaoOperacional.updateMany({
     where: {
       destinatarioId: usuarioId, agrupado: true, lidaEm: null,

@@ -190,7 +190,7 @@ export function deriveProcessStage(documentos: DocForStage[]): DerivedStage {
   if (semEmissao.length > 0) {
     return {
       stage: "EMISSAO_DOCUMENTAL",
-      reason: `${semEmissao.length} doc(s) aguardando cartório · ${c("SOLICITAR")} a solicitar · ${c("SOLICITADO")} solicitado(s)`,
+      reason: `${semEmissao.length} doc(s) aguardando terceiros · ${c("SOLICITAR")} a solicitar · ${c("SOLICITADO")} solicitado(s)`,
       countByStatus,
     }
   }

@@ -59,7 +59,7 @@ const ROTULO_STATUS_LINHA: Record<ColunaKanban, string> = {
   SEM_RESPONSAVEL: "Sem responsável",
   A_FAZER: "Atribuída",
   EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  AGUARDANDO_TERCEIRO: "Aguardando terceiros",
   BLOQUEADA: "Bloqueada",
   CONCLUIDA: "Concluída",
   CANCELADA: "Cancelada",

@@ -1,4 +1,5 @@
 import { OPCOES_DE_CAMPO } from "@/src/lib/requisitos/campos-canonicos"
+import { ROTULOS_DE_TERCEIRO } from "@/lib/operacional/torre-bola"
 // src/lib/gerenciamento/cadastros-registry.ts
 //
 // REGISTRO ÚNICO dos cadastros simples do Gerenciamento (26/07/2026).
@@ -18,6 +19,8 @@ export interface CampoSpec {
   obrigatorio?: boolean
   /** opções fixas do select (valor = rótulo quando string) */
   opcoes?: { valor: string; label: string }[]
+  /** Vocabulário FECHADO: a API recusa (400) valor fora de `opcoes` — o vazio continua valendo ("não diz"). */
+  fechado?: boolean
   /** select/multiselect alimentado por outra fonte (ver FONTES) */
   fonte?: string
   ajuda?: string
@@ -190,6 +193,13 @@ export const CADASTROS: Record<string, CadastroSpec> = {
       {
         key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia",
         ajuda: "O que esta categoria agrupa no Catálogo de Serviços.",
+      },
+      {
+        // TORRE NOVA (M5): "BOLA COM" — quando uma tarefa espera uma organização desta categoria, com QUEM a Torre diz que está a bola.
+        // É dado de cadastro (nunca lista no código): em branco, a Torre cai em "Cartório".
+        key: "rotuloBola", label: "Bola com (Torre de Controle)", tipo: "select", fechado: true, largura: "meia",
+        opcoes: ROTULOS_DE_TERCEIRO.map((v) => ({ valor: v, label: v })),
+        ajuda: "Quando uma tarefa espera uma organização desta categoria, a Torre mostra a bola com este rótulo. Em branco: Cartório.",
       },
       ...CAMPOS_BASE,
     ],

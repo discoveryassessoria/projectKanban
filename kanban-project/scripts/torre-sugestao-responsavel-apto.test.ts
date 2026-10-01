@@ -6,7 +6,7 @@
 // 0 ativa(s)" — o administrador aparecia só por ter carga zero (a permissão dele vem do tipo, não de executar
 // aquele trabalho). Regra agora:
 //   • há aptos (aptidão da unidade de trabalho ou equipe exigida existente) → o apto de MENOR carga;
-//   • ninguém tem aptidão cadastrada → FALLBACK explícito ("Ninguém com aptidão cadastrada para esta tarefa;
+//   • ninguém tem aptidão cadastrada → FALLBACK explícito ("Sem aptidão cadastrada para esta tarefa;
 //     sugiro X por menor carga"), nunca administrador; sem quem execute → sem sugestão;
 //   • ausente vai para o sucessor sugerido — se o sucessor também for apto e estiver disponível.
 //
@@ -35,7 +35,7 @@ type U = ContextoDeSugestao["usuarios"][number]
 const EXEC = { "tarefas.iniciar_concluir": true }
 const usuario = (id: number, nome: string, tipo = "assistente", permissoesCustom: unknown = EXEC): U => ({ id, nome, tipo, permissoesCustom, perfil: null })
 const org = (id: number, nome: string, o: { aptidoes?: number[]; ausenteCom?: number | null } = {}) => ({
-  usuarioId: id, nome, equipes: [], aptidoes: o.aptidoes ?? [], aptidoesDetalhadas: [],
+  usuarioId: id, nome, equipes: [], aptidoes: o.aptidoes ?? [], aptidoesDetalhadas: [], paisesAptos: [], paisesAptosDetalhados: [],
   indisponivelPor: o.ausenteCom === undefined ? null
     : { id: 1, tipo: "FERIAS" as const, inicio: "", fim: null, motivo: null, sucessorSugerido: o.ausenteCom == null ? null : { usuarioId: o.ausenteCom, nome: `U${o.ausenteCom}` } },
   indisponibilidades: [], limiteExecutaveis: null, observacaoCapacidade: null,
@@ -79,7 +79,7 @@ async function main() {
     const s = escolherResponsavel(ctxFb, a)
     ok(`${rot}: sugere o de menor carga entre quem executa (Beto), marcado como fallback`, s?.usuarioId === 3 && s.fallback === true, JSON.stringify(s))
     ok(`${rot}: o administrador (carga 0) não é sugerido`, s?.usuarioId !== 1)
-    ok(`${rot}: o texto diz que é fallback`, textoDaSugestao(s) === "Ninguém com aptidão cadastrada para esta tarefa; sugiro Beto por menor carga (1 ativa(s)).", textoDaSugestao(s))
+    ok(`${rot}: o texto diz que é fallback`, textoDaSugestao(s) === "Sem aptidão cadastrada para esta tarefa; sugiro Beto por menor carga (1 ativa(s)).", textoDaSugestao(s))
   }
   const soAdmin = contexto({ usuarios: [admin] })
   ok("só há o administrador → sem sugestão (nem fallback é seguro)", escolherResponsavel(soAdmin, alvo(null)) === null)
@@ -159,7 +159,7 @@ async function main() {
     })
     const lista = await comSugestoes([item(comUnidade.id), item(semUnidade.id)])
     ok("comSugestoes: apto → 'Sugiro <apto>: … apto a <unidade>'", new RegExp(`^Sugiro ${MARCA}Apto: 3 ativa\\(s\\), apto a ${MARCA}Espanha$`).test(lista[0].sugestao ?? ""), lista[0].sugestao ?? "")
-    ok("comSugestoes: sem aptidão → mensagem de fallback explícita", /^Ninguém com aptidão cadastrada para esta tarefa; sugiro .+ por menor carga \(\d+ ativa\(s\)\)\.$/.test(lista[1].sugestao ?? ""), lista[1].sugestao ?? "")
+    ok("comSugestoes: sem aptidão → mensagem de fallback explícita", /^Sem aptidão cadastrada para esta tarefa; sugiro .+ por menor carga \(\d+ ativa\(s\)\)\.$/.test(lista[1].sugestao ?? ""), lista[1].sugestao ?? "")
     ok("comSugestoes iguala a sugestão por item (mesma regra, uma leitura só)", lista[0].contexto.sugeridoId === sApto2?.usuarioId && lista[1].contexto.sugeridoId === (await sugerirResponsavelPrecisaDeVoce(semUnidade.id))?.usuarioId)
 
     // (d) ausente com sucessor NÃO apto: o sucessor é ignorado.

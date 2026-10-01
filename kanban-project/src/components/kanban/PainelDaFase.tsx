@@ -690,7 +690,7 @@ function IndiceView({
         <option value="ATIVAS">Só ativas</option>
         <option value="A_FAZER">A fazer</option>
         <option value="EM_ANDAMENTO">Em andamento</option>
-        <option value="AGUARDANDO_TERCEIRO">Aguardando terceiro</option>
+        <option value="AGUARDANDO_TERCEIRO">Aguardando terceiros</option>
         <option value="BLOQUEADA">Bloqueada</option>
         <option value="CONCLUIDA">Concluída</option>
         <option value="CANCELADA">Cancelada</option>

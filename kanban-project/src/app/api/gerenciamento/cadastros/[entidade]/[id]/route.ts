@@ -9,7 +9,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { CADASTROS } from '@/src/lib/gerenciamento/cadastros-registry'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { normalizarNome, chaveSemantica } from '@/lib/gerenciamento/cadastro-identidade'
-import { dadosDaSpec } from '../route'
+import { dadosDaSpec, campoForaDoVocabulario } from '../route'
 
 type Delegate = {
   findMany: (args?: Record<string, unknown>) => Promise<Record<string, unknown>[]>
@@ -52,6 +52,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    const foraDoVocabulario = campoForaDoVocabulario(cfg, body)
+    if (foraDoVocabulario) return NextResponse.json({ error: `Valor inválido em "${foraDoVocabulario}".` }, { status: 400 })
     const data = dadosDaSpec(cfg, body, false)
     const registro = Object.keys(data).length ? await db[cfg.model].update({ where: { id }, data }) : atual
     if (cfg.auditoria && Object.keys(data).length) {

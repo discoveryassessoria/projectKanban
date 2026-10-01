@@ -20,9 +20,9 @@ import { prisma } from "../lib/prisma"
 import { montarCenario } from "./_fixture-torre-gh"
 import { definirAptidoes, definirCapacidade } from "../lib/operacional/organizacao"
 import {
-  montarPrecisaDeVoce, itensPrecisaDeVoce, sugerirResponsavelPrecisaDeVoce, textoDaSugestao, briefingDoDia,
-  type ItemPrecisaDeVoceTorre,
+  montarPrecisaDeVoce, sugerirResponsavelPrecisaDeVoce, carregarContextoDeSugestao, sugestaoParaTexto,
 } from "../lib/operacional/precisa-de-voce"
+import { planoDoSemDono, textosDoSemDono } from "../lib/operacional/precisa-de-voce-decisoes"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -34,24 +34,23 @@ const secao = (t: string) => console.log(`\n${t}`)
 const MARCA = "TORRE_PDV_LOTE"
 const DIA = 86_400_000
 
-/** O caminho "de sempre": a lista e, para cada item que pede sugestão, uma chamada pública à regra. */
-async function itemAItem(agora: Date) {
-  const brutos = await itensPrecisaDeVoce({ agora })
-  const itens: ItemPrecisaDeVoceTorre[] = []
-  for (const it of brutos) {
-    if ((it.tipo === "FASE_DEIXADA" || it.tipo === "SEM_DONO") && it.tarefaId != null) {
-      const s = await sugerirResponsavelPrecisaDeVoce(it.tarefaId, agora)
-      itens.push({
-        ...it, sugestao: textoDaSugestao(s),
-        acao1: { ...it.acao1, rotulo: s ? `Atribuir a ${s.nome}` : it.acao1.rotulo },
-        contexto: { ...it.contexto, sugeridoId: s?.usuarioId ?? null, sugeridoNome: s?.nome ?? null },
-      })
-    } else itens.push(it)
+/**
+ * O caminho "de sempre": para cada decisão "Sem responsável" (um item por PROCESSO), a sugestão de CADA certidão pela função pública
+ * (uma chamada por tarefa, refazendo as leituras) e o plano/texto remontados pelas mesmas funções puras. Tudo o mais é copiado.
+ */
+async function itemAItem(agora: Date, lote: Awaited<ReturnType<typeof montarPrecisaDeVoce>>) {
+  const ctx = await carregarContextoDeSugestao(agora)
+  const itens = []
+  for (const it of lote.itens) {
+    if (it.tipo !== "SEM_DONO") { itens.push(it); continue }
+    const ids = it.contexto.tarefaIds as number[]
+    const sugestoes = []
+    for (const id of ids) sugestoes.push({ taskId: id, sugestao: sugestaoParaTexto(ctx, await sugerirResponsavelPrecisaDeVoce(id, agora)) })
+    const plano = planoDoSemDono(sugestoes)
+    const t = textosDoSemDono({ familia: it.familiaNome ?? "", pais: null, faseLabel: null, entrouNaFase: null, agora, total: ids.length, plano })
+    itens.push({ ...it, __plano: plano, __sugestao: t.sugestao, __acao1: t.acao1.rotulo })
   }
-  return {
-    itens, briefing: briefingDoDia(itens, agora),
-    resumo: { total: itens.length, criticos: itens.filter((i) => i.faixa === "CRITICO").length, atencao: itens.filter((i) => i.faixa === "ATENCAO").length },
-  }
+  return itens
 }
 
 async function main() {
@@ -76,18 +75,20 @@ async function main() {
     const bloq = await c.novaObrigacao({ responsavelId: ana.id })
     await prisma.tarefa.update({ where: { id: bloq.tarefaId }, data: { statusTarefa: "BLOQUEADA" } })
 
-    secao("LOTE × ITEM A ITEM — o mesmo instante, o mesmo banco, o mesmo JSON")
+    secao("LOTE × ITEM A ITEM — o mesmo instante, o mesmo banco, a mesma sugestão por certidão")
     const agora = new Date()
     const lote = await montarPrecisaDeVoce(agora)
-    const item = await itemAItem(agora)
+    const item = await itemAItem(agora, lote)
     const tipos = [...new Set(lote.itens.map((i) => i.tipo))].sort().join(",")
-    ok("o cenário produz itens que pedem sugestão E outros tipos (não é comparação vazia)", lote.itens.some((i) => i.tipo === "SEM_DONO") && lote.itens.length >= 4, `${lote.itens.length} itens: ${tipos}`)
-    ok("itens idênticos, na mesma ordem", isDeepStrictEqual(lote.itens, item.itens))
-    ok("briefing e resumo idênticos", lote.briefing === item.briefing && isDeepStrictEqual(lote.resumo, item.resumo))
-    ok("a resposta inteira é deep-equal", isDeepStrictEqual(JSON.parse(JSON.stringify(lote)), JSON.parse(JSON.stringify(item))))
-    const sd = lote.itens.find((i) => i.tipo === "SEM_DONO" && i.tarefaId === semDonoA.tarefaId)
-    ok("a tarefa com unidade de trabalho e a apta cadastrada: sugestão = a Ana (apta), com a unidade no motivo", sd?.contexto.sugeridoId === ana.id && /apto a/.test(sd.sugestao ?? ""), sd?.sugestao ?? "")
+    ok("o cenário produz Sem responsável E outros tipos (não é comparação vazia)", lote.itens.some((i) => i.tipo === "SEM_DONO") && lote.itens.length >= 4, `${lote.itens.length} itens: ${tipos}`)
+    const semDono = lote.itens.filter((i) => i.tipo === "SEM_DONO")
+    const comRemontagem = item as Array<(typeof item)[number] & { __plano?: unknown; __sugestao?: string; __acao1?: string }>
+    ok("o PLANO de atribuição do lote é idêntico ao montado certidão por certidão", comRemontagem.every((x) => x.tipo !== "SEM_DONO" || isDeepStrictEqual(x.contexto.plano, x.__plano)), `${semDono.length} processos`)
+    ok("a sugestão e o rótulo do botão 1 do lote são IDÊNTICOS aos do item a item", comRemontagem.every((x) => x.tipo !== "SEM_DONO" || (x.sugestao === x.__sugestao && x.acao1.rotulo === x.__acao1)))
+    const sd = lote.itens.find((i) => i.tipo === "SEM_DONO" && (i.contexto.tarefaIds as number[]).includes(semDonoA.tarefaId))
+    ok("a certidão com unidade de trabalho e a apta cadastrada: a sugestão é a Ana (apta), com a aptidão no texto", sd?.contexto.sugeridoId === ana.id && /apto a/.test(sd.sugestao ?? ""), sd?.sugestao ?? "")
     ok("o administrador não é sugerido em nenhum item", lote.itens.every((i) => i.contexto.sugeridoNome == null || !/admin/i.test(String(i.contexto.sugeridoNome))))
+    ok("a resposta inteira é serializável e o resumo fecha com a lista", JSON.stringify(lote).length > 0 && lote.resumo.total === lote.itens.length)
   } finally {
     await prisma.tarefa.deleteMany({ where: { titulo: { startsWith: MARCA } } })
     await prisma.aptidaoOperacional.deleteMany({ where: { perfilOperacional: { code: { startsWith: MARCA } } } })

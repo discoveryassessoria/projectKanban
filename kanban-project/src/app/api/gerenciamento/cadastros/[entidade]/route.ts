@@ -49,6 +49,20 @@ export function dadosDaSpec(cfg: CadastroSpec, body: Record<string, unknown>, cr
   return data
 }
 
+/**
+ * VOCABULÁRIO FECHADO (campo `fechado` do registro): devolve o rótulo do primeiro campo cujo valor enviado não está em `opcoes`
+ * (o vazio é aceito — "não diz"), ou `null`. Hoje só `rotuloBola` de Categorias de Organização usa; os demais campos não mudam.
+ */
+export function campoForaDoVocabulario(cfg: CadastroSpec, body: Record<string, unknown>): string | null {
+  for (const c of cfg.campos) {
+    if (!c.fechado || !(c.key in body)) continue
+    const v = body[c.key]
+    if (v === '' || v == null) continue
+    if (!(c.opcoes ?? []).some((o) => o.valor === String(v))) return c.label
+  }
+  return null
+}
+
 /** opções dos selects/multiselects que vêm de outra tabela (id + rótulo apenas). */
 async function carregarFontes(cfg: CadastroSpec) {
   const usadas = [...new Set(cfg.campos.map((c) => c.fonte).filter((f): f is string => !!f))]
@@ -110,6 +124,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: `Informe ${c.label.toLowerCase()}.` }, { status: 400 })
       }
     }
+    const foraDoVocabulario = campoForaDoVocabulario(cfg, body)
+    if (foraDoVocabulario) return NextResponse.json({ error: `Valor inválido em "${foraDoVocabulario}".` }, { status: 400 })
     const data = dadosDaSpec(cfg, body, true)
 
     // Registros existentes: base para duplicidade, código único e próxima posição.

@@ -200,7 +200,7 @@ function iniciaisDe(nome: string): string {
 function textoDaSituacao(l: LinhaOperacional): string {
   if (l.requerDecisao) return "Requer decisão"
   if (l.coluna === "AGUARDANDO_TERCEIRO") {
-    return l.esperandoDe === "cliente" ? "Aguardando o cliente" : `Aguardando ${l.terceiroNome ?? "terceiro"}`
+    return l.esperandoDe === "cliente" ? "Aguardando o cliente" : "Aguardando terceiros"
   }
   if (l.coluna === "BLOQUEADA") return l.motivoBloqueio ? `Bloqueada — ${l.motivoBloqueio}` : "Bloqueada"
   if (l.coluna === "A_FAZER") return "Ação necessária"

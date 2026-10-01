@@ -5,7 +5,7 @@
 //   npx tsx scripts/torre-topo-e-abas-movidas.test.ts   (banco de teste)
 //
 // PROVA:
-//   1.1/1.5/1.6  abas antigas → destino no Gerenciamento; a Torre fica com 6 abas; Regras/Integridade/Auditoria são sub-abas da Saúde;
+//   1.1/1.5/1.6  abas antigas → destino no Gerenciamento; a Torre fica com 7 abas (Visão geral na frente); Regras/Integridade/Auditoria são sub-abas da Saúde;
 //   1.2          Auditoria: mapa único SISTEMA × PROCESSO/TAREFA, padrão Sistema, filtros e CSV na mesma consulta;
 //   1.3          o "Precisa de você" não produz mais achado de cadastro (PAREDE_A_FRENTE);
 //   1.1          as portas de Regras/Integridade valem para quem tem usuarios.gerenciar (sem exigir ser gestor da Torre);
@@ -24,8 +24,9 @@ import {
   KPIS, KPI_POR_CHAVE, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, CAMPO_DA_FOTO, PREDICADO_DO_KPI, linhasDoKpi, numeroDoKpi, situacaoDaTarefa, diasAtePrazo,
   type LinhaParaKpi,
 } from "../lib/operacional/torre-kpis"
-import { topoDaTorre, fraseDoDia, distribuicaoPorFase, type LinhaParaTopo } from "../lib/operacional/torre-topo"
+import { topoDaTorre, fraseDoDia, textoDaFrase, distribuicaoPorPais, type LinhaParaTopo } from "../lib/operacional/torre-topo"
 import { destinoDaAbaAntigaDaTorre, urlDaSaudeDoSistema, SUB_ABAS_DA_SAUDE } from "../lib/operacional/navegacao"
+import { ABAS_DA_TORRE } from "../lib/operacional/torre-abas"
 import { ACOES_DE_SISTEMA, NATUREZA_DA_ACAO, consultarAuditoria, csvDaAuditoria, filtroDaQuery } from "../lib/operacional/torre-auditoria"
 import { itensPrecisaDeVoce } from "../lib/operacional/precisa-de-voce"
 import { listarTarefasDaTorre } from "../src/services/torre-tarefas"
@@ -66,7 +67,7 @@ async function main() {
     L(prazo("2026-10-07T12:00:00Z")),   // +7 → próximos 7 dias (limite inclusive)
     L(prazo("2026-10-08T12:00:00Z")),   // +8 → fora de tudo
     L({ dataPrazo: null }),             // sem prazo
-    L({ dataPrazo: null, estadoOperacao: "AGUARDANDO", responsavelId: 7 }), // sem prazo, com o cartório
+    L({ dataPrazo: null, estadoOperacao: "AGUARDANDO", responsavelId: 7 }), // sem prazo, aguardando terceiros
   ]
   const n = (k: Parameters<typeof numeroDoKpi>[0]) => numeroDoKpi(k, linhas, AGORA)
   ok("dias até o prazo: hoje 0, amanhã 1, ontem −1, sem prazo null", diasAtePrazo(linhas[2], AGORA) === 0 && diasAtePrazo(linhas[4], AGORA) === 1 && diasAtePrazo(linhas[0], AGORA) === -1 && diasAtePrazo(linhas[8], AGORA) === null)
@@ -75,7 +76,7 @@ async function main() {
   ok("Amanhã = 1", n("amanha") === 1)
   ok("Próximos 7 dias = 2 (+2 e +7; SEM hoje/amanhã; +8 fora)", n("prox7") === 2)
   ok("Sem prazo = 2", n("sprazo") === 2)
-  ok("o prazo NÃO pausa por terceiro: tarefa com o cartório e prazo vencido continua Atrasada", numeroDoKpi("venc", [L({ ...prazo("2026-09-20T12:00:00Z"), estadoOperacao: "AGUARDANDO" })], AGORA) === 1)
+  ok("o prazo NÃO pausa por terceiro: tarefa aguardando terceiros e prazo vencido continua Atrasada", numeroDoKpi("venc", [L({ ...prazo("2026-09-20T12:00:00Z"), estadoOperacao: "AGUARDANDO" })], AGORA) === 1)
   ok("hoje, amanhã, próximos 7 e atrasadas nunca se repetem (prazos disjuntos)", CARTOES_DA_AGENDA.filter((k) => ["venc", "hoje", "amanha", "prox7"].includes(k)).every((k, i, a) => a.slice(i + 1).every((j) => !linhas.some((l) => PREDICADO_DO_KPI[k]!(l, AGORA) && PREDICADO_DO_KPI[j]!(l, AGORA)))))
   ok("os mesmos prazos com outro 'agora' dão outra agenda (a data é injetada, não o relógio)", numeroDoKpi("hoje", linhas, new Date("2026-10-01T15:00:00Z")) === 1 && numeroDoKpi("venc", linhas, new Date("2026-10-01T15:00:00Z")) === 4)
 
@@ -87,53 +88,49 @@ async function main() {
     L({ responsavelId: 7, estadoOperacao: "FILA" }),                  // equipe
     L({ responsavelId: 8, statusTarefa: "EM_ANDAMENTO" }),            // equipe
   ]
-  ok("sem responsável E aguardando → 'Sem ninguém' (precedência: ninguém > cartório > equipe)", situacaoDaTarefa(part[1]) === "ninguem")
-  ok("Sem ninguém=2 · Com o cartório=1 · Com a equipe=2", numeroDoKpi("ninguem", part, AGORA) === 2 && numeroDoKpi("cartorio", part, AGORA) === 1 && numeroDoKpi("equipe", part, AGORA) === 2)
+  ok("sem responsável E aguardando → 'Sem responsável' (precedência: sem responsável > aguardando terceiros > equipe)", situacaoDaTarefa(part[1]) === "ninguem")
+  ok("Sem responsável=2 · Aguardando terceiros=1 · Com a equipe=2", numeroDoKpi("ninguem", part, AGORA) === 2 && numeroDoKpi("cartorio", part, AGORA) === 1 && numeroDoKpi("equipe", part, AGORA) === 2)
   ok("os TRÊS somam 'Tarefas abertas' (partição exata)", numeroDoKpi("ninguem", part, AGORA) + numeroDoKpi("cartorio", part, AGORA) + numeroDoKpi("equipe", part, AGORA) === numeroDoKpi("abertas", part, AGORA))
   ok("cada tarefa cai em UM e só um dos três", part.every((l) => ["ninguem", "cartorio", "equipe"].filter((k) => PREDICADO_DO_KPI[k as "ninguem"]!(l, AGORA)).length === 1))
-  ok("'Sem ninguém' é a MESMA conta do antigo 'Sem responsável' (foto E10 comparável)", part.every((l) => PREDICADO_DO_KPI.ninguem!(l, AGORA) === PREDICADO_DO_KPI.semdono!(l, AGORA)))
+  ok("'Sem responsável' (cartão) é a MESMA conta do antigo `semdono` (foto E10 comparável)", part.every((l) => PREDICADO_DO_KPI.ninguem!(l, AGORA) === PREDICADO_DO_KPI.semdono!(l, AGORA)))
 
   secao("2.5/2.x — REGRA escrita de cada indicador e tendência só onde a definição é a da foto")
   ok("todo cartão do topo tem rótulo e REGRA escrita", [...CARTOES_DA_SITUACAO, ...CARTOES_DA_AGENDA, "risco" as const].every((k) => KPI_POR_CHAVE[k].rotulo.length > 0 && KPI_POR_CHAVE[k].regra.length > 20))
   ok("toda chave de KPI tem predicado (exceto risco/back, que são por processo/agregado)", KPIS.filter((k) => k.chave !== "risco" && k.chave !== "back").every((k) => typeof PREDICADO_DO_KPI[k.chave] === "function"))
-  ok("tendência: só venc, ninguem, cob e risco (definição igual à da foto); cartório (só com dono), equipe, abertas e a agenda nova NÃO", CAMPO_DA_FOTO.venc === "vencidas" && CAMPO_DA_FOTO.ninguem === "semDono" && CAMPO_DA_FOTO.cob === "cobrancasPendentes" && CAMPO_DA_FOTO.risco === "emRisco" && !CAMPO_DA_FOTO.cartorio && !CAMPO_DA_FOTO.equipe && !CAMPO_DA_FOTO.abertas && !CAMPO_DA_FOTO.hoje && !CAMPO_DA_FOTO.prox7)
+  ok("tendência: venc, ninguem, cob e risco (definição igual à da foto antiga) + abertas, equipe e cartorio (colunas novas da M4, MESMA definição do cartão); a agenda nova (hoje/prox7…) NÃO", CAMPO_DA_FOTO.venc === "vencidas" && CAMPO_DA_FOTO.ninguem === "semDono" && CAMPO_DA_FOTO.cob === "cobrancasPendentes" && CAMPO_DA_FOTO.risco === "emRisco" && CAMPO_DA_FOTO.cartorio === "comCartorio" && CAMPO_DA_FOTO.equipe === "comEquipe" && CAMPO_DA_FOTO.abertas === "tarefasAbertas" && !CAMPO_DA_FOTO.hoje && !CAMPO_DA_FOTO.prox7)
   const kp = ler("src/components/torre/TorreKpis.tsx")
   ok("nenhum cartão escreve 'sem histórico' nem 'tendência só no total'", !/sem histórico|tendência só no total/i.test(kp))
   ok("cada cartão clica e filtra com o mesmo predicado (Torre.tsx usa linhasDoKpi; a aba Tarefas usa linhasDoKpi)", /linhasDoKpi\(kpi, linhasPais, agora\)/.test(ler("src/components/torre/Torre.tsx")) && /linhasDoKpi\(kpi, linhas, agora\)/.test(ler("src/components/torre/TorreTarefas.tsx")) && /numeroDoKpi\(k, linhas, agora\)/.test(kp))
-  ok("as visões 'Vencidas', 'Sem responsável' e 'Com o cartório' da aba Tarefas usam os predicados dos cartões", /PREDICADO_DO_KPI\.venc!/.test(ler("src/components/torre/TorreTarefas.tsx")) && /PREDICADO_DO_KPI\.ninguem!/.test(ler("src/components/torre/TorreTarefas.tsx")) && /PREDICADO_DO_KPI\.cartorio!/.test(ler("src/components/torre/TorreTarefas.tsx")))
+  ok("as visões 'Vencidas', 'Sem responsável' e 'Aguardando terceiros' da aba Tarefas usam os predicados dos cartões", /PREDICADO_DO_KPI\.venc!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.ninguem!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.cartorio!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /predicadoDaVisao\(visao/.test(ler("src/components/torre/TorreTarefas.tsx")))
 
-  secao("2.1 — a FRASE fixa (plural, famílias, data no fuso de SP)")
-  const a = (o: Partial<LinhaParaTopo>) => L({ aIniciar: true, ...o })
-  const f1 = fraseDoDia([a({ familiaNome: "Santin" })], AGORA)
-  ok("1 certidão: singular e uma família", f1 === "Hoje, 30 de setembro: 1 certidão para iniciar (Santin), 0 atrasadas, 0 com o cartório, 0 sem responsável.", f1)
-  const f2 = fraseDoDia([a({ familiaNome: "Santin" }), a({ familiaNome: "Brait" }), a({ familiaNome: "Santin", responsavelId: null, dataPrazo: "2026-09-20T12:00:00Z", estadoOperacao: "AGUARDANDO" })], AGORA)
-  ok("3 certidões, 2 famílias em ordem alfabética com 'e'; 1 atrasada; 1 sem responsável (aguardando+sem dono = sem responsável)", f2 === "Hoje, 30 de setembro: 3 certidões para iniciar (Brait e Santin), 1 atrasada, 0 com o cartório, 1 sem responsável.", f2)
-  const f3 = fraseDoDia(["A", "B", "C", "D", "E"].map((x) => a({ familiaNome: `Fam ${x}` })), AGORA)
-  ok("muitas famílias → 'N famílias'", f3.includes("5 certidões para iniciar (5 famílias)"), f3)
-  const f0 = fraseDoDia([L()], AGORA)
-  ok("nada a iniciar → sem parênteses", f0 === "Hoje, 30 de setembro: 0 certidões para iniciar, 0 atrasadas, 0 com o cartório, 0 sem responsável.", f0)
-  ok("tarefa em andamento sem dono NÃO é 'a iniciar' (mesma regra da Operação)", fraseDoDia([a({ statusTarefa: "EM_ANDAMENTO", responsavelId: null })], AGORA).includes("0 certidões para iniciar"))
-  const t = topoDaTorre(part, [{ risco: "critico", faseAtual: { label: "Genealogia" } }, { risco: "ok", faseAtual: { label: "Emissão" } }], AGORA)
-  ok("os números da frase são os dos cartões", t.frase.includes(`${t.situacao.find((c) => c.chave === "cartorio")!.valor} com o cartório`) && t.frase.includes(`${t.situacao.find((c) => c.chave === "ninguem")!.valor} sem responsável`))
-  ok("Processos ativos: total, distribuição por fase e 'N em risco' (crítico)", t.processosAtivos.total === 2 && t.processosAtivos.distribuicao === "2 · Emissão 1 · Genealogia 1" && t.processosAtivos.emRisco === 1, t.processosAtivos.distribuicao)
-  ok("distribuição sem fase", distribuicaoPorFase([{ risco: "ok", faseAtual: { label: null } }]) === "1 · Sem fase 1")
+  secao("2.1 — a FRASE do dia (Torre nova: processos ativos, no ritmo, decisões por tipo, gargalo)")
+  const dec = (tipo: string, n: number) => Array.from({ length: n }, () => ({ tipo }))
+  const f1 = textoDaFrase(fraseDoDia({ processos: 2, noRitmo: 1, decisoes: [...dec("SEM_DONO", 2), ...dec("CARGA", 1)], gargalo: null }))
+  ok("frase com decisões: 'Hoje: 2 processos ativos, 1 andando no ritmo. 3 decisões precisam de você: 2 sem dono, 1 de carga da equipe.'", f1 === "Hoje: 2 processos ativos, 1 andando no ritmo. 3 decisões precisam de você: 2 sem dono, 1 de carga da equipe.", f1)
+  ok("sem decisão e sem gargalo", textoDaFrase(fraseDoDia({ processos: 0, noRitmo: 0, decisoes: [], gargalo: null })) === "Hoje: 0 processos ativos, 0 andando no ritmo. Nenhuma decisão precisa de você.")
+  const t = topoDaTorre(part, [{ risco: "critico", pais: "Itália", faseAtual: { label: "Genealogia" } }, { risco: "ok", pais: "Espanha", faseAtual: { label: "Emissão" } }], AGORA)
+  ok("Processos ativos: total, distribuição por PAÍS e 'N em risco' (crítico)", t.processosAtivos.total === 2 && t.processosAtivos.distribuicao === "Espanha 1 · Itália 1" && t.processosAtivos.emRisco === 1, t.processosAtivos.distribuicao)
+  ok("distribuição sem país", distribuicaoPorPais([{ pais: null }]) === "Sem país 1")
 
   secao("2.5 — backlog vai para a aba Processos; 'Escaladas pra mim' e Backlog saem do topo")
-  ok("TorreProcessos mostra 'Semana: N abertas · N fechadas'", /Semana: \{backlog\.abertas\} abertas · \{backlog\.fechadas\} fechadas/.test(ler("src/components/torre/TorreProcessos.tsx")))
+  // Torre nova: o protótipo mostra a linha da semana na Visão geral (TorreFunil), não na aba Processos (que agora é por fase).
+  ok("a linha 'Semana: …' mora na Visão geral (funil) e a aba Processos, por fase, não a repete", /Semana:/.test(ler("src/components/torre/TorreFunil.tsx")) && !/Semana:/.test(ler("src/components/torre/TorreProcessos.tsx")))
   ok("o topo não tem mais 'Escaladas pra mim' nem 'Backlog'", !CARTOES_DA_SITUACAO.concat(CARTOES_DA_AGENDA).some((k) => k === "esc" || k === "back"))
 
   // ═══════════ SEÇÃO 1 — abas movidas ═══════════
-  secao("1.5/1.6 — a Torre tem 6 abas; as antigas redirecionam para o Gerenciamento")
+  secao("1.5/1.6 — a Torre tem 7 abas (Visão geral na frente); as antigas redirecionam para o Gerenciamento")
   const torre = ler("src/components/torre/Torre.tsx")
   const abas = /export const ABAS: Array<\[Aba, string\]> = \[([\s\S]*?)\n\]/.exec(torre)?.[1].match(/\["(\w+)", "([^"]+)"\]/g) ?? []
-  ok("exatamente 6 abas: Precisa de você · Radar · Tarefas · Equipe · Processos · Terceiros", abas.length === 6 && abas.map((x) => /"([^"]+)"\]$/.exec(x)![1]).join(" · ") === "Precisa de você · Radar · Tarefas · Equipe · Processos · Terceiros", abas.join(","))
+  const abasDoCasco = /export const ABAS: Array<\[Aba, string\]> = ABAS_DA_TORRE/.test(torre)
+  ok("o casco usa a lista única de abas (lib/operacional/torre-abas.ts)", abasDoCasco)
+  ok("exatamente 7 abas, na ordem: Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros", ABAS_DA_TORRE.length === 7 && ABAS_DA_TORRE.map(([, r]) => r).join(" · ") === "Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros", ABAS_DA_TORRE.map(([, r]) => r).join(","))
   ok("a Torre não importa mais Regras/Integridade/Auditoria", !/TorreRegras|TorreIntegridade|TorreAuditoria|SaudeRegras/.test(torre) && !existsSync("src/components/torre/TorreRegras.tsx") && !existsSync("src/components/torre/TorreIntegridade.tsx") && !existsSync("src/components/torre/TorreAuditoria.tsx"))
   ok("a Torre redireciona a aba antiga com router.replace", /destinoDaAbaAntigaDaTorre\(params\.get\("aba"\)\)/.test(torre) && /router\.replace\(destinoAntigo\)/.test(torre))
   ok("?aba=regras → Gerenciamento › Saúde › Regras", destinoDaAbaAntigaDaTorre("regras") === "/administrator?screen=syshealth&sub=regras")
   ok("?aba=integridade → …&sub=integridade", destinoDaAbaAntigaDaTorre("integridade") === "/administrator?screen=syshealth&sub=integridade")
   ok("?aba=auditoria → …&sub=auditoria", destinoDaAbaAntigaDaTorre("auditoria") === "/administrator?screen=syshealth&sub=auditoria")
-  ok("as abas que continuam da Torre NÃO redirecionam", ["precisa", "radar", "tarefas", "equipe", "processos", "terceiros", null, undefined, ""].every((x) => destinoDaAbaAntigaDaTorre(x) === null))
-  ok("a Saúde tem as quatro sub-abas e a URL 'saude' é a tela de sempre", SUB_ABAS_DA_SAUDE.join() === "saude,regras,integridade,auditoria" && urlDaSaudeDoSistema() === "/administrator?screen=syshealth")
+  ok("as abas que continuam da Torre NÃO redirecionam", ["visao", "precisa", "radar", "tarefas", "equipe", "processos", "terceiros", null, undefined, ""].every((x) => destinoDaAbaAntigaDaTorre(x) === null))
+  ok("a Saúde tem as cinco sub-abas (a quinta, 'metas', é nova) e a URL 'saude' é a tela de sempre", SUB_ABAS_DA_SAUDE.join() === "saude,regras,integridade,auditoria,metas" && urlDaSaudeDoSistema() === "/administrator?screen=syshealth")
   const saude = ler("src/components/gerenciamentoComponents/SaudeSistemaTab.tsx")
   ok("Saúde do sistema monta Regras, Integridade e Auditoria (Auditoria só admin) com o deep-link ?sub=", /<SaudeRegras/.test(saude) && /<SaudeIntegridade/.test(saude) && /isAdmin \? <SaudeAuditoria/.test(saude) && /get\("sub"\)/.test(saude))
   ok("o sino INTEGRIDADE aponta para o Gerenciamento › Saúde › Integridade", /urlDaSaudeDoSistema\('integridade'\)/.test(ler("lib/operacional/avisos-sino.ts")))

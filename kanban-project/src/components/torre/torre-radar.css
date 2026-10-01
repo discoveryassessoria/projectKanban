@@ -1,21 +1,73 @@
-/* Radar e Processos da Torre (Bloco J4) — tokens do Discovery Design System; nenhuma cor fora deles. */
-.tor-radar { overflow-x: auto; max-width: 100%; }
-.tor-radar-grid { display: grid; gap: 6px; align-items: stretch; min-width: max-content; padding: 14px; }
-.tor-radar-fam { text-align: left; border: 0; background: transparent; font-family: inherit; color: var(--text-primary); padding: 6px 4px; min-height: 44px; cursor: pointer; position: sticky; left: 0; z-index: 1; background: var(--surface-secondary); }
+/* Radar e Processos da Torre — tokens do Discovery Design System; nenhuma cor fora deles.
+   Blocos compartilhados (.tor-pg-*: trilha, título, filtros, selects, paginação) + Radar (.tor-radar-*) + modal do Relatório (.tor-rel-*).
+   Fiel ao protótipo (torre-de-controle.html, telas Radar e Fase): mesmas medidas relativas, mesma ordem dos blocos. */
+
+/* ── Estrutura compartilhada ───────────────────────────────────────────────────────────────────────────────────────────────── */
+.tor-pg { display: flex; flex-direction: column; gap: 14px; min-width: 0; max-width: 100%; }
+.tor-pg-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tor-pg-trilha { font-size: 13px; color: var(--text-secondary); }
+.tor-pg-trilha a { color: var(--info-text); text-decoration: underline; }
+.tor-pg-trilha b { font-weight: 400; color: var(--text-secondary); }
+.tor-pg-titulo { font-size: 24px; font-weight: 700; line-height: 1.25; margin: 2px 0 0; color: var(--text-primary); overflow-wrap: anywhere; }
+.tor-pg-barra { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tor-pg-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.tor-pg-campos { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.tor-pg-chip { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.tor-pg-chip:hover { background: var(--surface-tertiary); }
+.tor-pg-chip[aria-pressed="true"] { background: var(--action-primary); color: var(--action-primary-ink); border-color: transparent; font-weight: 600; }
+.tor-pg-in { height: 34px; border: 1px solid var(--border-default); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 13px; background: var(--surface-popover); color: var(--text-primary); min-width: 0; max-width: 100%; }
+.tor-pg-in::placeholder { color: var(--text-muted); }
+.tor-pg-explica { font-size: 13px; color: var(--text-secondary); }
+.tor-pg-explica b { font-weight: 600; color: var(--text-primary); }
+.tor-pg-rodape { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+.tor-pg-pags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tor-pg-pag { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.tor-pg-pag:hover:not([aria-current="page"]) { background: var(--surface-tertiary); }
+.tor-pg-pag[aria-current="page"] { background: var(--action-primary); color: var(--action-primary-ink); border-color: transparent; font-weight: 600; cursor: default; }
+.tor-pg-pag-reticencias { padding: 4px 6px; }
+
+/* ── Radar ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────── */
+.tor-radar-card { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; max-width: 100%; }
+.tor-radar-rolagem { overflow-x: auto; display: flex; flex-direction: column; gap: 6px; padding-bottom: 2px; }
+.tor-radar-linha { display: grid; gap: 6px; align-items: stretch; min-width: 900px; }
+.tor-radar-linha.cab { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-align: center; align-items: end; }
+.tor-radar-linha.cab > :first-child { text-align: left; }
+.tor-radar-linha.cab small { font-size: inherit; font-weight: 400; }
+.tor-radar-fam { display: flex; flex-direction: column; justify-content: center; text-decoration: none; color: var(--text-primary); min-width: 0; }
+.tor-radar-fam b { font-weight: 700; font-size: 13px; overflow-wrap: anywhere; }
 .tor-radar-fam:hover b { text-decoration: underline; }
-.tor-radar-h { font-size: 11px; font-weight: 700; text-align: center; color: var(--text-secondary); align-self: end; }
-.tor-radar-h small { display: block; font-weight: 500; color: var(--text-muted); }
-.tor-rc { border-radius: 6px; padding: 8px 6px; text-align: center; min-height: 44px; display: flex; flex-direction: column; justify-content: center; gap: 2px; border: 1px solid var(--border-default); font-size: 12px; cursor: pointer; font-family: inherit; color: inherit; background: transparent; }
-.tor-rc small { font-size: 10.5px; color: inherit; opacity: .85; }
-.tor-rc.feita { background: var(--success-tile); color: var(--success-text); }
-.tor-rc.futura { color: var(--text-muted); }
-.tor-rc.futura.sempassos { background: var(--danger-tile); color: var(--danger-text); font-weight: 600; }
-.tor-rc.na { border-style: dashed; color: var(--text-muted); background: var(--surface-tertiary); cursor: default; }
-.tor-rc.atual { border: 2px solid var(--action-primary); font-weight: 600; }
+.tor-radar-fam span { font-size: 11px; color: var(--text-secondary); }
+.tor-rc { border-radius: 8px; min-height: 52px; padding: 4px 4px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border: 1px solid var(--border-default); font-size: 13px; min-width: 0; }
+.tor-rc span { font-weight: 700; white-space: nowrap; font-size: 12px; }
+.tor-rc small { font-size: 11px; }
+.tor-rc.feita { background: var(--success-tile); border-color: var(--success-tile); color: var(--success-text); }
+.tor-rc.futura { background: var(--surface-tertiary); color: var(--text-muted); }
+.tor-rc.futura.sempassos { background: var(--danger-tile); color: var(--danger-text); border-color: var(--danger-tile); font-size: 11px; font-weight: 600; }
+.tor-rc.na { background: var(--surface-secondary); border-style: dashed; color: var(--text-muted); font-weight: 700; }
+.tor-rc.atual { border: 2px solid var(--action-primary); }
 .tor-rc.atual.ok { background: var(--success-tile); color: var(--success-text); }
 .tor-rc.atual.atencao { background: var(--warning-tile); color: var(--warning-text); }
 .tor-rc.atual.critico { background: var(--danger-tile); color: var(--danger-text); }
-.tor-legenda { display: flex; gap: 14px; flex-wrap: wrap; padding: 0 14px 14px; font-size: 11.5px; color: var(--text-secondary); }
-.tor-gProc { grid-template-columns: minmax(200px, 1.6fr) 1fr 1.6fr .6fr 1fr .8fr 1.6fr 150px; }
-.tor-bar-p { height: 8px; border-radius: 6px; background: var(--surface-tertiary); overflow: hidden; margin-bottom: 3px; }
-.tor-bar-p i { display: block; height: 100%; background: var(--success); }
+.tor-radar-rodape { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 8px; font-size: 13px; color: var(--text-secondary); }
+.tor-radar-legenda { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 600; }
+.tor-radar-legenda span { padding: 4px 10px; border-radius: 999px; }
+.tor-radar-legenda .feita { background: var(--success-tile); color: var(--success-text); }
+.tor-radar-legenda .ritmo { background: var(--success-tile); color: var(--success-text); border: 2px solid var(--action-primary); }
+.tor-radar-legenda .atencao { background: var(--warning-tile); color: var(--warning-text); }
+.tor-radar-legenda .critico { background: var(--danger-tile); color: var(--danger-text); }
+.tor-radar-legenda .na { border: 1px dashed var(--border-default); color: var(--text-secondary); font-weight: 600; }
+
+/* ── Relatório de controle (modal de 760 px) ───────────────────────────────────────────────────────────────────────────────── */
+.tor-rel-fundo { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--overlay-modal); }
+.tor-rel { width: min(760px, 100%); max-height: 92vh; overflow-y: auto; background: var(--surface-popover); color: var(--text-primary); border-radius: 14px; box-shadow: var(--elev-3); padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; }
+.tor-rel-topo { display: flex; align-items: center; gap: 12px; }
+.tor-rel-titulo { font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
+.tor-rel-x { margin-left: auto; border: 0; background: transparent; font-size: 20px; cursor: pointer; color: var(--text-secondary); }
+.tor-rel-texto { font-size: 13px; color: var(--text-secondary); }
+.tor-rel-erro { font-size: 12px; border-radius: 8px; padding: 8px 12px; background: var(--danger-tile); color: var(--danger-text); }
+.tor-rel-acoes { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.tor-rel-btn { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.tor-rel-btn:hover:not(:disabled) { background: var(--surface-tertiary); }
+.tor-rel-btn:disabled { opacity: .55; cursor: not-allowed; }
+.tor-rel-btn.pri { padding: 0 14px; border: 0; background: var(--action-primary); color: var(--action-primary-ink); font-weight: 600; }
+.tor-rel-btn.pri:hover:not(:disabled) { background: var(--action-primary-hover); }

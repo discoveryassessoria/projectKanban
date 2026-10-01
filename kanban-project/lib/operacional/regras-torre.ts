@@ -32,7 +32,8 @@ import { lerOrganizacao } from './organizacao'
 import { cargasComLimite, pessoasNoLimite, type PessoaNoLimite } from './torre-equipe'
 import { atribuirTarefa } from './tarefa-comandos'
 import { lerLinhasOperacionais } from './avisos-sino'
-import { itensPrecisaDeVoce, sugerirResponsavelPrecisaDeVoce } from './precisa-de-voce'
+import { itensPrecisaDeVoce, carregarContextoDeSugestao, alvosDeSugestao, escolherResponsavel } from './precisa-de-voce'
+import type { LinhaDaTorre } from '@/src/services/torre-tarefas'
 import { lerVersaoPublicada } from '@/src/services/versao-publicada'
 
 type Db = typeof prisma | Prisma.TransactionClient
@@ -221,17 +222,48 @@ export const MOTIVO_SEM_APTO = 'sem apto — fica no Precisa de você'
  * segura quem já está no limite (e vai somando na memória, para o plano de um lote
  * não estourar o limite de ninguém no meio). NÃO grava nada.
  */
-export async function planoDaR1(agora = new Date(), respeitarR3: boolean): Promise<PropostaDeAtribuicao[]> {
-  const itens = (await itensPrecisaDeVoce({ agora })).filter((i) => i.tipo === 'SEM_DONO' && i.tarefaId != null)
+export async function planoDaR1(
+  agora = new Date(), respeitarR3: boolean,
+  /**
+   * Torre nova (aba Equipe, "Distribuir por aptidão e carga"): as tarefas SEM DONO a planejar (as mesmas que a linha "Sem
+   * responsável" conta) e as leituras que quem chama já tem. Ausente = o de sempre: as SEM_DONO do "Precisa de você".
+   * A regra (`escolherResponsavel`) é a MESMA — esta função só a aplica em LOTE, com UMA leitura do sistema (sem N+1).
+   */
+  opcoes: {
+    alvos?: Array<{ tarefaId: number; titulo: string }>; linhas?: LinhaDaTorre[]; organizacao?: Awaited<ReturnType<typeof lerOrganizacao>>
+    /**
+     * `true` (aba Equipe, distribuição manual): quem JÁ está no limite sai da disputa e a tarefa vai ao próximo apto com folga;
+     * só fica segurada quando TODOS os aptos estão no limite. Padrão `false` = a r1 de sempre: se o escolhido está no limite,
+     * a tarefa fica segurada para decisão humana (nunca "pula" para outro).
+     */
+    pularQuemEstaNoLimite?: boolean
+  } = {},
+): Promise<PropostaDeAtribuicao[]> {
+  const alvos = opcoes.alvos
+    ?? (await itensPrecisaDeVoce({ agora })).filter((i) => i.tipo === 'SEM_DONO' && i.tarefaId != null).map((i) => ({ tarefaId: i.tarefaId as number, titulo: i.titulo }))
+  if (alvos.length === 0) return []
   // Só lê a carga quando r3 vale: desligada, o limite não interfere em nada.
-  const cargas = respeitarR3 ? await cargasComLimite(agora) : new Map<number, PessoaNoLimite>()
+  const cargas = respeitarR3 ? await cargasComLimite(agora, opcoes.linhas, opcoes.organizacao) : new Map<number, PessoaNoLimite>()
+  // UMA leitura do sistema e UMA dos alvos para o lote inteiro (a sugestão item a item refazia ~9 consultas por tarefa).
+  const [ctx, alvosDeAptidao] = await Promise.all([
+    carregarContextoDeSugestao(agora, prisma, opcoes.organizacao), alvosDeSugestao(alvos.map((a) => a.tarefaId)),
+  ])
   const plano: PropostaDeAtribuicao[] = []
   // O que este plano JÁ distribuiu: entra no ranking da próxima tarefa (balanceia como a execução sequencial).
   const jaDistribuido = new Map<number, number>()
-  for (const it of itens) {
-    const tarefaId = it.tarefaId as number
-    const s = await sugerirResponsavelPrecisaDeVoce(tarefaId, agora, prisma, jaDistribuido)
-    // Sem sugestão, ou só o FALLBACK (ninguém com aptidão cadastrada): a regra automática não atribui a quem não é apto.
+  for (const it of alvos) {
+    const tarefaId = it.tarefaId
+    const alvoDaTarefa = alvosDeAptidao.get(tarefaId) ?? null
+    let s = escolherResponsavel(ctx, alvoDaTarefa, jaDistribuido)
+    if (opcoes.pularQuemEstaNoLimite && s && !s.fallback) {
+      const noLimite = new Set([...cargas.values()].filter((x) => x.executaveis >= x.limite).map((x) => x.usuarioId))
+      if (noLimite.has(s.usuarioId)) {
+        // O melhor está cheio: tenta o próximo apto SEM quem está no limite. Todos cheios → segura (abaixo, com o 1º escolhido).
+        const alternativo = escolherResponsavel({ ...ctx, usuarios: ctx.usuarios.filter((u) => !noLimite.has(u.id)) }, alvoDaTarefa, jaDistribuido)
+        if (alternativo && !alternativo.fallback) s = alternativo
+      }
+    }
+    // Sem sugestão, ou só o FALLBACK (sem aptidão cadastrada): a regra automática não atribui a quem não é apto.
     if (!s || s.fallback) {
       plano.push({ tarefaId, titulo: it.titulo, paraId: null, paraNome: null, motivo: MOTIVO_SEM_APTO, atribui: false, seguradaPorLimite: false, semApto: true })
       continue
@@ -318,7 +350,7 @@ export async function simularRegra(chave: ChaveRegra, agora = new Date()): Promi
           `${seguradas.length ? `; ${seguradas.length} ficariam seguradas pelo limite de carga` : ''}` +
           `${semApto.length ? `; ${semApto.length} seguradas por falta de apto (continuam em "Precisa de você")` : ''}.`,
       numeros: { semDono: plano.length, atribuiria: atribuiria.length, seguradas: seguradas.length, semApto: semApto.length },
-      itens: plano.map((p) => ({ tarefaId: p.tarefaId, texto: `${p.titulo} → ${p.paraNome ?? 'ninguém'} (${p.motivo})` })),
+      itens: plano.map((p) => ({ tarefaId: p.tarefaId, texto: `${p.titulo} → ${p.paraNome ?? 'Sem responsável'} (${p.motivo})` })),
     }
   }
   if (chave === 'r3') {
@@ -332,7 +364,7 @@ export async function simularRegra(chave: ChaveRegra, agora = new Date()): Promi
       texto: comLimite === 0
         ? 'Nenhuma pessoa tem limite de carga cadastrado (Gerenciamento › Capacidade Operacional) — a regra não teria o que aplicar.'
         : noLimite.length === 0
-          ? `Hoje: ${comLimite} pessoa(s) com limite cadastrado e ninguém no limite — nenhuma atribuição seria segurada.`
+          ? `Hoje: ${comLimite} pessoa(s) com limite cadastrado e nenhuma no limite — nenhuma atribuição seria segurada.`
           : `Hoje: ${noLimite.map((n) => `${n.nome} em ${n.executaveis}/${n.limite}`).join(', ')}. ` +
             `${seguradas.length} tarefa(s) sem dono cairiam em "Precisa de você" em vez de serem atribuídas automaticamente.`,
       numeros: { comLimite, noLimite: noLimite.length, seguradas: seguradas.length },

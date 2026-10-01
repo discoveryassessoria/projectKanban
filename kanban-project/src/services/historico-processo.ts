@@ -20,6 +20,7 @@ import { VINCULO_PROCESSO_ATIVO } from '@/src/lib/genealogia/vinculo-ativo'
 import { titularDaUniao, SELECT_UNIAO_PARA_TITULAR } from '@/src/services/genealogia/titular-uniao'
 import { labelDaFasePorPhaseKey, phaseKeyToFaseCode, rotuloDoPasso } from '@/src/lib/process-stage/fases-catalog'
 import { TIPO_DOCUMENTO_LABELS } from '@/src/lib/process-stage/estrutura-operacional'
+import { idsDeUsuarioNoTexto } from '@/lib/operacional/historico-apresentacao'
 import {
   montarFatos, type ContextoDoHistorico, type FatoDoHistorico, type LinhaCrua,
 } from '@/lib/operacional/historico-processo'
@@ -100,7 +101,7 @@ export async function historicoDoProcesso(processoId: number, opcoes: { agora?: 
     db.workflowEvento.findMany({ where: { processoId, tipo: { in: [...WORKFLOW_COM_FATO] } }, orderBy: { criadoEm: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, tipo: true, entityType: true, entityId: true, tarefaId: true, stepInstanceId: true, dados: true, criadoEm: true } }),
     db.phaseAdvanceLog.findMany({ where: { processoId, resultado: { notIn: ['BLOQUEADO', 'IDEMPOTENTE', 'CONFLITO'] } }, orderBy: { criadoEm: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, faseAtual: true, fasePretendida: true, resultado: true, origem: true, solicitadoPorId: true, forcado: true, justificativa: true, criadoEm: true } }),
     necIds.length ? db.necessidadeDocumentalEvento.findMany({ where: { necessidadeId: { in: necIds } }, orderBy: { criadoEm: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, necessidadeId: true, tipo: true, descricao: true, dados: true, criadoEm: true } }) : Promise.resolve([]),
-    tarefaIds.length ? db.contatoTerceiro.findMany({ where: { tarefaId: { in: tarefaIds } }, orderBy: { registradoEm: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, tarefaId: true, documentoId: true, canal: true, resultado: true, observacao: true, registradoPorId: true, registradoEm: true, orgao: { select: { name: true, nomeFantasia: true } } } }) : Promise.resolve([]),
+    tarefaIds.length ? db.contatoTerceiro.findMany({ where: { tarefaId: { in: tarefaIds }, estornadoEm: null }, orderBy: { registradoEm: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, tarefaId: true, documentoId: true, canal: true, resultado: true, observacao: true, registradoPorId: true, registradoEm: true, orgao: { select: { name: true, nomeFantasia: true } } } }) : Promise.resolve([]),
     db.comentarioTarefa.findMany({ where: { OR: [...(tarefaIds.length ? [{ tarefaId: { in: tarefaIds } }] : []), ...(proc.familiaId != null ? [{ familiaId: proc.familiaId }] : [])] }, orderBy: { criadoEm: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, tarefaId: true, familiaId: true, autorId: true, texto: true, criadoEm: true } }),
     docIds.length ? db.documentoObservacao.findMany({ where: { documentoId: { in: docIds } }, orderBy: { createdAt: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, documentoId: true, texto: true, criadoPorId: true, createdAt: true } }) : Promise.resolve([]),
     tarefaIds.length ? db.tarefaHistorico.findMany({ where: { tarefaId: { in: tarefaIds }, acao: { in: ['COMENTARIO', 'ACOMPANHAMENTO_ADIADO'] } }, orderBy: { createdAt: 'desc' }, take: LIMITE_POR_FONTE, select: { id: true, tarefaId: true, acao: true, descricao: true, dados: true, usuarioId: true, createdAt: true } }) : Promise.resolve([]),
@@ -123,6 +124,8 @@ export async function historicoDoProcesso(processoId: number, opcoes: { agora?: 
     ...solicitacoes.map((s) => s.criadoPorId), ...contatos.map((c) => c.registradoPorId),
     ...comentarios.map((c) => c.autorId), ...observacoes.map((o) => o.criadoPorId), ...historicoTarefa.map((h) => h.usuarioId),
     ...avancos.map((a) => a.solicitadoPorId),
+    // ids citados DENTRO do texto gravado ("passadas ao usuário 7"): resolvidos aqui, em lote, para a exibição traduzir (nada é regravado).
+    ...logs.flatMap((l) => [...idsDeUsuarioNoTexto(l.descricao), ...idsDeUsuarioNoTexto((typeof asJ(l.detalhes)?.motivo === 'string' ? (asJ(l.detalhes)?.motivo as string) : null))]),
   ])
   const pessoaIdsCitados = ids<number>([
     ...pessoaIdsDaArvore, ...tarefas.map((t) => t.pessoaId), ...documentos.map((d) => d.pessoaId), ...necessidades.map((n) => n.pessoaId),

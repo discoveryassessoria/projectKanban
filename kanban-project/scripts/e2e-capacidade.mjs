@@ -64,7 +64,7 @@ await gestor.page.goto(`${BASE}/administrator?screen=opcapacity`, { waitUntil: "
 await gestor.page.waitForTimeout(4000)
 const tela = await gestor.page.locator("body").innerText()
 ok("§8) a área 'Equipes e capacidade operacional' abre", /capacidade operacional/i.test(tela))
-for (const coluna of ["Funcionário", "Equipe(s)", "Aptidões", "Disponibilidade", "Capacidade", "Carga ativa", "Executável", "Atrasadas", "Aguardando terceiro"]) {
+for (const coluna of ["Funcionário", "Equipe(s)", "Aptidões", "Disponibilidade", "Capacidade", "Carga ativa", "Executável", "Atrasadas", "Aguardando terceiros"]) {
   ok(`§8) mostra a coluna "${coluna}"`, new RegExp(coluna.replace(/[()]/g, "\\$&"), "i").test(tela))
 }
 ok("§8) sem ranking nem pontuação de produtividade",

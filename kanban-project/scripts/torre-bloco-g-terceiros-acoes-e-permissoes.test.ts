@@ -8,8 +8,8 @@
 //   G2  "Iniciar" só para a tarefa que REALMENTE pode iniciar (fase atual, sem bloqueio,
 //       com órgão, ponto de entrada) — na lista E na API — e executa pelo motor.
 //   G3  o N de "Cobrar todos os vencidos" é o MESMO da lista; a porta existente cobra.
-//   G4  cobrar POR CARTÓRIO cobra só o que está com aquele órgão; "Contatos" lista o histórico.
-//   G5  ligação e troca de canal entram no histórico da TAREFA (Andamento) e do ÓRGÃO,
+//   G4  cobrar POR CARTÓRIO cobra só o que está com aquele órgão; a lista de Terceiros é POR PEDIDO; "Contatos" lista o histórico DO PEDIDO.
+//   G5  ligação e troca de canal entram no histórico da TAREFA (Andamento) e do PEDIDO (Contatos),
 //       sem duplicar registro.
 //   G7  cada ação exige a permissão da porta individual; quem não é gestor da Torre é recusado.
 // ============================================================================
@@ -24,7 +24,9 @@ import { listarTarefasDaTorre } from "../src/services/torre-tarefas"
 import { visaoGerencial } from "../lib/operacional/tarefa-projecoes"
 import { ehCobravelVencido } from "../lib/operacional/torre-predicados"
 import { canaisCadastrados, cobrarTarefas } from "../src/services/cobranca-terceiros"
-import { cobrarOrgao, contatosDoOrgao, listarTerceiros } from "../src/services/torre-terceiros"
+import { cobrarOrgao, contatosDoPedido, contatosDoOrgao, listarTerceiros } from "../src/services/torre-terceiros"
+import { pedidosDeTerceiros, resumoDeTerceiros } from "../lib/operacional/terceiros-pedidos"
+import { numeroDoKpi } from "../lib/operacional/torre-kpis"
 import { registrarLigacao, trocarCanal } from "../src/services/precisa-de-voce-acoes"
 import { montarAndamentoDaOperacao } from "../src/services/andamento-operacional"
 import { motivoDeNaoPoderIniciar } from "../src/services/iniciar-envio"
@@ -34,6 +36,7 @@ import { POST as postIniciar } from "../src/app/api/torre/tarefas/[tarefaId]/ini
 import { POST as postCobrarOrgao } from "../src/app/api/torre/terceiros/[orgaoId]/cobrar/route"
 import { GET as getContatos } from "../src/app/api/torre/terceiros/[orgaoId]/contatos/route"
 import { GET as getTerceiros } from "../src/app/api/torre/terceiros/route"
+import { GET as getContatosDoPedido } from "../src/app/api/torre/terceiros/pedidos/[tarefaId]/contatos/route"
 import { POST as postLigacao } from "../src/app/api/torre/tarefas/[tarefaId]/ligacao/route"
 import { POST as postCanal } from "../src/app/api/torre/tarefas/[tarefaId]/canal/route"
 import { POST as postCobrarVencidos } from "../src/app/api/operacao/tarefas/cobrar-todos-vencidos/route"
@@ -144,25 +147,48 @@ async function main() {
     const rO2 = await postCobrarOrgao(req("POST", `/api/torre/terceiros/${o2.id}/cobrar`, tAdmin, { canal: "TELEFONE", resultado: "CONFIRMOU_PEDIDO", observacao: "confirmou por telefone" }), ctx({ orgaoId: String(o2.id) }))
     ok("canal e resultado escolhidos no formulário valem", rO2.status === 200 && (await prisma.contatoTerceiro.findFirst({ where: { tarefaId: a3.tarefaId, resultado: "CONFIRMOU_PEDIDO" } }))?.canal === "TELEFONE")
 
-    secao("G4 — a lista de TERCEIROS (Régua, nunca 'tempo aprendido')")
+    secao("G4 — a lista de TERCEIROS é POR PEDIDO (nada de placar por cartório)")
+    const linhasTer = (await listarTarefasDaTorre()).linhas
+    const agoraTer = new Date()
+    const pedidos = pedidosDeTerceiros(linhasTer, agoraTer)
+    const idsPedidos = new Set(pedidos.map((p) => p.taskId))
+    ok("os pedidos são as tarefas COM o terceiro (a1, a2, a3, a5); a4 (não enviada) não é pedido", [a1, a2, a3, a5].every((a) => idsPedidos.has(a.tarefaId)) && !idsPedidos.has(a4.tarefaId))
+    ok("cada pedido sabe o órgão a quem foi pedido (cadastro de órgãos)", pedidos.find((p) => p.taskId === a1.tarefaId)?.orgaoId === o1.id && pedidos.find((p) => p.taskId === a3.tarefaId)?.orgaoId === o2.id && pedidos.find((p) => p.taskId === a5.tarefaId)?.orgaoId === null)
+    ok("o pedido carrega 'pedida há' e 'cobrar em' (sem placar: nada de média, ranking ou 'sem resposta' por órgão)", pedidos.every((p) => typeof p.pedidaHa === "string" && typeof p.cobrarEm.texto === "string" && !("semResposta" in p) && !("naoLocalizada" in p) && !("regua" in p)))
+    const resumo = resumoDeTerceiros(linhasTer, agoraTer)
+    ok("cartão 'aguardando terceiros' = o MESMO número da Visão geral / aba Tarefas (numeroDoKpi cartorio)", resumo.aguardando === numeroDoKpi("cartorio", linhasTer, agoraTer))
+    ok("cartões 2–4 repartem o cartão 1", resumo.comCartorios + resumo.comOCliente + resumo.tradutora + resumo.juizo + resumo.consulado === resumo.aguardando)
+    ok("'para cobrar hoje ou vencidas' cobre pelo menos as vencidas da Operação (a1, a2)", resumo.paraCobrar >= linhasTer.filter((l) => l.cobravelVencida).length)
+
+    secao("G4 — a Régua por órgão (cadastro, nunca 'tempo aprendido') — sem placar por cartório")
     const rTer = await (await getTerceiros(req("GET", "/api/torre/terceiros", tAdmin))).json()
     const linhaO1 = rTer.orgaos.find((o: { orgaoId: number }) => o.orgaoId === o1.id)
     ok("o órgão 1 aparece com seus pedidos em aberto (a1, a2, a4)", linhaO1?.emAberto === 3 && linhaO1?.aguardando === 2, JSON.stringify({ e: linhaO1?.emAberto, a: linhaO1?.aguardando }))
     ok("a coluna Régua vem do cadastro (texto), sem mediana/pior caso", typeof linhaO1?.regua === "string" && /régua/i.test(linhaO1.regua) && !/median|pior caso|aprendid/i.test(linhaO1.regua), linhaO1?.regua)
     ok("a rota não devolve nenhum campo de tempo aprendido", !("tempoAprendido" in (linhaO1 ?? {})) && !("mediana" in (linhaO1 ?? {})))
+    ok("a rota NÃO devolve 'sem resposta' nem 'não localizada' por órgão (placar removido)", !("semResposta" in (linhaO1 ?? {})) && !("naoLocalizada" in (linhaO1 ?? {})))
     ok("UF e canal do cadastro", linhaO1?.uf === "SP" && ["EMAIL", "PRESENCIAL"].includes(linhaO1?.canal))
     const soBanco = await listarTerceiros((await listarTarefasDaTorre()).linhas)
     ok("mesma lista que a função de serviço", soBanco.length === rTer.orgaos.length)
 
-    secao("G4/G5 — CONTATOS do órgão")
-    const rCont = await (await getContatos(req("GET", `/api/torre/terceiros/${o1.id}/contatos`, tAdmin), ctx({ orgaoId: String(o1.id) }))).json()
-    ok("lista os 4 contatos do órgão 1 (2 pela porta de vencidos + 2 pela cobrança por órgão)", rCont.contatos.filter((x: { tipo: string }) => x.tipo === "CONTATO").length === 4, `${rCont.contatos.length}`)
-    // Contato ANTIGO, sem orgaoId gravado (anterior a esta entrega): entra pela tarefa do órgão.
+    secao("G4/G5 — CONTATOS do órgão (histórico, mesmos registros do Andamento)")
+    const rContO = await (await getContatos(req("GET", `/api/torre/terceiros/${o1.id}/contatos`, tAdmin), ctx({ orgaoId: String(o1.id) }))).json()
+    ok("lista os contatos do órgão 1 (2 pela porta de vencidos + 2 pela cobrança por órgão)", rContO.contatos.filter((x: { tipo: string }) => x.tipo === "CONTATO").length === 4, `${rContO.contatos.length}`)
+    ok("órgão inexistente: sem órgão", (await contatosDoOrgao(99999999)).orgao === null)
+
+    secao("G4/G5 — CONTATOS do PEDIDO")
+    const rCont = await (await getContatosDoPedido(req("GET", `/api/torre/terceiros/pedidos/${a1.tarefaId}/contatos`, tAdmin), ctx({ tarefaId: String(a1.tarefaId) }))).json()
+    ok("lista os 2 contatos do pedido a1 (1 pela porta de vencidos + 1 pela cobrança por órgão), mais o envio do pedido", rCont.contatos.filter((x: { tipo: string }) => x.tipo === "CONTATO").length === 2, `${rCont.contatos.length}`)
+    ok("cada contato é uma frase pronta: 'Fulano cobrou por e-mail · sem resposta'", rCont.contatos.filter((x: { tipo: string }) => x.tipo === "CONTATO").every((x: { texto: string }) => /cobrou por e-mail · sem resposta/.test(x.texto)))
+    ok("do mais novo ao mais antigo", rCont.contatos.every((x: { quando: string }, i: number, arr: Array<{ quando: string }>) => i === 0 || arr[i - 1].quando >= x.quando))
+    ok("o contato de a3 NÃO aparece no pedido a1 (histórico é do pedido)", !JSON.stringify(rCont).includes("contato:" + (await prisma.contatoTerceiro.findFirstOrThrow({ where: { tarefaId: a3.tarefaId }, select: { id: true } })).id))
+    // Contato ANTIGO, sem orgaoId gravado (anterior a esta entrega): é do PEDIDO pela tarefa — aparece, uma vez.
     const corrente = await prisma.subtaskExecution.findFirstOrThrow({ where: { stepInstanceId: a1.stepInstanceId, subtaskKey: "aguardar_retorno", supersededAt: null }, select: { id: true } })
     const antigo = await prisma.contatoTerceiro.create({ data: { subtaskExecutionId: corrente.id, tarefaId: a1.tarefaId, canal: "EMAIL", resultado: "EM_BUSCA", observacao: `${MARCA} legado sem órgão`, orgaoId: null } })
-    const rCont2 = await contatosDoOrgao(o1.id)
-    ok("contato antigo (orgaoId nulo) aparece pela tarefa do órgão, UMA vez", rCont2.contatos.filter((x) => x.id === `contato:${antigo.id}`).length === 1)
-    ok("órgão inexistente: sem órgão", (await contatosDoOrgao(99999999)).orgao === null)
+    const rCont2 = await contatosDoPedido(a1.tarefaId)
+    ok("contato antigo (orgaoId nulo) aparece pela tarefa, UMA vez, com a observação entre aspas", rCont2!.contatos.filter((x) => x.id === `contato:${antigo.id}`).length === 1 && rCont2!.contatos.find((x) => x.id === `contato:${antigo.id}`)!.texto.includes(`"${MARCA} legado sem órgão"`))
+    ok("pedido inexistente: 404 / null", (await contatosDoPedido(99999999)) === null && (await getContatosDoPedido(req("GET", "/api/torre/terceiros/pedidos/99999999/contatos", tAdmin), ctx({ tarefaId: "99999999" }))).status === 404)
+    ok("contatos do pedido: comum 403 (não é gestor da Torre)", (await getContatosDoPedido(req("GET", `/api/torre/terceiros/pedidos/${a1.tarefaId}/contatos`, tComum), ctx({ tarefaId: String(a1.tarefaId) }))).status === 403)
 
     secao("G5 — REGISTRAR LIGAÇÃO liga o histórico da tarefa e do órgão, sem duplicar")
     const antesLig = await prisma.contatoTerceiro.count({ where: { tarefaId: a2.tarefaId } })
@@ -176,11 +202,11 @@ async function main() {
     const andamento = await montarAndamentoDaOperacao(a2.documentoId!)
     const evLig = andamento.filter((e) => e.id === `contato:${contatoLig.id}`)
     ok("aparece no ANDAMENTO da tarefa, uma vez, como 'Ligação ao terceiro'", evLig.length === 1 && evLig[0].titulo === "Ligação ao terceiro" && /não localizou|em busca/.test(evLig[0].descricao ?? ""))
-    const histO = await contatosDoOrgao(o1.id)
-    ok("aparece no histórico do ÓRGÃO, uma vez", histO.contatos.filter((x) => x.id === `contato:${contatoLig.id}`).length === 1)
+    const histO = await contatosDoPedido(a2.tarefaId)
+    ok("aparece nos CONTATOS do pedido, uma vez, como 'ligou'", histO!.contatos.filter((x) => x.id === `contato:${contatoLig.id}`).length === 1 && /ligou · em busca · "ligou e pediram 2 dias"/.test(histO!.contatos.find((x) => x.id === `contato:${contatoLig.id}`)!.texto))
     ok("a cobrança de a2 também está no Andamento (mesmo registro, duas projeções)", andamento.some((e) => e.tipo === "CONTATO_TERCEIRO" && e.titulo === "Cobrança ao terceiro"))
 
-    secao("G5 — TROCAR CANAL: uma linha, visível na tarefa e no órgão")
+    secao("G5 — TROCAR CANAL: uma linha, visível na tarefa e nos contatos do pedido")
     const sol = await prisma.solicitacaoDocumento.findFirstOrThrow({ where: { tarefaId: a2.tarefaId }, select: { id: true, canal: true } })
     ok("a solicitação nasceu com BALCÃO", sol.canal === "BALCAO")
     const rCanal = await postCanal(req("POST", `/api/torre/tarefas/${a2.tarefaId}/canal`, tAdmin, { canal: "EMAIL" }), ctx({ tarefaId: String(a2.tarefaId) }))
@@ -190,8 +216,9 @@ async function main() {
       && (logsCanal[0].detalhes as { solicitacaoId?: number; orgaoId?: number })?.solicitacaoId === sol.id && (logsCanal[0].detalhes as { orgaoId?: number })?.orgaoId === o1.id)
     const andamento2 = await montarAndamentoDaOperacao(a2.documentoId!)
     ok("aparece no ANDAMENTO da tarefa", andamento2.some((e) => e.tipo === "SOLICITACAO_CANAL_ALTERADO" && e.titulo === "Canal da solicitação alterado" && e.categoria === "solicitacao"))
-    const histO2 = await contatosDoOrgao(o1.id)
-    ok("aparece no histórico do ÓRGÃO, uma vez", histO2.contatos.filter((x) => x.tipo === "CANAL_ALTERADO").length === 1)
+    const histO2 = await contatosDoPedido(a2.tarefaId)
+    ok("aparece nos CONTATOS do pedido, uma vez", histO2!.contatos.filter((x) => x.tipo === "CANAL_ALTERADO").length === 1)
+    ok("o envio do pedido (SolicitacaoDocumento) é uma linha dos contatos: 'enviou o pedido pelo …'", histO2!.contatos.filter((x) => x.tipo === "PEDIDO").length === 1 && /enviou o pedido pelo/.test(histO2!.contatos.find((x) => x.tipo === "PEDIDO")!.texto))
     ok("trocar para o MESMO canal: recusa (não polui a auditoria)", (await postCanal(req("POST", `/api/torre/tarefas/${a2.tarefaId}/canal`, tAdmin, { canal: "EMAIL" }), ctx({ tarefaId: String(a2.tarefaId) }))).status === 422)
     ok("canal inválido: recusa", (await postCanal(req("POST", `/api/torre/tarefas/${a2.tarefaId}/canal`, tAdmin, { canal: "POMBO" }), ctx({ tarefaId: String(a2.tarefaId) }))).status === 422)
     ok("sem solicitação: recusa", (await postCanal(req("POST", `/api/torre/tarefas/${a3.tarefaId}/canal`, tAdmin, { canal: "EMAIL" }), ctx({ tarefaId: String(a3.tarefaId) }))).status === 422)

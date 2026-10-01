@@ -1,23 +1,29 @@
 "use client"
 // src/components/torre/torre-base.tsx
 // ============================================================================
-// BASE DA TORRE (Blocos G/H) — contexto (toast de 6 s com "Desfazer", recarga,
+// BASE DA TORRE (Blocos G/H) — contexto (toast com "Desfazer" — FIXO na Torre, 6 s fora dela —, recarga,
 // permissões), o cliente HTTP e a Modal comum. Nada aqui decide regra: a tela só
-// chama as portas /api/torre/* e mostra o resultado real (item a item).
+// chama as portas /api/torre/… e mostra o resultado real (item a item).
 // ============================================================================
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { JANELA_DO_DESFAZER_MS, JANELA_DO_DESFAZER_TEXTO } from "@/lib/operacional/torre-desfazer"
 import { auth } from "@/src/components/operacao/kit-operacional"
 
 export interface PermissoesTorre {
   editar: boolean; bloquear: boolean; iniciar: boolean; equipe: boolean; admin: boolean; usuarioId: number
 }
-export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO"; tarefaIds: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. */ ausenciaId?: number }
+export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO" | "AUSENCIA" | "COBRANCA"; tarefaIds: number[]; /** "COBRANCA": os contatos que a ação criou (o Desfazer os ESTORNA, não os apaga). */ contatoIds?: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. "AUSENCIA" (Marcar ausência): só ela, sem tarefas. */ ausenciaId?: number }
+
+/** A janela do "Desfazer" é UMA SÓ na Torre inteira (`lib/operacional/torre-desfazer.ts`): cliente e servidor leem a mesma constante. */
+export { JANELA_DO_DESFAZER_MS }
+/** Toast sem `fixo` (telas fora da Torre, ex.: Gerenciamento › Saúde) some sozinho depois disto. */
+const TOAST_AUTOMATICO_MS = 6000
 
 export interface RespostaApi<T = Record<string, unknown>> { status: number; ok: boolean; data: T }
 
 /** Uma chamada às portas — devolve sempre o corpo (mesmo em erro), nunca lança. */
-export async function api<T = Record<string, unknown>>(url: string, metodo: "GET" | "POST" | "PATCH" | "DELETE" = "GET", corpo?: unknown): Promise<RespostaApi<T>> {
+export async function api<T = Record<string, unknown>>(url: string, metodo: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET", corpo?: unknown): Promise<RespostaApi<T>> {
   try {
     const r = await fetch(url, { method: metodo, headers: auth(), ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}) })
     const data = (await r.json().catch(() => ({}))) as T
@@ -53,29 +59,38 @@ export const useTorre = (): Ctx => {
   return c
 }
 
-export function TorreProvider({ permissoes, recarregar, abrirFoco = () => {}, abrirRelatorio = () => {}, children }: {
+export function TorreProvider({ permissoes, recarregar, fixo = false, abrirFoco = () => {}, abrirRelatorio = () => {}, children }: {
   permissoes: PermissoesTorre | null; recarregar: () => void
+  /** Toast FIXO (T013–T015): não some sozinho — só pelo ✕ ou quando outro o substitui — e fica acima de modais e gaveta. A Torre usa; o resto mantém os 6 s. */
+  fixo?: boolean
   abrirFoco?: (processoId: number) => void; abrirRelatorio?: (alvo: AlvoDoRelatorio) => void; children: ReactNode
 }) {
-  const [toast, setToast] = useState<{ msg: string; desfazer: Desfazer | null } | null>(null)
+  const [toast, setToast] = useState<{ msg: string; desfazer: Desfazer | null; em: number } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  // Toast de 6 s (Decisão 6 do Passo 0).
+  // Fixo: o aviso fica até o ✕ ou até outro aviso o substituir. Sem `fixo`: some em 6 s (Decisão 6 do Passo 0).
   const avisar = useCallback((msg: string, desfazer: Desfazer | null = null) => {
-    setToast({ msg, desfazer })
+    setToast({ msg, desfazer, em: Date.now() })
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => setToast(null), 6000)
-  }, [])
+    timer.current = fixo ? null : setTimeout(() => setToast(null), TOAST_AUTOMATICO_MS)
+  }, [fixo])
 
   const desfazer = async () => {
     const d = toast?.desfazer
     if (!d) return
+    // O servidor só aceita o Desfazer dentro da janela única. Como o aviso fixo pode ficar na tela além disso, o botão NUNCA falha em silêncio:
+    // passou da janela → mensagem clara (o servidor também recusaria; a tarefa pode ser corrigida pela própria gaveta).
+    if (fixo && Date.now() - toast.em > JANELA_DO_DESFAZER_MS) {
+      avisar(`Não foi possível desfazer: passaram mais de ${JANELA_DO_DESFAZER_TEXTO} desde a ação. Corrija pela própria tarefa (tudo fica no histórico).`)
+      return
+    }
     setToast(null)
-    const r = await api<{ total: number; desfeitas: number; itens: Array<{ ok: boolean; mensagem: string }> }>("/api/torre/tarefas/desfazer", "POST", d)
+    const r = await api<{ total: number; desfeitas: number; mensagem?: string; itens: Array<{ ok: boolean; mensagem: string }> }>("/api/torre/tarefas/desfazer", "POST", d)
     if (r.data && typeof r.data.desfeitas === "number") {
       const falha = r.data.itens?.find((i) => !i.ok)
-      avisar(`Desfeito: ${r.data.desfeitas} de ${r.data.total}.${falha ? ` ${falha.mensagem}` : ""}`)
+      if (d.tipo === "AUSENCIA" && r.data.mensagem) { avisar(r.data.desfeitas === 0 ? `Não foi possível desfazer: ${r.data.mensagem}` : r.data.mensagem); recarregar(); return }
+      avisar(r.data.desfeitas === 0 && falha ? `Não foi possível desfazer: ${falha.mensagem}` : `Desfeito: ${r.data.desfeitas} de ${r.data.total}.${falha ? ` ${falha.mensagem}` : ""}`)
     } else avisar(erroDe(r.data))
     recarregar()
   }
@@ -100,11 +115,24 @@ export function resumoDoLote(d: { total?: number; sucesso?: number; itens?: Arra
   return `${d.sucesso ?? 0} de ${d.total ?? 0}${falha ? ` · ${d.itens!.filter((i) => !i.ok).length} não passou(aram): ${falha.mensagem ?? "recusada"}` : ""}`
 }
 
-export function Modal({ titulo, subtitulo, onFechar, children, rodape, ocupado }: {
+/** Esc fecha o modal (T015). `ativo=false` (modal ocupado ou de justificativa — o protótipo não deixa fechar por Esc/fundo) não escuta. */
+export function useEscFecha(onFechar: () => void, ativo = true) {
+  useEffect(() => {
+    if (!ativo) return
+    const f = (e: KeyboardEvent) => { if (e.key === "Escape") onFechar() }
+    window.addEventListener("keydown", f)
+    return () => window.removeEventListener("keydown", f)
+  }, [onFechar, ativo])
+}
+
+export function Modal({ titulo, subtitulo, onFechar, children, rodape, ocupado, justificativa }: {
   titulo: string; subtitulo?: string; onFechar: () => void; children: ReactNode; rodape: ReactNode; ocupado?: boolean
+  /** Modal de justificativa (texto obrigatório): como no protótipo, NÃO fecha com Esc nem clicando no fundo — só por Cancelar/confirmar. */
+  justificativa?: boolean
 }) {
+  useEscFecha(onFechar, !ocupado && !justificativa)
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-modal)] px-4" style={{ zIndex: LAYER.popover }} onClick={ocupado ? undefined : onFechar}>
+    <div className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-modal)] px-4" style={{ zIndex: LAYER.popover }} onClick={ocupado || justificativa ? undefined : onFechar}>
       <div role="dialog" aria-label={titulo} className="tor w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface-popover)] shadow-[var(--elev-3)] p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="text-[15px] font-extrabold">{titulo}</h3>
@@ -140,7 +168,7 @@ export function ModalTexto({ titulo, subtitulo, rotulo, confirmar, minimo = 5, o
     if (!r.ok) setErro(r.mensagem ?? "Não foi possível concluir.")
   }
   return (
-    <Modal titulo={titulo} subtitulo={subtitulo} onFechar={onFechar} ocupado={enviando} rodape={<>
+    <Modal titulo={titulo} subtitulo={subtitulo} onFechar={onFechar} ocupado={enviando} justificativa rodape={<>
       <button className="tor-btn" onClick={onFechar} disabled={enviando}>Cancelar</button>
       <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !valido}>{enviando ? "Enviando…" : confirmar}</button>
     </>}>

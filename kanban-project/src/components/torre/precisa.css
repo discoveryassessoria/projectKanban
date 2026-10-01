@@ -1,0 +1,79 @@
+/* Precisa de você · Revisar o dia · Briefing — estilos próprios (frente B2). Só tokens do Discovery Design System. */
+
+/* ── a seção (embutida na Visão geral ou na aba própria) ─────────────────── */
+.pdv { background: var(--surface-popover); border: 1px solid var(--danger-tile); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.pdv-topo { display: flex; align-items: baseline; gap: 12px; }
+.pdv-titulo { font-size: 16px; font-weight: 700; }
+.pdv-texto { font-size: 13px; color: var(--text-secondary); flex: 1 1 0; min-width: 0; }
+.pdv-revisar { margin-left: auto; flex: none; white-space: nowrap; height: 30px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--action-primary); background: var(--surface-popover); color: var(--action-primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pdv-revisar:hover:not(:disabled) { background: var(--surface-tertiary); }
+.pdv-revisar:disabled { opacity: .55; cursor: not-allowed; }
+
+/* ── os seis cartões-filtro ──────────────────────────────────────────────── */
+.pdv-tipos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.pdv-tipo { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 10px; border-radius: 10px; text-align: left; font: inherit; cursor: pointer; color: var(--text-primary); background: var(--surface-secondary); border: 1px solid var(--border-subtle); }
+.pdv-tipo[aria-pressed="true"] { background: var(--surface-popover); border: 2px solid var(--action-primary); padding: 7px 9px; }
+.pdv-tipo:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+.pdv-tipo-n { font-size: 20px; font-weight: 700; line-height: 1.1; }
+.pdv-tipo-n.red { color: var(--danger-text); }
+.pdv-tipo-n.amb { color: var(--warning-text); }
+.pdv-tipo-n.nav { color: var(--action-primary); }
+.pdv-tipo-t { font-weight: 600; font-size: 13px; }
+.pdv-tipo-r { font-size: 12px; color: var(--text-secondary); }
+
+/* ── a tabela: Tipo · O que está acontecendo · Sugestão do sistema · Ação ── */
+.pdv-tab { display: flex; flex-direction: column; overflow-x: auto; }
+.pdv-hd, .pdv-lin { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 2.6fr) minmax(0, 2fr) minmax(270px, 1.9fr); gap: 12px; min-width: 940px; }
+.pdv-hd { padding: 6px 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: .04em; text-transform: uppercase; border-bottom: 1px solid var(--border-subtle); }
+.pdv-lin { padding: 7px 4px; align-items: center; border-bottom: 1px solid var(--border-subtle); }
+.pdv-lin.some { opacity: .45; pointer-events: none; }
+.pdv-quem { display: flex; flex-direction: column; min-width: 0; }
+.pdv-quem a { font-weight: 600; color: var(--text-primary); text-decoration: underline; }
+.pdv-quem a:hover { color: var(--info-text); }
+.pdv-det { font-size: 12px; color: var(--text-secondary); }
+.pdv-sug { font-size: 13px; color: var(--text-secondary); }
+.pdv-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
+.pdv-b1, .pdv-b2 { height: 30px; padding: 0 10px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.pdv-b1 { background: var(--action-primary); color: var(--action-primary-ink); border: 0; }
+.pdv-b1:hover:not(:disabled) { background: var(--action-primary-hover); }
+.pdv-b2 { background: var(--surface-popover); color: var(--text-primary); border: 1px solid var(--border-default); }
+.pdv-b2:hover:not(:disabled) { background: var(--surface-tertiary); }
+.pdv-b1:disabled, .pdv-b2:disabled { opacity: .55; cursor: not-allowed; }
+.pdv-rodape { padding: 10px 4px; font-size: 13px; color: var(--text-secondary); }
+
+/* ── Revisar o dia e Briefing (modais largos) ────────────────────────────── */
+.pdv-overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: var(--overlay-modal); }
+.pdv-modal { width: 100%; max-height: 92vh; overflow-y: auto; background: var(--surface-popover); color: var(--text-primary); border-radius: 14px; box-shadow: var(--elev-3); padding: 24px 26px; display: flex; flex-direction: column; gap: 16px; }
+.pdv-modal.rev { max-width: 760px; }
+.pdv-modal.brief { max-width: 720px; gap: 14px; }
+.pdv-modal.peq { max-width: 480px; gap: 12px; padding: 20px; }
+.pdv-dlg-t { font-size: 15px; font-weight: 800; }
+.pdv-dlg-rodape { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 4px; }
+.pdv-modal-t { font-size: 18px; font-weight: 700; }
+.pdv-rev-topo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.pdv-barra { flex-grow: 1; min-width: 80px; height: 8px; border-radius: 4px; background: var(--surface-tertiary); overflow: hidden; }
+.pdv-barra > i { display: block; height: 8px; background: var(--action-primary); }
+.pdv-contas { font-size: 12px; color: var(--text-secondary); }
+.pdv-cartao { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 10px; background: var(--surface-secondary); border: 1px solid var(--border-subtle); }
+.pdv-cartao-t { font-size: 17px; font-weight: 700; }
+.pdv-cartao-d { font-size: 13px; color: var(--text-secondary); }
+.pdv-cartao-s { font-size: 14px; margin-top: 6px; }
+.pdv-rev-fim { font-size: 15px; line-height: 1.6; }
+.pdv-rodape-m { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pdv-rodape-m .espaco { flex-grow: 1; }
+.pdv-rodape-m a { font-size: 13px; color: var(--info-text); text-decoration: underline; }
+.pdv-m1, .pdv-m2, .pdv-m3 { height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 13px; cursor: pointer; }
+.pdv-m1 { background: var(--action-primary); color: var(--action-primary-ink); border: 0; font-weight: 600; }
+.pdv-m1:hover:not(:disabled) { background: var(--action-primary-hover); }
+.pdv-m2 { background: var(--surface-popover); color: var(--action-primary); border: 1px solid var(--action-primary); font-weight: 600; }
+.pdv-m3 { background: var(--surface-popover); color: var(--text-primary); border: 1px solid var(--border-default); }
+.pdv-m1:disabled, .pdv-m2:disabled, .pdv-m3:disabled { opacity: .55; cursor: not-allowed; }
+.pdv-brief-txt { font-size: 14px; line-height: 1.6; }
+.pdv-brief-ac { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* ── toast com Desfazer ───────────────────────────────────────────────────── */
+.pdv-toast-det { font-size: 11.5px; color: var(--text-secondary); }
+
+@media (max-width: 900px) {
+  .pdv-tipos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

@@ -1,43 +1,44 @@
 "use client"
-// src/components/torre/TorreFeito.tsx — visão FEITO: concluídas dos últimos 14 dias (GET /api/operacao/tarefas?visao=feito&escopo=equipe),
-// agrupadas Hoje / Ontem / Antes por `concluidaEm` e depois por família — a mesma derivação de `AbaFeito` da Operação. Somente leitura + Abrir.
+// src/components/torre/TorreFeito.tsx — a visão FEITO (Torre nova): "Concluídas nos últimos 14 dias · toda a equipe · N certidões" e três
+// cartões — Hoje · Ontem · Antes (12 dias) — cada um com a pílula "N concluída(s)" e as colunas Certidão · pessoa, Família, Concluída em,
+// Prazo era (verde se cumprido, vermelho se concluída depois), Por quem e o link "Abrir" (leva ao detalhe do Processo). Somente leitura.
+// A fonte é a MESMA aba Feito da Operação (`concluidasRecentesDoUsuario`, escopo de equipe) + quem concluiu (LogAuditoria): sem registro, "—".
+import Link from "next/link"
 import { useMemo } from "react"
-import { diaOperacional } from "@/lib/operacional/tempo-operacional"
-import { agruparPorFamilia, docTipoTxt, orgaoTxt, fmtData } from "@/src/components/operacao/operacao-v3-derivacoes"
-import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
+import { blocoDoFeito, prazoEraDoFeito, textoConcluidaEm, type BlocoDoFeito } from "@/lib/operacional/torre-tarefas-tela"
+import { docTipoTxt } from "@/src/components/operacao/operacao-v3-derivacoes"
+import type { LinhaDoFeito } from "./tarefas-tipos"
 
-export function TorreFeito({ linhas, onAbrir }: { linhas: LinhaOperacaoV3[]; onAbrir: (l: LinhaOperacaoV3) => void }) {
-  const blocos = useMemo(() => {
-    // Hoje / Ontem no DIA OPERACIONAL (America/Sao_Paulo) — nunca no fuso do navegador (`toDateString()` usava o local).
-    const agora = new Date()
-    const hojeStr = diaOperacional(agora); const ontemStr = diaOperacional(new Date(agora.getTime() - 86_400_000))
-    const hoje = linhas.filter((l) => l.concluidaEm && diaOperacional(new Date(l.concluidaEm)) === hojeStr)
-    const ontem = linhas.filter((l) => l.concluidaEm && diaOperacional(new Date(l.concluidaEm)) === ontemStr)
-    const antes = linhas.filter((l) => !hoje.includes(l) && !ontem.includes(l))
-    return [{ titulo: "Hoje", rows: hoje }, { titulo: "Ontem", rows: ontem }, { titulo: "Antes", rows: antes }].filter((b) => b.rows.length > 0)
-  }, [linhas])
+const BLOCOS: Array<[BlocoDoFeito, string]> = [["hoje", "Hoje"], ["ontem", "Ontem"], ["antes", "Antes (12 dias)"]]
 
-  if (blocos.length === 0) return <div className="tor-card pad small">Nenhuma tarefa concluída nos últimos 14 dias.</div>
+export function TorreFeito({ linhas, agora }: { linhas: LinhaDoFeito[]; agora: Date }) {
+  const blocos = useMemo(() => BLOCOS.map(([k, titulo]) => ({
+    titulo, linhas: linhas.filter((l) => blocoDoFeito(l.concluidaEm, agora) === k),
+  })).filter((b) => b.linhas.length > 0), [linhas, agora])
+
   return (
     <>
+      <div className="tf-feito-txt">Concluídas nos últimos 14 dias · toda a equipe · {linhas.length} {linhas.length === 1 ? "certidão" : "certidões"}</div>
+      {blocos.length === 0 && <div className="tf-card"><span className="tf-vazio">Nenhuma tarefa concluída nos últimos 14 dias.</span></div>}
       {blocos.map((b) => (
-        <div key={b.titulo}>
-          <div className="tor-bar"><b>{b.titulo}</b><span className="tor-p grn">{b.rows.length} concluída(s)</span></div>
-          {agruparPorFamilia(b.rows).map((g) => (
-            <div key={g.fam} className="tor-card tor-scroll">
-              <div className="tor-grp"><b>{g.fam}</b><div style={{ flexGrow: 1 }} /><span className="tor-p gry">{g.linhas.length} tarefas</span></div>
-              <div className="tor-hd tor-gFe"><span>Certidão · pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span /></div>
-              {g.linhas.map((l) => (
-                <div key={l.taskId} className="tor-row tor-gFe">
-                  <div><b>{docTipoTxt(l)}</b><div className="small">{l.pessoaNome ?? l.casalNomes ?? "—"} · #{l.taskId}</div></div>
-                  <div><span className="tor-p grn">{fmtData(l.concluidaEm)}</span></div>
-                  <div className="small">{l.rotuloDoPrazo || "—"}</div>
-                  <div className="small">{orgaoTxt(l)}</div>
-                  <div><button className="tor-btn pri" onClick={() => onAbrir(l)}>Abrir</button></div>
+        <div key={b.titulo} className="tf-tabela">
+          <div className="tf-feito-bloco-t"><span>{b.titulo}</span><span className="tf-pilula verde">{b.linhas.length} concluída(s)</span></div>
+          <div className="tf-rolagem">
+            <div className="tf-feito-g tf-feito-h"><div>Certidão · pessoa</div><div>Família</div><div>Concluída em</div><div>Prazo era</div><div>Por quem</div><div /></div>
+            {b.linhas.map((l) => {
+              const prazo = prazoEraDoFeito(l.dataPrazo, l.concluidaEm)
+              return (
+                <div key={l.taskId} className="tf-feito-g tf-feito-linha">
+                  <div className="tf-cert"><b>{docTipoTxt(l)}</b><span className="tf-peq">{l.pessoaNome ?? l.casalNomes ?? "—"}</span></div>
+                  <div>{l.familiaNome ?? l.processoNome ?? "—"}</div>
+                  <div>{textoConcluidaEm(l.concluidaEm, agora)}</div>
+                  <div className={prazo.cumprido === true ? "tf-ok" : prazo.cumprido === false ? "tf-verm" : ""}>{prazo.texto}</div>
+                  <div>{l.concluidaPorNome ?? "—"}</div>
+                  <div>{l.processoId != null ? <Link className="tf-link" href={`/torre/processo/${l.processoId}`}>Abrir</Link> : null}</div>
                 </div>
-              ))}
-            </div>
-          ))}
+              )
+            })}
+          </div>
         </div>
       ))}
     </>

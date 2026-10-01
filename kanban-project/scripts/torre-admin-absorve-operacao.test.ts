@@ -82,9 +82,9 @@ async function main() {
   ok("a Torre lê ?visao=, ?processo= e ?tarefa=", /get\("visao"\)/.test(torre) && /get\("processo"\)/.test(torre) && /get\("tarefa"\)/.test(torre))
 
   console.log("\nAcomp. vencidos ≠ Cobranças vencidas; visões da aba Tarefas")
-  const tt = readFileSync("src/components/torre/TorreTarefas.tsx", "utf8")
-  ok("'Acompanhamentos vencidos' usa acompanhamentoVencido (o número que a Operação mostrava)", /case "acompvenc": return \(l\) => l\.acompanhamentoVencido === true/.test(tt))
-  ok("'Cobranças a fazer (vencidas)' segue com cobravelVencida — outra coisa, com outro nome", /case "cobranca": return \(l\) => l\.cobravelVencida/.test(tt) && /Acompanhamentos vencidos/.test(tt) && /Cobranças a fazer \(vencidas\)/.test(tt))
+  const tt = readFileSync("lib/operacional/torre-tarefas-tela.ts", "utf8")
+  ok("'Acompanhamentos vencidos' (visão antiga, só por URL/visão salva) usa acompanhamentoVencido (o número que a Operação mostrava)", /case 'acompvenc': return \(l\) => l\.acompanhamentoVencido === true/.test(tt))
+  ok("'Cobrar hoje' segue com cobravelVencida (o mesmo N da aba Terceiros) — outra coisa que o acompanhamento vencido", /case 'cobranca': return \(l\) => l\.cobravelVencida === true/.test(tt) && /'Cobrar hoje'/.test(tt) && /VISOES_ESCONDIDAS/.test(tt))
   const spec = limparSpec({ visao: "minhas", agrupar: "fam", dentro: "pessoa" })
   ok("visão salva guarda 'Minhas tarefas' e o subagrupamento", spec.visao === "minhas" && spec.dentro === "pessoa")
   ok("valor inválido de subagrupamento/visão é normalizado", limparSpec({ visao: "x", dentro: "y" }).visao === "todas" && limparSpec({ dentro: "y" }).dentro === "none")

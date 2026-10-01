@@ -137,7 +137,7 @@ ok("passo atual: só o nome, sem prefixo nem subtítulo", passoLabelDe(L({ aInic
 ok("passo atual sem passoCorrente cai em etapaAtual; sem nada '—'", passoLabelDe(L({ passoCorrente: null })).label === "Localizar registro da certidão" && passoLabelDe(L({ passoCorrente: null, etapaAtual: null })).label === "—")
 ok("passo atual nunca traz 'A iniciar', '(enviar ao cartório)', 'fase ', 'x/y ·'", [L({}), L({ faseMacroKey: "emissao_documental" }), L({ statusTarefa: "EM_ANDAMENTO", responsavelId: null }), L({ estadoOperacao: "CONCLUIDA" })].every((l) => { const p = passoLabelDe(l); return !/A iniciar|enviar ao cartório|fase |\d\/\d|Em andamento|Concluída/.test(p.label + p.sub) }))
 const STATUS = ["NAO_INICIADA", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "AGUARDANDO_TERCEIRO", "CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "BLOQUEADA", "SUPERSEDIDA", "CANCELADA"]
-const esperado: Record<string, string> = { NAO_INICIADA: "A iniciar", EM_ANDAMENTO: "Em andamento", AGUARDANDO_TERCEIRO: "Aguardando cartório", AGUARDANDO_CLIENTE: "Aguardando cliente", BLOQUEADA: "Bloqueada", CONCLUIDO_RECEBIDO: "Concluída", CONCLUIDO_NAO_POSSUI: "Concluída", CANCELADA: "Cancelada", SUPERSEDIDA: "Substituída" }
+const esperado: Record<string, string> = { NAO_INICIADA: "A iniciar", EM_ANDAMENTO: "Em andamento", AGUARDANDO_TERCEIRO: "Aguardando terceiros", AGUARDANDO_CLIENTE: "Aguardando cliente", BLOQUEADA: "Bloqueada", CONCLUIDO_RECEBIDO: "Concluída", CONCLUIDO_NAO_POSSUI: "Concluída", CANCELADA: "Cancelada", SUPERSEDIDA: "Substituída" }
 ok("o mapa cobre TODO o enum StatusTarefa do schema", (() => { const m = /enum StatusTarefa \{([^}]*)\}/.exec(ler("prisma/schema.prisma")); const doSchema = m![1].split("\n").map((x) => x.replace(/\/\/.*/, "").trim()).filter(Boolean); return doSchema.length === STATUS.length && doSchema.every((s) => s in ROTULO_STATUS_TAREFA) })())
 for (const s of STATUS) ok(`Status ${s} → '${esperado[s]}'`, statusTarefaTxt({ statusTarefa: s }) === esperado[s])
 ok("EM_ANDAMENTO (com ou sem dono) nunca 'A iniciar'", statusTarefaTxt(L({ statusTarefa: "EM_ANDAMENTO", responsavelId: null, aIniciar: true })) === "Em andamento" && statusTarefaTxt(L({ statusTarefa: "EM_ANDAMENTO", responsavelId: 12, aIniciar: true })) === "Em andamento" && emAndamentoSemDono(L({ statusTarefa: "EM_ANDAMENTO", responsavelId: null })))
@@ -172,7 +172,7 @@ secao("C3 — 'Fila' -> 'A fazer' em tudo que o usuário lê na Operação")
 const cv3 = codigo(v3), cabas = codigo(abas)
 ok("aba e cartão do topo: 'A fazer'", /A fazer <span className="opv3-n">/.test(cv3) && /<span>A fazer<\/span>/.test(cv3) && !/<span>Fila<\/span>/.test(cv3) && !/>Fila <span/.test(cv3))
 ok("botão '▶ Fazer agora (N)'", /▶ Fazer agora \(\{linhas\.length\}\)/.test(cv3) && !/Trabalhar a fila/.test(cv3))
-ok("texto explicativo EXATO", v3.includes("A fazer = o que depende de você agora: certidões a iniciar (enviar ao cartório) e no passo 4 (conferir e validar). O que está com o cartório fica em Aguardando."))
+ok("texto explicativo EXATO", v3.includes("A fazer = o que depende de você agora: certidões a iniciar (enviar ao cartório) e no passo 4 (conferir e validar). O que aguarda terceiros fica em Aguardando."))
 ok("seletor Vista: 'A fazer' (valor interno 'minha' e visao=minha_fila intactos)", /<option value="minha">A fazer<\/option>/.test(cv3) && /visao=minha_fila/.test(cv3))
 ok("mensagens: 'Nada a fazer.', 'Nenhuma a fazer com esse filtro.', '{n} a fazer', 'Navegação do A fazer'", /"Nada a fazer\."/.test(cv3) && /Nenhuma a fazer com esse filtro\./.test(cv3) && /a fazer ·/.test(cv3) && /Navegação do A fazer/.test(cv3))
 ok("nenhum texto visível com 'fila' na Operação (fora chaves internas)", !/(Fila vazia|Nada na fila|na fila com esse|Navegação da fila|Minha fila|\d na fila| na fila ·|Inicie uma certidão na Fila|esteja na Fila)/.test(cv3 + cabas))
@@ -183,13 +183,14 @@ ok("subtítulo da página /operacao", /subtitle="A fazer, aguardando/.test(ler("
 // ── C4 ───────────────────────────────────────────────────────────────────────
 secao("C4 — Torre (aba Tarefas e drawer)")
 const ctt = codigo(tt)
-ok("cabeçalho: ... Etapa, Status, Responsável ...", /<span>Etapa<\/span><span>Status<\/span><span>Responsável<\/span>/.test(ctt))
-ok("linha: coluna Etapa = passoLabelDe().label; coluna Status = statusTarefaTxt(l) (mapa único)", /passoLabelDe\(l\)\.label/.test(ctt) && /statusTarefaTxt\(l\)/.test(ctt))
+const tab = codigo(ler("src/components/torre/TarefasTabela.tsx")), gav = codigo(ler("src/components/torre/TarefasGaveta.tsx")), tela = ler("lib/operacional/torre-tarefas-tela.ts")
+ok("cabeçalho (Torre nova): ... Passo · status, ..., Responsável ...", /<div>Passo · status<\/div>.*<div>Responsável<\/div>/.test(tab))
+ok("linha: Passo = passoLabelDe().label; Status = statusDaLinha(l) (mapa único de rótulos)", /passoLabelDe\(l\)\.label/.test(tab) && /statusDaLinha\(l\)/.test(tab) && /import \{ ROTULO_STATUS \} from '@\/src\/lib\/home\/rotulo-status-tarefa'/.test(tela))
 ok("grade .tor-gT tem 10 colunas (chk, cert, bola, etapa, status, resp, prazo, acomp, risco, ações)", nCols(/\.tor-gT \{ grid-template-columns: ([^;]+);/.exec(ler("src/components/torre/torre.css"))![1]) === 10)
-ok("drawer (PainelTorreTarefa): mostra o Status real", /statusTarefaTxt\(linha\)/.test(codigo(painel)) && /<b>Status<\/b>/.test(painel))
-ok("botão '▶ Fazer agora (N)'; 'Nada a fazer.'; 'Navegação do A fazer'", /▶ Fazer agora \(\{visiveis\.length\}\)/.test(ctt) && /"Nada a fazer\."/.test(ctt) && /Navegação do A fazer/.test(ctt) && !/Trabalhar a fila|Fila vazia|Navegação da fila/.test(ctt))
+ok("gaveta (TarefasGaveta): mostra o Status real", /statusTarefaTxt\(linha\)/.test(gav) && /<span className="k">Status<\/span>/.test(gav))
+ok("botão '▶ Fazer agora (N)'; lista vazia não abre; Modo foco 'i de N'; sem 'fila'", /▶ Fazer agora \(\{nTrabalho\}\)/.test(ctt) && /lista vazia: nada abre/.test(tt) && /Modo foco · .* de \$\{focoIds\.length\}/.test(tt) && !/Trabalhar a fila|Fila vazia|Navegação da fila/.test(ctt + tab + gav))
 ok("a aba Equipe NÃO foi tocada (coluna técnica 'Fila' de semanas)", !/A fazer/.test(ler("src/components/torre/TorreEquipe.tsx")))
-ok("a Torre mostra a ação Continuar/Atribuir para EM_ANDAMENTO sem dono, sem rótulo na coluna Etapa", /acao\.label/.test(ctt) && /Atribuir/.test(ctt) && !/Em andamento — sem responsável/.test(ctt + codigo(der)))
+ok("a Torre mostra a ação Continuar/Atribuir para EM_ANDAMENTO sem dono, sem rótulo na coluna Passo", /acoesDaLinha/.test(tab) && /Atribuir/.test(ctt) && !/Em andamento — sem responsável/.test(ctt + tab + codigo(der)))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 if (falhou) process.exit(1)

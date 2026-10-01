@@ -223,12 +223,13 @@ export const LINK_SEM_RESPONSAVEL_NA_TORRE = '/torre?aba=tarefas&visao=semdono'
 // ─── REGRAS · INTEGRIDADE · AUDITORIA SAÍRAM DA TORRE (01/10/2026) ──────────────────────────────────────────────────
 // A Torre serve só à gestão de processo. Essas três moram em Gerenciamento › Saúde do sistema, como sub-abas
 // (`?screen=syshealth&sub=`). Quem abrir o endereço antigo (`/torre?aba=regras|integridade|auditoria`) é levado para lá.
-export type SubAbaDaSaude = 'saude' | 'regras' | 'integridade' | 'auditoria'
-export const SUB_ABAS_DA_SAUDE: SubAbaDaSaude[] = ['saude', 'regras', 'integridade', 'auditoria']
+// 'metas' (Torre nova, 01/10/2026) NÃO é uma aba antiga da Torre: nasceu direto no Gerenciamento ("Metas de tempo por fase e por país").
+export type SubAbaDaSaude = 'saude' | 'regras' | 'integridade' | 'auditoria' | 'metas'
+export const SUB_ABAS_DA_SAUDE: SubAbaDaSaude[] = ['saude', 'regras', 'integridade', 'auditoria', 'metas']
 export const urlDaSaudeDoSistema = (sub: SubAbaDaSaude = 'saude'): string =>
   sub === 'saude' ? '/administrator?screen=syshealth' : `/administrator?screen=syshealth&sub=${sub}`
 /** Abas antigas da Torre → sub-aba equivalente no Gerenciamento. */
-export const ABAS_DA_TORRE_MOVIDAS: Record<string, SubAbaDaSaude> = { regras: 'regras', integridade: 'integridade', auditoria: 'auditoria' }
+export const ABAS_DA_TORRE_MOVIDAS: Record<string, SubAbaDaSaude> = { regras: 'regras', integridade: 'integridade', auditoria: 'auditoria' } // `metas` nunca foi aba da Torre
 /** Destino de `?aba=` antigo da Torre (`null` = a aba ainda é da Torre). */
 export function destinoDaAbaAntigaDaTorre(aba: string | null | undefined): string | null {
   const sub = aba ? ABAS_DA_TORRE_MOVIDAS[aba] : undefined

@@ -25,7 +25,7 @@ const enumSchema = /enum StatusTarefa \{([^}]*)\}/.exec(ler("prisma/schema.prism
 ok("o enum tem 9 valores", enumSchema.length === 9, enumSchema.join(","))
 ok("o mapa cobre exatamente o enum (nem a mais, nem a menos)", enumSchema.length === Object.keys(ROTULO_STATUS).length && enumSchema.every((s) => s in ROTULO_STATUS))
 const esperado: Record<string, string> = {
-  NAO_INICIADA: "A iniciar", EM_ANDAMENTO: "Em andamento", AGUARDANDO_TERCEIRO: "Aguardando cartório", AGUARDANDO_CLIENTE: "Aguardando cliente",
+  NAO_INICIADA: "A iniciar", EM_ANDAMENTO: "Em andamento", AGUARDANDO_TERCEIRO: "Aguardando terceiros", AGUARDANDO_CLIENTE: "Aguardando cliente",
   BLOQUEADA: "Bloqueada", CONCLUIDO_RECEBIDO: "Concluída", CONCLUIDO_NAO_POSSUI: "Concluída", CANCELADA: "Cancelada", SUPERSEDIDA: "Substituída",
 }
 for (const s of enumSchema) ok(`${s} -> '${esperado[s]}'`, ROTULO_STATUS[s] === esperado[s] && rotuloStatusTarefa(s) === esperado[s], ROTULO_STATUS[s])

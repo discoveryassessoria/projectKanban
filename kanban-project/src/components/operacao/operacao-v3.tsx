@@ -586,7 +586,7 @@ function AbaFila({
           </div>
         )}
       </div>
-      <div style={{ fontSize: 12, color: "#5b6478" }}>A fazer = o que depende de você agora: certidões a iniciar (enviar ao cartório) e no passo 4 (conferir e validar). O que está com o cartório fica em Aguardando.</div>
+      <div style={{ fontSize: 12, color: "#5b6478" }}>A fazer = o que depende de você agora: certidões a iniciar (enviar ao cartório) e no passo 4 (conferir e validar). O que aguarda terceiros fica em Aguardando.</div>
 
       {noOrgTotal.length > 0 && !radar && !quick && (
         <div className="opv3-card" style={{ borderLeft: "4px solid #b3261e", padding: "10px 14px", display: "flex", gap: 12, alignItems: "center", fontSize: 12 }}>
@@ -600,7 +600,7 @@ function AbaFila({
       {linhas.length === 0 && (
         <div className="opv3-card" style={{ padding: 40, textAlign: "center", display: "flex", flexDirection: "column", gap: 8, alignItems: "center" }}>
           <b style={{ fontSize: 14, color: "#155e39" }}>{quick || radar ? "Nenhuma a fazer com esse filtro." : "Nada a fazer."}</b>
-          <span style={{ color: "#5b6478" }}>{nAguard} certidões com o cartório · {nAcompVenc} acompanhamentos vencidos.</span>
+          <span style={{ color: "#5b6478" }}>{nAguard} certidões aguardando terceiros · {nAcompVenc} acompanhamentos vencidos.</span>
         </div>
       )}
 

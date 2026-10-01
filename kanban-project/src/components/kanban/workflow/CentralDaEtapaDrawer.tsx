@@ -167,7 +167,7 @@ const STATUS_LABEL: Record<StatusStep, string> = {
   nao_iniciada: "Não iniciada",
   bloqueada: "Bloqueada",
   em_andamento: "Em andamento",
-  aguardando_terceiro: "Aguardando terceiro",
+  aguardando_terceiro: "Aguardando terceiros",
   atrasada: "Atrasada",
   concluida: "Concluída",
   cancelada: "Cancelada",

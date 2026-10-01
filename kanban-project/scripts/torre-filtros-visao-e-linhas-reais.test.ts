@@ -71,7 +71,7 @@ async function main() {
 
     secao("Visão salva pela API: TODOS os filtros, ida (POST → banco) e volta (GET)")
     const filtros: FiltrosTorre = {
-      responsavel: ["eu", String(beto.id)], prazo: ["vencidas", "7dias"], prazoDe: "2026-10-01", prazoAte: "2026-12-31", quando: "criada", quandoDe: "2026-09-01", quandoAte: "2026-12-31", familia: "Santin",
+      responsavel: ["eu", String(beto.id)], prazo: ["vencidas", "7dias"], prazoDe: "2026-10-01", prazoAte: "2026-12-31", quando: "criada", quandoDe: "2026-09-01", quandoAte: "2026-12-31", iniciou: null, iniciouDe: null, iniciouAte: null, familia: "Santin",
       status: ["AGUARDANDO_TERCEIRO"], certidao: ["CASAMENTO", "OUTRO"], fase: ["emissao_documental"], passo: ["Aguardar retorno"], orgao: ["sem"], prioridade: ["ALTA"], risco: ["critico"],
       linhaReta: true, acomp: ["vencido", "3dias"], cobranca: ["vencida", "semresposta"], ordenar: "risco",
     }

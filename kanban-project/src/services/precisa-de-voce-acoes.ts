@@ -14,13 +14,21 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { atribuirTarefa, redistribuirTarefas } from '@/lib/operacional/tarefa-comandos'
-import { cancelarTarefa, desbloquearTarefa, devolverAFila } from '@/lib/operacional/tarefa-ciclo'
-import { sugerirResponsavelPrecisaDeVoce } from '@/lib/operacional/precisa-de-voce'
+import { bloquearTarefa, cancelarTarefa, desbloquearTarefa, devolverAFila } from '@/lib/operacional/tarefa-ciclo'
+import {
+  sugerirResponsavelPrecisaDeVoce, semDonoDoProcesso, planoDeAtribuicao, planejarRedistribuicaoDaCarga, carregarContextoDeSugestao, alvosDeSugestao,
+} from '@/lib/operacional/precisa-de-voce'
+import { visaoGerencial } from '@/lib/operacional/tarefa-projecoes'
+import { pessoasNoLimite } from '@/lib/operacional/torre-equipe'
+import { certidoes } from '@/lib/operacional/precisa-de-voce-decisoes'
+import { advance, forceAdvance } from '@/src/lib/motor/phase-advance'
+import { JUSTIFICATIVA_MINIMA } from '@/src/services/processo-pausa'
 import { ignorarAchado } from '@/lib/saude/persistencia'
 import { subtarefaCorrenteDaTarefa, registrarCobranca, RESULTADOS_DE_CONTATO } from '@/src/services/subtarefas-da-etapa'
 import { projetarTarefaDoPasso, paresCoerentes, STATUS_TAREFA_POR_PASSO } from '@/src/services/passo-tarefa-projecao'
+import { humanizarEstadosNoTexto } from '@/src/lib/home/rotulo-status-tarefa'
 
-type Resultado = { ok: true; mensagem: string; [k: string]: unknown } | { ok: false; erro: string }
+type Resultado = { ok: true; mensagem: string; [k: string]: unknown } | { ok: false; erro: string; [k: string]: unknown }
 
 async function registrarAuditoriaSimples(args: {
   acao: string; entidade: string; entidadeId: number | null; usuarioId: number; descricao: string; detalhes?: unknown
@@ -55,6 +63,82 @@ export async function encerrarNaoDevida(tarefaId: number, justificativa: string,
   return { ok: true, mensagem: 'Encerrada como não devida.', tarefaId }
 }
 
+// ─── SEM RESPONSÁVEL — por PROCESSO ─────────────────────────────────────────
+
+/** Atribui as certidões sem responsável de um PROCESSO, cada uma a quem tem APTIDÃO comprovada (o plano da lista). Sem apto → nada, decisão humana. */
+export async function atribuirSugeridoDoProcesso(processoId: number, autorId: number, agora = new Date()): Promise<Resultado> {
+  const ids = await semDonoDoProcesso(processoId, agora)
+  if (ids.length === 0) return { ok: false, erro: 'este processo não tem mais certidões sem responsável' }
+  const plano = await planoDeAtribuicao(ids, agora)
+  if (plano.atribuicoes.length === 0) return { ok: false, erro: 'Sem aptidão cadastrada para estas certidões — escolha o responsável' }
+  const itens: Array<{ tarefaId: number; ok: boolean; mensagem?: string }> = []
+  for (const a of plano.atribuicoes) {
+    const r = await redistribuirTarefas({
+      tarefaIds: a.tarefaIds, novoResponsavelId: a.usuarioId, autorId,
+      motivo: `sugestão do Precisa de você${a.motivo ? `: ${a.motivo}` : ''}`,
+    })
+    itens.push(...r.itens)
+  }
+  const feitas = itens.filter((i) => i.ok)
+  if (feitas.length === 0) return { ok: false, erro: itens.find((i) => !i.ok)?.mensagem ?? 'nenhuma certidão pôde ser atribuída' }
+  const quem = plano.atribuicoes.map((a) => `${a.nome} (${a.tarefaIds.length})`).join(', ')
+  const sobra = plano.semAptidao.length ? ` ${certidoes(plano.semAptidao.length)} sem aptidão cadastrada continuam sem responsável.` : ''
+  return {
+    ok: true, mensagem: `${feitas.length} de ${itens.length} ${itens.length === 1 ? 'certidão atribuída' : 'certidões atribuídas'}: ${quem}.${sobra}`,
+    total: itens.length, sucesso: feitas.length, itens, processoId,
+  }
+}
+
+/** Atribui as certidões sem responsável de um PROCESSO à pessoa escolhida. */
+export async function atribuirEscolhidoDoProcesso(processoId: number, responsavelId: number, autorId: number, agora = new Date()): Promise<Resultado> {
+  const ids = await semDonoDoProcesso(processoId, agora)
+  if (ids.length === 0) return { ok: false, erro: 'este processo não tem mais certidões sem responsável' }
+  const r = await redistribuirTarefas({ tarefaIds: ids, novoResponsavelId: responsavelId, autorId, motivo: 'escolhido manualmente no Precisa de você (não a sugestão)' })
+  if (r.sucesso === 0) return { ok: false, erro: r.itens.find((i) => !i.ok)?.mensagem ?? 'nenhuma certidão pôde ser atribuída' }
+  return { ok: true, mensagem: `${r.sucesso} de ${r.total} ${r.total === 1 ? 'certidão atribuída' : 'certidões atribuídas'}.`, total: r.total, sucesso: r.sucesso, itens: r.itens, processoId }
+}
+
+// ─── FASE DEIXADA — AVANÇAR A FASE pela PORTA CANÔNICA ──────────────────────
+
+/**
+ * AVANÇAR FASE: a porta canônica do avanço (`advance`, o PhaseAdvanceService — gate `computeGate`, CAS, idempotência, auditoria em
+ * PhaseAdvanceLog). Nunca escreve `faseAtualKey`. Se o gate recusa, devolve as pendências (`pendencias`) e `podeForcar: true` — o
+ * "avançar na marra" é outra ação, com justificativa obrigatória (`avancarFaseForcado`).
+ */
+export async function avancarFase(processoId: number, autorId: number): Promise<Resultado> {
+  const r = await advance(processoId, { origem: 'torre:precisa', solicitadoPorId: autorId })
+  if (r.success) return { ok: true, mensagem: `Avançou de ${r.faseAnterior} para ${r.faseAtual}.`, processoId, faseAnterior: r.faseAnterior, faseAtual: r.faseAtual, logId: r.logId }
+  if (r.resultado === 'BLOQUEADO') {
+    return {
+      ok: false, erro: 'O avanço está bloqueado por pendências obrigatórias da fase.', podeForcar: true,
+      pendencias: (r.blockingIssues ?? []).map((b) => ({ code: b.code, message: b.message })),
+    }
+  }
+  return { ok: false, erro: r.message }
+}
+
+function justificativaDoAvanco(texto: unknown): string | null {
+  const t = typeof texto === 'string' ? texto.replace(/\s+/g, ' ').trim() : ''
+  return t.length >= JUSTIFICATIVA_MINIMA ? t : null
+}
+
+/** "Avançar na marra": ignora as pendências, EXIGE justificativa (mínimo de 5 letras) e fica no histórico como PhaseAdvanceLog FORÇADO. */
+export async function avancarFaseForcado(processoId: number, justificativa: unknown, autorId: number, motivoCodigo = 'AVANCO_FORCADO_PELA_TORRE'): Promise<Resultado> {
+  const j = justificativaDoAvanco(justificativa)
+  if (!j) return { ok: false, erro: `Informe a justificativa (mínimo de ${JUSTIFICATIVA_MINIMA} letras).` }
+  const r = await forceAdvance(processoId, { justificativa: j, motivoCodigo, origem: 'torre:precisa', solicitadoPorId: autorId })
+  if (r.success) return { ok: true, mensagem: `Avançou (forçado) de ${r.faseAnterior} para ${r.faseAtual}.`, processoId, faseAnterior: r.faseAnterior, faseAtual: r.faseAtual, logId: r.logId, forcado: true }
+  return { ok: false, erro: r.message }
+}
+
+/** "Encerrar (não devida)": a fase não é devida a este processo — encerra e segue, pelo avanço FORÇADO, com a justificativa no histórico. */
+export async function encerrarFaseNaoDevida(processoId: number, justificativa: unknown, autorId: number): Promise<Resultado> {
+  const j = justificativaDoAvanco(justificativa)
+  if (!j) return { ok: false, erro: `Informe a justificativa (mínimo de ${JUSTIFICATIVA_MINIMA} letras).` }
+  const r = await avancarFaseForcado(processoId, `Fase não devida: ${j}`, autorId, 'FASE_NAO_DEVIDA')
+  return r.ok ? { ...r, mensagem: `Fase encerrada como não devida: ${r.mensagem}` } : r
+}
+
 // ─── DIVERGÊNCIA ─────────────────────────────────────────────────────────────
 
 export async function reconciliar(tarefaId: number, autorId: number): Promise<Resultado> {
@@ -76,7 +160,7 @@ export async function reconciliar(tarefaId: number, autorId: number): Promise<Re
     descricao: `Tarefa #${tarefaId} reconciliada pelo Precisa de você: ${de} → ${resultado.para} (espelhando o passo ${tarefa.workflowStepInstance.status}).`,
     detalhes: { de, para: resultado.para, statusPasso: tarefa.workflowStepInstance.status, esperado: STATUS_TAREFA_POR_PASSO[tarefa.workflowStepInstance.status] },
   })
-  return { ok: true, mensagem: `Reconciliada: ${de} → ${resultado.para}.`, tarefaId }
+  return { ok: true, mensagem: humanizarEstadosNoTexto(`Reconciliada: ${de} → ${resultado.para}.`), tarefaId }
 }
 
 export async function ver3Fontes(tarefaId: number): Promise<Resultado> {
@@ -165,19 +249,42 @@ export async function desbloquear(tarefaId: number, autorId: number, motivo?: st
 
 const STATUS_ATIVOS_CARGA = ['NAO_INICIADA', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE', 'BLOQUEADA'] as const
 
-export async function redistribuirPorCarga(usuarioId: number, autorId: number, limite = 5): Promise<Resultado> {
-  const aEnviar = await prisma.tarefa.findMany({
-    where: { responsavelId: usuarioId, statusTarefa: 'NAO_INICIADA' },
-    select: { id: true }, orderBy: { dataPrazo: 'asc' }, take: Math.max(limite, 1),
-  })
-  if (aEnviar.length === 0) return { ok: false, erro: 'nenhuma tarefa "a enviar" para redistribuir' }
-  const destino = await sugerirResponsavelPrecisaDeVoce(aEnviar[0].id)
-  if (!destino || destino.usuarioId === usuarioId) return { ok: false, erro: 'sem candidato alternativo de menor carga' }
-  const r = await redistribuirTarefas({
-    tarefaIds: aEnviar.map((t) => t.id), novoResponsavelId: destino.usuarioId, autorId,
-    motivo: `redistribuição por carga (Precisa de você): ${destino.motivo}`,
-  })
-  return { ok: true, mensagem: `${r.sucesso} de ${r.total} tarefa(s) movida(s) para ${destino.nome}.`, ...r, responsavelId: destino.usuarioId }
+/**
+ * REDISTRIBUI A CARGA de uma pessoa no limite — o MESMO plano que a lista mostra (`planejarRedistribuicaoDaCarga`): as certidões
+ * ainda não iniciadas, o bastante para ficar abaixo do limite, cada uma para quem tem APTIDÃO comprovada e fila livre. Sem apto,
+ * nada se move por chute. Cada tarefa é movida pela porta de sempre (`redistribuirTarefas` → `atribuirTarefa`, auditada).
+ */
+export async function redistribuirPorCarga(usuarioId: number, autorId: number, agora = new Date()): Promise<Resultado> {
+  const noLimite = await pessoasNoLimite(agora)
+  const pessoa = noLimite.get(usuarioId)
+  if (!pessoa) return { ok: false, erro: 'a pessoa não está mais no limite de carga — nada para redistribuir' }
+  const [{ linhas }, ctx] = await Promise.all([visaoGerencial({ responsavelId: usuarioId, porPagina: 500 }, agora), carregarContextoDeSugestao(agora)])
+  const aIniciar = linhas.filter((l) => l.statusTarefa === 'NAO_INICIADA')
+  if (aIniciar.length === 0) return { ok: false, erro: 'nenhuma certidão ainda não iniciada para redistribuir' }
+  const alvos = await alvosDeSugestao(aIniciar.map((l) => l.taskId))
+  const plano = planejarRedistribuicaoDaCarga({ pessoa, linhas, ctx, alvos, noLimite: new Set(noLimite.keys()) })
+  if (plano.movimentos.length === 0) return { ok: false, erro: 'sem pessoa com aptidão comprovada e fila livre para receber — decida pela Equipe' }
+  const porDestino = new Map<number, { nome: string; tarefaIds: number[] }>()
+  for (const m of plano.movimentos) {
+    const d = porDestino.get(m.paraUsuarioId) ?? { nome: m.paraNome, tarefaIds: [] }
+    d.tarefaIds.push(m.tarefaId)
+    porDestino.set(m.paraUsuarioId, d)
+  }
+  const itens: Array<{ tarefaId: number; ok: boolean; mensagem?: string }> = []
+  for (const [destinoId, d] of porDestino) {
+    const r = await redistribuirTarefas({
+      tarefaIds: d.tarefaIds, novoResponsavelId: destinoId, autorId,
+      motivo: `redistribuição por carga (Precisa de você): ${pessoa.nome} está no limite (${pessoa.executaveis}/${pessoa.limite}); ${d.nome} tem aptidão e fila livre`,
+    })
+    itens.push(...r.itens)
+  }
+  const movidas = itens.filter((i) => i.ok)
+  if (movidas.length === 0) return { ok: false, erro: itens.find((i) => !i.ok)?.mensagem ?? 'nenhuma certidão pôde ser movida' }
+  const resumo = [...porDestino.values()].map((d) => `${d.nome} (${d.tarefaIds.length})`).join(', ')
+  return {
+    ok: true, mensagem: `${movidas.length} de ${itens.length} ${itens.length === 1 ? 'certidão movida' : 'certidões movidas'} de ${pessoa.nome} para ${resumo}.`,
+    total: itens.length, sucesso: movidas.length, itens, responsavelId: [...porDestino.keys()][0],
+  }
 }
 
 export async function verEquipe(usuarioId: number): Promise<Resultado> {
@@ -250,4 +357,41 @@ export async function desfazerAtribuicao(tarefaIds: number[], autorId: number, o
     itens.push({ tarefaId, ok: true, mensagem: 'desfeita' })
   }
   return { total: itens.length, desfeitas: itens.filter((i) => i.ok).length, itens }
+}
+
+/**
+ * DESFAZ UM DESBLOQUEIO: bloqueia de novo, com o motivo que a tarefa tinha. Só desfaz se o último fato da tarefa AINDA é o desbloqueio
+ * (nada aconteceu depois) e ela não está bloqueada.
+ */
+export async function desfazerDesbloqueio(tarefaId: number, autorId: number): Promise<Resultado> {
+  const t = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { id: true, statusTarefa: true, justificativa: true } })
+  if (!t) return { ok: false, erro: 'tarefa não encontrada' }
+  if (t.statusTarefa === 'BLOQUEADA') return { ok: false, erro: 'a tarefa já está bloqueada' }
+  const ultimo = await prisma.logAuditoria.findFirst({ where: { entidade: 'Tarefa', entidadeId: tarefaId }, orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }], select: { acao: true } })
+  if (ultimo?.acao !== 'TAREFA_DESBLOQUEADA') return { ok: false, erro: 'a tarefa mudou desde o desbloqueio — desfazer recusado' }
+  const r = await bloquearTarefa({ tarefaId, autorId, motivo: t.justificativa?.trim() || 'bloqueio restaurado (desfazer)' })
+  if (!r.ok) return { ok: false, erro: r.mensagem }
+  await registrarAuditoriaSimples({
+    acao: 'TAREFA_DESBLOQUEIO_DESFEITO', entidade: 'Tarefa', entidadeId: tarefaId, usuarioId: autorId,
+    descricao: `Desbloqueio da tarefa #${tarefaId} desfeito: a tarefa voltou a BLOQUEADA.`, detalhes: { tarefaId },
+  })
+  return { ok: true, mensagem: 'Desbloqueio desfeito.', tarefaId }
+}
+
+/** DESFAZ A TROCA DE CANAL: devolve à solicitação o canal anterior (lido do PRÓPRIO log da troca). Recusa se o canal já mudou de novo. */
+export async function desfazerTrocaDeCanal(tarefaId: number, autorId: number): Promise<Resultado> {
+  const log = await prisma.logAuditoria.findFirst({
+    where: { entidade: 'Tarefa', entidadeId: tarefaId, acao: 'SOLICITACAO_CANAL_ALTERADO' }, orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }], select: { detalhes: true },
+  })
+  const d = log?.detalhes as { solicitacaoId?: number; de?: string; para?: string } | null
+  if (!d?.solicitacaoId || !d.de || !d.para) return { ok: false, erro: 'nenhuma troca de canal para desfazer' }
+  const sol = await prisma.solicitacaoDocumento.findUnique({ where: { id: d.solicitacaoId }, select: { canal: true } })
+  if (!sol || sol.canal !== d.para) return { ok: false, erro: 'o canal mudou desde a troca — desfazer recusado' }
+  await prisma.solicitacaoDocumento.update({ where: { id: d.solicitacaoId }, data: { canal: d.de as never } })
+  await registrarAuditoriaSimples({
+    acao: 'SOLICITACAO_CANAL_ALTERADO', entidade: 'Tarefa', entidadeId: tarefaId, usuarioId: autorId,
+    descricao: `Troca de canal da solicitação #${d.solicitacaoId} (tarefa #${tarefaId}) desfeita: ${d.para} → ${d.de}.`,
+    detalhes: { tarefaId, solicitacaoId: d.solicitacaoId, de: d.para, para: d.de, desfazer: true },
+  })
+  return { ok: true, mensagem: `Canal devolvido para ${d.de}.`, tarefaId }
 }
