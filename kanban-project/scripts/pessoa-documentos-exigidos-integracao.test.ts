@@ -16,7 +16,7 @@ exigirBancoDeTeste("pessoa-documentos-exigidos-integracao.test.ts")
 import { prisma } from "../lib/prisma"
 import { criarPalco } from "./_fixture-arvore-fonte"
 import { calcularExigenciasDaGenealogia, materializarGenealogia } from "../src/services/genealogia/materializar-genealogia"
-import { iniciarAtendimentoNecessidade } from "../src/services/necessidade-documental"
+import { atenderNecessidade, iniciarAtendimentoNecessidade } from "../src/services/necessidade-documental"
 import { genealogiaZeradaPorEscolhaManual } from "../src/services/genealogia/zero-por-escolha"
 import { materializarExecucaoDaFase } from "../src/services/materializar-fase"
 import { advance } from "../src/lib/motor/phase-advance"
@@ -188,6 +188,28 @@ async function main() {
   const humano = await advance(D.processoId, { origem: "avancar-fase" })
   ok("avanço MANUAL humano continua permitido (não barrado pela trava de escolha)", !(!humano.success && humano.code === "AVANCO_MANUAL_OBRIGATORIO" && /desmarcados/.test(humano.message ?? "")), humano.success ? "avançou" : `${humano.code}: ${humano.message} ${JSON.stringify(!humano.success && "blockingIssues" in humano ? humano.blockingIssues?.map((b) => b.code) : [])}`)
   ok("e, com o gate aberto, ele realmente sai da Genealogia", humano.success === true, humano.success ? "" : `${humano.code}: ${humano.message} ${JSON.stringify("blockingIssues" in humano ? humano.blockingIssues?.map((b) => b.code) : [])}`)
+
+  // D3) CASO REAL (processo 688, 01/10/2026): havia certidão JÁ CONCLUÍDA (ATENDIDA) e a pessoa desmarcou tudo. A trava contava a
+  // necessidade ATENDIDA como "viva" e se desligava; o gate via tudo concluído e o processo seguia sozinho para Análise Documental.
+  secao("D3) Certidão já concluída + todos desmarcados: continua sendo decisão humana")
+  await alvoDasRegras("PESSOA_FORA_DA_LINHA_RETA")
+  await arquivarReq(true)
+  const D3 = await familia("D3", false)
+  await prisma.pessoa.updateMany({ where: { id: { in: [D3.titularId, D3.conjugeId!] } }, data: { casado: false } })
+  await materializarGenealogia(D3.processoId)
+  const necD3 = (await prisma.necessidadeDocumental.findMany({ where: { processoId: D3.processoId, pessoaId: D3.conjugeId!, supersedePorId: null, status: { not: "DISPENSADA" } }, select: { id: true } }))
+  ok("PRÉ-CONDIÇÃO: a cônjuge tem exatamente 1 necessidade viva", necD3.length === 1, String(necD3.length))
+  await atenderNecessidade(necD3[0].id)
+  await putDocs(D3.conjugeId!, [])
+  const c3 = await calc(D3.processoId)
+  ok("exigência zerou, a escolha removeu algo e a necessidade segue ATENDIDA (fato acontecido não se desfaz)", c3.exigencias.length === 0 && c3.removidasPorEscolha.length >= 1 && (await prisma.necessidadeDocumental.findUniqueOrThrow({ where: { id: necD3[0].id }, select: { status: true } })).status === "ATENDIDA")
+  ok("genealogiaZeradaPorEscolhaManual = true mesmo com certidão concluída", (await genealogiaZeradaPorEscolhaManual(D3.processoId)).zerada)
+  for (const origem of ["cron-reconciliacao", "reconciliacao", "recalcular", "arvore", undefined]) {
+    const a = await advance(D3.processoId, origem ? { origem } : {})
+    ok(`advance(origem=${origem ?? "(ausente)"}) → REJEITADO AVANCO_MANUAL_OBRIGATORIO`, !a.success && a.code === "AVANCO_MANUAL_OBRIGATORIO", a.success ? "AVANÇOU" : `${a.code}: ${a.message}`)
+  }
+  const rec3 = await reconciliarMotorDeFases(D3.processoId, { origem: "cron-reconciliacao" })
+  ok("reconciliarMotorDeFases: segue na Genealogia", rec3.transicoes.length === 0 && rec3.faseFinal === "genealogia", `${rec3.code}/${rec3.faseFinal}`)
 
   await alvoDasRegras("TODAS_AS_PESSOAS_DA_ARVORE")
   await arquivarReq(false)

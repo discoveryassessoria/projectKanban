@@ -10,7 +10,9 @@
 // DEFINIÇÃO (única, usada por `advance()`, cron `reconciliar-fases` (ensaio) e Saúde CRON-005):
 //   1. a regra automática da árvore exigiria ≥ 1 documento que a escolha manual tirou (`removidasPorEscolha`); E
 //   2. depois do filtro não sobrou nenhuma exigência (`exigencias` vazia); E
-//   3. não há NecessidadeDocumental viva no processo (nem atendida/em atendimento: trabalho que já andou é exigência real).
+//   3. não há NecessidadeDocumental EM ABERTO (PENDENTE/EM_ATENDIMENTO) — trabalho em andamento é exigência real. Certidão já
+//      ATENDIDA/NAO_LOCALIZADA NÃO desliga a trava: o fato fica registrado, mas a decisão "sem mais documentos, siga" continua
+//      sendo humana (processo 688, 01/10/2026: havia certidão concluída, a pessoa desmarcou tudo e o processo avançou sozinho).
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
@@ -31,7 +33,7 @@ export async function genealogiaZeradaPorEscolhaManual(processoId: number, db: D
   const removidas = calculo.removidasPorEscolha.length
   if (removidas === 0 || calculo.exigencias.length > 0) return { zerada: false, removidasPorEscolha: removidas }
   const vivas = await db.necessidadeDocumental.count({
-    where: { processoId, supersedePorId: null, status: { not: "DISPENSADA" } },
+    where: { processoId, supersedePorId: null, status: { in: ["PENDENTE", "EM_ATENDIMENTO"] } },
   })
   return { zerada: vivas === 0, removidasPorEscolha: removidas }
 }
