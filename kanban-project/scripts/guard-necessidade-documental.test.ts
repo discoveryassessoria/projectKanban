@@ -109,6 +109,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "dispensarNecessidade (o dono canônico), só o `deleteMany` de limpeza é direto",
   "scripts/duplicidade-reconciliacao-e-reancoragem.test.ts":
     "duplicidade de reconciliação/reancoragem (30/09/2026, item 12 da auditoria): monta e derruba os PRÓPRIOS processos/necessidades (marca de teste) só no banco de teste — a necessidade é cenário para provar idempotência, não uma escrita de negócio fora do reconciliador",
+  "scripts/torre-relatorio-fase-passo-iniciou.test.ts":
+    "Relatório de controle (Torre nova, 01/10/2026): monta e derruba a PRÓPRIA necessidade/documento (marca RELCTL) só no banco de teste, para provar as colunas Fase/Passo/Iniciou do domínio Certidões (uma linha = uma necessidade) — leitura do relatório, não uma escrita de negócio fora do serviço canônico",
   "scripts/torre-visao-gerencial-leitura-paralela.test.ts":
     "leitura paralela da visão gerencial (30/09/2026, desempenho): monta e derruba os PRÓPRIOS processos/necessidades (marca de teste) só no banco de teste, para comparar a hidratação em paralelo com a aninhada — as necessidades são cenário de leitura, não uma escrita de negócio fora do reconciliador",
   "scripts/obrigacao-atribuicao.test.ts":
