@@ -11,7 +11,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { KPIS, KPI_POR_CHAVE, CARTOES_DA_SITUACAO, PREDICADO_DO_KPI } from "../lib/operacional/torre-kpis"
-import { fraseDoDia, type LinhaParaTopo } from "../lib/operacional/torre-topo"
+import { fraseDoDia, textoDaFrase, TIPOS_NA_FRASE } from "../lib/operacional/torre-topo"
 import { ABAS_DA_TORRE } from "../lib/operacional/torre-abas"
 import { rotuloDoLado } from "../lib/operacional/torre-bola"
 import { escolherResponsavel, textoDaSugestao, type ContextoDeSugestao } from "../lib/operacional/precisa-de-voce"
@@ -69,14 +69,15 @@ ok("as CHAVES internas não mudaram (cartorio, ninguem, equipe, abertas) e todas
 ok("as chaves legadas de ?kpi= seguem válidas (aguard, semdono) — só o rótulo mudou", KPIS.some((k) => k.chave === "aguard" && k.rotulo.startsWith("Aguardando terceiros")) && KPIS.some((k) => k.chave === "semdono" && k.rotulo === "Sem responsável"))
 ok("nenhum rótulo de indicador contém os termos proibidos", KPIS.every((k) => !/cart[óo]rio|ningu[ée]m/i.test(k.rotulo)) )
 ok("nenhuma REGRA escrita (title do cartão) usa 'Sem ninguém'/'Com o cartório'", KPIS.every((k) => !/sem ningu[ée]m|com o cart[óo]rio/i.test(k.regra)))
-const L = (o: Partial<LinhaParaTopo> = {}) => ({ processoId: 1, dataPrazo: null, responsavelId: 7, atrasada: false, diasParaPrazo: null, estadoOperacao: "FILA", acompanhamentoVencido: false, escalada: false, faseMacroKey: "x", aIniciar: false, statusTarefa: "NAO_INICIADA", familiaNome: "F", processoNome: null, ...o }) as LinhaParaTopo
-const frase = fraseDoDia([L({ estadoOperacao: "AGUARDANDO" }), L({ responsavelId: null })], new Date("2026-09-30T15:00:00Z"))
-ok("a frase-resumo diz 'aguardando terceiros' e 'sem responsável'", /1 aguardando terceiros, 1 sem responsável\.$/.test(frase) && !/cart[óo]rio|ningu/i.test(frase), frase)
+const frase = textoDaFrase(fraseDoDia({ processos: 3, noRitmo: 1, decisoes: [{ tipo: "SEM_DONO" }, { tipo: "ESCALADA" }], gargalo: null }))
+ok("a frase-resumo diz 'sem dono' e 'escalada de cartório' (vocabulário do protótipo) e nunca 'Com o cartório'/'ninguém'", /1 sem dono, 1 escalada de cartório\.$/.test(frase) && !/com o cart[óo]rio|ningu/i.test(frase), frase)
+ok("os tipos da frase têm o vocabulário oficial", TIPOS_NA_FRASE.map((x) => x.varios).join(" · ") === "sem dono · fases deixadas · escaladas de cartório · divergências · bloqueadas · de carga da equipe")
 ok("as abas: a aba é 'Tarefas' (nunca 'Certidões') e não há 'Equipe e Terceiros'", ABAS_DA_TORRE.some(([, r]) => r === "Tarefas") && ABAS_DA_TORRE.every(([, r]) => !/certid|Equipe e Terceiros/i.test(r)))
 ok("'Bola nossa' / 'Bola com terceiro'", rotuloDoLado("Nossa") === "Bola nossa" && rotuloDoLado("Cartório") === "Bola com terceiro" && rotuloDoLado("Cliente") === "Bola com terceiro")
 ok("os nomes oficiais seguem no cabeçalho: 'Precisa de você', 'Revisar o dia', 'Briefing do dia'", ABAS_DA_TORRE.some(([, r]) => r === "Precisa de você") && /Revisar o dia/.test(ler("src/components/torre/TorreCabecalho.tsx")) && /Briefing do dia/.test(ler("src/components/torre/TorreCabecalho.tsx")))
-ok("a visão de Tarefas se chama 'Aguardando terceiros' e 'Sem responsável'", /\["aguard", "Aguardando terceiros"\]/.test(ler("src/components/torre/TorreTarefas.tsx")) && /\["semdono", "Sem responsável"\]/.test(ler("src/components/torre/TorreTarefas.tsx")))
-ok("os 4 números do Foco e a linha de Processos dizem 'Aguardando terceiros'", /"Aguardando terceiros", foco\.numeros\.comCartorio/.test(ler("src/components/torre/FocoFamilia.tsx")) && /aguardando terceiros · \{n\.semResponsavel\} sem responsável/.test(ler("src/components/torre/TorreProcessos.tsx")))
+ok("a visão de Tarefas se chama 'Aguardando terceiros' e 'Sem responsável'", /\['aguard', 'Aguardando terceiros'\]/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /\['semdono', 'Sem responsável'\]/.test(ler("lib/operacional/torre-tarefas-tela.ts")))
+// Torre nova: a aba Processos (por fase) não repete os 4 números por linha; o vocabulário vale nela e no Radar do mesmo jeito.
+ok("os 4 números do Foco dizem 'Aguardando terceiros'; Processos e Radar usam 'Sem responsável' e nunca 'Com o cartório'/'Sem ninguém'", /"Aguardando terceiros", foco\.numeros\.comCartorio/.test(ler("src/components/torre/FocoFamilia.tsx")) && [ "src/components/torre/TorreProcessos.tsx", "src/components/torre/TorreRadar.tsx", "lib/operacional/torre-fase.ts", "lib/operacional/torre-radar.ts" ].every((a) => !/Com o cart[oó]rio|Sem ningu[eé]m|Ninguém/.test(ler(a))) && /SEM_RESPONSAVEL = 'Sem responsável'/.test(ler("lib/operacional/torre-fase.ts")))
 ok("a coluna 'Bola com' mostra 'Sem responsável' (nunca 'Ninguém')", /txt: "Sem responsável", cls: "red"/.test(ler("src/components/torre/tipos.ts")))
 
 secao("o texto da sugestão sem aptidão (decisões do dia)")
