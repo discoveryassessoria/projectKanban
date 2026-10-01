@@ -9,6 +9,7 @@
 // proibidos (vocabulário oficial) — tudo em funções puras com `agora` e fuso fixos.
 // ============================================================================
 import { readFileSync } from "node:fs"
+import { humanizarEstadosNoTexto } from "../src/lib/home/rotulo-status-tarefa"
 import {
   TIPOS_DO_PAINEL, ROTULO_DO_TIPO, regraDoTipo, DIAS_BLOQUEADA_PARA_DECIDIR, certidoes, decimalPt, diasDeCalendario, quandoEntrouNaFase,
   canaisPorExtenso, identidadeDaCertidao, planoDoSemDono, textosDoSemDono, textosDaFaseDeixada, textosDaEscalada, textosDaDivergencia,
@@ -140,6 +141,7 @@ ok("POST …/acao usa exigirTorre com a permissão de cada ação", /exigirTorre
 ok("avançar fase pede workflow.avancar; forçar/encerrar fase pede workflow.forcarAvanco (as MESMAS permissões das rotas de avanço)", /AVANCAR_FASE: 'workflow\.avancar'/.test(rotaAcao) && /AVANCAR_FASE_FORCADO: 'workflow\.forcarAvanco'/.test(rotaAcao) && /ENCERRAR_FASE_NAO_DEVIDA: 'workflow\.forcarAvanco'/.test(rotaAcao))
 ok("o avanço passa pela PORTA CANÔNICA (advance/forceAdvance do PhaseAdvanceService) — nunca escreve faseAtualKey", /from '@\/src\/lib\/motor\/phase-advance'/.test(ler("src/services/precisa-de-voce-acoes.ts")) && !/faseAtualKey:/.test(semComentarios(ler("src/services/precisa-de-voce-acoes.ts"))))
 ok("POST …/desfazer usa exigirTorre('tarefas.editar')", /exigirTorre\(request, 'tarefas\.editar'\)/.test(rotaDesfazer) && !/verificarPermissao/.test(semComentarios(rotaDesfazer)))
+ok("o toast de 'Reconciliar' mostra os status em português, nunca o enum cru (NAO_INICIADA → CONCLUIDO_RECEBIDO)", /humanizarEstadosNoTexto\(`Reconciliada: \$\{de\} → \$\{resultado\.para\}\.`\)/.test(ler("src/services/precisa-de-voce-acoes.ts")) && humanizarEstadosNoTexto("Reconciliada: NAO_INICIADA → CONCLUIDO_RECEBIDO.") === "Reconciliada: a iniciar → concluída." && !/[A-Z]+_[A-Z_]+/.test(humanizarEstadosNoTexto("Reconciliada: NAO_INICIADA → CONCLUIDO_RECEBIDO.")))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 if (falhou > 0) { console.log(falhas.join("\n")); process.exit(1) }

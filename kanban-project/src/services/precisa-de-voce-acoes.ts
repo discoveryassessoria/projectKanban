@@ -26,6 +26,7 @@ import { JUSTIFICATIVA_MINIMA } from '@/src/services/processo-pausa'
 import { ignorarAchado } from '@/lib/saude/persistencia'
 import { subtarefaCorrenteDaTarefa, registrarCobranca, RESULTADOS_DE_CONTATO } from '@/src/services/subtarefas-da-etapa'
 import { projetarTarefaDoPasso, paresCoerentes, STATUS_TAREFA_POR_PASSO } from '@/src/services/passo-tarefa-projecao'
+import { humanizarEstadosNoTexto } from '@/src/lib/home/rotulo-status-tarefa'
 
 type Resultado = { ok: true; mensagem: string; [k: string]: unknown } | { ok: false; erro: string; [k: string]: unknown }
 
@@ -159,7 +160,7 @@ export async function reconciliar(tarefaId: number, autorId: number): Promise<Re
     descricao: `Tarefa #${tarefaId} reconciliada pelo Precisa de você: ${de} → ${resultado.para} (espelhando o passo ${tarefa.workflowStepInstance.status}).`,
     detalhes: { de, para: resultado.para, statusPasso: tarefa.workflowStepInstance.status, esperado: STATUS_TAREFA_POR_PASSO[tarefa.workflowStepInstance.status] },
   })
-  return { ok: true, mensagem: `Reconciliada: ${de} → ${resultado.para}.`, tarefaId }
+  return { ok: true, mensagem: humanizarEstadosNoTexto(`Reconciliada: ${de} → ${resultado.para}.`), tarefaId }
 }
 
 export async function ver3Fontes(tarefaId: number): Promise<Resultado> {
