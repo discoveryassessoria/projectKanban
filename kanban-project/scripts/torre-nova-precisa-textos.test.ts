@@ -91,7 +91,7 @@ ok("já houve ligação: a sugestão não manda 'trocar para telefone' de novo",
 secao("DIVERGÊNCIA (T099)")
 const d1 = textosDaDivergencia({ familia: "Fogli", certidao: "Certidão de nascimento · Rodolfo Giovanni Fogli", pais: "Itália", statusTarefa: "CONCLUIDO_RECEBIDO", statusPasso: "AGUARDANDO", esperado: "AGUARDANDO_TERCEIRO" })
 ok("título: '<família> · <certidão + pessoa>'", d1.titulo === "Fogli · Certidão de nascimento · Rodolfo Giovanni Fogli")
-ok("detalhe: a tarefa diz X, o passo diz Y, a Central espera Z", /^Itália · a tarefa diz "concluída", o passo diz "aguardando", a Central espera "aguardando cartório"$/.test(d1.detalhe), d1.detalhe)
+ok("detalhe: a tarefa diz X, o passo diz Y, a Central espera Z", /^Itália · a tarefa diz "concluída", o passo diz "aguardando", a Central espera "aguardando terceiros"$/.test(d1.detalhe), d1.detalhe)
 ok("sugestão: reconciliar pela Central", /^Reconciliar pela Central/.test(d1.sugestao))
 
 secao("BLOQUEADA — esperando o cliente há 10+ dias (T101)")

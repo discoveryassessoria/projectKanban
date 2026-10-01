@@ -13,6 +13,7 @@ import { join } from "node:path"
 import { KPIS, KPI_POR_CHAVE, CARTOES_DA_SITUACAO, PREDICADO_DO_KPI } from "../lib/operacional/torre-kpis"
 import { fraseDoDia, textoDaFrase, TIPOS_NA_FRASE } from "../lib/operacional/torre-topo"
 import { ABAS_DA_TORRE } from "../lib/operacional/torre-abas"
+import { ROTULO_STATUS } from "../src/lib/home/rotulo-status-tarefa"
 import { rotuloDoLado } from "../lib/operacional/torre-bola"
 import { escolherResponsavel, textoDaSugestao, type ContextoDeSugestao } from "../lib/operacional/precisa-de-voce"
 
@@ -79,6 +80,28 @@ ok("a visão de Tarefas se chama 'Aguardando terceiros' e 'Sem responsável'", /
 // Torre nova: a aba Processos (por fase) não repete os 4 números por linha; o vocabulário vale nela e no Radar do mesmo jeito.
 ok("os 4 números do Foco dizem 'Aguardando terceiros'; Processos e Radar usam 'Sem responsável' e nunca 'Com o cartório'/'Sem ninguém'", /"Aguardando terceiros", foco\.numeros\.comCartorio/.test(ler("src/components/torre/FocoFamilia.tsx")) && [ "src/components/torre/TorreProcessos.tsx", "src/components/torre/TorreRadar.tsx", "lib/operacional/torre-fase.ts", "lib/operacional/torre-radar.ts" ].every((a) => !/Com o cart[oó]rio|Sem ningu[eé]m|Ninguém/.test(ler(a))) && /SEM_RESPONSAVEL = 'Sem responsável'/.test(ler("lib/operacional/torre-fase.ts")))
 ok("a coluna 'Bola com' mostra 'Sem responsável' (nunca 'Ninguém')", /txt: "Sem responsável", cls: "red"/.test(ler("src/components/torre/tipos.ts")))
+
+secao("vocabulário de STATUS em TODA a interface (30/09/2026+): 'Aguardando terceiros', nunca 'Aguardando cartório/juízo/consulado' nem 'Com o cartório'")
+// Varredura ampla do código de exibição (comentários não contam). Nomes de passo configurados no Gerenciamento ('Aguardar retorno do cartório') não casam: são DADO, não rótulo de status.
+const RAIZES_DE_EXIBICAO = ["src/components", "src/app", "src/lib", "src/services", "lib/operacional", "lib/home", "lib/saude"].filter((d) => { try { return statSync(d).isDirectory() } catch { return false } })
+const EXCECOES_DE_EXIBICAO = new Set(["src/components/arvore/pessoa-sidebar.tsx", "src/components/arvore/pessoa-card.tsx"]) // Árvore está congelada (ADR13): rótulo singular próprio, fora do escopo.
+const STATUS_PROIBIDOS: Array<[RegExp, string]> = [
+  [/Aguardando (o |a )?(cart[óo]rio|ju[íi]zo|consulado)/i, "'Aguardando cartório/juízo/consulado' → 'Aguardando terceiros'"],
+  [/\bCom o cart[óo]rio/, "'Com o cartório' (rótulo, com C maiúsculo) → 'Aguardando terceiros'"],
+  [/Equipe e Terceiros/i, "'Equipe e Terceiros' não existe"],
+  [/["'`>]Aguardando terceiro["'`<]/, "rótulo singular 'Aguardando terceiro' → 'Aguardando terceiros'"],
+]
+const achadosStatus: string[] = []
+for (const raiz of RAIZES_DE_EXIBICAO) {
+  for (const f of arquivos(raiz)) {
+    if (EXCECOES_DE_EXIBICAO.has(f)) continue
+    const cod = semComentarios(ler(f))
+    for (const [re, porque] of STATUS_PROIBIDOS) { const m = re.exec(cod); if (m) achadosStatus.push(`${f}: "${m[0]}" — ${porque}`) }
+  }
+}
+ok(`nenhum rótulo de status antigo no código de exibição (${RAIZES_DE_EXIBICAO.join(", ")})`, achadosStatus.length === 0, achadosStatus.join(" | "))
+ok("controle positivo da varredura ampla", STATUS_PROIBIDOS.every(([re]) => re.test(['Aguardando cartório', 'Com o cartório', 'Equipe e Terceiros', '"Aguardando terceiro"'].join(' ') )))
+ok("a fonte única diz 'Aguardando terceiros' para AGUARDANDO_TERCEIRO", ROTULO_STATUS.AGUARDANDO_TERCEIRO === "Aguardando terceiros")
 
 secao("o texto da sugestão sem aptidão (decisões do dia)")
 type U = ContextoDeSugestao["usuarios"][number]

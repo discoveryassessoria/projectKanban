@@ -119,7 +119,7 @@ const TITULO_LOG_ACAO: Record<string, string> = {
   // O Desfazer da Torre grava UMA linha só (item 11, 30/09/2026), com de/para no detalhe.
   TAREFA_PRIORIDADE_DESFEITA: "Prioridade desfeita",
   TAREFA_PRAZO_REPACTUACAO_DESFEITA: "Repactuação de prazo desfeita",
-  TAREFA_AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  TAREFA_AGUARDANDO_TERCEIRO: "Aguardando terceiros",
   TAREFA_RETOMADA_DE_ESPERA: "Retomada da espera",
   TAREFA_CONCLUIDA: "Tarefa concluída",
   TAREFA_CANCELADA: "Operação cancelada",
@@ -381,7 +381,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
       data: e.criadoEm.toISOString(),
       // WorkflowEvento não carrega autor — é sempre o motor (task-step-sync.ts).
       autor: SISTEMA,
-      titulo: esperaDeTerceiro ? "Aguardando terceiro" : TITULO_WORKFLOW_EVENTO[e.tipo] ?? e.tipo,
+      titulo: esperaDeTerceiro ? "Aguardando terceiros" : TITULO_WORKFLOW_EVENTO[e.tipo] ?? e.tipo,
       descricao: null,
       de: typeof d.de === "string" ? d.de : null,
       para: typeof d.para === "string" ? d.para : null,

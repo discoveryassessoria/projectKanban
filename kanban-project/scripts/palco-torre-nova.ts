@@ -138,7 +138,7 @@ const PASSOS: Record<string, Array<{ key: string; label: string; card?: "PROCESS
   ],
   retificacao_registros: [
     { key: "peticionar_retificacao", label: "Petição a protocolar", card: "PROCESSO" },
-    { key: "aguardar_juizo", label: "Aguardando juízo", card: "PROCESSO" },
+    { key: "aguardar_juizo", label: "Aguardando terceiros", card: "PROCESSO" },
     { key: "receber_sentenca", label: "Sentença recebida", card: "PROCESSO" },
     { key: "averbar", label: "Averbada", card: "PROCESSO" },
   ],

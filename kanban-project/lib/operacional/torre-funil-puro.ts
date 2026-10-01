@@ -113,12 +113,12 @@ export function maiorGargalo(linhas: LinhaParaGargalo[], faseKey: string): Garga
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
 
-/** "12 tarefas em “Aguardando cartório” · 5 há 30+ dias" — a coluna "Maior gargalo". */
+/** "12 tarefas em “Aguardando terceiros” · 5 há 30+ dias" — a coluna "Maior gargalo". */
 export function textoDoGargalo(g: GargaloDaFase | null): string {
   if (!g) return '—'
   return `${plural(g.paradas, 'tarefa', 'tarefas')} em “${g.passo}”${g.antigas > 0 ? ` · ${g.antigas} há ${LIMITE_ESPERA_ANTIGA_DIAS}+ dias` : ''}`
 }
-/** A mesma informação para dentro da frase do dia: "12 tarefas em “Aguardando cartório” (5 há mais de 30 dias)". */
+/** A mesma informação para dentro da frase do dia: "12 tarefas em “Aguardando terceiros” (5 há mais de 30 dias)". */
 export function textoDoGargaloNaFrase(g: GargaloDaFase): string {
   return `${plural(g.paradas, 'tarefa', 'tarefas')} em “${g.passo}”${g.antigas > 0 ? ` (${g.antigas} há mais de ${LIMITE_ESPERA_ANTIGA_DIAS} dias)` : ''}`
 }

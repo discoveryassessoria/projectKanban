@@ -98,7 +98,7 @@ ok("a fase inicial é a de MAIOR volume (no protótipo, Emissão); sem processo 
 
 secao("PASSO ONDE A MAIORIA ESTÁ (T200)")
 const comTarefas = (semResp: number, passos: Array<[string, number, number]>) => processo({ id: 80, nome: "T", tarefasDaFase: { abertas: semResp + passos.reduce((s, p) => s + p[1], 0), semResponsavel: semResp, concluidas: 0, ehCertidao: true, passos: passos.map(([label, n, ordem]) => ({ chave: label, label, ordem, n, aguardando: 0, acimaDaMeta: 0 })) } })
-ok("a caixa com mais tarefas", passoDominante(comTarefas(0, [["Solicitar", 2, 1], ["Aguardando cartório", 7, 2]]))?.label === "Aguardando cartório")
+ok("a caixa com mais tarefas", passoDominante(comTarefas(0, [["Solicitar", 2, 1], ["Aguardando terceiros", 7, 2]]))?.label === "Aguardando terceiros")
 ok("'Sem responsável' é uma caixa como as outras", passoDominante(comTarefas(12, [["Solicitar", 2, 1]]))?.label === "Sem responsável")
 ok("empate → o passo mais adiantado vence 'Sem responsável'", passoDominante(comTarefas(3, [["Solicitar", 3, 1]]))?.label === "Solicitar")
 ok("sem tarefa aberta: '—' (null); só concluídas: 'Todas concluídas'", passoDominante(processo({ id: 81, nome: "V" })) === null && passoDominante(processo({ id: 82, nome: "C", tarefasDaFase: { abertas: 0, semResponsavel: 0, concluidas: 4, passos: [], ehCertidao: true } }))?.label === "Todas concluídas")

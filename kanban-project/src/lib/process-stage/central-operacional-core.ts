@@ -242,7 +242,7 @@ export function rotuloStatusPasso(status: string): string {
     case "PENDENTE": return "Pendente"
     case "DISPONIVEL": return "Disponível"
     case "EM_ANDAMENTO": return "Em andamento"
-    case "AGUARDANDO": return "Aguardando terceiro"
+    case "AGUARDANDO": return "Aguardando terceiros"
     case "AGUARDANDO_APROVACAO": return "Aguardando aprovação"
     case "BLOQUEADO": return "Bloqueado"
     case "EXECUTADO": return "Executado"

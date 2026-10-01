@@ -15,7 +15,7 @@
 export const ROTULO_STATUS: Readonly<Record<string, string>> = {
   NAO_INICIADA: "A iniciar",
   EM_ANDAMENTO: "Em andamento",
-  AGUARDANDO_TERCEIRO: "Aguardando cartório",
+  AGUARDANDO_TERCEIRO: "Aguardando terceiros",
   AGUARDANDO_CLIENTE: "Aguardando cliente",
   BLOQUEADA: "Bloqueada",
   CONCLUIDO_RECEBIDO: "Concluída",

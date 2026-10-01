@@ -27,11 +27,11 @@ const ABAS = ["visao", "precisa", "radar", "processos", "tarefas", "equipe", "te
 const PROIBIDOS: Array<[RegExp, string]> = [
   [/\bundefined\b/i, "undefined"], [/\bNaN\b/, "NaN"], [/\[object/i, "[object"], [/\bTODO\b/, "TODO"], [/\bexemplo\b/i, "exemplo"], [/em breve/i, "em breve"],
   [/com o cart[óo]rio/i, "Com o cartório"], [/\bning[uú][eé]m\b/i, "ninguém"], [/sem ningu[ée]m/i, "Sem ninguém"], [/Equipe e Terceiros/i, "Equipe e Terceiros"],
-  [/Aguardando cart[óo]rio/, "Aguardando cartório"],
+  [/Aguardando (o |a )?(cart[óo]rio|ju[íi]zo|consulado)/i, "Aguardando cartório/juízo/consulado (o status oficial é 'Aguardando terceiros')"],
   [/\b[A-Z]{3,}_[A-Z_]{2,}\b/, "enum cru (MAIUSCULA_COM_SUBLINHADO)"], [/\b(EMAIL|TELEFONE|WHATSAPP|OFICIO|PRESENCIAL)\b/, "canal em código cru"], [/usu[aá]rio \d+\b/i, "usuário por número"],
 ]
-// 'Aguardando cartório' é o rótulo de STATUS do protótipo (ROTULO_STATUS_TAREFA) — fica na lista só para ser REPORTADO, não conta como falha.
-const SO_REPORTAR = new Set(["Aguardando cartório", "usuário por número"]) // textos de auditoria gerados pelo backend (fora da Torre): reportados, não bloqueiam
+// O status oficial é 'Aguardando terceiros' (ROTULO_STATUS_TAREFA): 'Aguardando cartório/juízo/consulado' agora CONTA como falha.
+const SO_REPORTAR = new Set(["usuário por número"]) // textos de auditoria gerados pelo backend (fora da Torre): reportados, não bloqueiam
 
 const relatorio: any = { numeros: {}, divergencias: [], telas: {}, vocabulario: {}, funcoes: {}, mobile: {}, falhas: [] }
 const falha = (tela: string, msg: string) => { relatorio.falhas.push({ tela, msg }); console.log(`FALHA [${tela}] ${msg}`) }

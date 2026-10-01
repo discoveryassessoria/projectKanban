@@ -39,7 +39,7 @@ export function AbaAguardando({
   return (
     <>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>O que está com o cartório</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: "#0b1f4b" }}>Aguardando terceiros</div>
         <span style={{ fontSize: 12, color: "#5b6478" }}>passos 2 (confirmar pedido) e 3 (receber certidão) — vencido ou não</span>
         <label className="opv3-field" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <span>Agrupar por</span>
@@ -231,7 +231,7 @@ export function AbaAcompanhamento({
 // ============================================================================
 const ESTAGIOS: Array<{ chave: string; label: string; pred: (l: LinhaOperacaoV3) => boolean; cor: string }> = [
   { chave: "iniciar", label: "A iniciar", pred: (l) => aIniciarEfetivo(l), cor: "#141a2b" },
-  { chave: "cartorio", label: "Com o cartório", pred: (l) => l.estadoOperacao === "AGUARDANDO", cor: "#141a2b" },
+  { chave: "cartorio", label: "Aguardando terceiros", pred: (l) => l.estadoOperacao === "AGUARDANDO", cor: "#141a2b" },
   { chave: "conferir", label: "A conferir", pred: (l) => l.estadoOperacao === "FILA" && !aIniciarEfetivo(l), cor: "#141a2b" },
   { chave: "concluidas", label: "Concluídas", pred: (l) => l.estadoOperacao === "CONCLUIDA", cor: "#155e39" },
   { chave: "atrasadas", label: "Atrasadas", pred: (l) => l.atrasada && l.estadoOperacao !== "CONCLUIDA", cor: "#8f1d17" },

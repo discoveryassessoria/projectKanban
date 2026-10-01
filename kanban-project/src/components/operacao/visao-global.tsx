@@ -126,7 +126,7 @@ const COLUNAS: Array<{ chave: ColunaKanban; rotulo: string; nota?: string }> = [
   { chave: "SEM_RESPONSAVEL", rotulo: "Sem responsável", nota: "esperando decisão de quem distribui" },
   { chave: "A_FAZER", rotulo: "A fazer" },
   { chave: "EM_ANDAMENTO", rotulo: "Em andamento" },
-  { chave: "AGUARDANDO_TERCEIRO", rotulo: "Aguardando terceiro" },
+  { chave: "AGUARDANDO_TERCEIRO", rotulo: "Aguardando terceiros" },
   { chave: "BLOQUEADA", rotulo: "Bloqueada" },
   { chave: "CONCLUIDA", rotulo: "Concluída" },
 ]

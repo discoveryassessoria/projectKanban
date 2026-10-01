@@ -9,6 +9,7 @@
 // atrasada" cria um campo que precisa de alguém para atualizar todo dia.
 
 import { prisma } from "@/lib/prisma"
+import { ROTULO_STATUS } from "@/src/lib/home/rotulo-status-tarefa"
 import type { DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, igualId, periodo, porCampo, porMes } from "./_comuns"
 
@@ -75,7 +76,7 @@ export const DOMINIO_TAREFAS: DominioDef = {
     { key: "sem_responsavel", rotulo: "Sem responsável", tipo: "booleano",
       paraWhere: (v) => (v.tipo !== "booleano" ? null : v.valor ? { responsavelId: null } : { responsavelId: { not: null } }) },
     { key: "status", rotulo: "Status", tipo: "multi_selecao",
-      opcoes: { tipo: "catalogo", valores: STATUS.map((s) => ({ valor: s, rotulo: s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, " ") })) },
+      opcoes: { tipo: "catalogo", valores: STATUS.map((s) => ({ valor: s, rotulo: ROTULO_STATUS[s] ?? s })) },
       paraWhere: emLista("statusTarefa") },
     { key: "concluida", rotulo: "Concluída", tipo: "booleano",
       paraWhere: (v) => (v.tipo === "booleano" ? { concluida: v.valor } : null) },
@@ -108,7 +109,7 @@ export const DOMINIO_TAREFAS: DominioDef = {
 
   agrupamentos: [
     porCampo("responsavel", "Responsável", (l) => l.responsavel?.nome),
-    porCampo("status", "Status", (l) => l.statusTarefa),
+    porCampo("status", "Status", (l) => ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa),
     porCampo("prioridade", "Prioridade", (l) => l.prioridade),
     porCampo("fase", "Fase", (l) => l.faseMacroKey),
     porCampo("nacionalidade", "Nacionalidade", (l) => l.processo?.paisCanonico?.countryLabel),
@@ -122,7 +123,7 @@ export const DOMINIO_TAREFAS: DominioDef = {
     { key: "titulo", rotulo: "Tarefa", valor: (l) => l.titulo,
       link: (l) => (l.processoId ? `/processos/${l.processoId}` : "/tarefas") },
     { key: "responsavel", rotulo: "Responsável", valor: (l) => l.responsavel?.nome ?? "— sem responsável —" },
-    { key: "status", rotulo: "Status", valor: (l) => l.statusTarefa },
+    { key: "status", rotulo: "Status", valor: (l) => ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa },
     { key: "prioridade", rotulo: "Prioridade", valor: (l) => l.prioridade },
     { key: "processo", rotulo: "Processo",
       valor: (l) => (l.processo ? `${l.processo.codigo ?? l.processo.id} — ${l.processo.nome}` : null),

@@ -76,7 +76,7 @@ const CONDICOES_PRINCIPAIS: Array<{ chave: ChaveCondicao; rotulo: string }> = [
   { chave: "executavelAgora", rotulo: "Executável agora" },
   { chave: "atrasadas", rotulo: "Atrasadas" },
   { chave: "venceHoje", rotulo: "Vence hoje" },
-  { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiro" },
+  { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiros" },
   { chave: "semResponsavel", rotulo: "Sem responsável" },
 ]
 const CONDICOES_SECUNDARIAS: Array<{ chave: ChaveCondicao; rotulo: string }> = [
@@ -319,7 +319,7 @@ export function CentralOperacional() {
       { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias" },
       { chave: "semResponsavel", rotulo: "Sem responsável" },
       { chave: "bloqueadas", rotulo: "Bloqueadas" },
-      { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiro" },
+      { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiros" },
       { chave: "pendenciasFaseAnterior", rotulo: "Pendências de fases anteriores" },
       { chave: "familias", rotulo: "Famílias" },
     ]

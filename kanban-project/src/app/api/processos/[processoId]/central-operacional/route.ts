@@ -632,7 +632,7 @@ export async function GET(
         break
       case "waiting":
         filtered = docs.filter((d) => isAtivo(d) && isWaitingExternal(d))
-        queueTitle = "Aguardando cartório"
+        queueTitle = "Aguardando terceiros"
         break
       case "blocked":
         filtered = docs.filter(isBlocked)

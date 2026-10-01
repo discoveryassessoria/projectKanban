@@ -62,7 +62,7 @@ export function rotuloDuracaoMedia(dias: number): string {
 
 export type ChaveDeStatus = 'A_INICIAR' | 'EM_ANDAMENTO' | 'AGUARDANDO_TERCEIROS' | 'AGUARDANDO_CLIENTE' | 'BLOQUEADA' | 'CONCLUIDA' | 'CANCELADA' | 'NAO_EXIGIDA'
 
-/** O status da tarefa em português — o mapa único `ROTULO_STATUS`; só "Aguardando terceiros" é o termo oficial da Torre (o mapa global ainda diz "cartório"). */
+/** O status da tarefa em português — o mapa único `ROTULO_STATUS`; só "Aguardando terceiros" é o termo oficial da Torre. */
 export function rotuloDoStatus(statusTarefa: string): string {
   if (statusTarefa === 'AGUARDANDO_TERCEIRO') return 'Aguardando terceiros'
   return ROTULO_STATUS[statusTarefa] ?? statusTarefa

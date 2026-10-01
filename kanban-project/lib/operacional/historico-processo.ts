@@ -521,7 +521,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
     case 'TAREFA_DESBLOQUEADA':
       return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'desbloqueada', verbo: 'desbloqueou' }, 'a', { motivo: txt(d.motivo) })]
     case 'TAREFA_AGUARDANDO_TERCEIRO':
-      return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar o retorno do cartório em' }, 'em', { motivo: txt(d.motivo) })]
+      return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar terceiros em' }, 'em', { motivo: txt(d.motivo) })]
     case 'TAREFA_RETOMADA_DE_ESPERA':
       return [simples({ rank: 2, tipo: 'BLOQUEIO', subtipo: 'retomada', verbo: 'retomou o trabalho' }, 'de', { motivo: txt(d.motivo) })]
     case 'SOLICITACAO_CANAL_ALTERADO': {
@@ -557,7 +557,7 @@ function atomosDoWorkflow(w: Extract<LinhaCrua, { fonte: 'WORKFLOW' }>, ctx: Con
   // Espera por terceiro decidida pelo motor: a tarefa continua com o prazo correndo (o prazo nunca pausa por terceiro).
   if (w.tipo === 'TAREFA_BLOQUEADA' && txt(d.motivoCodigo) === 'AGUARDANDO_TERCEIRO') {
     const alvo = { tarefaId: w.tarefaId, documentoId: num(d.documentoId) }
-    const a = novoAtomo(ctx, { ...origem, rank: 1, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar o retorno do cartório em', chaveExtra: 'espera' }, alvo)
+    const a = novoAtomo(ctx, { ...origem, rank: 1, tipo: 'BLOQUEIO', subtipo: 'espera_terceiro', verbo: 'passou a aguardar terceiros em', chaveExtra: 'espera' }, alvo)
     a.objeto = sobre(ctx, resolverAlvo(ctx, alvo), 'em')
     return [a]
   }
@@ -847,7 +847,7 @@ function montarFato(ctx: ContextoDoHistorico, membros: Atomo[], reabriveis: Set<
       case 'nao_exigida': objeto = certidoes; contexto = null; break
       case 'linhagem': fraseLivre = `Sistema recalculou a linhagem da árvore ${n} vezes`; break
       case 'conferencia': fraseLivre = `Sistema conferiu as exigências documentais com os registros da árvore ${n} vezes`; break
-      case 'espera_terceiro': verbo = 'passou a aguardar o retorno do cartório em'; objeto = certidoes; contexto = faseRot; break
+      case 'espera_terceiro': verbo = 'passou a aguardar terceiros em'; objeto = certidoes; contexto = faseRot; break
       case 'protocolo': verbo = 'informou protocolos de'; objeto = certidoes; contexto = null; break
       case 'prazo': verbo = 'repactuou o prazo de'; objeto = certidoes; contexto = null; break
       default: break
