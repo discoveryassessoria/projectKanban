@@ -23,7 +23,7 @@ import { montarCenario } from "./_fixture-torre-gh"
 import { KPIS, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, kpisDasLinhas, totaisDaSituacao, linhasDoKpi, processosEmRisco, vence7, tendenciaDe, fotoDeReferencia, CAMPO_DA_FOTO, type ChaveKpi, type CampoDaFoto } from "../lib/operacional/torre-kpis"
 import { calcularIndicadoresDoDia } from "../lib/operacional/indicadores-diarios"
 import { tendenciasDaTorre } from "../lib/operacional/torre-tendencias"
-import { processosDaTorre, bolaDoProcesso, processosCriticos, anotarRisco } from "../lib/operacional/torre-processos"
+import { processosDaTorre, bolaDoProcesso, processosCriticos, anotarRisco, certidoesDosProcessos } from "../lib/operacional/torre-processos"
 import { listarTarefasDaTorre } from "../src/services/torre-tarefas"
 import { registrarCobranca } from "../src/services/subtarefas-da-etapa"
 import { nacionalidadesOfertadas } from "../src/lib/relatorios/motor/opcoes"
@@ -119,7 +119,7 @@ async function main() {
     // Um macrofluxo real para o tipo do teste: genealogia → emissão → análise → apostilamento.
     const macro = await prisma.macroWorkflow.findFirstOrThrow({ where: { tipoProcessoId: c.tipoId }, select: { id: true } })
     let ordem = 1
-    for (const k of ["genealogia", "emissao_documental", "analise_documental", "apostilamento"]) {
+    for (const k of ["genealogia", "emissao_documental", "analise_documental", "apostilamento", "finalizado"]) {
       await prisma.faseMacro.upsert({ where: { macroWorkflowId_phaseKey: { macroWorkflowId: macro.id, phaseKey: k } }, update: { ordem }, create: { macroWorkflowId: macro.id, phaseKey: k, label: k, ordem } })
       ordem++
     }
@@ -134,7 +134,8 @@ async function main() {
     const r = await processosDaTorre()
     const ids = new Set([pCrit.processoId, pAten.processoId, pOk.processoId])
     const linha = (id: number) => r.processos.find((p) => p.processoId === id)!
-    ok("as colunas do Radar são as fases ATIVAS do cadastro (na ordem padrão) — não uma lista no código", JSON.stringify(r.colunas.map((x) => x.key)) === JSON.stringify((await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: [{ ordemPadrao: "asc" }, { id: "asc" }] })).map((x) => x.phaseKey)) && r.colunas.length >= 9)
+    // Torre nova: a fase TERMINAL (a última de todo macrofluxo em que aparece e sem processo ativo nela — aqui, "finalizado") não é coluna: processo que chega lá está concluído.
+    ok("as colunas do Radar são as fases ATIVAS do cadastro (na ordem padrão) menos a terminal — não uma lista no código", JSON.stringify(r.colunas.map((x) => x.key)) === JSON.stringify((await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: [{ ordemPadrao: "asc" }, { id: "asc" }] })).map((x) => x.phaseKey).filter((k) => k !== "finalizado")) && r.colunas.length >= 9)
     ok("risco = o score do 'Precisa de você': crítico / atenção / ok", linha(pCrit.processoId).risco === "critico" && linha(pAten.processoId).risco === "atencao" && linha(pOk.processoId).risco === "ok", JSON.stringify([linha(pCrit.processoId).scoreMaximo, linha(pAten.processoId).scoreMaximo, linha(pOk.processoId).scoreMaximo]))
     ok("ordenado do pior para o melhor", r.processos.filter((p) => ids.has(p.processoId)).map((p) => p.risco).join() === "critico,atencao,ok")
     const cel = (id: number, key: string) => linha(id).celulas[r.colunas.findIndex((x) => x.key === key)]
@@ -146,7 +147,9 @@ async function main() {
     await prisma.saudeAchado.update({ where: { id: achado.id }, data: { ignoradoAte: new Date(Date.now() - 1000) } })
     ok("…e VOLTA a pintar quando o prazo vence", (await processosDaTorre()).processos.find((p) => p.processoId === pCrit.processoId)!.celulas[r.colunas.findIndex((x) => x.key === "apostilamento")].semPassos === true)
     const pl = linha(pCrit.processoId)
-    ok("cabeçalho da linha: família, código, fase, dias na fase, progresso e próximo marco (E9)", pl.familiaNome === `${MARCA} Família` && pl.codigo === `${MARCA}-1` && pl.faseAtual.key === "emissao_documental" && (pl.diasNaFase === null ? pl.naFase.desde === null : typeof pl.diasNaFase === "number") && typeof pl.progresso.requeridas === "number" && "proximoMarco" in pl)
+    // Torre nova: o "a de b" das certidões saiu da lista leve (fonte única, pedida só para a página — `certidoesDosProcessos`) e o "próximo marco" virou a PRÓXIMA AÇÃO derivada.
+    const [certPl] = await certidoesDosProcessos([pCrit.processoId])
+    ok("cabeçalho da linha: família, código, fase, dias na fase, requerentes, tarefas da fase e próxima ação; certidões pela fonte única", pl.familiaNome === `${MARCA} Família` && pl.codigo === `${MARCA}-1` && pl.faseAtual.key === "emissao_documental" && (pl.diasNaFase === null ? pl.naFase.desde === null : typeof pl.diasNaFase === "number") && typeof pl.requerentes === "number" && "proximaAcao" in pl && typeof pl.tarefasDaFase.abertas === "number" && typeof certPl.requeridas === "number")
     const linhasAba = (await listarTarefasDaTorre({})).linhas.filter((l) => l.processoId === pCrit.processoId)
     ok("os 4 números de cada processo batem com a aba Tarefas", JSON.stringify(pl.numeros) === JSON.stringify({ abertas: linhasAba.length, vencidas: linhasAba.filter((l) => l.atrasada).length, comCartorio: linhasAba.filter((l) => l.estadoOperacao === "AGUARDANDO").length, semResponsavel: linhasAba.filter((l) => l.responsavelId == null).length }))
     const criticosAgora = (await processosDaTorre()).processos.filter((p) => p.risco === "critico").length

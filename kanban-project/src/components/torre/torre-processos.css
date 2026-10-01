@@ -1,0 +1,63 @@
+/* Aba PROCESSOS (por fase) — tokens do Discovery Design System; nenhuma cor fora deles. Fiel à tela Fase do protótipo. */
+.tor-pf-rotulo { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .06em; text-transform: uppercase; }
+.tor-pf-fases { display: flex; flex-direction: column; gap: 6px; }
+.tor-pf-cartoes { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr); gap: 12px; }
+@media (max-width: 1000px) { .tor-pf-cartoes { grid-template-columns: minmax(0, 1fr); } }
+.tor-pf-cartao { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.tor-pf-numeros { display: flex; gap: 28px; flex-wrap: wrap; }
+.tor-pf-numero { display: flex; flex-direction: column; }
+.tor-pf-numero b { font-size: 28px; font-weight: 700; line-height: 1.2; }
+.tor-pf-numero b.ok { color: var(--success-text); }
+.tor-pf-numero b.at { color: var(--warning-text); }
+.tor-pf-numero b.pa { color: var(--danger-text); }
+.tor-pf-numero span { font-size: 12px; color: var(--text-secondary); }
+.tor-pf-barra { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--surface-tertiary); }
+.tor-pf-barra i { display: block; height: 100%; }
+.tor-pf-barra i.ok { background: var(--success); }
+.tor-pf-barra i.at { background: var(--warning); }
+.tor-pf-barra i.pa { background: var(--danger); }
+.tor-pf-texto { font-size: 13px; color: var(--text-secondary); }
+.tor-pf-caixas { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; }
+.tor-pf-caixa { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-default); background: var(--surface-tertiary); min-width: 0; }
+.tor-pf-caixa b { font-size: 22px; font-weight: 700; line-height: 1.2; min-height: 26px; }
+.tor-pf-caixa strong { font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+.tor-pf-caixa span { font-size: 11px; color: var(--text-secondary); min-height: 14px; }
+.tor-pf-caixa.r { background: var(--danger-tile); border-color: var(--danger-tile); color: var(--danger-text); }
+.tor-pf-caixa.r span { color: inherit; }
+.tor-pf-caixa.a { background: var(--warning-tile); border-color: var(--warning-tile); color: var(--warning-text); }
+.tor-pf-caixa.a span { color: inherit; }
+.tor-pf-caixa.g { background: var(--success-tile); border-color: var(--success-tile); color: var(--success-text); }
+.tor-pf-caixa.g span { color: inherit; }
+.tor-pf-tabela { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; max-width: 100%; }
+.tor-pf-rolagem { overflow-x: auto; }
+.tor-pf-grade { display: grid; grid-template-columns: minmax(120px, 1.4fr) minmax(84px, .9fr) minmax(92px, 1fr) minmax(100px, 1.1fr) 72px minmax(140px, 1.8fr) minmax(84px, 1fr) 58px 80px 134px; gap: 8px; align-items: center; min-width: 1030px; }
+.tor-pf-cab { padding: 10px 12px; font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .05em; text-transform: uppercase; background: var(--surface-tertiary); border-bottom: 1px solid var(--border-default); }
+.tor-pf-linha { padding: 9px 12px; border-bottom: 1px solid var(--border-default); color: var(--text-primary); }
+.tor-pf-fam { display: flex; flex-direction: column; min-width: 0; }
+.tor-pf-fam a { font-weight: 600; color: var(--text-primary); text-decoration: underline; overflow-wrap: anywhere; }
+.tor-pf-fam span, .tor-pf-sub { font-size: 12px; color: var(--text-secondary); }
+.tor-pf-col { display: flex; flex-direction: column; min-width: 0; }
+.tor-pf-dias { font-weight: 600; }
+.tor-pf-dias.vermelho { font-weight: 700; color: var(--danger-text); }
+.tor-pf-dias.ambar { font-weight: 600; color: var(--warning-text); }
+.tor-pf-prontas { display: flex; flex-direction: column; gap: 4px; }
+.tor-pf-prontas b { font-size: 13px; font-weight: 600; }
+.tor-pf-trilho { height: 6px; border-radius: 3px; background: var(--surface-tertiary); overflow: hidden; }
+.tor-pf-trilho i { display: block; height: 100%; background: var(--success); }
+.tor-pf-celula { font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.tor-pf-celula.sem { color: var(--danger-text); font-weight: 700; }
+.tor-pf-celula.vermelho { color: var(--danger-text); font-weight: 700; }
+.tor-pf-celula.ambar { color: var(--warning-text); font-weight: 700; }
+.tor-pf-pilula { white-space: nowrap; display: inline-flex; height: 22px; align-items: center; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.tor-pf-pilula.nossa { background: var(--warning-tile); color: var(--warning-text); }
+.tor-pf-pilula.outra { background: var(--surface-tertiary); color: var(--text-secondary); }
+.tor-pf-pilula.ok { background: var(--success-tile); color: var(--success-text); }
+.tor-pf-pilula.at { background: var(--warning-tile); color: var(--warning-text); }
+.tor-pf-pilula.pa, .tor-pf-pilula.sd { background: var(--danger-tile); color: var(--danger-text); }
+.tor-pf-acoes { display: flex; gap: 6px; }
+.tor-pf-foco { display: inline-flex; align-items: center; height: 26px; padding: 0 8px; border-radius: 6px; background: var(--action-primary); color: var(--action-primary-ink); font-size: 12px; font-weight: 600; text-decoration: none; }
+.tor-pf-foco:hover { background: var(--action-primary-hover); }
+.tor-pf-rel { height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.tor-pf-rel:hover { background: var(--surface-tertiary); }
+.tor-pf-rodape { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+.tor-pf-vazio { padding: 14px 16px; font-size: 13px; color: var(--text-secondary); }
