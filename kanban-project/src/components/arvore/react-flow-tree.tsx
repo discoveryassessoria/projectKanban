@@ -528,7 +528,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
 // CUSTOM NODE: Adicionar Pessoa (placeholder)
 // ========================================
 interface AddPersonNodeData {
-  type: 'pai' | 'mae' | 'filho' | 'conjuge'
+  type: 'filho' | 'conjuge'
   mode: ViewMode
   onClick?: () => void
   /**
@@ -542,8 +542,6 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   const { type, mode, onClick, contexto } = data
 
   const config = {
-    pai: { label: 'Adicionar Pai', color: colors.neutral },
-    mae: { label: 'Adicionar Mãe', color: colors.neutral },
     filho: { label: 'Adicionar Filho(a)', color: colors.green },
     conjuge: { label: 'Adicionar Cônjuge', color: colors.neutral }
   }
@@ -1121,7 +1119,7 @@ interface BuildTreeOptions {
 }
 
 function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edges: Edge[] } {
-  const { pessoas, unioes, pessoaPrincipal, mode, onPersonClick, onAddPai, onAddMae } = options
+  const { pessoas, unioes, pessoaPrincipal, mode, onPersonClick } = options
 
   if (!pessoaPrincipal || pessoas.length === 0) {
     return { nodes: [], edges: [] }
@@ -1274,33 +1272,13 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     if (pai) {
       addPersonWithAncestorsAndSiblings(pai, false, false, depth + 1)
       addEdge(`person-${pessoa.id}`, `person-${pai.id}`, `edge-pai-${pessoa.id}`, colors.neutral)
-    } else if (depth === 0) {
-      const addPaiId = `add-pai-${pessoa.id}`
-      if (!nodes.find(n => n.id === addPaiId)) {
-        nodes.push({
-          id: addPaiId,
-          type: 'addPerson',
-          position: { x: 0, y: 0 },
-          data: { type: 'pai' as const, mode, onClick: () => onAddPai?.(pessoa.id) },
-        })
-        addEdge(`person-${pessoa.id}`, addPaiId, `edge-add-pai-${pessoa.id}`, colors.neutral, true)
-      }
     }
+    // SEM cartão tracejado "Adicionar Pai" (01/10/2026): pai/mãe ausente se adiciona DENTRO do cartão da pessoa
+    // (painel operacional, página de detalhes e barra lateral) — o canvas não oferece mais esse atalho.
 
     if (mae) {
       addPersonWithAncestorsAndSiblings(mae, false, false, depth + 1)
       addEdge(`person-${pessoa.id}`, `person-${mae.id}`, `edge-mae-${pessoa.id}`, colors.neutral)
-    } else if (depth === 0) {
-      const addMaeId = `add-mae-${pessoa.id}`
-      if (!nodes.find(n => n.id === addMaeId)) {
-        nodes.push({
-          id: addMaeId,
-          type: 'addPerson',
-          position: { x: 0, y: 0 },
-          data: { type: 'mae' as const, mode, onClick: () => onAddMae?.(pessoa.id) },
-        })
-        addEdge(`person-${pessoa.id}`, addMaeId, `edge-add-mae-${pessoa.id}`, colors.neutral, true)
-      }
     }
 
     const irmaos = findIrmaos(pessoa)
@@ -1508,10 +1486,10 @@ interface OpcoesFoco {
 function idPessoaDoNode(nodeId: string): number | null {
   const m = nodeId.match(/^person-(\d+)$/)
   if (m) return Number(m[1])
-  // Os placeholders "Adicionar Pai/Mãe" pertencem à pessoa que os ancora: se ela
-  // recuou, o convite para adicionar pai dela recua junto. Deixá-lo em pleno ao
-  // lado de um card apagado é oferecer ação sobre alguém que saiu de foco.
-  const a = nodeId.match(/^add-(?:pai|mae|filho|conjuge)-(\d+)$/)
+  // Os placeholders "Adicionar Filho/Cônjuge" pertencem à pessoa que os ancora: se ela
+  // recuou, o convite recua junto. Deixá-lo em pleno ao lado de um card apagado é
+  // oferecer ação sobre alguém que saiu de foco. (Pai/Mãe não têm mais placeholder no canvas.)
+  const a = nodeId.match(/^add-(?:filho|conjuge)-(\d+)$/)
   return a ? Number(a[1]) : null
 }
 
