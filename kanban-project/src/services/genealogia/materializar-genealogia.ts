@@ -38,6 +38,7 @@ import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
 import { resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
+import { codigoExigivelDoTipo, documentoEscolhidoParaPessoa, documentoDaUniaoEscolhido, type PessoaParaFiltroDocumental } from "@/src/lib/genealogia/documentos-exigidos"
 import { montarPessoasDoProcesso, type ClassificacaoPessoa, type PessoaBruta, type UniaoBruta } from "@/src/lib/process-stage/central-operacional-core"
 
 type DB = typeof prisma | Prisma.TransactionClient
@@ -77,6 +78,11 @@ export interface CalculoExigenciasGenealogia {
   tipoProcessoId: number | null
   arvoreId: number
   exigencias: ExigenciaGenealogia[]
+  /**
+   * O que a regra automática exigiria mas a ESCOLHA MANUAL (`Pessoa.documentosExigidos`) tirou. Deduplicado por chave.
+   * Vazio = ninguém removeu nada por escolha — é o que distingue "zero por escolha" de "zero natural".
+   */
+  removidasPorEscolha: ExigenciaGenealogia[]
   pendencias: string[]
   instancia: { id: number; ciclo: number } | null
   labelLocalizarRegistro: string
@@ -116,7 +122,7 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
     where: pessoasAtivasDaArvore(processo.arvoreId),
     select: {
       id: true, nome: true, sobrenome: true, sexo: true, publicCode: true, numeroLinhagem: true,
-      documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true, paiId: true, maeId: true, data_nasc: true,
+      documentacao: true, documentosExigidos: true, casado: true, vivo: true, linhaReta: true, requerente: true, paiId: true, maeId: true, data_nasc: true,
     },
   })
   const todasIds = todasAtivas.map((p) => p.id)
@@ -152,7 +158,9 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
       })).filter((u) => ativosSet.has(u.pessoa1Id) && ativosSet.has(u.pessoa2Id))
     : []
   const uniõesPorPessoa = new Map<number, number[]>()
+  const conjugesPorUniao = new Map<number, [number, number]>()
   for (const u of uniõesRaw) {
+    conjugesPorUniao.set(u.id, [u.pessoa1Id, u.pessoa2Id])
     for (const pid of [u.pessoa1Id, u.pessoa2Id]) {
       const lista = uniõesPorPessoa.get(pid) ?? []
       lista.push(u.id)
@@ -165,6 +173,17 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
     orderBy: { ciclo: "desc" },
     select: { id: true, ciclo: true },
   })
+
+  // FILTRO SUBTRATIVO (`Pessoa.documentosExigidos`): classificação + documentação + lista gravada de cada pessoa ativa.
+  const paraFiltro = (id: number): PessoaParaFiltroDocumental => {
+    const x = todasAtivas.find((a) => a.id === id)
+    return {
+      classificacao: classificacaoPorId.get(id) ?? "PENDENTE_CLASSIFICACAO",
+      documentacao: x?.documentacao === true,
+      documentosExigidos: x?.documentosExigidos ?? null,
+    }
+  }
+  const removidasPorEscolha = new Map<string, ExigenciaGenealogia>()
 
   const exigencias: ExigenciaGenealogia[] = []
   for (const p of pessoas) {
@@ -194,7 +213,18 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
         pendencias.push(`"${ap.documentTypeCode}": regra de união aplicável a ${p.id}, mas a pessoa não tem nenhuma União cadastrada — necessidade não materializada`)
         continue
       }
+      const codigoExigivel = codigoExigivelDoTipo(ap.documentTypeCode)
       for (const alvo of alvos) {
+        const escolhido = alvo.uniaoId != null
+          ? documentoDaUniaoEscolhido((conjugesPorUniao.get(alvo.uniaoId) ?? [p.id]).map(paraFiltro), codigoExigivel)
+          : documentoEscolhidoParaPessoa(paraFiltro(p.id), codigoExigivel)
+        if (!escolhido) {
+          removidasPorEscolha.set(alvo.chave, {
+            pessoaId: alvo.pessoaId ?? null, uniaoId: alvo.uniaoId ?? null, chave: alvo.chave,
+            varianteKey, itemCatalogoId, regra, ap, sujeitoNome: sujeito.nome ?? `Pessoa ${p.id}`,
+          })
+          continue
+        }
         exigencias.push({
           pessoaId: alvo.pessoaId ?? null, uniaoId: alvo.uniaoId ?? null, chave: alvo.chave,
           varianteKey, itemCatalogoId, regra, ap, sujeitoNome: sujeito.nome ?? `Pessoa ${p.id}`,
@@ -205,7 +235,8 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
 
   return {
     processoId, tipoProcessoId: processo.tipoProcessoMotorId ?? null, arvoreId: processo.arvoreId,
-    exigencias, pendencias, instancia: instanciaRaw ?? null,
+    exigencias, removidasPorEscolha: [...removidasPorEscolha.values()].filter((r) => !exigencias.some((e) => e.chave === r.chave)),
+    pendencias, instancia: instanciaRaw ?? null,
     labelLocalizarRegistro, slaDaysLocalizarRegistro, tipoPorCode,
   }
 }

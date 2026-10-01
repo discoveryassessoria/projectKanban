@@ -1,0 +1,107 @@
+// src/lib/genealogia/documentos-exigidos.ts
+// ============================================================================
+// PESSOA.documentosExigidos — o FILTRO SUBTRATIVO das certidões de uma pessoa FORA da linhagem.
+//
+// Módulo PURO e sem imports de servidor (cliente, API e núcleo da Genealogia usam o MESMO).
+//
+//   exigido = (o que a regra automática da árvore pede) ∩ (o que está marcado)
+//
+// NUNCA cria exigência que a árvore não pede: marcar Casamento numa pessoa solteira ou Óbito numa viva não faz nascer nada.
+// O filtro só vale para quem está FORA DA LINHAGEM (mesma condição de `pessoaExigeDocumentacao`): linha principal, requerente
+// e pendente de classificação seguem sempre a regra automática. `null` (campo nunca tocado) = regra automática = comportamento
+// de antes desta coluna existir.
+// ============================================================================
+
+/** Lista FECHADA de três — a única constante. Os valores gravados em `Pessoa.documentosExigidos` são estes CODES. */
+export const DOCUMENTOS_EXIGIVEIS = [
+  { code: "NAS", rotulo: "Nascimento" },
+  { code: "CAS", rotulo: "Casamento" },
+  { code: "OBI", rotulo: "Óbito" },
+] as const
+
+export type CodigoDocumentoExigivel = (typeof DOCUMENTOS_EXIGIVEIS)[number]["code"]
+
+export const CODIGOS_DOCUMENTOS_EXIGIVEIS: readonly CodigoDocumentoExigivel[] = DOCUMENTOS_EXIGIVEIS.map((d) => d.code)
+
+export function ehCodigoDocumentoExigivel(v: unknown): v is CodigoDocumentoExigivel {
+  return typeof v === "string" && (CODIGOS_DOCUMENTOS_EXIGIVEIS as readonly string[]).includes(v)
+}
+
+/**
+ * Qual dos três é o `TipoDocumentoCadastro.code` de uma regra? O cadastro real usa `IT - NAS` / `IT - CAS` / `IT - OBI`
+ * (regras da Genealogia) e `NAS` / `CAS` / `OBI` (tipos simples); fixtures usam `PREFIXO-NAS`. O CODE canônico é o último
+ * token (separado por espaço ou hífen). Qualquer outro tipo (RG, comprovante, procuração…) devolve `null`: o filtro não o toca.
+ */
+export function codigoExigivelDoTipo(documentTypeCode: string | null | undefined): CodigoDocumentoExigivel | null {
+  if (!documentTypeCode) return null
+  const tokens = documentTypeCode.trim().toUpperCase().split(/[\s\-_]+/).filter(Boolean)
+  const ultimo = tokens[tokens.length - 1]
+  return ehCodigoDocumentoExigivel(ultimo) ? ultimo : null
+}
+
+export type ResultadoValidacaoDocumentosExigidos =
+  | { ok: true; valor: CodigoDocumentoExigivel[] | null }
+  | { ok: false; erro: string }
+
+/**
+ * Valida o que chega da API. `undefined` não chega aqui (campo não enviado = não mexe). `null` = volta à regra automática.
+ * Array: só os três codes, sem repetição; vazio é válido ("nenhum documento"). Igual aos três = `null` (nada a filtrar).
+ */
+export function validarDocumentosExigidos(raw: unknown): ResultadoValidacaoDocumentosExigidos {
+  if (raw === null) return { ok: true, valor: null }
+  if (!Array.isArray(raw)) return { ok: false, erro: "documentosExigidos deve ser uma lista (ou null)" }
+  const vistos = new Set<string>()
+  for (const item of raw) {
+    if (!ehCodigoDocumentoExigivel(item)) return { ok: false, erro: `documentosExigidos: "${String(item)}" não é um documento permitido (${CODIGOS_DOCUMENTOS_EXIGIVEIS.join(", ")})` }
+    if (vistos.has(item)) return { ok: false, erro: `documentosExigidos: "${item}" repetido` }
+    vistos.add(item)
+  }
+  if (vistos.size === CODIGOS_DOCUMENTOS_EXIGIVEIS.length) return { ok: true, valor: null }
+  // ordem canônica, estável
+  return { ok: true, valor: CODIGOS_DOCUMENTOS_EXIGIVEIS.filter((c) => vistos.has(c)) }
+}
+
+/** Lê o valor GRAVADO (Json do banco) de forma defensiva: qualquer coisa que não seja lista válida vale `null` (regra automática). */
+export function lerDocumentosExigidosGravado(v: unknown): CodigoDocumentoExigivel[] | null {
+  if (!Array.isArray(v)) return null
+  const r = validarDocumentosExigidos(v.filter(ehCodigoDocumentoExigivel))
+  return r.ok ? r.valor : null
+}
+
+/** Os três marcados? (o que a tela mostra quando o campo é `null`). */
+export function marcadosParaTela(gravado: unknown): CodigoDocumentoExigivel[] {
+  return lerDocumentosExigidosGravado(gravado) ?? [...CODIGOS_DOCUMENTOS_EXIGIVEIS]
+}
+
+export interface PessoaParaFiltroDocumental {
+  classificacao: "LINHA_PRINCIPAL" | "FORA_DA_LINHAGEM" | "PENDENTE_CLASSIFICACAO"
+  documentacao: boolean
+  documentosExigidos: unknown
+}
+
+/** O filtro se aplica a esta pessoa? Só FORA_DA_LINHAGEM, com documentação ligada e com lista gravada. */
+export function filtroSeAplica(p: PessoaParaFiltroDocumental): boolean {
+  return p.classificacao === "FORA_DA_LINHAGEM" && p.documentacao === true && lerDocumentosExigidosGravado(p.documentosExigidos) !== null
+}
+
+/**
+ * O documento `codigo` continua EXIGIDO para esta pessoa? `true` quando o filtro não se aplica (linha principal, requerente,
+ * pendente, campo `null`) ou quando o tipo não é um dos três.
+ */
+export function documentoEscolhidoParaPessoa(p: PessoaParaFiltroDocumental, codigo: CodigoDocumentoExigivel | null): boolean {
+  if (codigo == null) return true
+  if (!filtroSeAplica(p)) return true
+  return (lerDocumentosExigidosGravado(p.documentosExigidos) ?? []).includes(codigo)
+}
+
+/**
+ * CASAMENTO (alvo UNIÃO): vale se PELO MENOS UM dos cônjuges o mantém. Cônjuge a que o filtro não se aplica conta como
+ * "marcado" — exceto o FORA da linhagem com documentação DESLIGADA, que não quer documento nenhum e conta como desmarcado.
+ */
+export function documentoDaUniaoEscolhido(conjuges: PessoaParaFiltroDocumental[], codigo: CodigoDocumentoExigivel | null): boolean {
+  if (codigo == null) return true
+  return conjuges.some((c) => {
+    if (c.classificacao === "FORA_DA_LINHAGEM" && c.documentacao !== true) return false
+    return documentoEscolhidoParaPessoa(c, codigo)
+  })
+}
