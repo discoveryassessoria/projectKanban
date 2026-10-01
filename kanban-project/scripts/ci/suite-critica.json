@@ -193,7 +193,8 @@
    "scripts/torre-historico-legivel.test.ts",
    "scripts/torre-desfazer-janela-unica-e-ausencia.test.ts",
    "scripts/torre-toast-escuro.test.ts",
-   "scripts/torre-relatorio-fase-passo-iniciou.test.ts"
+   "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
+   "scripts/torre-sem-responsavel-quatro-lugares.test.ts"
   ]
  },
  "arquivos": [
@@ -368,6 +369,7 @@
   "scripts/torre-historico-legivel.test.ts",
   "scripts/torre-desfazer-janela-unica-e-ausencia.test.ts",
   "scripts/torre-toast-escuro.test.ts",
-  "scripts/torre-relatorio-fase-passo-iniciou.test.ts"
+  "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
+  "scripts/torre-sem-responsavel-quatro-lugares.test.ts"
  ]
 }
