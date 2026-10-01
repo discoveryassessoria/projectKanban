@@ -10,7 +10,8 @@ import { fotoDeReferencia } from './torre-kpis'
 
 const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
-const inicioDaSemana = (d: Date) => {
+/** A segunda-feira 00:00 da semana de `d` — a ÚNICA definição (o funil importa daqui: "abre/fecha" nunca diverge). */
+export const inicioDaSemana = (d: Date): Date => {
   const x = new Date(d)
   x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
   x.setHours(0, 0, 0, 0)

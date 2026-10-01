@@ -41,12 +41,8 @@ export interface PropsDaVisaoGeral {
   onRisco: () => void
   /** Navega para outra aba da Torre (ex.: "Ver equipe" → `equipe`). */
   irParaAba: (aba: Aba) => void
-  /** Abre a "Revisar o dia" (o casco). Sem ela, o botão da faixa aciona o mesmo botão do cabeçalho. */
-  onRevisar?: () => void
-}
-
-const ABRIR_REVISAO_DO_CABECALHO = () => {
-  document.querySelector<HTMLButtonElement>(".tor-cab-btns .tor-btn.pri")?.click()
+  /** Abre a "Revisar o dia" (o casco) — o mesmo que o botão do cabeçalho. */
+  onRevisar: () => void
 }
 
 /** O tempo médio real, a meta e a semana (`/api/torre/funil`): uma leitura por recarga da Torre. Mantém o último resultado enquanto recarrega. */
@@ -85,7 +81,7 @@ export function TorreVisaoGeral({ linhas, processos, itensPrecisa, agora, tend, 
     <div className="tvg">
       <TorreKpis
         linhas={linhas} processos={processos} itensPrecisa={itensPrecisa} agora={agora} tend={tend} filtrandoPais={filtrandoPais}
-        gargalo={gargalo} onProcessos={onProcessos} onRisco={onRisco} onRevisar={onRevisar ?? ABRIR_REVISAO_DO_CABECALHO}
+        gargalo={gargalo} onProcessos={onProcessos} onRisco={onRisco} onRevisar={onRevisar}
       />
       <TorreFunil funil={funil} semana={escopo?.semana ?? null} carregandoDados={carregando} erroDados={erro} />
 

@@ -9,3 +9,6 @@ export interface MemoriaDeProcessos extends ParametrosDeProcessos { fase: string
 
 export const memoriaDoRadar: MemoriaDoRadar = { filtro: FILTRO_INICIAL_DO_RADAR, busca: "", pais: PAIS_RADAR, ordem: "grave" }
 export const memoriaDeProcessos: MemoriaDeProcessos = { ...PARAMETROS_INICIAIS, fase: null, pagina: 1 }
+
+/** O casco pede a fase de Processos (`?aba=processos&fase=<phaseKey>`, vindo do funil): a aba a lê ao montar. Idempotente. */
+export function pedirFaseDeProcessos(fase: string): void { memoriaDeProcessos.fase = fase }

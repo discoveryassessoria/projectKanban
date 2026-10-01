@@ -7,13 +7,14 @@
 // Regras, Integridade e Auditoria NÃO são da Torre (ela serve só à gestão de processo): moram em Gerenciamento › Saúde do sistema.
 // Uma fonte por dado: as linhas de tarefa vêm de UMA leitura (`/api/torre/tarefas`, a projeção da Operação) e alimentam os KPIs,
 // a aba Tarefas, os contadores e a aba Terceiros — o número do cartão é sempre o tamanho da lista que ele filtra.
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 import { ABAS_DA_TORRE, ABA_INICIAL, ehAbaDaTorre, type Aba } from "@/lib/operacional/torre-abas"
+import { seloVisivel, separarFaseDaUrl, preservarFaseDeTarefas, filtrosNaQueryDaAba } from "@/lib/operacional/torre-casca"
 import { itensDoPais, mapaDePaisPorProcesso, contagemDeProcessosPorPais } from "@/lib/operacional/torre-pais"
 import { destinoDaAbaAntigaDaTorre } from "@/lib/operacional/navegacao"
-import { aplicarFiltros, aplicarFiltrosNaQuery, filtrosDaQuery, filtrosIguais, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
+import { aplicarFiltros, filtrosDaQuery, filtrosIguais, type FiltrosTorre } from "@/lib/operacional/torre-filtros"
 import { AGRUPAR_TORRE, DENTRO_TORRE } from "@/lib/operacional/torre-visoes"
 import { aplicarBusca } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { api, erroDe, TorreProvider, type PermissoesTorre, type AlvoDoRelatorio } from "./torre-base"
@@ -28,6 +29,7 @@ import { TorreBriefing } from "./TorreBriefing"
 import { TorreRevisao } from "./TorreRevisao"
 import { TorreRadar } from "./TorreRadar"
 import { TorreProcessos } from "./TorreProcessos"
+import { pedirFaseDeProcessos } from "./torre-fase-memoria"
 import { TorreTarefas, CHAVES_DE_VISAO } from "./TorreTarefas"
 import { TorreTerceiros } from "./TorreTerceiros"
 import { TorreEquipe } from "./TorreEquipe"
@@ -67,18 +69,29 @@ function lerUrl(params: URLSearchParams) {
   const agrupar = params.get("agrupar"); const dentro = params.get("dentro")
   // `?tarefa=` sempre vai para Tarefas; `?visao=`/`?processo=` sem `?aba=` também; com `?aba=` a aba é respeitada.
   const aba: Aba | null = tarefa != null ? "tarefas" : abaValida ?? (visao || processo != null ? "tarefas" : null)
+  // `?fase=` tem dois donos: filtro de TAREFAS (aba Tarefas) ou seleção de fase (aba Processos) — `torre-casca.ts`.
+  const { filtros, faseProcessos } = separarFaseDaUrl(aba ?? ABA_INICIAL, filtrosDaQuery(params))
   return {
-    aba, visao, processo, tarefa,
+    aba, visao, processo, tarefa, faseProcessos,
     kpi: kpiUrl && KPIS_QUE_FILTRAM.includes(kpiUrl) ? kpiUrl : null,
     pais: params.get("pais") ?? "",
     busca: params.get("q") ?? "",
     agrupar: agrupar && (AGRUPAR_TORRE as readonly string[]).includes(agrupar) && agrupar !== "fam" ? agrupar : null,
     dentro: dentro && (DENTRO_TORRE as readonly string[]).includes(dentro) && dentro !== "none" ? dentro : null,
-    filtros: filtrosDaQuery(params),
+    filtros,
   }
 }
 /** Comparação de querystrings sem depender da ordem das chaves. */
 const canonicaDaQuery = (q: URLSearchParams): string => [...q.entries()].map(([k, v]) => `${k}=${v}`).sort().join("&")
+
+/** Rola a página (a janela e qualquer contêiner rolável que envolva a Torre) para o topo. */
+function rolarAoTopo() {
+  if (typeof window === "undefined") return
+  window.scrollTo({ top: 0 })
+  for (let el = document.querySelector(".tor")?.parentElement ?? null; el; el = el.parentElement) {
+    if (el.scrollTop > 0) el.scrollTop = 0
+  }
+}
 
 export function Torre() {
   const params = useSearchParams()
@@ -86,6 +99,9 @@ export function Torre() {
   const urlInicial = lerUrl(params)
 
   const [aba, setAba] = useState<Aba>(urlInicial.aba ?? ABA_INICIAL)
+  // A fase que o link pediu para a aba PROCESSOS (`?aba=processos&fase=…`). A seleção em si mora na memória de Processos; `n` muda a cada
+  // pedido novo para a aba remontar e aplicá-lo (mesmo já estando em Processos).
+  const [pedidoFase, setPedidoFase] = useState<{ n: number }>(() => { if (urlInicial.faseProcessos) pedirFaseDeProcessos(urlInicial.faseProcessos); return { n: 0 } })
   // O que a aba Tarefas escolheu (visão fixa, agrupamento) e a URL guarda; ela também o recebe de volta quando a URL muda de fora.
   const [estadoTarefas, setEstadoTarefas] = useState<{ visao: string | null; agrupar: string | null; dentro: string | null }>({ visao: urlInicial.visao, agrupar: urlInicial.agrupar, dentro: urlInicial.dentro })
   const visaoPedida = estadoTarefas.visao
@@ -133,11 +149,12 @@ export function Torre() {
     if (!escritas.includes(paramsChave)) {
       const u = lerUrl(params)
       if (u.aba) setAba(u.aba)
+      if (u.faseProcessos) { pedirFaseDeProcessos(u.faseProcessos); setPedidoFase((p) => ({ n: p.n + 1 })) }
       setEstadoTarefas((e) => (e.visao === u.visao && e.agrupar === u.agrupar && e.dentro === u.dentro ? e : { visao: u.visao, agrupar: u.agrupar, dentro: u.dentro }))
       setTarefaPedida(u.tarefa); setProcessoDaUrl(u.processo)
       if (u.processo != null) setFoco(u.processo)
       setKpi(u.kpi); setPais(u.pais); setBusca(u.busca)
-      setFiltros((f) => (filtrosIguais(f, u.filtros) ? f : u.filtros))
+      setFiltros((f) => { const novos = preservarFaseDeTarefas(u.aba ?? aba, u.filtros, f); return filtrosIguais(f, novos) ? f : novos })
     }
   }
 
@@ -160,7 +177,7 @@ export function Torre() {
         if (estadoTarefas.agrupar) q.set("agrupar", estadoTarefas.agrupar)
         if (estadoTarefas.dentro) q.set("dentro", estadoTarefas.dentro)
       }
-      const novo = aplicarFiltrosNaQuery(q, filtros)
+      const novo = filtrosNaQueryDaAba(q, aba, filtros)
       if (canonicaDaQuery(novo) === canonicaDaQuery(atual)) return
       setEscritas((e) => [...e.slice(-11), novo.toString()])
       window.history.replaceState(window.history.state, "", novo.toString() ? `${window.location.pathname}?${novo.toString()}` : window.location.pathname)
@@ -246,7 +263,22 @@ export function Torre() {
   }
   const irParaAba = (a: "equipe") => setAba(a)
 
+  // T011: trocar de aba (clique, link interno, "ver equipe"…) rola a página para o topo. Não roda na montagem.
+  const abaAnterior = useRef<Aba>(aba)
+  useEffect(() => {
+    if (abaAnterior.current === aba) return
+    abaAnterior.current = aba
+    rolarAoTopo()
+  }, [aba])
+  // T009/T010: "Precisa de você" é um LINK no protótipo, não uma tela — na Visão geral rola suave até a seção #pdv; nas outras vai à Visão geral.
+  const clicarNaAba = (k: Aba) => {
+    if (k !== "precisa") { setAba(k); return }
+    if (aba === "visao") { document.getElementById("pdv")?.scrollIntoView({ behavior: "smooth" }); return }
+    setAba("visao")
+  }
+
   const n = (k: Aba): { txt: string; cls: string } | null => {
+    if (!seloVisivel(k, aba)) return null // T004–T008: o selo só aparece nas telas do protótipo (torre-casca.ts)
     if (k === "precisa") return itensPrecisaPais ? { txt: String(itensPrecisaPais.length), cls: "red" } : null
     if (k === "tarefas") return linhas ? { txt: String(nTarefas), cls: "" } : null
     if (k === "equipe") return nEquipe != null ? { txt: String(nEquipe), cls: "" } : null
@@ -257,7 +289,7 @@ export function Torre() {
 
   return (
     <TorreProvider
-      permissoes={permissoes} recarregar={recarregar}
+      permissoes={permissoes} recarregar={recarregar} fixo
       abrirFoco={setFoco} abrirRelatorio={setRelatorio}
     >
       <div className="tor">
@@ -273,7 +305,7 @@ export function Torre() {
             {ABAS.map(([k, l]) => {
               const c = n(k)
               return (
-                <button key={k} role="tab" aria-selected={aba === k} className="tor-tab" onClick={() => setAba(k)}>
+                <button key={k} role="tab" aria-selected={aba === k} className="tor-tab" onClick={() => clicarNaAba(k)}>
                   {l}{c ? <span className={`n ${c.cls}`}>{c.txt}</span> : null}
                 </button>
               )
@@ -299,7 +331,7 @@ export function Torre() {
               linhas={linhasPais} processos={procs ? processosPais : null} itensPrecisa={itensPrecisaPais} agora={agora} tend={tend}
               filtrandoPais={!!pais} kpiAtivo={kpi} onEscolherKpi={escolherKpi}
               onProcessos={() => { setFiltroProc(null); setAba("processos") }} onRisco={() => { setFiltroProc("risco"); setAba("processos") }}
-              irParaAba={setAba}
+              irParaAba={setAba} onRevisar={() => itensPrecisaPais && setRevisao([...itensPrecisaPais])}
             />
           ) : <div className="tor-card pad small">{erro ?? "Carregando a Torre…"}</div>
         )}
@@ -316,7 +348,7 @@ export function Torre() {
           />
         )}
         {aba === "equipe" && <TorreEquipe versao={versao} pais={pais} />}
-        {aba === "processos" && <TorreProcessos processos={processosDaAba} carregando={!procs && !erroProcs} erro={erroProcs} backlog={filtrandoBacklogPais ? null : tend?.backlog ?? null} />}
+        {aba === "processos" && <TorreProcessos key={pedidoFase.n} processos={processosDaAba} carregando={!procs && !erroProcs} erro={erroProcs} backlog={filtrandoBacklogPais ? null : tend?.backlog ?? null} />}
         {aba === "terceiros" && <TorreTerceiros linhas={linhasPais} versao={versao} />}
         {erro && aba !== "tarefas" && <div className="small mt-2">{erro}</div>}
 

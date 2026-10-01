@@ -1,7 +1,7 @@
 "use client"
 // src/components/torre/torre-base.tsx
 // ============================================================================
-// BASE DA TORRE (Blocos G/H) — contexto (toast de 6 s com "Desfazer", recarga,
+// BASE DA TORRE (Blocos G/H) — contexto (toast com "Desfazer" — FIXO na Torre, 6 s fora dela —, recarga,
 // permissões), o cliente HTTP e a Modal comum. Nada aqui decide regra: a tela só
 // chama as portas /api/torre/* e mostra o resultado real (item a item).
 // ============================================================================
@@ -13,6 +13,11 @@ export interface PermissoesTorre {
   editar: boolean; bloquear: boolean; iniciar: boolean; equipe: boolean; admin: boolean; usuarioId: number
 }
 export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO"; tarefaIds: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. */ ausenciaId?: number }
+
+/** A janela em que o servidor aceita o "Desfazer" (igual a `JANELA_DO_DESFAZER_MS` de torre-acoes-lote.ts; o teste confere). */
+export const JANELA_DO_DESFAZER_MS = 30_000
+/** Toast sem `fixo` (telas fora da Torre, ex.: Gerenciamento › Saúde) some sozinho depois disto. */
+const TOAST_AUTOMATICO_MS = 6000
 
 export interface RespostaApi<T = Record<string, unknown>> { status: number; ok: boolean; data: T }
 
@@ -53,29 +58,37 @@ export const useTorre = (): Ctx => {
   return c
 }
 
-export function TorreProvider({ permissoes, recarregar, abrirFoco = () => {}, abrirRelatorio = () => {}, children }: {
+export function TorreProvider({ permissoes, recarregar, fixo = false, abrirFoco = () => {}, abrirRelatorio = () => {}, children }: {
   permissoes: PermissoesTorre | null; recarregar: () => void
+  /** Toast FIXO (T013–T015): não some sozinho — só pelo ✕ ou quando outro o substitui — e fica acima de modais e gaveta. A Torre usa; o resto mantém os 6 s. */
+  fixo?: boolean
   abrirFoco?: (processoId: number) => void; abrirRelatorio?: (alvo: AlvoDoRelatorio) => void; children: ReactNode
 }) {
-  const [toast, setToast] = useState<{ msg: string; desfazer: Desfazer | null } | null>(null)
+  const [toast, setToast] = useState<{ msg: string; desfazer: Desfazer | null; em: number } | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
 
-  // Toast de 6 s (Decisão 6 do Passo 0).
+  // Fixo: o aviso fica até o ✕ ou até outro aviso o substituir. Sem `fixo`: some em 6 s (Decisão 6 do Passo 0).
   const avisar = useCallback((msg: string, desfazer: Desfazer | null = null) => {
-    setToast({ msg, desfazer })
+    setToast({ msg, desfazer, em: Date.now() })
     if (timer.current) clearTimeout(timer.current)
-    timer.current = setTimeout(() => setToast(null), 6000)
-  }, [])
+    timer.current = fixo ? null : setTimeout(() => setToast(null), TOAST_AUTOMATICO_MS)
+  }, [fixo])
 
   const desfazer = async () => {
     const d = toast?.desfazer
     if (!d) return
+    // O servidor só aceita o Desfazer por 30 s. Como o aviso fixo pode ficar na tela além disso, o botão NUNCA falha em silêncio:
+    // passou da janela → mensagem clara (o servidor também recusaria; a tarefa pode ser corrigida pela própria gaveta).
+    if (fixo && Date.now() - toast.em > JANELA_DO_DESFAZER_MS) {
+      avisar(`Não foi possível desfazer: passaram mais de ${JANELA_DO_DESFAZER_MS / 1000} segundos desde a ação. Corrija pela própria tarefa (tudo fica no histórico).`)
+      return
+    }
     setToast(null)
     const r = await api<{ total: number; desfeitas: number; itens: Array<{ ok: boolean; mensagem: string }> }>("/api/torre/tarefas/desfazer", "POST", d)
     if (r.data && typeof r.data.desfeitas === "number") {
       const falha = r.data.itens?.find((i) => !i.ok)
-      avisar(`Desfeito: ${r.data.desfeitas} de ${r.data.total}.${falha ? ` ${falha.mensagem}` : ""}`)
+      avisar(r.data.desfeitas === 0 && falha ? `Não foi possível desfazer: ${falha.mensagem}` : `Desfeito: ${r.data.desfeitas} de ${r.data.total}.${falha ? ` ${falha.mensagem}` : ""}`)
     } else avisar(erroDe(r.data))
     recarregar()
   }

@@ -15,6 +15,7 @@ import { prisma } from '@/lib/prisma'
 import { FASES, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { fasesDoRadar } from './torre-processos'
 import { metasAtivas, resolverMeta } from './torre-metas'
+import { inicioDaSemana } from './torre-tendencias'
 import { RESULTADOS_QUE_MOVEM_DE_FASE } from './metricas-processo'
 import {
   ESCOPO_VAZIO, permanenciasConcluidas, tempoMedioPorFase,
@@ -23,13 +24,7 @@ import {
 
 const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
-/** A segunda-feira 00:00 da semana de `d` — A MESMA de `tendenciasDaTorre` (torre-tendencias.ts), para "abre/fecha" nunca divergir. */
-export function inicioDaSemana(d: Date): Date {
-  const x = new Date(d)
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
-  x.setHours(0, 0, 0, 0)
-  return x
-}
+// `inicioDaSemana` mora em torre-tendencias.ts (a MESMA de `tendenciasDaTorre`, para "abre/fecha" nunca divergir).
 
 const ORDEM_DA_ULTIMA_FASE = Math.max(...Object.values(FASES).map((f) => f.ordem))
 

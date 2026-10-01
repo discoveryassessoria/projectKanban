@@ -230,7 +230,7 @@ secao("URL ↔ estado — parse/serialize idempotente, compartilhável")
   ok("valor fora da lista é descartado, o válido fica", lixo.prazo.join() === "hoje" && lixo.risco.length === 0 && lixo.status.length === 0 && lixo.certidao.join() === "NASCIMENTO" && lixo.prazoDe === null && lixo.prazoAte === null
     && lixo.quando === null && lixo.quandoDe === null && lixo.responsavel.join() === "eu,12" && lixo.ordenar === null && lixo.orgao.join() === "sem,7" && lixo.linhaReta === false && lixo.prioridade.join() === "ALTA", JSON.stringify(lixo))
   ok("limites: lista longa é cortada e texto enorme também", normalizarFiltros({ responsavel: Array.from({ length: 100 }, (_, i) => String(i + 1)) }).responsavel.length === 30 && (normalizarFiltros({ familia: "x".repeat(500) }).familia ?? "").length === 80)
-  ok("o estado inicial da tela vem da URL e a URL acompanha o estado (estático)", /lerUrl\(params\)/.test(ler("src/components/torre/Torre.tsx")) && /useState<FiltrosTorre>\(urlInicial\.filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /aplicarFiltrosNaQuery\(q, filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /history\.replaceState/.test(ler("src/components/torre/Torre.tsx")))
+  ok("o estado inicial da tela vem da URL e a URL acompanha o estado (estático)", /lerUrl\(params\)/.test(ler("src/components/torre/Torre.tsx")) && /useState<FiltrosTorre>\(urlInicial\.filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /filtrosNaQueryDaAba\(q, aba, filtros\)/.test(ler("src/components/torre/Torre.tsx")) && /aplicarFiltrosNaQuery\(query, aba === 'processos'/.test(ler("lib/operacional/torre-casca.ts")) && /history\.replaceState/.test(ler("src/components/torre/Torre.tsx")))
   ok("as chaves antigas da URL continuam lidas (aba, kpi, visao, processo, tarefa)", ["aba", "kpi", "visao", "processo", "tarefa"].every((k) => new RegExp(`params\\.get\\("${k}"\\)`).test(ler("src/components/torre/Torre.tsx"))))
 }
 
@@ -279,7 +279,7 @@ secao("Tela — painel do protótipo, Limpar filtros, Mais filtros, nacionalidad
   ok("Família: campo de texto 'Digite: Ant…'", /placeholder="Digite: Ant…"/.test(f))
   ok("rótulo de status pelo mapa único; fase pelo cadastro (rotularFase)", /ROTULO_STATUS\[/.test(f) && /rotularFase\(f\)/.test(f))
   ok("400 px: o painel passa a 2 colunas e nada tem largura fixa acima de 400 px", /@media \(max-width: 720px\)[\s\S]*\.tf-fx \{ grid-template-columns: repeat\(2/.test(css))
-  ok("a busca do topo: 'Buscar pessoa, cartório ou tarefa…' (família tem campo próprio)", /placeholder="Buscar pessoa, cartório ou tarefa…"/.test(cab) && !/Buscar família/.test(cab))
+  ok("a busca do topo: 'Buscar família, pessoa, cartório…' (T042, igual ao protótipo; o campo Família do painel segue com o seu 'Digite: Ant…')", /placeholder="Buscar família, pessoa, cartório…"/.test(cab) && !/Buscar pessoa, cartório ou tarefa/.test(cab))
   ok("a Torre repassa os filtros, o chip/limpar de país e de busca, e o estado da URL", /filtros=\{filtros\} onFiltros=\{setFiltros\}/.test(torre) && /onLimparPais=/.test(torre) && /onLimparBusca=/.test(torre) && /onEstadoUrl=\{onEstadoUrl\}/.test(torre))
 }
 

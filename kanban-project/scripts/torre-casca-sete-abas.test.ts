@@ -54,7 +54,7 @@ async function main() {
   secao("4 — cabeçalho: país (botões), busca, Briefing do dia SÓ manual, Revisar o dia")
   const cab = ler("src/components/torre/TorreCabecalho.tsx")
   ok("botão 'Briefing do dia' e botão 'Revisar o dia (N)'", /☀ Briefing do dia/.test(cab) && /Revisar o dia \(\{nPrecisa/.test(cab))
-  ok("a busca existe, com o placeholder de sempre", /placeholder="Buscar pessoa, cartório ou tarefa…"/.test(cab))
+  ok("a busca existe, com o placeholder de sempre", /placeholder="Buscar família, pessoa, cartório…"/.test(cab))
   ok("o país são botões 'Todos' + um por país cadastrado, com a contagem de processos", /Todos/.test(cab) && /paises\.map/.test(cab) && /p\.n != null/.test(cab) && /aria-pressed/.test(cab))
   ok("todo botão do cabeçalho tem handler", [...cab.matchAll(/<button\b[^>]*>/g)].every((m) => /onClick=/.test(m[0])))
   const torreCod = semComentarios(torre)
