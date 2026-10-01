@@ -71,8 +71,9 @@ ok("com `fixo` NÃO há timer: só o ✕ ou outro aviso encerram o toast; sem `f
 ok("o ✕ (aria-label 'Fechar aviso') continua", /aria-label="Fechar aviso" onClick=\{\(\) => setToast\(null\)\}/.test(bc))
 ok("o toast fica acima de modais e gaveta (z-index 10080 > popover 10060 > gaveta 10002)", /\.tor-toast \{[^}]*z-index: 10080/.test(ler("src/components/torre/torre.css")) && /toast: 10080/.test(ler("src/lib/ui/layers.ts")))
 const servico = ler("src/services/torre-acoes-lote.ts")
-ok("a janela do cliente = a do servidor (30 s)", /JANELA_DO_DESFAZER_MS = 30_000/.test(bc) && /JANELA_DO_DESFAZER_MS = 30_000/.test(servico))
-ok("Desfazer depois de 30 s FALHA com mensagem clara (nunca em silêncio) e não chama o servidor à toa", /Date\.now\(\) - toast\.em > JANELA_DO_DESFAZER_MS/.test(bc) && /Não foi possível desfazer: passaram mais de/.test(bc))
+const janela = sem(ler("lib/operacional/torre-desfazer.ts"))
+ok("a janela do cliente = a do servidor = UMA constante (24 h, a do protótipo), em lib/operacional/torre-desfazer.ts", /JANELA_DO_DESFAZER_MS = 24 \* 60 \* 60 \* 1000/.test(janela) && /from "@\/lib\/operacional\/torre-desfazer"/.test(bc) && /from '@\/lib\/operacional\/torre-desfazer'/.test(servico) && !/JANELA_DO_DESFAZER_MS = \d/.test(bc) && !/JANELA_DO_DESFAZER_MS = \d/.test(servico))
+ok("Desfazer depois da janela FALHA com mensagem clara (nunca em silêncio) e não chama o servidor à toa", /Date\.now\(\) - toast\.em > JANELA_DO_DESFAZER_MS/.test(bc) && /Não foi possível desfazer: passaram mais de/.test(bc))
 ok("Desfazer que o servidor recusa por inteiro mostra a causa", /Não foi possível desfazer: \$\{falha\.mensagem\}/.test(bc))
 ok("o relógio só é lido dentro do callback do aviso/clique (nunca no corpo de render)", !/^\s*const \w+ = Date\.now\(\)/m.test(bc))
 

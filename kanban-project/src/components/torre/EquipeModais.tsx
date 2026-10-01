@@ -28,7 +28,7 @@ function ModalDaEquipe({ titulo, texto, ocupado, onFechar, children, cancelar, c
 }
 
 /** MARCAR AUSÊNCIA — só registra (a porta de capacidade grava e audita; o sucessor é só sugestão). */
-export function AusenciaModal({ pessoa, onFechar, onFeito }: { pessoa: PessoaDaEquipe; onFechar: () => void; onFeito: () => void }) {
+export function AusenciaModal({ pessoa, onFechar, onFeito }: { pessoa: PessoaDaEquipe; onFechar: () => void; onFeito: (ausenciaId: number | null) => void }) {
   const [tipo, setTipo] = useState("FERIAS")
   const [de, setDe] = useState("")
   const [ate, setAte] = useState("")
@@ -37,12 +37,12 @@ export function AusenciaModal({ pessoa, onFechar, onFeito }: { pessoa: PessoaDaE
   const [erro, setErro] = useState<string | null>(null)
   const enviar = async () => {
     setEnviando(true); setErro(null)
-    const r = await api("/api/operacao/capacidade", "PATCH", {
+    const r = await api<{ id?: number }>("/api/operacao/capacidade", "PATCH", {
       acao: "indisponibilizar", usuarioId: pessoa.usuarioId, tipo,
       ...(de ? { inicio: `${de}T00:00:00-03:00` } : {}), ...(ate ? { fim: `${ate}T23:59:59-03:00` } : {}), motivo: motivo.trim() || undefined,
     })
     setEnviando(false)
-    if (r.ok) onFeito(); else setErro(erroDe(r.data))
+    if (r.ok) onFeito(typeof r.data.id === "number" ? r.data.id : null); else setErro(erroDe(r.data))
   }
   return (
     <ModalDaEquipe titulo={`Marcar ausência · ${pessoa.nome}`} texto={TEXTO_MARCAR_AUSENCIA} ocupado={enviando} onFechar={onFechar}

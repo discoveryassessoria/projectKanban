@@ -3,19 +3,20 @@
 // ============================================================================
 // BASE DA TORRE (Blocos G/H) — contexto (toast com "Desfazer" — FIXO na Torre, 6 s fora dela —, recarga,
 // permissões), o cliente HTTP e a Modal comum. Nada aqui decide regra: a tela só
-// chama as portas /api/torre/* e mostra o resultado real (item a item).
+// chama as portas /api/torre/… e mostra o resultado real (item a item).
 // ============================================================================
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
+import { JANELA_DO_DESFAZER_MS, JANELA_DO_DESFAZER_TEXTO } from "@/lib/operacional/torre-desfazer"
 import { auth } from "@/src/components/operacao/kit-operacional"
 
 export interface PermissoesTorre {
   editar: boolean; bloquear: boolean; iniciar: boolean; equipe: boolean; admin: boolean; usuarioId: number
 }
-export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO"; tarefaIds: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. */ ausenciaId?: number }
+export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO" | "AUSENCIA"; tarefaIds: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. "AUSENCIA" (Marcar ausência): só ela, sem tarefas. */ ausenciaId?: number }
 
-/** A janela em que o servidor aceita o "Desfazer" (igual a `JANELA_DO_DESFAZER_MS` de torre-acoes-lote.ts; o teste confere). */
-export const JANELA_DO_DESFAZER_MS = 30_000
+/** A janela do "Desfazer" é UMA SÓ na Torre inteira (`lib/operacional/torre-desfazer.ts`): cliente e servidor leem a mesma constante. */
+export { JANELA_DO_DESFAZER_MS }
 /** Toast sem `fixo` (telas fora da Torre, ex.: Gerenciamento › Saúde) some sozinho depois disto. */
 const TOAST_AUTOMATICO_MS = 6000
 
@@ -78,16 +79,17 @@ export function TorreProvider({ permissoes, recarregar, fixo = false, abrirFoco 
   const desfazer = async () => {
     const d = toast?.desfazer
     if (!d) return
-    // O servidor só aceita o Desfazer por 30 s. Como o aviso fixo pode ficar na tela além disso, o botão NUNCA falha em silêncio:
+    // O servidor só aceita o Desfazer dentro da janela única. Como o aviso fixo pode ficar na tela além disso, o botão NUNCA falha em silêncio:
     // passou da janela → mensagem clara (o servidor também recusaria; a tarefa pode ser corrigida pela própria gaveta).
     if (fixo && Date.now() - toast.em > JANELA_DO_DESFAZER_MS) {
-      avisar(`Não foi possível desfazer: passaram mais de ${JANELA_DO_DESFAZER_MS / 1000} segundos desde a ação. Corrija pela própria tarefa (tudo fica no histórico).`)
+      avisar(`Não foi possível desfazer: passaram mais de ${JANELA_DO_DESFAZER_TEXTO} desde a ação. Corrija pela própria tarefa (tudo fica no histórico).`)
       return
     }
     setToast(null)
-    const r = await api<{ total: number; desfeitas: number; itens: Array<{ ok: boolean; mensagem: string }> }>("/api/torre/tarefas/desfazer", "POST", d)
+    const r = await api<{ total: number; desfeitas: number; mensagem?: string; itens: Array<{ ok: boolean; mensagem: string }> }>("/api/torre/tarefas/desfazer", "POST", d)
     if (r.data && typeof r.data.desfeitas === "number") {
       const falha = r.data.itens?.find((i) => !i.ok)
+      if (d.tipo === "AUSENCIA" && r.data.mensagem) { avisar(r.data.desfeitas === 0 ? `Não foi possível desfazer: ${r.data.mensagem}` : r.data.mensagem); recarregar(); return }
       avisar(r.data.desfeitas === 0 && falha ? `Não foi possível desfazer: ${falha.mensagem}` : `Desfeito: ${r.data.desfeitas} de ${r.data.total}.${falha ? ` ${falha.mensagem}` : ""}`)
     } else avisar(erroDe(r.data))
     recarregar()

@@ -102,7 +102,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
 
       <EquipePrevisao previsao={dados.previsao} pessoas={dados.pessoas} />
 
-      {ausencia && <AusenciaModal pessoa={ausencia} onFechar={() => setAusencia(null)} onFeito={() => { avisar(toastAusenciaMarcada(ausencia.nome)); setAusencia(null); atualizar() }} />}
+      {ausencia && <AusenciaModal pessoa={ausencia} onFechar={() => setAusencia(null)} onFeito={(ausenciaId) => { avisar(toastAusenciaMarcada(ausencia.nome), ausenciaId != null ? { tipo: "AUSENCIA", tarefaIds: [], ausenciaId } : null); setAusencia(null); atualizar() }} />}
       {mover && <MoverModal origem={mover} pessoas={dados.pessoas} onFechar={() => setMover(null)}
         onFeito={(r) => { avisar(toastCarteiraMovida(mover.nome, r), r.desfazer); setMover(null); atualizar() }} />}
     </div>

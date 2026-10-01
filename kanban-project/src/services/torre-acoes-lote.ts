@@ -22,9 +22,11 @@
 // está exatamente como a ação a deixou; se alguém mexeu depois, RECUSA (desfazer
 // apagaria a decisão mais recente). Cada reversão grava a própria auditoria.
 //
-// COBRAR NÃO TEM DESFAZER, de propósito: cobrança é um fato histórico append-only
-// (`ContatoTerceiro` — o terceiro FOI contatado; apagar o registro seria mentir
-// sobre o que aconteceu). O toast dela não oferece "Desfazer".
+// COBRAR AINDA NÃO TEM DESFAZER: cobrança é um fato histórico append-only (`ContatoTerceiro` — apagar o registro seria
+// mentir sobre o que aconteceu). O ESTORNO auditado (o fato fica, ganha um contrafato lido pela contagem de "sem resposta",
+// pela última cobrança e pelas listas) precisa de uma marca persistida no contato: é aditivo, mas EXIGE migration — e a
+// regra desta frente é não criar migration. Pedido escrito em `prototipo-torre/PEDIDOS/terceiros-desfazer-cobranca.md`;
+// enquanto isso o toast da cobrança não oferece "Desfazer" (nunca um botão que não desfaz).
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { redistribuirTarefas, redistribuirPrioridade, type ItemDaRedistribuicao } from '@/lib/operacional/tarefa-comandos'
@@ -32,17 +34,18 @@ import { alterarPrazo, alterarPrioridade } from '@/lib/operacional/tarefa-ciclo'
 import { desfazerAtribuicao } from '@/src/services/precisa-de-voce-acoes'
 import { cobrarTarefas, type CobrancaIgnorada } from '@/src/services/cobranca-terceiros'
 import { encerrarIndisponibilidade } from '@/lib/operacional/organizacao'
+import { JANELA_DO_DESFAZER_MS, dentroDaJanelaDoDesfazer } from '@/lib/operacional/torre-desfazer'
 
 export const LIMITE_DO_LOTE = 200
 
 /**
- * A JANELA DO DESFAZER. O toast oferece 6 s; o servidor aceita até 30 s (rede, clique no
- * último segundo) — e SÓ do autor da própria ação. Sem isto, "Desfazer" seria um botão
- * que desmancha, dias depois, qualquer decisão antiga de qualquer pessoa.
+ * A JANELA DO DESFAZER é UMA SÓ para a Torre inteira (`lib/operacional/torre-desfazer.ts`): o servidor só desfaz ação
+ * RECENTE e SÓ do autor da própria ação. Sem isto, "Desfazer" seria um botão que desmancha, dias depois, qualquer decisão
+ * antiga de qualquer pessoa. Reexportada aqui para os importadores antigos.
  */
-export const JANELA_DO_DESFAZER_MS = 30_000
+export { JANELA_DO_DESFAZER_MS }
 
-export type TipoDesfazer = 'ATRIBUICAO' | 'PRIORIDADE' | 'PRAZO'
+export type TipoDesfazer = 'ATRIBUICAO' | 'PRIORIDADE' | 'PRAZO' | 'AUSENCIA'
 
 export interface ResultadoDoLote {
   acao: 'ATRIBUIR' | 'PRIORIDADE_ALTA' | 'REPACTUAR' | 'COBRAR'
@@ -165,35 +168,54 @@ async function dentroDaJanela(tarefaId: number, acoes: string[], autorId: number
     where: { entidade: 'Tarefa', entidadeId: tarefaId, acao: { in: acoes } },
     orderBy: { criadoEm: 'desc' }, select: { usuarioId: true, criadoEm: true },
   })
-  return !!log && log.usuarioId === autorId && agora.getTime() - log.criadoEm.getTime() <= JANELA_DO_DESFAZER_MS
+  return !!log && log.usuarioId === autorId && dentroDaJanelaDoDesfazer(log.criadoEm, agora)
+}
+
+/**
+ * DESFAZ "MARCAR AUSÊNCIA" — cancela a ausência recém-marcada pela PORTA EXISTENTE (`encerrarIndisponibilidade`: o registro
+ * fica, com a data em que deixou de valer — nada é apagado). Mesma validação dos outros Desfazer: só o AUTOR da ausência, só
+ * dentro da janela única e só se nada mudou depois (ainda vigente: uma ausência já encerrada/terminada não é reaberta nem
+ * reescrita). Grava a própria linha de auditoria. Também é o pedaço de "Aplicar saída" que encerra a ausência junto.
+ */
+export async function desfazerAusenciaMarcada(args: { ausenciaId: number; autorId: number; agora?: Date; origem?: string }): Promise<{ ok: boolean; mensagem: string; usuarioId?: number; nome?: string }> {
+  const agora = args.agora ?? new Date()
+  const aus = await prisma.indisponibilidadeOperacional.findUnique({
+    where: { id: args.ausenciaId }, select: { id: true, usuarioId: true, criadoPorId: true, criadoEm: true, inicio: true, fim: true, usuario: { select: { nome: true } } },
+  })
+  if (!aus) return { ok: false, mensagem: 'ausência não encontrada' }
+  if (aus.criadoPorId !== args.autorId || !dentroDaJanelaDoDesfazer(aus.criadoEm, agora)) {
+    return { ok: false, mensagem: 'só se desfaz a ação recente, feita por você — passou o tempo do "Desfazer"', usuarioId: aus.usuarioId, nome: aus.usuario.nome }
+  }
+  // Nada mudou depois: a ausência continua como foi marcada (aberta ou com o fim futuro de quando nasceu). Encerrada por outra decisão = recusa.
+  if (aus.fim != null && aus.fim <= agora) {
+    return { ok: false, mensagem: 'a ausência já foi encerrada desde então — desfazer recusado', usuarioId: aus.usuarioId, nome: aus.usuario.nome }
+  }
+  const r = await encerrarIndisponibilidade(aus.id, agora)
+  if (!r.ok) return { ok: false, mensagem: r.erro, usuarioId: aus.usuarioId, nome: aus.usuario.nome }
+  await prisma.logAuditoria.create({
+    data: {
+      acao: 'EDITAR', entidade: 'CapacidadeOperacional', entidadeId: aus.usuarioId, usuarioId: args.autorId,
+      descricao: `Ausência de ${aus.usuario.nome} desfeita (${args.origem ?? 'Desfazer de "Marcar ausência" da Torre'}).`,
+      detalhes: { indisponibilidadeId: aus.id, origem: args.origem ?? 'torre-desfazer-ausencia', desfazer: true },
+    },
+  })
+  return { ok: true, mensagem: `Ausência de ${aus.usuario.nome} desfeita.`, usuarioId: aus.usuarioId, nome: aus.usuario.nome }
 }
 
 export async function desfazerLote(args: { tipo: TipoDesfazer; tarefaIds: number[]; autorId: number; agora?: Date; ausenciaId?: number | null }): Promise<{
   total: number; desfeitas: number; ausenciaEncerrada?: boolean; itens: Array<{ tarefaId: number; ok: boolean; mensagem: string }>
 }> {
   const agora = args.agora ?? new Date()
+  // "Marcar ausência" não é desfeita por lote de tarefas: tem a sua própria porta (`desfazerAusenciaMarcada`).
+  if (args.tipo === 'AUSENCIA') return { total: 0, desfeitas: 0, itens: [] }
 
   // DESFAZER "APLICAR SAÍDA": a ausência registrada junto com a mudança de carteira precisa ser
   // encerrada ANTES — quem está ausente não pode receber trabalho de volta (`atribuirTarefa` recusa).
-  // Só a ausência que ESTE autor abriu agora há pouco; nunca uma antiga nem de outra pessoa.
+  // Só a ausência que ESTE autor abriu há pouco; nunca uma antiga nem de outra pessoa.
   let ausenciaEncerrada: boolean | undefined
   if (args.ausenciaId != null) {
-    const aus = await prisma.indisponibilidadeOperacional.findUnique({
-      where: { id: args.ausenciaId }, select: { id: true, usuarioId: true, criadoPorId: true, criadoEm: true, usuario: { select: { nome: true } } },
-    })
-    if (aus && aus.criadoPorId === args.autorId && agora.getTime() - aus.criadoEm.getTime() <= JANELA_DO_DESFAZER_MS) {
-      const r = await encerrarIndisponibilidade(aus.id, agora)
-      ausenciaEncerrada = r.ok
-      if (r.ok) {
-        await prisma.logAuditoria.create({
-          data: {
-            acao: 'EDITAR', entidade: 'CapacidadeOperacional', entidadeId: aus.usuarioId, usuarioId: args.autorId,
-            descricao: `Ausência de ${aus.usuario.nome} desfeita junto com a mudança de carteira (Desfazer da simulação de saída da Torre).`,
-            detalhes: { indisponibilidadeId: aus.id, origem: 'torre-desfazer-saida' },
-          },
-        })
-      }
-    } else ausenciaEncerrada = false
+    const r = await desfazerAusenciaMarcada({ ausenciaId: args.ausenciaId, autorId: args.autorId, agora, origem: 'Desfazer da simulação de saída da Torre' })
+    ausenciaEncerrada = r.ok
   }
   const itens: Array<{ tarefaId: number; ok: boolean; mensagem: string }> = []
   const ids = [...new Set(args.tarefaIds)]
