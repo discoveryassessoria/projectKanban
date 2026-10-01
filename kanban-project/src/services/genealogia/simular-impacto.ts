@@ -53,6 +53,8 @@ export interface MudancasPropostas {
   requerente?: string | null
   linhaReta?: boolean
   documentacao?: boolean
+  /** Filtro de certidões (NAS/CAS/OBI) da pessoa fora da linhagem; `null` = regra automática. */
+  documentosExigidos?: string[] | null
 }
 
 export interface UniaoProposta {
@@ -404,6 +406,7 @@ async function aplicarMudancaProposta(db: DB, entrada: EntradaSimulacao): Promis
     if (mudancas.requerente !== undefined) data.requerente = mudancas.requerente
     if (mudancas.linhaReta !== undefined) data.linhaReta = mudancas.linhaReta
     if (mudancas.documentacao !== undefined) data.documentacao = mudancas.documentacao
+    if (mudancas.documentosExigidos !== undefined) data.documentosExigidos = mudancas.documentosExigidos ?? Prisma.DbNull
     if (mudancas.paiId !== undefined) {
       data.pai = mudancas.paiId ? { connect: { id: mudancas.paiId } } : { disconnect: true }
     }

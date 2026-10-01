@@ -7,6 +7,8 @@ import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verif
 import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/requerente-flag"
 import { registrarTransicaoParaRequerenteTx, efeitosDoVinculoPosCommit } from "@/lib/genealogia/vincular-requerente"
 import { aplicarMudancaNaArvore, descreverMudancaPessoa, SELECT_PESSOA_COMPARAVEL, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
+import { validarDocumentosExigidos, mesmaEscolha, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
+import { auditarDocumentosExigidos } from "@/src/services/genealogia/documentos-exigidos-auditoria"
 import { removerPessoaDaArvore, type ModoRemocao } from "@/src/services/pessoa-ciclo-vida"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
@@ -79,7 +81,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = await request.json()
 
     // Estado ANTERIOR do flag — para detectar a TRANSIÇÃO não→requerente (§1/§9).
-    const antes = await prisma.pessoa.findUnique({ where: { id }, select: { requerente: true } })
+    const antes = await prisma.pessoa.findUnique({ where: { id }, select: { requerente: true, documentacao: true, documentosExigidos: true } })
 
     const dataToUpdate: Prisma.PessoaUpdateInput = {}
 
@@ -144,6 +146,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.linhaReta !== undefined) dataToUpdate.linhaReta = body.linhaReta === true
     if (body.documentacao !== undefined) dataToUpdate.documentacao = body.documentacao === true
 
+    // FILTRO DE CERTIDÕES (`documentosExigidos`): lista fechada NAS/CAS/OBI validada AQUI (constante única). Só grava quando
+    // MUDOU de verdade (re-save de pessoa antiga NUNCA grava a lista cheia: `null` ≡ os três marcados) e é ignorado quando
+    // a pessoa NÃO precisa de documentação (a caixa desligada vale mais que qualquer lista).
+    let documentosExigidosNovo: CodigoDocumentoExigivel[] | null | undefined
+    if (body.documentosExigidos !== undefined) {
+      const v = validarDocumentosExigidos(body.documentosExigidos)
+      if (!v.ok) return NextResponse.json({ error: v.erro }, { status: 400 })
+      const documentacaoFinal = body.documentacao !== undefined ? body.documentacao === true : antes?.documentacao !== false
+      if (documentacaoFinal && !mesmaEscolha(antes?.documentosExigidos ?? null, v.valor)) {
+        documentosExigidosNovo = v.valor
+        dataToUpdate.documentosExigidos = v.valor ?? Prisma.DbNull
+      }
+    }
+
     // ✅ NOVO (rodada 3): flag de casado pra engine
     if (body.casado !== undefined) dataToUpdate.casado = body.casado === true
 
@@ -158,9 +174,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // propagação para necessidade → documento → passo → tarefa acontecem na MESMA
     // transação (`aplicarMudancaNaArvore`). Falhou qualquer parte → nada é gravado e
     // a resposta é ERRO (não 200 com falha engolida).
+    const autorDaMudanca = (await extrairUsuarioComPermissoes(request))?.userId ?? null
     const { resultado } = await aplicarMudancaNaArvore({
       arvoreId: null,
-      autorId: (await extrairUsuarioComPermissoes(request))?.userId ?? null,
+      autorId: autorDaMudanca,
       fn: async (tx) => {
         const estadoAntes = await tx.pessoa.findUnique({ where: { id }, select: SELECT_PESSOA_COMPARAVEL })
         const p = await tx.pessoa.update({
@@ -176,6 +193,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         // ocorreu. Ela não conhece a DomainOutbox.
         if (houveTransicao && p.arvoreId) {
           await registrarTransicaoParaRequerenteTx(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
+        }
+        if (documentosExigidosNovo !== undefined) {
+          await auditarDocumentosExigidos(tx, { pessoaId: p.id, antes: estadoAntes?.documentosExigidos ?? null, depois: documentosExigidosNovo, usuarioId: autorDaMudanca })
         }
         return { pessoa: p, estadoAntes }
       },

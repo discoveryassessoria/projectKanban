@@ -14,6 +14,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
+import { validarDocumentosExigidos } from "@/src/lib/genealogia/documentos-exigidos"
 import {
   simularImpactoPessoa,
   type EntradaSimulacao,
@@ -31,6 +32,7 @@ const CAMPOS: Array<keyof MudancasPropostas> = [
   "requerente",
   "linhaReta",
   "documentacao",
+  "documentosExigidos",
 ]
 
 export async function POST(
@@ -56,7 +58,15 @@ export async function POST(
     const mudancas: MudancasPropostas = {}
     for (const campo of CAMPOS) {
       const valor = body?.mudancas?.[campo]
-      if (valor !== undefined) Object.assign(mudancas, { [campo]: valor })
+      if (valor === undefined) continue
+      if (campo === "documentosExigidos") {
+        // Mesma validação da gravação (lista fechada NAS/CAS/OBI): o preview nunca simula o que a API recusaria.
+        const v = validarDocumentosExigidos(valor)
+        if (!v.ok) return NextResponse.json({ error: v.erro }, { status: 400 })
+        Object.assign(mudancas, { documentosExigidos: v.valor })
+        continue
+      }
+      Object.assign(mudancas, { [campo]: valor })
     }
 
     let uniao: UniaoProposta | undefined

@@ -9,6 +9,9 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { aplicarMudancaNaArvore, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
+import { Prisma } from "@prisma/client"
+import { validarDocumentosExigidos } from "@/src/lib/genealogia/documentos-exigidos"
+import { auditarDocumentosExigidos } from "@/src/services/genealogia/documentos-exigidos-auditoria"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 // LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
 // Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
@@ -187,6 +190,7 @@ export async function POST(request: NextRequest) {
       requerente,
       linhaReta,
       documentacao,
+      documentosExigidos,
 
       // ✅ NOVO (rodada 3): flag de casamento pra engine
       casado,
@@ -199,6 +203,12 @@ export async function POST(request: NextRequest) {
     if (!arvoreId) {
       return NextResponse.json({ error: "arvoreId é obrigatório" }, { status: 400 })
     }
+
+    // Filtro de certidões (lista fechada NAS/CAS/OBI). Ignorado quando a pessoa NÃO precisa de documentação; `null`/ausente/os
+    // três = regra automática (nada gravado).
+    const validado = documentosExigidos === undefined ? ({ ok: true, valor: null } as const) : validarDocumentosExigidos(documentosExigidos)
+    if (!validado.ok) return NextResponse.json({ error: validado.erro }, { status: 400 })
+    const documentosExigidosGravar = documentacao === false ? null : validado.valor
 
     // Verificar se a árvore existe
     const arvore = await prisma.arvore.findUnique({
@@ -264,6 +274,7 @@ export async function POST(request: NextRequest) {
         // abaixo) já calcula e grava o valor certo — nunca é digitado.
         linhaReta: linhaReta ?? true,
         documentacao: documentacao ?? true,
+        documentosExigidos: documentosExigidosGravar ?? Prisma.DbNull,
 
         // ✅ NOVO (rodada 3): flag de casado
         casado: casado === true,
@@ -309,6 +320,10 @@ export async function POST(request: NextRequest) {
         where: { id: arvoreId },
         data: { pessoaPrincipalId: pessoa.id }
       })
+    }
+
+    if (documentosExigidosGravar) {
+      await auditarDocumentosExigidos(tx, { pessoaId: pessoa.id, antes: null, depois: documentosExigidosGravar, usuarioId: autorId })
     }
 
     return pessoa

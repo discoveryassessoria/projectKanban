@@ -105,3 +105,22 @@ export function documentoDaUniaoEscolhido(conjuges: PessoaParaFiltroDocumental[]
     return documentoEscolhidoParaPessoa(c, codigo)
   })
 }
+
+const ROTULO_POR_CODIGO: Record<CodigoDocumentoExigivel, string> = { NAS: "Nascimento", CAS: "Casamento", OBI: "Óbito" }
+
+/** "Nascimento, Óbito" / "nenhum documento" — para auditoria e tela. */
+export function rotuloDaLista(lista: readonly CodigoDocumentoExigivel[]): string {
+  return lista.length === 0 ? "nenhum documento" : lista.map((c) => ROTULO_POR_CODIGO[c]).join(", ")
+}
+
+/** Duas escolhas gravadas significam o MESMO? (`null` ≡ os três marcados.) */
+export function mesmaEscolha(a: unknown, b: unknown): boolean {
+  const x = marcadosParaTela(a), y = marcadosParaTela(b)
+  return x.length === y.length && x.every((c) => y.includes(c))
+}
+
+/** O que mudou na escolha, em palavras (auditoria). `null` = nada mudou. */
+export function descreverMudancaDocumentosExigidos(antes: unknown, depois: unknown): string | null {
+  if (mesmaEscolha(antes, depois)) return null
+  return `documentos exigidos da pessoa alterados: de ${rotuloDaLista(marcadosParaTela(antes))} para ${rotuloDaLista(marcadosParaTela(depois))}`
+}
