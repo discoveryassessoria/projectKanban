@@ -56,7 +56,7 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
     const r = await cobrarIds([p.taskId], d)
     if (!r.ok) return r
     setCobrar(null)
-    avisar(`Cobrança enviada e registrada · ${p.pessoa}`)
+    avisar(`Cobrança registrada · ${p.pessoa}`)
     recarregar()
     return { ok: true }
   }
@@ -64,14 +64,14 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
     const r = await cobrarIds(idsVencidos, d)
     if (!r.ok) return r
     setTodos(false)
-    avisar(`${r.cobradas} ${r.cobradas === 1 ? "cobrança enviada e registrada" : "cobranças enviadas e registradas"}`)
+    avisar(`${r.cobradas} ${r.cobradas === 1 ? "cobrança registrada" : "cobranças registradas"}`)
     recarregar()
     return { ok: true }
   }
   const cobrarCartorio = async (orgaoId: number, nome: string, doGrupo: PedidoDeTerceiro[]) => {
     const r = aceitar(await api<RespostaDaCobranca>(`/api/torre/terceiros/${orgaoId}/cobrar`, "POST", { tarefaIds: doGrupo.map((p) => p.taskId), proximaEmDias: DIAS_PADRAO_DA_COBRANCA }))
     if (!r.ok) { avisar(r.mensagem ?? "Não foi possível cobrar este cartório."); return }
-    avisar(`Cobrança enviada a ${nome} com ${r.cobradas} ${r.cobradas === 1 ? "certidão" : "certidões"} · registrada em cada uma`)
+    avisar(`Cobrança registrada para ${nome} com ${r.cobradas} ${r.cobradas === 1 ? "certidão" : "certidões"} · registrada em cada uma`)
     recarregar()
   }
 

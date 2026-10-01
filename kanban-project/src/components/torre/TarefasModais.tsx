@@ -91,7 +91,7 @@ export function ModalDaAcao({ acao, linha, agora, onFechar, onFeito }: {
 
   if (acao === "cobrar") {
     return (
-      <TarefasModal titulo="Cobrar o cartório" texto={`${bola} · ${certidao} · ${pessoa}`} botao="Enviar e registrar" onFechar={onFechar} onConfirmar={async (just) => {
+      <TarefasModal titulo="Registrar cobrança · cartório" texto={`${bola} · ${certidao} · ${pessoa}`} botao="Registrar cobrança" onFechar={onFechar} onConfirmar={async (just) => {
         const r = await api<{ ok?: boolean; mensagem?: string; proximoAcompanhamentoEm?: string | null }>(`/api/torre/tarefas/${linha.taskId}/cobrar`, "POST", { ...(campo ? { canal: campo } : {}), observacao: just })
         if (!r.ok || !r.data.ok) return { ok: false, mensagem: r.data.mensagem ?? erroDe(r.data) }
         const dias = r.data.proximoAcompanhamentoEm ? diasEntreDiasOperacionais(new Date(r.data.proximoAcompanhamentoEm), agora) : null
@@ -106,7 +106,7 @@ export function ModalDaAcao({ acao, linha, agora, onFechar, onFeito }: {
   }
   if (acao === "cobrarCliente") {
     return (
-      <TarefasModal titulo="Cobrar o cliente" texto={`${certidao} · ${pessoa}`} botao="Enviar e registrar" onFechar={onFechar} onConfirmar={async (just) => {
+      <TarefasModal titulo="Registrar cobrança · cliente" texto={`${certidao} · ${pessoa}`} botao="Registrar cobrança" onFechar={onFechar} onConfirmar={async (just) => {
         const r = await api<{ ok?: boolean; mensagem?: string }>(`/api/torre/tarefas/${linha.taskId}/cobrar-cliente`, "POST", { justificativa: just })
         if (!r.ok || !r.data.ok) return { ok: false, mensagem: r.data.mensagem ?? erroDe(r.data) }
         concluir(`Cobrança ao cliente registrada · ${pessoa}`)

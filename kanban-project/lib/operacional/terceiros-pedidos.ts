@@ -172,8 +172,8 @@ export interface GrupoDeOrgao {
   pedidos: PedidoDeTerceiro[]
 }
 
-/** "1 pedido(s) · um e-mail só, com todas as certidões" — o subtítulo do cabeçalho de cada grupo. */
-export const subtituloDoGrupo = (n: number): string => `${n} pedido(s) · um e-mail só, com todas as certidões`
+/** "1 pedido(s) · cobrança registrada em cada certidão" — o subtítulo do cabeçalho de cada grupo. */
+export const subtituloDoGrupo = (n: number): string => `${n} pedido(s) · cobrança registrada em cada certidão`
 
 /**
  * Ordena por nome do órgão e agrupa. SEM números comparativos: o grupo só diz quantos pedidos tem, para cobrar junto.

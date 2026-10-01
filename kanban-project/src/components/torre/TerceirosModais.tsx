@@ -41,7 +41,7 @@ function Campos({ f, comCanal }: { f: ReturnType<typeof useFormularioDeCobranca>
   return (
     <>
       {comCanal && (
-        <label className="ter-campo">Canal
+        <label className="ter-campo">Canal usado
           <select className="tor-in" value={f.canal} onChange={(e) => f.setCanal(e.target.value)}>
             <option value={CANAL_CADASTRADO}>Canal cadastrado do cartório</option>
             {CANAIS_DE_CONTATO_UI.map((c) => <option key={c.v} value={c.v}>{c.l}</option>)}
@@ -69,13 +69,13 @@ export function CobrarPedidoModal({ pedido, onFechar, onEnviar }: {
     if (!r.ok) setErro(r.mensagem ?? "Não foi possível registrar a cobrança.")
   }
   return (
-    <CascaDoModal titulo={`Cobrar · ${pedido.orgao ?? "pedido sem órgão vinculado"}`} onFechar={onFechar} ocupado={enviando}>
-      <p className="ter-modal-texto">{pedido.certidao} · {pedido.pessoa} · {pedido.familia}. O sistema envia pelo canal cadastrado, registra no histórico da certidão e marca a próxima cobrança.</p>
+    <CascaDoModal titulo={`Registrar cobrança · ${pedido.orgao ?? "pedido sem órgão vinculado"}`} onFechar={onFechar} ocupado={enviando}>
+      <p className="ter-modal-texto">{pedido.certidao} · {pedido.pessoa} · {pedido.familia}. Registra a cobrança no histórico da certidão e marca a próxima. O sistema não envia a mensagem: o canal abaixo é o que você usou.</p>
       <Campos f={f} comCanal />
       {erro && <div className="ter-erro" role="alert">{erro}</div>}
       <div className="ter-rodape">
         <button className="tor-btn" onClick={onFechar} disabled={enviando}>Cancelar</button>
-        <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !f.valido}>{enviando ? "Enviando…" : "Enviar e registrar"}</button>
+        <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !f.valido}>{enviando ? "Registrando…" : "Registrar cobrança"}</button>
       </div>
     </CascaDoModal>
   )
@@ -98,13 +98,13 @@ export function CobrarTodosModal({ n, cartorios, onFechar, onEnviar }: {
     <CascaDoModal titulo="Cobrar todos os vencidos" onFechar={onFechar} ocupado={enviando}>
       <p className="ter-modal-texto">
         {n} {n === 1 ? "pedido com data" : "pedidos com data"} de cobrança vencida ou de hoje, em {cartorios} {cartorios === 1 ? "cartório" : "cartórios"}.
-        Um e-mail por cartório pelo canal cadastrado; cada certidão recebe o registro.
+        Registra uma cobrança em cada certidão, pelo canal cadastrado dela. O sistema não envia a mensagem.
       </p>
       <Campos f={f} comCanal={false} />
       {erro && <div className="ter-erro" role="alert">{erro}</div>}
       <div className="ter-rodape">
         <button className="tor-btn" onClick={onFechar} disabled={enviando}>Cancelar</button>
-        <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !f.valido}>{enviando ? "Enviando…" : `Enviar ${n} ${n === 1 ? "cobrança" : "cobranças"}`}</button>
+        <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !f.valido}>{enviando ? "Registrando…" : `Registrar ${n} ${n === 1 ? "cobrança" : "cobranças"}`}</button>
       </div>
     </CascaDoModal>
   )

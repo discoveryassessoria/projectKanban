@@ -236,7 +236,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
       const msg = acao === "ATRIBUIR" ? `${n} ${n === 1 ? "tarefa atribuída" : "tarefas atribuídas"} a ${pessoa?.nome ?? "a pessoa"}`
         : acao === "PRIORIDADE_ALTA" ? `Prioridade alta em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
           : acao === "REPACTUAR" ? `${n} ${n === 1 ? "prazo repactuado" : "prazos repactuados"} para ${ddmm}`
-            : `Cobrança enviada e registrada em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
+            : `Cobrança registrada em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
       avisar(`${msg}${sufixoDasFalhas(r.data.itens)}`, r.data.desfazer ?? null)
       if (limpar) setSel({})
       recarregar()
