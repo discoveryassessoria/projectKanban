@@ -148,6 +148,8 @@ model Pessoa {
   unioesComoPessoa1  Uniao[]       @relation("Pessoa1")
   unioesComoPessoa2  Uniao[]       @relation("Pessoa2")
   documentacao       Boolean       @default(true)
+  // Filtro SUBTRATIVO das certidões (NAS/CAS/OBI) exigidas desta pessoa FORA da linhagem. NULL = regra automática (todas as que a árvore pede).
+  documentosExigidos Json?         @db.JsonB
   casado             Boolean       @default(false)
   linhaReta          Boolean       @default(true)
   custosFin          Custo[]

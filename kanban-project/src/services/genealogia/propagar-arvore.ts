@@ -39,6 +39,7 @@ import {
   type MaterializarResultado,
   type FatoNecessidade,
 } from "@/src/services/genealogia/materializar-genealogia"
+import { descreverMudancaDocumentosExigidos } from "@/src/lib/genealogia/documentos-exigidos"
 import { recalcularNumerosLinhagemDaArvore } from "@/src/services/genealogia/numero-linhagem"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
@@ -74,6 +75,7 @@ export async function autorLegivel(db: Prisma.TransactionClient | typeof prisma,
 interface PessoaComparavel {
   casado?: boolean | null; vivo?: boolean | null; paiId?: number | null; maeId?: number | null
   linhaReta?: boolean | null; requerente?: string | null; documentacao?: boolean | null
+  documentosExigidos?: unknown
 }
 
 const EH_REQ = (v: string | null | undefined) => ["sim", "maior", "menor"].includes(String(v ?? "").toLowerCase())
@@ -89,12 +91,14 @@ export function descreverMudancaPessoa(antes: PessoaComparavel | null, depois: P
   if (antes.linhaReta !== depois.linhaReta) m.push(depois.linhaReta ? "pessoa entrou na linha reta" : "pessoa saiu da linha reta")
   if (EH_REQ(antes.requerente) !== EH_REQ(depois.requerente)) m.push(EH_REQ(depois.requerente) ? "pessoa passou a ser requerente" : "pessoa deixou de ser requerente")
   if (antes.documentacao !== depois.documentacao) m.push(depois.documentacao ? "pessoa passou a precisar de documentação" : "pessoa deixou de precisar de documentação")
+  const docs = descreverMudancaDocumentosExigidos(antes.documentosExigidos, depois.documentosExigidos)
+  if (docs) m.push(docs)
   return m
 }
 
 /** Campos da Pessoa que a árvore documental lê (select reutilizável "antes/depois"). */
 export const SELECT_PESSOA_COMPARAVEL = {
-  casado: true, vivo: true, paiId: true, maeId: true, linhaReta: true, requerente: true, documentacao: true, arvoreId: true,
+  casado: true, vivo: true, paiId: true, maeId: true, linhaReta: true, requerente: true, documentacao: true, documentosExigidos: true, arvoreId: true,
 } as const
 
 /**

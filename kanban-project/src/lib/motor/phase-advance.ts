@@ -33,6 +33,7 @@ import { somarAoAviso, rotuloDaFamilia } from "@/lib/operacional/notificacao-can
 import { urlVisaoGlobalDaFamilia } from "@/lib/operacional/navegacao"
 import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
 import { ehFaseAguardandoFechamento, avancoHumano } from "@/src/lib/process-stage/fase-pre-contrato"
+import { processoParadoPorEscolhaManual } from "@/src/services/genealogia/zero-por-escolha"
 import {
   fotografarObrigacoes,
   compararObrigacoes,
@@ -799,6 +800,17 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
     return {
       success: false, resultado: "REJEITADO", code: "AVANCO_MANUAL_OBRIGATORIO",
       message: `Fase "${c.processo.faseAtual}" (Aguardando fechamento) só sai por decisão humana — avanço automático e reconciliação não a deixam.`,
+      faseAtual: c.processo.faseAtual, correlationId,
+    }
+  }
+
+  // GENEALOGIA ZERADA POR ESCOLHA MANUAL: se alguém desmarcou (em `Pessoa.documentosExigidos`) TODA certidão que a árvore pede, a régua
+  // "0 exigido = 100%" liberaria a fase sozinha. Quem decide "sem documentos, siga" é um humano: só avanço MANUAL passa. Zero NATURAL
+  // (árvore sem exigência, nenhuma escolha) mantém o comportamento de sempre.
+  if (!avancoHumano(ctx.origem) && (await processoParadoPorEscolhaManual(processoId, c.processo.faseAtual))) {
+    return {
+      success: false, resultado: "REJEITADO", code: "AVANCO_MANUAL_OBRIGATORIO",
+      message: `Fase "${c.processo.faseAtual}": todos os documentos foram desmarcados na árvore — o processo espera uma decisão humana (avanço manual); avanço automático não o move.`,
       faseAtual: c.processo.faseAtual, correlationId,
     }
   }

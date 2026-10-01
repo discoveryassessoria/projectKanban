@@ -13,6 +13,7 @@ import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 import { phaseKeyToFaseCode, isProcessoFase } from '@/src/lib/process-stage/fases-catalog'
 import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
+import { processoParadoPorEscolhaManual } from '@/src/services/genealogia/zero-por-escolha'
 import { projecoesDeCertidaoPorNecessidade, statusEPrazoEfetivos } from '@/src/lib/process-stage/projecao-certidao'
 
 const HORA = 60 * 60 * 1000
@@ -324,6 +325,9 @@ registrar({
       const faseCode = phaseKeyToFaseCode(p.faseAtualKey)
       if (faseCode && isProcessoFase(faseCode)) continue
       const g = await calcularPendencias(p.id, p.faseAtualKey!, { correlationId: `saude-reconc-${p.id}` }).catch(() => null)
+      // Genealogia zerada por ESCOLHA MANUAL (todas as certidões desmarcadas na árvore): o processo espera decisão humana, de propósito
+      // (`AVANCO_MANUAL_OBRIGATORIO`) — "pode avançar e não avançou" seria falso positivo permanente.
+      if (g?.canAdvance && (await processoParadoPorEscolhaManual(p.id, p.faseAtualKey))) continue
       if (g?.canAdvance) parados.push({ id: p.id, nome: p.nome, fase: p.faseAtualKey! })
     }
     if (!parados.length) {

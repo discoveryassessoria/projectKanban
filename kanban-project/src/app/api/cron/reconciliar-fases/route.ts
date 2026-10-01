@@ -35,6 +35,7 @@ import { calcularPendencias } from '@/src/lib/motor/blocking-engine'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { temPermissao } from '@/src/lib/permissoes'
 import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
+import { processoParadoPorEscolhaManual } from '@/src/services/genealogia/zero-por-escolha'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -79,6 +80,7 @@ async function executar(req: NextRequest) {
       // ENSAIO consulta o gate e NÃO chama o reconciliador — nem para registrar
       // tentativa bloqueada. Ensaio que escreve log não é ensaio.
       const g = await calcularPendencias(p.id, p.faseAtualKey!, { correlationId: `ensaio-reconc-${p.id}` }).catch(() => null)
+      if (g?.canAdvance && (await processoParadoPorEscolhaManual(p.id, p.faseAtualKey))) { barrados.push({ processoId: p.id, fase: p.faseAtualKey!, pendencias: ['AVANCO_MANUAL_OBRIGATORIO'] }); continue }
       if (g?.canAdvance) { avancaram++; movimentos.push({ processoId: p.id, de: p.faseAtualKey!, para: '(avançaria)' }) }
       else if (g) barrados.push({ processoId: p.id, fase: p.faseAtualKey!, pendencias: g.blocking.map((b) => b.code) })
       continue
