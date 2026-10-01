@@ -91,7 +91,8 @@ model Usuario {
   snapshotCambial_usuario                   SnapshotCambial[]                   @relation("SnapshotCambial_usuarioId")
   stepSubtaskDefinition_responsavel         StepSubtaskDefinition[]             @relation("StepSubtaskDefinition_responsavelId")
   subtaskExecution_responsavel              SubtaskExecution[]                  @relation("SubtaskExecution_responsavelId")
-  contatosTerceiroRegistrados               ContatoTerceiro[]
+  contatosTerceiroRegistrados               ContatoTerceiro[]                   @relation("ContatoTerceiroRegistradoPor")
+  contatosTerceiroEstornados                ContatoTerceiro[]                   @relation("ContatoTerceiroEstornadoPor")
 
   @@index([perfilId])
 }
@@ -5699,12 +5700,23 @@ model ContatoTerceiro {
 
   /// Protegido pelo banco: ON DELETE SET NULL — quem registrou não trava a
   /// exclusão da própria conta.
-  registradoPor   Usuario? @relation(fields: [registradoPorId], references: [id], onDelete: SetNull)
+  registradoPor   Usuario? @relation("ContatoTerceiroRegistradoPor", fields: [registradoPorId], references: [id], onDelete: SetNull)
   registradoPorId Int?
   /// QUANDO O CONTATO ACONTECEU — default agora, mas aceita registro
   /// retroativo (contato feito por telefone e só anotado depois). É o mesmo
   /// campo que já existia (`registradoEm`), não um `dataContato` duplicado.
   registradoEm    DateTime @default(now())
+
+  /// ESTORNO (Desfazer de "Registrar cobrança", Torre nova): o fato NÃO é apagado, é MARCADO. Leitor que conta cobrança
+  /// sem resposta/escalada/última cobrança ignora `estornadoEm != null`; o histórico exibe riscado.
+  estornadoEm                   DateTime?
+  estornadoPor                  Usuario?  @relation("ContatoTerceiroEstornadoPor", fields: [estornadoPorId], references: [id], onDelete: SetNull)
+  estornadoPorId                Int?
+  /// O estado da execução ANTES e DEPOIS desta cobrança: o estorno devolve o anterior e só vale se a execução ainda está como a cobrança a deixou.
+  antesProximoAcompanhamentoEm  DateTime?
+  antesEscalada                 Boolean?
+  antesEscaladaEm               DateTime?
+  depoisProximoAcompanhamentoEm DateTime?
 
   @@index([subtaskExecutionId])
   @@index([tarefaId])
