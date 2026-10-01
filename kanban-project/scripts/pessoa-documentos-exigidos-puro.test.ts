@@ -3,7 +3,7 @@
 // Pessoa.documentosExigidos — o FILTRO SUBTRATIVO de certidões (NAS/CAS/OBI) — parte PURA e ESTÁTICA (sem banco).
 //   • lista fechada de três; resolução do code real do tipo ('IT - NAS', 'NAS', 'PREFIXO-NAS');
 //   • validação da API (lista fechada, sem repetição, [] válido, três = null, null = regra automática);
-//   • decisões 1–3: filtro só para FORA_DA_LINHAGEM, NULL idêntico a hoje, Casamento por união (ao menos um cônjuge mantém);
+//   • decisões 1–3: filtro vale para QUALQUER pessoa (linha reta, requerente, fora da linhagem — revisto em 01/10/2026), NULL idêntico a hoje, Casamento por união (ao menos um cônjuge mantém);
 //   • migration EXATA; schema; rotas; UI (texto corrigido, enviar só se mudou); registros no CI.
 //
 //   node scripts/ci/gate-build.mjs --suite todas --so pessoa-documentos-exigidos-puro
@@ -43,22 +43,25 @@ ok("leitura do gravado é defensiva: lixo = null (regra automática)", lerDocume
 ok("tela: NULL ⇒ os três marcados; lista ⇒ a lista", JSON.stringify(marcadosParaTela(null)) === JSON.stringify(CODIGOS_DOCUMENTOS_EXIGIVEIS) && JSON.stringify(marcadosParaTela(["CAS"])) === JSON.stringify(["CAS"]) && marcadosParaTela([]).length === 0)
 ok("NULL ≡ os três; [] ≠ NULL", mesmaEscolha(null, ["NAS", "CAS", "OBI"]) && !mesmaEscolha(null, []) && !mesmaEscolha(["NAS"], null) && mesmaEscolha(["NAS", "OBI"], ["OBI", "NAS"]))
 
-secao("3) Decisão 2: o filtro só vale para FORA_DA_LINHAGEM")
+secao("3) Decisão 2 (REVISTA em 01/10/2026): o filtro vale para QUALQUER pessoa")
 const so = ["NAS"]
 ok("FORA + lista [NAS]: NAS fica; CAS e OBI saem", documentoEscolhidoParaPessoa(P({ documentosExigidos: so }), "NAS") && !documentoEscolhidoParaPessoa(P({ documentosExigidos: so }), "CAS") && !documentoEscolhidoParaPessoa(P({ documentosExigidos: so }), "OBI"))
-ok("LINHA_PRINCIPAL ignora a lista (mesmo vazia)", (["NAS", "CAS", "OBI"] as const).every((c) => documentoEscolhidoParaPessoa(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: [] }), c)))
-ok("PENDENTE_CLASSIFICACAO ignora a lista", (["NAS", "CAS", "OBI"] as const).every((c) => documentoEscolhidoParaPessoa(P({ classificacao: "PENDENTE_CLASSIFICACAO", documentosExigidos: [] }), c)))
+ok("LINHA_PRINCIPAL APLICA a lista: [NAS] mantém Nascimento e tira Casamento/Óbito; [] tira os três", documentoEscolhidoParaPessoa(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: so }), "NAS") && !documentoEscolhidoParaPessoa(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: so }), "CAS") && !documentoEscolhidoParaPessoa(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: so }), "OBI") && (["NAS", "CAS", "OBI"] as const).every((c) => !documentoEscolhidoParaPessoa(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: [] }), c)))
+ok("PENDENTE_CLASSIFICACAO também aplica a lista", !documentoEscolhidoParaPessoa(P({ classificacao: "PENDENTE_CLASSIFICACAO", documentosExigidos: ["NAS", "OBI"] }), "CAS") && documentoEscolhidoParaPessoa(P({ classificacao: "PENDENTE_CLASSIFICACAO", documentosExigidos: ["NAS", "OBI"] }), "OBI"))
+ok("campo NULL em LINHA_PRINCIPAL: tudo continua exigido (pessoas existentes não mudam)", (["NAS", "CAS", "OBI"] as const).every((c) => documentoEscolhidoParaPessoa(P({ classificacao: "LINHA_PRINCIPAL" }), c)))
 ok("campo NULL: tudo continua exigido (idêntico a hoje)", (["NAS", "CAS", "OBI"] as const).every((c) => documentoEscolhidoParaPessoa(P({}), c)))
 ok("lista [] em FORA: nada dos três é exigido", (["NAS", "CAS", "OBI"] as const).every((c) => !documentoEscolhidoParaPessoa(P({ documentosExigidos: [] }), c)))
 ok("tipo fora dos três (code null) nunca é filtrado", documentoEscolhidoParaPessoa(P({ documentosExigidos: [] }), null))
-ok("filtroSeAplica: só FORA + documentação ligada + lista gravada", filtroSeAplica(P({ documentosExigidos: [] })) && !filtroSeAplica(P({})) && !filtroSeAplica(P({ documentacao: false, documentosExigidos: [] })) && !filtroSeAplica(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: [] })))
+ok("filtroSeAplica: lista gravada em qualquer classificação; só NÃO vale sem lista, ou FORA com a documentação desligada", filtroSeAplica(P({ documentosExigidos: [] })) && filtroSeAplica(P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: [] })) && filtroSeAplica(P({ classificacao: "PENDENTE_CLASSIFICACAO", documentosExigidos: ["NAS"] })) && !filtroSeAplica(P({})) && !filtroSeAplica(P({ classificacao: "LINHA_PRINCIPAL" })) && !filtroSeAplica(P({ documentacao: false, documentosExigidos: [] })))
 
 secao("4) Decisão 3: Casamento (união) vale se PELO MENOS UM cônjuge o mantém")
 const semCas = P({ documentosExigidos: ["NAS", "OBI"] })
 ok("dois FORA, ambos sem Casamento → some", !documentoDaUniaoEscolhido([semCas, semCas], "CAS"))
 ok("dois FORA, um mantém → fica", documentoDaUniaoEscolhido([semCas, P({ documentosExigidos: ["CAS"] })], "CAS"))
 ok("FORA sem Casamento + FORA com campo NULL (automático) → fica", documentoDaUniaoEscolhido([semCas, P({})], "CAS"))
-ok("FORA sem Casamento + LINHA_PRINCIPAL (filtro não se aplica) → fica", documentoDaUniaoEscolhido([semCas, P({ classificacao: "LINHA_PRINCIPAL" })], "CAS"))
+ok("FORA sem Casamento + LINHA_PRINCIPAL sem lista (automático) → fica", documentoDaUniaoEscolhido([semCas, P({ classificacao: "LINHA_PRINCIPAL" })], "CAS"))
+ok("FORA sem Casamento + LINHA_PRINCIPAL TAMBÉM sem Casamento → some (a lista da linha reta vale)", !documentoDaUniaoEscolhido([semCas, P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: ["NAS", "OBI"] })], "CAS"))
+ok("LINHA_PRINCIPAL com Casamento marcado sustenta a união mesmo com o outro cônjuge sem", documentoDaUniaoEscolhido([semCas, P({ classificacao: "LINHA_PRINCIPAL", documentosExigidos: ["CAS"] })], "CAS"))
 ok("FORA sem Casamento + FORA com documentação DESLIGADA → some (quem não quer documento não sustenta a união)", !documentoDaUniaoEscolhido([semCas, P({ documentacao: false })], "CAS"))
 ok("união de outro tipo/code null nunca é filtrada", documentoDaUniaoEscolhido([P({ documentosExigidos: [] })], null))
 
@@ -89,7 +92,8 @@ ok("núcleo: lê o campo, aplica o filtro e expõe as removidas por escolha", /d
 ok("núcleo: pessoaExigeDocumentacao INTACTA (documentacao=false só tem efeito FORA da linhagem)", /classificacao === "FORA_DA_LINHAGEM" \? documentacao === true : true/.test(nucleo))
 ok("núcleo: a_iniciar = retorno antecipado ANTES de calcular/reconciliar", nucleo.indexOf("ehFaseAguardandoFechamento(posicao?.faseAtualKey)") > 0 && nucleo.indexOf("ehFaseAguardandoFechamento(posicao?.faseAtualKey)") < nucleo.indexOf("const calculo = await calcularExigenciasDaGenealogia(processoId, db)"))
 const view = ler("src/components/arvore/arvore-genealogica-view.tsx"), campo = ler("src/components/arvore/documentos-exigidos-campo.tsx")
-ok("UI: texto corrigido (linha reta do requerente / linha principal / Central Operacional) nas DUAS modais e o antigo saiu", (view.match(/TEXTO_PRECISA_DOCUMENTACAO/g) ?? []).length >= 3 && /fora da linha reta do requerente/.test(campo) && /Quem está na linha principal sempre segue a regra automática/.test(campo) && /Central Operacional \/ workflow/.test(campo) && !view.includes("Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow."))
+ok("UI: texto da caixa explica a lista e a exceção da linha principal, nas DUAS modais; sem o aviso antigo de que a lista não vale", (view.match(/TEXTO_PRECISA_DOCUMENTACAO/g) ?? []).length >= 3 && /escolha abaixo quais certidões ela precisa/.test(campo) && /exceto quem está na linha principal \(linha reta ou requerente\), que continua entrando/.test(campo) && /Central Operacional \/ workflow/.test(campo) && !/Vale para pessoas fora da linha reta do requerente/.test(campo + view))
+ok("UI: a lista NUNCA é desabilitada por linha reta/requerente (sem `aplicavel`, sem aviso 'a lista não se aplica')", !/aplicavel/.test(campo + view) && !/a lista não se aplica/.test(campo) && !/disabled=\{!aplic/.test(campo))
 ok("UI: a multi-seleção abre nas duas modais, abaixo da caixa", (view.match(/<DocumentosExigidosCampo/g) ?? []).length === 2 && (view.match(/precisaDocumentacao && <DocumentosExigidosCampo/g) ?? []).length === 2)
 ok("UI: o aviso do 'sumiço silencioso' está na tela", /NÃO volta sozinho se a pessoa casar ou falecer depois/.test(campo))
 ok("UI: Editar só envia a lista quando MUDOU e reflete o salvo (NULL ⇒ três)", /\.\.\.\(documentosExigidosMudou \? \{ documentosExigidos: docsMarcados \} : \{\}\)/.test(view) && /marcadosParaTela\(\(pessoa as any\)\.documentosExigidos\)/.test(view))
