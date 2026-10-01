@@ -191,7 +191,8 @@
    "scripts/torre-bloco-f-score-e-sugestao.test.ts",
    "scripts/torre-revisao-final-textos.test.ts",
    "scripts/torre-historico-legivel.test.ts",
-   "scripts/torre-desfazer-janela-unica-e-ausencia.test.ts"
+   "scripts/torre-desfazer-janela-unica-e-ausencia.test.ts",
+   "scripts/torre-toast-escuro.test.ts"
   ]
  },
  "arquivos": [
@@ -364,6 +365,7 @@
   "scripts/torre-bloco-f-score-e-sugestao.test.ts",
   "scripts/torre-revisao-final-textos.test.ts",
   "scripts/torre-historico-legivel.test.ts",
-  "scripts/torre-desfazer-janela-unica-e-ausencia.test.ts"
+  "scripts/torre-desfazer-janela-unica-e-ausencia.test.ts",
+  "scripts/torre-toast-escuro.test.ts"
  ]
 }

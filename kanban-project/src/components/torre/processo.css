@@ -123,7 +123,7 @@
 .tpr-modal > div { width: min(980px, 100%); max-height: 90vh; overflow: auto; background: var(--surface-popover); border-radius: 14px; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; box-shadow: var(--elev-3); }
 
 /* toast da página */
-.tpr-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10080; display: flex; gap: 10px; align-items: center; max-width: min(92vw, 720px); background: var(--surface-popover); color: var(--text-primary); border: 1px solid var(--border-default); box-shadow: var(--elev-3); border-radius: 12px; padding: 10px 14px; font-size: 13px; }
+.tpr-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 10080; display: flex; align-items: center; max-width: min(92vw, 720px); } /* cores: bloco "toast" no fim de torre.css */
 
 @media (max-width: 1100px) {
   .tpr-tres { grid-template-columns: 1fr; }
