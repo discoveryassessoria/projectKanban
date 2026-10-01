@@ -1,11 +1,18 @@
 "use client"
-// src/components/torre/TorreKpis.tsx — o TOPO da Torre (01/10/2026): a frase fixa + duas faixas, SITUAÇÃO e AGENDA.
-// O NÚMERO de cada cartão é `numeroDoKpi` (torre-kpis.ts): o tamanho da lista que o clique filtra na aba Tarefas (mesmo predicado).
-// "Processos ativos" (e o selo "N em risco") vêm da aba Processos. A tendência (▲/▼ vs semana passada) só existe quando há
-// foto de 7 dias E a definição do cartão é a mesma da foto; sem isso o cartão não mostra nada (nenhum texto de ausência).
-// Torre nova (M4): Tarefas abertas · Com a equipe · Aguardando terceiros também têm foto (colunas novas, só de hoje em diante).
+// src/components/torre/TorreKpis.tsx — o TOPO da Visão geral (Torre nova, frente B1, 01/10/2026): a faixa "Hoje" + as faixas SITUAÇÃO e AGENDA.
+// O NÚMERO de cada cartão é `numeroDoKpi` (torre-kpis.ts): o tamanho da lista que o clique filtra na aba Tarefas (mesmo predicado, mesmas
+// linhas). O clique é um LINK para a URL que a Torre já entende (`?aba=tarefas&kpi=…`, mantendo país e busca): a aba Tarefas abre só
+// com aquele filtro, sem sobras de filtros anteriores — por isso o número do cartão = o "Mostrando N" da lista.
+// "Processos ativos" (e o selo "N em risco") vêm da aba Processos. A tendência (vs semana passada) só existe quando há foto de 7 dias
+// E a definição do cartão é a mesma da foto; sem isso o cartão não mostra nada (nenhum texto de ausência).
+import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { KPI_POR_CHAVE, CAMPO_DA_FOTO, tendenciaDe, numeroDoKpi, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, emRiscoCritico, type ChaveKpi } from "@/lib/operacional/torre-kpis"
-import { fraseDoDia, distribuicaoPorFase, type LinhaParaTopo } from "@/lib/operacional/torre-topo"
+import {
+  fraseDoDia, distribuicaoPorPais, detalheDosTerceiros, familiasSemResponsavel, subtituloSemResponsavel, corDaTendencia, milhar, rotuloDecisoes,
+  type LinhaParaTopo,
+} from "@/lib/operacional/torre-topo"
+import type { LinhaDoFunil } from "@/lib/operacional/torre-funil-puro"
 import type { ProcessoDaTorre } from "./tipos-processos"
 
 export interface FotoDoDia {
@@ -16,48 +23,100 @@ export interface FotoDoDia {
 }
 export interface Tendencias { backlog: { abertas: number; fechadas: number }; referencia: FotoDoDia | null; fotosNaSerie: number }
 
-export function TorreKpis({ linhas, processos, agora, tend, ativo, filtrandoPais, onEscolher, onProcessos, onRisco }: {
-  linhas: LinhaParaTopo[]; processos: ProcessoDaTorre[] | null; agora: Date; tend: Tendencias | null; ativo: ChaveKpi | null
-  filtrandoPais: boolean; onEscolher: (k: ChaveKpi) => void; onProcessos: () => void; onRisco: () => void
+/** O endereço de um cartão: a aba Tarefas já filtrada (`kpi`), mantendo o país e a busca da URL. "Tarefas abertas" = a lista inteira. */
+export function hrefDoKpi(chave: ChaveKpi, manter: { pais?: string | null; q?: string | null } = {}): string {
+  const q = new URLSearchParams()
+  q.set("aba", "tarefas")
+  if (KPI_POR_CHAVE[chave].filtra) q.set("kpi", chave)
+  if (manter.pais) q.set("pais", manter.pais)
+  if (manter.q) q.set("q", manter.q)
+  return `/torre?${q.toString()}`
+}
+
+const COR_DA_TENDENCIA = { boa: "tvg-tend boa", ruim: "tvg-tend ruim", neutra: "tvg-tend" } as const
+
+export function TorreKpis({ linhas, processos, itensPrecisa, agora, tend, filtrandoPais, gargalo, onProcessos, onRisco, onRevisar }: {
+  linhas: LinhaParaTopo[]; processos: ProcessoDaTorre[] | null; itensPrecisa: Array<{ tipo: string }> | null; agora: Date; tend: Tendencias | null
+  filtrandoPais: boolean; gargalo: LinhaDoFunil | null
+  onProcessos: () => void; onRisco: () => void; onRevisar: () => void
 }) {
-  const tendencia = (k: ChaveKpi, n: number) => {
-    const campo = CAMPO_DA_FOTO[k]
+  const url = useSearchParams()
+  const manter = { pais: url.get("pais"), q: url.get("q") }
+
+  const tendencia = (k: ChaveKpi | "processos", n: number) => {
+    const campo = k === "processos" ? "processosAtivos" : CAMPO_DA_FOTO[k]
     if (filtrandoPais || !campo || !tend?.referencia) return null
-    return tendenciaDe(n, tend.referencia[campo])   // `null` na foto antiga (anterior à M4) → sem tendência
+    const anterior = tend.referencia[campo as keyof FotoDoDia] as number | null | undefined
+    return tendenciaDe(n, anterior)   // `null` na foto antiga (anterior à M4) → sem tendência
+  }
+  const nDe = (k: ChaveKpi) => numeroDoKpi(k, linhas, agora)
+  const textoDaTendencia = (k: ChaveKpi | "processos", n: number) => {
+    const t = tendencia(k, n)
+    if (!t) return null
+    // O protótipo mostra o cartão "Processos ativos" sem seta ("+12 vs semana passada"); os demais com ▲/▼.
+    const rotulo = k === "processos" && t.delta !== 0 ? `${t.delta > 0 ? "+" : "−"}${Math.abs(t.delta)} vs semana passada` : t.rotulo
+    return <i className={COR_DA_TENDENCIA[corDaTendencia(k, t.direcao)]}>{rotulo}</i>
+  }
+
+  const nRisco = processos ? processos.filter(emRiscoCritico).length : null
+  const nProcessos = processos ? processos.length : null
+  const noRitmo = processos ? processos.filter((p) => p.risco === "ok").length : null
+  const decisoes = itensPrecisa ?? []
+
+  const subtitulo: Record<string, string> = {
+    abertas: "certidões e passos em andamento",
+    equipe: "bola nossa: solicitar, conferir, traduzir",
+    cartorio: detalheDosTerceiros(linhas),
+    ninguem: subtituloSemResponsavel(familiasSemResponsavel(linhas)),
   }
   const cartao = (k: ChaveKpi) => {
     const def = KPI_POR_CHAVE[k]
-    const n = numeroDoKpi(k, linhas, agora)
-    const t = tendencia(k, n)
+    const n = nDe(k)
     return (
-      <button key={k} type="button" className={`tor-kpi ${ativo === k ? "on" : ""}`} aria-pressed={ativo === k} title={def.regra} onClick={() => onEscolher(k)}>
-        <b className={`tor-kpi-n ${def.cor}`}>{n}</b>
-        <span className="tor-kpi-l">{def.rotulo}</span>
-        {t && <i className={`tor-kpi-t ${t.direcao}`}>{t.rotulo}</i>}
-      </button>
+      <Link key={k} href={hrefDoKpi(k, manter)} prefetch={false} className="tvg-card" title={def.regra} data-kpi={k}>
+        <span className="tvg-card-t">{def.rotulo}</span>
+        <span className="tvg-card-n"><b className={def.cor}>{milhar(n)}</b>{textoDaTendencia(k, n)}</span>
+        {subtitulo[k] ? <span className="tvg-card-s">{subtitulo[k]}</span> : null}
+      </Link>
     )
   }
-  const nRisco = processos ? processos.filter(emRiscoCritico).length : null
-  const rotuloRisco = KPI_POR_CHAVE.risco
+  const agenda = (k: ChaveKpi) => {
+    const def = KPI_POR_CHAVE[k]
+    return (
+      <Link key={k} href={hrefDoKpi(k, manter)} prefetch={false} className="tvg-ag" title={def.regra} data-kpi={k}>
+        <b className={def.cor}>{milhar(nDe(k))}</b><span>{def.rotulo}</span>
+      </Link>
+    )
+  }
+
   return (
-    <div className="tor-topo">
-      <p className="tor-frase" data-testid="torre-frase">{fraseDoDia(linhas, agora)}</p>
-      <div className="tor-faixa-titulo">Situação</div>
-      <div className="tor-kpis tor-kpis-sit" role="group" aria-label="Situação">
-        <div className="tor-kpi tor-kpi-proc">
-          <button type="button" className="tor-kpi-inner" title="Processos que ainda não foram concluídos (a lista da aba Processos)." onClick={onProcessos}>
-            <b className="tor-kpi-n blu">{processos ? processos.length : "…"}</b>
-            <span className="tor-kpi-l">Processos ativos</span>
-            {processos && processos.length > 0 && <i className="tor-kpi-t">{distribuicaoPorFase(processos).split(" · ").slice(1).join(" · ")}</i>}
+    <div className="tvg-topo">
+      <div className="tvg-hoje" data-testid="torre-frase">
+        <div className="tvg-hoje-t">
+          {nProcessos == null || noRitmo == null
+            ? "Carregando os processos…"
+            : fraseDoDia({ processos: nProcessos, noRitmo, decisoes, gargalo }).map((x, i) => (x.b ? <b key={i}>{x.t}</b> : <span key={i}>{x.t}</span>))}
+        </div>
+        <button type="button" className="tvg-hoje-b" disabled={decisoes.length === 0} onClick={onRevisar}>▶ Revisar o dia · {rotuloDecisoes(decisoes.length)}</button>
+      </div>
+
+      <div className="tvg-rotulo">Situação · onde está o trabalho agora</div>
+      <div className="tvg-grid5" role="group" aria-label="Situação">
+        <div className="tvg-card tvg-card-proc" data-kpi="processos">
+          <button type="button" className="tvg-card-inner" title="Processos que ainda não foram concluídos (a lista da aba Processos)." onClick={onProcessos}>
+            <span className="tvg-card-t">Processos ativos</span>
+            <span className="tvg-card-n"><b className="blu">{nProcessos == null ? "…" : milhar(nProcessos)}</b>{nProcessos != null ? textoDaTendencia("processos", nProcessos) : null}</span>
+            <span className="tvg-card-s">{processos ? distribuicaoPorPais(processos) : ""}</span>
           </button>
           {nRisco != null && nRisco > 0 && (
-            <button type="button" className="tor-p red tor-selo" title={rotuloRisco.regra} onClick={onRisco}>{nRisco} em risco</button>
+            <button type="button" className="tvg-selo-risco" title={KPI_POR_CHAVE.risco.regra} onClick={onRisco}>{nRisco} em risco</button>
           )}
         </div>
         {CARTOES_DA_SITUACAO.map(cartao)}
       </div>
-      <div className="tor-faixa-titulo">Agenda</div>
-      <div className="tor-kpis tor-kpis-agenda" role="group" aria-label="Agenda">{CARTOES_DA_AGENDA.map(cartao)}</div>
+
+      <div className="tvg-rotulo">Agenda · prazos de todas as certidões</div>
+      <div className="tvg-grid6" role="group" aria-label="Agenda">{CARTOES_DA_AGENDA.map(agenda)}</div>
     </div>
   )
 }

@@ -1,0 +1,87 @@
+/* ===== Visão geral — Torre nova, frente B1 (início) ===== */
+/* Só tokens do Discovery Design System. Prefixo .tvg-. A largura é fluida (a Torre mora na área de conteúdo do app). */
+.tvg { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.tvg-topo { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* faixa "Hoje" */
+.tvg-hoje { display: flex; align-items: center; gap: 18px; padding: 12px 18px; border-radius: 12px; background: var(--action-primary); color: var(--action-primary-ink); }
+.tvg-hoje-t { flex: 1 1 auto; min-width: 0; font-size: 15px; line-height: 1.55; }
+.tvg-hoje-t b { font-weight: 700; }
+.tvg-hoje-b { flex: 0 0 auto; height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--surface-popover); color: var(--action-primary); font: inherit; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.tvg-hoje-b:disabled { opacity: .55; cursor: not-allowed; }
+
+.tvg-rotulo { margin-top: 2px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.tvg-grid5, .tvg-grid6 { display: grid; gap: 10px; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: -6px; }
+@media (min-width: 900px) { .tvg-grid5 { grid-template-columns: repeat(5, minmax(0, 1fr)); } .tvg-grid6 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .tvg-grid6 { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+/* cartões da SITUAÇÃO */
+.tvg-card { position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); text-decoration: none; cursor: pointer; text-align: left; }
+.tvg-card:hover { background: var(--surface-tertiary); }
+.tvg-card-t { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); }
+.tvg-card-n { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+.tvg-card-n b { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.tvg-card-n b.red, .tvg-ag b.red { color: var(--danger-text); }
+.tvg-card-n b.amb, .tvg-ag b.amb { color: var(--warning-text); }
+.tvg-card-n b.blu, .tvg-ag b.blu { color: var(--text-primary); }
+.tvg-card-s { font-size: 12px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.tvg-tend { font-size: 12px; font-weight: 600; font-style: normal; color: var(--text-muted); }
+.tvg-tend.boa { color: var(--success-text); }
+.tvg-tend.ruim { color: var(--danger-text); }
+.tvg-card-proc { padding: 0; cursor: default; }
+.tvg-card-proc:hover { background: var(--surface-popover); }
+.tvg-card-inner { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tvg-card-inner:hover { background: var(--surface-tertiary); }
+.tvg-selo-risco { position: absolute; top: 28px; right: 10px; height: 22px; padding: 0 8px; border: 0; border-radius: 999px; background: var(--danger-tile); color: var(--danger-text); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+/* cartões da AGENDA */
+.tvg-ag { display: flex; align-items: baseline; gap: 8px; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); text-decoration: none; }
+.tvg-ag:hover { background: var(--surface-tertiary); }
+.tvg-ag b { font-size: 20px; font-weight: 700; }
+.tvg-ag span { font-size: 13px; color: var(--text-secondary); }
+
+/* FUNIL POR FASE */
+.tvg-funil { display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; border-radius: 12px; border: 1px solid var(--border-default); background: var(--surface-popover); min-width: 0; }
+.tvg-funil-hd { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.tvg-funil-hd h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.tvg-funil-hd p { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.tvg-funil-hd p b { font-weight: 600; color: var(--text-primary); }
+.tvg-funil-hd p b.tvg-sentido.cresce { color: var(--warning-text); }
+.tvg-funil-hd p b.tvg-sentido.diminui { color: var(--success-text); }
+.tvg-legenda { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--text-secondary); }
+.tvg-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.tvg-legenda i { width: 10px; height: 10px; border-radius: 2px; }
+.tvg-legenda i.ok, .tvg-barra i.ok { background: var(--success); }
+.tvg-legenda i.at, .tvg-barra i.at { background: var(--warning); }
+.tvg-legenda i.pa, .tvg-barra i.pa { background: var(--danger); }
+.tvg-funil-scroll { overflow-x: auto; }
+.tvg-funil-grid { display: grid; grid-template-columns: 2.2fr .7fr 3fr 1.3fr 1.3fr 1.6fr; gap: 14px; min-width: 880px; padding: 5px 4px; align-items: center; }
+.tvg-funil-cab { padding: 6px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-secondary); border-bottom: 1px solid var(--border-default); }
+.tvg-funil-cab .dir, .tvg-funil-lin .dir { text-align: right; }
+.tvg-funil-lin { color: var(--text-primary); text-decoration: none; border-bottom: 1px solid var(--surface-tertiary); }
+.tvg-funil-lin:hover { background: var(--surface-secondary); }
+.tvg-fase { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tvg-fase-n { flex: 0 0 24px; width: 24px; height: 24px; border-radius: 6px; background: var(--surface-tertiary); color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.tvg-fase-nome { font-weight: 600; }
+.tvg-fase-total { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tvg-sit { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tvg-barra { display: flex; height: 9px; border-radius: 3px; overflow: hidden; background: var(--surface-tertiary); }
+.tvg-barra i { display: block; height: 100%; }
+.tvg-sit-txt { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.tvg-parados { color: var(--danger-text); font-weight: 600; }
+.tvg-tempo { font-weight: 600; font-variant-numeric: tabular-nums; }
+.tvg-tempo.estourou { color: var(--danger-text); font-weight: 700; }
+.tvg-meta { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.tvg-gargalo { font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.tvg-funil-vazio, .tvg-funil-nota { margin: 0; font-size: 12px; color: var(--text-secondary); }
+
+/* "Precisa de você" embutido (âncora) e as 5 palavras */
+.tvg-pdv { scroll-margin-top: 12px; min-width: 0; }
+.tvg-palavras { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; padding: 6px 2px; font-size: 12px; color: var(--text-secondary); }
+.tvg-palavras b { font-weight: 600; color: var(--text-primary); }
+.tvg-palavras > b:first-child { font-weight: 700; }
+
+@media (max-width: 720px) { .tvg-hoje { flex-direction: column; align-items: stretch; } }
+/* ===== Visão geral — Torre nova, frente B1 (fim) ===== */
+
+.tvg-card-proc .tvg-card-n { padding-right: 84px; }

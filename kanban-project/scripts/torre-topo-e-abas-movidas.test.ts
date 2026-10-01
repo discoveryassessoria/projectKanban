@@ -24,7 +24,7 @@ import {
   KPIS, KPI_POR_CHAVE, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, CAMPO_DA_FOTO, PREDICADO_DO_KPI, linhasDoKpi, numeroDoKpi, situacaoDaTarefa, diasAtePrazo,
   type LinhaParaKpi,
 } from "../lib/operacional/torre-kpis"
-import { topoDaTorre, fraseDoDia, distribuicaoPorFase, type LinhaParaTopo } from "../lib/operacional/torre-topo"
+import { topoDaTorre, fraseDoDia, textoDaFrase, distribuicaoPorPais, type LinhaParaTopo } from "../lib/operacional/torre-topo"
 import { destinoDaAbaAntigaDaTorre, urlDaSaudeDoSistema, SUB_ABAS_DA_SAUDE } from "../lib/operacional/navegacao"
 import { ABAS_DA_TORRE } from "../lib/operacional/torre-abas"
 import { ACOES_DE_SISTEMA, NATUREZA_DA_ACAO, consultarAuditoria, csvDaAuditoria, filtroDaQuery } from "../lib/operacional/torre-auditoria"
@@ -101,26 +101,20 @@ async function main() {
   const kp = ler("src/components/torre/TorreKpis.tsx")
   ok("nenhum cartão escreve 'sem histórico' nem 'tendência só no total'", !/sem histórico|tendência só no total/i.test(kp))
   ok("cada cartão clica e filtra com o mesmo predicado (Torre.tsx usa linhasDoKpi; a aba Tarefas usa linhasDoKpi)", /linhasDoKpi\(kpi, linhasPais, agora\)/.test(ler("src/components/torre/Torre.tsx")) && /linhasDoKpi\(kpi, linhas, agora\)/.test(ler("src/components/torre/TorreTarefas.tsx")) && /numeroDoKpi\(k, linhas, agora\)/.test(kp))
-  ok("as visões 'Vencidas', 'Sem responsável' e 'Aguardando terceiros' da aba Tarefas usam os predicados dos cartões", /PREDICADO_DO_KPI\.venc!/.test(ler("src/components/torre/TorreTarefas.tsx")) && /PREDICADO_DO_KPI\.ninguem!/.test(ler("src/components/torre/TorreTarefas.tsx")) && /PREDICADO_DO_KPI\.cartorio!/.test(ler("src/components/torre/TorreTarefas.tsx")))
+  ok("as visões 'Vencidas', 'Sem responsável' e 'Aguardando terceiros' da aba Tarefas usam os predicados dos cartões", /PREDICADO_DO_KPI\.venc!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.ninguem!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /PREDICADO_DO_KPI\.cartorio!/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /predicadoDaVisao\(visao/.test(ler("src/components/torre/TorreTarefas.tsx")))
 
-  secao("2.1 — a FRASE fixa (plural, famílias, data no fuso de SP)")
-  const a = (o: Partial<LinhaParaTopo>) => L({ aIniciar: true, ...o })
-  const f1 = fraseDoDia([a({ familiaNome: "Santin" })], AGORA)
-  ok("1 certidão: singular e uma família", f1 === "Hoje, 30 de setembro: 1 certidão para iniciar (Santin), 0 atrasadas, 0 aguardando terceiros, 0 sem responsável.", f1)
-  const f2 = fraseDoDia([a({ familiaNome: "Santin" }), a({ familiaNome: "Brait" }), a({ familiaNome: "Santin", responsavelId: null, dataPrazo: "2026-09-20T12:00:00Z", estadoOperacao: "AGUARDANDO" })], AGORA)
-  ok("3 certidões, 2 famílias em ordem alfabética com 'e'; 1 atrasada; 1 sem responsável (aguardando+sem dono = sem responsável)", f2 === "Hoje, 30 de setembro: 3 certidões para iniciar (Brait e Santin), 1 atrasada, 0 aguardando terceiros, 1 sem responsável.", f2)
-  const f3 = fraseDoDia(["A", "B", "C", "D", "E"].map((x) => a({ familiaNome: `Fam ${x}` })), AGORA)
-  ok("muitas famílias → 'N famílias'", f3.includes("5 certidões para iniciar (5 famílias)"), f3)
-  const f0 = fraseDoDia([L()], AGORA)
-  ok("nada a iniciar → sem parênteses", f0 === "Hoje, 30 de setembro: 0 certidões para iniciar, 0 atrasadas, 0 aguardando terceiros, 0 sem responsável.", f0)
-  ok("tarefa em andamento sem dono NÃO é 'a iniciar' (mesma regra da Operação)", fraseDoDia([a({ statusTarefa: "EM_ANDAMENTO", responsavelId: null })], AGORA).includes("0 certidões para iniciar"))
-  const t = topoDaTorre(part, [{ risco: "critico", faseAtual: { label: "Genealogia" } }, { risco: "ok", faseAtual: { label: "Emissão" } }], AGORA)
-  ok("os números da frase são os dos cartões", t.frase.includes(`${t.situacao.find((c) => c.chave === "cartorio")!.valor} aguardando terceiros`) && t.frase.includes(`${t.situacao.find((c) => c.chave === "ninguem")!.valor} sem responsável`))
-  ok("Processos ativos: total, distribuição por fase e 'N em risco' (crítico)", t.processosAtivos.total === 2 && t.processosAtivos.distribuicao === "2 · Emissão 1 · Genealogia 1" && t.processosAtivos.emRisco === 1, t.processosAtivos.distribuicao)
-  ok("distribuição sem fase", distribuicaoPorFase([{ risco: "ok", faseAtual: { label: null } }]) === "1 · Sem fase 1")
+  secao("2.1 — a FRASE do dia (Torre nova: processos ativos, no ritmo, decisões por tipo, gargalo)")
+  const dec = (tipo: string, n: number) => Array.from({ length: n }, () => ({ tipo }))
+  const f1 = textoDaFrase(fraseDoDia({ processos: 2, noRitmo: 1, decisoes: [...dec("SEM_DONO", 2), ...dec("CARGA", 1)], gargalo: null }))
+  ok("frase com decisões: 'Hoje: 2 processos ativos, 1 andando no ritmo. 3 decisões precisam de você: 2 sem dono, 1 de carga da equipe.'", f1 === "Hoje: 2 processos ativos, 1 andando no ritmo. 3 decisões precisam de você: 2 sem dono, 1 de carga da equipe.", f1)
+  ok("sem decisão e sem gargalo", textoDaFrase(fraseDoDia({ processos: 0, noRitmo: 0, decisoes: [], gargalo: null })) === "Hoje: 0 processos ativos, 0 andando no ritmo. Nenhuma decisão precisa de você.")
+  const t = topoDaTorre(part, [{ risco: "critico", pais: "Itália", faseAtual: { label: "Genealogia" } }, { risco: "ok", pais: "Espanha", faseAtual: { label: "Emissão" } }], AGORA)
+  ok("Processos ativos: total, distribuição por PAÍS e 'N em risco' (crítico)", t.processosAtivos.total === 2 && t.processosAtivos.distribuicao === "Espanha 1 · Itália 1" && t.processosAtivos.emRisco === 1, t.processosAtivos.distribuicao)
+  ok("distribuição sem país", distribuicaoPorPais([{ pais: null }]) === "Sem país 1")
 
   secao("2.5 — backlog vai para a aba Processos; 'Escaladas pra mim' e Backlog saem do topo")
-  ok("TorreProcessos mostra 'Semana: N abertas · N fechadas'", /Semana: \{backlog\.abertas\} abertas · \{backlog\.fechadas\} fechadas/.test(ler("src/components/torre/TorreProcessos.tsx")))
+  // Torre nova: o protótipo mostra a linha da semana na Visão geral (TorreFunil), não na aba Processos (que agora é por fase).
+  ok("a linha 'Semana: …' mora na Visão geral (funil) e a aba Processos, por fase, não a repete", /Semana:/.test(ler("src/components/torre/TorreFunil.tsx")) && !/Semana:/.test(ler("src/components/torre/TorreProcessos.tsx")))
   ok("o topo não tem mais 'Escaladas pra mim' nem 'Backlog'", !CARTOES_DA_SITUACAO.concat(CARTOES_DA_AGENDA).some((k) => k === "esc" || k === "back"))
 
   // ═══════════ SEÇÃO 1 — abas movidas ═══════════
