@@ -7,7 +7,7 @@
 
 export const TITULO_EQUIPE = 'Quem está carregando o quê'
 export const TEXTO_EXPLICATIVO =
-  'Carga = certidões que a pessoa pode tocar agora (fora as que esperam cartório) ÷ limite cadastrado. Fila = carga ÷ o que ela fecha por semana (média das últimas 4). Limite e aptidões vêm de Capacidade Operacional.'
+  'Carga = certidões que a pessoa pode tocar agora (fora as que aguardam terceiros) ÷ limite cadastrado. Fila = carga ÷ o que ela fecha por semana (média das últimas 4). Limite e aptidões vêm de Capacidade Operacional.'
 export const TITULO_PREVISAO = 'Previsão de carga · próximas 4 semanas'
 export const SUBTITULO_PREVISAO = 'quantos prazos vencem por pessoa em cada semana'
 export const NOTA_PREVISAO = 'As 4 semanas + vencidas + depois + sem prazo somam o total de abertas da pessoa. Vermelho = semana acima do que a pessoa costuma fechar.'

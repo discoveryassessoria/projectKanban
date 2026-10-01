@@ -32,7 +32,7 @@ const semComentarios = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace
 
 secao("T325/T326/T327 — título, explicação e colunas (literais do protótipo)")
 ok("título 'Quem está carregando o quê'", TITULO_EQUIPE === "Quem está carregando o quê")
-ok("explicação de Carga e Fila, literal", TEXTO_EXPLICATIVO === "Carga = certidões que a pessoa pode tocar agora (fora as que esperam cartório) ÷ limite cadastrado. Fila = carga ÷ o que ela fecha por semana (média das últimas 4). Limite e aptidões vêm de Capacidade Operacional.")
+ok("explicação de Carga e Fila, literal", TEXTO_EXPLICATIVO === "Carga = certidões que a pessoa pode tocar agora (fora as que aguardam terceiros) ÷ limite cadastrado. Fila = carga ÷ o que ela fecha por semana (média das últimas 4). Limite e aptidões vêm de Capacidade Operacional.")
 ok("colunas: Pessoa · Carga · Ativas · Atrasadas · Aguard. terceiros · Fila · Ações", COLUNAS_DA_TABELA.join(" · ") === "Pessoa · Carga · Ativas · Atrasadas · Aguard. terceiros · Fila · Ações")
 
 secao("T328–T332 — a linha da pessoa (papel, aptidões, disponibilidade)")
