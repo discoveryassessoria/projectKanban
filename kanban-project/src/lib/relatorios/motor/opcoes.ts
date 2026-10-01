@@ -20,6 +20,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { CATEGORIA_CERTIDAO } from "./dominios/certidoes"
+import { rotuloOficialDaFase } from "@/src/lib/process-stage/fase-pre-contrato"
 
 export interface Opcao {
   /** O que trafega. ID quando existe entidade; chave canônica quando é cadastro. */
@@ -141,7 +142,8 @@ export async function opcoesDoCadastro(chave: string, busca?: string | null): Pr
       const r = await prisma.catalogoFase.findMany({
         where: { ativo: true }, orderBy: { ordemPadrao: "asc" }, select: { phaseKey: true, label: true },
       })
-      return r.map((f) => ({ valor: f.phaseKey, rotulo: f.label }))
+      // O rótulo OFICIAL ("Aguardando fechamento" nunca sai como "A iniciar" nem como a chave crua); a ordem é a do cadastro (`ordemPadrao`).
+      return r.map((f) => ({ valor: f.phaseKey, rotulo: rotuloOficialDaFase(f.phaseKey, f.label) }))
     }
 
     // CERTIDÃO × DOCUMENTO — a mesma fronteira que recorta as LINHAS precisa

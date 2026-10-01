@@ -17,12 +17,13 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { rotuloOficialDaFase } from "@/src/lib/process-stage/fase-pre-contrato"
 
 export async function GET(request: NextRequest) {
   const usuario = await extrairUsuarioComPermissoes(request)
   if (!usuario) return NextResponse.json({ error: "não autenticado" }, { status: 401 })
 
   const fases = await prisma.catalogoFase.findMany({ select: { phaseKey: true, label: true } })
-  const rotulos = Object.fromEntries(fases.map((f) => [f.phaseKey, f.label]))
+  const rotulos = Object.fromEntries(fases.map((f) => [f.phaseKey, rotuloOficialDaFase(f.phaseKey, f.label)]))
   return NextResponse.json({ rotulos })
 }

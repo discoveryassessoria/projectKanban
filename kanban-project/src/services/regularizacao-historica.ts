@@ -21,6 +21,7 @@ import type { Prisma, WorkflowInstanceStatus, RegularizacaoHistorica } from "@pr
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from "@/src/lib/permissoes"
 import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
+import { ehFaseAguardandoFechamento } from "@/src/lib/process-stage/fase-pre-contrato"
 import { instanciarWorkflowDaFase } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso, carregarPreCondicoes } from "@/src/services/passo-tarefa"
 
@@ -160,6 +161,8 @@ export interface ResultadoMaterializacao {
 
 /** Sequência oficial de fases do fluxo, até a fase operacional (exclusive). */
 export function fasesAnterioresA(faseOperacional: string): FaseCode[] {
+  // "Aguardando fechamento" (`a_iniciar`) é a PRIMEIRA fase da sequência (extensão fora do enum): não há nenhuma anterior a ela.
+  if (ehFaseAguardandoFechamento(faseOperacional)) return []
   const alvo = phaseKeyToFaseCode(faseOperacional)
   if (!alvo) throw new RegularizacaoErro(`Fase "${faseOperacional}" não pertence ao fluxo oficial.`, 400, "FASE_INVALIDA")
   const ordemAlvo = FASES[alvo].ordem
