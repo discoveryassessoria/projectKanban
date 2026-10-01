@@ -97,6 +97,12 @@ export interface PropostaImpacto {
   /** Simula a remoção da pessoa da árvore. */
   removerPessoa?: boolean
   alteracoes: AlteracaoDescrita[]
+  /**
+   * Para cada certidão MARCADA da pessoa: "será gerado" ou "não será gerado, porque …" (`situacaoDosDocumentosMarcados`). Quando existe,
+   * a prévia SEMPRE aparece — mesmo que o motor responda "sem impacto" — porque é justamente aí que o usuário descobre que o documento
+   * marcado não será gerado (antes o modal salvava direto e o Óbito de uma pessoa viva sumia em silêncio).
+   */
+  certidoesEscolhidas?: Array<{ code: string; rotulo: string; gera: boolean; porque: string | null }>
   /** Requerentes afetados, calculados no cliente pelo motor puro de linhagem. */
   requerentesAfetados?: string[]
   /** Estado de hoje, para montar a coluna ANTES. */
@@ -190,7 +196,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar, onSemIm
         }
         const corpo: Resultado = await r.json()
         setResultado(corpo)
-        if (corpo.semImpacto && onSemImpactoRef.current && !semImpactoDisparado.current) {
+        if (corpo.semImpacto && onSemImpactoRef.current && !semImpactoDisparado.current && !(proposta.certidoesEscolhidas?.length)) {
           semImpactoDisparado.current = true
           onSemImpactoRef.current()
         }
@@ -243,6 +249,22 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar, onSemIm
               ))}
             </ul>
           </section>
+
+          {proposta.certidoesEscolhidas && proposta.certidoesEscolhidas.length > 0 && (
+            <section data-testid="preview-certidoes-escolhidas">
+              <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Certidões marcadas para esta pessoa
+              </h3>
+              <ul className="space-y-1">
+                {proposta.certidoesEscolhidas.map((c) => (
+                  <li key={c.code} data-testid={`preview-certidao-${c.code}`} className={`text-[13px] ${c.gera ? "text-gray-800" : "text-amber-900"}`}>
+                    <span className="font-medium">{c.rotulo}:</span>{" "}
+                    {c.gera ? "será gerado" : `não será gerado, porque ${c.porque ?? "a árvore ainda não sustenta este documento"}`}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {carregando && (
             <div className="flex items-center gap-2 py-6 text-[13px] text-gray-500">
