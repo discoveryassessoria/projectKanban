@@ -12,7 +12,7 @@ import { visaoGerencialComExtras, ordenarFila, type LinhaGerencial, type Filtros
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
 import { semFaseFutura } from '@/lib/operacional/fase-futura'
 import { motivoDeNaoPoderIniciar } from '@/src/services/iniciar-envio'
-import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
+import { idsDeProcessosForaDaTorre, semProcessosForaDaTorre } from '@/src/services/processo-pre-contrato'
 import { lerBolaEmLote, type CamposDaBola } from '@/lib/operacional/torre-bola'
 
 /**
@@ -32,8 +32,9 @@ export interface LinhaDaTorre extends LinhaGerencial, CamposDaBola {
 
 export interface OpcoesDaListaDaTorre {
   /**
-   * Inclui as tarefas de processos PAUSADOS. Padrão `false`: processo pausado fica FORA da Torre (filtro canônico, M2).
-   * Só o detalhe do Processo (Foco) liga isto — ele continua acessível e mostra "Pausado".
+   * Inclui as tarefas de processos PAUSADOS e de processos em AGUARDANDO FECHAMENTO. Padrão `false`: ambos ficam FORA da Torre
+   * (filtro canônico `idsDeProcessosForaDaTorre` = pausa ∪ `a_iniciar`). Só o detalhe do Processo (Foco) liga isto — ele continua
+   * acessível e mostra "Pausado".
    */
   incluirPausados?: boolean
 }
@@ -45,8 +46,8 @@ export async function listarTarefasDaTorre(
   // outra. A ordem das páginas é preservada.
   const [primeira, pausados] = await Promise.all([
     visaoGerencialComExtras({ ...filtros, pagina: 1, porPagina: 500 }, agora),
-    // Uma consulta, constante no volume: os processos com pausa vigente (nunca por linha).
-    opcoes.incluirPausados ? Promise.resolve(new Set<number>()) : idsDeProcessosPausados(),
+    // Duas consultas, constantes no volume: os processos com pausa vigente e os em Aguardando fechamento (nunca por linha).
+    opcoes.incluirPausados ? Promise.resolve(new Set<number>()) : idsDeProcessosForaDaTorre(),
   ])
   const restantes = primeira.linhas.length === 0
     ? []
@@ -61,9 +62,9 @@ export async function listarTarefasDaTorre(
   // O mesmo recorte de `minhaFila`: encerradas não são fila.
   // E tarefa de FASE FUTURA também não é fila (regra única do Bloco F — `fase-futura.ts`): lista, KPIs,
   // Radar, Processos, Foco e Equipe leem daqui, então a exclusão vale para todos de uma vez.
-  // E o processo PAUSADO fica fora da Torre inteira (filtro canônico `semProcessosPausados`): quem lê daqui — lista, KPIs,
+  // E o processo PAUSADO (ou em AGUARDANDO FECHAMENTO) fica fora da Torre inteira (filtro canônico `semProcessosForaDaTorre`): quem lê daqui — lista, KPIs,
   // Terceiros, Equipe, Radar, Processos, Foco (que liga `incluirPausados`) e a foto diária — herda a exclusão de uma vez.
-  const abertas = ordenarFila(semProcessosPausados(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), pausados)) as LinhaGerencial[]
+  const abertas = ordenarFila(semProcessosForaDaTorre(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), pausados)) as LinhaGerencial[]
   // A BOLA COM (função única da Torre): uma leitura em lote para todas as linhas.
   const bolas = await lerBolaEmLote(abertas.map((l) => ({
     taskId: l.taskId, estadoOperacao: l.estadoOperacao, esperandoDe: l.esperandoDe, esperandoDesde: l.esperandoDesde,

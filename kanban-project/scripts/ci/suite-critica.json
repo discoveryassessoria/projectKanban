@@ -196,7 +196,8 @@
    "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
    "scripts/torre-sem-responsavel-quatro-lugares.test.ts",
    "scripts/torre-cobranca-estorno.test.ts",
-   "scripts/fase-aguardando-fechamento-motor.test.ts"
+   "scripts/fase-aguardando-fechamento-motor.test.ts",
+   "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts"
   ]
  },
  "arquivos": [
@@ -374,6 +375,7 @@
   "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
   "scripts/torre-sem-responsavel-quatro-lugares.test.ts",
   "scripts/torre-cobranca-estorno.test.ts",
-  "scripts/fase-aguardando-fechamento-motor.test.ts"
+  "scripts/fase-aguardando-fechamento-motor.test.ts",
+  "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts"
  ]
 }

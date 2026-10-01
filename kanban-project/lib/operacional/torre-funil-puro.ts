@@ -71,6 +71,11 @@ export interface DadosDoFunilPorEscopo {
   /** Meta resolvida para o escopo (país → padrão da fase → `null`). */
   metas: Record<string, number | null>
   semana: SemanaDoFunil
+  /**
+   * Processos em "Aguardando fechamento" (`a_iniciar`) NESTE escopo — a linha PRÓPRIA do funil. FORA do total (`Funil.total`), da barra de
+   * risco e de "processos ativos": é contagem de quem ainda não começou, nunca trabalho. Ausente (leitor antigo) = 0.
+   */
+  aguardandoFechamento?: number
 }
 export interface RespostaDoFunil {
   fases: FaseDoCadastro[]
@@ -80,7 +85,7 @@ export interface RespostaDoFunil {
   /** Por RÓTULO do país (`CatalogoPais.countryLabel`, o mesmo que a linha e o processo carregam). */
   porPais: Record<string, DadosDoFunilPorEscopo>
 }
-export const ESCOPO_VAZIO: DadosDoFunilPorEscopo = { tempos: {}, metas: {}, semana: { processosAbertos: 0, protocolados: 0, tarefasAbertas: 0, tarefasFechadas: 0 } }
+export const ESCOPO_VAZIO: DadosDoFunilPorEscopo = { tempos: {}, metas: {}, semana: { processosAbertos: 0, protocolados: 0, tarefasAbertas: 0, tarefasFechadas: 0 }, aguardandoFechamento: 0 }
 
 // ─── gargalo por fase ───────────────────────────────────────────────────────────────────────────────────────────────────
 export interface LinhaParaGargalo {

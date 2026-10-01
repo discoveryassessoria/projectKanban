@@ -83,7 +83,7 @@ export function TorreVisaoGeral({ linhas, processos, itensPrecisa, agora, tend, 
         linhas={linhas} processos={processos} itensPrecisa={itensPrecisa} agora={agora} tend={tend} filtrandoPais={filtrandoPais}
         gargalo={gargalo} onProcessos={onProcessos} onRisco={onRisco} onRevisar={onRevisar}
       />
-      <TorreFunil funil={funil} semana={escopo?.semana ?? null} carregandoDados={carregando} erroDados={erro} />
+      <TorreFunil funil={funil} semana={escopo?.semana ?? null} carregandoDados={carregando} erroDados={erro} aguardandoFechamento={dados ? (escopo?.aguardandoFechamento ?? 0) : null} />
 
       <div id="pdv" className="tvg-pdv">
         <TorrePrecisaDeVoce itens={itensPrecisa} carregando={itensPrecisa == null} erro={null} irParaAba={irParaAba} {...PROPS_EMBUTIDO} />

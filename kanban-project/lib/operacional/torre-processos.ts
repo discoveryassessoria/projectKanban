@@ -27,7 +27,9 @@ import { lerLinhasOperacionais } from './avisos-sino'
 import type { LinhaGerencial } from './tarefa-projecoes'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { BOLA_NOSSA, BOLA_CLIENTE, BOLA_PADRAO_DO_TERCEIRO, VALORES_DE_BOLA, type BolaCom } from './torre-bola'
-import { ONDE_PROCESSO_NAO_PAUSADO, idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
+import { ONDE_PROCESSO_NA_TORRE, idsDeProcessosForaDaTorre, semProcessosForaDaTorre } from '@/src/services/processo-pre-contrato'
+import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
+import type { Prisma } from '@prisma/client'
 import { entradasNaFaseEmLote, concluidasDaFaseEmLote, tempoDesde, metasDaTorre, metaDaFaseDoPais } from './torre-fase-dados'
 import {
   riscoDoProcesso, baldeDoRadar, situacaoDaFase, ehGrave, type NivelDeRisco, type EntradaDoRisco, type SituacaoDaFase,
@@ -38,8 +40,11 @@ import { proximaAcaoDoProcesso, prazoCurto, type ProximaAcao, type PrazoCurto } 
 export type RiscoDoProcesso = 'ok' | 'atencao' | 'critico'
 export type { NivelDeRisco, SituacaoDaFase }
 
-/** "Processo ativo na Torre" = não concluído e não pausado. UMA definição: a lista (Radar/Processos) e a foto diária (`processosAtivos`) leem esta. */
-export const ONDE_PROCESSO_ATIVO_DA_TORRE = { dataConclusao: null, ...ONDE_PROCESSO_NAO_PAUSADO } as const
+/**
+ * "Processo ativo na Torre" = não concluído, não pausado E fora de "Aguardando fechamento" (`a_iniciar`). UMA definição: a lista
+ * (Radar/Processos) e a foto diária (`processosAtivos`) leem esta. Em `AND` para nunca ser sobrescrita por chave repetida de quem a usa.
+ */
+export const ONDE_PROCESSO_ATIVO_DA_TORRE: Prisma.ProcessoWhereInput = { AND: [{ dataConclusao: null }, ONDE_PROCESSO_NA_TORRE] }
 
 export interface ColunaDoRadar { key: string; label: string; condicional: boolean }
 
@@ -143,9 +148,13 @@ export function bolaDoProcesso(linhas: Array<Pick<LinhaDaTorre, 'estadoOperacao'
   return { rotulo: BOLA_NOSSA, dias: null }
 }
 
-/** As fases ATIVAS do cadastro, na ordem padrão (todas — a poda das terminais é `colunasDoRadar`). */
+/**
+ * As fases ATIVAS do cadastro, na ordem padrão (todas — a poda das terminais é `colunasDoRadar`). SEM "Aguardando fechamento"
+ * (`a_iniciar`): o processo nela está FORA do Radar/Processos/funil, então ela não é coluna nem botão de fase (o funil mostra o
+ * contador dela numa linha PRÓPRIA, fora do total — `contarAguardandoFechamento`).
+ */
 export async function fasesDoRadar(): Promise<ColunaDoRadar[]> {
-  const fases = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: [{ ordemPadrao: 'asc' }, { id: 'asc' }], select: { phaseKey: true, label: true, conditionalPadrao: true } })
+  const fases = await prisma.catalogoFase.findMany({ where: { ativo: true, phaseKey: { not: PHASEKEY_A_INICIAR } }, orderBy: [{ ordemPadrao: 'asc' }, { id: 'asc' }], select: { phaseKey: true, label: true, conditionalPadrao: true } })
   return fases.map((f) => ({ key: f.phaseKey, label: f.label, condicional: f.conditionalPadrao }))
 }
 
@@ -246,9 +255,9 @@ const porProcesso = <T extends { processoId: number | null }>(xs: T[]): Map<numb
  * foto diária e do filtro "Críticas" do Radar. Sem metas nem dias na fase: elas só movem atenção, nunca o balde grave.
  */
 export async function processosCriticos(agora = new Date()): Promise<Set<number>> {
-  const [lidas, pausados] = await Promise.all([lerLinhasOperacionais(agora), idsDeProcessosPausados()])
+  const [lidas, foraDaTorre] = await Promise.all([lerLinhasOperacionais(agora), idsDeProcessosForaDaTorre()])
   const itens = await itensPrecisaDeVoce({ agora, linhas: lidas })
-  const linhas = semProcessosPausados(lidas, pausados).filter((l) => STATUS_ATIVOS.includes(l.statusTarefa))
+  const linhas = semProcessosForaDaTorre(lidas, foraDaTorre).filter((l) => STATUS_ATIVOS.includes(l.statusTarefa))
   const linhasPorProcesso = porProcesso(linhas)
   const itensPorProcesso = porProcesso(itens)
   const graves = new Set<number>()
