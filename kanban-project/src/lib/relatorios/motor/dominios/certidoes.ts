@@ -17,7 +17,8 @@
 // documento entregue é uma das colunas.
 
 import { prisma } from "@/lib/prisma"
-import { estadoTemporal, estadoTemporalSolicitacao, type EstadoTemporal } from "@/lib/operacional/tempo-operacional"
+import { estadoTemporal, estadoTemporalSolicitacao, FUSO_OPERACIONAL, type EstadoTemporal } from "@/lib/operacional/tempo-operacional"
+import { labelDaFasePorPhaseKey, phaseKeyToFaseCode, rotuloDoPasso } from "@/src/lib/process-stage/fases-catalog"
 import { CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO } from "@/src/lib/process-stage/subtarefa-confirmacao-pedido"
 import {
   CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO, CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO,
@@ -184,7 +185,15 @@ const INCLUDE = {
       // RESPONSÁVEL E PRAZO — da TAREFA vinculada (fonte única de
       // responsável/prazo, ver ownership-canonico-tarefa), não do Documento.
       tarefasVinculadas: {
-        select: { id: true, dataPrazo: true, dataConclusao: true, statusTarefa: true, responsavel: { select: { nome: true } } },
+        select: {
+          id: true, dataPrazo: true, dataConclusao: true, statusTarefa: true, responsavel: { select: { nome: true } },
+          // FASE, PASSO e INICIOU da certidão (Relatório de controle do Detalhe do Processo): a MESMA tarefa que dá Responsável e Prazo.
+          // `dataInicio` é o início REAL do trabalho (task-step-sync.registrarInicioDoTrabalho) — vazio em registro antigo, e fica vazio.
+          faseMacroKey: true, dataInicio: true,
+          workflowStepInstance: { select: { stepKey: true, snapshot: true, stepDefinitionId: true } },
+        },
+        // A MAIS RECENTE (determinístico): sem ordem, `take: 1` podia pegar a tarefa cancelada/antiga do mesmo documento.
+        orderBy: { id: "desc" as const },
         take: 1,
       },
       // SITUAÇÃO DA SOLICITAÇÃO — as 3 subtarefas do Step único "Solicitar
@@ -419,6 +428,12 @@ export const DOMINIO_CERTIDOES: DominioDef = {
     // CRIOU o registro de solicitação): este é quem tem a Tarefa AGORA, a
     // fonte única de responsável (ownership-canonico-tarefa).
     { key: "responsavel_tarefa", rotulo: "Responsável", valor: (l) => tarefaDoDoc(l)?.responsavel?.nome ?? null },
+    // FASE / PASSO / INICIOU da certidão (Relatório de controle do Detalhe do Processo, prévia e CSV/Excel/PDF): da TAREFA da certidão — a fase em que
+    // ela vive (nome do cadastro, nunca a chave), o passo em que está e o dia em que o trabalho COMEÇOU. Sem registro → "—" (nada é inventado).
+    { key: "fase_certidao", rotulo: "Fase", valor: (l) => labelDaFasePorPhaseKey(tarefaDoDoc(l)?.faseMacroKey) ?? "—" },
+    { key: "passo", rotulo: "Passo", valor: (l) => l.__passo ?? "—" },
+    { key: "iniciou", rotulo: "Iniciou",
+      valor: (l) => { const d = tarefaDoDoc(l)?.dataInicio; return d ? new Date(d).toLocaleDateString("pt-BR", { timeZone: FUSO_OPERACIONAL }) : "—" } },
     { key: "geracao", rotulo: "Geração", valor: (l) => { const p = pessoaDaLinha(l); return p?.numeroLinhagem != null ? `G${p.numeroLinhagem}` : null } },
     { key: "orgao_municipio_uf", rotulo: "Município/UF do órgão",
       valor: (l) => { const o = doc(l)?.orgao; const t = [o?.city, o?.state].filter(Boolean).join("/"); return t || null } },
@@ -449,11 +464,28 @@ export const DOMINIO_CERTIDOES: DominioDef = {
   ordenacaoPadrao: { key: "criacao", direcao: "desc" },
 
   contar: (where) => prisma.necessidadeDocumental.count({ where: { AND: [where, SO_CERTIDAO, { supersedePorId: null }] } }),
-  carregar: (where, orderBy, pular, levar) =>
-    prisma.necessidadeDocumental.findMany({
+  carregar: async (where, orderBy, pular, levar) => {
+    const linhas = await prisma.necessidadeDocumental.findMany({
       where: { AND: [where, SO_CERTIDAO, { supersedePorId: null }] },
       orderBy, skip: pular, take: levar, include: INCLUDE,
-    }),
+    })
+    // O NOME DO PASSO pela resolução ÚNICA (`rotuloDoPasso`: snapshot → definição publicada → catálogo da fase → chave), os rótulos das
+    // definições lidos em UMA consulta para a página inteira (nunca uma por linha).
+    const defIds = [...new Set(linhas.flatMap((l: any) => {
+      const id = tarefaDoDoc(l)?.workflowStepInstance?.stepDefinitionId
+      return id != null ? [id as number] : []
+    }))]
+    const defs = defIds.length ? await prisma.phaseInternalWorkflowStep.findMany({ where: { id: { in: defIds } }, select: { id: true, label: true } }) : []
+    const rotuloDaDefinicao = new Map(defs.map((d) => [d.id, d.label]))
+    for (const l of linhas as any[]) {
+      const t = tarefaDoDoc(l)
+      const wsi = t?.workflowStepInstance
+      l.__passo = wsi
+        ? rotuloDoPasso({ stepKey: wsi.stepKey, snapshot: wsi.snapshot, labelPublicado: wsi.stepDefinitionId != null ? rotuloDaDefinicao.get(wsi.stepDefinitionId) ?? null : null, faseCode: phaseKeyToFaseCode(t.faseMacroKey) })
+        : null
+    }
+    return linhas
+  },
 
   // GETTER (não array estático): "Certidões solicitadas no período" precisa do
   // mês ATUAL, recalculado a cada consulta a /api/relatorios/meta — um array

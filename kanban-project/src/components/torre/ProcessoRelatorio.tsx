@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { auth } from "@/src/components/operacao/kit-operacional"
 import { api, erroDe } from "./torre-base"
+import { COLUNAS_DO_RELATORIO_DE_CONTROLE } from "@/lib/operacional/torre-relatorio-colunas"
 
 type Cor = "vermelho" | "amarelo" | "verde" | "cinza"
 interface Resultado {
@@ -16,8 +17,8 @@ interface Resultado {
   linhas: Array<{ id: number; celulas: Array<{ key: string; valor: string | number | null; cor?: Cor | null }> }>
 }
 const COR: Record<Cor, string> = { vermelho: "var(--danger-text)", amarelo: "var(--warning-text)", verde: "var(--success-text)", cinza: "var(--text-muted)" }
-// As colunas do protótipo que o relatório de Certidões do motor sabe dar (Fase/Passo/Iniciou não existem nele).
-const COLUNAS = ["tipo", "pessoa", "geracao", "status", "responsavel_tarefa", "prazo"]
+// As colunas do protótipo + Geração: UMA lista (lib/operacional/torre-relatorio-colunas.ts), a mesma da prévia e das exportações.
+const COLUNAS = [...COLUNAS_DO_RELATORIO_DE_CONTROLE]
 
 export function ProcessoRelatorio({ processoId, processoRotulo, familiaId, familiaNome, onFechar, avisar }: {
   processoId: number; processoRotulo: string; familiaId: number | null; familiaNome: string; onFechar: () => void; avisar: (msg: string) => void

@@ -8,6 +8,7 @@ import { useMemo, useState } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
 import { auth } from "@/src/components/operacao/kit-operacional"
 import { erroDe, useTorre } from "./torre-base"
+import { COLUNAS_DO_RELATORIO_DE_CONTROLE } from "@/lib/operacional/torre-relatorio-colunas"
 import "./torre-radar.css"
 
 type Formato = "csv" | "xlsx" | "pdf"
@@ -22,7 +23,7 @@ export function RelatorioControle({ processoId, processoRotulo, familiaId, famil
     filtros: [familiaId != null
       ? { key: "familia", valor: { tipo: "entidade", id: familiaId, rotulo: familiaNome } }
       : { key: "processo", valor: { tipo: "entidade", id: processoId, rotulo: processoRotulo } }],
-    ordenarPor: "familia_geracao", direcao: "asc", pagina: 1, porPagina: 100,
+    colunas: [...COLUNAS_DO_RELATORIO_DE_CONTROLE], ordenarPor: "familia_geracao", direcao: "asc", pagina: 1, porPagina: 100,
   }), [familiaId, familiaNome, processoId, processoRotulo])
   const [exportando, setExportando] = useState<Formato | null>(null)
   const [erro, setErro] = useState<string | null>(null)
