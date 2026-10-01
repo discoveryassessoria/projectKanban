@@ -241,7 +241,7 @@ export async function calcularExigenciasDaGenealogia(processoId: number, db: DB 
   }
 }
 
-const FASE_GENEALOGIA = "genealogia" // phaseKey canônica (minúscula)
+export const FASE_GENEALOGIA = "genealogia" // phaseKey canônica (minúscula)
 // stepKey canônico ÚNICO da Genealogia. "Localizar registro" (não "buscar
 // documento"/"certidão"): aqui só se LOCALIZA o registro civil e preenchem-se os
 // dados registrais. A solicitação/obtenção da certidão é da Emissão Documental.
