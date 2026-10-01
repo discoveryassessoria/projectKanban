@@ -16,6 +16,7 @@ import { prisma } from '@/lib/prisma'
 import { labelDaFasePorPhaseKey } from '@/src/lib/process-stage/fases-catalog'
 import { listarTarefasDaTorre, type LinhaDaTorre } from '@/src/services/torre-tarefas'
 import { progressoRealDoProcesso, diasNaFaseAtual } from './metricas-processo'
+import { pausaVigenteDoProcesso, type PausaDoProcesso } from '@/src/services/processo-pausa'
 import { STATUS_DOCUMENTO_INATIVOS } from '@/src/lib/documentos/status-inativos'
 import { encerramentosDosDocumentos } from '@/src/services/encerramento-documental'
 import { TIPO_DOCUMENTO_LABELS } from '@/src/lib/process-stage/estrutura-operacional'
@@ -32,6 +33,11 @@ export interface FocoDaFamilia {
   numeros: { abertas: number; vencidas: number; comCartorio: number; semResponsavel: number }
   tarefas: LinhaDaTorre[]
   /**
+   * PROCESSO PAUSADO (Torre nova, M2): `null` = ativo na Torre. Preenchido = a pausa vigente (quem, quando, por quê) — o
+   * detalhe do Processo continua acessível e mostra "Pausado"; só a Torre (lista, KPIs, Radar…) o deixa de fora.
+   */
+  pausa: PausaDoProcesso | null
+  /**
    * CANCELAR NUNCA ESCONDE, SÓ MARCA: as certidões CANCELADAS ou NÃO EXIGIDAS não são trabalho (não entram em `tarefas` nem nos
    * 4 números), mas o Foco as MOSTRA, marcadas, com quem/quando/por quê. O Histórico (mesma tela) registra o fato.
    */
@@ -46,7 +52,7 @@ export interface CertidaoEncerradaDoFoco {
   tipo: 'CANCELADA' | 'NAO_EXIGIDA'
 }
 
-/** Os 4 números do Foco — a MESMA definição dos filtros da aba Tarefas (Vencidas / Com o cartório / Sem responsável). */
+/** Os 4 números do Foco — a MESMA definição dos filtros da aba Tarefas (Vencidas / Aguardando terceiros / Sem responsável). */
 export function numerosDoFoco(linhas: Array<Pick<LinhaDaTorre, 'atrasada' | 'estadoOperacao' | 'responsavelId'>>) {
   return {
     abertas: linhas.length,
@@ -63,10 +69,12 @@ export async function focoDaFamilia(processoId: number, agora = new Date()): Pro
   })
   if (!proc) return null
 
-  const [{ linhas }, progresso, dias] = await Promise.all([
-    listarTarefasDaTorre({ processoId }, agora),
+  // O detalhe do Processo continua acessível MESMO pausado (`incluirPausados`) — a pausa tira o processo da Torre, não do Foco.
+  const [{ linhas }, progresso, dias, pausa] = await Promise.all([
+    listarTarefasDaTorre({ processoId }, agora, { incluirPausados: true }),
     progressoRealDoProcesso(processoId),
     diasNaFaseAtual(processoId, agora),
+    pausaVigenteDoProcesso(processoId),
   ])
   const rot = (k: string | null) => (k ? labelDaFasePorPhaseKey(k) ?? k : '—')
 
@@ -98,6 +106,6 @@ export async function focoDaFamilia(processoId: number, agora = new Date()): Pro
     pais: proc.paisCanonico?.countryLabel ?? null, codigo: proc.codigo,
     faseAtual: { key: proc.faseAtualKey, label: rot(proc.faseAtualKey), dias: dias.dias, horas: dias.horas, desde: dias.desde, origem: dias.origem },
     certidoes: { recebidas: progresso.completed, requeridas: progresso.required },
-    numeros: numerosDoFoco(linhas), tarefas: linhas, encerradas,
+    numeros: numerosDoFoco(linhas), tarefas: linhas, pausa, encerradas,
   }
 }

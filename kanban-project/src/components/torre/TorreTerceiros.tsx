@@ -1,7 +1,8 @@
 "use client"
 // src/components/torre/TorreTerceiros.tsx — aba TERCEIROS (Bloco G3–G5).
-// Cartório/órgão, Em aberto, Sem resposta, RÉGUA (só o que o Gerenciamento cadastrou — nunca "tempo
-// aprendido"), Não localizada, Próx. cobrança, Cobrar (SÓ aquele órgão) e Contatos (histórico).
+// Cartório/órgão, Em aberto, RÉGUA (só o que o Gerenciamento cadastrou — nunca "tempo aprendido"), Próx. cobrança,
+// Cobrar (SÓ aquele órgão) e Contatos (histórico). SEM placar por cartório (Torre nova, Etapa A): nada de ranking,
+// média nem contagem de "sem resposta"/"não localizada" por órgão — o dono da aba (G) a reescreve por pedido.
 import { useEffect, useState } from "react"
 import { RegistrarContatoModal, CANAL_CADASTRADO } from "@/src/components/operacao/RegistrarContatoModal"
 import { api, erroDe, fmtDataHora, fmtDia, Modal, useTorre } from "./torre-base"
@@ -49,15 +50,13 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
         <CobrarTodosVencidos linhas={linhas} />
       </div>
       <div className="tor-card tor-scroll">
-        <div className="tor-hd tor-gC"><span>Cartório / órgão (UF · canal)</span><span>Em aberto</span><span>Sem resposta (dias)</span><span>Régua</span><span>Não localizada</span><span>Próx. cobrança</span><span /></div>
+        <div className="tor-hd tor-gC"><span>Cartório / órgão (UF · canal)</span><span>Em aberto</span><span>Régua</span><span>Próx. cobrança</span><span /></div>
         {orgaos.length === 0 && <div className="p-4 small">Nenhum cartório/órgão com trabalho em aberto vinculado.</div>}
         {orgaos.map((o) => (
           <div key={o.orgaoId} className="tor-row tor-gC">
             <div><b>{o.nome}</b><div className="small">{o.uf ?? "—"} · canal: {o.canal}</div></div>
             <div>{o.emAberto}</div>
-            <div>{o.semResposta.tarefas > 0 ? <span className="tor-p amb">{o.semResposta.tarefas}{o.semResposta.maxDias != null ? ` · ${o.semResposta.maxDias} d` : ""}</span> : "—"}</div>
             <div className="small">{o.regua}</div>
-            <div className="small">{o.naoLocalizada > 0 ? `${o.naoLocalizada} registro(s) não localizado(s)` : "0"}</div>
             <div>{o.proximaCobranca.vencida ? <span className="tor-p red">vencida</span> : <span className="tor-p gry">{o.proximaCobranca.data ? fmtDia(o.proximaCobranca.data) : "—"}</span>}</div>
             <div className="flex gap-1">
               <button className="tor-btn pri" disabled={o.aguardando === 0} title={o.aguardando === 0 ? "Nada está com este órgão" : undefined} onClick={() => setCobrar(o)}>Cobrar</button>
@@ -97,6 +96,7 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
           </ul>
         </Modal>
       )}
+      <div className="small mb-2">A lista agrupa por cartório só para cobrar junto o que está no mesmo lugar. Não há ranking nem média por cartório: ele não é medido nem comparado aqui.</div>
       <CartoesDeMetricas versao={versao} />
     </div>
   )

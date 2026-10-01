@@ -14,7 +14,7 @@
 .tor-row { border-top: 1px solid var(--border-default); }
 .tor-row.sel { background: var(--info-tile); }
 .tor-gT { grid-template-columns: 28px minmax(200px, 2fr) 1fr minmax(120px, 1.2fr) minmax(110px, .9fr) 1fr .9fr .9fr .8fr minmax(210px, 1.4fr); }
-.tor-gC { grid-template-columns: minmax(200px, 1.6fr) .6fr .9fr 2fr .8fr 1fr 190px; }
+.tor-gC { grid-template-columns: minmax(200px, 1.6fr) .6fr 2fr 1fr 190px; }
 .tor-gE { grid-template-columns: minmax(230px, 2fr) 1.5fr .5fr .6fr .5fr .8fr 260px; }
 .tor-grp { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface-tertiary); }
 .tor-chk { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border-default); background: var(--surface-popover); cursor: pointer; padding: 0; }
@@ -135,3 +135,12 @@
 .tor-fxchips { gap: 6px; }
 .tor-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow-wrap: anywhere; }
 .tor-fx-cont { margin-left: auto; }
+
+.tor-gMeta { grid-template-columns: minmax(180px, 1.6fr) minmax(160px, 1.2fr) 120px minmax(160px, 1.4fr) minmax(220px, 1.4fr); }
+
+/* ── TORRE NOVA (Etapa A): país como botões no cabeçalho ── */
+.tor-paises { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.tor-pais { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); cursor: pointer; white-space: nowrap; }
+.tor-pais:hover { background: var(--surface-tertiary); }
+.tor-pais[aria-pressed="true"] { background: var(--action-primary); color: var(--action-primary-ink); border-color: transparent; }
+.tor-pais .n { margin-left: 6px; font-size: 11px; font-weight: 600; opacity: .8; }

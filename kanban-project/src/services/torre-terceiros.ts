@@ -17,6 +17,7 @@ import { visaoGerencial, ordenarFila, type LinhaGerencial } from '@/lib/operacio
 import { lerReguaDeCobranca, reguaResumida, type LinhaDaRegua } from '@/lib/operacional/regras-torre'
 import { ehCobravelVencido } from '@/lib/operacional/torre-predicados'
 import { semFaseFutura } from '@/lib/operacional/fase-futura'
+import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
 import { cobrarTarefas, canaisCadastrados, CANAIS_VALIDOS, RESULTADOS_VALIDOS } from '@/src/services/cobranca-terceiros'
 
 export interface OrgaoTerceiro {
@@ -41,7 +42,8 @@ async function tarefasAbertasDoOrgao(orgaoId: number, agora: Date): Promise<Linh
     todas.push(...linhas)
     if (pagina * 500 >= total || linhas.length === 0) break
   }
-  return ordenarFila(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA'))) as LinhaGerencial[]
+  // Processo PAUSADO fica fora da Torre — inclusive de "Cobrar este cartório" (filtro canônico `semProcessosPausados`).
+  return ordenarFila(semProcessosPausados(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), await idsDeProcessosPausados())) as LinhaGerencial[]
 }
 
 /** A régua que o CADASTRO define para cada órgão: a regra temporal DELE, senão a dos passos. */

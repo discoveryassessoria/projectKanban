@@ -20,6 +20,8 @@ interface Foco {
   certidoes: { recebidas: number; requeridas: number }
   numeros: { abertas: number; vencidas: number; comCartorio: number; semResponsavel: number }
   tarefas: LinhaTorre[]
+  /** Torre nova (M2): o processo está pausado? (`null` = ativo na Torre). */
+  pausa?: { motivo: string; pausadoEm: string; pausadoPor: { nome: string } | null } | null
   encerradas: Array<{ documentoId: number; titulo: string; pessoa: string | null; tipo: "CANCELADA" | "NAO_EXIGIDA"; encerramento: { quando: string | null; quandoRotulo: string | null; porNome: string | null; motivo: string | null; justificativa: string | null } | null }>
 }
 interface Comentario { id: number; texto: string; autorNome: string; criadoEm: string }
@@ -88,7 +90,9 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
           <div className="flex-1">
             {foco ? (
               <>
-                <h2 className="font-extrabold" style={{ fontSize: 18 }}>{foco.familiaNome} · {foco.pais ?? "—"} · {foco.codigo ?? "—"}</h2>
+                <h2 className="font-extrabold" style={{ fontSize: 18 }}>{foco.familiaNome} · {foco.pais ?? "—"} · {foco.codigo ?? "—"}
+                  {foco.pausa && <span className="tor-p amb" style={{ marginLeft: 8 }} title={`Pausado em ${fmtDataHora(foco.pausa.pausadoEm)}${foco.pausa.pausadoPor ? ` por ${foco.pausa.pausadoPor.nome}` : ""}: ${foco.pausa.motivo}`}>Pausado</span>}
+                </h2>
                 <div>{foco.faseAtual.label ?? "—"} · {foco.certidoes.recebidas} de {foco.certidoes.requeridas} certidões recebidas
                   <span className="small"> · {foco.faseAtual.desde ? `na fase há ${textoTempoNaFase(foco.faseAtual)}` : "sem registro de quando entrou na fase"}</span></div>
               </>
@@ -102,7 +106,7 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
         {foco && (
           <>
             <div className="tor-num">
-              {([["Abertas", foco.numeros.abertas], ["Vencidas", foco.numeros.vencidas], ["Com o cartório", foco.numeros.comCartorio], ["Sem responsável", foco.numeros.semResponsavel]] as const).map(([r, n]) => (
+              {([["Abertas", foco.numeros.abertas], ["Vencidas", foco.numeros.vencidas], ["Aguardando terceiros", foco.numeros.comCartorio], ["Sem responsável", foco.numeros.semResponsavel]] as const).map(([r, n]) => (
                 <div key={r}><b>{n}</b><span>{r}</span></div>
               ))}
             </div>

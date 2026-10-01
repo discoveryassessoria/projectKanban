@@ -41,7 +41,7 @@ export function dataPorExtenso(agora: Date): string {
   return agora.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', timeZone: FUSO_OPERACIONAL })
 }
 
-/** A FRASE FIXA: "Hoje, {data}: {N} certidão(ões) para iniciar ({famílias}), {N} atrasada(s), {N} com o cartório, {N} sem responsável." */
+/** A FRASE FIXA: "Hoje, {data}: {N} certidão(ões) para iniciar ({famílias}), {N} atrasada(s), {N} aguardando terceiros, {N} sem responsável." */
 export function fraseDoDia(linhas: LinhaParaTopo[], agora: Date): string {
   const aIniciar = linhas.filter(aIniciarNoTopo)
   const familias = [...new Set(aIniciar.map((l) => l.familiaNome ?? l.processoNome ?? 'Sem família'))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
@@ -49,7 +49,7 @@ export function fraseDoDia(linhas: LinhaParaTopo[], agora: Date): string {
   const quais = familias.length === 0 ? '' : familias.length > LIMITE_DE_FAMILIAS_NA_FRASE ? ` (${familias.length} famílias)`
     : ` (${familias.length > 1 ? `${familias.slice(0, -1).join(', ')} e ${familias[familias.length - 1]}` : familias[0]})`
   const atr = n('venc')
-  return `Hoje, ${dataPorExtenso(agora)}: ${plural(aIniciar.length, 'certidão', 'certidões')} para iniciar${quais}, ${plural(atr, 'atrasada', 'atrasadas')}, ${n('cartorio')} com o cartório, ${n('ninguem')} sem responsável.`
+  return `Hoje, ${dataPorExtenso(agora)}: ${plural(aIniciar.length, 'certidão', 'certidões')} para iniciar${quais}, ${plural(atr, 'atrasada', 'atrasadas')}, ${n('cartorio')} aguardando terceiros, ${n('ninguem')} sem responsável.`
 }
 
 export function topoDaTorre(linhas: LinhaParaTopo[], processos: ProcessoParaTopo[], agora: Date): TopoDaTorre {

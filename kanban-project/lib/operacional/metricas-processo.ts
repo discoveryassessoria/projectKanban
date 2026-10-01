@@ -63,30 +63,57 @@ export async function diasNaFaseAtual(processoId: number, agora = new Date()): P
   })
   if (!proc?.faseAtualKey) return { faseAtual: null, desde: null, origem: null, dias: null, horas: null }
   const fase = proc.faseAtualKey
-  const monta = (desde: Date, origem: NonNullable<DiasNaFase['origem']>): DiasNaFase => {
-    const ms = Math.max(0, agora.getTime() - desde.getTime())
-    return { faseAtual: fase, desde: desde.toISOString(), origem, dias: Math.floor(ms / 86_400_000), horas: Math.floor(ms / 3_600_000) }
-  }
+  // A entrada vem da função CANÔNICA ÚNICA (`entradaNaFase`) — "dias na fase" só mede a distância até agora.
+  const entrada = await entradaNaFaseDoProcesso(processoId, fase, proc)
+  if (!entrada.desde || !entrada.origem) return { faseAtual: fase, desde: null, origem: null, dias: null, horas: null }
+  const ms = Math.max(0, agora.getTime() - new Date(entrada.desde).getTime())
+  return { faseAtual: fase, desde: entrada.desde, origem: entrada.origem, dias: Math.floor(ms / 86_400_000), horas: Math.floor(ms / 3_600_000) }
+}
 
+/** QUANDO o processo ENTROU numa fase — só de registro real. `desde: null` = sem registro (a tela mostra "—"). */
+export interface EntradaNaFase {
+  faseKey: string
+  /** ISO do instante de entrada, ou `null` quando não há registro (nunca "agora", nunca um palpite). */
+  desde: string | null
+  origem: DiasNaFase['origem']
+}
+
+type ProcessoParaEntrada = { dataInicio: Date | null; createdAt: Date; tipoProcessoMotorId: number | null }
+
+/**
+ * FUNÇÃO CANÔNICA ÚNICA: QUANDO O PROCESSO ENTROU NA FASE `faseKey` (a atual ou uma anterior) — Torre nova, Etapa A (01/10/2026).
+ * Reaproveita as fontes de `diasNaFaseAtual` (que passa a chamar esta): o último avanço/movimentação registrado PARA a fase
+ * (`PhaseAdvanceLog`, `RESULTADOS_QUE_MOVEM_DE_FASE`) → a abertura do processo (se a fase é a PRIMEIRA do macrofluxo) → a
+ * criação do workflow da fase (`PhaseWorkflowInstance`) → nada (`null`). TODA transição de fase passa por `executarPlano`
+ * (`src/lib/motor/phase-advance.ts`), que grava a `PhaseAdvanceLog` na MESMA transação em que escreve `faseAtualKey` — por isso
+ * "daqui para frente" a data de entrada existe para toda mudança de fase; processo antigo sem log cai na ordem acima ou em `null`.
+ */
+export async function entradaNaFase(processoId: number, faseKey: string): Promise<EntradaNaFase> {
+  const proc = await prisma.processo.findUnique({ where: { id: processoId }, select: { dataInicio: true, createdAt: true, tipoProcessoMotorId: true } })
+  if (!proc) return { faseKey, desde: null, origem: null }
+  return entradaNaFaseDoProcesso(processoId, faseKey, proc)
+}
+
+async function entradaNaFaseDoProcesso(processoId: number, fase: string, proc: ProcessoParaEntrada): Promise<EntradaNaFase> {
   const ultimoAvanco = await prisma.phaseAdvanceLog.findFirst({
     where: { processoId, resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, fasePretendida: fase },
     orderBy: { criadoEm: 'desc' }, select: { criadoEm: true },
   })
-  if (ultimoAvanco) return monta(ultimoAvanco.criadoEm, 'AVANCO_DE_FASE')
+  if (ultimoAvanco) return { faseKey: fase, desde: ultimoAvanco.criadoEm.toISOString(), origem: 'AVANCO_DE_FASE' }
 
   if (proc.tipoProcessoMotorId != null) {
     const ordens = await ordensDeFase(proc.tipoProcessoMotorId)
-    const ordemAtual = ordens.get(fase)
+    const ordemDaFase = ordens.get(fase)
     const primeira = ordens.size ? Math.min(...ordens.values()) : null
-    if (ordemAtual != null && primeira != null && ordemAtual === primeira) return monta(proc.dataInicio ?? proc.createdAt, 'CADASTRO_DO_PROCESSO')
+    if (ordemDaFase != null && primeira != null && ordemDaFase === primeira) return { faseKey: fase, desde: (proc.dataInicio ?? proc.createdAt).toISOString(), origem: 'CADASTRO_DO_PROCESSO' }
   }
 
   const instancia = await prisma.phaseWorkflowInstance.findFirst({
     where: { processoId, faseMacroKey: fase }, orderBy: { createdAt: 'desc' }, select: { createdAt: true },
   })
-  if (instancia) return monta(instancia.createdAt, 'INSTANCIA_DA_FASE')
+  if (instancia) return { faseKey: fase, desde: instancia.createdAt.toISOString(), origem: 'INSTANCIA_DA_FASE' }
 
-  return { faseAtual: fase, desde: null, origem: null, dias: null, horas: null }
+  return { faseKey: fase, desde: null, origem: null }
 }
 
 /**

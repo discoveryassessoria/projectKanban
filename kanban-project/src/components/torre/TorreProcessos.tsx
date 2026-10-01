@@ -36,7 +36,7 @@ export function TorreProcessos({ processos, carregando, erro, backlog }: { proce
             <div>
               <b>{p.familiaNome}</b>
               <div className="small">{p.pais ?? "—"} · {p.codigo ?? "—"}</div>
-              <div className="small">{n.abertas} abertas · {n.vencidas} vencidas · {n.comCartorio} com o cartório · {n.semResponsavel} sem responsável</div>
+              <div className="small">{n.abertas} abertas · {n.vencidas} vencidas · {n.comCartorio} aguardando terceiros · {n.semResponsavel} sem responsável</div>
             </div>
             <div>{p.faseAtual.label ?? "—"}</div>
             <div>

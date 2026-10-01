@@ -231,7 +231,7 @@ export async function planoDaR1(agora = new Date(), respeitarR3: boolean): Promi
   for (const it of itens) {
     const tarefaId = it.tarefaId as number
     const s = await sugerirResponsavelPrecisaDeVoce(tarefaId, agora, prisma, jaDistribuido)
-    // Sem sugestão, ou só o FALLBACK (ninguém com aptidão cadastrada): a regra automática não atribui a quem não é apto.
+    // Sem sugestão, ou só o FALLBACK (sem aptidão cadastrada): a regra automática não atribui a quem não é apto.
     if (!s || s.fallback) {
       plano.push({ tarefaId, titulo: it.titulo, paraId: null, paraNome: null, motivo: MOTIVO_SEM_APTO, atribui: false, seguradaPorLimite: false, semApto: true })
       continue
@@ -318,7 +318,7 @@ export async function simularRegra(chave: ChaveRegra, agora = new Date()): Promi
           `${seguradas.length ? `; ${seguradas.length} ficariam seguradas pelo limite de carga` : ''}` +
           `${semApto.length ? `; ${semApto.length} seguradas por falta de apto (continuam em "Precisa de você")` : ''}.`,
       numeros: { semDono: plano.length, atribuiria: atribuiria.length, seguradas: seguradas.length, semApto: semApto.length },
-      itens: plano.map((p) => ({ tarefaId: p.tarefaId, texto: `${p.titulo} → ${p.paraNome ?? 'ninguém'} (${p.motivo})` })),
+      itens: plano.map((p) => ({ tarefaId: p.tarefaId, texto: `${p.titulo} → ${p.paraNome ?? 'Sem responsável'} (${p.motivo})` })),
     }
   }
   if (chave === 'r3') {
@@ -332,7 +332,7 @@ export async function simularRegra(chave: ChaveRegra, agora = new Date()): Promi
       texto: comLimite === 0
         ? 'Nenhuma pessoa tem limite de carga cadastrado (Gerenciamento › Capacidade Operacional) — a regra não teria o que aplicar.'
         : noLimite.length === 0
-          ? `Hoje: ${comLimite} pessoa(s) com limite cadastrado e ninguém no limite — nenhuma atribuição seria segurada.`
+          ? `Hoje: ${comLimite} pessoa(s) com limite cadastrado e nenhuma no limite — nenhuma atribuição seria segurada.`
           : `Hoje: ${noLimite.map((n) => `${n.nome} em ${n.executaveis}/${n.limite}`).join(', ')}. ` +
             `${seguradas.length} tarefa(s) sem dono cairiam em "Precisa de você" em vez de serem atribuídas automaticamente.`,
       numeros: { comLimite, noLimite: noLimite.length, seguradas: seguradas.length },

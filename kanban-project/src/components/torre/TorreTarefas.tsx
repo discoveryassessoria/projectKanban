@@ -34,12 +34,12 @@ type Dentro = "none" | "pessoa" | "orgao" | "passo"
 export type VisaoTarefas = "todas" | "vencidas" | "semdono" | "aguard" | "cobranca" | "acompvenc" | "minhas" | "feito"
 
 const VISOES: Array<[VisaoTarefas, string]> = [
-  ["todas", "Todas as abertas"], ["minhas", "Minhas tarefas"], ["vencidas", "Vencidas"], ["semdono", "Sem responsável"], ["aguard", "Com o cartório"],
+  ["todas", "Todas as abertas"], ["minhas", "Minhas tarefas"], ["vencidas", "Vencidas"], ["semdono", "Sem responsável"], ["aguard", "Aguardando terceiros"],
   ["acompvenc", "Acompanhamentos vencidos"], ["cobranca", "Cobranças a fazer (vencidas)"], ["feito", "Feito"],
 ]
 /** As chaves aceitas em `?visao=` (a Torre valida a URL com esta lista). */
 export const CHAVES_DE_VISAO: string[] = VISOES.map(([v]) => v)
-// "Vencidas", "Sem responsável" e "Com o cartório" usam os MESMOS predicados dos cartões do topo (torre-kpis.ts) — uma definição só.
+// "Vencidas", "Sem responsável" e "Aguardando terceiros" usam os MESMOS predicados dos cartões do topo (torre-kpis.ts) — uma definição só.
 const predicadoDe = (v: VisaoTarefas, usuarioId: number | null, agora: Date = new Date()): ((l: LinhaTorre) => boolean) => {
   switch (v) {
     case "vencidas": return (l) => PREDICADO_DO_KPI.venc!(l, agora)

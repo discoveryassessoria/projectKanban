@@ -160,7 +160,15 @@
    "scripts/gate-avanco-cancelado-e-fora-da-linha.test.ts",
    "scripts/historico-processo-servico.test.ts",
    "scripts/central-certidao-cancelada-continua-na-lista.test.ts",
-   "scripts/historico-processo-puro.test.ts"
+   "scripts/historico-processo-puro.test.ts",
+   "scripts/torre-etapa-a-migrations-e-metas.test.ts",
+   "scripts/torre-pausa-de-processo.test.ts",
+   "scripts/torre-aptidao-por-pais.test.ts",
+   "scripts/torre-inicio-registrado-e-entrada-na-fase.test.ts",
+   "scripts/torre-bola-com.test.ts",
+   "scripts/torre-tendencia-vs-semana.test.ts",
+   "scripts/torre-casca-sete-abas.test.ts",
+   "scripts/torre-vocabulario-oficial.test.ts"
   ]
  },
  "arquivos": [
@@ -302,6 +310,14 @@
   "scripts/hidratacao-torre.test.ts",
   "scripts/historico-processo-servico.test.ts",
   "scripts/central-certidao-cancelada-continua-na-lista.test.ts",
-  "scripts/historico-processo-puro.test.ts"
+  "scripts/historico-processo-puro.test.ts",
+  "scripts/torre-etapa-a-migrations-e-metas.test.ts",
+  "scripts/torre-pausa-de-processo.test.ts",
+  "scripts/torre-aptidao-por-pais.test.ts",
+  "scripts/torre-inicio-registrado-e-entrada-na-fase.test.ts",
+  "scripts/torre-bola-com.test.ts",
+  "scripts/torre-tendencia-vs-semana.test.ts",
+  "scripts/torre-casca-sete-abas.test.ts",
+  "scripts/torre-vocabulario-oficial.test.ts"
  ]
 }

@@ -3,6 +3,7 @@
 // O NÚMERO de cada cartão é `numeroDoKpi` (torre-kpis.ts): o tamanho da lista que o clique filtra na aba Tarefas (mesmo predicado).
 // "Processos ativos" (e o selo "N em risco") vêm da aba Processos. A tendência (▲/▼ vs semana passada) só existe quando há
 // foto de 7 dias E a definição do cartão é a mesma da foto; sem isso o cartão não mostra nada (nenhum texto de ausência).
+// Torre nova (M4): Tarefas abertas · Com a equipe · Aguardando terceiros também têm foto (colunas novas, só de hoje em diante).
 import { KPI_POR_CHAVE, CAMPO_DA_FOTO, tendenciaDe, numeroDoKpi, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, emRiscoCritico, type ChaveKpi } from "@/lib/operacional/torre-kpis"
 import { fraseDoDia, distribuicaoPorFase, type LinhaParaTopo } from "@/lib/operacional/torre-topo"
 import type { ProcessoDaTorre } from "./tipos-processos"
@@ -10,6 +11,8 @@ import type { ProcessoDaTorre } from "./tipos-processos"
 export interface FotoDoDia {
   data: string; vencidas: number; vencemEm7Dias: number; semDono: number; aguardandoTerceiro: number
   cobrancasPendentes: number; escaladas: number; emRisco: number; backlogAbertas: number; backlogFechadasNaSemana: number
+  /** Torre nova (M4): `null` = foto anterior à M4 (sem o número → sem tendência, nunca estimativa). */
+  processosAtivos?: number | null; tarefasAbertas?: number | null; comEquipe?: number | null; comCartorio?: number | null
 }
 export interface Tendencias { backlog: { abertas: number; fechadas: number }; referencia: FotoDoDia | null; fotosNaSerie: number }
 
@@ -20,7 +23,7 @@ export function TorreKpis({ linhas, processos, agora, tend, ativo, filtrandoPais
   const tendencia = (k: ChaveKpi, n: number) => {
     const campo = CAMPO_DA_FOTO[k]
     if (filtrandoPais || !campo || !tend?.referencia) return null
-    return tendenciaDe(n, tend.referencia[campo])
+    return tendenciaDe(n, tend.referencia[campo])   // `null` na foto antiga (anterior à M4) → sem tendência
   }
   const cartao = (k: ChaveKpi) => {
     const def = KPI_POR_CHAVE[k]

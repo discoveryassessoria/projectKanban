@@ -19,7 +19,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
-import { lerOrganizacao, capacidadeMedidaPorUsuario, unidadesDasTarefas, unidadesComAptidaoDeclarada, type Indisponibilidade } from './organizacao'
+import { lerOrganizacao, capacidadeMedidaPorUsuario, unidadesDasTarefas, unidadesComAptidaoDeclarada, paisesDasTarefas, paisesComAptidaoDeclarada, type Indisponibilidade } from './organizacao'
 import { sugerirSucessor } from './elegibilidade'
 import { redistribuirTarefas } from './tarefa-comandos'
 import { cargaPorPessoa, faixaDaCarga, faixaDaFila, nivelDaPrevisao, type FaixaDaCarga, type FaixaDaFila } from './torre-predicados'
@@ -34,6 +34,8 @@ export interface LinhaDaEquipe {
   nome: string
   papel: string
   aptidoes: string[]
+  /** APTIDÃO POR PAÍS (Torre nova, M3): os países em que a pessoa é apta ("apto em Itália"). Vazio = sem aptidão por país cadastrada. */
+  aptidoesPais: string[]
   ausencia: (Indisponibilidade & { rotulo: string }) | null
   carga: {
     executaveis: number
@@ -140,6 +142,7 @@ export async function quadroDaEquipe(
       usuarioId: u.id, nome: u.nome,
       papel: u.perfil?.nome ?? (u.tipo === 'admin' ? 'Administrador' : u.tipo),
       aptidoes: (org?.aptidoesDetalhadas ?? []).map((a) => a.nome),
+      aptidoesPais: (org?.paisesAptosDetalhados ?? []).map((p) => p.nome),
       ausencia: ind ? { ...ind, rotulo: ROTULO_AUSENCIA[ind.tipo] ?? ind.tipo } : null,
       carga: { executaveis: c.executaveis, limite, pct, faixa: pct != null ? faixaDaCarga(pct) : null, fechaPorSemana: m.mediaSemanal },
       ativas: c.ativas, atrasadas: c.atrasadas, aguardando: c.aguardando,
@@ -207,10 +210,10 @@ export interface SimulacaoDeSaida {
   usuarioId: number
   nome: string
   dias: number
-  /** O sucessor que a regra SUGERE (E2). `null` = ninguém apto e disponível. */
+  /** O sucessor que a regra SUGERE (E2). `null` = sem apto disponível. */
   sucessor: { usuarioId: number; nome: string } | null
   ativas: number
-  /** Continuam com o cartório correndo: não dependem de ninguém agora. */
+  /** Aguardando terceiros: continuam correndo e não dependem da pessoa agora. */
   comOCartorio: number
   /** Vencem dentro do período da saída. */
   vencemNoPeriodo: number
@@ -230,11 +233,16 @@ export interface SimulacaoDeSaida {
  */
 async function quemAbsorve(tarefaIds: number[], sucessorId: number | null, agora: Date): Promise<Set<number>> {
   if (sucessorId == null || tarefaIds.length === 0) return new Set()
-  const [unidades, comAptidao, org] = await Promise.all([unidadesDasTarefas(tarefaIds), unidadesComAptidaoDeclarada(), lerOrganizacao(agora)])
+  const [unidades, comAptidao, org, paises, paisesComApt] = await Promise.all([
+    unidadesDasTarefas(tarefaIds), unidadesComAptidaoDeclarada(), lerOrganizacao(agora), paisesDasTarefas(tarefaIds), paisesComAptidaoDeclarada(),
+  ])
   const aptoA = new Set(org.get(sucessorId)?.aptidoes ?? [])
+  const aptoNosPaises = new Set(org.get(sucessorId)?.paisesAptos ?? [])
   return new Set(tarefaIds.filter((id) => {
     const u = unidades.get(id) ?? null
-    return u == null || !comAptidao.has(u) || aptoA.has(u)
+    const p = paises.get(id) ?? null
+    // As duas aptidões são opt-in e SOMAM: só restringe onde já existe regra (unidade ou país com apto declarado).
+    return (u == null || !comAptidao.has(u) || aptoA.has(u)) && (p == null || !paisesComApt.has(p) || aptoNosPaises.has(p))
   }))
 }
 
@@ -255,7 +263,7 @@ export async function simularSaida(
 
   const texto = minhas.length === 0
     ? 'Sem impacto: nenhuma tarefa ativa.'
-    : `Ficam sem dono ${minhas.length} tarefa(s); ${comOCartorio.length} com o cartório continuam correndo. Vencem no período: ${vencem.length}. ` +
+    : `Ficam sem dono ${minhas.length} tarefa(s); ${comOCartorio.length} aguardando terceiros continuam correndo. Vencem no período: ${vencem.length}. ` +
       (sucessor
         ? `${sucessor.nome} (sucessor sugerido) absorve ${absorvidas}; sobram ${semApto} sem apto disponível.`
         : 'Nenhum sucessor apto e disponível — as ' + minhas.length + ' ficam sem dono até alguém decidir.')

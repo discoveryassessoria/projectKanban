@@ -20,7 +20,7 @@ const TIPOS_AUSENCIA: Array<[string, string]> = [["FERIAS", "Férias"], ["AFASTA
 const PILL_FILA = { vermelho: "red", ambar: "amb", livre: "grn", sem_base: "gry" } as const
 const curto = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })
 
-export function TorreEquipe({ versao }: { versao: number }) {
+export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: string }) {
   const { permissoes, avisar, recarregar } = useTorre()
   const [dados, setDados] = useState<{ pessoas: Pessoa[]; previsao: Previsao } | null>(null)
   const [erro, setErro] = useState<string | null>(null)
@@ -35,12 +35,13 @@ export function TorreEquipe({ versao }: { versao: number }) {
   useEffect(() => {
     if (!permitido) return
     let vivo = true
-    void api<{ pessoas: Pessoa[]; previsao: Previsao }>("/api/torre/equipe").then((r) => {
+    // O PAÍS DO CABEÇALHO FILTRA os números (carga, atrasadas, previsão): o servidor recorta as linhas por país antes de somar.
+    void api<{ pessoas: Pessoa[]; previsao: Previsao }>(`/api/torre/equipe${pais ? `?pais=${encodeURIComponent(pais)}` : ""}`).then((r) => {
       if (!vivo) return
       if (r.ok) { setDados(r.data); setErro(null) } else setErro(erroDe(r.data, "Não foi possível carregar a equipe."))
     })
     return () => { vivo = false }
-  }, [tick, versao, permitido])
+  }, [tick, versao, permitido, pais])
   const atualizar = () => { setTick((n) => n + 1); recarregar() }
 
   if (!permitido) return <div className="tor-card pad">A aba Equipe exige a permissão de gerenciar usuários e acessos (<code>usuarios.gerenciar</code>).</div>

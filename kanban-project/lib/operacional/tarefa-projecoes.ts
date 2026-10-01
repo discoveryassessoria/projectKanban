@@ -1852,6 +1852,13 @@ export interface LinhaGerencial extends LinhaDeFila {
   motivoBloqueio: string | null
   concluidaEm: string | null
   /**
+   * QUANDO A TAREFA FOI INICIADA (`Tarefa.dataInicio`) — Torre nova, Etapa A (01/10/2026). Só de registro REAL, gravado
+   * "daqui para frente" pela porta de início/primeira entrega do passo: tarefa antiga (ou nunca iniciada) = `null`, e a
+   * tela mostra "—"/"não iniciou". NUNCA preenchido por suposição (nem a partir de `SubtaskExecution.startedAt`, que
+   * é o instante da conclusão da subtarefa, não do início do trabalho).
+   */
+  iniciouEm: string | null
+  /**
    * QUANTAS VEZES o prazo desta Tarefa já foi repactuado (Torre de
    * Controle, Bloco D — correção 29/09/2026: a Torre precisa enxergar
    * repactuação sem abrir o drawer). Conta `LogAuditoria` com
@@ -2420,7 +2427,7 @@ const SELECT_ESCALAR_GERENCIAL = {
 type EscalarGerencial = Prisma.TarefaGetPayload<{ select: typeof SELECT_ESCALAR_GERENCIAL }>
 
 /** O que a Torre precisa por linha e a projeção (JSON) não carrega: o órgão e a fase em que o processo está. */
-export interface ExtraDaLinha { orgaoId: number | null; faseAtualKey: string | null }
+export interface ExtraDaLinha { orgaoId: number | null; faseAtualKey: string | null; /** `Tarefa.workflowStepInstanceId` — de onde a Torre lê a subtarefa em espera (bola com). */ passoId: number | null }
 
 const unicos = <T,>(xs: Array<T | null | undefined>): T[] => [...new Set(xs.filter((x): x is T => x != null))]
 
@@ -2531,7 +2538,7 @@ async function carregarBrutas(
     const uniao = nec?.uniaoId != null ? uniaoPorId.get(nec.uniaoId) ?? null : null
     const passo = workflowStepInstanceId != null ? passoPorId.get(workflowStepInstanceId) ?? null : null
     const doc = e.documentoId != null ? documentoPorId.get(e.documentoId) ?? null : null
-    extras.set(e.id, { orgaoId: orgaoId ?? doc?.orgaoId ?? null, faseAtualKey: proc?.faseAtualKey ?? null })
+    extras.set(e.id, { orgaoId: orgaoId ?? doc?.orgaoId ?? null, faseAtualKey: proc?.faseAtualKey ?? null, passoId: workflowStepInstanceId ?? null })
     return {
       ...resto,
       processo: proc ? {
@@ -2590,6 +2597,7 @@ async function enriquecerEscalares(
   const { brutas, ordensPorTipo, extras, proximaFasePorProcesso } = carga
   const [rotulos, subtarefas] = await Promise.all([rotulosDosPassos(brutas, db, cache), progressoPorSubtarefa(brutas, db, cache)])
   const hoje = diaOperacional(agora)
+  const iniciouEmPorTarefa = new Map(esc.map((t) => [t.id, t.dataInicio?.toISOString() ?? null]))
 
   const linhas = brutas.map((t): LinhaGerencial => {
     const base = projetar(t, agora, nomes, rotulos, totais, subtarefas, linhagem)
@@ -2610,6 +2618,7 @@ async function enriquecerEscalares(
       esperandoHaDias: esperando && espera ? Math.floor((agora.getTime() - espera.getTime()) / 86400000) : null,
       motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? parada?.motivo ?? null : null,
       concluidaEm: t.dataConclusao?.toISOString() ?? null,
+      iniciouEm: iniciouEmPorTarefa.get(t.id) ?? null,
       repactuacoes: repactuacao?.total ?? 0,
       ultimaRepactuacao: repactuacao?.ultima ?? null,
       proximaFaseDoProcessoLabel: t.processoId != null ? labelDaFasePorPhaseKey(proximaFasePorProcesso.get(t.processoId)) : null,

@@ -15,9 +15,14 @@ import { labelDaFasePorPhaseKey } from '@/src/lib/process-stage/fases-catalog'
 import { ordensDeFase } from '@/src/services/documento-operacao'
 import { listarTarefasDaTorre, type LinhaDaTorre } from '@/src/services/torre-tarefas'
 import { itensPrecisaDeVoce, faixaDoScore } from './precisa-de-voce'
+import { BOLA_NOSSA, BOLA_CLIENTE, BOLA_PADRAO_DO_TERCEIRO, VALORES_DE_BOLA, type BolaCom } from './torre-bola'
 import { progressoRealDoProcesso, diasNaFaseAtual, proximoMarco } from './metricas-processo'
+import { ONDE_PROCESSO_NAO_PAUSADO } from '@/src/services/processo-pausa'
 
 export type RiscoDoProcesso = 'ok' | 'atencao' | 'critico'
+
+/** "Processo ativo na Torre" = não concluído e não pausado. UMA definição: a lista (Radar/Processos) e a foto diária (`processosAtivos`) leem esta. */
+export const ONDE_PROCESSO_ATIVO_DA_TORRE = { dataConclusao: null, ...ONDE_PROCESSO_NAO_PAUSADO } as const
 
 export interface ColunaDoRadar { key: string; label: string; condicional: boolean }
 
@@ -52,16 +57,27 @@ export interface ProcessoDaTorre {
   celulas: CelulaDoRadar[]
 }
 
-/** DE QUEM É A BOLA no processo — a mesma leitura das linhas: cartório, cliente ou nossa. */
-export function bolaDoProcesso(linhas: Array<Pick<LinhaDaTorre, 'estadoOperacao' | 'esperandoDe' | 'esperandoHaDias'>>): { rotulo: string; dias: number | null } {
-  if (linhas.length === 0) return { rotulo: 'Nossa', dias: null }
-  const esperandoTerceiro = linhas.filter((l) => l.esperandoDe === 'terceiro')
-  const esperandoCliente = linhas.filter((l) => l.esperandoDe === 'cliente')
+/**
+ * DE QUEM É A BOLA no processo — a MESMA função de bola da tarefa (`torre-bola.ts`), agregada pela regra do protótipo:
+ * metade ou mais das tarefas abertas esperando TERCEIRO (cartório, tradutor, juízo, consulado) → a bola é do terceiro dominante
+ * (o mais frequente; empate pela ordem de `VALORES_DE_BOLA`); senão metade ou mais esperando o CLIENTE → Cliente; senão Nossa.
+ * Linha SEM `bolaCom` (leitor antigo) cai no critério de antes: `esperandoDe` → Cartório / Cliente / Nossa.
+ */
+export function bolaDoProcesso(linhas: Array<Pick<LinhaDaTorre, 'estadoOperacao' | 'esperandoDe' | 'esperandoHaDias'> & { bolaCom?: BolaCom }>): { rotulo: string; dias: number | null } {
+  if (linhas.length === 0) return { rotulo: BOLA_NOSSA, dias: null }
   const maxDias = (ls: typeof linhas) => { const d = ls.map((l) => l.esperandoHaDias).filter((x): x is number => x != null); return d.length ? Math.max(...d) : null }
-  // Metade ou mais das tarefas abertas esperando o terceiro: a bola está com o cartório (a regra do protótipo).
-  if (esperandoTerceiro.length * 2 >= linhas.length) return { rotulo: 'Cartório', dias: maxDias(esperandoTerceiro) }
-  if (esperandoCliente.length * 2 >= linhas.length) return { rotulo: 'Cliente', dias: maxDias(esperandoCliente) }
-  return { rotulo: 'Nossa', dias: null }
+  const bolaDe = (l: (typeof linhas)[number]): BolaCom =>
+    l.bolaCom ?? (l.esperandoDe === 'terceiro' ? BOLA_PADRAO_DO_TERCEIRO : l.esperandoDe === 'cliente' ? BOLA_CLIENTE : BOLA_NOSSA)
+  const comTerceiro = linhas.filter((l) => { const b = bolaDe(l); return b !== BOLA_NOSSA && b !== BOLA_CLIENTE })
+  const comCliente = linhas.filter((l) => bolaDe(l) === BOLA_CLIENTE)
+  if (comTerceiro.length * 2 >= linhas.length) {
+    const por = new Map<BolaCom, number>()
+    for (const l of comTerceiro) por.set(bolaDe(l), (por.get(bolaDe(l)) ?? 0) + 1)
+    const dominante = VALORES_DE_BOLA.filter((v) => por.has(v)).sort((a, b) => (por.get(b) ?? 0) - (por.get(a) ?? 0))[0]
+    return { rotulo: dominante, dias: maxDias(comTerceiro) }
+  }
+  if (comCliente.length * 2 >= linhas.length) return { rotulo: BOLA_CLIENTE, dias: maxDias(comCliente) }
+  return { rotulo: BOLA_NOSSA, dias: null }
 }
 
 export async function fasesDoRadar(): Promise<ColunaDoRadar[]> {
@@ -101,7 +117,8 @@ export async function processosDaTorre(agora = new Date(), linhasEntrada?: Linha
     fasesSemPassos(agora),
   ])
   const procs = await prisma.processo.findMany({
-    where: { dataConclusao: null },
+    // PROCESSO ATIVO DA TORRE: não concluído E não pausado (filtro canônico — o mesmo de `listarTarefasDaTorre`).
+    where: ONDE_PROCESSO_ATIVO_DA_TORRE,
     orderBy: { id: 'asc' }, take: 300,
     select: { id: true, nome: true, codigo: true, faseAtualKey: true, tipoProcessoMotorId: true, familiaId: true, familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } } },
   })

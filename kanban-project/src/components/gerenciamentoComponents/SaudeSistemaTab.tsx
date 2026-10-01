@@ -15,6 +15,7 @@ import "@/src/components/torre/torre.css"
 import { SaudeRegras } from "./saude/SaudeRegras"
 import { SaudeIntegridade } from "./saude/SaudeIntegridade"
 import { SaudeAuditoria } from "./saude/SaudeAuditoria"
+import { SaudeMetas } from "./saude/SaudeMetas"
 
 type Estado = "SAUDAVEL" | "ATENCAO" | "DEGRADADO" | "CRITICO" | "DIAGNOSTICO_INCOMPLETO" | "INDISPONIVEL"
 type Severidade = "CRITICO" | "ERRO" | "ALERTA" | "INFORMATIVO"
@@ -725,12 +726,13 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
 // ─── SUB-ABAS (01/10/2026): Saúde · Regras · Integridade · Auditoria ─────────────────────────────────────────────────
 // Regras, Integridade e Auditoria saíram da Torre (que serve só à gestão de processo) e moram aqui, com o MESMO motor e as
 // MESMAS portas (/api/torre/regras, /integridade, /auditoria — permissão do Gerenciamento, `usuarios.gerenciar`; a Auditoria
-// é só de administrador). Deep-link: `?screen=syshealth&sub=regras|integridade|auditoria`.
-type SubAba = "saude" | "regras" | "integridade" | "auditoria"
+// é só de administrador). Deep-link: `?screen=syshealth&sub=regras|integridade|auditoria|metas`.
+// METAS (Torre nova, 01/10/2026): "Metas de tempo por fase e por país" — só exibição, nunca prazo (`/api/torre/metas`).
+type SubAba = "saude" | "regras" | "integridade" | "auditoria" | "metas"
 function subAbaDaUrl(): SubAba {
   try {
     const v = new URLSearchParams(window.location.search).get("sub")
-    return v === "regras" || v === "integridade" || v === "auditoria" ? v : "saude"
+    return v === "regras" || v === "integridade" || v === "auditoria" || v === "metas" ? v : "saude"
   } catch { return "saude" }
 }
 
@@ -738,7 +740,7 @@ export function SaudeSistemaTab() {
   const { isAdmin, carregando } = usePermissoes()
   const [sub, setSub] = useState<SubAba>(subAbaDaUrl)
   const [versao] = useState(0)
-  const subs: Array<[SubAba, string]> = [["saude", "Saúde"], ["regras", "Regras"], ["integridade", "Integridade"], ...(isAdmin ? [["auditoria", "Auditoria"] as [SubAba, string]] : [])]
+  const subs: Array<[SubAba, string]> = [["saude", "Saúde"], ["regras", "Regras"], ["integridade", "Integridade"], ["metas", "Metas de tempo"], ...(isAdmin ? [["auditoria", "Auditoria"] as [SubAba, string]] : [])]
   const ativa: SubAba = sub === "auditoria" && !isAdmin && !carregando ? "saude" : sub
   return (
     <div className="space-y-4">
@@ -754,6 +756,7 @@ export function SaudeSistemaTab() {
           <div className="tor">
             {ativa === "regras" && <SaudeRegras versao={versao} />}
             {ativa === "integridade" && <SaudeIntegridade />}
+            {ativa === "metas" && <SaudeMetas />}
             {ativa === "auditoria" && (isAdmin ? <SaudeAuditoria /> : <div className="tor-card pad">A auditoria é só para administradores.</div>)}
           </div>
         </TorreProvider>

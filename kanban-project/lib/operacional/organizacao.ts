@@ -85,6 +85,12 @@ export interface OrganizacaoDoUsuario {
   aptidoes: number[]
   /** As mesmas, com nome e família — para a tela e para a explicação. */
   aptidoesDetalhadas: UnidadeOperacional[]
+  /**
+   * APTIDÃO POR PAÍS (Torre nova, M3): os países (ids de `CatalogoPais`) em que esta pessoa foi declarada apta — "apto em
+   * Itália". Soma-se à aptidão por unidade de trabalho; nunca a substitui nem concede permissão.
+   */
+  paisesAptos: number[]
+  paisesAptosDetalhados: Array<{ paisId: number; nome: string }>
   /** A indisponibilidade VIGENTE agora, se houver. */
   indisponivelPor: Indisponibilidade | null
   /** Todas, para a tela de gestão — inclusive as encerradas. */
@@ -114,7 +120,7 @@ export function vigenteEm(i: { inicio: Date; fim: Date | null }, agora: Date): b
  * seria N×M idas ao banco.
  */
 export async function lerOrganizacao(agora = new Date()): Promise<Map<number, OrganizacaoDoUsuario>> {
-  const [usuarios, grupos, aptidoes, indisponibilidades, capacidades] = await Promise.all([
+  const [usuarios, grupos, aptidoes, indisponibilidades, capacidades, aptidoesPais] = await Promise.all([
     prisma.usuario.findMany({ select: { id: true, nome: true }, orderBy: { id: 'asc' } }),
     prisma.grupoUsuario.findMany({
       where: { ativo: true },
@@ -134,12 +140,13 @@ export async function lerOrganizacao(agora = new Date()): Promise<Map<number, Or
       orderBy: { inicio: 'desc' },
     }),
     prisma.capacidadeOperacional.findMany({ select: { usuarioId: true, limiteExecutaveis: true, observacao: true } }),
+    prisma.aptidaoOperacionalPais.findMany({ select: { usuarioId: true, paisId: true, pais: { select: { countryLabel: true } } }, orderBy: { paisId: 'asc' } }),
   ])
 
   const mapa = new Map<number, OrganizacaoDoUsuario>()
   for (const u of usuarios) {
     mapa.set(u.id, {
-      usuarioId: u.id, nome: u.nome, equipes: [], aptidoes: [], aptidoesDetalhadas: [],
+      usuarioId: u.id, nome: u.nome, equipes: [], aptidoes: [], aptidoesDetalhadas: [], paisesAptos: [], paisesAptosDetalhados: [],
       indisponivelPor: null, indisponibilidades: [], limiteExecutaveis: null, observacaoCapacidade: null,
     })
   }
@@ -158,6 +165,12 @@ export async function lerOrganizacao(agora = new Date()): Promise<Map<number, Or
       nome: a.perfilOperacional.name,
       familia: a.perfilOperacional.familiaDocumental?.name ?? null,
     })
+  }
+  for (const a of aptidoesPais) {
+    const o = mapa.get(a.usuarioId)
+    if (!o) continue
+    o.paisesAptos.push(a.paisId)
+    o.paisesAptosDetalhados.push({ paisId: a.paisId, nome: a.pais.countryLabel })
   }
   for (const i of indisponibilidades) {
     const o = mapa.get(i.usuarioId)
@@ -190,7 +203,67 @@ export async function unidadesComAptidaoDeclarada(): Promise<Set<number>> {
   return new Set(linhas.map((l) => l.perfilOperacionalId))
 }
 
+/**
+ * OS PAÍSES QUE JÁ TÊM APTIDÃO DECLARADA (Torre nova, M3) — a mesma política opt-in da aptidão por unidade: país em que
+ * ninguém foi declarado apto NÃO restringe (criar a tabela vazia não pode tornar toda tarefa inelegível); assim que alguém
+ * for, só os declarados passam naquele país. Sem nenhum cadastro, a Torre diz "sem aptidão cadastrada" e NUNCA atribui
+ * automaticamente (a r1 só atribui a apto comprovado).
+ */
+export async function paisesComAptidaoDeclarada(): Promise<Set<number>> {
+  const linhas = await prisma.aptidaoOperacionalPais.groupBy({ by: ['paisId'] })
+  return new Set(linhas.map((l) => l.paisId))
+}
+
+/**
+ * O PAÍS DE CADA TAREFA (`Processo.paisId`) — derivado, nunca copiado para a Tarefa (mesma lógica de `unidadesDasTarefas`).
+ * Tarefa sem processo (avulsa) ou processo sem país = `null`: o critério de país simplesmente não se aplica a ela.
+ */
+export async function paisesDasTarefas(tarefaIds: number[]): Promise<Map<number, number | null>> {
+  const fora = new Map<number, number | null>()
+  if (tarefaIds.length === 0) return fora
+  const tarefas = await prisma.tarefa.findMany({ where: { id: { in: tarefaIds } }, select: { id: true, processo: { select: { paisId: true } } } })
+  for (const t of tarefas) fora.set(t.id, t.processo?.paisId ?? null)
+  return fora
+}
+
 // ─── ESCRITA (cadastro, não runtime) ────────────────────────────────────────
+
+/**
+ * Declara os países em que uma pessoa é APTA — a lista inteira (sem sobra), na mesma transação do histórico em
+ * `LogAuditoria` (quem, o quê, quando; só grava quando algo mudou). Recusa país inexistente ou inativo.
+ */
+export async function definirAptidoesPais(
+  usuarioId: number, paisIds: number[], autorId: number,
+): Promise<{ ok: true; adicionados: number[]; removidos: number[] } | { ok: false; erro: string }> {
+  const ids = [...new Set(paisIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b)
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId }, select: { id: true, nome: true } })
+  if (!usuario) return { ok: false, erro: 'usuário não encontrado' }
+  const validos = await prisma.catalogoPais.findMany({ where: { id: { in: ids }, ativo: true }, select: { id: true, countryLabel: true } })
+  const rotulo = new Map(validos.map((p) => [p.id, p.countryLabel]))
+  const invalidos = ids.filter((i) => !rotulo.has(i))
+  if (invalidos.length) return { ok: false, erro: `país(es) inexistente(s) ou inativo(s): ${invalidos.join(', ')}` }
+
+  return prisma.$transaction(async (tx) => {
+    const atuais = await tx.aptidaoOperacionalPais.findMany({ where: { usuarioId }, select: { paisId: true, pais: { select: { countryLabel: true } } } })
+    const tinha = new Set(atuais.map((a) => a.paisId))
+    const adicionados = ids.filter((i) => !tinha.has(i))
+    const removidos = [...tinha].filter((i) => !ids.includes(i)).sort((a, b) => a - b)
+    if (removidos.length) await tx.aptidaoOperacionalPais.deleteMany({ where: { usuarioId, paisId: { in: removidos } } })
+    for (const paisId of adicionados) await tx.aptidaoOperacionalPais.create({ data: { usuarioId, paisId, criadoPorId: autorId } })
+    if (adicionados.length || removidos.length) {
+      const nomeDe = (id: number) => rotulo.get(id) ?? atuais.find((a) => a.paisId === id)?.pais.countryLabel ?? `#${id}`
+      await tx.logAuditoria.create({
+        data: {
+          acao: 'APTIDAO_PAIS_ALTERADA', entidade: 'Usuario', entidadeId: usuarioId, usuarioId: autorId,
+          descricao: `Aptidão por país de ${usuario.nome}: ${adicionados.length ? `apto em ${adicionados.map(nomeDe).join(', ')}` : ''}` +
+            `${adicionados.length && removidos.length ? '; ' : ''}${removidos.length ? `deixou de ser apto em ${removidos.map(nomeDe).join(', ')}` : ''}.`,
+          detalhes: { adicionados, removidos, ficou: ids },
+        },
+      })
+    }
+    return { ok: true as const, adicionados, removidos }
+  })
+}
 
 /** Declara as aptidões de uma pessoa — a lista inteira, para não deixar sobra. */
 export async function definirAptidoes(

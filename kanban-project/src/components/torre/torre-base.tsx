@@ -17,7 +17,7 @@ export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO"; tarefaI
 export interface RespostaApi<T = Record<string, unknown>> { status: number; ok: boolean; data: T }
 
 /** Uma chamada às portas — devolve sempre o corpo (mesmo em erro), nunca lança. */
-export async function api<T = Record<string, unknown>>(url: string, metodo: "GET" | "POST" | "PATCH" | "DELETE" = "GET", corpo?: unknown): Promise<RespostaApi<T>> {
+export async function api<T = Record<string, unknown>>(url: string, metodo: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" = "GET", corpo?: unknown): Promise<RespostaApi<T>> {
   try {
     const r = await fetch(url, { method: metodo, headers: auth(), ...(corpo !== undefined ? { body: JSON.stringify(corpo) } : {}) })
     const data = (await r.json().catch(() => ({}))) as T

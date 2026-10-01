@@ -1,8 +1,20 @@
 // Tipos da Torre no cliente — espelho de `LinhaDaTorre` (src/services/torre-tarefas.ts) em JSON.
 import type { LinhaOperacaoV3 } from "@/src/components/operacao/operacao-v3-tipos"
 import { nivelDeRisco } from "@/lib/operacional/torre-filtros"
+import type { CamposDaBola } from "@/lib/operacional/torre-bola"
 
-export interface LinhaTorre extends LinhaOperacaoV3 {
+/**
+ * A linha da Torre no cliente. Campos ADITIVOS da Torre nova (Etapa A, 01/10/2026) — nomes EXATOS para as telas:
+ *   `iniciouEm`            ISO de quando a tarefa foi iniciada (só de registro real; `null` = "—"/"não iniciou");
+ *   `bolaCom`              Nossa · Cartório · Cliente · Tradutor · Juízo · Consulado (função única `torre-bola.ts`);
+ *   `bolaDesde`            ISO do início da espera atual (`null` = sem registro, "—");
+ *   `categoriaTerceiro`    o rótulo de terceiro do órgão da tarefa (`null` = a tarefa não tem órgão);
+ *   `pedidaEm`             ISO do pedido (SolicitacaoDocumento.dataEnvio) — `null` = sem registro;
+ *   `cobrarEm`             ISO de quando cobrar (acompanhamento registrado, ou o padrão de 7 dias) — `null` = nada a cobrar;
+ *   `cobrarEmPadrao`       `true` = `cobrarEm` é o padrão de 7 dias, não uma data registrada.
+ */
+export interface LinhaTorre extends LinhaOperacaoV3, CamposDaBola {
+  iniciouEm: string | null
   orgaoId: number | null
   faseAtualKey: string | null
   podeIniciar: boolean
@@ -19,7 +31,7 @@ export function bolaDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
   if (l.esperandoDe === "cliente") return { txt: "Cliente", cls: "amb" }
   if (l.statusTarefa === "BLOQUEADA") return { txt: "Bloqueada", cls: "red" }
   if (l.responsavelNome) return { txt: l.responsavelNome, cls: "blu" }
-  return { txt: "Ninguém", cls: "red" }
+  return { txt: "Sem responsável", cls: "red" }
 }
 
 /** RISCO — derivado dos indicadores que a Operação já calcula (nada recalculado). */

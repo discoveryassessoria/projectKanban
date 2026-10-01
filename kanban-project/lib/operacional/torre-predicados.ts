@@ -34,7 +34,7 @@ export interface CargaDaPessoa {
   /** Ativas que dependem DELA agora — fora as que esperam terceiro/cliente e as bloqueadas (a conta que o limite do cadastro governa). */
   executaveis: number
   atrasadas: number
-  /** "Aguard." — as que estão com o cartório (`estadoOperacao: AGUARDANDO`, o "Com o cartório" da Operação). */
+  /** "Aguard." — as que estão com o cartório (`estadoOperacao: AGUARDANDO`, o "Aguardando terceiros" da Torre). */
   aguardando: number
 }
 

@@ -67,13 +67,13 @@ export function diasAtePrazo(l: Pick<LinhaParaKpi, 'dataPrazo'>, agora: Date): n
   return Number.isNaN(prazo.getTime()) ? null : diasEntreDiasOperacionais(prazo, agora)
 }
 
-// ─── A PARTIÇÃO DA SITUAÇÃO — Com a equipe + Com o cartório + Sem ninguém = Tarefas abertas ────────────────────────
+// ─── A PARTIÇÃO DA SITUAÇÃO — Com a equipe + Aguardando terceiros + Sem responsável = Tarefas abertas ────────────────
 export type SituacaoDaTarefa = 'ninguem' | 'cartorio' | 'equipe'
 /**
  * PRECEDÊNCIA da partição (a primeira regra que casa vence):
- *   1. `ninguem`  — a tarefa NÃO tem responsável (mesmo que esteja aguardando o cartório: o acompanhamento dela não é de ninguém,
- *                   e é exatamente o que o administrador precisa ver);
- *   2. `cartorio` — tem responsável e `estadoOperacao = AGUARDANDO` (a bola está com o terceiro);
+ *   1. `ninguem`  — a tarefa NÃO tem responsável ("Sem responsável"; mesmo que esteja aguardando um terceiro: o acompanhamento dela
+ *                   não é de ninguém da equipe, e é exatamente o que o administrador precisa ver);
+ *   2. `cartorio` — "Aguardando terceiros": tem responsável e `estadoOperacao = AGUARDANDO` (a bola está com o terceiro);
  *   3. `equipe`   — o resto: tem responsável e a bola é nossa.
  * Cada tarefa cai em UM e só um dos três; por isso os três somam "Tarefas abertas".
  */
@@ -114,11 +114,11 @@ export const KPIS: DefinicaoDeKpi[] = [
   { chave: 'abertas', rotulo: 'Tarefas abertas', cor: 'blu', filtra: false, grupo: 'situacao',
     regra: 'Toda tarefa que a aba Tarefas lista: aberta (não concluída, não cancelada) e que não seja de fase futura do processo.' },
   { chave: 'equipe', rotulo: 'Com a equipe', cor: 'blu', filtra: true, grupo: 'situacao',
-    regra: 'Aberta, com responsável e com a bola nossa (não está aguardando o cartório). É o que sobra depois de "Sem ninguém" e "Com o cartório".' },
-  { chave: 'cartorio', rotulo: 'Com o cartório', cor: 'blu', filtra: true, grupo: 'situacao',
-    regra: 'Aberta, COM responsável, e aguardando o terceiro (estadoOperacao = AGUARDANDO). Aguardando e sem responsável conta em "Sem ninguém".' },
-  { chave: 'ninguem', rotulo: 'Sem ninguém', cor: 'red', filtra: true, grupo: 'situacao',
-    regra: 'Aberta e sem responsável — tem precedência sobre "Com o cartório": tarefa sem dono aguardando o cartório também é "Sem ninguém".' },
+    regra: 'Aberta, com responsável e com a bola nossa (não está aguardando terceiros). É o que sobra depois de "Sem responsável" e "Aguardando terceiros".' },
+  { chave: 'cartorio', rotulo: 'Aguardando terceiros', cor: 'blu', filtra: true, grupo: 'situacao',
+    regra: 'Aberta, COM responsável, e aguardando um terceiro — cartório, cliente, tradutor, juízo ou consulado (estadoOperacao = AGUARDANDO). Aguardando e sem responsável conta em "Sem responsável".' },
+  { chave: 'ninguem', rotulo: 'Sem responsável', cor: 'red', filtra: true, grupo: 'situacao',
+    regra: 'Aberta e sem responsável — tem precedência sobre "Aguardando terceiros": tarefa sem responsável que aguarda um terceiro também é "Sem responsável".' },
   { chave: 'venc', rotulo: 'Atrasadas', cor: 'red', filtra: true, grupo: 'agenda',
     regra: 'Prazo anterior a hoje (dia operacional, fuso America/Sao_Paulo). O prazo nunca pausa por causa de terceiro.' },
   { chave: 'hoje', rotulo: 'Vence hoje', cor: 'amb', filtra: true, grupo: 'agenda',
@@ -135,8 +135,8 @@ export const KPIS: DefinicaoDeKpi[] = [
     regra: 'Processos de risco CRÍTICO: score 6 ou mais no "Precisa de você" (o mesmo do Radar e da aba Processos).' },
   // ── legadas ──
   { chave: 'v7', rotulo: 'Vencem em 7 dias', cor: 'amb', filtra: true, grupo: 'legado', regra: 'Legado: prazo de hoje a 7 dias, sem as atrasadas.' },
-  { chave: 'semdono', rotulo: 'Sem responsável', cor: 'red', filtra: true, grupo: 'legado', regra: 'Legado: tarefa aberta sem responsável (igual a "Sem ninguém").' },
-  { chave: 'aguard', rotulo: 'Com o cartório (todas)', cor: 'blu', filtra: true, grupo: 'legado', regra: 'Legado: aguardando o terceiro, com ou sem responsável.' },
+  { chave: 'semdono', rotulo: 'Sem responsável', cor: 'red', filtra: true, grupo: 'legado', regra: 'Legado: tarefa aberta sem responsável (igual ao cartão "Sem responsável").' },
+  { chave: 'aguard', rotulo: 'Aguardando terceiros (todas)', cor: 'blu', filtra: true, grupo: 'legado', regra: 'Legado: aguardando um terceiro, com ou sem responsável.' },
   { chave: 'esc', rotulo: 'Escaladas pra mim', cor: 'red', filtra: true, grupo: 'legado', regra: 'Legado: duas ou mais cobranças sem resposta.' },
   { chave: 'back', rotulo: 'Backlog: abre / fecha por sem.', cor: 'amb', filtra: false, grupo: 'legado', regra: 'Legado: passou para a linha "Semana" da aba Processos.' },
 ]
@@ -169,6 +169,14 @@ export function numeroDoKpi(chave: ChaveKpi, linhas: LinhaParaKpi[], agora: Date
   return linhasDoKpi(chave, linhas, agora).length
 }
 
+/** Os TOTAIS da Visão geral que a foto diária guarda desde a Torre nova (M4): tarefas abertas, com a equipe, aguardando terceiros (com responsável). */
+export interface TotaisDaSituacao { tarefasAbertas: number; comEquipe: number; comCartorio: number }
+
+/** Os totais da SITUAÇÃO sobre as linhas — o mesmo `numeroDoKpi` do cartão (abertas · equipe · cartorio): foto, cartão e lista nunca discordam. */
+export function totaisDaSituacao(linhas: LinhaParaKpi[], agora: Date = new Date()): TotaisDaSituacao {
+  return { tarefasAbertas: numeroDoKpi('abertas', linhas, agora), comEquipe: numeroDoKpi('equipe', linhas, agora), comCartorio: numeroDoKpi('cartorio', linhas, agora) }
+}
+
 export interface ValoresDosKpis {
   vencidas: number
   vencemEm7Dias: number
@@ -193,9 +201,15 @@ export function kpisDasLinhas(linhas: LinhaParaKpi[], agora: Date = new Date()):
  * (todo responsável nulo), `venc`, `cob` e `risco`. `cartorio` (só COM responsável), `equipe`, `abertas` e a AGENDA nova não
  * têm foto de 7 dias — a tendência deles NÃO é mostrada (comparar com uma foto de outra definição seria mentir).
  */
-export const CAMPO_DA_FOTO: Partial<Record<ChaveKpi, keyof ValoresDosKpis>> = {
+/** Os campos NUMÉRICOS da foto diária que têm tendência: os 7 dos KPIs + os totais da Visão geral (M4) + processos ativos. */
+export type CampoDaFoto = keyof ValoresDosKpis | keyof TotaisDaSituacao | 'processosAtivos'
+
+export const CAMPO_DA_FOTO: Partial<Record<ChaveKpi, CampoDaFoto>> = {
   venc: 'vencidas', ninguem: 'semDono', cob: 'cobrancasPendentes', risco: 'emRisco',
   v7: 'vencemEm7Dias', semdono: 'semDono', aguard: 'aguardandoTerceiro', esc: 'escaladas',
+  // Torre nova (M4): estes três ganharam coluna própria na foto, com a MESMA definição do cartão (`totaisDaSituacao`).
+  // Foto antiga (anterior à M4) tem NULL nelas → sem tendência (nunca estimativa).
+  abertas: 'tarefasAbertas', equipe: 'comEquipe', cartorio: 'comCartorio',
 }
 
 export interface Tendencia {
@@ -211,6 +225,38 @@ export function tendenciaDe(atual: number, anterior: number | null | undefined):
   const delta = atual - anterior
   if (delta === 0) return { rotulo: `= ${atual} vs semana passada`, direcao: 'igual', delta }
   return { rotulo: `${delta > 0 ? '▲ +' : '▼ −'}${Math.abs(delta)} vs semana passada`, direcao: delta > 0 ? 'up' : 'down', delta }
+}
+
+/** A idade MÁXIMA (em dias) da foto que ainda vale como "semana passada": de 7 a 10 dias. */
+export const IDADE_MAXIMA_DA_FOTO_DE_REFERENCIA_DIAS = 10
+export const IDADE_MINIMA_DA_FOTO_DE_REFERENCIA_DIAS = 7
+
+/** Os números de um dia, para comparar: a data (AAAA-MM-DD) e os campos numéricos (ausente/`null` = sem registro). */
+export type FotoComparavel = { data: string } & Partial<Record<CampoDaFoto, number | null>>
+
+/**
+ * "▲/▼ vs SEMANA PASSADA" — PURA. Compara os números de HOJE com a foto de uma semana atrás, campo a campo, e SÓ devolve
+ * tendência de um campo quando as duas pontas existem. Sem foto, foto com menos de 7 dias (não é "semana passada"), com mais de
+ * 10 (já não é comparável) ou registro antigo sem a coluna (NULL, anterior à M4) → o campo NÃO aparece no resultado: a tela não
+ * mostra nada, nunca uma estimativa. Direção/rótulo vêm de `tendenciaDe` (a mesma conta dos cartões).
+ */
+export function tendenciaVsSemana(
+  hoje: FotoComparavel, fotoSemanaPassada: FotoComparavel | null | undefined,
+): Partial<Record<CampoDaFoto, Tendencia>> {
+  if (!fotoSemanaPassada) return {}
+  const dia = (d: string) => Date.parse(`${d.slice(0, 10)}T00:00:00Z`)
+  const idade = Math.round((dia(hoje.data) - dia(fotoSemanaPassada.data)) / 86_400_000)
+  if (!Number.isFinite(idade) || idade < IDADE_MINIMA_DA_FOTO_DE_REFERENCIA_DIAS || idade > IDADE_MAXIMA_DA_FOTO_DE_REFERENCIA_DIAS) return {}
+  const saida: Partial<Record<CampoDaFoto, Tendencia>> = {}
+  for (const campo of Object.keys(hoje) as Array<keyof FotoComparavel>) {
+    if (campo === 'data') continue
+    const atual = hoje[campo]
+    const anterior = fotoSemanaPassada[campo]
+    if (typeof atual !== 'number' || typeof anterior !== 'number') continue
+    const t = tendenciaDe(atual, anterior)
+    if (t) saida[campo as CampoDaFoto] = t
+  }
+  return saida
 }
 
 /**

@@ -768,6 +768,11 @@ export async function concluirSubtarefaCorrentePeloPasso(args: {
   await reconciliarSubtarefas({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   await aplicarEsperaExternaDaSubtarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   await aplicarPrazoDaTarefaSeConfigurado({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
+  // "INICIOU EM", DAQUI PARA FRENTE (Torre nova): a 1ª subtarefa entregue é o início real do trabalho. Grava o início do
+  // passo, da tentativa vigente e da Tarefa SE VAZIOS (o dono da escrita é task-step-sync); nunca sobrescreve, nunca
+  // preenche registro antigo. Iniciar pelo lote, pela Torre ou pelo editor do passo passa por aqui.
+  const { registrarInicioDoTrabalho } = await import("@/src/services/task-step-sync")
+  await registrarInicioDoTrabalho(args.stepInstanceId)
   const gate = await passoPodeConcluir({ stepInstanceId: args.stepInstanceId, valores: args.valores, fornecedorId: args.fornecedorId })
   return { aplicavel: true, subtarefaKey: corrente.key, podeConcluirPasso: gate.pode, faltando: gate.faltando }
 }

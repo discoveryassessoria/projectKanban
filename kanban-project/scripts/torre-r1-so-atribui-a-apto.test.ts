@@ -5,7 +5,7 @@
 //   npx tsx scripts/torre-r1-so-atribui-a-apto.test.ts   (banco de teste)
 //
 // A sugestão manual (`escolherResponsavel`) tem um FALLBACK: sem ninguém com aptidão cadastrada, ela mostra
-// ao HUMANO "Ninguém com aptidão cadastrada; sugiro X por menor carga". A r1 é automática: usar o fallback
+// ao HUMANO "Sem aptidão cadastrada; sugiro X por menor carga". A r1 é automática: usar o fallback
 // atribuiria trabalho a quem não tem aptidão comprovada. Contrato:
 //   • só-fallback  → a r1 NÃO atribui; conta N "sem apto"; a tarefa continua sem dono e em "Precisa de você";
 //   • com apto     → atribui ao apto de MENOR carga;
@@ -50,7 +50,7 @@ async function main() {
     const semApto2 = await c.novaObrigacao({ })
     const sug = await sugerirResponsavelPrecisaDeVoce(semApto1.tarefaId)
     ok("pré-condição: a sugestão manual É um fallback (candidato existe, mas sem aptidão cadastrada)", sug?.fallback === true && sug.usuarioId !== admin.id, JSON.stringify(sug))
-    ok("…e o texto que o humano lê continua sendo o do fallback (não mudou)", /^Ninguém com aptidão cadastrada para esta tarefa; sugiro .+ por menor carga/.test(textoDaSugestao(sug) ?? ""), textoDaSugestao(sug) ?? "")
+    ok("…e o texto que o humano lê continua sendo o do fallback (não mudou)", /^Sem aptidão cadastrada para esta tarefa; sugiro .+ por menor carga/.test(textoDaSugestao(sug) ?? ""), textoDaSugestao(sug) ?? "")
 
     const plano0 = await planoDaR1(new Date(), false)
     ok("o plano tem as 2 tarefas, nenhuma atribuída, todas 'semApto' com o motivo registrado",
@@ -59,7 +59,7 @@ async function main() {
     const sim0 = await simularRegra("r1")
     ok("a simulação conta 2 sem apto e 0 a atribuir", sim0.numeros.semDono === 2 && sim0.numeros.atribuiria === 0 && sim0.numeros.semApto === 2, JSON.stringify(sim0.numeros))
     ok("…e o texto diz 'seguradas por falta de apto'", /2 seguradas por falta de apto/.test(sim0.texto), sim0.texto)
-    ok("…e cada item traz o motivo (ninguém, 'sem apto — fica no Precisa de você')", sim0.itens.length === 2 && sim0.itens.every((i) => /→ ninguém \(sem apto — fica no Precisa de você\)/.test(i.texto)), JSON.stringify(sim0.itens))
+    ok("…e cada item traz o motivo (Sem responsável, 'sem apto — fica no Precisa de você')", sim0.itens.length === 2 && sim0.itens.every((i) => /→ Sem responsável \(sem apto — fica no Precisa de você\)/.test(i.texto)), JSON.stringify(sim0.itens))
 
     const logsAntes = await prisma.logAuditoria.count({ where: { acao: "TAREFA_ATRIBUIDA" } })
     const ex0 = await executarR1(admin.id)

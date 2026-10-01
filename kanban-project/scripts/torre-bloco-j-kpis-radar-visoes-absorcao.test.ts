@@ -20,7 +20,7 @@ import { NextRequest } from "next/server"
 import { prisma } from "../lib/prisma"
 import { signAuthToken } from "../lib/auth-jwt"
 import { montarCenario } from "./_fixture-torre-gh"
-import { KPIS, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, kpisDasLinhas, linhasDoKpi, processosEmRisco, vence7, tendenciaDe, fotoDeReferencia, CAMPO_DA_FOTO, type ChaveKpi } from "../lib/operacional/torre-kpis"
+import { KPIS, CARTOES_DA_SITUACAO, CARTOES_DA_AGENDA, kpisDasLinhas, totaisDaSituacao, linhasDoKpi, processosEmRisco, vence7, tendenciaDe, fotoDeReferencia, CAMPO_DA_FOTO, type ChaveKpi, type CampoDaFoto } from "../lib/operacional/torre-kpis"
 import { calcularIndicadoresDoDia } from "../lib/operacional/indicadores-diarios"
 import { tendenciasDaTorre } from "../lib/operacional/torre-tendencias"
 import { processosDaTorre, bolaDoProcesso, processosCriticos, anotarRisco } from "../lib/operacional/torre-processos"
@@ -71,6 +71,7 @@ async function main() {
 
     const linhas = anotarRisco((await listarTarefasDaTorre({})).linhas, await processosCriticos())
     const K = kpisDasLinhas(linhas)
+    const KF = { ...K, ...totaisDaSituacao(linhas) } // os campos da foto: os 7 KPIs + os totais da Visão geral (M4)
     const chaves: Array<[ChaveKpi, number]> = [["venc", K.vencidas], ["v7", K.vencemEm7Dias], ["semdono", K.semDono], ["aguard", K.aguardandoTerceiro], ["cob", K.cobrancasPendentes], ["esc", K.escaladas]]
     for (const [k, n] of chaves) ok(`${k}: o número do cartão = o tamanho da lista filtrada`, linhasDoKpi(k, linhas).length === n, `${n}`)
     ok("risco: o número = nº de PROCESSOS; a lista filtrada = as tarefas desses processos", K.emRisco === processosEmRisco(linhas).size && linhasDoKpi("risco", linhas).every((l) => l.processoId != null && processosEmRisco(linhas).has(l.processoId)))
@@ -80,7 +81,7 @@ async function main() {
     ok("'Atrasadas' não repete o que vence em 7 dias", !linhasDoKpi("v7", linhas).some((l) => l.taskId === vencida.tarefaId))
     ok("o backlog NÃO filtra (devolve a lista inteira)", linhasDoKpi("back", linhas).length === linhas.length)
     const foto = await calcularIndicadoresDoDia()
-    ok("a foto diária (E10) usa a MESMA função: cada campo = o número do cartão", (Object.keys(CAMPO_DA_FOTO) as Array<keyof typeof CAMPO_DA_FOTO>).every((k) => { const c = CAMPO_DA_FOTO[k]!; return foto[c] === K[c] }))
+    ok("a foto diária (E10) usa a MESMA função: cada campo = o número do cartão", (Object.keys(CAMPO_DA_FOTO) as Array<keyof typeof CAMPO_DA_FOTO>).every((k) => { const c = CAMPO_DA_FOTO[k]! as Exclude<CampoDaFoto, 'processosAtivos'>; return foto[c] === KF[c] }))
 
     secao("J3 — a tendência é REAL ou 'sem histórico'")
     ok("sem foto de referência: null (a tela não mostra tendência alguma)", tendenciaDe(5, null) === null && tendenciaDe(5, undefined) === null)

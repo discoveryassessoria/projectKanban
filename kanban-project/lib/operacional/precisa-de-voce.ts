@@ -32,6 +32,7 @@ import { ordensDeFase } from '@/src/services/documento-operacao'
 import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
 import { equipeExigida } from './elegibilidade'
 import { pessoasNoLimite } from './torre-equipe'
+import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
   urlDistribuicaoDoProcesso, urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia,
@@ -107,19 +108,21 @@ export interface SugestaoDeResponsavel {
   nome: string
   motivo: string
   /**
-   * `true` = NINGUÉM tem aptidão cadastrada para esta tarefa (nem a unidade de trabalho, nem a equipe exigida
+   * `true` = SEM APTIDÃO CADASTRADA para esta tarefa (nem a unidade de trabalho, nem o país, nem a equipe exigida
    * definem quem é apto): o nome é só o de MENOR CARGA entre quem tem permissão de executar — nunca uma aptidão
-   * inventada. A tela diz isso com todas as letras.
+   * inventada. A tela diz isso com todas as letras, e a regra automática (r1) NÃO atribui com ele.
    */
   fallback?: boolean
   /** As ativas de quem foi sugerido (a carga que decidiu o fallback). */
   ativas?: number
 }
 
-/** O que da TAREFA decide quem é apto: a unidade de trabalho e a equipe exigida (ambas do cadastro). */
+/** O que da TAREFA decide quem é apto: a unidade de trabalho, o país do processo e a equipe exigida (todos do cadastro). */
 export interface AlvoDaSugestao {
   unidadeOperacionalId: number | null
   equipeExigida: string | null
+  /** O país do processo (`Processo.paisId`) — a aptidão por país (M3) compara com ele. Ausente/`null` = o critério não se aplica. */
+  paisId?: number | null
 }
 
 /**
@@ -133,7 +136,7 @@ export async function alvosDeSugestao(tarefaIds: number[], db: Db = prisma): Pro
     unidadesDasTarefas(tarefaIds),
     db.tarefa.findMany({
       where: { id: { in: tarefaIds } },
-      select: { id: true, equipeKey: true, workflowStepInstance: { select: { papel: true, equipe: true } } },
+      select: { id: true, equipeKey: true, workflowStepInstance: { select: { papel: true, equipe: true } }, processo: { select: { paisId: true } } },
     }),
   ])
   const porId = new Map(tarefas.map((t) => [t.id, t]))
@@ -141,6 +144,7 @@ export async function alvosDeSugestao(tarefaIds: number[], db: Db = prisma): Pro
     const t = porId.get(id)
     saida.set(id, {
       unidadeOperacionalId: unidades.get(id) ?? null,
+      paisId: t?.processo?.paisId ?? null,
       equipeExigida: t ? equipeExigida({ equipeKey: t.equipeKey, equipeDoPasso: t.workflowStepInstance?.equipe ?? null, papelDoPasso: t.workflowStepInstance?.papel ?? null }) : null,
     })
   }
@@ -159,6 +163,8 @@ export interface ContextoDeSugestao {
   ativasPorUsuario: Map<number, number>
   atribuicoes30dPorUsuario: Map<number, number>
   unidadesComAptidao: Set<number>
+  /** Os países em que alguém já foi declarado apto (M3) — opcional: contexto montado sem ele = a aptidão por país não restringe. */
+  paisesComAptidao?: Set<number>
   rotulos: Awaited<ReturnType<typeof rotulosDasUnidades>>
   /** Equipes ATIVAS do cadastro (código em minúsculas → membros): só elas restringem quem é apto. */
   equipes: Map<string, Set<number>>
@@ -198,6 +204,7 @@ export async function carregarContextoDeSugestao(
   return {
     organizacao, usuarios, ativasPorUsuario, atribuicoes30dPorUsuario, rotulos, equipes,
     unidadesComAptidao: new Set([...organizacao.values()].flatMap((o) => o.aptidoes)),
+    paisesComAptidao: new Set([...organizacao.values()].flatMap((o) => o.paisesAptos ?? [])),
   }
 }
 
@@ -205,11 +212,12 @@ export async function carregarContextoDeSugestao(
  * A regra pura. QUEM PODE SER SUGERIDO é decidido em camadas — cada uma só TIRA gente, nenhuma inventa aptidão:
  *   1. permissão de executar tarefa (`tarefas.iniciar_concluir`);
  *   2. a EQUIPE exigida pela tarefa, quando ela existe como equipe ativa no cadastro (só membros);
- *   3. a APTIDÃO da unidade de trabalho, quando alguém já foi declarado apto a ela (só os declarados).
- * Se (2) ou (3) definiram quem é apto, o ranking é entre os aptos: menos ativas → empate 30 d → ausente vai
+ *   3. a APTIDÃO da unidade de trabalho, quando alguém já foi declarado apto a ela (só os declarados);
+ *   4. a APTIDÃO POR PAÍS do processo (M3), quando alguém já foi declarado apto naquele país (só os declarados).
+ * Se (2), (3) ou (4) definiram quem é apto, o ranking é entre os aptos: menos ativas → empate 30 d → ausente vai
  * para o sucessor sugerido (que também precisa ser apto e estar disponível).
  *
- * Se NENHUMA das duas definiu aptidão, ninguém tem aptidão cadastrada para esta tarefa: a sugestão é um
+ * Se NENHUMA delas definiu aptidão, não há aptidão cadastrada para esta tarefa: a sugestão é um
  * FALLBACK explícito por menor carga, e nunca recai sobre administrador — ser administrador dá todas as
  * permissões, não prova que a pessoa executa este trabalho (achado real, 30/09/2026: "Sugiro Marco Rovatti:
  * 0 ativa(s)" só porque o gestor tinha carga zero). Sem ninguém que execute, não há sugestão (`null`).
@@ -217,15 +225,18 @@ export async function carregarContextoDeSugestao(
 export function escolherResponsavel(
   ctx: ContextoDeSugestao, alvo: AlvoDaSugestao | number | null, extraAtivas?: ReadonlyMap<number, number>,
 ): SugestaoDeResponsavel | null {
-  const { unidadeOperacionalId, equipeExigida: exigida }: AlvoDaSugestao =
+  const { unidadeOperacionalId, equipeExigida: exigida, paisId = null }: AlvoDaSugestao =
     alvo != null && typeof alvo === 'object' ? alvo : { unidadeOperacionalId: alvo, equipeExigida: null }
   const { organizacao } = ctx
   const aptidaoEhRegra = unidadeOperacionalId != null && ctx.unidadesComAptidao.has(unidadeOperacionalId)
+  // APTIDÃO POR PAÍS (M3) — opt-in por país, como a da unidade: só restringe o país em que alguém já foi declarado apto.
+  const paisEhRegra = paisId != null && (ctx.paisesComAptidao?.has(paisId) ?? false)
+  const nomeDoPais = paisEhRegra ? [...organizacao.values()].flatMap((o) => o.paisesAptosDetalhados ?? []).find((p) => p.paisId === paisId)?.nome ?? null : null
   const membrosDaEquipe = exigida != null ? ctx.equipes.get(exigida) ?? null : null
   const equipeEhRegra = membrosDaEquipe != null
   // NOME DA UNIDADE — como no protótipo ("apta a Espanha"), nunca só "apto".
   const nomeDaUnidade = aptidaoEhRegra ? ctx.rotulos.get(unidadeOperacionalId!)?.nome ?? null : null
-  const semAptidaoCadastrada = !aptidaoEhRegra && !equipeEhRegra
+  const semAptidaoCadastrada = !aptidaoEhRegra && !equipeEhRegra && !paisEhRegra
 
   // DISPONIBILIDADE NÃO É PRÉ-FILTRO AQUI, DE PROPÓSITO: o mandato pede
   // "apto → menos ativas → empate 30 d → AUSENTE vai para o sucessor
@@ -238,6 +249,7 @@ export function escolherResponsavel(
     if (equipeEhRegra && !membrosDaEquipe!.has(u.id)) return false
     const org = organizacao.get(u.id)
     if (aptidaoEhRegra && !(org?.aptidoes ?? []).includes(unidadeOperacionalId!)) return false
+    if (paisEhRegra && !(org?.paisesAptos ?? []).includes(paisId!)) return false
     // Sem aptidão cadastrada, o administrador não é candidato: a permissão dele vem do tipo, não de executar este trabalho.
     if (semAptidaoCadastrada && u.tipo === 'admin') return false
     return true
@@ -265,8 +277,8 @@ export function escolherResponsavel(
       return {
         usuarioId: c.id, nome: c.nome, ativas: c.ativas,
         ...(semAptidaoCadastrada
-          ? { fallback: true, motivo: `ninguém com aptidão cadastrada para esta tarefa; menor carga (${c.ativas} ativa(s))` }
-          : { motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}${equipeEhRegra ? `, da equipe ${exigida}` : ''}` }),
+          ? { fallback: true, motivo: `sem aptidão cadastrada para esta tarefa; menor carga (${c.ativas} ativa(s))` }
+          : { motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}${paisEhRegra ? `, apto em ${nomeDoPais ?? `país #${paisId}`}` : ''}${equipeEhRegra ? `, da equipe ${exigida}` : ''}` }),
       }
     }
     const sucessor = indisponivel.sucessorSugerido
@@ -339,7 +351,10 @@ export async function itensPrecisaDeVoce(
 ): Promise<ItemPrecisaDeVoceTorre[]> {
   const agora = opts.agora ?? new Date()
   const db = opts.db ?? prisma
-  const brutas = opts.linhas ?? await lerLinhasOperacionais(agora, db)
+  // PROCESSO PAUSADO FICA FORA DA TORRE (M2, filtro canônico `semProcessosPausados`): a lista de decisões é da Torre, então
+  // não acusa nada de um processo que o gestor pausou. A Operação (sino, fila) lê as linhas por outro caminho e não muda.
+  const [brutasLidas, pausados] = await Promise.all([opts.linhas ?? lerLinhasOperacionais(agora, db), idsDeProcessosPausados(db)])
+  const brutas = semProcessosPausados(brutasLidas, pausados)
 
   // SÓ TAREFA ABERTA (achado real, 30/09/2026): `lerLinhasOperacionais` usa a
   // MESMA leitura do Kanban (`visaoGerencial` sem filtro de status devolve
@@ -511,7 +526,7 @@ export async function itensPrecisaDeVoce(
 /** O texto que a tela mostra: com aptidão, "Sugiro X: motivo"; sem aptidão cadastrada, o FALLBACK dito com todas as letras. */
 export function textoDaSugestao(s: SugestaoDeResponsavel | null): string {
   if (!s) return 'Nenhum candidato apto e disponível encontrado.'
-  if (s.fallback) return `Ninguém com aptidão cadastrada para esta tarefa; sugiro ${s.nome} por menor carga${s.ativas != null ? ` (${s.ativas} ativa(s))` : ''}.`
+  if (s.fallback) return `Sem aptidão cadastrada para esta tarefa; sugiro ${s.nome} por menor carga${s.ativas != null ? ` (${s.ativas} ativa(s))` : ''}.`
   return `Sugiro ${s.nome}: ${s.motivo}`
 }
 
