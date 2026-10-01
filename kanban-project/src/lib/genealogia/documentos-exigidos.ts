@@ -1,15 +1,16 @@
 // src/lib/genealogia/documentos-exigidos.ts
 // ============================================================================
-// PESSOA.documentosExigidos — o FILTRO SUBTRATIVO das certidões de uma pessoa FORA da linhagem.
+// PESSOA.documentosExigidos — o FILTRO SUBTRATIVO das certidões de uma pessoa (QUALQUER pessoa da árvore).
 //
 // Módulo PURO e sem imports de servidor (cliente, API e núcleo da Genealogia usam o MESMO).
 //
 //   exigido = (o que a regra automática da árvore pede) ∩ (o que está marcado)
 //
 // NUNCA cria exigência que a árvore não pede: marcar Casamento numa pessoa solteira ou Óbito numa viva não faz nascer nada.
-// O filtro só vale para quem está FORA DA LINHAGEM (mesma condição de `pessoaExigeDocumentacao`): linha principal, requerente
-// e pendente de classificação seguem sempre a regra automática. `null` (campo nunca tocado) = regra automática = comportamento
-// de antes desta coluna existir.
+// O filtro vale para QUALQUER pessoa — linha reta, requerente, fora da linhagem ou pendente (decisão do usuário, 01/10/2026:
+// "quando a pessoa pertence à linha de transmissão eu também preciso escolher só Nascimento e Óbito"). O que `pessoaExigeDocumentacao`
+// protege continua igual: desligar a caixa "Precisa de documentação" NÃO tira da árvore quem está na linha principal (mandato 675).
+// `null` (campo nunca tocado) = regra automática = comportamento de antes desta coluna existir.
 // ============================================================================
 
 /** Lista FECHADA de três — a única constante. Os valores gravados em `Pessoa.documentosExigidos` são estes CODES. */
@@ -79,14 +80,18 @@ export interface PessoaParaFiltroDocumental {
   documentosExigidos: unknown
 }
 
-/** O filtro se aplica a esta pessoa? Só FORA_DA_LINHAGEM, com documentação ligada e com lista gravada. */
+/**
+ * O filtro se aplica a esta pessoa? Quando há lista gravada — para QUALQUER classificação. Exceção: FORA da linhagem com a
+ * documentação DESLIGADA não gera documento nenhum (a pessoa inteira sai), então a lista nem chega a valer.
+ */
 export function filtroSeAplica(p: PessoaParaFiltroDocumental): boolean {
-  return p.classificacao === "FORA_DA_LINHAGEM" && p.documentacao === true && lerDocumentosExigidosGravado(p.documentosExigidos) !== null
+  if (p.classificacao === "FORA_DA_LINHAGEM" && p.documentacao !== true) return false
+  return lerDocumentosExigidosGravado(p.documentosExigidos) !== null
 }
 
 /**
- * O documento `codigo` continua EXIGIDO para esta pessoa? `true` quando o filtro não se aplica (linha principal, requerente,
- * pendente, campo `null`) ou quando o tipo não é um dos três.
+ * O documento `codigo` continua EXIGIDO para esta pessoa? `true` quando o filtro não se aplica (campo `null`, ou pessoa fora da
+ * linhagem sem documentação) ou quando o tipo não é um dos três.
  */
 export function documentoEscolhidoParaPessoa(p: PessoaParaFiltroDocumental, codigo: CodigoDocumentoExigivel | null): boolean {
   if (codigo == null) return true
@@ -95,8 +100,8 @@ export function documentoEscolhidoParaPessoa(p: PessoaParaFiltroDocumental, codi
 }
 
 /**
- * CASAMENTO (alvo UNIÃO): vale se PELO MENOS UM dos cônjuges o mantém. Cônjuge a que o filtro não se aplica conta como
- * "marcado" — exceto o FORA da linhagem com documentação DESLIGADA, que não quer documento nenhum e conta como desmarcado.
+ * CASAMENTO (alvo UNIÃO): vale se PELO MENOS UM dos cônjuges o mantém. Cônjuge sem lista (campo `null`) conta como "marcado" —
+ * exceto o FORA da linhagem com documentação DESLIGADA, que não quer documento nenhum e conta como desmarcado.
  */
 export function documentoDaUniaoEscolhido(conjuges: PessoaParaFiltroDocumental[], codigo: CodigoDocumentoExigivel | null): boolean {
   if (codigo == null) return true

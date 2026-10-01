@@ -1951,7 +1951,7 @@ function AddPersonModal({
                 <span className="block text-xs text-[var(--text-muted)]">{TEXTO_PRECISA_DOCUMENTACAO}</span>
               </span>
             </label>
-            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} aplicavel={!isLinhaReta} />}
+            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} />}
           </section>
 
           {/* ===== Observações ===== */}
@@ -2600,7 +2600,7 @@ function EditPersonModal({
                 <span className="block text-xs text-[var(--text-muted)]">{TEXTO_PRECISA_DOCUMENTACAO}</span>
               </span>
             </label>
-            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} aplicavel={!isLinhaReta && !ehRequerente(requerente)} />}
+            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} />}
           </section>
 
           {/* ===== Observações ===== */}

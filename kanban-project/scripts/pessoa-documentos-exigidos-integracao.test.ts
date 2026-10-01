@@ -2,7 +2,7 @@
 // ============================================================================
 // Pessoa.documentosExigidos — INTEGRAÇÃO (rotas reais, token de administrador, banco de TESTE).
 //   decisão 1  filtro SUBTRATIVO: marcar sem o fato na árvore NÃO cria nada;
-//   decisão 2  linha principal e requerente ignoram o filtro; fora da linhagem aplica;
+//   decisão 2  (REVISTA em 01/10/2026) o filtro vale para QUALQUER pessoa — linha reta, requerente e fora da linhagem;
 //   decisão 3  Casamento (união): ao menos um cônjuge mantém;
 //   decisão 4  zero por escolha manual: avanço automático recusado, humano permitido; zero natural inalterado;
 //   decisão 5  a_iniciar: nada nasce nem é dispensado; ao mover nasce só o marcado;
@@ -95,7 +95,10 @@ async function main() {
 
   await prisma.pessoa.update({ where: { id: A.titularId }, data: { documentosExigidos: [] } })
   c = await calc(A.processoId)
-  ok("LINHA PRINCIPAL/REQUERENTE ignora o filtro: titular com lista [] segue exigido", tem(c, "NAS", { pessoaId: A.titularId }) && !removida(c, "NAS", { pessoaId: A.titularId }))
+  ok("LINHA PRINCIPAL/REQUERENTE APLICA o filtro: titular com lista [] tem o Nascimento removido por escolha", !tem(c, "NAS", { pessoaId: A.titularId }) && removida(c, "NAS", { pessoaId: A.titularId }))
+  await prisma.pessoa.update({ where: { id: A.titularId }, data: { documentosExigidos: ["NAS", "OBI"] } })
+  c = await calc(A.processoId)
+  ok("titular da linha principal com ['NAS','OBI']: Nascimento fica; Casamento da UNIÃO fica (a cônjuge sem lista sustenta)", tem(c, "NAS", { pessoaId: A.titularId }) && tem(c, "CAS", { uniaoId: A.uniaoId }))
   await prisma.pessoa.update({ where: { id: A.titularId }, data: { documentosExigidos: undefined as never } }).catch(() => null)
   await prisma.$executeRawUnsafe(`UPDATE "Pessoa" SET "documentosExigidos" = NULL WHERE id = ${A.titularId}`)
 
