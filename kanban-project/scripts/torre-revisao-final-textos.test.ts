@@ -24,7 +24,7 @@ ok("os 8 canais têm rótulo diferente do código", CANAIS_SOLICITACAO.length ==
 const regua = readFileSync("src/components/torre/TerceirosRegua.tsx", "utf8")
 ok("a Régua mostra o rótulo do canal (E-mail), não EMAIL", /CANAIS_DE_CONTATO_UI\.find\(\(c\) => c\.v === o\.canal\)\?\.l/.test(regua))
 const rota = readFileSync("src/app/api/torre/tarefas/[tarefaId]/gaveta/route.ts", "utf8")
-ok("a rota da gaveta humaniza o texto do histórico", /texto: humanizarEstadosNoTexto\(f\.texto\)/.test(rota))
+ok("a gaveta humaniza o texto do histórico (serviço da gaveta)", /humanizarEstadosNoTexto\(f\.texto\)/.test(readFileSync("src/services/torre-gaveta-historico.ts", "utf8")) && /historicoDaGaveta/.test(rota))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 if (falhou > 0) process.exit(1)

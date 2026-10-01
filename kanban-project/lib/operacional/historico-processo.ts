@@ -31,6 +31,7 @@
 //     contrário — esperar o cartório é um estado da tarefa, não uma pausa.
 // ============================================================================
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
+import { apresentarTextoDoHistorico } from './historico-apresentacao'
 import {
   CHAVES_SUBTAREFA_CONFIRMACAO_PEDIDO, CHAVES_SUBTAREFA_ENVIO_REQUERIMENTO, CHAVES_SUBTAREFA_RECEBIMENTO_CERTIDAO, STEP_KEY_LOCALIZAR_REGISTRO,
 } from '@/src/lib/process-stage/situacao-solicitacao-certidao'
@@ -798,7 +799,20 @@ function redigir(quemNome: string, p: { verbo: string; objeto: string | null; co
   return `${nucleoDe(quemNome, p)}${cauda.length ? `. ${cauda.join('. ')}` : ''}`.replace(/\s+/g, ' ').trim()
 }
 
-function montarFato(ctx: ContextoDoHistorico, membros: Atomo[], reabriveis: Set<string>): FatoDoHistorico {
+/**
+ * Texto gerado pelo SISTEMA (auditoria, workflow, fase, necessidade) em linguagem de gente: "usuário 7" → nome, "equipe_documental" →
+ * "Equipe documental", "SLA 5d" → "prazo de 5 dias". Só na EXIBIÇÃO (nada é regravado). Texto DIGITADO por pessoa (comentário, observação,
+ * observação de tarefa) não é reescrito.
+ */
+const FONTES_DE_TEXTO_DO_SISTEMA = new Set<LinhaCrua['fonte']>(['LOG', 'WORKFLOW', 'FASE', 'NECESSIDADE'])
+function apresentavel(ctx: ContextoDoHistorico, a: Atomo): Atomo {
+  if (!FONTES_DE_TEXTO_DO_SISTEMA.has(a.fonte)) return a
+  const t = (v: string | null) => (v == null ? v : apresentarTextoDoHistorico(v, ctx.usuarios))
+  return { ...a, motivo: t(a.motivo), justificativa: t(a.justificativa), efeito: t(a.efeito), complemento: t(a.complemento), fraseLivre: t(a.fraseLivre) }
+}
+
+function montarFato(ctx: ContextoDoHistorico, membrosBrutos: Atomo[], reabriveis: Set<string>): FatoDoHistorico {
+  const membros = membrosBrutos.map((m) => apresentavel(ctx, m))
   const ordenados = [...membros].sort((x, y) => y.t - x.t || (x.id < y.id ? 1 : -1))
   const a = ordenados[0]
   const n = membros.length

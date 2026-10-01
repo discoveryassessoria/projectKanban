@@ -20,6 +20,7 @@ import { VINCULO_PROCESSO_ATIVO } from '@/src/lib/genealogia/vinculo-ativo'
 import { titularDaUniao, SELECT_UNIAO_PARA_TITULAR } from '@/src/services/genealogia/titular-uniao'
 import { labelDaFasePorPhaseKey, phaseKeyToFaseCode, rotuloDoPasso } from '@/src/lib/process-stage/fases-catalog'
 import { TIPO_DOCUMENTO_LABELS } from '@/src/lib/process-stage/estrutura-operacional'
+import { idsDeUsuarioNoTexto } from '@/lib/operacional/historico-apresentacao'
 import {
   montarFatos, type ContextoDoHistorico, type FatoDoHistorico, type LinhaCrua,
 } from '@/lib/operacional/historico-processo'
@@ -123,6 +124,8 @@ export async function historicoDoProcesso(processoId: number, opcoes: { agora?: 
     ...solicitacoes.map((s) => s.criadoPorId), ...contatos.map((c) => c.registradoPorId),
     ...comentarios.map((c) => c.autorId), ...observacoes.map((o) => o.criadoPorId), ...historicoTarefa.map((h) => h.usuarioId),
     ...avancos.map((a) => a.solicitadoPorId),
+    // ids citados DENTRO do texto gravado ("passadas ao usuário 7"): resolvidos aqui, em lote, para a exibição traduzir (nada é regravado).
+    ...logs.flatMap((l) => [...idsDeUsuarioNoTexto(l.descricao), ...idsDeUsuarioNoTexto((typeof asJ(l.detalhes)?.motivo === 'string' ? (asJ(l.detalhes)?.motivo as string) : null))]),
   ])
   const pessoaIdsCitados = ids<number>([
     ...pessoaIdsDaArvore, ...tarefas.map((t) => t.pessoaId), ...documentos.map((d) => d.pessoaId), ...necessidades.map((n) => n.pessoaId),
