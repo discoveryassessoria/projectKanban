@@ -202,7 +202,7 @@ function ModalForcar({ pedido, chamar, concluir }: { pedido: Extract<Pedido, { t
     pedido.resolver(concluir(pedido.item, "Avançar fase", true, d))
   }
   return (
-    <Modal titulo="O avanço está bloqueado" subtitulo={pedido.item.titulo} ocupado={env} onFechar={() => pedido.resolver(null)} rodape={<>
+    <Modal titulo="O avanço está bloqueado" subtitulo={pedido.item.titulo} ocupado={env} justificativa onFechar={() => pedido.resolver(null)} rodape={<>
       <button className="tor-btn" onClick={() => pedido.resolver(null)} disabled={env}>Cancelar</button>
       <button className="tor-btn pri" onClick={() => void enviar()} disabled={env || texto.trim().length < 5}>{env ? "Avançando…" : "Avançar mesmo assim"}</button>
     </>}>
@@ -310,7 +310,7 @@ function PdvTexto({ titulo, subtitulo, rotulo, confirmar, onFechar, onEnviar }: 
     if (!r.ok) setErro(r.mensagem ?? "Não foi possível concluir.")
   }
   return (
-    <Modal titulo={titulo} subtitulo={subtitulo} onFechar={onFechar} ocupado={enviando} rodape={<>
+    <Modal titulo={titulo} subtitulo={subtitulo} onFechar={onFechar} ocupado={enviando} justificativa rodape={<>
       <button className="tor-btn" onClick={onFechar} disabled={enviando}>Cancelar</button>
       <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || texto.trim().length < 5}>{enviando ? "Enviando…" : confirmar}</button>
     </>}>

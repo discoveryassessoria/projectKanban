@@ -8,13 +8,14 @@ import { CANAIS_DE_CONTATO_UI, CANAL_CADASTRADO } from "@/src/components/operaca
 import { DIAS_PADRAO_DA_COBRANCA } from "@/lib/operacional/torre-bola"
 import type { PedidoDeTerceiro } from "@/lib/operacional/terceiros-pedidos"
 import { ddmmHora } from "@/lib/operacional/terceiros-pedidos"
-import { api, erroDe } from "./torre-base"
+import { api, erroDe, useEscFecha } from "./torre-base"
 import "./terceiros.css"
 
 /** O teto da "Próxima cobrança em (dias)" — o mesmo do servidor (`MAX_PROXIMA_COBRANCA_DIAS`). */
 const MAX_DIAS = 60
 
 function CascaDoModal({ titulo, onFechar, ocupado, children }: { titulo: string; onFechar: () => void; ocupado?: boolean; children: ReactNode }) {
+  useEscFecha(onFechar, !ocupado)
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-modal)] px-4" style={{ zIndex: LAYER.popover }} onClick={ocupado ? undefined : onFechar}>
       <div role="dialog" aria-label={titulo} className="tor ter-modal" onClick={(e) => e.stopPropagation()}>

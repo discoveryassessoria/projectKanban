@@ -115,11 +115,24 @@ export function resumoDoLote(d: { total?: number; sucesso?: number; itens?: Arra
   return `${d.sucesso ?? 0} de ${d.total ?? 0}${falha ? ` · ${d.itens!.filter((i) => !i.ok).length} não passou(aram): ${falha.mensagem ?? "recusada"}` : ""}`
 }
 
-export function Modal({ titulo, subtitulo, onFechar, children, rodape, ocupado }: {
+/** Esc fecha o modal (T015). `ativo=false` (modal ocupado ou de justificativa — o protótipo não deixa fechar por Esc/fundo) não escuta. */
+export function useEscFecha(onFechar: () => void, ativo = true) {
+  useEffect(() => {
+    if (!ativo) return
+    const f = (e: KeyboardEvent) => { if (e.key === "Escape") onFechar() }
+    window.addEventListener("keydown", f)
+    return () => window.removeEventListener("keydown", f)
+  }, [onFechar, ativo])
+}
+
+export function Modal({ titulo, subtitulo, onFechar, children, rodape, ocupado, justificativa }: {
   titulo: string; subtitulo?: string; onFechar: () => void; children: ReactNode; rodape: ReactNode; ocupado?: boolean
+  /** Modal de justificativa (texto obrigatório): como no protótipo, NÃO fecha com Esc nem clicando no fundo — só por Cancelar/confirmar. */
+  justificativa?: boolean
 }) {
+  useEscFecha(onFechar, !ocupado && !justificativa)
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-modal)] px-4" style={{ zIndex: LAYER.popover }} onClick={ocupado ? undefined : onFechar}>
+    <div className="fixed inset-0 flex items-center justify-center bg-[var(--overlay-modal)] px-4" style={{ zIndex: LAYER.popover }} onClick={ocupado || justificativa ? undefined : onFechar}>
       <div role="dialog" aria-label={titulo} className="tor w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface-popover)] shadow-[var(--elev-3)] p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div>
           <h3 className="text-[15px] font-extrabold">{titulo}</h3>
@@ -155,7 +168,7 @@ export function ModalTexto({ titulo, subtitulo, rotulo, confirmar, minimo = 5, o
     if (!r.ok) setErro(r.mensagem ?? "Não foi possível concluir.")
   }
   return (
-    <Modal titulo={titulo} subtitulo={subtitulo} onFechar={onFechar} ocupado={enviando} rodape={<>
+    <Modal titulo={titulo} subtitulo={subtitulo} onFechar={onFechar} ocupado={enviando} justificativa rodape={<>
       <button className="tor-btn" onClick={onFechar} disabled={enviando}>Cancelar</button>
       <button className="tor-btn pri" onClick={() => void enviar()} disabled={enviando || !valido}>{enviando ? "Enviando…" : confirmar}</button>
     </>}>

@@ -10,7 +10,7 @@ import { HistoricoDoProcesso } from "@/src/components/historico/HistoricoDoProce
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 import type { LinhaDaTabela } from "@/lib/operacional/torre-processo-puro"
-import { api, erroDe, Modal, ModalTexto } from "./torre-base"
+import { api, erroDe, Modal, ModalTexto, useEscFecha } from "./torre-base"
 import { ProcessoRelatorio } from "./ProcessoRelatorio"
 import { ProcessoCabecalho } from "./ProcessoCabecalho"
 import { ProcessoCaminho } from "./ProcessoCaminho"
@@ -188,6 +188,7 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
         {modal?.tipo === "relatorio" && (
           <ProcessoRelatorio processoId={d.processoId} processoRotulo={d.codigo ?? d.familiaNome} familiaId={d.familiaId} familiaNome={d.familiaNome} onFechar={() => setModal(null)} avisar={avisarSimples} />
         )}
+        {modal?.tipo === "historico" && (<HistoricoEsc onFechar={() => setModal(null)} />)}
         {modal?.tipo === "historico" && (
           <div className="tpr-modal" style={{ zIndex: 10050 }} onClick={() => setModal(null)}>
             <div role="dialog" aria-label="Histórico completo" onClick={(e) => e.stopPropagation()}>
@@ -212,3 +213,6 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     </>
   )
 }
+
+/** Esc fecha o modal "Histórico completo" (T015). */
+function HistoricoEsc({ onFechar }: { onFechar: () => void }) { useEscFecha(onFechar); return null }

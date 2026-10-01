@@ -7,7 +7,7 @@
 import { useMemo, useState } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
 import { auth } from "@/src/components/operacao/kit-operacional"
-import { erroDe, useTorre } from "./torre-base"
+import { erroDe, useEscFecha, useTorre } from "./torre-base"
 import { COLUNAS_DO_RELATORIO_DE_CONTROLE } from "@/lib/operacional/torre-relatorio-colunas"
 import "./torre-radar.css"
 
@@ -26,6 +26,7 @@ export function RelatorioControle({ processoId, processoRotulo, familiaId, famil
     colunas: [...COLUNAS_DO_RELATORIO_DE_CONTROLE], ordenarPor: "familia_geracao", direcao: "asc", pagina: 1, porPagina: 100,
   }), [familiaId, familiaNome, processoId, processoRotulo])
   const [exportando, setExportando] = useState<Formato | null>(null)
+  useEscFecha(onFechar, !exportando)
   const [erro, setErro] = useState<string | null>(null)
 
   const exportar = async (formato: Formato) => {

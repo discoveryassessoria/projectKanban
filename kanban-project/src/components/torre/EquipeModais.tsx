@@ -3,7 +3,7 @@
 // O modal NÃO decide nada: chama as portas existentes (capacidade / mover-carteira) e devolve o resultado real.
 import { useState, type ReactNode } from "react"
 import { LAYER } from "@/src/lib/ui/layers"
-import { api, erroDe, type Desfazer } from "./torre-base"
+import { api, erroDe, useEscFecha, type Desfazer } from "./torre-base"
 import { TIPOS_DE_AUSENCIA, TEXTO_MARCAR_AUSENCIA } from "./equipe-visual"
 import type { PessoaDaEquipe } from "./equipe-tipos"
 import "./equipe.css"
@@ -12,6 +12,7 @@ function ModalDaEquipe({ titulo, texto, ocupado, onFechar, children, cancelar, c
   titulo: string; texto: string; ocupado: boolean; onFechar: () => void; children: ReactNode
   cancelar: string; confirmar: { rotulo: string; ocupado: string; onClick: () => void }
 }) {
+  useEscFecha(onFechar, !ocupado)
   return (
     <div className="eqp-fundo" style={{ zIndex: LAYER.popover }} onClick={ocupado ? undefined : onFechar}>
       <div role="dialog" aria-label={titulo} className="eqp-modal" onClick={(e) => e.stopPropagation()}>

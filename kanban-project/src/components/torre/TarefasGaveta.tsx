@@ -11,7 +11,7 @@ import { passosDaGaveta, textoDaBola, textoDoCobrar, textoDoIniciou, type AcaoDa
 import { statusTarefaTxt, docTipoTxt } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { rotularFase } from "@/src/components/operacao/kit-operacional"
 import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
-import { api, useTorre } from "./torre-base"
+import { api, useEscFecha, useTorre } from "./torre-base"
 import type { AcaoComModal, DadosDaGaveta, LinhaDaTela } from "./tarefas-tipos"
 import { ehCancelada } from "./tarefas-tipos"
 
@@ -30,6 +30,12 @@ export function TarefasGaveta({ linha, agora, foco, acoes, onFechar, onAcaoPrima
   onAcaoComModal: (acao: AcaoComModal) => void
 }) {
   const { permissoes } = useTorre()
+  // Esc fecha a gaveta (T015) — só quando ela é o único painel aberto (um modal de justificativa por cima nunca fecha por Esc).
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => { if (e.key === "Escape" && document.querySelectorAll("[role=dialog]").length <= 1) onFechar() }
+    window.addEventListener("keydown", f)
+    return () => window.removeEventListener("keydown", f)
+  }, [onFechar])
   const [dados, setDados] = useState<{ id: number; d: DadosDaGaveta | null; erro: boolean } | null>(null)
   useEffect(() => {
     let vivo = true

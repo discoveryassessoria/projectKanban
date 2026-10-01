@@ -7,7 +7,7 @@
 // (sem "Desfazer": um arquivo baixado não se desfaz).
 import { useEffect, useMemo, useState } from "react"
 import { auth } from "@/src/components/operacao/kit-operacional"
-import { api, erroDe } from "./torre-base"
+import { api, erroDe, useEscFecha } from "./torre-base"
 import { COLUNAS_DO_RELATORIO_DE_CONTROLE } from "@/lib/operacional/torre-relatorio-colunas"
 
 type Cor = "vermelho" | "amarelo" | "verde" | "cinza"
@@ -33,6 +33,7 @@ export function ProcessoRelatorio({ processoId, processoRotulo, familiaId, famil
   const [res, setRes] = useState<Resultado | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [exportando, setExportando] = useState<string | null>(null)
+  useEscFecha(onFechar, !exportando)
 
   useEffect(() => {
     let vivo = true
