@@ -248,6 +248,32 @@ export async function materializarExecucaoDaFase(input: MaterializarInput): Prom
     else ciclo = 1
   }
 
+  const passosAntes = phaseInstanceId != null
+    ? await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: phaseInstanceId } })
+    : 0
+
+  // ── 1.5) OBRIGAÇÕES DOCUMENTAIS — motor ÚNICO, antes dos passos ──────────
+  //
+  // As necessidades da fase nascem AQUI, das Regras Documentais PUBLICADAS, e de
+  // lugar nenhum mais. Antes existiam DOIS motores: este e a geração por árvore
+  // (DOCUMENT_RULES) embutida em `carregarContextoEscopo`. Como cada um gravava
+  // um `varianteKey` diferente para a mesma obrigação, a chave de idempotência
+  // não os reconhecia como iguais e a mesma pessoa recebia a certidão duas vezes
+  // — uma por motor.
+  //
+  // A ordem importa: as necessidades precisam existir ANTES de
+  // `instanciarWorkflowDaFase`, que é quem transforma alvo em passo.
+  if (faseMacroKey === "genealogia") {
+    try {
+      await materializarGenealogia(input.processoId)
+    } catch (e) {
+      // Falha aqui não derruba a materialização da fase: os passos que não
+      // dependem de necessidade continuam válidos, e o relatório dirá que a
+      // fase ficou sem alvo documental.
+      console.error(`[materializar-fase] materializarGenealogia falhou (proc ${input.processoId}):`, e)
+    }
+  }
+
   // ── 1.1) "AGUARDANDO FECHAMENTO" (`a_iniciar`) — SEM tarefas POR DESENHO ───────────────────────────────────────────────
   // Exceção explícita e testada: pré-trabalho, não há Workflow Interno nem passo. Materializar = garantir a instância da fase (idempotente,
   // `instanciarWorkflowDaFase` já trata a exceção) e devolver SUCESSO com 0 passos, 0 tarefas — nunca `SEM_WORKFLOW_PUBLICADO` /
@@ -278,32 +304,6 @@ export async function materializarExecucaoDaFase(input: MaterializarInput): Prom
       workflowInstanceId: instVazia.workflowInstance.id, ciclo: instVazia.workflowInstance.ciclo,
       workflowDefinitionId: null, workflowVersion: null, duracaoMs: Date.now() - inicio,
     })
-  }
-
-  const passosAntes = phaseInstanceId != null
-    ? await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: phaseInstanceId } })
-    : 0
-
-  // ── 1.5) OBRIGAÇÕES DOCUMENTAIS — motor ÚNICO, antes dos passos ──────────
-  //
-  // As necessidades da fase nascem AQUI, das Regras Documentais PUBLICADAS, e de
-  // lugar nenhum mais. Antes existiam DOIS motores: este e a geração por árvore
-  // (DOCUMENT_RULES) embutida em `carregarContextoEscopo`. Como cada um gravava
-  // um `varianteKey` diferente para a mesma obrigação, a chave de idempotência
-  // não os reconhecia como iguais e a mesma pessoa recebia a certidão duas vezes
-  // — uma por motor.
-  //
-  // A ordem importa: as necessidades precisam existir ANTES de
-  // `instanciarWorkflowDaFase`, que é quem transforma alvo em passo.
-  if (faseMacroKey === "genealogia") {
-    try {
-      await materializarGenealogia(input.processoId)
-    } catch (e) {
-      // Falha aqui não derruba a materialização da fase: os passos que não
-      // dependem de necessidade continuam válidos, e o relatório dirá que a
-      // fase ficou sem alvo documental.
-      console.error(`[materializar-fase] materializarGenealogia falhou (proc ${input.processoId}):`, e)
-    }
   }
 
   // ── 2) workflow publicado → alvos → passos (serviço canônico) ────────────

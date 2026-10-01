@@ -16,6 +16,7 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from "fs"
 import { join } from "path"
+import { phaseKeyToFaseCode } from "../src/lib/process-stage/fases-catalog"
 import {
   verificarPhaseKeys,
   phaseKeysCanonicas,
@@ -167,6 +168,20 @@ check("nenhum componente monta uma lista própria de phaseKeys", (() => {
   }
   return suspeitos.length === 0 || (suspeitos.length === 1 && suspeitos[0].includes("WorkflowMacroTrilha"))
 })())
+
+// "AGUARDANDO FECHAMENTO" (a_iniciar) — extensão fora do enum: o guard a RECONHECE, sem virar fase do enum e sem exigir workflow.
+{
+  const ai = verificarPhaseKeys({
+    ...ctxBase,
+    phaseKeysComWorkflow: new Set(phaseKeysCanonicas().filter((k) => k !== "a_iniciar")),
+    fases: [fase({ id: 1, phaseKey: "a_iniciar", ordem: 0, required: true }), fase({ id: 2, phaseKey: "genealogia", ordem: 1 })],
+    catalogoFase: [{ id: 1, phaseKey: "a_iniciar", label: "Aguardando fechamento", ativo: true }],
+  })
+  check("o guard NÃO acusa a_iniciar (nem PHASEKEY_FORA_DO_CATALOGO, nem CATALOGO_FASE_COM_CHAVE_LEGADA)", !ai.some((a) => a.tipo === "PHASEKEY_FORA_DO_CATALOGO" || a.tipo === "CATALOGO_FASE_COM_CHAVE_LEGADA"), JSON.stringify(ai))
+  check("a_iniciar é fase SEM workflow por desenho: nem obrigatória gera FASE_OBRIGATORIA_SEM_WORKFLOW", !ai.some((a) => a.tipo === "FASE_OBRIGATORIA_SEM_WORKFLOW" && a.phaseKey === "a_iniciar"))
+  check("a_iniciar está no vocabulário canônico e NÃO virou fase do enum", phaseKeysCanonicas().includes("a_iniciar") && phaseKeyToFaseCode("a_iniciar") === null)
+  check("fase fora do catálogo continua acusada (o guard não afrouxou)", verificarPhaseKeys({ ...ctxBase, fases: [fase({ id: 9, phaseKey: "a_iniciar_x" })] }).some((a) => a.tipo === "PHASEKEY_FORA_DO_CATALOGO"))
+}
 
 // ENDPOINT de criação de macro: recusa cadastro legado, nunca converte.
 const rotaMacro = read("src/app/api/gerenciamento/workflow-macro/route.ts")
