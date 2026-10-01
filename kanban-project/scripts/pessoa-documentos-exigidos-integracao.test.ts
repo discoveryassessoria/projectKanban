@@ -16,6 +16,7 @@ exigirBancoDeTeste("pessoa-documentos-exigidos-integracao.test.ts")
 import { prisma } from "../lib/prisma"
 import { criarPalco } from "./_fixture-arvore-fonte"
 import { calcularExigenciasDaGenealogia, materializarGenealogia } from "../src/services/genealogia/materializar-genealogia"
+import { iniciarAtendimentoNecessidade } from "../src/services/necessidade-documental"
 import { genealogiaZeradaPorEscolhaManual } from "../src/services/genealogia/zero-por-escolha"
 import { materializarExecucaoDaFase } from "../src/services/materializar-fase"
 import { advance } from "../src/lib/motor/phase-advance"
@@ -141,13 +142,12 @@ async function main() {
   // ───────────────────────────────────────────────────────────────────────────
   secao("C) Tipo que já ANDOU fica e gera ARV-002")
   const necAndou = (await P.foto(B.processoId)).necDe("NAS", { pessoaId: B.conjugeId! })[0]
-  await prisma.necessidadeDocumental.update({ where: { id: necAndou.id }, data: { status: "EM_ATENDIMENTO" } })
+  await iniciarAtendimentoNecessidade(necAndou.id) // pelo serviço dono: a necessidade ANDOU (PENDENTE → EM_ATENDIMENTO)
   await putDocs(B.conjugeId!, ["OBI"])
   d = await P.derivados(necAndou.id)
   ok("Nascimento EM_ATENDIMENTO NÃO é dispensado ao desmarcar (fato acontecido)", d.status === "EM_ATENDIMENTO", String(d.status))
   const arv = await verificacaoPorCodigo("ARV-002")!.executar({} as never)
   ok("ARV-002 aponta a necessidade que andou e perdeu a causa", arv.achados.some((a) => a.chave === `ARV-002:nec:${necAndou.id}`), arv.achados.map((a) => a.chave).join(","))
-  await prisma.necessidadeDocumental.update({ where: { id: necAndou.id }, data: { status: "PENDENTE" } })
   await putDocs(B.conjugeId!, null)
 
   // ───────────────────────────────────────────────────────────────────────────
