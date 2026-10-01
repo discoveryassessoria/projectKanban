@@ -155,7 +155,7 @@ async function main() {
   // Para o gate poder abrir é preciso um REQUERENTE na árvore (titular, linha principal). As regras passam a mirar só quem está
   // FORA da linha reta, e o casal deixa de ser casado: assim a única exigência é a da cônjuge — e é ela que a escolha zera.
   const REGRAS = [P.RULE.NAS, P.RULE.CAS, P.RULE.OBI]
-  const alvoDasRegras = (publico: string) => prisma.matrizDocumental.updateMany({ where: { codigo: { in: REGRAS } }, data: { publicoAlvo: publico, publicosAlvo: [publico] } })
+  const alvoDasRegras = (publico: "PESSOA_FORA_DA_LINHA_RETA" | "TODAS_AS_PESSOAS_DA_ARVORE") => prisma.matrizDocumental.updateMany({ where: { codigo: { in: REGRAS } }, data: { publicoAlvo: publico, publicosAlvo: [publico] } })
   await alvoDasRegras("PESSOA_FORA_DA_LINHA_RETA")
   const arquivarReq = (arquivado: boolean) => prisma.matrizDocumental.updateMany({ where: { codigo: P.RULE.REQ }, data: { arquivado } })
   await arquivarReq(true) // a certidão do requerente (regra REQ) também é exigência real; fica de fora só deste cenário
