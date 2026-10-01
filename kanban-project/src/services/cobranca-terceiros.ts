@@ -76,6 +76,8 @@ export async function cobrarTarefas(args: {
   resultado?: string
   observacao?: string | null
   dataContato?: Date | null
+  /** "Próxima cobrança em (dias)" (Torre › Terceiros): dias corridos a partir de agora. Ausente = a régua do cadastro. */
+  proximaEmDias?: number | null
   exigirAguardando?: boolean
 }): Promise<{ cobradas: Array<{ tarefaId: number; contatoId: number; canal: string; orgaoId: number | null }>; ignoradas: CobrancaIgnorada[] }> {
   const ids = [...new Set(args.tarefaIds)]
@@ -109,7 +111,7 @@ export async function cobrarTarefas(args: {
     const r = await registrarCobranca({
       stepInstanceId: corrente.stepInstanceId, subtaskKey: corrente.subtaskKey, canal, resultado,
       observacao: args.observacao ?? null, documentoId: t.documentoId ?? null, orgaoId,
-      registradoPorId: args.autor.userId, dataContato: args.dataContato ?? null,
+      registradoPorId: args.autor.userId, dataContato: args.dataContato ?? null, proximaEmDias: args.proximaEmDias ?? null,
     })
     if (r.ok) cobradas.push({ tarefaId: t.id, contatoId: r.contatoId, canal, orgaoId })
     else ignoradas.push({ tarefaId: t.id, motivo: r.motivo })

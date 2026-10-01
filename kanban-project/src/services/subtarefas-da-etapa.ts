@@ -811,6 +811,10 @@ export async function cobrancasSemRespostaDesde(subtaskExecutionId: number, db: 
   return contarCobrancasSemResposta(contatos.map((c) => c.resultado))
 }
 
+/** Teto da "Próxima cobrança em (dias)": dois meses de dias corridos. */
+export const MAX_PROXIMA_COBRANCA_DIAS = 60
+export const proximaEmDiasValida = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= MAX_PROXIMA_COBRANCA_DIAS
+
 /**
  * REGISTRA UMA COBRANÇA (contato ao terceiro) — Etapa 2, item 5; `resultado`
  * obrigatório desde o Bloco B (Torre de Controle, 29/09/2026).
@@ -846,12 +850,19 @@ export async function registrarCobranca(args: {
   registradoPorId?: number | null
   /** Quando o contato ACONTECEU, se diferente de agora (registro retroativo). */
   dataContato?: Date | null
+  /**
+   * "Próxima cobrança em (dias)" escolhida por quem cobra (Torre › Terceiros): dias CORRIDOS a partir de agora.
+   * Ausente = a régua do cadastro (`diasAposCobranca` do passo), como sempre. Inteiro de 1 a `MAX_PROXIMA_COBRANCA_DIAS`;
+   * valor fora disso é recusado (`PROXIMA_EM_DIAS_INVALIDO`) — nunca ajustado em silêncio.
+   */
+  proximaEmDias?: number | null
 }): Promise<
-  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" | "RESULTADO_INVALIDO" | "CANAL_INVALIDO" }
+  | { ok: false; motivo: "SEM_EXECUCAO_VIGENTE" | "SEM_TAREFA" | "RESULTADO_INVALIDO" | "CANAL_INVALIDO" | "PROXIMA_EM_DIAS_INVALIDO" }
   | { ok: true; contatoId: number; totalContatos: number; cobrancasSemResposta: number; escalada: boolean; proximoAcompanhamentoEm: Date | null }
 > {
   if (!(RESULTADOS_DE_CONTATO as readonly string[]).includes(args.resultado)) return { ok: false, motivo: "RESULTADO_INVALIDO" }
   if (!(CANAIS_DE_CONTATO as readonly string[]).includes(args.canal)) return { ok: false, motivo: "CANAL_INVALIDO" }
+  if (args.proximaEmDias != null && !proximaEmDiasValida(args.proximaEmDias)) return { ok: false, motivo: "PROXIMA_EM_DIAS_INVALIDO" }
 
   const { execucaoVigente, registrarNaExecucao } = await import("@/src/services/execucao-da-subtarefa")
   const vigente = await execucaoVigente(args.stepInstanceId, args.subtaskKey)
@@ -863,7 +874,7 @@ export async function registrarCobranca(args: {
   if (!tarefa) return { ok: false, motivo: "SEM_TAREFA" }
 
   const hist = await definicaoHistoricaDoPasso(args.stepInstanceId)
-  const diasAposCobranca = hist?.passo.diasAposCobranca ?? 1
+  const diasAposCobranca = args.proximaEmDias ?? hist?.passo.diasAposCobranca ?? 1
   const escalarApos = hist?.passo.escalarApos ?? 2
 
   const contato = await prisma.contatoTerceiro.create({
@@ -889,6 +900,13 @@ export async function registrarCobranca(args: {
   // padrão), o comportamento é exatamente o de sempre.
   const { regraAtiva } = await import("@/lib/operacional/regras-torre")
   if (!(await regraAtiva("r2"))) {
+    // A data ESCOLHIDA por quem cobrou (Torre › Terceiros) é decisão humana, não ação da régua: vale mesmo com a régua
+    // desligada. Sem escolha, nada é reagendado (comportamento de sempre). A escalada segue sendo só da régua.
+    if (args.proximaEmDias != null) {
+      const marcada = prazoOperacional(args.proximaEmDias, new Date())
+      await registrarNaExecucao(args.stepInstanceId, args.subtaskKey, { proximoAcompanhamentoEm: marcada })
+      return { ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta, escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: marcada }
+    }
     return {
       ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta,
       escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: vigente.proximoAcompanhamentoEm ?? null,
