@@ -196,6 +196,16 @@ const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFi
 const cortar = (s: string, n = 240) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s)
 
 /** "Motivo: X · Justificativa: Y · Impacto: Z" (o texto que o modal de cancelamento compõe) → campos. */
+/** O motivo CODIFICADO de um cancelamento automático, em português — a MESMA frase no histórico e no "Motivo" da certidão cancelada. */
+export const ROTULO_MOTIVO_CANCELAMENTO: Readonly<Record<string, string>> = {
+  CAUSA_REMOVIDA: 'a exigência deixou de existir (o workflow que a originou foi encerrado)',
+}
+/** Código cru (ex.: CAUSA_REMOVIDA) → rótulo legível; texto livre digitado por pessoa passa sem mudança. */
+export const rotuloDoMotivoDeCancelamento = (motivo: string | null | undefined): string | null => {
+  const t = (motivo ?? '').trim()
+  return t ? (ROTULO_MOTIVO_CANCELAMENTO[t] ?? t) : null
+}
+
 export function lerMotivoComposto(bruto: string | null | undefined): { motivo: string | null; justificativa: string | null; impacto: string | null; slaNaoCancelado: boolean; estruturado: boolean } {
   const t = (bruto ?? '').replace(/^Opera[cç][aã]o cancelada:\s*/i, '').trim()
   if (!t) return { motivo: null, justificativa: null, impacto: null, slaNaoCancelado: false, estruturado: false }
@@ -460,7 +470,7 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       const automatico = autor == null
       const causaRemovida = automatico && txt(d.motivo) === 'CAUSA_REMOVIDA'
       const alvo = { ...alvoDaTarefa, necessidadeId: num(d.necessidadeId) }
-      const a = novoAtomo(ctx, { ...origem, rank: 3, tipo: 'CERTIDAO', subtipo: 'cancelada', verbo: automatico ? 'retirou do trabalho' : 'cancelou', motivo: causaRemovida ? 'a exigência deixou de existir (o workflow que a originou foi encerrado)' : composto.motivo, justificativa: composto.justificativa }, alvo)
+      const a = novoAtomo(ctx, { ...origem, rank: 3, tipo: 'CERTIDAO', subtipo: 'cancelada', verbo: automatico ? 'retirou do trabalho' : 'cancelou', motivo: causaRemovida ? ROTULO_MOTIVO_CANCELAMENTO.CAUSA_REMOVIDA : composto.motivo, justificativa: composto.justificativa }, alvo)
       const r = resolverAlvo(ctx, alvo)
       a.objeto = sobre(ctx, r, 'a')
       if (!temCertidao(r)) a.tipo = 'TAREFA'

@@ -271,7 +271,7 @@ const maisCedo = <T extends LinhaParaDerivar>(ls: T[]): T =>
  * O cartão "Próxima ação · obrigatória": a MESMA derivação da aba Processos (`torre-proxima-acao.ts`, decisão 3 do PROGRESSO.md —
  * lida das tarefas abertas da fase, nunca digitada). Aqui só se REDIGE o cartão do protótipo:
  *   título   "Distribuir as 12 certidões de Emissão documental" (a ação + a fase, quando a ação é distribuir);
- *   detalhe  "responsável: nenhum · prazo: hoje · por isso este processo está em "Precisa de você"".
+ *   detalhe  "sem responsável · prazo: hoje · por isso este processo está em "Precisa de você"" (com dono: "responsável: <nome> · prazo: …").
  */
 export function cartaoDaProximaAcao(
   a: { texto: string; tipo: string; urgencia: 'atrasada' | 'vence_em_breve' | null; responsavelNome: string | null },
@@ -281,7 +281,7 @@ export function cartaoDaProximaAcao(
   const prazo = prazoTexto ?? 'sem prazo'
   return {
     titulo,
-    detalhe: `responsável: ${a.responsavelNome ?? 'nenhum'} · prazo: ${prazo}${noPrecisaDeVoce ? ' · por isso este processo está em "Precisa de você"' : ''}`,
+    detalhe: `${a.responsavelNome ? `responsável: ${a.responsavelNome}` : 'sem responsável'} · prazo: ${prazo}${noPrecisaDeVoce ? ' · por isso este processo está em "Precisa de você"' : ''}`,
     urgente: a.tipo === 'distribuir' || a.urgencia === 'atrasada',
   }
 }

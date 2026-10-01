@@ -88,7 +88,7 @@ async function main() {
   ok("Pausado vence tudo", seloDoCabecalho({ pausado: true, risco: "critico", numeros: { vencidas: 4, semResponsavel: 2, comCartorio: 0 } }).rotulo === "Pausado")
   const pa = cartaoDaProximaAcao({ texto: "Distribuir as 12 certidões", tipo: "distribuir", urgencia: null, responsavelNome: null }, "hoje", "Emissão documental", true)
   ok("Distribuir as 12 certidões de Emissão documental", pa.titulo === "Distribuir as 12 certidões de Emissão documental")
-  ok('responsável: nenhum · prazo: hoje · por isso…"Precisa de você"', pa.detalhe === 'responsável: nenhum · prazo: hoje · por isso este processo está em "Precisa de você"' && pa.urgente)
+  ok('sem responsável · prazo: hoje · por isso…"Precisa de você"', pa.detalhe === 'sem responsável · prazo: hoje · por isso este processo está em "Precisa de você"' && pa.urgente)
 
   secao("cinco cartões")
   const base = (o: Partial<LinhaParaDerivar>): LinhaParaDerivar => ({
