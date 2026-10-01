@@ -24,9 +24,10 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { lerLinhasOperacionais } from './avisos-sino'
-import type { LinhaGerencial } from './tarefa-projecoes'
+import { visaoGerencial, type LinhaGerencial } from './tarefa-projecoes'
+import { semFaseFutura } from './fase-futura'
 import { STATUS_ATIVOS } from './tarefa-canonica'
-import { FUSO_OPERACIONAL } from './tempo-operacional'
+import { FUSO_OPERACIONAL, janelaDoDiaOperacionalDe, diaOperacional } from './tempo-operacional'
 import { conferirCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 import { ordensDeFase } from '@/src/services/documento-operacao'
 import { lerOrganizacao, unidadesDasTarefas, capacidadeMedidaPorUsuario, rotulosDasUnidades } from './organizacao'
@@ -34,6 +35,17 @@ import { equipeExigida } from './elegibilidade'
 import { pessoasNoLimite } from './torre-equipe'
 import { idsDeProcessosPausados, semProcessosPausados } from '@/src/services/processo-pausa'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
+import { ONDE_PROCESSO_NAO_PAUSADO } from '@/src/services/processo-pausa'
+import { entradaNaFase, RESULTADOS_QUE_MOVEM_DE_FASE } from './metricas-processo'
+import { resolverMacroWorkflowDoProcesso } from '@/src/lib/motor/resolver-macro-workflow'
+import { proximaFaseDoCaminho } from '@/src/lib/motor/phase-advance-helpers'
+import { resolveWorkflowRuntime } from '@/src/lib/workflow-runtime'
+import { labelDaFasePorPhaseKey, FASES } from '@/src/lib/process-stage/fases-catalog'
+import {
+  ROTULO_DO_TIPO, TIPOS_DO_PAINEL, ESCALAR_APOS_PADRAO, bloqueioPedeDecisao, certidoes, contagemPorTipo, diasDeCalendario,
+  identidadeDaCertidao, planoDoSemDono, quantoMoverDaCarga, textosDaBloqueada, textosDaCarga, textosDaDivergencia, textosDaEscalada,
+  textosDaFaseDeixada, textosDoSemDono, type PlanoDoSemDono, type SugestaoParaTexto, type TipoDoPainel,
+} from './precisa-de-voce-decisoes'
 import {
   urlDistribuicaoDoProcesso, urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia,
 } from './navegacao'
@@ -115,6 +127,13 @@ export interface SugestaoDeResponsavel {
   fallback?: boolean
   /** As ativas de quem foi sugerido (a carga que decidiu o fallback). */
   ativas?: number
+  /**
+   * A APTIDÃO COMPROVADA que justificou a escolha, estruturada (só do cadastro — nunca inferida): o país do processo (M3), a unidade
+   * de trabalho, a equipe exigida. Ausente no fallback e no sucessor de ausente (nenhuma aptidão a citar).
+   */
+  aptoEm?: string | null
+  aptoA?: string | null
+  equipe?: string | null
 }
 
 /** O que da TAREFA decide quem é apto: a unidade de trabalho, o país do processo e a equipe exigida (todos do cadastro). */
@@ -224,6 +243,8 @@ export async function carregarContextoDeSugestao(
  */
 export function escolherResponsavel(
   ctx: ContextoDeSugestao, alvo: AlvoDaSugestao | number | null, extraAtivas?: ReadonlyMap<number, number>,
+  /** Quem NÃO pode ser sugerido (ex.: a origem de uma redistribuição, quem já está no limite). Ausente = ninguém é excluído. */
+  excluir?: ReadonlySet<number>,
 ): SugestaoDeResponsavel | null {
   const { unidadeOperacionalId, equipeExigida: exigida, paisId = null }: AlvoDaSugestao =
     alvo != null && typeof alvo === 'object' ? alvo : { unidadeOperacionalId: alvo, equipeExigida: null }
@@ -244,6 +265,7 @@ export function escolherResponsavel(
   // porque não está recebendo trabalho novo) e só então é redirecionado
   // para quem ele mesmo sugeriu como sucessor (Bloco E2).
   const elegiveis = ctx.usuarios.filter((u) => {
+    if (excluir?.has(u.id)) return false
     const permissoes = calcularPermissoes(u.tipo, u.perfil?.permissoes as MapaPermissoes | null, u.permissoesCustom as MapaPermissoes | null)
     if (!temPermissao(permissoes, 'tarefas.iniciar_concluir')) return false
     if (equipeEhRegra && !membrosDaEquipe!.has(u.id)) return false
@@ -278,7 +300,10 @@ export function escolherResponsavel(
         usuarioId: c.id, nome: c.nome, ativas: c.ativas,
         ...(semAptidaoCadastrada
           ? { fallback: true, motivo: `sem aptidão cadastrada para esta tarefa; menor carga (${c.ativas} ativa(s))` }
-          : { motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}${paisEhRegra ? `, apto em ${nomeDoPais ?? `país #${paisId}`}` : ''}${equipeEhRegra ? `, da equipe ${exigida}` : ''}` }),
+          : {
+              motivo: `${c.ativas} ativa(s)${nomeDaUnidade ? `, apto a ${nomeDaUnidade}` : ''}${paisEhRegra ? `, apto em ${nomeDoPais ?? `país #${paisId}`}` : ''}${equipeEhRegra ? `, da equipe ${exigida}` : ''}`,
+              aptoEm: paisEhRegra ? nomeDoPais ?? `país #${paisId}` : null, aptoA: nomeDaUnidade, equipe: equipeEhRegra ? exigida : null,
+            }),
       }
     }
     const sucessor = indisponivel.sucessorSugerido
@@ -286,7 +311,9 @@ export function escolherResponsavel(
       return {
         usuarioId: sucessor.usuarioId, nome: sucessor.nome,
         motivo: `${c.nome} está ausente — sucessor sugerido para a carteira.`,
-        ...(semAptidaoCadastrada ? { fallback: true } : {}),
+        ...(semAptidaoCadastrada
+          ? { fallback: true }
+          : { aptoEm: paisEhRegra ? nomeDoPais ?? `país #${paisId}` : null, aptoA: nomeDaUnidade, equipe: equipeEhRegra ? exigida : null }),
       }
     }
   }
@@ -349,6 +376,30 @@ const rotuloDaFamilia = (l: LinhaGerencial) => l.familiaNome ?? l.processoNome ?
 export async function itensPrecisaDeVoce(
   opts: { agora?: Date; linhas?: LinhaGerencial[]; db?: Db; organizacao?: ContextoDeSugestao['organizacao']; adiantadas?: LeiturasAdiantadas } = {},
 ): Promise<ItemPrecisaDeVoceTorre[]> {
+  return (await lerBaseDoPrecisa(opts)).itens
+}
+
+/**
+ * A LEITURA-BASE do "Precisa de você": os itens POR TAREFA (o que o score, o Radar e a regra r1 leem) e o que as DECISÕES do dia
+ * (`montarPrecisaDeVoce`) precisam para se apresentar — as linhas abertas, as divergências, o score de cada tarefa, quem está no limite.
+ * `itensPrecisaDeVoce` é esta função devolvendo só os itens: um caminho só.
+ */
+export interface BaseDoPrecisa {
+  itens: ItemPrecisaDeVoceTorre[]
+  /** Só tarefa ABERTA, de processo não pausado, nunca de fase futura — o universo de todos os itens. */
+  linhas: LinhaGerencial[]
+  divergencias: Awaited<ReturnType<typeof conferirCoerenciaPassoTarefa>>
+  tarefasDivergentes: Set<number>
+  scorePorTarefa: Map<number, number>
+  fasesEspeciais: Set<string>
+  noLimite: Awaited<ReturnType<typeof pessoasNoLimite>>
+  /** A fase ATUAL de cada processo das linhas (`Processo.faseAtualKey`) — a linha traz o rótulo, não a chave. */
+  faseAtualPorProcesso: Map<number, string | null>
+}
+
+export async function lerBaseDoPrecisa(
+  opts: { agora?: Date; linhas?: LinhaGerencial[]; db?: Db; organizacao?: ContextoDeSugestao['organizacao']; adiantadas?: LeiturasAdiantadas } = {},
+): Promise<BaseDoPrecisa> {
   const agora = opts.agora ?? new Date()
   const db = opts.db ?? prisma
   // PROCESSO PAUSADO FICA FORA DA TORRE (M2, filtro canônico `semProcessosPausados`): a lista de decisões é da Torre, então
@@ -416,19 +467,23 @@ export async function itensPrecisaDeVoce(
   const tarefasDivergentes = new Set(divergencias.map((d) => d.tarefaId))
 
   const itens: ItemPrecisaDeVoceTorre[] = []
+  const scorePorTarefa = new Map<number, number>()
 
   for (const l of linhas) {
     const fatores: FatoresDeRisco = {
       semDono: l.responsavelId == null,
       vencida: l.atrasada === true,
       acompanhamentoVencido: l.acompanhamentoVencido === true,
-      cobrancasSemRespostaMuitas: (l.cobrancasSemResposta ?? 0) >= 2,
+      // ESCALADA = cobrança sem resposta ≥ o limite do CADASTRO do passo (`escalarApos`): a linha traz `escalada`, ligada pelo
+      // próprio motor de cobrança quando a contagem de cobranças sem resposta atinge esse limite — nunca um "2" fixo aqui.
+      cobrancasSemRespostaMuitas: l.escalada === true,
       faseDeixada: (l as unknown as { faseAnteriorAFaseAtual?: boolean }).faseAnteriorAFaseAtual === true,
       divergente: tarefasDivergentes.has(l.taskId),
       bloqueada: l.statusTarefa === 'BLOQUEADA',
       faseApostilamentoOuRetificacao: l.faseMacroKey != null && fasesEspeciais.has(l.faseMacroKey),
     }
     const score = scoreDeRisco(fatores)
+    scorePorTarefa.set(l.taskId, score)
     if (score === 0) continue
     const faixa = faixaDoScore(score)
     const familia = rotuloDaFamilia(l)
@@ -520,7 +575,7 @@ export async function itensPrecisaDeVoce(
   // Gerenciamento › Saúde do sistema; a Torre serve só à gestão de processo. O tipo continua existindo, mas nunca é produzido.
 
   itens.sort((a, b) => b.score - a.score || a.tipo.localeCompare(b.tipo) || (a.tarefaId ?? 0) - (b.tarefaId ?? 0))
-  return itens
+  return { itens, linhas, divergencias, tarefasDivergentes, scorePorTarefa, fasesEspeciais, noLimite, faseAtualPorProcesso }
 }
 
 /** O texto que a tela mostra: com aptidão, "Sugiro X: motivo"; sem aptidão cadastrada, o FALLBACK dito com todas as letras. */
@@ -589,6 +644,420 @@ export async function comSugestoes(
   })
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AS DECISÕES DO DIA — o que a Torre MOSTRA (frente B2, 01/10/2026)
+//
+// Os itens por TAREFA acima (`lerBaseDoPrecisa`) são a base. As decisões são a apresentação do protótipo (inventário §2.4):
+// "Sem responsável" e "Fase deixada" agregam por PROCESSO; Escalada, Divergência e Bloqueada seguem por tarefa; Carga por pessoa.
+// Cada texto vem de `precisa-de-voce-decisoes.ts` (puro). A sugestão NUNCA aponta quem não tem aptidão comprovada.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const linkDoProcesso = (processoId: number) => `/torre/processo/${processoId}`
+
+/** A tarefa entra em "Sem responsável"? Aberta (a base já filtrou), sem dono, e não é Divergência (que tem prioridade). UMA definição: lista e ação leem esta. */
+export const ehSemDonoDoPainel = (l: Pick<LinhaGerencial, 'responsavelId' | 'taskId'>, divergentes: ReadonlySet<number>): boolean =>
+  l.responsavelId == null && !divergentes.has(l.taskId)
+
+/**
+ * As certidões sem responsável de UM processo, do jeito que o item da lista as conta: abertas, fora de fase futura, não administrativas
+ * e não-divergentes. A ação "Atribuir" age exatamente neste conjunto — o que a pessoa viu é o que é atribuído.
+ */
+export async function semDonoDoProcesso(processoId: number, agora: Date, db: Db = prisma): Promise<number[]> {
+  const { linhas } = await visaoGerencial({ processoId, semResponsavel: true, porPagina: 500 }, agora, db)
+  const abertas = semFaseFutura(linhas).filter((l) => STATUS_ATIVOS.includes(l.statusTarefa))
+  if (abertas.length === 0) return []
+  const admin = await db.tarefa.findMany({ where: { id: { in: abertas.map((l) => l.taskId) }, tipo: 'ADMINISTRATIVA' }, select: { id: true } })
+  const ehAdmin = new Set(admin.map((a) => a.id))
+  const candidatas = abertas.filter((l) => !ehAdmin.has(l.taskId))
+  const comPasso = await db.tarefa.findMany({ where: { id: { in: candidatas.map((l) => l.taskId) }, workflowStepInstanceId: { not: null } }, select: { workflowStepInstanceId: true } })
+  const divergentes = new Set(
+    (await conferirCoerenciaPassoTarefa(db as Prisma.TransactionClient, [...new Set(comPasso.map((t) => t.workflowStepInstanceId as number))])).map((d) => d.tarefaId),
+  )
+  return candidatas.filter((l) => ehSemDonoDoPainel(l, divergentes)).map((l) => l.taskId)
+}
+
+/** A sugestão de UMA tarefa, no formato do texto — com a aptidão por extenso e a "fila livre" (abaixo do limite cadastrado). */
+export function sugestaoParaTexto(ctx: ContextoDeSugestao, s: SugestaoDeResponsavel | null): SugestaoParaTexto | null {
+  if (!s) return null
+  const limite = ctx.organizacao.get(s.usuarioId)?.limiteExecutaveis ?? null
+  const aptidao = s.aptoEm ? [`apto em ${s.aptoEm}`] : s.aptoA ? [`apto a ${s.aptoA}`] : s.equipe ? [`da equipe ${s.equipe}`] : []
+  const ativas = s.ativas ?? ctx.ativasPorUsuario.get(s.usuarioId) ?? 0
+  return {
+    usuarioId: s.usuarioId, nome: s.nome, fallback: s.fallback === true, aptidao, ativas,
+    filaLivre: limite != null && ativas < limite,
+  }
+}
+
+/**
+ * O PLANO de atribuição de um conjunto de tarefas sem responsável: cada tarefa vai para QUEM TEM APTIDÃO comprovada (a regra de
+ * `escolherResponsavel`), agrupadas por pessoa; sem apto → fica para decisão humana. A lista e a ação usam ESTA função.
+ */
+export async function planoDeAtribuicao(
+  tarefaIds: number[], agora: Date, db: Db = prisma, ctxJaLido?: ContextoDeSugestao, alvosJaLidos?: ReadonlyMap<number, AlvoDaSugestao>,
+): Promise<PlanoDoSemDono> {
+  if (tarefaIds.length === 0) return { atribuicoes: [], semAptidao: [] }
+  const [ctx, alvos] = await Promise.all([
+    ctxJaLido ? Promise.resolve(ctxJaLido) : carregarContextoDeSugestao(agora, db),
+    alvosJaLidos && tarefaIds.every((id) => alvosJaLidos.has(id)) ? Promise.resolve(alvosJaLidos) : alvosDeSugestao(tarefaIds, db),
+  ])
+  const porAlvo = new Map<string, SugestaoParaTexto | null>()
+  const sugestaoDe = (id: number): SugestaoParaTexto | null => {
+    const alvo = alvos.get(id) ?? { unidadeOperacionalId: null, equipeExigida: null }
+    const chave = `${alvo.unidadeOperacionalId ?? '-'}|${alvo.equipeExigida ?? '-'}|${alvo.paisId ?? '-'}`
+    if (!porAlvo.has(chave)) porAlvo.set(chave, sugestaoParaTexto(ctx, escolherResponsavel(ctx, alvo)))
+    return porAlvo.get(chave) ?? null
+  }
+  return planoDoSemDono(tarefaIds.map((taskId) => ({ taskId, sugestao: sugestaoDe(taskId) })))
+}
+
+// ─── FASE DEIXADA — "fase sem próxima ação" ─────────────────────────────────
+
+export interface ProcessoSemProximaAcao {
+  processoId: number
+  familia: string
+  pais: string | null
+  faseKey: string
+  faseLabel: string
+  proximaFaseKey: string
+  proximaFaseLabel: string
+  /** A conclusão mais recente de uma tarefa DESTA fase (registro real); `null` = a fase nunca teve tarefa concluída. */
+  ultimaConclusao: Date | null
+  /** Quando entrou na fase (`entradaNaFase`, registro real); `null` = sem registro. */
+  entrouNaFase: Date | null
+}
+
+/**
+ * OS PROCESSOS EM FASE SEM PRÓXIMA AÇÃO: ativos (não concluídos, não pausados), no motor v2, cuja fase atual NÃO tem nenhuma tarefa
+ * aberta (nem de trabalho nem de espera) e que ainda têm para onde ir (a próxima fase do caminho, com o desvio condicional da Análise).
+ * Fase por-processo de avanço MANUAL (Apostilamento, Tradução…) é o caso típico: terminou o trabalho e ninguém clicou "avançar".
+ */
+export async function processosSemProximaAcao(db: Db = prisma): Promise<ProcessoSemProximaAcao[]> {
+  const cfg = await db.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
+  const v2Global = cfg?.runtimeV2Habilitado ?? false
+  if (!v2Global) return []
+  const procs = (await db.processo.findMany({
+    where: { dataConclusao: null, ...ONDE_PROCESSO_NAO_PAUSADO, faseAtualKey: { not: null }, tipoProcessoMotorId: { not: null }, modalidadeId: { not: null } },
+    orderBy: { id: 'asc' },
+    select: {
+      id: true, nome: true, faseAtualKey: true, tipoProcessoMotorId: true, modalidadeId: true, workflowRuntime: true,
+      familia: { select: { nome: true } }, paisCanonico: { select: { countryLabel: true } },
+    },
+  })).filter((p) => resolveWorkflowRuntime(p.workflowRuntime, v2Global) === 'v2')
+  if (procs.length === 0) return []
+  const ids = procs.map((p) => p.id)
+
+  // Tarefa ABERTA da fase atual (ou sem fase: transversal) = há próxima ação. Uma leitura para todos os processos.
+  const abertas = await db.tarefa.groupBy({
+    by: ['processoId', 'faseMacroKey'], where: { processoId: { in: ids }, statusTarefa: { in: STATUS_ATIVOS } }, _count: { _all: true },
+  })
+  const comAcao = new Set<number>()
+  const fasePorProcesso = new Map(procs.map((p) => [p.id, p.faseAtualKey as string]))
+  for (const a of abertas) {
+    if (a.processoId == null) continue
+    if (a.faseMacroKey == null || a.faseMacroKey === fasePorProcesso.get(a.processoId)) comAcao.add(a.processoId)
+  }
+  const candidatos = procs.filter((p) => !comAcao.has(p.id))
+  if (candidatos.length === 0) return []
+
+  const candIds = candidatos.map((p) => p.id)
+  const [macros, analises, concluidas] = await Promise.all([
+    Promise.all([...new Set(candidatos.map((p) => `${p.tipoProcessoMotorId}:${p.modalidadeId}`))].map(async (par) => {
+      const [t, m] = par.split(':').map(Number)
+      return [par, await resolverMacroWorkflowDoProcesso(t, m, db)] as const
+    })),
+    db.analiseDocumental.findMany({ where: { processoId: { in: candIds } }, select: { processoId: true, requerRetificacao: true } }),
+    db.tarefa.groupBy({
+      by: ['processoId', 'faseMacroKey'],
+      where: { processoId: { in: candIds }, statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] }, dataConclusao: { not: null } },
+      _max: { dataConclusao: true },
+    }),
+  ])
+  const macroPorPar = new Map(macros)
+  const requerRetificacao = new Map(analises.map((a) => [a.processoId, a.requerRetificacao === true]))
+  const ultimaPorProcessoFase = new Map<string, Date>()
+  for (const c of concluidas) if (c.processoId != null && c._max.dataConclusao) ultimaPorProcessoFase.set(`${c.processoId}|${c.faseMacroKey ?? ''}`, c._max.dataConclusao)
+
+  const saida: ProcessoSemProximaAcao[] = []
+  const prontos = candidatos.flatMap((p) => {
+    const macro = macroPorPar.get(`${p.tipoProcessoMotorId}:${p.modalidadeId}`)
+    if (!macro) return []
+    const proxima = proximaFaseDoCaminho(macro.fases, p.faseAtualKey as string, requerRetificacao.get(p.id) === true)
+    if (!proxima) return [] // última fase: não há para onde ir
+    const rotuloDe = (k: string) => macro.fases.find((f) => f.phaseKey === k)?.label ?? labelDaFasePorPhaseKey(k) ?? k
+    return [{ p, faseLabel: rotuloDe(p.faseAtualKey as string), proxima, proximaLabel: rotuloDe(proxima) }]
+  })
+  // A ENTRADA NA FASE vem da função canônica única; em blocos, como o resto da Torre (pool de conexões pequeno).
+  for (let i = 0; i < prontos.length; i += 4) {
+    const bloco = await Promise.all(prontos.slice(i, i + 4).map(async ({ p, faseLabel, proxima, proximaLabel }): Promise<ProcessoSemProximaAcao> => {
+      const entrada = await entradaNaFase(p.id, p.faseAtualKey as string)
+      return {
+        processoId: p.id, familia: p.familia?.nome ?? p.nome, pais: p.paisCanonico?.countryLabel ?? null,
+        faseKey: p.faseAtualKey as string, faseLabel, proximaFaseKey: proxima, proximaFaseLabel: proximaLabel,
+        ultimaConclusao: ultimaPorProcessoFase.get(`${p.id}|${p.faseAtualKey}`) ?? null,
+        entrouNaFase: entrada.desde ? new Date(entrada.desde) : null,
+      }
+    }))
+    saida.push(...bloco)
+  }
+  return saida
+}
+
+// ─── ESCALADA / BLOQUEADA — o que a linha não traz ──────────────────────────
+
+async function lerExtrasDaEscalada(ids: number[], db: Db) {
+  if (ids.length === 0) return { pedidoEm: new Map<number, Date>(), contatos: new Map<number, Array<{ canal: string; resultado: string }>>(), orgaoPorTarefa: new Map<number, string>() }
+  const [pedidos, contatos, comOrgao] = await Promise.all([
+    db.solicitacaoDocumento.findMany({ where: { tarefaId: { in: ids } }, orderBy: { createdAt: 'desc' }, select: { tarefaId: true, dataEnvio: true } }),
+    db.contatoTerceiro.findMany({ where: { tarefaId: { in: ids } }, orderBy: [{ registradoEm: 'desc' }, { id: 'desc' }], select: { tarefaId: true, canal: true, resultado: true } }),
+    db.tarefa.findMany({ where: { id: { in: ids }, orgaoId: { not: null } }, select: { id: true, orgaoId: true } }),
+  ])
+  const pedidoEm = new Map<number, Date>()
+  for (const x of pedidos) if (x.tarefaId != null && x.dataEnvio && !pedidoEm.has(x.tarefaId)) pedidoEm.set(x.tarefaId, x.dataEnvio)
+  const porTarefa = new Map<number, Array<{ canal: string; resultado: string }>>()
+  for (const c of contatos) if (c.tarefaId != null) porTarefa.set(c.tarefaId, [...(porTarefa.get(c.tarefaId) ?? []), { canal: String(c.canal), resultado: String(c.resultado) }])
+  // O ÓRGÃO canônico da tarefa (`Tarefa.orgaoId`): a linha só traz o nome quando o Documento o resolve — este é o mesmo cadastro (OrgaoProtocolo).
+  const orgaos = comOrgao.length ? await db.orgaoProtocolo.findMany({ where: { id: { in: comOrgao.map((t) => t.orgaoId as number) } }, select: { id: true, name: true } }) : []
+  const nomeDoOrgao = new Map(orgaos.map((o) => [o.id, o.name]))
+  const orgaoPorTarefa = new Map<number, string>()
+  for (const t of comOrgao) { const n = nomeDoOrgao.get(t.orgaoId as number); if (n) orgaoPorTarefa.set(t.id, n) }
+  return { pedidoEm, contatos: porTarefa, orgaoPorTarefa }
+}
+
+/** Desde quando cada tarefa está BLOQUEADA (o último bloqueio registrado) e quantas cobranças ao cliente já houve. Sem registro → ausente (nunca inventado). */
+async function lerExtrasDaBloqueada(ids: number[], db: Db) {
+  const desde = new Map<number, Date>()
+  const cobrancas = new Map<number, number>()
+  if (ids.length === 0) return { desde, cobrancas }
+  const [logs, eventos, cobr] = await Promise.all([
+    db.logAuditoria.findMany({ where: { entidade: 'Tarefa', entidadeId: { in: ids }, acao: 'TAREFA_BLOQUEADA' }, select: { entidadeId: true, criadoEm: true } }),
+    db.workflowEvento.findMany({ where: { entityType: 'tarefa', entityId: { in: ids }, tipo: 'TAREFA_BLOQUEADA' }, select: { entityId: true, criadoEm: true } }),
+    db.logAuditoria.groupBy({ by: ['entidadeId'], where: { entidade: 'Tarefa', entidadeId: { in: ids }, acao: 'COBRANCA_CLIENTE_BLOQUEIO' }, _count: { _all: true } }),
+  ])
+  const ver = (id: number | null, quando: Date) => { if (id != null && (!desde.has(id) || desde.get(id)! < quando)) desde.set(id, quando) }
+  for (const l of logs) ver(l.entidadeId, l.criadoEm)
+  for (const e of eventos) ver(e.entityId, e.criadoEm)
+  for (const c of cobr) if (c.entidadeId != null) cobrancas.set(c.entidadeId, c._count._all)
+  return { desde, cobrancas }
+}
+
+/** O limite de cobranças sem resposta que ESCALA, do cadastro (o valor mais usado nos passos); o padrão do cadastro quando nada diz. */
+export async function escalarAposDoCadastro(db: Db = prisma): Promise<number> {
+  const grupos = await db.phaseInternalWorkflowStep.groupBy({ by: ['escalarApos'], where: { escalarApos: { not: null } }, _count: { _all: true } }).catch(() => [])
+  const mais = [...grupos].sort((a, b) => b._count._all - a._count._all || (a.escalarApos ?? 0) - (b.escalarApos ?? 0))[0]
+  return mais?.escalarApos ?? ESCALAR_APOS_PADRAO
+}
+
+// ─── CARGA — o plano de redistribuição ──────────────────────────────────────
+
+export interface PlanoDaCarga {
+  usuarioId: number
+  nome: string
+  executaveis: number
+  limite: number
+  vencidas: number
+  /** As certidões "a iniciar" (ainda não iniciadas) que sairiam da carteira, cada uma com a pessoa APTA e de fila livre que a receberia. */
+  movimentos: Array<{ tarefaId: number; paraUsuarioId: number; paraNome: string; pais: string | null }>
+  filaEmSemanas: number | null
+}
+
+/**
+ * O PLANO de uma pessoa no limite: quantas certidões a iniciar mover (o bastante para ficar UMA abaixo do limite) e para quem — só
+ * aptos comprovados, fora a própria pessoa e fora quem também está no limite. A lista (texto + rótulo do botão) e a ação usam ESTA função.
+ */
+export function planejarRedistribuicaoDaCarga(args: {
+  pessoa: { usuarioId: number; nome: string; executaveis: number; limite: number }
+  linhas: LinhaGerencial[]; ctx: ContextoDeSugestao; alvos: Map<number, AlvoDaSugestao>; noLimite: ReadonlySet<number>
+}): Omit<PlanoDaCarga, 'filaEmSemanas'> {
+  const { pessoa, linhas, ctx, alvos } = args
+  const dela = linhas.filter((l) => l.responsavelId === pessoa.usuarioId)
+  const aIniciar = dela.filter((l) => l.statusTarefa === 'NAO_INICIADA')
+    .sort((a, b) => (a.dataPrazo ?? '9999').localeCompare(b.dataPrazo ?? '9999') || a.taskId - b.taskId)
+  const quanto = quantoMoverDaCarga({ executaveis: pessoa.executaveis, limite: pessoa.limite, aIniciar: aIniciar.length })
+  const excluir = new Set<number>([pessoa.usuarioId, ...args.noLimite])
+  const extra = new Map<number, number>()
+  const movimentos: PlanoDaCarga['movimentos'] = []
+  for (const l of aIniciar) {
+    if (movimentos.length >= quanto) break
+    const alvo = alvos.get(l.taskId) ?? { unidadeOperacionalId: null, equipeExigida: null }
+    const s = escolherResponsavel(ctx, alvo, extra, excluir)
+    if (!s || s.fallback) continue // sem apto comprovado: não se move por chute
+    const limite = ctx.organizacao.get(s.usuarioId)?.limiteExecutaveis ?? null
+    const carga = (ctx.ativasPorUsuario.get(s.usuarioId) ?? 0) + (extra.get(s.usuarioId) ?? 0)
+    if (limite != null && carga >= limite) continue // "fila livre": quem receberia não pode estourar o próprio limite
+    extra.set(s.usuarioId, (extra.get(s.usuarioId) ?? 0) + 1)
+    movimentos.push({ tarefaId: l.taskId, paraUsuarioId: s.usuarioId, paraNome: s.nome, pais: l.pais })
+  }
+  return {
+    usuarioId: pessoa.usuarioId, nome: pessoa.nome, executaveis: pessoa.executaveis, limite: pessoa.limite,
+    vencidas: dela.filter((l) => l.atrasada).length, movimentos,
+  }
+}
+
+// ─── A MONTAGEM ──────────────────────────────────────────────────────────────
+
+/** Ordem dos tipos para desempate (a dos cartões do protótipo). */
+const ORDEM_DO_TIPO = new Map<string, number>(TIPOS_DO_PAINEL.map((t, i) => [t, i]))
+
+export async function decisoesDoDia(
+  base: BaseDoPrecisa, agora: Date, db: Db = prisma, organizacao?: ContextoDeSugestao['organizacao'],
+): Promise<{ itens: ItemPrecisaDeVoceTorre[]; escaladaApos: number }> {
+  const { linhas, divergencias, tarefasDivergentes, scorePorTarefa, fasesEspeciais, noLimite, faseAtualPorProcesso } = base
+  const porTarefa = new Map(linhas.map((l) => [l.taskId, l]))
+  const decisoes: ItemPrecisaDeVoceTorre[] = []
+
+  const semDono = linhas.filter((l) => ehSemDonoDoPainel(l, tarefasDivergentes))
+  const escaladas = base.itens.filter((i) => i.tipo === 'ESCALADA' && i.tarefaId != null)
+  const bloqueadas = base.itens.filter((i) => i.tipo === 'BLOQUEADA' && i.tarefaId != null)
+  const cargas = base.itens.filter((i) => i.tipo === 'CARGA')
+  const divergentes = base.itens.filter((i) => i.tipo === 'DIVERGENCIA' && i.tarefaId != null)
+
+  // Uma leitura de contexto para a lista toda; as demais correm juntas.
+  const precisaCtx = semDono.length > 0 || cargas.length > 0
+  const [ctx, alvos, semProximaAcao, extrasEscalada, extrasBloqueada, escaladaApos, capacidades] = await Promise.all([
+    precisaCtx ? carregarContextoDeSugestao(agora, db, organizacao) : Promise.resolve(null),
+    // O alvo (unidade, país, equipe) das certidões que a lista decide: as sem responsável e as ainda não iniciadas de quem está no limite.
+    precisaCtx
+      ? alvosDeSugestao([...semDono.map((l) => l.taskId), ...linhas.filter((l) => l.statusTarefa === 'NAO_INICIADA' && l.responsavelId != null && noLimite.has(l.responsavelId)).map((l) => l.taskId)], db)
+      : Promise.resolve(new Map<number, AlvoDaSugestao>()),
+    processosSemProximaAcao(db),
+    lerExtrasDaEscalada(escaladas.map((i) => i.tarefaId as number), db),
+    lerExtrasDaBloqueada(bloqueadas.map((i) => i.tarefaId as number), db),
+    escalarAposDoCadastro(db),
+    cargas.length
+      ? capacidadeMedidaPorUsuario(cargas.map((i) => Number(i.contexto.usuarioId)), new Map([...noLimite.values()].map((u) => [u.usuarioId, u.executaveis])), agora)
+      : Promise.resolve(new Map() as Awaited<ReturnType<typeof capacidadeMedidaPorUsuario>>),
+  ])
+
+  // ── SEM RESPONSÁVEL — um item por processo ────────────────────────────────
+  const porProcesso = new Map<number, LinhaGerencial[]>()
+  const soltas: LinhaGerencial[] = []
+  for (const l of semDono) {
+    if (l.processoId == null) soltas.push(l)
+    else porProcesso.set(l.processoId, [...(porProcesso.get(l.processoId) ?? []), l])
+  }
+  const grupos: Array<{ processoId: number | null; ls: LinhaGerencial[] }> = [
+    ...[...porProcesso].map(([processoId, ls]) => ({ processoId: processoId as number | null, ls })),
+    ...soltas.map((l) => ({ processoId: null as number | null, ls: [l] })),
+  ]
+  const entradas = new Map<number, Date | null>()
+  const comFase = grupos.filter((g) => g.processoId != null)
+  for (let i = 0; i < comFase.length; i += 4) {
+    await Promise.all(comFase.slice(i, i + 4).map(async (g) => {
+      const faseKey = faseAtualPorProcesso.get(g.processoId as number) ?? null
+      if (!faseKey) { entradas.set(g.processoId as number, null); return }
+      const e = await entradaNaFase(g.processoId as number, faseKey)
+      entradas.set(g.processoId as number, e.desde ? new Date(e.desde) : null)
+    }))
+  }
+  for (const g of grupos) {
+    const ids = g.ls.map((l) => l.taskId)
+    const plano = await planoDeAtribuicao(ids, agora, db, ctx ?? undefined, alvos)
+    const l0 = g.ls[0]
+    const familia = l0.familiaNome ?? l0.processoNome ?? 'Sem família'
+    const t = textosDoSemDono({
+      familia, pais: l0.pais, faseLabel: l0.faseAtualDoProcessoLabel, entrouNaFase: g.processoId != null ? entradas.get(g.processoId) ?? null : null,
+      agora, total: ids.length, plano,
+    })
+    const score = Math.max(...ids.map((id) => scorePorTarefa.get(id) ?? 0))
+    decisoes.push({
+      tipo: 'SEM_DONO', score, faixa: faixaDoScore(score), tarefaId: null, processoId: g.processoId, familiaNome: familia,
+      titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, acao1: t.acao1, acao2: t.acao2,
+      link: g.processoId != null ? linkDoProcesso(g.processoId) : `/torre?aba=tarefas&visao=semdono`,
+      contexto: {
+        processoId: g.processoId, tarefaIds: ids, plano,
+        sugeridoId: plano.atribuicoes.length === 1 ? plano.atribuicoes[0].usuarioId : null,
+        sugeridoNome: plano.atribuicoes.length === 1 ? plano.atribuicoes[0].nome : null,
+      },
+    })
+  }
+
+  // ── FASE DEIXADA — um item por processo ───────────────────────────────────
+  for (const p of semProximaAcao) {
+    const t = textosDaFaseDeixada({
+      familia: p.familia, pais: p.pais, faseLabel: p.faseLabel, proximaFaseLabel: p.proximaFaseLabel,
+      ultimaConclusao: p.ultimaConclusao, entrouNaFase: p.entrouNaFase, agora,
+    })
+    const score = scoreDeRisco({
+      semDono: false, vencida: false, acompanhamentoVencido: false, cobrancasSemRespostaMuitas: false, faseDeixada: true,
+      divergente: false, bloqueada: false, faseApostilamentoOuRetificacao: fasesEspeciais.has(p.faseKey),
+    })
+    decisoes.push({
+      tipo: 'FASE_DEIXADA', score, faixa: faixaDoScore(score), tarefaId: null, processoId: p.processoId, familiaNome: p.familia,
+      titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao,
+      acao1: { rotulo: 'Avançar fase', acao: 'AVANCAR_FASE' }, acao2: { rotulo: 'Encerrar (não devida)', acao: 'ENCERRAR_FASE_NAO_DEVIDA' },
+      link: linkDoProcesso(p.processoId),
+      contexto: { processoId: p.processoId, faseKey: p.faseKey, proximaFaseKey: p.proximaFaseKey, proximaFaseLabel: p.proximaFaseLabel },
+    })
+  }
+
+  // ── ESCALADA — por tarefa ─────────────────────────────────────────────────
+  for (const i of escaladas) {
+    const l = porTarefa.get(i.tarefaId as number)
+    if (!l) continue
+    const contatos = extrasEscalada.contatos.get(l.taskId) ?? []
+    const semResposta: string[] = []
+    for (const c of contatos) { if (c.resultado !== 'SEM_RESPOSTA') break; semResposta.unshift(c.canal) } // do mais antigo para o mais recente
+    const pedido = extrasEscalada.pedidoEm.get(l.taskId) ?? (l.esperandoDesde ? new Date(l.esperandoDesde) : null)
+    const t = textosDaEscalada({
+      orgao: l.terceiroNome ?? extrasEscalada.orgaoPorTarefa.get(l.taskId) ?? null, certidao: identidadeDaCertidao(l), familia: rotuloDaFamilia(l), pais: l.pais,
+      pedidoHaDias: pedido ? Math.max(0, diasDeCalendario(pedido, agora)) : null, cobrancas: l.cobrancasSemResposta, canais: semResposta,
+    })
+    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
+  }
+
+  // ── DIVERGÊNCIA — por tarefa ──────────────────────────────────────────────
+  for (const i of divergentes) {
+    const l = porTarefa.get(i.tarefaId as number)
+    const d = divergencias.find((x) => x.tarefaId === i.tarefaId)
+    if (!l) continue
+    const t = textosDaDivergencia({
+      familia: rotuloDaFamilia(l), certidao: identidadeDaCertidao(l), pais: l.pais,
+      statusTarefa: d?.statusTarefa ?? l.statusTarefa, statusPasso: d?.statusPasso ?? '', esperado: d?.esperado ?? null,
+    })
+    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
+  }
+
+  // ── BLOQUEADA — por tarefa, bloqueada há 10+ dias e esperando o cliente ───
+  for (const i of bloqueadas) {
+    const l = porTarefa.get(i.tarefaId as number)
+    if (!l || l.esperandoDe === 'terceiro') continue // bloqueada esperando o TERCEIRO é Escalada/cobrança, não "esperando o cliente"
+    const desde = extrasBloqueada.desde.get(l.taskId) ?? null
+    const haDias = desde ? Math.max(0, diasDeCalendario(desde, agora)) : null
+    if (!bloqueioPedeDecisao(haDias)) continue
+    const t = textosDaBloqueada({
+      familia: rotuloDaFamilia(l), certidao: identidadeDaCertidao(l), pais: l.pais, faseLabel: l.faseAtualDoProcessoLabel,
+      bloqueadaHaDias: haDias, cobrancasAoCliente: extrasBloqueada.cobrancas.get(l.taskId) ?? 0, motivo: l.motivoBloqueio,
+    })
+    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
+  }
+
+  // ── CARGA — por pessoa ────────────────────────────────────────────────────
+  const idsNoLimite = new Set(noLimite.keys())
+  for (const i of cargas) {
+    const usuarioId = Number(i.contexto.usuarioId)
+    const pessoa = noLimite.get(usuarioId)
+    if (!pessoa || !ctx) continue
+    const plano = planejarRedistribuicaoDaCarga({ pessoa, linhas, ctx, alvos, noLimite: idsNoLimite })
+    const paises = [...new Set(plano.movimentos.map((m) => m.pais).filter((x): x is string => !!x))]
+    const destinos = [...new Map(plano.movimentos.map((m) => [m.paraUsuarioId, m.paraNome])).values()]
+    const t = textosDaCarga({
+      nome: pessoa.nome, executaveis: pessoa.executaveis, limite: pessoa.limite, vencidas: plano.vencidas,
+      filaEmSemanas: capacidades.get(usuarioId)?.filaEmSemanas ?? null, mover: plano.movimentos.length,
+      paisDasMovidas: paises.length === 1 ? paises[0] : null, destinos,
+    })
+    decisoes.push({
+      ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: '/torre?aba=equipe',
+      acao1: { rotulo: t.rotuloAcao1, acao: 'REDISTRIBUIR_CARGA' }, acao2: { rotulo: 'Ver equipe', acao: 'VER_EQUIPE' },
+      contexto: { usuarioId, executaveis: pessoa.executaveis, limite: pessoa.limite, quantidade: plano.movimentos.length, tarefaIds: plano.movimentos.map((m) => m.tarefaId) },
+    })
+  }
+
+  decisoes.sort((a, b) => b.score - a.score || (ORDEM_DO_TIPO.get(a.tipo) ?? 9) - (ORDEM_DO_TIPO.get(b.tipo) ?? 9)
+    || (a.processoId ?? 0) - (b.processoId ?? 0) || (a.tarefaId ?? 0) - (b.tarefaId ?? 0))
+  // O limite de cobranças que escala (do cadastro) viaja em cada decisão: a regra escrita no cartão "Escalada" é a verdadeira.
+  return { itens: decisoes.map((d) => ({ ...d, contexto: { ...d.contexto, escaladaApos } })), escaladaApos }
+}
+
 // ─── BRIEFING DO DIA ────────────────────────────────────────────────────────
 
 /** A saudação pelo relógio de SÃO PAULO, nunca o do servidor (achado real,
@@ -601,33 +1070,66 @@ function saudacao(agora: Date): string {
   return 'Boa noite'
 }
 
-export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date()): string {
-  const criticos = itens.filter((i) => i.faixa === 'CRITICO').length
-  const atencao = itens.filter((i) => i.faixa === 'ATENCAO').length
-  const semDono = itens.filter((i) => i.tipo === 'SEM_DONO').length
-  const escaladas = itens.filter((i) => i.tipo === 'ESCALADA').length
-  const bloqueadas = itens.filter((i) => i.tipo === 'BLOQUEADA').length
-  const carga = itens.filter((i) => i.tipo === 'CARGA').length
-  const parede = itens.filter((i) => i.tipo === 'PAREDE_A_FRENTE').length
+/** Os números do dia que o texto do Briefing cita ALÉM das decisões — todos de leitura real; ausente = a frase correspondente não aparece. */
+export interface ExtrasDoBriefing {
+  nome?: string | null
+  ativos?: number
+  noRitmo?: number
+  fechadasOntem?: number
+  protocoladosOntem?: number
+  vencemHoje?: number
+}
 
-  const cumprimento = saudacao(agora)
+const juntar = (partes: string[]): string => (partes.length <= 1 ? partes[0] ?? '' : `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`)
+const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+
+/**
+ * O TEXTO DO BRIEFING — a estrutura do protótipo ("Bom dia, <nome>. N processos ativos, M no ritmo. Ontem… Hoje vencem… N decisões
+ * esperam você: …"), com os números REAIS. O que o sistema não mede (gargalo da semana, cobranças a fazer) não é escrito.
+ */
+export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date(), extras: ExtrasDoBriefing = {}): string {
   const dataFmt = agora.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL, weekday: 'long', day: '2-digit', month: 'long' })
-  if (itens.length === 0) return `${cumprimento}. Hoje, ${dataFmt}: nada precisa de você agora.`
+  const primeiroNome = extras.nome?.trim().split(/\s+/)[0]
+  const abertura = `${saudacao(agora)}${primeiroNome ? `, ${primeiroNome}` : ''}.`
+  if (itens.length === 0) return `${abertura} Hoje, ${dataFmt}: nada precisa de você agora.`
 
-  const partes: string[] = []
-  if (criticos > 0) partes.push(`${criticos} crítica(s)`)
-  if (atencao > 0) partes.push(`${atencao} em atenção`)
-  const resumoFaixas = partes.length ? partes.join(' e ') : `${itens.length} decisão(ões)`
+  const frases: string[] = [abertura]
+  if (extras.ativos != null) frases.push(`${pl(extras.ativos, 'processo ativo', 'processos ativos')}${extras.noRitmo != null ? `, ${extras.noRitmo} no ritmo` : ''}.`)
+  if (extras.fechadasOntem != null || extras.protocoladosOntem != null) {
+    const partes: string[] = []
+    if (extras.fechadasOntem != null) partes.push(`a equipe fechou ${certidoes(extras.fechadasOntem)}`)
+    if (extras.protocoladosOntem != null) partes.push(`${pl(extras.protocoladosOntem, 'processo foi protocolado', 'processos foram protocolados')}`)
+    frases.push(`Ontem ${partes.join(' e ')}.`)
+  }
+  if (extras.vencemHoje != null) frases.push(extras.vencemHoje === 1 ? 'Hoje vence 1 prazo.' : `Hoje vencem ${extras.vencemHoje} prazos.`)
 
+  const c = contagemPorTipo(itens)
+  const semDono = itens.filter((i) => i.tipo === 'SEM_DONO')
   const detalhes: string[] = []
-  if (semDono > 0) detalhes.push(`${semDono} sem dono`)
-  if (escaladas > 0) detalhes.push(`${escaladas} escalada(s)`)
-  if (bloqueadas > 0) detalhes.push(`${bloqueadas} bloqueada(s)`)
-  if (carga > 0) detalhes.push(`${carga} pessoa(s) no limite`)
-  if (parede > 0) detalhes.push(`${parede} parede(s) à frente`)
-
-  return `${cumprimento}. Hoje, ${dataFmt}: ${resumoFaixas} precisam de você` +
-    (detalhes.length ? ` (${detalhes.join(' · ')}).` : '.')
+  if (c.SEM_DONO > 0) {
+    const grandes = semDono
+      .filter((i) => i.familiaNome)
+      .map((i) => ({ familia: i.familiaNome as string, n: Array.isArray(i.contexto.tarefaIds) ? (i.contexto.tarefaIds as number[]).length : 1 }))
+      .sort((a, b) => b.n - a.n).slice(0, 2)
+    const concentram = grandes.length >= 2
+      ? ` (${grandes[0].familia} e ${grandes[1].familia} concentram ${grandes[0].n + grandes[1].n})`
+      : grandes.length === 1 ? ` (${grandes[0].familia} concentra ${grandes[0].n})` : ''
+    detalhes.push(`${pl(c.SEM_DONO, 'processo com certidões sem responsável', 'processos com certidões sem responsável')}${concentram}`)
+  }
+  if (c.FASE_DEIXADA > 0) detalhes.push(pl(c.FASE_DEIXADA, 'fase deixada sem próxima ação', 'fases deixadas sem próxima ação'))
+  if (c.ESCALADA > 0) detalhes.push(pl(c.ESCALADA, 'cobrança escalada sem resposta', 'cobranças escaladas sem resposta'))
+  if (c.DIVERGENCIA > 0) detalhes.push(pl(c.DIVERGENCIA, 'divergência para reconciliar', 'divergências para reconciliar'))
+  if (c.BLOQUEADA > 0) detalhes.push(pl(c.BLOQUEADA, 'tarefa bloqueada há 10+ dias', 'tarefas bloqueadas há 10+ dias'))
+  if (c.CARGA > 0) {
+    const cargas = itens.filter((i) => i.tipo === 'CARGA')
+    const maior = cargas.map((i) => ({ nome: i.familiaNome ?? '', ...(i.contexto as { executaveis?: number; limite?: number }) }))
+      .filter((x) => x.executaveis != null && x.limite)
+      .sort((a, b) => (b.executaveis! / b.limite!) - (a.executaveis! / a.limite!))[0]
+    const acima = maior ? ` (${maior.nome} está com ${maior.executaveis} executáveis, ${Math.round((maior.executaveis! / maior.limite! - 1) * 100)}% ${maior.executaveis! >= maior.limite! ? 'acima do' : 'abaixo do'} limite de ${maior.limite})` : ''
+    detalhes.push(`${pl(c.CARGA, 'aviso de carga', 'avisos de carga')}${acima}`)
+  }
+  frases.push(`${itens.length === 1 ? '1 decisão espera' : `${itens.length} decisões esperam`} você: ${juntar(detalhes)}.`)
+  return frases.join(' ')
 }
 
 // ─── A RESPOSTA DO ENDPOINT, MONTADA EM UM LUGAR ────────────────────────────
@@ -635,29 +1137,63 @@ export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date(
 export interface RespostaPrecisaDeVoce {
   itens: ItemPrecisaDeVoceTorre[]
   briefing: string
-  resumo: { total: number; criticos: number; atencao: number }
+  resumo: { total: number; criticos: number; atencao: number; porTipo: Record<TipoDoPainel, number>; escaladaApos: number }
+}
+
+/** Os números do dia do Briefing (processos ativos, no ritmo, fechadas e protocolados de ontem, prazos de hoje). */
+async function extrasDoBriefing(base: BaseDoPrecisa, agora: Date, db: Db): Promise<ExtrasDoBriefing> {
+  const ontem = diaOperacional(new Date(agora.getTime() - 86_400_000))
+  const janela = janelaDoDiaOperacionalDe(ontem)
+  const [ativos, fechadas, protocolados] = await Promise.all([
+    db.processo.count({ where: { dataConclusao: null, ...ONDE_PROCESSO_NAO_PAUSADO } }),
+    db.tarefa.count({
+      where: {
+        statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] }, dataConclusao: { gte: janela.inicio, lt: janela.fim },
+        OR: [{ processoId: null }, { processo: ONDE_PROCESSO_NAO_PAUSADO }],
+      },
+    }),
+    db.phaseAdvanceLog.findMany({
+      where: { resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, fasePretendida: FASES.PROTOCOLADO.phaseKey, criadoEm: { gte: janela.inicio, lt: janela.fim } },
+      select: { processoId: true },
+    }),
+  ])
+  // "No ritmo" = o processo ativo que NÃO tem decisão pendente de atenção ou crítica (o mesmo corte do Radar: score < 3).
+  const maxPorProcesso = new Map<number, number>()
+  for (const i of base.itens) if (i.processoId != null) maxPorProcesso.set(i.processoId, Math.max(maxPorProcesso.get(i.processoId) ?? 0, i.score))
+  const foraDoRitmo = [...maxPorProcesso.values()].filter((sc) => faixaDoScore(sc) !== 'OK').length
+  return {
+    ativos, noRitmo: Math.max(0, ativos - foraDoRitmo), fechadasOntem: fechadas,
+    protocoladosOntem: new Set(protocolados.map((p) => p.processoId)).size,
+    vencemHoje: base.linhas.filter((l) => l.venceHoje).length,
+  }
 }
 
 /**
- * O que `GET /api/torre/precisa-de-voce` devolve. As leituras que a lista e as sugestões
- * compartilham (linhas da Operação, organização) são feitas UMA vez aqui e passadas adiante —
- * o resultado é o mesmo de encadear `itensPrecisaDeVoce` + `comSugestoes` + `briefingDoDia`.
+ * O que `GET /api/torre/precisa-de-voce` devolve. As leituras que a lista e as sugestões compartilham (linhas da Operação,
+ * organização) são feitas UMA vez aqui e passadas adiante.
  */
-export async function montarPrecisaDeVoce(agora = new Date(), db: Db = prisma): Promise<RespostaPrecisaDeVoce> {
+export async function montarPrecisaDeVoce(
+  agora = new Date(), db: Db = prisma, opts: { nomeDoUsuario?: string | null } = {},
+): Promise<RespostaPrecisaDeVoce> {
   const organizacaoP = lerOrganizacao(agora)
   organizacaoP.catch(() => undefined)
   // As leituras que não dependem das linhas começam já, enquanto a mais lenta (as linhas) é esperada.
   const adiantadas = iniciarLeiturasIndependentes(agora, db, organizacaoP)
   const [organizacao, linhas] = await Promise.all([organizacaoP, lerLinhasOperacionais(agora, db)])
-  const brutos = await itensPrecisaDeVoce({ agora, db, linhas, organizacao, adiantadas })
-  const itens = await comSugestoes(brutos, agora, db, { organizacao })
+  const base = await lerBaseDoPrecisa({ agora, db, linhas, organizacao, adiantadas })
+  const [{ itens, escaladaApos }, extras] = await Promise.all([decisoesDoDia(base, agora, db, organizacao), extrasDoBriefing(base, agora, db)])
   return {
     itens,
-    briefing: briefingDoDia(itens, agora),
+    briefing: briefingDoDia(itens, agora, { ...extras, nome: opts.nomeDoUsuario ?? null }),
     resumo: {
       total: itens.length,
       criticos: itens.filter((i) => i.faixa === 'CRITICO').length,
       atencao: itens.filter((i) => i.faixa === 'ATENCAO').length,
+      porTipo: contagemPorTipo(itens),
+      escaladaApos,
     },
   }
 }
+
+/** O nome que a tela mostra de cada tipo — reexportado para quem monta texto no servidor. */
+export { ROTULO_DO_TIPO }

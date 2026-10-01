@@ -183,8 +183,10 @@ async function main() {
   ok("...sai de BLOQUEADA", depoisDesbloqueio?.statusTarefa !== "BLOQUEADA")
 
   secao("AÇÕES — Carga")
-  const rRedistribui = await acoes.redistribuirPorCarga(noLimite.id, admin.id, 5)
-  ok("redistribuir por carga: move as 'a enviar' para quem tem menos carga", rRedistribui.ok === true, JSON.stringify(rRedistribui))
+  // Torre nova (01/10/2026): só se move para quem tem APTIDÃO comprovada — sem aptidão cadastrada nada é movido por chute.
+  // (O caminho feliz, com apto de fila livre, está em torre-nova-precisa-decisoes.test.ts.)
+  const rRedistribui = await acoes.redistribuirPorCarga(noLimite.id, admin.id)
+  ok("redistribuir por carga SEM nenhum apto cadastrado: recusa com motivo e não move nada", rRedistribui.ok === false && (await prisma.tarefa.count({ where: { titulo: { startsWith: `${MARCA}carga-` }, responsavelId: noLimite.id } })) === 2, JSON.stringify(rRedistribui))
   const rVerEquipe = await acoes.verEquipe(noLimite.id)
   ok("ver equipe: leitura, nunca escreve", rVerEquipe.ok === true)
 

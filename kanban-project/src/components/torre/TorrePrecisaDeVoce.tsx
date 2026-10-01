@@ -1,49 +1,116 @@
 "use client"
-// src/components/torre/TorrePrecisaDeVoce.tsx — aba PRECISA DE VOCÊ (Bloco J4 · motor do Bloco F).
-// Decisões que só o Administrador toma, ordenadas por score (maior risco primeiro), cada linha com a ação embutida.
-import { useState } from "react"
-import { ROTULO_TIPO, PILL_DA_FAIXA, type ItemPrecisa } from "./tipos-precisa"
+// src/components/torre/TorrePrecisaDeVoce.tsx — PRECISA DE VOCÊ (Bloco J4; Torre nova, frente B2).
+//
+// UM componente em DOIS lugares:
+//   • a aba própria "Precisa de você" (a 2ª aba) — mostra TODAS as decisões;
+//   • EMBUTIDO na Visão geral (`embutido`) — a seção do protótipo, com as 7 primeiras decisões e o rodapé "+ N decisões".
+//
+// A assinatura é ESTÁVEL (a Visão geral importa este componente): `itens`, `carregando`, `erro` e `irParaAba` são obrigatórios; `embutido`
+// e `onRevisar` são opcionais. Sem `onRevisar`, a seção abre a Revisão do dia sozinha sobre os itens que mostra.
+//
+// O que a seção tem (inventário §1.2): título "Precisa de você · N" e o texto de apoio; "▶ Revisar uma por uma"; os 6 cartões-filtro por tipo
+// (número · nome · regra; clicar liga o filtro, clicar de novo desliga, um por vez); a tabela Tipo · O que está acontecendo · Sugestão do
+// sistema · Ação (dois botões por linha, o título é link ao Detalhe do Processo); e o rodapé com a ordem e o "Desfazer".
+import { useMemo, useState } from "react"
+import Link from "next/link"
+import {
+  TIPOS_DO_PAINEL, ROTULO_TIPO, PILL_DO_TIPO, COR_DO_NUMERO, regraDoCartao, escaladaAposDos, type ItemPrecisa,
+} from "./tipos-precisa"
 import { useAcoesDoItem } from "./acoes-do-item"
+import { TorreRevisao } from "./TorreRevisao"
+import "./precisa.css"
 
-export function TorrePrecisaDeVoce({ itens, carregando, erro, irParaAba }: {
-  itens: ItemPrecisa[] | null; carregando: boolean; erro: string | null; irParaAba: (aba: "equipe") => void
-}) {
-  const { executar, modais } = useAcoesDoItem({ irParaAba })
+/** Quantas decisões a seção EMBUTIDA mostra sem filtro (o resto vai pelo "Revisar uma por uma" e pela aba própria). */
+export const DECISOES_NA_SECAO_EMBUTIDA = 7
+
+export interface PropsPrecisaDeVoce {
+  itens: ItemPrecisa[] | null
+  carregando: boolean
+  erro: string | null
+  irParaAba: (aba: "equipe") => void
+  /** `true` = a seção da Visão geral (cartão com borda, 7 decisões, âncora `#pdv`). Ausente/`false` = a aba própria. */
+  embutido?: boolean
+  /** Abre a Revisão do dia. Ausente → a própria seção abre a Revisão sobre as decisões que tem. */
+  onRevisar?: () => void
+}
+
+const chaveDe = (it: ItemPrecisa, i: number) => `${i}:${it.tipo}:${it.processoId ?? "-"}:${it.tarefaId ?? it.contexto.usuarioId ?? "-"}`
+
+export function TorrePrecisaDeVoce({ itens, carregando, erro, irParaAba, embutido = false, onRevisar }: PropsPrecisaDeVoce) {
+  const [tipo, setTipo] = useState<(typeof TIPOS_DO_PAINEL)[number] | null>(null)
   const [ocupado, setOcupado] = useState<string | null>(null)
+  // O que acabou de ser resolvido some NA HORA (como no protótipo). Os itens são OBJETOS da leitura: a releitura traz objetos novos, então
+  // o que sobrou aqui deixa de valer sozinho — a lista de verdade volta a mandar.
+  const [feitos, setFeitos] = useState<ReadonlySet<ItemPrecisa>>(new Set())
+  const [revisao, setRevisao] = useState<ItemPrecisa[] | null>(null)
+  const { executar, modais } = useAcoesDoItem({ irParaAba, onFeito: (it) => setFeitos((s) => new Set(s).add(it)) })
+
+  const todos = useMemo(() => itens ?? [], [itens])
+  const contagem = useMemo(() => Object.fromEntries(TIPOS_DO_PAINEL.map((t) => [t, todos.filter((i) => i.tipo === t).length])) as Record<(typeof TIPOS_DO_PAINEL)[number], number>, [todos])
+  const escaladaApos = escaladaAposDos(todos)
 
   if (erro) return <div className="tor-card pad">{erro}</div>
   if (carregando || itens == null) return <div className="tor-card pad small">Carregando as decisões…</div>
+
+  const doTipo = tipo ? todos.filter((i) => i.tipo === tipo) : todos
+  const pendentes = doTipo.filter((i) => !feitos.has(i))
+  // Sem filtro, a seção embutida mostra só as primeiras; com filtro mostra o tipo inteiro (nenhuma decisão fica sem caminho).
+  const limite = embutido && !tipo ? DECISOES_NA_SECAO_EMBUTIDA : pendentes.length
+  const visiveis = pendentes.slice(0, limite)
+  const restantes = pendentes.length - visiveis.length
 
   const rodar = async (item: ItemPrecisa, qual: 1 | 2, chave: string) => {
     setOcupado(chave)
     try { await executar(item, qual) } finally { setOcupado(null) }
   }
+  const abrirRevisao = () => (onRevisar ? onRevisar() : setRevisao([...todos]))
+
+  const rodape = tipo
+    ? `Mostrando só "${ROTULO_TIPO[tipo]}" · ordenadas do maior risco para o menor · cada ação fica no histórico; as reversíveis têm "Desfazer"`
+    : `${restantes > 0 ? `+ ${restantes} ${restantes === 1 ? "decisão" : "decisões"} · ` : ""}ordenadas do maior risco para o menor · cada ação fica no histórico; as reversíveis têm "Desfazer"`
 
   return (
-    <div>
-      <div className="small mb-2">Decisões que só o Administrador toma. Cada linha tem a ação embutida. O score ordena: maior risco primeiro.</div>
-      {itens.length === 0 ? (
-        <div className="tor-card" style={{ padding: 40, textAlign: "center" }}><b style={{ fontSize: 16, color: "var(--success-text)" }}>Nada depende de você agora.</b></div>
-      ) : (
-        <div className="tor-card tor-scroll">
-          <div className="tor-hd tor-gP"><span>Tipo</span><span>O que está acontecendo</span><span>Sugestão do sistema</span><span>Ação</span></div>
-          {itens.map((it, i) => {
-            const chave = `${i}:${it.tipo}:${it.tarefaId ?? it.processoId ?? ""}`
-            return (
-              <div key={chave} className="tor-row tor-gP">
-                <span className={`tor-p ${PILL_DA_FAIXA[it.faixa]}`} style={{ justifySelf: "start" }}>{ROTULO_TIPO[it.tipo] ?? it.tipo}</span>
-                <div><b>{it.titulo}</b><div className="small">{it.detalhe}</div></div>
-                <div className="small">{it.sugestao ?? "—"}</div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button className="tor-btn pri" disabled={ocupado === chave} onClick={() => void rodar(it, 1, chave)}>{it.acao1.rotulo}</button>
-                  <button className="tor-btn" disabled={ocupado === chave} onClick={() => void rodar(it, 2, chave)}>{it.acao2.rotulo}</button>
-                </div>
+    <div className="pdv tor" data-pdv={embutido ? "embutido" : "aba"}>
+      <div className="pdv-topo">
+        <div className="pdv-titulo">Precisa de você · {todos.length}</div>
+        <div className="pdv-texto">Decisões que só o Administrador toma. Tarefa vencida não entra aqui: é trabalho da equipe. Ordem: maior risco primeiro.</div>
+        <button type="button" className="pdv-revisar" onClick={abrirRevisao} disabled={todos.length === 0}>▶ Revisar uma por uma</button>
+      </div>
+
+      <div className="pdv-tipos">
+        {TIPOS_DO_PAINEL.map((t) => (
+          <button key={t} type="button" className="pdv-tipo" aria-pressed={tipo === t} onClick={() => setTipo(tipo === t ? null : t)}>
+            <span className={`pdv-tipo-n ${COR_DO_NUMERO[t]}`}>{contagem[t]}</span>
+            <span className="pdv-tipo-t">{ROTULO_TIPO[t]}</span>
+            <span className="pdv-tipo-r">{regraDoCartao(t, escaladaApos)}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="pdv-tab">
+        <div className="pdv-hd"><div>Tipo</div><div>O que está acontecendo</div><div>Sugestão do sistema</div><div>Ação</div></div>
+        {visiveis.map((it, i) => {
+          const chave = chaveDe(it, i)
+          return (
+            <div key={chave} className="pdv-lin">
+              <div><span className={`tor-p ${PILL_DO_TIPO[it.tipo]}`}>{ROTULO_TIPO[it.tipo] ?? it.tipo}</span></div>
+              <div className="pdv-quem">
+                <Link href={it.link}>{it.titulo}</Link>
+                <span className="pdv-det">{it.detalhe}</span>
               </div>
-            )
-          })}
-        </div>
-      )}
+              <div className="pdv-sug">{it.sugestao ?? "—"}</div>
+              <div className="pdv-acoes">
+                <button type="button" className="pdv-b1" disabled={ocupado === chave} onClick={() => void rodar(it, 1, chave)}>{it.acao1.rotulo}</button>
+                <button type="button" className="pdv-b2" disabled={ocupado === chave} onClick={() => void rodar(it, 2, chave)}>{it.acao2.rotulo}</button>
+              </div>
+            </div>
+          )
+        })}
+        <div className="pdv-rodape">{rodape}</div>
+      </div>
+
       {modais}
+      {revisao && <TorreRevisao itens={revisao} irParaAba={(a) => { setRevisao(null); irParaAba(a) }} onSair={() => setRevisao(null)} />}
     </div>
   )
 }
