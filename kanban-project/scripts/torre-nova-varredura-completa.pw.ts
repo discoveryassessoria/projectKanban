@@ -249,9 +249,11 @@ async function numeros(page: Page) {
     const c = await txt(page); const u = page.url().replace(base, "")
     const total = lerNum(/Mostrando [\d.]+ de ([\d.]+)/, c)
     const procs = lerNum(/Mostrando [\d.]+ de ([\d.]+) processos/i, c)
-    const lista = Number.isNaN(total) ? procs : total
-    const bate = rot === "PROCESSOS ATIVOS" ? valor >= lista : valor === lista
-    const l = `${bate ? "ok" : "DIVERGE"} cartão ${rot} = ${valor} → ${u} → lista com ${lista}`; cliques.push(l); console.log(l)
+    // Processos é por fase: o total do cartão = a SOMA dos botões de fase (cada processo está em uma fase só)
+    const somaFases = rot === "PROCESSOS ATIVOS" ? await page.evaluate(() => Array.from(document.querySelectorAll("button")).map((b) => /^(Genealogia|Emissão Documental|Análise Documental|Retificação de Registros|Emissão Documental Retificada|Tradução Juramentada|Apostilamento|Aguardando Protocolo|Protocolado|Finalizado)\s*(\d+)$/.exec((b.textContent || "").trim())).filter(Boolean).reduce((a, m) => a + Number(m![2]), 0)) : NaN
+    const lista = rot === "PROCESSOS ATIVOS" ? somaFases : Number.isNaN(total) ? procs : total
+    const bate = valor === lista
+    const l = `${bate ? "ok" : "DIVERGE"} cartão ${rot} = ${valor} → ${u} → ${rot === "PROCESSOS ATIVOS" ? "soma das fases" : "lista com"} ${lista}`; cliques.push(l); console.log(l)
     if (!bate) { div.push(l); falha("numeros", l) }
   }
   writeFileSync(`${IMPL}/varredura-completa-numeros.json`, JSON.stringify({ vg, tf, eq, semDono, ter, radar, comparacoes: linhas, cliques, divergencias: div }, null, 1))

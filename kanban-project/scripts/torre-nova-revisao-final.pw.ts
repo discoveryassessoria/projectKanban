@@ -605,7 +605,9 @@ async function funcoes(browser: any, page: Page, ev: Eventos) {
       for (let t = 0; t < 4 && !achouMencao; t++) {
         await sino.click().catch(() => {}); await pd.waitForTimeout(1500)
         corpoSino = await pd.locator("body").innerText()
-        achouMencao = /menç(ão|ões) a você \(a última de Marco/.test(corpoSino) && new RegExp(`Família ${familia.replace(/^Família /, "")} — \\d+ menç`).test(corpoSino)
+        const nomeFam = familia.replace(/^Família /, "")
+        // duas formas do mesmo aviso agrupado (aviso-texto.ts): 1 menção = "<autor> mencionou você em Família X: “…”"; 2+ = "Família X — N menções a você (a última de <autor>)"
+        achouMencao = new RegExp(`mencionou você em Família ${nomeFam}`).test(corpoSino) || (/menç(ão|ões) a você \(a última de Marco/.test(corpoSino) && new RegExp(`Família ${nomeFam} — \\d+ menç`).test(corpoSino))
         if (!achouMencao) { await pd.keyboard.press("Escape"); await pd.reload({ waitUntil: "domcontentloaded" }); await pd.waitForTimeout(2500) }
       }
       const mencoesBanco = await db.comentarioMencao.count({ where: { usuarioId: alvo.id } }).catch(() => -1)
