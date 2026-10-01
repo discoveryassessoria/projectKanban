@@ -38,6 +38,7 @@ import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
 import { resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
+import { ehFaseAguardandoFechamento } from "@/src/lib/process-stage/fase-pre-contrato"
 import { codigoExigivelDoTipo, documentoEscolhidoParaPessoa, documentoDaUniaoEscolhido, type PessoaParaFiltroDocumental } from "@/src/lib/genealogia/documentos-exigidos"
 import { montarPessoasDoProcesso, type ClassificacaoPessoa, type PessoaBruta, type UniaoBruta } from "@/src/lib/process-stage/central-operacional-core"
 
@@ -260,6 +261,8 @@ export interface MaterializarResultado {
   reativadas: number
   pendencias: string[]
   semInstanciaWorkflow: boolean
+  /** `true` quando o processo está em "Aguardando fechamento": retorno antecipado, nada criado nem reconciliado. */
+  aguardandoFechamento?: boolean
   /** FATOS desta rodada, legíveis — alimentam a auditoria e o preview. */
   fatos: FatoNecessidade[]
   /** Necessidades já ATENDIDAS/EM_ATENDIMENTO/NAO_LOCALIZADA cuja causa sumiu: NUNCA dispensadas sozinhas (fato acontecido). */
@@ -337,6 +340,17 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
     processoId, aplicaveis: 0, necessidadesCriadas: 0, necessidadesReusadas: 0, documentosCriados: 0,
     stepsCriados: 0, stepsReusados: 0, dispensadas: 0, reativadas: 0, pendencias: [], semInstanciaWorkflow: false,
     fatos: [], preservadasSemCausa: [],
+  }
+
+  // "AGUARDANDO FECHAMENTO" (`a_iniciar`): o contrato ainda não fechou — NADA nasce (nem necessidade, nem documento, nem passo, nem tarefa) e
+  // NADA é reconciliado. RETORNO ANTECIPADO de propósito: devolver "zero exigências" cairia na reconciliação abaixo e DISPENSARIA
+  // necessidades existentes. Marcar/desmarcar documentos de uma pessoa nessa fase só grava a escolha na Pessoa; ao mover (manualmente) o
+  // processo para a Genealogia, `materializarExecucaoDaFase` chama este mesmo núcleo e tudo nasce só do que está marcado.
+  const posicao = await db.processo.findUnique({ where: { id: processoId }, select: { faseAtualKey: true } })
+  if (ehFaseAguardandoFechamento(posicao?.faseAtualKey)) {
+    res.aguardandoFechamento = true
+    res.pendencias.push("processo em Aguardando fechamento — nada é materializado até a movimentação para a Genealogia")
+    return res
   }
 
   const calculo = await calcularExigenciasDaGenealogia(processoId, db)

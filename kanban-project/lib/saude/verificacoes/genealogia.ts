@@ -19,6 +19,7 @@ import { STATUS_DOCUMENTO_INATIVOS } from '@/src/lib/documentos/status-inativos'
 import { resolverTiposDocumentais, recebeWorkflowOperacional } from '@/src/lib/documentos/politica-natureza-fase'
 import { SELECT_UNIAO_PARA_TITULAR, titularDaUniao } from '@/src/services/genealogia/titular-uniao'
 import { calcularExigenciasDaGenealogia } from '@/src/services/genealogia/materializar-genealogia'
+import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
 import { MOTIVO_DOCUMENTO_DISPENSADO } from '@/src/services/necessidade-documental'
 import { conferirCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 
@@ -46,7 +47,8 @@ registrar({
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
     const processos = await prisma.processo.findMany({
-      where: { arvoreId: { not: null }, dataConclusao: null, faseAtualKey: { not: 'finalizado' } },
+      // "Aguardando fechamento" fora: nada é materializado nessa fase por desenho (ver materializarGenealogia).
+      where: { arvoreId: { not: null }, dataConclusao: null, faseAtualKey: { notIn: ['finalizado', PHASEKEY_A_INICIAR] } },
       select: { id: true },
       take: 500,
     })
