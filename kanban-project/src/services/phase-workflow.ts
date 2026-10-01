@@ -15,6 +15,7 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { validarDefinicao } from "@/src/services/workflow-definition-validator"
 import { exigirDocumentoNoPasso } from "@/src/services/invariante-documental"
 import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { ehFaseAguardandoFechamento, ROTULO_AGUARDANDO_FECHAMENTO } from "@/src/lib/process-stage/fase-pre-contrato"
 import { resolverEscopoDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import { lerVersaoPublicada, resolverConteudoDaBiblioteca } from "@/src/services/versao-publicada"
 import {
@@ -716,6 +717,60 @@ export async function instanciarWorkflowDaFase(
     select: { id: true, versao: true, macroWorkflow: { select: { id: true, versao: true } } },
   })
   if (!fase) return fail("CONFIGURACAO_INVALIDA", [{ code: "FASE_MACRO_INVALIDA", message: `Fase ${input.faseMacroKey} inexistente no macro do processo` }])
+
+  // 2b) "AGUARDANDO FECHAMENTO" (`a_iniciar`) — fase SEM tarefas POR DESENHO (exceção explícita, testada): pré-trabalho, a antessala
+  //     do contrato. Não resolve Workflow Interno (não há — `SEM_WORKFLOW_INTERNO` nunca se aplica a ela), não planeja alvo, não cria
+  //     passo, Tarefa, Documento nem StepInstance. Cria SÓ a instância da fase (ATIVO, 0 passos): é ela que dá ao processo um ciclo de
+  //     fase para o motor (CAS, supersessão ao ser movido, histórico, `currentPhaseInstanceId` da criação). Idempotente.
+  if (ehFaseAguardandoFechamento(input.faseMacroKey)) {
+    const chaveSemTarefas = montarChaveWorkflow({
+      processoId: processo.id, faseMacroId: fase.id, faseMacroKey: input.faseMacroKey,
+      faseMacroVersion: fase.versao, workflowDefinitionId: 0, workflowVersion: 0, ciclo,
+    })
+    const instantiatedSemTarefas = new Date().toISOString()
+    const corpoSemTarefas = async (tx: Prisma.TransactionClient): Promise<InstanciarResultado> => {
+      const jaExiste = await tx.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveSemTarefas } })
+        ?? await tx.phaseWorkflowInstance.findFirst({
+          where: { processoId: processo.id, faseMacroKey: input.faseMacroKey, ciclo, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
+        })
+      if (jaExiste) {
+        return { success: true, created: false, workflowInstance: jaExiste, stepInstances: [], warnings: [], correlationId }
+      }
+      const instancia = await tx.phaseWorkflowInstance.create({
+        data: {
+          processoId: processo.id, faseMacroKey: input.faseMacroKey, faseMacroId: fase.id, faseMacroVersion: fase.versao,
+          macroWorkflowId: fase.macroWorkflow.id, macroVersion: fase.macroWorkflow.versao,
+          workflowDefinitionId: null, workflowVersion: null,
+          snapshot: construirSnapshotWorkflow({
+            workflowDefinitionId: 0, workflowVersion: 0, name: `${ROTULO_AGUARDANDO_FECHAMENTO} (fase sem tarefas por desenho)`,
+            faseMacroId: fase.id, faseMacroKey: input.faseMacroKey, faseMacroVersion: fase.versao,
+            modoKey: input.modoKey ?? null, tipoProcessoId: processo.tipoProcessoMotorId, instantiatedAt: instantiatedSemTarefas,
+          }) as Prisma.InputJsonValue,
+          snapshotSchemaVersion: 1, ciclo, status: "ATIVO", origem,
+          instanciadoPor: input.solicitadoPorId != null ? String(input.solicitadoPorId) : "MOTOR",
+          correlationId, causationId: input.causationId ?? null, chaveIdempotencia: chaveSemTarefas,
+        },
+      })
+      await tx.workflowEvento.create({
+        data: {
+          tipo: "WORKFLOW_INSTANCIADO", entityType: "workflow_instance", entityId: instancia.id,
+          processoId: processo.id, workflowInstanceId: instancia.id, correlationId, causationId: input.causationId ?? null,
+          chaveIdempotencia: montarChaveEvento({ correlationId, tipo: "WORKFLOW_INSTANCIADO", entityType: "workflow_instance", entityId: instancia.id, operationKey: chaveSemTarefas }),
+          dados: { faseMacroKey: input.faseMacroKey, ciclo, steps: [], semTarefasPorDesenho: true },
+        },
+      })
+      return { success: true, created: true, workflowInstance: instancia, stepInstances: [], warnings: [], correlationId }
+    }
+    try {
+      return txExterno ? await corpoSemTarefas(txExterno) : await prisma.$transaction(corpoSemTarefas, { timeout: 15_000 })
+    } catch (e) {
+      if (!txExterno && (e as { code?: string })?.code === "P2002") {
+        const existente = await prisma.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveSemTarefas } })
+        if (existente) return { success: true, created: false, workflowInstance: existente, stepInstances: [], warnings: [], correlationId }
+      }
+      throw e
+    }
+  }
 
   // 3) workflow aplicável — pelo MESMO cliente das leituras acima (`db`). Sob txExterno
   //    isso é o que impede a segunda conexão (e o deadlock com connection_limit=1).

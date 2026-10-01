@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { efeitoExiste } from '@/src/lib/motor/catalogo-de-efeitos'
+import { ehFaseAguardandoFechamento } from '@/src/lib/process-stage/fase-pre-contrato'
 import { publicarRevisaoCatalogoFase, statusDeAtivo } from '@/src/lib/motor/catalogo-fase-revisao'
 import { enqueueReconciliacaoCatalogoFase, type EnqueueResultadoCatalogoFase } from '@/src/lib/motor/reconciliar-fase-macro'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
@@ -95,7 +96,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // pode tudo" está definitivamente eliminado; a contrapartida é que "sem
     // declaração" também não pode virar publicação vazia por omissão).
     const efeitosResultantes = (Array.isArray(b?.efeitosPermitidos) ? b.efeitosPermitidos : atual.efeitosPermitidos) as string[] | null
-    if (ativoPedido && (efeitosResultantes ?? []).length === 0) {
+    // EXCEÇÃO ÚNICA, EXPLÍCITA E TESTADA: "Aguardando fechamento" (`a_iniciar`) é fase SEM tarefas por desenho (pré-trabalho) — não há
+    // passo que execute efeito, então exigir um efeito marcado seria impedir a única fase que, por definição, não executa nada.
+    if (ativoPedido && (efeitosResultantes ?? []).length === 0 && !ehFaseAguardandoFechamento(atual.phaseKey)) {
       return NextResponse.json(
         { error: `A fase "${atual.label}" não pode ser publicada sem nenhum efeito selecionado. Marque pelo menos um efeito permitido.`, code: 'EFEITOS_OBRIGATORIOS_PARA_PUBLICAR' },
         { status: 400 },

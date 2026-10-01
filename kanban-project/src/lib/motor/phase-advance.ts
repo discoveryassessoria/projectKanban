@@ -32,6 +32,7 @@ import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { somarAoAviso, rotuloDaFamilia } from "@/lib/operacional/notificacao-canonica"
 import { urlVisaoGlobalDaFamilia } from "@/lib/operacional/navegacao"
 import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
+import { ehFaseAguardandoFechamento, avancoHumano } from "@/src/lib/process-stage/fase-pre-contrato"
 import {
   fotografarObrigacoes,
   compararObrigacoes,
@@ -564,7 +565,9 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         // administrador. Idempotente pela MESMA `chave` que já protege `WorkflowEvento` e
         // `PhaseAdvanceLog` desta transição (inclui `lockVersion`): a conclusão é UM fato,
         // e reprocessar a transação não soma duas vezes (o item é chaveado por ela).
-        const admins = await tx.usuario.findMany({ where: { tipo: "admin" }, select: { id: true } })
+        // "Aguardando fechamento" (`a_iniciar`) NÃO é trabalho concluído (fase sem tarefas por desenho): fechar o contrato e movê-la para
+        // Genealogia não vira "fase concluída" no sino do gestor. O fato `phase.completed` (outbox, acima) continua registrado.
+        const admins = ehFaseAguardandoFechamento(p.faseAtual) ? [] : await tx.usuario.findMany({ where: { tipo: "admin" }, select: { id: true } })
         const proc = await tx.processo.findUnique({ where: { id: p.processoId }, select: { nome: true, familia: { select: { nome: true } } } })
         for (const admin of admins) {
           await somarAoAviso(tx, {
@@ -785,6 +788,19 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
   const proxima = await proximaFaseComCondicional(processoId, c.fases, c.processo.faseAtual)
   if (!proxima) {
     return { success: false, resultado: "REJEITADO", code: "SEM_PROXIMA_FASE", message: "Não há próxima fase (última fase do macro)", faseAtual: c.processo.faseAtual, correlationId }
+  }
+
+  // FASE "AGUARDANDO FECHAMENTO" (`a_iniciar`, pré-trabalho): o processo nasce aqui e fica PARADO até um humano movê-lo. Fase fora do
+  // enum `FaseCode`, então a trava de `isProcessoFase` abaixo NÃO a alcança — e sem tarefa nenhuma o gate dela é "0 exigido = 100%",
+  // o que deixaria QUALQUER chamador automático (cron, reconciliador, auto-avanço, recalcular) empurrá-la para Genealogia. Aqui só
+  // passa um CLIQUE HUMANO explícito (`avancoHumano`: botão Avançar, arrastar o card); a movimentação manual (`movePhaseManual`)
+  // nem passa por aqui. Lista de origens humanas FECHADA: chamador novo nasce bloqueado.
+  if (ehFaseAguardandoFechamento(c.processo.faseAtual) && !avancoHumano(ctx.origem)) {
+    return {
+      success: false, resultado: "REJEITADO", code: "AVANCO_MANUAL_OBRIGATORIO",
+      message: `Fase "${c.processo.faseAtual}" (Aguardando fechamento) só sai por decisão humana — avanço automático e reconciliação não a deixam.`,
+      faseAtual: c.processo.faseAtual, correlationId,
+    }
   }
 
   // FASE "processo" (checklist + avanço manual, por definição do catálogo —

@@ -195,7 +195,8 @@
    "scripts/torre-toast-escuro.test.ts",
    "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
    "scripts/torre-sem-responsavel-quatro-lugares.test.ts",
-   "scripts/torre-cobranca-estorno.test.ts"
+   "scripts/torre-cobranca-estorno.test.ts",
+   "scripts/fase-aguardando-fechamento-motor.test.ts"
   ]
  },
  "arquivos": [
@@ -372,6 +373,7 @@
   "scripts/torre-toast-escuro.test.ts",
   "scripts/torre-relatorio-fase-passo-iniciou.test.ts",
   "scripts/torre-sem-responsavel-quatro-lugares.test.ts",
-  "scripts/torre-cobranca-estorno.test.ts"
+  "scripts/torre-cobranca-estorno.test.ts",
+  "scripts/fase-aguardando-fechamento-motor.test.ts"
  ]
 }

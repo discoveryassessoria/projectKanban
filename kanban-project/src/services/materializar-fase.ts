@@ -34,6 +34,7 @@ import { garantirTarefaDePasso, carregarPreCondicoes } from "@/src/services/pass
 import type { WorkflowValidationIssue } from "@/src/services/phase-workflow-helpers"
 import { phaseKeyToFaseCode, FASES } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
+import { ehFaseAguardandoFechamento, ROTULO_AGUARDANDO_FECHAMENTO } from "@/src/lib/process-stage/fase-pre-contrato"
 
 /** De onde veio o pedido de materialização — vai para a auditoria, sem exceção. */
 export type FonteMaterializacao =
@@ -245,6 +246,38 @@ export async function materializarExecucaoDaFase(input: MaterializarInput): Prom
     })
     if (ativa) { phaseInstanceId = ativa.id; ciclo = ativa.ciclo }
     else ciclo = 1
+  }
+
+  // ── 1.1) "AGUARDANDO FECHAMENTO" (`a_iniciar`) — SEM tarefas POR DESENHO ───────────────────────────────────────────────
+  // Exceção explícita e testada: pré-trabalho, não há Workflow Interno nem passo. Materializar = garantir a instância da fase (idempotente,
+  // `instanciarWorkflowDaFase` já trata a exceção) e devolver SUCESSO com 0 passos, 0 tarefas — nunca `SEM_WORKFLOW_PUBLICADO` /
+  // `SEM_ALVO_APLICAVEL`, que seriam um falso problema de cadastro. Nenhum Tarefa/Documento/StepInstance nasce aqui.
+  if (ehFaseAguardandoFechamento(faseMacroKey)) {
+    // Só materializa a instância se o processo ESTÁ nela. Reconciliação retroativa (publicação de macro/catálogo) pedindo
+    // "Aguardando fechamento" para um processo que já passou para Genealogia ou adiante NÃO cria instância ativa numa fase
+    // que ele já deixou: não há trabalho retroativo a materializar numa fase sem trabalho.
+    const posicao = await prisma.processo.findUnique({ where: { id: input.processoId }, select: { faseAtualKey: true } })
+    if (posicao?.faseAtualKey !== faseMacroKey) {
+      return base({
+        ok: true, estado: "MATERIALIZADO", faseMacroKey, faseLabel: ROTULO_AGUARDANDO_FECHAMENTO, escopo: "PROCESSO",
+        ciclo, duracaoMs: Date.now() - inicio,
+      })
+    }
+    const instVazia = await instanciarWorkflowDaFase({
+      processoId: input.processoId, faseMacroKey, ciclo: ciclo ?? 1, origem: ORIGEM_POR_FONTE[input.fonte],
+      correlationId, causationId: input.causationId, solicitadoPorId: input.solicitadoPorId,
+    })
+    if (!instVazia.success) {
+      const motivos = instVazia.errors.length ? instVazia.errors : [{ code: instVazia.code, message: `Materialização recusada pelo serviço de instanciação (${instVazia.code}).` }]
+      const rel = base({ estado: "CONFIGURACAO_INVALIDA", faseMacroKey, faseLabel: ROTULO_AGUARDANDO_FECHAMENTO, escopo: "PROCESSO", ciclo, motivos, mensagemAdministrativa: mensagemDe("CONFIGURACAO_INVALIDA", ROTULO_AGUARDANDO_FECHAMENTO, motivos) })
+      await auditar(input, rel)
+      return rel
+    }
+    return base({
+      ok: true, estado: "MATERIALIZADO", faseMacroKey, faseLabel: ROTULO_AGUARDANDO_FECHAMENTO, escopo: "PROCESSO",
+      workflowInstanceId: instVazia.workflowInstance.id, ciclo: instVazia.workflowInstance.ciclo,
+      workflowDefinitionId: null, workflowVersion: null, duracaoMs: Date.now() - inicio,
+    })
   }
 
   const passosAntes = phaseInstanceId != null
