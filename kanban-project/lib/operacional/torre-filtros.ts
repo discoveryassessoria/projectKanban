@@ -15,13 +15,15 @@
 //   status → statusTarefa · tipo de certidão → categoriaDoc · fase → faseMacroKey · passo → passoCorrente.label (etapaAtual)
 //   cartório → orgaoId (terceiroNome) · prioridade → prioridade · risco → o MESMO nível da coluna Risco (`nivelDeRisco`)
 //   linha reta → linhaReta · acompanhamento → acompanhamentoVencido + acompanhamentoPasso · cobrança → cobravelVencida / escalada.
-// "Iniciada" (Quando) NÃO existe: `Tarefa.dataInicio` não é confiável (tarefa concluída sem nunca ter sido "iniciada" fica com
-// `dataInicio` nulo — medido em produção, 26 concluídas e 0 com `dataInicio`) e a linha nem o carrega.
+// "Iniciou" (Torre nova, 01/10/2026) lê `iniciouEm` (registro real do início do trabalho, `task-step-sync.registrarInicioDoTrabalho`):
+// SÓ casa quem TEM o registro (registro antigo sem valor nunca entra em "Hoje/Esta semana/Há mais de 30 dias/Intervalo"); "Ainda não
+// iniciou" é o estado real NAO_INICIADA. A dimensão antiga "Quando" (criada/atribuída) segue válida na URL e em visão salva.
 // ============================================================================
 import { diasAtePrazo } from './torre-kpis'
 import { diaOperacional } from './tempo-operacional'
 import { ehCobravelVencido } from './torre-predicados'
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
+import { INICIOU_TORRE, ROTULO_INICIOU_TORRE, casaIniciou, type IniciouTorre } from './torre-tarefas-tela'
 
 // ─── listas fechadas ────────────────────────────────────────────────────────
 export const PRAZOS_TORRE = ['vencidas', 'hoje', 'amanha', '7dias', '30dias', 'sem'] as const
@@ -65,6 +67,10 @@ export interface FiltrosTorre {
   quando: QuandoTorre | null
   quandoDe: string | null
   quandoAte: string | null
+  /** "Iniciou" (`iniciouEm`): hoje · esta semana · há mais de 30 dias · ainda não iniciou — mais o intervalo (AAAA-MM-DD, dia operacional). */
+  iniciou: IniciouTorre | null
+  iniciouDe: string | null
+  iniciouAte: string | null
   /** Texto (sem acento, sem caixa) contido no nome da família. */
   familia: string | null
   status: string[]
@@ -85,11 +91,11 @@ export interface FiltrosTorre {
 }
 
 export const FILTROS_VAZIOS: Readonly<FiltrosTorre> = Object.freeze({
-  responsavel: [], prazo: [], prazoDe: null, prazoAte: null, quando: null, quandoDe: null, quandoAte: null, familia: null,
+  responsavel: [], prazo: [], prazoDe: null, prazoAte: null, quando: null, quandoDe: null, quandoAte: null, iniciou: null, iniciouDe: null, iniciouAte: null, familia: null,
   status: [], certidao: [], fase: [], passo: [], orgao: [], prioridade: [], risco: [], linhaReta: false, acomp: [], cobranca: [], ordenar: null,
 })
 export const filtrosVazios = (): FiltrosTorre => ({
-  responsavel: [], prazo: [], prazoDe: null, prazoAte: null, quando: null, quandoDe: null, quandoAte: null, familia: null,
+  responsavel: [], prazo: [], prazoDe: null, prazoAte: null, quando: null, quandoDe: null, quandoAte: null, iniciou: null, iniciouDe: null, iniciouAte: null, familia: null,
   status: [], certidao: [], fase: [], passo: [], orgao: [], prioridade: [], risco: [], linhaReta: false, acomp: [], cobranca: [], ordenar: null,
 })
 
@@ -100,6 +106,8 @@ export interface LinhaParaFiltro {
   dataPrazo: string | null
   criadaEm: string | null
   atribuidaEm: string | null
+  /** O início REAL do trabalho (`Tarefa.dataInicio`); `null`/ausente = registro antigo ou ainda não iniciada. */
+  iniciouEm?: string | null
   familiaNome: string | null
   processoNome: string | null
   statusTarefa: string
@@ -150,6 +158,7 @@ export function normalizarFiltros(b: Record<string, unknown> | null | undefined)
   const x = b ?? {}
   const quando = typeof x.quando === 'string' && (QUANDOS_TORRE as readonly string[]).includes(x.quando) ? (x.quando as QuandoTorre) : null
   const ordenar = typeof x.ordenar === 'string' && (ORDENS_TORRE as readonly string[]).includes(x.ordenar) ? (x.ordenar as OrdemTorre) : null
+  const iniciou = typeof x.iniciou === 'string' && (INICIOU_TORRE as readonly string[]).includes(x.iniciou) ? (x.iniciou as IniciouTorre) : null
   const familia = typeof x.familia === 'string' && x.familia.trim() ? x.familia.trim().slice(0, 80) : null
   const lr = x.linhaReta
   return {
@@ -157,6 +166,7 @@ export function normalizarFiltros(b: Record<string, unknown> | null | undefined)
     prazo: listaFechada<PrazoTorre>(x.prazo, PRAZOS_TORRE),
     prazoDe: diaValido(x.prazoDe), prazoAte: diaValido(x.prazoAte),
     quando, quandoDe: quando ? diaValido(x.quandoDe) : null, quandoAte: quando ? diaValido(x.quandoAte) : null,
+    iniciou, iniciouDe: diaValido(x.iniciouDe), iniciouAte: diaValido(x.iniciouAte),
     familia,
     status: listaFechada<string>(x.status, STATUS_TORRE),
     certidao: listaFechada<string>(x.certidao, CERTIDOES_TORRE),
@@ -175,7 +185,7 @@ export function normalizarFiltros(b: Record<string, unknown> | null | undefined)
 // ─── URL ↔ estado (idempotente: serializar(ler(serializar(f))) === serializar(f)) ─
 /** As chaves da querystring que pertencem aos filtros (a Torre só mexe nestas ao escrever a URL). */
 export const CHAVES_URL_FILTROS = [
-  'resp', 'prazo', 'prazo_de', 'prazo_ate', 'quando', 'quando_de', 'quando_ate', 'familia', 'status', 'certidao', 'fase', 'passo',
+  'resp', 'prazo', 'prazo_de', 'prazo_ate', 'quando', 'quando_de', 'quando_ate', 'iniciou', 'iniciou_de', 'iniciou_ate', 'familia', 'status', 'certidao', 'fase', 'passo',
   'orgao', 'prio', 'risco', 'linha_reta', 'acomp', 'cobranca', 'ordem',
 ] as const
 
@@ -190,6 +200,9 @@ export function filtrosParaPares(f: FiltrosTorre): Array<[string, string]> {
   if (n.quando) p.push(['quando', n.quando])
   if (n.quandoDe) p.push(['quando_de', n.quandoDe])
   if (n.quandoAte) p.push(['quando_ate', n.quandoAte])
+  if (n.iniciou) p.push(['iniciou', n.iniciou])
+  if (n.iniciouDe) p.push(['iniciou_de', n.iniciouDe])
+  if (n.iniciouAte) p.push(['iniciou_ate', n.iniciouAte])
   if (n.familia) p.push(['familia', n.familia])
   lista('status', n.status); lista('certidao', n.certidao); lista('fase', n.fase)
   // O nome do passo pode ter vírgula: nunca vai na lista por vírgula — uma chave repetida por valor.
@@ -214,7 +227,7 @@ export function filtrosDaQuery(query: URLSearchParams): FiltrosTorre {
   const g = (k: string) => query.get(k) ?? undefined
   return normalizarFiltros({
     responsavel: g('resp'), prazo: g('prazo'), prazoDe: g('prazo_de'), prazoAte: g('prazo_ate'),
-    quando: g('quando'), quandoDe: g('quando_de'), quandoAte: g('quando_ate'), familia: g('familia'),
+    quando: g('quando'), quandoDe: g('quando_de'), quandoAte: g('quando_ate'), iniciou: g('iniciou'), iniciouDe: g('iniciou_de'), iniciouAte: g('iniciou_ate'), familia: g('familia'),
     status: g('status'), certidao: g('certidao'), fase: g('fase'), passo: query.getAll('passo'), orgao: g('orgao'),
     prioridade: g('prio'), risco: g('risco'), linhaReta: g('linha_reta'), acomp: g('acomp'), cobranca: g('cobranca'), ordenar: g('ordem'),
   })
@@ -305,6 +318,7 @@ export function linhaPassa(l: LinhaParaFiltro, f: FiltrosTorre, ctx: ContextoDeF
   return casaResponsavel(l, f.responsavel, ctx.usuarioId)
     && casaPrazo(l, f, ctx.agora)
     && casaQuando(l, f)
+    && casaIniciou({ iniciouEm: l.iniciouEm, statusTarefa: l.statusTarefa }, f, ctx.agora)
     && casaFamilia(l, f.familia)
     && (!f.status.length || f.status.includes(l.statusTarefa))
     && casaCertidao(l, f.certidao)
@@ -379,6 +393,7 @@ export function chipsDoFiltro(f: FiltrosTorre, r: RotulosDoFiltro = {}): ChipDeF
   for (const v of f.prazo) c.push({ chave: 'prazo', valor: v, rotulo: `Prazo: ${ROTULO_PRAZO_TORRE[v]}` })
   if (f.prazoDe || f.prazoAte) c.push({ chave: 'prazoDe', valor: null, rotulo: `Prazo: ${f.prazoDe ? `de ${dia(f.prazoDe)}` : ''}${f.prazoDe && f.prazoAte ? ' ' : ''}${f.prazoAte ? `até ${dia(f.prazoAte)}` : ''}` })
   if (f.quando && (f.quandoDe || f.quandoAte)) c.push({ chave: 'quando', valor: null, rotulo: `${ROTULO_QUANDO_TORRE[f.quando]}: ${f.quandoDe ? `de ${dia(f.quandoDe)}` : ''}${f.quandoDe && f.quandoAte ? ' ' : ''}${f.quandoAte ? `até ${dia(f.quandoAte)}` : ''}` })
+  if (f.iniciou || f.iniciouDe || f.iniciouAte) c.push({ chave: 'iniciou', valor: null, rotulo: `Iniciou: ${f.iniciou ? ROTULO_INICIOU_TORRE[f.iniciou] : ''}${f.iniciou && (f.iniciouDe || f.iniciouAte) ? ' · ' : ''}${f.iniciouDe ? `de ${dia(f.iniciouDe)}` : ''}${f.iniciouDe && f.iniciouAte ? ' ' : ''}${f.iniciouAte ? `até ${dia(f.iniciouAte)}` : ''}` })
   if (f.familia) c.push({ chave: 'familia', valor: null, rotulo: `Família: ${f.familia}` })
   for (const v of f.status) c.push({ chave: 'status', valor: v, rotulo: `Status: ${ROTULO_STATUS[v] ?? v}` })
   for (const v of f.certidao) c.push({ chave: 'certidao', valor: v, rotulo: `Certidão: ${ROTULO_CERTIDAO_TORRE[v] ?? v}` })
@@ -400,6 +415,7 @@ export function removerChip(f: FiltrosTorre, chip: Pick<ChipDeFiltro, 'chave' | 
   switch (chip.chave) {
     case 'prazoDe': case 'prazoAte': return { ...n, prazoDe: null, prazoAte: null }
     case 'quando': case 'quandoDe': case 'quandoAte': return { ...n, quando: null, quandoDe: null, quandoAte: null }
+    case 'iniciou': case 'iniciouDe': case 'iniciouAte': return { ...n, iniciou: null, iniciouDe: null, iniciouAte: null }
     case 'familia': return { ...n, familia: null }
     case 'linhaReta': return { ...n, linhaReta: false }
     case 'ordenar': return { ...n, ordenar: null }

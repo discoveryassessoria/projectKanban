@@ -1,16 +1,27 @@
 "use client"
-// src/components/torre/VisoesSalvas.tsx — VISÕES SALVAS da aba Tarefas (Bloco J4). Guardadas em `RelatorioVisao`
-// (`dominio: torre-tarefas`, sem migration). A visão guarda a PERGUNTA (visão, agrupamento, KPI, país, busca e filtros da barra), nunca o resultado.
+// src/components/torre/VisoesSalvas.tsx — o cartão "VISÃO" + "SALVAS" da aba Tarefas (Torre nova, igual ao protótipo):
+// o segmentado com as oito visões e o selo numérico de cada uma, e abaixo as visões SALVAS como chips + "+ Salvar visão atual".
+// Guardadas em `RelatorioVisao` (`dominio: torre-tarefas`, sem migration). A visão guarda a PERGUNTA (visão, agrupamento, indicador,
+// nacionalidade, busca e TODOS os filtros do painel), nunca o resultado. Clicar num chip APLICA a visão salva (o protótipo só realça).
 import { useCallback, useEffect, useState } from "react"
 import type { FiltrosTorre } from "@/lib/operacional/torre-filtros"
-import { api, erroDe, Campo, Modal, useTorre } from "./torre-base"
+import { api, erroDe, useTorre } from "./torre-base"
+import { TarefasModal } from "./TarefasModais"
 
-export interface SpecDaVisao { visao: string | null; agrupar: string | null; dentro?: string | null; kpi: string | null; pais: string | null; busca: string | null; /** Os filtros da barra (ausente nas visões salvas antes dela = nenhum filtro). */ filtros?: FiltrosTorre | null }
+export interface SpecDaVisao { visao: string | null; agrupar: string | null; dentro?: string | null; kpi: string | null; pais: string | null; busca: string | null; /** Os filtros do painel (ausente nas visões salvas antes dele = nenhum filtro). */ filtros?: FiltrosTorre | null }
 interface Minha { id: number; nome: string; spec: SpecDaVisao; compartilhada: boolean }
 interface DaEquipe { id: number; nome: string; spec: SpecDaVisao; donoNome: string }
 
+/** "Da equipe: Priscila · Portugal" — o nome da visão compartilhada pode já trazer o prefixo; nunca duplica. */
+export const rotuloDaVisaoDaEquipe = (v: { nome: string; donoNome: string }): string =>
+  /^da equipe\b/i.test(v.nome) ? v.nome : `Da equipe: ${v.donoNome} · ${v.nome}`
+
+/** 3.842 — milhar com ponto (sem toLocaleString: nada de formatação dependente do ambiente). */
+const fmtN = (n: number | null): string => (n == null ? "…" : String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "."))
+
 export function VisoesSalvas({ fixas, valor, atual, onEscolherFixa, onAplicar }: {
-  fixas: Array<[string, string]>
+  /** [chave, rótulo, número] — o número é o tamanho da lista da visão (`null` = ainda carregando). */
+  fixas: Array<[string, string, number | null]>
   valor: string
   atual: SpecDaVisao
   onEscolherFixa: (v: string) => void
@@ -22,8 +33,6 @@ export function VisoesSalvas({ fixas, valor, atual, onEscolherFixa, onAplicar }:
   const [salvar, setSalvar] = useState(false)
   const [nome, setNome] = useState("")
   const [comp, setComp] = useState(false)
-  const [env, setEnv] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     const r = await api<{ minhas: Minha[]; compartilhadas: DaEquipe[] }>("/api/torre/visoes")
@@ -35,20 +44,9 @@ export function VisoesSalvas({ fixas, valor, atual, onEscolherFixa, onAplicar }:
     return () => { vivo = false }
   }, [])
 
-  const escolher = (v: string) => {
-    if (v.startsWith("minha:")) { const x = minhas.find((m) => `minha:${m.id}` === v); if (x) onAplicar(x.spec, v); return }
-    if (v.startsWith("equipe:")) { const x = equipe.find((m) => `equipe:${m.id}` === v); if (x) onAplicar(x.spec, v); return }
-    onEscolherFixa(v)
-  }
+  const escolherSalva = (id: string, spec: SpecDaVisao) => { if (valor === id) onEscolherFixa("todas"); else onAplicar(spec, id) }
   const selecionada = minhas.find((m) => `minha:${m.id}` === valor)
 
-  const gravar = async () => {
-    setEnv(true); setErro(null)
-    const r = await api<{ visao?: { id: number; nome: string } }>("/api/torre/visoes", "POST", { nome: nome.trim(), ...atual, compartilhada: comp })
-    setEnv(false)
-    if (!r.ok) { setErro(erroDe(r.data)); return }
-    setSalvar(false); setNome(""); setComp(false); avisar(`Visão "${r.data.visao?.nome ?? nome}" salva${comp ? " e compartilhada com a equipe" : ""}.`); void carregar()
-  }
   const alternarComp = async (m: Minha) => {
     const r = await api("/api/torre/visoes", "PATCH", { id: m.id, compartilhada: !m.compartilhada })
     if (r.ok) { avisar(m.compartilhada ? `"${m.nome}" deixou de ser compartilhada.` : `"${m.nome}" agora é compartilhada com a equipe.`); void carregar() } else avisar(erroDe(r.data))
@@ -60,31 +58,52 @@ export function VisoesSalvas({ fixas, valor, atual, onEscolherFixa, onAplicar }:
   }
 
   return (
-    <>
-      <label className="flex items-center gap-1.5 small">Visão
-        <select className="tor-in" aria-label="Visão salva" value={valor} onChange={(e) => escolher(e.target.value)}>
-          {fixas.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          {minhas.length > 0 && <optgroup label="Minhas visões">{minhas.map((m) => <option key={m.id} value={`minha:${m.id}`}>{m.nome}{m.compartilhada ? " (compartilhada)" : ""}</option>)}</optgroup>}
-          {equipe.length > 0 && <optgroup label="Da equipe">{equipe.map((m) => <option key={m.id} value={`equipe:${m.id}`}>{m.nome} — {m.donoNome}</option>)}</optgroup>}
-        </select>
-      </label>
-      <button className="tor-btn" onClick={() => setSalvar(true)}>Salvar visão</button>
-      {selecionada && (
-        <>
-          <button className="tor-btn" onClick={() => void alternarComp(selecionada)}>{selecionada.compartilhada ? "Deixar de compartilhar" : "Compartilhar com a equipe"}</button>
-          <button className="tor-btn" onClick={() => void excluir(selecionada)}>Excluir visão</button>
-        </>
-      )}
+    <div className="tf-card">
+      <div className="tf-lin">
+        <span className="tf-rot">Visão</span>
+        <div className="tf-seg" role="group" aria-label="Visão">
+          {fixas.map(([v, l, n]) => (
+            <button key={v} type="button" aria-pressed={valor === v} onClick={() => onEscolherFixa(v)}>{l}<span className="tf-n">{fmtN(n)}</span></button>
+          ))}
+        </div>
+      </div>
+      <div className="tf-lin">
+        <span className="tf-rot">Salvas</span>
+        <div className="tf-salvas">
+          {minhas.map((m) => (
+            <button key={m.id} type="button" className="tf-chip" aria-pressed={valor === `minha:${m.id}`} onClick={() => escolherSalva(`minha:${m.id}`, m.spec)}>{m.nome.startsWith("★") ? m.nome : `★ ${m.nome}`}</button>
+          ))}
+          {equipe.map((m) => (
+            <button key={m.id} type="button" className="tf-chip" aria-pressed={valor === `equipe:${m.id}`} onClick={() => escolherSalva(`equipe:${m.id}`, m.spec)}>{rotuloDaVisaoDaEquipe(m)}</button>
+          ))}
+          {selecionada && (
+            <>
+              <button type="button" className="tf-link" onClick={() => void alternarComp(selecionada)}>{selecionada.compartilhada ? "Deixar de compartilhar" : "Compartilhar com a equipe"}</button>
+              <button type="button" className="tf-link" onClick={() => void excluir(selecionada)}>Excluir visão</button>
+            </>
+          )}
+        </div>
+        <button type="button" className="tf-chip tracejado" onClick={() => { setNome(""); setComp(false); setSalvar(true) }}>+ Salvar visão atual</button>
+      </div>
+
       {salvar && (
-        <Modal titulo="Salvar visão" subtitulo="Guarda os filtros de agora (visão, agrupamento, indicador, nacionalidade, busca e todos os filtros da barra) — nunca o resultado." onFechar={() => setSalvar(false)} ocupado={env} rodape={<>
-          <button className="tor-btn" onClick={() => setSalvar(false)} disabled={env}>Cancelar</button>
-          <button className="tor-btn pri" onClick={() => void gravar()} disabled={env || !nome.trim()}>{env ? "Salvando…" : "Salvar"}</button>
-        </>}>
-          <Campo rotulo="Nome da visão"><input className="tor-in w-full" value={nome} maxLength={80} onChange={(e) => setNome(e.target.value)} /></Campo>
-          <label className="flex items-center gap-2 small"><input type="checkbox" checked={comp} onChange={(e) => setComp(e.target.checked)} /> Compartilhar com a equipe</label>
-          {erro && <div className="text-[12px] rounded-lg px-3 py-2 bg-[var(--danger-tile)] text-[var(--danger-text)]">{erro}</div>}
-        </Modal>
+        <TarefasModal
+          titulo="Salvar visão" texto="Guarda visão, agrupamento, filtros, país e busca." botao="Salvar" podeConfirmar={nome.trim().length > 0} onFechar={() => setSalvar(false)}
+          onConfirmar={async (just) => {
+            const r = await api<{ visao?: { id: number; nome: string } }>("/api/torre/visoes", "POST", { nome: nome.trim(), ...atual, compartilhada: comp, justificativa: just })
+            if (!r.ok) return { ok: false, mensagem: erroDe(r.data) }
+            setSalvar(false); avisar('Visão salva · aparece em "Salvas"'); void carregar()
+            return { ok: true }
+          }}
+        >
+          <label>Nome da visão
+            <input type="text" placeholder="Itália · emissão parada" value={nome} maxLength={80} aria-label="Nome da visão" onChange={(e) => setNome(e.target.value)} />
+          </label>
+          <label style={{ flexDirection: "row", alignItems: "center", gap: 8, fontWeight: 400 }}>
+            <input type="checkbox" style={{ height: 15, width: 15 }} checked={comp} onChange={(e) => setComp(e.target.checked)} /> Compartilhar com a equipe
+          </label>
+        </TarefasModal>
       )}
-    </>
+    </div>
   )
 }

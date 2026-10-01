@@ -175,7 +175,7 @@ secao("Todos os filtros combinados — AND entre filtros, OR dentro de cada um")
     passoCorrente: { chave: "aguardar", label: "Aguardar retorno" }, orgaoId: 10, prioridade: "ALTA", atrasada: false, escalada: true, linhaReta: true, estadoOperacao: "AGUARDANDO",
     acompanhamentoVencido: true, acompanhamentoPasso: { dueAt: "2026-10-01T12:00:00.000Z", semPrazo: false }, cobravelVencida: true })
   const tudo: FiltrosTorre = {
-    responsavel: ["eu", "9"], prazo: ["amanha", "sem"], prazoDe: "2026-10-01", prazoAte: "2026-10-30", quando: "criada", quandoDe: "2026-09-01", quandoAte: "2026-09-30", familia: "sant",
+    responsavel: ["eu", "9"], prazo: ["amanha", "sem"], prazoDe: "2026-10-01", prazoAte: "2026-10-30", quando: "criada", quandoDe: "2026-09-01", quandoAte: "2026-09-30", iniciou: null, iniciouDe: null, iniciouAte: null, familia: "sant",
     status: ["AGUARDANDO_TERCEIRO", "NAO_INICIADA"], certidao: ["CASAMENTO"], fase: ["emissao_documental"], passo: ["Aguardar retorno"], orgao: ["10", "sem"], prioridade: ["ALTA", "URGENTE"],
     risco: ["critico"], linhaReta: true, acomp: ["vencido"], cobranca: ["vencida", "semresposta"], ordenar: "prazo",
   }
@@ -206,7 +206,7 @@ secao("'Mostrando N de M' e contadores — a MESMA função da tabela")
   ok("o texto sai do mesmo objeto", textoMostrando(r) === "Mostrando 2 de 10")
   ok("sem filtro: N = M", textoMostrando(aplicarFiltros(x, filtrosVazios(), CTX)) === "Mostrando 10 de 10")
   const t = ler("src/components/torre/TorreTarefas.tsx"), f = ler("src/components/torre/TorreFiltros.tsx")
-  ok("estático: a tabela (visiveis) e o texto leem `resumo` — o resultado de UM aplicarFiltros", /const resumo = useMemo\(\(\) => aplicarFiltros\(listaBase, filtros, ctxFiltro\)/.test(t) && /const l = resumo\.linhas/.test(t) && /mostrando=\{resumo\.mostrando\}/.test(t) && /textoMostrando\(\{ mostrando, total \}\)/.test(f))
+  ok("estático: a tabela (trabalhoVisivel) e o texto leem `resumo` — o resultado de UM aplicarFiltros", /const resumo = useMemo\(\(\) => aplicarFiltros\(listaBase, filtros, ctxFiltro\)/.test(t) && /const l = resumo\.linhas/.test(t) && /mostrando=\{resumo\.mostrando\}/.test(t) && /Mostrando \{mostrando\} de \{total\}/.test(f))
   const torre = ler("src/components/torre/Torre.tsx")
   ok("estático: o número da aba Tarefas também passa por aplicarFiltros", /const nTarefas = aplicarFiltros\(/.test(torre))
 }
@@ -263,20 +263,22 @@ secao("Opções da barra — só o que existe em tarefa aberta")
 }
 
 // ═══ TELA ═══
-secao("Tela — chips com ✕, Limpar filtros, Mais filtros, chip de nacionalidade, placeholder, 400 px")
+secao("Tela — painel do protótipo, Limpar filtros, Mais filtros, nacionalidade, placeholder, 400 px")
 {
-  const f = ler("src/components/torre/TorreFiltros.tsx"), t = ler("src/components/torre/TorreTarefas.tsx"), css = ler("src/components/torre/torre.css"), cab = ler("src/components/torre/TorreCabecalho.tsx"), torre = ler("src/components/torre/Torre.tsx")
-  ok("barra abaixo de Agrupar/Dentro/Visão e escondida no Feito", t.indexOf('aria-label="Dentro da família"') < t.indexOf("<TorreFiltros") && /visao !== "feito" && \(\s*<TorreFiltros/.test(t))
-  ok("chips com ✕ (um por valor), 'Limpar filtros' e 'Mostrando N de M'", /aria-label=\{`Remover o filtro \$\{c\.rotulo\}`\}/.test(f) && />Limpar filtros</.test(f) && /textoMostrando/.test(f))
-  ok("todo <button> da barra tem onClick (sem botão morto)", [...f.matchAll(/<button\b[^>]*>/g)].every((m) => /onClick=/.test(m[0])))
+  const f = ler("src/components/torre/TorreFiltros.tsx"), t = ler("src/components/torre/TorreTarefas.tsx"), css = ler("src/components/torre/tarefas.css"), cab = ler("src/components/torre/TorreCabecalho.tsx"), torre = ler("src/components/torre/Torre.tsx")
+  ok("o painel fica abaixo de Visão/Salvas e é escondido no Feito", t.indexOf("<VisoesSalvas") < t.indexOf("<TorreFiltros") && /visao !== "feito" && \(\s*<TorreFiltros/.test(t))
+  ok("'Limpar filtros', 'Mais filtros · 6' e 'Mostrando N de M · 50 por página'", />Limpar filtros</.test(f) && /Mais filtros · 6/.test(f) && /Menos filtros/.test(f) && /por página/.test(f))
+  ok("todo <button> do painel tem onClick (sem botão morto)", [...f.matchAll(/<button\b[^>]*>/g)].every((m) => /onClick=/.test(m[0])))
   const antesMais = f.slice(0, f.indexOf("{mais && ("))
-  ok("visíveis: Responsável, Prazo, Família, Status, Certidão, Cartório, Risco, Ordenar por — e nenhum dos de 'Mais filtros'", ['rotulo="Responsável"', "Filtro Prazo", 'aria-label="Família"', 'rotulo="Status"', 'rotulo="Certidão"', 'rotulo="Cartório"', 'rotulo="Risco"', 'aria-label="Ordenar por"'].every((r) => antesMais.includes(r)) && ['rotulo="Fase"', 'rotulo="Passo atual"', 'rotulo="Prioridade"', "Só linha reta", 'rotulo="Acompanhamento"', 'rotulo="Cobrança"', 'aria-label="Quando"'].every((r) => !antesMais.includes(r)))
+  ok("linha 1, na ordem do protótipo: Família · Responsável · Prazo · Iniciou · Nacionalidade · Fase · Certidão · Risco", ["Família", "Responsável", "Prazo", "Iniciou", "Nacionalidade", "Fase", "Certidão", "Risco"].map((r) => antesMais.indexOf(`<label>${r}`)).every((i, k, v) => i > 0 && (k === 0 || i > v[k - 1])))
   const aposMais = f.slice(f.indexOf("{mais && ("))
-  ok("'Mais filtros' guarda Quando, Fase, Passo atual, Prioridade, Só linha reta, Acompanhamento e Cobrança", ["Quando", 'rotulo="Fase"', 'rotulo="Passo atual"', 'rotulo="Prioridade"', "Só linha reta", 'rotulo="Acompanhamento"', 'rotulo="Cobrança"'].every((r) => aposMais.includes(r)))
-  ok("o chip de nacionalidade é só exibição (o seletor do topo continua o dono) e tem ✕", /Nacionalidade: \{paisRotulo\}/.test(f) && /aria-label="Limpar a nacionalidade"/.test(f))
-  ok("Família: campo com datalist alimentado por sugestoesDeFamilia", /list="tor-familias"/.test(f) && /sugestoesDeFamilia\(linhasTodas/.test(f))
-  ok("rótulo de status pelo mapa único; fase pelo cadastro (rotularFase)", /ROTULO_STATUS\[s\]/.test(f) && /rotularFase\(f\)/.test(f) && !/NAO_INICIADA:\s*"/.test(f))
-  ok("400 px: a barra quebra em linhas, o menu abre na largura da barra e nada tem largura fixa acima de 400 px", /\.tor-fxrow \{[^}]*flex-wrap: wrap/.test(css) && /\.tor-fx-pop \{[^}]*width: min\(340px, 100%\)/.test(css) && !/\.tor-fx[\w-]* \{[^}]*width: (\d{3,})px/.test(css.replace(/min\(340px, 100%\)/g, "")))
+  ok("'Mais filtros' guarda Passo atual, Cartório, Prioridade, Cobrança, Status e Só linha reta", ["Passo atual", "Cartório", "Prioridade", "Cobrança", "Status", "Só linha reta"].every((r) => aposMais.includes(r)))
+  ok("sem duplicar as visões: Responsável sem 'Eu/Sem responsável' como opção fixa, Prazo sem 'Vencidas', Status só A iniciar/Em andamento/Cancelada", !/<option value="eu">Eu</.test(f.replace(/\{filtros\.responsavel\.includes[^}]*\}/g, "")) && /PRAZOS_TORRE\.filter\(\(p\) => p !== "vencidas"/.test(f) && /A iniciar<\/option><option value="EM_ANDAMENTO">Em andamento<\/option><option value="CANCELADA">Cancelada/.test(f))
+  ok("Nacionalidade lê e escreve o MESMO estado do seletor do topo (onPais → onAplicarSpec do casco)", /onPais=\{\(pais\) => onAplicarSpec\(/.test(t) && /value=\{paisChave\}/.test(f))
+  ok("Limpar filtros limpa de verdade: filtros, agrupar, dentro, indicador, país e busca", /onLimparTudo=\{\(\) => \{ onFiltros\(filtrosVazios\(\)\); setAgrupar\("fam"\); setDentro\("none"\); onAplicarSpec\(\{ kpi: null, pais: "", busca: "" \}\)/.test(t))
+  ok("Família: campo de texto 'Digite: Ant…'", /placeholder="Digite: Ant…"/.test(f))
+  ok("rótulo de status pelo mapa único; fase pelo cadastro (rotularFase)", /ROTULO_STATUS\[/.test(f) && /rotularFase\(f\)/.test(f))
+  ok("400 px: o painel passa a 2 colunas e nada tem largura fixa acima de 400 px", /@media \(max-width: 720px\)[\s\S]*\.tf-fx \{ grid-template-columns: repeat\(2/.test(css))
   ok("a busca do topo: 'Buscar pessoa, cartório ou tarefa…' (família tem campo próprio)", /placeholder="Buscar pessoa, cartório ou tarefa…"/.test(cab) && !/Buscar família/.test(cab))
   ok("a Torre repassa os filtros, o chip/limpar de país e de busca, e o estado da URL", /filtros=\{filtros\} onFiltros=\{setFiltros\}/.test(torre) && /onLimparPais=/.test(torre) && /onLimparBusca=/.test(torre) && /onEstadoUrl=\{onEstadoUrl\}/.test(torre))
 }

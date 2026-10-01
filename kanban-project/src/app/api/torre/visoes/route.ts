@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
   const b = await request.json().catch(() => ({}))
   const nome = String(b?.nome ?? '').trim().slice(0, 80)
   if (!nome) return NextResponse.json({ error: 'Dê um nome à visão.' }, { status: 400 })
+  // A JUSTIFICATIVA (Torre nova: mínimo 5 letras, vai para o histórico): opcional para quem chama pela API; se vier, precisa valer.
+  const justificativa = typeof b?.justificativa === 'string' ? b.justificativa.trim().slice(0, 300) : ''
+  if (b?.justificativa !== undefined && justificativa.length < 5) return NextResponse.json({ error: 'Escreva pelo menos 5 letras na justificativa.' }, { status: 400 })
   // Os filtros da barra entram validados (`normalizarFiltros`, dentro de `limparSpec`); o JSON é só o formato de gravação.
   const spec = JSON.parse(JSON.stringify(limparSpec(b as Record<string, unknown>)))
   const visao = await prisma.relatorioVisao.upsert({
@@ -45,8 +48,8 @@ export async function POST(request: NextRequest) {
   await prisma.logAuditoria.create({
     data: {
       acao: 'VISAO_TORRE_SALVA', entidade: 'RelatorioVisao', entidadeId: visao.id, usuarioId: usuario.userId,
-      descricao: `Visão "${nome}" da Torre salva${visao.compartilhada ? ' e compartilhada com a equipe' : ''}.`,
-      detalhes: JSON.parse(JSON.stringify({ visaoId: visao.id, spec, compartilhada: visao.compartilhada })),
+      descricao: `Visão "${nome}" da Torre salva${visao.compartilhada ? ' e compartilhada com a equipe' : ''}.${justificativa ? ` Justificativa: ${justificativa}` : ''}`,
+      detalhes: JSON.parse(JSON.stringify({ visaoId: visao.id, spec, compartilhada: visao.compartilhada, ...(justificativa ? { justificativa } : {}) })),
     },
   })
   return NextResponse.json({ visao })

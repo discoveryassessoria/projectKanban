@@ -1,25 +1,13 @@
 "use client"
-// src/components/torre/adiar-acompanhamento.tsx — "Adiar acompanhamento" da Torre: a MESMA porta e o MESMO modal da Operação
-// (`AdiarAcompanhamentoModal` + POST /api/operacao/tarefas/{id}/adiar-acompanhamento). O prazo da tarefa não muda.
+// src/components/torre/adiar-acompanhamento.tsx — "Adiar a cobrança" da Torre: o MESMO modal-padrão da aba Tarefas (`ModalDaAcao`, ação
+// "adiar": campo "Nova data" + justificativa de 5 letras) sobre a MESMA porta da Operação (POST /api/operacao/tarefas/{id}/adiar-acompanhamento).
+// O prazo da tarefa NÃO muda — só a data da próxima cobrança. Este gancho serve às telas que adiam a partir de uma linha (painel do trabalho).
 import { useState, type ReactNode } from "react"
-import { AdiarAcompanhamentoModal } from "@/src/components/operacao/AdiarAcompanhamentoModal"
-import { api, useTorre } from "./torre-base"
+import { ModalDaAcao } from "./TarefasModais"
+import type { LinhaTorre } from "./tipos"
 
-export function useAdiarAcompanhamento(): { abrir: (taskId: number) => void; modal: ReactNode } {
-  const { avisar, recarregar } = useTorre()
-  const [taskId, setTaskId] = useState<number | null>(null)
-  const modal = taskId == null ? null : (
-    <AdiarAcompanhamentoModal
-      onFechar={() => setTaskId(null)}
-      onEnviar={async (dados) => {
-        const r = await api<{ ok?: boolean; mensagem?: string }>(`/api/operacao/tarefas/${taskId}/adiar-acompanhamento`, "POST", dados)
-        if (!r.ok || !r.data.ok) return { ok: false, mensagem: r.data.mensagem }
-        setTaskId(null)
-        avisar(`Acompanhamento adiado ${dados.dias} dia(s). O prazo da tarefa não muda.`)
-        recarregar()
-        return { ok: true }
-      }}
-    />
-  )
-  return { abrir: setTaskId, modal }
+export function useAdiarAcompanhamento(agora: Date): { abrir: (linha: LinhaTorre) => void; modal: ReactNode } {
+  const [linha, setLinha] = useState<LinhaTorre | null>(null)
+  const modal = linha == null ? null : <ModalDaAcao acao="adiar" linha={linha} agora={agora} onFechar={() => setLinha(null)} />
+  return { abrir: setLinha, modal }
 }

@@ -3,7 +3,8 @@
 import { normalizarFiltros } from './torre-filtros'
 
 export const DOMINIO_VISAO_TORRE = 'torre-tarefas'
-export const VISOES_TORRE = ['todas', 'minhas', 'vencidas', 'semdono', 'aguard', 'acompvenc', 'cobranca', 'feito'] as const
+// 'bloqueadas' entrou na Torre nova (01/10/2026); 'acompvenc' continua válida (visão salva antiga), mas a tela já não a mostra.
+export const VISOES_TORRE = ['todas', 'minhas', 'vencidas', 'semdono', 'aguard', 'acompvenc', 'cobranca', 'bloqueadas', 'feito'] as const
 export const DENTRO_TORRE = ['none', 'pessoa', 'orgao', 'passo'] as const
 export const AGRUPAR_TORRE = ['fam', 'resp', 'org', 'fase', 'none'] as const
 export const KPIS_TORRE = ['venc', 'v7', 'semdono', 'aguard', 'cob', 'esc', 'risco'] as const
