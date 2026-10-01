@@ -14,6 +14,7 @@ import { prisma } from '@/lib/prisma'
 import { exigirTorre } from '@/src/lib/torre-acesso'
 import { dossieDaTarefa } from '@/lib/operacional/tarefa-projecoes'
 import { rotuloDoMomento } from '@/lib/operacional/historico-filtros'
+import { humanizarEstadosNoTexto } from '@/src/lib/home/rotulo-status-tarefa'
 
 const LIMITE_DO_HISTORICO = 12
 
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ tarefaI
     historico: d.timeline.slice(0, LIMITE_DO_HISTORICO).map((f) => ({
       em: f.em,
       quando: rotuloDoMomento(f.em, agora).replace(', ', ' '),
-      texto: f.texto,
+      texto: humanizarEstadosNoTexto(f.texto),
       autor: f.autor ?? autorPorEmETexto.get(`${f.em}|${f.texto}`) ?? null,
     })),
   })

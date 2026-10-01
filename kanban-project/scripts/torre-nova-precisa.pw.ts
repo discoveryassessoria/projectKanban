@@ -39,7 +39,8 @@ async function main() {
   const regras = await page.locator(".pdv-tipo .pdv-tipo-r").allInnerTexts()
   ok("as regras escritas nos cartões", regras[0] === "certidão ativa sem responsável" && regras[1] === "fase sem próxima ação" && /^cartório sem resposta após \d+ cobranças?$/.test(regras[2]) && regras[3] === "tarefa, passo e Central discordam" && regras[4] === "esperando o cliente há 10+ dias" && regras[5] === "pessoa acima do limite", regras.join("|"))
   const numeros = (await page.locator(".pdv-tipo .pdv-tipo-n").allInnerTexts()).map(Number)
-  ok("a soma dos seis cartões fecha com o título e com o contador da aba", numeros.reduce((a, b) => a + b, 0) === total && Number((await texto('[role="tab"][aria-selected="true"] .n')).replace(/\D/g, "")) === total, `${numeros.join("+")} = ${total}`)
+  // T004: o selo da aba "Precisa de você" NÃO aparece na própria aba (só na Visão geral/Processos/Tarefas) — a soma fecha com o título.
+  ok("a soma dos seis cartões fecha com o título (e a própria aba não repete o selo — T004)", numeros.reduce((a, b) => a + b, 0) === total && (await page.locator('[role="tab"][aria-selected="true"] .n').count()) === 0, `${numeros.join("+")} = ${total}`)
   const colunas = (await page.locator(".pdv-hd > div").allTextContents()).join("|")
   ok("T095 colunas Tipo · O que está acontecendo · Sugestão do sistema · Ação", colunas === "Tipo|O que está acontecendo|Sugestão do sistema|Ação", colunas)
   const linhasAba = await page.locator(".pdv-lin").count()

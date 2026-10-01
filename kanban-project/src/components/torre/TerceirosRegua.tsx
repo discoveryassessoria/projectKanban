@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react"
 import { ddmmHora } from "@/lib/operacional/terceiros-pedidos"
 import { labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
+import { CANAIS_DE_CONTATO_UI } from "@/src/components/operacao/RegistrarContatoModal"
 import { api, erroDe, Modal } from "./torre-base"
 import "./terceiros.css"
 
@@ -58,7 +59,7 @@ export function TerceirosRegua({ versao }: { versao: number }) {
         <div className="tor-scroll">
           {orgaos?.map((o) => (
             <div key={o.orgaoId} className="tor-row ter-gr">
-              <div><b>{o.nome}</b><div className="small">{o.uf ?? "—"} · canal: {o.canal}</div></div>
+              <div><b>{o.nome}</b><div className="small">{o.uf ?? "—"} · canal: {CANAIS_DE_CONTATO_UI.find((c) => c.v === o.canal)?.l ?? o.canal}</div></div>
               <div className="small">{o.regua}</div>
               <div>{o.proximaCobranca.vencida ? <span className="tor-p red">vencida</span> : <span className="tor-p gry">{o.proximaCobranca.data ? ddmmHora(o.proximaCobranca.data).slice(0, 5) : "—"}</span>}</div>
               <div><button className="tor-btn" onClick={() => void abrirContatos(o)}>Contatos</button></div>

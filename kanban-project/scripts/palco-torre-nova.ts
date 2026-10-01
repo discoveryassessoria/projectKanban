@@ -216,9 +216,11 @@ async function cadastro(): Promise<Cad> {
     OBI: { nome: "Certidão de óbito", perfil: perfilCivil.id },
     REQ: { nome: "Certidão do requerente", perfil: perfilReq.id },
   } as const
+  // Categoria 'REGISTRO_CIVIL' (a que o domínio "certidões" do Relatório lê): sem ela os relatórios CSV/Excel/PDF saem vazios no palco.
+  const categoriaCivil = await prisma.categoriaDocumental.upsert({ where: { code: "REGISTRO_CIVIL" }, update: {}, create: { code: "REGISTRO_CIVIL", name: "Registro civil", sistema: true } })
   for (const [k, d] of Object.entries(DOCS)) {
     const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_${k}`, name: d.nome, natureza: "DOCUMENTO" } })
-    await prisma.tipoDocumentoCadastro.create({ data: { code: `${MARCA}-${k}`, name: d.nome, itemCatalogoId: item.id, nature: "certidao", naturezaOperacionalId: natureza.id, perfilOperacionalId: d.perfil } })
+    await prisma.tipoDocumentoCadastro.create({ data: { code: `${MARCA}-${k}`, name: d.nome, itemCatalogoId: item.id, nature: "certidao", naturezaOperacionalId: natureza.id, perfilOperacionalId: d.perfil, categoriaDocumentalId: categoriaCivil.id } })
   }
   const faseGen = await prisma.catalogoFase.findUniqueOrThrow({ where: { phaseKey: "genealogia" } })
   await prisma.faseNaturezaPermitida.upsert({

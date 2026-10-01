@@ -48,7 +48,7 @@
 .tpr-bloco .rot { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .06em; text-transform: uppercase; }
 .tpr-caminho { display: grid; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
 .tpr-fase { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 8px; background: var(--surface-tertiary); min-width: 0; }
-.tpr-fase div { font-size: 12px; overflow-wrap: anywhere; }
+.tpr-fase div { font-size: 12px; overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto; } /* "Apostilamento" não parte no meio da palavra sem hífen (revisão final) */
 .tpr-fase .l1 { font-weight: 600; color: var(--text-secondary); }
 .tpr-fase .l2, .tpr-fase .l3 { color: var(--text-muted); }
 .tpr-fase.concluida { background: var(--success-tile); }

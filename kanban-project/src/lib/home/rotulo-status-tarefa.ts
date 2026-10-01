@@ -30,6 +30,14 @@ export function rotuloStatusTarefa(status: string | null | undefined): string | 
   return ROTULO_STATUS[status] ?? null
 }
 
+/**
+ * Texto de auditoria gravado pelo motor ("bloqueada (estava NAO_INICIADA)") com o estado em português na hora de MOSTRAR.
+ * O que está gravado não muda; só a leitura (histórico da gaveta da Torre) troca o enum pelo rótulo oficial, em minúsculas.
+ */
+export function humanizarEstadosNoTexto(texto: string): string {
+  return texto.replace(/\b(NAO_INICIADA|EM_ANDAMENTO|AGUARDANDO_TERCEIRO|AGUARDANDO_CLIENTE|BLOQUEADA|CONCLUIDO_RECEBIDO|CONCLUIDO_NAO_POSSUI|CANCELADA|SUPERSEDIDA)\b/g, (m) => (ROTULO_STATUS[m] ?? m).toLowerCase())
+}
+
 /** Motivos de PendenciaFinanceira (varchar; ver schema) em português — a fila financeira não mostra o código cru. */
 export const ROTULO_MOTIVO_PENDENCIA: Record<string, string> = {
   SEM_PRECO: "Sem preço",

@@ -7,12 +7,12 @@
 // desbloqueio, troca de canal — cada um lê o PRÓPRIO LogAuditoria e recusa se algo mudou depois). Avançar fase, reconciliar, registrar
 // ligação e cobrar o cliente são fatos acontecidos: o toast confirma, sem "Desfazer".
 import { useCallback, useEffect, useState, type ReactNode } from "react"
+import { CANAIS_SOLICITACAO } from "@/src/lib/process-stage/canais-solicitacao"
 import { api, erroDe, Campo, useTorre } from "./torre-base"
 import { PdvDialogo as Modal } from "./pdv-modal"
 import { nome1, type ItemPrecisa } from "./tipos-precisa"
 import "./precisa.css"
 
-const CANAIS = ["CRC", "ECARTORIO", "EMAIL", "WHATSAPP", "BALCAO", "COMUNE", "CORREIOS", "CONSULADO"]
 const RESULTADOS = [
   ["SEM_RESPOSTA", "Sem resposta"], ["CONFIRMOU_PEDIDO", "Confirmou o pedido"], ["PEDIU_DOCUMENTO", "Pediu documento"],
   ["EM_BUSCA", "Em busca"], ["NAO_LOCALIZOU", "Não localizou"], ["ENVIOU", "Enviou (ainda não recebido)"],
@@ -289,7 +289,7 @@ function ModalCanal({ pedido, chamar, concluir }: { pedido: Extract<Pedido, { ti
       <button className="tor-btn" onClick={() => pedido.resolver(null)} disabled={env}>Cancelar</button>
       <button className="tor-btn pri" onClick={() => void enviar()} disabled={env}>{env ? "Trocando…" : "Trocar canal"}</button>
     </>}>
-      <Campo rotulo="Novo canal"><select className="tor-in w-full" value={canal} onChange={(e) => setCanal(e.target.value)}>{CANAIS.map((c) => <option key={c} value={c}>{c}</option>)}</select></Campo>
+      <Campo rotulo="Novo canal"><select className="tor-in w-full" value={canal} onChange={(e) => setCanal(e.target.value)}>{CANAIS_SOLICITACAO.map((c) => <option key={c.canal} value={c.canal}>{c.label}</option>)}</select></Campo>
       <Erro t={erro} />
     </Modal>
   )

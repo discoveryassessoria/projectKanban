@@ -188,7 +188,8 @@
    "scripts/torre-nova-tarefas-tela.test.ts",
    "scripts/torre-nova-tarefas-rotas.test.ts",
    "scripts/torre-bloco-f-itens-e-acoes.test.ts",
-   "scripts/torre-bloco-f-score-e-sugestao.test.ts"
+   "scripts/torre-bloco-f-score-e-sugestao.test.ts",
+   "scripts/torre-revisao-final-textos.test.ts"
   ]
  },
  "arquivos": [
@@ -358,6 +359,7 @@
   "scripts/torre-nova-tarefas-tela.test.ts",
   "scripts/torre-nova-tarefas-rotas.test.ts",
   "scripts/torre-bloco-f-itens-e-acoes.test.ts",
-  "scripts/torre-bloco-f-score-e-sugestao.test.ts"
+  "scripts/torre-bloco-f-score-e-sugestao.test.ts",
+  "scripts/torre-revisao-final-textos.test.ts"
  ]
 }
