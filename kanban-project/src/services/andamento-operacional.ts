@@ -257,7 +257,7 @@ export async function montarAndamentoDaOperacao(documentoId: number): Promise<Ev
     // duas projeções. Nunca uma segunda gravação.
     escopo.tarefaId != null
       ? prisma.contatoTerceiro.findMany({
-          where: { tarefaId: escopo.tarefaId },
+          where: { tarefaId: escopo.tarefaId, estornadoEm: null }, // cobrança estornada (Desfazer) não é contato
           select: { id: true, canal: true, resultado: true, observacao: true, registradoPorId: true, registradoEm: true, orgao: { select: { name: true } } },
           orderBy: { registradoEm: "desc" },
         })

@@ -25,5 +25,5 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   })
   if (cobradas.length === 0) return NextResponse.json({ ok: false, mensagem: ignoradas[0]?.motivo ?? 'Não foi possível cobrar.' }, { status: 422 })
   const contato = await prisma.contatoTerceiro.findUnique({ where: { id: cobradas[0].contatoId }, select: { subtaskExecution: { select: { proximoAcompanhamentoEm: true } } } })
-  return NextResponse.json({ ok: true, canal: cobradas[0].canal, proximoAcompanhamentoEm: contato?.subtaskExecution?.proximoAcompanhamentoEm?.toISOString() ?? null })
+  return NextResponse.json({ ok: true, canal: cobradas[0].canal, proximoAcompanhamentoEm: contato?.subtaskExecution?.proximoAcompanhamentoEm?.toISOString() ?? null, desfazer: { tipo: 'COBRANCA', tarefaIds: [], contatoIds: [cobradas[0].contatoId] } })
 }

@@ -808,7 +808,7 @@ async function lerExtrasDaEscalada(ids: number[], db: Db) {
   if (ids.length === 0) return { pedidoEm: new Map<number, Date>(), contatos: new Map<number, Array<{ canal: string; resultado: string }>>(), orgaoPorTarefa: new Map<number, string>() }
   const [pedidos, contatos, comOrgao] = await Promise.all([
     db.solicitacaoDocumento.findMany({ where: { tarefaId: { in: ids } }, orderBy: { createdAt: 'desc' }, select: { tarefaId: true, dataEnvio: true } }),
-    db.contatoTerceiro.findMany({ where: { tarefaId: { in: ids } }, orderBy: [{ registradoEm: 'desc' }, { id: 'desc' }], select: { tarefaId: true, canal: true, resultado: true } }),
+    db.contatoTerceiro.findMany({ where: { tarefaId: { in: ids }, estornadoEm: null }, orderBy: [{ registradoEm: 'desc' }, { id: 'desc' }], select: { tarefaId: true, canal: true, resultado: true } }),
     db.tarefa.findMany({ where: { id: { in: ids }, orgaoId: { not: null } }, select: { id: true, orgaoId: true } }),
   ])
   const pedidoEm = new Map<number, Date>()

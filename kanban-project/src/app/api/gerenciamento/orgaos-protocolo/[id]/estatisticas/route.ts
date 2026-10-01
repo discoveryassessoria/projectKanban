@@ -37,8 +37,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       // ESTE órgão (ex.: quantas certidões dele nunca saíram do lugar), não
       // ruído a esconder de uma tela de estatística.
       visaoGerencial({ orgaoId, incluirEncerradas: true, porPagina: 500 }),
-      prisma.contatoTerceiro.groupBy({ by: ["resultado"], where: { orgaoId }, _count: { _all: true } }),
-      prisma.contatoTerceiro.count({ where: { orgaoId } }),
+      prisma.contatoTerceiro.groupBy({ by: ["resultado"], where: { orgaoId, estornadoEm: null }, _count: { _all: true } }),
+      prisma.contatoTerceiro.count({ where: { orgaoId, estornadoEm: null } }),
     ])
 
     const linhas = tarefasResp.linhas

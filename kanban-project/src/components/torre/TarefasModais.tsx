@@ -92,10 +92,10 @@ export function ModalDaAcao({ acao, linha, agora, onFechar, onFeito }: {
   if (acao === "cobrar") {
     return (
       <TarefasModal titulo="Registrar cobrança · cartório" texto={`${bola} · ${certidao} · ${pessoa}`} botao="Registrar cobrança" onFechar={onFechar} onConfirmar={async (just) => {
-        const r = await api<{ ok?: boolean; mensagem?: string; proximoAcompanhamentoEm?: string | null }>(`/api/torre/tarefas/${linha.taskId}/cobrar`, "POST", { ...(campo ? { canal: campo } : {}), observacao: just })
+        const r = await api<{ ok?: boolean; mensagem?: string; proximoAcompanhamentoEm?: string | null; desfazer?: Desfazer | null }>(`/api/torre/tarefas/${linha.taskId}/cobrar`, "POST", { ...(campo ? { canal: campo } : {}), observacao: just })
         if (!r.ok || !r.data.ok) return { ok: false, mensagem: r.data.mensagem ?? erroDe(r.data) }
         const dias = r.data.proximoAcompanhamentoEm ? diasEntreDiasOperacionais(new Date(r.data.proximoAcompanhamentoEm), agora) : null
-        concluir(dias != null && dias > 0 ? `Cobrança registrada · próxima em ${dias} ${dias === 1 ? "dia" : "dias"} · ${pessoa}` : `Cobrança registrada · ${pessoa}`)
+        concluir(dias != null && dias > 0 ? `Cobrança registrada · próxima em ${dias} ${dias === 1 ? "dia" : "dias"} · ${pessoa}` : `Cobrança registrada · ${pessoa}`, r.data.desfazer ?? null)
         return { ok: true }
       }}>
         <label>Canal

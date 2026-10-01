@@ -22,11 +22,8 @@
 // está exatamente como a ação a deixou; se alguém mexeu depois, RECUSA (desfazer
 // apagaria a decisão mais recente). Cada reversão grava a própria auditoria.
 //
-// COBRAR AINDA NÃO TEM DESFAZER: cobrança é um fato histórico append-only (`ContatoTerceiro` — apagar o registro seria
-// mentir sobre o que aconteceu). O ESTORNO auditado (o fato fica, ganha um contrafato lido pela contagem de "sem resposta",
-// pela última cobrança e pelas listas) precisa de uma marca persistida no contato: é aditivo, mas EXIGE migration — e a
-// regra desta frente é não criar migration. Pedido escrito em `prototipo-torre/PEDIDOS/terceiros-desfazer-cobranca.md`;
-// enquanto isso o toast da cobrança não oferece "Desfazer" (nunca um botão que não desfaz).
+// COBRAR TEM DESFAZER POR ESTORNO: cobrança é fato append-only (`ContatoTerceiro`); o Desfazer MARCA o contato como estornado
+// (`estornarCobranca`, cobranca-terceiros.ts) e devolve a próxima cobrança/escalada; o fato fica, riscado no histórico.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { redistribuirTarefas, redistribuirPrioridade, type ItemDaRedistribuicao } from '@/lib/operacional/tarefa-comandos'
@@ -45,7 +42,7 @@ export const LIMITE_DO_LOTE = 200
  */
 export { JANELA_DO_DESFAZER_MS }
 
-export type TipoDesfazer = 'ATRIBUICAO' | 'PRIORIDADE' | 'PRAZO' | 'AUSENCIA'
+export type TipoDesfazer = 'ATRIBUICAO' | 'PRIORIDADE' | 'PRAZO' | 'AUSENCIA' | 'COBRANCA'
 
 export interface ResultadoDoLote {
   acao: 'ATRIBUIR' | 'PRIORIDADE_ALTA' | 'REPACTUAR' | 'COBRAR'
@@ -54,7 +51,7 @@ export interface ResultadoDoLote {
   falha: number
   itens: Array<{ tarefaId: number; ok: boolean; mensagem?: string }>
   /** O que o toast precisa para oferecer "Desfazer" (6 s). `null` = a ação não se desfaz. */
-  desfazer: { tipo: TipoDesfazer; tarefaIds: number[] } | null
+  desfazer: { tipo: TipoDesfazer; tarefaIds: number[]; contatoIds?: number[] } | null
 }
 
 const itensDe = (r: ItemDaRedistribuicao[]) => r.map((i) => ({ tarefaId: i.tarefaId, ok: i.ok, mensagem: i.mensagem }))
@@ -155,7 +152,7 @@ export async function cobrarCartorioEmLote(args: {
     await auditarLote(args.autor.userId, 'TAREFAS_COBRADAS_LOTE',
       `Cobrança de cartório em lote pela Torre: ${cobradas.length} de ${itens.length} tarefa(s).`, { cobradas, ignoradas })
   }
-  return { acao: 'COBRAR', total: itens.length, sucesso: cobradas.length, falha: ignoradas.length, itens, desfazer: null, ignoradas }
+  return { acao: 'COBRAR', total: itens.length, sucesso: cobradas.length, falha: ignoradas.length, itens, desfazer: cobradas.length ? { tipo: 'COBRANCA', tarefaIds: [], contatoIds: cobradas.map((c) => c.contatoId) } : null, ignoradas }
 }
 
 // ─── DESFAZER ────────────────────────────────────────────────────────────────
@@ -207,7 +204,7 @@ export async function desfazerLote(args: { tipo: TipoDesfazer; tarefaIds: number
 }> {
   const agora = args.agora ?? new Date()
   // "Marcar ausência" não é desfeita por lote de tarefas: tem a sua própria porta (`desfazerAusenciaMarcada`).
-  if (args.tipo === 'AUSENCIA') return { total: 0, desfeitas: 0, itens: [] }
+  if (args.tipo === 'AUSENCIA' || args.tipo === 'COBRANCA') return { total: 0, desfeitas: 0, itens: [] }
 
   // DESFAZER "APLICAR SAÍDA": a ausência registrada junto com a mudança de carteira precisa ser
   // encerrada ANTES — quem está ausente não pode receber trabalho de volta (`atribuirTarefa` recusa).

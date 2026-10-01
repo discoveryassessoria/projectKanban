@@ -14,7 +14,7 @@ import {
   type PedidoDeTerceiro,
 } from "@/lib/operacional/terceiros-pedidos"
 import { useAgora } from "@/src/lib/torre-agora"
-import { api, erroDe, useTorre } from "./torre-base"
+import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
 import type { LinhaTorre } from "./tipos"
 import { TerceirosRegua } from "./TerceirosRegua"
 import { CobrarPedidoModal, CobrarTodosModal, ContatosDoPedidoModal, type DadosDaCobranca } from "./TerceirosModais"
@@ -23,14 +23,14 @@ import "./terceiros.css"
 type Visao = "pedido" | "orgao"
 type Retorno = { ok: boolean; mensagem?: string }
 
-interface RespostaDaCobranca { ok?: boolean; cobradas?: number; ignoradas?: Array<{ motivo: string }>; mensagem?: string }
+interface RespostaDaCobranca { ok?: boolean; desfazer?: Desfazer | null; cobradas?: number; ignoradas?: Array<{ motivo: string }>; mensagem?: string }
 
 /** O que a porta devolveu → ok/erro para o modal. Nenhuma cobrança feita é erro (nada de "enviada" que não aconteceu). */
-function aceitar(r: { ok: boolean; data: RespostaDaCobranca }): Retorno & { cobradas: number } {
+function aceitar(r: { ok: boolean; data: RespostaDaCobranca }): Retorno & { cobradas: number; desfazer?: Desfazer | null } {
   if (!r.ok || !r.data.ok) return { ok: false, mensagem: erroDe(r.data, "Não foi possível registrar a cobrança."), cobradas: 0 }
   const cobradas = r.data.cobradas ?? 0
   if (cobradas === 0) return { ok: false, mensagem: r.data.ignoradas?.[0]?.motivo ?? "Nenhuma cobrança foi registrada.", cobradas }
-  return { ok: true, cobradas }
+  return { ok: true, cobradas, desfazer: r.data.desfazer ?? null }
 }
 
 export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versao: number }) {
@@ -56,7 +56,7 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
     const r = await cobrarIds([p.taskId], d)
     if (!r.ok) return r
     setCobrar(null)
-    avisar(`Cobrança registrada · ${p.pessoa}`)
+    avisar(`Cobrança registrada · ${p.pessoa}`, r.desfazer ?? null)
     recarregar()
     return { ok: true }
   }
@@ -64,14 +64,14 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
     const r = await cobrarIds(idsVencidos, d)
     if (!r.ok) return r
     setTodos(false)
-    avisar(`${r.cobradas} ${r.cobradas === 1 ? "cobrança registrada" : "cobranças registradas"}`)
+    avisar(`${r.cobradas} ${r.cobradas === 1 ? "cobrança registrada" : "cobranças registradas"}`, r.desfazer ?? null)
     recarregar()
     return { ok: true }
   }
   const cobrarCartorio = async (orgaoId: number, nome: string, doGrupo: PedidoDeTerceiro[]) => {
     const r = aceitar(await api<RespostaDaCobranca>(`/api/torre/terceiros/${orgaoId}/cobrar`, "POST", { tarefaIds: doGrupo.map((p) => p.taskId), proximaEmDias: DIAS_PADRAO_DA_COBRANCA }))
     if (!r.ok) { avisar(r.mensagem ?? "Não foi possível cobrar este cartório."); return }
-    avisar(`Cobrança registrada para ${nome} com ${r.cobradas} ${r.cobradas === 1 ? "certidão" : "certidões"} · registrada em cada uma`)
+    avisar(`Cobrança registrada para ${nome} com ${r.cobradas} ${r.cobradas === 1 ? "certidão" : "certidões"} · registrada em cada uma`, r.desfazer ?? null)
     recarregar()
   }
 

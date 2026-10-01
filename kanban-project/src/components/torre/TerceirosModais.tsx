@@ -110,7 +110,7 @@ export function CobrarTodosModal({ n, cartorios, onFechar, onEnviar }: {
   )
 }
 
-interface ContatoDoPedido { id: string; tipo: "PEDIDO" | "CONTATO" | "CANAL_ALTERADO"; quando: string; texto: string }
+interface ContatoDoPedido { id: string; tipo: "PEDIDO" | "CONTATO" | "CANAL_ALTERADO"; quando: string; texto: string; estornado?: boolean }
 
 /** "Contatos · <certidão> · <pessoa>" — o histórico do pedido (cobranças, ligações, trocas de canal e o envio do pedido). */
 export function ContatosDoPedidoModal({ pedido, onFechar }: { pedido: PedidoDeTerceiro; onFechar: () => void }) {
@@ -132,7 +132,7 @@ export function ContatosDoPedidoModal({ pedido, onFechar }: { pedido: PedidoDeTe
       {lista?.length === 0 && <div className="small">Nenhum contato registrado para este pedido ainda.</div>}
       {lista && lista.length > 0 && (
         <ul className="ter-contatos">
-          {lista.map((c) => <li key={c.id}><span className="quando">{ddmmHora(c.quando)}</span><span>{c.texto}</span></li>)}
+          {lista.map((c) => <li key={c.id}><span className="quando">{ddmmHora(c.quando)}</span><span style={c.estornado ? { textDecoration: "line-through", opacity: 0.7 } : undefined}>{c.texto}{c.estornado ? " · desfeita" : ""}</span></li>)}
         </ul>
       )}
       <div className="ter-rodape"><button className="tor-btn" onClick={onFechar}>Fechar</button></div>

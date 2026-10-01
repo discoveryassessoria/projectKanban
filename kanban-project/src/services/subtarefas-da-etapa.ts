@@ -804,7 +804,7 @@ export function contarCobrancasSemResposta(resultadosEmOrdem: readonly string[])
 
 export async function cobrancasSemRespostaDesde(subtaskExecutionId: number, db: typeof prisma = prisma): Promise<number> {
   const contatos = await db.contatoTerceiro.findMany({
-    where: { subtaskExecutionId },
+    where: { subtaskExecutionId, estornadoEm: null }, // cobrança ESTORNADA (Desfazer) não conta como sem resposta
     orderBy: { id: "asc" },
     select: { resultado: true },
   })
@@ -891,7 +891,10 @@ export async function registrarCobranca(args: {
     },
   })
 
-  const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id } })
+  // O ESTADO DA EXECUÇÃO ANTES desta cobrança (e, abaixo, DEPOIS): é o que o ESTORNO (Desfazer) devolve e confere.
+  const antes = { antesProximoAcompanhamentoEm: vigente.proximoAcompanhamentoEm ?? null, antesEscalada: vigente.escalada ?? false, antesEscaladaEm: vigente.escaladaEm ?? null }
+  const gravarEstado = (depois: Date | null) => prisma.contatoTerceiro.update({ where: { id: contato.id }, data: { ...antes, depoisProximoAcompanhamentoEm: depois } })
+  const totalContatos = await prisma.contatoTerceiro.count({ where: { subtaskExecutionId: vigente.id, estornadoEm: null } })
   const cobrancasSemResposta = await cobrancasSemRespostaDesde(vigente.id)
 
   // RÉGUA DESLIGADA (regra r2 da Torre, Bloco H3): o contato continua sendo
@@ -905,8 +908,10 @@ export async function registrarCobranca(args: {
     if (args.proximaEmDias != null) {
       const marcada = prazoOperacional(args.proximaEmDias, new Date())
       await registrarNaExecucao(args.stepInstanceId, args.subtaskKey, { proximoAcompanhamentoEm: marcada })
+      await gravarEstado(marcada)
       return { ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta, escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: marcada }
     }
+    await gravarEstado(vigente.proximoAcompanhamentoEm ?? null)
     return {
       ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta,
       escalada: vigente.escalada ?? false, proximoAcompanhamentoEm: vigente.proximoAcompanhamentoEm ?? null,
@@ -921,6 +926,7 @@ export async function registrarCobranca(args: {
     escalada,
     escaladaEm: escalada ? (vigente.escaladaEm ?? new Date()) : vigente.escaladaEm,
   })
+  await gravarEstado(proximoAcompanhamentoEm)
 
   return { ok: true, contatoId: contato.id, totalContatos, cobrancasSemResposta, escalada, proximoAcompanhamentoEm }
 }

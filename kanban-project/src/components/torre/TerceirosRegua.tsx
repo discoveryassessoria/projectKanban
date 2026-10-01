@@ -11,7 +11,7 @@ import { api, erroDe, Modal } from "./torre-base"
 import "./terceiros.css"
 
 interface OrgaoRegua { orgaoId: number; nome: string; uf: string | null; canal: string; emAberto: number; regua: string; proximaCobranca: { data: string | null; vencida: boolean } }
-interface ContatoOrgao { id: string; tipo: "CONTATO" | "CANAL_ALTERADO"; quando: string; quem: string | null; tarefaId: number | null; tarefaTitulo: string | null; canal: string | null; texto: string }
+interface ContatoOrgao { id: string; tipo: "CONTATO" | "CANAL_ALTERADO"; quando: string; quem: string | null; tarefaId: number | null; tarefaTitulo: string | null; canal: string | null; texto: string; estornado?: boolean }
 interface TempoPorFase { fase: string; amostras: number; mediaDias: number }
 const humanizar = (k: string) => k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
 
@@ -99,7 +99,7 @@ export function TerceirosRegua({ versao }: { versao: number }) {
           <ul className="space-y-2">
             {contatos.lista?.map((c) => (
               <li key={c.id} className="text-[12.5px] border-b border-[var(--border-default)] pb-1.5">
-                <div><b>{c.tipo === "CANAL_ALTERADO" ? "Canal alterado" : c.canal === "TELEFONE" ? "Ligação" : "Cobrança"}</b> · {ddmmHora(c.quando)}{c.quem ? ` · ${c.quem}` : ""}</div>
+                <div style={c.estornado ? { textDecoration: "line-through", opacity: 0.7 } : undefined}><b>{c.tipo === "CANAL_ALTERADO" ? "Canal alterado" : c.canal === "TELEFONE" ? "Ligação" : "Cobrança"}</b> · {ddmmHora(c.quando)}{c.quem ? ` · ${c.quem}` : ""}{c.estornado ? " · desfeita" : ""}</div>
                 <div className="small">{c.tarefaTitulo ? `${c.tarefaTitulo} · ` : ""}{c.tarefaId != null ? `#${c.tarefaId} · ` : ""}{c.texto}</div>
               </li>
             ))}

@@ -8,8 +8,7 @@
 //      arquivo declara janela própria; servidor, cliente e as portas "Precisa de você" e "Reativar (desfazer da pausa)" leem a mesma.
 //   2) "Marcar ausência" tem Desfazer: cancela a ausência recém-marcada pela porta existente (o registro fica, com o fim = agora),
 //      só o AUTOR, só dentro da janela e só se nada mudou depois; grava a própria auditoria. Pela rota HTTP também.
-//   3) Cobrança NÃO oferece Desfazer (estorno exige migration — ver PEDIDOS/terceiros-desfazer-cobranca.md): o toast nunca promete
-//      o que não faz.
+//   3) O Desfazer da cobrança (estorno) usa a mesma janela — o teste dele é torre-cobranca-estorno.test.ts.
 // ============================================================================
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 exigirBancoDeTeste("torre-desfazer-janela-unica-e-ausencia.test.ts")
@@ -140,11 +139,9 @@ async function main() {
     const rv4 = await postReativar(req(`/api/torre/processos/${o2.processoId}/reativar`, tAdmin, { desfazer: true }), ctxP)
     ok("Desfazer da pausa pelo autor, dentro da janela: 200", rv4.status === 200)
 
-    secao("4) Cobrança NÃO promete Desfazer (estorno exige migration)")
-    const lote = readFileSync("src/services/torre-acoes-lote.ts", "utf8")
-    ok("a cobrança em lote devolve `desfazer: null`", /acao: 'COBRAR'[\s\S]{0,200}desfazer: null/.test(lote))
-    const cobrar = readFileSync("src/app/api/torre/tarefas/[tarefaId]/cobrar/route.ts", "utf8")
-    ok("a cobrança individual não devolve `desfazer`", !/desfazer/i.test(cobrar.replace(/\/\/[^\n]*/g, "")))
+    secao("4) Cobrança: o Desfazer (estorno) usa a MESMA janela única")
+    const svc = readFileSync("src/services/cobranca-terceiros.ts", "utf8")
+    ok("o estorno da cobrança lê a janela única (dentroDaJanelaDoDesfazer) — não tem janela própria", /dentroDaJanelaDoDesfazer\(contato\.registradoEm, agora\)/.test(svc) && !/JANELA_DO_DESFAZER_MS\s*=/.test(svc))
   } finally {
     await c.limpar()
     await prisma.indisponibilidadeOperacional.deleteMany({ where: { usuarioId: { in: usuarios } } }).catch(() => {})

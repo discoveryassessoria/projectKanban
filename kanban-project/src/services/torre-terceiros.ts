@@ -62,6 +62,11 @@ async function tarefasAbertasDoOrgao(orgaoId: number, agora: Date): Promise<Linh
   return ordenarFila(semProcessosPausados(semFaseFutura(todas.filter((l) => l.coluna !== 'CONCLUIDA')), await idsDeProcessosPausados())) as LinhaGerencial[]
 }
 
+/** O que o toast precisa para oferecer "Desfazer" numa cobrança: os contatos que ESTA ação criou (estorno, não exclusão). */
+export interface DesfazerDeCobranca { tipo: 'COBRANCA'; tarefaIds: number[]; contatoIds: number[] }
+export const desfazerDe = (cobradas: Array<{ tarefaId: number; contatoId: number }>): DesfazerDeCobranca | null =>
+  cobradas.length ? { tipo: 'COBRANCA', tarefaIds: [], contatoIds: cobradas.map((c) => c.contatoId) } : null
+
 /**
  * COBRAR PEDIDOS — "Cobrar" de uma linha e "Cobrar todos os vencidos (N)". Uma cobrança (fato) por pedido, pelo canal
  * cadastrado de cada um (ou o escolhido), e a PRÓXIMA agendada em `proximaEmDias` (ausente = a régua do cadastro).
@@ -69,7 +74,7 @@ async function tarefasAbertasDoOrgao(orgaoId: number, agora: Date): Promise<Linh
  */
 export async function cobrarPedidos(args: { tarefaIds: number[]; autor: Autor } & OpcoesDaCobranca): Promise<
   | { ok: false; erro: string; status: number }
-  | { ok: true; cobradas: number; ignoradas: CobrancaIgnorada[]; canais: string[]; proximaEmDias: number | null }
+  | { ok: true; cobradas: number; ignoradas: CobrancaIgnorada[]; canais: string[]; proximaEmDias: number | null; desfazer: DesfazerDeCobranca | null }
 > {
   const v = validarOpcoes(args)
   if (!v.ok) return v
@@ -98,7 +103,7 @@ export async function cobrarPedidos(args: { tarefaIds: number[]; autor: Autor } 
       },
     })
   }
-  return { ok: true, cobradas: cobradas.length, ignoradas: todasIgnoradas, canais: [...new Set(cobradas.map((c) => c.canal))], proximaEmDias: args.proximaEmDias ?? null }
+  return { ok: true, cobradas: cobradas.length, ignoradas: todasIgnoradas, canais: [...new Set(cobradas.map((c) => c.canal))], proximaEmDias: args.proximaEmDias ?? null, desfazer: desfazerDe(cobradas) }
 }
 
 /**
@@ -108,7 +113,7 @@ export async function cobrarPedidos(args: { tarefaIds: number[]; autor: Autor } 
  */
 export async function cobrarOrgao(args: { orgaoId: number; autor: Autor; tarefaIds?: number[] | null; agora?: Date } & OpcoesDaCobranca): Promise<
   | { ok: false; erro: string; status: number }
-  | { ok: true; orgao: string; cobradas: number; ignoradas: Array<{ tarefaId: number; motivo: string }>; canais: string[] }
+  | { ok: true; orgao: string; cobradas: number; ignoradas: Array<{ tarefaId: number; motivo: string }>; canais: string[]; desfazer: DesfazerDeCobranca | null }
 > {
   const orgao = await prisma.orgaoProtocolo.findUnique({ where: { id: args.orgaoId }, select: { id: true, name: true, nomeFantasia: true } })
   if (!orgao) return { ok: false, erro: 'órgão não encontrado', status: 404 }
@@ -133,7 +138,7 @@ export async function cobrarOrgao(args: { orgaoId: number; autor: Autor; tarefaI
       detalhes: JSON.parse(JSON.stringify({ orgaoId: orgao.id, cobradas, ignoradas, proximaEmDias: args.proximaEmDias ?? null })),
     },
   })
-  return { ok: true, orgao: nome, cobradas: cobradas.length, ignoradas, canais: [...new Set(cobradas.map((c) => c.canal))] }
+  return { ok: true, orgao: nome, cobradas: cobradas.length, ignoradas, canais: [...new Set(cobradas.map((c) => c.canal))], desfazer: desfazerDe(cobradas) }
 }
 
 /** A régua que o CADASTRO define para cada órgão: a regra temporal DELE, senão a dos passos. */
@@ -194,6 +199,8 @@ export interface ContatoDoPedido {
   quando: string
   /** A frase pronta: "Priscila cobrou por e-mail · sem resposta". */
   texto: string
+  /** Cobrança ESTORNADA (Desfazer): continua no histórico, riscada; não conta em nada. */
+  estornado?: boolean
 }
 
 /**
@@ -208,7 +215,7 @@ export async function contatosDoPedido(tarefaId: number, limite = 100): Promise<
   const [contatos, canais, pedidos] = await Promise.all([
     prisma.contatoTerceiro.findMany({
       where: { tarefaId }, orderBy: { registradoEm: 'desc' }, take: limite,
-      select: { id: true, canal: true, resultado: true, observacao: true, registradoEm: true, registradoPor: { select: { nome: true } } },
+      select: { id: true, canal: true, resultado: true, observacao: true, registradoEm: true, estornadoEm: true, registradoPor: { select: { nome: true } } },
     }),
     prisma.logAuditoria.findMany({
       where: { acao: 'SOLICITACAO_CANAL_ALTERADO', entidade: 'Tarefa', entidadeId: tarefaId },
@@ -223,6 +230,7 @@ export async function contatosDoPedido(tarefaId: number, limite = 100): Promise<
     ...contatos.map((c): ContatoDoPedido => ({
       id: `contato:${c.id}`, tipo: 'CONTATO', quando: c.registradoEm.toISOString(),
       texto: textoDoContato({ quem: c.registradoPor?.nome ?? null, canal: c.canal, resultado: c.resultado, observacao: c.observacao }),
+      ...(c.estornadoEm ? { estornado: true } : {}),
     })),
     ...canais.map((l): ContatoDoPedido => ({ id: `canal:${l.id}`, tipo: 'CANAL_ALTERADO', quando: l.criadoEm.toISOString(), texto: l.descricao })),
     ...pedidos.map((p): ContatoDoPedido => ({
@@ -243,6 +251,8 @@ export interface ContatoDoOrgao {
   canal: string | null
   resultado: string | null
   texto: string
+  /** Cobrança ESTORNADA (Desfazer): continua no histórico, riscada; não conta em nada. */
+  estornado?: boolean
 }
 
 /**
@@ -264,7 +274,7 @@ export async function contatosDoOrgao(orgaoId: number, limite = 100): Promise<{ 
     prisma.contatoTerceiro.findMany({
       where: { OR: [{ orgaoId }, ...(ids.length ? [{ tarefaId: { in: ids } }] : [])] },
       orderBy: { registradoEm: 'desc' }, take: limite,
-      select: { id: true, tarefaId: true, canal: true, resultado: true, observacao: true, registradoEm: true, registradoPor: { select: { nome: true } } },
+      select: { id: true, tarefaId: true, canal: true, resultado: true, observacao: true, registradoEm: true, estornadoEm: true, registradoPor: { select: { nome: true } } },
     }),
     ids.length
       ? prisma.logAuditoria.findMany({
@@ -280,6 +290,7 @@ export async function contatosDoOrgao(orgaoId: number, limite = 100): Promise<{ 
       id: `contato:${c.id}`, tipo: 'CONTATO', quando: c.registradoEm.toISOString(), quem: c.registradoPor?.nome ?? null,
       tarefaId: c.tarefaId, tarefaTitulo: titulos.get(c.tarefaId) ?? null, canal: c.canal, resultado: c.resultado,
       texto: `${c.canal} · ${c.resultado}${c.observacao ? ` — ${c.observacao}` : ''}`,
+      ...(c.estornadoEm ? { estornado: true } : {}),
     })),
     ...canais.map((l): ContatoDoOrgao => ({
       id: `canal:${l.id}`, tipo: 'CANAL_ALTERADO', quando: l.criadoEm.toISOString(), quem: l.usuario?.nome ?? null,

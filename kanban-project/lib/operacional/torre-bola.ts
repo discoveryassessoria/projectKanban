@@ -172,7 +172,7 @@ export async function lerBolaEmLote(entradas: EntradaDaLeitura[], leitor?: Leito
           select: { stepInstanceId: true, enviadoEm: true, proximoAcompanhamentoEm: true },
         })
       : Promise.resolve([]),
-    db.contatoTerceiro.groupBy({ by: ['tarefaId'], where: { tarefaId: { in: tarefaIds } }, _max: { registradoEm: true } }),
+    db.contatoTerceiro.groupBy({ by: ['tarefaId'], where: { tarefaId: { in: tarefaIds }, estornadoEm: null }, _max: { registradoEm: true } }),
   ])
 
   const categoriasPorOrgao = new Map<number, Array<{ ordem: number; rotuloBola: string | null; ativo: boolean }>>()

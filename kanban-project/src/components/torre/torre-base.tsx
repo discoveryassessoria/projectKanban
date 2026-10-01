@@ -13,7 +13,7 @@ import { auth } from "@/src/components/operacao/kit-operacional"
 export interface PermissoesTorre {
   editar: boolean; bloquear: boolean; iniciar: boolean; equipe: boolean; admin: boolean; usuarioId: number
 }
-export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO" | "AUSENCIA"; tarefaIds: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. "AUSENCIA" (Marcar ausência): só ela, sem tarefas. */ ausenciaId?: number }
+export interface Desfazer { tipo: "ATRIBUICAO" | "PRIORIDADE" | "PRAZO" | "AUSENCIA" | "COBRANCA"; tarefaIds: number[]; /** "COBRANCA": os contatos que a ação criou (o Desfazer os ESTORNA, não os apaga). */ contatoIds?: number[]; /** "Aplicar saída": o Desfazer encerra a ausência junto. "AUSENCIA" (Marcar ausência): só ela, sem tarefas. */ ausenciaId?: number }
 
 /** A janela do "Desfazer" é UMA SÓ na Torre inteira (`lib/operacional/torre-desfazer.ts`): cliente e servidor leem a mesma constante. */
 export { JANELA_DO_DESFAZER_MS }
