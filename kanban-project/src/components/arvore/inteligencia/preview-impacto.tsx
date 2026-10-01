@@ -255,6 +255,9 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar, onSemIm
               <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
                 Certidões marcadas para esta pessoa
               </h3>
+              <p className="mb-1.5 text-[11px] leading-snug text-gray-500">
+                Só os documentos desta pessoa. Casamento é da união: continua sendo gerado se o outro cônjuge o mantiver marcado.
+              </p>
               <ul className="space-y-1">
                 {proposta.certidoesEscolhidas.map((c) => (
                   <li key={c.code} data-testid={`preview-certidao-${c.code}`} className={`text-[13px] ${c.gera ? "text-gray-800" : "text-amber-900"}`}>
@@ -459,8 +462,11 @@ function AntesDepois({ linhas }: { linhas: LinhaComparacao[] }) {
   return (
     <section>
       <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-        Como fica
+        Como fica o processo inteiro
       </h3>
+      <p data-testid="preview-como-fica-escopo" className="mb-1.5 text-[11px] leading-snug text-gray-500">
+        Os números abaixo somam <strong>todas as pessoas</strong> do processo, não só a que você está editando.
+      </p>
       <div className="overflow-hidden rounded-lg border border-gray-200">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2 border-b border-gray-100 bg-gray-50 px-2.5 py-1.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Antes</span>

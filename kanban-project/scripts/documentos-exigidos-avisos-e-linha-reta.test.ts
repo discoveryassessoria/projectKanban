@@ -100,5 +100,10 @@ ok("a seção 'Certidões marcadas para esta pessoa' mostra 'será gerado' e 'n�
 ok("o atalho 'sem impacto → salva direto' NÃO dispara quando há certidões a mostrar (era o 'nada apareceu')", /corpo\.semImpacto && onSemImpactoRef\.current && !semImpactoDisparado\.current && !\(proposta\.certidoesEscolhidas\?\.length\)/.test(prev))
 ok("Editar monta `certidoesEscolhidas` com a mesma regra pura quando a lista mudou", /certidoesEscolhidas: documentosExigidosMudou\s*\?\s*situacaoDosDocumentosMarcados\(docsMarcados, fatosDocs\)/.test(view))
 
+secao("Preview de impacto: escopo explícito (print 01/10/2026 — 'falam 3 documentos mas eu selecionei 1')")
+const previewSrc = codigo(ler("src/components/arvore/inteligencia/preview-impacto.tsx").replace(/\/\/[^\n]*/g, ""))
+ok("'Como fica' declara que soma todas as pessoas do processo", /Como fica o processo inteiro/.test(previewSrc) && /preview-como-fica-escopo/.test(previewSrc) && /todas as pessoas/.test(previewSrc))
+ok("'Certidões marcadas' declara que é só da pessoa e que Casamento é da união", /Só os documentos desta pessoa/.test(previewSrc) && /Casamento é da união/.test(previewSrc))
+
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 if (falhou > 0) { console.log(falhas.join("\n")); process.exit(1) }
