@@ -28,6 +28,9 @@ import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { DocumentosExigidosCampo, TEXTO_PRECISA_DOCUMENTACAO } from "./documentos-exigidos-campo"
+import { CODIGOS_DOCUMENTOS_EXIGIVEIS, marcadosParaTela, mesmaEscolha, rotuloDaLista, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
+import { ehRequerente } from "@/lib/genealogia/requerente-flag"
 import {
   Plus,
   User,
@@ -1586,6 +1589,8 @@ function AddPersonModal({
   const [requerente, setRequerente] = useState<string>('nao')
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>(type !== 'conjuge')
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>(true)
+  // Certidões exigidas (filtro subtrativo): os três marcados ao abrir. Enviado só se o usuário mudou E a pessoa está fora da linha reta.
+  const [docsMarcados, setDocsMarcados] = useState<CodigoDocumentoExigivel[]>([...CODIGOS_DOCUMENTOS_EXIGIVEIS])
 
   // Classes padrão
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
@@ -1679,6 +1684,8 @@ function AddPersonModal({
         documentacao: precisaDocumentacao,  // ✅ gera documentos ou não
         arvoreId
       }
+      // Pessoa nova nunca é requerente (a API normaliza para 'nao'): o filtro vale quando ela está FORA da linha reta.
+      if (precisaDocumentacao && !isLinhaReta && !mesmaEscolha(null, docsMarcados)) body.documentosExigidos = docsMarcados
 
       if (type === 'pai' && parentId) {
         body.filhoId = parentId
@@ -1941,9 +1948,10 @@ function AddPersonModal({
               <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
-                <span className="block text-xs text-[var(--text-muted)]">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
+                <span className="block text-xs text-[var(--text-muted)]">{TEXTO_PRECISA_DOCUMENTACAO}</span>
               </span>
             </label>
+            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} aplicavel={!isLinhaReta} />}
           </section>
 
           {/* ===== Observações ===== */}
@@ -2099,6 +2107,8 @@ function EditPersonModal({
 
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>((pessoa as any).linhaReta ?? true)
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
+  // Valor SALVO (NULL ⇒ os três marcados). O campo só vai ao servidor se o usuário mudou.
+  const [docsMarcados, setDocsMarcados] = useState<CodigoDocumentoExigivel[]>(marcadosParaTela((pessoa as any).documentosExigidos))
 
   // Classes padrão
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
@@ -2129,11 +2139,14 @@ function EditPersonModal({
   // documentação" também mudam o que é exigido — e o que já tem tarefa aberta.
   const linhaRetaMudou = ((pessoa as any).linhaReta ?? true) !== isLinhaReta
   const documentacaoMudou = ((pessoa as any).documentacao ?? true) !== precisaDocumentacao
+  // Filtro de certidões: vale só para quem está FORA da linha reta (não requerente e não na linha reta) e com a caixa ligada.
+  const listaAplicavel = !isLinhaReta && !ehRequerente(requerente)
+  const documentosExigidosMudou = precisaDocumentacao && listaAplicavel && !mesmaEscolha((pessoa as any).documentosExigidos ?? null, docsMarcados)
   const paiMudou = ((pessoa as any).paiId ?? null) !== (paiSelecionadoId || null)
   const maeMudou = ((pessoa as any).maeId ?? null) !== (maeSelecionadaId || null)
 
   const mudancaRelevante = obitoMudou || requerenteMudou || casamentoNasceu || casamentoAcabou
-    || linhaRetaMudou || documentacaoMudou || paiMudou || maeMudou
+    || linhaRetaMudou || documentacaoMudou || documentosExigidosMudou || paiMudou || maeMudou
 
   const descreverAlteracoes = (): AlteracaoDescrita[] => {
     const lista: AlteracaoDescrita[] = []
@@ -2157,6 +2170,9 @@ function EditPersonModal({
     if (documentacaoMudou) {
       lista.push({ campo: 'Precisa de documentação', de: precisaDocumentacao ? 'Não' : 'Sim', para: precisaDocumentacao ? 'Sim' : 'Não' })
     }
+    if (documentosExigidosMudou) {
+      lista.push({ campo: 'Certidões exigidas', de: rotuloDaLista(marcadosParaTela((pessoa as any).documentosExigidos)), para: rotuloDaLista(docsMarcados) })
+    }
     if (paiMudou) lista.push({ campo: 'Pai', de: 'alterado', para: paiSelecionadoId ? (pessoas.find(p => p.id === Number(paiSelecionadoId))?.nome ?? 'outro') : 'nenhum' })
     if (maeMudou) lista.push({ campo: 'Mãe', de: 'alterada', para: maeSelecionadaId ? (pessoas.find(p => p.id === Number(maeSelecionadaId))?.nome ?? 'outra') : 'nenhuma' })
     if (requerenteMudou) {
@@ -2178,6 +2194,7 @@ function EditPersonModal({
       requerente: requerente || 'nao',
       linhaReta: isLinhaReta,
       documentacao: precisaDocumentacao,
+      ...(documentosExigidosMudou ? { documentosExigidos: docsMarcados } : {}),
       paiId: paiSelecionadoId || null,
       maeId: maeSelecionadaId || null,
       data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
@@ -2238,6 +2255,8 @@ function EditPersonModal({
           requerente: requerente || 'nao',
           linhaReta: isLinhaReta,
           documentacao: precisaDocumentacao,
+          // Só vai se o usuário MUDOU a lista: re-salvar pessoa antiga (NULL) nunca grava a lista cheia.
+          ...(documentosExigidosMudou ? { documentosExigidos: docsMarcados } : {}),
           paiId: paiSelecionadoId || null,
           maeId: maeSelecionadaId || null,
         })
@@ -2578,9 +2597,10 @@ function EditPersonModal({
               <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
-                <span className="block text-xs text-[var(--text-muted)]">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
+                <span className="block text-xs text-[var(--text-muted)]">{TEXTO_PRECISA_DOCUMENTACAO}</span>
               </span>
             </label>
+            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} aplicavel={!isLinhaReta && !ehRequerente(requerente)} />}
           </section>
 
           {/* ===== Observações ===== */}
