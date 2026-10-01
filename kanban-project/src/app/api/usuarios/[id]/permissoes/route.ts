@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { calcularPermissoes, PERMISSOES, type MapaPermissoes } from '@/src/lib/permissoes'
+import { diffPermissoesCustom, exclusivasPerdidas, semMudanca } from '@/src/lib/usuarios-permissoes'
 
 // GET - Buscar permissões efetivas do usuário
 export async function GET(
@@ -93,6 +94,7 @@ export async function PUT(
 
     const body = await request.json()
     const { perfilId, permissoesCustom } = body
+    const confirmouRemocaoDeExclusivas = body.confirmarRemocaoExclusivas === true
 
     // Validar que o perfil existe (se informado)
     if (perfilId !== undefined && perfilId !== null) {
@@ -114,6 +116,24 @@ export async function PUT(
       })
     }
 
+    // O estado ANTERIOR: serve à trava das exclusivas e ao diff da auditoria.
+    const antes = await prisma.usuario.findUnique({ where: { id }, select: { perfilId: true, permissoesCustom: true } })
+    if (!antes) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
+
+    // TRAVA (01/10/2026): uma permissão EXCLUSIVA (`PERMISSOES_EXCLUSIVAS`) só existe por concessão nominal em
+    // `permissoesCustom`. Gravar um conjunto que a omita (ou `null`/`{}`) a REVOGA — e foi assim que o botão de excluir
+    // processo do Administrador sumiu, sem aviso. Revogar exige pedir isso de forma explícita.
+    if (permissoesCustom !== undefined) {
+      const perdidas = exclusivasPerdidas(antes.permissoesCustom, permissoesCustom)
+      if (perdidas.length > 0 && !confirmouRemocaoDeExclusivas) {
+        return NextResponse.json({
+          error: `Esta gravação removeria permissão(ões) exclusiva(s) já concedida(s): ${perdidas.join(', ')}. Confirme a remoção de forma explícita.`,
+          code: 'REMOVE_EXCLUSIVA_SEM_CONFIRMACAO',
+          exclusivas: perdidas,
+        }, { status: 409 })
+      }
+    }
+
     // Atualizar
     const updateData: any = {}
 
@@ -127,7 +147,13 @@ export async function PUT(
       updateData.permissoesCustom = temCustom ? permissoesCustom : null
     }
 
-    const usuario = await prisma.usuario.update({
+    // AUDITORIA na MESMA transação da alteração: quem, quando e o que entrou/saiu (nunca há registro de permissão sem fato).
+    const requester = await extrairUsuarioComPermissoes(request)
+    const depoisCustom = 'permissoesCustom' in updateData ? updateData.permissoesCustom : antes.permissoesCustom
+    const diff = diffPermissoesCustom(antes.permissoesCustom, depoisCustom)
+    const perfilMudou = 'perfilId' in updateData && updateData.perfilId !== antes.perfilId
+
+    const atualizar = prisma.usuario.update({
       where: { id },
       data: updateData,
       // A resposta do PUT não devolve permissoesCustom nem perfil.permissoes (quem edita já as tem;
@@ -139,6 +165,23 @@ export async function PUT(
         perfil: { select: { nome: true } },
       },
     })
+    const auditar = !semMudanca(diff) || perfilMudou
+      ? [prisma.logAuditoria.create({
+          data: {
+            acao: 'USUARIO_PERMISSOES_ALTERADAS', entidade: 'Usuario', entidadeId: id, usuarioId: requester?.userId ?? null,
+            descricao: `Permissões do usuário #${id} alteradas`
+              + (diff.concedidas.length ? ` · concedidas: ${diff.concedidas.join(', ')}` : '')
+              + (diff.revogadas.length ? ` · revogadas: ${diff.revogadas.join(', ')}` : '')
+              + (perfilMudou ? ` · perfil ${antes.perfilId ?? 'nenhum'} → ${updateData.perfilId ?? 'nenhum'}` : ''),
+            detalhes: JSON.parse(JSON.stringify({
+              perfil: { de: antes.perfilId, para: 'perfilId' in updateData ? updateData.perfilId : antes.perfilId },
+              concedidas: diff.concedidas, revogadas: diff.revogadas, mudancas: diff.mudancas,
+              removeuExclusivasComConfirmacao: confirmouRemocaoDeExclusivas && exclusivasPerdidas(antes.permissoesCustom, depoisCustom).length > 0,
+            })),
+          },
+        })]
+      : []
+    const [usuario] = await prisma.$transaction([atualizar, ...auditar])
 
     return NextResponse.json({ usuario, message: 'Permissões atualizadas' })
   } catch (error) {

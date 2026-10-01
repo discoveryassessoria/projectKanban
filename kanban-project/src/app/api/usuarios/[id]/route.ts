@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Verificar se o usuário a ser atualizado existe
     const usuarioExistente = await prisma.usuario.findUnique({
       where: { id: userId },
-      select: { id: true, email: true }
+      select: { id: true, email: true, nome: true, tipo: true }
     })
 
     if (!usuarioExistente) {
@@ -61,17 +61,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       dadosAtualizacao.senha = await hash(senha, 10)
     }
 
+    // AUDITORIA (01/10/2026): antes disto, trocar nome/e-mail/tipo de um usuário não deixava NENHUM registro. A senha nunca
+    // é gravada — só o fato de ter sido trocada. Mesma transação da alteração.
+    const mudancas: Record<string, { de: string; para: string }> = {}
+    if (dadosAtualizacao.nome !== undefined && dadosAtualizacao.nome !== usuarioExistente.nome) mudancas.nome = { de: usuarioExistente.nome, para: dadosAtualizacao.nome }
+    if (dadosAtualizacao.email !== undefined && dadosAtualizacao.email !== usuarioExistente.email) mudancas.email = { de: usuarioExistente.email, para: dadosAtualizacao.email }
+    if (dadosAtualizacao.tipo !== undefined && dadosAtualizacao.tipo !== usuarioExistente.tipo) mudancas.tipo = { de: String(usuarioExistente.tipo), para: String(dadosAtualizacao.tipo) }
+    const senhaAlterada = dadosAtualizacao.senha !== undefined
+    const auditar = Object.keys(mudancas).length > 0 || senhaAlterada
+      ? [prisma.logAuditoria.create({
+          data: {
+            acao: 'USUARIO_ATUALIZADO', entidade: 'Usuario', entidadeId: userId, usuarioId: requester.userId,
+            descricao: `Usuário #${userId} atualizado`
+              + (Object.keys(mudancas).length ? ` · campos: ${Object.keys(mudancas).join(', ')}` : '')
+              + (senhaAlterada ? ' · senha alterada' : ''),
+            detalhes: JSON.parse(JSON.stringify({ mudancas, senhaAlterada })),
+          },
+        })]
+      : []
+
     // Atualizar usuário
-    const usuarioAtualizado = await prisma.usuario.update({
-      where: { id: userId },
-      data: dadosAtualizacao,
-      select: {
-        id: true,
-        nome: true,
-        email: true,
-        tipo: true,
-      }
-    })
+    const [usuarioAtualizado] = await prisma.$transaction([
+      prisma.usuario.update({
+        where: { id: userId },
+        data: dadosAtualizacao,
+        select: {
+          id: true,
+          nome: true,
+          email: true,
+          tipo: true,
+        }
+      }),
+      ...auditar,
+    ])
 
     return NextResponse.json({
       message: "Usuário atualizado com sucesso",
