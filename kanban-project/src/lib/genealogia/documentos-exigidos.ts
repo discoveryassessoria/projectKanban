@@ -129,3 +129,65 @@ export function descreverMudancaDocumentosExigidos(antes: unknown, depois: unkno
   if (mesmaEscolha(antes, depois)) return null
   return `documentos exigidos da pessoa alterados: de ${rotuloDaLista(marcadosParaTela(antes))} para ${rotuloDaLista(marcadosParaTela(depois))}`
 }
+
+// ============================================================================
+// O QUE VAI ACONTECER COM CADA DOCUMENTO MARCADO — a tela e a prévia de impacto dizem a mesma coisa (fonte única).
+//
+// A lista só RETIRA: marcar um documento não faz a árvore exigi-lo. Nascimento depende só da regra automática; Casamento só nasce
+// com uma UNIÃO na árvore; Óbito só nasce se a pessoa está marcada como "Pessoa falecida" (`vivo = false`). Sem o fato, o documento
+// marcado NÃO é gerado — e isto precisa ser dito à pessoa, na hora, em vez de ser ignorado em silêncio (processo 688, 01/10/2026).
+// ============================================================================
+
+/** Os fatos da pessoa que a regra documental lê para Casamento e Óbito. */
+export interface FatosParaDocumentos {
+  /** "Pessoa falecida" está marcada (`vivo = false`). */
+  falecida: boolean
+  /** "Pessoa casada" marcada E com cônjuge (a certidão de casamento nasce da União). */
+  temCasamento: boolean
+}
+
+export interface SituacaoDoDocumentoMarcado {
+  code: CodigoDocumentoExigivel
+  rotulo: string
+  /** `true` = será gerado; `false` = marcado, mas a árvore ainda não sustenta. */
+  gera: boolean
+  /** Quando `gera = false`: o motivo, para a prévia ("não será gerado, porque …"). */
+  porque: string | null
+  /** Quando `gera = false`: a frase completa de aviso da tela, com o que fazer. */
+  aviso: string | null
+}
+
+const SEM_FATO: Partial<Record<CodigoDocumentoExigivel, { porque: string; aviso: string }>> = {
+  OBI: {
+    porque: "esta pessoa está viva na árvore",
+    aviso: "Esta pessoa está viva na árvore, então este documento não será gerado. Marque 'Pessoa falecida' para gerá-lo.",
+  },
+  CAS: {
+    porque: "esta pessoa não tem casamento cadastrado na árvore",
+    aviso: "Esta pessoa não tem casamento cadastrado na árvore, então este documento não será gerado. Marque 'Pessoa casada' e escolha o cônjuge para gerá-lo.",
+  },
+}
+
+/** Situação de CADA documento MARCADO (os desmarcados não aparecem), na ordem canônica. */
+export function situacaoDosDocumentosMarcados(
+  marcados: readonly CodigoDocumentoExigivel[], fatos: FatosParaDocumentos,
+): SituacaoDoDocumentoMarcado[] {
+  return DOCUMENTOS_EXIGIVEIS.filter((d) => marcados.includes(d.code)).map((d) => {
+    const temFato = d.code === "OBI" ? fatos.falecida : d.code === "CAS" ? fatos.temCasamento : true
+    const sem = temFato ? undefined : SEM_FATO[d.code]
+    return { code: d.code, rotulo: d.rotulo, gera: temFato, porque: sem?.porque ?? null, aviso: sem?.aviso ?? null }
+  })
+}
+
+/**
+ * A lista de documentos vai no corpo da gravação? SÓ quando a caixa "Precisa de documentação" está ligada e a escolha MUDOU em relação
+ * ao gravado (`null` ≡ os três). Propositalmente NÃO recebe a classificação da pessoa: vale para QUALQUER uma (requerente, linha reta
+ * ou não). Re-salvar uma pessoa sem mexer na lista nunca grava a lista cheia.
+ */
+export function deveEnviarDocumentosExigidos(args: {
+  precisaDocumentacao: boolean
+  gravado: unknown
+  marcados: readonly CodigoDocumentoExigivel[]
+}): boolean {
+  return args.precisaDocumentacao && !mesmaEscolha(args.gravado ?? null, args.marcados)
+}

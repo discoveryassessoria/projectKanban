@@ -29,7 +29,7 @@ import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { DocumentosExigidosCampo, TEXTO_PRECISA_DOCUMENTACAO } from "./documentos-exigidos-campo"
-import { CODIGOS_DOCUMENTOS_EXIGIVEIS, marcadosParaTela, mesmaEscolha, rotuloDaLista, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
+import { CODIGOS_DOCUMENTOS_EXIGIVEIS, deveEnviarDocumentosExigidos, marcadosParaTela, rotuloDaLista, situacaoDosDocumentosMarcados, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
 import {
   Plus,
@@ -1591,6 +1591,9 @@ function AddPersonModal({
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>(true)
   // Certidões exigidas (filtro subtrativo): os três marcados ao abrir. Enviado só se o usuário mudou E a pessoa está fora da linha reta.
   const [docsMarcados, setDocsMarcados] = useState<CodigoDocumentoExigivel[]>([...CODIGOS_DOCUMENTOS_EXIGIVEIS])
+  // O que a árvore sabe desta pessoa nova: decide se Casamento/Óbito marcados serão gerados (aviso na tela).
+  // A união nasce quando é cônjuge de alguém (`conjugeDePessoaId`) ou quando marcou casada + escolheu o cônjuge.
+  const fatosDocs = { falecida: isFalecido, temCasamento: Boolean((type === 'conjuge' && conjugeDePessoaId) || (isCasado && conjugeId)) }
 
   // Classes padrão
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
@@ -1684,8 +1687,8 @@ function AddPersonModal({
         documentacao: precisaDocumentacao,  // ✅ gera documentos ou não
         arvoreId
       }
-      // Pessoa nova nunca é requerente (a API normaliza para 'nao'): o filtro vale quando ela está FORA da linha reta.
-      if (precisaDocumentacao && !isLinhaReta && !mesmaEscolha(null, docsMarcados)) body.documentosExigidos = docsMarcados
+      // A lista vale para QUALQUER pessoa (requerente, linha reta ou não): vai quando difere dos três marcados (= regra automática).
+      if (deveEnviarDocumentosExigidos({ precisaDocumentacao, gravado: null, marcados: docsMarcados })) body.documentosExigidos = docsMarcados
 
       if (type === 'pai' && parentId) {
         body.filhoId = parentId
@@ -1951,7 +1954,7 @@ function AddPersonModal({
                 <span className="block text-xs text-[var(--text-muted)]">{TEXTO_PRECISA_DOCUMENTACAO}</span>
               </span>
             </label>
-            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} />}
+            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} fatos={fatosDocs} />}
           </section>
 
           {/* ===== Observações ===== */}
@@ -2139,9 +2142,10 @@ function EditPersonModal({
   // documentação" também mudam o que é exigido — e o que já tem tarefa aberta.
   const linhaRetaMudou = ((pessoa as any).linhaReta ?? true) !== isLinhaReta
   const documentacaoMudou = ((pessoa as any).documentacao ?? true) !== precisaDocumentacao
-  // Filtro de certidões: vale só para quem está FORA da linha reta (não requerente e não na linha reta) e com a caixa ligada.
-  const listaAplicavel = !isLinhaReta && !ehRequerente(requerente)
-  const documentosExigidosMudou = precisaDocumentacao && listaAplicavel && !mesmaEscolha((pessoa as any).documentosExigidos ?? null, docsMarcados)
+  // Filtro de certidões: vale para QUALQUER pessoa (requerente, linha reta ou não) com a caixa ligada — vai só quando MUDOU.
+  const documentosExigidosMudou = deveEnviarDocumentosExigidos({ precisaDocumentacao, gravado: (pessoa as any).documentosExigidos, marcados: docsMarcados })
+  // O que a árvore sabe agora desta pessoa: decide se Casamento/Óbito marcados serão gerados (aviso na tela e prévia).
+  const fatosDocs = { falecida: isFalecido, temCasamento: isCasado && conjugeSelecionadoId != null }
   const paiMudou = ((pessoa as any).paiId ?? null) !== (paiSelecionadoId || null)
   const maeMudou = ((pessoa as any).maeId ?? null) !== (maeSelecionadaId || null)
 
@@ -2207,6 +2211,10 @@ function EditPersonModal({
         ? { acao: 'remover', uniaoId: uniaoExistente.id }
         : undefined,
     alteracoes: descreverAlteracoes(),
+    // Para cada certidão marcada: "será gerado" ou "não será gerado, porque …" (a prévia aparece mesmo que o motor diga "sem impacto").
+    certidoesEscolhidas: documentosExigidosMudou
+      ? situacaoDosDocumentosMarcados(docsMarcados, fatosDocs).map(({ code, rotulo, gera, porque }) => ({ code, rotulo, gera, porque }))
+      : undefined,
     requerentesAfetados: requerentesAfetadosPor(pessoa.id),
     estadoAtual,
   })
@@ -2600,7 +2608,7 @@ function EditPersonModal({
                 <span className="block text-xs text-[var(--text-muted)]">{TEXTO_PRECISA_DOCUMENTACAO}</span>
               </span>
             </label>
-            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} />}
+            {precisaDocumentacao && <DocumentosExigidosCampo marcados={docsMarcados} onChange={setDocsMarcados} fatos={fatosDocs} />}
           </section>
 
           {/* ===== Observações ===== */}

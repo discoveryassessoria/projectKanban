@@ -96,9 +96,13 @@ async function main() {
   await prisma.pessoa.update({ where: { id: A.titularId }, data: { documentosExigidos: [] } })
   c = await calc(A.processoId)
   ok("LINHA PRINCIPAL/REQUERENTE APLICA o filtro: titular com lista [] tem o Nascimento removido por escolha", !tem(c, "NAS", { pessoaId: A.titularId }) && removida(c, "NAS", { pessoaId: A.titularId }))
-  await prisma.pessoa.update({ where: { id: A.titularId }, data: { documentosExigidos: ["NAS", "OBI"] } })
+  // PELA ROTA REAL (o que a tela envia): o titular é REQUERENTE e da LINHA RETA — a lista tem de ser aceita e GRAVADA para ele.
+  r = await putDocs(A.titularId, ["NAS", "OBI"])
+  ok("PUT do titular (requerente / linha reta) com ['NAS','OBI'] → 200 e a lista FICA GRAVADA (era descartada pela tela)", r.status === 200 && JSON.stringify(await gravado(A.titularId)) === '["NAS","OBI"]', String(r.status))
   c = await calc(A.processoId)
   ok("titular da linha principal com ['NAS','OBI']: Nascimento fica; Casamento da UNIÃO fica (a cônjuge sem lista sustenta)", tem(c, "NAS", { pessoaId: A.titularId }) && tem(c, "CAS", { uniaoId: A.uniaoId }))
+  r = await putDocs(A.titularId, ["NAS", "CAS", "OBI"])
+  ok("remarcar os três no titular → 200 e volta a NULL (regra automática)", r.status === 200 && (await gravado(A.titularId)) === null)
   await prisma.pessoa.update({ where: { id: A.titularId }, data: { documentosExigidos: undefined as never } }).catch(() => null)
   await prisma.$executeRawUnsafe(`UPDATE "Pessoa" SET "documentosExigidos" = NULL WHERE id = ${A.titularId}`)
 
