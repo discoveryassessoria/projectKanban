@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react"
 import { Loader2, Check, User, ArrowLeft, AlertCircle } from "lucide-react"
+import { idadeEmAnos, ehMaiorDeIdade } from "@/src/lib/documentos/maioridade"
 
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -46,26 +47,14 @@ interface RequerenteSelectorProps {
 }
 
 function idadeDe(dataNasc: string | null): string | null {
-  if (!dataNasc) return null
-  const d = new Date(dataNasc)
-  if (isNaN(d.getTime())) return null
-  const hoje = new Date()
-  let idade = hoje.getFullYear() - d.getFullYear()
-  const m = hoje.getMonth() - d.getMonth()
-  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
-  return `${idade} anos`
+  const anos = idadeEmAnos(dataNasc, new Date())
+  return anos == null ? null : `${anos} anos`
 }
 
-/** Faixa etária p/ o rótulo Adulto/Menor (≥18 = Adulto). Null se sem data. */
+/** Faixa etária p/ o rótulo Adulto/Menor (política canônica de maioridade). Null se sem data. */
 function faixaDe(dataNasc: string | null): "Adulto" | "Menor" | null {
-  if (!dataNasc) return null
-  const d = new Date(dataNasc)
-  if (isNaN(d.getTime())) return null
-  const hoje = new Date()
-  let idade = hoje.getFullYear() - d.getFullYear()
-  const m = hoje.getMonth() - d.getMonth()
-  if (m < 0 || (m === 0 && hoje.getDate() < d.getDate())) idade--
-  return idade >= 18 ? "Adulto" : "Menor"
+  const maior = ehMaiorDeIdade(dataNasc, new Date())
+  return maior == null ? null : maior ? "Adulto" : "Menor"
 }
 
 function pendenciasDe(r: RequerenteDisponivel): string[] {

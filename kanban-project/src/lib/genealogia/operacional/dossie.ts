@@ -12,9 +12,15 @@
 //     árvore só agrupa o que ele já decidiu.
 //   • divergências → insights do motor genealógico (conflito, duplicidade,
 //     sobrenome). Não são "erros de documento": são contradições de DADO, que é
-//     o que a árvore sabe apurar.
+//     o que a árvore sabe apurar. (Todos os achados acionáveis, inclusive relação
+//     e risco, saem de `achados-do-motor.ts`.)
 //   • tarefas → Tarefa do processo, ligada à pessoa pela necessidade que a
-//     originou. A árvore não cria nem conclui tarefa.
+//     originou. A árvore não cria nem conclui tarefa. ATENÇÃO (regra permanente,
+//     Etapa 2): tarefa é TRABALHO EM ANDAMENTO, não pendência de árvore. Ela
+//     aparece no dossiê só como informação (`tarefasAbertas`/`tarefasConcluidas`)
+//     e NUNCA entra na próxima ação, na urgência, no resumo da linhagem, na saúde
+//     da pessoa nem nas perguntas — essas contas só conhecem documento e achado
+//     do motor. Quem acompanha tarefa é a Torre e Tarefas.
 //   • custos e receitas → ObrigacaoEconomica com `personId`, e recebido pelo
 //     Ledger. A árvore não soma valor por conta própria e não conhece regra de
 //     preço.
@@ -25,13 +31,12 @@
 // PURO: sem prisma, sem rede, sem relógio. Recebe os fatos já lidos e projeta.
 
 import type { GrafoGenealogico } from "../motor/grafo"
-import type { AnaliseArvore, Insight, Severidade } from "../motor/tipos"
+import type { AnaliseArvore, CategoriaInsight, Insight, Severidade } from "../motor/tipos"
 import { ORDEM_SEVERIDADE, piorSeveridade } from "../motor/tipos"
 import type { Linhagem, MapaLinhagens } from "../motor/linhagens"
 import { requerentesQueDependemDe } from "../motor/linhagens"
 import {
   indicadorDaPessoa,
-  indicadorVazio,
   projetarIndicadores,
   ROTULO_SITUACAO,
   type IndicadorDocumental,
@@ -40,6 +45,8 @@ import {
   type SituacaoDocumental,
 } from "../documental/indicadores"
 import { nomeCompleto } from "../motor/texto"
+import type { NecessidadeDaFila } from "./fila-da-pessoa"
+import { consolidarDocumental, indicadorDeDivergencias, uniaoIdsDe } from "./indicadores"
 
 // ── FATOS: o contrato do que a leitura entrega ──────────────────────────────
 // Espelho fiel do endpoint. Campos extras são ignorados de propósito: quando o
@@ -80,14 +87,19 @@ export interface LancamentoDaPessoa {
  * isso, em vez de mostrar "R$ 0,00" e mentir.
  */
 export interface FatosOperacionais {
-  necessidades: NecessidadeOficial[]
+  /** Necessidades oficiais + a situação real do pedido (projeção oficial da certidão). */
+  necessidades: NecessidadeDaFila[]
   tarefas: Array<TarefaDaPessoa & { pessoaId: number | null }>
   lancamentos: Array<LancamentoDaPessoa & { pessoaId: number | null }>
   financeiroVisivel: boolean
+  /** `Processo.faseAtualKey` — a fase REAL, para a fila saber se o processo já entrou em Genealogia. */
+  faseAtualKey?: string | null
+  /** Rótulo da fase destino do fechamento, lido do CADASTRO (nunca literal). */
+  faseDestinoLabel?: string | null
 }
 
 export function fatosVazios(): FatosOperacionais {
-  return { necessidades: [], tarefas: [], lancamentos: [], financeiroVisivel: false }
+  return { necessidades: [], tarefas: [], lancamentos: [], financeiroVisivel: false, faseAtualKey: null, faseDestinoLabel: null }
 }
 
 // ── DOSSIÊ ──────────────────────────────────────────────────────────────────
@@ -108,6 +120,10 @@ export interface DossiePessoa {
   /** Contradições de dado apuradas pelo motor. Não são pendência documental. */
   divergencias: Insight[]
   severidadeMax: Severidade | null
+  /**
+   * Trabalho em andamento ligado à pessoa — INFORMAÇÃO, não pendência: nenhuma
+   * conta de pendência/urgência/saúde lê este campo (ver cabeçalho do arquivo).
+   */
   tarefasAbertas: TarefaDaPessoa[]
   tarefasConcluidas: number
   custos: TotalPorMoeda[]
@@ -127,15 +143,11 @@ export interface ContextoDossie {
   fatos: FatosOperacionais
 }
 
-const CATEGORIAS_DIVERGENCIA = new Set(["conflito", "duplicidade", "sobrenome"])
-
-/** Uniões de uma pessoa — a certidão de casamento é exigida da união. */
-function uniaoIdsDe(g: GrafoGenealogico, pessoaId: number): number[] {
-  return g
-    .unioesDe(pessoaId)
-    .map((u) => u.id)
-    .filter((id): id is number => typeof id === "number")
-}
+// Divergência do dossiê = CONTRADIÇÃO DE DADO (subconjunto dos achados do motor).
+// É o que alimenta o selo do cartão e o mapa de Saúde. O conjunto COMPLETO de
+// achados (inclui relação e risco) vive em `achados-do-motor.ts` e é o que a aba
+// Operação lista — sugestão de vínculo não deve pintar a Saúde da pessoa.
+const CATEGORIAS_DIVERGENCIA = new Set<CategoriaInsight>(["conflito", "duplicidade", "sobrenome"])
 
 export function projetarDossies(ctx: ContextoDossie): Map<number, DossiePessoa> {
   const { grafo, analise, mapa, fatos } = ctx
@@ -224,7 +236,8 @@ export function projetarDossies(ctx: ContextoDossie): Map<number, DossiePessoa> 
  *
  * A ordem abaixo é a ordem em que o trabalho realmente trava: um documento não
  * localizado bloqueia; uma contradição de dado invalida o documento que vier;
- * uma exigência não iniciada é trabalho parado; uma tarefa aberta já tem dono.
+ * uma exigência não iniciada é trabalho parado. Tarefa aberta NÃO entra: já tem
+ * dono e já tem lugar na Torre e em Tarefas (regra permanente da Etapa 2).
  * Quando nada disso existe, a resposta honesta é "nada pendente" — devolver
  * null, e não uma sugestão inventada para preencher a linha.
  */
@@ -236,9 +249,6 @@ export function decidirProximaAcao(d: DossiePessoa): string | null {
   if (critica) return critica.acao ?? critica.titulo
   if (d.documental.pendentes > 0) {
     return `Iniciar ${contar(d.documental.pendentes, "exigência documental pendente", "exigências documentais pendentes")}.`
-  }
-  if (d.tarefasAbertas.length > 0) {
-    return `Concluir a tarefa “${d.tarefasAbertas[0].titulo}”.`
   }
   if (d.documental.emAtendimento > 0) {
     return `Acompanhar ${contar(d.documental.emAtendimento, "documento em atendimento", "documentos em atendimento")}.`
@@ -261,7 +271,7 @@ export function calcularUrgencia(d: DossiePessoa): number {
   base += d.documental.pendentes * 12
   base += d.documental.emAtendimento * 4
   for (const i of d.divergencias) base += ORDEM_SEVERIDADE[i.severidade] * 6
-  base += d.tarefasAbertas.length * 5
+  // Tarefa aberta NÃO pesa aqui: não é pendência de árvore (Etapa 2).
   const dependentes = Math.max(1, d.requerentesDependentes.length)
   return Math.round(base * dependentes)
 }
@@ -285,25 +295,12 @@ export interface ResumoLinhagem {
   danteCausaNome: string | null
   /** Exigências marcadas como NÃO LOCALIZADA — o que de fato trava. */
   bloqueios: number
-  tarefasVencidas: number
   /** Consolidado documental de TODA a linha (pessoas + cônjuges delas). */
   documental: IndicadorDocumental
   divergencias: number
-  tarefasAbertas: number
   /** Pessoa mais urgente da linha — para onde o operador deve olhar primeiro. */
   focoId: number | null
   proximaAcao: string | null
-}
-
-/** Soma todos os campos numéricos de `fonte` em `alvo`, in place. */
-function somarIndicadorEm(alvo: IndicadorDocumental, fonte: IndicadorDocumental): void {
-  alvo.necessarias += fonte.necessarias
-  alvo.atendidas += fonte.atendidas
-  alvo.emAtendimento += fonte.emAtendimento
-  alvo.pendentes += fonte.pendentes
-  alvo.naoLocalizadas += fonte.naoLocalizadas
-  alvo.dispensadas += fonte.dispensadas
-  alvo.opcionais += fonte.opcionais
 }
 
 export function resumirLinhagem(
@@ -312,43 +309,27 @@ export function resumirLinhagem(
   grafo: GrafoGenealogico,
   /**
    * Projeção BRUTA (por pessoa e por união, sem a fusão que `indicadorDaPessoa`
-   * faz pro cartão). Necessária aqui porque `d.documental` de cada pessoa já
-   * inclui a(s) união(ões) dela — somar isso pra CADA cônjuge visível contaria
-   * a MESMA certidão de casamento duas vezes no total da linhagem (achado
-   * real 24/09/2026: 5 casamentos infl// avam o total em +5). Aqui a pessoa
-   * entra pela parte que é só dela, e cada união entra exatamente uma vez.
+   * faz pro cartão). Ver `consolidarDocumental`: cada união entra uma vez.
    */
   projecao: ProjecaoDocumental,
-  /** Data de referência para "tarefa vencida". Injetada — nada lê o relógio. */
-  agora: Date = new Date(0),
+  /**
+   * A análise do motor — de onde saem as divergências. Obrigatória: contar
+   * divergência a partir dos dossiês (por pessoa) foi o caminho paralelo que
+   * `indicadores.ts` aposentou.
+   */
+  analise: Pick<AnaliseArvore, "insights" | "truncado"> | null,
 ): ResumoLinhagem {
   const ids = [...linhagem.visivel]
-  const documental = indicadorVazio()
-  const uniõesContadas = new Set<number>()
-  let divergencias = 0
-  let tarefasAbertas = 0
-  let tarefasVencidas = 0
+  // Documentos e divergências: UMA definição (indicadores.ts), a mesma do painel
+  // de Inteligência e da aba Operação.
+  const documental = consolidarDocumental(ids, grafo, projecao)
+  const divergencias = indicadorDeDivergencias(analise, linhagem.visivel).total
+
   let focoId: number | null = null
   let maiorUrgencia = -1
-
   for (const id of ids) {
     const d = dossies.get(id)
     if (!d) continue
-    const pessoal = projecao.porPessoa.get(id)
-    if (pessoal) somarIndicadorEm(documental, pessoal)
-    for (const uid of uniaoIdsDe(grafo, id)) {
-      if (uniõesContadas.has(uid)) continue
-      uniõesContadas.add(uid)
-      const uniao = projecao.porUniao.get(uid)
-      if (uniao) somarIndicadorEm(documental, uniao)
-    }
-    divergencias += d.divergencias.length
-    tarefasAbertas += d.tarefasAbertas.length
-    for (const t of d.tarefasAbertas) {
-      if (!t.dataPrazo) continue
-      const prazoMs = Date.parse(t.dataPrazo)
-      if (Number.isFinite(prazoMs) && prazoMs < agora.getTime()) tarefasVencidas++
-    }
     // Só entra quem tem alguma urgência real; desempate por id, para que a mesma
     // linha aponte sempre para a mesma pessoa entre dois carregamentos.
     if (d.urgencia > 0) {
@@ -360,20 +341,6 @@ export function resumirLinhagem(
       }
     }
   }
-
-  const resolvidas = documental.atendidas + documental.dispensadas
-  documental.progresso =
-    documental.necessarias > 0 ? Math.round((resolvidas / documental.necessarias) * 100) : null
-  documental.situacao =
-    documental.necessarias === 0
-      ? "sem_exigencia"
-      : documental.naoLocalizadas > 0
-        ? "bloqueado"
-        : documental.pendentes > 0
-          ? "pendente"
-          : documental.emAtendimento > 0
-            ? "em_andamento"
-            : "completo"
 
   const foco = focoId != null ? dossies.get(focoId) : null
 
@@ -388,10 +355,8 @@ export function resumirLinhagem(
         ? (dossies.get(linhagem.danteCausaId)?.nome ?? null)
         : null,
     bloqueios: documental.naoLocalizadas,
-    tarefasVencidas,
     documental,
     divergencias,
-    tarefasAbertas,
     focoId,
     proximaAcao: foco ? (foco.proximaAcao ? `${foco.nome}: ${foco.proximaAcao}` : null) : null,
   }

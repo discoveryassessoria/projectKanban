@@ -27,7 +27,7 @@ import { mapaDeLinhagens, trilhaDaLinhagem } from "@/src/lib/genealogia/motor/li
 import { calcularFoco, preferenciasPadrao } from "@/src/lib/genealogia/navegacao/foco"
 import { projetarDossies, resumirLinhagem, type FatosOperacionais } from "@/src/lib/genealogia/operacional/dossie"
 import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
-import { diagnosticar, resolveNextGenealogyAction } from "@/src/lib/genealogia/operacional/diagnostico"
+import { diagnosticar, resolveNextGenealogyAction, TOTAL_PRIORIDADES } from "@/src/lib/genealogia/operacional/diagnostico"
 import type { PaisAlvo } from "@/src/lib/genealogia/motor/tipos"
 
 let passou = 0
@@ -172,10 +172,9 @@ async function main() {
 
   // ── 3. Diagnóstico e próxima ação ─────────────────────────────────────────
   console.log("\n3) diagnóstico e próxima ação")
-  const agora = new Date()
   const linhagem = mapa.linhagens[0] ?? null
   const t5 = Date.now()
-  const diag = diagnosticar({ grafo, analise, mapa, dossies, linhagem, agora })
+  const diag = diagnosticar({ grafo, analise, mapa, dossies, linhagem })
   const msDiag = Date.now() - t5
   ok(["saudavel", "atencao", "critico"].includes(diag.saude), `saúde: ${diag.rotuloSaude} (${msDiag}ms)`)
   console.log(`     ${diag.resumo} · ${diag.criticos} impeditivo(s) · ${diag.atencao} de atenção`)
@@ -185,13 +184,13 @@ async function main() {
   )
 
   const acao = resolveNextGenealogyAction(diag)
-  ok(acao.prioridade >= 1 && acao.prioridade <= 7, `próxima ação: prioridade ${acao.prioridade}`)
+  ok(acao.prioridade >= 1 && acao.prioridade <= TOTAL_PRIORIDADES, `próxima ação: prioridade ${acao.prioridade}`)
   console.log(`     → ${acao.pessoaNome ? `${acao.pessoaNome}: ` : ""}${acao.acao}`)
   console.log(`       fonte: ${acao.fonte}`)
 
   if (linhagem) {
     const projecaoDocumental = projetarIndicadores(fatos.necessidades)
-    const resumo = resumirLinhagem(linhagem, dossies, grafo, projecaoDocumental, agora)
+    const resumo = resumirLinhagem(linhagem, dossies, grafo, projecaoDocumental, analise)
     const trilha = trilhaDaLinhagem(grafo, linhagem, mapa)
     ok(trilha.length === linhagem.cadeia.length, "trilha da linhagem coerente com a cadeia")
     console.log(

@@ -4,8 +4,11 @@
 // ============================================================================
 // EXCLUSÃO DA ÁRVORE INTEIRA — mesma disciplina da remoção de UMA pessoa
 // (`remocao-pessoa-modal.tsx`), só que somada para toda a árvore, e com a
-// mesma barreira de "exclusão definitiva" que o resto do sistema usa para
-// ações irreversíveis de alto raio (frase de confirmação digitada).
+// barreira de "exclusão definitiva" para ações irreversíveis de alto raio:
+// o operador digita o NOME do processo (o que a tela mostra no cabeçalho) e o
+// botão só habilita quando bate EXATAMENTE. Isso é confirmação de UI — a
+// identidade e a autorização continuam no servidor, que exige a própria frase de
+// confirmação, aplica a guarda de ciclo de vida e a permissão `arvore.excluir`.
 //
 // Nada aqui é calculado no cliente: o plano vem de
 // `GET /api/arvore/[id]/plano-exclusao`, e o `DELETE` RECALCULA o mesmo plano
@@ -17,6 +20,7 @@ import { createPortal } from "react-dom"
 import { AlertTriangle, Loader2, Shield, Trash2, X } from "lucide-react"
 import { LAYER } from "@/src/lib/ui/layers"
 
+/** Frase que o SERVIDOR exige (`DELETE /api/arvore/[id]`). O operador não a digita: ele digita o nome. */
 const FRASE_CONFIRMACAO = "EXCLUIR DEFINITIVAMENTE"
 
 export interface RemoviveisArvoreUI {
@@ -81,7 +85,7 @@ export function ExclusaoArvoreModal({
 }) {
   const [plano, setPlano] = useState<PlanoExclusaoArvoreUI | null>(null)
   const [carregando, setCarregando] = useState(true)
-  const [frase, setFrase] = useState("")
+  const [digitado, setDigitado] = useState("")
   const [executando, setExecutando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
@@ -101,14 +105,17 @@ export function ExclusaoArvoreModal({
   if (typeof document === "undefined") return null
 
   const sairao = plano ? Object.entries(plano.removiveis).filter(([, n]) => n > 0) : []
-  const fraseOk = frase.trim() === FRASE_CONFIRMACAO
+  // O nome que o cabeçalho mostra é o nome a digitar. Comparação EXATA (sem trim,
+  // sem caixa): confirmar é provar que leu qual árvore está sendo apagada.
+  const nomeAlvo = plano ? (plano.arvoreNome || `Árvore ${plano.arvoreId}`) : ""
+  const nomeOk = plano != null && digitado === nomeAlvo
 
   const confirmar = async () => {
-    if (!fraseOk) return
+    if (!nomeOk) return
     setExecutando(true)
     setErro(null)
     try {
-      await executar(arvoreId, frase.trim())
+      await executar(arvoreId, FRASE_CONFIRMACAO)
       onExcluida()
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível excluir a árvore.")
@@ -126,7 +133,7 @@ export function ExclusaoArvoreModal({
           <div>
             <h2 className="text-base font-semibold text-red-700">Excluir árvore inteira</h2>
             <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
-              {plano ? plano.arvoreNome : "Verificando o que depende desta árvore…"}
+              {plano ? nomeAlvo : "Verificando o que depende desta árvore…"}
             </p>
           </div>
           <button
@@ -207,13 +214,16 @@ export function ExclusaoArvoreModal({
                 <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-3 space-y-2">
                   <div className="flex items-start gap-2 text-sm text-red-700">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                    <span>Esta ação é irreversível. Para confirmar, digite exatamente:</span>
+                    <span>Esta ação é irreversível. Para confirmar, digite o nome do processo exatamente como aparece abaixo:</span>
                   </div>
-                  <div className="text-sm font-mono font-bold text-red-700">{FRASE_CONFIRMACAO}</div>
+                  <div className="select-all break-words text-sm font-mono font-bold text-red-700">{nomeAlvo}</div>
                   <input
-                    value={frase}
-                    onChange={(e) => setFrase(e.target.value)}
-                    placeholder={FRASE_CONFIRMACAO}
+                    value={digitado}
+                    onChange={(e) => setDigitado(e.target.value)}
+                    placeholder="Digite o nome do processo"
+                    aria-label="Digite o nome do processo para confirmar"
+                    autoComplete="off"
+                    spellCheck={false}
                     disabled={executando}
                     className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm outline-none focus:border-red-400 disabled:opacity-60"
                   />
@@ -234,7 +244,7 @@ export function ExclusaoArvoreModal({
             {plano.podeExcluir && (
               <button
                 onClick={() => void confirmar()}
-                disabled={executando || !fraseOk}
+                disabled={executando || !nomeOk}
                 className="flex items-center justify-center gap-2 rounded-lg bg-red-700 px-4 py-2.5 text-sm font-medium text-[var(--action-primary-ink)] transition-colors hover:bg-red-800 disabled:opacity-40"
               >
                 {executando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}

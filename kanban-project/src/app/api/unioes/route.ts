@@ -72,11 +72,26 @@ export async function POST(request: NextRequest) {
       numero_registro,
       data_registro,
       observacoes,
+      // VINCULAR CÔNJUGES (Etapa 4 da reforma da árvore): casar duas pessoas que já
+      // existem na árvore, sem filho cadastrado. `marcarCasados` grava `casado=true`
+      // nas duas NA MESMA transação da união — sem isso a necessidade de casamento
+      // (que depende do estado civil das pessoas) só nasceria depois de um segundo
+      // PUT, e uma falha entre os dois deixaria a árvore pela metade.
+      marcarCasados,
+      // `idempotente`: se o casal JÁ está unido, devolve a união existente (200) em
+      // vez de recusar — repetir o clique/requisição não cria nada nem dá erro.
+      idempotente,
     } = body
 
     if (!pessoa1Id || !pessoa2Id) {
       return NextResponse.json(
         { error: "pessoa1Id e pessoa2Id são obrigatórios" },
+        { status: 400 }
+      )
+    }
+    if (Number(pessoa1Id) === Number(pessoa2Id)) {
+      return NextResponse.json(
+        { error: "Uma pessoa não pode ser unida a ela mesma." },
         { status: 400 }
       )
     }
@@ -93,6 +108,14 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+    // Os dois cônjuges são da MESMA árvore: união entre árvores diferentes ligaria
+    // famílias (e processos) que não têm nada a ver uma com a outra.
+    if (pessoa1.arvoreId == null || pessoa2.arvoreId == null || pessoa1.arvoreId !== pessoa2.arvoreId) {
+      return NextResponse.json(
+        { error: "As duas pessoas precisam estar na mesma árvore para serem unidas." },
+        { status: 400 }
+      )
+    }
 
     // Verificar se já existe uma união entre essas pessoas
     const uniaoExistente = await prisma.uniao.findFirst({
@@ -105,6 +128,9 @@ export async function POST(request: NextRequest) {
     })
 
     if (uniaoExistente) {
+      if (idempotente === true) {
+        return NextResponse.json({ ...uniaoExistente, jaExistia: true }, { status: 200 })
+      }
       return NextResponse.json(
         { error: "Já existe uma união entre essas pessoas" },
         { status: 400 }
@@ -118,7 +144,14 @@ export async function POST(request: NextRequest) {
       arvoreId: null, autorId,
       arvoreIdDe: (u: { pessoa1: { arvoreId: number | null } | null; pessoa2: { arvoreId: number | null } | null }) => u.pessoa1?.arvoreId ?? u.pessoa2?.arvoreId,
       motivo: () => "união criada (casal registrado na árvore)",
-      fn: (tx) => tx.uniao.create({
+      fn: async (tx) => {
+        if (marcarCasados === true) {
+          await tx.pessoa.updateMany({
+            where: { id: { in: [Number(pessoa1Id), Number(pessoa2Id)] } },
+            data: { casado: true },
+          })
+        }
+        return tx.uniao.create({
       data: {
         pessoa1Id: Number(pessoa1Id),
         pessoa2Id: Number(pessoa2Id),
@@ -151,10 +184,16 @@ export async function POST(request: NextRequest) {
           }
         },
       },
-    }),
+    })
+      },
     })
 
-    return NextResponse.json(novaUniao, { status: 201 })
+    // `casadoAntes`: o estado civil que cada um tinha ANTES de unir — é o que o
+    // Desfazer restaura (a união some, mas o flag que este POST ligou não pode ficar).
+    return NextResponse.json(
+      { ...novaUniao, casadoAntes: { pessoa1: pessoa1.casado === true, pessoa2: pessoa2.casado === true } },
+      { status: 201 },
+    )
   } catch (error) {
     if (error instanceof PropagacaoPosCommitError) {
       return NextResponse.json({ error: error.message, salvo: true }, { status: 500 })

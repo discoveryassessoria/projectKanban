@@ -55,6 +55,8 @@ export interface AnalisePessoa {
   completude: number
   /** Campos essenciais ausentes, já ordenados por importância. */
   faltando: string[]
+  /** Todos os campos avaliados (preenchidos ou não) — a conta da completude. */
+  campos: CampoAvaliado[]
   insightIds: string[]
   /** Pior severidade entre os insights da pessoa (para o selo do card). */
   severidadeMax: Severidade | null
@@ -62,6 +64,66 @@ export interface AnalisePessoa {
   descendentesNaLinha: number
   /** Resumo de uma linha, gerado automaticamente. */
   resumo: string
+}
+
+/** Um campo exigido de uma pessoa, já avaliado — a decomposição da completude. */
+export interface CampoAvaliado {
+  chave: string
+  rotulo: string
+  peso: number
+  preenchido: boolean
+}
+
+/** Uma linha da decomposição de uma porcentagem: o que entra na conta. */
+export interface ItemDecomposicao {
+  /** Estável entre leituras da mesma árvore. */
+  chave: string
+  /** Nome da pessoa, título do achado ou nome do componente. */
+  rotulo: string
+  /** Pessoa-alvo do clique (primeira envolvida). null = item sem pessoa. */
+  pessoaId: number | null
+  pessoaIds: number[]
+  /** Quanto este item soma no numerador da conta da medida. */
+  numerador: number
+  /** Quanto soma no denominador. null = a medida não é uma fração (consistência). */
+  denominador: number | null
+  /** true = o item REDUZ a nota (falta/pesa). false = entra na conta sem reduzir. */
+  pesa: boolean
+  /** Frase tirada do dado: "Faltam: Data de nascimento, Sobrenome". */
+  detalhe: string
+  /** Campos do cadastro envolvidos (só completude/cobertura). */
+  campos: Array<{ chave: string; rotulo: string; peso: number }>
+}
+
+export type ChaveMedida = "qualidade" | "completude" | "consistencia" | "cobertura"
+
+/** Uma porcentagem COM a conta que a produziu. `valor` é exatamente o número exibido. */
+export interface Medida {
+  chave: ChaveMedida
+  rotulo: string
+  /** 0..100 inteiro — o número mostrado na tela. */
+  valor: number
+  /** A fórmula real, em linguagem de operador. */
+  formula: string
+  /** Σ do numerador de TODOS os itens (inclusive os não listados). */
+  numerador: number
+  /** Σ do denominador. null quando a medida não é fração. */
+  denominador: number | null
+  /** Nota de leitura quando a medida não tem base (ex.: sem linha de cidadania). */
+  observacao: string | null
+  /** Itens que entram na conta, do que mais pesa ao que menos pesa. Pode estar cortado. */
+  itens: ItemDecomposicao[]
+  /** Quantos itens a conta tem no total (listados + omitidos + os que não pesam). */
+  totalItens: number
+  /** Itens que pesam e ficaram fora de `itens` pelo teto de exibição. */
+  omitidos: number
+}
+
+export interface DetalheQualidade {
+  qualidade: Medida
+  completude: Medida
+  consistencia: Medida
+  cobertura: Medida
 }
 
 export interface QualidadeArvore {
@@ -77,10 +139,14 @@ export interface QualidadeArvore {
   conflitos: number
   duplicidades: number
   lacunas: number
+  /** A conta de cada porcentagem acima — mesma passada, nunca recalculada. */
+  detalhe: DetalheQualidade
 }
 
 export interface PassoSugerido {
   id: string
+  /** Id do Insight de origem — é dele que a tela tira a explicação real. */
+  insightId: string
   ordem: number
   titulo: string
   motivo: string

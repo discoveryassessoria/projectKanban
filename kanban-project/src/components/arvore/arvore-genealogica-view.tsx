@@ -6,16 +6,39 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useApi, invalidar } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
 import dagre from "dagre"
-import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import type { PessoaArvore, UniaoArvore, DocumentoArvore, CampoEdicaoPessoa } from "./types"
 import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { ExclusaoArvoreModal, type PlanoExclusaoArvoreUI } from '@/src/components/arvore/exclusao-arvore-modal'
+import { MenuMaisArvore } from './menu-mais-arvore'
+import { AvisoEdicao, type AvisoEdicaoDados } from './aviso-edicao'
+import { RemoverVinculoModal } from './remover-vinculo-modal'
+import { VincularConjugeModal } from './vincular-conjuge-modal'
+import { criarHistorico, type ComandoEdicao } from '@/src/lib/genealogia/historico-edicao'
+import {
+  classificarVinculo,
+  comandoMoverNos,
+  comandoRemoverFiliacao,
+  comandoRemoverUniao,
+  comandoVincularConjuges,
+  nomeCompleto,
+  type DadosDoVinculoConjugal,
+  type Http,
+  type MovimentoNo,
+  type VinculoRemovivel,
+} from '@/src/lib/genealogia/vinculos-edicao'
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { useAnaliseArvore, paisAlvoDe } from "./inteligencia/use-analise-arvore"
 import { useArvoreOperacional } from "./inteligencia/use-arvore-operacional"
-import { BarraLinhagem, EVENTO_FECHAR_CAMADA, MARCA_MENU_ABERTO } from "./inteligencia/barra-linhagem"
-import { PainelDiagnostico, SeloSaude } from "./inteligencia/painel-diagnostico"
+import {
+  ControlesLinhagem,
+  CLASSE_BOTAO_BARRA,
+  EVENTO_FECHAR_CAMADA,
+  MARCA_MENU_ABERTO,
+} from "./inteligencia/barra-linhagem"
+import { CartaoResumoFlutuante, LegendaSaude, TrilhaFlutuante } from "./inteligencia/cartoes-flutuantes"
+import { MenuPdf } from "./menu-pdf"
 import {
   PreviewImpactoModal,
   type AlteracaoDescrita,
@@ -23,11 +46,16 @@ import {
 } from "./inteligencia/preview-impacto"
 import type { EstadoAtual } from "@/src/lib/genealogia/operacional/comparacao"
 import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
+import { CriarTarefaModal } from "./inteligencia/criar-tarefa-modal"
+import { useAbrirTarefaNaCentral } from "./fila-da-pessoa"
+import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 import { PaletaComandos } from "./inteligencia/paleta-comandos"
 import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { CampoCidadeNascimento, CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { maioridadeEhManual, marcadorRequerenteParaGravar } from "@/src/lib/documentos/maioridade"
 import { DocumentosExigidosCampo, TEXTO_PRECISA_DOCUMENTACAO } from "./documentos-exigidos-campo"
 import { CODIGOS_DOCUMENTOS_EXIGIVEIS, deveEnviarDocumentosExigidos, marcadosParaTela, rotuloDaLista, situacaoDosDocumentosMarcados, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
@@ -37,13 +65,21 @@ import {
   Loader2,
   Minimize2,
   Maximize2,
-  FileDown,
   Search,
   Sparkles,
   ImagePlus,
-  Trash2,
+  Unlink,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { AvisoPessoaRepetida, usePessoasParecidas } from "@/src/components/arvore/aviso-pessoa-repetida"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
+import {
+  ROTULO_GENITOR,
+  estenderTrilha,
+  proximosPassosDaLinhagem,
+  rotuloDaTrilha,
+  type TipoGenitor,
+} from "@/src/lib/genealogia/cadastro-linhagem"
 
 // Helper para fetch autenticado
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -155,7 +191,6 @@ export function ArvoreGenealogicaView({
   const [painelAberto, setPainelAberto] = useState(false)
   const [importarAberto, setImportarAberto] = useState(false)
   const [paletaAberta, setPaletaAberta] = useState(false)
-  const [diagnosticoAberto, setDiagnosticoAberto] = useState(false)
 
   // ── OPERAÇÃO DA ÁRVORE ────────────────────────────────────────────────────
   // Linhagens, foco, dossiê por pessoa e sinais do cartão saem daqui, numa
@@ -163,6 +198,14 @@ export function ArvoreGenealogicaView({
   // disto recalcula posição: trocar de requerente é um Map novo, não um desenho
   // novo. Ver `aplicarFoco` em react-flow-tree.tsx.
   const operacional = useArvoreOperacional({ processoId, pessoas, unioes, analise })
+
+  // CRIAR TAREFA a partir do que a árvore aponta (próximo passo, próxima ação,
+  // documento sem tarefa). O rascunho nasce nos módulos puros; a escrita é da
+  // porta canônica (`POST /api/tarefas/manual`), dentro do modal. Sem a permissão
+  // `tarefas.criar` o handler não existe — e portanto o botão também não.
+  const [rascunhoTarefa, setRascunhoTarefa] = useState<RascunhoTarefa | null>(null)
+  const abrirTarefaNaCentral = useAbrirTarefaNaCentral()
+  const abrirCriarTarefa = pode('tarefas.criar') ? setRascunhoTarefa : undefined
 
   // SEM BECO SEM SAÍDA: quantos requerentes do processo ainda NÃO estão na
   // árvore. É lido AQUI, com a árvore, e não dentro do modal — porque a decisão
@@ -259,12 +302,27 @@ export function ArvoreGenealogicaView({
   const [addPersonType, setAddPersonType] = useState<'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null>(null)
   const [addPersonParentId, setAddPersonParentId] = useState<number | null>(null)
   const [addConjugeForPessoaId, setAddConjugeForPessoaId] = useState<number | null>(null)
+  // Cadastro de linhagem em série: nomes já cadastrados neste lote (vazio = fora do modo)
+  // e a chave que remonta o formulário limpo a cada passo, sem fechar o modal.
+  const [trilhaLinhagem, setTrilhaLinhagem] = useState<string[]>([])
+  const [addModalKey, setAddModalKey] = useState(0)
 
   const [showEditPersonModal, setShowEditPersonModal] = useState(false)
   const [editingPerson, setEditingPerson] = useState<PessoaArvore | null>(null)
+  // Campo vazio na página da pessoa → "preencher": abre a edição já focada neste campo.
+  const [campoEdicaoInicial, setCampoEdicaoInicial] = useState<CampoEdicaoPessoa | undefined>(undefined)
 
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
+  // Botão de um achado do motor (aba Operação): leva à pessoa-alvo e já abre o
+  // painel dela na aba Operação, onde os achados dela estão — não na aba Info.
+  const abrirAchado = useCallback(
+    (pessoaId: number) => {
+      setSidebarTabInicial("operacao")
+      localizarPessoa(pessoaId)
+    },
+    [localizarPessoa],
+  )
 
   // Posições dos nós: o arrasto responde na hora e o salvamento é debounced, então o
   // valor local é um RASCUNHO sobre o que o servidor devolveu.
@@ -567,6 +625,155 @@ export function ArvoreGenealogicaView({
   const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
   const [mostrarExclusaoArvore, setMostrarExclusaoArvore] = useState(false)
 
+  // ── SEGURANÇA DE EDIÇÃO (Etapa 3) ─────────────────────────────────────────
+  // Remover vínculo é ação EXPLÍCITA (selecionar a linha → "Remover vínculo" →
+  // confirmação que diz quem é afetado). Delete/Backspace não remove nada. Tudo
+  // o que muda o canvas entra num histórico de Desfazer/Refazer (Ctrl/Cmd+Z); o
+  // desfazer passa pelas MESMAS rotas oficiais (propagação §37), nunca direto no banco.
+  const historicoRef = useRef(criarHistorico())
+  const [aviso, setAviso] = useState<AvisoEdicaoDados | null>(null)
+  const avisoSeqRef = useRef(0)
+  const [arestaSelecionada, setArestaSelecionada] = useState<{ id: string; source: string; target: string } | null>(null)
+  const [vinculoParaRemover, setVinculoParaRemover] = useState<VinculoRemovivel | null>(null)
+  const removendoVinculoRef = useRef(false)
+  // VINCULAR CÔNJUGE (Etapa 4): casal que já existe na árvore, sem filho cadastrado.
+  const [vincularConjuge, setVincularConjuge] = useState<{ pessoaId: number; outraId: number | null } | null>(null)
+  const vinculandoConjugeRef = useRef(false)
+  const executarHistoricoRef = useRef<(sentido: 'desfazer' | 'refazer') => Promise<void>>(async () => {})
+
+  // Pilha limpa ao trocar de árvore/processo (e ao sair): comando de uma árvore
+  // nunca pode rodar sobre outra.
+  useEffect(() => {
+    const h = historicoRef.current
+    h.limpar()
+    return () => h.limpar()
+  }, [arvoreId, processoId])
+
+  const mostrarAviso = useCallback((tipo: AvisoEdicaoDados['tipo'], mensagem: string, acao?: AvisoEdicaoDados['acao']) => {
+    avisoSeqRef.current += 1
+    setAviso({ id: avisoSeqRef.current, tipo, mensagem, acao })
+  }, [])
+  const fecharAviso = useCallback(() => setAviso(null), [])
+
+  const http = useCallback<Http>(async (metodo, url, corpo) => {
+    const r = await authFetch(url, {
+      method: metodo,
+      ...(corpo !== undefined
+        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) }
+        : {}),
+    })
+    return { ok: r.ok, status: r.status, corpo: await r.json().catch(() => null) as unknown }
+  }, [])
+
+  const vinculoSelecionado = useMemo<VinculoRemovivel | null>(
+    () => (arestaSelecionada ? classificarVinculo(arestaSelecionada, pessoas, unioes) : null),
+    [arestaSelecionada, pessoas, unioes],
+  )
+
+  const executarHistorico = useCallback(async (sentido: 'desfazer' | 'refazer') => {
+    const h = historicoRef.current
+    const r = sentido === 'desfazer' ? await h.desfazer() : await h.refazer()
+    if (r.status === 'ocupado') return
+    if (r.status === 'vazio') {
+      mostrarAviso('sucesso', sentido === 'desfazer' ? 'Nada para desfazer.' : 'Nada para refazer.')
+      return
+    }
+    // Mexeu em dados da árvore (ou tentou): recarrega — a tela mostra o que o servidor tem.
+    if (r.afetaDados) await fetchArvore()
+    if (r.status === 'falhou') {
+      mostrarAviso(
+        'erro',
+        `Não foi possível ${sentido === 'desfazer' ? 'desfazer' : 'refazer'} ${r.rotulo}: ${r.erro}` +
+          (r.descartado ? ' Esta ação saiu do histórico.' : ''),
+      )
+      return
+    }
+    const inverso = sentido === 'desfazer' ? 'refazer' : 'desfazer'
+    const temInverso = inverso === 'refazer' ? h.podeRefazer() : h.podeDesfazer()
+    mostrarAviso(
+      'sucesso',
+      `${sentido === 'desfazer' ? 'Desfeito' : 'Refeito'}: ${r.rotulo}.`,
+      temInverso ? { rotulo: inverso === 'refazer' ? 'Refazer' : 'Desfazer', onClick: () => void executarHistoricoRef.current(inverso) } : undefined,
+    )
+  }, [fetchArvore, mostrarAviso])
+  useEffect(() => { executarHistoricoRef.current = executarHistorico }, [executarHistorico])
+
+  // Cartão arrastado → comando de "mover" (o inverso grava a posição anterior).
+  const aoMoverCartoes = useCallback((modo: string, movimentos: MovimentoNo[]) => {
+    const cmd = comandoMoverNos(modo, movimentos, (m, posicoes) => {
+      const arvore = reactFlowTreeRef.current
+      if (!arvore) throw new Error('árvore indisponível')
+      arvore.aplicarPosicoes(m, posicoes)
+    })
+    historicoRef.current.registrar(cmd)
+  }, [])
+
+  // Confirmação do modal: devolve `null` (deu certo) ou a mensagem do servidor.
+  const executarRemocaoVinculo = useCallback(async (v: VinculoRemovivel): Promise<string | null> => {
+    if (removendoVinculoRef.current) return null
+    removendoVinculoRef.current = true
+    try {
+      let comando: ComandoEdicao
+      if (v.tipo === 'uniao') {
+        const c = await comandoRemoverUniao(v, http)
+        if (!c.ok) return c.erro
+        comando = c.comando
+      } else {
+        comando = comandoRemoverFiliacao(v, http)
+      }
+      const r = await comando.aplicar()
+      if (!r.ok) {
+        // Pode ter gravado e falhado depois (500 com `salvo`): a tela relê o servidor.
+        await fetchArvore()
+        return r.erro
+      }
+      historicoRef.current.registrar(comando)
+      setVinculoParaRemover(null)
+      setArestaSelecionada(null)
+      await fetchArvore()
+      mostrarAviso('sucesso', `Vínculo removido: ${comando.rotulo}.`, {
+        rotulo: 'Desfazer',
+        onClick: () => void executarHistoricoRef.current('desfazer'),
+      })
+      return null
+    } finally {
+      removendoVinculoRef.current = false
+    }
+  }, [http, fetchArvore, mostrarAviso])
+
+  const abrirVincularConjuge = useCallback((pessoaId: number, outraId: number | null) => {
+    setSelectedPerson(null)
+    setFullDetailsPerson(null)
+    setVincularConjuge({ pessoaId, outraId })
+  }, [setSelectedPerson])
+
+  // Confirmação do modal: devolve `null` (deu certo) ou a mensagem do servidor. A
+  // gravação é a rota oficial (união + estado civil + reavaliação documental na MESMA
+  // transação); o comando entra no histórico, então Ctrl+Z desfaz pelas mesmas rotas.
+  const executarVinculoConjugal = useCallback(async (dados: DadosDoVinculoConjugal): Promise<string | null> => {
+    if (vinculandoConjugeRef.current) return null
+    vinculandoConjugeRef.current = true
+    try {
+      const comando = comandoVincularConjuges(dados, http)
+      const r = await comando.aplicar()
+      if (!r.ok) {
+        // Pode ter gravado e falhado depois (500 com `salvo`): a tela relê o servidor.
+        await fetchArvore()
+        return r.erro
+      }
+      historicoRef.current.registrar(comando)
+      setVincularConjuge(null)
+      await fetchArvore()
+      mostrarAviso('sucesso', `Casamento registrado: ${comando.rotulo}.`, {
+        rotulo: 'Desfazer',
+        onClick: () => void executarHistoricoRef.current('desfazer'),
+      })
+      return null
+    } finally {
+      vinculandoConjugeRef.current = false
+    }
+  }, [http, fetchArvore, mostrarAviso])
+
   // FRONTEIRA (ADR — Árvore como camada de projeção): a exclusão de Documento
   // saiu daqui.
   //
@@ -823,6 +1030,21 @@ export function ArvoreGenealogicaView({
         setPaletaAberta((v) => !v)
         return
       }
+      // DESFAZER / REFAZER do canvas. Em campo de texto o Ctrl+Z é do campo (desfazer
+      // nativo) — não se captura. Também não com modal aberto: o foco ali é do modal.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.defaultPrevented) {
+        const k = e.key.toLowerCase()
+        if (k === 'z' || k === 'y') {
+          const modalAberto =
+            vinculoParaRemover != null || vincularConjuge != null || pessoaParaRemover != null || mostrarExclusaoArvore ||
+            showEditPersonModal || showAddPersonModal || importarAberto || paletaAberta || fullDetailsPerson != null
+          if (digitando || modalAberto) return
+          e.preventDefault()
+          const refazer = k === 'y' || e.shiftKey
+          void executarHistoricoRef.current(refazer ? 'refazer' : 'desfazer')
+          return
+        }
+      }
       if (digitando) return
 
       // Atalhos de LETRA. Só disparam sem modificador: Ctrl+D é favoritar no
@@ -833,11 +1055,6 @@ export function ArvoreGenealogicaView({
         if (tecla === "/") {
           e.preventDefault()
           setPaletaAberta(true)
-          return
-        }
-        if (tecla === "d") {
-          e.preventDefault()
-          setDiagnosticoAberto((v) => !v)
           return
         }
         if (tecla === "l") {
@@ -855,6 +1072,9 @@ export function ArvoreGenealogicaView({
       }
 
       if (e.key === "Escape") {
+        // Modal de adicionar pessoa: o Esc é dele (pilha de Esc), e sair dele encerra o
+        // cadastro em série. A árvore por baixo não fecha nada às costas do modal.
+        if (showAddPersonModal) return
         // DONO ÚNICO DO ESCAPE, e só enquanto a árvore tem algo a fechar.
         //
         // A árvore abre dentro do modal do processo, que fecha no Escape por um
@@ -874,10 +1094,20 @@ export function ArvoreGenealogicaView({
           document.dispatchEvent(new Event(EVENTO_FECHAR_CAMADA))
           return
         }
+        if (vinculoParaRemover != null) {
+          consumir()
+          if (!removendoVinculoRef.current) setVinculoParaRemover(null)
+          return
+        }
+        if (vincularConjuge != null) {
+          consumir()
+          if (!vinculandoConjugeRef.current) setVincularConjuge(null)
+          return
+        }
         if (paletaAberta) { consumir(); setPaletaAberta(false); return }
-        if (diagnosticoAberto) { consumir(); setDiagnosticoAberto(false); return }
         if (painelAberto) { consumir(); setPainelAberto(false); return }
         if (fullDetailsPerson) { consumir(); setFullDetailsPerson(null); return }
+        if (arestaSelecionada) { consumir(); setArestaSelecionada(null); return }
         if (selectedPersonId != null) {
           consumir()
           setSelectedPersonId(null)
@@ -935,8 +1165,15 @@ export function ArvoreGenealogicaView({
       selectedPersonId,
       paletaAberta,
       painelAberto,
-      diagnosticoAberto,
       fullDetailsPerson,
+      vinculoParaRemover,
+      vincularConjuge,
+      arestaSelecionada,
+      pessoaParaRemover,
+      mostrarExclusaoArvore,
+      showEditPersonModal,
+      showAddPersonModal,
+      importarAberto,
       localizarPessoa,
       irParaPessoa,
       operacional,
@@ -1007,24 +1244,20 @@ export function ArvoreGenealogicaView({
   // DESVINCULAR pai/mãe (não apaga a pessoa, só religa o ponteiro pra null) —
   // corrige o mesmo tipo de erro de importação que o seletor do Editar Pessoa
   // corrige, só que direto do card da sidebar, sem abrir o formulário inteiro.
-  const handleRemoveParent = async (pessoaId: number, tipo: 'pai' | 'mae') => {
-    const campo = tipo === 'pai' ? 'Pai' : 'Mãe'
-    if (!window.confirm(`Remover o vínculo de ${campo} desta pessoa? A pessoa não é apagada — só o vínculo.`)) return
-    try {
-      const res = await authFetch(`/api/pessoas/${pessoaId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tipo === 'pai' ? { paiId: null } : { maeId: null }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        alert(d.error || `Erro ao remover ${campo.toLowerCase()}`)
-        return
-      }
-      await fetchArvore()
-    } catch {
-      alert(`Erro ao remover ${campo.toLowerCase()}`)
-    }
+  const handleRemoveParent = (pessoaId: number, tipo: 'pai' | 'mae') => {
+    // Mesma porta do canvas: o modal diz quem é afetado e o efeito na documentação,
+    // a remoção entra no histórico (Ctrl+Z) e passa por `PUT /api/pessoas/:id`.
+    const filho = pessoas.find((p) => p.id === pessoaId)
+    const progenitorId = tipo === 'pai' ? filho?.paiId : filho?.maeId
+    const progenitor = pessoas.find((p) => p.id === progenitorId)
+    if (!filho || !progenitor) return
+    setVinculoParaRemover({
+      tipo,
+      filhoId: filho.id,
+      filhoNome: nomeCompleto(filho),
+      progenitorId: progenitor.id,
+      progenitorNome: nomeCompleto(progenitor),
+    })
   }
 
   const handleOnboardingComplete = async () => {
@@ -1040,17 +1273,20 @@ export function ArvoreGenealogicaView({
   // nos dois lugares — não há como um sair de sincronia com o outro.
   const podeImportar = Boolean(pode('arvore.criar') && arvoreId)
 
-  const botaoImportar = podeImportar ? (
-    <button
-      onClick={() => setImportarAberto(true)}
-      title="Importar árvore a partir de um print"
-      aria-label="Importar árvore a partir de um print"
-      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-    >
-      <ImagePlus className="h-4 w-4" aria-hidden="true" />
-      <span className="hidden sm:inline">Importar Árvore</span>
-    </button>
-  ) : null
+  // O botão tem duas peles: a da LINHA DE FERRAMENTAS (árvore montada) e a flutuante
+  // (onboarding, onde não há barra). Mesmo handler, mesmo rótulo — só a casca muda.
+  const botaoImportar = (classe: string, classeRotulo: string) =>
+    podeImportar ? (
+      <button
+        onClick={() => setImportarAberto(true)}
+        title="Importar árvore a partir de um print"
+        aria-label="Importar árvore a partir de um print"
+        className={classe}
+      >
+        <ImagePlus className="h-4 w-4" aria-hidden="true" />
+        <span className={classeRotulo}>Importar Árvore</span>
+      </button>
+    ) : null
 
   const modalImportar = arvoreId ? (
     <ImportarArvoreModal
@@ -1130,7 +1366,14 @@ export function ArvoreGenealogicaView({
           paisProcesso={paisProcesso}
           onComplete={handleOnboardingComplete}
         />
-        {botaoImportar && <div className="absolute right-4 top-4 z-20">{botaoImportar}</div>}
+        {podeImportar && (
+          <div className="absolute right-4 top-4 z-20">
+            {botaoImportar(
+              "flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900",
+              "hidden sm:inline",
+            )}
+          </div>
+        )}
         {modalImportar}
       </div>
     )
@@ -1142,13 +1385,22 @@ export function ArvoreGenealogicaView({
       {/* Overlay de transição */}
       <div className={`absolute inset-0 bg-[var(--surface-primary)] z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`} />
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] text-white/70">
-        <div className="flex items-center gap-2">
+      {/* BARRA ÚNICA — a ÚNICA linha de ferramentas acima do canvas. À esquerda,
+          Paisagem/Retrato e os controles de linhagem (visualização, requerente,
+          foco, filtros, Saúde, Comparar); à direita, Buscar, Importar, Análise,
+          PDF (com o idioma dentro), tela cheia e a lixeira. Em largura estreita a
+          linha QUEBRA — os rótulos somem e ficam os ícones — e nunca cria rolagem
+          horizontal da página. Resumo, legenda da Saúde e trilha da linhagem não
+          são controles: são cartões flutuantes sobre o canvas. */}
+      <div className="@container relative z-20 flex max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] text-white/70">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           {/* Botão Paisagem */}
           <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-[var(--surface-tertiary)] text-white/95' : 'hover:bg-[var(--surface-tertiary)]'}`}
             onClick={() => setViewMode('paisagem')}
+            title="Disposição em paisagem"
+            aria-label="Paisagem"
+            aria-pressed={viewMode === 'paisagem'}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="9" width="6" height="6" rx="1" />
@@ -1157,13 +1409,16 @@ export function ArvoreGenealogicaView({
               <path d="M8 12 L14 6" />
               <path d="M8 12 L14 18" />
             </svg>
-            <span className="text-sm font-medium">PAISAGEM</span>
+            <span className="hidden text-sm font-medium @[1300px]:inline">PAISAGEM</span>
           </button>
 
           {/* Botão Retrato */}
           <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-[var(--surface-tertiary)] text-white/95' : 'hover:bg-[var(--surface-tertiary)]'}`}
             onClick={() => setViewMode('retrato')}
+            title="Disposição em retrato"
+            aria-label="Retrato"
+            aria-pressed={viewMode === 'retrato'}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="2" width="6" height="6" rx="1" />
@@ -1172,41 +1427,84 @@ export function ArvoreGenealogicaView({
               <path d="M6 8 L12 16" />
               <path d="M18 8 L12 16" />
             </svg>
-            <span className="text-sm font-medium">RETRATO</span>
+            <span className="hidden text-sm font-medium @[1300px]:inline">RETRATO</span>
           </button>
+
+          {pessoas.length > 0 && (
+            <>
+              <span aria-hidden className="mx-1 hidden h-5 w-px bg-[var(--border-default)] sm:block" />
+              <ControlesLinhagem
+                mapa={operacional.mapa}
+                linhagem={operacional.linhagem}
+                requerenteSelecionadoId={operacional.requerenteSelecionadoId}
+                onSelecionarRequerente={operacional.selecionarRequerente}
+                modo={operacional.modo}
+                onModo={operacional.setModo}
+                estilo={operacional.estilo}
+                onEstilo={operacional.setEstilo}
+                filtros={operacional.filtros}
+                filtrosAtivos={operacional.filtrosAtivos}
+                onAlternarFiltro={operacional.alternar}
+                onLimparFiltros={operacional.limparFiltros}
+                comparacao={operacional.comparacao}
+                relacionadosVisiveis={operacional.relacionadosVisiveis}
+                onAlternarRelacionados={operacional.alternarRelacionados}
+                totalRelacionados={operacional.totalRelacionados}
+                saudeLigada={operacional.saudeLigada}
+                onAlternarSaude={operacional.alternarSaude}
+                contagemFiltros={operacional.contagemFiltros}
+                totalRecuado={operacional.foco.totalRecuado}
+                totalRecolhivel={operacional.totalRecolhivel}
+                onRecolherTudo={operacional.recolherTudo}
+              />
+            </>
+          )}
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* IDIOMA DO PDF — nasce no idioma do país do processo (cadastro), e
-              o operador troca quando o destinatário fala outra língua. */}
-          <select
-            value={idiomaPdf}
-            onChange={(e) => setIdiomaPdf(e.target.value)}
-            disabled={isExporting}
-            title="Idioma do PDF"
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-tertiary)] px-2 py-2 text-sm text-white/90 outline-none disabled:opacity-50"
-          >
-            {Object.entries(TITULO_ARVORE).map(([codigo, def]) => (
-              <option key={codigo} value={codigo} className="text-black">{def.rotulo}</option>
-            ))}
-          </select>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          {pessoas.length > 0 && (
+            <button
+              onClick={() => setPaletaAberta(true)}
+              title="Buscar pessoa (⌘K)"
+              aria-label="Buscar pessoa"
+              className={CLASSE_BOTAO_BARRA}
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden @[1500px]:inline">Buscar</span>
+              <kbd className="hidden rounded border border-[var(--border-default)] px-1 text-[10px] text-[var(--text-muted)] @[1700px]:inline">⌘K</kbd>
+            </button>
+          )}
+          {botaoImportar(CLASSE_BOTAO_BARRA, "hidden @[1500px]:inline")}
+          {pessoas.length > 0 && (
+            <button
+              onClick={() => setPainelAberto(true)}
+              title="Inteligência da árvore"
+              aria-label="Inteligência da árvore"
+              className={CLASSE_BOTAO_BARRA}
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden @[1500px]:inline">Análise</span>
+              {/* Contagem só dos achados que exigem ação — número no botão que não
+                  significa urgência vira ruído e o usuário para de olhar. */}
+              {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
+                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] font-semibold text-red-600">
+                  {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
+                </span>
+              )}
+            </button>
+          )}
 
-          {/* Botão Exportar PDF */}
-          <button
-            className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleExportPDF}
-            disabled={isExporting || pessoas.length === 0}
-            title="Exportar para PDF"
-          >
-            {isExporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileDown className="h-4 w-4" />
-            )}
-            <span className="text-sm font-medium">
-              {isExporting ? 'Exportando...' : 'PDF'}
-            </span>
-          </button>
+          {/* PDF — o idioma do PDF mora DENTRO do botão (menu): nasce no idioma
+              do país do processo (cadastro), e o operador troca quando o
+              destinatário fala outra língua. */}
+          <MenuPdf
+            idiomas={Object.entries(TITULO_ARVORE).map(([codigo, def]) => ({ codigo, rotulo: def.rotulo }))}
+            idioma={idiomaPdf}
+            onIdioma={setIdiomaPdf}
+            onExportar={handleExportPDF}
+            exportando={isExporting}
+            desabilitado={pessoas.length === 0}
+          />
 
           {/* Botão Fullscreen */}
           <button
@@ -1218,19 +1516,18 @@ export function ArvoreGenealogicaView({
             {isFullscreen ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
           </button>
 
-          {/* Excluir árvore inteira — ação rara e irreversível, por isso separada
-              do resto do grupo e sempre atrás de confirmação (ver ExclusaoArvoreModal).
-              Só aparece com permissão e com uma árvore de fato para excluir. */}
-          {pode('arvore.excluir') && arvoreId && (
-            <button
-              className="p-2 rounded transition-colors text-red-300 hover:bg-red-950/40 hover:text-red-200"
-              onClick={() => setMostrarExclusaoArvore(true)}
-              title="Excluir árvore inteira"
-              aria-label="Excluir árvore inteira"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
+          {/* Ações RARAS e irreversíveis moram no menu "⋯", nunca soltas na barra:
+              a exclusão da árvore inteira é o único item hoje (a exclusão do PROCESSO
+              não existe nesta tela — vive em Processos, com a guarda de ciclo de vida
+              e a permissão `processos.excluirDefinitivo`). Só aparece com permissão
+              e com uma árvore de fato para excluir; o menu some se não houver item. */}
+          <MenuMaisArvore
+            itens={
+              pode('arvore.excluir') && arvoreId
+                ? [{ chave: 'excluir-arvore', rotulo: 'Excluir árvore inteira…', perigo: true, onSelecionar: () => setMostrarExclusaoArvore(true) }]
+                : []
+            }
+          />
         </div>
       </div>
 
@@ -1291,110 +1588,60 @@ export function ArvoreGenealogicaView({
             onExpandirGrupo={operacional.expandirGrupo}
             lacunas={operacional.lacunas}
             saude={operacional.saude}
+            onPosicoesMovidas={aoMoverCartoes}
+            onVinculoSelecionado={setArestaSelecionada}
+            arestaSelecionadaId={vinculoSelecionado ? arestaSelecionada?.id ?? null : null}
           />
         )}
 
-        {/* Barra de linhagem: `absolute` no canto oposto ao dos botões
-            Buscar/Importar/Análise, com a mesma casca deles. Sobreposta ao
-            canvas — o <ReactFlowTree> acima não sabe que ela existe. */}
-        {pessoas.length > 0 && (
-          <BarraLinhagem
-            mapa={operacional.mapa}
-            linhagem={operacional.linhagem}
-            requerenteSelecionadoId={operacional.requerenteSelecionadoId}
-            onSelecionarRequerente={operacional.selecionarRequerente}
-            modo={operacional.modo}
-            onModo={operacional.setModo}
-            estilo={operacional.estilo}
-            onEstilo={operacional.setEstilo}
-            filtros={operacional.filtros}
-            filtrosAtivos={operacional.filtrosAtivos}
-            onAlternarFiltro={operacional.alternar}
-            onLimparFiltros={operacional.limparFiltros}
+        {/* Ação sobre a linha selecionada. Fica FORA do <ReactFlowTree>: o canvas
+            só informa qual aresta foi escolhida; quem sabe o que ela significa e
+            quem pode removê-la é a tela. Remover pai/mãe exige `arvore.editar`;
+            remover união exige `arvore.excluir` — as mesmas das rotas. */}
+        {vinculoSelecionado &&
+          (vinculoSelecionado.tipo === 'uniao' ? pode('arvore.excluir') : pode('arvore.editar')) && (
+            <div
+              className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-gray-900 shadow-[var(--elev-2)]"
+              role="group"
+              aria-label="Vínculo selecionado"
+            >
+              <span className="min-w-0 truncate">
+                {vinculoSelecionado.tipo === 'uniao'
+                  ? `União: ${vinculoSelecionado.pessoa1Nome} e ${vinculoSelecionado.pessoa2Nome}`
+                  : `${vinculoSelecionado.tipo === 'pai' ? 'Pai' : 'Mãe'}: ${vinculoSelecionado.progenitorNome} → ${vinculoSelecionado.filhoNome}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setVinculoParaRemover(vinculoSelecionado)}
+                className="flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2.5 py-1.5 font-medium text-red-700 transition-colors hover:bg-[var(--surface-secondary)]"
+              >
+                <Unlink className="h-4 w-4" aria-hidden="true" />
+                Remover vínculo
+              </button>
+            </div>
+          )}
+
+        {/* CARTÕES FLUTUANTES — sobrepostos ao canvas, NUNCA dentro dele: o
+            <ReactFlowTree> acima não sabe que eles existem, então abrir,
+            recolher ou trocar de requerente não move um card sequer. Resumo do
+            requerente (recolhível) no canto superior esquerdo; legenda da Saúde
+            no superior direito, SÓ com o modo Saúde ligado; trilha da linhagem na
+            base. Os zoom/minimapa do canvas ficam nos cantos inferiores. */}
+        {pessoas.length > 0 && operacional.mapa.linhagens.length > 0 && (
+          <CartaoResumoFlutuante
             resumo={operacional.resumo}
-            comparacao={operacional.comparacao}
-            trilha={operacional.trilha}
             proximaAcao={operacional.proximaAcao}
-            relacionadosVisiveis={operacional.relacionadosVisiveis}
-            onAlternarRelacionados={operacional.alternarRelacionados}
-            totalRelacionados={operacional.totalRelacionados}
-            saudeLigada={operacional.saudeLigada}
-            onAlternarSaude={operacional.alternarSaude}
-            contagemSaude={operacional.contagemSaude}
-            contagemFiltros={operacional.contagemFiltros}
-            totalRecuado={operacional.foco.totalRecuado}
-            totalRecolhivel={operacional.totalRecolhivel}
-            onRecolherTudo={operacional.recolherTudo}
-            onIrParaPessoa={localizarPessoa}
             carregando={operacional.carregando}
+            onIrParaPessoa={localizarPessoa}
+            rascunhoDaProximaAcao={operacional.rascunhoDaProximaAcao}
+            onCriarTarefa={abrirCriarTarefa}
           />
         )}
-
-        <PainelDiagnostico
-          diagnostico={operacional.diagnostico}
-          proximaAcao={operacional.proximaAcao}
-          aberto={diagnosticoAberto}
-          onFechar={() => setDiagnosticoAberto(false)}
-          onIrParaPessoa={localizarPessoa}
-          escopo={
-            operacional.modo === "linhagem" && operacional.linhagem
-              ? `Linhagem de ${operacional.linhagem.nome}`
-              : "Árvore inteira"
-          }
-          auditor={operacional.auditor}
-        />
-
-        {/* TELAS NOVAS — sobrepostas ao canvas, NUNCA dentro dele. Ficam em
-            `absolute` no canto superior direito, longe dos controles que já
-            existiam no canto inferior esquerdo. O <ReactFlowTree> acima não sabe
-            que elas existem: abrir ou fechar não move um card sequer. */}
-        {/* Uma barra só, nesta ordem: Buscar · Importar Árvore · Análise.
-            "Importar Árvore" NÃO depende de `pessoas.length`: árvore vazia é
-            justamente quando importar faz mais sentido. Buscar e Análise seguem
-            condicionais — não há o que buscar nem analisar sem pessoas. Por
-            ficarem em lados opostos do Importar, cada um carrega a sua própria
-            guarda em vez de dividirem um fragmento. */}
-        {(pessoas.length > 0 || podeImportar) && (
-          <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-            {pessoas.length > 0 && (
-            <button
-              onClick={() => setPaletaAberta(true)}
-              title="Buscar pessoa (⌘K)"
-              aria-label="Buscar pessoa"
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-            >
-              <Search className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Buscar</span>
-              <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-[var(--text-muted)] sm:inline">⌘K</kbd>
-            </button>
-            )}
-            {botaoImportar}
-            {pessoas.length > 0 && (
-              <SeloSaude
-                diagnostico={operacional.diagnostico}
-                ativo={diagnosticoAberto}
-                onAbrir={() => setDiagnosticoAberto((v) => !v)}
-              />
-            )}
-            {pessoas.length > 0 && (
-            <button
-              onClick={() => setPainelAberto(true)}
-              title="Inteligência da árvore"
-              aria-label="Inteligência da árvore"
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Análise</span>
-              {/* Contagem só dos achados que exigem ação — número no botão que não
-                  significa urgência vira ruído e o usuário para de olhar. */}
-              {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
-                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] font-semibold text-red-600">
-                  {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
-                </span>
-              )}
-            </button>
-            )}
-          </div>
+        {pessoas.length > 0 && operacional.saudeLigada && (
+          <LegendaSaude contagem={operacional.contagemSaude} />
+        )}
+        {pessoas.length > 0 && operacional.modo === "linhagem" && (
+          <TrilhaFlutuante trilha={operacional.trilha} onIrParaPessoa={localizarPessoa} />
         )}
 
         {modalImportar}
@@ -1406,7 +1653,21 @@ export function ArvoreGenealogicaView({
           onIrParaPessoa={localizarPessoa}
           nomeDePessoa={nomeDePessoa}
           perguntas={operacional.perguntas}
+          indicadores={operacional.indicadores}
+          onCriarTarefa={abrirCriarTarefa}
+          rascunhoDoPasso={operacional.rascunhoDoPasso}
+          onAbrirTarefa={abrirTarefaNaCentral}
         />
+        {rascunhoTarefa && (
+          <CriarTarefaModal
+            rascunho={rascunhoTarefa}
+            processoId={processoId}
+            onFechar={() => setRascunhoTarefa(null)}
+            onCriada={() => {
+              void invalidar(`/api/processos/${processoId}/genealogia/operacional`)
+            }}
+          />
+        )}
         <PaletaComandos
           indice={indice}
           aberto={paletaAberta}
@@ -1443,7 +1704,29 @@ export function ArvoreGenealogicaView({
         financeiroVisivel={operacional.financeiroVisivel}
         nomeDeRequerente={nomeDePessoa}
         eventos={selectedPersonId != null ? operacional.eventosDe(selectedPersonId) : undefined}
+        indicadores={selectedPersonId != null ? operacional.indicadoresDe(selectedPersonId) : null}
+        fila={selectedPersonId != null ? operacional.filaDe(selectedPersonId) : null}
+        mensagemAntesDaGenealogia={operacional.mensagemAntesDaGenealogia}
+        onAbrirAchado={abrirAchado}
+        onVincularConjuge={pode('arvore.criar') ? abrirVincularConjuge : undefined}
+        processoId={processoId}
       />
+
+      {vincularConjuge != null && (() => {
+        const base = pessoas.find((p) => p.id === vincularConjuge.pessoaId)
+        if (!base) return null
+        const jaUnidos = new Set(findConjuges(base).map((c) => c.id))
+        return (
+          <VincularConjugeModal
+            key={`${vincularConjuge.pessoaId}-${vincularConjuge.outraId ?? 'x'}`}
+            pessoa={base}
+            candidatos={pessoas.filter((p) => p.id !== base.id && !jaUnidos.has(p.id))}
+            outraPessoaIdInicial={vincularConjuge.outraId}
+            onFechar={() => setVincularConjuge(null)}
+            executar={executarVinculoConjugal}
+          />
+        )
+      })()}
 
       {pessoaParaRemover != null && (
         <RemocaoPessoaModal
@@ -1454,6 +1737,16 @@ export function ArvoreGenealogicaView({
           carregarPlano={carregarPlanoRemocao}
         />
       )}
+
+      {vinculoParaRemover != null && (
+        <RemoverVinculoModal
+          vinculo={vinculoParaRemover}
+          onFechar={() => setVinculoParaRemover(null)}
+          executar={executarRemocaoVinculo}
+        />
+      )}
+
+      <AvisoEdicao aviso={aviso} onFechar={fecharAviso} />
 
       {mostrarExclusaoArvore && arvoreId != null && (
         <ExclusaoArvoreModal
@@ -1479,12 +1772,15 @@ export function ArvoreGenealogicaView({
           onAddMae={handleAddMae}
           onAddFilho={handleAddFilho}
           onAddConjuge={handleAddConjugeById}
+          onEditar={pode('arvore.editar') ? (p, campo) => { setCampoEdicaoInicial(campo); handleEditPerson(p) } : undefined}
+          onVincularConjuge={pode('arvore.criar') ? abrirVincularConjuge : undefined}
         />
       )}
 
       {/* Modal Adicionar Pessoa */}
       {showAddPersonModal && (
         <AddPersonModal
+          key={addModalKey}
           arvoreId={arvoreId!}
           processoId={processoId}
           type={addPersonType}
@@ -1493,11 +1789,13 @@ export function ArvoreGenealogicaView({
           pessoas={pessoas}
           unioes={unioes}
           requerentesForaDaArvore={requerentesForaDaArvore}
+          trilha={trilhaLinhagem}
           onClose={() => {
             setShowAddPersonModal(false)
             setAddPersonType(null)
             setAddPersonParentId(null)
             setAddConjugeForPessoaId(null)
+            setTrilhaLinhagem([])
           }}
           onSuccess={async () => {
             await fetchArvore()
@@ -1505,6 +1803,16 @@ export function ArvoreGenealogicaView({
             setAddPersonType(null)
             setAddPersonParentId(null)
             setAddConjugeForPessoaId(null)
+            setTrilhaLinhagem([])
+          }}
+          onSalvouEmSerie={fetchArvore}
+          onContinuarLinhagem={({ tipo, pessoaId, trilha }) => {
+            // Mesmos handlers de hoje (handleAddPai/handleAddMae): o modal é o mesmo, o vínculo
+            // vai pelo mesmo POST /api/pessoas. A chave só remonta o formulário limpo.
+            setTrilhaLinhagem(trilha)
+            setAddModalKey((k) => k + 1)
+            if (tipo === 'pai') handleAddPai(pessoaId)
+            else handleAddMae(pessoaId)
           }}
         />
       )}
@@ -1519,14 +1827,17 @@ export function ArvoreGenealogicaView({
           arvoreId={arvoreId!}
           requerentesAfetadosPor={requerentesAfetadosPor}
           estadoAtual={operacional.estadoAtual}
+          campoInicial={campoEdicaoInicial}
           onClose={() => {
             setShowEditPersonModal(false)
             setEditingPerson(null)
+            setCampoEdicaoInicial(undefined)
           }}
           onSuccess={async () => {
             await fetchArvore()
             setShowEditPersonModal(false)
             setEditingPerson(null)
+            setCampoEdicaoInicial(undefined)
           }}
         />
       )}
@@ -1546,8 +1857,11 @@ function AddPersonModal({
   pessoas,
   unioes,
   requerentesForaDaArvore,
+  trilha,
   onClose,
-  onSuccess
+  onSuccess,
+  onSalvouEmSerie,
+  onContinuarLinhagem,
 }: {
   arvoreId: number
   processoId: number
@@ -1558,9 +1872,18 @@ function AddPersonModal({
   unioes: UniaoArvore[]
   /** Quantos requerentes do processo ainda não estão na árvore. */
   requerentesForaDaArvore: number
+  /** Nomes já cadastrados neste lote de linhagem (vazio = cadastro avulso). */
+  trilha: string[]
   onClose: () => void
   onSuccess: () => void
+  /** Atualiza a árvore SEM fechar o modal (cadastro em série). */
+  onSalvouEmSerie: () => Promise<void>
+  onContinuarLinhagem: (c: { tipo: TipoGenitor; pessoaId: number; trilha: string[] }) => void
 }) {
+  // Esc fecha o modal e, com ele, encerra o cadastro em série.
+  useFecharComEsc(true, onClose)
+  // Passo seguinte da linhagem, mostrado depois de salvar uma pessoa da linha reta.
+  const [proximo, setProximo] = useState<{ pessoaId: number; nome: string; falta: TipoGenitor[]; trilha: string[] } | null>(null)
   // Modo de cadastro: pessoa comum (cria Pessoa) OU requerente do processo (REUSA a
   // Pessoa já existente — nunca duplica). O requerente NUNCA é criado por este form.
   // Quando não há requerente fora da árvore, a aba nem é oferecida — e um modo
@@ -1572,9 +1895,9 @@ function AddPersonModal({
   const [sobrenome, setSobrenome] = useState('')
   const [sexo, setSexo] = useState<string>('')
   const [dataNasc, setDataNasc] = useState('')
-  const [localNasc, setLocalNasc] = useState('')
-  const [paisNasc, setPaisNasc] = useState('')
-  const [nacionalidade, setNacionalidade] = useState('')
+  // País → cidade (autocomplete) → nacionalidade (gentílico) vivem juntos: ver campos-nascimento.tsx.
+  const { pais: paisNasc, setPais: setPaisNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
+    useNascimentoPessoa({ pais: '', cidade: '', nacionalidade: '' })
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState('')
   const [localObito, setLocalObito] = useState('')
@@ -1584,6 +1907,7 @@ function AddPersonModal({
   const [conjugeId, setConjugeId] = useState<number | string>('')
   const [comentario, setComentario] = useState('')
   const [saving, setSaving] = useState(false)
+  const parecidas = usePessoasParecidas({ nome, sobrenome, dataNascimento: dataNasc, arvoreId })
   
   // ✅ NOVOS CAMPOS
   const [requerente, setRequerente] = useState<string>('nao')
@@ -1742,7 +2066,21 @@ function AddPersonModal({
           })
         }
 
-        onSuccess()
+        const falta = proximosPassosDaLinhagem({
+          linhaReta: isLinhaReta,
+          tipo: type,
+          temPai: body.paiId != null,
+          temMae: body.maeId != null,
+        })
+        if (falta.length > 0) {
+          const base = (type === 'pai' || type === 'mae') && parentId ? pessoas.find(p => p.id === parentId) : undefined
+          const baseNome = base ? nomeCompleto(base) : null
+          const novoNome = [nome.trim(), sobrenome.trim()].filter(Boolean).join(' ')
+          await onSalvouEmSerie()
+          setProximo({ pessoaId: novaPessoa.id, nome: novoNome, falta, trilha: estenderTrilha(trilha, baseNome, novoNome) })
+        } else {
+          onSuccess()
+        }
       } else {
         const error = await response.json()
         alert(error.error || 'Erro ao adicionar pessoa')
@@ -1764,6 +2102,9 @@ function AddPersonModal({
   }
 
   const pessoasDisponiveis = pessoas.filter(p => true)
+  const rotulo = proximo
+    ? rotuloDaTrilha(proximo.trilha, null)
+    : rotuloDaTrilha(trilha, type === 'pai' || type === 'mae' ? type : null)
 
   return (
     <>
@@ -1776,9 +2117,31 @@ function AddPersonModal({
           — inclusive qualquer campo que venha a ser adicionado depois. */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-[var(--elev-3)] z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b sticky top-0 bg-[var(--surface-primary)]">
-          <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{proximo ? 'Pessoa adicionada' : titles[type || 'pessoa']}</h2>
+          {rotulo && (
+            <p data-linhagem="trilha" className="text-xs text-[var(--text-secondary)] mt-1">{rotulo}</p>
+          )}
         </div>
 
+        {proximo ? (
+          <div className="p-6 space-y-4" data-linhagem="proximo-passo">
+            <p className="text-sm text-gray-700"><strong>{proximo.nome}</strong> foi salva na linha reta. Continuar a linhagem?</p>
+            <div className="flex flex-wrap gap-3">
+              {proximo.falta.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  autoFocus={g === proximo.falta[0]}
+                  onClick={() => onContinuarLinhagem({ tipo: g, pessoaId: proximo.pessoaId, trilha: proximo.trilha })}
+                  className="px-4 py-2 bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg"
+                >
+                  Adicionar {ROTULO_GENITOR[g]} de {proximo.nome}
+                </button>
+              ))}
+              <button type="button" onClick={onSuccess} className="px-4 py-2 text-gray-600 hover:text-gray-800">Concluir</button>
+            </div>
+          </div>
+        ) : (<>
         {/* Seletor de modo: pessoa comum (cria) x requerente do processo (REUSA) */}
         <div className="px-6 pt-4">
           <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
@@ -1856,20 +2219,22 @@ function AddPersonModal({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
                 <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <input type="text" value={localNasc} onChange={(e) => setLocalNasc(e.target.value)} className={inputClass} />
+                <SeloMaioridade nascimento={dataNasc} marcador={requerente} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <input type="text" value={paisNasc} onChange={(e) => setPaisNasc(e.target.value)} placeholder="Ex: Brasil, Itália..." className={inputClass} />
+                <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
+                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
-                <input type="text" value={nacionalidade} onChange={(e) => setNacionalidade(e.target.value)} placeholder="Ex: Brasileiro..." className={inputClass} />
+                <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
             </div>
+            <AvisoPessoaRepetida candidatos={parecidas} />
           </section>
 
           {/* ===== Situação ===== */}
@@ -1971,6 +2336,7 @@ function AddPersonModal({
           </div>
         </form>
         )}
+        </>)}
       </div>
     </>
   )
@@ -1987,6 +2353,7 @@ function EditPersonModal({
   arvoreId,
   requerentesAfetadosPor,
   estadoAtual,
+  campoInicial,
   onClose,
   onSuccess
 }: {
@@ -1999,6 +2366,8 @@ function EditPersonModal({
   requerentesAfetadosPor: (pessoaId: number) => string[]
   /** Números de hoje, para o preview montar a coluna ANTES. */
   estadoAtual?: EstadoAtual
+  /** Campo a focar ao abrir (atalho de campo vazio). Sem ele, o foco é o Nome. */
+  campoInicial?: CampoEdicaoPessoa
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -2011,9 +2380,9 @@ function EditPersonModal({
   const [sobrenome, setSobrenome] = useState(pessoa.sobrenome || '')
   const [sexo, setSexo] = useState(pessoa.sexo || '')
   const [dataNasc, setDataNasc] = useState(pessoa.data_nasc ? new Date(pessoa.data_nasc).toISOString().split('T')[0] : '')
-  const [localNasc, setLocalNasc] = useState(pessoa.local_nasc || '')
-  const [paisNasc, setPaisNasc] = useState(pessoa.pais_nasc || '')
-  const [nacionalidade, setNacionalidade] = useState(pessoa.nacionalidade || '')
+  // Nacionalidade já gravada diferente do gentílico do país conta como escolha manual e é preservada.
+  const { pais: paisNasc, setPais: setPaisNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
+    useNascimentoPessoa({ pais: pessoa.pais_nasc || '', cidade: pessoa.local_nasc || '', nacionalidade: pessoa.nacionalidade || '' })
   const [isFalecido, setIsFalecido] = useState(pessoa.vivo === false || !!pessoa.data_obito)
   const [dataObito, setDataObito] = useState(pessoa.data_obito ? new Date(pessoa.data_obito).toISOString().split('T')[0] : '')
   const [localObito, setLocalObito] = useState(pessoa.local_emigracao || '')
@@ -2029,6 +2398,15 @@ function EditPersonModal({
   const [maeSelecionadaId, setMaeSelecionadaId] = useState<number | ''>((pessoa as any).maeId || '')
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
+  // Aviso de pessoa parecida em OUTRO processo: só quando nome ou nascimento foram alterados aqui.
+  const dataNascOriginal = pessoa.data_nasc ? new Date(pessoa.data_nasc).toISOString().split('T')[0] : ''
+  const parecidas = usePessoasParecidas({
+    nome,
+    sobrenome,
+    dataNascimento: dataNasc,
+    arvoreId,
+    ativo: nome !== pessoa.nome || sobrenome !== (pessoa.sobrenome || '') || dataNasc !== dataNascOriginal,
+  })
   const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
   const jaEhRequerente = ["sim", "maior", "menor"].includes(String((pessoa as any).requerente ?? "").toLowerCase())
   // ── VINCULAR A UM REQUERENTE JÁ CADASTRADO NO PROCESSO ──────────────────────
@@ -2260,7 +2638,8 @@ function EditPersonModal({
           data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
           local_emigracao: isFalecido && localObito ? localObito.trim() : null,
           comentario: comentario.trim() || null,
-          requerente: requerente || 'nao',
+          // Com data de nascimento válida o marcador acompanha o cálculo (função única); sem data, vale o que foi declarado.
+          requerente: marcadorRequerenteParaGravar(dataNasc || null, requerente || 'nao', new Date()),
           linhaReta: isLinhaReta,
           documentacao: precisaDocumentacao,
           // Só vai se o usuário MUDOU a lista: re-salvar pessoa antiga (NULL) nunca grava a lista cheia.
@@ -2340,6 +2719,17 @@ function EditPersonModal({
 
   const pessoasDisponiveis = pessoas.filter(p => p.id !== pessoa.id)
 
+  // ATALHO "NÃO INFORMADO — PREENCHER": foca o campo pedido (e o leva à vista). Roda
+  // uma vez, na abertura; os campos de dentro de seção condicional (casamento, óbito)
+  // já nascem visíveis porque o estado inicial reflete a união/óbito existentes.
+  useEffect(() => {
+    if (!campoInicial) return
+    const alvo = document.querySelector<HTMLElement>(`[data-campo="${campoInicial}"]`)
+    const foco = alvo?.matches('input,select,textarea,button') ? alvo : alvo?.querySelector<HTMLElement>('input,select,textarea,button')
+    foco?.focus()
+    alvo?.scrollIntoView({ block: 'center' })
+  }, [campoInicial])
+
   // "I" abre o preview quando já existe mudança relevante pendente no formulário.
   useEffect(() => {
     const atalho = (e: KeyboardEvent) => {
@@ -2394,7 +2784,7 @@ function EditPersonModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-                <select value={sexo} onChange={(e) => setSexo(e.target.value)} className={selectClass} style={selectStyle}>
+                <select data-campo="sexo" value={sexo} onChange={(e) => setSexo(e.target.value)} className={selectClass} style={selectStyle}>
                   <option value="">Selecione...</option>
                   <option value="Masculino">Masculino</option>
                   <option value="Feminino">Feminino</option>
@@ -2439,23 +2829,25 @@ function EditPersonModal({
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Nascimento</h3>
             <div className="grid grid-cols-3 gap-3">
-              <div>
+              <div data-campo="data_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
                 <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
+                <SeloMaioridade nascimento={dataNasc} marcador={requerente} mostrarSemData={jaEhRequerente} />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <input type="text" value={localNasc} onChange={(e) => setLocalNasc(e.target.value)} className={inputClass} />
-              </div>
-              <div>
+              <div data-campo="pais_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <input type="text" value={paisNasc} onChange={(e) => setPaisNasc(e.target.value)} className={inputClass} />
+                <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
               </div>
-              <div>
+              <div data-campo="cidade_nasc">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
+                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
+              </div>
+              <div data-campo="nacionalidade">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
-                <input type="text" value={nacionalidade} onChange={(e) => setNacionalidade(e.target.value)} className={inputClass} />
+                <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
             </div>
+            <AvisoPessoaRepetida candidatos={parecidas} />
           </section>
 
           {/* ===== Situação ===== */}
@@ -2485,11 +2877,11 @@ function EditPersonModal({
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div data-campo="data_casamento">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
                     <DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} />
                   </div>
-                  <div>
+                  <div data-campo="local_casamento">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
                     <input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
                   </div>
@@ -2501,11 +2893,11 @@ function EditPersonModal({
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 mt-3">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
+                  <div data-campo="data_obito">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
                     <DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} />
                   </div>
-                  <div>
+                  <div data-campo="local_obito">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
                     <input type="text" value={localObito} onChange={(e) => setLocalObito(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
                   </div>
@@ -2527,6 +2919,10 @@ function EditPersonModal({
                     principal (maior/menor); demais é somente leitura. */}
                 {jaEhRequerente ? (
                   <div className="space-y-1.5">
+                    {!maioridadeEhManual(dataNasc || null, new Date()) ? (
+                      // Há data de nascimento válida: maior/menor é CALCULADO (selo na data) — sem seletor manual.
+                      <p className="text-sm text-gray-700">Requerente · maioridade calculada pela data de nascimento</p>
+                    ) : (
                     <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
                       {/* "sim" é o estado de quem foi vinculado como requerente sem ainda
                           ter maioridade classificada (2º+ requerente vinculado na mesma
@@ -2536,6 +2932,7 @@ function EditPersonModal({
                       <option value="maior">Sim - Maior de idade</option>
                       <option value="menor">Sim - Menor de idade</option>
                     </select>
+                    )}
                     <button
                       type="button"
                       onClick={desvincularRequerente}

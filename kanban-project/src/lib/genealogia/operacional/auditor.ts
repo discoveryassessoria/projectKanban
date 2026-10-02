@@ -30,7 +30,7 @@ import type { Linhagem, MapaLinhagens } from "../motor/linhagens"
 import { calcularParentesco } from "../motor/parentesco"
 import { nomeCompleto } from "../motor/texto"
 import type { DossiePessoa } from "./dossie"
-import type { Problema } from "./diagnostico"
+import { FILA_DE_PRIORIDADE, TOTAL_PRIORIDADES, type Problema } from "./diagnostico"
 
 /** Um degrau da cadeia causal. */
 export interface EloCausal {
@@ -435,15 +435,7 @@ export function porQueValor(ctx: ContextoAuditor, pessoaId: number, financeiroVi
 
 // ── POR QUE ESTA É A PRÓXIMA AÇÃO? ──────────────────────────────────────────
 
-const FILA = [
-  "bloqueio crítico",
-  "divergência impeditiva",
-  "documento obrigatório ausente",
-  "tarefa vencida",
-  "tarefa aberta",
-  "próxima obrigação documental",
-  "nenhuma ação necessária",
-]
+const FILA = FILA_DE_PRIORIDADE
 
 export function porQueProximaAcao(prioridade: number, fonte: string, motivo: string): Explicacao {
   const idx = Math.max(1, Math.min(prioridade, FILA.length)) - 1
@@ -451,14 +443,14 @@ export function porQueProximaAcao(prioridade: number, fonte: string, motivo: str
 
   return {
     pergunta: "Por que esta é a próxima ação?",
-    resposta: `Porque é o item mais alto da fila fixa de prioridade que existe hoje: ${FILA[idx]} (${prioridade}/7).`,
+    resposta: `Porque é o item mais alto da fila fixa de prioridade que existe hoje: ${FILA[idx]} (${prioridade}/${TOTAL_PRIORIDADES}).`,
     cadeia: [
       { fato: motivo, fonte },
       {
         fato: acimaNaFila.length
           ? `Nada acima na fila está pendente: ${acimaNaFila.join(", ")}`
           : "É o topo da fila — não há categoria mais urgente",
-        fonte: "Diagnóstico da Árvore — fila FIXA de 7 prioridades, não heurística",
+        fonte: `Diagnóstico da Árvore — fila FIXA de ${TOTAL_PRIORIDADES} prioridades, não heurística`,
       },
       {
         fato: "Dentro da mesma faixa, desempata o peso — que já multiplica pelos requerentes que dependem da pessoa",

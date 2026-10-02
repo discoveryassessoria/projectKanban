@@ -2,17 +2,19 @@
 
 // src/components/arvore/inteligencia/barra-linhagem.tsx
 // ============================================================================
-// BARRA DE LINHAGEM — controles novos, gramática visual velha.
+// CONTROLES DE LINHAGEM DA BARRA ÚNICA.
 //
-// Tudo aqui é `absolute`, por cima do canvas, com exatamente a mesma casca dos
-// botões "Buscar" e "Análise" que já existiam:
+// A árvore tem UMA barra de ferramentas acima do canvas — a linha com
+// PAISAGEM | RETRATO. Os controles de linhagem (visualização, requerente, foco,
+// filtros, Saúde, Comparar) moram NESSA MESMA LINHA, ao lado de Paisagem/Retrato;
+// não existe mais uma segunda barra sobreposta ao canvas.
 //
-//     rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px]
-//     text-gray-600 shadow-[var(--elev-1)] hover:border-gray-300 hover:text-gray-900
+// O que antes eram faixas empilhadas sobre o canvas (resumo do requerente,
+// legenda da Saúde e trilha da linhagem) virou CARTÕES FLUTUANTES — ver
+// `cartoes-flutuantes.tsx`. Aqui fica só o que é CONTROLE.
 //
-// Isso não é economia de esforço: é o requisito. A árvore tem de continuar
-// parecendo a mesma. Nenhum controle daqui entra no fluxo do canvas — abrir,
-// fechar ou trocar de requerente não move um card.
+// Os botões usam a mesma casca da linha de ferramentas que já existia
+// (`CLASSE_BOTAO_BARRA`), para a árvore continuar parecendo a mesma.
 //
 // O CONTROLE PRINCIPAL é um seletor de DUAS opções — "Árvore completa" e
 // "Linhagem do requerente" — em vez de um botão de liga/desliga. Um toggle
@@ -21,18 +23,23 @@
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react"
-import { Activity, ChevronDown, ChevronRight, Eye, Filter, Users2, X } from "lucide-react"
-import { COR_NIVEL, ROTULO_NIVEL, type NivelSaudePessoa } from "@/src/lib/genealogia/operacional/saude"
-import type { DegrauLinhagem, Linhagem, MapaLinhagens } from "@/src/lib/genealogia/motor/linhagens"
+import { Activity, ChevronDown, Eye, Filter, GitCompare, Users2, X } from "lucide-react"
+import { LAYER } from "@/src/lib/ui/layers"
+import type { Linhagem, MapaLinhagens } from "@/src/lib/genealogia/motor/linhagens"
 import type { EstiloFoco, ModoFoco } from "@/src/lib/genealogia/navegacao/foco"
 import { ROTULO_FILTRO, type ChaveFiltro, type EstadoFiltros } from "@/src/lib/genealogia/navegacao/filtros"
 import type { ResumoLinhagem } from "@/src/lib/genealogia/operacional/dossie"
-import type { AcaoRecomendada } from "@/src/lib/genealogia/operacional/diagnostico"
 
-const CASCA =
-  "flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-const CASCA_ATIVA =
-  "flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] font-medium text-gray-900 shadow-[var(--elev-1)] transition"
+/** Botão da linha de ferramentas (a mesma casca de PAISAGEM/RETRATO/PDF). */
+export const CLASSE_BOTAO_BARRA =
+  "flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors hover:bg-[var(--surface-tertiary)] disabled:cursor-not-allowed disabled:opacity-50"
+export const CLASSE_BOTAO_BARRA_ATIVO =
+  "flex items-center gap-2 rounded px-3 py-2 text-sm font-medium transition-colors bg-[var(--surface-tertiary)] text-white/95"
+/** Painel de menu aberto a partir da barra: superfície OPACA de popover. */
+export const CLASSE_MENU_BARRA =
+  "absolute left-0 top-full mt-1 overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-gray-900 shadow-[var(--elev-2)]"
+/** Camada dos menus da barra (SSOT em `layers.ts`). */
+export const CAMADA_MENU_BARRA = LAYER.popover
 
 const FILTROS_RAPIDOS: ChaveFiltro[] = [
   "requerentes",
@@ -57,23 +64,17 @@ interface Props {
   filtrosAtivos: number
   onAlternarFiltro: (c: ChaveFiltro) => void
   onLimparFiltros: () => void
-  resumo: ResumoLinhagem | null
   comparacao: ResumoLinhagem[]
-  trilha: DegrauLinhagem[]
-  proximaAcao: AcaoRecomendada
   relacionadosVisiveis: boolean
   onAlternarRelacionados: () => void
   totalRelacionados: number
   saudeLigada: boolean
   onAlternarSaude: () => void
-  contagemSaude: Record<NivelSaudePessoa, number>
   /** Quantas pessoas cada filtro casaria agora. */
   contagemFiltros: Record<string, number>
   totalRecuado: number
   totalRecolhivel: number
   onRecolherTudo: () => void
-  onIrParaPessoa: (pessoaId: number) => void
-  carregando: boolean
 }
 
 export const MARCA_MENU_ABERTO = "arvoreMenuAberto"
@@ -107,7 +108,7 @@ function marcarMenu(aberto: boolean) {
  * coordenação, dispensar o menu de filtros fechava junto o painel que o usuário
  * estava lendo.
  */
-function useFecharFora(aberto: boolean, fechar: () => void) {
+export function useFecharFora(aberto: boolean, fechar: () => void) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!aberto) return
@@ -128,552 +129,322 @@ function useFecharFora(aberto: boolean, fechar: () => void) {
   return ref
 }
 
-export function BarraLinhagem(props: Props) {
+/** Os controles de linhagem, como fragmento da linha de ferramentas. */
+export function ControlesLinhagem(props: Props) {
   const {
     mapa, linhagem, requerenteSelecionadoId, onSelecionarRequerente,
     modo, onModo, estilo, onEstilo,
-    filtros, filtrosAtivos, onAlternarFiltro, onLimparFiltros,
-    resumo, comparacao, trilha, proximaAcao,
+    filtros, filtrosAtivos, onAlternarFiltro, onLimparFiltros, comparacao,
     relacionadosVisiveis, onAlternarRelacionados, totalRelacionados,
-    saudeLigada, onAlternarSaude, contagemSaude, contagemFiltros,
-    totalRecuado, totalRecolhivel, onRecolherTudo, onIrParaPessoa, carregando,
+    saudeLigada, onAlternarSaude, contagemFiltros,
+    totalRecuado, totalRecolhivel, onRecolherTudo,
   } = props
 
   const [menuRequerente, setMenuRequerente] = useState(false)
   const [menuFiltros, setMenuFiltros] = useState(false)
-  const [resumoAberto, setResumoAberto] = useState(false)
   const [comparando, setComparando] = useState(false)
 
   const refRequerente = useFecharFora(menuRequerente, () => setMenuRequerente(false))
   const refFiltros = useFecharFora(menuFiltros, () => setMenuFiltros(false))
-  const refResumo = useFecharFora(resumoAberto, () => setResumoAberto(false))
   const refComparar = useFecharFora(comparando, () => setComparando(false))
 
-  // Sem requerente cadastrado não há linhagem para escolher. A barra some em vez
-  // de oferecer um seletor vazio — controle que não faz nada é ruído.
+  // Sem requerente cadastrado não há linhagem para escolher. Os controles somem em
+  // vez de oferecer um seletor vazio — controle que não faz nada é ruído.
   if (mapa.linhagens.length === 0) return null
 
   const emLinhagem = modo === "linhagem"
 
   return (
-    <div className="absolute left-4 top-4 z-20 flex max-w-[calc(100%-2rem)] flex-col gap-2">
-      <div className="flex flex-wrap items-start gap-2">
-        {/* ── VISUALIZAÇÃO: dois estados explícitos ────────────────────── */}
-        <div
-          role="group"
-          aria-label="Visualização da árvore"
-          className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-1)]"
-        >
-          <button
-            onClick={() => onModo("todos")}
-            aria-pressed={!emLinhagem}
-            className={`px-3 py-2 text-[13px] transition ${
-              !emLinhagem
-                ? "bg-gray-50 font-medium text-gray-900"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            }`}
-            title="Ver a árvore inteira, como sempre"
-          >
-            Árvore completa
-          </button>
-          <span aria-hidden className="h-5 w-px bg-gray-200" />
-          <button
-            onClick={() => onModo("linhagem")}
-            aria-pressed={emLinhagem}
-            className={`flex items-center gap-1.5 px-3 py-2 text-[13px] transition ${
-              emLinhagem
-                ? "bg-gray-50 font-medium text-gray-900"
-                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-            }`}
-            title="Ver somente a linhagem do requerente selecionado (L)"
-          >
-            Linhagem do requerente
-            {emLinhagem && totalRecuado > 0 && (
-              <span className="rounded-full bg-gray-200 px-1.5 text-[11px] tabular-nums text-gray-700">
-                −{totalRecuado}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* ── Requerente em foco ───────────────────────────────────────── */}
-        <div ref={refRequerente} className="relative">
-          <button
-            onClick={() => setMenuRequerente((v) => !v)}
-            className={CASCA}
-            title="Escolher o requerente cuja linhagem será exibida"
-          >
-            <span className="max-w-[180px] truncate">
-              {linhagem?.nome ?? "Escolher requerente"}
-            </span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-          </button>
-
-          {menuRequerente && (
-            <div className="absolute left-0 top-full mt-1 w-[300px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-2)]">
-              <p className="border-b border-gray-100 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
-                {mapa.linhagens.length} requerente(s) neste processo
-              </p>
-              <ul className="max-h-[280px] overflow-y-auto">
-                {mapa.linhagens.map((l) => {
-                  const ativo = l.requerenteId === requerenteSelecionadoId
-                  return (
-                    <li key={l.requerenteId}>
-                      <button
-                        onClick={() => {
-                          onSelecionarRequerente(l.requerenteId)
-                          // Escolher requerente é pedir para ver a linha dele.
-                          onModo("linhagem")
-                          setMenuRequerente(false)
-                        }}
-                        className={`flex w-full items-start gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-gray-50 ${
-                          ativo ? "bg-gray-50 font-medium text-gray-900" : "text-gray-700"
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate">{l.nome}</span>
-                          <span className="block text-[11px] text-gray-500">
-                            {l.geracoes} geração(ões) · {l.visivel.size} pessoa(s) na linha
-                            {l.danteCausaId == null ? " · sem ascendente estrangeiro" : ""}
-                          </span>
-                        </span>
-                        {l.marca === "menor" && (
-                          <span className="mt-0.5 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
-                            menor
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-              {mapa.linhagens.length > 1 && (
-                <button
-                  onClick={() => {
-                    setMenuRequerente(false)
-                    setComparando(true)
-                  }}
-                  className="w-full border-t border-gray-100 px-3 py-2 text-left text-[12px] text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"
-                >
-                  Comparar requerentes
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Controles do modo linhagem ───────────────────────────────── */}
-        {emLinhagem && (
-          <>
-            <button
-              onClick={() => onEstilo(estilo === "esmaecer" ? "ocultar" : "esmaecer")}
-              className={CASCA}
-              title={
-                estilo === "esmaecer"
-                  ? "Os demais ramos estão a 20%. Clique para ocultá-los."
-                  : "Os demais ramos estão ocultos. Clique para deixá-los a 20%."
-              }
-            >
-              <Eye className="h-4 w-4" />
-              <span className="hidden md:inline">{estilo === "esmaecer" ? "A 20%" : "Ocultos"}</span>
-            </button>
-
-            {totalRelacionados > 0 && (
-              <button
-                onClick={onAlternarRelacionados}
-                className={relacionadosVisiveis ? CASCA_ATIVA : CASCA}
-                title="Revelar irmãos, cônjuges e filhos de quem está na linha, sem sair do foco"
-              >
-                <Users2 className="h-4 w-4" />
-                <span className="hidden md:inline">Mostrar relacionados</span>
-                <span className="rounded-full bg-gray-100 px-1.5 text-[11px] tabular-nums text-gray-600">
-                  {totalRelacionados}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => onModo("todos")}
-              className={CASCA}
-              title="Restaurar todos os ramos (ESC)"
-            >
-              Voltar para árvore completa
-            </button>
-          </>
-        )}
-
-        {/* ── Filtros rápidos ──────────────────────────────────────────── */}
-        <div ref={refFiltros} className="relative">
-          <button
-            onClick={() => setMenuFiltros((v) => !v)}
-            className={filtrosAtivos > 0 ? CASCA_ATIVA : CASCA}
-            title="Filtros rápidos — realçam, não escondem"
-          >
-            <Filter className="h-4 w-4" />
-            <span className="hidden sm:inline">Filtros</span>
-            {filtrosAtivos > 0 && (
-              <span className="rounded-full bg-gray-200 px-1.5 text-[11px] tabular-nums text-gray-700">
-                {filtrosAtivos}
-              </span>
-            )}
-          </button>
-
-          {menuFiltros && (
-            <div className="absolute left-0 top-full mt-1 w-[260px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-2)]">
-              <p className="border-b border-gray-100 px-3 py-2 text-[11px] leading-snug text-gray-500">
-                O filtro <strong className="font-semibold">realça</strong> quem casa. Ninguém sai da
-                árvore — esconder um pai deixaria o filho órfão na tela.
-              </p>
-              <ul className="max-h-[300px] overflow-y-auto py-1">
-                {FILTROS_RAPIDOS.map((chave) => {
-                  const ligado = filtros.chaves.has(chave)
-                  return (
-                    <li key={chave}>
-                      <button
-                        onClick={() => onAlternarFiltro(chave)}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-gray-700 transition hover:bg-gray-50"
-                      >
-                        <span
-                          aria-hidden
-                          className={`h-3.5 w-3.5 shrink-0 rounded border ${
-                            ligado ? "border-gray-800 bg-[var(--surface-popover)]" : "border-gray-300 bg-[var(--surface-primary)]"
-                          }`}
-                        />
-                        {ROTULO_FILTRO[chave]}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-              {(filtrosAtivos > 0 || totalRecolhivel > 0) && (
-                <div className="flex items-center justify-between gap-2 border-t border-gray-100 px-3 py-2">
-                  {filtrosAtivos > 0 ? (
-                    <button
-                      onClick={onLimparFiltros}
-                      className="flex items-center gap-1 text-[12px] text-gray-500 transition hover:text-gray-800"
-                    >
-                      <X className="h-3.5 w-3.5" /> Limpar
-                    </button>
-                  ) : (
-                    <span />
-                  )}
-                  {totalRecolhivel > 0 && (
-                    <button
-                      onClick={onRecolherTudo}
-                      className="text-[12px] text-gray-500 transition hover:text-gray-800"
-                      title="Voltar a recolher os ramos que foram expandidos"
-                    >
-                      Recolher ramos ({totalRecolhivel})
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Modo Saúde (heatmap) ─────────────────────────────────────── */}
+    <>
+      {/* ── VISUALIZAÇÃO: dois estados explícitos ────────────────────── */}
+      <div
+        role="group"
+        aria-label="Visualização da árvore"
+        className="flex items-center overflow-hidden rounded border border-[var(--border-default)]"
+      >
         <button
-          onClick={onAlternarSaude}
-          className={saudeLigada ? CASCA_ATIVA : CASCA}
-          title="Sinalizar cada pessoa por saúde operacional — o cartão não muda, ganha um anel"
+          onClick={() => onModo("todos")}
+          aria-pressed={!emLinhagem}
+          className={`px-3 py-2 text-sm font-medium transition-colors ${
+            !emLinhagem ? "bg-[var(--surface-tertiary)] text-white/95" : "hover:bg-[var(--surface-tertiary)]"
+          }`}
+          title="Ver a árvore inteira, como sempre"
         >
-          <Activity className="h-4 w-4" />
-          <span className="hidden md:inline">Saúde</span>
+          Árvore completa
+        </button>
+        <span aria-hidden className="h-5 w-px bg-[var(--border-default)]" />
+        <button
+          onClick={() => onModo("linhagem")}
+          aria-pressed={emLinhagem}
+          className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
+            emLinhagem ? "bg-[var(--surface-tertiary)] text-white/95" : "hover:bg-[var(--surface-tertiary)]"
+          }`}
+          title="Ver somente a linhagem do requerente selecionado (L)"
+        >
+          Linhagem
+          <span className="hidden @[1300px]:inline">do requerente</span>
+          {emLinhagem && totalRecuado > 0 && (
+            <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] tabular-nums text-gray-700">
+              −{totalRecuado}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Requerente em foco ───────────────────────────────────────── */}
+      <div ref={refRequerente} className="relative">
+        <button
+          onClick={() => setMenuRequerente((v) => !v)}
+          className={CLASSE_BOTAO_BARRA}
+          title="Escolher o requerente cuja linhagem será exibida"
+        >
+          <span className="max-w-[130px] truncate">{linhagem?.nome ?? "Escolher requerente"}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
         </button>
 
-        {/* ── Resumo do requerente ─────────────────────────────────────── */}
-        {resumo && (
-          <div ref={refResumo} className="relative">
-            <button
-              onClick={() => setResumoAberto((v) => !v)}
-              className={resumoAberto ? CASCA_ATIVA : CASCA}
-              title="Resumo da linhagem em foco"
-            >
-              <span className="tabular-nums">
-                {resumo.documental.necessarias > 0
-                  ? `${resumo.documental.atendidas + resumo.documental.dispensadas}/${resumo.documental.necessarias}`
-                  : "—"}
-              </span>
-              <span className="hidden lg:inline text-[var(--text-muted)]">·</span>
-              <span className="hidden lg:inline">{resumo.pessoas} na linha</span>
-            </button>
-
-            {resumoAberto && (
-              <div className="absolute left-0 top-full mt-1 w-[330px] rounded-lg border border-gray-200 bg-[var(--surface-primary)] p-3 shadow-[var(--elev-2)]">
-                <p className="text-[13px] font-semibold text-gray-900">{resumo.nome}</p>
-                <p className="mt-0.5 text-[11px] text-gray-500">
-                  Linhagem: {resumo.pessoas} pessoas · {resumo.geracoes} geração(ões)
-                </p>
-                <p className="mt-0.5 text-[11px] text-gray-500">
-                  Ascendente transmissor:{" "}
-                  {resumo.danteCausaNome ? (
+        {menuRequerente && (
+          <div
+            className={`${CLASSE_MENU_BARRA} w-[300px] max-w-[calc(100vw-1.5rem)]`}
+            style={{ zIndex: CAMADA_MENU_BARRA }}
+          >
+            <p className="border-b border-[var(--border-default)] px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
+              {mapa.linhagens.length} requerente(s) neste processo
+            </p>
+            <ul className="max-h-[280px] overflow-y-auto">
+              {mapa.linhagens.map((l) => {
+                const ativo = l.requerenteId === requerenteSelecionadoId
+                return (
+                  <li key={l.requerenteId}>
                     <button
                       onClick={() => {
-                        onIrParaPessoa(resumo.danteCausaId!)
-                        setResumoAberto(false)
+                        onSelecionarRequerente(l.requerenteId)
+                        // Escolher requerente é pedir para ver a linha dele.
+                        onModo("linhagem")
+                        setMenuRequerente(false)
                       }}
-                      className="font-medium text-gray-800 underline underline-offset-2 transition hover:text-gray-950"
+                      className={`flex w-full items-start gap-2 px-3 py-2 text-left text-[13px] transition hover:bg-[var(--surface-hover)] ${
+                        ativo ? "bg-[var(--surface-selected)] font-medium text-gray-900" : "text-gray-700"
+                      }`}
                     >
-                      {resumo.danteCausaNome}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{l.nome}</span>
+                        <span className="block text-[11px] text-gray-500">
+                          {l.geracoes} geração(ões) · {l.visivel.size} pessoa(s) na linha
+                          {l.danteCausaId == null ? " · sem ascendente estrangeiro" : ""}
+                        </span>
+                      </span>
+                      {l.maioridade === "MENOR" && (
+                        <span className="mt-0.5 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                          menor
+                        </span>
+                      )}
                     </button>
-                  ) : (
-                    <span className="text-[var(--text-muted)]">não identificado</span>
-                  )}
-                </p>
-
-                <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-[12px]">
-                  <Linha
-                    rotulo="Documentos"
-                    texto={
-                      resumo.documental.necessarias > 0
-                        ? `${resumo.documental.atendidas + resumo.documental.dispensadas}/${resumo.documental.necessarias}`
-                        : "sem exigência"
-                    }
-                  />
-                  <Linha rotulo="Pendências" texto={String(resumo.documental.pendentes)} />
-                  <Linha rotulo="Bloqueios" texto={String(resumo.bloqueios)} />
-                  <Linha rotulo="Divergências" texto={String(resumo.divergencias)} />
-                  <Linha rotulo="Tarefas abertas" texto={String(resumo.tarefasAbertas)} />
-                  <Linha rotulo="Tarefas vencidas" texto={String(resumo.tarefasVencidas)} />
-                </dl>
-
-                <div className="mt-3 rounded-md bg-gray-50 p-2.5">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                    Próxima ação
-                  </p>
-                  <p className="mt-0.5 text-[12px] leading-snug text-gray-700">
-                    {proximaAcao.pessoaNome ? `${proximaAcao.pessoaNome}: ` : ""}
-                    {proximaAcao.acao}
-                  </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-                    Fonte: {proximaAcao.fonte}
-                  </p>
-                  {proximaAcao.pessoaId != null && (
-                    <button
-                      onClick={() => {
-                        onIrParaPessoa(proximaAcao.pessoaId!)
-                        setResumoAberto(false)
-                      }}
-                      className="mt-1.5 text-[12px] font-medium text-gray-800 underline underline-offset-2 transition hover:text-gray-950"
-                    >
-                      Ir até a pessoa
-                    </button>
-                  )}
-                </div>
-
-                {carregando && (
-                  <p className="mt-2 text-[11px] text-[var(--text-muted)]">Atualizando dados operacionais…</p>
-                )}
-              </div>
+                  </li>
+                )
+              })}
+            </ul>
+            {mapa.linhagens.length > 1 && (
+              <button
+                onClick={() => {
+                  setMenuRequerente(false)
+                  setComparando(true)
+                }}
+                className="w-full border-t border-[var(--border-default)] px-3 py-2 text-left text-[12px] text-gray-600 transition hover:bg-[var(--surface-hover)] hover:text-gray-900"
+              >
+                Comparar requerentes
+              </button>
             )}
           </div>
         )}
+      </div>
 
-        {/* ── Comparação entre requerentes ─────────────────────────────── */}
-        {comparacao.length > 1 && (
-          <div ref={refComparar} className="relative">
+      {/* ── Controles do modo linhagem ───────────────────────────────── */}
+      {emLinhagem && (
+        <>
+          <button
+            onClick={() => onEstilo(estilo === "esmaecer" ? "ocultar" : "esmaecer")}
+            className={CLASSE_BOTAO_BARRA}
+            title={
+              estilo === "esmaecer"
+                ? "Os demais ramos estão a 20%. Clique para ocultá-los."
+                : "Os demais ramos estão ocultos. Clique para deixá-los a 20%."
+            }
+          >
+            <Eye className="h-4 w-4" />
+            <span className="hidden @[1700px]:inline">{estilo === "esmaecer" ? "A 20%" : "Ocultos"}</span>
+          </button>
+
+          {totalRelacionados > 0 && (
             <button
-              onClick={() => setComparando((v) => !v)}
-              className={comparando ? CASCA_ATIVA : CASCA}
-              title="Comparar o estado de todos os requerentes"
+              onClick={onAlternarRelacionados}
+              className={relacionadosVisiveis ? CLASSE_BOTAO_BARRA_ATIVO : CLASSE_BOTAO_BARRA}
+              title="Revelar irmãos, cônjuges e filhos de quem está na linha, sem sair do foco"
+              aria-label="Mostrar relacionados"
             >
-              Comparar
+              <Users2 className="h-4 w-4" />
+              <span className="hidden @[1700px]:inline">Mostrar relacionados</span>
+              <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] tabular-nums text-gray-700">
+                {totalRelacionados}
+              </span>
             </button>
-            {comparando && (
-              <div className="absolute left-0 top-full mt-1 w-[380px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-2)]">
-                <p className="border-b border-gray-100 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
-                  Comparação · clique para focar a linhagem
-                </p>
-                <ul className="max-h-[340px] overflow-y-auto">
-                  {comparacao.map((r) => {
-                    const total = r.documental.necessarias
-                    const feitos = r.documental.atendidas + r.documental.dispensadas
-                    const completa = total > 0 && feitos === total
-                    return (
-                      <li key={r.requerenteId}>
-                        <button
-                          onClick={() => {
-                            onSelecionarRequerente(r.requerenteId)
-                            setComparando(false)
-                          }}
-                          className="w-full px-3 py-2 text-left transition hover:bg-gray-50"
-                        >
-                          <span className="flex items-baseline justify-between gap-2">
-                            <span className="truncate text-[13px] font-medium text-gray-900">
-                              {r.nome}
-                            </span>
-                            <span className="shrink-0 text-[12px] tabular-nums text-gray-700">
-                              {total > 0 ? `${feitos}/${total}` : "sem exigência"}
-                            </span>
-                          </span>
-                          <span className="mt-0.5 block text-[11px] text-gray-500">
-                            {r.pessoas} na linhagem
-                            {completa
-                              ? " · completa"
-                              : ` · ${r.documental.pendentes} pendência(s)`}
-                            {r.bloqueios > 0 ? ` · ${r.bloqueios} bloqueio(s)` : ""}
-                            {r.tarefasVencidas > 0 ? ` · ${r.tarefasVencidas} vencida(s)` : ""}
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
+          )}
+
+          <button
+            onClick={() => onModo("todos")}
+            className={CLASSE_BOTAO_BARRA}
+            title="Restaurar todos os ramos (ESC)"
+          >
+            <X className="h-4 w-4 @[1700px]:hidden" aria-hidden />
+            <span className="sr-only @[1700px]:not-sr-only">Voltar para árvore completa</span>
+          </button>
+        </>
+      )}
+
+      {/* ── Filtros rápidos ──────────────────────────────────────────── */}
+      <div ref={refFiltros} className="relative">
+        <button
+          onClick={() => setMenuFiltros((v) => !v)}
+          className={filtrosAtivos > 0 ? CLASSE_BOTAO_BARRA_ATIVO : CLASSE_BOTAO_BARRA}
+          title="Filtros rápidos — realçam, não escondem"
+          aria-label="Filtros rápidos"
+        >
+          <Filter className="h-4 w-4" />
+          <span className="hidden @[1500px]:inline">Filtros</span>
+          {filtrosAtivos > 0 && (
+            <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] tabular-nums text-gray-700">
+              {filtrosAtivos}
+            </span>
+          )}
+        </button>
+
+        {menuFiltros && (
+          <div
+            className={`${CLASSE_MENU_BARRA} w-[260px] max-w-[calc(100vw-1.5rem)]`}
+            style={{ zIndex: CAMADA_MENU_BARRA }}
+          >
+            <p className="border-b border-[var(--border-default)] px-3 py-2 text-[11px] leading-snug text-gray-500">
+              O filtro <strong className="font-semibold">realça</strong> quem casa. Ninguém sai da
+              árvore — esconder um pai deixaria o filho órfão na tela.
+            </p>
+            <ul className="max-h-[300px] overflow-y-auto py-1">
+              {FILTROS_RAPIDOS.map((chave) => {
+                const ligado = filtros.chaves.has(chave)
+                return (
+                  <li key={chave}>
+                    <button
+                      onClick={() => onAlternarFiltro(chave)}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] text-gray-700 transition hover:bg-[var(--surface-hover)]"
+                    >
+                      <span
+                        aria-hidden
+                        className={`h-3.5 w-3.5 shrink-0 rounded border ${
+                          ligado
+                            ? "border-[var(--border-strong)] bg-[var(--action-primary)]"
+                            : "border-[var(--border-default)] bg-[var(--surface-input)]"
+                        }`}
+                      />
+                      <span className="min-w-0 flex-1">{ROTULO_FILTRO[chave]}</span>
+                      {contagemFiltros[chave] != null && (
+                        <span className="text-[11px] tabular-nums text-gray-500">{contagemFiltros[chave]}</span>
+                      )}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            {(filtrosAtivos > 0 || totalRecolhivel > 0) && (
+              <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-3 py-2">
+                {filtrosAtivos > 0 ? (
+                  <button
+                    onClick={onLimparFiltros}
+                    className="flex items-center gap-1 text-[12px] text-gray-500 transition hover:text-gray-800"
+                  >
+                    <X className="h-3.5 w-3.5" /> Limpar
+                  </button>
+                ) : (
+                  <span />
+                )}
+                {totalRecolhivel > 0 && (
+                  <button
+                    onClick={onRecolherTudo}
+                    className="text-[12px] text-gray-500 transition hover:text-gray-800"
+                    title="Voltar a recolher os ramos que foram expandidos"
+                  >
+                    Recolher ramos ({totalRecolhivel})
+                  </button>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* ── FAIXA FIXA DE CONTEXTO ─────────────────────────────────────────
-          Uma linha, sempre visível: quem, quantos, quem transmite, quanto falta
-          e o que fazer agora. Não é dashboard — é a legenda do que está na tela,
-          e sem ela o operador precisa abrir três popovers para saber onde está.
-          Rótulo em cima do número: "0/4" sozinho não diz nada. */}
-      {resumo && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-1.5 shadow-[var(--elev-1)]">
-          <Campo rotulo="Requerente" valor={resumo.nome} destaque />
-          <Campo
-            rotulo="Ascendente transmissor"
-            valor={resumo.danteCausaNome ?? "não identificado"}
-            aoClicar={resumo.danteCausaId != null ? () => onIrParaPessoa(resumo.danteCausaId!) : undefined}
-            dica="Ascendente mais próximo com nacionalidade do país-alvo — é ele que fundamenta o pedido."
-          />
-          <Campo
-            rotulo="Linhagem"
-            valor={`${resumo.pessoas} pessoa${resumo.pessoas === 1 ? "" : "s"}`}
-            dica="Cadeia do requerente mais os cônjuges dela."
-          />
-          <Campo
-            rotulo="Documentos"
-            valor={
-              resumo.documental.necessarias > 0
-                ? `${resumo.documental.atendidas + resumo.documental.dispensadas} de ${resumo.documental.necessarias}`
-                : "sem exigência"
-            }
-            dica="Atendidos ou dispensados, sobre o total exigido pelas Regras Documentais."
-          />
-          <Campo
-            rotulo="Pendências"
-            valor={String(resumo.documental.pendentes)}
-            dica="Exigências que ainda não foram iniciadas."
-          />
-          <Campo
-            rotulo="Bloqueios"
-            valor={String(resumo.bloqueios)}
-            alerta={resumo.bloqueios > 0}
-            dica="Documentos marcados como não localizados — é o que impede concluir."
-          />
-          <span aria-hidden className="hidden h-5 w-px bg-gray-200 lg:block" />
-          <Campo
-            rotulo="Próxima ação"
-            valor={`${proximaAcao.pessoaNome ? `${proximaAcao.pessoaNome}: ` : ""}${proximaAcao.acao}`}
-            aoClicar={proximaAcao.pessoaId != null ? () => onIrParaPessoa(proximaAcao.pessoaId!) : undefined}
-            dica={`Prioridade ${proximaAcao.prioridade}/7 · ${proximaAcao.fonte}`}
-          />
-        </div>
-      )}
-
-      {/* ── LEGENDA DA SAÚDE ───────────────────────────────────────────────
-          Números reais, não só cores: "amarelo" não diz quantas pessoas. */}
-      {saudeLigada && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-2.5 py-1.5 shadow-[var(--elev-1)]">
-          {(["critico", "atencao", "saudavel", "fora"] as NivelSaudePessoa[]).map((n) => (
-            <span key={n} className="flex items-center gap-1.5 text-[12px] text-gray-600">
-              <span
-                aria-hidden
-                className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: COR_NIVEL[n] }}
-              />
-              {ROTULO_NIVEL[n]}
-              <span className="font-medium tabular-nums text-gray-900">{contagemSaude[n]}</span>
-            </span>
-          ))}
-          <span className="text-[11px] text-[var(--text-muted)]">
-            Crítico = bloqueio impeditivo · Atenção = pendência, divergência ou tarefa
-          </span>
-        </div>
-      )}
-
-      {/* ── BREADCRUMB DA LINHAGEM ─────────────────────────────────────────
-          Projeção do caminho que já existe na árvore: cada degrau aponta para o
-          MESMO nó do canvas. Não é uma segunda representação da estrutura. */}
-      {emLinhagem && trilha.length > 1 && (
-        <nav
-          aria-label="Caminho da linhagem"
-          className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-2.5 py-1.5 shadow-[var(--elev-1)]"
-        >
-          {trilha.map((degrau, i) => (
-            <span key={degrau.pessoaId} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight aria-hidden className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />}
-              <button
-                onClick={() => onIrParaPessoa(degrau.pessoaId)}
-                title={`${degrau.rotulo}${degrau.compartilhadoPor > 1 ? ` · ${degrau.compartilhadoPor} requerentes dependem` : ""}`}
-                className={`max-w-[150px] truncate rounded px-1.5 py-0.5 text-[12px] transition hover:bg-gray-100 ${
-                  degrau.ehDanteCausa ? "font-semibold text-gray-900" : "text-gray-600"
-                }`}
-              >
-                <span className="text-[var(--text-muted)]">{degrau.rotulo}: </span>
-                {degrau.nome}
-              </button>
-            </span>
-          ))}
-        </nav>
-      )}
-    </div>
-  )
-}
-
-/** Rótulo em cima, valor embaixo. Nenhum número aparece sem dizer o que é. */
-function Campo({
-  rotulo,
-  valor,
-  dica,
-  destaque = false,
-  alerta = false,
-  aoClicar,
-}: {
-  rotulo: string
-  valor: string
-  dica?: string
-  destaque?: boolean
-  alerta?: boolean
-  aoClicar?: () => void
-}) {
-  const corpo = (
-    <>
-      <span className="block text-[9px] uppercase leading-none tracking-wide text-[var(--text-muted)]">
-        {rotulo}
-      </span>
-      <span
-        className={`block max-w-[240px] truncate text-[12px] leading-tight ${
-          alerta ? "font-semibold text-red-700" : destaque ? "font-semibold text-gray-900" : "text-gray-700"
-        }`}
+      {/* ── Modo Saúde (heatmap) ─────────────────────────────────────── */}
+      <button
+        onClick={onAlternarSaude}
+        aria-pressed={saudeLigada}
+        aria-label="Modo Saúde"
+        className={saudeLigada ? CLASSE_BOTAO_BARRA_ATIVO : CLASSE_BOTAO_BARRA}
+        title="Sinalizar cada pessoa por saúde operacional — o cartão não muda, ganha um anel"
       >
-        {valor}
-      </span>
-    </>
-  )
-  if (!aoClicar) {
-    return (
-      <span className="min-w-0" title={dica}>
-        {corpo}
-      </span>
-    )
-  }
-  return (
-    <button onClick={aoClicar} title={dica} className="min-w-0 text-left transition hover:opacity-70">
-      {corpo}
-    </button>
-  )
-}
+        <Activity className="h-4 w-4" />
+        <span className="hidden @[1500px]:inline">Saúde</span>
+      </button>
 
-function Linha({ rotulo, texto }: { rotulo: string; texto: string }) {
-  return (
-    <>
-      <dt className="text-gray-500">{rotulo}</dt>
-      <dd className="text-right font-medium tabular-nums text-gray-900">{texto}</dd>
+      {/* ── Comparação entre requerentes (na barra única, não em linha própria) ── */}
+      {comparacao.length > 1 && (
+        <div ref={refComparar} className="relative">
+          <button
+            onClick={() => setComparando((v) => !v)}
+            className={comparando ? CLASSE_BOTAO_BARRA_ATIVO : CLASSE_BOTAO_BARRA}
+            title="Comparar o estado de todos os requerentes"
+            aria-label="Comparar requerentes"
+          >
+            <GitCompare className="h-4 w-4" />
+            <span className="hidden @[1500px]:inline">Comparar</span>
+          </button>
+          {comparando && (
+            <div
+              className={`${CLASSE_MENU_BARRA} w-[380px] max-w-[calc(100vw-1.5rem)]`}
+              style={{ zIndex: CAMADA_MENU_BARRA }}
+            >
+              <p className="border-b border-[var(--border-default)] px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
+                Comparação · clique para focar a linhagem
+              </p>
+              <ul className="max-h-[340px] overflow-y-auto">
+                {comparacao.map((r) => {
+                  const total = r.documental.necessarias
+                  const feitos = r.documental.atendidas + r.documental.dispensadas
+                  const completa = total > 0 && feitos === total
+                  return (
+                    <li key={r.requerenteId}>
+                      <button
+                        onClick={() => {
+                          onSelecionarRequerente(r.requerenteId)
+                          setComparando(false)
+                        }}
+                        className="w-full px-3 py-2 text-left transition hover:bg-[var(--surface-hover)]"
+                      >
+                        <span className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-[13px] font-medium text-gray-900">{r.nome}</span>
+                          <span className="shrink-0 text-[12px] tabular-nums text-gray-700">
+                            {total > 0 ? `${feitos}/${total}` : "sem exigência"}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-gray-500">
+                          {r.pessoas} na linhagem
+                          {completa ? " · completa" : ` · ${r.documental.pendentes} pendência(s)`}
+                          {r.bloqueios > 0 ? ` · ${r.bloqueios} bloqueio(s)` : ""}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </>
   )
 }

@@ -111,6 +111,12 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/arvore-pessoa-repetida-rota-etapa6.test.ts":
+    "Aviso de pessoa parecida (Etapa 6): cria e derruba as PRÓPRIAS pessoas/árvores/processos (marca ARVREP6) só no " +
+    "banco de teste efêmero, para provar a rota de leitura — nenhuma pessoa real é removida",
+  "scripts/arvore-criar-tarefa-etapa5.test.ts":
+    "Criar tarefa da árvore (Etapa 5): cria e derruba a PRÓPRIA pessoa/árvore/processo (marca ARVTAREFA5) só no " +
+    "banco de teste efêmero, para provar a tarefa vinculada à pessoa pela porta canônica — nenhuma pessoa real é removida",
   "scripts/torre-nova-precisa-decisoes.test.ts":
     "teste do Precisa de você (Torre nova): cria pessoas de marca própria na árvore de um processo " +
     "do banco de teste efêmero para provar 'Sem responsável'/'Fase deixada' por processo — só o que o " +

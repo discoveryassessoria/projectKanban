@@ -8,7 +8,7 @@
 // igual seria mentir para o operador.
 
 import type { GrafoGenealogico } from "../grafo"
-import type { Insight, PapelLinha, PessoaEntrada } from "../tipos"
+import type { CampoAvaliado, Insight, PapelLinha, PessoaEntrada } from "../tipos"
 import { anoDe, formatarData, nomeCompleto } from "../texto"
 
 interface CampoExigido {
@@ -78,6 +78,13 @@ const CAMPOS_DANTE_CAUSA: CampoExigido[] = [
 export interface ResultadoCompletude {
   completude: number
   faltando: string[]
+  /**
+   * TODOS os campos que entraram na conta (os que o papel exige e cuja condição
+   * bateu), preenchidos ou não. `completude` = Σ peso dos preenchidos ÷ Σ peso
+   * de todos — é daqui que a tela mostra "o que entra no numerador e no
+   * denominador", sem refazer a conta.
+   */
+  campos: CampoAvaliado[]
 }
 
 export function calcularCompletude(
@@ -95,16 +102,19 @@ export function calcularCompletude(
   let total = 0
   let obtido = 0
   const faltando: string[] = []
+  const avaliados: CampoAvaliado[] = []
 
   for (const c of efetivos) {
     if (c.quando && !c.quando(p, g)) continue
+    const preenchido = c.preenchido(p, g)
     total += c.peso
-    if (c.preenchido(p, g)) obtido += c.peso
+    avaliados.push({ chave: c.chave, rotulo: c.rotulo, peso: c.peso, preenchido })
+    if (preenchido) obtido += c.peso
     else faltando.push(c.rotulo)
   }
 
   const completude = total === 0 ? 100 : Math.round((obtido / total) * 100)
-  return { completude, faltando }
+  return { completude, faltando, campos: avaliados }
 }
 
 /** Lacunas viram insight só quando doem: linha reta ou pessoa documentável. */

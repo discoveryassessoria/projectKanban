@@ -13,6 +13,7 @@ import { origemOperacionalDoLancamento } from '@/lib/financeiro/supressao-motor'
 import { rotularPhaseKey } from '@/lib/financeiro/apresentacao-lancamento'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { requerentesAtivosDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
+import { classificarMaioridade } from "@/src/lib/documentos/maioridade"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -139,13 +140,14 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     if (requerentesConsiderados.length === 0 && receita.processo?.arvoreId) {
       const pessoas = await prisma.pessoa.findMany({
         where: requerentesAtivosDaArvore(receita.processo.arvoreId),
-        select: { id: true, nome: true, sobrenome: true, requerente: true },
+        select: { id: true, nome: true, sobrenome: true, requerente: true, data_nasc: true },
         orderBy: { id: 'asc' },
       })
       requerentesConsiderados = pessoas.map((p) => ({
         id: p.id,
         nome: `${p.nome} ${p.sobrenome ?? ''}`.trim(),
-        statusFamiliar: p.requerente === 'menor' ? 'menor' : 'maior',
+        // Maior/menor pela função ÚNICA (data de nascimento manda; sem data, o marcador).
+        statusFamiliar: classificarMaioridade(p.data_nasc, p.requerente, new Date()).estado === 'MENOR' ? 'menor' : 'maior',
         percentual: 100,
       }))
     }

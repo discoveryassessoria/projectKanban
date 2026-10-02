@@ -42,11 +42,13 @@ import {
   resumirLinhagem,
   type FatosOperacionais,
 } from "@/src/lib/genealogia/operacional/dossie"
-import { responder, responderTodas } from "@/src/lib/genealogia/operacional/perguntas"
+import { contextoDePerguntas, responder, responderTodas } from "@/src/lib/genealogia/operacional/perguntas"
+import { montarFilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
+import { achadosDoMotorPorPessoa } from "@/src/lib/genealogia/operacional/achados-do-motor"
 import {
   diagnosticar,
   resolveNextGenealogyAction,
-  tarefaVencida,
+  TOTAL_PRIORIDADES,
 } from "@/src/lib/genealogia/operacional/diagnostico"
 import { analisarIntegridade } from "@/src/lib/genealogia/motor/regras/integridade"
 import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
@@ -374,7 +376,7 @@ ok(limpo === null, "sem pendência, a próxima ação é ausência de ação", l
 secao("4) resumo da linhagem")
 
 const projecaoFatos = projetarIndicadores(FATOS.necessidades)
-const resumo = resumirLinhagem(lMarcos, dossies, grafo, projecaoFatos)
+const resumo = resumirLinhagem(lMarcos, dossies, grafo, projecaoFatos, analise)
 ok(resumo.requerenteId === 4, "o resumo é da linhagem pedida")
 ok(resumo.pessoas === lMarcos.visivel.size, "conta as pessoas visíveis da linha")
 ok(resumo.documental.necessarias > 0, "consolida as exigências da linha inteira")
@@ -384,7 +386,27 @@ ok(resumo.proximaAcao?.startsWith("Giuseppe") === true, "a próxima ação nomei
 // ── 5. PERGUNTAS ────────────────────────────────────────────────────────────
 secao("5) perguntas determinísticas")
 
-const ctxPerguntas = { grafo, analise, mapa, dossies, linhagem: lMarcos }
+// O contexto é montado pelo MESMO construtor do hook da tela (Etapa 5): a fila da
+// pessoa e a projeção documental são as do cartão e da aba Operação.
+const achadosFixture = achadosDoMotorPorPessoa(analise)
+const ctxPerguntas = contextoDePerguntas({
+  grafo,
+  analise,
+  mapa,
+  dossies,
+  linhagem: lMarcos,
+  projecao: projecaoFatos,
+  filaDe: (pessoaId) =>
+    montarFilaDaPessoa({
+      pessoaId,
+      processoId: 1,
+      faseAtualKey: null,
+      necessidades: FATOS.necessidades,
+      tarefas: FATOS.tarefas,
+      uniaoIdsDaPessoa: grafo.unioesDe(pessoaId).map((u) => u.id as number),
+      achados: achadosFixture.get(pessoaId) ?? [],
+    }),
+})
 const todas = responderTodas(ctxPerguntas)
 ok(todas.length === 5, "responde as cinco perguntas do escopo", todas.length)
 ok(
@@ -402,13 +424,15 @@ ok(impede.itens.some((i) => i.pessoaId === 1), "aponta o documento não localiza
 // Sem cadeia, a resposta é "não dá para afirmar" — nunca um palpite.
 const grafoSolto = construirGrafo([{ id: 1, nome: "Sozinho", requerente: "maior" }], [])
 const mapaSolto = mapaDeLinhagens(grafoSolto, "ITALIA", 1)
-const semCadeia = responder("quem_transmite", {
+const semCadeia = responder("quem_transmite", contextoDePerguntas({
   grafo: grafoSolto,
   analise: null,
   mapa: mapaSolto,
   dossies: new Map(),
   linhagem: mapaSolto.porRequerente.get(1)!,
-})
+  projecao: projetarIndicadores([]),
+  filaDe: () => ({ antesDaGenealogia: false, itens: [], proximo: null }),
+}))
 ok(
   semCadeia.resumo.startsWith("Não dá para afirmar"),
   "sem ascendente, a resposta declara que não sabe",
@@ -549,15 +573,12 @@ ok(
 // ── 5d. DIAGNÓSTICO E PRÓXIMA AÇÃO ──────────────────────────────────────────
 secao("5d) diagnóstico e próxima melhor ação")
 
-const HOJE = new Date("2026-08-08T12:00:00.000Z")
-
 const diag = diagnosticar({
   grafo,
   analise,
   mapa,
   dossies,
   linhagem: lMarcos,
-  agora: HOJE,
 })
 ok(diag.saude === "critico", "documento não localizado torna o processo CRÍTICO", diag.saude)
 ok(diag.criticos >= 1, "conta ao menos um impeditivo", diag.criticos)
@@ -629,7 +650,6 @@ const diagSao = diagnosticar({
   mapa: mapaSao,
   dossies: dossiesSaos,
   linhagem: mapaSao.porRequerente.get(3)!,
-  agora: HOJE,
 })
 ok(diagSao.problemas.length === 0, "árvore sem pendência não gera problema", diagSao.problemas.map((p) => p.id))
 ok(diagSao.saude === "saudavel", "e o veredito é saudável")
@@ -641,12 +661,8 @@ ok(
   diagSao.resumo,
 )
 
-// Tarefa vencida
-ok(tarefaVencida({ id: 1, titulo: "x", concluida: false, dataPrazo: "2020-01-01" }, HOJE), "prazo passado = vencida")
-ok(!tarefaVencida({ id: 1, titulo: "x", concluida: false, dataPrazo: "2099-01-01" }, HOJE), "prazo futuro = no prazo")
-ok(!tarefaVencida({ id: 1, titulo: "x", concluida: true, dataPrazo: "2020-01-01" }, HOJE), "concluída nunca vence")
-ok(!tarefaVencida({ id: 1, titulo: "x", concluida: false }, HOJE), "sem prazo nunca vence")
-
+// REGRA PERMANENTE (Etapa 2): tarefa vencida/aberta/com dono NUNCA é pendência de
+// árvore. Mesmo com uma tarefa atrasada e outra no prazo, o diagnóstico não as lista.
 const comVencida = projetarDossies({
   grafo,
   analise,
@@ -655,15 +671,25 @@ const comVencida = projetarDossies({
     ...FATOS,
     tarefas: [
       { id: 90, pessoaId: 3, titulo: "Atrasada", concluida: false, dataPrazo: "2020-01-01", necessidadeId: 4 },
+      { id: 91, pessoaId: 3, titulo: "No prazo", concluida: false, dataPrazo: "2099-01-01", necessidadeId: 4 },
     ],
   },
 })
 const diagVencida = diagnosticar({
-  grafo, analise, mapa, dossies: comVencida, linhagem: lMarcos, agora: HOJE,
+  grafo, analise, mapa, dossies: comVencida, linhagem: lMarcos,
 })
 ok(
-  diagVencida.problemas.some((p) => p.categoria === "tarefa_vencida"),
-  "diagnóstico encontra tarefa vencida",
+  diagVencida.problemas.every((p) => /^(bloqueio_documental|documento_ausente|divergencia|duplicidade|relacao|linhagem)$/.test(p.categoria)),
+  "diagnóstico não tem categoria de tarefa (vencida ou aberta)",
+)
+ok(
+  !diagVencida.problemas.some((p) => /tarefa/i.test(p.titulo) || /tarefa/i.test(p.fonte)),
+  "e nenhum problema cita tarefa como título ou fonte",
+)
+ok(
+  diagVencida.problemas.length === diag.problemas.length,
+  "tarefa atrasada ou aberta não muda a lista de pendências da árvore",
+  [diagVencida.problemas.length, diag.problemas.length],
 )
 
 // PRIORIDADE FIXA da próxima ação.
@@ -674,16 +700,21 @@ ok(acao.fonte.length > 0, "a ação declara a fonte")
 ok(acao.problemaId != null, "a ação tem link de navegação (id do problema)")
 
 const acaoSa = resolveNextGenealogyAction(diagSao)
-ok(acaoSa.prioridade === 7, "sem pendência, prioridade 7", acaoSa.prioridade)
+ok(acaoSa.prioridade === TOTAL_PRIORIDADES, "sem pendência, a última prioridade da fila", acaoSa.prioridade)
 ok(acaoSa.acao === "Nenhuma ação necessária.", "e a ação é ausência de ação")
 
-// Sem bloqueio, a tarefa vencida sobe na fila acima da tarefa aberta.
+// Sem bloqueio nem exigência, a tarefa vencida NÃO ocupa a próxima ação: a fila
+// cai direto na próxima pendência de árvore, ou em "nenhuma ação necessária".
 const semBloqueio = {
   ...diagVencida,
   problemas: diagVencida.problemas.filter((p) => !p.impeditivo && p.categoria !== "documento_ausente"),
 }
-const acaoVencida = resolveNextGenealogyAction(semBloqueio)
-ok(acaoVencida.prioridade === 4, "tarefa vencida é prioridade 4", acaoVencida.prioridade)
+const acaoSemTarefa = resolveNextGenealogyAction(semBloqueio)
+ok(
+  !/tarefa/i.test(acaoSemTarefa.acao) && !/tarefa/i.test(acaoSemTarefa.motivo),
+  "com tarefa vencida e nada mais grave, a próxima ação não é a tarefa",
+  acaoSemTarefa.acao,
+)
 
 // ── 5e. DELTA DE LINHAGEM (base do preview) ─────────────────────────────────
 secao("5e) delta de linhagem")

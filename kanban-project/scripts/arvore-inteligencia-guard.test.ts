@@ -79,6 +79,8 @@ const PECAS = [
   "src/lib/genealogia/operacional/perguntas.ts",
   "src/components/arvore/inteligencia/use-arvore-operacional.ts",
   "src/components/arvore/inteligencia/barra-linhagem.tsx",
+  "src/components/arvore/inteligencia/cartoes-flutuantes.tsx",
+  "src/lib/genealogia/operacional/achados-do-motor.ts",
   "src/app/api/processos/[processoId]/genealogia/operacional/route.ts",
 ]
 for (const p of PECAS) {
@@ -241,6 +243,7 @@ for (const [arquivo, conteudo] of [
   ["saude.ts", saude],
   ["lacunas.ts", ler("src/lib/genealogia/navegacao/lacunas.ts")],
   ["diagnostico.ts", ler("src/lib/genealogia/operacional/diagnostico.ts")],
+  ["achados-do-motor.ts", ler("src/lib/genealogia/operacional/achados-do-motor.ts")],
 ]) {
   if (/\bfetch\(|from ["']@\/lib\/prisma["']|Math\.random\(|Date\.now\(/.test(conteudo)) {
     falhar(`${arquivo} deixou de ser puro`, "rede, banco, relógio ou acaso quebram o determinismo")
@@ -254,16 +257,22 @@ else falhar("as respostas perderam a fonte", "resposta sem fonte não é respost
 // ── 6) A tela continua sendo a mesma ────────────────────────────────────────
 console.log("\n6) identidade da tela")
 const barra = ler("src/components/arvore/inteligencia/barra-linhagem.tsx")
-// `bg-white` virou `bg-[var(--surface-primary)]` no rebranding de tokens de
-// cor (commit 9167b47e, "Cor deixa de ser decoração e passa a ter contrato")
-// — a casca continua a mesma, só o valor do token mudou de nome.
-if (/border-gray-200 bg-\[var\(--surface-primary\)\]/.test(barra)) {
-  ok("a barra de linhagem usa a casca dos botões que já existiam")
+const cartoes = ler("src/components/arvore/inteligencia/cartoes-flutuantes.tsx")
+// Etapa 2: os controles de linhagem moram na LINHA ÚNICA de ferramentas
+// (PAISAGEM | RETRATO) e usam a casca dela; o que não é controle (resumo, legenda,
+// trilha) é cartão flutuante sobre o canvas, de superfície opaca.
+if (/CLASSE_BOTAO_BARRA\s*=\s*\n?\s*"[^"]*hover:bg-\[var\(--surface-tertiary\)\]/.test(barra)) {
+  ok("os controles de linhagem usam a casca da linha de ferramentas que já existia")
 } else {
-  falhar("a barra de linhagem inventou estilo próprio", "os controles novos usam a casca antiga")
+  falhar("os controles de linhagem inventaram estilo próprio", "devem usar a mesma casca de PAISAGEM/RETRATO/PDF")
 }
-if (/absolute/.test(barra)) ok("a barra é sobreposta — não entra no fluxo do canvas")
-else falhar("a barra entrou no fluxo", "ela empurraria o canvas e mudaria o enquadramento")
+if (!/\babsolute left-4 top-4\b/.test(barra)) ok("os controles não formam uma segunda barra sobreposta ao canvas")
+else falhar("a barra de linhagem voltou a ser uma barra própria sobre o canvas", "a barra é UMA só, acima do canvas")
+if (/absolute/.test(cartoes) && /--surface-elevated/.test(cartoes)) {
+  ok("resumo, legenda e trilha são cartões flutuantes opacos — não entram no fluxo do canvas")
+} else {
+  falhar("os cartões flutuantes entraram no fluxo ou perderam a superfície opaca", "empurrariam o canvas e mudariam o enquadramento")
+}
 
 const guardaCongelado = ler("scripts/arvore-layout-congelado.test.ts")
 if (guardaCongelado.length > 0) ok("a guarda de layout congelado continua no lugar")

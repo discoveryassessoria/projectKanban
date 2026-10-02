@@ -27,6 +27,7 @@
 // clássico que faz o operador correr atrás do que já foi resolvido.
 
 import { prisma } from "@/lib/prisma"
+import { idadeEmAnos } from "@/src/lib/documentos/maioridade"
 import { CAMPOS_CANONICOS, campoPorChave, valorSatisfaz } from "./campos-canonicos"
 
 export type EstadoRequisito = "SATISFEITO" | "PENDENTE" | "DISPENSADO" | "NAO_LOCALIZADA" | "EM_ATENDIMENTO"
@@ -82,13 +83,8 @@ export interface CompletudeDoProcesso {
 
 /** Idade em anos completos NA DATA DE REFERÊNCIA. Nunca persistida. */
 export function idadeEm(nascimento: Date | null | undefined, referencia = new Date()): number | null {
-  if (!nascimento) return null
-  const n = new Date(nascimento)
-  if (Number.isNaN(n.getTime())) return null
-  let idade = referencia.getFullYear() - n.getFullYear()
-  const m = referencia.getMonth() - n.getMonth()
-  if (m < 0 || (m === 0 && referencia.getDate() < n.getDate())) idade--
-  return idade
+  // Política canônica de maioridade/idade — um cálculo só.
+  return idadeEmAnos(nascimento ?? null, referencia)
 }
 
 /**

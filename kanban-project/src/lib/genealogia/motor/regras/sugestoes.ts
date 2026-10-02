@@ -11,6 +11,14 @@ import type { Insight, PessoaEntrada } from "../tipos"
 import { anoDe, chaveFonetica, nomeCompleto, similaridadeLocal, similaridadeNome } from "../texto"
 
 const LIMIAR = 0.55
+
+/**
+ * Prefixos de id dos achados de CÔNJUGE. A fila da pessoa (Etapa 4) reconhece o
+ * tipo do achado por AQUI — constante exportada, não por texto nem por prefixo
+ * copiado em outro arquivo: renomear o id aqui quebra a fila no `tsc`/teste.
+ */
+export const PREFIXO_UNIAO_IMPLICITA = "sug-uniao-implicita-"
+export const PREFIXO_CONJUGE_AUSENTE = "sug-conjuge-ausente-"
 const MAX_POR_PESSOA = 3
 
 interface Candidato {
@@ -134,7 +142,7 @@ export function analisarSugestoes(g: GrafoGenealogico, naLinha: Set<number>): In
     // certidão que mais frequentemente resolve filiação da geração acima.
     if (p.casado && g.unioesDe(p.id).length === 0) {
       out.push({
-        id: `sug-conjuge-ausente-${p.id}`,
+        id: `${PREFIXO_CONJUGE_AUSENTE}${p.id}`,
         categoria: "relacao",
         severidade: naLinha.has(p.id) ? "medio" : "baixo",
         titulo: `${nomeCompleto(p)} consta como casada, mas não tem cônjuge na árvore`,
@@ -155,7 +163,7 @@ export function analisarSugestoes(g: GrafoGenealogico, naLinha: Set<number>): In
     if (!a || !b) continue
     const relevante = naLinha.has(casal.a) || naLinha.has(casal.b)
     out.push({
-      id: `sug-uniao-implicita-${casal.chave}`,
+      id: `${PREFIXO_UNIAO_IMPLICITA}${casal.chave}`,
       categoria: "relacao",
       severidade: relevante ? "medio" : "baixo",
       titulo: `${nomeCompleto(a)} e ${nomeCompleto(b)} têm ${casal.filhos.length} ${casal.filhos.length === 1 ? "filho em comum" : "filhos em comum"}, mas nenhuma união registrada`,

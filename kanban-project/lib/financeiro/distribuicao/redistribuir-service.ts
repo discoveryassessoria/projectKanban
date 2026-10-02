@@ -17,14 +17,12 @@ import { dedupPorPessoa, registrarPendenciaReconciliacao } from '@/lib/financeir
 import { taxaDe } from '@/lib/financeiro/dominio/cambio'
 import { aReceber, type Natureza } from '@/lib/financeiro/dominio/obrigacao-economica'
 import { gerarCodigoReceita } from '@/lib/financeiro/codigos'
+import { idadeEmAnos, ehMaiorDeIdade } from '@/src/lib/documentos/maioridade'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
-const idadeDe = (dn?: Date | null): number | null => {
-  if (!dn) return null
-  const hoje = new Date(); let a = hoje.getFullYear() - dn.getFullYear()
-  const m = hoje.getMonth() - dn.getMonth(); if (m < 0 || (m === 0 && hoje.getDate() < dn.getDate())) a--
-  return a
-}
+// Idade e menoridade vêm da política canônica de maioridade (um lugar só).
+const idadeDe = (dn?: Date | null): number | null => idadeEmAnos(dn ?? null, new Date())
+const menorDe = (dn?: Date | null): boolean => ehMaiorDeIdade(dn ?? null, new Date()) === false
 
 export interface ParticipanteEditavel {
   obrigacaoId: number
@@ -101,7 +99,7 @@ export async function carregarDistribuicaoEditavel(ref: string): Promise<Distrib
     const requerenteId = reqRow?.requerenteId ?? p.pessoaId ?? null
     const req = requerenteId != null ? reqMap.get(requerenteId) : null
     const idade = idadeDe(req?.dataNascimento ?? null)
-    const isMenor = idade != null && idade < 18
+    const isMenor = menorDe(req?.dataNascimento ?? null)
     const recebidoBase = recebidoMap.get(p.obrigacaoId) ?? 0
     const valorBase = o ? Number(o.valorContratado) : p.valorBase
     const temCobranca = (rec?.cobrancas?.length ?? 0) > 0
@@ -137,7 +135,7 @@ export async function carregarDistribuicaoEditavel(ref: string): Promise<Distrib
     const { itens, duplicatas } = dedupPorPessoa(candidatos.map((r) => ({ id: r.id, personId: r.personId, nome: r.nome, dataNascimento: r.dataNascimento })))
     registrarPendenciaReconciliacao(`redistribuir:processo:${processoId}`, duplicatas)
     disponiveis = itens.map((r) => {
-      const idade = idadeDe(r.dataNascimento); return { requerenteId: r.id, nome: r.nome, idade, isMenor: idade != null && idade < 18, vinculo: 'Requerente' }
+      const idade = idadeDe(r.dataNascimento); return { requerenteId: r.id, nome: r.nome, idade, isMenor: menorDe(r.dataNascimento), vinculo: 'Requerente' }
     })
   }
 

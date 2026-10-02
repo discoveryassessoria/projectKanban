@@ -64,6 +64,16 @@ export interface NovaTarefaManual {
   slaDays?: number | null
   dataPrazo?: Date | null
   motivo: string
+  /**
+   * CHAVE DE ORIGEM — quem pediu a tarefa diz DE QUE FATO ela nasceu (ex.: o
+   * achado da árvore genealógica que originou o "próximo passo"). Gravada em
+   * `Tarefa.correlationId` e usada só para o aviso de duplicidade: duas
+   * tarefas abertas do mesmo fato de origem são candidatas a ser o mesmo
+   * trabalho. NÃO é `chaveIdempotencia`: essa coluna é a identidade da tarefa
+   * AUTOMÁTICA e vários gates de fase tratam "tem chave" como "tarefa
+   * canônica do motor" — dar chave a uma tarefa manual a faria barrar fase.
+   */
+  chaveOrigem?: string | null
   /** O usuário viu o aviso de possível duplicidade e confirmou mesmo assim. */
   confirmarDuplicidade?: boolean
   /**
@@ -132,6 +142,7 @@ async function reconciliarMotorApos(tarefaId: number, motivo: string): Promise<v
 
 export async function tarefasSemelhantesAbertas(n: {
   processoId: number; pessoaId?: number | null; documentoId?: number | null; necessidadeId?: number | null
+  chaveOrigem?: string | null
 }): Promise<Semelhante[]> {
   // A COINCIDÊNCIA TEM DE SER DA OBRIGAÇÃO — necessidade ou documento. Pessoa
   // sozinha é sinal fraco demais: a mesma pessoa tem legitimamente a certidão
@@ -141,6 +152,9 @@ export async function tarefasSemelhantesAbertas(n: {
   const alvos: Prisma.TarefaWhereInput[] = []
   if (n.necessidadeId != null) alvos.push({ necessidadeId: n.necessidadeId })
   if (n.documentoId != null) alvos.push({ documentoId: n.documentoId })
+  // Mesmo FATO DE ORIGEM (ex.: o mesmo achado da árvore): identidade canônica
+  // de quem pediu, nunca o título.
+  if (n.chaveOrigem) alvos.push({ correlationId: n.chaveOrigem })
   if (alvos.length === 0) return []
 
   const achadas = await prisma.tarefa.findMany({
@@ -195,6 +209,7 @@ export async function criarTarefaManual(
         statusTarefa: 'NAO_INICIADA',
         origem: nova.origem ?? 'MANUAL',
         justificativa: nova.motivo,
+        correlationId: nova.chaveOrigem ? nova.chaveOrigem.slice(0, 60) : null,
         ...(nova.camposDeDominio ?? {}),
         // Sem workflow: trabalho que ninguém modelou ainda não tem etapas. A
         // tarefa existe assim mesmo — é melhor uma linha na fila sem roteiro do

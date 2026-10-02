@@ -25,6 +25,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
+import { projecoesDeCertidaoPorNecessidade } from "@/src/lib/process-stage/projecao-certidao"
+import { PHASEKEY_DESTINO_DO_FECHAMENTO } from "@/src/lib/process-stage/fase-pre-contrato"
 
 export async function GET(
   request: NextRequest,
@@ -45,7 +47,12 @@ export async function GET(
       usuario && temPermissao(usuario.permissoes, "financeiro.ver"),
     )
 
-    const [necessidadesRaw, tarefasRaw, lancamentosRaw] = await Promise.all([
+    const [processo, faseDestino, necessidadesRaw, tarefasRaw, lancamentosRaw] = await Promise.all([
+      // Fase real do processo (a fila da pessoa diz "as exigências serão geradas
+      // quando entrar em Genealogia" ANTES dela) e o rótulo da fase destino, que
+      // vem do CADASTRO (CatalogoFase) — nunca de literal.
+      prisma.processo.findUnique({ where: { id }, select: { faseAtualKey: true } }),
+      prisma.catalogoFase.findUnique({ where: { phaseKey: PHASEKEY_DESTINO_DO_FECHAMENTO }, select: { label: true } }),
       prisma.necessidadeDocumental.findMany({
         // A ÁRVORE SÓ CONHECE REGISTRO CIVIL (nascimento/casamento/óbito) — a
         // exigência que nasce da estrutura genealógica. RG, comprovante de
@@ -110,7 +117,13 @@ export async function GET(
         : Promise.resolve([]),
     ])
 
+    // SITUAÇÃO REAL do pedido de cada certidão — a MESMA projeção da Central e do
+    // Relatório de Certidões (uma função, nunca copiada). A fila da pessoa traduz
+    // este valor para o rótulo; não recalcula nada.
+    const projecoes = await projecoesDeCertidaoPorNecessidade(necessidadesRaw.map((n) => n.id))
+
     const necessidades = necessidadesRaw.map((n) => ({
+      situacaoCertidao: projecoes.get(n.id)?.situacao ?? null,
       id: n.id,
       pessoaId: n.pessoaId,
       uniaoId: n.uniaoId,
@@ -146,7 +159,14 @@ export async function GET(
       pessoaId: o.personId,
     }))
 
-    return NextResponse.json({ necessidades, tarefas, lancamentos, financeiroVisivel })
+    return NextResponse.json({
+      necessidades,
+      tarefas,
+      lancamentos,
+      financeiroVisivel,
+      faseAtualKey: processo?.faseAtualKey ?? null,
+      faseDestinoLabel: faseDestino?.label ?? null,
+    })
   } catch (error) {
     console.error("GET genealogia/operacional", error)
     return NextResponse.json({ error: "Erro ao ler os fatos operacionais da árvore." }, { status: 500 })

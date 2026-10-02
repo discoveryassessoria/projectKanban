@@ -22,6 +22,7 @@ import ReactFlow, {
 import dagre from "dagre"
 import "reactflow/dist/style.css"
 import type { PessoaArvore, UniaoArvore } from "./types"
+import { classificarMaioridade, ehRequerente } from "@/src/lib/documentos/maioridade"
 import { opacidadeDe, type EstadoFoco, type GrupoRecolhivel } from "@/src/lib/genealogia/navegacao/foco"
 import { COR_NIVEL, ROTULO_NIVEL, type SaudePessoa } from "@/src/lib/genealogia/operacional/saude"
 
@@ -187,19 +188,18 @@ function formatDate(dateStr: string | Date | null | undefined): string | null {
  *
  * Deliberadamente NÃO incluem estado documental: o cartão já tem os indicadores
  * N/C/O, e um segundo sinal documental na mesma superfície seria uma segunda
- * verdade sobre a mesma coisa. Aqui entram só duas marcas, ambas de 6px, ambas
- * no canto superior direito, ambas ausentes quando não há o que sinalizar:
- * contradição de dado (motor genealógico) e tarefa aberta (Tarefa do processo).
+ * verdade sobre a mesma coisa. Aqui entra só uma marca, de 6px, no canto
+ * superior direito, ausente quando não há o que sinalizar: contradição de dado
+ * (motor genealógico). Tarefa aberta NÃO é marca (Etapa 2): é trabalho em
+ * andamento, não pendência de árvore — já tem lugar na Torre e em Tarefas.
  */
 export interface SinaisPessoa {
   /** Há divergência crítica/alta apurada pelo motor. */
   divergencia?: boolean
-  /** Há tarefa aberta ligada a esta pessoa. */
-  tarefaAberta?: boolean
 }
 
 function MarcasDiscretas({ sinais }: { sinais?: SinaisPessoa }) {
-  if (!sinais?.divergencia && !sinais?.tarefaAberta) return null
+  if (!sinais?.divergencia) return null
   return (
     <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
       {sinais.divergencia && (
@@ -207,13 +207,6 @@ function MarcasDiscretas({ sinais }: { sinais?: SinaisPessoa }) {
           title="Divergência de dados nesta pessoa"
           className="block h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: 'var(--danger-solid)' }}
-        />
-      )}
-      {sinais.tarefaAberta && (
-        <span
-          title="Tarefa aberta para esta pessoa"
-          className="block h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: 'var(--action-primary)' }}
         />
       )}
     </div>
@@ -257,14 +250,17 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   // ficavam com o vínculo gravado certo no banco mas SEM NENHUM selo na
   // tela — pareciam não-requerentes mesmo estando marcadas.
   const requerente = (pessoa as any).requerente
-  const isRequerente = requerente === 'maior' || requerente === 'menor' || requerente === 'sim'
-  const requerenteLabel = requerente === 'maior'
-    ? 'Requerente maior de idade'
-    : requerente === 'menor'
-      ? 'Requerente menor de idade'
-      : requerente === 'sim'
-        ? 'Requerente'
-        : null
+  const isRequerente = ehRequerente(requerente)
+  // Maior/menor vem da função ÚNICA (data de nascimento manda; sem data, o marcador
+  // do cadastro; sem nenhum dos dois, só "Requerente" — a classificar).
+  const maioridade = classificarMaioridade(pessoa.data_nasc ?? null, requerente, new Date())
+  const requerenteLabel = !isRequerente
+    ? null
+    : maioridade.estado === 'MAIOR'
+      ? 'Requerente maior de idade'
+      : maioridade.estado === 'MENOR'
+        ? 'Requerente menor de idade'
+        : 'Requerente'
 
   // Verificar se tem cônjuge
   const temConjuge = unioes.length > 0
@@ -366,7 +362,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           {/* Badge de Requerente */}
             {isRequerente && (
               <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold w-fit ${
-                requerente === 'maior' 
+                maioridade.estado === 'MAIOR' 
                   ? 'bg-[var(--surface-secondary)] text-green-800' 
                   : 'bg-[var(--surface-secondary)] text-amber-800'
                   }`}>
@@ -486,7 +482,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         {/* Badge de Requerente */}
           {isRequerente && (
             <span className={`inline-flex items-center mt-0.5 px-1 py-0.5 rounded text-[7px] font-semibold ${
-              requerente === 'maior' 
+              maioridade.estado === 'MAIOR' 
                 ? 'bg-[var(--surface-secondary)] text-green-800' 
                 : 'bg-[var(--surface-secondary)] text-amber-800'
                 }`}>
@@ -1621,6 +1617,12 @@ export interface ReactFlowTreeRef {
   centerOnPerson: (pessoaId: number, opcoes?: { zoom?: number }) => void
   /** Enquadra um conjunto de pessoas (ex.: a linhagem em foco). */
   enquadrar: (pessoaIds: number[]) => void
+  /**
+   * Põe cartões em posições dadas (desfazer/refazer de "mover"). Atualiza o canvas
+   * quando `modo` é o modo visível e SEMPRE persiste no modo informado — as
+   * posições são guardadas por modo (paisagem/retrato).
+   */
+  aplicarPosicoes: (modo: string, posicoes: Record<string, { x: number; y: number }>) => void
 }
 
 // ========================================
@@ -1649,6 +1651,12 @@ interface ReactFlowTreeProps {
   lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
   /** Heatmap por pessoa. Ausente = modo Saúde desligado. */
   saude?: ReadonlyMap<number, SaudePessoa>
+  /** Cartões arrastados (antes/depois) — alimenta o Desfazer. Só chega com movimento real. */
+  onPosicoesMovidas?: (modo: ViewMode, movimentos: { pessoaId: number; antes: { x: number; y: number }; depois: { x: number; y: number } }[]) => void
+  /** Aresta selecionada no canvas (clique ou Enter); `null` ao limpar. Quem decide o que é removível é a tela. */
+  onVinculoSelecionado?: (aresta: { id: string; source: string; target: string } | null) => void
+  /** Aresta em destaque — CONTROLADA pela tela (ela a limpa ao remover/recarregar). */
+  arestaSelecionadaId?: string | null
 }
 
 const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
@@ -1669,6 +1677,9 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   onExpandirGrupo,
   lacunas,
   saude,
+  onPosicoesMovidas,
+  onVinculoSelecionado,
+  arestaSelecionadaId = null,
 }, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -1678,6 +1689,9 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
 
   const savedPositionsRef = useRef(savedPositions)
   const onSavePositionsRef = useRef(onSavePositions)
+  const onPosicoesMovidasRef = useRef(onPosicoesMovidas)
+  const onVinculoSelecionadoRef = useRef(onVinculoSelecionado)
+  const posicoesNoInicioDoArrasteRef = useRef<Map<string, { x: number; y: number }>>(new Map())
 
   const onPersonClickRef = useRef(onPersonClick)
   const onAddPaiRef = useRef(onAddPai)
@@ -1693,7 +1707,9 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     onAddConjugeRef.current = onAddConjuge
     savedPositionsRef.current = savedPositions
     onSavePositionsRef.current = onSavePositions
-  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge, savedPositions, onSavePositions])
+    onPosicoesMovidasRef.current = onPosicoesMovidas
+    onVinculoSelecionadoRef.current = onVinculoSelecionado
+  }, [onPersonClick, onAddPai, onAddMae, onAddFilho, onAddConjuge, savedPositions, onSavePositions, onPosicoesMovidas, onVinculoSelecionado])
 
   const calculateLayout = useCallback(() => {
     const { nodes: rawNodes, edges: rawEdges } = buildTreeNodesAndEdges({
@@ -1744,35 +1760,56 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     calculateLayout()
   }, [calculateLayout, mode])
 
-  // ✅ NOVO: Salvar posição ao arrastar
-  const handleNodeDragStop = useCallback((_: any, node: Node) => {
+  // Persistência das posições: grava a posição de TODOS os nós person- visíveis
+  // (mais as `sobrescritas`, que valem mais que o estado do canvas — o setNodes
+  // acabou de ser pedido e o store ainda pode não tê-lo refletido).
+  const persistirPosicoes = useCallback((
+    modoAlvo: ViewMode,
+    sobrescritas: Record<string, { x: number; y: number }> = {},
+  ) => {
+    const atuais = { ...(savedPositionsRef.current || {}) }
+    const doModo = { ...(atuais[modoAlvo] || {}) }
+    if (modoAlvo === mode) {
+      getNodes().forEach(n => {
+        const m = n.id.match(/^person-(\d+)$/)
+        if (m) doModo[m[1]] = { x: n.position.x, y: n.position.y }
+      })
+    }
+    for (const [id, pos] of Object.entries(sobrescritas)) doModo[id] = { x: pos.x, y: pos.y }
+    atuais[modoAlvo] = doModo
+    savedPositionsRef.current = atuais
+    onSavePositionsRef.current?.(atuais)
+  }, [mode, getNodes])
+
+  // Posição de cada cartão no INÍCIO do arrasto — é o "antes" do Desfazer.
+  const handleNodeDragStart = useCallback((_: unknown, node: Node, arrastados?: Node[]) => {
+    const mapa = new Map<string, { x: number; y: number }>()
+    for (const n of (arrastados && arrastados.length > 0 ? arrastados : [node])) {
+      mapa.set(n.id, { x: n.position.x, y: n.position.y })
+    }
+    posicoesNoInicioDoArrasteRef.current = mapa
+  }, [])
+
+  // ✅ Salvar posição ao arrastar (e informar o movimento ao histórico)
+  const handleNodeDragStop = useCallback((_: unknown, node: Node, arrastados?: Node[]) => {
     const match = node.id.match(/^person-(\d+)$/)
     if (!match) return
 
-    const pessoaId = match[1]
-    const currentPositions = { ...(savedPositionsRef.current || {}) }
-    
-    if (!currentPositions[mode]) {
-      currentPositions[mode] = {}
-    }
-    
-    currentPositions[mode] = {
-      ...currentPositions[mode],
-      [pessoaId]: { x: node.position.x, y: node.position.y }
-    }
-
-    // Salvar posição de todos os nós person- visíveis
-    const currentNodes = getNodes()
-    currentNodes.forEach(n => {
+    const movimentos: { pessoaId: number; antes: { x: number; y: number }; depois: { x: number; y: number } }[] = []
+    for (const n of (arrastados && arrastados.length > 0 ? arrastados : [node])) {
       const m = n.id.match(/^person-(\d+)$/)
-      if (m) {
-        currentPositions[mode][m[1]] = { x: n.position.x, y: n.position.y }
-      }
-    })
+      const antes = posicoesNoInicioDoArrasteRef.current.get(n.id)
+      if (!m || !antes) continue
+      movimentos.push({ pessoaId: Number(m[1]), antes, depois: { x: n.position.x, y: n.position.y } })
+    }
+    posicoesNoInicioDoArrasteRef.current = new Map()
 
-    savedPositionsRef.current = currentPositions
-    onSavePositionsRef.current?.(currentPositions)
-  }, [mode, getNodes])
+    persistirPosicoes(mode, { [match[1]]: { x: node.position.x, y: node.position.y } })
+
+    // Movimento nulo (clique) não é ação: não entra no histórico.
+    const reais = movimentos.filter(m => Math.abs(m.antes.x - m.depois.x) > 0.5 || Math.abs(m.antes.y - m.depois.y) > 0.5)
+    if (reais.length > 0) onPosicoesMovidasRef.current?.(mode, reais)
+  }, [mode, persistirPosicoes])
 
   useImperativeHandle(ref, () => ({
     centerOnPerson: (pessoaId: number, opcoes?: { zoom?: number }) => {
@@ -1804,7 +1841,18 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       }
       fitView({ padding: 0.25, duration: 500, maxZoom: 1.2, nodes: nos.map((n) => ({ id: n.id })) })
     },
-  }), [getNodes, setCenter, getZoom, fitView, mode])
+    aplicarPosicoes: (modoAlvo: string, posicoes: Record<string, { x: number; y: number }>) => {
+      const alvo: ViewMode = modoAlvo === 'retrato' ? 'retrato' : 'paisagem'
+      if (alvo === mode) {
+        setNodes((atuais) => atuais.map((n) => {
+          const m = n.id.match(/^person-(\d+)$/)
+          const nova = m ? posicoes[m[1]] : undefined
+          return nova ? { ...n, position: { x: nova.x, y: nova.y } } : n
+        }))
+      }
+      persistirPosicoes(alvo, posicoes)
+    },
+  }), [getNodes, setCenter, getZoom, fitView, mode, setNodes, persistirPosicoes])
 
   // Foco aplicado sobre o layout já calculado. Ver `aplicarFoco`: nada aqui
   // recalcula dagre, então trocar de linhagem não move card nenhum.
@@ -1813,13 +1861,45 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
     [nodes, edges, foco, sinais, gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo],
   )
 
+  // Aresta selecionada ganha destaque PRÓPRIO (cor de ação, traço mais grosso):
+  // a seleção do reactflow não sobrevive ao `aplicarFoco`, que reconstrói arestas.
+  // Seleção cuja aresta sumiu do desenho (pessoa removida, recarga) não destaca nada;
+  // a tela também a descarta, pois `classificarVinculo` não acha mais o vínculo.
+  const edgesDesenhadas = useMemo(
+    () => arestaSelecionadaId == null
+      ? edgesEmTela
+      : edgesEmTela.map((e) => e.id === arestaSelecionadaId
+        ? { ...e, style: { ...e.style, stroke: '#0d2c58', strokeWidth: 4 }, zIndex: 10 }
+        : e),
+    [edgesEmTela, arestaSelecionadaId],
+  )
+
+  const selecionarAresta = useCallback((_: unknown, edge: Edge) => {
+    if (edge.id.startsWith('edge-grupo-')) return
+    onVinculoSelecionadoRef.current?.({ id: edge.id, source: edge.source, target: edge.target })
+  }, [])
+
+  const limparSelecaoDeAresta = useCallback(() => {
+    onVinculoSelecionadoRef.current?.(null)
+  }, [])
+
   return (
     <ReactFlow
       nodes={nodesEmTela}
-      edges={edgesEmTela}
+      edges={edgesDesenhadas}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
+      onNodeDragStart={handleNodeDragStart}
       onNodeDragStop={handleNodeDragStop}
+      onEdgeClick={selecionarAresta}
+      onPaneClick={limparSelecaoDeAresta}
+      onNodeClick={limparSelecaoDeAresta}
+      // DELETE/BACKSPACE NÃO APAGAM NADA. O padrão do reactflow remove o elemento
+      // selecionado do estado local — para o operador parecia que o vínculo foi
+      // apagado (e uma pessoa também!), mas era só o desenho; no próximo
+      // recarregamento voltava. Remover vínculo é ação explícita, com confirmação
+      // (ver remover-vinculo-modal.tsx) e passa pela porta oficial da árvore.
+      deleteKeyCode={null}
       nodeTypes={nodeTypes}
       connectionLineType={ConnectionLineType.SmoothStep}
       fitView

@@ -241,6 +241,11 @@ export function tsDe(d: Date | string | null | undefined): number | null {
   if (typeof d === "string") {
     const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/)
     if (m) return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12)
+    // DATA PARCIAL NÃO É DATA. "1850" ou "1850-03" dizem ano (ou mês), não um dia:
+    // o construtor de Date os leria como 1º de janeiro / 1º do mês e a
+    // cronologia acusaria conflito de um dia que ninguém registrou. Sem dia,
+    // não há diferença em dias a medir — devolve null e nenhuma regra dispara.
+    if (/^\d{4}(-\d{2})?$/.test(d.trim())) return null
   }
   const dt = d instanceof Date ? d : new Date(d)
   if (isNaN(dt.getTime())) return null
@@ -258,6 +263,32 @@ export function anosEntre(
   const tb = tsDe(b)
   if (ta == null || tb == null) return null
   return (tb - ta) / (365.2425 * DIA)
+}
+
+/**
+ * Anos COMPLETOS de calendário entre duas datas (idade em anos de quem nasceu em
+ * `de`, na data `ate`). Negativo/zero tratado por quem chama: se `ate` é anterior
+ * a `de`, devolve null — "idade" antes do nascimento não existe.
+ *
+ * Existe porque `anosEntre` divide dias por 365,2425 e erra nas bordas: quem faz
+ * exatamente 12 anos entre 1897 e 1909 (2 anos bissextos, não 3) dá 11,9976 e
+ * seria acusado de ter menos de 12. Limite de idade é regra de calendário.
+ */
+export function anosCompletosEntre(
+  de: Date | string | null | undefined,
+  ate: Date | string | null | undefined,
+): number | null {
+  const ta = tsDe(de)
+  const tb = tsDe(ate)
+  if (ta == null || tb == null || tb < ta) return null
+  const a = new Date(ta)
+  const b = new Date(tb)
+  let anos = b.getUTCFullYear() - a.getUTCFullYear()
+  const mesA = a.getUTCMonth()
+  const mesB = b.getUTCMonth()
+  const aniversarioJaPassou = mesB > mesA || (mesB === mesA && b.getUTCDate() >= a.getUTCDate())
+  if (!aniversarioJaPassou) anos--
+  return anos
 }
 
 /** Diferença em dias entre duas datas. */

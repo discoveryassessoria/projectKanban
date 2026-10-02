@@ -69,9 +69,23 @@ import {
   type FatosOperacionais,
   type ResumoLinhagem,
 } from "@/src/lib/genealogia/operacional/dossie"
-import type { ContextoAuditor } from "@/src/lib/genealogia/operacional/auditor"
+import { achadosDoMotorPorPessoa, type AchadoDoMotor } from "@/src/lib/genealogia/operacional/achados-do-motor"
+import { montarFilaDaPessoa, mensagemAntesDaGenealogia, type FilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
+import { nomeCompleto } from "@/src/lib/genealogia/motor/texto"
 import { calcularParentesco } from "@/src/lib/genealogia/motor/parentesco"
-import type { ContextoPerguntas } from "@/src/lib/genealogia/operacional/perguntas"
+import { contextoDePerguntas, type ContextoPerguntas } from "@/src/lib/genealogia/operacional/perguntas"
+import {
+  indicadoresDaArvore,
+  indicadoresDaPessoa,
+  type IndicadoresDaArvore,
+  type IndicadoresDaPessoa,
+} from "@/src/lib/genealogia/operacional/indicadores"
+import {
+  rascunhoDaProximaAcao,
+  rascunhoDoPasso,
+  type RascunhoTarefa,
+} from "@/src/lib/genealogia/operacional/tarefa-do-passo"
+import type { PassoSugerido } from "@/src/lib/genealogia/motor/tipos"
 import type { SinaisPessoa } from "../react-flow-tree"
 
 // A Árvore Genealógica NÃO tem prazo/SLA (decisão do usuário, 17/09/2026):
@@ -104,12 +118,35 @@ export interface ArvoreOperacional {
   resumo: ResumoLinhagem | null
   /** Contexto pronto para as perguntas da árvore. null sem análise. */
   perguntas: ContextoPerguntas | null
+  /**
+   * Números da árvore inteira (qualidade com decomposição + divergências) — a
+   * fonte do painel de Inteligência. O cartão de resumo e a aba Operação leem da
+   * mesma função (`indicadores.ts`); nenhum painel recalcula.
+   */
+  indicadores: IndicadoresDaArvore | null
+  /** Números de UMA pessoa (documentos + divergências) para a aba Operação. */
+  indicadoresDe: (pessoaId: number) => IndicadoresDaPessoa | null
+  /** Rascunho do "Criar tarefa" de um próximo passo do painel. */
+  rascunhoDoPasso: (passo: PassoSugerido) => RascunhoTarefa | null
+  /** Rascunho do "Criar tarefa" da próxima ação do cartão de resumo. */
+  rascunhoDaProximaAcao: RascunhoTarefa | null
 
   /** Caminho requerente → transmissor, clicável. Vazio fora do modo linhagem. */
   trilha: DegrauLinhagem[]
-  /** Diagnóstico do escopo em foco. */
-  diagnostico: Diagnostico
+  /** Próxima ação do escopo em foco (fila de pendências da árvore; tarefa nunca entra). */
   proximaAcao: AcaoRecomendada
+  /**
+   * Achados do motor genealógico que tocam a pessoa — a fonte única
+   * (`achados-do-motor.ts`) que substituiu a lista do painel Diagnóstico.
+   */
+  achadosDe: (pessoaId: number) => AchadoDoMotor[]
+  /**
+   * Fila de trabalho da pessoa (aba Operação): documentos reais com estado e ação +
+   * divergências do motor. Montada pela função PURA `montarFilaDaPessoa`.
+   */
+  filaDe: (pessoaId: number) => FilaDaPessoa
+  /** "As exigências serão geradas quando o processo entrar em <fase do cadastro>." */
+  mensagemAntesDaGenealogia: string
   /** Resumos de TODOS os requerentes, para a comparação. */
   comparacao: ResumoLinhagem[]
 
@@ -121,8 +158,6 @@ export interface ArvoreOperacional {
   contextoDe: (pessoaId: number) => string | null
   /** O que significa faltar pai/mãe em cada slot desenhado. */
   lacunas: Map<string, LacunaParental>
-  /** Contexto do Modo Auditor. null sem análise. */
-  auditor: ContextoAuditor | null
 
   /** Modo Saúde (heatmap). Desligado = o canvas não recebe anel nenhum. */
   saudeLigada: boolean
@@ -149,6 +184,7 @@ export interface ArvoreOperacional {
 }
 
 const SEM_DOSSIES = new Map<number, DossiePessoa>()
+const SEM_ACHADOS: AchadoDoMotor[] = []
 
 export function useArvoreOperacional(params: {
   processoId: number
@@ -171,6 +207,8 @@ export function useArvoreOperacional(params: {
             tarefas: req.dados.tarefas ?? [],
             lancamentos: req.dados.lancamentos ?? [],
             financeiroVisivel: Boolean(req.dados.financeiroVisivel),
+            faseAtualKey: req.dados.faseAtualKey ?? null,
+            faseDestinoLabel: req.dados.faseDestinoLabel ?? null,
           }
         : fatosVazios(),
     [req.dados],
@@ -198,17 +236,6 @@ export function useArvoreOperacional(params: {
   const [filtros, setFiltros] = useState<EstadoFiltros>(filtrosVazios)
   const [relacionadosVisiveis, setRelacionadosVisiveis] = useState(false)
   const [saudeLigada, setSaudeLigada] = useState(false)
-
-  /**
-   * "Agora" congelado no ciclo de vida do componente.
-   *
-   * `tarefa vencida` depende de hoje, mas ler `new Date()` durante o render faria
-   * o diagnóstico ter identidade nova a cada render — e ele é dependência de
-   * memo. Um valor por montagem é preciso o bastante (ninguém mantém a árvore
-   * aberta atravessando a meia-noite esperando um alerta mudar) e mantém tudo
-   * memoizável.
-   */
-  const [agora] = useState(() => new Date())
 
   // Requerente em foco: o escolhido à mão; senão o primeiro da lista (a linhagem
   // mais mapeada). Nunca `undefined` silencioso — a árvore abre centrada em
@@ -291,7 +318,7 @@ export function useArvoreOperacional(params: {
     [analise, modo, linhagem],
   )
 
-  // Duas marcas por cartão, no máximo. Só nascem quando há o que sinalizar —
+  // Uma marca por cartão. Só nasce quando há o que sinalizar —
   // um Map vazio faz o canvas seguir o caminho de custo zero.
   const sinais = useMemo<Map<number, SinaisPessoa>>(() => {
     const m = new Map<number, SinaisPessoa>()
@@ -299,8 +326,9 @@ export function useArvoreOperacional(params: {
       const divergencia = d.divergencias.some(
         (i) => i.severidade === "critico" || i.severidade === "alto",
       )
-      const tarefaAberta = d.tarefasAbertas.length > 0
-      if (divergencia || tarefaAberta) m.set(id, { divergencia, tarefaAberta })
+      // Só divergência vira marca no cartão. Tarefa aberta é trabalho em
+      // andamento, não pendência de árvore — não ganha marca aqui (Etapa 2).
+      if (divergencia) m.set(id, { divergencia })
     }
     return m
   }, [dossies])
@@ -308,9 +336,9 @@ export function useArvoreOperacional(params: {
   const resumo = useMemo<ResumoLinhagem | null>(
     () =>
       linhagem && analise
-        ? resumirLinhagem(linhagem, dossies, analise.grafo, projecaoDocumental, agora)
+        ? resumirLinhagem(linhagem, dossies, analise.grafo, projecaoDocumental, analise)
         : null,
-    [linhagem, dossies, analise, projecaoDocumental, agora],
+    [linhagem, dossies, analise, projecaoDocumental],
   )
 
   // Comparação: um resumo por requerente. É o mesmo `resumirLinhagem` — nenhuma
@@ -318,9 +346,9 @@ export function useArvoreOperacional(params: {
   const comparacao = useMemo<ResumoLinhagem[]>(
     () =>
       analise
-        ? mapa.linhagens.map((l) => resumirLinhagem(l, dossies, analise.grafo, projecaoDocumental, agora))
+        ? mapa.linhagens.map((l) => resumirLinhagem(l, dossies, analise.grafo, projecaoDocumental, analise))
         : [],
-    [mapa, dossies, analise, projecaoDocumental, agora],
+    [mapa, dossies, analise, projecaoDocumental],
   )
 
   // O canvas só desenha slot "+pai/+mãe" para a pessoa RAIZ (profundidade 0);
@@ -347,7 +375,6 @@ export function useArvoreOperacional(params: {
             // O diagnóstico segue o escopo da tela: no modo linhagem fala da
             // linha; na vista completa fala da árvore.
             linhagem: modo === "linhagem" ? linhagem : null,
-            agora,
           })
         : {
             saude: "saudavel",
@@ -358,14 +385,7 @@ export function useArvoreOperacional(params: {
             atencao: 0,
             semExigenciaMaterializada: true,
           },
-    [analise, mapa, dossies, modo, linhagem, agora],
-  )
-
-  // O Auditor come exatamente o mesmo contexto do diagnóstico — nenhuma
-  // projeção nova, nenhuma segunda leitura. Ele só narra o que já foi apurado.
-  const auditor = useMemo<ContextoAuditor | null>(
-    () => (analise ? { grafo: analise.grafo, analise, mapa, dossies, linhagem } : null),
-    [analise, mapa, dossies, linhagem],
+    [analise, mapa, dossies, modo, linhagem],
   )
 
   // O heatmap sai dos MESMOS dossiês do diagnóstico — nenhuma leitura nova,
@@ -386,14 +406,6 @@ export function useArvoreOperacional(params: {
   const proximaAcao = useMemo<AcaoRecomendada>(
     () => resolveNextGenealogyAction(diagnostico),
     [diagnostico],
-  )
-
-  // O contexto das perguntas é memoizado junto: sem isso, cada render entregaria
-  // um objeto novo ao painel e a resposta seria recalculada a cada movimento do
-  // mouse sobre o canvas.
-  const perguntas = useMemo<ContextoPerguntas | null>(
-    () => (analise ? { grafo: analise.grafo, analise, mapa, dossies, linhagem } : null),
-    [analise, mapa, dossies, linhagem],
   )
 
   // ANTES do preview: os mesmos números que a barra já mostra. Nada é lido de
@@ -454,6 +466,93 @@ export function useArvoreOperacional(params: {
     [analise, pessoasComConflito],
   )
 
+  // Achados do motor por pessoa — o que o painel Diagnóstico listava como
+  // divergência/duplicidade/relação/risco, agora servido à aba Operação.
+  const achadosPorPessoa = useMemo(() => achadosDoMotorPorPessoa(analise), [analise])
+  const achadosDe = useCallback(
+    (pessoaId: number): AchadoDoMotor[] => achadosPorPessoa.get(pessoaId) ?? SEM_ACHADOS,
+    [achadosPorPessoa],
+  )
+
+  // FILA DA PESSOA: só roda quando a aba é aberta (chamada por pessoa, sob demanda).
+  // Usa os fatos já lidos — nenhuma leitura nova, nenhuma segunda contagem.
+  const filaDe = useCallback(
+    (pessoaId: number): FilaDaPessoa =>
+      montarFilaDaPessoa({
+        pessoaId,
+        processoId,
+        faseAtualKey: fatos.faseAtualKey ?? null,
+        necessidades: fatos.necessidades,
+        tarefas: fatos.tarefas,
+        uniaoIdsDaPessoa: (analise?.grafo.unioesDe(pessoaId) ?? [])
+          .map((u) => u.id)
+          .filter((id): id is number => typeof id === "number"),
+        nomeDoConjugeDaUniao: (uniaoId) => {
+          const u = analise?.grafo.unioesDe(pessoaId).find((x) => x.id === uniaoId)
+          if (!u || !analise) return null
+          const outro = analise.grafo.pessoa(u.pessoa1Id === pessoaId ? u.pessoa2Id : u.pessoa1Id)
+          return outro ? nomeCompleto(outro) : null
+        },
+        achados: achadosPorPessoa.get(pessoaId) ?? SEM_ACHADOS,
+        nomeDePessoa: (id) => {
+          const p = analise?.grafo.pessoa(id)
+          return p ? nomeCompleto(p) : `#${id}`
+        },
+      }),
+    [processoId, fatos, analise, achadosPorPessoa],
+  )
+  const textoAntesDaGenealogia = useMemo(
+    () => mensagemAntesDaGenealogia(fatos.faseDestinoLabel),
+    [fatos.faseDestinoLabel],
+  )
+
+  // O contexto das perguntas é memoizado: sem isso, cada render entregaria um
+  // objeto novo ao painel e a resposta seria recalculada a cada movimento do
+  // mouse sobre o canvas. Montado por `contextoDePerguntas` (o mesmo que os
+  // testes usam) com a MESMA fila e a MESMA projeção documental do cartão e da
+  // aba Operação — as respostas citam os mesmos documentos e somam os mesmos
+  // totais.
+  const perguntas = useMemo<ContextoPerguntas | null>(
+    () =>
+      analise
+        ? contextoDePerguntas({
+            grafo: analise.grafo,
+            analise,
+            mapa,
+            dossies,
+            linhagem,
+            projecao: projecaoDocumental,
+            filaDe,
+          })
+        : null,
+    [analise, mapa, dossies, linhagem, projecaoDocumental, filaDe],
+  )
+
+  // Indicadores: UMA definição (`indicadores.ts`) para o painel de Inteligência,
+  // o cartão de resumo (`resumo`, via `resumirLinhagem`) e a aba Operação.
+  const indicadores = useMemo<IndicadoresDaArvore | null>(
+    () => (analise ? indicadoresDaArvore(analise) : null),
+    [analise],
+  )
+  const indicadoresDe = useCallback(
+    (pessoaId: number): IndicadoresDaPessoa | null => {
+      const d = dossies.get(pessoaId)
+      return d ? indicadoresDaPessoa(d.documental, achadosPorPessoa.get(pessoaId) ?? SEM_ACHADOS) : null
+    },
+    [dossies, achadosPorPessoa],
+  )
+
+  // "Criar tarefa": só o RASCUNHO nasce aqui; a escrita é da porta canônica.
+  const rascunhoDoPassoDe = useCallback(
+    (passo: PassoSugerido): RascunhoTarefa | null => {
+      if (!analise) return null
+      const insight = analise.insights.find((i) => i.id === passo.insightId)
+      return rascunhoDoPasso(passo, insight, analise.grafo)
+    },
+    [analise],
+  )
+  const rascunhoProximaAcao = useMemo(() => rascunhoDaProximaAcao(proximaAcao), [proximaAcao])
+
   const selecionarRequerente = useCallback((id: number | null) => setEscolhaManual(id), [])
   const alternarRelacionados = useCallback(() => setRelacionadosVisiveis((v) => !v), [])
   const alternarSaude = useCallback(() => setSaudeLigada((v) => !v), [])
@@ -503,16 +602,21 @@ export function useArvoreOperacional(params: {
     dossies,
     resumo,
     perguntas,
+    indicadores,
+    indicadoresDe,
+    rascunhoDoPasso: rascunhoDoPassoDe,
+    rascunhoDaProximaAcao: rascunhoProximaAcao,
     trilha,
-    diagnostico,
     proximaAcao,
+    achadosDe,
+    filaDe,
+    mensagemAntesDaGenealogia: textoAntesDaGenealogia,
     comparacao,
     relacionadosVisiveis,
     alternarRelacionados,
     totalRelacionados,
     contextoDe,
     lacunas,
-    auditor,
     saudeLigada,
     alternarSaude,
     saude: saudeCalculada,
