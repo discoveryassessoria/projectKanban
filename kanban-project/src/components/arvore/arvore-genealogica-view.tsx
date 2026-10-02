@@ -71,6 +71,15 @@ import {
   Unlink,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { AvisoPessoaRepetida, usePessoasParecidas } from "@/src/components/arvore/aviso-pessoa-repetida"
+import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
+import {
+  ROTULO_GENITOR,
+  estenderTrilha,
+  proximosPassosDaLinhagem,
+  rotuloDaTrilha,
+  type TipoGenitor,
+} from "@/src/lib/genealogia/cadastro-linhagem"
 
 // Helper para fetch autenticado
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -293,6 +302,10 @@ export function ArvoreGenealogicaView({
   const [addPersonType, setAddPersonType] = useState<'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null>(null)
   const [addPersonParentId, setAddPersonParentId] = useState<number | null>(null)
   const [addConjugeForPessoaId, setAddConjugeForPessoaId] = useState<number | null>(null)
+  // Cadastro de linhagem em série: nomes já cadastrados neste lote (vazio = fora do modo)
+  // e a chave que remonta o formulário limpo a cada passo, sem fechar o modal.
+  const [trilhaLinhagem, setTrilhaLinhagem] = useState<string[]>([])
+  const [addModalKey, setAddModalKey] = useState(0)
 
   const [showEditPersonModal, setShowEditPersonModal] = useState(false)
   const [editingPerson, setEditingPerson] = useState<PessoaArvore | null>(null)
@@ -1059,6 +1072,9 @@ export function ArvoreGenealogicaView({
       }
 
       if (e.key === "Escape") {
+        // Modal de adicionar pessoa: o Esc é dele (pilha de Esc), e sair dele encerra o
+        // cadastro em série. A árvore por baixo não fecha nada às costas do modal.
+        if (showAddPersonModal) return
         // DONO ÚNICO DO ESCAPE, e só enquanto a árvore tem algo a fechar.
         //
         // A árvore abre dentro do modal do processo, que fecha no Escape por um
@@ -1764,6 +1780,7 @@ export function ArvoreGenealogicaView({
       {/* Modal Adicionar Pessoa */}
       {showAddPersonModal && (
         <AddPersonModal
+          key={addModalKey}
           arvoreId={arvoreId!}
           processoId={processoId}
           type={addPersonType}
@@ -1772,11 +1789,13 @@ export function ArvoreGenealogicaView({
           pessoas={pessoas}
           unioes={unioes}
           requerentesForaDaArvore={requerentesForaDaArvore}
+          trilha={trilhaLinhagem}
           onClose={() => {
             setShowAddPersonModal(false)
             setAddPersonType(null)
             setAddPersonParentId(null)
             setAddConjugeForPessoaId(null)
+            setTrilhaLinhagem([])
           }}
           onSuccess={async () => {
             await fetchArvore()
@@ -1784,6 +1803,16 @@ export function ArvoreGenealogicaView({
             setAddPersonType(null)
             setAddPersonParentId(null)
             setAddConjugeForPessoaId(null)
+            setTrilhaLinhagem([])
+          }}
+          onSalvouEmSerie={fetchArvore}
+          onContinuarLinhagem={({ tipo, pessoaId, trilha }) => {
+            // Mesmos handlers de hoje (handleAddPai/handleAddMae): o modal é o mesmo, o vínculo
+            // vai pelo mesmo POST /api/pessoas. A chave só remonta o formulário limpo.
+            setTrilhaLinhagem(trilha)
+            setAddModalKey((k) => k + 1)
+            if (tipo === 'pai') handleAddPai(pessoaId)
+            else handleAddMae(pessoaId)
           }}
         />
       )}
@@ -1828,8 +1857,11 @@ function AddPersonModal({
   pessoas,
   unioes,
   requerentesForaDaArvore,
+  trilha,
   onClose,
-  onSuccess
+  onSuccess,
+  onSalvouEmSerie,
+  onContinuarLinhagem,
 }: {
   arvoreId: number
   processoId: number
@@ -1840,9 +1872,18 @@ function AddPersonModal({
   unioes: UniaoArvore[]
   /** Quantos requerentes do processo ainda não estão na árvore. */
   requerentesForaDaArvore: number
+  /** Nomes já cadastrados neste lote de linhagem (vazio = cadastro avulso). */
+  trilha: string[]
   onClose: () => void
   onSuccess: () => void
+  /** Atualiza a árvore SEM fechar o modal (cadastro em série). */
+  onSalvouEmSerie: () => Promise<void>
+  onContinuarLinhagem: (c: { tipo: TipoGenitor; pessoaId: number; trilha: string[] }) => void
 }) {
+  // Esc fecha o modal e, com ele, encerra o cadastro em série.
+  useFecharComEsc(true, onClose)
+  // Passo seguinte da linhagem, mostrado depois de salvar uma pessoa da linha reta.
+  const [proximo, setProximo] = useState<{ pessoaId: number; nome: string; falta: TipoGenitor[]; trilha: string[] } | null>(null)
   // Modo de cadastro: pessoa comum (cria Pessoa) OU requerente do processo (REUSA a
   // Pessoa já existente — nunca duplica). O requerente NUNCA é criado por este form.
   // Quando não há requerente fora da árvore, a aba nem é oferecida — e um modo
@@ -1866,6 +1907,7 @@ function AddPersonModal({
   const [conjugeId, setConjugeId] = useState<number | string>('')
   const [comentario, setComentario] = useState('')
   const [saving, setSaving] = useState(false)
+  const parecidas = usePessoasParecidas({ nome, sobrenome, dataNascimento: dataNasc, arvoreId })
   
   // ✅ NOVOS CAMPOS
   const [requerente, setRequerente] = useState<string>('nao')
@@ -2024,7 +2066,21 @@ function AddPersonModal({
           })
         }
 
-        onSuccess()
+        const falta = proximosPassosDaLinhagem({
+          linhaReta: isLinhaReta,
+          tipo: type,
+          temPai: body.paiId != null,
+          temMae: body.maeId != null,
+        })
+        if (falta.length > 0) {
+          const base = (type === 'pai' || type === 'mae') && parentId ? pessoas.find(p => p.id === parentId) : undefined
+          const baseNome = base ? nomeCompleto(base) : null
+          const novoNome = [nome.trim(), sobrenome.trim()].filter(Boolean).join(' ')
+          await onSalvouEmSerie()
+          setProximo({ pessoaId: novaPessoa.id, nome: novoNome, falta, trilha: estenderTrilha(trilha, baseNome, novoNome) })
+        } else {
+          onSuccess()
+        }
       } else {
         const error = await response.json()
         alert(error.error || 'Erro ao adicionar pessoa')
@@ -2046,6 +2102,9 @@ function AddPersonModal({
   }
 
   const pessoasDisponiveis = pessoas.filter(p => true)
+  const rotulo = proximo
+    ? rotuloDaTrilha(proximo.trilha, null)
+    : rotuloDaTrilha(trilha, type === 'pai' || type === 'mae' ? type : null)
 
   return (
     <>
@@ -2058,9 +2117,31 @@ function AddPersonModal({
           — inclusive qualquer campo que venha a ser adicionado depois. */}
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-[var(--elev-3)] z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b sticky top-0 bg-[var(--surface-primary)]">
-          <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{proximo ? 'Pessoa adicionada' : titles[type || 'pessoa']}</h2>
+          {rotulo && (
+            <p data-linhagem="trilha" className="text-xs text-[var(--text-secondary)] mt-1">{rotulo}</p>
+          )}
         </div>
 
+        {proximo ? (
+          <div className="p-6 space-y-4" data-linhagem="proximo-passo">
+            <p className="text-sm text-gray-700"><strong>{proximo.nome}</strong> foi salva na linha reta. Continuar a linhagem?</p>
+            <div className="flex flex-wrap gap-3">
+              {proximo.falta.map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  autoFocus={g === proximo.falta[0]}
+                  onClick={() => onContinuarLinhagem({ tipo: g, pessoaId: proximo.pessoaId, trilha: proximo.trilha })}
+                  className="px-4 py-2 bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg"
+                >
+                  Adicionar {ROTULO_GENITOR[g]} de {proximo.nome}
+                </button>
+              ))}
+              <button type="button" onClick={onSuccess} className="px-4 py-2 text-gray-600 hover:text-gray-800">Concluir</button>
+            </div>
+          </div>
+        ) : (<>
         {/* Seletor de modo: pessoa comum (cria) x requerente do processo (REUSA) */}
         <div className="px-6 pt-4">
           <div className="inline-flex rounded-lg border border-gray-200 p-1 bg-gray-50">
@@ -2153,6 +2234,7 @@ function AddPersonModal({
                 <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
             </div>
+            <AvisoPessoaRepetida candidatos={parecidas} />
           </section>
 
           {/* ===== Situação ===== */}
@@ -2254,6 +2336,7 @@ function AddPersonModal({
           </div>
         </form>
         )}
+        </>)}
       </div>
     </>
   )
@@ -2315,6 +2398,15 @@ function EditPersonModal({
   const [maeSelecionadaId, setMaeSelecionadaId] = useState<number | ''>((pessoa as any).maeId || '')
   const [comentario, setComentario] = useState(pessoa.comentario || '')
   const [saving, setSaving] = useState(false)
+  // Aviso de pessoa parecida em OUTRO processo: só quando nome ou nascimento foram alterados aqui.
+  const dataNascOriginal = pessoa.data_nasc ? new Date(pessoa.data_nasc).toISOString().split('T')[0] : ''
+  const parecidas = usePessoasParecidas({
+    nome,
+    sobrenome,
+    dataNascimento: dataNasc,
+    arvoreId,
+    ativo: nome !== pessoa.nome || sobrenome !== (pessoa.sobrenome || '') || dataNasc !== dataNascOriginal,
+  })
   const [requerente, setRequerente] = useState((pessoa as any).requerente || 'nao')
   const jaEhRequerente = ["sim", "maior", "menor"].includes(String((pessoa as any).requerente ?? "").toLowerCase())
   // ── VINCULAR A UM REQUERENTE JÁ CADASTRADO NO PROCESSO ──────────────────────
@@ -2755,6 +2847,7 @@ function EditPersonModal({
                 <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
             </div>
+            <AvisoPessoaRepetida candidatos={parecidas} />
           </section>
 
           {/* ===== Situação ===== */}
