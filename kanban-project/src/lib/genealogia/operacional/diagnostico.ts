@@ -1,17 +1,24 @@
 // src/lib/genealogia/operacional/diagnostico.ts
 //
-// DIAGNÓSTICO DA ÁRVORE — o processo se explica sozinho.
+// DIAGNÓSTICO DA ÁRVORE — a lista do que trava a árvore, por trás da "Próxima ação".
 //
-// Uma pergunta, uma resposta: "este processo está saudável?". Abaixo dela, a
-// lista ordenada do que impede dizer que sim — cada item com pessoa, categoria,
-// motivo, impacto, FONTE e ação.
+// O PAINEL "Diagnóstico" saiu da tela (Etapa 2 da reforma da árvore). Este módulo
+// ficou porque a "Próxima ação" do cartão de resumo ainda precisa de UMA fila
+// ordenada de pendências da árvore — cada item com pessoa, categoria, motivo,
+// impacto, FONTE e ação.
 //
-// TRÊS REGRAS QUE DEFINEM ESTE MÓDULO:
+// QUATRO REGRAS QUE DEFINEM ESTE MÓDULO:
+//
+// 0. TAREFA NUNCA É PENDÊNCIA DE ÁRVORE (regra permanente, Etapa 2). Tarefa
+//    vencida, aberta ou com dono é TRABALHO EM ANDAMENTO: já tem lugar na Torre de
+//    Controle e em Tarefas. Listá-la aqui duplicaria a verdade operacional numa
+//    tela que fala de estrutura familiar/documental. Por isso este módulo não lê
+//    `tarefasAbertas`, não tem categoria de tarefa e a fila não tem faixa de
+//    tarefa. `CATEGORIAS_DE_PENDENCIA` é o fecho dessa regra (testado).
 //
 // 1. NÃO INVENTA PROBLEMA. Todo item nasce de um fato lido de fonte canônica:
-//    NecessidadeDocumental (Sistema Documental), Tarefa (processo), SLA (engine
-//    única) ou uma regra determinística do motor genealógico. Não há heurística
-//    de "parece errado".
+//    NecessidadeDocumental (Sistema Documental) ou um achado do motor genealógico
+//    (`achados-do-motor.ts`, a fonte única). Não há heurística de "parece errado".
 //
 // 2. NÃO HÁ SCORE. A saúde tem três estados com definição fechada:
 //    CRÍTICO = existe bloqueio impeditivo; ATENÇÃO = existe pendência ou
@@ -24,15 +31,14 @@
 //    exigência para conferir — e o diagnóstico diz isso, em vez de exibir um
 //    verde que o operador leria como aprovação.
 //
-// PURO: sem prisma, sem rede, sem relógio interno. A data de referência entra
-// por parâmetro, porque "tarefa vencida" depende de HOJE e um módulo que lê o
-// relógio não é testável.
+// PURO: sem prisma, sem rede, sem relógio.
 
 import type { GrafoGenealogico } from "../motor/grafo"
-import type { AnaliseArvore, Insight, Severidade } from "../motor/tipos"
+import type { AnaliseArvore, Severidade } from "../motor/tipos"
 import type { Linhagem, MapaLinhagens } from "../motor/linhagens"
 import { nomeCompleto } from "../motor/texto"
-import type { DossiePessoa, TarefaDaPessoa } from "./dossie"
+import type { DossiePessoa } from "./dossie"
+import { achadosDoMotor, type CategoriaAchado } from "./achados-do-motor"
 
 export type NivelSaude = "saudavel" | "atencao" | "critico"
 
@@ -42,22 +48,25 @@ export const ROTULO_SAUDE: Record<NivelSaude, string> = {
   critico: "Crítico",
 }
 
-export type CategoriaProblema =
-  | "bloqueio_documental"
-  | "linhagem"
-  | "documento_ausente"
-  | "tarefa_vencida"
-  | "tarefa_aberta"
-  | "divergencia"
-  | "duplicidade"
-  | "relacao"
+export type CategoriaProblema = "bloqueio_documental" | "documento_ausente" | CategoriaAchado
+
+/**
+ * As categorias que PODEM ser pendência de árvore. Fechado de propósito: tarefa
+ * não está aqui e não pode entrar (ver regra 0 no topo do arquivo).
+ */
+export const CATEGORIAS_DE_PENDENCIA: readonly CategoriaProblema[] = [
+  "bloqueio_documental",
+  "documento_ausente",
+  "divergencia",
+  "duplicidade",
+  "relacao",
+  "linhagem",
+]
 
 export const ROTULO_CATEGORIA: Record<CategoriaProblema, string> = {
   bloqueio_documental: "Documento não localizado",
   linhagem: "Linhagem",
   documento_ausente: "Documento obrigatório",
-  tarefa_vencida: "Tarefa vencida",
-  tarefa_aberta: "Tarefa aberta",
   divergencia: "Divergência de dados",
   duplicidade: "Possível duplicidade",
   relacao: "Relação incompleta",
@@ -107,23 +116,12 @@ export interface ContextoDiagnostico {
   dossies: Map<number, DossiePessoa>
   /** Escopo: uma linhagem, ou a árvore inteira quando null. */
   linhagem: Linhagem | null
-  /** Data de referência para vencimento. Injetada — o módulo não lê relógio. */
-  agora: Date
 }
 
 const FONTE_DOCUMENTAL = "NecessidadeDocumental (Sistema Documental)"
-const FONTE_TAREFA = "Tarefa do processo"
-const FONTE_MOTOR = "Motor genealógico (regra determinística)"
-
-/** Uma tarefa está vencida quando tem prazo e o prazo já passou. */
-export function tarefaVencida(t: TarefaDaPessoa, agora: Date): boolean {
-  if (t.concluida || !t.dataPrazo) return false
-  const prazo = Date.parse(t.dataPrazo)
-  return Number.isFinite(prazo) && prazo < agora.getTime()
-}
 
 export function diagnosticar(ctx: ContextoDiagnostico): Diagnostico {
-  const { grafo, analise, mapa, dossies, linhagem, agora } = ctx
+  const { grafo, analise, mapa, dossies, linhagem } = ctx
   const problemas: Problema[] = []
 
   const escopo = linhagem ? [...linhagem.visivel] : grafo.pessoas.map((p) => p.id)
@@ -188,80 +186,34 @@ export function diagnosticar(ctx: ContextoDiagnostico): Diagnostico {
     }
   }
 
-  // ── 2. Tarefas (fonte: Tarefa do processo) ────────────────────────────────
-  for (const id of escopo) {
-    const d = dossies.get(id)
-    if (!d) continue
-    const vencidas = d.tarefasAbertas.filter((t) => tarefaVencida(t, agora))
-    const abertasNoPrazo = d.tarefasAbertas.length - vencidas.length
-
-    if (vencidas.length > 0) {
-      problemas.push({
-        id: `diag-tarefa-vencida-${id}`,
-        categoria: "tarefa_vencida",
-        severidade: "alto",
-        impeditivo: false,
-        pessoaId: id,
-        pessoaNome: d.nome,
-        titulo: `${vencidas.length} tarefa(s) vencida(s) — ${d.nome}`,
-        motivo: `Prazo mais antigo: ${vencidas[0].dataPrazo?.slice(0, 10) ?? "sem data"}. A tarefa tem dono e passou da data.`,
-        impacto: impactoDe(id),
-        fonte: FONTE_TAREFA,
-        acao: `Cobrar ou reprogramar “${vencidas[0].titulo}”.`,
-        peso: 700 + vencidas.length,
-      })
-    }
-    if (abertasNoPrazo > 0) {
-      problemas.push({
-        id: `diag-tarefa-aberta-${id}`,
-        categoria: "tarefa_aberta",
-        severidade: "medio",
-        impeditivo: false,
-        pessoaId: id,
-        pessoaNome: d.nome,
-        titulo: `${abertasNoPrazo} tarefa(s) aberta(s) — ${d.nome}`,
-        motivo: "Trabalho em andamento, dentro do prazo.",
-        impacto: impactoDe(id),
-        fonte: FONTE_TAREFA,
-        acao: "Acompanhar a tarefa na aba Operação da pessoa.",
-        peso: 300,
-      })
-    }
-  }
-
-  // ── 3. Motor genealógico (divergência, duplicidade, relação, linhagem) ────
-  // Os insights JÁ vêm priorizados e explicados pelo motor. Aqui eles só são
-  // traduzidos para a linguagem do diagnóstico — reclassificar severidade seria
+  // ── 2. Motor genealógico (divergência, duplicidade, relação, linhagem) ────
+  // Os achados JÁ vêm priorizados e explicados pelo motor, e a seleção de quais
+  // insights são pendência de árvore mora em UM lugar (`achados-do-motor.ts`).
+  // Aqui eles só ganham o impacto em requerentes — reclassificar severidade seria
   // criar uma segunda opinião sobre o mesmo fato.
-  for (const i of analise?.insights ?? []) {
-    const tocaEscopo = i.pessoaIds.length === 0 || i.pessoaIds.some((id) => noEscopo.has(id))
-    if (!tocaEscopo) continue
-
-    const categoria = categoriaDoInsight(i)
-    if (!categoria) continue
-    const pessoaId = i.pessoaIds.find((id) => noEscopo.has(id)) ?? i.pessoaIds[0] ?? null
-
+  for (const a of achadosDoMotor(analise, noEscopo)) {
     problemas.push({
-      id: `diag-${i.id}`,
-      categoria,
-      severidade: i.severidade,
+      id: `diag-${a.id}`,
+      categoria: a.categoria,
+      severidade: a.severidade,
       // Só é impeditivo o que o motor classificou como crítico: uma grafia
       // divergente atrasa, não impede.
-      impeditivo: i.severidade === "critico",
-      pessoaId,
-      pessoaNome: pessoaId != null ? nomeDe(pessoaId) : null,
-      titulo: i.titulo,
-      motivo: i.explicacao,
-      impacto: pessoaId != null ? impactoDe(pessoaId) : "Afeta a estrutura da árvore.",
-      fonte: FONTE_MOTOR,
-      acao: i.acao ?? "Abrir a pessoa e conferir o cadastro.",
-      peso: (i.severidade === "critico" ? 900 : 400) + Math.min(i.peso, 99),
+      impeditivo: a.impeditivo,
+      pessoaId: a.pessoaId,
+      pessoaNome: a.pessoaId != null ? nomeDe(a.pessoaId) : null,
+      titulo: a.titulo,
+      motivo: a.explicacao,
+      impacto: a.pessoaId != null ? impactoDe(a.pessoaId) : "Afeta a estrutura da árvore.",
+      fonte: a.fonte,
+      acao: a.acao,
+      peso: (a.impeditivo ? 900 : 400) + Math.min(a.peso, 99),
     })
   }
 
   // A Árvore Genealógica NÃO tem prazo/SLA (decisão do usuário, 17/09/2026):
   // existiu aqui uma categoria "sla" alimentada pela engine de SLA de
   // FaseMacro/Processo (removida) — eliminada por completo, sem substituto.
+  // E NÃO tem tarefa (Etapa 2, regra 0): tarefa é trabalho, não pendência.
 
   // Ordem determinística: peso, depois id. Duas leituras da mesma árvore
   // produzem a mesma lista, na mesma ordem.
@@ -294,28 +246,24 @@ function montarResumo(saude: NivelSaude, total: number, semExigencia: boolean): 
   return `${total} ${total === 1 ? "pendência" : "pendências"}`
 }
 
-function categoriaDoInsight(i: Insight): CategoriaProblema | null {
-  switch (i.categoria) {
-    case "conflito":
-      return "divergencia"
-    case "duplicidade":
-      return "duplicidade"
-    case "sobrenome":
-      return "divergencia"
-    case "relacao":
-      return "relacao"
-    case "risco":
-      return "linhagem"
-    // Lacuna de cadastro e sugestão de pesquisa não são pendência operacional:
-    // aparecem no painel de Análise, não na lista do que trava o processo.
-    case "lacuna":
-    case "pesquisa":
-    case "migracao":
-      return null
-  }
-}
-
 // ── PRÓXIMA MELHOR AÇÃO ─────────────────────────────────────────────────────
+
+/**
+ * A fila é FIXA e declarada, não negociável por heurística. Os rótulos moram
+ * AQUI (fonte única) e o Modo Auditor os lê — nada de lista paralela.
+ *
+ * TAREFA NÃO TEM FAIXA: tarefa vencida/aberta é trabalho, não pendência de árvore
+ * (regra 0 no topo do arquivo). Havia duas faixas de tarefa (4 e 5) até a Etapa 2.
+ */
+export const FILA_DE_PRIORIDADE = [
+  "bloqueio crítico",
+  "divergência impeditiva",
+  "documento obrigatório ausente",
+  "outra pendência da árvore (divergência, duplicidade ou relação)",
+  "nenhuma ação necessária",
+] as const
+
+export const TOTAL_PRIORIDADES = FILA_DE_PRIORIDADE.length
 
 export interface AcaoRecomendada {
   pessoaId: number | null
@@ -325,22 +273,20 @@ export interface AcaoRecomendada {
   /** Por que é ESTA a próxima, e não outra. */
   motivo: string
   fonte: string
-  /** Posição na fila fixa de prioridade (1..7). 7 = nada a fazer. */
+  /** Posição na fila fixa de prioridade (1..TOTAL_PRIORIDADES). A última = nada a fazer. */
   prioridade: number
   /** Problema de origem — o link de navegação da tela. */
   problemaId: string | null
 }
 
 /**
- * A fila é FIXA e declarada, não negociável por heurística:
+ * Faixas, na ordem de `FILA_DE_PRIORIDADE`:
  *
  *   1. bloqueio crítico          — o que impede
  *   2. divergência impeditiva    — o que invalida o documento que vier
  *   3. documento obrigatório ausente
- *   4. tarefa vencida
- *   5. tarefa aberta
- *   6. próxima obrigação documental (em atendimento)
- *   7. nenhuma ação necessária
+ *   4. qualquer outra pendência da árvore
+ *   5. nenhuma ação necessária
  *
  * Dentro de cada faixa desempata o peso do problema — que já considera quantos
  * requerentes dependem da pessoa. Por isso, entre dois bloqueios iguais, vence o
@@ -351,9 +297,7 @@ export function resolveNextGenealogyAction(diag: Diagnostico): AcaoRecomendada {
     { prioridade: 1, casa: (p) => p.impeditivo && p.categoria === "bloqueio_documental" },
     { prioridade: 2, casa: (p) => p.impeditivo },
     { prioridade: 3, casa: (p) => p.categoria === "documento_ausente" },
-    { prioridade: 4, casa: (p) => p.categoria === "tarefa_vencida" },
-    { prioridade: 5, casa: (p) => p.categoria === "tarefa_aberta" },
-    { prioridade: 6, casa: () => true },
+    { prioridade: 4, casa: () => true },
   ]
 
   for (const faixa of faixas) {
@@ -379,7 +323,7 @@ export function resolveNextGenealogyAction(diag: Diagnostico): AcaoRecomendada {
       ? "Nenhuma exigência documental foi materializada para esta linha ainda."
       : "Nenhuma pendência conhecida nesta linha.",
     fonte: FONTE_DOCUMENTAL,
-    prioridade: 7,
+    prioridade: TOTAL_PRIORIDADES,
     problemaId: null,
   }
 }

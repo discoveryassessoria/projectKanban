@@ -10,7 +10,7 @@
 //
 //   CRÍTICO   existe bloqueio impeditivo (documento NÃO LOCALIZADO, ou
 //             divergência que o motor classificou como crítica)
-//   ATENÇÃO   existe pendência, divergência ou tarefa aberta
+//   ATENÇÃO   existe pendência documental ou divergência (tarefa aberta NÃO conta: é trabalho, não pendência)
 //   SAUDÁVEL  nenhuma pendência conhecida
 //   FORA      a pessoa não está na linhagem em foco
 //
@@ -111,14 +111,12 @@ export function calcularSaude(
     const pendentes = d.documental.pendentes
     const emAndamento = d.documental.emAtendimento
     const divergencias = d.divergencias.length
-    const tarefas = d.tarefasAbertas.length
 
-    if (pendentes > 0 || divergencias > 0 || tarefas > 0 || emAndamento > 0) {
+    if (pendentes > 0 || divergencias > 0 || emAndamento > 0) {
       const partes: string[] = []
       if (pendentes > 0) partes.push(`${pendentes} exigência(s) pendente(s)`)
       if (emAndamento > 0) partes.push(`${emAndamento} em atendimento`)
       if (divergencias > 0) partes.push(`${divergencias} divergência(s)`)
-      if (tarefas > 0) partes.push(`${tarefas} tarefa(s) aberta(s)`)
       saida.set(p.id, {
         pessoaId: p.id,
         nivel: "atencao",
@@ -133,7 +131,7 @@ export function calcularSaude(
       nivel: "saudavel",
       motivo: semDossie
         ? "Nada a apontar — nenhuma exigência materializada ainda."
-        : "Todas as exigências resolvidas, sem divergência nem tarefa aberta.",
+        : "Todas as exigências resolvidas, sem divergência.",
       semDossie,
     })
   }

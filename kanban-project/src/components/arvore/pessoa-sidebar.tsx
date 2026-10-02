@@ -30,6 +30,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { classificarMaioridade, ROTULO_MAIORIDADE } from "@/src/lib/documentos/maioridade"
 import type { DossiePessoa, TotalPorMoeda } from "@/src/lib/genealogia/operacional/dossie"
 import { ROTULO_EVENTO, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
+import { ROTULO_CATEGORIA_ACHADO, type AchadoDoMotor } from "@/src/lib/genealogia/operacional/achados-do-motor"
 
 // ========================================
 // TIPOS
@@ -70,6 +71,13 @@ interface PessoaSidebarProps {
    * (`motor/eventos.ts`), não uma tabela nova — a árvore não guarda histórico.
    */
   eventos?: EventoProjetado[]
+  /**
+   * Achados do motor genealógico que tocam esta pessoa (`achados-do-motor.ts`) —
+   * a lista que antes vivia no painel Diagnóstico. Ausente = a seção não aparece.
+   */
+  achados?: AchadoDoMotor[]
+  /** Foca outra pessoa no mapa e abre o painel dela (aba Operação). */
+  onAbrirAchado?: (pessoaId: number) => void
 }
 
 // ========================================
@@ -250,7 +258,7 @@ function CollapsibleSection({
 }
 
 // ========================================
-// RESUMO OPERACIONAL — o que a pessoa custa de trabalho, em cinco números
+// RESUMO OPERACIONAL — o que a pessoa custa de trabalho, em quatro números
 // ========================================
 // Fica no topo do painel, antes das abas, porque é a pergunta que se faz ao
 // abrir alguém: "o que falta aqui?". Cada número tem dono declarado em
@@ -276,7 +284,7 @@ function ResumoOperacional({
         </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-5 gap-1.5 text-center">
+      <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
         <Numero rotulo="Exig." valor={d.necessarias} />
         <Numero rotulo="Receb." valor={d.atendidas + d.dispensadas} />
         <Numero rotulo="Pend." valor={d.pendentes} destaque={d.pendentes > 0} />
@@ -284,11 +292,6 @@ function ResumoOperacional({
           rotulo="Diverg."
           valor={dossie.divergencias.length}
           destaque={dossie.divergencias.length > 0}
-        />
-        <Numero
-          rotulo="Tarefas"
-          valor={dossie.tarefasAbertas.length}
-          destaque={dossie.tarefasAbertas.length > 0}
         />
       </div>
 
@@ -317,6 +320,70 @@ function ResumoOperacional({
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * DIVERGÊNCIAS DO MOTOR — o que o motor genealógico aponta sobre esta pessoa
+ * (filho em comum sem união registrada, sobrenome divergente entre gerações,
+ * duplicidade, conflito de datas, risco de linhagem). Cada item traz o texto, a
+ * ação e um botão que leva ao alvo: a outra pessoa envolvida, ou o mapa quando
+ * o achado é só desta pessoa. Lista simples de propósito — a Etapa 4 a integra à
+ * fila final da aba Operação.
+ */
+function DivergenciasDoMotor({
+  achados,
+  pessoaId,
+  nomeDe,
+  onAbrir,
+}: {
+  achados: AchadoDoMotor[]
+  pessoaId: number
+  nomeDe?: (id: number) => string
+  onAbrir?: (pessoaId: number) => void
+}) {
+  if (achados.length === 0) {
+    return (
+      <p className="py-2 text-sm italic text-[var(--text-secondary)]">
+        O motor não encontrou divergência nesta pessoa.
+      </p>
+    )
+  }
+  return (
+    <ul className="space-y-2">
+      {achados.map((a) => {
+        const outros = a.pessoaIds.filter((id) => id !== pessoaId).slice(0, 3)
+        const alvos = outros.length > 0 ? outros : [pessoaId]
+        return (
+          <li
+            key={a.id}
+            data-achado-do-motor={a.id}
+            className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+              {a.impeditivo ? "Crítico" : "Atenção"} · {ROTULO_CATEGORIA_ACHADO[a.categoria]}
+            </p>
+            <p className="mt-0.5 text-sm font-medium leading-snug text-amber-900">{a.titulo}</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-amber-800">{a.explicacao}</p>
+            <p className="mt-1 text-[11px] font-medium text-amber-900">→ {a.acao}</p>
+            {onAbrir && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {alvos.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => onAbrir(id)}
+                    className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
+                  >
+                    {id === pessoaId ? "Ver no mapa" : `Abrir ${nomeDe ? nomeDe(id) : `#${id}`}`}
+                  </button>
+                ))}
+              </div>
+            )}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
@@ -614,7 +681,9 @@ function ConteudoSidebar({
   dossie,
   financeiroVisivel = false,
   nomeDeRequerente,
-  eventos
+  eventos,
+  achados = [],
+  onAbrirAchado,
 }: PessoaSidebarProps) {
   // Aba inicial: a do deep-link, quando veio uma reconhecida; senão "info".
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs" | "operacao">(() => {
@@ -791,9 +860,9 @@ function ConteudoSidebar({
           >
             <ListChecks className="h-4 w-4" />
             Operação
-            {dossie.tarefasAbertas.length > 0 && (
+            {achados.length > 0 && (
               <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-800">
-                {dossie.tarefasAbertas.length}
+                {achados.length}
               </span>
             )}
             {activeTab === "operacao" && (
@@ -1092,7 +1161,19 @@ function ConteudoSidebar({
             módulo dono (Central Operacional, Tarefas, Financeiro). */}
         {activeTab === "operacao" && dossie && (
           <div>
-            <CollapsibleSection title="Tarefas abertas" icon={ListChecks} defaultOpen>
+            <CollapsibleSection title="Divergências do motor" icon={TriangleAlert} defaultOpen={achados.length > 0}>
+              <DivergenciasDoMotor
+                achados={achados}
+                pessoaId={pessoa.id}
+                nomeDe={nomeDeRequerente}
+                onAbrir={onAbrirAchado}
+              />
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Trabalho em andamento" icon={ListChecks} defaultOpen={false}>
+              <p className="mb-2 text-[11px] leading-snug text-[var(--text-secondary)]">
+                Tarefas não são pendência da árvore: acompanhe e execute na Torre e em Tarefas.
+              </p>
               {dossie.tarefasAbertas.length === 0 ? (
                 <p className="py-2 text-sm italic text-[var(--text-secondary)]">
                   {dossie.tarefasConcluidas > 0
@@ -1118,25 +1199,7 @@ function ConteudoSidebar({
               )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Divergências" icon={TriangleAlert} defaultOpen={false}>
-              {dossie.divergencias.length === 0 ? (
-                <p className="py-2 text-sm italic text-[var(--text-secondary)]">
-                  Nenhuma contradição de dado encontrada.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {dossie.divergencias.map((i) => (
-                    <li key={i.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2">
-                      <p className="text-sm font-medium leading-snug text-amber-900">{i.titulo}</p>
-                      <p className="mt-0.5 text-[11px] leading-snug text-amber-800">{i.explicacao}</p>
-                      {i.acao && (
-                        <p className="mt-1 text-[11px] font-medium text-amber-900">→ {i.acao}</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CollapsibleSection>
+
 
             <CollapsibleSection title="Histórico" icon={History} defaultOpen={false}>
               {!eventos || eventos.length === 0 ? (

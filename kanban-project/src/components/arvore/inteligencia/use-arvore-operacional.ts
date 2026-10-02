@@ -69,7 +69,7 @@ import {
   type FatosOperacionais,
   type ResumoLinhagem,
 } from "@/src/lib/genealogia/operacional/dossie"
-import type { ContextoAuditor } from "@/src/lib/genealogia/operacional/auditor"
+import { achadosDoMotorPorPessoa, type AchadoDoMotor } from "@/src/lib/genealogia/operacional/achados-do-motor"
 import { calcularParentesco } from "@/src/lib/genealogia/motor/parentesco"
 import type { ContextoPerguntas } from "@/src/lib/genealogia/operacional/perguntas"
 import type { SinaisPessoa } from "../react-flow-tree"
@@ -107,9 +107,13 @@ export interface ArvoreOperacional {
 
   /** Caminho requerente → transmissor, clicável. Vazio fora do modo linhagem. */
   trilha: DegrauLinhagem[]
-  /** Diagnóstico do escopo em foco. */
-  diagnostico: Diagnostico
+  /** Próxima ação do escopo em foco (fila de pendências da árvore; tarefa nunca entra). */
   proximaAcao: AcaoRecomendada
+  /**
+   * Achados do motor genealógico que tocam a pessoa — a fonte única
+   * (`achados-do-motor.ts`) que substituiu a lista do painel Diagnóstico.
+   */
+  achadosDe: (pessoaId: number) => AchadoDoMotor[]
   /** Resumos de TODOS os requerentes, para a comparação. */
   comparacao: ResumoLinhagem[]
 
@@ -121,8 +125,6 @@ export interface ArvoreOperacional {
   contextoDe: (pessoaId: number) => string | null
   /** O que significa faltar pai/mãe em cada slot desenhado. */
   lacunas: Map<string, LacunaParental>
-  /** Contexto do Modo Auditor. null sem análise. */
-  auditor: ContextoAuditor | null
 
   /** Modo Saúde (heatmap). Desligado = o canvas não recebe anel nenhum. */
   saudeLigada: boolean
@@ -149,6 +151,7 @@ export interface ArvoreOperacional {
 }
 
 const SEM_DOSSIES = new Map<number, DossiePessoa>()
+const SEM_ACHADOS: AchadoDoMotor[] = []
 
 export function useArvoreOperacional(params: {
   processoId: number
@@ -198,17 +201,6 @@ export function useArvoreOperacional(params: {
   const [filtros, setFiltros] = useState<EstadoFiltros>(filtrosVazios)
   const [relacionadosVisiveis, setRelacionadosVisiveis] = useState(false)
   const [saudeLigada, setSaudeLigada] = useState(false)
-
-  /**
-   * "Agora" congelado no ciclo de vida do componente.
-   *
-   * `tarefa vencida` depende de hoje, mas ler `new Date()` durante o render faria
-   * o diagnóstico ter identidade nova a cada render — e ele é dependência de
-   * memo. Um valor por montagem é preciso o bastante (ninguém mantém a árvore
-   * aberta atravessando a meia-noite esperando um alerta mudar) e mantém tudo
-   * memoizável.
-   */
-  const [agora] = useState(() => new Date())
 
   // Requerente em foco: o escolhido à mão; senão o primeiro da lista (a linhagem
   // mais mapeada). Nunca `undefined` silencioso — a árvore abre centrada em
@@ -291,7 +283,7 @@ export function useArvoreOperacional(params: {
     [analise, modo, linhagem],
   )
 
-  // Duas marcas por cartão, no máximo. Só nascem quando há o que sinalizar —
+  // Uma marca por cartão. Só nasce quando há o que sinalizar —
   // um Map vazio faz o canvas seguir o caminho de custo zero.
   const sinais = useMemo<Map<number, SinaisPessoa>>(() => {
     const m = new Map<number, SinaisPessoa>()
@@ -299,8 +291,9 @@ export function useArvoreOperacional(params: {
       const divergencia = d.divergencias.some(
         (i) => i.severidade === "critico" || i.severidade === "alto",
       )
-      const tarefaAberta = d.tarefasAbertas.length > 0
-      if (divergencia || tarefaAberta) m.set(id, { divergencia, tarefaAberta })
+      // Só divergência vira marca no cartão. Tarefa aberta é trabalho em
+      // andamento, não pendência de árvore — não ganha marca aqui (Etapa 2).
+      if (divergencia) m.set(id, { divergencia })
     }
     return m
   }, [dossies])
@@ -308,9 +301,9 @@ export function useArvoreOperacional(params: {
   const resumo = useMemo<ResumoLinhagem | null>(
     () =>
       linhagem && analise
-        ? resumirLinhagem(linhagem, dossies, analise.grafo, projecaoDocumental, agora)
+        ? resumirLinhagem(linhagem, dossies, analise.grafo, projecaoDocumental)
         : null,
-    [linhagem, dossies, analise, projecaoDocumental, agora],
+    [linhagem, dossies, analise, projecaoDocumental],
   )
 
   // Comparação: um resumo por requerente. É o mesmo `resumirLinhagem` — nenhuma
@@ -318,9 +311,9 @@ export function useArvoreOperacional(params: {
   const comparacao = useMemo<ResumoLinhagem[]>(
     () =>
       analise
-        ? mapa.linhagens.map((l) => resumirLinhagem(l, dossies, analise.grafo, projecaoDocumental, agora))
+        ? mapa.linhagens.map((l) => resumirLinhagem(l, dossies, analise.grafo, projecaoDocumental))
         : [],
-    [mapa, dossies, analise, projecaoDocumental, agora],
+    [mapa, dossies, analise, projecaoDocumental],
   )
 
   // O canvas só desenha slot "+pai/+mãe" para a pessoa RAIZ (profundidade 0);
@@ -347,7 +340,6 @@ export function useArvoreOperacional(params: {
             // O diagnóstico segue o escopo da tela: no modo linhagem fala da
             // linha; na vista completa fala da árvore.
             linhagem: modo === "linhagem" ? linhagem : null,
-            agora,
           })
         : {
             saude: "saudavel",
@@ -358,14 +350,7 @@ export function useArvoreOperacional(params: {
             atencao: 0,
             semExigenciaMaterializada: true,
           },
-    [analise, mapa, dossies, modo, linhagem, agora],
-  )
-
-  // O Auditor come exatamente o mesmo contexto do diagnóstico — nenhuma
-  // projeção nova, nenhuma segunda leitura. Ele só narra o que já foi apurado.
-  const auditor = useMemo<ContextoAuditor | null>(
-    () => (analise ? { grafo: analise.grafo, analise, mapa, dossies, linhagem } : null),
-    [analise, mapa, dossies, linhagem],
+    [analise, mapa, dossies, modo, linhagem],
   )
 
   // O heatmap sai dos MESMOS dossiês do diagnóstico — nenhuma leitura nova,
@@ -454,6 +439,14 @@ export function useArvoreOperacional(params: {
     [analise, pessoasComConflito],
   )
 
+  // Achados do motor por pessoa — o que o painel Diagnóstico listava como
+  // divergência/duplicidade/relação/risco, agora servido à aba Operação.
+  const achadosPorPessoa = useMemo(() => achadosDoMotorPorPessoa(analise), [analise])
+  const achadosDe = useCallback(
+    (pessoaId: number): AchadoDoMotor[] => achadosPorPessoa.get(pessoaId) ?? SEM_ACHADOS,
+    [achadosPorPessoa],
+  )
+
   const selecionarRequerente = useCallback((id: number | null) => setEscolhaManual(id), [])
   const alternarRelacionados = useCallback(() => setRelacionadosVisiveis((v) => !v), [])
   const alternarSaude = useCallback(() => setSaudeLigada((v) => !v), [])
@@ -504,15 +497,14 @@ export function useArvoreOperacional(params: {
     resumo,
     perguntas,
     trilha,
-    diagnostico,
     proximaAcao,
+    achadosDe,
     comparacao,
     relacionadosVisiveis,
     alternarRelacionados,
     totalRelacionados,
     contextoDe,
     lacunas,
-    auditor,
     saudeLigada,
     alternarSaude,
     saude: saudeCalculada,

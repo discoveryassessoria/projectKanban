@@ -14,8 +14,14 @@ import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { useAnaliseArvore, paisAlvoDe } from "./inteligencia/use-analise-arvore"
 import { useArvoreOperacional } from "./inteligencia/use-arvore-operacional"
-import { BarraLinhagem, EVENTO_FECHAR_CAMADA, MARCA_MENU_ABERTO } from "./inteligencia/barra-linhagem"
-import { PainelDiagnostico, SeloSaude } from "./inteligencia/painel-diagnostico"
+import {
+  ControlesLinhagem,
+  CLASSE_BOTAO_BARRA,
+  EVENTO_FECHAR_CAMADA,
+  MARCA_MENU_ABERTO,
+} from "./inteligencia/barra-linhagem"
+import { CartaoResumoFlutuante, LegendaSaude, TrilhaFlutuante } from "./inteligencia/cartoes-flutuantes"
+import { MenuPdf } from "./menu-pdf"
 import {
   PreviewImpactoModal,
   type AlteracaoDescrita,
@@ -39,7 +45,6 @@ import {
   Loader2,
   Minimize2,
   Maximize2,
-  FileDown,
   Search,
   Sparkles,
   ImagePlus,
@@ -157,7 +162,6 @@ export function ArvoreGenealogicaView({
   const [painelAberto, setPainelAberto] = useState(false)
   const [importarAberto, setImportarAberto] = useState(false)
   const [paletaAberta, setPaletaAberta] = useState(false)
-  const [diagnosticoAberto, setDiagnosticoAberto] = useState(false)
 
   // ── OPERAÇÃO DA ÁRVORE ────────────────────────────────────────────────────
   // Linhagens, foco, dossiê por pessoa e sinais do cartão saem daqui, numa
@@ -267,6 +271,15 @@ export function ArvoreGenealogicaView({
 
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
+  // Botão de um achado do motor (aba Operação): leva à pessoa-alvo e já abre o
+  // painel dela na aba Operação, onde os achados dela estão — não na aba Info.
+  const abrirAchado = useCallback(
+    (pessoaId: number) => {
+      setSidebarTabInicial("operacao")
+      localizarPessoa(pessoaId)
+    },
+    [localizarPessoa],
+  )
 
   // Posições dos nós: o arrasto responde na hora e o salvamento é debounced, então o
   // valor local é um RASCUNHO sobre o que o servidor devolveu.
@@ -837,11 +850,6 @@ export function ArvoreGenealogicaView({
           setPaletaAberta(true)
           return
         }
-        if (tecla === "d") {
-          e.preventDefault()
-          setDiagnosticoAberto((v) => !v)
-          return
-        }
         if (tecla === "l") {
           e.preventDefault()
           operacional.setModo(operacional.modo === "linhagem" ? "todos" : "linhagem")
@@ -877,7 +885,6 @@ export function ArvoreGenealogicaView({
           return
         }
         if (paletaAberta) { consumir(); setPaletaAberta(false); return }
-        if (diagnosticoAberto) { consumir(); setDiagnosticoAberto(false); return }
         if (painelAberto) { consumir(); setPainelAberto(false); return }
         if (fullDetailsPerson) { consumir(); setFullDetailsPerson(null); return }
         if (selectedPersonId != null) {
@@ -937,7 +944,6 @@ export function ArvoreGenealogicaView({
       selectedPersonId,
       paletaAberta,
       painelAberto,
-      diagnosticoAberto,
       fullDetailsPerson,
       localizarPessoa,
       irParaPessoa,
@@ -1042,17 +1048,20 @@ export function ArvoreGenealogicaView({
   // nos dois lugares — não há como um sair de sincronia com o outro.
   const podeImportar = Boolean(pode('arvore.criar') && arvoreId)
 
-  const botaoImportar = podeImportar ? (
-    <button
-      onClick={() => setImportarAberto(true)}
-      title="Importar árvore a partir de um print"
-      aria-label="Importar árvore a partir de um print"
-      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-    >
-      <ImagePlus className="h-4 w-4" aria-hidden="true" />
-      <span className="hidden sm:inline">Importar Árvore</span>
-    </button>
-  ) : null
+  // O botão tem duas peles: a da LINHA DE FERRAMENTAS (árvore montada) e a flutuante
+  // (onboarding, onde não há barra). Mesmo handler, mesmo rótulo — só a casca muda.
+  const botaoImportar = (classe: string, classeRotulo: string) =>
+    podeImportar ? (
+      <button
+        onClick={() => setImportarAberto(true)}
+        title="Importar árvore a partir de um print"
+        aria-label="Importar árvore a partir de um print"
+        className={classe}
+      >
+        <ImagePlus className="h-4 w-4" aria-hidden="true" />
+        <span className={classeRotulo}>Importar Árvore</span>
+      </button>
+    ) : null
 
   const modalImportar = arvoreId ? (
     <ImportarArvoreModal
@@ -1132,7 +1141,14 @@ export function ArvoreGenealogicaView({
           paisProcesso={paisProcesso}
           onComplete={handleOnboardingComplete}
         />
-        {botaoImportar && <div className="absolute right-4 top-4 z-20">{botaoImportar}</div>}
+        {podeImportar && (
+          <div className="absolute right-4 top-4 z-20">
+            {botaoImportar(
+              "flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900",
+              "hidden sm:inline",
+            )}
+          </div>
+        )}
         {modalImportar}
       </div>
     )
@@ -1144,13 +1160,22 @@ export function ArvoreGenealogicaView({
       {/* Overlay de transição */}
       <div className={`absolute inset-0 bg-[var(--surface-primary)] z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`} />
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] text-white/70">
-        <div className="flex items-center gap-2">
+      {/* BARRA ÚNICA — a ÚNICA linha de ferramentas acima do canvas. À esquerda,
+          Paisagem/Retrato e os controles de linhagem (visualização, requerente,
+          foco, filtros, Saúde, Comparar); à direita, Buscar, Importar, Análise,
+          PDF (com o idioma dentro), tela cheia e a lixeira. Em largura estreita a
+          linha QUEBRA — os rótulos somem e ficam os ícones — e nunca cria rolagem
+          horizontal da página. Resumo, legenda da Saúde e trilha da linhagem não
+          são controles: são cartões flutuantes sobre o canvas. */}
+      <div className="@container relative z-20 flex max-w-full flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] text-white/70">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           {/* Botão Paisagem */}
           <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-[var(--surface-tertiary)] text-white/95' : 'hover:bg-[var(--surface-tertiary)]'}`}
             onClick={() => setViewMode('paisagem')}
+            title="Disposição em paisagem"
+            aria-label="Paisagem"
+            aria-pressed={viewMode === 'paisagem'}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="9" width="6" height="6" rx="1" />
@@ -1159,13 +1184,16 @@ export function ArvoreGenealogicaView({
               <path d="M8 12 L14 6" />
               <path d="M8 12 L14 18" />
             </svg>
-            <span className="text-sm font-medium">PAISAGEM</span>
+            <span className="hidden text-sm font-medium @[1300px]:inline">PAISAGEM</span>
           </button>
 
           {/* Botão Retrato */}
           <button
             className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-[var(--surface-tertiary)] text-white/95' : 'hover:bg-[var(--surface-tertiary)]'}`}
             onClick={() => setViewMode('retrato')}
+            title="Disposição em retrato"
+            aria-label="Retrato"
+            aria-pressed={viewMode === 'retrato'}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="2" width="6" height="6" rx="1" />
@@ -1174,41 +1202,84 @@ export function ArvoreGenealogicaView({
               <path d="M6 8 L12 16" />
               <path d="M18 8 L12 16" />
             </svg>
-            <span className="text-sm font-medium">RETRATO</span>
+            <span className="hidden text-sm font-medium @[1300px]:inline">RETRATO</span>
           </button>
+
+          {pessoas.length > 0 && (
+            <>
+              <span aria-hidden className="mx-1 hidden h-5 w-px bg-[var(--border-default)] sm:block" />
+              <ControlesLinhagem
+                mapa={operacional.mapa}
+                linhagem={operacional.linhagem}
+                requerenteSelecionadoId={operacional.requerenteSelecionadoId}
+                onSelecionarRequerente={operacional.selecionarRequerente}
+                modo={operacional.modo}
+                onModo={operacional.setModo}
+                estilo={operacional.estilo}
+                onEstilo={operacional.setEstilo}
+                filtros={operacional.filtros}
+                filtrosAtivos={operacional.filtrosAtivos}
+                onAlternarFiltro={operacional.alternar}
+                onLimparFiltros={operacional.limparFiltros}
+                comparacao={operacional.comparacao}
+                relacionadosVisiveis={operacional.relacionadosVisiveis}
+                onAlternarRelacionados={operacional.alternarRelacionados}
+                totalRelacionados={operacional.totalRelacionados}
+                saudeLigada={operacional.saudeLigada}
+                onAlternarSaude={operacional.alternarSaude}
+                contagemFiltros={operacional.contagemFiltros}
+                totalRecuado={operacional.foco.totalRecuado}
+                totalRecolhivel={operacional.totalRecolhivel}
+                onRecolherTudo={operacional.recolherTudo}
+              />
+            </>
+          )}
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* IDIOMA DO PDF — nasce no idioma do país do processo (cadastro), e
-              o operador troca quando o destinatário fala outra língua. */}
-          <select
-            value={idiomaPdf}
-            onChange={(e) => setIdiomaPdf(e.target.value)}
-            disabled={isExporting}
-            title="Idioma do PDF"
-            className="rounded border border-[var(--border-default)] bg-[var(--surface-tertiary)] px-2 py-2 text-sm text-white/90 outline-none disabled:opacity-50"
-          >
-            {Object.entries(TITULO_ARVORE).map(([codigo, def]) => (
-              <option key={codigo} value={codigo} className="text-black">{def.rotulo}</option>
-            ))}
-          </select>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
+          {pessoas.length > 0 && (
+            <button
+              onClick={() => setPaletaAberta(true)}
+              title="Buscar pessoa (⌘K)"
+              aria-label="Buscar pessoa"
+              className={CLASSE_BOTAO_BARRA}
+            >
+              <Search className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden @[1500px]:inline">Buscar</span>
+              <kbd className="hidden rounded border border-[var(--border-default)] px-1 text-[10px] text-[var(--text-muted)] @[1700px]:inline">⌘K</kbd>
+            </button>
+          )}
+          {botaoImportar(CLASSE_BOTAO_BARRA, "hidden @[1500px]:inline")}
+          {pessoas.length > 0 && (
+            <button
+              onClick={() => setPainelAberto(true)}
+              title="Inteligência da árvore"
+              aria-label="Inteligência da árvore"
+              className={CLASSE_BOTAO_BARRA}
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden @[1500px]:inline">Análise</span>
+              {/* Contagem só dos achados que exigem ação — número no botão que não
+                  significa urgência vira ruído e o usuário para de olhar. */}
+              {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
+                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] font-semibold text-red-600">
+                  {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
+                </span>
+              )}
+            </button>
+          )}
 
-          {/* Botão Exportar PDF */}
-          <button
-            className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={handleExportPDF}
-            disabled={isExporting || pessoas.length === 0}
-            title="Exportar para PDF"
-          >
-            {isExporting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileDown className="h-4 w-4" />
-            )}
-            <span className="text-sm font-medium">
-              {isExporting ? 'Exportando...' : 'PDF'}
-            </span>
-          </button>
+          {/* PDF — o idioma do PDF mora DENTRO do botão (menu): nasce no idioma
+              do país do processo (cadastro), e o operador troca quando o
+              destinatário fala outra língua. */}
+          <MenuPdf
+            idiomas={Object.entries(TITULO_ARVORE).map(([codigo, def]) => ({ codigo, rotulo: def.rotulo }))}
+            idioma={idiomaPdf}
+            onIdioma={setIdiomaPdf}
+            onExportar={handleExportPDF}
+            exportando={isExporting}
+            desabilitado={pessoas.length === 0}
+          />
 
           {/* Botão Fullscreen */}
           <button
@@ -1296,107 +1367,25 @@ export function ArvoreGenealogicaView({
           />
         )}
 
-        {/* Barra de linhagem: `absolute` no canto oposto ao dos botões
-            Buscar/Importar/Análise, com a mesma casca deles. Sobreposta ao
-            canvas — o <ReactFlowTree> acima não sabe que ela existe. */}
-        {pessoas.length > 0 && (
-          <BarraLinhagem
-            mapa={operacional.mapa}
-            linhagem={operacional.linhagem}
-            requerenteSelecionadoId={operacional.requerenteSelecionadoId}
-            onSelecionarRequerente={operacional.selecionarRequerente}
-            modo={operacional.modo}
-            onModo={operacional.setModo}
-            estilo={operacional.estilo}
-            onEstilo={operacional.setEstilo}
-            filtros={operacional.filtros}
-            filtrosAtivos={operacional.filtrosAtivos}
-            onAlternarFiltro={operacional.alternar}
-            onLimparFiltros={operacional.limparFiltros}
+        {/* CARTÕES FLUTUANTES — sobrepostos ao canvas, NUNCA dentro dele: o
+            <ReactFlowTree> acima não sabe que eles existem, então abrir,
+            recolher ou trocar de requerente não move um card sequer. Resumo do
+            requerente (recolhível) no canto superior esquerdo; legenda da Saúde
+            no superior direito, SÓ com o modo Saúde ligado; trilha da linhagem na
+            base. Os zoom/minimapa do canvas ficam nos cantos inferiores. */}
+        {pessoas.length > 0 && operacional.mapa.linhagens.length > 0 && (
+          <CartaoResumoFlutuante
             resumo={operacional.resumo}
-            comparacao={operacional.comparacao}
-            trilha={operacional.trilha}
             proximaAcao={operacional.proximaAcao}
-            relacionadosVisiveis={operacional.relacionadosVisiveis}
-            onAlternarRelacionados={operacional.alternarRelacionados}
-            totalRelacionados={operacional.totalRelacionados}
-            saudeLigada={operacional.saudeLigada}
-            onAlternarSaude={operacional.alternarSaude}
-            contagemSaude={operacional.contagemSaude}
-            contagemFiltros={operacional.contagemFiltros}
-            totalRecuado={operacional.foco.totalRecuado}
-            totalRecolhivel={operacional.totalRecolhivel}
-            onRecolherTudo={operacional.recolherTudo}
-            onIrParaPessoa={localizarPessoa}
             carregando={operacional.carregando}
+            onIrParaPessoa={localizarPessoa}
           />
         )}
-
-        <PainelDiagnostico
-          diagnostico={operacional.diagnostico}
-          proximaAcao={operacional.proximaAcao}
-          aberto={diagnosticoAberto}
-          onFechar={() => setDiagnosticoAberto(false)}
-          onIrParaPessoa={localizarPessoa}
-          escopo={
-            operacional.modo === "linhagem" && operacional.linhagem
-              ? `Linhagem de ${operacional.linhagem.nome}`
-              : "Árvore inteira"
-          }
-          auditor={operacional.auditor}
-        />
-
-        {/* TELAS NOVAS — sobrepostas ao canvas, NUNCA dentro dele. Ficam em
-            `absolute` no canto superior direito, longe dos controles que já
-            existiam no canto inferior esquerdo. O <ReactFlowTree> acima não sabe
-            que elas existem: abrir ou fechar não move um card sequer. */}
-        {/* Uma barra só, nesta ordem: Buscar · Importar Árvore · Análise.
-            "Importar Árvore" NÃO depende de `pessoas.length`: árvore vazia é
-            justamente quando importar faz mais sentido. Buscar e Análise seguem
-            condicionais — não há o que buscar nem analisar sem pessoas. Por
-            ficarem em lados opostos do Importar, cada um carrega a sua própria
-            guarda em vez de dividirem um fragmento. */}
-        {(pessoas.length > 0 || podeImportar) && (
-          <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-            {pessoas.length > 0 && (
-            <button
-              onClick={() => setPaletaAberta(true)}
-              title="Buscar pessoa (⌘K)"
-              aria-label="Buscar pessoa"
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-            >
-              <Search className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Buscar</span>
-              <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-[var(--text-muted)] sm:inline">⌘K</kbd>
-            </button>
-            )}
-            {botaoImportar}
-            {pessoas.length > 0 && (
-              <SeloSaude
-                diagnostico={operacional.diagnostico}
-                ativo={diagnosticoAberto}
-                onAbrir={() => setDiagnosticoAberto((v) => !v)}
-              />
-            )}
-            {pessoas.length > 0 && (
-            <button
-              onClick={() => setPainelAberto(true)}
-              title="Inteligência da árvore"
-              aria-label="Inteligência da árvore"
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Análise</span>
-              {/* Contagem só dos achados que exigem ação — número no botão que não
-                  significa urgência vira ruído e o usuário para de olhar. */}
-              {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
-                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] font-semibold text-red-600">
-                  {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
-                </span>
-              )}
-            </button>
-            )}
-          </div>
+        {pessoas.length > 0 && operacional.saudeLigada && (
+          <LegendaSaude contagem={operacional.contagemSaude} />
+        )}
+        {pessoas.length > 0 && operacional.modo === "linhagem" && (
+          <TrilhaFlutuante trilha={operacional.trilha} onIrParaPessoa={localizarPessoa} />
         )}
 
         {modalImportar}
@@ -1445,6 +1434,8 @@ export function ArvoreGenealogicaView({
         financeiroVisivel={operacional.financeiroVisivel}
         nomeDeRequerente={nomeDePessoa}
         eventos={selectedPersonId != null ? operacional.eventosDe(selectedPersonId) : undefined}
+        achados={selectedPersonId != null ? operacional.achadosDe(selectedPersonId) : undefined}
+        onAbrirAchado={abrirAchado}
       />
 
       {pessoaParaRemover != null && (

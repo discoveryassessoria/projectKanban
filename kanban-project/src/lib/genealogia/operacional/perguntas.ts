@@ -178,18 +178,17 @@ function quemTemPendencia(ctx: ContextoPerguntas): Resposta {
     chave: "quem_tem_pendencia",
     resumo: lista.length
       ? `${lista.length} pessoa(s) com pendência, em ordem de impacto sobre a cidadania.`
-      : "Nenhuma pessoa desta linha tem pendência documental, tarefa aberta ou divergência.",
+      : "Nenhuma pessoa desta linha tem pendência documental ou divergência.",
     itens: lista.slice(0, 10).map((d) => ({
       pessoaId: d.pessoaId,
       texto:
         `${d.nome} — ${d.rotuloSituacao}` +
-        (d.tarefasAbertas.length ? ` · ${d.tarefasAbertas.length} tarefa(s)` : "") +
         (d.divergencias.length ? ` · ${d.divergencias.length} divergência(s)` : "") +
         (d.requerentesDependentes.length > 1
           ? ` · ${d.requerentesDependentes.length} requerentes dependem dela`
           : ""),
     })),
-    fonte: "NecessidadeDocumental + Tarefa do processo + motor genealógico",
+    fonte: "NecessidadeDocumental + motor genealógico",
   }
 }
 

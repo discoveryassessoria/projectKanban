@@ -188,19 +188,18 @@ function formatDate(dateStr: string | Date | null | undefined): string | null {
  *
  * Deliberadamente NÃO incluem estado documental: o cartão já tem os indicadores
  * N/C/O, e um segundo sinal documental na mesma superfície seria uma segunda
- * verdade sobre a mesma coisa. Aqui entram só duas marcas, ambas de 6px, ambas
- * no canto superior direito, ambas ausentes quando não há o que sinalizar:
- * contradição de dado (motor genealógico) e tarefa aberta (Tarefa do processo).
+ * verdade sobre a mesma coisa. Aqui entra só uma marca, de 6px, no canto
+ * superior direito, ausente quando não há o que sinalizar: contradição de dado
+ * (motor genealógico). Tarefa aberta NÃO é marca (Etapa 2): é trabalho em
+ * andamento, não pendência de árvore — já tem lugar na Torre e em Tarefas.
  */
 export interface SinaisPessoa {
   /** Há divergência crítica/alta apurada pelo motor. */
   divergencia?: boolean
-  /** Há tarefa aberta ligada a esta pessoa. */
-  tarefaAberta?: boolean
 }
 
 function MarcasDiscretas({ sinais }: { sinais?: SinaisPessoa }) {
-  if (!sinais?.divergencia && !sinais?.tarefaAberta) return null
+  if (!sinais?.divergencia) return null
   return (
     <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
       {sinais.divergencia && (
@@ -208,13 +207,6 @@ function MarcasDiscretas({ sinais }: { sinais?: SinaisPessoa }) {
           title="Divergência de dados nesta pessoa"
           className="block h-1.5 w-1.5 rounded-full"
           style={{ backgroundColor: 'var(--danger-solid)' }}
-        />
-      )}
-      {sinais.tarefaAberta && (
-        <span
-          title="Tarefa aberta para esta pessoa"
-          className="block h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: 'var(--action-primary)' }}
         />
       )}
     </div>

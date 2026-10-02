@@ -12,9 +12,15 @@
 //     árvore só agrupa o que ele já decidiu.
 //   • divergências → insights do motor genealógico (conflito, duplicidade,
 //     sobrenome). Não são "erros de documento": são contradições de DADO, que é
-//     o que a árvore sabe apurar.
+//     o que a árvore sabe apurar. (Todos os achados acionáveis, inclusive relação
+//     e risco, saem de `achados-do-motor.ts`.)
 //   • tarefas → Tarefa do processo, ligada à pessoa pela necessidade que a
-//     originou. A árvore não cria nem conclui tarefa.
+//     originou. A árvore não cria nem conclui tarefa. ATENÇÃO (regra permanente,
+//     Etapa 2): tarefa é TRABALHO EM ANDAMENTO, não pendência de árvore. Ela
+//     aparece no dossiê só como informação (`tarefasAbertas`/`tarefasConcluidas`)
+//     e NUNCA entra na próxima ação, na urgência, no resumo da linhagem, na saúde
+//     da pessoa nem nas perguntas — essas contas só conhecem documento e achado
+//     do motor. Quem acompanha tarefa é a Torre e Tarefas.
 //   • custos e receitas → ObrigacaoEconomica com `personId`, e recebido pelo
 //     Ledger. A árvore não soma valor por conta própria e não conhece regra de
 //     preço.
@@ -25,7 +31,7 @@
 // PURO: sem prisma, sem rede, sem relógio. Recebe os fatos já lidos e projeta.
 
 import type { GrafoGenealogico } from "../motor/grafo"
-import type { AnaliseArvore, Insight, Severidade } from "../motor/tipos"
+import type { AnaliseArvore, CategoriaInsight, Insight, Severidade } from "../motor/tipos"
 import { ORDEM_SEVERIDADE, piorSeveridade } from "../motor/tipos"
 import type { Linhagem, MapaLinhagens } from "../motor/linhagens"
 import { requerentesQueDependemDe } from "../motor/linhagens"
@@ -108,6 +114,10 @@ export interface DossiePessoa {
   /** Contradições de dado apuradas pelo motor. Não são pendência documental. */
   divergencias: Insight[]
   severidadeMax: Severidade | null
+  /**
+   * Trabalho em andamento ligado à pessoa — INFORMAÇÃO, não pendência: nenhuma
+   * conta de pendência/urgência/saúde lê este campo (ver cabeçalho do arquivo).
+   */
   tarefasAbertas: TarefaDaPessoa[]
   tarefasConcluidas: number
   custos: TotalPorMoeda[]
@@ -127,7 +137,11 @@ export interface ContextoDossie {
   fatos: FatosOperacionais
 }
 
-const CATEGORIAS_DIVERGENCIA = new Set(["conflito", "duplicidade", "sobrenome"])
+// Divergência do dossiê = CONTRADIÇÃO DE DADO (subconjunto dos achados do motor).
+// É o que alimenta o selo do cartão e o mapa de Saúde. O conjunto COMPLETO de
+// achados (inclui relação e risco) vive em `achados-do-motor.ts` e é o que a aba
+// Operação lista — sugestão de vínculo não deve pintar a Saúde da pessoa.
+const CATEGORIAS_DIVERGENCIA = new Set<CategoriaInsight>(["conflito", "duplicidade", "sobrenome"])
 
 /** Uniões de uma pessoa — a certidão de casamento é exigida da união. */
 function uniaoIdsDe(g: GrafoGenealogico, pessoaId: number): number[] {
@@ -224,7 +238,8 @@ export function projetarDossies(ctx: ContextoDossie): Map<number, DossiePessoa> 
  *
  * A ordem abaixo é a ordem em que o trabalho realmente trava: um documento não
  * localizado bloqueia; uma contradição de dado invalida o documento que vier;
- * uma exigência não iniciada é trabalho parado; uma tarefa aberta já tem dono.
+ * uma exigência não iniciada é trabalho parado. Tarefa aberta NÃO entra: já tem
+ * dono e já tem lugar na Torre e em Tarefas (regra permanente da Etapa 2).
  * Quando nada disso existe, a resposta honesta é "nada pendente" — devolver
  * null, e não uma sugestão inventada para preencher a linha.
  */
@@ -236,9 +251,6 @@ export function decidirProximaAcao(d: DossiePessoa): string | null {
   if (critica) return critica.acao ?? critica.titulo
   if (d.documental.pendentes > 0) {
     return `Iniciar ${contar(d.documental.pendentes, "exigência documental pendente", "exigências documentais pendentes")}.`
-  }
-  if (d.tarefasAbertas.length > 0) {
-    return `Concluir a tarefa “${d.tarefasAbertas[0].titulo}”.`
   }
   if (d.documental.emAtendimento > 0) {
     return `Acompanhar ${contar(d.documental.emAtendimento, "documento em atendimento", "documentos em atendimento")}.`
@@ -261,7 +273,7 @@ export function calcularUrgencia(d: DossiePessoa): number {
   base += d.documental.pendentes * 12
   base += d.documental.emAtendimento * 4
   for (const i of d.divergencias) base += ORDEM_SEVERIDADE[i.severidade] * 6
-  base += d.tarefasAbertas.length * 5
+  // Tarefa aberta NÃO pesa aqui: não é pendência de árvore (Etapa 2).
   const dependentes = Math.max(1, d.requerentesDependentes.length)
   return Math.round(base * dependentes)
 }
@@ -285,11 +297,9 @@ export interface ResumoLinhagem {
   danteCausaNome: string | null
   /** Exigências marcadas como NÃO LOCALIZADA — o que de fato trava. */
   bloqueios: number
-  tarefasVencidas: number
   /** Consolidado documental de TODA a linha (pessoas + cônjuges delas). */
   documental: IndicadorDocumental
   divergencias: number
-  tarefasAbertas: number
   /** Pessoa mais urgente da linha — para onde o operador deve olhar primeiro. */
   focoId: number | null
   proximaAcao: string | null
@@ -319,15 +329,11 @@ export function resumirLinhagem(
    * entra pela parte que é só dela, e cada união entra exatamente uma vez.
    */
   projecao: ProjecaoDocumental,
-  /** Data de referência para "tarefa vencida". Injetada — nada lê o relógio. */
-  agora: Date = new Date(0),
 ): ResumoLinhagem {
   const ids = [...linhagem.visivel]
   const documental = indicadorVazio()
   const uniõesContadas = new Set<number>()
   let divergencias = 0
-  let tarefasAbertas = 0
-  let tarefasVencidas = 0
   let focoId: number | null = null
   let maiorUrgencia = -1
 
@@ -343,12 +349,6 @@ export function resumirLinhagem(
       if (uniao) somarIndicadorEm(documental, uniao)
     }
     divergencias += d.divergencias.length
-    tarefasAbertas += d.tarefasAbertas.length
-    for (const t of d.tarefasAbertas) {
-      if (!t.dataPrazo) continue
-      const prazoMs = Date.parse(t.dataPrazo)
-      if (Number.isFinite(prazoMs) && prazoMs < agora.getTime()) tarefasVencidas++
-    }
     // Só entra quem tem alguma urgência real; desempate por id, para que a mesma
     // linha aponte sempre para a mesma pessoa entre dois carregamentos.
     if (d.urgencia > 0) {
@@ -388,10 +388,8 @@ export function resumirLinhagem(
         ? (dossies.get(linhagem.danteCausaId)?.nome ?? null)
         : null,
     bloqueios: documental.naoLocalizadas,
-    tarefasVencidas,
     documental,
     divergencias,
-    tarefasAbertas,
     focoId,
     proximaAcao: foco ? (foco.proximaAcao ? `${foco.nome}: ${foco.proximaAcao}` : null) : null,
   }
