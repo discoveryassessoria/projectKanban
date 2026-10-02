@@ -303,10 +303,14 @@ export async function precisaDeVoce(
 
   // ── SEM_RESPONSAVEL ─────────────────────────────────────────────────────
   const limite = new Date(agora.getTime() - DIAS_SEM_DONO_PARA_ALERTAR * 86_400_000)
-  const semDono = await db.tarefa.findMany({
+  const semDonoBruto = await db.tarefa.findMany({
     where: { responsavelId: null, statusTarefa: { notIn: STATUS_TERMINAIS }, tipo: { not: 'ADMINISTRATIVA' }, createdAt: { lt: limite } },
     select: { id: true, processoId: true, processo: SELECT_ROTULO_FAMILIA },
   })
+  // Tarefa de FASE FUTURA não é trabalho de hoje (regra única — `fase-futura.ts`): `linhas` já a tirou, e a contagem do aviso
+  // tem de ser a MESMA da lista da Torre. Antes esta consulta ia direto na tabela e contava as de fase futura (aviso "23" com 1 na lista).
+  const idsDaOperacao = new Set(linhas.map((l) => l.taskId))
+  const semDono = semDonoBruto.filter((t) => idsDaOperacao.has(t.id))
   if (semDono.length) {
     const devolvidas = await db.logAuditoria.groupBy({
       by: ['entidadeId'], where: { acao: 'TAREFA_DEVOLVIDA_A_FILA', entidade: 'Tarefa', entidadeId: { in: semDono.map((t) => t.id) } },
