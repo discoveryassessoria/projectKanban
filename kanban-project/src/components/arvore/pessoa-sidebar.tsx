@@ -21,16 +21,16 @@ import {
   ChevronDown,
   ExternalLink,
   ListChecks,
-  Wallet,
-  TriangleAlert,
+  ListTodo,
   History
 } from "lucide-react"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { classificarMaioridade, ROTULO_MAIORIDADE } from "@/src/lib/documentos/maioridade"
-import type { DossiePessoa, TotalPorMoeda } from "@/src/lib/genealogia/operacional/dossie"
+import type { DossiePessoa } from "@/src/lib/genealogia/operacional/dossie"
 import { ROTULO_EVENTO, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
-import { ROTULO_CATEGORIA_ACHADO, type AchadoDoMotor } from "@/src/lib/genealogia/operacional/achados-do-motor"
+import type { FilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
+import { ListaDaFila, ResumoOperacional, useExecutarAcaoDaFila, type DestinosDaFila } from "./fila-da-pessoa"
 
 // ========================================
 // TIPOS
@@ -72,12 +72,18 @@ interface PessoaSidebarProps {
    */
   eventos?: EventoProjetado[]
   /**
-   * Achados do motor genealógico que tocam esta pessoa (`achados-do-motor.ts`) —
-   * a lista que antes vivia no painel Diagnóstico. Ausente = a seção não aparece.
+   * FILA DE TRABALHO desta pessoa (`fila-da-pessoa.ts`): os documentos reais dela
+   * com estado e ação + as divergências do motor (que antes eram uma lista à parte).
    */
-  achados?: AchadoDoMotor[]
+  fila?: FilaDaPessoa | null
+  /** "As exigências serão geradas quando o processo entrar em <fase>." */
+  mensagemAntesDaGenealogia?: string
   /** Foca outra pessoa no mapa e abre o painel dela (aba Operação). */
   onAbrirAchado?: (pessoaId: number) => void
+  /** Abre o modal de vincular cônjuges (casal sem filho cadastrado). */
+  onVincularConjuge?: (pessoaId: number, outraPessoaId: number | null) => void
+  /** Processo da árvore — destino do link para o Financeiro. */
+  processoId?: number
 }
 
 // ========================================
@@ -253,215 +259,6 @@ function CollapsibleSection({
           {children}
         </div>
       )}
-    </div>
-  )
-}
-
-// ========================================
-// RESUMO OPERACIONAL — o que a pessoa custa de trabalho, em quatro números
-// ========================================
-// Fica no topo do painel, antes das abas, porque é a pergunta que se faz ao
-// abrir alguém: "o que falta aqui?". Cada número tem dono declarado em
-// `operacional/dossie.ts` — nenhum é calculado nesta tela.
-function ResumoOperacional({
-  dossie,
-  nomeDeRequerente,
-}: {
-  dossie: DossiePessoa
-  nomeDeRequerente?: (id: number) => string
-}) {
-  const d = dossie.documental
-  const compartilhada = dossie.requerentesDependentes.length > 1
-
-  return (
-    <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)]/60 px-5 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-          Resumo operacional
-        </span>
-        <span className="text-xs font-medium text-[var(--text-secondary)]">
-          {d.progresso == null ? "Sem exigência" : `${d.progresso}% do dossiê`}
-        </span>
-      </div>
-
-      <div className="mt-2 grid grid-cols-4 gap-1.5 text-center">
-        <Numero rotulo="Exig." valor={d.necessarias} />
-        <Numero rotulo="Receb." valor={d.atendidas + d.dispensadas} />
-        <Numero rotulo="Pend." valor={d.pendentes} destaque={d.pendentes > 0} />
-        <Numero
-          rotulo="Diverg."
-          valor={dossie.divergencias.length}
-          destaque={dossie.divergencias.length > 0}
-        />
-      </div>
-
-      {d.naoLocalizadas > 0 && (
-        <p className="mt-2 rounded-md bg-[var(--surface-secondary)] px-2 py-1 text-[11px] font-medium text-red-700">
-          {d.naoLocalizadas} documento(s) marcado(s) como não localizado(s).
-        </p>
-      )}
-
-      {compartilhada && (
-        <p className="mt-2 text-[11px] leading-snug text-[var(--text-secondary)]">
-          {dossie.requerentesDependentes.length} requerentes dependem desta pessoa
-          {nomeDeRequerente
-            ? `: ${dossie.requerentesDependentes.map(nomeDeRequerente).join(", ")}`
-            : ""}
-          . Resolver aqui destrava todos.
-        </p>
-      )}
-
-      {dossie.proximaAcao && (
-        <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-            Próxima ação
-          </p>
-          <p className="mt-0.5 text-xs leading-snug text-[var(--text-secondary)]">{dossie.proximaAcao}</p>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * DIVERGÊNCIAS DO MOTOR — o que o motor genealógico aponta sobre esta pessoa
- * (filho em comum sem união registrada, sobrenome divergente entre gerações,
- * duplicidade, conflito de datas, risco de linhagem). Cada item traz o texto, a
- * ação e um botão que leva ao alvo: a outra pessoa envolvida, ou o mapa quando
- * o achado é só desta pessoa. Lista simples de propósito — a Etapa 4 a integra à
- * fila final da aba Operação.
- */
-function DivergenciasDoMotor({
-  achados,
-  pessoaId,
-  nomeDe,
-  onAbrir,
-}: {
-  achados: AchadoDoMotor[]
-  pessoaId: number
-  nomeDe?: (id: number) => string
-  onAbrir?: (pessoaId: number) => void
-}) {
-  if (achados.length === 0) {
-    return (
-      <p className="py-2 text-sm italic text-[var(--text-secondary)]">
-        O motor não encontrou divergência nesta pessoa.
-      </p>
-    )
-  }
-  return (
-    <ul className="space-y-2">
-      {achados.map((a) => {
-        const outros = a.pessoaIds.filter((id) => id !== pessoaId).slice(0, 3)
-        const alvos = outros.length > 0 ? outros : [pessoaId]
-        return (
-          <li
-            key={a.id}
-            data-achado-do-motor={a.id}
-            className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2"
-          >
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-              {a.impeditivo ? "Crítico" : "Atenção"} · {ROTULO_CATEGORIA_ACHADO[a.categoria]}
-            </p>
-            <p className="mt-0.5 text-sm font-medium leading-snug text-amber-900">{a.titulo}</p>
-            <p className="mt-0.5 text-[11px] leading-snug text-amber-800">{a.explicacao}</p>
-            <p className="mt-1 text-[11px] font-medium text-amber-900">→ {a.acao}</p>
-            {onAbrir && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {alvos.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => onAbrir(id)}
-                    className="rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)] transition hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
-                  >
-                    {id === pessoaId ? "Ver no mapa" : `Abrir ${nomeDe ? nomeDe(id) : `#${id}`}`}
-                  </button>
-                ))}
-              </div>
-            )}
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
-
-function Numero({
-  rotulo,
-  valor,
-  destaque = false,
-}: {
-  rotulo: string
-  valor: number
-  destaque?: boolean
-}) {
-  return (
-    <div className="rounded-md bg-[var(--surface-primary)] px-1 py-1.5 ring-1 ring-[var(--border-default)]">
-      <p
-        className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-800" : "text-[var(--text-secondary)]"}`}
-      >
-        {valor}
-      </p>
-      <p className="text-[10px] leading-none text-[var(--text-secondary)]">{rotulo}</p>
-    </div>
-  )
-}
-
-/** Moeda formatada pela moeda do próprio lançamento — nunca convertida aqui. */
-function formatarTotal(t: TotalPorMoeda): string {
-  try {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: t.moeda }).format(t.valor)
-  } catch {
-    return `${t.moeda} ${t.valor.toFixed(2)}`
-  }
-}
-
-function BlocoValores({
-  titulo,
-  totais,
-  visivel,
-}: {
-  titulo: string
-  totais: TotalPorMoeda[]
-  visivel: boolean
-}) {
-  // Sem permissão financeira o painel DIZ isso. Exibir "R$ 0,00" seria informar
-  // um valor falso a quem não pode ver o verdadeiro.
-  if (!visivel) {
-    return (
-      <div className="py-2">
-        <p className="text-xs font-medium text-[var(--text-secondary)]">{titulo}</p>
-        <p className="mt-0.5 text-sm text-[var(--text-secondary)] italic">Sem permissão para ver valores</p>
-      </div>
-    )
-  }
-  if (totais.length === 0) {
-    return (
-      <div className="py-2">
-        <p className="text-xs font-medium text-[var(--text-secondary)]">{titulo}</p>
-        <p className="mt-0.5 text-sm text-[var(--text-secondary)] italic">Nenhum lançamento para esta pessoa</p>
-      </div>
-    )
-  }
-  return (
-    <div className="py-2">
-      <p className="text-xs font-medium text-[var(--text-secondary)]">{titulo}</p>
-      <ul className="mt-1 space-y-1">
-        {totais.map((t) => (
-          <li key={t.moeda} className="flex items-baseline justify-between text-sm">
-            <span className="text-[var(--text-secondary)]">{t.moeda}</span>
-            <span className="font-medium tabular-nums text-[var(--text-secondary)]">
-              {formatarTotal(t)}
-              {t.recebido > 0 && (
-                <span className="ml-1 text-[11px] font-normal text-[var(--text-secondary)]">
-                  (liquidado {formatarTotal({ ...t, valor: t.recebido })})
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }
@@ -682,8 +479,11 @@ function ConteudoSidebar({
   financeiroVisivel = false,
   nomeDeRequerente,
   eventos,
-  achados = [],
+  fila = null,
+  mensagemAntesDaGenealogia = "",
   onAbrirAchado,
+  onVincularConjuge,
+  processoId,
 }: PessoaSidebarProps) {
   // Aba inicial: a do deep-link, quando veio uma reconhecida; senão "info".
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs" | "operacao">(() => {
@@ -694,6 +494,10 @@ function ConteudoSidebar({
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { pode } = usePermissoes()
+  const destinosDaFila: DestinosDaFila = { onAbrirPessoa: onAbrirAchado, onVincularConjuge }
+  const executarAcaoDaFila = useExecutarAcaoDaFila(destinosDaFila)
+  // Selo da aba: só divergências do motor (grain ACHADO) — nunca soma documento + achado.
+  const divergenciasNaFila = fila ? fila.itens.filter((i) => i.tipo === "divergencia").length : 0
   
   if (!pessoa) return null
   
@@ -795,7 +599,16 @@ function ConteudoSidebar({
       
       {/* Resumo operacional — só existe quando há dossiê projetado. Fora do
           contexto de processo o painel continua exatamente como era. */}
-      {dossie && <ResumoOperacional dossie={dossie} nomeDeRequerente={nomeDeRequerente} />}
+      {dossie && fila && (
+        <ResumoOperacional
+          dossie={dossie}
+          fila={fila}
+          mensagemAntesDaGenealogia={mensagemAntesDaGenealogia}
+          destinos={destinosDaFila}
+          onExecutar={executarAcaoDaFila}
+          nomeDeRequerente={nomeDeRequerente}
+        />
+      )}
 
       {/* Tabs
           Com a 4ª aba (Operação), os rótulos encurtam para caber nos 420px do
@@ -860,9 +673,12 @@ function ConteudoSidebar({
           >
             <ListChecks className="h-4 w-4" />
             Operação
-            {achados.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-800">
-                {achados.length}
+            {divergenciasNaFila > 0 && (
+              <span
+                title="Divergências do motor nesta pessoa"
+                className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-800"
+              >
+                {divergenciasNaFila}
               </span>
             )}
             {activeTab === "operacao" && (
@@ -1086,6 +902,14 @@ function ConteudoSidebar({
                   <Heart className="w-4 h-4" />
                   <span className="text-sm font-medium">Adicionar cônjuge</span>
                 </button>}
+                {pode('arvore.criar') && onVincularConjuge && <button
+                  type="button"
+                  onClick={() => onVincularConjuge(pessoa.id, null)}
+                  className="w-full flex items-center justify-center gap-2 p-3 border border-[var(--border-default)] rounded-lg text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-secondary)] transition-colors"
+                >
+                  <Heart className="w-4 h-4" />
+                  <span className="text-sm font-medium">Vincular cônjuge já cadastrado</span>
+                </button>}
               </div>
             </div>
             
@@ -1161,13 +985,17 @@ function ConteudoSidebar({
             módulo dono (Central Operacional, Tarefas, Financeiro). */}
         {activeTab === "operacao" && dossie && (
           <div>
-            <CollapsibleSection title="Divergências do motor" icon={TriangleAlert} defaultOpen={achados.length > 0}>
-              <DivergenciasDoMotor
-                achados={achados}
-                pessoaId={pessoa.id}
-                nomeDe={nomeDeRequerente}
-                onAbrir={onAbrirAchado}
-              />
+            <CollapsibleSection title="Fila de trabalho" icon={ListTodo} defaultOpen>
+              {fila ? (
+                <ListaDaFila
+                  fila={fila}
+                  mensagemAntesDaGenealogia={mensagemAntesDaGenealogia}
+                  destinos={destinosDaFila}
+                  onExecutar={executarAcaoDaFila}
+                />
+              ) : (
+                <p className="py-2 text-sm italic text-[var(--text-secondary)]">Fila indisponível.</p>
+              )}
             </CollapsibleSection>
 
             <CollapsibleSection title="Trabalho em andamento" icon={ListChecks} defaultOpen={false}>
@@ -1247,14 +1075,19 @@ function ConteudoSidebar({
               )}
             </CollapsibleSection>
 
-            <CollapsibleSection title="Custos e receitas" icon={Wallet} defaultOpen={false}>
-              <BlocoValores titulo="Custos" totais={dossie.custos} visivel={financeiroVisivel} />
-              <BlocoValores titulo="Receitas" totais={dossie.receitas} visivel={financeiroVisivel} />
-              <p className="mt-2 text-[11px] leading-snug text-[var(--text-secondary)]">
-                Valores por moeda, sem conversão: converter aqui exigiria uma taxa, e a taxa é do
-                motor de câmbio. O saldo vem do Ledger.
-              </p>
-            </CollapsibleSection>
+{financeiroVisivel && processoId != null && (
+              <div className="px-4 py-3">
+                {/* Sem total aqui de propósito: o valor é do Financeiro (Ledger/obrigações),
+                    por moeda e com saldo — a árvore só leva até lá. */}
+                <a
+                  href={`/processos/${processoId}?tab=faturas`}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--action-primary)] hover:underline"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  Ver o financeiro do processo
+                </a>
+              </div>
+            )}
           </div>
         )}
       </div>

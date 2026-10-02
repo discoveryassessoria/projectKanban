@@ -119,3 +119,18 @@ export interface DocumentoArvore {
 }
 
 export type ViewMode = 'paisagem' | 'retrato'
+/**
+ * Campo do formulário "Editar Pessoa" que um atalho pode abrir já focado (campo
+ * vazio na página da pessoa → "preencher"). Cada valor casa com um `data-campo` do
+ * formulário; campo novo sem `data-campo` correspondente não tem atalho.
+ */
+export type CampoEdicaoPessoa =
+  | "sexo"
+  | "data_nasc"
+  | "pais_nasc"
+  | "cidade_nasc"
+  | "nacionalidade"
+  | "data_obito"
+  | "local_obito"
+  | "data_casamento"
+  | "local_casamento"

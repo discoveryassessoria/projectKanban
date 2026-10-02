@@ -46,6 +46,7 @@ import {
   type SituacaoDocumental,
 } from "../documental/indicadores"
 import { nomeCompleto } from "../motor/texto"
+import type { NecessidadeDaFila } from "./fila-da-pessoa"
 
 // ── FATOS: o contrato do que a leitura entrega ──────────────────────────────
 // Espelho fiel do endpoint. Campos extras são ignorados de propósito: quando o
@@ -86,14 +87,19 @@ export interface LancamentoDaPessoa {
  * isso, em vez de mostrar "R$ 0,00" e mentir.
  */
 export interface FatosOperacionais {
-  necessidades: NecessidadeOficial[]
+  /** Necessidades oficiais + a situação real do pedido (projeção oficial da certidão). */
+  necessidades: NecessidadeDaFila[]
   tarefas: Array<TarefaDaPessoa & { pessoaId: number | null }>
   lancamentos: Array<LancamentoDaPessoa & { pessoaId: number | null }>
   financeiroVisivel: boolean
+  /** `Processo.faseAtualKey` — a fase REAL, para a fila saber se o processo já entrou em Genealogia. */
+  faseAtualKey?: string | null
+  /** Rótulo da fase destino do fechamento, lido do CADASTRO (nunca literal). */
+  faseDestinoLabel?: string | null
 }
 
 export function fatosVazios(): FatosOperacionais {
-  return { necessidades: [], tarefas: [], lancamentos: [], financeiroVisivel: false }
+  return { necessidades: [], tarefas: [], lancamentos: [], financeiroVisivel: false, faseAtualKey: null, faseDestinoLabel: null }
 }
 
 // ── DOSSIÊ ──────────────────────────────────────────────────────────────────

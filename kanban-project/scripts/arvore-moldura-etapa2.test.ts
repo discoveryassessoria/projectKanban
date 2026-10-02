@@ -223,12 +223,14 @@ ok(/--surface-elevated/.test(cartoes), "cartões usam a superfície opaca de 'o 
 ok(!/\bpainelAberto.*Resumo|resumoAberto/.test(barra), "não sobrou popover de resumo na barra")
 
 // ═══ 5) AÇÃO: a aba Operação lista os achados com botão que leva ao alvo ════
-secao("5) aba Operação da pessoa: Divergências do motor")
+secao("5) aba Operação da pessoa: as divergências do motor viraram itens da fila (Etapa 4)")
 
 const sidebar = codigo(ler("src/components/arvore/pessoa-sidebar.tsx"))
-ok(/Divergências do motor/.test(sidebar) && /<DivergenciasDoMotor/.test(sidebar), "a aba Operação tem a lista 'Divergências do motor'")
-ok(/onClick=\{\(\) => onAbrir\(id\)\}/.test(sidebar), "cada item tem botão ligado a um handler real")
-ok(/achados=\{selectedPersonId != null \? operacional\.achadosDe\(selectedPersonId\)/.test(view) && /onAbrirAchado=\{abrirAchado\}/.test(view), "a tela alimenta a lista e liga o botão")
+const filaUi = codigo(ler("src/components/arvore/fila-da-pessoa.tsx"))
+ok(/Fila de trabalho/.test(sidebar) && /<ListaDaFila/.test(sidebar), "a aba Operação tem a 'Fila de trabalho' (as divergências do motor entram nela)")
+ok(/data-achado-do-motor=\{item\.achadoId\}/.test(filaUi), "cada divergência continua sendo um item identificável na fila")
+ok(/onClick=\{\(\) => onExecutar\(acao\)\}/.test(filaUi), "cada item tem botão ligado a um handler real")
+ok(/fila=\{selectedPersonId != null \? operacional\.filaDe\(selectedPersonId\)/.test(view) && /onAbrirAchado=\{abrirAchado\}/.test(view), "a tela alimenta a fila e liga o botão de abrir pessoa")
 ok(/setSidebarTabInicial\("operacao"\)[\s\S]{0,80}localizarPessoa\(pessoaId\)/.test(view), "o botão foca a pessoa-alvo e abre o painel dela na aba Operação")
 ok(/achadosDoMotorPorPessoa\(analise\)/.test(hook), "o hook serve os achados pela função única")
 ok(!/Concluir a tarefa/.test(sidebar), "o painel da pessoa não manda 'concluir a tarefa'")

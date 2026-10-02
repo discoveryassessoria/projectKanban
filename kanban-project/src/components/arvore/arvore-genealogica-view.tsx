@@ -6,19 +6,22 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useApi, invalidar } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
 import dagre from "dagre"
-import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import type { PessoaArvore, UniaoArvore, DocumentoArvore, CampoEdicaoPessoa } from "./types"
 import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { ExclusaoArvoreModal, type PlanoExclusaoArvoreUI } from '@/src/components/arvore/exclusao-arvore-modal'
 import { MenuMaisArvore } from './menu-mais-arvore'
 import { AvisoEdicao, type AvisoEdicaoDados } from './aviso-edicao'
 import { RemoverVinculoModal } from './remover-vinculo-modal'
+import { VincularConjugeModal } from './vincular-conjuge-modal'
 import { criarHistorico, type ComandoEdicao } from '@/src/lib/genealogia/historico-edicao'
 import {
   classificarVinculo,
   comandoMoverNos,
   comandoRemoverFiliacao,
   comandoRemoverUniao,
+  comandoVincularConjuges,
   nomeCompleto,
+  type DadosDoVinculoConjugal,
   type Http,
   type MovimentoNo,
   type VinculoRemovivel,
@@ -282,6 +285,8 @@ export function ArvoreGenealogicaView({
 
   const [showEditPersonModal, setShowEditPersonModal] = useState(false)
   const [editingPerson, setEditingPerson] = useState<PessoaArvore | null>(null)
+  // Campo vazio na página da pessoa → "preencher": abre a edição já focada neste campo.
+  const [campoEdicaoInicial, setCampoEdicaoInicial] = useState<CampoEdicaoPessoa | undefined>(undefined)
 
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
@@ -607,6 +612,9 @@ export function ArvoreGenealogicaView({
   const [arestaSelecionada, setArestaSelecionada] = useState<{ id: string; source: string; target: string } | null>(null)
   const [vinculoParaRemover, setVinculoParaRemover] = useState<VinculoRemovivel | null>(null)
   const removendoVinculoRef = useRef(false)
+  // VINCULAR CÔNJUGE (Etapa 4): casal que já existe na árvore, sem filho cadastrado.
+  const [vincularConjuge, setVincularConjuge] = useState<{ pessoaId: number; outraId: number | null } | null>(null)
+  const vinculandoConjugeRef = useRef(false)
   const executarHistoricoRef = useRef<(sentido: 'desfazer' | 'refazer') => Promise<void>>(async () => {})
 
   // Pilha limpa ao trocar de árvore/processo (e ao sair): comando de uma árvore
@@ -706,6 +714,39 @@ export function ArvoreGenealogicaView({
       return null
     } finally {
       removendoVinculoRef.current = false
+    }
+  }, [http, fetchArvore, mostrarAviso])
+
+  const abrirVincularConjuge = useCallback((pessoaId: number, outraId: number | null) => {
+    setSelectedPerson(null)
+    setFullDetailsPerson(null)
+    setVincularConjuge({ pessoaId, outraId })
+  }, [setSelectedPerson])
+
+  // Confirmação do modal: devolve `null` (deu certo) ou a mensagem do servidor. A
+  // gravação é a rota oficial (união + estado civil + reavaliação documental na MESMA
+  // transação); o comando entra no histórico, então Ctrl+Z desfaz pelas mesmas rotas.
+  const executarVinculoConjugal = useCallback(async (dados: DadosDoVinculoConjugal): Promise<string | null> => {
+    if (vinculandoConjugeRef.current) return null
+    vinculandoConjugeRef.current = true
+    try {
+      const comando = comandoVincularConjuges(dados, http)
+      const r = await comando.aplicar()
+      if (!r.ok) {
+        // Pode ter gravado e falhado depois (500 com `salvo`): a tela relê o servidor.
+        await fetchArvore()
+        return r.erro
+      }
+      historicoRef.current.registrar(comando)
+      setVincularConjuge(null)
+      await fetchArvore()
+      mostrarAviso('sucesso', `Casamento registrado: ${comando.rotulo}.`, {
+        rotulo: 'Desfazer',
+        onClick: () => void executarHistoricoRef.current('desfazer'),
+      })
+      return null
+    } finally {
+      vinculandoConjugeRef.current = false
     }
   }, [http, fetchArvore, mostrarAviso])
 
@@ -971,7 +1012,7 @@ export function ArvoreGenealogicaView({
         const k = e.key.toLowerCase()
         if (k === 'z' || k === 'y') {
           const modalAberto =
-            vinculoParaRemover != null || pessoaParaRemover != null || mostrarExclusaoArvore ||
+            vinculoParaRemover != null || vincularConjuge != null || pessoaParaRemover != null || mostrarExclusaoArvore ||
             showEditPersonModal || showAddPersonModal || importarAberto || paletaAberta || fullDetailsPerson != null
           if (digitando || modalAberto) return
           e.preventDefault()
@@ -1029,6 +1070,11 @@ export function ArvoreGenealogicaView({
         if (vinculoParaRemover != null) {
           consumir()
           if (!removendoVinculoRef.current) setVinculoParaRemover(null)
+          return
+        }
+        if (vincularConjuge != null) {
+          consumir()
+          if (!vinculandoConjugeRef.current) setVincularConjuge(null)
           return
         }
         if (paletaAberta) { consumir(); setPaletaAberta(false); return }
@@ -1094,6 +1140,7 @@ export function ArvoreGenealogicaView({
       painelAberto,
       fullDetailsPerson,
       vinculoParaRemover,
+      vincularConjuge,
       arestaSelecionada,
       pessoaParaRemover,
       mostrarExclusaoArvore,
@@ -1614,9 +1661,28 @@ export function ArvoreGenealogicaView({
         financeiroVisivel={operacional.financeiroVisivel}
         nomeDeRequerente={nomeDePessoa}
         eventos={selectedPersonId != null ? operacional.eventosDe(selectedPersonId) : undefined}
-        achados={selectedPersonId != null ? operacional.achadosDe(selectedPersonId) : undefined}
+        fila={selectedPersonId != null ? operacional.filaDe(selectedPersonId) : null}
+        mensagemAntesDaGenealogia={operacional.mensagemAntesDaGenealogia}
         onAbrirAchado={abrirAchado}
+        onVincularConjuge={pode('arvore.criar') ? abrirVincularConjuge : undefined}
+        processoId={processoId}
       />
+
+      {vincularConjuge != null && (() => {
+        const base = pessoas.find((p) => p.id === vincularConjuge.pessoaId)
+        if (!base) return null
+        const jaUnidos = new Set(findConjuges(base).map((c) => c.id))
+        return (
+          <VincularConjugeModal
+            key={`${vincularConjuge.pessoaId}-${vincularConjuge.outraId ?? 'x'}`}
+            pessoa={base}
+            candidatos={pessoas.filter((p) => p.id !== base.id && !jaUnidos.has(p.id))}
+            outraPessoaIdInicial={vincularConjuge.outraId}
+            onFechar={() => setVincularConjuge(null)}
+            executar={executarVinculoConjugal}
+          />
+        )
+      })()}
 
       {pessoaParaRemover != null && (
         <RemocaoPessoaModal
@@ -1662,6 +1728,8 @@ export function ArvoreGenealogicaView({
           onAddMae={handleAddMae}
           onAddFilho={handleAddFilho}
           onAddConjuge={handleAddConjugeById}
+          onEditar={pode('arvore.editar') ? (p, campo) => { setCampoEdicaoInicial(campo); handleEditPerson(p) } : undefined}
+          onVincularConjuge={pode('arvore.criar') ? abrirVincularConjuge : undefined}
         />
       )}
 
@@ -1702,14 +1770,17 @@ export function ArvoreGenealogicaView({
           arvoreId={arvoreId!}
           requerentesAfetadosPor={requerentesAfetadosPor}
           estadoAtual={operacional.estadoAtual}
+          campoInicial={campoEdicaoInicial}
           onClose={() => {
             setShowEditPersonModal(false)
             setEditingPerson(null)
+            setCampoEdicaoInicial(undefined)
           }}
           onSuccess={async () => {
             await fetchArvore()
             setShowEditPersonModal(false)
             setEditingPerson(null)
+            setCampoEdicaoInicial(undefined)
           }}
         />
       )}
@@ -2171,6 +2242,7 @@ function EditPersonModal({
   arvoreId,
   requerentesAfetadosPor,
   estadoAtual,
+  campoInicial,
   onClose,
   onSuccess
 }: {
@@ -2183,6 +2255,8 @@ function EditPersonModal({
   requerentesAfetadosPor: (pessoaId: number) => string[]
   /** Números de hoje, para o preview montar a coluna ANTES. */
   estadoAtual?: EstadoAtual
+  /** Campo a focar ao abrir (atalho de campo vazio). Sem ele, o foco é o Nome. */
+  campoInicial?: CampoEdicaoPessoa
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -2525,6 +2599,17 @@ function EditPersonModal({
 
   const pessoasDisponiveis = pessoas.filter(p => p.id !== pessoa.id)
 
+  // ATALHO "NÃO INFORMADO — PREENCHER": foca o campo pedido (e o leva à vista). Roda
+  // uma vez, na abertura; os campos de dentro de seção condicional (casamento, óbito)
+  // já nascem visíveis porque o estado inicial reflete a união/óbito existentes.
+  useEffect(() => {
+    if (!campoInicial) return
+    const alvo = document.querySelector<HTMLElement>(`[data-campo="${campoInicial}"]`)
+    const foco = alvo?.matches('input,select,textarea,button') ? alvo : alvo?.querySelector<HTMLElement>('input,select,textarea,button')
+    foco?.focus()
+    alvo?.scrollIntoView({ block: 'center' })
+  }, [campoInicial])
+
   // "I" abre o preview quando já existe mudança relevante pendente no formulário.
   useEffect(() => {
     const atalho = (e: KeyboardEvent) => {
@@ -2579,7 +2664,7 @@ function EditPersonModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-                <select value={sexo} onChange={(e) => setSexo(e.target.value)} className={selectClass} style={selectStyle}>
+                <select data-campo="sexo" value={sexo} onChange={(e) => setSexo(e.target.value)} className={selectClass} style={selectStyle}>
                   <option value="">Selecione...</option>
                   <option value="Masculino">Masculino</option>
                   <option value="Feminino">Feminino</option>
@@ -2624,20 +2709,20 @@ function EditPersonModal({
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Nascimento</h3>
             <div className="grid grid-cols-3 gap-3">
-              <div>
+              <div data-campo="data_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
                 <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
                 <SeloMaioridade nascimento={dataNasc} marcador={requerente} mostrarSemData={jaEhRequerente} />
               </div>
-              <div>
+              <div data-campo="pais_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
                 <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
               </div>
-              <div>
+              <div data-campo="cidade_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
                 <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
               </div>
-              <div>
+              <div data-campo="nacionalidade">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
                 <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
@@ -2671,11 +2756,11 @@ function EditPersonModal({
                       ))}
                     </select>
                   </div>
-                  <div>
+                  <div data-campo="data_casamento">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data do Casamento</label>
                     <DatePickerField value={dataCasamento} onChange={(value) => setDataCasamento(value)} />
                   </div>
-                  <div>
+                  <div data-campo="local_casamento">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Local do Casamento</label>
                     <input type="text" value={localCasamento} onChange={(e) => setLocalCasamento(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
                   </div>
@@ -2687,11 +2772,11 @@ function EditPersonModal({
               <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 mt-3">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Dados do Falecimento</h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
+                  <div data-campo="data_obito">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Data de Falecimento</label>
                     <DatePickerField value={dataObito} onChange={(value) => setDataObito(value)} />
                   </div>
-                  <div>
+                  <div data-campo="local_obito">
                     <label className="block text-sm font-medium text-gray-700 mb-1">Local de Falecimento</label>
                     <input type="text" value={localObito} onChange={(e) => setLocalObito(e.target.value)} placeholder="Cidade - Estado" className={inputClass} />
                   </div>

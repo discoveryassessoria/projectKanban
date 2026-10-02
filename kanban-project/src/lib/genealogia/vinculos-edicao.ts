@@ -195,6 +195,77 @@ export async function comandoRemoverUniao(
   }
 }
 
+// ── VINCULAR CÔNJUGES ──────────────────────────────────────────────────────
+export interface DadosDoVinculoConjugal {
+  pessoa1Id: number
+  pessoa2Id: number
+  pessoa1Nome: string
+  pessoa2Nome: string
+  /** ISO (data do casamento) ou null. */
+  dataCasamento: string | null
+  /** Local do casamento ou null. */
+  localCasamento: string | null
+}
+
+/**
+ * Vincular dois cônjuges que já existem na árvore (casal sem filho cadastrado).
+ * Aplicar = `POST /api/unioes` com `marcarCasados` (a união E o estado civil das
+ * duas pessoas, mais a reavaliação documental, na MESMA transação — §37) e
+ * `idempotente` (repetir não cria nem dá erro). Desfazer = remover a união pela
+ * rota oficial e devolver a cada pessoa o estado civil que tinha ANTES (o servidor
+ * informa em `casadoAntes`) — sem deixar "casada sem cônjuge" para trás.
+ */
+export function comandoVincularConjuges(d: DadosDoVinculoConjugal, http: Http): ComandoEdicao {
+  let idVivo: number | null = null
+  let casadoAntes: { pessoa1: boolean; pessoa2: boolean } | null = null
+  return {
+    rotulo: `casamento de ${d.pessoa1Nome} e ${d.pessoa2Nome}`,
+    aplicar: async () => {
+      const c = await chamar(
+        http,
+        "POST",
+        "/api/unioes",
+        {
+          pessoa1Id: d.pessoa1Id,
+          pessoa2Id: d.pessoa2Id,
+          tipo: "casamento",
+          data_inicio: d.dataCasamento,
+          local: d.localCasamento,
+          marcarCasados: true,
+          idempotente: true,
+        },
+        "Não foi possível vincular os cônjuges.",
+      )
+      if (!c.r.ok) return c.r
+      const corpo = (c.corpo ?? {}) as { id?: unknown; jaExistia?: unknown; casadoAntes?: { pessoa1?: unknown; pessoa2?: unknown } }
+      if (typeof corpo.id !== "number") {
+        return { ok: false, erro: "A união foi gravada, mas o servidor não devolveu o identificador dela.", definitivo: true }
+      }
+      idVivo = corpo.id
+      // Já existia: nada foi criado por este comando, então nada será desfeito por ele.
+      casadoAntes = corpo.jaExistia === true || !corpo.casadoAntes
+        ? null
+        : { pessoa1: corpo.casadoAntes.pessoa1 === true, pessoa2: corpo.casadoAntes.pessoa2 === true }
+      if (corpo.jaExistia === true) idVivo = null
+      return { ok: true }
+    },
+    desfazer: async () => {
+      if (idVivo == null) return { ok: true }
+      const del = await chamar(http, "DELETE", `/api/unioes/${idVivo}`, undefined, "Não foi possível desfazer o vínculo conjugal.")
+      if (!del.r.ok) return del.r
+      idVivo = null
+      const restaurar: Array<[number, boolean]> = []
+      if (casadoAntes && !casadoAntes.pessoa1) restaurar.push([d.pessoa1Id, false])
+      if (casadoAntes && !casadoAntes.pessoa2) restaurar.push([d.pessoa2Id, false])
+      for (const [id, casado] of restaurar) {
+        const r = await chamar(http, "PUT", `/api/pessoas/${id}`, { casado }, "A união foi removida, mas não foi possível restaurar o estado civil.")
+        if (!r.r.ok) return r.r
+      }
+      return { ok: true }
+    },
+  }
+}
+
 // ── MOVER CARTÕES ──────────────────────────────────────────────────────────
 export interface Posicao { x: number; y: number }
 export interface MovimentoNo { pessoaId: number; antes: Posicao; depois: Posicao }

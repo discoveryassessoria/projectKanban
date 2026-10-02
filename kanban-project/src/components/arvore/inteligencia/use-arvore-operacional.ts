@@ -70,6 +70,8 @@ import {
   type ResumoLinhagem,
 } from "@/src/lib/genealogia/operacional/dossie"
 import { achadosDoMotorPorPessoa, type AchadoDoMotor } from "@/src/lib/genealogia/operacional/achados-do-motor"
+import { montarFilaDaPessoa, mensagemAntesDaGenealogia, type FilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
+import { nomeCompleto } from "@/src/lib/genealogia/motor/texto"
 import { calcularParentesco } from "@/src/lib/genealogia/motor/parentesco"
 import type { ContextoPerguntas } from "@/src/lib/genealogia/operacional/perguntas"
 import type { SinaisPessoa } from "../react-flow-tree"
@@ -114,6 +116,13 @@ export interface ArvoreOperacional {
    * (`achados-do-motor.ts`) que substituiu a lista do painel Diagnóstico.
    */
   achadosDe: (pessoaId: number) => AchadoDoMotor[]
+  /**
+   * Fila de trabalho da pessoa (aba Operação): documentos reais com estado e ação +
+   * divergências do motor. Montada pela função PURA `montarFilaDaPessoa`.
+   */
+  filaDe: (pessoaId: number) => FilaDaPessoa
+  /** "As exigências serão geradas quando o processo entrar em <fase do cadastro>." */
+  mensagemAntesDaGenealogia: string
   /** Resumos de TODOS os requerentes, para a comparação. */
   comparacao: ResumoLinhagem[]
 
@@ -174,6 +183,8 @@ export function useArvoreOperacional(params: {
             tarefas: req.dados.tarefas ?? [],
             lancamentos: req.dados.lancamentos ?? [],
             financeiroVisivel: Boolean(req.dados.financeiroVisivel),
+            faseAtualKey: req.dados.faseAtualKey ?? null,
+            faseDestinoLabel: req.dados.faseDestinoLabel ?? null,
           }
         : fatosVazios(),
     [req.dados],
@@ -447,6 +458,38 @@ export function useArvoreOperacional(params: {
     [achadosPorPessoa],
   )
 
+  // FILA DA PESSOA: só roda quando a aba é aberta (chamada por pessoa, sob demanda).
+  // Usa os fatos já lidos — nenhuma leitura nova, nenhuma segunda contagem.
+  const filaDe = useCallback(
+    (pessoaId: number): FilaDaPessoa =>
+      montarFilaDaPessoa({
+        pessoaId,
+        processoId,
+        faseAtualKey: fatos.faseAtualKey ?? null,
+        necessidades: fatos.necessidades,
+        tarefas: fatos.tarefas,
+        uniaoIdsDaPessoa: (analise?.grafo.unioesDe(pessoaId) ?? [])
+          .map((u) => u.id)
+          .filter((id): id is number => typeof id === "number"),
+        nomeDoConjugeDaUniao: (uniaoId) => {
+          const u = analise?.grafo.unioesDe(pessoaId).find((x) => x.id === uniaoId)
+          if (!u || !analise) return null
+          const outro = analise.grafo.pessoa(u.pessoa1Id === pessoaId ? u.pessoa2Id : u.pessoa1Id)
+          return outro ? nomeCompleto(outro) : null
+        },
+        achados: achadosPorPessoa.get(pessoaId) ?? SEM_ACHADOS,
+        nomeDePessoa: (id) => {
+          const p = analise?.grafo.pessoa(id)
+          return p ? nomeCompleto(p) : `#${id}`
+        },
+      }),
+    [processoId, fatos, analise, achadosPorPessoa],
+  )
+  const textoAntesDaGenealogia = useMemo(
+    () => mensagemAntesDaGenealogia(fatos.faseDestinoLabel),
+    [fatos.faseDestinoLabel],
+  )
+
   const selecionarRequerente = useCallback((id: number | null) => setEscolhaManual(id), [])
   const alternarRelacionados = useCallback(() => setRelacionadosVisiveis((v) => !v), [])
   const alternarSaude = useCallback(() => setSaudeLigada((v) => !v), [])
@@ -499,6 +542,8 @@ export function useArvoreOperacional(params: {
     trilha,
     proximaAcao,
     achadosDe,
+    filaDe,
+    mensagemAntesDaGenealogia: textoAntesDaGenealogia,
     comparacao,
     relacionadosVisiveis,
     alternarRelacionados,

@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import type { PessoaArvore, UniaoArvore } from "./types"
+import type { PessoaArvore, UniaoArvore, CampoEdicaoPessoa } from "./types"
+import { localDaUniao, rotuloTipoDaUniao } from "@/src/lib/genealogia/uniao-rotulos"
 import { 
   ChevronLeft, 
   ChevronUp, 
@@ -25,6 +26,10 @@ interface PessoaDetailsPageProps {
   onAddMae?: (pessoaId: number) => void
   onAddFilho?: (pessoaId: number) => void
   onAddConjuge?: (pessoaId: number) => void
+  /** Abre "Editar pessoa" já focando o campo (atalho de campo vazio). Ausente = sem atalho. */
+  onEditar?: (pessoa: PessoaArvore, campo: CampoEdicaoPessoa) => void
+  /** Casar com alguém que já está na árvore (casal sem filho cadastrado). */
+  onVincularConjuge?: (pessoaId: number, outraPessoaId: number | null) => void
 }
 
 // Cores por gênero
@@ -167,18 +172,34 @@ function CollapsibleSection({ title, children, defaultOpen = true }: { title: st
 function InfoItem({ 
   label, 
   value, 
-  icon: Icon
+  icon: Icon,
+  onPreencher,
 }: { 
   label: string
   value: string | null | undefined
   icon?: React.ElementType
+  /** Campo vazio vira atalho: abre a edição da pessoa já focando este campo. */
+  onPreencher?: () => void
 }) {
   return (
     <div className="flex items-start gap-2 py-2">
       {Icon && <Icon className="h-4 w-4 text-[var(--text-muted)] mt-0.5" />}
       <div>
         <p className="text-sm text-gray-500">{label}</p>
-        <p className="font-medium text-gray-900">{value || 'Não informado'}</p>
+        {value ? (
+          <p className="font-medium text-gray-900">{value}</p>
+        ) : onPreencher ? (
+          <button
+            type="button"
+            onClick={onPreencher}
+            data-preencher
+            className="font-medium text-amber-700 underline decoration-dotted underline-offset-2 hover:text-amber-900"
+          >
+            Não informado — preencher
+          </button>
+        ) : (
+          <p className="font-medium text-gray-900">Não informado</p>
+        )}
       </div>
     </div>
   )
@@ -194,7 +215,9 @@ export function PessoaDetailsPage({
   onAddPai,
   onAddMae,
   onAddFilho,
-  onAddConjuge
+  onAddConjuge,
+  onEditar,
+  onVincularConjuge,
 }: PessoaDetailsPageProps) {
   const [activeTab, setActiveTab] = useState<'sobre' | 'detalhes' | 'fontes'>('detalhes')
   const [showDetailedView, setShowDetailedView] = useState(false)
@@ -206,6 +229,8 @@ export function PessoaDetailsPage({
   
   // Construir local de nascimento
   const localNascimento = [pessoa.local_nasc, pessoa.estado_nasc, pessoa.pais_nasc].filter(Boolean).join(', ')
+
+  const preencher = (campo: CampoEdicaoPessoa) => (onEditar ? () => onEditar(pessoa, campo) : undefined)
 
   const tabs = [
     { id: 'sobre', label: 'Sobre' },
@@ -278,17 +303,19 @@ export function PessoaDetailsPage({
               
               <div className="grid grid-cols-2 gap-x-8 gap-y-2 mt-4">
                 <InfoItem label="Nome completo" value={nomeCompleto} />
-                <InfoItem label="Sexo" value={pessoa.sexo} />
+                <InfoItem label="Sexo" value={pessoa.sexo} onPreencher={preencher("sexo")} />
                 
                 <InfoItem 
                   label="Nascimento" 
                   value={formatDateFull(pessoa.data_nasc)} 
                   icon={Calendar}
+                  onPreencher={preencher("data_nasc")}
                 />
                 <InfoItem 
                   label="Local de nascimento" 
                   value={localNascimento} 
                   icon={MapPin}
+                  onPreencher={preencher(pessoa.pais_nasc ? "cidade_nasc" : "pais_nasc")}
                 />
                 
                 {(pessoa.data_obito || pessoa.vivo === false) && (
@@ -297,16 +324,18 @@ export function PessoaDetailsPage({
                       label="Falecimento" 
                       value={formatDateFull(pessoa.data_obito)} 
                       icon={Calendar}
+                      onPreencher={preencher("data_obito")}
                     />
                     <InfoItem 
                       label="Local de falecimento" 
                       value={pessoa.local_obito} 
                       icon={MapPin}
+                      onPreencher={preencher("local_obito")}
                     />
                   </>
                 )}
                 
-                <InfoItem label="Nacionalidade" value={pessoa.nacionalidade} />
+                <InfoItem label="Nacionalidade" value={pessoa.nacionalidade} onPreencher={preencher("nacionalidade")} />
                 {pessoa.cidadanias_outras && (
                   <InfoItem label="Outras cidadanias" value={pessoa.cidadanias_outras} />
                 )}
@@ -374,13 +403,26 @@ export function PessoaDetailsPage({
                       </div>
                     )}
                     
-                    {/* Casamento info */}
+                    {/* Vínculo do casal: data e local do casamento (da União). O título
+                        "Casamento" não se repete na linha do tipo — só entra o que acrescenta. */}
                     {casamento && (
-                      <div className="p-3 border-t border-gray-100 bg-gray-50">
+                      <div className="p-3 border-t border-gray-100 bg-gray-50" data-vinculo-do-casal>
                         <p className="text-sm font-medium text-gray-700">Casamento</p>
-                        <p className="text-sm text-gray-600">{formatDateFull(casamento.data_inicio)}</p>
-                        {casamento.local && <p className="text-sm text-gray-500">{casamento.local}{casamento.pais && `, ${casamento.pais}`}</p>}
-                        {casamento.tipo && <p className="text-xs text-[var(--text-muted)]">{casamento.tipo}</p>}
+                        <p className="text-sm text-gray-600">
+                          {casamento.data_inicio
+                            ? formatDateFull(casamento.data_inicio)
+                            : onEditar
+                              ? <button type="button" data-preencher onClick={() => onEditar(pessoa, "data_casamento")} className="text-amber-700 underline decoration-dotted underline-offset-2 hover:text-amber-900">Data não informada — preencher</button>
+                              : "Data não informada"}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {localDaUniao(casamento)
+                            ? localDaUniao(casamento)
+                            : onEditar
+                              ? <button type="button" data-preencher onClick={() => onEditar(pessoa, "local_casamento")} className="text-amber-700 underline decoration-dotted underline-offset-2 hover:text-amber-900">Local não informado — preencher</button>
+                              : "Local não informado"}
+                        </p>
+                        {rotuloTipoDaUniao(casamento.tipo) && <p className="text-xs text-[var(--text-muted)]">{rotuloTipoDaUniao(casamento.tipo)}</p>}
                       </div>
                     )}
                     
@@ -436,6 +478,17 @@ export function PessoaDetailsPage({
                     >
                       <Plus className="h-4 w-4" />
                       <span className="text-sm font-medium">ACRESCENTAR CÔNJUGE</span>
+                    </button>
+                  )}
+                  
+                  {!conjuge && onVincularConjuge && (
+                    <button 
+                      type="button"
+                      onClick={() => onVincularConjuge(pessoa.id, null)}
+                      className="w-full mt-2 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <Heart className="h-4 w-4" />
+                      <span className="text-sm font-medium">VINCULAR CÔNJUGE JÁ CADASTRADO</span>
                     </button>
                   )}
                   
