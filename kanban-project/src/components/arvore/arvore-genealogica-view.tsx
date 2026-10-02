@@ -9,6 +9,20 @@ import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { ExclusaoArvoreModal, type PlanoExclusaoArvoreUI } from '@/src/components/arvore/exclusao-arvore-modal'
+import { MenuMaisArvore } from './menu-mais-arvore'
+import { AvisoEdicao, type AvisoEdicaoDados } from './aviso-edicao'
+import { RemoverVinculoModal } from './remover-vinculo-modal'
+import { criarHistorico, type ComandoEdicao } from '@/src/lib/genealogia/historico-edicao'
+import {
+  classificarVinculo,
+  comandoMoverNos,
+  comandoRemoverFiliacao,
+  comandoRemoverUniao,
+  nomeCompleto,
+  type Http,
+  type MovimentoNo,
+  type VinculoRemovivel,
+} from '@/src/lib/genealogia/vinculos-edicao'
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
@@ -48,7 +62,7 @@ import {
   Search,
   Sparkles,
   ImagePlus,
-  Trash2,
+  Unlink,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -582,6 +596,119 @@ export function ArvoreGenealogicaView({
   const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
   const [mostrarExclusaoArvore, setMostrarExclusaoArvore] = useState(false)
 
+  // ── SEGURANÇA DE EDIÇÃO (Etapa 3) ─────────────────────────────────────────
+  // Remover vínculo é ação EXPLÍCITA (selecionar a linha → "Remover vínculo" →
+  // confirmação que diz quem é afetado). Delete/Backspace não remove nada. Tudo
+  // o que muda o canvas entra num histórico de Desfazer/Refazer (Ctrl/Cmd+Z); o
+  // desfazer passa pelas MESMAS rotas oficiais (propagação §37), nunca direto no banco.
+  const historicoRef = useRef(criarHistorico())
+  const [aviso, setAviso] = useState<AvisoEdicaoDados | null>(null)
+  const avisoSeqRef = useRef(0)
+  const [arestaSelecionada, setArestaSelecionada] = useState<{ id: string; source: string; target: string } | null>(null)
+  const [vinculoParaRemover, setVinculoParaRemover] = useState<VinculoRemovivel | null>(null)
+  const removendoVinculoRef = useRef(false)
+  const executarHistoricoRef = useRef<(sentido: 'desfazer' | 'refazer') => Promise<void>>(async () => {})
+
+  // Pilha limpa ao trocar de árvore/processo (e ao sair): comando de uma árvore
+  // nunca pode rodar sobre outra.
+  useEffect(() => {
+    const h = historicoRef.current
+    h.limpar()
+    return () => h.limpar()
+  }, [arvoreId, processoId])
+
+  const mostrarAviso = useCallback((tipo: AvisoEdicaoDados['tipo'], mensagem: string, acao?: AvisoEdicaoDados['acao']) => {
+    avisoSeqRef.current += 1
+    setAviso({ id: avisoSeqRef.current, tipo, mensagem, acao })
+  }, [])
+  const fecharAviso = useCallback(() => setAviso(null), [])
+
+  const http = useCallback<Http>(async (metodo, url, corpo) => {
+    const r = await authFetch(url, {
+      method: metodo,
+      ...(corpo !== undefined
+        ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) }
+        : {}),
+    })
+    return { ok: r.ok, status: r.status, corpo: await r.json().catch(() => null) as unknown }
+  }, [])
+
+  const vinculoSelecionado = useMemo<VinculoRemovivel | null>(
+    () => (arestaSelecionada ? classificarVinculo(arestaSelecionada, pessoas, unioes) : null),
+    [arestaSelecionada, pessoas, unioes],
+  )
+
+  const executarHistorico = useCallback(async (sentido: 'desfazer' | 'refazer') => {
+    const h = historicoRef.current
+    const r = sentido === 'desfazer' ? await h.desfazer() : await h.refazer()
+    if (r.status === 'ocupado') return
+    if (r.status === 'vazio') {
+      mostrarAviso('sucesso', sentido === 'desfazer' ? 'Nada para desfazer.' : 'Nada para refazer.')
+      return
+    }
+    // Mexeu em dados da árvore (ou tentou): recarrega — a tela mostra o que o servidor tem.
+    if (r.afetaDados) await fetchArvore()
+    if (r.status === 'falhou') {
+      mostrarAviso(
+        'erro',
+        `Não foi possível ${sentido === 'desfazer' ? 'desfazer' : 'refazer'} ${r.rotulo}: ${r.erro}` +
+          (r.descartado ? ' Esta ação saiu do histórico.' : ''),
+      )
+      return
+    }
+    const inverso = sentido === 'desfazer' ? 'refazer' : 'desfazer'
+    const temInverso = inverso === 'refazer' ? h.podeRefazer() : h.podeDesfazer()
+    mostrarAviso(
+      'sucesso',
+      `${sentido === 'desfazer' ? 'Desfeito' : 'Refeito'}: ${r.rotulo}.`,
+      temInverso ? { rotulo: inverso === 'refazer' ? 'Refazer' : 'Desfazer', onClick: () => void executarHistoricoRef.current(inverso) } : undefined,
+    )
+  }, [fetchArvore, mostrarAviso])
+  useEffect(() => { executarHistoricoRef.current = executarHistorico }, [executarHistorico])
+
+  // Cartão arrastado → comando de "mover" (o inverso grava a posição anterior).
+  const aoMoverCartoes = useCallback((modo: string, movimentos: MovimentoNo[]) => {
+    const cmd = comandoMoverNos(modo, movimentos, (m, posicoes) => {
+      const arvore = reactFlowTreeRef.current
+      if (!arvore) throw new Error('árvore indisponível')
+      arvore.aplicarPosicoes(m, posicoes)
+    })
+    historicoRef.current.registrar(cmd)
+  }, [])
+
+  // Confirmação do modal: devolve `null` (deu certo) ou a mensagem do servidor.
+  const executarRemocaoVinculo = useCallback(async (v: VinculoRemovivel): Promise<string | null> => {
+    if (removendoVinculoRef.current) return null
+    removendoVinculoRef.current = true
+    try {
+      let comando: ComandoEdicao
+      if (v.tipo === 'uniao') {
+        const c = await comandoRemoverUniao(v, http)
+        if (!c.ok) return c.erro
+        comando = c.comando
+      } else {
+        comando = comandoRemoverFiliacao(v, http)
+      }
+      const r = await comando.aplicar()
+      if (!r.ok) {
+        // Pode ter gravado e falhado depois (500 com `salvo`): a tela relê o servidor.
+        await fetchArvore()
+        return r.erro
+      }
+      historicoRef.current.registrar(comando)
+      setVinculoParaRemover(null)
+      setArestaSelecionada(null)
+      await fetchArvore()
+      mostrarAviso('sucesso', `Vínculo removido: ${comando.rotulo}.`, {
+        rotulo: 'Desfazer',
+        onClick: () => void executarHistoricoRef.current('desfazer'),
+      })
+      return null
+    } finally {
+      removendoVinculoRef.current = false
+    }
+  }, [http, fetchArvore, mostrarAviso])
+
   // FRONTEIRA (ADR — Árvore como camada de projeção): a exclusão de Documento
   // saiu daqui.
   //
@@ -838,6 +965,21 @@ export function ArvoreGenealogicaView({
         setPaletaAberta((v) => !v)
         return
       }
+      // DESFAZER / REFAZER do canvas. Em campo de texto o Ctrl+Z é do campo (desfazer
+      // nativo) — não se captura. Também não com modal aberto: o foco ali é do modal.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.defaultPrevented) {
+        const k = e.key.toLowerCase()
+        if (k === 'z' || k === 'y') {
+          const modalAberto =
+            vinculoParaRemover != null || pessoaParaRemover != null || mostrarExclusaoArvore ||
+            showEditPersonModal || showAddPersonModal || importarAberto || paletaAberta || fullDetailsPerson != null
+          if (digitando || modalAberto) return
+          e.preventDefault()
+          const refazer = k === 'y' || e.shiftKey
+          void executarHistoricoRef.current(refazer ? 'refazer' : 'desfazer')
+          return
+        }
+      }
       if (digitando) return
 
       // Atalhos de LETRA. Só disparam sem modificador: Ctrl+D é favoritar no
@@ -884,9 +1026,15 @@ export function ArvoreGenealogicaView({
           document.dispatchEvent(new Event(EVENTO_FECHAR_CAMADA))
           return
         }
+        if (vinculoParaRemover != null) {
+          consumir()
+          if (!removendoVinculoRef.current) setVinculoParaRemover(null)
+          return
+        }
         if (paletaAberta) { consumir(); setPaletaAberta(false); return }
         if (painelAberto) { consumir(); setPainelAberto(false); return }
         if (fullDetailsPerson) { consumir(); setFullDetailsPerson(null); return }
+        if (arestaSelecionada) { consumir(); setArestaSelecionada(null); return }
         if (selectedPersonId != null) {
           consumir()
           setSelectedPersonId(null)
@@ -945,6 +1093,13 @@ export function ArvoreGenealogicaView({
       paletaAberta,
       painelAberto,
       fullDetailsPerson,
+      vinculoParaRemover,
+      arestaSelecionada,
+      pessoaParaRemover,
+      mostrarExclusaoArvore,
+      showEditPersonModal,
+      showAddPersonModal,
+      importarAberto,
       localizarPessoa,
       irParaPessoa,
       operacional,
@@ -1015,24 +1170,20 @@ export function ArvoreGenealogicaView({
   // DESVINCULAR pai/mãe (não apaga a pessoa, só religa o ponteiro pra null) —
   // corrige o mesmo tipo de erro de importação que o seletor do Editar Pessoa
   // corrige, só que direto do card da sidebar, sem abrir o formulário inteiro.
-  const handleRemoveParent = async (pessoaId: number, tipo: 'pai' | 'mae') => {
-    const campo = tipo === 'pai' ? 'Pai' : 'Mãe'
-    if (!window.confirm(`Remover o vínculo de ${campo} desta pessoa? A pessoa não é apagada — só o vínculo.`)) return
-    try {
-      const res = await authFetch(`/api/pessoas/${pessoaId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tipo === 'pai' ? { paiId: null } : { maeId: null }),
-      })
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}))
-        alert(d.error || `Erro ao remover ${campo.toLowerCase()}`)
-        return
-      }
-      await fetchArvore()
-    } catch {
-      alert(`Erro ao remover ${campo.toLowerCase()}`)
-    }
+  const handleRemoveParent = (pessoaId: number, tipo: 'pai' | 'mae') => {
+    // Mesma porta do canvas: o modal diz quem é afetado e o efeito na documentação,
+    // a remoção entra no histórico (Ctrl+Z) e passa por `PUT /api/pessoas/:id`.
+    const filho = pessoas.find((p) => p.id === pessoaId)
+    const progenitorId = tipo === 'pai' ? filho?.paiId : filho?.maeId
+    const progenitor = pessoas.find((p) => p.id === progenitorId)
+    if (!filho || !progenitor) return
+    setVinculoParaRemover({
+      tipo,
+      filhoId: filho.id,
+      filhoNome: nomeCompleto(filho),
+      progenitorId: progenitor.id,
+      progenitorNome: nomeCompleto(progenitor),
+    })
   }
 
   const handleOnboardingComplete = async () => {
@@ -1291,19 +1442,18 @@ export function ArvoreGenealogicaView({
             {isFullscreen ? <Minimize2 className="h-4 w-4" aria-hidden="true" /> : <Maximize2 className="h-4 w-4" aria-hidden="true" />}
           </button>
 
-          {/* Excluir árvore inteira — ação rara e irreversível, por isso separada
-              do resto do grupo e sempre atrás de confirmação (ver ExclusaoArvoreModal).
-              Só aparece com permissão e com uma árvore de fato para excluir. */}
-          {pode('arvore.excluir') && arvoreId && (
-            <button
-              className="p-2 rounded transition-colors text-red-300 hover:bg-red-950/40 hover:text-red-200"
-              onClick={() => setMostrarExclusaoArvore(true)}
-              title="Excluir árvore inteira"
-              aria-label="Excluir árvore inteira"
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </button>
-          )}
+          {/* Ações RARAS e irreversíveis moram no menu "⋯", nunca soltas na barra:
+              a exclusão da árvore inteira é o único item hoje (a exclusão do PROCESSO
+              não existe nesta tela — vive em Processos, com a guarda de ciclo de vida
+              e a permissão `processos.excluirDefinitivo`). Só aparece com permissão
+              e com uma árvore de fato para excluir; o menu some se não houver item. */}
+          <MenuMaisArvore
+            itens={
+              pode('arvore.excluir') && arvoreId
+                ? [{ chave: 'excluir-arvore', rotulo: 'Excluir árvore inteira…', perigo: true, onSelecionar: () => setMostrarExclusaoArvore(true) }]
+                : []
+            }
+          />
         </div>
       </div>
 
@@ -1364,8 +1514,38 @@ export function ArvoreGenealogicaView({
             onExpandirGrupo={operacional.expandirGrupo}
             lacunas={operacional.lacunas}
             saude={operacional.saude}
+            onPosicoesMovidas={aoMoverCartoes}
+            onVinculoSelecionado={setArestaSelecionada}
+            arestaSelecionadaId={vinculoSelecionado ? arestaSelecionada?.id ?? null : null}
           />
         )}
+
+        {/* Ação sobre a linha selecionada. Fica FORA do <ReactFlowTree>: o canvas
+            só informa qual aresta foi escolhida; quem sabe o que ela significa e
+            quem pode removê-la é a tela. Remover pai/mãe exige `arvore.editar`;
+            remover união exige `arvore.excluir` — as mesmas das rotas. */}
+        {vinculoSelecionado &&
+          (vinculoSelecionado.tipo === 'uniao' ? pode('arvore.excluir') : pode('arvore.editar')) && (
+            <div
+              className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm text-gray-900 shadow-[var(--elev-2)]"
+              role="group"
+              aria-label="Vínculo selecionado"
+            >
+              <span className="min-w-0 truncate">
+                {vinculoSelecionado.tipo === 'uniao'
+                  ? `União: ${vinculoSelecionado.pessoa1Nome} e ${vinculoSelecionado.pessoa2Nome}`
+                  : `${vinculoSelecionado.tipo === 'pai' ? 'Pai' : 'Mãe'}: ${vinculoSelecionado.progenitorNome} → ${vinculoSelecionado.filhoNome}`}
+              </span>
+              <button
+                type="button"
+                onClick={() => setVinculoParaRemover(vinculoSelecionado)}
+                className="flex shrink-0 items-center gap-1.5 rounded-md border border-[var(--border-default)] px-2.5 py-1.5 font-medium text-red-700 transition-colors hover:bg-[var(--surface-secondary)]"
+              >
+                <Unlink className="h-4 w-4" aria-hidden="true" />
+                Remover vínculo
+              </button>
+            </div>
+          )}
 
         {/* CARTÕES FLUTUANTES — sobrepostos ao canvas, NUNCA dentro dele: o
             <ReactFlowTree> acima não sabe que eles existem, então abrir,
@@ -1447,6 +1627,16 @@ export function ArvoreGenealogicaView({
           carregarPlano={carregarPlanoRemocao}
         />
       )}
+
+      {vinculoParaRemover != null && (
+        <RemoverVinculoModal
+          vinculo={vinculoParaRemover}
+          onFechar={() => setVinculoParaRemover(null)}
+          executar={executarRemocaoVinculo}
+        />
+      )}
+
+      <AvisoEdicao aviso={aviso} onFechar={fecharAviso} />
 
       {mostrarExclusaoArvore && arvoreId != null && (
         <ExclusaoArvoreModal
