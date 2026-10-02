@@ -6,17 +6,36 @@
 
 import type { GrafoGenealogico } from "../grafo"
 import type { Insight } from "../tipos"
-import { anosEntre, anoDe, diasEntre, formatarData, nomeCompleto, tsDe } from "../texto"
+import { anosCompletosEntre, anosEntre, anoDe, diasEntre, formatarData, nomeCompleto, tsDe } from "../texto"
 
 // Limites biológicos/documentais aceitos em genealogia profissional.
-const IDADE_MIN_MAE = 12
-const IDADE_MIN_PAI = 13
-const IDADE_MAX_MAE = 52
-const IDADE_MAX_PAI = 78
-const IDADE_MAX_VIDA = 110
-const IDADE_MIN_CASAMENTO = 12
-const GESTACAO_MAX_DIAS = 300 // filho póstumo legítimo
-const INTERVALO_MIN_IRMAOS_DIAS = 250 // menos que isso só se forem gêmeos
+//
+// Exportados porque são CONTRATO: o painel de Análise e a fila da aba Operação
+// mostram achados que nascem daqui, e o teste de limites trava cada número.
+//
+// Datas ausentes ou parciais (só ano, ou ano-mês) NUNCA geram achado: sem dia
+// não há diferença a medir, e inventar o dia acusaria erro que ninguém cometeu
+// (ver `tsDe`). Idades-limite usam ANOS COMPLETOS de calendário
+// (`anosCompletosEntre`) — quem faz exatamente 12 anos não tem "11,99".
+export const IDADE_MIN_MAE = 12
+export const IDADE_MIN_PAI = 13
+export const IDADE_MAX_MAE = 52
+export const IDADE_MAX_PAI = 78
+export const IDADE_MAX_VIDA = 110
+export const IDADE_MIN_CASAMENTO = 12
+/**
+ * Filho póstumo legítimo: gestação humana vai a ~280 dias; 300 dá ~20 dias de
+ * tolerância (parto tardio + imprecisão de registro). Óbito do pai a 8 meses
+ * (~243 dias) do nascimento é possível; a 10 meses (~304 dias) já não é.
+ */
+export const GESTACAO_MAX_DIAS = 300
+/**
+ * Mãe: o nascimento é posterior ao óbito dela só por imprecisão de registro de
+ * 1 dia (parto na madrugada, certidão lavrada no dia seguinte). A partir de 2
+ * dias é impossível.
+ */
+export const TOLERANCIA_OBITO_MAE_DIAS = 1
+export const INTERVALO_MIN_IRMAOS_DIAS = 250 // menos que isso só se forem gêmeos
 
 export function analisarCronologia(g: GrafoGenealogico): Insight[] {
   const out: Insight[] = []
@@ -184,12 +203,12 @@ export function analisarCronologia(g: GrafoGenealogico): Insight[] {
             pessoaIds: [p.id, parenteId],
             confianca: 1,
           })
-        } else if (idadeNoParto < idadeMin) {
+        } else if ((anosCompletosEntre(parente.data_nasc, nasc) ?? idadeNoParto) < idadeMin) {
           add({
             id: `cron-parente-jovem-${p.id}-${parenteId}`,
             categoria: "conflito",
             severidade: "alto",
-            titulo: `${nomeCompleto(parente)} teria ${Math.floor(idadeNoParto)} anos ao nascer ${nomeCompleto(p)}`,
+            titulo: `${nomeCompleto(parente)} teria ${anosCompletosEntre(parente.data_nasc, nasc) ?? Math.floor(idadeNoParto)} anos ao nascer ${nomeCompleto(p)}`,
             explicacao: `Idade biologicamente improvável para ${papel} (mínimo considerado: ${idadeMin} anos).`,
             acao: "Provavelmente falta uma geração intermediária — verificar se não é avô/avó.",
             pessoaIds: [p.id, parenteId],
@@ -212,7 +231,7 @@ export function analisarCronologia(g: GrafoGenealogico): Insight[] {
       // Filho nascido após o óbito do ascendente
       const diasAposObito = diasEntre(parente.data_obito, nasc)
       if (diasAposObito != null && diasAposObito > 0) {
-        const limite = papel === "mãe" ? 1 : GESTACAO_MAX_DIAS
+        const limite = papel === "mãe" ? TOLERANCIA_OBITO_MAE_DIAS : GESTACAO_MAX_DIAS
         if (diasAposObito > limite) {
           add({
             id: `cron-postumo-${p.id}-${parenteId}`,
@@ -258,7 +277,11 @@ export function analisarCronologia(g: GrafoGenealogico): Insight[] {
     if (!u.data_inicio) continue
 
     for (const pessoa of [a, b]) {
+      // O cônjuge entra nos envolvidos: a data é da UNIÃO, e o achado precisa
+      // aparecer na fila dos dois (corrigir a data muda o casamento de ambos).
+      const conjuge = pessoa.id === a.id ? b : a
       const idade = anosEntre(pessoa.data_nasc, u.data_inicio)
+      const idadeCompleta = anosCompletosEntre(pessoa.data_nasc, u.data_inicio)
       if (idade != null && idade < 0) {
         add({
           id: `cron-casou-antes-nascer-${u.id}-${pessoa.id}`,
@@ -267,19 +290,19 @@ export function analisarCronologia(g: GrafoGenealogico): Insight[] {
           titulo: `${nomeCompleto(pessoa)} casou antes de nascer`,
           explicacao: `Casamento em ${formatarData(u.data_inicio)} e nascimento em ${formatarData(pessoa.data_nasc)}.`,
           acao: "Corrigir a data do casamento ou do nascimento.",
-          pessoaIds: [pessoa.id],
+          pessoaIds: [pessoa.id, conjuge.id],
           uniaoIds: [u.id],
           confianca: 1,
         })
-      } else if (idade != null && idade < IDADE_MIN_CASAMENTO) {
+      } else if (idadeCompleta != null && idadeCompleta < IDADE_MIN_CASAMENTO) {
         add({
           id: `cron-casou-crianca-${u.id}-${pessoa.id}`,
           categoria: "conflito",
           severidade: "alto",
-          titulo: `${nomeCompleto(pessoa)} casou com ${Math.floor(idade)} anos`,
+          titulo: `${nomeCompleto(pessoa)} casou com ${idadeCompleta} anos`,
           explicacao: `Idade abaixo do mínimo considerado (${IDADE_MIN_CASAMENTO} anos) na data do casamento.`,
           acao: "Verificar se a data do casamento não é a do registro do filho.",
-          pessoaIds: [pessoa.id],
+          pessoaIds: [pessoa.id, conjuge.id],
           uniaoIds: [u.id],
           confianca: 0.85,
         })
@@ -294,7 +317,7 @@ export function analisarCronologia(g: GrafoGenealogico): Insight[] {
           titulo: `${nomeCompleto(pessoa)} casou depois de falecer`,
           explicacao: `Óbito em ${formatarData(pessoa.data_obito)} e casamento em ${formatarData(u.data_inicio)}.`,
           acao: "Uma das datas está errada — conferir a certidão de casamento.",
-          pessoaIds: [pessoa.id],
+          pessoaIds: [pessoa.id, conjuge.id],
           uniaoIds: [u.id],
           confianca: 1,
         })

@@ -117,7 +117,7 @@ ok(calcularUrgencia(soTarefa) === 0, "tarefa não pesa na urgência da pessoa", 
 const saude = calcularSaude(grafo, new Map([[1, { ...soTarefa, pessoaId: 1 }]]), null)
 ok(saude.get(1)?.nivel === "saudavel", "tarefa aberta não pinta a Saúde da pessoa (heatmap)", saude.get(1)?.nivel)
 
-const resumoCom = resumirLinhagem(linhagem!, dossiesCom, grafo, projetarIndicadores([]))
+const resumoCom = resumirLinhagem(linhagem!, dossiesCom, grafo, projetarIndicadores([]), analise)
 ok(!("tarefasVencidas" in resumoCom) && !("tarefasAbertas" in resumoCom), "o resumo da linhagem não carrega contagem de tarefa", Object.keys(resumoCom).join(","))
 
 // ═══ 2) OS ACHADOS DO MOTOR NÃO SE PERDEM ════════════════════════════════════

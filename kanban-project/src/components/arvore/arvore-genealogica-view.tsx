@@ -46,6 +46,9 @@ import {
 } from "./inteligencia/preview-impacto"
 import type { EstadoAtual } from "@/src/lib/genealogia/operacional/comparacao"
 import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
+import { CriarTarefaModal } from "./inteligencia/criar-tarefa-modal"
+import { useAbrirTarefaNaCentral } from "./fila-da-pessoa"
+import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 import { PaletaComandos } from "./inteligencia/paleta-comandos"
 import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
@@ -186,6 +189,14 @@ export function ArvoreGenealogicaView({
   // disto recalcula posição: trocar de requerente é um Map novo, não um desenho
   // novo. Ver `aplicarFoco` em react-flow-tree.tsx.
   const operacional = useArvoreOperacional({ processoId, pessoas, unioes, analise })
+
+  // CRIAR TAREFA a partir do que a árvore aponta (próximo passo, próxima ação,
+  // documento sem tarefa). O rascunho nasce nos módulos puros; a escrita é da
+  // porta canônica (`POST /api/tarefas/manual`), dentro do modal. Sem a permissão
+  // `tarefas.criar` o handler não existe — e portanto o botão também não.
+  const [rascunhoTarefa, setRascunhoTarefa] = useState<RascunhoTarefa | null>(null)
+  const abrirTarefaNaCentral = useAbrirTarefaNaCentral()
+  const abrirCriarTarefa = pode('tarefas.criar') ? setRascunhoTarefa : undefined
 
   // SEM BECO SEM SAÍDA: quantos requerentes do processo ainda NÃO estão na
   // árvore. É lido AQUI, com a árvore, e não dentro do modal — porque a decisão
@@ -1606,6 +1617,8 @@ export function ArvoreGenealogicaView({
             proximaAcao={operacional.proximaAcao}
             carregando={operacional.carregando}
             onIrParaPessoa={localizarPessoa}
+            rascunhoDaProximaAcao={operacional.rascunhoDaProximaAcao}
+            onCriarTarefa={abrirCriarTarefa}
           />
         )}
         {pessoas.length > 0 && operacional.saudeLigada && (
@@ -1624,7 +1637,21 @@ export function ArvoreGenealogicaView({
           onIrParaPessoa={localizarPessoa}
           nomeDePessoa={nomeDePessoa}
           perguntas={operacional.perguntas}
+          indicadores={operacional.indicadores}
+          onCriarTarefa={abrirCriarTarefa}
+          rascunhoDoPasso={operacional.rascunhoDoPasso}
+          onAbrirTarefa={abrirTarefaNaCentral}
         />
+        {rascunhoTarefa && (
+          <CriarTarefaModal
+            rascunho={rascunhoTarefa}
+            processoId={processoId}
+            onFechar={() => setRascunhoTarefa(null)}
+            onCriada={() => {
+              void invalidar(`/api/processos/${processoId}/genealogia/operacional`)
+            }}
+          />
+        )}
         <PaletaComandos
           indice={indice}
           aberto={paletaAberta}
@@ -1661,6 +1688,7 @@ export function ArvoreGenealogicaView({
         financeiroVisivel={operacional.financeiroVisivel}
         nomeDeRequerente={nomeDePessoa}
         eventos={selectedPersonId != null ? operacional.eventosDe(selectedPersonId) : undefined}
+        indicadores={selectedPersonId != null ? operacional.indicadoresDe(selectedPersonId) : null}
         fila={selectedPersonId != null ? operacional.filaDe(selectedPersonId) : null}
         mensagemAntesDaGenealogia={operacional.mensagemAntesDaGenealogia}
         onAbrirAchado={abrirAchado}

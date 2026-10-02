@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
     slaDays: Number.isInteger(b?.slaDays) ? b.slaDays : null,
     dataPrazo: b?.dataPrazo ? new Date(String(b.dataPrazo)) : null,
     motivo: String(b?.motivo ?? ''),
+    chaveOrigem: typeof b?.chaveOrigem === 'string' && b.chaveOrigem.trim() ? b.chaveOrigem.trim().slice(0, 60) : null,
     confirmarDuplicidade: b?.confirmarDuplicidade === true,
   })
 
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
         pessoaId: Number.isInteger(b?.pessoaId) ? b.pessoaId : null,
         documentoId: Number.isInteger(b?.documentoId) ? b.documentoId : null,
         necessidadeId: Number.isInteger(b?.necessidadeId) ? b.necessidadeId : null,
+        chaveOrigem: typeof b?.chaveOrigem === 'string' && b.chaveOrigem.trim() ? b.chaveOrigem.trim().slice(0, 60) : null,
       })
       return NextResponse.json(
         { error: r.mensagem, codigo: r.codigo, semelhantes, comoConfirmar: 'reenvie com confirmarDuplicidade: true' },

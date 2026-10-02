@@ -27,6 +27,7 @@ import {
   type ItemFila,
 } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
 import type { DossiePessoa } from "@/src/lib/genealogia/operacional/dossie"
+import type { IndicadoresDaPessoa } from "@/src/lib/genealogia/operacional/indicadores"
 
 // ── AÇÕES ───────────────────────────────────────────────────────────────────
 
@@ -37,17 +38,32 @@ export interface DestinosDaFila {
   onVincularConjuge?: (pessoaId: number, outraPessoaId: number | null) => void
 }
 
-/** Executa a ação de um item da fila. Estável enquanto os destinos forem estáveis. */
-export function useExecutarAcaoDaFila(destinos: DestinosDaFila): (acao: AcaoFila) => void {
+/**
+ * Abre uma tarefa na Central Operacional (ADMIN passa pela Torre de Controle).
+ * UM caminho para todo botão "Abrir tarefa" da árvore — a fila da pessoa, as
+ * respostas das perguntas e o aviso de duplicidade do "Criar tarefa".
+ */
+export function useAbrirTarefaNaCentral(): (processoId: number, tarefaId: number) => void {
   const router = useRouter()
   const { tipo } = usePermissoes()
+  return useCallback(
+    (processoId: number, tarefaId: number) => {
+      const link = linkDaTarefaNaCentral(processoId, tarefaId)
+      router.push(linkDoAvisoParaAdmin(link, tipo) ?? link)
+    },
+    [router, tipo],
+  )
+}
+
+/** Executa a ação de um item da fila. Estável enquanto os destinos forem estáveis. */
+export function useExecutarAcaoDaFila(destinos: DestinosDaFila): (acao: AcaoFila) => void {
+  const abrirTarefa = useAbrirTarefaNaCentral()
   const { onAbrirPessoa, onVincularConjuge } = destinos
   return useCallback(
     (acao: AcaoFila) => {
       switch (acao.tipo) {
         case "abrir_tarefa": {
-          const link = linkDaTarefaNaCentral(acao.processoId, acao.tarefaId)
-          router.push(linkDoAvisoParaAdmin(link, tipo) ?? link)
+          abrirTarefa(acao.processoId, acao.tarefaId)
           return
         }
         case "abrir_pessoa":
@@ -59,7 +75,7 @@ export function useExecutarAcaoDaFila(destinos: DestinosDaFila): (acao: AcaoFila
           return
       }
     },
-    [router, tipo, onAbrirPessoa, onVincularConjuge],
+    [abrirTarefa, onAbrirPessoa, onVincularConjuge],
   )
 }
 
@@ -221,8 +237,11 @@ export function ResumoOperacional({
   destinos,
   onExecutar,
   nomeDeRequerente,
+  indicadores,
 }: {
   dossie: DossiePessoa
+  /** Números da pessoa — de `indicadores.ts`, a mesma fonte do cartão e do painel. */
+  indicadores?: IndicadoresDaPessoa | null
   fila: FilaDaPessoa
   mensagemAntesDaGenealogia: string
   destinos: DestinosDaFila
@@ -249,6 +268,15 @@ export function ResumoOperacional({
 
       {fila.antesDaGenealogia && (
         <p className="mt-2 text-[11px] leading-snug text-[var(--text-secondary)]">{mensagemAntesDaGenealogia}</p>
+      )}
+
+      {indicadores && !fila.antesDaGenealogia && (
+        <p className="mt-1.5 text-[11px] tabular-nums text-[var(--text-secondary)]" data-indicadores-pessoa>
+          {indicadores.documental.necessarias > 0
+            ? `Documentos ${indicadores.documental.atendidas + indicadores.documental.dispensadas} de ${indicadores.documental.necessarias}`
+            : "Sem exigência documental"}
+          {` · ${indicadores.divergencias} divergência(s) do motor`}
+        </p>
       )}
 
       {compartilhada && (

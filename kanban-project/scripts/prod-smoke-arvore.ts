@@ -190,7 +190,7 @@ async function main() {
 
   if (linhagem) {
     const projecaoDocumental = projetarIndicadores(fatos.necessidades)
-    const resumo = resumirLinhagem(linhagem, dossies, grafo, projecaoDocumental)
+    const resumo = resumirLinhagem(linhagem, dossies, grafo, projecaoDocumental, analise)
     const trilha = trilhaDaLinhagem(grafo, linhagem, mapa)
     ok(trilha.length === linhagem.cadeia.length, "trilha da linhagem coerente com a cadeia")
     console.log(

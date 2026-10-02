@@ -29,6 +29,7 @@ import {
   type UniaoEntrada,
 } from "./tipos"
 import { nomeCompleto } from "./texto"
+import { calcularQualidade } from "./qualidade"
 
 export interface OpcoesAnalise {
   paisAlvo?: PaisAlvo | null
@@ -154,6 +155,7 @@ export function analisarArvore(
       naLinhaCidadania: naLinha.has(p.id),
       completude: comp.completude,
       faltando: comp.faltando,
+      campos: comp.campos,
       insightIds: [],
       severidadeMax: null,
       descendentesNaLinha: 0,
@@ -260,62 +262,6 @@ function limitarInsights(insights: Insight[]): Insight[] {
   return saida
 }
 
-function calcularQualidade(
-  grafo: GrafoGenealogico,
-  porPessoa: Map<number, AnalisePessoa>,
-  insights: Insight[],
-  linha: number[],
-  geracoes: Map<number, number>,
-): AnaliseArvore["qualidade"] {
-  const total = grafo.pessoas.length
-  const conflitos = insights.filter((i) => i.categoria === "conflito").length
-  const duplicidades = insights.filter((i) => i.categoria === "duplicidade").length
-  const lacunas = insights.filter((i) => i.categoria === "lacuna").length
-
-  // Completude média ponderada: quem está na linha pesa 4×.
-  let soma = 0
-  let peso = 0
-  porPessoa.forEach((a) => {
-    const w = a.naLinhaCidadania ? 4 : 1
-    soma += a.completude * w
-    peso += w
-  })
-  const completude = peso ? Math.round(soma / peso) : 0
-
-  // Consistência: penaliza por gravidade, não por contagem crua.
-  const penalidade = insights
-    .filter((i) => i.categoria === "conflito" || i.categoria === "duplicidade")
-    .reduce((acc, i) => acc + ORDEM_SEVERIDADE[i.severidade] * 2, 0)
-  const consistencia = Math.max(0, Math.round(100 - (total ? (penalidade / total) * 8 : penalidade)))
-
-  // Cobertura da linha: a linha está resolvida do requerente ao dante causa?
-  let resolvidos = 0
-  for (const id of linha) {
-    const a = porPessoa.get(id)
-    if (a && a.completude >= 80) resolvidos++
-  }
-  const coberturaLinha = linha.length ? Math.round((resolvidos / linha.length) * 100) : 0
-
-  const geracoesMapeadas = geracoes.size
-    ? Math.max(...[...geracoes.values()]) - Math.min(...[...geracoes.values()]) + 1
-    : 0
-
-  const score = Math.round(completude * 0.4 + consistencia * 0.3 + coberturaLinha * 0.3)
-
-  return {
-    score,
-    completude,
-    consistencia,
-    coberturaLinha,
-    totalPessoas: total,
-    totalUnioes: grafo.unioes.length,
-    geracoesMapeadas,
-    conflitos,
-    duplicidades,
-    lacunas,
-  }
-}
-
 function montarPassos(
   grafo: GrafoGenealogico,
   insights: Insight[],
@@ -351,6 +297,7 @@ function montarPassos(
 
     passos.push({
       id: `passo-${i.id}`,
+      insightId: i.id,
       ordem: passos.length + 1,
       titulo: i.acao,
       motivo: alvo ? `${nomeCompleto(alvo)} — ${i.titulo}` : i.titulo,

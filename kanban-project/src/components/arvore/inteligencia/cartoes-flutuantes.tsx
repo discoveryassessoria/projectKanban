@@ -25,6 +25,7 @@ import { COR_NIVEL, ROTULO_NIVEL, type NivelSaudePessoa } from "@/src/lib/geneal
 import type { DegrauLinhagem } from "@/src/lib/genealogia/motor/linhagens"
 import type { ResumoLinhagem } from "@/src/lib/genealogia/operacional/dossie"
 import { TOTAL_PRIORIDADES, type AcaoRecomendada } from "@/src/lib/genealogia/operacional/diagnostico"
+import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 
 const CARTAO =
   "rounded-lg border border-[var(--border-default)] bg-[var(--surface-elevated)] text-gray-900 shadow-[var(--elev-2)]"
@@ -58,11 +59,17 @@ export function CartaoResumoFlutuante({
   proximaAcao,
   carregando,
   onIrParaPessoa,
+  rascunhoDaProximaAcao,
+  onCriarTarefa,
 }: {
   resumo: ResumoLinhagem | null
   proximaAcao: AcaoRecomendada
   carregando: boolean
   onIrParaPessoa: (pessoaId: number) => void
+  /** Rascunho do "Criar tarefa" da próxima ação (null = não há alvo). */
+  rascunhoDaProximaAcao?: RascunhoTarefa | null
+  /** Ausente = sem permissão `tarefas.criar`: o botão não existe. */
+  onCriarTarefa?: (rascunho: RascunhoTarefa) => void
 }) {
   // Nasce aberto (a primeira leitura do processo precisa do resumo) e lembra a
   // escolha de quem recolheu. Lido depois da montagem para não divergir do HTML
@@ -171,15 +178,27 @@ export function CartaoResumoFlutuante({
           >
             Fonte: {proximaAcao.fonte}
           </p>
-          {proximaAcao.pessoaId != null && (
-            <button
-              type="button"
-              onClick={() => onIrParaPessoa(proximaAcao.pessoaId!)}
-              className="mt-1.5 text-[12px] font-medium text-gray-900 underline underline-offset-2 transition hover:opacity-70"
-            >
-              Ir até a pessoa
-            </button>
-          )}
+          <div className="mt-1.5 flex flex-wrap items-center gap-3">
+            {proximaAcao.pessoaId != null && (
+              <button
+                type="button"
+                onClick={() => onIrParaPessoa(proximaAcao.pessoaId!)}
+                className="text-[12px] font-medium text-gray-900 underline underline-offset-2 transition hover:opacity-70"
+              >
+                Ir até a pessoa
+              </button>
+            )}
+            {rascunhoDaProximaAcao && onCriarTarefa && (
+              <button
+                type="button"
+                data-criar-tarefa
+                onClick={() => onCriarTarefa(rascunhoDaProximaAcao)}
+                className="rounded-md bg-[var(--action-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary-hover)]"
+              >
+                Criar tarefa
+              </button>
+            )}
+          </div>
         </div>
 
         {carregando && (

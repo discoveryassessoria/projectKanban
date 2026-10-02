@@ -127,7 +127,13 @@ if (violacoesEscrita.length === 0) {
 // invisível para um guard que só olha ORM.
 const ROTAS_ALHEIAS: Array<[RegExp, string]> = [
   [/authFetch\(\s*[`'"]\/api\/documentos\//, "Documento (Sistema Documental)"],
-  [/authFetch\(\s*[`'"]\/api\/tarefas\//, "Tarefa (motor de workflow)"],
+  // EXCEÇÃO ÚNICA (Etapa 5): "Criar tarefa" a partir do que a árvore aponta chama a
+  // PORTA CANÔNICA do dono (`POST /api/tarefas/manual` → `criarTarefaManual`:
+  // permissão tarefas.criar, motivo obrigatório, auditoria, aviso de duplicidade).
+  // A árvore não escreve em Tarefa — pede ao dono. Qualquer OUTRA rota de
+  // /api/tarefas/ continua proibida. `arvore-inteligencia-etapa5.test.ts` trava
+  // que só o modal de criação chama essa porta e que ele não usa o ORM.
+  [/authFetch\(\s*[`'"]\/api\/tarefas\/(?!manual[`'"])/, "Tarefa (motor de workflow)"],
   [/authFetch\(\s*[`'"]\/api\/necessidades?\//, "NecessidadeDocumental"],
   [/authFetch\(\s*[`'"][^`'"]*\/(custos|receitas|financeiro|v3)\//, "Financeiro"],
 ]

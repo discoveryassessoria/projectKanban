@@ -28,6 +28,7 @@ import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { classificarMaioridade, ROTULO_MAIORIDADE } from "@/src/lib/documentos/maioridade"
 import type { DossiePessoa } from "@/src/lib/genealogia/operacional/dossie"
+import type { IndicadoresDaPessoa } from "@/src/lib/genealogia/operacional/indicadores"
 import { ROTULO_EVENTO, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
 import type { FilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
 import { ListaDaFila, ResumoOperacional, useExecutarAcaoDaFila, type DestinosDaFila } from "./fila-da-pessoa"
@@ -62,6 +63,8 @@ interface PessoaSidebarProps {
    * Operação simplesmente não aparecem, em vez de mostrarem zero.
    */
   dossie?: DossiePessoa | null
+  /** Números da pessoa (documentos + divergências) — `indicadores.ts`. */
+  indicadores?: IndicadoresDaPessoa | null
   /** false quando o usuário não tem `financeiro.ver`. Muda o texto, não o zero. */
   financeiroVisivel?: boolean
   /** Requerentes cuja linha depende desta pessoa — para explicar a prioridade. */
@@ -476,6 +479,7 @@ function ConteudoSidebar({
   onSelectPerson,
   initialTab,
   dossie,
+  indicadores,
   financeiroVisivel = false,
   nomeDeRequerente,
   eventos,
@@ -602,6 +606,7 @@ function ConteudoSidebar({
       {dossie && fila && (
         <ResumoOperacional
           dossie={dossie}
+          indicadores={indicadores}
           fila={fila}
           mensagemAntesDaGenealogia={mensagemAntesDaGenealogia}
           destinos={destinosDaFila}

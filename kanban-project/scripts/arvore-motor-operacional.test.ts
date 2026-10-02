@@ -42,7 +42,9 @@ import {
   resumirLinhagem,
   type FatosOperacionais,
 } from "@/src/lib/genealogia/operacional/dossie"
-import { responder, responderTodas } from "@/src/lib/genealogia/operacional/perguntas"
+import { contextoDePerguntas, responder, responderTodas } from "@/src/lib/genealogia/operacional/perguntas"
+import { montarFilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
+import { achadosDoMotorPorPessoa } from "@/src/lib/genealogia/operacional/achados-do-motor"
 import {
   diagnosticar,
   resolveNextGenealogyAction,
@@ -374,7 +376,7 @@ ok(limpo === null, "sem pendência, a próxima ação é ausência de ação", l
 secao("4) resumo da linhagem")
 
 const projecaoFatos = projetarIndicadores(FATOS.necessidades)
-const resumo = resumirLinhagem(lMarcos, dossies, grafo, projecaoFatos)
+const resumo = resumirLinhagem(lMarcos, dossies, grafo, projecaoFatos, analise)
 ok(resumo.requerenteId === 4, "o resumo é da linhagem pedida")
 ok(resumo.pessoas === lMarcos.visivel.size, "conta as pessoas visíveis da linha")
 ok(resumo.documental.necessarias > 0, "consolida as exigências da linha inteira")
@@ -384,7 +386,27 @@ ok(resumo.proximaAcao?.startsWith("Giuseppe") === true, "a próxima ação nomei
 // ── 5. PERGUNTAS ────────────────────────────────────────────────────────────
 secao("5) perguntas determinísticas")
 
-const ctxPerguntas = { grafo, analise, mapa, dossies, linhagem: lMarcos }
+// O contexto é montado pelo MESMO construtor do hook da tela (Etapa 5): a fila da
+// pessoa e a projeção documental são as do cartão e da aba Operação.
+const achadosFixture = achadosDoMotorPorPessoa(analise)
+const ctxPerguntas = contextoDePerguntas({
+  grafo,
+  analise,
+  mapa,
+  dossies,
+  linhagem: lMarcos,
+  projecao: projecaoFatos,
+  filaDe: (pessoaId) =>
+    montarFilaDaPessoa({
+      pessoaId,
+      processoId: 1,
+      faseAtualKey: null,
+      necessidades: FATOS.necessidades,
+      tarefas: FATOS.tarefas,
+      uniaoIdsDaPessoa: grafo.unioesDe(pessoaId).map((u) => u.id as number),
+      achados: achadosFixture.get(pessoaId) ?? [],
+    }),
+})
 const todas = responderTodas(ctxPerguntas)
 ok(todas.length === 5, "responde as cinco perguntas do escopo", todas.length)
 ok(
@@ -402,13 +424,15 @@ ok(impede.itens.some((i) => i.pessoaId === 1), "aponta o documento não localiza
 // Sem cadeia, a resposta é "não dá para afirmar" — nunca um palpite.
 const grafoSolto = construirGrafo([{ id: 1, nome: "Sozinho", requerente: "maior" }], [])
 const mapaSolto = mapaDeLinhagens(grafoSolto, "ITALIA", 1)
-const semCadeia = responder("quem_transmite", {
+const semCadeia = responder("quem_transmite", contextoDePerguntas({
   grafo: grafoSolto,
   analise: null,
   mapa: mapaSolto,
   dossies: new Map(),
   linhagem: mapaSolto.porRequerente.get(1)!,
-})
+  projecao: projetarIndicadores([]),
+  filaDe: () => ({ antesDaGenealogia: false, itens: [], proximo: null }),
+}))
 ok(
   semCadeia.resumo.startsWith("Não dá para afirmar"),
   "sem ascendente, a resposta declara que não sabe",

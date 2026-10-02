@@ -20,14 +20,20 @@
 // ============================================================================
 
 import { useMemo, useState } from "react"
-import { X, AlertTriangle, TriangleAlert, Info, Target, Users, MessageCircleQuestion } from "lucide-react"
-import type { AnaliseArvore, Insight, Severidade } from "@/src/lib/genealogia/motor/tipos"
+import {
+  X, AlertTriangle, TriangleAlert, Info, Target, Users, MessageCircleQuestion, ChevronDown, ChevronRight,
+} from "lucide-react"
+import type {
+  AnaliseArvore, ChaveMedida, Insight, ItemDecomposicao, Medida, PassoSugerido, Severidade,
+} from "@/src/lib/genealogia/motor/tipos"
 import {
   PERGUNTAS,
   responder,
   type ChavePergunta,
   type ContextoPerguntas,
 } from "@/src/lib/genealogia/operacional/perguntas"
+import type { IndicadoresDaArvore } from "@/src/lib/genealogia/operacional/indicadores"
+import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 
 interface Props {
   analise: AnaliseArvore | null
@@ -41,6 +47,18 @@ interface Props {
    * aparece; ela não tem como responder sem os dossiês.
    */
   perguntas?: ContextoPerguntas | null
+  /**
+   * Os números da árvore (qualidade com a CONTA de cada porcentagem + divergências).
+   * Vêm de `indicadores.ts` — a mesma fonte do cartão de resumo e da aba Operação;
+   * o painel não recalcula nada.
+   */
+  indicadores?: IndicadoresDaArvore | null
+  /** Abre o modal "Criar tarefa". Ausente = sem permissão `tarefas.criar` (o botão não existe). */
+  onCriarTarefa?: (rascunho: RascunhoTarefa) => void
+  /** Rascunho do "Criar tarefa" de um próximo passo. */
+  rascunhoDoPasso?: (passo: PassoSugerido) => RascunhoTarefa | null
+  /** Abre uma tarefa que já existe (Central Operacional). */
+  onAbrirTarefa?: (processoId: number, tarefaId: number) => void
 }
 
 /**
@@ -54,9 +72,13 @@ interface Props {
 function SecaoPerguntas({
   ctx,
   onIrParaPessoa,
+  onCriarTarefa,
+  onAbrirTarefa,
 }: {
   ctx: ContextoPerguntas
   onIrParaPessoa?: (id: number) => void
+  onCriarTarefa?: (rascunho: RascunhoTarefa) => void
+  onAbrirTarefa?: (processoId: number, tarefaId: number) => void
 }) {
   const [ativa, setAtiva] = useState<ChavePergunta | null>(null)
   const resposta = useMemo(() => (ativa ? responder(ativa, ctx) : null), [ativa, ctx])
@@ -81,24 +103,51 @@ function SecaoPerguntas({
               </button>
               {aberta && resposta && (
                 <div className="border-t border-gray-100 px-2.5 py-2">
-                  <p className="text-[12px] leading-relaxed text-gray-800">{resposta.resumo}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{resposta.escopo}</p>
+                  <p className="mt-0.5 text-[12px] leading-relaxed text-gray-800">{resposta.resumo}</p>
                   {resposta.itens.length > 0 && (
                     <ul className="mt-1.5 space-y-1">
                       {resposta.itens.map((item, i) => (
-                        <li key={`${resposta.chave}-${i}`} className="text-[11px] leading-snug">
+                        <li
+                          key={`${resposta.chave}-${i}`}
+                          className="flex items-start justify-between gap-2 text-[11px] leading-snug"
+                        >
                           {item.pessoaId != null && onIrParaPessoa ? (
                             <button
                               onClick={() => onIrParaPessoa(item.pessoaId!)}
-                              className="text-left text-gray-600 underline decoration-gray-300 underline-offset-2 transition hover:text-gray-900"
+                              className="min-w-0 text-left text-gray-600 underline decoration-gray-300 underline-offset-2 transition hover:text-gray-900"
                             >
                               {item.texto}
                             </button>
                           ) : (
-                            <span className="text-gray-600">{item.texto}</span>
+                            <span className="min-w-0 text-gray-600">{item.texto}</span>
                           )}
+                          {/* Documento com tarefa → abrir a que existe; sem tarefa →
+                              criar pela porta canônica. Nunca os dois. */}
+                          {item.tarefa && onAbrirTarefa ? (
+                            <button
+                              onClick={() => onAbrirTarefa(item.tarefa!.processoId, item.tarefa!.id)}
+                              className="shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                            >
+                              Abrir tarefa
+                            </button>
+                          ) : item.rascunho && onCriarTarefa ? (
+                            <button
+                              onClick={() => onCriarTarefa(item.rascunho!)}
+                              data-criar-tarefa
+                              className="shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                            >
+                              Criar tarefa
+                            </button>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {resposta.totalItens > resposta.itens.length && (
+                    <p className="mt-1 text-[10px] text-[var(--text-muted)]">
+                      Mostrando {resposta.itens.length} de {resposta.totalItens}.
+                    </p>
                   )}
                   {/* Resposta sem fonte não é resposta: o operador precisa saber
                       onde conferir antes de agir sobre um processo. */}
@@ -129,18 +178,125 @@ function IconeSeveridade({ s }: { s: Severidade }) {
   return <Info className="h-4 w-4 shrink-0" />
 }
 
-function Medidor({ rotulo, valor }: { rotulo: string; valor: number }) {
-  const pct = Math.max(0, Math.min(100, Math.round(valor)))
+/**
+ * Uma porcentagem COM a conta aberta. O número e a lista saem do mesmo objeto
+ * (`Medida`, produzido por `motor/qualidade.ts`): não há como a lista dizer uma
+ * coisa e o número outra.
+ */
+function MedidorExpansivel({
+  medida,
+  aberto,
+  onAlternar,
+  onAbrirMedida,
+  nomeDePessoa,
+  onIrParaPessoa,
+}: {
+  medida: Medida
+  aberto: boolean
+  onAlternar: () => void
+  onAbrirMedida: (chave: ChaveMedida) => void
+  nomeDePessoa: (id: number) => string
+  onIrParaPessoa?: (id: number) => void
+}) {
+  const pct = Math.max(0, Math.min(100, Math.round(medida.valor)))
+  const pesam = medida.itens.filter((i) => i.pesa).length
   return (
-    <div>
-      <div className="flex items-baseline justify-between">
-        <span className="text-[11px] uppercase tracking-wide text-gray-500">{rotulo}</span>
-        <span className="text-sm font-semibold tabular-nums text-gray-800">{pct}%</span>
-      </div>
-      <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100">
-        <div className="h-1.5 rounded-full bg-[#2c7be5] transition-all" style={{ width: `${pct}%` }} />
-      </div>
+    <div data-medida={medida.chave}>
+      <button
+        type="button"
+        onClick={onAlternar}
+        aria-expanded={aberto}
+        aria-label={`${medida.rotulo}: ${pct}%. ${aberto ? "Fechar" : "Ver"} a conta`}
+        className="w-full text-left"
+      >
+        <div className="flex items-baseline justify-between">
+          <span className="flex items-center gap-1 text-[11px] uppercase tracking-wide text-gray-500">
+            {aberto ? <ChevronDown className="h-3 w-3" aria-hidden /> : <ChevronRight className="h-3 w-3" aria-hidden />}
+            {medida.rotulo}
+          </span>
+          <span className="text-sm font-semibold tabular-nums text-gray-800">{pct}%</span>
+        </div>
+        <div className="mt-1 h-1.5 w-full rounded-full bg-gray-100">
+          <div className="h-1.5 rounded-full bg-[#2c7be5] transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </button>
+
+      {aberto && (
+        <div className="mt-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5" data-medida-conta={medida.chave}>
+          <p className="text-[11px] leading-snug text-gray-600">{medida.formula}</p>
+          <p className="mt-1 text-[11px] tabular-nums text-gray-700">
+            Conta: {Math.round(medida.numerador * 100) / 100}
+            {medida.denominador != null ? ` ÷ ${Math.round(medida.denominador * 100) / 100}` : ""} →{" "}
+            <strong>{pct}%</strong> · {pesam} item(ns) pesando de {medida.totalItens}
+          </p>
+          {medida.observacao && <p className="mt-1 text-[11px] text-amber-800">{medida.observacao}</p>}
+          {medida.itens.length > 0 && (
+            <ul className="mt-2 space-y-1.5">
+              {medida.itens.map((item) => (
+                <ItemDaConta
+                  key={item.chave}
+                  item={item}
+                  nomeDePessoa={nomeDePessoa}
+                  onIrParaPessoa={onIrParaPessoa}
+                  onAbrirMedida={medida.chave === "qualidade" ? onAbrirMedida : undefined}
+                />
+              ))}
+            </ul>
+          )}
+          {medida.omitidos > 0 && (
+            <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
+              + {medida.omitidos} item(ns) de menor peso não listados (já entram na conta acima).
+            </p>
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+function ItemDaConta({
+  item,
+  nomeDePessoa,
+  onIrParaPessoa,
+  onAbrirMedida,
+}: {
+  item: ItemDecomposicao
+  nomeDePessoa: (id: number) => string
+  onIrParaPessoa?: (id: number) => void
+  onAbrirMedida?: (chave: ChaveMedida) => void
+}) {
+  const rotulo = (
+    <span className={`text-[12px] font-medium ${item.pesa ? "text-gray-800" : "text-gray-500"}`}>{item.rotulo}</span>
+  )
+  return (
+    <li className="text-[11px] leading-snug" data-item-conta={item.chave}>
+      {onAbrirMedida && item.pessoaId == null ? (
+        <button type="button" onClick={() => onAbrirMedida(item.chave as ChaveMedida)} className="text-left underline decoration-gray-300 underline-offset-2">
+          {rotulo}
+        </button>
+      ) : item.pessoaId != null && onIrParaPessoa && item.pessoaIds.length <= 1 ? (
+        <button type="button" onClick={() => onIrParaPessoa(item.pessoaId!)} className="text-left underline decoration-gray-300 underline-offset-2 hover:text-gray-900">
+          {rotulo}
+        </button>
+      ) : (
+        rotulo
+      )}
+      <p className="text-gray-600">{item.detalhe}</p>
+      {item.pessoaIds.length > 1 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {item.pessoaIds.slice(0, 4).map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onIrParaPessoa?.(id)}
+              className="rounded-full border border-gray-200 bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+            >
+              {nomeDePessoa(id)}
+            </button>
+          ))}
+        </div>
+      )}
+    </li>
   )
 }
 
@@ -190,7 +346,21 @@ export function PainelInteligencia({
   onIrParaPessoa,
   nomeDePessoa,
   perguntas,
+  indicadores,
+  onCriarTarefa,
+  rascunhoDoPasso,
+  onAbrirTarefa,
 }: Props) {
+  const [medidasAbertas, setMedidasAbertas] = useState<ReadonlySet<ChaveMedida>>(new Set())
+  const alternarMedida = (chave: ChaveMedida) =>
+    setMedidasAbertas((atual) => {
+      const novo = new Set(atual)
+      if (novo.has(chave)) novo.delete(chave)
+      else novo.add(chave)
+      return novo
+    })
+  const abrirMedida = (chave: ChaveMedida) => setMedidasAbertas((atual) => new Set(atual).add(chave))
+
   // Agrupa por severidade preservando a ordem que o motor já priorizou.
   const porSeveridade = useMemo(() => {
     const grupos = new Map<Severidade, Insight[]>()
@@ -205,7 +375,7 @@ export function PainelInteligencia({
   if (!aberto) return null
 
   const q = analise?.qualidade
-  const totalAchados = analise ? Object.values(analise.totais).reduce((s, n) => s + n, 0) : 0
+  const totalAchados = indicadores?.totalAchados ?? 0
 
   // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
   return (
@@ -228,17 +398,44 @@ export function PainelInteligencia({
         ) : (
           <>
             <section className="space-y-3">
-              <Medidor rotulo="Qualidade geral" valor={q?.score ?? 0} />
-              <Medidor rotulo="Completude" valor={q?.completude ?? 0} />
-              <Medidor rotulo="Consistência" valor={q?.consistencia ?? 0} />
-              <Medidor rotulo="Cobertura da linha" valor={q?.coberturaLinha ?? 0} />
+              {/* Cada porcentagem abre a CONTA que a produziu (clique no nome). */}
+              {(["qualidade", "completude", "consistencia", "cobertura"] as const).map((chave) => {
+                const medida = (indicadores?.qualidade ?? analise.qualidade.detalhe)[chave]
+                return (
+                  <MedidorExpansivel
+                    key={chave}
+                    medida={medida}
+                    aberto={medidasAbertas.has(chave)}
+                    onAlternar={() => alternarMedida(chave)}
+                    onAbrirMedida={abrirMedida}
+                    nomeDePessoa={nomeDePessoa}
+                    onIrParaPessoa={onIrParaPessoa}
+                  />
+                )
+              })}
               <p className="pt-1 text-[12px] text-gray-500">
                 {q?.totalPessoas ?? 0} pessoa(s) · {analise.linhaCidadania.length} na linha de cidadania
                 {analise.paisAlvo ? ` (${analise.paisAlvo.toLowerCase()})` : ""}
               </p>
+              {indicadores && (
+                <p className="text-[12px] text-gray-500" data-indicador-divergencias>
+                  Divergências na árvore: {indicadores.divergencias.total}
+                  {indicadores.divergencias.impeditivas > 0
+                    ? ` (${indicadores.divergencias.impeditivas} crítica(s))`
+                    : ""}
+                  {indicadores.divergencias.parcial ? " · contagem limitada aos achados mais relevantes" : ""}
+                </p>
+              )}
             </section>
 
-            {perguntas && <SecaoPerguntas ctx={perguntas} onIrParaPessoa={onIrParaPessoa} />}
+            {perguntas && (
+              <SecaoPerguntas
+                ctx={perguntas}
+                onIrParaPessoa={onIrParaPessoa}
+                onCriarTarefa={onCriarTarefa}
+                onAbrirTarefa={onAbrirTarefa}
+              />
+            )}
 
             {analise.proximosPassos.length > 0 && (
               <section>
@@ -246,17 +443,44 @@ export function PainelInteligencia({
                   <Target className="h-3.5 w-3.5" /> Próximos passos
                 </h3>
                 <ol className="space-y-1.5">
-                  {analise.proximosPassos.slice(0, 5).map((passo, i) => (
-                    <li key={passo.id} className="flex gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 text-[12px] text-gray-700">
-                      <span className="font-semibold text-[var(--text-muted)]">{i + 1}</span>
-                      <span className="min-w-0">
-                        {passo.titulo}
-                        {/* O motor também diz POR QUE o passo importa — é o que
-                            transforma uma lista de tarefas em prioridade. */}
-                        <span className="block text-[11px] text-gray-500">{passo.motivo}</span>
-                      </span>
-                    </li>
-                  ))}
+                  {analise.proximosPassos.slice(0, 5).map((passo, i) => {
+                    const rascunho = onCriarTarefa && rascunhoDoPasso ? rascunhoDoPasso(passo) : null
+                    const pessoaId = passo.pessoaIds[0] ?? null
+                    return (
+                      <li key={passo.id} data-proximo-passo={passo.id} className="flex gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 text-[12px] text-gray-700">
+                        <span className="font-semibold text-[var(--text-muted)]">{i + 1}</span>
+                        <span className="min-w-0 flex-1">
+                          {passo.titulo}
+                          {/* O motor também diz POR QUE o passo importa — é o que
+                              transforma uma lista de tarefas em prioridade. */}
+                          <span className="block text-[11px] text-gray-500">{passo.motivo}</span>
+                          {(pessoaId != null && onIrParaPessoa) || rascunho ? (
+                            <span className="mt-1.5 flex flex-wrap gap-1.5">
+                              {pessoaId != null && onIrParaPessoa && (
+                                <button
+                                  type="button"
+                                  onClick={() => onIrParaPessoa(pessoaId)}
+                                  className="rounded border border-gray-200 bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                                >
+                                  Ver no mapa
+                                </button>
+                              )}
+                              {rascunho && (
+                                <button
+                                  type="button"
+                                  data-criar-tarefa
+                                  onClick={() => onCriarTarefa!(rascunho)}
+                                  className="rounded bg-[var(--action-primary)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary-hover)]"
+                                >
+                                  Criar tarefa
+                                </button>
+                              )}
+                            </span>
+                          ) : null}
+                        </span>
+                      </li>
+                    )
+                  })}
                 </ol>
               </section>
             )}

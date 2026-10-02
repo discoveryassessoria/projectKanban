@@ -37,7 +37,6 @@ import type { Linhagem, MapaLinhagens } from "../motor/linhagens"
 import { requerentesQueDependemDe } from "../motor/linhagens"
 import {
   indicadorDaPessoa,
-  indicadorVazio,
   projetarIndicadores,
   ROTULO_SITUACAO,
   type IndicadorDocumental,
@@ -47,6 +46,7 @@ import {
 } from "../documental/indicadores"
 import { nomeCompleto } from "../motor/texto"
 import type { NecessidadeDaFila } from "./fila-da-pessoa"
+import { consolidarDocumental, indicadorDeDivergencias, uniaoIdsDe } from "./indicadores"
 
 // ── FATOS: o contrato do que a leitura entrega ──────────────────────────────
 // Espelho fiel do endpoint. Campos extras são ignorados de propósito: quando o
@@ -148,14 +148,6 @@ export interface ContextoDossie {
 // achados (inclui relação e risco) vive em `achados-do-motor.ts` e é o que a aba
 // Operação lista — sugestão de vínculo não deve pintar a Saúde da pessoa.
 const CATEGORIAS_DIVERGENCIA = new Set<CategoriaInsight>(["conflito", "duplicidade", "sobrenome"])
-
-/** Uniões de uma pessoa — a certidão de casamento é exigida da união. */
-function uniaoIdsDe(g: GrafoGenealogico, pessoaId: number): number[] {
-  return g
-    .unioesDe(pessoaId)
-    .map((u) => u.id)
-    .filter((id): id is number => typeof id === "number")
-}
 
 export function projetarDossies(ctx: ContextoDossie): Map<number, DossiePessoa> {
   const { grafo, analise, mapa, fatos } = ctx
@@ -311,50 +303,33 @@ export interface ResumoLinhagem {
   proximaAcao: string | null
 }
 
-/** Soma todos os campos numéricos de `fonte` em `alvo`, in place. */
-function somarIndicadorEm(alvo: IndicadorDocumental, fonte: IndicadorDocumental): void {
-  alvo.necessarias += fonte.necessarias
-  alvo.atendidas += fonte.atendidas
-  alvo.emAtendimento += fonte.emAtendimento
-  alvo.pendentes += fonte.pendentes
-  alvo.naoLocalizadas += fonte.naoLocalizadas
-  alvo.dispensadas += fonte.dispensadas
-  alvo.opcionais += fonte.opcionais
-}
-
 export function resumirLinhagem(
   linhagem: Linhagem,
   dossies: Map<number, DossiePessoa>,
   grafo: GrafoGenealogico,
   /**
    * Projeção BRUTA (por pessoa e por união, sem a fusão que `indicadorDaPessoa`
-   * faz pro cartão). Necessária aqui porque `d.documental` de cada pessoa já
-   * inclui a(s) união(ões) dela — somar isso pra CADA cônjuge visível contaria
-   * a MESMA certidão de casamento duas vezes no total da linhagem (achado
-   * real 24/09/2026: 5 casamentos infl// avam o total em +5). Aqui a pessoa
-   * entra pela parte que é só dela, e cada união entra exatamente uma vez.
+   * faz pro cartão). Ver `consolidarDocumental`: cada união entra uma vez.
    */
   projecao: ProjecaoDocumental,
+  /**
+   * A análise do motor — de onde saem as divergências. Obrigatória: contar
+   * divergência a partir dos dossiês (por pessoa) foi o caminho paralelo que
+   * `indicadores.ts` aposentou.
+   */
+  analise: Pick<AnaliseArvore, "insights" | "truncado"> | null,
 ): ResumoLinhagem {
   const ids = [...linhagem.visivel]
-  const documental = indicadorVazio()
-  const uniõesContadas = new Set<number>()
-  let divergencias = 0
+  // Documentos e divergências: UMA definição (indicadores.ts), a mesma do painel
+  // de Inteligência e da aba Operação.
+  const documental = consolidarDocumental(ids, grafo, projecao)
+  const divergencias = indicadorDeDivergencias(analise, linhagem.visivel).total
+
   let focoId: number | null = null
   let maiorUrgencia = -1
-
   for (const id of ids) {
     const d = dossies.get(id)
     if (!d) continue
-    const pessoal = projecao.porPessoa.get(id)
-    if (pessoal) somarIndicadorEm(documental, pessoal)
-    for (const uid of uniaoIdsDe(grafo, id)) {
-      if (uniõesContadas.has(uid)) continue
-      uniõesContadas.add(uid)
-      const uniao = projecao.porUniao.get(uid)
-      if (uniao) somarIndicadorEm(documental, uniao)
-    }
-    divergencias += d.divergencias.length
     // Só entra quem tem alguma urgência real; desempate por id, para que a mesma
     // linha aponte sempre para a mesma pessoa entre dois carregamentos.
     if (d.urgencia > 0) {
@@ -366,20 +341,6 @@ export function resumirLinhagem(
       }
     }
   }
-
-  const resolvidas = documental.atendidas + documental.dispensadas
-  documental.progresso =
-    documental.necessarias > 0 ? Math.round((resolvidas / documental.necessarias) * 100) : null
-  documental.situacao =
-    documental.necessarias === 0
-      ? "sem_exigencia"
-      : documental.naoLocalizadas > 0
-        ? "bloqueado"
-        : documental.pendentes > 0
-          ? "pendente"
-          : documental.emAtendimento > 0
-            ? "em_andamento"
-            : "completo"
 
   const foco = focoId != null ? dossies.get(focoId) : null
 
