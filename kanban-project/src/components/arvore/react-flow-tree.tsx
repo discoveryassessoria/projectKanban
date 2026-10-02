@@ -22,6 +22,7 @@ import ReactFlow, {
 import dagre from "dagre"
 import "reactflow/dist/style.css"
 import type { PessoaArvore, UniaoArvore } from "./types"
+import { classificarMaioridade, ehRequerente } from "@/src/lib/documentos/maioridade"
 import { opacidadeDe, type EstadoFoco, type GrupoRecolhivel } from "@/src/lib/genealogia/navegacao/foco"
 import { COR_NIVEL, ROTULO_NIVEL, type SaudePessoa } from "@/src/lib/genealogia/operacional/saude"
 
@@ -257,14 +258,17 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   // ficavam com o vínculo gravado certo no banco mas SEM NENHUM selo na
   // tela — pareciam não-requerentes mesmo estando marcadas.
   const requerente = (pessoa as any).requerente
-  const isRequerente = requerente === 'maior' || requerente === 'menor' || requerente === 'sim'
-  const requerenteLabel = requerente === 'maior'
-    ? 'Requerente maior de idade'
-    : requerente === 'menor'
-      ? 'Requerente menor de idade'
-      : requerente === 'sim'
-        ? 'Requerente'
-        : null
+  const isRequerente = ehRequerente(requerente)
+  // Maior/menor vem da função ÚNICA (data de nascimento manda; sem data, o marcador
+  // do cadastro; sem nenhum dos dois, só "Requerente" — a classificar).
+  const maioridade = classificarMaioridade(pessoa.data_nasc ?? null, requerente, new Date())
+  const requerenteLabel = !isRequerente
+    ? null
+    : maioridade.estado === 'MAIOR'
+      ? 'Requerente maior de idade'
+      : maioridade.estado === 'MENOR'
+        ? 'Requerente menor de idade'
+        : 'Requerente'
 
   // Verificar se tem cônjuge
   const temConjuge = unioes.length > 0
@@ -366,7 +370,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           {/* Badge de Requerente */}
             {isRequerente && (
               <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold w-fit ${
-                requerente === 'maior' 
+                maioridade.estado === 'MAIOR' 
                   ? 'bg-[var(--surface-secondary)] text-green-800' 
                   : 'bg-[var(--surface-secondary)] text-amber-800'
                   }`}>
@@ -486,7 +490,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         {/* Badge de Requerente */}
           {isRequerente && (
             <span className={`inline-flex items-center mt-0.5 px-1 py-0.5 rounded text-[7px] font-semibold ${
-              requerente === 'maior' 
+              maioridade.estado === 'MAIOR' 
                 ? 'bg-[var(--surface-secondary)] text-green-800' 
                 : 'bg-[var(--surface-secondary)] text-amber-800'
                 }`}>

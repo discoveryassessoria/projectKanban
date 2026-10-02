@@ -7,6 +7,7 @@
 // cadastro, e cada domínio busca na fonte canônica dele.
 
 import { fimDoDia, inicioDoDia } from "../datas"
+import { idadeEmAnos } from "@/src/lib/documentos/maioridade"
 import type { FonteDeOpcoes, ValorDeFiltro } from "../tipos"
 
 export const dataBR = (d: Date | string | null | undefined) =>
@@ -69,14 +70,8 @@ export function diasEntre(de: Date | string | null | undefined, ate?: Date | str
 
 /** Idade em anos completos NA LEITURA. Nunca gravada. */
 export function idade(nascimento: Date | string | null | undefined): number | null {
-  if (!nascimento) return null
-  const n = new Date(nascimento)
-  if (Number.isNaN(n.getTime())) return null
-  const hoje = new Date()
-  let i = hoje.getFullYear() - n.getFullYear()
-  const m = hoje.getMonth() - n.getMonth()
-  if (m < 0 || (m === 0 && hoje.getDate() < n.getDate())) i--
-  return i
+  // Política canônica de maioridade/idade — um cálculo só.
+  return idadeEmAnos(nascimento, new Date())
 }
 
 /** Agrupamento por mês de um campo de data. */

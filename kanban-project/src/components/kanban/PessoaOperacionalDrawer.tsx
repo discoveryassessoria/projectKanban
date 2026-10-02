@@ -6,6 +6,7 @@ import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
+import { classificarMaioridade, ehRequerente } from "@/src/lib/documentos/maioridade"
 import { useFecharComEsc } from "@/src/lib/ui/escape-stack"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, Plus, Pencil, Trash2, FileText, ChevronRight, PlayCircle } from "lucide-react"
@@ -117,6 +118,7 @@ interface Pessoa {
   sobrenome: string | null
   numeroLinhagem: number | null
   requerente: string | null
+  data_nasc?: string | null
   documentos: Documento[]
 }
 
@@ -148,9 +150,11 @@ const nomeCompleto = (p: Pessoa | null): string =>
 const linhagemLabel = (p: Pessoa): string => {
   const parts: string[] = []
   if (p.numeroLinhagem != null) parts.push(`Linhagem ${p.numeroLinhagem}`)
-  if (p.requerente === "sim") parts.push("requerente")
-  else if (p.requerente === "maior") parts.push("requerente · maior")
-  else if (p.requerente === "menor") parts.push("requerente · menor")
+  if (ehRequerente(p.requerente)) {
+    // Maior/menor pela função única (data de nascimento manda; sem data, o marcador).
+    const m = classificarMaioridade(p.data_nasc ?? null, p.requerente, new Date())
+    parts.push(m.estado === "MAIOR" ? "requerente · maior" : m.estado === "MENOR" ? "requerente · menor" : "requerente")
+  }
   return parts.length > 0 ? parts.join(" · ") : "fora da linha direta"
 }
 

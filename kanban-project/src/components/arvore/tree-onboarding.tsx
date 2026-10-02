@@ -5,6 +5,9 @@ import { Loader2, ArrowLeft, Check } from "lucide-react"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { enviar } from "@/src/lib/dados"
 import { RequerenteSelector } from "./requerente-selector"
+import { CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { gentilicoDoPais } from "@/src/lib/genealogia/gentilico"
+import { marcadorRequerenteParaGravar } from "@/src/lib/documentos/maioridade"
 
 // ─────────────────────────────────────────────────────────────
 // Tipos
@@ -268,8 +271,9 @@ function Step2PersonForm({
   const [nome, setNome] = useState("")
   const [sobrenome, setSobrenome] = useState("")
   const [dataNasc, setDataNasc] = useState("")
-  const [paisNasc, setPaisNasc] = useState(defaultPaisNasc(type, paisProcesso))
-  const [nacionalidade, setNacionalidade] = useState(defaultNacionalidade(type, paisProcesso))
+  // País → nacionalidade (gentílico automático, sempre editável): ver campos-nascimento.tsx.
+  const { pais: paisNasc, setPais: setPaisNasc, nacionalidade, setNacionalidade } =
+    useNascimentoPessoa({ pais: defaultPaisNasc(type, paisProcesso), cidade: "", nacionalidade: defaultNacionalidade(type, paisProcesso) })
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState("")
   const [isCasado, setIsCasado] = useState(false)
@@ -303,7 +307,8 @@ function Step2PersonForm({
         isDirectLine: typeOption.presets.isDirectLine,
         lineageRole: typeOption.presets.lineageRole || null,
         numeroLinhagem: typeOption.presets.numeroLinhagem,
-        requerente: type === "applicant" ? "sim" : "nao",
+        // Com data de nascimento o requerente já nasce classificado (maior/menor calculado); sem data fica "sim" (a classificar).
+        requerente: type === "applicant" ? marcadorRequerenteParaGravar(dataNasc || null, "sim", new Date()) : "nao",
       }
 
       // `enviar` em vez de `fetch` puro: o token vai no header `Authorization`
@@ -395,24 +400,13 @@ function Step2PersonForm({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <FormField label="Data de Nascimento">
               <DatePickerField value={dataNasc} onChange={setDataNasc} />
+              <SeloMaioridade nascimento={dataNasc} marcador={type === "applicant" ? "sim" : "nao"} mostrarSemData={type === "applicant"} />
             </FormField>
             <FormField label="País de Nascimento">
-              <input
-                type="text"
-                value={paisNasc}
-                onChange={(e) => setPaisNasc(e.target.value)}
-                className={inputCls}
-                placeholder="Brasil"
-              />
+              <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputCls} placeholder="Brasil" />
             </FormField>
             <FormField label="Nacionalidade">
-              <input
-                type="text"
-                value={nacionalidade}
-                onChange={(e) => setNacionalidade(e.target.value)}
-                className={inputCls}
-                placeholder="Brasileira"
-              />
+              <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputCls} placeholder="Brasileira" />
             </FormField>
           </div>
 
@@ -534,10 +528,8 @@ function defaultPaisNasc(type: PersonType, paisProcesso?: PaisProcesso): string 
 }
 
 function defaultNacionalidade(type: PersonType, paisProcesso?: PaisProcesso): string {
-  if (type === "origin" && paisProcesso) {
-    return NACIONALIDADE_ADJ[paisProcesso]
-  }
-  return "Brasileira"
+  // Gentílico da tabela única (mesma convenção feminina do restante do sistema).
+  return gentilicoDoPais(defaultPaisNasc(type, paisProcesso)) ?? ""
 }
 
 const PAIS_NOME: Record<PaisProcesso, string> = {
@@ -545,13 +537,6 @@ const PAIS_NOME: Record<PaisProcesso, string> = {
   ESPANHA: "Espanha",
   ALEMANHA: "Alemanha",
   ITALIA: "Itália",
-}
-
-const NACIONALIDADE_ADJ: Record<PaisProcesso, string> = {
-  PORTUGAL: "Portuguesa",
-  ESPANHA: "Espanhola",
-  ALEMANHA: "Alemã",
-  ITALIA: "Italiana",
 }
 
 // ─────────────────────────────────────────────────────────────

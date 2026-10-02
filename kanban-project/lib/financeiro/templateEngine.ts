@@ -9,6 +9,7 @@
 // A geração de parcelas mensais (com a última absorvendo os centavos) espelha
 // `lib/financeiro/parcelas.ts` e fica aqui pra manter o engine self-contained.
 
+import { idadeEmAnos, ehMaiorDeIdade } from '@/src/lib/documentos/maioridade';
 import type {
   TemplateFinanceiro,
   TemplateReceitaItem,
@@ -127,14 +128,8 @@ function addMeses(base: Date, meses: number): Date {
 }
 
 function calcularIdade(dataNasc: Date | string | null): number | null {
-  if (!dataNasc) return null;
-  const dn = toDate(dataNasc);
-  if (isNaN(dn.getTime())) return null;
-  const hoje = new Date();
-  let idade = hoje.getFullYear() - dn.getFullYear();
-  const m = hoje.getMonth() - dn.getMonth();
-  if (m < 0 || (m === 0 && hoje.getDate() < dn.getDate())) idade--;
-  return idade;
+  // Política canônica de maioridade/idade — um cálculo só.
+  return idadeEmAnos(dataNasc, new Date());
 }
 
 // ── Geração de parcelas mensais (espelha lib/financeiro/parcelas.ts) ─────────
@@ -189,7 +184,8 @@ function classificarRequerentes(reqs: RequerenteEntrada[]): {
   const todos: RequerenteClassificado[] = [];
   for (const r of reqs) {
     const idade = calcularIdade(r.dataNascimento);
-    const isAdulto = idade == null ? true : idade >= 18;
+    // Sem data de nascimento o financeiro trata como adulto (só menor CONHECIDO muda a divisão).
+    const isAdulto = ehMaiorDeIdade(r.dataNascimento, new Date()) !== false;
     const c: RequerenteClassificado = {
       requerenteId: r.requerenteId,
       nome: r.nome,

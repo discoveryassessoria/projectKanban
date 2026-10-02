@@ -28,6 +28,7 @@ import type { PaisAlvo, PapelLinha, PessoaEntrada } from "./tipos"
 import { ehDoPais } from "./regras/linhagem"
 import { calcularParentesco } from "./parentesco"
 import { nomeCompleto } from "./texto"
+import { classificarMaioridade, type EstadoMaioridade } from "@/src/lib/documentos/maioridade"
 
 /** Valores de `Pessoa.requerente` que significam "é requerente deste processo". */
 const MARCAS_REQUERENTE = new Set(["sim", "maior", "menor"])
@@ -42,6 +43,8 @@ export interface Linhagem {
   nome: string
   /** Rótulo do vínculo, como o cadastro o declara ("maior" | "menor" | "sim"). */
   marca: string
+  /** Maior/menor EFETIVO (função única: data de nascimento manda; sem data, o marcador). */
+  maioridade: EstadoMaioridade
   /** Requerente → dante causa, inclusive. Vazia quando não há cadeia. */
   cadeia: number[]
   danteCausaId: number | null
@@ -104,6 +107,7 @@ export function calcularLinhagem(
     requerenteId,
     nome: pessoa ? nomeCompleto(pessoa) : `#${requerenteId}`,
     marca: (pessoa?.requerente || "").toLowerCase(),
+    maioridade: classificarMaioridade(pessoa?.data_nasc ?? null, pessoa?.requerente, new Date()).estado,
     cadeia: [],
     danteCausaId: null,
     naLinha: new Set(),

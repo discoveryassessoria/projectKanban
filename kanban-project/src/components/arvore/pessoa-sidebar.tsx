@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { classificarMaioridade, ROTULO_MAIORIDADE } from "@/src/lib/documentos/maioridade"
 import type { DossiePessoa, TotalPorMoeda } from "@/src/lib/genealogia/operacional/dossie"
 import { ROTULO_EVENTO, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
 
@@ -630,6 +631,11 @@ function ConteudoSidebar({
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
   const isDeceased = pessoa.vivo === false || !!pessoa.data_obito
   const documentos = pessoa.documentos || []
+  // Maior/menor pela função única (data manda; sem data, o marcador do cadastro).
+  const m = classificarMaioridade(pessoa.data_nasc ?? null, pessoa.requerente, new Date())
+  const maioridadeSidebar = m.origem === "NENHUMA"
+    ? null
+    : `${ROTULO_MAIORIDADE[m.estado]}${m.idade != null ? ` · ${m.idade} anos` : ""}`
 
   // Sem "Confirmar?" aqui: a confirmação é o PLANO DE REMOÇÃO, que diz o que sai
   // e o que fica. Um segundo clique não é informação — é só atrito.
@@ -810,6 +816,13 @@ function ConteudoSidebar({
                   label="Data de Nascimento" 
                   value={formatDateFull(pessoa.data_nasc)} 
                 />
+                {maioridadeSidebar && (
+                  <InfoItem
+                    icon={Calendar}
+                    label="Maioridade"
+                    value={maioridadeSidebar}
+                  />
+                )}
                 <InfoItem 
                   icon={MapPin} 
                   label="Local de Nascimento" 

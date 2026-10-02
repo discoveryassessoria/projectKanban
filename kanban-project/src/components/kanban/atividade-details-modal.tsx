@@ -14,6 +14,7 @@ import { ArvoreGenealogicaView } from "../arvore"
 // ⚠ ALTERAÇÃO: ProcessoTarefas sai do Geral e vai migrar para Central Operacional (aba a criar)
 // import { ProcessoTarefas } from "./ProcessoTarefas"
 import { ProcessoEstatisticas } from "./ProcessoEstatisticas"
+import { AvisoMaioridadeProcesso } from "./AvisoMaioridadeProcesso"
 import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 // Diagnóstico técnico do Runtime v2 (WorkflowV2Panel/WorkflowV2AtivacaoPanel) foi
 // movido para Gerenciamento → Motor → Diagnóstico do Runtime. A Central Operacional
@@ -649,6 +650,9 @@ function ConteudoModal({
             </button>
           ))}
         </div>
+
+        {/* Aviso derivado: alguém da árvore completa 18 anos com o processo ativo */}
+        <AvisoMaioridadeProcesso processoId={processo.id} />
 
         {/* Conteúdo principal */}
         <div className={`flex-1 overflow-hidden ${finDark ? 'text-white/80' : ''}`}>

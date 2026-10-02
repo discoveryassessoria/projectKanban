@@ -11,6 +11,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
+import { dataLimiteMaioridade, IDADE_MAIORIDADE } from "@/src/lib/documentos/maioridade"
 import type { DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, idade, igualId, periodo, porCampo } from "./_comuns"
 
@@ -70,8 +71,7 @@ export const DOMINIO_REQUERENTES: DominioDef = {
       descricao: "Derivado da data de nascimento na leitura.", tipo: "booleano",
       paraWhere: (v) => {
         if (v.tipo !== "booleano") return null
-        const corte = new Date()
-        corte.setFullYear(corte.getFullYear() - 18)
+        const corte = dataLimiteMaioridade(new Date())
         return v.valor ? { dataNascimento: { gt: corte } } : { dataNascimento: { lte: corte } }
       } },
     { key: "estado", rotulo: "Estado (UF)", tipo: "texto", paraWhere: contem("estado") },
@@ -99,7 +99,7 @@ export const DOMINIO_REQUERENTES: DominioDef = {
     porCampo("faixa", "Faixa etária", (l) => {
       const i = idade(l.dataNascimento)
       if (i == null) return null
-      return i < 18 ? "Menor de 18" : i < 30 ? "18–29" : i < 45 ? "30–44" : i < 60 ? "45–59" : "60 ou mais"
+      return i < IDADE_MAIORIDADE ? "Menor de 18" : i < 30 ? "18–29" : i < 45 ? "30–44" : i < 60 ? "45–59" : "60 ou mais"
     }),
     porCampo("vinculo", "Vínculo com processo", (l) => (l.processos?.length ? "Com processo" : "Sem processo")),
   ],

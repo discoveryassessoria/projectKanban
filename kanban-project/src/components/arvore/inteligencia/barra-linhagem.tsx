@@ -237,7 +237,7 @@ export function BarraLinhagem(props: Props) {
                             {l.danteCausaId == null ? " · sem ascendente estrangeiro" : ""}
                           </span>
                         </span>
-                        {l.marca === "menor" && (
+                        {l.maioridade === "MENOR" && (
                           <span className="mt-0.5 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                             menor
                           </span>

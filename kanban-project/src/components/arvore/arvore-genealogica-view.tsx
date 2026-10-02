@@ -28,6 +28,8 @@ import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { CampoCidadeNascimento, CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { maioridadeEhManual, marcadorRequerenteParaGravar } from "@/src/lib/documentos/maioridade"
 import { DocumentosExigidosCampo, TEXTO_PRECISA_DOCUMENTACAO } from "./documentos-exigidos-campo"
 import { CODIGOS_DOCUMENTOS_EXIGIVEIS, deveEnviarDocumentosExigidos, marcadosParaTela, rotuloDaLista, situacaoDosDocumentosMarcados, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
@@ -1572,9 +1574,9 @@ function AddPersonModal({
   const [sobrenome, setSobrenome] = useState('')
   const [sexo, setSexo] = useState<string>('')
   const [dataNasc, setDataNasc] = useState('')
-  const [localNasc, setLocalNasc] = useState('')
-  const [paisNasc, setPaisNasc] = useState('')
-  const [nacionalidade, setNacionalidade] = useState('')
+  // País → cidade (autocomplete) → nacionalidade (gentílico) vivem juntos: ver campos-nascimento.tsx.
+  const { pais: paisNasc, setPais: setPaisNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
+    useNascimentoPessoa({ pais: '', cidade: '', nacionalidade: '' })
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState('')
   const [localObito, setLocalObito] = useState('')
@@ -1856,18 +1858,19 @@ function AddPersonModal({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
                 <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <input type="text" value={localNasc} onChange={(e) => setLocalNasc(e.target.value)} className={inputClass} />
+                <SeloMaioridade nascimento={dataNasc} marcador={requerente} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <input type="text" value={paisNasc} onChange={(e) => setPaisNasc(e.target.value)} placeholder="Ex: Brasil, Itália..." className={inputClass} />
+                <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
+                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
-                <input type="text" value={nacionalidade} onChange={(e) => setNacionalidade(e.target.value)} placeholder="Ex: Brasileiro..." className={inputClass} />
+                <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
             </div>
           </section>
@@ -2011,9 +2014,9 @@ function EditPersonModal({
   const [sobrenome, setSobrenome] = useState(pessoa.sobrenome || '')
   const [sexo, setSexo] = useState(pessoa.sexo || '')
   const [dataNasc, setDataNasc] = useState(pessoa.data_nasc ? new Date(pessoa.data_nasc).toISOString().split('T')[0] : '')
-  const [localNasc, setLocalNasc] = useState(pessoa.local_nasc || '')
-  const [paisNasc, setPaisNasc] = useState(pessoa.pais_nasc || '')
-  const [nacionalidade, setNacionalidade] = useState(pessoa.nacionalidade || '')
+  // Nacionalidade já gravada diferente do gentílico do país conta como escolha manual e é preservada.
+  const { pais: paisNasc, setPais: setPaisNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
+    useNascimentoPessoa({ pais: pessoa.pais_nasc || '', cidade: pessoa.local_nasc || '', nacionalidade: pessoa.nacionalidade || '' })
   const [isFalecido, setIsFalecido] = useState(pessoa.vivo === false || !!pessoa.data_obito)
   const [dataObito, setDataObito] = useState(pessoa.data_obito ? new Date(pessoa.data_obito).toISOString().split('T')[0] : '')
   const [localObito, setLocalObito] = useState(pessoa.local_emigracao || '')
@@ -2260,7 +2263,8 @@ function EditPersonModal({
           data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
           local_emigracao: isFalecido && localObito ? localObito.trim() : null,
           comentario: comentario.trim() || null,
-          requerente: requerente || 'nao',
+          // Com data de nascimento válida o marcador acompanha o cálculo (função única); sem data, vale o que foi declarado.
+          requerente: marcadorRequerenteParaGravar(dataNasc || null, requerente || 'nao', new Date()),
           linhaReta: isLinhaReta,
           documentacao: precisaDocumentacao,
           // Só vai se o usuário MUDOU a lista: re-salvar pessoa antiga (NULL) nunca grava a lista cheia.
@@ -2442,18 +2446,19 @@ function EditPersonModal({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
                 <DatePickerField value={dataNasc} onChange={(value) => setDataNasc(value)} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <input type="text" value={localNasc} onChange={(e) => setLocalNasc(e.target.value)} className={inputClass} />
+                <SeloMaioridade nascimento={dataNasc} marcador={requerente} mostrarSemData={jaEhRequerente} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
-                <input type="text" value={paisNasc} onChange={(e) => setPaisNasc(e.target.value)} className={inputClass} />
+                <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
+                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
-                <input type="text" value={nacionalidade} onChange={(e) => setNacionalidade(e.target.value)} className={inputClass} />
+                <CampoNacionalidade value={nacionalidade} onChange={setNacionalidade} inputClass={inputClass} />
               </div>
             </div>
           </section>
@@ -2527,6 +2532,10 @@ function EditPersonModal({
                     principal (maior/menor); demais é somente leitura. */}
                 {jaEhRequerente ? (
                   <div className="space-y-1.5">
+                    {!maioridadeEhManual(dataNasc || null, new Date()) ? (
+                      // Há data de nascimento válida: maior/menor é CALCULADO (selo na data) — sem seletor manual.
+                      <p className="text-sm text-gray-700">Requerente · maioridade calculada pela data de nascimento</p>
+                    ) : (
                     <select value={requerente} onChange={(e) => setRequerente(e.target.value)} className={selectClass} style={selectStyle}>
                       {/* "sim" é o estado de quem foi vinculado como requerente sem ainda
                           ter maioridade classificada (2º+ requerente vinculado na mesma
@@ -2536,6 +2545,7 @@ function EditPersonModal({
                       <option value="maior">Sim - Maior de idade</option>
                       <option value="menor">Sim - Menor de idade</option>
                     </select>
+                    )}
                     <button
                       type="button"
                       onClick={desvincularRequerente}
