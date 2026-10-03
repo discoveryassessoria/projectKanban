@@ -34,8 +34,9 @@ import { nacionalidadeDigitadaToca, nacionalidadeJaTocada, proximaNacionalidade 
 // Estado compartilhado dos três campos
 // ─────────────────────────────────────────────────────────────
 
-export function useNascimentoPessoa(inicial: { pais: string; cidade: string; nacionalidade: string }) {
+export function useNascimentoPessoa(inicial: { pais: string; estado?: string; cidade: string; nacionalidade: string }) {
   const [pais, setPaisBruto] = useState(inicial.pais)
+  const [estado, setEstado] = useState(inicial.estado ?? "")
   const [cidade, setCidade] = useState(inicial.cidade)
   const [nacionalidade, setNacionalidadeBruta] = useState(inicial.nacionalidade)
   // "Tocada": o usuário (ou o cadastro gravado) escolheu a nacionalidade à mão — o país não a sobrescreve mais.
@@ -51,7 +52,7 @@ export function useNascimentoPessoa(inicial: { pais: string; cidade: string; nac
     setTocada(nacionalidadeDigitadaToca(novo))
   }, [])
 
-  return { pais, setPais, cidade, setCidade, nacionalidade, setNacionalidade }
+  return { pais, setPais, estado, setEstado, cidade, setCidade, nacionalidade, setNacionalidade }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -201,6 +202,38 @@ export function CampoPaisNascimento({
 }
 
 // ─────────────────────────────────────────────────────────────
+// Estado de nascimento (UF no Brasil; texto livre fora dele)
+// ─────────────────────────────────────────────────────────────
+
+export const UFS_BR: ReadonlyArray<{ uf: string; nome: string }> = [
+  { uf: "AC", nome: "Acre" }, { uf: "AL", nome: "Alagoas" }, { uf: "AP", nome: "Amapá" }, { uf: "AM", nome: "Amazonas" },
+  { uf: "BA", nome: "Bahia" }, { uf: "CE", nome: "Ceará" }, { uf: "DF", nome: "Distrito Federal" }, { uf: "ES", nome: "Espírito Santo" },
+  { uf: "GO", nome: "Goiás" }, { uf: "MA", nome: "Maranhão" }, { uf: "MT", nome: "Mato Grosso" }, { uf: "MS", nome: "Mato Grosso do Sul" },
+  { uf: "MG", nome: "Minas Gerais" }, { uf: "PA", nome: "Pará" }, { uf: "PB", nome: "Paraíba" }, { uf: "PR", nome: "Paraná" },
+  { uf: "PE", nome: "Pernambuco" }, { uf: "PI", nome: "Piauí" }, { uf: "RJ", nome: "Rio de Janeiro" }, { uf: "RN", nome: "Rio Grande do Norte" },
+  { uf: "RS", nome: "Rio Grande do Sul" }, { uf: "RO", nome: "Rondônia" }, { uf: "RR", nome: "Roraima" }, { uf: "SC", nome: "Santa Catarina" },
+  { uf: "SP", nome: "São Paulo" }, { uf: "SE", nome: "Sergipe" }, { uf: "TO", nome: "Tocantins" },
+]
+
+export function CampoEstadoNascimento({
+  value, onChange, pais, inputClass, placeholder = "Ex: Veneto, Catalunha...",
+}: { value: string; onChange: (v: string) => void; pais: string; inputClass: string; placeholder?: string }) {
+  if (!paisEhBrasil(pais)) {
+    return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} placeholder={placeholder} />
+  }
+  const atual = value.trim()
+  // Valor já gravado que não é uma UF (ex.: texto livre de antes) atravessa intacto como opção própria.
+  const estranho = atual !== "" && !UFS_BR.some((u) => u.uf === atual.toUpperCase())
+  return (
+    <select value={estranho ? atual : atual.toUpperCase()} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+      <option value="">Selecione o estado</option>
+      {estranho && <option value={atual}>{atual}</option>}
+      {UFS_BR.map((u) => <option key={u.uf} value={u.uf}>{u.nome} ({u.uf})</option>)}
+    </select>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
 // Cidade de nascimento (municípios do IBGE só no Brasil)
 // ─────────────────────────────────────────────────────────────
 
@@ -215,8 +248,8 @@ function carregarMunicipios(): Promise<MunicipioIndexado> {
 }
 
 export function CampoCidadeNascimento({
-  value, onChange, pais, inputClass, placeholder,
-}: { value: string; onChange: (v: string) => void; pais: string; inputClass: string; placeholder?: string }) {
+  value, onChange, pais, uf, inputClass, placeholder,
+}: { value: string; onChange: (v: string) => void; pais: string; /** UF escolhida: restringe as sugestões ao estado. */ uf?: string; inputClass: string; placeholder?: string }) {
   const brasil = paisEhBrasil(pais)
   const [lista, setLista] = useState<MunicipioIndexado | null>(null)
   const [pedir, setPedir] = useState(false)
@@ -229,8 +262,10 @@ export function CampoCidadeNascimento({
 
   const itens = useMemo<ItemSugestao[]>(() => {
     if (!brasil || !lista) return []
-    return sugerirMunicipios(lista, baseDaCidade(value)).map((m) => ({ valor: m.nome, detalhe: m.uf }))
-  }, [brasil, lista, value])
+    const ufEscolhida = (uf ?? "").trim().toUpperCase()
+    const base = ufEscolhida ? lista.filter((m) => m.uf === ufEscolhida) : lista
+    return sugerirMunicipios(base, baseDaCidade(value)).map((m) => ({ valor: m.nome, detalhe: ufEscolhida ? undefined : m.uf }))
+  }, [brasil, lista, value, uf])
 
   return (
     <div>
