@@ -147,7 +147,7 @@ export interface ContextoDossie {
 // É o que alimenta o selo do cartão e o mapa de Saúde. O conjunto COMPLETO de
 // achados (inclui relação e risco) vive em `achados-do-motor.ts` e é o que a aba
 // Operação lista — sugestão de vínculo não deve pintar a Saúde da pessoa.
-const CATEGORIAS_DIVERGENCIA = new Set<CategoriaInsight>(["conflito", "duplicidade", "sobrenome"])
+const CATEGORIAS_DIVERGENCIA = new Set<CategoriaInsight>(["conflito", "duplicidade"])
 
 export function projetarDossies(ctx: ContextoDossie): Map<number, DossiePessoa> {
   const { grafo, analise, mapa, fatos } = ctx

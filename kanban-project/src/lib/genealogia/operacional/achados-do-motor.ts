@@ -15,8 +15,14 @@
 //   • a Etapa 4 (fila final) consome a mesma função.
 //
 // Quais categorias do motor são pendência de árvore: conflito, duplicidade,
-// sobrenome, relação e risco. `lacuna`, `pesquisa` e `migracao` NÃO são
-// pendência — são sugestão/cadastro incompleto e continuam no painel de Análise.
+// relação e risco. `lacuna`, `pesquisa` e `migracao` NÃO são pendência — são
+// sugestão/cadastro incompleto.
+//
+// `sobrenome` (divergência de nome/sobrenome entre gerações) também FICA DE FORA
+// por decisão de produto (02/10/2026): o motor continua detectando
+// (`motor/regras/linhagem.ts`), mas nenhuma tela da árvore exibe nem conta isso.
+// Quando a fase Análise Documental for construída, é ela que consome. Para
+// religar, basta incluir "sobrenome" aqui e em `CATEGORIAS_DIVERGENCIA` (dossie.ts).
 //
 // REGRA PERMANENTE (mesma da Etapa 2): tarefa vencida/aberta/com dono NUNCA é
 // achado de árvore. Tarefa é trabalho em andamento — já tem lugar na Torre e em
@@ -42,7 +48,6 @@ export const FONTE_ACHADO_DO_MOTOR = "Motor genealógico (regra determinística)
 export const CATEGORIAS_ACHADO: ReadonlySet<CategoriaInsight> = new Set<CategoriaInsight>([
   "conflito",
   "duplicidade",
-  "sobrenome",
   "relacao",
   "risco",
 ])
@@ -73,7 +78,6 @@ export function categoriaDoAchado(i: Insight): CategoriaAchado | null {
   if (!CATEGORIAS_ACHADO.has(i.categoria)) return null
   switch (i.categoria) {
     case "conflito":
-    case "sobrenome":
       return "divergencia"
     case "duplicidade":
       return "duplicidade"

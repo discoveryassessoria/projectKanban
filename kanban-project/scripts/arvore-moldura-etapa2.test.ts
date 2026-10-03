@@ -137,16 +137,16 @@ const insights: Insight[] = [
   sintetico("g", "conflito", [], 30), // achado da árvore toda: sem pessoa
 ]
 const todos = achadosDoMotor({ insights })
-ok(todos.length === 6, "conflito/duplicidade/sobrenome/relação/risco entram; lacuna/pesquisa/migração ficam de fora", todos.map((a) => a.id).join(","))
-ok(todos.map((a) => a.id).join(",") === "c,d,k,s,r,g", "ordem do mais pesado ao mais leve", todos.map((a) => a.id).join(","))
-ok(todos.find((a) => a.id === "c")!.impeditivo && !todos.find((a) => a.id === "s")!.impeditivo, "só o que o motor classificou como crítico é impeditivo")
+ok(todos.length === 5, "conflito/duplicidade/relação/risco entram; sobrenome (fora da tela por decisão), lacuna/pesquisa/migração ficam de fora", todos.map((a) => a.id).join(","))
+ok(todos.map((a) => a.id).join(",") === "c,d,k,r,g", "ordem do mais pesado ao mais leve", todos.map((a) => a.id).join(","))
+ok(todos.find((a) => a.id === "c")!.impeditivo && !todos.find((a) => a.id === "r")!.impeditivo, "só o que o motor classificou como crítico é impeditivo")
 ok(todos.every((a) => a.acao.length > 0 && a.fonte.length > 0), "todo achado tem ação e fonte")
 
 const porPessoa = achadosDoMotorPorPessoa({ insights })
 ok(porPessoa.get(1)!.map((a) => a.id).join(",") === "c,d,r", "pessoa 1 vê os 3 achados que a tocam", porPessoa.get(1)?.map((a) => a.id).join(","))
 ok(porPessoa.get(2)!.some((a) => a.id === "d") && porPessoa.get(1)!.some((a) => a.id === "d"), "achado de duas pessoas aparece nas duas fichas")
 ok(![...porPessoa.values()].flat().some((a) => a.id === "g"), "achado sem pessoa não tem dono (continua em achadosDoMotor e na Análise)")
-ok(achadosDoMotor({ insights }, new Set([3])).map((a) => a.id).join(",") === "k,s,g", "escopo da linhagem: só quem toca o escopo + os da árvore toda", achadosDoMotor({ insights }, new Set([3])).map((a) => a.id).join(","))
+ok(achadosDoMotor({ insights }, new Set([3])).map((a) => a.id).join(",") === "k,g", "escopo da linhagem: só quem toca o escopo + os da árvore toda", achadosDoMotor({ insights }, new Set([3])).map((a) => a.id).join(","))
 
 // Fixture real: o motor aponta "filho em comum sem união registrada".
 const reais = achadosDoMotor(analise)
