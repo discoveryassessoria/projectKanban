@@ -27,6 +27,7 @@ import {
   type ItemFila,
 } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
 import type { DossiePessoa } from "@/src/lib/genealogia/operacional/dossie"
+import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 import type { IndicadoresDaPessoa } from "@/src/lib/genealogia/operacional/indicadores"
 
 // ── AÇÕES ───────────────────────────────────────────────────────────────────
@@ -36,6 +37,8 @@ export interface DestinosDaFila {
   onAbrirPessoa?: (pessoaId: number) => void
   /** Abre o modal de vincular cônjuges (porta oficial de criação de união). */
   onVincularConjuge?: (pessoaId: number, outraPessoaId: number | null) => void
+  /** Abre o modal "Criar tarefa" (some sem a permissão `tarefas.criar`). */
+  onCriarTarefa?: (rascunho: RascunhoTarefa) => void
 }
 
 /**
@@ -58,7 +61,7 @@ export function useAbrirTarefaNaCentral(): (processoId: number, tarefaId: number
 /** Executa a ação de um item da fila. Estável enquanto os destinos forem estáveis. */
 export function useExecutarAcaoDaFila(destinos: DestinosDaFila): (acao: AcaoFila) => void {
   const abrirTarefa = useAbrirTarefaNaCentral()
-  const { onAbrirPessoa, onVincularConjuge } = destinos
+  const { onAbrirPessoa, onVincularConjuge, onCriarTarefa } = destinos
   return useCallback(
     (acao: AcaoFila) => {
       switch (acao.tipo) {
@@ -73,9 +76,12 @@ export function useExecutarAcaoDaFila(destinos: DestinosDaFila): (acao: AcaoFila
         case "vincular_conjuge":
           onVincularConjuge?.(acao.pessoaId, acao.outraPessoaId)
           return
+        case "criar_tarefa":
+          onCriarTarefa?.(acao.rascunho)
+          return
       }
     },
-    [abrirTarefa, onAbrirPessoa, onVincularConjuge],
+    [abrirTarefa, onAbrirPessoa, onVincularConjuge, onCriarTarefa],
   )
 }
 
@@ -86,6 +92,7 @@ export function acaoDisponivel(acao: AcaoFila, destinos: DestinosDaFila): boolea
     case "abrir_pessoa":
     case "ver_no_mapa": return Boolean(destinos.onAbrirPessoa)
     case "vincular_conjuge": return Boolean(destinos.onVincularConjuge)
+    case "criar_tarefa": return Boolean(destinos.onCriarTarefa)
   }
 }
 
@@ -155,8 +162,44 @@ function LinhaDaFila({
           </span>
         </div>
         {item.detalhe && <p className="mt-0.5 pl-5 text-[11px] text-[var(--text-secondary)]">{item.detalhe}</p>}
+        {item.localizacao && (
+          <div className="mt-1.5 ml-5 rounded-md bg-[var(--surface-secondary)] px-2 py-1.5" data-localizar-certidao>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Onde localizar</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-primary)]">
+              {item.localizacao.orgao}
+              {item.localizacao.municipio ? ` — ${item.localizacao.municipio}` : ""}
+              {item.localizacao.ano != null ? ` · ano ${item.localizacao.ano}` : ""}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-secondary)]">{item.localizacao.nota}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">Fonte: {item.localizacao.fonte}</p>
+          </div>
+        )}
         {acoes.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5 pl-5">
+            {acoes.map((a, i) => (
+              <BotaoDeAcao key={`${a.tipo}-${i}`} acao={a} destaque={i === 0} onExecutar={onExecutar} />
+            ))}
+          </div>
+        )}
+      </li>
+    )
+  }
+
+  if (item.tipo === "naturalizacao") {
+    return (
+      <li
+        data-naturalizacao-transmissor
+        className="rounded-lg border-2 border-[var(--danger-text)] bg-[var(--danger-tile)] px-3 py-2"
+      >
+        <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--danger-text)]">
+          <TriangleAlert className="h-3 w-3" aria-hidden />
+          {item.rotuloEstado}
+        </p>
+        <p className="mt-0.5 text-sm font-semibold leading-snug text-[var(--text-primary)]">{item.titulo}</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-[var(--text-secondary)]">{item.explicacao}</p>
+        <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">Fonte: {item.fonte}</p>
+        {acoes.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {acoes.map((a, i) => (
               <BotaoDeAcao key={`${a.tipo}-${i}`} acao={a} destaque={i === 0} onExecutar={onExecutar} />
             ))}

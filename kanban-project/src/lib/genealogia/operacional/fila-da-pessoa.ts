@@ -46,6 +46,13 @@ import type { AchadoDoMotor } from "./achados-do-motor"
 import { ROTULO_CATEGORIA_ACHADO } from "./achados-do-motor"
 import type { NecessidadeOficial } from "../documental/indicadores"
 import { PREFIXO_CONJUGE_AUSENTE, PREFIXO_UNIAO_IMPLICITA } from "../motor/regras/sugestoes"
+import {
+  REGRA_CASAMENTO,
+  REGRA_NASCIMENTO,
+  type NaturalizacaoDoTransmissor,
+  type SugestaoDeRegistro,
+} from "./localizar-certidao"
+import { rascunhoDaNaturalizacao, rascunhoDoDocumento, type RascunhoTarefa } from "./tarefa-do-passo"
 
 // ── CONTRATOS ───────────────────────────────────────────────────────────────
 
@@ -57,6 +64,8 @@ export type SituacaoOficialCertidao =
 export interface NecessidadeDaFila extends NecessidadeOficial {
   /** Projeção oficial (`projecoesDeCertidaoPorNecessidade`). null = não projetada. */
   situacaoCertidao?: SituacaoOficialCertidao | null
+  /** Código da regra documental que gerou a exigência (ex.: GEN-CIVIL-NASC). */
+  ruleCode?: string | null
 }
 
 export interface TarefaDaFila {
@@ -85,6 +94,21 @@ export type AcaoFila =
   | { tipo: "abrir_pessoa"; rotulo: string; pessoaId: number }
   | { tipo: "ver_no_mapa"; rotulo: string; pessoaId: number }
   | { tipo: "vincular_conjuge"; rotulo: string; pessoaId: number; outraPessoaId: number | null }
+  /** Abre o modal "Criar tarefa" já preenchido (porta canônica de tarefa manual). */
+  | { tipo: "criar_tarefa"; rotulo: string; rascunho: RascunhoTarefa }
+
+/** De onde vem a sugestão: o texto que a tela mostra, nunca o nome técnico de uma entidade. */
+export const FONTE_SUGESTAO_REGISTRO = "Regras documentais / motor genealógico"
+
+export interface LocalizacaoSugerida {
+  /** Cartório / registro civil (ou livro paroquial, antes do registro civil). */
+  orgao: string
+  municipio: string | null
+  ano: number | null
+  /** Nota histórica: por que o registro está ali. */
+  nota: string
+  fonte: string
+}
 
 export interface ItemDocumento {
   tipo: "documento"
@@ -96,7 +120,21 @@ export interface ItemDocumento {
   /** Texto de apoio tirado do dado (ex.: previsão de retorno). Nunca inventado. */
   detalhe: string | null
   opcional: boolean
+  /** Onde procurar a certidão — só quando o motor calculou e a exigência ainda está em aberto. */
+  localizacao: LocalizacaoSugerida | null
   /** Ordem de exibição (menor = mais urgente). */
+  ordem: number
+  acoes: AcaoFila[]
+}
+
+/** Naturalização do ascendente transmissor: o documento que decide a viabilidade. */
+export interface ItemNaturalizacao {
+  tipo: "naturalizacao"
+  chave: string
+  titulo: string
+  explicacao: string
+  rotuloEstado: string
+  fonte: string
   ordem: number
   acoes: AcaoFila[]
 }
@@ -114,7 +152,7 @@ export interface ItemDivergencia {
   acoes: AcaoFila[]
 }
 
-export type ItemFila = ItemDocumento | ItemDivergencia
+export type ItemFila = ItemDocumento | ItemDivergencia | ItemNaturalizacao
 
 export interface FilaDaPessoa {
   /**
@@ -140,6 +178,10 @@ export interface EntradaFila {
   /** "com Maria Silva" — para distinguir duas uniões da mesma pessoa. */
   nomeDoConjugeDaUniao?: (uniaoId: number) => string | null
   achados: AchadoDoMotor[]
+  /** Sugestões de onde localizar certidão (motor de pesquisa); só as desta pessoa/uniões entram. */
+  registros?: SugestaoDeRegistro[]
+  /** Naturalização do transmissor; só entra quando é DESTA pessoa. */
+  naturalizacao?: NaturalizacaoDoTransmissor | null
   /** Nome de pessoa para o botão "Abrir <nome>". */
   nomeDePessoa?: (pessoaId: number) => string
 }
@@ -170,6 +212,7 @@ export function estadoDoDocumento(n: Pick<NecessidadeDaFila, "status" | "situaca
 const ORDEM_ESTADO: Record<EstadoDocumento, number> = {
   bloqueado: 0, a_localizar: 20, a_solicitar: 30, solicitado: 40, recebido: 70, dispensado: 80,
 }
+const ORDEM_NATURALIZACAO = 5
 const ORDEM_DIVERGENCIA_CRITICA = 10
 const ORDEM_DIVERGENCIA_LEVE = 50
 
@@ -180,6 +223,14 @@ const ROTULO_ACAO_DO_ESTADO: Record<EstadoDocumento, string> = {
   solicitado: "Acompanhar",
   recebido: "Abrir",
   dispensado: "Abrir",
+}
+
+/** Exigência ainda em aberto: é onde a sugestão de onde localizar ajuda. */
+const ESTADOS_EM_ABERTO: ReadonlySet<EstadoDocumento> = new Set<EstadoDocumento>(["bloqueado", "a_localizar", "a_solicitar"])
+
+function dicaDeLocalizacao(l: LocalizacaoSugerida): string {
+  const onde = [l.orgao, l.municipio].filter(Boolean).join(" — ")
+  return `Sugestão de onde localizar: ${onde}${l.ano != null ? `, ano ${l.ano}` : ""}. ${l.nota}`.replace(/\s+/g, " ").trim()
 }
 
 const STATUS_TAREFA_FORA = new Set(["CANCELADA", "SUPERSEDIDA"])
@@ -277,6 +328,33 @@ export function montarFilaDaPessoa(e: EntradaFila): FilaDaPessoa {
       })
     }
 
+    // Sugestão de onde localizar: a certidão de nascimento é da pessoa; a de casamento, da união.
+    const sug = ESTADOS_EM_ABERTO.has(estado)
+      ? (e.registros ?? []).find((r) =>
+          n.ruleCode === REGRA_NASCIMENTO
+            ? r.evento === "nascimento" && r.pessoaId === e.pessoaId && n.pessoaId === e.pessoaId
+            : n.ruleCode === REGRA_CASAMENTO
+              ? r.evento === "casamento" && r.uniaoId != null && r.uniaoId === n.uniaoId
+              : false,
+        )
+      : undefined
+    const localizacao: LocalizacaoSugerida | null = sug
+      ? { orgao: sug.orgao, municipio: sug.municipio, ano: sug.ano, nota: sug.nota, fonte: FONTE_SUGESTAO_REGISTRO }
+      : null
+    // "Criar tarefa" só onde há sugestão e ainda NÃO há tarefa para a exigência.
+    if (localizacao && !destino) {
+      acoes.push({
+        tipo: "criar_tarefa",
+        rotulo: "Criar tarefa",
+        rascunho: rascunhoDoDocumento(
+          { necessidadeId: n.id, nome, rotuloEstado: ROTULO_ESTADO_DOCUMENTO[estado] },
+          e.pessoaId,
+          e.nomeDePessoa ? e.nomeDePessoa(e.pessoaId) : null,
+          dicaDeLocalizacao(localizacao),
+        ),
+      })
+    }
+
     itens.push({
       tipo: "documento",
       chave: `nec-${n.id}`,
@@ -286,6 +364,7 @@ export function montarFilaDaPessoa(e: EntradaFila): FilaDaPessoa {
       rotuloEstado: ROTULO_ESTADO_DOCUMENTO[estado],
       detalhe: detalheDoDocumento(estado, n),
       opcional: n.obrigatoriedade === "OPCIONAL",
+      localizacao,
       ordem: ORDEM_ESTADO[estado],
       acoes,
     })
@@ -302,6 +381,27 @@ export function montarFilaDaPessoa(e: EntradaFila): FilaDaPessoa {
       impeditivo: a.impeditivo,
       ordem: a.impeditivo || a.severidade === "alto" ? ORDEM_DIVERGENCIA_CRITICA : ORDEM_DIVERGENCIA_LEVE,
       acoes: acoesDoAchado(a, e.pessoaId, e.nomeDePessoa),
+    })
+  }
+
+  // Naturalização do ascendente transmissor: destaque só na pessoa transmissora.
+  if (e.naturalizacao && e.naturalizacao.pessoaId === e.pessoaId) {
+    const nat = e.naturalizacao
+    itens.push({
+      tipo: "naturalizacao",
+      chave: `nat-${nat.id}`,
+      titulo: nat.titulo,
+      explicacao: nat.explicacao,
+      rotuloEstado: "Crítico · Documento que decide a viabilidade",
+      fonte: FONTE_SUGESTAO_REGISTRO,
+      ordem: ORDEM_NATURALIZACAO,
+      acoes: [
+        {
+          tipo: "criar_tarefa",
+          rotulo: "Criar tarefa",
+          rascunho: rascunhoDaNaturalizacao(nat, e.pessoaId, e.nomeDePessoa ? e.nomeDePessoa(e.pessoaId) : null),
+        },
+      ],
     })
   }
 

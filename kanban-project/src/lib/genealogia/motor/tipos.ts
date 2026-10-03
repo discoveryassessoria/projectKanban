@@ -32,6 +32,11 @@ export interface Insight {
   acao?: string
   pessoaIds: number[]
   uniaoIds?: number[]
+  /**
+   * Só nas sugestões de ONDE LOCALIZAR a certidão (regra de pesquisa): o órgão, o
+   * município e o ano calculados — para a tela mostrar sem reler o texto.
+   */
+  registro?: { evento: "nascimento" | "casamento"; orgao: string; municipio: string | null; ano: number | null }
   /** 0..1 — quão confiante o motor está. Sugestões nunca são afirmações. */
   confianca?: number
   /** Prioridade final (peso × severidade × impacto na linha de cidadania). */

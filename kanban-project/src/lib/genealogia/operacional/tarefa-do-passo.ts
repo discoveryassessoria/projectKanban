@@ -122,10 +122,13 @@ export function rascunhoDoDocumento(
   item: Pick<ItemDocumento, "necessidadeId" | "nome" | "rotuloEstado">,
   pessoaId: number | null,
   pessoaNome: string | null,
+  /** Sugestão de onde localizar (tirada do motor), anexada à descrição. */
+  dica?: string | null,
 ): RascunhoTarefa {
+  const base = `Documento ${item.nome}${pessoaNome ? ` de ${pessoaNome}` : ""} está "${item.rotuloEstado}" e não há tarefa aberta para ele.`
   return {
     titulo: cortarTitulo(pessoaNome ? `${item.nome} — ${pessoaNome}` : item.nome),
-    motivo: `Documento ${item.nome}${pessoaNome ? ` de ${pessoaNome}` : ""} está "${item.rotuloEstado}" e não há tarefa aberta para ele.`,
+    motivo: dica ? `${base} ${dica}` : base,
     pessoaId,
     pessoaNome,
     necessidadeId: item.necessidadeId,
@@ -158,5 +161,26 @@ export function corpoDaCriacao(
     ...(o.responsavelId != null ? { responsavelId: o.responsavelId } : {}),
     ...(o.dataPrazo ? { dataPrazo: o.dataPrazo } : {}),
     ...(o.confirmarDuplicidade ? { confirmarDuplicidade: true } : {}),
+  }
+}
+
+/**
+ * Rascunho da certidão de NATURALIZAÇÃO do ascendente transmissor. A duplicidade é
+ * decidida pelo fato de origem (o id do achado), nunca pelo título.
+ */
+export function rascunhoDaNaturalizacao(
+  n: { id: string; titulo: string; explicacao: string; acao: string },
+  pessoaId: number,
+  pessoaNome: string | null,
+): RascunhoTarefa {
+  return {
+    titulo: cortarTitulo(pessoaNome ? `Certidão de naturalização — ${pessoaNome}` : semPontoFinal(n.acao)),
+    motivo: `${semPontoFinal(n.titulo)}. ${n.explicacao}`.replace(/\s+/g, " ").trim(),
+    pessoaId,
+    pessoaNome,
+    necessidadeId: null,
+    documentoNome: null,
+    chaveOrigem: chaveDeOrigem("arvore-achado", n.id),
+    origemRotulo: "Naturalização do ascendente transmissor",
   }
 }

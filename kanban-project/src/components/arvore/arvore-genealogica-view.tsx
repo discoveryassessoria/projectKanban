@@ -1674,6 +1674,7 @@ export function ArvoreGenealogicaView({
         mensagemAntesDaGenealogia={operacional.mensagemAntesDaGenealogia}
         onAbrirAchado={abrirAchado}
         onVincularConjuge={pode('arvore.criar') ? abrirVincularConjuge : undefined}
+        onCriarTarefa={abrirCriarTarefa}
         processoId={processoId}
       />
 

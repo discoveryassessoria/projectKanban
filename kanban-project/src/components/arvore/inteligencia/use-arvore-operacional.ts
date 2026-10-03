@@ -69,6 +69,7 @@ import {
   type FatosOperacionais,
   type ResumoLinhagem,
 } from "@/src/lib/genealogia/operacional/dossie"
+import { fatosDePesquisa } from "@/src/lib/genealogia/operacional/localizar-certidao"
 import { achadosDoMotorPorPessoa, type AchadoDoMotor } from "@/src/lib/genealogia/operacional/achados-do-motor"
 import { montarFilaDaPessoa, mensagemAntesDaGenealogia, type FilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
 import { nomeCompleto } from "@/src/lib/genealogia/motor/texto"
@@ -474,6 +475,10 @@ export function useArvoreOperacional(params: {
     [achadosPorPessoa],
   )
 
+  // Onde localizar cada certidão + naturalização do transmissor (regra de pesquisa
+  // do motor, sem o corte de exibição). Calculado uma vez por análise.
+  const pesquisa = useMemo(() => fatosDePesquisa(analise), [analise])
+
   // FILA DA PESSOA: só roda quando a aba é aberta (chamada por pessoa, sob demanda).
   // Usa os fatos já lidos — nenhuma leitura nova, nenhuma segunda contagem.
   const filaDe = useCallback(
@@ -494,12 +499,14 @@ export function useArvoreOperacional(params: {
           return outro ? nomeCompleto(outro) : null
         },
         achados: achadosPorPessoa.get(pessoaId) ?? SEM_ACHADOS,
+        registros: pesquisa.registros,
+        naturalizacao: pesquisa.naturalizacao,
         nomeDePessoa: (id) => {
           const p = analise?.grafo.pessoa(id)
           return p ? nomeCompleto(p) : `#${id}`
         },
       }),
-    [processoId, fatos, analise, achadosPorPessoa],
+    [processoId, fatos, analise, achadosPorPessoa, pesquisa],
   )
   const textoAntesDaGenealogia = useMemo(
     () => mensagemAntesDaGenealogia(fatos.faseDestinoLabel),

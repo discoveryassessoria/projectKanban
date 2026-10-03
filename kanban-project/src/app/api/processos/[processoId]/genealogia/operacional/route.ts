@@ -72,6 +72,7 @@ export async function GET(
           status: true,
           obrigatoriedade: true,
           ciclo: true,
+          ruleCode: true,
           itemCatalogo: { select: { id: true, code: true, name: true } },
         },
         orderBy: { id: "asc" },
@@ -130,6 +131,7 @@ export async function GET(
       status: n.status,
       obrigatoriedade: n.obrigatoriedade,
       ciclo: n.ciclo,
+      ruleCode: n.ruleCode,
       itemCatalogo: n.itemCatalogo,
     }))
 

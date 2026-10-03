@@ -15,6 +15,8 @@ import { rotuloPais } from "./linhagem"
 
 interface FonteProvavel {
   fonte: string
+  /** O órgão sem a cidade ("Ufficio di Stato Civile do Comune"). */
+  orgao: string
   detalhe: string
   probabilidade: number // 0..1
 }
@@ -81,6 +83,7 @@ export function fonteProvavel(
   if (ano == null) {
     return {
       fonte: marco.civil,
+      orgao: marco.civil,
       detalhe: `Sem ano de ${rotuloEvento} não dá para saber se o registro é civil ou paroquial${cidade ? ` — localidade indicada: ${cidade}` : ""}.`,
       probabilidade: 0.4,
     }
@@ -89,6 +92,7 @@ export function fonteProvavel(
   if (ano >= marco.ano) {
     return {
       fonte: cidade ? `${marco.civil} — ${cidade}` : marco.civil,
+      orgao: marco.civil,
       detalhe: `Registro civil já obrigatório em ${chave === "BRASIL" ? "1889" : marco.ano} para ${rotuloEvento}s.`,
       probabilidade: cidade ? 0.9 : 0.65,
     }
@@ -96,6 +100,7 @@ export function fonteProvavel(
 
   return {
     fonte: cidade ? `${marco.eclesiastico} — ${cidade}` : marco.eclesiastico,
+    orgao: marco.eclesiastico,
     detalhe: `Antes de ${marco.ano} o registro civil não existia neste país: o ${rotuloEvento} está no livro eclesiástico.`,
     probabilidade: cidade ? 0.8 : 0.5,
   }
@@ -149,6 +154,7 @@ export function analisarPesquisa(
           explicacao: f.detalhe,
           acao: `Consultar ${f.fonte}${anoNasc ? ` — ano ${anoNasc}` : ""}.`,
           pessoaIds: [p.id],
+          registro: { evento: "nascimento", orgao: f.orgao, municipio: p.local_nasc?.trim() || null, ano: anoNasc },
           confianca: f.probabilidade,
           peso: Math.round(f.probabilidade * 30 * prioridade),
         })
@@ -190,6 +196,7 @@ export function analisarPesquisa(
             acao: `Consultar ${f.fonte}${anoCas ? ` — ano ${anoCas}` : ""}.`,
             pessoaIds: outro ? [p.id, outro.id] : [p.id],
             uniaoIds: [u.id],
+            registro: { evento: "casamento", orgao: f.orgao, municipio: u.local?.trim() || null, ano: anoCas },
             confianca: f.probabilidade,
             peso: Math.round(f.probabilidade * 28 * prioridade),
           })

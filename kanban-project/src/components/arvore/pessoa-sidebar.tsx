@@ -31,6 +31,7 @@ import type { DossiePessoa } from "@/src/lib/genealogia/operacional/dossie"
 import type { IndicadoresDaPessoa } from "@/src/lib/genealogia/operacional/indicadores"
 import { ROTULO_EVENTO, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
 import type { FilaDaPessoa } from "@/src/lib/genealogia/operacional/fila-da-pessoa"
+import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
 import { ListaDaFila, ResumoOperacional, useExecutarAcaoDaFila, type DestinosDaFila } from "./fila-da-pessoa"
 
 // ========================================
@@ -85,6 +86,8 @@ interface PessoaSidebarProps {
   onAbrirAchado?: (pessoaId: number) => void
   /** Abre o modal de vincular cônjuges (casal sem filho cadastrado). */
   onVincularConjuge?: (pessoaId: number, outraPessoaId: number | null) => void
+  /** Abre o modal "Criar tarefa" (aba Operação). Ausente = sem permissão `tarefas.criar`. */
+  onCriarTarefa?: (rascunho: RascunhoTarefa) => void
   /** Processo da árvore — destino do link para o Financeiro. */
   processoId?: number
 }
@@ -487,6 +490,7 @@ function ConteudoSidebar({
   mensagemAntesDaGenealogia = "",
   onAbrirAchado,
   onVincularConjuge,
+  onCriarTarefa,
   processoId,
 }: PessoaSidebarProps) {
   // Aba inicial: a do deep-link, quando veio uma reconhecida; senão "info".
@@ -498,7 +502,7 @@ function ConteudoSidebar({
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
   const { pode } = usePermissoes()
-  const destinosDaFila: DestinosDaFila = { onAbrirPessoa: onAbrirAchado, onVincularConjuge }
+  const destinosDaFila: DestinosDaFila = { onAbrirPessoa: onAbrirAchado, onVincularConjuge, onCriarTarefa }
   const executarAcaoDaFila = useExecutarAcaoDaFila(destinosDaFila)
   // Selo da aba: só divergências do motor (grain ACHADO) — nunca soma documento + achado.
   const divergenciasNaFila = fila ? fila.itens.filter((i) => i.tipo === "divergencia").length : 0
