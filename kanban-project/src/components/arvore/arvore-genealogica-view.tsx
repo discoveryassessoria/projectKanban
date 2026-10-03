@@ -45,7 +45,6 @@ import {
   type PropostaImpacto,
 } from "./inteligencia/preview-impacto"
 import type { EstadoAtual } from "@/src/lib/genealogia/operacional/comparacao"
-import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
 import { CriarTarefaModal } from "./inteligencia/criar-tarefa-modal"
 import { useAbrirTarefaNaCentral } from "./fila-da-pessoa"
 import type { RascunhoTarefa } from "@/src/lib/genealogia/operacional/tarefa-do-passo"
@@ -66,7 +65,6 @@ import {
   Minimize2,
   Maximize2,
   Search,
-  Sparkles,
   ImagePlus,
   Unlink,
 } from "lucide-react"
@@ -188,7 +186,6 @@ export function ArvoreGenealogicaView({
     paisAlvo: paisAlvoDe(paisProcesso),
     raizId: pessoaPrincipal?.id ?? null,
   })
-  const [painelAberto, setPainelAberto] = useState(false)
   const [importarAberto, setImportarAberto] = useState(false)
   const [paletaAberta, setPaletaAberta] = useState(false)
 
@@ -1105,7 +1102,6 @@ export function ArvoreGenealogicaView({
           return
         }
         if (paletaAberta) { consumir(); setPaletaAberta(false); return }
-        if (painelAberto) { consumir(); setPainelAberto(false); return }
         if (fullDetailsPerson) { consumir(); setFullDetailsPerson(null); return }
         if (arestaSelecionada) { consumir(); setArestaSelecionada(null); return }
         if (selectedPersonId != null) {
@@ -1164,7 +1160,6 @@ export function ArvoreGenealogicaView({
       pessoas,
       selectedPersonId,
       paletaAberta,
-      painelAberto,
       fullDetailsPerson,
       vinculoParaRemover,
       vincularConjuge,
@@ -1387,7 +1382,7 @@ export function ArvoreGenealogicaView({
 
       {/* BARRA ÚNICA — a ÚNICA linha de ferramentas acima do canvas. À esquerda,
           Paisagem/Retrato e os controles de linhagem (visualização, requerente,
-          foco, filtros, Saúde, Comparar); à direita, Buscar, Importar, Análise,
+          foco, filtros, Saúde, Comparar); à direita, Buscar, Importar,
           PDF (com o idioma dentro), tela cheia e a lixeira. Em largura estreita a
           linha QUEBRA — os rótulos somem e ficam os ícones — e nunca cria rolagem
           horizontal da página. Resumo, legenda da Saúde e trilha da linhagem não
@@ -1475,24 +1470,6 @@ export function ArvoreGenealogicaView({
             </button>
           )}
           {botaoImportar(CLASSE_BOTAO_BARRA, "hidden @[1500px]:inline")}
-          {pessoas.length > 0 && (
-            <button
-              onClick={() => setPainelAberto(true)}
-              title="Inteligência da árvore"
-              aria-label="Inteligência da árvore"
-              className={CLASSE_BOTAO_BARRA}
-            >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden @[1500px]:inline">Análise</span>
-              {/* Contagem só dos achados que exigem ação — número no botão que não
-                  significa urgência vira ruído e o usuário para de olhar. */}
-              {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
-                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] font-semibold text-red-600">
-                  {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
-                </span>
-              )}
-            </button>
-          )}
 
           {/* PDF — o idioma do PDF mora DENTRO do botão (menu): nasce no idioma
               do país do processo (cadastro), e o operador troca quando o
@@ -1646,18 +1623,6 @@ export function ArvoreGenealogicaView({
 
         {modalImportar}
 
-        <PainelInteligencia
-          analise={analise}
-          aberto={painelAberto}
-          onFechar={() => setPainelAberto(false)}
-          onIrParaPessoa={localizarPessoa}
-          nomeDePessoa={nomeDePessoa}
-          perguntas={operacional.perguntas}
-          indicadores={operacional.indicadores}
-          onCriarTarefa={abrirCriarTarefa}
-          rascunhoDoPasso={operacional.rascunhoDoPasso}
-          onAbrirTarefa={abrirTarefaNaCentral}
-        />
         {rascunhoTarefa && (
           <CriarTarefaModal
             rascunho={rascunhoTarefa}

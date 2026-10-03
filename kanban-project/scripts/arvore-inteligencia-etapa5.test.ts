@@ -262,15 +262,13 @@ secao("(c) criar tarefa: rascunho, idempotência por ID e porta canônica")
   ok(/LAYER\.aboveProcessDrawer/.test(mod) && !/z-\[\d+\]/.test(mod), "camada vem de layers.ts (acima do painel de Inteligência)")
   ok(/atribuiveis/.test(mod) && /pode\(["']tarefas\.editar["']\)/.test(mod), "responsável opcional só para quem distribui (mesma rota do seletor de Atribuir)")
 
-  const usos = ["src/components/arvore/arvore-genealogica-view.tsx", "src/components/arvore/inteligencia/painel-inteligencia.tsx", "src/components/arvore/inteligencia/cartoes-flutuantes.tsx", "src/components/arvore/pessoa-sidebar.tsx", "src/components/arvore/fila-da-pessoa.tsx", "src/components/arvore/inteligencia/use-arvore-operacional.ts"]
+  const usos = ["src/components/arvore/arvore-genealogica-view.tsx", "src/components/arvore/inteligencia/cartoes-flutuantes.tsx", "src/components/arvore/pessoa-sidebar.tsx", "src/components/arvore/fila-da-pessoa.tsx", "src/components/arvore/inteligencia/use-arvore-operacional.ts"]
   const quemChamaPorta = usos.filter((f) => /api\/tarefas\/manual/.test(codigo(ler(f))))
   ok(quemChamaPorta.length === 0, "só o modal chama a porta — nenhuma outra tela da árvore escreve em Tarefa", quemChamaPorta)
 
   const view = codigo(ler("src/components/arvore/arvore-genealogica-view.tsx"))
   ok(/pode\(['"]tarefas\.criar['"]\)\s*\?\s*setRascunhoTarefa\s*:\s*undefined/.test(view), "sem a permissão tarefas.criar o handler não existe (e portanto o botão também não)")
   ok(/<CriarTarefaModal/.test(view) && /onCriada/.test(view) && /invalidar\(`\/api\/processos\/\$\{processoId\}\/genealogia\/operacional`\)/.test(view), "criar tarefa invalida os fatos operacionais (a fila enxerga a tarefa nova)")
-  const painel = codigo(ler("src/components/arvore/inteligencia/painel-inteligencia.tsx"))
-  ok((painel.match(/data-criar-tarefa/g) ?? []).length >= 2 && /rascunhoDoPasso\(passo\)/.test(painel) && /onCriarTarefa &&|onCriarTarefa\s*&&\s*rascunhoDoPasso/.test(painel), "painel: 'Criar tarefa' em cada próximo passo e em documento sem tarefa, só com permissão")
   ok(/data-criar-tarefa/.test(codigo(ler("src/components/arvore/inteligencia/cartoes-flutuantes.tsx"))), "cartão: 'Criar tarefa' na próxima ação")
 
   // Porta: a chave de origem chega ao dono e NÃO vira chaveIdempotencia (gates de fase tratam "tem chave" como tarefa do motor).
@@ -324,10 +322,6 @@ secao("(d) consistência entre painéis: um módulo, mesmos números")
 
 {
   // Varredura de fonte: ninguém recalcula.
-  const painel = codigo(ler("src/components/arvore/inteligencia/painel-inteligencia.tsx"))
-  ok(!/qualidade\??\.(score|completude|consistencia|coberturaLinha)\b/.test(painel), "painel de Inteligência não lê os números de qualidade soltos — lê a Medida")
-  ok(/indicadores\.divergencias|indicadores\?\.divergencias/.test(painel) || /indicadores &&/.test(painel), "painel lê as divergências de indicadores")
-  ok(!/\.reduce\(|\.filter\(.*categoria|Object\.values\(analise\.totais\)/.test(painel), "painel não soma nem filtra achados por conta própria")
   const cartao = codigo(ler("src/components/arvore/inteligencia/cartoes-flutuantes.tsx"))
   ok(/resumo\.divergencias/.test(cartao) && !/\.reduce\(|analise\./.test(cartao), "cartão só exibe o que o resumo (indicadores) entrega")
   const hook = codigo(ler("src/components/arvore/inteligencia/use-arvore-operacional.ts"))
