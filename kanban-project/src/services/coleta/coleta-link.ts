@@ -11,7 +11,7 @@
 import { randomBytes } from "crypto"
 import type { ColetaLink } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { ehFaseAguardandoFechamento } from "@/src/lib/process-stage/fase-pre-contrato"
+import { ehFaseAguardandoFechamento, ROTULO_AGUARDANDO_FECHAMENTO } from "@/src/lib/process-stage/fase-pre-contrato"
 
 export type MotivoEncerramento = "FASE_MUDOU" | "MANUAL" | "CONFERENCIA"
 
@@ -54,7 +54,7 @@ export async function gerarLinkDeColeta(processoId: number, usuarioId: number | 
   const processo = await prisma.processo.findUnique({ where: { id: processoId }, select: { id: true, faseAtualKey: true } })
   if (!processo) return { ok: false, code: "PROCESSO_NAO_ENCONTRADO", message: "Processo não encontrado." }
   if (!processoAceitaColeta(processo.faseAtualKey)) {
-    return { ok: false, code: "FASE_NAO_PERMITE", message: 'O link de coleta só pode ser gerado com o processo em "Aguardando fechamento".' }
+    return { ok: false, code: "FASE_NAO_PERMITE", message: `O link de coleta só pode ser gerado com o processo em “${ROTULO_AGUARDANDO_FECHAMENTO}”.` }
   }
   const existente = await linkAtivoDoProcesso(processoId)
   if (existente) return { ok: true, link: existente, jaExistia: true }

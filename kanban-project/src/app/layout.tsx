@@ -5,6 +5,7 @@ import "./globals.css";
 import { SidebarWrapper } from "@/src/components/sidebar-wrapper";
 import { Providers } from "@/src/components/providers";
 import { Toaster } from "@/components/ui/toaster";
+import { ConferenciaColetaHost } from "@/src/components/kanban/ConferenciaColetaHost";
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
 // IDENTIDADE BITRIX (14-15/09/2026): Inter é a fonte mais próxima, sem ter o
@@ -43,6 +44,7 @@ export default async function RootLayout({
             {children}
           </SidebarWrapper>
             <Toaster />
+            <ConferenciaColetaHost />
         </Providers>
         <SpeedInsights />
       </body>

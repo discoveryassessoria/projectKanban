@@ -22,6 +22,7 @@ import {
 } from "@/src/lib/coleta/campos"
 import { copiarParaAnexoDeCliente, apagarObjetoColeta } from "./storage-coleta"
 import { linkAtivoDoProcesso } from "./coleta-link"
+import { REATIVAR_VINCULO_PROCESSO } from "@/src/lib/genealogia/vinculo-ativo"
 
 // ── LEITURA ─────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ async function garantirRequerente(tx: Tx, processoId: number, d: DadosColeta): P
   const id = existente ? existente.id : (await tx.requerente.create({ data: dadosParaCadastro(d), select: { id: true } })).id
   const vinculo = await tx.processoRequerente.findUnique({ where: { processoId_requerenteId: { processoId, requerenteId: id } } })
   if (!vinculo) await tx.processoRequerente.create({ data: { processoId, requerenteId: id } })
-  else if (vinculo.removidoEm) await tx.processoRequerente.update({ where: { processoId_requerenteId: { processoId, requerenteId: id } }, data: { removidoEm: null, removidoPorId: null, motivoRemocao: null } })
+  else if (vinculo.removidoEm) await tx.processoRequerente.update({ where: { processoId_requerenteId: { processoId, requerenteId: id } }, data: REATIVAR_VINCULO_PROCESSO })
   return { id, reaproveitou: Boolean(existente) }
 }
 

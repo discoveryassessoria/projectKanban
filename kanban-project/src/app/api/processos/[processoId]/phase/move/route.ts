@@ -52,6 +52,8 @@ const CODIGO_API: Record<string, string> = {
   // configuração ausente. Caía em INTERNAL_ERROR/500 antes; a tela mostrava
   // "erro interno" para um problema que é do cadastro, não do código.
   INSTANCIACAO_FALHOU: "PHASE_NOT_CONFIGURED",
+  // Coleta de dados: há pré-cadastro pendente de conferência (a tela abre a conferência e repete a ação).
+  CONFERENCIA_PENDENTE: "COLETA_CONFERENCE_PENDING",
 }
 
 const STATUS_POR_CODIGO: Record<string, number> = {
@@ -67,6 +69,7 @@ const STATUS_POR_CODIGO: Record<string, number> = {
   CONCURRENT_MODIFICATION: 409,
   MIGRATION_NOT_READY: 409,
   PHASE_NOT_CONFIGURED: 422,
+  COLETA_CONFERENCE_PENDING: 409,
   INTERNAL_ERROR: 500,
 }
 

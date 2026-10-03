@@ -31,6 +31,11 @@ interface Props {
   onChange: (valor: string) => void
   disabled?: boolean
   className?: string
+  /**
+   * Buscar os nomes dos países na base (rota autenticada). `false` na página PÚBLICA de coleta:
+   * sem login não há como chamar a rota, e os nomes vêm do navegador.
+   */
+  usarBase?: boolean
 }
 
 interface ItemPais { iso: string; nome: string; ddi: string }
@@ -45,8 +50,8 @@ function nomeDoNavegador(iso: string): string {
   }
 }
 
-export function TelefoneInput({ value, onChange, disabled = false, className }: Props) {
-  const base = useApi<{ paises?: Array<{ codigo: string; nome: string }> }>(disabled ? null : "/api/geografia/paises")
+export function TelefoneInput({ value, onChange, disabled = false, className, usarBase = true }: Props) {
+  const base = useApi<{ paises?: Array<{ codigo: string; nome: string }> }>(disabled || !usarBase ? null : "/api/geografia/paises")
   const [aberto, setAberto] = useState(false)
   const [busca, setBusca] = useState("")
   const [escolhido, setEscolhido] = useState<string | null>(null)
