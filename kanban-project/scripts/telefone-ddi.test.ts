@@ -5,6 +5,7 @@
 //
 //   npx tsx scripts/telefone-ddi.test.ts
 // ============================================================================
+import { readFileSync } from "node:fs"
 import countriesI18n from "i18n-iso-countries"
 import { DDI_DO_PAIS, PAIS_PADRAO_DO_DDI, PAISES_COM_MASCARA } from "@/src/lib/telefone/ddi"
 import {
@@ -73,6 +74,12 @@ ok(formatTelefone("19984412070") === "+55 (19) 98441-2070", "sem '+' prefixa +55
 ok(formatTelefone("+15551234567") === "+1 (555) 123-4567", "+1")
 ok(formatTelefone("+34612345678") === "+34 612 345 678", "+34")
 ok(formatTelefone("+") === "+", "'+' sozinho")
+
+secao("Rota da lista de países: quem edita dados lê")
+const rota = readFileSync("src/app/api/geografia/paises/route.ts", "utf8").replace(/\/\/.*$/gm, "")
+ok(/arvore\.editar_documento/.test(rota) && /clientes\.editar/.test(rota), "aceita árvore (editar documento) OU clientes (editar dados)")
+ok(/401/.test(rota) && /403/.test(rota), "sem login 401; sem nenhuma das duas permissões 403")
+ok(!/clientes\.ver/.test(rota), "só quem EDITA: ver clientes não basta")
 
 console.log(`\n${passou + falhou} verificações · ${falhou === 0 ? "OK ✅" : "FALHOU ❌"}`)
 process.exit(falhou === 0 ? 0 : 1)

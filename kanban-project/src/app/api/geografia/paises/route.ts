@@ -5,11 +5,17 @@
 // base local — nunca uma chamada externa por tecla.
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { temPermissao } from "@/src/lib/permissoes"
 
 export async function GET(req: NextRequest) {
-  const erro = await verificarPermissao(req, "arvore.editar_documento")
-  if (erro) return erro
+  // Lê quem pode EDITAR dados: a Árvore (documento/país de nascimento) e o cadastro
+  // de clientes (seletor de DDI do telefone). Basta uma das duas.
+  const usuario = await extrairUsuarioComPermissoes(req)
+  if (!usuario) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+  if (!temPermissao(usuario.permissoes, "arvore.editar_documento") && !temPermissao(usuario.permissoes, "clientes.editar")) {
+    return NextResponse.json({ error: "Sem permissão para esta ação" }, { status: 403 })
+  }
 
   const q = req.nextUrl.searchParams.get("q")?.trim().toLowerCase() ?? ""
 
