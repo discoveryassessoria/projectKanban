@@ -54,7 +54,7 @@ import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
-import { CampoCidadeNascimento, CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
+import { CampoCidadeNascimento, CampoEstadoNascimento, CampoNacionalidade, CampoPaisNascimento, SeloMaioridade, useNascimentoPessoa } from "./campos-nascimento"
 import { maioridadeEhManual, marcadorRequerenteParaGravar } from "@/src/lib/documentos/maioridade"
 import { DocumentosExigidosCampo, TEXTO_PRECISA_DOCUMENTACAO } from "./documentos-exigidos-campo"
 import { CODIGOS_DOCUMENTOS_EXIGIVEIS, deveEnviarDocumentosExigidos, marcadosParaTela, rotuloDaLista, situacaoDosDocumentosMarcados, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
@@ -1896,7 +1896,7 @@ function AddPersonModal({
   const [sexo, setSexo] = useState<string>('')
   const [dataNasc, setDataNasc] = useState('')
   // País → cidade (autocomplete) → nacionalidade (gentílico) vivem juntos: ver campos-nascimento.tsx.
-  const { pais: paisNasc, setPais: setPaisNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
+  const { pais: paisNasc, setPais: setPaisNasc, estado: estadoNasc, setEstado: setEstadoNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
     useNascimentoPessoa({ pais: '', cidade: '', nacionalidade: '' })
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState('')
@@ -1999,6 +1999,7 @@ function AddPersonModal({
         sexo: sexo || null,
         data_nasc: dataNasc ? new Date(dataNasc).toISOString() : null,
         local_nasc: localNasc.trim() || null,
+        estado_nasc: estadoNasc.trim() || null,
         pais_nasc: paisNasc.trim() || null,
         nacionalidade: nacionalidade.trim() || null,
         vivo: !isFalecido,
@@ -2226,8 +2227,12 @@ function AddPersonModal({
                 <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado de Nascimento</label>
+                <CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} />
+              </div>
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
+                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} uf={estadoNasc} inputClass={inputClass} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
@@ -2381,8 +2386,8 @@ function EditPersonModal({
   const [sexo, setSexo] = useState(pessoa.sexo || '')
   const [dataNasc, setDataNasc] = useState(pessoa.data_nasc ? new Date(pessoa.data_nasc).toISOString().split('T')[0] : '')
   // Nacionalidade já gravada diferente do gentílico do país conta como escolha manual e é preservada.
-  const { pais: paisNasc, setPais: setPaisNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
-    useNascimentoPessoa({ pais: pessoa.pais_nasc || '', cidade: pessoa.local_nasc || '', nacionalidade: pessoa.nacionalidade || '' })
+  const { pais: paisNasc, setPais: setPaisNasc, estado: estadoNasc, setEstado: setEstadoNasc, cidade: localNasc, setCidade: setLocalNasc, nacionalidade, setNacionalidade } =
+    useNascimentoPessoa({ pais: pessoa.pais_nasc || '', estado: pessoa.estado_nasc || '', cidade: pessoa.local_nasc || '', nacionalidade: pessoa.nacionalidade || '' })
   const [isFalecido, setIsFalecido] = useState(pessoa.vivo === false || !!pessoa.data_obito)
   const [dataObito, setDataObito] = useState(pessoa.data_obito ? new Date(pessoa.data_obito).toISOString().split('T')[0] : '')
   const [localObito, setLocalObito] = useState(pessoa.local_emigracao || '')
@@ -2631,6 +2636,7 @@ function EditPersonModal({
           sexo: sexo || null,
           data_nasc: dataNasc ? new Date(dataNasc).toISOString() : null,
           local_nasc: localNasc.trim() || null,
+          estado_nasc: estadoNasc.trim() || null,
           pais_nasc: paisNasc.trim() || null,
           nacionalidade: nacionalidade.trim() || null,
           vivo: !isFalecido,
@@ -2838,9 +2844,13 @@ function EditPersonModal({
                 <label className="block text-sm font-medium text-gray-700 mb-1">País de Nascimento</label>
                 <CampoPaisNascimento value={paisNasc} onChange={setPaisNasc} inputClass={inputClass} />
               </div>
+              <div data-campo="estado_nasc">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Estado de Nascimento</label>
+                <CampoEstadoNascimento value={estadoNasc} onChange={setEstadoNasc} pais={paisNasc} inputClass={inputClass} />
+              </div>
               <div data-campo="cidade_nasc">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Cidade de Nascimento</label>
-                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} inputClass={inputClass} />
+                <CampoCidadeNascimento value={localNasc} onChange={setLocalNasc} pais={paisNasc} uf={estadoNasc} inputClass={inputClass} />
               </div>
               <div data-campo="nacionalidade">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nacionalidade</label>
