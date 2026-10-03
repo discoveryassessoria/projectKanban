@@ -42,6 +42,7 @@ import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as C
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
 import { AcessoAppTab } from "./contratantesComponents/AcessoAppTab"
 import { DocumentosGeradosTab } from "./contratantesComponents/DocumentosGeradosTab"
+import { TelefoneInput } from "./telefone-input"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { useIsClient } from "@/src/lib/cliente"
 
@@ -700,133 +701,6 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
     return value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 15)
   }
 
-  // Formatar telefone
-  const formatTelefone = (value: string) => {
-    let cleaned = value.replace(/[^\d+]/g, '')
-    
-    if (cleaned && !cleaned.startsWith('+')) {
-      cleaned = '+55' + cleaned
-    }
-    
-    if (cleaned === '+') return '+'
-    
-    const digits = cleaned.slice(1)
-    if (!digits) return '+'
-    
-    // Brasil +55
-    if (digits.startsWith('55')) {
-      const number = digits.slice(2)
-      if (number.length === 0) return '+55'
-      if (number.length <= 2) return `+55 (${number}`
-      const ddd = number.slice(0, 2)
-      const rest = number.slice(2)
-      if (rest.length === 0) return `+55 (${ddd})`
-      if (rest.length <= 5) return `+55 (${ddd}) ${rest}`
-      if (rest.length <= 9) {
-        if (rest.length === 9) {
-          return `+55 (${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`
-        } else if (rest.length === 8) {
-          return `+55 (${ddd}) ${rest.slice(0, 4)}-${rest.slice(4)}`
-        }
-        return `+55 (${ddd}) ${rest}`
-      }
-      const maxRest = rest.slice(0, 9)
-      return `+55 (${ddd}) ${maxRest.slice(0, 5)}-${maxRest.slice(5)}`
-    }
-    
-    // EUA/Canadá +1
-    if (digits.startsWith('1')) {
-      const number = digits.slice(1)
-      if (number.length === 0) return '+1'
-      if (number.length <= 3) return `+1 (${number}`
-      const areaCode = number.slice(0, 3)
-      const rest = number.slice(3)
-      if (rest.length === 0) return `+1 (${areaCode})`
-      if (rest.length <= 3) return `+1 (${areaCode}) ${rest}`
-      if (rest.length <= 7) {
-        return `+1 (${areaCode}) ${rest.slice(0, 3)}-${rest.slice(3)}`
-      }
-      const maxRest = rest.slice(0, 7)
-      return `+1 (${areaCode}) ${maxRest.slice(0, 3)}-${maxRest.slice(3)}`
-    }
-    
-    // Portugal +351
-    if (digits.startsWith('351')) {
-      const number = digits.slice(3)
-      if (number.length === 0) return '+351'
-      if (number.length <= 3) return `+351 ${number}`
-      if (number.length <= 6) return `+351 ${number.slice(0, 3)} ${number.slice(3)}`
-      if (number.length <= 9) return `+351 ${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`
-      const maxNum = number.slice(0, 9)
-      return `+351 ${maxNum.slice(0, 3)} ${maxNum.slice(3, 6)} ${maxNum.slice(6)}`
-    }
-    
-    // Espanha +34
-    if (digits.startsWith('34')) {
-      const number = digits.slice(2)
-      if (number.length === 0) return '+34'
-      if (number.length <= 3) return `+34 ${number}`
-      if (number.length <= 6) return `+34 ${number.slice(0, 3)} ${number.slice(3)}`
-      if (number.length <= 9) return `+34 ${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`
-      const maxNum = number.slice(0, 9)
-      return `+34 ${maxNum.slice(0, 3)} ${maxNum.slice(3, 6)} ${maxNum.slice(6)}`
-    }
-    
-    // Itália +39
-    if (digits.startsWith('39')) {
-      const number = digits.slice(2)
-      if (number.length === 0) return '+39'
-      if (number.length <= 3) return `+39 ${number}`
-      if (number.length <= 6) return `+39 ${number.slice(0, 3)} ${number.slice(3)}`
-      if (number.length <= 10) return `+39 ${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6)}`
-      const maxNum = number.slice(0, 10)
-      return `+39 ${maxNum.slice(0, 3)} ${maxNum.slice(3, 6)} ${maxNum.slice(6)}`
-    }
-    
-    // Alemanha +49
-    if (digits.startsWith('49')) {
-      const number = digits.slice(2)
-      if (number.length === 0) return '+49'
-      if (number.length <= 4) return `+49 ${number}`
-      if (number.length <= 11) return `+49 ${number.slice(0, 4)} ${number.slice(4)}`
-      const maxNum = number.slice(0, 11)
-      return `+49 ${maxNum.slice(0, 4)} ${maxNum.slice(4)}`
-    }
-    
-    // França +33
-    if (digits.startsWith('33')) {
-      const number = digits.slice(2)
-      if (number.length === 0) return '+33'
-      if (number.length <= 1) return `+33 ${number}`
-      if (number.length <= 3) return `+33 ${number.slice(0, 1)} ${number.slice(1)}`
-      if (number.length <= 5) return `+33 ${number.slice(0, 1)} ${number.slice(1, 3)} ${number.slice(3)}`
-      if (number.length <= 7) return `+33 ${number.slice(0, 1)} ${number.slice(1, 3)} ${number.slice(3, 5)} ${number.slice(5)}`
-      if (number.length <= 9) return `+33 ${number.slice(0, 1)} ${number.slice(1, 3)} ${number.slice(3, 5)} ${number.slice(5, 7)} ${number.slice(7)}`
-      const maxNum = number.slice(0, 9)
-      return `+33 ${maxNum.slice(0, 1)} ${maxNum.slice(1, 3)} ${maxNum.slice(3, 5)} ${maxNum.slice(5, 7)} ${maxNum.slice(7)}`
-    }
-    
-    // Argentina +54
-    if (digits.startsWith('54')) {
-      const number = digits.slice(2)
-      if (number.length === 0) return '+54'
-      if (number.length <= 2) return `+54 ${number}`
-      if (number.length <= 6) return `+54 ${number.slice(0, 2)} ${number.slice(2)}`
-      if (number.length <= 10) return `+54 ${number.slice(0, 2)} ${number.slice(2, 6)} ${number.slice(6)}`
-      const maxNum = number.slice(0, 10)
-      return `+54 ${maxNum.slice(0, 2)} ${maxNum.slice(2, 6)} ${maxNum.slice(6)}`
-    }
-    
-    // Para qualquer outro DDI - formatação genérica
-    if (digits.length <= 3) return `+${digits}`
-    if (digits.length <= 6) return `+${digits.slice(0, 3)} ${digits.slice(3)}`
-    if (digits.length <= 9) return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6)}`
-    if (digits.length <= 12) return `+${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)} ${digits.slice(9)}`
-    
-    // Limita a 15 dígitos (padrão E.164)
-    const maxDigits = digits.slice(0, 15)
-    return `+${maxDigits.slice(0, 3)} ${maxDigits.slice(3, 6)} ${maxDigits.slice(6, 9)} ${maxDigits.slice(9, 12)} ${maxDigits.slice(12)}`
-  }
 
   // Formatar CEP brasileiro
   const formatCEPBrasil = (value: string) => {
@@ -1389,13 +1263,10 @@ style={{
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
-                      <Input
+                      <TelefoneInput
                         value={formData.telefone}
-                        onChange={(e) => setFormData({ ...formData, telefone: formatTelefone(e.target.value) })}
-                        placeholder="+55 (11) 99999-9999"
-                        maxLength={25}
+                        onChange={(telefone) => setFormData({ ...formData, telefone })}
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>

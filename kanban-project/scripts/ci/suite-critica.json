@@ -396,6 +396,7 @@
   "scripts/arvore-fila-etapa4.test.ts",
   "scripts/arvore-inteligencia-etapa5.test.ts",
   "scripts/arvore-criar-tarefa-etapa5.test.ts",
+  "scripts/telefone-ddi.test.ts",
   "scripts/arvore-vincular-conjuges-etapa4.test.ts",
   "scripts/arvore-pessoa-repetida-etapa6.test.ts",
   "scripts/arvore-pessoa-repetida-rota-etapa6.test.ts",
