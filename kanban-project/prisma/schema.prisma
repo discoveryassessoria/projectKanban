@@ -37,6 +37,8 @@ model Usuario {
   fasesCriadas           PhaseWorkflowInstance[] @relation("FaseCriadaPor")
   fasesRegularizadas     PhaseWorkflowInstance[] @relation("FaseRegularizadaPor")
   processosRegularizados Processo[]              @relation("ProcessoRegularizadoPor")
+  coletaLinksCriados     ColetaLink[]            @relation("ColetaLinkCriadoPor")
+  coletaEnviosDecididos  ColetaEnvio[]           @relation("ColetaEnvioDecididoPor")
 
   lotesRegistrais           LoteRegistral[]             @relation("LoteRegistralAutor")
   fatosRegistraisAfirmados  FatoRegistral[]             @relation("FatoRegistralResponsavel")
@@ -540,6 +542,8 @@ model Processo {
   motivoCadastroEmAndamento   String?                  @db.Text
   contratantes                ProcessoContratante[]
   requerentes                 ProcessoRequerente[]
+  /// Link público de coleta de dados do cliente (pré-cadastro) — docs/coleta-de-dados-mandato.md
+  coletaLinks                 ColetaLink[]
   receitas                    Receita[]
   recibos                     Recibo[]
   tarefas                     Tarefa[]
@@ -850,6 +854,7 @@ model Contratante {
 
   // MODELOS DOCUMENTAIS — documentos gerados em que este cliente é OUTORGANTE.
   documentosGerados DocumentoGerado[]
+  coletaEnvios      ColetaEnvio[]
 
   @@index([personId])
 }
@@ -898,6 +903,7 @@ model Requerente {
 
   // MODELOS DOCUMENTAIS — documentos gerados em que este cliente é OUTORGANTE.
   documentosGerados DocumentoGerado[]
+  coletaEnvios      ColetaEnvio[]
 }
 
 /// PROTOCOLIZAÇÃO — ocorrência operacional realizada DENTRO do processo.
@@ -9035,4 +9041,99 @@ model CartorioSyncRun {
 
   @@index([startedAt])
   @@index([status])
+}
+
+// ============================================================================
+// COLETA DE DADOS DO CLIENTE — link público por processo (pré-cadastro).
+// Mandato: docs/coleta-de-dados-mandato.md. NADA aqui é cadastro oficial: o que o
+// cliente envia só vira Requerente/Contratante na CONFERÊNCIA (saída de
+// "Aguardando fechamento"), e nunca cria Pessoa nem toca a árvore.
+// ============================================================================
+
+/// Link público de coleta. UM ativo por processo; vale enquanto o processo está
+/// em `a_iniciar` e `encerradoEm` é nulo.
+model ColetaLink {
+  id         Int      @id @default(autoincrement())
+  /// Código aleatório e longo da URL pública (sem login).
+  codigo     String   @unique @db.VarChar(64)
+  processoId Int
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("ColetaLinkCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoEm    DateTime @default(now())
+
+  encerradoEm        DateTime?
+  /// FASE_MUDOU | MANUAL | CONFERENCIA — vocabulário fechado, conferido na porta.
+  motivoEncerramento String?   @db.VarChar(20)
+  encerradoPorId     Int?
+
+  envios ColetaEnvio[]
+
+  @@index([processoId])
+}
+
+/// Uma pessoa enviada pelo cliente. `cpf` e `dados` são apagados na purga de 30
+/// dias dos DESCARTADOS (fica só o registro de que houve o envio).
+model ColetaEnvio {
+  id     Int        @id @default(autoincrement())
+  linkId Int
+  link   ColetaLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  /// Só dígitos — chave do reenvio (um envio por CPF por link).
+  cpf   String? @db.VarChar(11)
+  /// Campos do formulário (mesmos do cadastro de cliente).
+  dados Json?
+
+  /// REQUERENTE | CONTRATANTE | AMBOS — o que o cliente declarou.
+  papel               String   @db.VarChar(20)
+  consentimentoEm     DateTime
+  consentimentoVersao String   @db.VarChar(20)
+  /// Só o hash do IP (limite de envios e auditoria; nunca o IP cru).
+  ipHash              String?  @db.VarChar(64)
+
+  /// PENDENTE | CONFIRMADO | DESCARTADO
+  status       String    @default("PENDENTE") @db.VarChar(12)
+  reenvios     Int       @default(0)
+  reenviadoEm  DateTime?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  decididoEm      DateTime?
+  decididoPorId   Int?
+  decididoPor     Usuario?  @relation("ColetaEnvioDecididoPor", fields: [decididoPorId], references: [id], onDelete: SetNull)
+  /// O papel que o administrador confirmou (pode diferir do declarado).
+  papelConfirmado String?   @db.VarChar(20)
+
+  /// Os dois ids guardados quando o papel é AMBOS — servirão para unir os cadastros
+  /// quando existir o cadastro único de cliente.
+  requerenteId  Int?
+  requerente    Requerente?  @relation(fields: [requerenteId], references: [id], onDelete: SetNull)
+  contratanteId Int?
+  contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: SetNull)
+
+  purgadoEm DateTime?
+
+  arquivos ColetaArquivo[]
+
+  @@unique([linkId, cpf])
+  @@index([linkId, status])
+}
+
+/// Arquivo do envio, no storage PRIVADO (`privado/coleta/...`): o banco guarda só a
+/// chave; ninguém recebe URL pública.
+model ColetaArquivo {
+  id      Int         @id @default(autoincrement())
+  envioId Int
+  envio   ColetaEnvio @relation(fields: [envioId], references: [id], onDelete: Cascade)
+
+  /// IDENTIDADE (RG ou CNH) | COMPROVANTE_ENDERECO
+  tipo     String   @db.VarChar(24)
+  chave    String   @unique @db.VarChar(300)
+  nome     String   @db.VarChar(200)
+  tamanho  Int
+  mime     String   @db.VarChar(100)
+  criadoEm DateTime @default(now())
+
+  @@index([envioId])
 }

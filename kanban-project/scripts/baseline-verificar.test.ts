@@ -605,6 +605,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20261001100400_categoria_organizacao_rotulo_bola',
   '20261001120000_contato_terceiro_estorno',
   '20261002100000_pessoa_documentos_exigidos',
+  '20261003100000_coleta_dados_cliente',
 ]
 
 const CAMINHO_MANIFESTO = join(RAIZ, 'prisma', 'baseline', 'migrations-absorvidas.json')
