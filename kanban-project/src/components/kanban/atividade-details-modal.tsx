@@ -26,6 +26,9 @@ import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/Processo
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
 import { ProcessoEventos } from "./ProcessoEventos"
+import { ProcessoPreCadastro } from "./ProcessoPreCadastro"
+import { ehFaseAguardandoFechamento } from "@/src/lib/process-stage/fase-pre-contrato"
+import { useApi } from "@/src/lib/dados"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { confirmarExclusaoProcesso } from "@/src/lib/confirmar-exclusao-processo"
 // ✅ NOVO: header de progresso da fase do processo
@@ -100,7 +103,7 @@ function ehItalia(processo: ProcessoWithStatus | Processo | null): boolean {
 }
 
 /** Abas válidas do modal. */
-type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "eventos"
+type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "eventos" | "precadastro"
 
 /**
  * Aba inicial a partir do deep-link. Puro: mesma entrada, mesma saída — era isto que a
@@ -108,7 +111,7 @@ type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV
  * não repetir. Sem efeito, não há o que repetir.
  */
 function abaInicial(initialTab: string | undefined, isItalia: boolean): AbaProcesso {
-  const permitidas: AbaProcesso[] = ["documentos", "central", "arvore", "geral", "faturas", "historico", "eventos"]
+  const permitidas: AbaProcesso[] = ["documentos", "central", "arvore", "geral", "faturas", "historico", "eventos", "precadastro"]
   if (initialTab && (permitidas as string[]).includes(initialTab)) return initialTab as AbaProcesso
   // Protocolo é ocorrência de QUALQUER processo — não é mais exclusivo da Espanha.
   if (initialTab === "protocolos") return "protocolos"
@@ -173,6 +176,12 @@ function ConteudoModal({
   // revalida, em vez de piscar.
   const [phaseRefreshExtra, setPhaseRefreshExtra] = useState(0)
   const phaseRefreshKey = `${activeTab}:${phaseRefreshExtra}`
+
+  // PRÉ-CADASTRO (link de coleta de dados): a aba só existe com o processo em "Aguardando fechamento" e para quem
+  // tem `clientes.criar`. O contador sai da MESMA leitura que a aba usa (mesma chave de cache).
+  const mostrarPreCadastro = Boolean(isOpen && processo && pode('clientes.criar') && ehFaseAguardandoFechamento(processo.faseAtualKey))
+  const preCadastro = useApi<{ pendentes: number }>(mostrarPreCadastro && processo ? `/api/processos/${processo.id}/coleta` : null)
+  const preCadastroPendentes = preCadastro.dados?.pendentes ?? 0
 
   // Modo edição
   const [isEditing, setIsEditing] = useState(false)
@@ -557,6 +566,8 @@ function ConteudoModal({
 
   const tabs = [
     { id: "geral", label: "Geral" },
+    // Pré-cadastro do link de coleta: só enquanto o processo espera o fechamento e só para quem cadastra clientes.
+    ...(mostrarPreCadastro ? [{ id: "precadastro", label: preCadastroPendentes > 0 ? `Pré-cadastro (${preCadastroPendentes})` : "Pré-cadastro" }] : []),
     { id: "central", label: "Central Operacional" },
     ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
     ...(pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
@@ -568,7 +579,7 @@ function ConteudoModal({
 
   // Abas com o Discovery Design System (dark glass/dourado). As demais permanecem
   // no tema claro. Skin only — layout idêntico.
-  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico" || activeTab === "protocolos" || activeTab === "eventos" || activeTab === "arvore"
+  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico" || activeTab === "protocolos" || activeTab === "eventos" || activeTab === "arvore" || activeTab === "precadastro"
 
   const modalContent = (
     <>
@@ -1086,6 +1097,18 @@ function ConteudoModal({
             </div>
           )}
 
+
+          {activeTab === "precadastro" && mostrarPreCadastro && (
+            <div className="h-full min-h-0 overflow-y-auto">
+              <ProcessoPreCadastro processoId={processo.id} />
+            </div>
+          )}
+
+          {activeTab === "precadastro" && !mostrarPreCadastro && (
+            <p className="p-6 text-sm text-[var(--text-secondary)]">
+              O processo saiu de “Aguardando fechamento”: o link de coleta foi encerrado e a conferência já foi feita. Quem entrar agora é cadastrado manualmente.
+            </p>
+          )}
 
           {activeTab === "documentos" && (
             // Mesmo padrão de rolagem das outras abas (central/faturas): sem

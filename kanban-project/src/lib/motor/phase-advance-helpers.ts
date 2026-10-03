@@ -51,6 +51,10 @@ export type AdvanceFailureCode =
   // "obrigação cumprida" não são a mesma coisa. Bloqueia especificamente a
   // entrada em `finalizado` (mandato "Catálogo de Fases", 20/09/2026).
   | "OBRIGACAO_RETROATIVA_PENDENTE"
+  // Saindo de "Aguardando fechamento" com envios do link de coleta de dados ainda
+  // PENDENTES: a conferência (quem entra como cliente) vem ANTES do movimento.
+  // Nada muda; a tela abre a conferência e repete a ação (docs/coleta-de-dados-mandato.md §5).
+  | "CONFERENCIA_PENDENTE"
 
 /** Resultado de sucesso esperado para cada operação (quando há mutação de fato). */
 export function resultadoDaOperacao(op: AdvanceOperacao): Exclude<AdvanceResultadoStr, "BLOQUEADO" | "IDEMPOTENTE" | "CONFLITO"> {

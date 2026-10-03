@@ -92,6 +92,13 @@ const API_PUBLICA: string[] = [
   // Execução das regras da Torre (de hora em hora, Bloco H3, 30/09/2026). Auto-verifica como o
   // anterior; com r1 desligada (padrão) não faz nada.
   "/api/cron/torre-regras",
+  // Retenção da coleta de dados (diária). Auto-verifica: x-vercel-cron ou CRON_SECRET.
+  "/api/cron/coleta-purga",
+  // LINK PÚBLICO DE COLETA DE DADOS (docs/coleta-de-dados-mandato.md): o cliente não tem login. O que
+  // autoriza é o CÓDIGO aleatório do link, conferido em cada handler (inexistente, encerrado e processo
+  // fora de "Aguardando fechamento" respondem IGUAL). Nada daqui devolve dado já enviado. As rotas do
+  // administrador moram em /api/processos/[id]/coleta e continuam exigindo JWT + permissão.
+  "/api/coleta/",
 ]
 
 function isApiPublica(pathname: string): boolean {

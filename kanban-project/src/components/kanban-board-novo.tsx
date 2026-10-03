@@ -38,6 +38,7 @@ import {
   type Requerente,
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { CODIGO_CONFERENCIA_PENDENTE, pedirConferenciaColeta } from "@/src/lib/coleta/conferencia-evento"
 import { useSelecaoEmMassa, BarraDeSelecao } from "@/src/components/ui/selecao-em-massa"
 
 // Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
@@ -356,7 +357,7 @@ export function KanbanBoard({
       prev.map(p => p.id === activeId ? { ...p, faseAtualKey: targetFaseKey! } : p)
     )
 
-    try {
+    const solicitar = async (): Promise<void> => {
       const response = await fetch(`/api/processos/${activeId}/fase`, {
         method: "PUT",
         headers: {
@@ -367,10 +368,27 @@ export function KanbanBoard({
       })
       if (!response.ok) {
         const d = await response.json().catch(() => ({}))
+        // Saindo de "Aguardando fechamento" com pré-cadastro pendente: a conferência abre ANTES do movimento
+        // (a porta única de fase devolveu o código) e, concluída, o mesmo pedido é repetido.
+        if (d.code === CODIGO_CONFERENCIA_PENDENTE) {
+          setLocalProcessos(previousProcessos)
+          pedirConferenciaColeta(Number(activeId), () => {
+            setLocalProcessos((prev) => prev.map((p) => (p.id === activeId ? { ...p, faseAtualKey: targetFaseKey! } : p)))
+            solicitar().catch((e) => {
+              setLocalProcessos(previousProcessos)
+              setAviso((e as Error)?.message || "Não foi possível mover o processo. Tente novamente.")
+            })
+          })
+          return
+        }
         // A mensagem REAL do servidor. O genérico é fallback, não o padrão.
         throw new Error(d.message || d.error || "Não foi possível mover o processo.")
       }
       onRefresh()
+    }
+
+    try {
+      await solicitar()
     } catch (error) {
       console.error("[kanban] avanço de fase recusado:", error)
       setLocalProcessos(previousProcessos)

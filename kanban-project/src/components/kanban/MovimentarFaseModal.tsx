@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AlertTriangle, ArrowRight, Loader2, X } from "lucide-react"
+import { CODIGO_CONFERENCIA_PENDENTE, pedirConferenciaColeta } from "@/src/lib/coleta/conferencia-evento"
 
 interface MotivoMovimentacao {
   codigo: string
@@ -148,6 +149,8 @@ export function MovimentarFaseModal({
     return () => { vivo = false }
   }, [faseAlvo, ctx, processoId])
 
+  // Repetir a confirmação depois da conferência da coleta (a ref evita a auto-referência do callback).
+  const confirmarRef = useRef<() => Promise<void>>(async () => undefined)
   const confirmar = useCallback(async () => {
     if (enviandoRef.current) return
     enviandoRef.current = true
@@ -187,6 +190,8 @@ export function MovimentarFaseModal({
       if (!res.ok || d?.success !== true) {
         // A mensagem REAL do servidor. O genérico só entra se o servidor não disse nada.
         setErro(d?.message || "Não foi possível mover o processo. Tente novamente.")
+        // Pré-cadastro da coleta pendente: abre a conferência e, concluída, repete esta confirmação.
+        if (d?.motorCode === CODIGO_CONFERENCIA_PENDENTE) pedirConferenciaColeta(processoId, () => { void confirmarRef.current() })
         return
       }
       onMovido({ faseAtual: d.faseAtual, faseAtualLabel: d.faseAtualLabel, message: d.message })
@@ -197,6 +202,7 @@ export function MovimentarFaseModal({
       setEnviando(false)
     }
   }, [processoId, faseAlvo, motivoCodigo, justificativa, origem, onMovido, plano])
+  useEffect(() => { confirmarRef.current = confirmar }, [confirmar])
 
   const min = ctx?.justificativa.min ?? 10
   const max = ctx?.justificativa.max ?? 500

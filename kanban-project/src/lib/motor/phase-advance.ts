@@ -33,6 +33,7 @@ import { somarAoAviso, rotuloDaFamilia } from "@/lib/operacional/notificacao-can
 import { urlVisaoGlobalDaFamilia } from "@/lib/operacional/navegacao"
 import { phaseKeyToFaseCode, isProcessoFase } from "@/src/lib/process-stage/fases-catalog"
 import { ehFaseAguardandoFechamento, avancoHumano } from "@/src/lib/process-stage/fase-pre-contrato"
+import { contarEnviosColetaPendentes } from "@/src/services/coleta/coleta-pendentes"
 import { processoParadoPorEscolhaManual } from "@/src/services/genealogia/zero-por-escolha"
 import {
   fotografarObrigacoes,
@@ -302,6 +303,21 @@ interface Plano {
 }
 
 async function executarPlano(p: Plano): Promise<AdvanceResult> {
+  // CONFERÊNCIA DA COLETA DE DADOS — a mesma porta única. Sair de "Aguardando fechamento" com envios do
+  // link público ainda PENDENTES é rejeitado (nada muda): o administrador decide quem entra como cliente
+  // ANTES de o processo ir para Genealogia. Vale para avanço normal, forçado e movimentação manual, e para
+  // qualquer chamador (tela, Torre, script) — nunca silencioso: o código e a mensagem voltam a quem chamou.
+  if (ehFaseAguardandoFechamento(p.faseAtual) && p.novaFaseAtualKey !== p.faseAtual) {
+    const pendentes = await contarEnviosColetaPendentes(p.processoId)
+    if (pendentes > 0) {
+      return {
+        success: false, resultado: "REJEITADO", code: "CONFERENCIA_PENDENTE",
+        message: `Há ${pendentes} pré-cadastro(s) enviado(s) pelo link de coleta aguardando conferência. Confira quem entra como cliente antes de mover o processo.`,
+        faseAtual: p.faseAtual, correlationId: p.correlationId,
+      }
+    }
+  }
+
   // OBRIGAÇÃO RETROATIVA — GATE ÚNICO, para TODO caminho que escreve
   // `Processo.faseAtualKey` (mandato "Catálogo de Fases", continuação 20/09/2026).
   // `executarPlano` é o funil comum de avanço normal, forçado, reabertura, retorno

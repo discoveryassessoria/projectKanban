@@ -39,6 +39,10 @@
     {
       "path": "/api/cron/torre-regras",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/coleta-purga",
+      "schedule": "0 7 * * *"
     }
   ]
 }

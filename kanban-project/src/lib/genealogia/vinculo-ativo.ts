@@ -26,6 +26,13 @@ export const PESSOA_ATIVA = { removidaEm: null } satisfies Prisma.PessoaWhereInp
 /** Vínculo pessoa↔processo que ainda participa da operação. */
 export const VINCULO_PROCESSO_ATIVO = { removidoEm: null } satisfies Prisma.ProcessoRequerenteWhereInput
 
+/**
+ * REATIVAR um vínculo pessoa↔processo removido (limpa a marca de remoção e o motivo). O dono do campo
+ * continua sendo este módulo: quem precisa "voltar" o vínculo (conferência da coleta de dados) usa este
+ * fragmento em vez de escrever o literal.
+ */
+export const REATIVAR_VINCULO_PROCESSO = { removidoEm: null, removidoPorId: null, motivoRemocao: null } satisfies Prisma.ProcessoRequerenteUpdateInput
+
 /** Pessoas ATIVAS de uma árvore. Recorte usado pela materialização e pelo roster. */
 export function pessoasAtivasDaArvore(arvoreId: number): Prisma.PessoaWhereInput {
   return { arvoreId, ...PESSOA_ATIVA }
