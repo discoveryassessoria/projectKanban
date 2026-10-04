@@ -119,6 +119,25 @@ verificado, de propósito, para não abrir esses arquivos. Opções: (A) bucket 
 `privado/` (+ variável nova; migrar o que já existe); (B) regra de bloqueio de `/privado/*` no domínio público
 (Cloudflare, fora do código, não verificável daqui).
 
+### Plano do P0 (aprovado em 04/10/2026, opção A — bucket privado separado)
+
+Condições do usuário: (1) **não ligar** `R2_BUCKET_PRIVADO` na Vercel, não fazer redeploy de ligação e **não apagar
+nada do bucket público** sem aviso explícito em cada passo; (2) a exclusão no público só depois de **24 h de
+observação** e de autorização; (3) os 298 anexos de cliente do bucket público ficam para o bloco seguinte (abaixo).
+
+Ordem: 1) código em modo duplo (sem efeito em produção) → 2) usuário cria bucket + CORS + acesso na Cloudflare;
+sonda com arquivo fictício → 3) copiar e conferir os 43 objetos (`privado/documentos/*`; tamanho + ETag, sem ler
+conteúdo) → 4) ligar a variável + redeploy (só com aviso) → 5) segunda passada de cópia → 6) testes, observação de
+24 h (log `LEITURA_NO_BUCKET_ANTIGO`), exclusão chave a chave do público (só com autorização) → 7) limpeza do plano B.
+Estado: passo 1 em código (regra em `src/lib/r2-buckets.ts`; teste `scripts/r2-bucket-privado-modo-duplo.test.ts`).
+
+### PRÓXIMO BLOCO (depois do P0) — anexos de cliente no bucket público
+
+Hoje 298 objetos em `documentos/` (+1 em `analise-documental/`, +1 em `app-uploads/`) — anexos de cliente (RG, certidões,
+comprovantes) — vivem no bucket PÚBLICO, abertos por quem tiver o endereço. Rotas que escrevem ali:
+`/api/storage/presign` e `/api/app/upload/presign`. Tornar privados exige: gravar em bucket privado, migrar os existentes,
+e mudar todas as telas que hoje abrem `urlArquivo` direto para abrir por URL assinada. Tarefa própria, com proposta antes.
+
 **a) Arquivo enviado sem o formulário concluído.** O navegador sobe o arquivo (URL assinada) ANTES de enviar o
 formulário; se o cliente desiste, o objeto fica em `privado/coleta/<link>/…` sem nenhuma linha no banco. Nada o
 apaga nunca (a purga só olha envios descartados).
