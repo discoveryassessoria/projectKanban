@@ -2,14 +2,16 @@
 //
 // GET /api/financas/fluxo — aba "Fluxo de Caixa", dados REAIS.
 // Constrói a linha do tempo de caixa combinando:
-//   ENTRADAS = ParcelaFinanceira de receita (em aberto ou recebida) por data
-//   SAÍDAS   = ContaPagar por data de vencimento/pagamento
+//   ENTRADAS = motor V3: obrigações A_RECEBER em aberto (por vencimento) + pagamentos recebidos (por data do pagamento)
+//   SAÍDAS   = motor V3: obrigações A_PAGAR em aberto (por vencimento) + pagamentos feitos (por data do pagamento)
+//   Obrigação SEM vencimento não tem dia no calendário: vem à parte em `fontes.semVencimento`, nunca com data inventada.
+//   (o motor antigo — ParcelaFinanceira/ContaPagar — não é mais lido; ver lib/financeiro/leitura/abas-v3.ts)
 // Janela: 90 dias passados + 90 dias futuros.
 // Saldo atual = soma de ContaBancaria.saldoAtual.
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
+import { carregarBaseV3, emAberto, soma } from "@/lib/financeiro/leitura/abas-v3"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 function dias(d: Date) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) }
@@ -25,58 +27,35 @@ export async function GET(req: NextRequest) {
     const ini = new Date(agora); ini.setDate(ini.getDate() - 90)
     const fim = new Date(agora); fim.setDate(fim.getDate() + 90)
 
-    // ETAPA 1A — câmbio da fonte oficial; sem cotação real não se converte.
-    const fx = await carregarFx()
-    const semCotacao: { moeda: string; valor: number }[] = []
-    const toBRL = (v: number, m?: string | null): number => {
-      const c = converterBrl(fx, v, m)
-      if (c == null) { semCotacao.push({ moeda: (m ?? "BRL").toUpperCase(), valor: v }); return 0 }
-      return c
-    }
-
-    const [parcelas, contasPagar, contasBancarias] = await Promise.all([
-      prisma.parcelaFinanceira.findMany({
-        where: { receitaId: { not: null }, vencimento: { gte: ini, lte: fim }, receita: { is: { cancelada: false } } },
-        select: {
-          valor: true, valorBrl: true, vencimento: true, status: true, dataPagamento: true,
-          receita: { select: { descricao: true, moeda: true, processo: { select: { nome: true } } } },
-        },
-      }),
-      prisma.contaPagar.findMany({
-        where: { status: { not: "CANCELADO" }, dataVencimento: { gte: ini, lte: fim } },
-        select: {
-          valor: true, dataVencimento: true, dataPagamento: true, status: true, descricao: true,
-          fornecedor: { select: { nome: true } },
-        },
-      }),
-      prisma.contaBancaria.findMany({ where: { ativo: true }, select: { saldoAtual: true } }),
-    ])
-
+    const base = await carregarBaseV3(agora)
+    const contasBancarias = await prisma.contaBancaria.findMany({ where: { ativo: true }, select: { saldoAtual: true } })
     const saldoAtual = contasBancarias.reduce((a, c) => a + Number(c.saldoAtual), 0)
 
-    // monta eventos unificados
     type Evento = { date: string; entrada: number; saida: number; desc: string; tipo: "in" | "out"; realizado: boolean }
     const eventos: Evento[] = []
+    const nome = (o: { processoNome: string | null; fornecedor: string | null }) => o.processoNome ?? o.fornecedor ?? "Avulso"
+    const porId = new Map(base.obrigacoes.map((o) => [o.obrigacaoId, o]))
+    const naJanela = (d: Date) => d >= ini && d <= fim
 
-    for (const p of parcelas) {
-      const moeda = p.receita?.moeda ?? "BRL"
-      const valorBRL = p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), moeda)
-      const recebida = p.status === "RECEBIDA" || p.status === "PAGA"
-      const dataRef = recebida && p.dataPagamento ? p.dataPagamento : p.vencimento
-      eventos.push({
-        date: iso(dataRef), entrada: valorBRL, saida: 0,
-        desc: `${p.receita?.processo?.nome ?? "Avulso"} · ${p.receita?.descricao ?? "Recebimento"}`,
-        tipo: "in", realizado: recebida,
-      })
+    for (const o of base.obrigacoes) {
+      if (!emAberto(o) || !o.vencimento) continue
+      const v = new Date(o.vencimento)
+      if (!naJanela(v)) continue
+      const desc = `${nome(o)} · ${o.descricao ?? o.codigoOperacional ?? "Lançamento"}`
+      if (o.direcao === "A_RECEBER") eventos.push({ date: iso(v), entrada: o.saldoBrl, saida: 0, desc, tipo: "in", realizado: false })
+      else eventos.push({ date: iso(v), entrada: 0, saida: o.saldoBrl, desc, tipo: "out", realizado: false })
     }
-    for (const c of contasPagar) {
-      const pago = c.status === "PAGO"
-      const dataRef = pago && c.dataPagamento ? c.dataPagamento : c.dataVencimento
-      eventos.push({
-        date: iso(dataRef), entrada: 0, saida: Number(c.valor),
-        desc: `${c.fornecedor?.nome ?? "—"} · ${c.descricao}`,
-        tipo: "out", realizado: pago,
-      })
+    for (const p of base.pagamentos) {
+      if (!naJanela(p.data)) continue
+      const o = porId.get(p.obrigacaoId)
+      const desc = `${o ? nome(o) : "Avulso"} · ${o?.descricao ?? o?.codigoOperacional ?? "Pagamento"}`
+      if (p.direcao === "A_RECEBER") eventos.push({ date: iso(p.data), entrada: p.valorBrl, saida: 0, desc, tipo: "in", realizado: true })
+      else eventos.push({ date: iso(p.data), entrada: 0, saida: p.valorBrl, desc, tipo: "out", realizado: true })
+    }
+    const semVenc = base.obrigacoes.filter((o) => emAberto(o) && !o.vencimento)
+    const semVencimento = {
+      aReceber: { qtd: semVenc.filter((o) => o.direcao === "A_RECEBER").length, totalBRL: soma(semVenc.filter((o) => o.direcao === "A_RECEBER"), (o) => o.saldoBrl) },
+      aPagar: { qtd: semVenc.filter((o) => o.direcao === "A_PAGAR").length, totalBRL: soma(semVenc.filter((o) => o.direcao === "A_PAGAR"), (o) => o.saldoBrl) },
     }
 
     eventos.sort((a, b) => a.date.localeCompare(b.date))
@@ -136,10 +115,12 @@ export async function GET(req: NextRequest) {
       mesLabel: agora.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
       timeline,
       fontes: {
-        cambio: fx.fonte,
-        cambioDataReferencia: fx.dataReferencia,
-        moedasSemCotacao: fx.indisponiveis,
-        naoConvertido: semCotacao,
+        motor: "V3 (ObrigacaoEconomica + OcorrenciaFinanceira)",
+        cambio: base.fx.fonte,
+        cambioDataReferencia: base.fx.dataReferencia,
+        moedasSemCotacao: base.fx.indisponiveis,
+        naoConvertido: base.naoConvertido,
+        semVencimento,
       },
     })
   } catch (e) {
