@@ -222,7 +222,7 @@ export function saudeDaFase(
   return {
     total, ok, atencao: c.atencao, parados: c.parados,
     tempoMedioDias: dados.tempoMedioDias, metaDias: dados.metaDias,
-    acimaDaMeta: dados.tempoMedioDias != null && dados.metaDias != null && dados.metaDias > 0 && dados.tempoMedioDias > dados.metaDias,
+    acimaDaMeta: dados.tempoMedioDias != null && dados.metaDias != null && dados.metaDias > 0 && Math.round(dados.tempoMedioDias) > dados.metaDias, // em dias inteiros, como o funil (`estourouAMeta`)
     barra: { ok: pct1(ok, total), atencao: pct1(c.atencao, total), parados: pct1(c.parados, total) },
     semana: fraseDaSemana(dados.fluxo, dados.rotuloDaFase),
   }

@@ -9,6 +9,7 @@
 // A linha é o RESPONSÁVEL, e as tarefas são agregadas nele. Quem quiser ver as
 // tarefas em si tem o domínio Tarefas, que é o dono delas.
 
+import { inicioDoDiaOperacional } from "@/lib/operacional/tempo-operacional"
 import { prisma } from "@/lib/prisma"
 import type { DominioDef } from "../tipos"
 import { contem, porCampo } from "./_comuns"
@@ -25,10 +26,12 @@ const SELECT = {
 } as const
 
 const ts = (l: any) => l.tarefas ?? []
-const abertas = (l: any) => ts(l).filter((t: any) => !t.concluida)
+// Aberta = não concluída E não cancelada/substituída (a mesma regra da Torre/Operação: cancelada nunca é backlog nem atraso).
+const viva = (t: any) => !t.concluida && t.statusTarefa !== "CANCELADA" && t.statusTarefa !== "SUPERSEDIDA"
+const abertas = (l: any) => ts(l).filter(viva)
 const concluidas = (l: any) => ts(l).filter((t: any) => t.concluida)
 const atrasadas = (l: any) =>
-  abertas(l).filter((t: any) => t.dataPrazo && new Date(t.dataPrazo) < new Date())
+  abertas(l).filter((t: any) => t.dataPrazo && new Date(t.dataPrazo) < inicioDoDiaOperacional(new Date()))
 
 /** Tempo médio de execução das concluídas, em dias. */
 function tempoMedio(l: any): number | null {
@@ -65,10 +68,10 @@ export const DOMINIO_EQUIPE: DominioDef = {
     { key: "tipo", rotulo: "Tipo de usuário", tipo: "texto", paraWhere: contem("tipo") },
     { key: "com_backlog", rotulo: "Com tarefa em aberto", tipo: "booleano",
       paraWhere: (v) => (v.tipo !== "booleano" ? null
-        : v.valor ? { tarefas: { some: { concluida: false } } } : { tarefas: { none: { concluida: false } } }) },
+        : v.valor ? { tarefas: { some: { concluida: false, statusTarefa: { notIn: ["CANCELADA", "SUPERSEDIDA"] } } } } : { tarefas: { none: { concluida: false, statusTarefa: { notIn: ["CANCELADA", "SUPERSEDIDA"] } } } }) },
     { key: "com_atraso", rotulo: "Com tarefa atrasada", tipo: "booleano",
       paraWhere: (v) => (v.tipo !== "booleano" || !v.valor ? null
-        : { tarefas: { some: { concluida: false, dataPrazo: { lt: new Date() } } } }) },
+        : { tarefas: { some: { concluida: false, statusTarefa: { notIn: ["CANCELADA", "SUPERSEDIDA"] }, dataPrazo: { lt: inicioDoDiaOperacional(new Date()) } } } }) },
     { key: "sem_tarefa", rotulo: "Sem nenhuma tarefa", tipo: "booleano",
       paraWhere: (v) => (v.tipo !== "booleano" ? null
         : v.valor ? { tarefas: { none: {} } } : { tarefas: { some: {} } }) },

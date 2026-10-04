@@ -15,5 +15,11 @@ for (const p of ["lib/operacional/tarefa-projecoes.ts", "src/components/operacao
   ok(`${p}: sem new Date().toISOString().slice(0, 10) / agora.toISOString().slice(0, 10)`, !/(new Date\(\)|agora)\.toISOString\(\)\.slice\(0, 10\)/.test(src))
 }
 ok("Home: o bloco pessoal não afirma 'tudo em dia' da empresa", !f("src/components/home/home-content.tsx").includes("Tudo em dia — nenhuma operação exige sua atenção"))
+console.log("Relatórios: atrasada = regra da Torre (dia operacional, sem cancelada)")
+for (const p of ["src/lib/relatorios/motor/dominios/tarefas.ts", "src/lib/relatorios/motor/dominios/equipe.ts"]) {
+  const src = f(p)
+  ok(`${p}: atraso por início do dia operacional e sem CANCELADA/SUPERSEDIDA`, src.includes("inicioDoDiaOperacional(new Date())") && src.includes("SUPERSEDIDA") && !/dataPrazo: \{ lt: new Date\(\) \}/.test(src))
+}
+ok("Saúde da fase compara a meta em dias inteiros, como o funil", f("lib/operacional/torre-fase.ts").includes("Math.round(dados.tempoMedioDias) > dados.metaDias"))
 console.log(`\n${passou} ok, ${falhou} falhas`)
 process.exit(falhou ? 1 : 0)
