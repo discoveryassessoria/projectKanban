@@ -49,17 +49,28 @@ export function permanenciasConcluidas(logs: LogDeFase[]): Permanencia[] {
   return saida
 }
 
-export interface TempoDaFase { mediaDias: number; amostras: number }
+export interface TempoDaFase {
+  mediaDias: number
+  /** Permanências concluídas que entraram na média (um processo que passou duas vezes pela fase conta duas). */
+  amostras: number
+  /**
+   * Quantos PROCESSOS DISTINTOS entraram na média (dois registros do mesmo processo contam 1). É o número que a tela
+   * mostra ao lado da média ("4 dias · 1 processo"), para ninguém ler uma média de um processo como se fosse do funil.
+   * Opcional só por compatibilidade com leitores antigos da rota; sem ele a tela mostra a média sem a amostra.
+   */
+  processos?: number
+}
 
 /** A média por fase (1 casa decimal, como `tempoMedioRealPorFase`). Fase sem permanência concluída não aparece. */
 export function tempoMedioPorFase(perm: Permanencia[]): Record<string, TempoDaFase> {
-  const soma = new Map<string, { somaDias: number; amostras: number }>()
+  const soma = new Map<string, { somaDias: number; amostras: number; processos: Set<number> }>()
   for (const p of perm) {
-    const a = soma.get(p.fase) ?? { somaDias: 0, amostras: 0 }
-    soma.set(p.fase, { somaDias: a.somaDias + p.dias, amostras: a.amostras + 1 })
+    const a = soma.get(p.fase) ?? { somaDias: 0, amostras: 0, processos: new Set<number>() }
+    a.processos.add(p.processoId)
+    soma.set(p.fase, { somaDias: a.somaDias + p.dias, amostras: a.amostras + 1, processos: a.processos })
   }
   const r: Record<string, TempoDaFase> = {}
-  for (const [fase, v] of soma) r[fase] = { mediaDias: Math.round((v.somaDias / v.amostras) * 10) / 10, amostras: v.amostras }
+  for (const [fase, v] of soma) r[fase] = { mediaDias: Math.round((v.somaDias / v.amostras) * 10) / 10, amostras: v.amostras, processos: v.processos.size }
   return r
 }
 
@@ -131,13 +142,22 @@ export function textoDoGargaloNaFrase(g: GargaloDaFase): string {
 // ─── formatação ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 const decimalBR = (n: number) => String(n).replace('.', ',')
 
-/** "12 dias" · "1 dia" · "menos de 1 dia" · "4,1 meses" (só sem meta e a partir de 90 dias) · "—" (sem amostra). */
-export function textoDoTempoMedio(t: TempoDaFase | undefined, meta: number | null): string {
-  if (!t || t.amostras === 0) return '—'
+/** "1 processo" · "3 processos" — o tamanho da amostra ao lado da média. */
+export const textoDaAmostra = (processos: number): string => (processos === 1 ? '1 processo' : `${processos} processos`)
+
+/** A média sem a amostra: "12 dias" · "1 dia" · "menos de 1 dia" · "4,1 meses" (só sem meta e a partir de 90 dias). */
+function textoDaMedia(t: TempoDaFase, meta: number | null): string {
   if (meta == null && t.mediaDias >= DIAS_PARA_MOSTRAR_EM_MESES) return `${decimalBR(Math.round((t.mediaDias / 30) * 10) / 10)} meses`
   const d = Math.round(t.mediaDias)
   if (d < 1) return 'menos de 1 dia'
   return d === 1 ? '1 dia' : `${d} dias`
+}
+
+/** "12 dias · 3 processos" · "4 dias · 1 processo" · "menos de 1 dia · 1 processo" · "—" (sem amostra). */
+export function textoDoTempoMedio(t: TempoDaFase | undefined, meta: number | null): string {
+  if (!t || t.amostras === 0) return '—'
+  const media = textoDaMedia(t, meta)
+  return t.processos != null && t.processos > 0 ? `${media} · ${textoDaAmostra(t.processos)}` : media
 }
 /** "15 dias" · "—" (sem meta cadastrada: nunca uma meta inventada). */
 export const textoDaMeta = (meta: number | null): string => (meta == null ? '—' : meta === 1 ? '1 dia' : `${meta} dias`)
