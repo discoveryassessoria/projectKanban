@@ -18,15 +18,14 @@ import { prisma } from '@/lib/prisma'
 import { FASES, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 import { fasesDoRadar } from './torre-processos'
 import { metasAtivas, resolverMeta } from './torre-metas'
-import { inicioDaSemana } from './torre-tendencias'
-import { ONDE_TAREFA_DE_PROCESSO_NA_TORRE, idsDeProcessosForaDaTorre, contarProcessosAguardandoFechamento } from '@/src/services/processo-pre-contrato'
+import { inicioDaSemana, ONDE_TAREFA_ABERTA_NA_SEMANA, ONDE_TAREFA_FECHADA_NA_SEMANA } from './torre-semana'
+import { idsDeProcessosForaDaTorre, contarProcessosAguardandoFechamento } from '@/src/services/processo-pre-contrato'
 import { RESULTADOS_QUE_MOVEM_DE_FASE } from './metricas-processo'
 import {
   ESCOPO_VAZIO, permanenciasConcluidas, tempoMedioPorFase,
   type DadosDoFunilPorEscopo, type FaseDoCadastro, type RespostaDoFunil, type Permanencia,
 } from './torre-funil-puro'
 
-const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
 // `inicioDaSemana` mora em torre-tendencias.ts (a MESMA de `tendenciasDaTorre`, para "abre/fecha" nunca divergir).
 
@@ -56,8 +55,8 @@ export async function funilDaTorre(agora = new Date()): Promise<RespostaDoFunil>
       where: { resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, fasePretendida: FASE_PROTOCOLADA, criadoEm: { gte: inicio } },
       select: { processoId: true },
     }),
-    prisma.tarefa.findMany({ where: { createdAt: { gte: inicio }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] }, select: { processoId: true } }),
-    prisma.tarefa.findMany({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicio }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] }, select: { processoId: true } }),
+    prisma.tarefa.findMany({ where: ONDE_TAREFA_ABERTA_NA_SEMANA(inicio), select: { processoId: true } }),
+    prisma.tarefa.findMany({ where: ONDE_TAREFA_FECHADA_NA_SEMANA(inicio), select: { processoId: true } }),
     idsDeProcessosForaDaTorre(),
     contarProcessosAguardandoFechamento(),
   ])

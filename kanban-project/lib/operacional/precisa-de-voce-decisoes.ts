@@ -290,3 +290,85 @@ export function contagemPorTipo(itens: Array<{ tipo: string }>): Record<TipoDoPa
   for (const i of itens) if ((TIPOS_DO_PAINEL as readonly string[]).includes(i.tipo)) c[i.tipo as TipoDoPainel] += 1
   return c
 }
+
+// ─── BRIEFING DO DIA — TEXTO PURO ───────────────────────────────────────────
+// Mora AQUI (módulo puro, importável pela tela) para que o Briefing seja montado no CLIENTE com os MESMOS conjuntos que os cartões
+// mostram (país escolhido, "no ritmo" = a classe do funil). Antes ele vinha pronto do servidor, global e com "no ritmo" por outra
+// régua: com país escolhido o botão dizia 0 decisões e o texto 2.
+
+/** O mínimo que o texto lê de cada decisão (qualquer ItemPrecisaDeVoceTorre cabe). */
+export interface ItemParaBriefing { tipo: string; familiaNome: string | null; contexto: Record<string, unknown> }
+
+
+/** A saudação pelo relógio de SÃO PAULO, nunca o do servidor (achado real,
+ * 30/09/2026: em UTC "23h40 de terça" virava "Bom dia" — o servidor não
+ * mora no fuso da operação). Bom dia 5h–12h, boa tarde 12h–18h, boa noite depois. */
+function saudacao(agora: Date): string {
+  const hora = Number(agora.toLocaleString('en-US', { timeZone: FUSO_OPERACIONAL, hour: 'numeric', hourCycle: 'h23' }))
+  if (hora >= 5 && hora < 12) return 'Bom dia'
+  if (hora >= 12 && hora < 18) return 'Boa tarde'
+  return 'Boa noite'
+}
+
+/** Os números do dia que o texto do Briefing cita ALÉM das decisões — todos de leitura real; ausente = a frase correspondente não aparece. */
+export interface ExtrasDoBriefing {
+  nome?: string | null
+  ativos?: number
+  noRitmo?: number
+  fechadasOntem?: number
+  protocoladosOntem?: number
+  vencemHoje?: number
+}
+
+const juntar = (partes: string[]): string => (partes.length <= 1 ? partes[0] ?? '' : `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`)
+const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
+
+/**
+ * O TEXTO DO BRIEFING — a estrutura do protótipo ("Bom dia, <nome>. N processos ativos, M no ritmo. Ontem… Hoje vencem… N decisões
+ * esperam você: …"), com os números REAIS. O que o sistema não mede (gargalo da semana, cobranças a fazer) não é escrito.
+ */
+export function briefingDoDia(itens: ItemParaBriefing[], agora = new Date(), extras: ExtrasDoBriefing = {}): string {
+  const dataFmt = agora.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL, weekday: 'long', day: '2-digit', month: 'long' })
+  const primeiroNome = extras.nome?.trim().split(/\s+/)[0]
+  const abertura = `${saudacao(agora)}${primeiroNome ? `, ${primeiroNome}` : ''}.`
+  if (itens.length === 0) return `${abertura} Hoje, ${dataFmt}: nada precisa de você agora.`
+
+  const frases: string[] = [abertura]
+  if (extras.ativos != null) frases.push(`${pl(extras.ativos, 'processo ativo', 'processos ativos')}${extras.noRitmo != null ? `, ${extras.noRitmo} no ritmo` : ''}.`)
+  if (extras.fechadasOntem != null || extras.protocoladosOntem != null) {
+    const partes: string[] = []
+    if (extras.fechadasOntem != null) partes.push(`a equipe fechou ${certidoes(extras.fechadasOntem)}`)
+    if (extras.protocoladosOntem != null) partes.push(`${pl(extras.protocoladosOntem, 'processo foi protocolado', 'processos foram protocolados')}`)
+    frases.push(`Ontem ${partes.join(' e ')}.`)
+  }
+  if (extras.vencemHoje != null) frases.push(extras.vencemHoje === 1 ? 'Hoje vence 1 prazo.' : `Hoje vencem ${extras.vencemHoje} prazos.`)
+
+  const c = contagemPorTipo(itens)
+  const semDono = itens.filter((i) => i.tipo === 'SEM_DONO')
+  const detalhes: string[] = []
+  if (c.SEM_DONO > 0) {
+    const grandes = semDono
+      .filter((i) => i.familiaNome)
+      .map((i) => ({ familia: i.familiaNome as string, n: Array.isArray(i.contexto.tarefaIds) ? (i.contexto.tarefaIds as number[]).length : 1 }))
+      .sort((a, b) => b.n - a.n).slice(0, 2)
+    const concentram = grandes.length >= 2
+      ? ` (${grandes[0].familia} e ${grandes[1].familia} concentram ${grandes[0].n + grandes[1].n})`
+      : grandes.length === 1 ? ` (${grandes[0].familia} concentra ${grandes[0].n})` : ''
+    detalhes.push(`${pl(c.SEM_DONO, 'processo com certidões sem responsável', 'processos com certidões sem responsável')}${concentram}`)
+  }
+  if (c.FASE_DEIXADA > 0) detalhes.push(pl(c.FASE_DEIXADA, 'fase deixada sem próxima ação', 'fases deixadas sem próxima ação'))
+  if (c.ESCALADA > 0) detalhes.push(pl(c.ESCALADA, 'cobrança escalada sem resposta', 'cobranças escaladas sem resposta'))
+  if (c.DIVERGENCIA > 0) detalhes.push(pl(c.DIVERGENCIA, 'divergência para reconciliar', 'divergências para reconciliar'))
+  if (c.BLOQUEADA > 0) detalhes.push(pl(c.BLOQUEADA, 'tarefa bloqueada há 10+ dias', 'tarefas bloqueadas há 10+ dias'))
+  if (c.CARGA > 0) {
+    const cargas = itens.filter((i) => i.tipo === 'CARGA')
+    const maior = cargas.map((i) => ({ nome: i.familiaNome ?? '', ...(i.contexto as { executaveis?: number; limite?: number }) }))
+      .filter((x) => x.executaveis != null && x.limite)
+      .sort((a, b) => (b.executaveis! / b.limite!) - (a.executaveis! / a.limite!))[0]
+    const acima = maior ? ` (${maior.nome} está com ${maior.executaveis} executáveis, ${Math.round((maior.executaveis! / maior.limite! - 1) * 100)}% ${maior.executaveis! >= maior.limite! ? 'acima do' : 'abaixo do'} limite de ${maior.limite})` : ''
+    detalhes.push(`${pl(c.CARGA, 'aviso de carga', 'avisos de carga')}${acima}`)
+  }
+  frases.push(`${itens.length === 1 ? '1 decisão espera' : `${itens.length} decisões esperam`} você: ${juntar(detalhes)}.`)
+  return frases.join(' ')
+}
+

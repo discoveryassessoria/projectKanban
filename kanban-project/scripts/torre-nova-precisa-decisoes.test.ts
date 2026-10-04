@@ -16,6 +16,7 @@ import { prisma } from "../lib/prisma"
 import { montarCenario } from "./_fixture-torre-gh"
 import { definirAptidoes, definirCapacidade } from "../lib/operacional/organizacao"
 import { montarPrecisaDeVoce, itensPrecisaDeVoce, semDonoDoProcesso, type ItemPrecisaDeVoceTorre } from "../lib/operacional/precisa-de-voce"
+import { briefingDoDia } from "../lib/operacional/precisa-de-voce-decisoes"
 import { registrarCobranca } from "../src/services/subtarefas-da-etapa"
 import { pausarProcesso } from "../src/services/processo-pausa"
 import { publicarWorkflow } from "../src/services/publicacao-de-workflow"
@@ -246,8 +247,12 @@ async function main() {
     const soma = Object.values(r.resumo.porTipo).reduce((a, b) => a + b, 0)
     ok("o resumo por tipo fecha com a lista (total = soma dos 6 tipos)", soma === r.itens.length && r.resumo.total === r.itens.length, `${soma}/${r.itens.length}`)
     ok("ordenada por score, maior primeiro", r.itens.every((it, i) => i === 0 || r.itens[i - 1].score >= it.score))
-    ok("o Briefing saúda pelo nome e cita as decisões e os números do dia", /^(Bom dia|Boa tarde|Boa noite), Marco\./.test(r.briefing) && /\d+ (decisões esperam|decisão espera) você/.test(r.briefing) && /processos? ativos?/.test(r.briefing) && /Ontem a equipe fechou/.test(r.briefing) && /Hoje (vencem \d+ prazos|vence 1 prazo)/.test(r.briefing), r.briefing)
-    ok("o Briefing não inventa o que o sistema não mede (gargalo da semana)", !/Gargalo/i.test(r.briefing))
+    const soma2 = (m: Record<string, number>) => Object.values(m).reduce((x, y) => x + y, 0)
+    ok("a resposta traz o nome de quem lê e o que aconteceu ONTEM por país (o texto do Briefing é montado na tela, com os conjuntos dos cartões)",
+      r.nome === "Marco Rovatti" && !("briefing" in r) && typeof r.ontem.fechadas === "object" && typeof r.ontem.protocolados === "object")
+    const texto = briefingDoDia(r.itens, new Date(), { nome: r.nome, ativos: 5, noRitmo: 3, fechadasOntem: soma2(r.ontem.fechadas), protocoladosOntem: soma2(r.ontem.protocolados), vencemHoje: 1 })
+    ok("o Briefing saúda pelo nome e cita as decisões e os números do dia", /^(Bom dia|Boa tarde|Boa noite), Marco\./.test(texto) && /\d+ (decisões esperam|decisão espera) você/.test(texto) && /5 processos ativos, 3 no ritmo/.test(texto) && /Ontem a equipe fechou/.test(texto) && /Hoje vence 1 prazo/.test(texto), texto)
+    ok("o Briefing não inventa o que o sistema não mede (gargalo da semana)", !/Gargalo/i.test(texto))
     const itensTarefa = await itensPrecisaDeVoce({})
     ok("a leitura por TAREFA (Radar, regra r1) continua existindo: itens SEM_DONO por tarefa com tarefaId", itensTarefa.some((i) => i.tipo === "SEM_DONO" && i.tarefaId != null))
   } finally {

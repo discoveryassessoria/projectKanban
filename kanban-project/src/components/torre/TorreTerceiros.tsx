@@ -104,7 +104,7 @@ export function TorreTerceiros({ linhas, versao }: { linhas: LinhaTorre[]; versa
       </div>
 
       <div className="ter-kpis" role="group" aria-label="Resumo por tipo de terceiro">
-        <div className="ter-kpi" title="O mesmo número de Aguardando terceiros na Visão geral e na aba Tarefas."><b className="ter-kpi-n">{resumo ? milhar(resumo.aguardando) : "…"}</b><span className="ter-kpi-l">aguardando terceiros</span></div>
+        <div className="ter-kpi" title="Todos os pedidos que esperam resposta de fora, com ou sem responsável na tarefa. O cartão 'Aguardando terceiros' da Visão geral conta só os que têm responsável; os sem responsável entram em 'Sem responsável'."><b className="ter-kpi-n">{resumo ? milhar(resumo.aguardando) : "…"}</b><span className="ter-kpi-l">aguardando terceiros (com ou sem responsável)</span></div>
         <div className="ter-kpi"><b className="ter-kpi-n">{resumo ? milhar(resumo.comCartorios) : "…"}</b><span className="ter-kpi-l">com cartórios</span></div>
         <div className="ter-kpi"><b className="ter-kpi-n">{resumo ? milhar(resumo.comOCliente) : "…"}</b><span className="ter-kpi-l">com o cliente</span></div>
         <div className="ter-kpi"><b className="ter-kpi-n">{resumo ? `${milhar(resumo.tradutora)} · ${milhar(resumo.juizo)} · ${milhar(resumo.consulado)}` : "…"}</b><span className="ter-kpi-l">tradutora · juízo · consulado</span></div>

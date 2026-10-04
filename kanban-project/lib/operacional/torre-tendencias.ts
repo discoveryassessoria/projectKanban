@@ -7,25 +7,18 @@
 import { prisma } from '@/lib/prisma'
 import { serieDeIndicadores } from './indicadores-diarios'
 import { fotoDeReferencia } from './torre-kpis'
-import { ONDE_TAREFA_DE_PROCESSO_NA_TORRE } from '@/src/services/processo-pre-contrato'
+import { inicioDaSemana, ONDE_TAREFA_ABERTA_NA_SEMANA, ONDE_TAREFA_FECHADA_NA_SEMANA } from './torre-semana'
 
-const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
-
-/** A segunda-feira 00:00 da semana de `d` — a ÚNICA definição (o funil importa daqui: "abre/fecha" nunca diverge). */
-export const inicioDaSemana = (d: Date): Date => {
-  const x = new Date(d)
-  x.setDate(x.getDate() - ((x.getDay() + 6) % 7))
-  x.setHours(0, 0, 0, 0)
-  return x
-}
+// A semana (início, "abre", "fecha") mora em torre-semana.ts — a ÚNICA definição; reexportada aqui para quem já importava daqui.
+export { inicioDaSemana, ONDE_TAREFA_ABERTA_NA_SEMANA, ONDE_TAREFA_FECHADA_NA_SEMANA } from './torre-semana'
 
 export async function tendenciasDaTorre(agora = new Date()) {
   const [serie, abertas, fechadas] = await Promise.all([
     serieDeIndicadores(30),
     // O backlog da semana também deixa de fora a tarefa de processo PAUSADO ou em AGUARDANDO FECHAMENTO (fora da Torre — o mesmo filtro
     // das listas e da foto diária): "abre/fecha" nunca diverge do que a Torre mostra.
-    prisma.tarefa.count({ where: { createdAt: { gte: inicioDaSemana(agora) }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
-    prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioDaSemana(agora) }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
+    prisma.tarefa.count({ where: ONDE_TAREFA_ABERTA_NA_SEMANA(inicioDaSemana(agora)) }),
+    prisma.tarefa.count({ where: ONDE_TAREFA_FECHADA_NA_SEMANA(inicioDaSemana(agora)) }),
   ])
   const referencia = fotoDeReferencia(serie, agora)
   return {

@@ -19,6 +19,7 @@
 // ============================================================================
 import { diaOperacional, diasEntreDiasOperacionais, FUSO_OPERACIONAL } from './tempo-operacional'
 import { numeroDoKpi, PREDICADO_DO_KPI, type LinhaParaKpi } from './torre-kpis'
+import { ehCobravelVencido } from './torre-predicados'
 import type { BolaCom } from './torre-bola'
 
 /** O que a tela Terceiros precisa saber de uma linha da Torre (subconjunto de `LinhaTorre`). */
@@ -84,10 +85,7 @@ export function quandoCobrar(cobrarEm: string | null, agora: Date): QuandoCobrar
  * (lá o "terceiro" é o trabalho de localizar, não um cartório a cobrar). Só vale para pedido.
  */
 export function precisaCobrar(l: Pick<LinhaParaTerceiros, 'estadoOperacao' | 'faseMacroKey' | 'cobravelVencida' | 'cobrarEm'>, agora: Date): boolean {
-  if (!ehPedidoDeTerceiro(l) || l.faseMacroKey === 'genealogia') return false
-  if (l.cobravelVencida) return true
-  const q = quandoCobrar(l.cobrarEm, agora)
-  return q.dias != null && q.dias <= 0
+  return ehPedidoDeTerceiro(l) && ehCobravelVencido({ ...l, acompanhamentoVencido: l.cobravelVencida }, agora)
 }
 
 // ─── A LINHA DO PEDIDO ───────────────────────────────────────────────────────────────────────────────────────────

@@ -525,3 +525,16 @@ export function rotuloDaPrevisaoExterna(previsao: Date | string | null | undefin
   if (!d) return null
   return `Retorno previsto ${d.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL })}`
 }
+
+/**
+ * O instante em que a semana operacional começou: a segunda-feira à meia-noite de SÃO PAULO. UMA definição para tudo o que fala de
+ * "esta semana" (funil, tendência, foto diária, Saúde da fase, analytics) — antes havia uma por fuso do servidor e outra por São
+ * Paulo, e na Vercel (UTC) a semana do funil começava 3 h antes da semana da Saúde da fase.
+ */
+export function inicioDaSemanaOperacional(agora: Date): Date {
+  const ymd = diaOperacional(agora)
+  const dow = new Date(`${ymd}T00:00:00.000Z`).getUTCDay() // 0 = domingo
+  const atras = (dow + 6) % 7 // dias desde a segunda
+  const segunda = new Date(new Date(`${ymd}T00:00:00.000Z`).getTime() - atras * 86_400_000)
+  return janelaDoDiaOperacionalDe(segunda.toISOString().slice(0, 10)).inicio
+}

@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react"
 import type { ChaveKpi } from "@/lib/operacional/torre-kpis"
 import type { Aba } from "@/lib/operacional/torre-abas"
 import {
-  ESCOPO_VAZIO, funilDasFases, gargaloDaSemana, rotuloDoPaisFiltrado, textoDaFaseNasPalavras,
+  ESCOPO_VAZIO, funilDasFases, gargaloDaSemana, textoDaFaseNasPalavras,
   type DadosDoFunilPorEscopo, type RespostaDoFunil,
 } from "@/lib/operacional/torre-funil-puro"
 import type { LinhaTorre } from "./tipos"
@@ -34,6 +34,8 @@ export interface PropsDaVisaoGeral {
   tend: Tendencias | null
   /** O país do cabeçalho está filtrando? (a tendência é do total e some quando filtra) */
   filtrandoPais: boolean
+  /** O RÓTULO do país escolhido (do casco, que já o resolveu). Nunca inferido das listas: país sem processo na Torre tem listas vazias. */
+  paisRotulo: string | null
   /** O cartão ativo (filtro do indicador) — o casco guarda; os cartões navegam por URL. */
   kpiAtivo?: ChaveKpi | null
   onEscolherKpi?: (k: ChaveKpi) => void
@@ -61,16 +63,15 @@ function useDadosDoFunil(agora: Date) {
   return { ...estado, carregando: estado.dados == null && estado.erro == null }
 }
 
-export function TorreVisaoGeral({ linhas, processos, itensPrecisa, agora, tend, filtrandoPais, onProcessos, onRisco, irParaAba, onRevisar }: PropsDaVisaoGeral) {
+export function TorreVisaoGeral({ linhas, processos, itensPrecisa, agora, tend, filtrandoPais, paisRotulo, onProcessos, onRisco, irParaAba, onRevisar }: PropsDaVisaoGeral) {
   const { dados, erro, carregando } = useDadosDoFunil(agora)
 
   // O escopo do funil: geral, ou o do PAÍS escolhido (o rótulo é o que a lista de processos e as linhas carregam).
   const escopo: DadosDoFunilPorEscopo | null = useMemo(() => {
     if (!dados) return null
-    if (!filtrandoPais) return dados.geral
-    const rotulo = rotuloDoPaisFiltrado(processos, linhas)
-    return (rotulo ? dados.porPais[rotulo] : null) ?? ESCOPO_VAZIO
-  }, [dados, filtrandoPais, processos, linhas])
+    if (!filtrandoPais || !paisRotulo) return dados.geral
+    return dados.porPais[paisRotulo] ?? ESCOPO_VAZIO
+  }, [dados, filtrandoPais, paisRotulo])
 
   const funil = useMemo(() => (dados && processos
     ? funilDasFases({ fases: dados.fases, processos, linhas, escopo: escopo ?? ESCOPO_VAZIO })

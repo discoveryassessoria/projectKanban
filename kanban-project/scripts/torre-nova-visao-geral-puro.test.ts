@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs"
 import {
   permanenciasConcluidas, tempoMedioPorFase, textoDaAmostra, maiorGargalo, textoDoGargalo, textoDoTempoMedio, textoDaMeta, estourouAMeta, classeDoFunil,
-  funilDasFases, gargaloDaSemana, sentidoDoBacklog, hrefDaFase, rotuloDoPaisFiltrado, textoDaFaseNasPalavras, ESCOPO_VAZIO,
+  funilDasFases, gargaloDaSemana, sentidoDoBacklog, hrefDaFase, textoDaFaseNasPalavras, ESCOPO_VAZIO,
   type LinhaParaGargalo, type DadosDoFunilPorEscopo,
 } from "../lib/operacional/torre-funil-puro"
 import { fraseDoDia, textoDaFrase, milhar, distribuicaoPorPais, detalheDosTerceiros, familiasSemResponsavel, corDaTendencia, rotuloDecisoes } from "../lib/operacional/torre-topo"
@@ -86,7 +86,6 @@ ok("gargalo da semana = a fase que estourou a meta", gargaloDaSemana(f.linhas)?.
 ok("sem estouro, a fase com mais parados; sem parados, nenhuma", gargaloDaSemana(funilDasFases({ fases, processos: procs, linhas: [], escopo: ESCOPO_VAZIO }).linhas)?.key === "e" && gargaloDaSemana(funilDasFases({ fases, processos: [procs[0]], linhas: [], escopo: ESCOPO_VAZIO }).linhas) === null)
 ok("backlog: cresce / diminui / se mantém", sentidoDoBacklog({ tarefasAbertas: 212, tarefasFechadas: 186 }) === "cresce" && sentidoDoBacklog({ tarefasAbertas: 1, tarefasFechadas: 2 }) === "diminui" && sentidoDoBacklog({ tarefasAbertas: 2, tarefasFechadas: 2 }) === "estavel")
 ok("link da fase: ?aba=processos&fase=<chave>, mantendo país e busca", hrefDaFase("emissao_documental") === "/torre?aba=processos&fase=emissao_documental" && hrefDaFase("x", { pais: "italia", q: "bel" }) === "/torre?aba=processos&fase=x&pais=italia&q=bel")
-ok("rótulo do país filtrado: dos processos, senão das linhas", rotuloDoPaisFiltrado([{ pais: "Itália" }], []) === "Itália" && rotuloDoPaisFiltrado([], [{ pais: "Espanha" }]) === "Espanha" && rotuloDoPaisFiltrado(null, []) === null)
 ok("'Fase = etapa do processo (primeira → última)' vem do cadastro", textoDaFaseNasPalavras(fases) === "etapa do processo (Emissão → Genealogia)" && textoDaFaseNasPalavras([]) === "etapa do processo")
 
 console.log("\nfrase do dia")

@@ -77,12 +77,15 @@ ok("Desfazer depois da janela FALHA com mensagem clara (nunca em silêncio) e n�
 ok("Desfazer que o servidor recusa por inteiro mostra a causa", /Não foi possível desfazer: \$\{falha\.mensagem\}/.test(bc))
 ok("o relógio só é lido dentro do callback do aviso/clique (nunca no corpo de render)", !/^\s*const \w+ = Date\.now\(\)/m.test(bc))
 
-console.log("\ninicioDaSemana — UMA definição")
-const funil = ler("lib/operacional/torre-funil.ts"), tend = ler("lib/operacional/torre-tendencias.ts")
-ok("exportada de torre-tendencias.ts; o funil importa dali e não tem cópia", /export const inicioDaSemana/.test(tend) && /import \{ inicioDaSemana \} from '\.\/torre-tendencias'/.test(funil) && !/function inicioDaSemana|const inicioDaSemana/.test(funil))
-const seg = inicioDaSemana(new Date(2026, 9, 1, 15, 0)) // quinta 01/10/2026 (hora local do processo)
-ok("quinta 01/10 → segunda 28/09 00:00 (hora local)", seg.getFullYear() === 2026 && seg.getMonth() === 8 && seg.getDate() === 28 && seg.getHours() === 0 && seg.getDay() === 1)
-ok("domingo → a segunda anterior", inicioDaSemana(new Date(2026, 9, 4, 10, 0)).getDate() === 28)
+console.log("\ninicioDaSemana — UMA definição (de São Paulo, não do servidor)")
+const funil = ler("lib/operacional/torre-funil.ts"), tend = ler("lib/operacional/torre-tendencias.ts"), semana = ler("lib/operacional/torre-semana.ts"), diario = ler("lib/operacional/indicadores-diarios.ts"), faseDados = ler("lib/operacional/torre-fase-dados.ts")
+ok("definida UMA vez (torre-semana.ts → tempo-operacional.ts); funil, tendência, foto diária e Saúde da fase usam a MESMA, sem cópia",
+  /export const inicioDaSemana/.test(semana) && /from '\.\/torre-semana'/.test(funil) && /from '\.\/torre-semana'/.test(diario) && /from '\.\/torre-semana'/.test(tend)
+  && !/function inicioDaSemana|const inicioDaSemana =/.test(funil + diario + tend) && /import \{[^}]*inicioDaSemanaOperacional[^}]*\} from '\.\/tempo-operacional'/.test(faseDados) && !/function inicioDaSemanaOperacional/.test(faseDados))
+const iso = (d: Date) => d.toISOString()
+ok("quinta 01/10 → segunda 28/09 00:00 de SP (03:00Z), qualquer que seja o fuso da máquina", iso(inicioDaSemana(new Date("2026-10-01T15:00:00Z"))) === "2026-09-28T03:00:00.000Z")
+ok("domingo (inclusive à noite em SP) → a segunda anterior", iso(inicioDaSemana(new Date("2026-10-04T10:00:00Z"))) === "2026-09-28T03:00:00.000Z" && iso(inicioDaSemana(new Date("2026-10-05T01:30:00Z"))) === "2026-09-28T03:00:00.000Z")
+ok("segunda 00:30 em SP já é a semana nova", iso(inicioDaSemana(new Date("2026-09-28T03:30:00Z"))) === "2026-09-28T03:00:00.000Z" && iso(inicioDaSemana(new Date("2026-09-28T02:00:00Z"))) === "2026-09-21T03:00:00.000Z")
 
 console.log("\nCabeçalho (T034/T042)")
 const cab = ler("src/components/torre/TorreCabecalho.tsx")

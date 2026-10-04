@@ -16,6 +16,7 @@
 // Gestão de TODA a operação — mesma régua de admin que Distribuição/Tarefas
 // e Projetos.
 // ============================================================================
+import { inicioDaSemana } from '@/lib/operacional/torre-semana'
 import { type NextRequest, NextResponse } from 'next/server'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { prisma } from '@/lib/prisma'
@@ -53,13 +54,6 @@ export async function GET(request: NextRequest) {
   // ── D1: THROUGHPUT POR SEMANA — quantas Tarefas a operação INTEIRA fecha
   // por semana, últimas 8 semanas. Semana ISO (segunda a domingo), fuso do
   // servidor (mesma régua de `tempo-operacional.ts`).
-  const inicioDaSemana = (d: Date) => {
-    const x = new Date(d)
-    const dia = (x.getDay() + 6) % 7 // 0 = segunda
-    x.setDate(x.getDate() - dia)
-    x.setHours(0, 0, 0, 0)
-    return x
-  }
   const throughputMapa = new Map<string, number>()
   for (let i = 0; i < semanasNoPeriodo; i++) {
     const s = new Date(inicioDaSemana(agora))

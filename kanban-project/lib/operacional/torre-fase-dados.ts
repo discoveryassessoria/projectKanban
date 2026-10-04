@@ -18,7 +18,7 @@ import type { PrismaClient, Prisma } from '@prisma/client'
 type Leitor = PrismaClient | Prisma.TransactionClient
 import { RESULTADOS_QUE_MOVEM_DE_FASE, tempoMedioRealPorFase, type EntradaNaFase } from './metricas-processo'
 import { metasAtivas, resolverMeta } from './torre-metas'
-import { diaOperacional, janelaDoDiaOperacionalDe } from './tempo-operacional'
+import { diaOperacional, janelaDoDiaOperacionalDe, inicioDaSemanaOperacional } from './tempo-operacional'
 
 /** As metas de tempo ATIVAS, lidas UMA vez, e a resolução país → padrão → null. A Torre lê as metas por aqui (benchmark de exibição). */
 export const metasDaTorre = metasAtivas
@@ -104,14 +104,8 @@ export async function concluidasDaFaseEmLote(procs: Array<{ id: number; faseAtua
 
 // ─── A SEMANA (segunda-feira 00:00 no fuso operacional) ───────────────────────────────────────────────────────────────────
 
-/** O instante em que a semana operacional começou: a segunda-feira à meia-noite de São Paulo. */
-export function inicioDaSemanaOperacional(agora: Date): Date {
-  const ymd = diaOperacional(agora)
-  const dow = new Date(`${ymd}T00:00:00.000Z`).getUTCDay() // 0 = domingo
-  const atras = (dow + 6) % 7 // dias desde a segunda
-  const segunda = new Date(new Date(`${ymd}T00:00:00.000Z`).getTime() - atras * 86_400_000)
-  return janelaDoDiaOperacionalDe(segunda.toISOString().slice(0, 10)).inicio
-}
+// `inicioDaSemanaOperacional` mora em tempo-operacional.ts (UMA definição de "esta semana" para toda a Torre); reexportada para quem já importava daqui.
+export { inicioDaSemanaOperacional }
 
 export interface FluxoDeFase {
   phaseKey: string

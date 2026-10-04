@@ -3,21 +3,30 @@
 // PREDICADOS PUROS DA TORRE — sem Prisma, importáveis pela tela e pelo servidor.
 // A mesma conta nos dois lados é o que faz o "N" de um botão bater com a lista.
 // ============================================================================
+import { diasEntreDiasOperacionais } from './tempo-operacional'
 
 /** O que a Torre precisa saber de uma linha para decidir "cobrança vencida". */
 export interface LinhaParaCobranca {
   acompanhamentoVencido: boolean
   faseMacroKey: string | null
   estadoOperacao: 'FILA' | 'AGUARDANDO' | 'CONCLUIDA'
+  /** Data marcada para cobrar (ISO). Hoje ou passada = precisa cobrar, mesmo que o acompanhamento do passo ainda não tenha vencido. */
+  cobrarEm?: string | null
 }
 
 /**
- * "COBRAR TODOS OS VENCIDOS (N)" — o MESMO predicado do botão da Operação
- * (`acompanhamentoVencido` e fora da Genealogia: lá o "terceiro" é o trabalho
- * de localizar, não um cartório a cobrar), sem tarefa encerrada.
+ * "PRECISA COBRAR" — o ÚNICO predicado: cartão "Cobranças a fazer", botão "Cobrar todos os vencidos", selo "N a cobrar" da aba
+ * Terceiros, filtro "Cobranças vencidas" e a lista de pedidos. É verdade quando o acompanhamento do passo venceu OU a data de
+ * cobrança é hoje/passou (dia operacional) — fora da Genealogia (lá o "terceiro" é o trabalho de localizar, não um cartório a
+ * cobrar), sem tarefa encerrada, e a data só vale para pedido (tarefa AGUARDANDO).
  */
-export const ehCobravelVencido = (l: LinhaParaCobranca): boolean =>
-  l.acompanhamentoVencido && l.faseMacroKey !== 'genealogia' && l.estadoOperacao !== 'CONCLUIDA'
+export function ehCobravelVencido(l: LinhaParaCobranca, agora: Date = new Date()): boolean {
+  if (l.faseMacroKey === 'genealogia' || l.estadoOperacao === 'CONCLUIDA') return false
+  if (l.acompanhamentoVencido) return true
+  if (l.estadoOperacao !== 'AGUARDANDO' || !l.cobrarEm) return false
+  const alvo = new Date(l.cobrarEm)
+  return !Number.isNaN(alvo.getTime()) && diasEntreDiasOperacionais(alvo, agora) <= 0
+}
 
 // ─── CARGA POR PESSOA — a conta da Operação, sobre as MESMAS linhas ─────────
 
