@@ -2,7 +2,7 @@
 //   npx tsx scripts/torre-nova-visao-geral-puro.test.ts   (sem banco)
 import { readFileSync } from "node:fs"
 import {
-  permanenciasConcluidas, tempoMedioPorFase, maiorGargalo, textoDoGargalo, textoDoTempoMedio, textoDaMeta, estourouAMeta, classeDoFunil,
+  permanenciasConcluidas, tempoMedioPorFase, textoDaAmostra, maiorGargalo, textoDoGargalo, textoDoTempoMedio, textoDaMeta, estourouAMeta, classeDoFunil,
   funilDasFases, gargaloDaSemana, sentidoDoBacklog, hrefDaFase, rotuloDoPaisFiltrado, textoDaFaseNasPalavras, ESCOPO_VAZIO,
   type LinhaParaGargalo, type DadosDoFunilPorEscopo,
 } from "../lib/operacional/torre-funil-puro"
@@ -27,6 +27,28 @@ const t = tempoMedioPorFase(permanenciasConcluidas(logs))
 ok("b = média de 10 e 4 = 7 dias, 2 amostras; o processo ainda na fase não entra", t.b.mediaDias === 7 && t.b.amostras === 2)
 ok("fase sem permanência concluída não tem tempo", t.a === undefined && t.c === undefined)
 ok("entrada de um processo não casa com a saída de outro", permanenciasConcluidas([logs[0], logs[3]]).length === 0)
+
+console.log("\namostra: quantos PROCESSOS entraram na média (a regra da média não mudou)")
+ok("a média e as permanências continuam as mesmas; agora b também diz 2 processos distintos", t.b.mediaDias === 7 && t.b.amostras === 2 && t.b.processos === 2)
+ok("amostra 0: nenhuma permanência → nenhuma fase, e o texto é —", Object.keys(tempoMedioPorFase([])).length === 0 && textoDoTempoMedio(undefined, null) === "—" && textoDoTempoMedio({ mediaDias: 0, amostras: 0, processos: 0 }, null) === "—")
+const um = tempoMedioPorFase(permanenciasConcluidas([
+  { processoId: 7, faseAtual: "a", fasePretendida: "b", criadoEm: d("2026-01-01T00:00:00Z") },
+  { processoId: 7, faseAtual: "b", fasePretendida: "c", criadoEm: d("2026-01-05T00:00:00Z") },   // 4 dias
+]))
+ok("amostra 1: '4 dias · 1 processo' (singular)", um.b.processos === 1 && textoDoTempoMedio(um.b, null) === "4 dias · 1 processo", textoDoTempoMedio(um.b, null))
+ok("amostra 1, menos de um dia: 'menos de 1 dia · 1 processo'", textoDoTempoMedio({ mediaDias: 0.3, amostras: 1, processos: 1 }, null) === "menos de 1 dia · 1 processo")
+ok("vários processos: '7 dias · 2 processos' (plural)", textoDoTempoMedio(t.b, null) === "7 dias · 2 processos" && textoDaAmostra(3) === "3 processos" && textoDaAmostra(1) === "1 processo")
+const mesmo = tempoMedioPorFase(permanenciasConcluidas([
+  { processoId: 9, faseAtual: "a", fasePretendida: "b", criadoEm: d("2026-01-01T00:00:00Z") },
+  { processoId: 9, faseAtual: "b", fasePretendida: "c", criadoEm: d("2026-01-03T00:00:00Z") },   // 1ª passagem: 2 dias
+  { processoId: 9, faseAtual: "c", fasePretendida: "b", criadoEm: d("2026-01-10T00:00:00Z") },
+  { processoId: 9, faseAtual: "b", fasePretendida: "d", criadoEm: d("2026-01-16T00:00:00Z") },   // 2ª passagem: 6 dias
+]))
+ok("dois registros do MESMO processo na fase: 2 permanências (amostras) mas 1 processo; média continua 4", mesmo.b.amostras === 2 && mesmo.b.processos === 1 && mesmo.b.mediaDias === 4 && textoDoTempoMedio(mesmo.b, null) === "4 dias · 1 processo", JSON.stringify(mesmo.b))
+const doFunil = funilDasFases({ fases: [{ key: "e", label: "Emissão", condicional: false }], processos: [], linhas: [], escopo: { tempos: { e: { mediaDias: 3.9, amostras: 1, processos: 1 } }, metas: { e: null }, semana: { processosAbertos: 0, protocolados: 0, tarefasAbertas: 0, tarefasFechadas: 0 } } })
+ok("a linha do funil já traz o texto com a amostra (é o que a tela imprime)", doFunil.linhas[0].tempoTexto === "4 dias · 1 processo", doFunil.linhas[0].tempoTexto)
+ok("leitor antigo da rota (sem o campo processos): mostra só a média, como antes", textoDoTempoMedio({ mediaDias: 12.4, amostras: 3 }, 15) === "12 dias")
+ok("a tela só imprime o texto pronto (nenhuma conta nova no componente)", /f\.tempoTexto\b/.test(ler("src/components/torre/TorreFunil.tsx")))
 
 console.log("\ntexto: tempo, meta, estouro")
 ok("sem amostra → —", textoDoTempoMedio(undefined, 30) === "—" && textoDoTempoMedio({ mediaDias: 0, amostras: 0 }, 30) === "—")
