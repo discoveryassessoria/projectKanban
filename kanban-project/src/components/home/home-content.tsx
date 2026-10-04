@@ -130,7 +130,7 @@ function MinhaAtencaoBloco({ data }: { data: HomeData }) {
         <div className="min-w-0">
           <p className="text-[13.5px] font-semibold text-[var(--text-primary)]">
             {precisaAtencao === 0
-              ? "Tudo em dia — nenhuma operação exige sua atenção agora."
+              ? "Nada pendente com você — nenhuma operação sua exige atenção agora. (O que está atrasado na empresa fica na Torre.)"
               : `${precisaAtencao} operaç${precisaAtencao === 1 ? "ão exige" : "ões exigem"} sua atenção`}
           </p>
           {precisaAtencao > 0 && (

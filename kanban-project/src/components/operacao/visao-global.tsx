@@ -36,6 +36,7 @@
 // ============================================================================
 "use client"
 
+import { diaOperacional } from "@/lib/operacional/tempo-operacional"
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
@@ -279,7 +280,7 @@ const TILES: Array<{
   { chave: "venceEm7Dias", rotulo: "Vencem em 7 dias", tom: "text-[var(--warning-text)]", icone: Clock, iconeTom: "bg-[var(--warning-tile)] text-[var(--warning-text)]", filtro: { venceEm7Dias: true } },
   {
     chave: "concluidasHoje", rotulo: "Concluídas (hoje)", tom: "text-[var(--success-text)]", icone: CheckCircle2, iconeTom: "bg-[var(--success-tile)] text-[var(--success-text)]",
-    filtro: { dataTipo: "concluida", dataInicio: new Date().toISOString().slice(0, 10), dataFim: new Date().toISOString().slice(0, 10) },
+    filtro: { dataTipo: "concluida", dataInicio: diaOperacional(new Date()), dataFim: diaOperacional(new Date()) },
   },
   { chave: "familias", rotulo: "Famílias", tom: "text-[var(--text-primary)]", icone: Users2, iconeTom: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]" },
   { chave: "processos", rotulo: "Processos", tom: "text-[var(--text-primary)]", icone: FileStack, iconeTom: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]" },

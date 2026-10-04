@@ -1085,7 +1085,7 @@ export async function acompanhamentoDoUsuario(
  * tiles de Tarefas e Projetos já usam).
  */
 export async function concluidasHojeDoUsuario(usuarioId: number, agora = new Date(), db: Leitor = prisma): Promise<LinhaGerencial[]> {
-  const hoje = agora.toISOString().slice(0, 10)
+  const hoje = diaOperacional(agora)
   const { linhas } = await visaoGerencial(
     { responsavelId: usuarioId, dataTipo: 'concluida', dataInicio: hoje, dataFim: hoje, porPagina: 500 },
     agora, db,
@@ -1109,8 +1109,8 @@ export async function concluidasRecentesDoUsuario(
   usuarioId: number | null, agora = new Date(), dias = 14, db: Leitor = prisma,
   filtrosExtra: Omit<FiltrosGerenciais, 'porPagina' | 'dataTipo' | 'dataInicio' | 'dataFim'> = {},
 ): Promise<LinhaGerencial[]> {
-  const fim = agora.toISOString().slice(0, 10)
-  const inicio = new Date(agora.getTime() - dias * 86_400_000).toISOString().slice(0, 10)
+  const fim = diaOperacional(agora)
+  const inicio = diaOperacional(new Date(agora.getTime() - dias * 86_400_000))
   const { estadoOperacao, ...filtrosParaWhere } = filtrosExtra
   const responsavelId = usuarioId !== null ? usuarioId : filtrosExtra.responsavelId
   const { linhas } = await visaoGerencial(

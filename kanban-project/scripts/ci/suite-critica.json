@@ -221,6 +221,7 @@
   ]
  },
  "arquivos": [
+    "scripts/paridade-dia-operacional.test.ts",
     "scripts/paridade-processos-contagens.test.ts",
     "scripts/torre-paridade-numeros.test.ts",
   "scripts/fase-terminal-finalizacao-atomica.test.ts",
