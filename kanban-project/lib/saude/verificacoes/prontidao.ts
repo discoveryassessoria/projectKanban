@@ -296,12 +296,20 @@ registrar({
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
     const { prisma } = await import('@/lib/prisma')
-    const semProximaAcao = await prisma.$queryRawUnsafe<{ id: number; nome: string }[]>(
+    // MESMO recorte da Torre: processo fora dela (Aguardando fechamento, pausado) não é "parado". E o número é o TOTAL real:
+    // o LIMIT vale só para a amostra que se detalha (antes o painel dizia "100" quando eram 157).
+    const { idsDeProcessosForaDaTorre } = await import('@/src/services/processo-pre-contrato')
+    const foraDaTorre = [...(await idsDeProcessosForaDaTorre())]
+    const todosSemProximaAcao = await prisma.$queryRawUnsafe<{ id: number; nome: string }[]>(
       `SELECT p.id, p.nome FROM "Processo" p
         WHERE p."dataConclusao" IS NULL
-          AND NOT EXISTS (SELECT 1 FROM "Tarefa" t WHERE t."processoId" = p.id AND t.concluida = false)
-        LIMIT 100`,
+          AND NOT (p.id = ANY($1::int[]))
+          AND NOT EXISTS (SELECT 1 FROM "Tarefa" t WHERE t."processoId" = p.id AND t.concluida = false AND t."statusTarefa"::text NOT IN ('CANCELADA','SUPERSEDIDA'))
+        ORDER BY p.id`,
+      foraDaTorre,
     )
+    const totalSemProximaAcao = todosSemProximaAcao.length
+    const semProximaAcao = todosSemProximaAcao.slice(0, 100)
     // O MOTIVO JÁ FOI ESCRITO — BASTA LER. O materializador nomeia por que não
     // criou nada ("o passo opera por NECESSIDADE e o processo não tem certidão a
     // localizar") e grava isso na auditoria. Dizer só "sem tarefa aberta" obriga
@@ -343,19 +351,19 @@ registrar({
       achados.push({
         chave: 'processo-sem-proxima-acao',
         severidade: 'ALERTA',
-        titulo: `${semProximaAcao.length} processo(s) sem próxima ação`,
+        titulo: `${totalSemProximaAcao} processo(s) sem próxima ação`,
         descricao: `${primeiro.nome} (#${primeiro.id}): ${primeiro.motivo}`,
         explicacao: 'Sem tarefa aberta, ninguém tem o que fazer no processo — ele fica parado sem aparecer em nenhuma fila. O motivo acima é o que o materializador registrou quando tentou criar as tarefas da fase.',
         impacto: 'Processo estagnado sem sinal visível para a operação.',
         entidade: 'Processo',
         registroId: String(primeiro.id),
         registroNome: primeiro.nome,
-        quantidade: semProximaAcao.length,
+        quantidade: totalSemProximaAcao,
         link: `/kanban?processoId=${primeiro.id}`,
         recomendacao: 'Leia o motivo: SEM_ALVO_APLICAVEL quase sempre significa que a fase só tem passos que operam sobre uma entidade que o processo ainda não tem — é cadastro do workflow da fase, não falha de execução.',
-        evidencia: { total: semProximaAcao.length, amostra: comMotivo.slice(0, 10) },
+        evidencia: { total: totalSemProximaAcao, amostra: comMotivo.slice(0, 10) },
       })
     }
-    return { achados, metricas: { semProximaAcao: semProximaAcao.length }, resumo: 'Todo processo em andamento tem próxima ação.' }
+    return { achados, metricas: { semProximaAcao: totalSemProximaAcao }, resumo: 'Todo processo em andamento tem próxima ação.' }
   },
 })

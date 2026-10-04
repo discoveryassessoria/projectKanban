@@ -152,8 +152,11 @@ export function ProcessosLista({
           </thead>
           <tbody>
             {paginatedProcessos.map((processo) => {
-              const tarefasCount = processo._count?.tarefas ?? processo.tarefas?.length ?? 0
-              const tarefasConcluidas = processo.tarefas?.filter(t => t.concluida)?.length ?? 0
+              // Total e concluídas saem da MESMA lista de tarefas VIVAS: cancelada/substituída não é tarefa a fazer (antes o total vinha
+              // do COUNT bruto e mostrava "0/24" com 5 tarefas reais).
+              const tarefasVivas = (processo.tarefas ?? []).filter((t) => t.statusTarefa !== "CANCELADA" && t.statusTarefa !== "SUPERSEDIDA")
+              const tarefasCount = tarefasVivas.length
+              const tarefasConcluidas = tarefasVivas.filter((t) => t.concluida || t.statusTarefa === "CONCLUIDA").length
               const requerentesCount = processo.requerentes?.length ?? 0
               const primeiroContratante = processo.contratantes?.[0]
 

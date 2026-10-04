@@ -44,6 +44,9 @@ export const ONDE_PROCESSO_NA_TORRE: Prisma.ProcessoWhereInput = {
   AND: [ONDE_PROCESSO_NAO_PAUSADO, ONDE_PROCESSO_FORA_DO_AGUARDANDO_FECHAMENTO],
 }
 
+/** "Processo ativo" em QUALQUER tela: não concluído E na Torre (não pausado, fora de Aguardando fechamento). Uma definição só. */
+export const ONDE_PROCESSO_ATIVO_E_NA_TORRE: Prisma.ProcessoWhereInput = { AND: [{ dataConclusao: null }, ONDE_PROCESSO_NA_TORRE] }
+
 /** Para consultas a `Tarefa`: a tarefa AVULSA (sem processo) entra; a de processo só se o processo está na Torre. */
 export const ONDE_TAREFA_DE_PROCESSO_NA_TORRE: Prisma.TarefaWhereInput = {
   OR: [{ processoId: null }, { processo: ONDE_PROCESSO_NA_TORRE }],

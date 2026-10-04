@@ -17,6 +17,7 @@
 // ticket médio, série de 6 meses do gráfico) volta como `mock: {...}` e o front
 // mostra como placeholder. Trocamos por dado real numa fatia futura.
 
+import { ONDE_PROCESSO_ATIVO_E_NA_TORRE } from "@/src/services/processo-pre-contrato"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
@@ -97,7 +98,7 @@ export async function GET(req: NextRequest) {
         where: { data: { gte: mesIni, lte: mesFim }, estornado: false },
         select: { valor: true, valorOriginal: true, cambio: true, fatura: { select: { moeda: true } } },
       }),
-      prisma.processo.count({ where: { dataConclusao: null } }),
+      prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_E_NA_TORRE }),
       prisma.logAuditoria.findMany({
         orderBy: { criadoEm: "desc" },
         take: 7,

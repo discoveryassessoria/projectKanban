@@ -174,6 +174,8 @@ export interface Tarefa {
   responsavelId?: number | null
   responsavel?: Usuario | null
   concluida: boolean
+  /** Estado canônico da tarefa (a API devolve a linha inteira). CANCELADA/SUPERSEDIDA não contam como tarefa a fazer. */
+  statusTarefa?: string
   prioridade: PrioridadeTarefa
   dataPrazo?: string | null
   dataConclusao?: string | null
@@ -210,6 +212,8 @@ export interface Processo {
   descricao?: string | null
   observacoes?: string | null
   pais: string                        // countryKey ("italia")
+  /** País REAL do processo, como a API de detalhe o devolve (identidade canônica). */
+  paisCanonico?: { countryKey: string; countryLabel: string; flag?: string | null } | null
   faseAtualKey?: string | null        // fase do motor = coluna atual — dado TÉCNICO, nunca rótulo de interface
   /** Rótulo canônico resolvido (código→cadastro, inclusive fase inativa) — é isto que a interface exibe. */
   faseAtualLabel?: string | null

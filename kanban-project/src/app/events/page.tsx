@@ -64,7 +64,7 @@ interface Evento {
   processo: {
     id: number
     nome: string
-    pais: string
+    paisCanonico?: { countryKey: string; countryLabel: string; flag?: string | null } | null
     codigo?: string | null
   }
 }
@@ -645,7 +645,7 @@ const handleSubmit = async () => {
                             const Icon = tc.icon
                             const stb = statusEventoBadge(evento.status)
                             const d = new Date(evento.dataInicio)
-                            const clickProc = () => { if (evento.processo) router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`) }
+                            const clickProc = () => { if (evento.processo) router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.paisCanonico?.countryKey ?? ""}`) }
                             return (
                               <Tr key={evento.id} onClick={clickProc}>
                                 <td className="py-2.5 px-2">
@@ -771,7 +771,7 @@ const handleSubmit = async () => {
                                   title={evento.titulo}
                                   onClick={() => {
   if (evento.processo) {
-    router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.pais}`)
+    router.push(`/kanban?processoId=${evento.processo.id}&tab=eventos&pais=${evento.processo.paisCanonico?.countryKey ?? ""}`)
   }
 }}
                                 >
