@@ -8,6 +8,7 @@
 //   - Processo: nome, pais (enum Pais)
 // Só DSO e "vs Abril" são mock ("prévia").
 
+import { ONDE_PROCESSO_ATIVO_E_NA_TORRE } from "@/src/services/processo-pre-contrato"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
@@ -54,7 +55,7 @@ export async function GET(_req: NextRequest) {
           },
         },
       }),
-      prisma.processo.count({ where: { dataConclusao: null } }),
+      prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_E_NA_TORRE }),
     ])
 
     const itens = parcelas.map((p) => {

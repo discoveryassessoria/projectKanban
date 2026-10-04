@@ -27,7 +27,7 @@ import { lerLinhasOperacionais } from './avisos-sino'
 import type { LinhaGerencial } from './tarefa-projecoes'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { BOLA_NOSSA, BOLA_CLIENTE, BOLA_PADRAO_DO_TERCEIRO, VALORES_DE_BOLA, type BolaCom } from './torre-bola'
-import { ONDE_PROCESSO_NA_TORRE, idsDeProcessosForaDaTorre, semProcessosForaDaTorre } from '@/src/services/processo-pre-contrato'
+import { ONDE_PROCESSO_ATIVO_E_NA_TORRE, ONDE_PROCESSO_NA_TORRE, idsDeProcessosForaDaTorre, semProcessosForaDaTorre } from '@/src/services/processo-pre-contrato'
 import { PHASEKEY_A_INICIAR } from '@/src/lib/process-stage/fase-pre-contrato'
 import type { Prisma } from '@prisma/client'
 import { entradasNaFaseEmLote, concluidasDaFaseEmLote, tempoDesde, metasDaTorre, metaDaFaseDoPais } from './torre-fase-dados'
@@ -44,7 +44,7 @@ export type { NivelDeRisco, SituacaoDaFase }
  * "Processo ativo na Torre" = não concluído, não pausado E fora de "Aguardando fechamento" (`a_iniciar`). UMA definição: a lista
  * (Radar/Processos) e a foto diária (`processosAtivos`) leem esta. Em `AND` para nunca ser sobrescrita por chave repetida de quem a usa.
  */
-export const ONDE_PROCESSO_ATIVO_DA_TORRE: Prisma.ProcessoWhereInput = { AND: [{ dataConclusao: null }, ONDE_PROCESSO_NA_TORRE] }
+export const ONDE_PROCESSO_ATIVO_DA_TORRE: Prisma.ProcessoWhereInput = ONDE_PROCESSO_ATIVO_E_NA_TORRE
 
 export interface ColunaDoRadar { key: string; label: string; condicional: boolean }
 

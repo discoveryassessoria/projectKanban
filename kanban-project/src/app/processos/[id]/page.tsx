@@ -76,10 +76,10 @@ export default function ProcessoPage() {
         </Link>
         <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)]" aria-hidden />
         <span className="font-medium text-[var(--text-primary)]">{processo.nome}</span>
-        {processo.pais && (
+        {processo.paisCanonico?.countryLabel && (
           <>
             <span className="text-[var(--text-muted)]">·</span>
-            <span className="capitalize text-[var(--text-secondary)]">{processo.pais}</span>
+            <span className="capitalize text-[var(--text-secondary)]">{processo.paisCanonico?.countryLabel}</span>
           </>
         )}
       </nav>

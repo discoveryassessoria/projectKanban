@@ -22,6 +22,7 @@
 // São derivações declaradas, não campos novos: o Processo continua sem
 // "prioridade" e sem "responsável" próprios, e nada é escrito.
 // ============================================================================
+import { ONDE_PROCESSO_ATIVO_E_NA_TORRE } from "@/src/services/processo-pre-contrato"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
   // ESCOPO: admin vê todo processo aberto; operacional só o que tem
   // tarefa/passo atribuído a ele — nunca a operação inteira da empresa
   // (ver src/lib/autorizacao/escopo-operacional.ts).
-  const whereBase = { dataConclusao: null, ...escopoProcesso(escopoUsuario) }
+  const whereBase = { AND: [ONDE_PROCESSO_ATIVO_E_NA_TORRE, escopoProcesso(escopoUsuario)] }
 
   // Processos operacionais: os que ainda não concluíram, dentro do escopo.
   const [processos, total] = await Promise.all([
