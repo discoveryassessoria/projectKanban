@@ -18,6 +18,7 @@
 // ============================================================================
 "use client"
 
+import { diaOperacional } from "@/lib/operacional/tempo-operacional"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { gravarLocal, useJsonLocalStorage } from "@/src/lib/cliente"
@@ -229,7 +230,7 @@ export function CentralOperacional() {
   const [concluidasPorProcesso, setConcluidasPorProcesso] = useState<Map<number, number>>(new Map())
   useEffect(() => {
     let vivo = true
-    const hoje = new Date().toISOString().slice(0, 10)
+    const hoje = diaOperacional(new Date())
     const p = filtros.escopo === "minha_fila"
       ? new URLSearchParams({ visao: "concluidas_hoje" })
       : (() => {

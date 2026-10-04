@@ -14,7 +14,7 @@
 import { prisma } from "@/lib/prisma"
 import { rotuloStatusTarefa, rotuloMotivoPendencia } from "@/src/lib/home/rotulo-status-tarefa"
 import { ehEsperaExterna } from "@/lib/operacional/proximo-acontecimento"
-import { estadoTemporal, estadoTemporalSubtarefa } from "@/lib/operacional/tempo-operacional"
+import { diaOperacional, janelaDoDiaOperacionalDe, estadoTemporal, estadoTemporalSubtarefa } from "@/lib/operacional/tempo-operacional"
 import {
   FILAS_PASSO,
   FILAS_ESTADO,
@@ -920,7 +920,8 @@ export async function montarResumoDia(base: BaseOperacional, ctx: ContextoHome):
 // ---------------------------------------------------------------------------
 export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): Promise<AlertaOperacional[]> {
   const alertas: AlertaOperacional[] = []
-  const amanha = fimDoDia(somarDias(ctx.agora, 1))
+  // "até amanhã" = fim do dia de amanhã NO FUSO DA OPERAÇÃO (São Paulo), a mesma régua do prazo da tarefa em toda tela.
+  const amanha = janelaDoDiaOperacionalDe(diaOperacional(new Date(ctx.agora.getTime() + 86_400_000))).fim
 
   // 1) Prazo vencendo — passos e tarefas com prazo até amanhã.
   const prazosCriticos =
@@ -937,7 +938,7 @@ export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): P
       // ?ate= pré-carrega a Central de Prazos já filtrada no mesmo período que
       // este alerta conta ("até amanhã") — sem isso o clique abria a tela cheia
       // de tudo, obrigando a filtrar de novo pra ver só o que o alerta prometeu.
-      href: `/dashboard/fila/prazos-vencendo?ate=${amanha.toISOString().slice(0, 10)}`,
+      href: `/dashboard/fila/prazos-vencendo?ate=${diaOperacional(new Date(ctx.agora.getTime() + 86_400_000))}`,
     })
   }
 
