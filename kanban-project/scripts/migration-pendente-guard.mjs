@@ -76,6 +76,17 @@ try {
     process.exit(0)
   }
 
+  // PREVIEW NÃO É PRODUÇÃO. O banco do Preview (homologação) é separado e fica para trás do repositório; reprovar o build ali
+  // fazia TODO PR aparecer com "Error" na Vercel e o aviso virou ruído que esconde falha real (testes, tipos, build). A pendência
+  // continua sendo DITA em voz alta (lista abaixo), só que não derruba o Preview. Em PRODUÇÃO a trava segue integral.
+  if (AMBIENTE === 'preview') {
+    console.warn('')
+    console.warn(`[migration-guard] AVISO (preview): o banco de homologação não tem ${pendentes.length} migration(s) do repositório:`)
+    for (const m of pendentes) console.warn(`    · ${m}`)
+    console.warn('[migration-guard] Preview segue o build — telas que usem colunas novas podem falhar ali. PRODUÇÃO continua travada por este guard.')
+    process.exit(0)
+  }
+
   console.error('')
   console.error('  MIGRATION PENDENTE — O BUILD PARA AQUI, DE PROPÓSITO')
   console.error('')
