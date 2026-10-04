@@ -6,7 +6,8 @@
 // ver `torre-funil-puro.ts`):
 //   · as FASES do cadastro (`CatalogoFase` ativo, na ordem), sem a fase TERMINAL (sem próxima fase no catálogo: "Finalizado" —
 //     o processo que chega nela deixa de ser ativo);
-//   · o TEMPO MÉDIO REAL por fase = média das permanências CONCLUÍDAS (`PhaseAdvanceLog`), geral e por país;
+//   · o TEMPO MÉDIO REAL por fase = média das permanências CONCLUÍDAS (`PhaseAdvanceLog`), geral e por país, SÓ de processos que estão
+//     na Torre (fora dela = Aguardando fechamento e pausados, como nos contadores);
 //   · a META de cada fase (cadastro de metas: a do país, senão a padrão, senão `null`) — SÓ EXIBIÇÃO;
 //   · a SEMANA: processos abertos, processos que chegaram em "Protocolado", e as tarefas abertas × fechadas (a MESMA conta de
 //     `tendenciasDaTorre`: criadas / concluídas com sucesso desde a segunda-feira; cancelada nunca é fechada) — SEM os processos
@@ -66,7 +67,10 @@ export async function funilDaTorre(agora = new Date()): Promise<RespostaDoFunil>
 
   const escopo = (rotulo: string | null, paisId: number | null, aguardandoFechamento: number): DadosDoFunilPorEscopo => {
     const noEscopo = (processoId: number | null) => rotulo == null || (processoId != null && paisDoProcesso.get(processoId) === rotulo)
-    const perm: Permanencia[] = permanenciasConcluidas(logs.filter((l) => noEscopo(l.processoId)))
+    // Só processos DA TORRE: quem está fora dela (Aguardando fechamento, pausado) não entra no tempo médio — o MESMO recorte dos
+    // contadores ("Todos 2", "Itália 2") e de tudo o mais na Torre. Sem isso o "Todos" mostrava um tempo de um processo que nem
+    // aparece nas contagens (achado 04/10/2026: o Antão, da Espanha, em Aguardando fechamento, dava "4 dias · 1 processo").
+    const perm: Permanencia[] = permanenciasConcluidas(logs.filter((l) => noEscopo(l.processoId) && !foraDaTorre.has(l.processoId)))
     return {
       tempos: tempoMedioPorFase(perm),
       metas: Object.fromEntries(fases.map((f) => [f.key, resolverMeta(metas, f.key, paisId)])),

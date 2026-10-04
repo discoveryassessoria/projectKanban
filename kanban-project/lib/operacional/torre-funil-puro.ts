@@ -6,8 +6,9 @@
 //   · Processos           — os processos ATIVOS da Torre (a lista da aba Processos / Radar, já recortada pelo país) agrupados pela FASE ATUAL.
 //   · Situação (barra)    — a MESMA palavra de risco do Radar e da aba Processos (`ProcessoDaTorre.risco`): ok → "no ritmo",
 //                           atencao → "atenção", critico → "parados". Nenhuma regra de risco é recalculada aqui.
-//   · Tempo médio         — média REAL das permanências CONCLUÍDAS (entrada → saída da fase, `PhaseAdvanceLog`): a MESMA conta de
-//                           `tempoMedioRealPorFase` (metricas-processo.ts), só que repartida por país. Sem amostra → "—". Nunca estimativa.
+//   · Tempo médio         — média REAL das permanências CONCLUÍDAS (entrada → saída da fase, `PhaseAdvanceLog`): a conta de
+//                           `tempoMedioRealPorFase` (metricas-processo.ts), repartida por país e SÓ de processos que estão na Torre (fora
+//                           dela — Aguardando fechamento, pausado — não entram, como nos contadores). Sem amostra → "—". Nunca estimativa.
 //   · Meta                — cadastro de metas (padrão da fase ou do país). SÓ EXIBIÇÃO: não gera prazo nem entra no risco. Sem meta → "—".
 //   · Maior gargalo       — o passo com mais tarefas PARADAS (aguardando terceiro/cliente ou bloqueadas) na fase; empate pelo mais antigo.
 //   · "Gargalo da semana" — a fase que mais estourou a meta (média ÷ meta); sem nenhuma estourada, a fase com mais parados.

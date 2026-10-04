@@ -52,6 +52,19 @@ async function main() {
     ok("por país: o país dos processos tem as 2 amostras", !!rotulo && f.porPais[rotulo!]?.tempos.emissao_documental?.amostras === 2)
     ok("fase sem amostra concluída não aparece (sem estimativa)", f.geral.tempos.analise_documental === undefined)
 
+    console.log("\nfora da Torre não entra no tempo médio (o mesmo recorte dos contadores)")
+    const fora = await c.novaObrigacao({})
+    await prisma.processo.update({ where: { id: fora.processoId }, data: { paisId: pais.id, faseAtualKey: "a_iniciar" } })
+    await log(fora.processoId, "genealogia", "analise_documental", t0 - 20 * dia)
+    await log(fora.processoId, "analise_documental", "a_iniciar", t0 - 20 * dia + 4 * dia)   // 4 dias em Análise, mas o processo está em Aguardando fechamento
+    const ff = await funilDaTorre()
+    const baseFora = await tempoMedioRealPorFase()
+    ok("o histórico do processo em Aguardando fechamento EXISTE no log (nada foi apagado)", (await prisma.phaseAdvanceLog.count({ where: { processoId: fora.processoId } })) === 2)
+    ok("mas o funil NÃO o conta: Análise continua sem amostra, geral e no país", ff.geral.tempos.analise_documental === undefined && ff.porPais[rotulo!]?.tempos.analise_documental === undefined)
+    ok("e tempoMedioRealPorFase (Terceiros, página do processo) usa o MESMO recorte — a paridade continua", !baseFora.some((x) => x.fase === "analise_documental") && baseFora.every((x) => ff.geral.tempos[x.fase]?.mediaDias === x.mediaDias && ff.geral.tempos[x.fase]?.amostras === x.amostras))
+    ok("o histórico do processo fora da Torre continua acessível pela página dele (com processoId)", (await tempoMedioRealPorFase(fora.processoId)).some((x) => x.fase === "analise_documental" && x.amostras === 1))
+    ok("e o que já era dos processos da Torre não mudou (Emissão: 7 dias, 2 processos)", ff.geral.tempos.emissao_documental?.mediaDias === 7 && ff.geral.tempos.emissao_documental?.processos === 2)
+
     console.log("\nmeta: país → padrão → null (só exibição)")
     await definirMeta({ phaseKey: "emissao_documental", metaDias: 30, autorId: admin.id })
     await definirMeta({ phaseKey: "emissao_documental", paisId: pa.paisCanonico!.id, metaDias: 45, autorId: admin.id })
