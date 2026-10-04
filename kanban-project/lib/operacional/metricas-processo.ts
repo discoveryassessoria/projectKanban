@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma'
 import { documentacaoRequeridaDoProcesso } from '@/src/lib/process-stage/documentacao-requerida'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { ordensDeFase } from '@/src/services/documento-operacao'
+import { idsDeProcessosForaDaTorre } from '@/src/services/processo-pre-contrato'
 
 export interface ProgressoReal {
   required: number
@@ -169,11 +170,17 @@ export interface TempoPorFase {
  * depois). Uma fase ainda em curso (sem saída registrada) não entra na
  * média — só permanências COMPLETAS, para não subestimar o tempo real.
  *
- * `processoId` ausente = geral (todos os processos, mesma régua).
+ * `processoId` ausente = geral (os processos DA TORRE, mesma régua): quem está fora dela — Aguardando fechamento e pausado — não
+ * entra, o mesmo recorte dos contadores e do funil (achado 04/10/2026: o histórico do Antão, em Aguardando fechamento e da
+ * Espanha, aparecia como "4 dias" no "Todos" sem ser nenhum dos processos contados). Com `processoId`, é a história daquele processo.
  */
 export async function tempoMedioRealPorFase(processoId?: number): Promise<TempoPorFase[]> {
+  const foraDaTorre = processoId == null ? [...(await idsDeProcessosForaDaTorre())] : []
   const logs = await prisma.phaseAdvanceLog.findMany({
-    where: { resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, ...(processoId != null ? { processoId } : {}) },
+    where: {
+      resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] },
+      ...(processoId != null ? { processoId } : foraDaTorre.length > 0 ? { processoId: { notIn: foraDaTorre } } : {}),
+    },
     orderBy: [{ processoId: 'asc' }, { criadoEm: 'asc' }],
     select: { processoId: true, faseAtual: true, fasePretendida: true, criadoEm: true },
   })
