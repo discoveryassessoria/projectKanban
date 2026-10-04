@@ -9,6 +9,7 @@
 // atrasada" cria um campo que precisa de alguém para atualizar todo dia.
 
 import { prisma } from "@/lib/prisma"
+import { inicioDoDiaOperacional } from "@/lib/operacional/tempo-operacional"
 import { ROTULO_STATUS } from "@/src/lib/home/rotulo-status-tarefa"
 import type { DominioDef } from "../tipos"
 import { cadastro, contem, dataBR, diasEntre, emLista, igualId, periodo, porCampo, porMes } from "./_comuns"
@@ -31,8 +32,12 @@ const INCLUDE = {
   workflowStepInstance: { select: { id: true, stepKey: true } },
 } as const
 
-/** Atrasada = tem prazo, o prazo passou e ela não foi concluída. */
-const atrasada = (l: any) => !!l.dataPrazo && !l.concluida && new Date(l.dataPrazo) < new Date()
+/**
+ * Atrasada = a MESMA regra da Torre/Operação: prazo anterior a HOJE (dia operacional de São Paulo, não o instante), tarefa aberta
+ * e que não foi cancelada/substituída (cancelada nunca é "atrasada": não é trabalho a fazer).
+ */
+const encerradaSemSucesso = (l: any) => l.statusTarefa === "CANCELADA" || l.statusTarefa === "SUPERSEDIDA"
+const atrasada = (l: any) => !!l.dataPrazo && !l.concluida && !encerradaSemSucesso(l) && new Date(l.dataPrazo) < inicioDoDiaOperacional(new Date())
 
 // CANCELADA/SUPERSEDIDA não aparecem por padrão — achado real (28/09/2026):
 // de 48 tarefas totais, 13 eram CANCELADA(3)/SUPERSEDIDA(10) aparecendo sem
@@ -83,8 +88,8 @@ export const DOMINIO_TAREFAS: DominioDef = {
     { key: "atrasada", rotulo: "Atrasada",
       descricao: "Prazo no passado e ainda não concluída.", tipo: "booleano",
       paraWhere: (v) => (v.tipo !== "booleano" ? null
-        : v.valor ? { concluida: false, dataPrazo: { lt: new Date() } }
-        : { OR: [{ concluida: true }, { dataPrazo: null }, { dataPrazo: { gte: new Date() } }] }) },
+        : v.valor ? { concluida: false, statusTarefa: { notIn: [...STATUS_EXCLUIDOS_POR_PADRAO] }, dataPrazo: { lt: inicioDoDiaOperacional(new Date()) } }
+        : { OR: [{ concluida: true }, { statusTarefa: { in: [...STATUS_EXCLUIDOS_POR_PADRAO] } }, { dataPrazo: null }, { dataPrazo: { gte: inicioDoDiaOperacional(new Date()) } }] }) },
     { key: "sem_prazo", rotulo: "Sem prazo", tipo: "booleano",
       paraWhere: (v) => (v.tipo !== "booleano" ? null : v.valor ? { dataPrazo: null } : { dataPrazo: { not: null } }) },
     { key: "prioridade", rotulo: "Prioridade", tipo: "multi_selecao",
