@@ -105,6 +105,41 @@ todos os outros) e as cópias privadas são apagadas. Antes da confirmação os 
 Tornar privados **todos** os anexos de cliente (e a aba passar a abri-los por URL assinada) é uma tarefa
 própria, ainda não aberta.
 
+## 8b. PENDÊNCIAS DO PRÓXIMO BLOCO — armazenamento da coleta (registradas em 04/10/2026, após o teste real)
+
+Achadas no teste de ponta a ponta em produção (processo 847 "Teste link"). Nada disto foi corrigido ainda; a
+proposta vem antes do código.
+
+**P0 — O armazenamento "privado" não é privado.** O endereço público do bucket (`R2_PUBLIC_URL`, domínio `pub-….dev`)
+serve o bucket INTEIRO: um arquivo em `privado/coleta/<link>/<uuid>/...` abriu SEM autenticação (HTTP 200, conteúdo
+legível). O prefixo `privado/` é só um nome, não uma barreira. O comentário de `storage-privado.ts` ("nenhum arquivo
+aqui é servido pelo domínio público") está errado. A proteção hoje é só o uuid no caminho (não adivinhável).
+Alcance provável: também `privado/documentos/*` (procurações e documentos gerados, com CPF/RG/endereço) — NÃO foi
+verificado, de propósito, para não abrir esses arquivos. Opções: (A) bucket separado, sem endereço público, para
+`privado/` (+ variável nova; migrar o que já existe); (B) regra de bloqueio de `/privado/*` no domínio público
+(Cloudflare, fora do código, não verificável daqui).
+
+**a) Arquivo enviado sem o formulário concluído.** O navegador sobe o arquivo (URL assinada) ANTES de enviar o
+formulário; se o cliente desiste, o objeto fica em `privado/coleta/<link>/…` sem nenhuma linha no banco. Nada o
+apaga nunca (a purga só olha envios descartados).
+
+**b) Arquivos de link cujo processo foi excluído.** `ColetaLink → Processo`, `ColetaEnvio → ColetaLink` e
+`ColetaArquivo → ColetaEnvio` são `ON DELETE CASCADE`: apagar o processo apaga as linhas, inclusive a CHAVE do
+arquivo — e o objeto no storage fica sem referência alguma (órfão para sempre, impossível de localizar pelo banco).
+(Confirmado pelo schema e pela migration; o caminho de exclusão de processo não trata a coleta.)
+
+**c) Envios pendentes de processo que nunca saiu de "Aguardando fechamento".** Dados pessoais, CPF e arquivos
+ficam por prazo indeterminado; a retenção de 30 dias cobre só os DESCARTADOS.
+
+**d) (derivada) Anexos de cliente em endereço público** — ver §8; agravada pelo P0.
+
+Registro do teste real (04/10/2026, processo 847): link gerado → 3 pessoas enviadas pela URL pública de produção com
+RG e comprovante → pré-cadastro com 3 pendentes e 0 cadastros oficiais → saída de fase barrada com
+`CONFERENCIA_PENDENTE` → conferência (Requerente, Contratante, "os dois") → "os dois" = 1 Requerente + 1 Contratante
+com os dois ids no envio → nenhuma Pessoa criada, árvore intocada → 6 arquivos copiados para anexos e cópias
+privadas apagadas → link encerrado (`CONFERENCIA`) → envio no link encerrado recusado (404). Tudo removido ao final
+(somente itens com "TESTE COLETA" no nome); contagens voltaram à linha de base.
+
 ## 9. Testes e critério de aceite
 
 Cada regra acima tem teste na suíte crítica: reenvio por CPF; CPF inválido; consentimento obrigatório;
