@@ -221,6 +221,7 @@
   ]
  },
  "arquivos": [
+    "scripts/torre-paridade-numeros.test.ts",
   "scripts/fase-terminal-finalizacao-atomica.test.ts",
   "scripts/gate-finalizacao-todos-os-caminhos.test.ts",
   "scripts/execucao-do-passo.test.ts",

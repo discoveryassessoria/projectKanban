@@ -10,7 +10,8 @@ import { exigirBancoDeTeste } from "./_banco-de-teste"
 exigirBancoDeTeste("torre-bloco-f-score-e-sugestao.test.ts")
 
 import { prisma } from "../lib/prisma"
-import { scoreDeRisco, faixaDoScore, briefingDoDia, sugerirResponsavelPrecisaDeVoce, type ItemPrecisaDeVoceTorre } from "../lib/operacional/precisa-de-voce"
+import { scoreDeRisco, faixaDoScore, sugerirResponsavelPrecisaDeVoce, type ItemPrecisaDeVoceTorre } from "../lib/operacional/precisa-de-voce"
+import { briefingDoDia } from "../lib/operacional/precisa-de-voce-decisoes"
 import { abrirIndisponibilidade } from "../lib/operacional/organizacao"
 
 let passou = 0, falhou = 0

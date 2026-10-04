@@ -108,7 +108,7 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
           <>
             <div className="tor-num">
               {([["Abertas", foco.numeros.abertas], ["Vencidas", foco.numeros.vencidas], ["Aguardando terceiros", foco.numeros.comCartorio], ["Sem responsável", foco.numeros.semResponsavel]] as const).map(([r, n]) => (
-                <div key={r}><b>{n}</b><span>{r}</span></div>
+                <div key={r} title={r === "Aguardando terceiros" ? "Toda tarefa aberta esperando resposta de fora, com ou sem responsável (o filtro da aba Tarefas). Na Visão geral, as sem responsável contam em 'Sem responsável'." : undefined}><b>{n}</b><span>{r}</span></div>
               ))}
             </div>
             <div className="tor-card tor-scroll">

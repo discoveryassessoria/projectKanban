@@ -9,7 +9,10 @@
 // a aba Tarefas, os contadores e a aba Terceiros — o número do cartão é sempre o tamanho da lista que ele filtra.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { KPIS, KPI_POR_CHAVE, emRiscoCritico, linhasDoKpi, numeroDoKpi, processosEmRisco, type ChaveKpi } from "@/lib/operacional/torre-kpis"
+import { briefingDoDia } from "@/lib/operacional/precisa-de-voce-decisoes"
+import { classeDoFunil } from "@/lib/operacional/torre-funil-puro"
+import type { OntemPorPais } from "@/lib/operacional/precisa-de-voce"
 import { ABAS_DA_TORRE, ABA_INICIAL, ehAbaDaTorre, type Aba } from "@/lib/operacional/torre-abas"
 import { seloVisivel, separarFaseDaUrl, preservarFaseDeTarefas, filtrosNaQueryDaAba } from "@/lib/operacional/torre-casca"
 import { itensDoPais, mapaDePaisPorProcesso, contagemDeProcessosPorPais } from "@/lib/operacional/torre-pais"
@@ -124,7 +127,7 @@ export function Torre() {
   const [linhas, setLinhas] = useState<LinhaTorre[] | null>(null)
   const [permissoes, setPermissoes] = useState<PermissoesTorre | null>(null)
   const [erro, setErro] = useState<string | null>(null)
-  const [precisa, setPrecisa] = useState<{ itens: ItemPrecisa[]; briefing: string } | null>(null)
+  const [precisa, setPrecisa] = useState<{ itens: ItemPrecisa[]; nome: string | null; ontem: OntemPorPais } | null>(null)
   const [erroPrecisa, setErroPrecisa] = useState<string | null>(null)
   const [tend, setTend] = useState<Tendencias | null>(null)
   const [paises, setPaises] = useState<PaisDaTorre[]>([])
@@ -193,10 +196,10 @@ export function Torre() {
       if (r.ok) { setLinhas(r.data.linhas); setPermissoes(r.data.permissoes); setErro(null) }
       else setErro(erroDe(r.data, "Não foi possível carregar a Torre."))
     })
-    void api<{ itens: ItemPrecisa[]; briefing: string }>("/api/torre/precisa-de-voce").then((r) => {
+    void api<{ itens: ItemPrecisa[]; nome: string | null; ontem: OntemPorPais }>("/api/torre/precisa-de-voce").then((r) => {
       if (!vivo) return
       // O BRIEFING DO DIA É SÓ MANUAL (botão "Briefing do dia" do cabeçalho): nada abre sozinho ao entrar na Torre.
-      if (r.ok) { setPrecisa({ itens: r.data.itens, briefing: r.data.briefing }); setErroPrecisa(null) }
+      if (r.ok) { setPrecisa({ itens: r.data.itens, nome: r.data.nome, ontem: r.data.ontem }); setErroPrecisa(null) }
       else setErroPrecisa(erroDe(r.data, "Não foi possível carregar as decisões do dia."))
     })
     return () => { vivo = false }
@@ -226,6 +229,9 @@ export function Torre() {
 
   // País filtra TUDO: linhas (KPIs, Tarefas, Terceiros, contadores) e processos (Radar, Processos).
   const paisRotulo = paises.find((p) => p.chave === pais)?.rotulo ?? null
+  // UM critério de "estou filtrando por país" para TUDO (listas, KPIs, funil, backlog, tendência): só vale com o rótulo RESOLVIDO.
+  // `?pais=` desconhecido, ou antes de /api/torre/paises responder, = "Todos" em todas as superfícies (nunca metade filtrada).
+  const filtrandoPais = !!(pais && paisRotulo)
   const linhasPais = useMemo(() => (linhas == null || !pais || !paisRotulo ? linhas ?? [] : linhas.filter((l) => l.pais === paisRotulo)), [linhas, pais, paisRotulo])
   const processosFiltrados = useMemo(() => {
     const b = semAcento(busca.trim())
@@ -253,8 +259,22 @@ export function Torre() {
   const base = kpi ? linhasDoKpi(kpi, linhasPais, agora) : linhasPais
   // O número da aba = a lista que os filtros da barra deixam passar (a MESMA `aplicarFiltros` da tabela).
   const nTarefas = aplicarFiltros(aplicarBusca(base, busca) as LinhaTorre[], filtros, { usuarioId: permissoes?.usuarioId ?? null, agora }).mostrando
-  const filtrandoBacklogPais = !!pais // o backlog da semana é do total, não por nacionalidade
-  const nCobrar = linhasPais.filter((l) => l.cobravelVencida).length
+  const filtrandoBacklogPais = filtrandoPais
+  const nCobrar = numeroDoKpi("cob", linhasPais, agora)
+  // O TEXTO DO BRIEFING sai dos MESMOS conjuntos que os cartões mostram (país escolhido, "no ritmo" = a classe do funil, "vencem hoje" =
+  // o cartão da Agenda). Ele não vem mais pronto do servidor: era global e com outra régua de "no ritmo".
+  const textoDoBriefing = useMemo(() => {
+    if (!precisa) return ""
+    const escopo = filtrandoPais ? paisRotulo : null
+    const somar = (m: Record<string, number>) => (escopo != null ? m[escopo] ?? 0 : Object.values(m).reduce((a, b) => a + b, 0))
+    const itens = itensPrecisaPais ?? precisa.itens
+    return briefingDoDia(itens, agora, {
+      nome: precisa.nome,
+      ...(procs ? { ativos: processosPais.length, noRitmo: processosPais.filter((p) => classeDoFunil(p.risco) === "ritmo").length } : {}),
+      fechadasOntem: somar(precisa.ontem.fechadas), protocoladosOntem: somar(precisa.ontem.protocolados),
+      vencemHoje: numeroDoKpi("hoje", linhasPais, agora),
+    })
+  }, [precisa, itensPrecisaPais, procs, processosPais, linhasPais, filtrandoPais, paisRotulo, agora])
   const rotuloKpi = kpi ? KPI_POR_CHAVE[kpi].rotulo : undefined
 
   const escolherKpi = (k: ChaveKpi) => {
@@ -329,7 +349,7 @@ export function Torre() {
           linhas ? (
             <TorreVisaoGeral
               linhas={linhasPais} processos={procs ? processosPais : null} itensPrecisa={itensPrecisaPais} agora={agora} tend={tend}
-              filtrandoPais={!!pais} kpiAtivo={kpi} onEscolherKpi={escolherKpi}
+              filtrandoPais={filtrandoPais} paisRotulo={paisRotulo} kpiAtivo={kpi} onEscolherKpi={escolherKpi}
               onProcessos={() => { setFiltroProc(null); setAba("processos") }} onRisco={() => { setFiltroProc("risco"); setAba("processos") }}
               irParaAba={setAba} onRevisar={() => itensPrecisaPais && setRevisao([...itensPrecisaPais])}
             />
@@ -354,7 +374,7 @@ export function Torre() {
 
         {briefingAberto && precisa && (
           <TorreBriefing
-            texto={precisa.briefing} n={itensPrecisaPais?.length ?? precisa.itens.length} onFechar={() => setBriefingAberto(false)}
+            texto={textoDoBriefing} n={itensPrecisaPais?.length ?? precisa.itens.length} onFechar={() => setBriefingAberto(false)}
             onRevisar={() => { setBriefingAberto(false); setRevisao([...(itensPrecisaPais ?? precisa.itens)]) }}
           />
         )}

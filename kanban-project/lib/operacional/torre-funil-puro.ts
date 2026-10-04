@@ -258,13 +258,6 @@ export function hrefDaFase(faseKey: string, manter: { pais?: string | null; q?: 
   return `/torre?${q.toString()}`
 }
 
-/** O rótulo do país que está filtrando: o que os processos (ou, sem processo, as linhas) já recortados carregam. `null` = não dá para saber. */
-export function rotuloDoPaisFiltrado(
-  processos: Array<{ pais: string | null }> | null, linhas: Array<{ pais: string | null }>,
-): string | null {
-  return processos?.find((p) => p.pais)?.pais ?? linhas.find((l) => l.pais)?.pais ?? null
-}
-
 /** "etapa do processo (Genealogia → Protocolado)" — o intervalo vem das fases do cadastro (nunca literal); sem funil ainda, só a definição. */
 export function textoDaFaseNasPalavras(linhas: Array<{ label: string }>): string {
   return linhas.length >= 2 ? `etapa do processo (${linhas[0].label} → ${linhas[linhas.length - 1].label})` : 'etapa do processo'

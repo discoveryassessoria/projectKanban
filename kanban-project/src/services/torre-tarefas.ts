@@ -83,7 +83,7 @@ export async function listarTarefasDaTorre(
       podeIniciar: motivo === null,
       // Só interessa explicar quem TERIA sentido iniciar (não iniciada e no ponto de entrada).
       motivoNaoIniciar: l.aIniciar && l.statusTarefa === 'NAO_INICIADA' ? motivo : null,
-      cobravelVencida: ehCobravelVencido(l),
+      cobravelVencida: ehCobravelVencido({ ...l, cobrarEm: (bolas.get(l.taskId) as CamposDaBola | undefined)?.cobrarEm ?? null }),
     }
   })
   return { linhas, total: linhas.length, cobrancasVencidas: linhas.filter((l) => l.cobravelVencida).length }

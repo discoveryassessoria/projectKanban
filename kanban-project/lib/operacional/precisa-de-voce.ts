@@ -1062,113 +1062,52 @@ export async function decisoesDoDia(
 }
 
 // ─── BRIEFING DO DIA ────────────────────────────────────────────────────────
-
-/** A saudação pelo relógio de SÃO PAULO, nunca o do servidor (achado real,
- * 30/09/2026: em UTC "23h40 de terça" virava "Bom dia" — o servidor não
- * mora no fuso da operação). Bom dia 5h–12h, boa tarde 12h–18h, boa noite depois. */
-function saudacao(agora: Date): string {
-  const hora = Number(agora.toLocaleString('en-US', { timeZone: FUSO_OPERACIONAL, hour: 'numeric', hourCycle: 'h23' }))
-  if (hora >= 5 && hora < 12) return 'Bom dia'
-  if (hora >= 12 && hora < 18) return 'Boa tarde'
-  return 'Boa noite'
-}
-
-/** Os números do dia que o texto do Briefing cita ALÉM das decisões — todos de leitura real; ausente = a frase correspondente não aparece. */
-export interface ExtrasDoBriefing {
-  nome?: string | null
-  ativos?: number
-  noRitmo?: number
-  fechadasOntem?: number
-  protocoladosOntem?: number
-  vencemHoje?: number
-}
-
-const juntar = (partes: string[]): string => (partes.length <= 1 ? partes[0] ?? '' : `${partes.slice(0, -1).join(', ')} e ${partes[partes.length - 1]}`)
-const pl = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`
-
-/**
- * O TEXTO DO BRIEFING — a estrutura do protótipo ("Bom dia, <nome>. N processos ativos, M no ritmo. Ontem… Hoje vencem… N decisões
- * esperam você: …"), com os números REAIS. O que o sistema não mede (gargalo da semana, cobranças a fazer) não é escrito.
- */
-export function briefingDoDia(itens: ItemPrecisaDeVoceTorre[], agora = new Date(), extras: ExtrasDoBriefing = {}): string {
-  const dataFmt = agora.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL, weekday: 'long', day: '2-digit', month: 'long' })
-  const primeiroNome = extras.nome?.trim().split(/\s+/)[0]
-  const abertura = `${saudacao(agora)}${primeiroNome ? `, ${primeiroNome}` : ''}.`
-  if (itens.length === 0) return `${abertura} Hoje, ${dataFmt}: nada precisa de você agora.`
-
-  const frases: string[] = [abertura]
-  if (extras.ativos != null) frases.push(`${pl(extras.ativos, 'processo ativo', 'processos ativos')}${extras.noRitmo != null ? `, ${extras.noRitmo} no ritmo` : ''}.`)
-  if (extras.fechadasOntem != null || extras.protocoladosOntem != null) {
-    const partes: string[] = []
-    if (extras.fechadasOntem != null) partes.push(`a equipe fechou ${certidoes(extras.fechadasOntem)}`)
-    if (extras.protocoladosOntem != null) partes.push(`${pl(extras.protocoladosOntem, 'processo foi protocolado', 'processos foram protocolados')}`)
-    frases.push(`Ontem ${partes.join(' e ')}.`)
-  }
-  if (extras.vencemHoje != null) frases.push(extras.vencemHoje === 1 ? 'Hoje vence 1 prazo.' : `Hoje vencem ${extras.vencemHoje} prazos.`)
-
-  const c = contagemPorTipo(itens)
-  const semDono = itens.filter((i) => i.tipo === 'SEM_DONO')
-  const detalhes: string[] = []
-  if (c.SEM_DONO > 0) {
-    const grandes = semDono
-      .filter((i) => i.familiaNome)
-      .map((i) => ({ familia: i.familiaNome as string, n: Array.isArray(i.contexto.tarefaIds) ? (i.contexto.tarefaIds as number[]).length : 1 }))
-      .sort((a, b) => b.n - a.n).slice(0, 2)
-    const concentram = grandes.length >= 2
-      ? ` (${grandes[0].familia} e ${grandes[1].familia} concentram ${grandes[0].n + grandes[1].n})`
-      : grandes.length === 1 ? ` (${grandes[0].familia} concentra ${grandes[0].n})` : ''
-    detalhes.push(`${pl(c.SEM_DONO, 'processo com certidões sem responsável', 'processos com certidões sem responsável')}${concentram}`)
-  }
-  if (c.FASE_DEIXADA > 0) detalhes.push(pl(c.FASE_DEIXADA, 'fase deixada sem próxima ação', 'fases deixadas sem próxima ação'))
-  if (c.ESCALADA > 0) detalhes.push(pl(c.ESCALADA, 'cobrança escalada sem resposta', 'cobranças escaladas sem resposta'))
-  if (c.DIVERGENCIA > 0) detalhes.push(pl(c.DIVERGENCIA, 'divergência para reconciliar', 'divergências para reconciliar'))
-  if (c.BLOQUEADA > 0) detalhes.push(pl(c.BLOQUEADA, 'tarefa bloqueada há 10+ dias', 'tarefas bloqueadas há 10+ dias'))
-  if (c.CARGA > 0) {
-    const cargas = itens.filter((i) => i.tipo === 'CARGA')
-    const maior = cargas.map((i) => ({ nome: i.familiaNome ?? '', ...(i.contexto as { executaveis?: number; limite?: number }) }))
-      .filter((x) => x.executaveis != null && x.limite)
-      .sort((a, b) => (b.executaveis! / b.limite!) - (a.executaveis! / a.limite!))[0]
-    const acima = maior ? ` (${maior.nome} está com ${maior.executaveis} executáveis, ${Math.round((maior.executaveis! / maior.limite! - 1) * 100)}% ${maior.executaveis! >= maior.limite! ? 'acima do' : 'abaixo do'} limite de ${maior.limite})` : ''
-    detalhes.push(`${pl(c.CARGA, 'aviso de carga', 'avisos de carga')}${acima}`)
-  }
-  frases.push(`${itens.length === 1 ? '1 decisão espera' : `${itens.length} decisões esperam`} você: ${juntar(detalhes)}.`)
-  return frases.join(' ')
-}
+// O texto é puro e mora em `precisa-de-voce-decisoes.ts` (reexportado abaixo): a tela o monta com os conjuntos do país escolhido.
 
 // ─── A RESPOSTA DO ENDPOINT, MONTADA EM UM LUGAR ────────────────────────────
 
+/** O que aconteceu ONTEM por país (rótulo do país; '' = sem país) — o texto do Briefing soma o que a tela está mostrando (Todos ou um país). */
+export interface OntemPorPais { fechadas: Record<string, number>; protocolados: Record<string, number> }
+
 export interface RespostaPrecisaDeVoce {
   itens: ItemPrecisaDeVoceTorre[]
-  briefing: string
+  /**
+   * NÃO existe mais um texto de Briefing pronto aqui: ele era global e usava um "no ritmo" de outra régua, então com país escolhido
+   * o botão dizia 0 decisões e o texto 2. A tela monta o texto (`briefingDoDia`, puro) com os MESMOS conjuntos dos cartões; daqui vêm
+   * só o nome de quem lê e o que aconteceu ontem (que a tela não tem).
+   */
+  nome: string | null
+  ontem: OntemPorPais
   resumo: { total: number; criticos: number; atencao: number; porTipo: Record<TipoDoPainel, number>; escaladaApos: number }
 }
 
-/** Os números do dia do Briefing (processos ativos, no ritmo, fechadas e protocolados de ontem, prazos de hoje). */
-async function extrasDoBriefing(base: BaseDoPrecisa, agora: Date, db: Db): Promise<ExtrasDoBriefing> {
+/** Fechadas e protocolados de ONTEM, repartidos por país (processos fora da Torre não entram — o mesmo recorte de todo o resto). */
+async function ontemDoBriefing(agora: Date, db: Db): Promise<OntemPorPais> {
   const ontem = diaOperacional(new Date(agora.getTime() - 86_400_000))
   const janela = janelaDoDiaOperacionalDe(ontem)
-  const [ativos, fechadas, protocolados] = await Promise.all([
-    db.processo.count({ where: { AND: [ONDE_PROCESSO_NA_TORRE, { dataConclusao: null }] } }),
-    db.tarefa.count({
+  const [fechadas, protocolados] = await Promise.all([
+    db.tarefa.findMany({
       where: {
         statusTarefa: { in: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] }, dataConclusao: { gte: janela.inicio, lt: janela.fim },
         OR: [{ processoId: null }, { processo: ONDE_PROCESSO_NA_TORRE }],
       },
+      select: { processo: { select: { paisCanonico: { select: { countryLabel: true } } } } },
     }),
     db.phaseAdvanceLog.findMany({
-      where: { resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, fasePretendida: FASES.PROTOCOLADO.phaseKey, criadoEm: { gte: janela.inicio, lt: janela.fim } },
-      select: { processoId: true },
+      where: {
+        resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] }, fasePretendida: FASES.PROTOCOLADO.phaseKey, criadoEm: { gte: janela.inicio, lt: janela.fim },
+        processo: ONDE_PROCESSO_NA_TORRE,
+      },
+      select: { processoId: true, processo: { select: { paisCanonico: { select: { countryLabel: true } } } } },
     }),
   ])
-  // "No ritmo" = o processo ativo que NÃO tem decisão pendente de atenção ou crítica (o mesmo corte do Radar: score < 3).
-  const maxPorProcesso = new Map<number, number>()
-  for (const i of base.itens) if (i.processoId != null) maxPorProcesso.set(i.processoId, Math.max(maxPorProcesso.get(i.processoId) ?? 0, i.score))
-  const foraDoRitmo = [...maxPorProcesso.values()].filter((sc) => faixaDoScore(sc) !== 'OK').length
-  return {
-    ativos, noRitmo: Math.max(0, ativos - foraDoRitmo), fechadasOntem: fechadas,
-    protocoladosOntem: new Set(protocolados.map((p) => p.processoId)).size,
-    vencemHoje: base.linhas.filter((l) => l.venceHoje).length,
-  }
+  const somar = (m: Record<string, number>, pais: string | null | undefined) => { const k = pais ?? ''; m[k] = (m[k] ?? 0) + 1 }
+  const porFechadas: Record<string, number> = {}
+  for (const t of fechadas) somar(porFechadas, t.processo?.paisCanonico?.countryLabel)
+  const porProtocolados: Record<string, number> = {}
+  const vistos = new Set<number>()
+  for (const l of protocolados) { if (vistos.has(l.processoId)) continue; vistos.add(l.processoId); somar(porProtocolados, l.processo?.paisCanonico?.countryLabel) }
+  return { fechadas: porFechadas, protocolados: porProtocolados }
 }
 
 /**
@@ -1184,10 +1123,11 @@ export async function montarPrecisaDeVoce(
   const adiantadas = iniciarLeiturasIndependentes(agora, db, organizacaoP)
   const [organizacao, linhas] = await Promise.all([organizacaoP, lerLinhasOperacionais(agora, db)])
   const base = await lerBaseDoPrecisa({ agora, db, linhas, organizacao, adiantadas })
-  const [{ itens, escaladaApos }, extras] = await Promise.all([decisoesDoDia(base, agora, db, organizacao), extrasDoBriefing(base, agora, db)])
+  const [{ itens, escaladaApos }, ontem] = await Promise.all([decisoesDoDia(base, agora, db, organizacao), ontemDoBriefing(agora, db)])
   return {
     itens,
-    briefing: briefingDoDia(itens, agora, { ...extras, nome: opts.nomeDoUsuario ?? null }),
+    nome: opts.nomeDoUsuario ?? null,
+    ontem,
     resumo: {
       total: itens.length,
       criticos: itens.filter((i) => i.faixa === 'CRITICO').length,

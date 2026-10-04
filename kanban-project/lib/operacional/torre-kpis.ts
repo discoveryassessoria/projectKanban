@@ -35,6 +35,8 @@ export interface LinhaParaKpi {
   /** O processo desta linha está em risco CRÍTICO (score ≥ 6 do "Precisa de você" — o mesmo do Radar e da aba Processos). Anotado pela rota. */
   processoEmRisco?: boolean
   faseMacroKey: string | null
+  /** Data marcada para cobrar (ISO) — entra na conta de "Cobranças a fazer" (ver `ehCobravelVencido`). */
+  cobrarEm?: string | null
 }
 
 export type GrupoDoKpi = 'situacao' | 'agenda' | 'legado'
@@ -101,7 +103,7 @@ export const PREDICADO_DO_KPI: Partial<Record<ChaveKpi, PredicadoDeLinha>> = {
   amanha: (l, agora) => dias(l, agora) === 1,
   prox7: (l, agora) => { const d = dias(l, agora); return d != null && d >= 2 && d <= 7 },
   sprazo: (l) => l.dataPrazo == null,
-  cob: (l) => ehCobravelVencido(l),
+  cob: (l, agora) => ehCobravelVencido(l, agora),
   // ── legadas (foto E10, URLs antigas, visões salvas) — definições INALTERADAS ──
   v7: vence7,
   semdono: (l) => l.responsavelId == null,

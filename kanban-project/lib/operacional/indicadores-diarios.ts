@@ -29,9 +29,8 @@ import { prisma } from '@/lib/prisma'
 import { kpisDasLinhas, totaisDaSituacao } from './torre-kpis'
 import { listarTarefasDaTorre } from '@/src/services/torre-tarefas'
 import { processosCriticos, anotarRisco, ONDE_PROCESSO_ATIVO_DA_TORRE } from './torre-processos'
-import { ONDE_TAREFA_DE_PROCESSO_NA_TORRE } from '@/src/services/processo-pre-contrato'
+import { inicioDaSemana, ONDE_TAREFA_ABERTA_NA_SEMANA, ONDE_TAREFA_FECHADA_NA_SEMANA } from './torre-semana'
 
-const STATUS_CONCLUIDOS_SUCESSO = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'] as const
 
 export interface IndicadoresDoDia {
   vencidas: number
@@ -50,14 +49,6 @@ export interface IndicadoresDoDia {
   comCartorio: number
 }
 
-const inicioDaSemana = (d: Date) => {
-  const x = new Date(d)
-  const dia = (x.getDay() + 6) % 7 // 0 = segunda
-  x.setDate(x.getDate() - dia)
-  x.setHours(0, 0, 0, 0)
-  return x
-}
-
 /** CALCULA os 8 indicadores + backlog, AO VIVO — a mesma função que o cron
  * grava também serve para conferir "hoje" sem esperar a foto do dia. */
 export async function calcularIndicadoresDoDia(agora = new Date()): Promise<IndicadoresDoDia> {
@@ -70,8 +61,8 @@ export async function calcularIndicadoresDoDia(agora = new Date()): Promise<Indi
     processosCriticos(agora),
     prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_DA_TORRE }),
     // Backlog da semana: também fora da Torre o processo pausado e o em Aguardando fechamento (o mesmo filtro das listas).
-    prisma.tarefa.count({ where: { createdAt: { gte: inicioSemana }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
-    prisma.tarefa.count({ where: { statusTarefa: { in: [...STATUS_CONCLUIDOS_SUCESSO] }, dataConclusao: { gte: inicioSemana }, AND: [ONDE_TAREFA_DE_PROCESSO_NA_TORRE] } }),
+    prisma.tarefa.count({ where: ONDE_TAREFA_ABERTA_NA_SEMANA(inicioSemana) }),
+    prisma.tarefa.count({ where: ONDE_TAREFA_FECHADA_NA_SEMANA(inicioSemana) }),
   ])
   const linhas = anotarRisco(brutas, criticos)
   return { ...kpisDasLinhas(linhas, agora), ...totaisDaSituacao(linhas, agora), processosAtivos, backlogAbertas, backlogFechadasNaSemana: backlogFechadas }
