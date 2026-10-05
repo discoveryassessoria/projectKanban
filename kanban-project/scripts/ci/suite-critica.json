@@ -221,6 +221,7 @@
   ]
  },
  "arquivos": [
+    "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",
     "scripts/exclusao-processo-sem-orfao.test.ts",
     "scripts/torre-ajustes-passos-e-prazo.test.ts",
