@@ -50,8 +50,34 @@ export interface RelatorioDeOrfaos {
   copiasLegadasNoPublico: string[]
   /** Objetos em prefixo de backup intencional (não contam como órfãos). */
   backupsIntencionais: number
+  /** Links ainda ativos há mais de 90 dias com envios pendentes (só aviso — nada é apagado por isso). */
+  linksAtivosAntigosComPendentes?: LinkAntigoComPendentes[]
   /** Lembrete fixo: este relatório nunca apaga. */
   nota: string
+}
+
+/** Link ainda ATIVO há mais de 90 dias com envios pendentes: só relatório (o dono decide; o sistema não apaga por isso). */
+export const DIAS_LINK_ATIVO_ANTIGO = 90
+export interface LinkAntigoComPendentes { linkId: number; processoId: number; criadoEm: string; diasAtivo: number; pendentes: number }
+
+/** PURA — filtra e ordena (mais antigo primeiro). */
+export function linksAtivosAntigosComPendentes(
+  links: Array<{ linkId: number; processoId: number; criadoEm: Date; pendentes: number }>, agora: Date,
+): LinkAntigoComPendentes[] {
+  return links
+    .map((l) => ({ ...l, diasAtivo: Math.floor((agora.getTime() - l.criadoEm.getTime()) / 86_400_000) }))
+    .filter((l) => l.pendentes > 0 && l.diasAtivo > DIAS_LINK_ATIVO_ANTIGO)
+    .sort((a, b) => b.diasAtivo - a.diasAtivo || a.linkId - b.linkId)
+    .map((l) => ({ linkId: l.linkId, processoId: l.processoId, criadoEm: l.criadoEm.toISOString(), diasAtivo: l.diasAtivo, pendentes: l.pendentes }))
+}
+
+/** Lê (só leitura) os links ativos com envios pendentes. */
+export async function lerLinksAtivosComPendentes(agora = new Date()): Promise<LinkAntigoComPendentes[]> {
+  const links = await prisma.coletaLink.findMany({
+    where: { encerradoEm: null, envios: { some: { status: "PENDENTE" } } },
+    select: { id: true, processoId: true, criadoEm: true, _count: { select: { envios: { where: { status: "PENDENTE" } } } } },
+  })
+  return linksAtivosAntigosComPendentes(links.map((l) => ({ linkId: l.id, processoId: l.processoId, criadoEm: l.criadoEm, pendentes: l._count.envios })), agora)
 }
 
 export const NOTA_DO_RELATORIO = "Somente relatório. Nada foi apagado. Apagar órfão exige a ordem explícita do dono."
@@ -126,17 +152,18 @@ const LIMITE_NA_AUDITORIA = 300
 export async function conferirOrfaos(): Promise<RelatorioDeOrfaos> {
   const cfg = configDosBuckets()
   const [objetos, chaves] = await Promise.all([listarObjetosDosBuckets(cfg), lerChavesReferenciadasNoBanco()])
-  const rel = compararObjetosComReferencias({ objetos, chavesReferenciadas: chaves, buckets: cfg })
+  const rel: RelatorioDeOrfaos = { ...compararObjetosComReferencias({ objetos, chavesReferenciadas: chaves, buckets: cfg }), linksAtivosAntigosComPendentes: await lerLinksAtivosComPendentes() }
   await prisma.logAuditoria.create({
     data: {
       acao: "conferidor_orfaos_relatorio",
       entidade: "Storage",
       entidadeId: 0,
-      descricao: `Conferidor semanal: ${rel.orfaos.length} órfão(s) (${rel.bytesOrfaos} bytes), ${rel.referenciasSemObjeto.length} referência(s) sem objeto, ${rel.copiasLegadasNoPublico.length} cópia(s) legada(s) no público. ${NOTA_DO_RELATORIO}`,
+      descricao: `Conferidor semanal: ${rel.orfaos.length} órfão(s) (${rel.bytesOrfaos} bytes), ${rel.referenciasSemObjeto.length} referência(s) sem objeto, ${rel.copiasLegadasNoPublico.length} cópia(s) legada(s) no público, ${rel.linksAtivosAntigosComPendentes?.length ?? 0} link(s) ativo(s) há mais de ${DIAS_LINK_ATIVO_ANTIGO} dias com envio pendente. ${NOTA_DO_RELATORIO}`,
       detalhes: JSON.parse(JSON.stringify({
         totais: rel.totais, bytesOrfaos: rel.bytesOrfaos, backupsIntencionais: rel.backupsIntencionais,
         orfaos: rel.orfaos.slice(0, LIMITE_NA_AUDITORIA), orfaosTruncado: rel.orfaos.length > LIMITE_NA_AUDITORIA,
         referenciasSemObjeto: rel.referenciasSemObjeto.slice(0, LIMITE_NA_AUDITORIA), copiasLegadasNoPublico: rel.copiasLegadasNoPublico.slice(0, LIMITE_NA_AUDITORIA),
+        linksAtivosAntigosComPendentes: rel.linksAtivosAntigosComPendentes ?? [],
         nota: NOTA_DO_RELATORIO,
       })),
     },
