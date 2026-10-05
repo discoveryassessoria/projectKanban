@@ -23,5 +23,6 @@ ok("conta só as selecionadas DO grupo", contarSelecionadas([1, 2, 3], sel) === 
 ok("recolhido e selecionado: '2 selecionadas' / '1 selecionada'", textoSelecionadasNoGrupo(true, 2) === "2 selecionadas" && textoSelecionadasNoGrupo(true, 1) === "1 selecionada")
 ok("aberto ou nada selecionado: sem aviso", textoSelecionadasNoGrupo(false, 2) === null && textoSelecionadasNoGrupo(true, 0) === null)
 ok("estado da caixinha: todas / algumas / nenhuma", estadoDaSelecaoDoGrupo([1, 3], sel) === "todas" && estadoDaSelecaoDoGrupo([1, 2], sel) === "algumas" && estadoDaSelecaoDoGrupo([4], sel) === "nenhuma")
+ok("colunas fixas: fundo igual ao da linha (nunca o branco do popover) e altura inteira", /\.tf-fixa-0, \.tf-fixa-1 \{[^}]*background-color: var\(--surface-secondary\)[^}]*align-self: stretch/.test(css) && !/\.tf-fixa-0, \.tf-fixa-1 \{[^}]*surface-popover/.test(css))
 console.log(`\n${passou} ok, ${falhou} falhas`)
 process.exit(falhou ? 1 : 0)
