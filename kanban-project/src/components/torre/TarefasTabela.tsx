@@ -4,18 +4,17 @@
 // TUDO CABE NA TELA (sem arrastar para o lado): colunas fluidas, texto quebra linha. O cabeçalho das colunas fica DENTRO de cada bloco, abaixo da faixa da família.
 // Cabeçalho de grupo: ☐, a família (link), o resumo, "N tarefas" e "Foco ›". A certidão CANCELADA continua visível — riscada, no fim do
 // grupo, com "Ver motivo" — mas é só exibição: não conta no "N tarefas", não tem seleção e não entra em lote.
-// Prazo: SEMPRE o da tarefa, uma vez só (`textoPrazoDaTarefa`). Status: `ROTULO_STATUS_TAREFA` (via `statusDaLinha`).
+// Prazo: SEMPRE o da tarefa, uma vez só, curto (`textoPrazoCompacto`: "venceu há 5 dias", ≤ 2 linhas; a data vai na dica). Status: `ROTULO_STATUS_TAREFA` (via `statusDaLinha`).
 import Link from "next/link"
 import { Fragment, useState } from "react"
 import { alternarGrupo, contarSelecionadas, expandirTudo, grupoAberto, recolherTudo, textoSelecionadasNoGrupo } from "@/lib/operacional/torre-tarefas-grupos"
 import {
-  acoesDaLinha, statusDaLinha, textoDaBola, textoDoCobrar, textoDoIniciou, resumoDoGrupo, type AcaoDaLinha, type Agrupar,
+  acoesDaLinha, statusDaLinha, textoDaBola, textoDoCobrar, textoPrazoCompacto, textoDoIniciou, resumoDoGrupo, type AcaoDaLinha, type Agrupar,
 } from "@/lib/operacional/torre-tarefas-tela"
 import {
   passoLabelDe, docTipoTxt, aIniciarEfetivo, acaoDe, agruparDentroDaFamilia,
 } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { rotularFase } from "@/src/components/operacao/kit-operacional"
-import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import { riscoDe, temAcompanhamento } from "./tipos"
 import type { ProcessoDaTorre } from "./tipos-processos"
 import { ehCancelada, type LinhaDaTela } from "./tarefas-tipos"
@@ -63,6 +62,7 @@ export function TarefasTabela({
     const st = statusDaLinha(l)
     const bola = textoDaBola(l, agora)
     const cobrar = cancelada ? null : textoDoCobrar(l.cobrarEm, agora)
+    const prazo = textoPrazoCompacto(l, agora)
     const risco = riscoDe(l)
     const aIniciar = aIniciarEfetivo(l)
     const acoes = acoesDaLinha({
@@ -96,7 +96,7 @@ export function TarefasTabela({
         </div>
         <div className={`tf-t13 ${semDono && !cancelada ? "tf-b tf-verm" : ""}`}>{cancelada ? "—" : l.responsavelNome ?? "Sem responsável"}</div>
         <div className="tf-t13" style={{ fontVariantNumeric: "tabular-nums" }}>{cancelada ? "—" : textoDoIniciou(l)}</div>
-        <div className={`tf-t13 ${l.atrasada && !cancelada ? "tf-b tf-verm" : ""}`}>{cancelada ? "—" : textoPrazoDaTarefa(l) || "—"}</div>
+        <div className={`tf-t13 tf-prazo ${l.atrasada && !cancelada ? "tf-b tf-verm" : ""}`} title={!cancelada && prazo.dica ? `Prazo: ${prazo.dica}` : undefined}>{cancelada ? "—" : prazo.texto}</div>
         <div><span className={`tf-rk ${TOM_RISCO[risco.cls] ?? "grn"}`}>{risco.txt}</span></div>
         <div className="tf-acoes">
           {acoes.map((a, i) => (

@@ -221,6 +221,7 @@
   ]
  },
  "arquivos": [
+    "scripts/torre-ajustes-passos-e-prazo.test.ts",
     "scripts/tempo-extenso.test.ts",
     "scripts/torre-tarefas-blocos.test.ts",
     "scripts/torre-aguardando-vocabulario.test.ts",

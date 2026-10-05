@@ -61,3 +61,5 @@
 .tor-pf-rel:hover { background: var(--surface-tertiary); }
 .tor-pf-rodape { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
 .tor-pf-vazio { padding: 14px 16px; font-size: 13px; color: var(--text-secondary); }
+
+.tor-pf-semresp { margin-top: 8px; font-size: 12px; color: var(--text-secondary); font-style: italic; }

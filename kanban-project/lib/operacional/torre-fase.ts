@@ -233,9 +233,15 @@ export interface PassosDaFase {
   /** Todas as tarefas da fase (abertas + concluídas) — o número do título. */
   total: number
   substantivo: 'certidões' | 'tarefas'
+  /** SÓ passos reais (+ "Concluídas"). "Sem responsável" NÃO é passo: vem à parte, em `semResponsavel`. */
   caixas: CaixaDoPasso[]
+  /** Tarefas abertas sem responsável — mostradas numa linha separada, para a soma continuar batendo com `total`. */
+  semResponsavel: number
   gargalo: string
 }
+
+/** A soma do que o cartão mostra: cada caixa + a linha de "sem responsável". Tem de ser igual a `total`. */
+export const somaExibidaDosPassos = (p: Pick<PassosDaFase, 'caixas' | 'semResponsavel'>): number => p.caixas.reduce((a, c) => a + c.n, 0) + p.semResponsavel
 
 /**
  * O CARTÃO POR PASSO — grain TAREFA (a certidão é a unidade de trabalho; um passo NÃO multiplica a contagem). Caixas, na ordem:
@@ -258,7 +264,7 @@ export function passosDaFase(linhasDaFase: ProcessoDaTorre[], metaDias: number |
   }
   const passos = [...agregado.values()].sort((a, b) => a.ordem - b.ordem || a.label.localeCompare(b.label, 'pt-BR'))
 
-  const caixas: CaixaDoPasso[] = [{ chave: '__sem_responsavel', nome: SEM_RESPONSAVEL, obs: 'sem responsável', n: semResp, classe: 'r' }]
+  const caixas: CaixaDoPasso[] = []
   for (const x of passos) {
     const espera = x.aguardando * 2 >= x.n
     const obs = x.acimaDaMeta > 0 && metaDias != null ? `${x.acimaDaMeta} há mais de ${diasPorExtenso(metaDias)}`
@@ -276,5 +282,5 @@ export function passosDaFase(linhasDaFase: ProcessoDaTorre[], metaDias: number |
     const extra = maior.acimaDaMeta > 0 && metaDias != null ? `, ${milhar(maior.acimaDaMeta)} há mais de ${diasPorExtenso(metaDias)}` : ''
     gargalo = `O passo com mais volume${parado ? ' parado' : ''} é ${maior.label}: ${milhar(maior.n)} ${substantivo}${extra}.`
   }
-  return { total: abertas + concl, substantivo, caixas, gargalo }
+  return { total: abertas + concl, substantivo, caixas, semResponsavel: semResp, gargalo }
 }
