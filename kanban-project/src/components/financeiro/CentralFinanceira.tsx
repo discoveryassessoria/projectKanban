@@ -10,6 +10,7 @@
 // ============================================================================
 "use client"
 
+import { totaisAReceber, estaEmAbertoAReceber, estaVencida, venceEm } from "@/lib/financeiro/leitura/totais-a-receber"
 import { useEffect, useMemo, useState } from "react"
 import { Wallet, TrendingUp, AlertTriangle, Clock, Landmark, Coins, ArrowRight, Receipt, FileText, RefreshCw } from "lucide-react"
 import { PageHeader, KpiCard, SectionCard, Thead, Th, Tr, StatusBadge, EmptyState, PrimaryButton, SecondaryButton, LinkAction, FilterChip } from "@/src/components/financeiroComponents/ui/kit"
@@ -24,6 +25,8 @@ interface Obr {
   obrigacaoId: number; codigoOperacional: string | null; descricao: string | null; direcao: string; status: string
   processoId: number | null; moeda: string; valorContratado: number; saldo: number; recebido: number
   vencimento: string | null; requerente: string | null; responsavel: string | null
+  /** Em REAIS, pela regra de câmbio da própria obrigação (a mesma da aba A Receber). `saldo` é na moeda da obrigação. */
+  saldoBrl: number; recebidoBrl: number
 }
 
 export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => void }) {
@@ -59,20 +62,22 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
   // trocava a identidade de `emAberto`. Estabilizar aqui conserta os dois.
   const aReceber = useMemo(() => obrs.filter((o) => o.direcao === "A_RECEBER"), [obrs])
   const emAberto = useMemo(
-    () => aReceber.filter((o) => o.saldo > 0.005 && o.status !== "CANCELADA"),
+    () => aReceber.filter((o) => estaEmAbertoAReceber(o) && o.status !== "CANCELADA"),
     [aReceber],
   )
   // Instante de referência do painel, fixado na montagem. Ler o relógio durante
   // o render dá um valor diferente a cada passagem — a lista "vencidas" mudaria
   // sozinha entre renders sem nada ter mudado nos dados.
   const [agora] = useState(() => Date.now())
-  const vencidas = useMemo(() => emAberto.filter((o) => o.vencimento && new Date(o.vencimento).getTime() < agora).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [emAberto, agora])
-  const vencendo = useMemo(() => emAberto.filter((o) => { const dd = diasAte(o.vencimento); return dd != null && dd >= 0 && dd <= horizonte }).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [emAberto, horizonte])
+  const vencidas = useMemo(() => emAberto.filter((o) => estaVencida(o, new Date(agora))).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [emAberto, agora])
+  const vencendo = useMemo(() => emAberto.filter((o) => venceEm(o, new Date(agora), horizonte)).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [emAberto, agora, horizonte])
 
-  const totalReceber = resumo?.aReceber?.saldo ?? emAberto.reduce((s, o) => s + o.saldo, 0)
-  const totalRecebido = resumo?.aReceber?.recebido ?? aReceber.reduce((s, o) => s + o.recebido, 0)
-  const totalVencido = vencidas.reduce((s, o) => s + o.saldo, 0)
-  const totalPrevisto = vencendo.reduce((s, o) => s + o.saldo, 0)
+  // TODOS os totais em REAIS, pela função única que a aba A Receber também usa (nada de somar euro como se fosse real).
+  const totais = useMemo(() => totaisAReceber(obrs, new Date(agora), horizonte), [obrs, agora, horizonte])
+  const totalReceber = totais.totalReceberBRL
+  const totalRecebido = totais.totalRecebidoBRL
+  const totalVencido = totais.totalVencidoBRL
+  const totalPrevisto = totais.totalAVencerBRL
 
   const ir = (tab: string) => onIrPara?.(tab)
 
@@ -82,7 +87,7 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
       <Tr key={o.obrigacaoId} onClick={o.processoId ? () => window.open(`/processos/${o.processoId}`, "_blank") : undefined}>
         <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-primary)" }}>{o.codigoOperacional ?? `OBR-${o.obrigacaoId}`}</td>
         <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{o.requerente ?? o.descricao ?? "—"}</td>
-        <td className="py-2.5 px-2 text-sm text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{brl(o.saldo)}</td>
+        <td className="py-2.5 px-2 text-sm text-right tabular-nums" style={{ color: "var(--text-primary)" }}>{brl(o.saldoBrl)}</td>
         <td className="py-2.5 px-2 text-sm">{dataBR(o.vencimento)}</td>
         <td className="py-2.5 px-2 text-center"><StatusBadge tone={tone}>{tone === "danger" ? `${Math.abs(dd ?? 0)}d em atraso` : dd === 0 ? "vence hoje" : `em ${dd}d`}</StatusBadge></td>
       </Tr>
@@ -105,7 +110,7 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
 
       {/* KPIs consolidados (read-model — sem regra própria) */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <KpiCard icon={<TrendingUp className="h-4 w-4" />} label="Total a receber" value={loading ? "…" : brl(totalReceber)} sub={`${emAberto.length} em aberto`} />
+        <KpiCard icon={<TrendingUp className="h-4 w-4" />} label="Total a receber" value={loading ? "…" : brl(totalReceber)} sub={`${totais.qtdEmAberto} em aberto`} />
         <KpiCard icon={<Wallet className="h-4 w-4" />} label="Total recebido" value={loading ? "…" : brl(totalRecebido)} iconTone="success" />
         <KpiCard icon={<AlertTriangle className="h-4 w-4" />} label="Total vencido" value={loading ? "…" : brl(totalVencido)} sub={pluralizar(vencidas.length, "cobrança")} iconTone="danger" />
         <KpiCard icon={<Clock className="h-4 w-4" />} label={`A vencer (${horizonte}d)`} value={loading ? "…" : brl(totalPrevisto)} sub={pluralizar(vencendo.length, "cobrança")} iconTone="warning" />
