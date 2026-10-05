@@ -23,8 +23,11 @@ Contexto e decisões anteriores: `docs/coleta-de-dados-mandato.md` §8 e §8b.
    - conferência final: o bucket público tem agora **43 objetos, todos sob `privado/`** (nenhum do manifesto sobrou; nada fora do manifesto
      foi tocado); o bucket privado continua com 56 (43 + 13 do backup do Antão); 4 endereços públicos testados (3 do manifesto + o citado
      na auditoria) respondem **404**.
-4. **Continua pendente:** apagar do público os 43 de `privado/` (só depois de 05/10/2026 18:02 UTC e com o "apaga" separado do Marco) e
-   o restante deste documento (anexos novos no bucket privado, pontos a/b/c de privacidade).
+4. **05/10/2026 — bucket público esvaziado e acesso público desligado.** Os 43 de `privado/` foram apagados do público (0 objetos).
+   O PR #27 pôs todo anexo novo no `discovery-privado` (`privado/anexos/...`), aberto só por URL assinada de 5 min após login + permissão.
+   Em seguida o acesso público (r2.dev) do `discovery-documents` foi desligado (`wrangler r2 bucket dev-url disable`; o bucket não foi apagado
+   e não havia domínio customizado). Conferido: o endereço público antigo responde 401 (antes 404 por não existir objeto); `discovery-privado`
+   segue com os 58 objetos; leitura por URL assinada devolve 206 nos 45 objetos `privado/` (os 13 do backup do Antão não são servidos pela tela).
 
 Por causa da decisão 1, a seção 1 abaixo (migração dos 287) fica **superada**: não há mais o que migrar; ela permanece só como registro do
 levantamento. As seções 1.5 (como o sistema passa a ler do privado) e 2 (três pontos) seguem valendo para o que vem a seguir.
