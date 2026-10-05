@@ -21,17 +21,22 @@
 .pdv-tipo-t { font-weight: 600; font-size: 13px; }
 .pdv-tipo-r { font-size: 12px; color: var(--text-secondary); }
 
-/* ── a tabela: Tipo · O que está acontecendo · Sugestão do sistema · Ação ── */
+/* ── a tabela: Família · Tipo · Fase · Tarefa · Quantidade · Ação (cabe na tela, sem rolagem lateral) ── */
 .pdv-tab { display: flex; flex-direction: column; overflow-x: auto; }
-.pdv-hd, .pdv-lin { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 2.6fr) minmax(0, 2fr) minmax(270px, 1.9fr); gap: 12px; min-width: 940px; }
+.pdv-hd, .pdv-lin { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 2.2fr) minmax(0, .9fr) minmax(150px, 1.3fr); gap: 10px; }
 .pdv-hd { padding: 6px 4px; font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: .04em; text-transform: uppercase; border-bottom: 1px solid var(--border-subtle); }
 .pdv-lin { padding: 7px 4px; align-items: center; border-bottom: 1px solid var(--border-subtle); }
 .pdv-lin.some { opacity: .45; pointer-events: none; }
-.pdv-quem { display: flex; flex-direction: column; min-width: 0; }
+.pdv-quem { display: flex; flex-direction: column; min-width: 0; overflow-wrap: break-word; font-size: 13px; }
 .pdv-quem a { font-weight: 600; color: var(--text-primary); text-decoration: underline; }
 .pdv-quem a:hover { color: var(--info-text); }
 .pdv-det { font-size: 12px; color: var(--text-secondary); }
-.pdv-sug { font-size: 13px; color: var(--text-secondary); }
+.pdv-fam { display: flex; flex-direction: column; min-width: 0; overflow-wrap: break-word; }
+.pdv-fam a { font-weight: 600; color: var(--text-primary); text-decoration: underline; }
+.pdv-fam a:hover { color: var(--info-text); }
+.pdv-t13 { font-size: 13px; overflow-wrap: break-word; }
+.pdv-qtd { display: flex; flex-direction: column; min-width: 0; }
+.pdv-qtd b { font-size: 16px; font-weight: 700; }
 .pdv-acoes { display: flex; gap: 6px; flex-wrap: wrap; }
 .pdv-b1, .pdv-b2 { height: 30px; padding: 0 10px; border-radius: 6px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .pdv-b1 { background: var(--action-primary); color: var(--action-primary-ink); border: 0; }

@@ -1,5 +1,5 @@
 // Tipos do "Precisa de você" no cliente — espelho de `ItemPrecisaDeVoceTorre` (lib/operacional/precisa-de-voce.ts) em JSON.
-import { TIPOS_DO_PAINEL, ROTULO_DO_TIPO, regraDoTipo, ESCALAR_APOS_PADRAO, type TipoDoPainel } from "@/lib/operacional/precisa-de-voce-decisoes"
+import { TIPOS_DO_PAINEL, ROTULO_DO_TIPO, regraDoTipo, ESCALAR_APOS_PADRAO, type TipoDoPainel, type ColunasDoItem } from "@/lib/operacional/precisa-de-voce-decisoes"
 
 export type TipoItem = TipoDoPainel | "PAREDE_A_FRENTE"
 export interface AcaoDoItem { rotulo: string; acao: string }
@@ -14,6 +14,8 @@ export interface ItemPrecisa {
   titulo: string
   detalhe: string
   sugestao: string | null
+  /** Família · Fase · Tarefa · Quantidade da tabela (cada informação uma vez). */
+  colunas?: ColunasDoItem
   acao1: AcaoDoItem
   acao2: AcaoDoItem
   /** Onde o título leva: o Detalhe do Processo (ou a Equipe, na Carga). */
