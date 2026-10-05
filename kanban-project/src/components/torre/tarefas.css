@@ -84,8 +84,11 @@
 .tf-sub-grp { background: var(--surface-secondary); border-top: 1px solid var(--border-default); }
 .tf-linha { border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 /* ☐ e Certidão FIXOS à esquerda na rolagem horizontal (precisam de fundo próprio para não deixar o texto passar por baixo). */
-.tf-fixa-0, .tf-fixa-1 { position: sticky; z-index: 2; background: inherit; }
+.tf-fixa-0, .tf-fixa-1 { position: sticky; z-index: 2; background-color: var(--surface-popover); align-self: stretch; display: flex; align-items: center; } /* stretch: o fundo cobre a ALTURA INTEIRA da linha (senão o texto vizinho aparece acima/abaixo do ☐ ao rolar) */ /* OPACO: o fundo da linha é translúcido e deixaria a coluna vizinha aparecer por baixo */
+.tf-linha.sel .tf-fixa-0, .tf-linha.sel .tf-fixa-1 { background-image: linear-gradient(var(--info-tile), var(--info-tile)); }
+.tf-hd .tf-fixa-0, .tf-hd .tf-fixa-1 { background-image: linear-gradient(var(--surface-tertiary), var(--surface-tertiary)); }
 .tf-fixa-0 { left: 0; }
+.tf-cert.tf-fixa-1 { flex-direction: row; align-items: center; justify-content: flex-start; padding-left: 4px; }
 .tf-fixa-1 { left: 34px; box-shadow: 1px 0 0 var(--border-default); }
 .tf-hd { position: relative; min-width: 1700px; padding: 10px 26px; } /* 26 = margem do bloco (12) + borda (2) + respiro da linha (12): as colunas do cabeçalho alinham com as dos blocos */
 .tf-bloco .tf-g { min-width: 0; }
