@@ -4,6 +4,7 @@ import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { ImagemDeAnexo, MiniaturaPdfDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
+import { authHeaders, jsonHeaders } from "@/src/lib/financeiro/http"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -524,7 +525,7 @@ function ConteudoModal({
         // Salvar no banco com categoria
         const response = await fetch("/api/anexos", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: jsonHeaders(),
           body: JSON.stringify({
             nome: uploaded.name,
             nomeArquivo: uploaded.name,
@@ -560,6 +561,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
   try {
     const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${anexo.id}`, {
       method: "DELETE",
+      headers: authHeaders(),
     })
     
     if (response.ok) {
@@ -601,7 +603,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
           try {
             const response = await fetch("/api/anexos", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: jsonHeaders(),
               body: JSON.stringify({
                 nome: file.name,
                 nomeArquivo: file.name,
@@ -653,6 +655,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
       try {
         const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${anexo.id}`, {
           method: "DELETE",
+      headers: authHeaders(),
         })
         
         if (response.ok) {

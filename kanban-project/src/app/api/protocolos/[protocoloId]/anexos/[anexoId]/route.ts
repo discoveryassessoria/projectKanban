@@ -2,7 +2,8 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { exigirPermissao } from '@/src/lib/verificar-permissao'
+import { excluirAnexos } from '@/src/services/anexos-exclusao'
 
 // DELETE - Excluir anexo específico
 export async function DELETE(
@@ -10,7 +11,7 @@ export async function DELETE(
   { params }: { params: Promise<{ protocoloId: string; anexoId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar')
+    const { usuario, erro } = await exigirPermissao(request, 'processos.editar')
     if (erro) return erro
 
     const { protocoloId, anexoId } = await params
@@ -39,9 +40,7 @@ export async function DELETE(
       )
     }
 
-    await prisma.anexoProtocolo.delete({
-      where: { id: anexoIdNum }
-    })
+    await excluirAnexos({ tabela: "AnexoProtocolo", ids: [anexoIdNum], protocoloId: protocoloIdNum, usuarioId: usuario.userId })
 
     return NextResponse.json({ message: "Anexo excluído com sucesso" })
   } catch (error) {

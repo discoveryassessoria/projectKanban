@@ -1,13 +1,19 @@
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { extrairUsuarioKanban } from "@/lib/kanban-auth"
+import { exigirPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { excluirAnexos } from "@/src/services/anexos-exclusao"
 import { promoverRascunhoDeAnexo } from "@/src/lib/anexos/storage"
 import { leituraDoValor, alvoDaChave } from "@/src/lib/anexos/chave"
 
 // POST - Salvar anexo
 export async function POST(request: NextRequest) {
   try {
+    // Login + permissão sobre o cadastro do cliente (criar ou editar). Sem login 401; sem permissão 403.
+    const usuarioLogado = await extrairUsuarioComPermissoes(request)
+    if (!usuarioLogado) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+    if (usuarioLogado.permissoes["clientes.editar"] !== true && usuarioLogado.permissoes["clientes.criar"] !== true) {
+      return NextResponse.json({ error: "Sem permissão para esta ação", permissao: "clientes.editar" }, { status: 403 })
+    }
     const body = await request.json()
     const { nome, nomeArquivo, urlArquivo: urlArquivoRecebido, tamanho, mimeType, tipoCliente, contratanteId, requerenteId, categoria } = body
 
@@ -20,13 +26,19 @@ export async function POST(request: NextRequest) {
     let urlArquivo = urlArquivoRecebido as string
     const ehRascunho = leituraDoValor(urlArquivo).tipo === "chave" && alvoDaChave(urlArquivo)?.dominio === "rascunho"
     if (ehRascunho) {
-      const usuario = await extrairUsuarioKanban(request)
-      if (!usuario) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      const usuario = usuarioLogado
       const dono = tipoCliente === "requerente" && requerenteId
         ? { dominio: "requerente" as const, id: parseInt(requerenteId) }
         : { dominio: "contratante" as const, id: parseInt(contratanteId) }
       if (!Number.isInteger(dono.id)) return NextResponse.json({ error: "ID do cliente é obrigatório" }, { status: 400 })
       urlArquivo = await promoverRascunhoDeAnexo(urlArquivo, dono, usuario.userId, nomeArquivo)
+    } else if (leituraDoValor(urlArquivo).tipo === "chave") {
+      // Chave já definitiva: só pode ser gravada na linha do dono que a chave nomeia (ninguém "cola" o anexo de outro cliente no seu).
+      const alvo = alvoDaChave(urlArquivo)
+      const donoEsperado = tipoCliente === "requerente" && requerenteId ? { dominio: "requerente", id: parseInt(requerenteId) } : { dominio: "contratante", id: parseInt(contratanteId) }
+      if (!alvo || alvo.dominio !== donoEsperado.dominio || alvo.id !== donoEsperado.id) {
+        return NextResponse.json({ error: "Arquivo não pertence a este cliente" }, { status: 403 })
+      }
     }
 
     let anexo
@@ -71,6 +83,8 @@ export async function POST(request: NextRequest) {
 // GET - Buscar anexos por cliente
 export async function GET(request: NextRequest) {
   try {
+    const { erro } = await exigirPermissao(request, "clientes.ver")
+    if (erro) return erro
     const { searchParams } = new URL(request.url)
     const tipoCliente = searchParams.get("tipoCliente")
     const id = searchParams.get("id")
@@ -100,28 +114,28 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// DELETE - Excluir anexo
+// DELETE - Excluir anexo (login + clientes.editar; linha + auditoria numa transação, objeto apagado DEPOIS do commit)
 export async function DELETE(request: NextRequest) {
   try {
+    const { usuario, erro } = await exigirPermissao(request, "clientes.editar")
+    if (erro) return erro
+
     const { searchParams } = new URL(request.url)
     const tipoCliente = searchParams.get("tipoCliente")
-    const id = searchParams.get("id")
+    const id = parseInt(searchParams.get("id") ?? "")
 
-    if (!id) {
+    if (!Number.isInteger(id)) {
       return NextResponse.json({ error: "ID é obrigatório" }, { status: 400 })
     }
 
-    if (tipoCliente === "requerente") {
-      await prisma.anexoRequerente.delete({
-        where: { id: parseInt(id) },
-      })
-    } else {
-      await prisma.anexoContratante.delete({
-        where: { id: parseInt(id) },
-      })
-    }
+    const r = await excluirAnexos({
+      tabela: tipoCliente === "requerente" ? "AnexoRequerente" : "AnexoContratante",
+      ids: [id],
+      usuarioId: usuario.userId,
+    })
+    if (r.excluidos === 0) return NextResponse.json({ error: "Anexo não encontrado" }, { status: 404 })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, arquivosNaoApagados: r.falhas.length })
   } catch (error) {
     console.error("Erro ao excluir anexo:", error)
     return NextResponse.json({ error: "Erro ao excluir anexo" }, { status: 500 })

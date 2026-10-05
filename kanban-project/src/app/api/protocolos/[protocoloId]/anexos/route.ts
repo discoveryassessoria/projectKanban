@@ -2,7 +2,9 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, exigirPermissao } from '@/src/lib/verificar-permissao'
+import { excluirAnexos } from '@/src/services/anexos-exclusao'
+import { leituraDoValor, alvoDaChave } from '@/src/lib/anexos/chave'
 
 // GET - Buscar anexos de um protocolo
 export async function GET(
@@ -10,6 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
+    const erro = await verificarPermissao(request, 'processos.ver')
+    if (erro) return erro
+
     const { protocoloId } = await params
     const id = parseInt(protocoloId)
 
@@ -64,6 +69,14 @@ export async function POST(
       )
     }
 
+    // Chave definitiva só entra na linha do protocolo que ela nomeia.
+    if (leituraDoValor(urlArquivo).tipo === "chave") {
+      const alvo = alvoDaChave(urlArquivo)
+      if (!alvo || alvo.dominio !== "protocolo" || alvo.id !== id) {
+        return NextResponse.json({ error: "Arquivo não pertence a este protocolo" }, { status: 403 })
+      }
+    }
+
     // Verificar se protocolo existe
     const protocolo = await prisma.protocolo.findUnique({
       where: { id }
@@ -104,7 +117,7 @@ export async function DELETE(
   { params }: { params: Promise<{ protocoloId: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar_paginas')
+    const { usuario, erro } = await exigirPermissao(request, 'processos.editar_paginas')
     if (erro) return erro
 
     const { protocoloId } = await params
@@ -117,9 +130,7 @@ export async function DELETE(
       )
     }
 
-    await prisma.anexoProtocolo.deleteMany({
-      where: { protocoloId: id }
-    })
+    await excluirAnexos({ tabela: "AnexoProtocolo", protocoloId: id, usuarioId: usuario.userId })
 
     return NextResponse.json({ message: "Anexos excluídos com sucesso" })
   } catch (error) {
