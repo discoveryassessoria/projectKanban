@@ -8,6 +8,7 @@
 // FONTE ÚNICA reaproveitada (nada recalculado): `PREDICADO_DO_KPI` (o mesmo dos cartões do topo), `nivelDeRisco`,
 // `diasAtePrazo`, `torre-bola.ts` (bolaCom / bolaDesde / cobrarEm), `ROTULO_STATUS_TAREFA` e `textoPrazoDaTarefa`.
 // ============================================================================
+import { diasPorExtenso } from './tempo-extenso'
 import { PREDICADO_DO_KPI, diasAtePrazo } from './torre-kpis'
 import { diasEntreDiasOperacionais, FUSO_OPERACIONAL } from './tempo-operacional'
 import type { BolaCom } from './torre-bola'
@@ -94,16 +95,17 @@ export interface LinhaParaBolaDaTela {
 }
 
 /**
- * "Bola com" — "Nossa" · "Cliente · há 14 d" · "Cartório de Caxias do Sul · há 21 d". Com terceiro, o NOME do órgão da tarefa
- * (se tiver) ou o rótulo da categoria (Cartório, Tradutor, Juízo, Consulado). O "há N d" só existe quando há registro real do
- * início da espera (`bolaDesde`); sem registro, nada é inventado.
+ * "Aguardando" — QUEM é aguardado: "Equipe" · "Cliente · há 14 d" · "Cartório · há 21 d". Com terceiro, o TIPO (Cartório,
+ * Tradutor, Juízo, Consulado); o nome do órgão da tarefa (se tiver) vai em `orgao` (dica ao passar o mouse), não no texto. O
+ * "há N d" só existe quando há registro real do início da espera (`bolaDesde`); sem registro, nada é inventado.
  */
-export function textoDaBola(l: LinhaParaBolaDaTela, agora: Date): { nome: string; haDias: number | null; texto: string; comTerceiro: boolean } {
+export function textoDaBola(l: LinhaParaBolaDaTela, agora: Date): { nome: string; orgao: string | null; haDias: number | null; texto: string; comTerceiro: boolean } {
   const bola: BolaCom = l.bolaCom ?? (l.esperandoDe === 'cliente' ? 'Cliente' : l.esperandoDe === 'terceiro' || l.estadoOperacao === 'AGUARDANDO' ? 'Cartório' : BOLA_NOSSA)
   const comTerceiro = bola !== BOLA_NOSSA
-  const nome = bola === 'Cliente' || !comTerceiro ? bola : l.terceiroNome ?? bola
+  const nome = bola
+  const orgao = bola === 'Cliente' || !comTerceiro ? null : l.terceiroNome ?? null
   const haDias = comTerceiro ? haQuantosDias(l.bolaDesde, agora) : null
-  return { nome, haDias, comTerceiro, texto: haDias != null ? `${nome} · há ${haDias} d` : nome }
+  return { nome, orgao, haDias, comTerceiro, texto: haDias != null ? `${nome} · há ${diasPorExtenso(haDias)}` : nome }
 }
 
 export type TomDoCobrar = 'vermelho' | 'ambar' | 'cinza'

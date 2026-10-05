@@ -184,7 +184,7 @@ ok("subtítulo da página /operacao", /subtitle="A fazer, aguardando/.test(ler("
 secao("C4 — Torre (aba Tarefas e drawer)")
 const ctt = codigo(tt)
 const tab = codigo(ler("src/components/torre/TarefasTabela.tsx")), gav = codigo(ler("src/components/torre/TarefasGaveta.tsx")), tela = ler("lib/operacional/torre-tarefas-tela.ts")
-ok("cabeçalho (Torre nova): ... Passo · status, ..., Responsável ...", /<div>Passo · status<\/div>.*<div>Responsável<\/div>/.test(tab))
+ok("cabeçalho (Torre nova): ... Passo | Status, ..., Responsável ...", /<div>Passo<\/div><div>Status<\/div>.*<div>Responsável<\/div>/.test(tab))
 ok("linha: Passo = passoLabelDe().label; Status = statusDaLinha(l) (mapa único de rótulos)", /passoLabelDe\(l\)\.label/.test(tab) && /statusDaLinha\(l\)/.test(tab) && /import \{ ROTULO_STATUS \} from '@\/src\/lib\/home\/rotulo-status-tarefa'/.test(tela))
 ok("grade .tor-gT tem 10 colunas (chk, cert, bola, etapa, status, resp, prazo, acomp, risco, ações)", nCols(/\.tor-gT \{ grid-template-columns: ([^;]+);/.exec(ler("src/components/torre/torre.css"))![1]) === 10)
 ok("gaveta (TarefasGaveta): mostra o Status real", /statusTarefaTxt\(linha\)/.test(gav) && /<span className="k">Status<\/span>/.test(gav))

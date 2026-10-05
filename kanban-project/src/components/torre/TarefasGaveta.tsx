@@ -74,7 +74,7 @@ export function TarefasGaveta({ linha, agora, foco, acoes, onFechar, onAcaoPrima
         </div>
 
         <div className="tf-grade">
-          <div><span className="k">Bola com</span><span className="v">{cancelada ? "—" : bola.texto}</span></div>
+          <div><span className="k">Aguardando</span><span className="v">{cancelada ? "—" : bola.texto}</span></div>
           <div><span className="k">Status</span><span className="v">{statusTarefaTxt(linha)}</span></div>
           <div><span className="k">Prazo da tarefa</span><span className={`v ${linha.atrasada && !cancelada ? "tf-verm" : ""}`}>{cancelada ? "—" : textoPrazoDaTarefa(linha) || "—"}</span></div>
           <div><span className="k">Próxima cobrança</span><span className="v">{cancelada || !cobrar ? "—" : cobrar.texto}</span></div>

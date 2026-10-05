@@ -121,7 +121,7 @@ export function ProcessoCertidoes({ d, agora, podeAtribuir, ocupado, onAtribuir,
         <div className="tpr-grade tpr-th">
           <div><input type="checkbox" className="tpr-chk" aria-label="Selecionar todas" disabled={marcaveis.length === 0} checked={todasMarcadas}
             onChange={() => setMarcadas(todasMarcadas ? new Set() : new Set(marcaveis.map((l) => l.chave)))} /></div>
-          <div>Certidão · pessoa</div><div>Passo atual</div><div>Status</div><div>Responsável</div><div>Iniciou em</div><div>Prazo</div><div>Bola com</div><div>Ação</div>
+          <div>Certidão · pessoa</div><div>Passo atual</div><div>Status</div><div>Responsável</div><div>Iniciou em</div><div>Prazo</div><div>Aguardando</div><div>Ação</div>
         </div>
 
         {linhas.length === 0 && (

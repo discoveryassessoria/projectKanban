@@ -15,9 +15,10 @@
 //     30 e 24: 24 = 80% de 30 — aqui o corte acompanha a meta de cada fase); sem meta, sem cor;
 //   • paginação REAL (12 por página).
 // ============================================================================
+import { diasPorExtenso } from './tempo-extenso'
 import type { ProcessoDaTorre, ColunaDoRadar, PassoDoProcesso } from './torre-processos'
 import { PESO_DA_SITUACAO } from './torre-risco'
-import { textoTempoNaFase } from './torre-predicados'
+import { textoTempoNaFase, textoTempoNaFaseCurto } from './torre-predicados'
 
 export const ITENS_POR_PAGINA = 12
 
@@ -43,11 +44,12 @@ export const semAcento = (x: string | null | undefined): string => String(x ?? '
 
 // ─── TEMPO E COR ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** "52 d" · "8 h" (menos de 1 dia) · "4,1 meses" (100 d ou mais, como o protótipo mostra "4,1 meses/m") · "—" sem registro. Até 100 d DELEGA a `textoTempoNaFase`. */
+/** Por extenso: "52 dias" · "1 dia" · "menos de 1 dia" · "4,1 meses" (100 dias ou mais) · "—" sem registro. `curto` (só o selo do Radar): "52 d" · "8 h" · "4,1 m". */
 export function textoDuracao(dias: number | null, horas: number | null = null, curto = false): string {
   if (dias == null) return '—'
   if (dias >= 100) return `${(dias / 30).toFixed(1).replace('.', ',')} ${curto ? 'm' : 'meses'}`
-  return textoTempoNaFase({ dias, horas: horas ?? dias * 24 })
+  const t = { dias, horas: horas ?? dias * 24 }
+  return curto ? textoTempoNaFaseCurto(t) : textoTempoNaFase(t)
 }
 
 /** Dias em número (h/24, m×30) — a conversão do protótipo para ordenar "mais tempo na fase". */
@@ -61,10 +63,10 @@ export function tomDosDias(dias: number | null, metaDias: number | null): TomDos
   return 'normal'
 }
 
-/** "52 d / 30" — a meta só aparece quando existe. */
+/** "52 dias / 30 dias" — a meta só aparece quando existe. */
 export const textoNaFase = (p: Pick<ProcessoDaTorre, 'naFase' | 'metaDias'>): string => {
   const t = textoDuracao(p.naFase.dias, p.naFase.horas)
-  return p.metaDias != null && p.naFase.dias != null ? `${t} / ${p.metaDias}` : t
+  return p.metaDias != null && p.naFase.dias != null ? `${t} / ${diasPorExtenso(p.metaDias)}` : t
 }
 
 // ─── FASES (botões) ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -84,21 +86,6 @@ export const responsavelDaLinha = (p: ProcessoDaTorre): string | null | undefine
 
 /** O texto da busca: família + próxima ação + responsável (+ código). */
 export const textoDeBusca = (p: ProcessoDaTorre): string => semAcento(`${p.familiaNome} ${p.codigo ?? ''} ${p.proximaAcao?.texto ?? ''} ${p.proximaAcao?.responsavelNome ?? ''}`)
-
-export interface PassoDominante { label: string; n: number }
-/**
- * "Passo onde a maioria está": entre as tarefas ABERTAS da fase do processo, a "caixa" com mais tarefas — "Sem responsável" conta como
- * uma caixa, cada passo com tarefa COM responsável é outra. Empate → a mais adiantada no roteiro (o passo vence "Sem responsável").
- * Sem tarefa aberta: `null` ("—"); só concluídas: "Todas concluídas".
- */
-export function passoDominante(p: Pick<ProcessoDaTorre, 'tarefasDaFase'>): PassoDominante | null {
-  const t = p.tarefasDaFase
-  if (t.abertas === 0) return t.concluidas > 0 ? { label: 'Todas concluídas', n: t.concluidas } : null
-  const caixas: Array<{ label: string; n: number; ordem: number }> = t.passos.map((x) => ({ label: x.label, n: x.n, ordem: x.ordem }))
-  if (t.semResponsavel > 0) caixas.push({ label: SEM_RESPONSAVEL, n: t.semResponsavel, ordem: -1 })
-  caixas.sort((a, b) => b.n - a.n || b.ordem - a.ordem)
-  return { label: caixas[0].label, n: caixas[0].n }
-}
 
 // ─── FILTRAR · ORDENAR · PAGINAR ──────────────────────────────────────────────────────────────────────────────────────────
 
@@ -274,8 +261,8 @@ export function passosDaFase(linhasDaFase: ProcessoDaTorre[], metaDias: number |
   const caixas: CaixaDoPasso[] = [{ chave: '__sem_responsavel', nome: SEM_RESPONSAVEL, obs: 'sem responsável', n: semResp, classe: 'r' }]
   for (const x of passos) {
     const espera = x.aguardando * 2 >= x.n
-    const obs = x.acimaDaMeta > 0 && metaDias != null ? `${x.acimaDaMeta} há mais de ${metaDias} d`
-      : espera && metaDias != null ? `nenhuma há mais de ${metaDias} d` : ''
+    const obs = x.acimaDaMeta > 0 && metaDias != null ? `${x.acimaDaMeta} há mais de ${diasPorExtenso(metaDias)}`
+      : espera && metaDias != null ? `nenhuma há mais de ${diasPorExtenso(metaDias)}` : ''
     caixas.push({ chave: x.chave, nome: x.label, obs, n: x.n, classe: espera ? 'a' : 'n' })
   }
   caixas.push({ chave: '__concluidas', nome: 'Concluídas', obs: 'feitas nesta fase', n: concl, classe: 'g' })
@@ -286,7 +273,7 @@ export function passosDaFase(linhasDaFase: ProcessoDaTorre[], metaDias: number |
   else if (!maior || semResp > maior.n) gargalo = `O maior volume está sem responsável: ${milhar(semResp)} ${substantivo}. Distribuir é o próximo passo.`
   else {
     const parado = maior.aguardando * 2 >= maior.n
-    const extra = maior.acimaDaMeta > 0 && metaDias != null ? `, ${milhar(maior.acimaDaMeta)} há mais de ${metaDias} d` : ''
+    const extra = maior.acimaDaMeta > 0 && metaDias != null ? `, ${milhar(maior.acimaDaMeta)} há mais de ${diasPorExtenso(metaDias)}` : ''
     gargalo = `O passo com mais volume${parado ? ' parado' : ''} é ${maior.label}: ${milhar(maior.n)} ${substantivo}${extra}.`
   }
   return { total: abertas + concl, substantivo, caixas, gargalo }

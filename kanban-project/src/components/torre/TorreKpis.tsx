@@ -65,7 +65,7 @@ export function TorreKpis({ linhas, processos, itensPrecisa, agora, tend, filtra
 
   const subtitulo: Record<string, string> = {
     abertas: "certidões e passos em andamento",
-    equipe: "bola nossa: solicitar, conferir, traduzir",
+    equipe: "aguardando a equipe: solicitar, conferir, traduzir",
     cartorio: detalheDosTerceiros(linhas),
     ninguem: subtituloSemResponsavel(familiasSemResponsavel(linhas)),
   }

@@ -36,10 +36,11 @@ import type { PrismaClient, Prisma } from '@prisma/client'
 
 type Leitor = PrismaClient | Prisma.TransactionClient
 
-/** O vocabulário FECHADO do que uma categoria de organização pode produzir como "bola com" (Gerenciamento › Categorias de Organização). */
+/** O vocabulário FECHADO do que uma categoria de organização pode produzir como "aguardando" (Gerenciamento › Categorias de Organização). */
 export const ROTULOS_DE_TERCEIRO = ['Cartório', 'Tradutor', 'Juízo', 'Consulado'] as const
 export type RotuloDeTerceiro = (typeof ROTULOS_DE_TERCEIRO)[number]
-export const BOLA_NOSSA = 'Nossa' as const
+// EXIBIÇÃO: quem é aguardado. O valor mostrado para o lado interno é "Equipe" (antes "Nossa"); a lógica compara SEMPRE com esta constante.
+export const BOLA_NOSSA = 'Equipe' as const
 export const BOLA_CLIENTE = 'Cliente' as const
 /** Órgão sem categoria, ou categoria sem rótulo: a bola está com o cartório. */
 export const BOLA_PADRAO_DO_TERCEIRO: RotuloDeTerceiro = 'Cartório'
@@ -51,9 +52,9 @@ export const DIAS_PADRAO_DA_COBRANCA = 7
 
 export const ehRotuloDeTerceiro = (v: unknown): v is RotuloDeTerceiro => typeof v === 'string' && (ROTULOS_DE_TERCEIRO as readonly string[]).includes(v)
 
-/** "Bola nossa" ou "Bola com terceiro" — a partição de 2 lados do Radar e dos Processos. */
+/** "Aguardando a equipe" ou "Aguardando terceiros" — a partição de 2 lados do Radar e dos Processos. */
 export const ladoDaBola = (b: BolaCom): 'nossa' | 'terceiro' => (b === BOLA_NOSSA ? 'nossa' : 'terceiro')
-export const rotuloDoLado = (b: BolaCom): 'Bola nossa' | 'Bola com terceiro' => (b === BOLA_NOSSA ? 'Bola nossa' : 'Bola com terceiro')
+export const rotuloDoLado = (b: BolaCom): 'Aguardando a equipe' | 'Aguardando terceiros' => (b === BOLA_NOSSA ? 'Aguardando a equipe' : 'Aguardando terceiros')
 
 // ─── PURO ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 

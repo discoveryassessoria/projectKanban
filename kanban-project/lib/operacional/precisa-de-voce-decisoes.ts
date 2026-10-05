@@ -15,6 +15,7 @@
 //
 // Cadastro (CAD-*/PAREDE_A_FRENTE) NÃO entra. Vocabulário oficial: "Sem responsável" (nunca "ninguém"/"Sem ninguém").
 // ============================================================================
+import { diasPorExtenso } from './tempo-extenso'
 import { FUSO_OPERACIONAL, diaOperacional } from './tempo-operacional'
 import { ROTULO_STATUS } from '@/src/lib/home/rotulo-status-tarefa'
 
@@ -212,7 +213,7 @@ export function textosDaEscalada(args: {
   orgao: string | null; certidao: string; familia: string | null; pais: string | null
   pedidoHaDias: number | null; cobrancas: number; canais: string[]
 }): { titulo: string; detalhe: string; sugestao: string } {
-  const pedido = args.pedidoHaDias != null ? `pedido há ${args.pedidoHaDias} d` : 'pedido não registrado'
+  const pedido = args.pedidoHaDias != null ? `pedido há ${diasPorExtenso(args.pedidoHaDias)}` : 'pedido não registrado'
   const porCanal = args.canais.length ? ` por ${canaisPorExtenso(args.canais)}` : ''
   const cobr = `${args.cobrancas} ${args.cobrancas === 1 ? 'cobrança' : 'cobranças'}${porCanal} sem resposta`
   const jaLigou = args.canais.includes('TELEFONE')
@@ -246,7 +247,7 @@ export function textosDaBloqueada(args: {
   familia: string | null; certidao: string; pais: string | null; faseLabel: string | null
   bloqueadaHaDias: number | null; cobrancasAoCliente: number; motivo: string | null
 }): { titulo: string; detalhe: string; sugestao: string } {
-  const quando = args.bloqueadaHaDias != null ? `bloqueada há ${args.bloqueadaHaDias} d` : 'bloqueio sem data registrada'
+  const quando = args.bloqueadaHaDias != null ? `bloqueada há ${diasPorExtenso(args.bloqueadaHaDias)}` : 'bloqueio sem data registrada'
   const cobr = `${args.cobrancasAoCliente} ${args.cobrancasAoCliente === 1 ? 'cobrança' : 'cobranças'} ao cliente`
   return {
     titulo: `${args.familia ? `${args.familia} · ` : ''}${args.certidao}`,

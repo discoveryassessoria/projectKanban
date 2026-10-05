@@ -4,7 +4,7 @@
 //
 //   npx tsx scripts/torre-nova-radar-regras.test.ts
 //
-// PROVA (CHECKLIST T130–T142, T164–T166): cada filtro (Todas · Precisam de alguém · Bola nossa · Bola com terceiro · Críticas) e as
+// PROVA (CHECKLIST T130–T142, T164–T166): cada filtro (Todas · Precisam de alguém · Aguardando a equipe · Aguardando terceiros · Críticas) e as
 // contagens dos botões; o filtro padrão; busca por família sem acento/maiúsculas; País; as três ordens (mais grave com desempate por
 // MAIOR tempo na fase, mais tempo com h/24, A–Z pt-BR); paginação REAL; rodapé e texto da célula; textos fixos do protótipo.
 // ============================================================================
@@ -24,14 +24,14 @@ const dias = (d: number | null, h = d == null ? null : d * 24) => ({ desde: null
 // As 14 famílias do protótipo (inventário §1.3), com o risco e a bola de lá.
 const P = [
   processo({ id: 1, nome: "Bertolucci", pais: "Itália", nivel: "critico", bola: { rotulo: "Cartório", dias: 52 }, naFase: dias(52) }),
-  processo({ id: 2, nome: "Salvarani", pais: "Itália", nivel: "critico", bola: { rotulo: "Nossa", dias: null }, naFase: dias(1) }),
-  processo({ id: 3, nome: "Antão (real)", pais: "Espanha", nivel: "atencao", bola: { rotulo: "Nossa", dias: null }, naFase: dias(0, 8) }),
+  processo({ id: 2, nome: "Salvarani", pais: "Itália", nivel: "critico", bola: { rotulo: "Equipe", dias: null }, naFase: dias(1) }),
+  processo({ id: 3, nome: "Antão (real)", pais: "Espanha", nivel: "atencao", bola: { rotulo: "Equipe", dias: null }, naFase: dias(0, 8) }),
   processo({ id: 4, nome: "Martín Manzano", pais: "Espanha", nivel: "parado", bola: { rotulo: "Juízo", dias: 64 }, naFase: dias(64) }),
   processo({ id: 5, nome: "Ferreira Lopes", pais: "Portugal", nivel: "atencao", bola: { rotulo: "Cartório", dias: 42 }, naFase: dias(42) }),
-  processo({ id: 6, nome: "Fogli", pais: "Itália", nivel: "atencao", bola: { rotulo: "Nossa", dias: null }, naFase: dias(5) }),
+  processo({ id: 6, nome: "Fogli", pais: "Itália", nivel: "atencao", bola: { rotulo: "Equipe", dias: null }, naFase: dias(5) }),
   processo({ id: 7, nome: "Gallo Pereira", pais: "Itália", nivel: "atencao", bola: { rotulo: "Cartório", dias: 33 }, naFase: dias(33) }),
-  processo({ id: 8, nome: "Panza", pais: "Itália", nivel: "atencao", bola: { rotulo: "Nossa", dias: null }, naFase: dias(17) }),
-  processo({ id: 9, nome: "Rossetto", pais: "Itália", nivel: "atencao", bola: { rotulo: "Nossa", dias: null }, naFase: dias(31) }),
+  processo({ id: 8, nome: "Panza", pais: "Itália", nivel: "atencao", bola: { rotulo: "Equipe", dias: null }, naFase: dias(17) }),
+  processo({ id: 9, nome: "Rossetto", pais: "Itália", nivel: "atencao", bola: { rotulo: "Equipe", dias: null }, naFase: dias(31) }),
   processo({ id: 10, nome: "Navarro Ruiz", pais: "Espanha", nivel: "no_ritmo", bola: { rotulo: "Tradutor", dias: 6 }, naFase: dias(6) }),
   processo({ id: 11, nome: "Zanella", pais: "Itália", nivel: "no_ritmo", bola: { rotulo: "Cartório", dias: 24 }, naFase: dias(24) }),
   processo({ id: 12, nome: "Schneider", pais: "Alemanha", nivel: "no_ritmo", bola: { rotulo: "Cliente", dias: 9 }, naFase: dias(9) }),
@@ -41,18 +41,18 @@ const P = [
 const nomes = (xs: typeof P) => xs.map((p) => p.familiaNome)
 
 secao("OS BOTÕES — vocabulário, padrão e contagens (T130, T131)")
-ok("rótulos, na ordem: Todas · Precisam de alguém · Bola nossa · Bola com terceiro · Críticas", FILTROS_DO_RADAR.map((f) => f.rotulo).join(" · ") === "Todas · Precisam de alguém · Bola nossa · Bola com terceiro · Críticas")
+ok("rótulos, na ordem: Todas · Precisam de alguém · Aguardando a equipe · Aguardando terceiros · Críticas", FILTROS_DO_RADAR.map((f) => f.rotulo).join(" · ") === "Todas · Precisam de alguém · Aguardando a equipe · Aguardando terceiros · Críticas")
 ok("o filtro padrão é 'Precisam de alguém'", FILTRO_INICIAL_DO_RADAR === "precisam")
 const c = contagensDoRadar(P)
-ok("contagens: todas 14 · precisam 9 · bola nossa 5 · bola com terceiro 9 · críticas 3", c.todas === 14 && c.precisam === 9 && c.nossa === 5 && c.terceiro === 9 && c.criticas === 3, JSON.stringify(c))
+ok("contagens: todas 14 · precisam 9 · aguardando a equipe 5 · bola com terceiro 9 · críticas 3", c.todas === 14 && c.precisam === 9 && c.nossa === 5 && c.terceiro === 9 && c.criticas === 3, JSON.stringify(c))
 // Antão, Rossetto, Fogli, Panza, Salvarani = Nossa (5) — Cliente/Tradutor/Juízo/Consulado/Cartório = terceiro (9)
 
 secao("OS FILTROS (T132–T136)")
 const por = (f: Parameters<typeof passaNoFiltroDoRadar>[1]) => P.filter((p) => passaNoFiltroDoRadar(p, f))
 ok("Todas → 14 linhas", por("todas").length === 14)
 ok("Precisam de alguém → risco ≠ no ritmo (9)", por("precisam").length === 9 && por("precisam").every((p) => p.nivelDeRisco !== "no_ritmo"))
-ok("Bola nossa → bola = Nossa (5)", por("nossa").length === 5 && por("nossa").every((p) => p.bola.rotulo === "Nossa"))
-ok("Bola com terceiro → bola ≠ Nossa (9) — o Cliente conta como terceiro", por("terceiro").length === 9 && por("terceiro").some((p) => p.bola.rotulo === "Cliente"))
+ok("Aguardando a equipe → bola = Nossa (5)", por("nossa").length === 5 && por("nossa").every((p) => p.bola.rotulo === "Equipe"))
+ok("Aguardando terceiros → bola ≠ Nossa (9) — o Cliente conta como terceiro", por("terceiro").length === 9 && por("terceiro").some((p) => p.bola.rotulo === "Cliente"))
 ok("Críticas → o balde vermelho: crítico E parado (3)", nomes(por("criticas")).sort().join(",") === "Bertolucci,Martín Manzano,Salvarani")
 
 secao("A BUSCA e o PAÍS (T137, T138)")
@@ -87,12 +87,12 @@ ok("página fora do intervalo é travada", paginar(muitas, 99).pagina === 3 && p
 ok("números de página: até 7 todos; acima, 1 2 … vizinhas … n-1 n", paginasVisiveis(1, 5).join() === "1,2,3,4,5" && paginasVisiveis(1, 36).join() === "1,2,…,35,36" && paginasVisiveis(18, 36).join() === "1,2,…,17,18,19,…,35,36")
 
 secao("A CÉLULA (T147)")
-ok("'<bola> · <tempo>' em dias, horas (<1 dia), '—' sem registro e meses a partir de 100 d", textoDaCelulaAtual("Cartório", 52, 1248) === "Cartório · 52 d" && textoDaCelulaAtual("Nossa", 0, 8) === "Nossa · 8 h" && textoDaCelulaAtual("Nossa", null, null) === "Nossa · —" && textoDaCelulaAtual("Consulado", 123, 2952) === "Consulado · 4,1 m")
-ok("duração longa por extenso: '4,1 meses'", textoDuracao(123, null) === "4,1 meses" && textoDuracao(99, null) === "99 d" && textoDuracao(0, 0) === "< 1 h")
+ok("'<bola> · <tempo>' em dias, horas (<1 dia), '—' sem registro e meses a partir de 100 d", textoDaCelulaAtual("Cartório", 52, 1248) === "Cartório · 52 d" && textoDaCelulaAtual("Equipe", 0, 8) === "Equipe · 8 h" && textoDaCelulaAtual("Equipe", null, null) === "Equipe · —" && textoDaCelulaAtual("Consulado", 123, 2952) === "Consulado · 4,1 m")
+ok("duração longa por extenso: '4,1 meses'", textoDuracao(123, null) === "4,1 meses" && textoDuracao(99, null) === "99 dias" && textoDuracao(0, 0) === "menos de 1 hora" && textoDuracao(99, null, true) === "99 d" && textoDuracao(0, 0, true) === "< 1 h")
 
 secao("TEXTOS FIXOS DO PROTÓTIPO NA TELA (T128, T143, T144, T166, T168)")
 const tela = readFileSync("src/components/torre/TorreRadar.tsx", "utf8")
-for (const t of ["Radar · cada família em cada fase", "Torre de Controle", "Buscar família…", "Todos os países", "de quem é a bola", "(Nossa, Cartório, Cliente, Tradutor, Consulado) e há quanto tempo. Cor = risco. Clique na família para abrir o processo.", "✓ fase concluída", "no ritmo", "atenção: sem responsável, cobrança vencida, perto do prazo", "crítico: atraso nosso + sem dono, divergência, parado 15+ dias", "n/a: fase que essa família não precisa", "(cond.)", "Nenhuma família encontrada com esses filtros."])
+for (const t of ["Radar · cada família em cada fase", "Torre de Controle", "Buscar família…", "Todos os países", "quem é aguardado", "(Equipe, Cartório, Cliente, Tradutor, Juízo, Consulado) e há quanto tempo. Cor = risco. Clique na família para abrir o processo.", "✓ fase concluída", "no ritmo", "atenção: sem responsável, cobrança vencida, perto do prazo", "crítico: atraso nosso + sem dono, divergência, parado 15+ dias", "n/a: fase que essa família não precisa", "(cond.)", "Nenhuma família encontrada com esses filtros."])
   ok(`a tela tem o texto "${t}"`, tela.includes(t) || readFileSync("lib/operacional/torre-radar.ts", "utf8").includes(t))
 ok("sem 'exemplo do protótipo' e sem 'Com o cartório'", !/exemplo do prot|Com o cart[oó]rio|Sem ninguém/.test(tela + readFileSync("lib/operacional/torre-radar.ts", "utf8")))
 ok("o nome da família é um link para /torre/processo/[id]", /href=\{`\/torre\/processo\/\$\{p\.processoId\}`\}/.test(tela))

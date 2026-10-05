@@ -82,7 +82,7 @@ export function TorreRadar({ colunas, processos, carregando, erro }: { colunas: 
             </div>
           </div>
 
-          <div className="tor-pg-explica">A célula da fase atual diz <b>de quem é a bola</b> (Nossa, Cartório, Cliente, Tradutor, Consulado) e há quanto tempo. Cor = risco. Clique na família para abrir o processo.</div>
+          <div className="tor-pg-explica">A célula da fase atual diz <b>quem é aguardado</b> (Equipe, Cartório, Cliente, Tradutor, Juízo, Consulado) e há quanto tempo. Cor = risco. Clique na família para abrir o processo.</div>
 
           <div className="tor-radar-card">
             <div className="tor-radar-rolagem">
@@ -116,7 +116,7 @@ export function TorreRadar({ colunas, processos, carregando, erro }: { colunas: 
             <span className="feita">✓ fase concluída</span>
             <span className="ritmo">no ritmo</span>
             <span className="atencao" title="Pontuação 3 a 5 do Precisa de você, cobrança vencida, prazo hoje/amanhã ou passou da meta de tempo da fase">atenção: sem responsável, cobrança vencida, perto do prazo</span>
-            <span className="critico" title="Pontuação 6 ou mais do Precisa de você, ou bola com terceiro há 15+ dias sem cobrança em dia">crítico: atraso nosso + sem dono, divergência, parado 15+ dias</span>
+            <span className="critico" title="Pontuação 6 ou mais do Precisa de você, ou aguardando terceiro há 15+ dias sem cobrança em dia">crítico: atraso nosso + sem dono, divergência, parado 15+ dias</span>
             <span className="na">n/a: fase que essa família não precisa</span>
           </div>
         </>

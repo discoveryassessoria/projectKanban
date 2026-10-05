@@ -25,6 +25,7 @@
 // consulta o estado: ela responde "o que aconteceria com os dados de hoje" tanto
 // para regra ligada quanto desligada — e nunca grava.
 // ============================================================================
+import { diasPorExtenso } from './tempo-extenso'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
@@ -142,8 +143,8 @@ export async function lerReguaDeCobranca(db: Db = prisma): Promise<LinhaDaRegua[
       const esperas: string[] = []
       for (const s of p.subtarefas ?? []) {
         if (s.ativo === false) continue
-        if (s.acompanhamentoAtivo && s.acompanhamentoPrimeiroDias != null) esperas.push(`${s.label}: acompanhar em ${s.acompanhamentoPrimeiroDias} d`)
-        if (s.regraTemporalAtiva && s.regraTemporalDias != null) esperas.push(`${s.label}: previsão do terceiro ${s.regraTemporalDias} d`)
+        if (s.acompanhamentoAtivo && s.acompanhamentoPrimeiroDias != null) esperas.push(`${s.label}: acompanhar em ${diasPorExtenso(s.acompanhamentoPrimeiroDias)}`)
+        if (s.regraTemporalAtiva && s.regraTemporalDias != null) esperas.push(`${s.label}: previsão do terceiro ${diasPorExtenso(s.regraTemporalDias)}`)
       }
       if (p.diasParaIniciar == null && p.diasAposCobranca == null && p.escalarApos == null && esperas.length === 0) continue
       linhas.push({
@@ -160,7 +161,7 @@ export function reguaResumida(linhas: LinhaDaRegua[]): string {
   const vistos = new Set<string>()
   for (const l of linhas) {
     const partes: string[] = []
-    if (l.diasAposCobranca != null) partes.push(`cobrar a cada ${l.diasAposCobranca} d`)
+    if (l.diasAposCobranca != null) partes.push(`cobrar a cada ${diasPorExtenso(l.diasAposCobranca)}`)
     if (l.escalarApos != null) partes.push(`escalar na ${l.escalarApos}ª sem resposta`)
     if (partes.length) vistos.add(partes.join(' · '))
   }
@@ -178,8 +179,8 @@ export function textoDaRegua(linhas: LinhaDaRegua[]): string {
   const esperas = new Set<string>()
   for (const l of linhas) {
     const partes: string[] = []
-    if (l.diasParaIniciar != null) partes.push(`iniciar em ${l.diasParaIniciar} d`)
-    if (l.diasAposCobranca != null) partes.push(`cobrar a cada ${l.diasAposCobranca} d`)
+    if (l.diasParaIniciar != null) partes.push(`iniciar em ${diasPorExtenso(l.diasParaIniciar)}`)
+    if (l.diasAposCobranca != null) partes.push(`cobrar a cada ${diasPorExtenso(l.diasAposCobranca)}`)
     if (l.escalarApos != null) partes.push(`escalar na ${l.escalarApos}ª sem resposta`)
     if (partes.length) {
       const chave = partes.join(' · ')

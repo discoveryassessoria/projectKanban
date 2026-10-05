@@ -116,7 +116,7 @@ export const KPIS: DefinicaoDeKpi[] = [
   { chave: 'abertas', rotulo: 'Tarefas abertas', cor: 'blu', filtra: false, grupo: 'situacao',
     regra: 'Toda tarefa que a aba Tarefas lista: aberta (não concluída, não cancelada) e que não seja de fase futura do processo.' },
   { chave: 'equipe', rotulo: 'Com a equipe', cor: 'blu', filtra: true, grupo: 'situacao',
-    regra: 'Aberta, com responsável e com a bola nossa (não está aguardando terceiros). É o que sobra depois de "Sem responsável" e "Aguardando terceiros".' },
+    regra: 'Aberta, com responsável e aguardando a equipe (não está aguardando terceiros). É o que sobra depois de "Sem responsável" e "Aguardando terceiros".' },
   { chave: 'cartorio', rotulo: 'Aguardando terceiros', cor: 'blu', filtra: true, grupo: 'situacao',
     regra: 'Aberta, COM responsável, e aguardando um terceiro — cartório, cliente, tradutor, juízo ou consulado (estadoOperacao = AGUARDANDO). Aguardando e sem responsável conta em "Sem responsável".' },
   { chave: 'ninguem', rotulo: 'Sem responsável', cor: 'red', filtra: true, grupo: 'situacao',

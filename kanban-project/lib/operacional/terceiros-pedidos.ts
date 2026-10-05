@@ -17,6 +17,7 @@
 // NÃO EXISTE aqui ranking, média nem contagem comparativa por cartório. O agrupamento por órgão (`agruparPorOrgao`) serve
 // só para cobrar junto o que está no mesmo lugar; o cabeçalho de cada grupo carrega o nome e a quantidade de pedidos.
 // ============================================================================
+import { diasPorExtenso } from './tempo-extenso'
 import { diaOperacional, diasEntreDiasOperacionais, FUSO_OPERACIONAL } from './tempo-operacional'
 import { numeroDoKpi, PREDICADO_DO_KPI, type LinhaParaKpi } from './torre-kpis'
 import { ehCobravelVencido } from './torre-predicados'
@@ -75,7 +76,7 @@ export function quandoCobrar(cobrarEm: string | null, agora: Date): QuandoCobrar
   const dias = diasEntreDiasOperacionais(alvo, agora)
   if (dias === 0) return { texto: 'hoje', tom: 'hoje', dias }
   if (dias === -1) return { texto: 'ontem', tom: 'vencida', dias }
-  if (dias < -1) return { texto: `há ${-dias} d`, tom: 'vencida', dias }
+  if (dias < -1) return { texto: `há ${diasPorExtenso(-dias)}`, tom: 'vencida', dias }
   return { texto: ddmm(cobrarEm), tom: 'futura', dias }
 }
 
@@ -95,7 +96,7 @@ export function pedidaHa(pedidaEm: string | null, agora: Date): string {
   if (!pedidaEm) return '—'
   const d = new Date(pedidaEm)
   if (Number.isNaN(d.getTime())) return '—'
-  return `${Math.max(0, diasEntreDiasOperacionais(agora, d))} d`
+  return diasPorExtenso(Math.max(0, diasEntreDiasOperacionais(agora, d)))
 }
 
 /** "nenhuma" · "1 cobrança" · "2 cobranças". */

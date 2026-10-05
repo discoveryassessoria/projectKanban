@@ -30,7 +30,7 @@
 .tor-pf-caixa.g span { color: inherit; }
 .tor-pf-tabela { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; max-width: 100%; }
 .tor-pf-rolagem { overflow-x: auto; }
-.tor-pf-grade { display: grid; grid-template-columns: minmax(120px, 1.4fr) minmax(84px, .9fr) minmax(92px, 1fr) minmax(100px, 1.1fr) 72px minmax(140px, 1.8fr) minmax(84px, 1fr) 58px 80px 134px; gap: 8px; align-items: center; min-width: 1030px; }
+.tor-pf-grade { display: grid; grid-template-columns: minmax(120px, 1.4fr) minmax(84px, .9fr) minmax(92px, 1fr) 100px minmax(140px, 1.8fr) minmax(84px, 1fr) 58px 80px 134px; gap: 8px; align-items: center; min-width: 930px; }
 .tor-pf-cab { padding: 10px 12px; font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .05em; text-transform: uppercase; background: var(--surface-tertiary); border-bottom: 1px solid var(--border-default); }
 .tor-pf-linha { padding: 9px 12px; border-bottom: 1px solid var(--border-default); color: var(--text-primary); }
 .tor-pf-fam { display: flex; flex-direction: column; min-width: 0; }

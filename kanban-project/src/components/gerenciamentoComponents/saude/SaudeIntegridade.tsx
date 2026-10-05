@@ -83,7 +83,7 @@ export function SaudeIntegridade({ onContagem }: { onContagem?: (n: number) => v
               <div className="flex flex-wrap gap-1 items-center">
                 {i.acao.link && <a className="tor-btn" href={i.acao.link}>Abrir no Gerenciamento</a>}
                 {i.acao.correcao && <button className="tor-btn pri" disabled={ocupado === i.id} title={i.acao.correcao.descricao} onClick={() => void corrigir(i)}>Corrigir</button>}
-                <button className="tor-btn" onClick={() => setIgnorar(i)}>Ignorar 7 d</button>
+                <button className="tor-btn" onClick={() => setIgnorar(i)}>Ignorar por 7 dias</button>
                 {i.acao.recomendacao && <div className="small" style={{ flexBasis: "100%" }}>{i.acao.recomendacao}</div>}
               </div>
             </div>
@@ -100,7 +100,7 @@ export function SaudeIntegridade({ onContagem }: { onContagem?: (n: number) => v
       )}
       {ignorar && (
         <ModalTexto titulo="Ignorar por 7 dias" subtitulo={`${ignorar.codigo} · ${ignorar.titulo} — o achado continua visível no painel de Saúde; aqui ele volta sozinho quando o prazo vencer.`}
-          rotulo="Justificativa" confirmar="Ignorar 7 d" onFechar={() => setIgnorar(null)}
+          rotulo="Justificativa" confirmar="Ignorar por 7 dias" onFechar={() => setIgnorar(null)}
           onEnviar={async (justificativa) => {
             const r = await api<{ ok?: boolean; mensagem?: string; erro?: string }>("/api/torre/integridade/ignorar", "POST", { achadoId: ignorar.id, justificativa })
             if (!r.ok || r.data.ok === false) return { ok: false, mensagem: erroDe(r.data) }

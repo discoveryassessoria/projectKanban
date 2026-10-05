@@ -14,6 +14,7 @@
 // contador e leva à Operação já na família. "Marcar todas como lidas" limpa o contador.
 // Os lidos ficam em "Ver anteriores" por 30 dias.
 // ============================================================================
+import { horasPorExtenso, minutosPorExtenso } from "@/lib/operacional/tempo-extenso"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
@@ -64,9 +65,9 @@ const COR_DO_TIPO: Record<string, string> = {
 function haQuanto(iso: string, agora = Date.now()): string {
   const min = Math.max(0, Math.round((agora - new Date(iso).getTime()) / 60_000))
   if (min < 1) return "agora"
-  if (min < 60) return `há ${min} min`
+  if (min < 60) return `há ${minutosPorExtenso(min)}`
   const h = Math.round(min / 60)
-  if (h < 24) return `há ${h} h`
+  if (h < 24) return `há ${horasPorExtenso(h)}`
   const d = Math.round(h / 24)
   return `há ${d} ${d === 1 ? "dia" : "dias"}`
 }

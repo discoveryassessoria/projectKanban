@@ -48,13 +48,13 @@ async function main() {
   ok("pessoa = o casal quando a certidão é de uma união; família ao lado", p1.pessoa === "Giuseppe Bertolucci e Ana Bertolucci" && p1.familia === "Bertolucci" && p1.certidao === "Certidão de casamento")
   ok("sem pessoa/família: '—' (nada inventado)", pedidosDeTerceiros([L({ pessoaNome: null, casalNomes: null, familiaNome: null, processoNome: null })], AGORA).every((p) => p.pessoa === "—" && p.familia === "—"))
   ok("cobranças: nenhuma · 1 cobrança · 2 cobranças", cobrancasTexto(0) === "nenhuma" && cobrancasTexto(1) === "1 cobrança" && cobrancasTexto(2) === "2 cobranças")
-  ok("pedida há: dias civis no fuso da operação; sem pedido registrado → '—'", pedidaHa(dia(-52), AGORA) === "52 d" && pedidaHa(dia(0), AGORA) === "0 d" && pedidaHa(null, AGORA) === "—" && pedidaHa("lixo", AGORA) === "—")
-  ok("pedida há: 23h50 de ontem ainda é ontem (dia civil, não 24 h)", pedidaHa(new Date("2026-10-01T02:50:00.000Z").toISOString(), AGORA) === "1 d")
+  ok("pedida há: dias civis no fuso da operação; sem pedido registrado → '—'", pedidaHa(dia(-52), AGORA) === "52 dias" && pedidaHa(dia(0), AGORA) === "menos de 1 dia" && pedidaHa(null, AGORA) === "—" && pedidaHa("lixo", AGORA) === "—")
+  ok("pedida há: 23h50 de ontem ainda é ontem (dia civil, não 24 h)", pedidaHa(new Date("2026-10-01T02:50:00.000Z").toISOString(), AGORA) === "1 dia")
 
   secao("COBRAR EM — ontem (vermelho) · hoje (âmbar) · data futura (cinza)")
   ok("ontem → 'ontem' vencida", quandoCobrar(dia(-1), AGORA).texto === "ontem" && quandoCobrar(dia(-1), AGORA).tom === "vencida")
   ok("hoje → 'hoje' âmbar (mesmo às 23h)", quandoCobrar(dia(0, 23), AGORA).texto === "hoje" && quandoCobrar(dia(0, 23), AGORA).tom === "hoje")
-  ok("mais antigo que ontem → 'há N d' vencida", quandoCobrar(dia(-10), AGORA).texto === "há 10 d" && quandoCobrar(dia(-10), AGORA).tom === "vencida")
+  ok("mais antigo que ontem → 'há N d' vencida", quandoCobrar(dia(-10), AGORA).texto === "há 10 dias" && quandoCobrar(dia(-10), AGORA).tom === "vencida")
   ok("futuro → dd/mm no fuso da operação (cinza)", quandoCobrar(dia(4), AGORA).texto === "05/10" && quandoCobrar(dia(4), AGORA).tom === "futura" && quandoCobrar(dia(9), AGORA).texto === "10/10")
   ok("sem data → '—'", quandoCobrar(null, AGORA).texto === "—" && quandoCobrar(null, AGORA).tom === "sem" && quandoCobrar("x", AGORA).tom === "sem")
   ok("meia-noite UTC não vira o dia errado (21h de São Paulo ainda é hoje)", quandoCobrar(new Date("2026-10-02T00:00:00.000Z").toISOString(), AGORA).texto === "hoje")
@@ -95,7 +95,7 @@ async function main() {
   const mix: LinhaParaTerceiros[] = [
     L({ bolaCom: "Cartório" }), L({ bolaCom: "Cartório", responsavelId: 8, cobrarEm: dia(0) }), L({ bolaCom: "Cliente" }), L({ bolaCom: "Tradutor" }), L({ bolaCom: "Tradutor" }),
     L({ bolaCom: "Juízo" }), L({ bolaCom: "Consulado" }), L({ bolaCom: "Cartório", responsavelId: null }),            // sem responsável: lista sim, cartão 1 não
-    L({ bolaCom: "Nossa", estadoOperacao: "FILA" }), L({ bolaCom: "Cartório", escalada: true }), L({ bolaCom: "Cartório", cobravelVencida: true, cobrarEm: dia(3) }),
+    L({ bolaCom: "Equipe", estadoOperacao: "FILA" }), L({ bolaCom: "Cartório", escalada: true }), L({ bolaCom: "Cartório", cobravelVencida: true, cobrarEm: dia(3) }),
   ]
   const r = resumoDeTerceiros(mix, AGORA)
   ok("cartão 1 = numeroDoKpi('cartorio') — o MESMO número da Visão geral e da aba Tarefas", r.aguardando === numeroDoKpi("cartorio", mix, AGORA) && r.aguardando === 9)

@@ -94,7 +94,7 @@ async function main() {
   const base = (o: Partial<LinhaParaDerivar>): LinhaParaDerivar => ({
     taskId: 1, titulo: "Certidão de nascimento · X", documentoId: 1, pessoaNome: "X", statusTarefa: "NAO_INICIADA", aIniciar: true, estadoOperacao: "FILA", responsavelId: null, responsavelNome: null,
     dataPrazo: "2026-10-10T15:00:00Z", rotuloDoPrazo: "Iniciar até 10/10", diasParaPrazo: 10, atrasada: false, faseMacroKey: "emissao_documental",
-    passoAtual: { ordem: 0, total: 4 }, passoCorrente: { chave: "solicitar", label: "Solicitar certidão" }, bolaCom: "Nossa", terceiroNome: null, ...o,
+    passoAtual: { ordem: 0, total: 4 }, passoCorrente: { chave: "solicitar", label: "Solicitar certidão" }, bolaCom: "Equipe", terceiroNome: null, ...o,
   })
   const doze2 = Array.from({ length: 12 }, (_, i) => base({ taskId: i + 1 }))
   const c = cartoesDaFase({ linhas: doze2, encerradas: { canceladas: 1, naoExigidas: 1 }, riscoDe: () => "atencao" })
@@ -144,7 +144,7 @@ async function main() {
 
   secao("estático — textos exatos do protótipo e vocabulário")
   const fonte = ["Cabecalho", "Caminho", "Certidoes", "Fatos", "Comentarios", "Relatorio"].map((n) => readFileSync(`src/components/torre/Processo${n}.tsx`, "utf8")).join("\n") + readFileSync("src/components/torre/TorreProcessoPagina.tsx", "utf8")
-  for (const t of ["Próxima ação · obrigatória", "Previsão · validade", "Caminho do processo", "Últimos fatos", "Ver histórico completo", "Comentários da família", "Relatório de controle", "Histórico completo", "Árvore e cadastro", "Pausar processo", "Mencionar…", "Comentar", "Escreva um comentário… use @ para mencionar alguém da equipe", "Quem é mencionado recebe aviso no sino e no resumo diário. O comentário fica no histórico da família.", "Selecionar todas", "Todas as pessoas", "ver todas", "Motivo", "Reabrir", "Atribuir", "Certidão · pessoa", "Passo atual", "Iniciou em", "Bola com", "Processo pausado com motivo · sai do Radar e das contagens, volta quando você reativar", "Certidão reaberta · volta para A iniciar e entra de novo na contagem · fica no histórico", "Responsável atribuído", "Filtro: família", "Relatório exportado ·", "Exportar CSV", "Mostrando"]) ok(`texto "${t.slice(0, 50)}"`, fonte.includes(t) || readFileSync("lib/operacional/torre-processo-puro.ts", "utf8").includes(t))
+  for (const t of ["Próxima ação · obrigatória", "Previsão · validade", "Caminho do processo", "Últimos fatos", "Ver histórico completo", "Comentários da família", "Relatório de controle", "Histórico completo", "Árvore e cadastro", "Pausar processo", "Mencionar…", "Comentar", "Escreva um comentário… use @ para mencionar alguém da equipe", "Quem é mencionado recebe aviso no sino e no resumo diário. O comentário fica no histórico da família.", "Selecionar todas", "Todas as pessoas", "ver todas", "Motivo", "Reabrir", "Atribuir", "Certidão · pessoa", "Passo atual", "Iniciou em", "Aguardando", "Processo pausado com motivo · sai do Radar e das contagens, volta quando você reativar", "Certidão reaberta · volta para A iniciar e entra de novo na contagem · fica no histórico", "Responsável atribuído", "Filtro: família", "Relatório exportado ·", "Exportar CSV", "Mostrando"]) ok(`texto "${t.slice(0, 50)}"`, fonte.includes(t) || readFileSync("lib/operacional/torre-processo-puro.ts", "utf8").includes(t))
   ok("sem 'Com o cartório' nem 'ninguém'", !/com o cart[óo]rio|ningu[ée]m/i.test(fonte))
 
   secao("integração (banco de teste) — detalhe, pausa, distribuição sem aptidão, comentário sem família")

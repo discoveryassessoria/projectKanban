@@ -83,7 +83,7 @@ ok("fase que nunca teve tarefa concluída: conta desde a entrada na fase", /na f
 secao("ESCALADA (T098)")
 const e1 = textosDaEscalada({ orgao: "4ª Zona de Porto Alegre", certidao: "Certidão de nascimento · Joaquim Ferreira Lopes", familia: "Família Lopes", pais: "Portugal", pedidoHaDias: 42, cobrancas: 3, canais: ["EMAIL", "EMAIL", "EMAIL"] })
 ok("título: '<órgão> · <certidão + pessoa>'", e1.titulo === "4ª Zona de Porto Alegre · Certidão de nascimento · Joaquim Ferreira Lopes")
-ok("detalhe: país · família · 'pedido há 42 d' · '3 cobranças por e-mail sem resposta'", e1.detalhe === "Portugal · Família Lopes · pedido há 42 d · 3 cobranças por e-mail sem resposta", e1.detalhe)
+ok("detalhe: país · família · 'pedido há 42 d' · '3 cobranças por e-mail sem resposta'", e1.detalhe === "Portugal · Família Lopes · pedido há 42 dias · 3 cobranças por e-mail sem resposta", e1.detalhe)
 ok("sugestão: 'Trocar o canal para telefone e registrar a ligação'", e1.sugestao === "Trocar o canal para telefone e registrar a ligação")
 const e2 = textosDaEscalada({ orgao: null, certidao: "x", familia: null, pais: null, pedidoHaDias: null, cobrancas: 1, canais: ["TELEFONE"] })
 ok("sem data do pedido: 'pedido não registrado' (nunca inventa)", /pedido não registrado/.test(e2.detalhe) && /1 cobrança por telefone sem resposta/.test(e2.detalhe))
@@ -97,7 +97,7 @@ ok("sugestão: reconciliar pela Central", /^Reconciliar pela Central/.test(d1.su
 
 secao("BLOQUEADA — esperando o cliente há 10+ dias (T101)")
 const b1 = textosDaBloqueada({ familia: "Martín Manzano", certidao: "Procuração · Martín Manzano", pais: "Espanha", faseLabel: "Retificação", bloqueadaHaDias: 14, cobrancasAoCliente: 2, motivo: "esperando procuração do cliente" })
-ok("detalhe: 'Espanha · Retificação · bloqueada há 14 d · 2 cobranças ao cliente'", b1.detalhe.startsWith("Espanha · Retificação · bloqueada há 14 d · 2 cobranças ao cliente"), b1.detalhe)
+ok("detalhe: 'Espanha · Retificação · bloqueada há 14 dias · 2 cobranças ao cliente'", b1.detalhe.startsWith("Espanha · Retificação · bloqueada há 14 dias · 2 cobranças ao cliente"), b1.detalhe)
 ok("sugestão cobra o cliente de novo e prevê pausar o processo", /^Cobrar o cliente de novo/.test(b1.sugestao) && /pausar o processo/.test(b1.sugestao))
 ok("só entra com 10+ dias (ou sem data registrada: nunca se prova que é recente)", !bloqueioPedeDecisao(9) && bloqueioPedeDecisao(10) && bloqueioPedeDecisao(14) && bloqueioPedeDecisao(null))
 

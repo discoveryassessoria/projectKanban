@@ -6,7 +6,7 @@
 //
 // PROVA (CHECKLIST T171–T207, T221–T227): botões de fase com contagem e a fase inicial; os 4 filtros de situação (Todos · Precisam de
 // alguém · Atenção · Parados ou sem dono) e suas contagens; País, Responsável, busca (família + próxima ação + responsável, sem acento)
-// combinando em E; as 4 ordens; paginação real e rodapé; "Na fase há" (cor pela meta); "Passo onde a maioria está"; Saúde da fase (números,
+// combinando em E; as 4 ordens; paginação real e rodapé; "Na fase há" (cor pela meta); Saúde da fase (números,
 // barra em %, tempo médio vs meta, frase da semana); o cartão por passo (caixas, gargalo); a PRÓXIMA AÇÃO derivada das tarefas abertas
 // (prioridade, textos, "—" sem tarefa) e o prazo curto (ontem/hoje/amanhã/dd/mm); textos fixos do protótipo na tela.
 // ============================================================================
@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs"
 import {
   FILTROS_DE_PROCESSOS, ORDENS_DE_PROCESSOS, PARAMETROS_INICIAIS, SEM_RESPONSAVEL, ITENS_POR_PAGINA,
   aplicarPaisRespBusca, botoesDeFase, contagensDosFiltros, escolherFaseInicial, metaDaVisao, opcoesDePais, opcoesDeResponsavel, ordenarProcessos,
-  paginar, passaNoFiltro, passoDominante, passosDaFase, rodapeDeProcessos, saudeDaFase, fraseDaSemana, textoNaFase, tomDosDias, textoDuracao,
+  paginar, passaNoFiltro, passosDaFase, rodapeDeProcessos, saudeDaFase, fraseDaSemana, textoNaFase, tomDosDias, textoDuracao,
 } from "../lib/operacional/torre-fase"
 import { proximaAcaoDoProcesso, prazoCurto, tipoDaTarefa, type LinhaParaProximaAcao } from "../lib/operacional/torre-proxima-acao"
 import { processo } from "./_torre-nova-fabrica"
@@ -85,7 +85,7 @@ ok("rodapé: 'Mostrando 12 de 30 processos da fase · 12 por página' / página 
 ok("rodapé sem resultado: 'Nenhum processo encontrado com esses filtros.'", rodapeDeProcessos(paginar([], 1)) === "Nenhum processo encontrado com esses filtros.")
 
 secao("'NA FASE HÁ' (T202)")
-ok("'52 d / 30' com meta; '52 d' sem meta; '—' sem registro", textoNaFase(EMISSAO[0]) === "52 d / 30" && textoNaFase({ ...EMISSAO[0], metaDias: null }) === "52 d" && textoNaFase({ naFase: { desde: null, origem: null, dias: null, horas: null }, metaDias: 30 }) === "—")
+ok("'52 d / 30' com meta; '52 d' sem meta; '—' sem registro", textoNaFase(EMISSAO[0]) === "52 dias / 30 dias" && textoNaFase({ ...EMISSAO[0], metaDias: null }) === "52 dias" && textoNaFase({ naFase: { desde: null, origem: null, dias: null, horas: null }, metaDias: 30 }) === "—")
 ok("cor pela META da fase: acima = vermelho; acima de 80% = âmbar; senão normal (meta 30 → cortes 30 e 24, como no protótipo)", tomDosDias(31, 30) === "vermelho" && tomDosDias(30, 30) === "ambar" && tomDosDias(25, 30) === "ambar" && tomDosDias(24, 30) === "normal" && tomDosDias(10, 30) === "normal")
 ok("o corte acompanha a meta de cada fase (Retificação 60: 50 d é âmbar, 61 d vermelho) e sem meta não há cor", tomDosDias(50, 60) === "ambar" && tomDosDias(61, 60) === "vermelho" && tomDosDias(400, null) === "normal" && tomDosDias(null, 30) === "normal")
 
@@ -95,13 +95,6 @@ const mix = [...EMISSAO, processo({ id: 70, nome: "G1", fase: "genealogia" }), p
 const botoes = botoesDeFase(colunas, mix)
 ok("um botão por fase do cadastro, com a contagem dos processos que estão nela", botoes.map((b) => `${b.label} ${b.n}`).join() === "Genealogia 2,Emissão Documental 12,Análise Documental 0")
 ok("a fase inicial é a de MAIOR volume (no protótipo, Emissão); sem processo nenhum, a primeira; sem fases, null", escolherFaseInicial(botoes) === "emissao" && escolherFaseInicial(botoesDeFase(colunas, [])) === "genealogia" && escolherFaseInicial([]) === null)
-
-secao("PASSO ONDE A MAIORIA ESTÁ (T200)")
-const comTarefas = (semResp: number, passos: Array<[string, number, number]>) => processo({ id: 80, nome: "T", tarefasDaFase: { abertas: semResp + passos.reduce((s, p) => s + p[1], 0), semResponsavel: semResp, concluidas: 0, ehCertidao: true, passos: passos.map(([label, n, ordem]) => ({ chave: label, label, ordem, n, aguardando: 0, acimaDaMeta: 0 })) } })
-ok("a caixa com mais tarefas", passoDominante(comTarefas(0, [["Solicitar", 2, 1], ["Aguardando terceiros", 7, 2]]))?.label === "Aguardando terceiros")
-ok("'Sem responsável' é uma caixa como as outras", passoDominante(comTarefas(12, [["Solicitar", 2, 1]]))?.label === "Sem responsável")
-ok("empate → o passo mais adiantado vence 'Sem responsável'", passoDominante(comTarefas(3, [["Solicitar", 3, 1]]))?.label === "Solicitar")
-ok("sem tarefa aberta: '—' (null); só concluídas: 'Todas concluídas'", passoDominante(processo({ id: 81, nome: "V" })) === null && passoDominante(processo({ id: 82, nome: "C", tarefasDaFase: { abertas: 0, semResponsavel: 0, concluidas: 4, passos: [], ehCertidao: true } }))?.label === "Todas concluídas")
 
 secao("SAÚDE DA FASE (T178–T187)")
 const s = saudeDaFase(EMISSAO, { tempoMedioDias: 34, metaDias: 30, fluxo: { entraram: 14, sairam: [{ para: "analise", n: 11 }] }, rotuloDaFase: (k) => (k === "analise" ? "Análise" : k) })
@@ -114,7 +107,7 @@ ok("frase (Análise): destinos múltiplos 'saíram 9 (6 para Tradução, 3 para 
 ok("frase sem movimento: nada inventado", fraseDaSemana(null, String) === "Nenhum processo entrou nem saiu desta fase esta semana." && fraseDaSemana({ entraram: 0, sairam: [] }, String) === "Nenhum processo entrou nem saiu desta fase esta semana.")
 ok("singular: 'cresce 1 processo/semana'", fraseDaSemana({ entraram: 3, sairam: [{ para: "x", n: 2 }] }, String).endsWith("a fase cresce 1 processo/semana."))
 ok("meta da visão: a que todos compartilham; se divergem (países), a padrão; sem nenhuma, null", metaDaVisao([{ metaDias: 45 }, { metaDias: 45 }], 30) === 45 && metaDaVisao([{ metaDias: 45 }, { metaDias: 30 }], 30) === 30 && metaDaVisao([{ metaDias: null }], null) === null && metaDaVisao([{ metaDias: null }], 30) === 30)
-ok("duração: '34 d' · '4,1 meses' · '—'", textoDuracao(34, null) === "34 d" && textoDuracao(123, null) === "4,1 meses" && textoDuracao(null, null) === "—")
+ok("duração: '34 d' · '4,1 meses' · '—'", textoDuracao(34, null) === "34 dias" && textoDuracao(123, null) === "4,1 meses" && textoDuracao(null, null) === "—")
 
 secao("ONDE ESTÃO AS CERTIDÕES — POR PASSO (T188–T193)")
 const fase = [
@@ -124,8 +117,8 @@ const fase = [
 const pf = passosDaFase(fase, 30)
 ok("o título soma abertas + concluídas (grain TAREFA): 15 certidões", pf.total === 15 && pf.substantivo === "certidões")
 ok("caixas: Sem responsável (r) · cada passo (a se a maioria espera, n se não) · Concluídas (g)", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join() === "Sem responsável:2:r,Solicitar:1:n,Aguardar:8:a,Concluídas:4:g", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join())
-ok("observação do passo em espera: quantas passaram da meta ('5 há mais de 30 d')", pf.caixas[2].obs === "5 há mais de 30 d" && pf.caixas[0].obs === "sem responsável")
-ok("gargalo: 'O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.'", pf.gargalo === "O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.", pf.gargalo)
+ok("observação do passo em espera: quantas passaram da meta ('5 há mais de 30 d')", pf.caixas[2].obs === "5 há mais de 30 dias" && pf.caixas[0].obs === "sem responsável")
+ok("gargalo: 'O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.'", pf.gargalo === "O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 dias.", pf.gargalo)
 ok("o passo NÃO multiplica: as caixas de passo somam as tarefas abertas COM responsável (9 = 11 abertas − 2 sem responsável)", pf.caixas.filter((x) => x.classe === "n" || x.classe === "a").reduce((a, x) => a + x.n, 0) === 9)
 ok("sem tarefa aberta: gargalo diz que está tudo concluído; sem nada: 'Nenhuma certidão nesta fase ainda.'", passosDaFase([processo({ id: 92, nome: "Z", tarefasDaFase: { abertas: 0, semResponsavel: 0, concluidas: 5, passos: [], ehCertidao: true } })], 30).gargalo.startsWith("Nenhuma certidão aberta") && passosDaFase([], null).gargalo === "Nenhuma tarefa nesta fase ainda.")
 ok("fase sem certidões usa 'tarefas'", passosDaFase([processo({ id: 93, nome: "P", tarefasDaFase: { abertas: 1, semResponsavel: 1, concluidas: 0, passos: [], ehCertidao: false } })], null).substantivo === "tarefas")
@@ -172,10 +165,17 @@ ok("o dia é o do fuso operacional (23:30 em São Paulo ainda é 'hoje' mesmo se
 
 secao("TEXTOS FIXOS NA TELA (T170–T177, T188, T194–T198, T200, T217–T227)")
 const tela = readFileSync("src/components/torre/TorreProcessos.tsx", "utf8") + readFileSync("src/components/torre/TorreSaudeDaFase.tsx", "utf8") + readFileSync("src/components/torre/TorrePassosDaFase.tsx", "utf8") + readFileSync("lib/operacional/torre-fase.ts", "utf8")
-for (const t of ["Torre de Controle", "Buscar família, pessoa, cartório…", "Escolha a fase — a tabela abaixo mostra só os processos dela", "Saúde da fase", "no ritmo", "atenção", "parados", "tempo médio real · meta", "desta fase — por passo", "Família · país", "Na fase há", "Certidões prontas", "Passo onde a maioria está", "Bola com", "Próxima ação", "Responsável", "Prazo", "Situação", "Ações", "Foco", "Relatório", "Todos os países", "Todos os responsáveis", "Nenhum processo encontrado com esses filtros.", "12 por página", "Cada linha é um processo."])
+for (const t of ["Torre de Controle", "Buscar família, pessoa, cartório…", "Escolha a fase — a tabela abaixo mostra só os processos dela", "Saúde da fase", "no ritmo", "atenção", "parados", "tempo médio real · meta", "desta fase — por passo", "Família · país", "Na fase há", "Certidões prontas", "Aguardando", "Próxima ação", "Responsável", "Prazo", "Situação", "Ações", "Foco", "Relatório", "Todos os países", "Todos os responsáveis", "Nenhum processo encontrado com esses filtros.", "12 por página", "Cada linha é um processo."])
   ok(`a tela tem o texto "${t}"`, tela.includes(t))
 ok("todo botão tem handler; sem 'exemplo do protótipo' / 'Com o cartório' / 'Sem ninguém'", [...tela.matchAll(/<button\b[^>]*>/g)].every((m) => /onClick=/.test(m[0])) && !/exemplo do prot|reaproveitados|Com o cart[oó]rio|Sem ningu/.test(tela))
 ok("Foco e o nome da família levam a /torre/processo/[id]; Relatório só com permissão", (tela.match(/href=\{`\/torre\/processo\/\$\{p\.processoId\}`\}/g) ?? []).length === 2 && /podeRelatorio && \(/.test(tela))
 
+// A coluna "Passo onde a maioria está" foi REMOVIDA da aba Processos: mostrava "Sem responsável", que não é um passo.
+{
+  const tela = readFileSync("src/components/torre/TorreProcessos.tsx", "utf8")
+  ok("a coluna 'Passo onde a maioria está' não existe mais na tela", !tela.includes("Passo onde a maioria está") && !tela.includes("passoDominante"))
+}
+
 console.log(`\n${passou} verificações ok, ${falhou} falha(s)`)
 process.exit(falhou ? 1 : 0)
+

@@ -25,6 +25,7 @@
 // COBRAR TEM DESFAZER POR ESTORNO: cobrança é fato append-only (`ContatoTerceiro`); o Desfazer MARCA o contato como estornado
 // (`estornarCobranca`, cobranca-terceiros.ts) e devolve a próxima cobrança/escalada; o fato fica, riscado no histórico.
 // ============================================================================
+import { separarPrioridadeDoLote, rotuloDaPrioridade, type PrioridadeDoModelo } from '@/lib/operacional/torre-prioridade-lote'
 import { prisma } from '@/lib/prisma'
 import { redistribuirTarefas, redistribuirPrioridade, type ItemDaRedistribuicao } from '@/lib/operacional/tarefa-comandos'
 import { alterarPrazo, alterarPrioridade } from '@/lib/operacional/tarefa-ciclo'
@@ -45,7 +46,7 @@ export { JANELA_DO_DESFAZER_MS }
 export type TipoDesfazer = 'ATRIBUICAO' | 'PRIORIDADE' | 'PRAZO' | 'AUSENCIA' | 'COBRANCA'
 
 export interface ResultadoDoLote {
-  acao: 'ATRIBUIR' | 'PRIORIDADE_ALTA' | 'REPACTUAR' | 'COBRAR'
+  acao: 'ATRIBUIR' | 'PRIORIDADE_ALTA' | 'PRIORIDADE' | 'REPACTUAR' | 'COBRAR'
   total: number
   sucesso: number
   falha: number
@@ -108,6 +109,24 @@ export async function prioridadeAltaEmLote(args: { tarefaIds: number[]; autorId:
   const sucesso = itens.filter((i) => i.ok).length
   return {
     acao: 'PRIORIDADE_ALTA', total: itens.length, sucesso, falha: itens.length - sucesso, itens,
+    desfazer: sucesso > 0 ? { tipo: 'PRIORIDADE', tarefaIds: itens.filter((i) => i.ok).map((i) => i.tarefaId) } : null,
+  }
+}
+
+// ─── PRIORIDADE (QUALQUER NÍVEL DO MODELO) ───────────────────────────────────
+// Escolhe BAIXA · MEDIA ("normal") · ALTA · URGENTE para todas as selecionadas. Serve também para "voltar ao normal" (MEDIA).
+// Usa a mesma primitiva da prioridade individual e o mesmo Desfazer (de/para na auditoria).
+
+export async function prioridadeEmLote(args: { tarefaIds: number[]; prioridade: PrioridadeDoModelo; autorId: number }): Promise<ResultadoDoLote> {
+  const atuais = await prisma.tarefa.findMany({ where: { id: { in: args.tarefaIds } }, select: { id: true, prioridade: true } })
+  const { aMudar, puladas } = separarPrioridadeDoLote(args.tarefaIds, new Map(atuais.map((t) => [t.id, String(t.prioridade)])), args.prioridade)
+  const r = aMudar.length
+    ? await redistribuirPrioridade({ tarefaIds: aMudar, novaPrioridade: args.prioridade, autorId: args.autorId, motivo: `prioridade ${rotuloDaPrioridade(args.prioridade).toLowerCase()} em lote pela Torre` })
+    : { total: 0, sucesso: 0, falha: 0, itens: [] as ItemDaRedistribuicao[] }
+  const itens = [...itensDe(r.itens), ...puladas.map((p) => ({ ...p, ok: false }))]
+  const sucesso = itens.filter((i) => i.ok).length
+  return {
+    acao: 'PRIORIDADE', total: itens.length, sucesso, falha: itens.length - sucesso, itens,
     desfazer: sucesso > 0 ? { tipo: 'PRIORIDADE', tarefaIds: itens.filter((i) => i.ok).map((i) => i.tarefaId) } : null,
   }
 }

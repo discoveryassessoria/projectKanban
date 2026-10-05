@@ -221,6 +221,10 @@
   ]
  },
  "arquivos": [
+    "scripts/tempo-extenso.test.ts",
+    "scripts/torre-tarefas-blocos.test.ts",
+    "scripts/torre-aguardando-vocabulario.test.ts",
+    "scripts/torre-prioridade-lote.test.ts",
     "scripts/paridade-central-a-receber.test.ts",
     "scripts/financeiro-abas-v3.test.ts",
     "scripts/guard-migration-preview.test.ts",

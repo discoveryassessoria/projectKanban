@@ -78,7 +78,7 @@ export interface PassoDoProcesso {
   acimaDaMeta: number
 }
 
-/** O resumo das tarefas da FASE ATUAL do processo — o insumo do "Passo onde a maioria está" e do cartão "Onde estão as certidões". */
+/** O resumo das tarefas da FASE ATUAL do processo — o insumo do cartão "Onde estão as certidões". */
 export interface TarefasDaFase {
   abertas: number
   /** Abertas SEM responsável (a caixa vermelha). */

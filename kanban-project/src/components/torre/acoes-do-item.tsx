@@ -155,7 +155,7 @@ export function useAcoesDoItem({ irParaAba, onFeito }: { irParaAba: (aba: "equip
           <PdvTexto
             titulo={pedido.acao === "IGNORAR_7_DIAS" ? "Ignorar 7 dias" : "Encerrar (não devida)"}
             subtitulo={pedido.item.titulo} rotulo="Justificativa"
-            confirmar={pedido.acao === "IGNORAR_7_DIAS" ? "Ignorar 7 d" : "Encerrar"}
+            confirmar={pedido.acao === "IGNORAR_7_DIAS" ? "Ignorar por 7 dias" : "Encerrar"}
             onFechar={() => pedido.resolver(null)}
             onEnviar={async (justificativa) => {
               const base = pedido.acao === "ENCERRAR_NAO_DEVIDA" ? { tarefaId: pedido.item.tarefaId }
