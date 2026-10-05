@@ -1,7 +1,7 @@
 "use client"
 // src/components/torre/TarefasTabela.tsx — a TABELA agrupada da aba Tarefas (Torre nova, igual ao protótipo).
 // Colunas (uma informação por coluna): [☐] Certidão | Pessoa | Família | Fase | Passo | Status | Aguardando | Cobrar em | Responsável | Iniciou | Prazo | Risco | [ações].
-// Rolagem horizontal quando precisar; o ☐ e a Certidão ficam fixos à esquerda.
+// TUDO CABE NA TELA (sem arrastar para o lado): colunas fluidas, texto quebra linha. O cabeçalho das colunas fica DENTRO de cada bloco, abaixo da faixa da família.
 // Cabeçalho de grupo: ☐, a família (link), o resumo, "N tarefas" e "Foco ›". A certidão CANCELADA continua visível — riscada, no fim do
 // grupo, com "Ver motivo" — mas é só exibição: não conta no "N tarefas", não tem seleção e não entra em lote.
 // Prazo: SEMPRE o da tarefa, uma vez só (`textoPrazoDaTarefa`). Status: `ROTULO_STATUS_TAREFA` (via `statusDaLinha`).
@@ -51,6 +51,13 @@ export function TarefasTabela({
   const todasDaPagina = grupos.flatMap(([, ls]) => ls).filter((l) => !ehCancelada(l)).map((l) => l.taskId)
   const todasMarcadas = todasDaPagina.length > 0 && todasDaPagina.every((id) => sel[id])
 
+  // O CABEÇALHO DAS COLUNAS vive DENTRO de cada bloco, logo abaixo da faixa com o nome da família (não mais uma vez no topo da tabela).
+  const cabecalho = (
+    <div className="tf-g tf-hd" role="row">
+      <div /><div>Certidão</div><div>Pessoa</div><div>Família</div><div>Fase</div><div>Passo</div><div>Status</div><div>Aguardando</div><div>Cobrar em</div><div>Responsável</div><div>Iniciou</div><div>Prazo</div><div>Risco</div><div />
+    </div>
+  )
+
   const renderLinha = (l: LinhaDaTela) => {
     const cancelada = ehCancelada(l)
     const st = statusDaLinha(l)
@@ -66,12 +73,12 @@ export function TarefasTabela({
     const semDono = l.responsavelId == null
     return (
       <div key={l.taskId} className={`tf-g tf-linha ${marcada ? "sel" : ""} ${cancelada ? "cancelada" : ""}`}>
-        <div className="tf-fixa-0">
+        <div>
           {cancelada
             ? <button type="button" className="tf-chk" disabled aria-label="Certidão cancelada: só exibição" style={{ opacity: 0.4, cursor: "not-allowed" }} />
             : <button type="button" className={`tf-chk ${marcada ? "on" : ""}`} aria-label={`Selecionar a tarefa ${l.taskId}`} aria-pressed={marcada} onClick={() => onSelecionar([l.taskId], !marcada)} />}
         </div>
-        <div className="tf-cert tf-fixa-1">
+        <div className="tf-cert">
           <button type="button" className="tf-nome" onClick={() => onAbrirGaveta(l)}>
             {novas.has(l.taskId) && <span className="tor-p amb tf-nova">nova</span>}{docTipoTxt(l)}
           </button>
@@ -102,20 +109,16 @@ export function TarefasTabela({
 
   return (
     <div className="tf-tabela">
-      {comFaixa && !vazio && grupos.length > 0 && (
+      {!vazio && grupos.length > 0 && (
         <div className="tf-expande" role="group" aria-label="Expandir ou recolher os grupos">
           <button type="button" onClick={() => setAbertos(expandirTudo(grupos.map(([n]) => n)))}>Expandir tudo</button>
           <button type="button" onClick={() => setAbertos(recolherTudo())}>Recolher tudo</button>
+          <button type="button" aria-pressed={todasMarcadas} disabled={todasDaPagina.length === 0} onClick={() => onTodas(todasDaPagina, !todasMarcadas)}>
+            {todasMarcadas ? "Desmarcar todas" : "Selecionar todas"}
+          </button>
         </div>
       )}
       <div className="tf-rolagem">
-        <div className="tf-g tf-hd">
-          <div className="tf-fixa-0">
-            <button type="button" className={`tf-chk ${todasMarcadas ? "on" : ""}`} aria-label="Selecionar todas" aria-pressed={todasMarcadas} disabled={todasDaPagina.length === 0}
-              onClick={() => onTodas(todasDaPagina, !todasMarcadas)} />
-          </div>
-          <div className="tf-fixa-1">Certidão</div><div>Pessoa</div><div>Família</div><div>Fase</div><div>Passo</div><div>Status</div><div>Aguardando</div><div>Cobrar em</div><div>Responsável</div><div>Iniciou</div><div>Prazo</div><div>Risco</div><div />
-        </div>
         {!vazio && grupos.map(([nome, itens]) => {
           const trabalho = itens.filter((l) => !ehCancelada(l))
           const ids = trabalho.map((l) => l.taskId)
@@ -145,6 +148,7 @@ export function TarefasTabela({
                   {processoId != null && <button type="button" className="foco" onClick={(e) => { parar(e); onFocoDaFamilia(processoId) }}>Foco ›</button>}
                 </div>
               </div>
+              {aberto && cabecalho}
               {!aberto ? null : subgrupos
                 ? subgrupos.map((g) => {
                   const ls = g.linhas as LinhaDaTela[]
