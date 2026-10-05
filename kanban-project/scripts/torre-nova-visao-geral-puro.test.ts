@@ -119,7 +119,7 @@ ok("todo cartão que filtra tem chave aceita na URL (filtra=true) — o resto é
 console.log("\nestático: textos e ordem do protótipo")
 const kp = ler("src/components/torre/TorreKpis.tsx"), vg = ler("src/components/torre/TorreVisaoGeral.tsx"), fu = ler("src/components/torre/TorreFunil.tsx")
 ok("rótulos 'Situação · onde está o trabalho agora' e 'Agenda · prazos de todas as certidões'", kp.includes("Situação · onde está o trabalho agora") && kp.includes("Agenda · prazos de todas as certidões"))
-ok("subtítulos dos cartões", kp.includes("certidões e passos em andamento") && kp.includes("bola nossa: solicitar, conferir, traduzir"))
+ok("subtítulos dos cartões", kp.includes("certidões e passos em andamento") && kp.includes("aguardando a equipe: solicitar, conferir, traduzir"))
 ok("botão da faixa 'Revisar o dia · N decisões'", kp.includes("▶ Revisar o dia · "))
 ok("colunas do funil: Fase · Processos · Situação · Tempo médio · Meta · Maior gargalo", ["Fase", "Processos", "Situação", "Tempo médio", "Meta", "Maior gargalo"].every((c) => fu.includes(`>${c}<`)) && fu.includes("Clique numa fase.") && fu.includes("no ritmo") && fu.includes("atenção") && fu.includes("parado"))
 ok("a Visão geral monta, em ordem: TorreKpis → TorreFunil → Precisa de você (#pdv) → 5 palavras", (() => { const a = vg.indexOf("<TorreKpis"), b = vg.indexOf("<TorreFunil"), c = vg.indexOf('id="pdv"'), e2 = vg.indexOf("As 5 palavras da Torre:"); return a > 0 && b > a && c > b && e2 > c })())

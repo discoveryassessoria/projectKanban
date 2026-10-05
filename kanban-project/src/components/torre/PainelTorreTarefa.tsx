@@ -47,7 +47,7 @@ export function PainelTorreTarefa({ linha, agora }: { linha: LinhaTorre; agora: 
   return (
     <div className="tor tor-painel" data-testid="painel-torre">
       <div className="tor-kv">
-        <div><b>Bola com</b><span className={`tor-p ${bola.comTerceiro ? "amb" : "blu"}`}>{bola.texto}</span></div>
+        <div><b>Aguardando</b><span className={`tor-p ${bola.comTerceiro ? "amb" : "blu"}`}>{bola.texto}</span></div>
         <div><b>Status</b><span className={`tor-p ${statusTarefaCls(linha).replace("opv3-p-", "")}`}>{st.texto}</span></div>
         <div><b>Prazo da tarefa</b>{textoPrazoDaTarefa(linha) || "—"}</div>
         {linha.regraTemporalPasso && !linha.regraTemporalPasso.semPrazo && <div><b>Espera do passo</b>{relTxt(linha.regraTemporalPasso)} · {fmtData(linha.regraTemporalPasso.dueAt)}</div>}

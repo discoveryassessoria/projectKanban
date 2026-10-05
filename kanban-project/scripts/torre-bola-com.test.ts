@@ -6,8 +6,8 @@
 //   npx tsx scripts/torre-bola-com.test.ts   (banco de teste)
 //
 // PROVA:
-//   • os SEIS valores (Nossa, Cartório, Cliente, Tradutor, Juízo, Consulado) e a regra: Cliente = AGUARDANDO_CLIENTE, terceiro =
-//     categoria do órgão (`rotuloBola` do CADASTRO; sem categoria/rótulo → Cartório), Nossa = o resto; 'Bola nossa' × 'Bola com terceiro';
+//   • os SEIS valores (Equipe, Cartório, Cliente, Tradutor, Juízo, Consulado) e a regra: Cliente = AGUARDANDO_CLIENTE, terceiro =
+//     categoria do órgão (`rotuloBola` do CADASTRO; sem categoria/rótulo → Cartório), Nossa = o resto; 'Aguardando a equipe' × 'Aguardando terceiros';
 //   • `bolaDesde`: início da espera atual, só de registro real (auditoria → envio da subtarefa → envio do pedido → null);
 //   • `pedidaEm` = SolicitacaoDocumento.dataEnvio; `cobrarEm` = o acompanhamento REGISTRADO, senão 7 dias corridos depois da última
 //     cobrança/pedido (e `cobrarEmPadrao` avisa); nada a cobrar quando a bola é nossa; sem registro → null;
@@ -42,14 +42,14 @@ const fatos = (o: Partial<FatosDaBola> = {}): FatosDaBola => ({ categorias: [], 
 
 async function main() {
   secao("PURO — os valores e a regra")
-  ok("os SEIS valores, na ordem: Nossa · Cartório · Cliente · Tradutor · Juízo · Consulado", VALORES_DE_BOLA.join(" · ") === "Nossa · Cartório · Cliente · Tradutor · Juízo · Consulado")
-  ok("o vocabulário do cadastro (rotuloBola) é fechado: Cartório · Tradutor · Juízo · Consulado", ROTULOS_DE_TERCEIRO.join(" · ") === "Cartório · Tradutor · Juízo · Consulado" && ehRotuloDeTerceiro("Juízo") && !ehRotuloDeTerceiro("Cliente") && !ehRotuloDeTerceiro("Nossa") && !ehRotuloDeTerceiro("qualquer"))
+  ok("os SEIS valores, na ordem: Equipe · Cartório · Cliente · Tradutor · Juízo · Consulado", VALORES_DE_BOLA.join(" · ") === "Equipe · Cartório · Cliente · Tradutor · Juízo · Consulado")
+  ok("o vocabulário do cadastro (rotuloBola) é fechado: Cartório · Tradutor · Juízo · Consulado", ROTULOS_DE_TERCEIRO.join(" · ") === "Cartório · Tradutor · Juízo · Consulado" && ehRotuloDeTerceiro("Juízo") && !ehRotuloDeTerceiro("Cliente") && !ehRotuloDeTerceiro("Equipe") && !ehRotuloDeTerceiro("qualquer"))
   ok("Cliente = a tarefa espera o cliente", bolaDaLinha(linha({ esperandoDe: "cliente" }), "Tradutor") === "Cliente")
   ok("terceiro (esperandoDe) → o rótulo do órgão", bolaDaLinha(linha({ esperandoDe: "terceiro" }), "Tradutor") === "Tradutor" && bolaDaLinha(linha({ esperandoDe: "terceiro" }), "Juízo") === "Juízo" && bolaDaLinha(linha({ esperandoDe: "terceiro" }), "Consulado") === "Consulado")
   ok("terceiro pela SUBTAREFA em espera externa (estadoOperacao AGUARDANDO) — a mesma definição do cartão 'Aguardando terceiros'", bolaDaLinha(linha({ estadoOperacao: "AGUARDANDO" }), "Consulado") === "Consulado")
   ok("sem categoria/rótulo → 'Cartório'", bolaDaLinha(linha({ estadoOperacao: "AGUARDANDO" }), null) === "Cartório")
-  ok("Nossa = o resto (inclusive FILA sem responsável)", bolaDaLinha(linha(), "Tradutor") === "Nossa" && bolaDaLinha(linha({ estadoOperacao: "CONCLUIDA" }), null) === "Nossa")
-  ok("'Bola nossa' × 'Bola com terceiro' = Nossa × qualquer outro (o Cliente conta como terceiro)", VALORES_DE_BOLA.every((b) => (b === "Nossa") === (ladoDaBola(b) === "nossa") && rotuloDoLado(b) === (b === "Nossa" ? "Bola nossa" : "Bola com terceiro")))
+  ok("Nossa = o resto (inclusive FILA sem responsável)", bolaDaLinha(linha(), "Tradutor") === "Equipe" && bolaDaLinha(linha({ estadoOperacao: "CONCLUIDA" }), null) === "Equipe")
+  ok("'Aguardando a equipe' × 'Aguardando terceiros' = Nossa × qualquer outro (o Cliente conta como terceiro)", VALORES_DE_BOLA.every((b) => (b === "Equipe") === (ladoDaBola(b) === "nossa") && rotuloDoLado(b) === (b === "Equipe" ? "Aguardando a equipe" : "Aguardando terceiros")))
 
   secao("PURO — a categoria do órgão (cadastro)")
   ok("vale a de MENOR ordem que declara um rótulo válido", categoriaDoTerceiro([{ ordem: 5, rotuloBola: "Juízo" }, { ordem: 2, rotuloBola: "Tradutor" }]) === "Tradutor")
@@ -65,7 +65,7 @@ async function main() {
   ok("2º: o envio da subtarefa em espera externa", montarBola(espera, fatos({ subtarefaEnviadaEm: dt(5), solicitacaoEnviadaEm: dt(3) })).bolaDesde === iso(5))
   ok("3º: o envio do pedido (SolicitacaoDocumento.dataEnvio)", montarBola(espera, fatos({ solicitacaoEnviadaEm: dt(3) })).bolaDesde === iso(3))
   ok("nenhum registro → null (registro antigo NUNCA é preenchido por suposição)", montarBola(espera, fatos()).bolaDesde === null)
-  ok("com a bola nossa, 'desde' é null", montarBola(linha({ esperandoDesde: iso(4) }), fatos({ solicitacaoEnviadaEm: dt(3) })).bolaDesde === null)
+  ok("com a aguardando a equipe, 'desde' é null", montarBola(linha({ esperandoDesde: iso(4) }), fatos({ solicitacaoEnviadaEm: dt(3) })).bolaDesde === null)
   ok("data inválida na auditoria é ignorada (cai no próximo registro real)", montarBola({ ...espera, esperandoDesde: "lixo" }, fatos({ solicitacaoEnviadaEm: dt(3) })).bolaDesde === iso(3))
 
   secao("PURO — pedida em e COBRAR EM (registrado, ou o padrão de 7 dias)")
@@ -81,16 +81,16 @@ async function main() {
   ok("sem pedido, sem cobrança, sem acompanhamento → null", cobrarEmDe({ proximoAcompanhamentoEm: null, ultimaCobrancaEm: null, pedidaEm: null }).data === null)
   const m = montarBola(espera, fatos({ solicitacaoEnviadaEm: dt(10) }))
   ok("montarBola: pedidaEm = o envio do pedido; cobrarEm = +7 d; cobrarEmPadrao = true", m.pedidaEm === iso(10) && m.cobrarEm === new Date(dt(10).getTime() + 7 * DIA).toISOString() && m.cobrarEmPadrao === true)
-  ok("com a bola nossa não há o que cobrar (cobrarEm null) — mas o pedido continua sendo fato (pedidaEm)", (() => { const n = montarBola(linha(), fatos({ solicitacaoEnviadaEm: dt(10), proximoAcompanhamentoEm: dt(-2) })); return n.cobrarEm === null && n.cobrarEmPadrao === false && n.pedidaEm === iso(10) })())
+  ok("com a aguardando a equipe não há o que cobrar (cobrarEm null) — mas o pedido continua sendo fato (pedidaEm)", (() => { const n = montarBola(linha(), fatos({ solicitacaoEnviadaEm: dt(10), proximoAcompanhamentoEm: dt(-2) })); return n.cobrarEm === null && n.cobrarEmPadrao === false && n.pedidaEm === iso(10) })())
   ok("sem órgão: categoriaTerceiro = null (a tarefa não tem terceiro cadastrado); a espera cai em 'Cartório'", (() => { const n = montarBola(espera, fatos({ temOrgao: false, categorias: null })); return n.categoriaTerceiro === null && n.bolaCom === "Cartório" })())
   ok("com órgão sem categoria: categoriaTerceiro = 'Cartório' (o padrão)", montarBola(linha(), fatos({ categorias: [] })).categoriaTerceiro === "Cartório")
 
   secao("PURO — a bola do PROCESSO (Radar/Processos) usa a mesma função e o mesmo vocabulário")
-  const P = (bolaCom: (typeof VALORES_DE_BOLA)[number], dias: number | null = null) => ({ estadoOperacao: (bolaCom === "Nossa" ? "FILA" : "AGUARDANDO") as "FILA" | "AGUARDANDO", esperandoDe: (bolaCom === "Cliente" ? "cliente" : bolaCom === "Nossa" ? null : "terceiro") as "terceiro" | "cliente" | null, esperandoHaDias: dias, bolaCom })
-  ok("metade ou mais com um terceiro → o terceiro dominante (Tradutor), com os dias da maior espera", JSON.stringify(bolaDoProcesso([P("Tradutor", 3), P("Tradutor", 8), P("Nossa")])) === '{"rotulo":"Tradutor","dias":8}')
-  ok("terceiros misturados: conta como terceiro e vale o mais frequente (Juízo ×2 contra Cartório ×1)", bolaDoProcesso([P("Juízo"), P("Juízo"), P("Cartório"), P("Nossa")]).rotulo === "Juízo")
+  const P = (bolaCom: (typeof VALORES_DE_BOLA)[number], dias: number | null = null) => ({ estadoOperacao: (bolaCom === "Equipe" ? "FILA" : "AGUARDANDO") as "FILA" | "AGUARDANDO", esperandoDe: (bolaCom === "Cliente" ? "cliente" : bolaCom === "Equipe" ? null : "terceiro") as "terceiro" | "cliente" | null, esperandoHaDias: dias, bolaCom })
+  ok("metade ou mais com um terceiro → o terceiro dominante (Tradutor), com os dias da maior espera", JSON.stringify(bolaDoProcesso([P("Tradutor", 3), P("Tradutor", 8), P("Equipe")])) === '{"rotulo":"Tradutor","dias":8}')
+  ok("terceiros misturados: conta como terceiro e vale o mais frequente (Juízo ×2 contra Cartório ×1)", bolaDoProcesso([P("Juízo"), P("Juízo"), P("Cartório"), P("Equipe")]).rotulo === "Juízo")
   ok("empate entre terceiros → a ordem de VALORES_DE_BOLA (Cartório antes de Consulado)", bolaDoProcesso([P("Consulado"), P("Cartório")]).rotulo === "Cartório")
-  ok("só cliente → Cliente; menos da metade com outro → Nossa", bolaDoProcesso([P("Cliente", 5), P("Nossa")]).rotulo === "Cliente" && bolaDoProcesso([P("Cartório"), P("Nossa"), P("Nossa")]).rotulo === "Nossa" && bolaDoProcesso([]).rotulo === "Nossa")
+  ok("só cliente → Cliente; menos da metade com outro → Nossa", bolaDoProcesso([P("Cliente", 5), P("Equipe")]).rotulo === "Cliente" && bolaDoProcesso([P("Cartório"), P("Equipe"), P("Equipe")]).rotulo === "Equipe" && bolaDoProcesso([]).rotulo === "Equipe")
   ok("linha SEM bolaCom (leitor antigo) mantém o critério de sempre", bolaDoProcesso([{ estadoOperacao: "AGUARDANDO", esperandoDe: "terceiro", esperandoHaDias: 2 }]).rotulo === "Cartório")
 
   secao("O módulo é importável pela TELA: sem prisma estático")
@@ -141,7 +141,7 @@ async function main() {
     ok("duas categorias: vale a de menor ordem com rótulo válido (Tradutor)", L(tDuas).bolaCom === "Tradutor")
     ok("aguardando SEM órgão identificado → Cartório (padrão), categoriaTerceiro null", L(tSemOrgao).bolaCom === "Cartório" && L(tSemOrgao).categoriaTerceiro === null)
     ok("AGUARDANDO_CLIENTE → Cliente", L(tCliente).bolaCom === "Cliente")
-    ok("não aguardando → Nossa (mesmo com órgão de tradutor cadastrado); categoriaTerceiro continua dizendo o tipo do órgão", L(tNossa).bolaCom === "Nossa" && L(tNossa).categoriaTerceiro === "Tradutor" && L(tNossa).bolaDesde === null && L(tNossa).cobrarEm === null)
+    ok("não aguardando → Nossa (mesmo com órgão de tradutor cadastrado); categoriaTerceiro continua dizendo o tipo do órgão", L(tNossa).bolaCom === "Equipe" && L(tNossa).categoriaTerceiro === "Tradutor" && L(tNossa).bolaDesde === null && L(tNossa).cobrarEm === null)
     ok("a linha confere com a função pura (mesma regra, uma só)", linhas.every((l) => l.bolaCom === bolaDaLinha(l, l.categoriaTerceiro)))
     ok("os campos EXISTENTES da linha continuam lá", linhas.every((l) => "estadoOperacao" in l && "esperandoDe" in l && "acompanhamentoPasso" in l && "passoCorrente" in l && "cobravelVencida" in l))
 
@@ -203,7 +203,7 @@ async function main() {
     secao("BANCO — o Radar/Processos usam a bola da tarefa: o processo do Tradutor mostra 'Tradutor'")
     const radar = await processosDaTorre(new Date())
     const doTrad = radar.processos.find((p) => p.processoId === tTrad.processoId)
-    ok("a coluna 'Bola com' do processo diz 'Tradutor' (o terceiro dominante), vindo do cadastro da categoria", doTrad?.bola.rotulo === "Tradutor", JSON.stringify(doTrad?.bola))
+    ok("a coluna 'Aguardando' do processo diz 'Tradutor' (o terceiro dominante), vindo do cadastro da categoria", doTrad?.bola.rotulo === "Tradutor", JSON.stringify(doTrad?.bola))
     ok("e o do Consulado mostra 'Consulado'", radar.processos.find((p) => p.processoId === tCons.processoId)?.bola.rotulo === "Consulado")
 
     secao("O detalhe do Processo (Foco) traz os mesmos campos")

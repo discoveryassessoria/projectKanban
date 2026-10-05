@@ -5,7 +5,7 @@
 //   npx tsx scripts/torre-vocabulario-oficial.test.ts   (sem banco)
 //
 // 'Aguardando terceiros' (nunca 'Com o cartório') · 'Sem responsável' (nunca 'Sem ninguém'/'ninguém') · aba 'Tarefas' (nunca 'Certidões') ·
-// sem 'Equipe e Terceiros' · 'Bola nossa'/'Bola com terceiro' · 'Precisa de você' · 'Revisar o dia'.
+// sem 'Equipe e Terceiros' · 'Aguardando a equipe'/'Aguardando terceiro' · 'Precisa de você' · 'Revisar o dia'.
 // As CHAVES internas (kpi=aguard, `cartorio`, `ninguem`…) e as URLs NÃO mudam — a varredura olha só o que a pessoa lê (comentários não contam).
 // ============================================================================
 import { readFileSync, readdirSync, statSync } from "node:fs"
@@ -74,12 +74,12 @@ const frase = textoDaFrase(fraseDoDia({ processos: 3, noRitmo: 1, decisoes: [{ t
 ok("a frase-resumo diz 'sem dono' e 'escalada de cartório' (vocabulário do protótipo) e nunca 'Com o cartório'/'ninguém'", /1 sem dono, 1 escalada de cartório\.$/.test(frase) && !/com o cart[óo]rio|ningu/i.test(frase), frase)
 ok("os tipos da frase têm o vocabulário oficial", TIPOS_NA_FRASE.map((x) => x.varios).join(" · ") === "sem dono · fases deixadas · escaladas de cartório · divergências · bloqueadas · de carga da equipe")
 ok("as abas: a aba é 'Tarefas' (nunca 'Certidões') e não há 'Equipe e Terceiros'", ABAS_DA_TORRE.some(([, r]) => r === "Tarefas") && ABAS_DA_TORRE.every(([, r]) => !/certid|Equipe e Terceiros/i.test(r)))
-ok("'Bola nossa' / 'Bola com terceiro'", rotuloDoLado("Nossa") === "Bola nossa" && rotuloDoLado("Cartório") === "Bola com terceiro" && rotuloDoLado("Cliente") === "Bola com terceiro")
+ok("'Aguardando a equipe' / 'Aguardando terceiros'", rotuloDoLado("Equipe") === "Aguardando a equipe" && rotuloDoLado("Cartório") === "Aguardando terceiros" && rotuloDoLado("Cliente") === "Aguardando terceiros")
 ok("os nomes oficiais seguem no cabeçalho: 'Precisa de você', 'Revisar o dia', 'Briefing do dia'", ABAS_DA_TORRE.some(([, r]) => r === "Precisa de você") && /Revisar o dia/.test(ler("src/components/torre/TorreCabecalho.tsx")) && /Briefing do dia/.test(ler("src/components/torre/TorreCabecalho.tsx")))
 ok("a visão de Tarefas se chama 'Aguardando terceiros' e 'Sem responsável'", /\['aguard', 'Aguardando terceiros'\]/.test(ler("lib/operacional/torre-tarefas-tela.ts")) && /\['semdono', 'Sem responsável'\]/.test(ler("lib/operacional/torre-tarefas-tela.ts")))
 // Torre nova: a aba Processos (por fase) não repete os 4 números por linha; o vocabulário vale nela e no Radar do mesmo jeito.
 ok("os 4 números do Foco dizem 'Aguardando terceiros'; Processos e Radar usam 'Sem responsável' e nunca 'Com o cartório'/'Sem ninguém'", /"Aguardando terceiros", foco\.numeros\.comCartorio/.test(ler("src/components/torre/FocoFamilia.tsx")) && [ "src/components/torre/TorreProcessos.tsx", "src/components/torre/TorreRadar.tsx", "lib/operacional/torre-fase.ts", "lib/operacional/torre-radar.ts" ].every((a) => !/Com o cart[oó]rio|Sem ningu[eé]m|Ninguém/.test(ler(a))) && /SEM_RESPONSAVEL = 'Sem responsável'/.test(ler("lib/operacional/torre-fase.ts")))
-ok("a coluna 'Bola com' mostra 'Sem responsável' (nunca 'Ninguém')", /txt: "Sem responsável", cls: "red"/.test(ler("src/components/torre/tipos.ts")))
+ok("a coluna 'Aguardando' mostra 'Sem responsável' (nunca 'Ninguém')", /txt: "Sem responsável", cls: "red"/.test(ler("src/components/torre/tipos.ts")))
 
 secao("vocabulário de STATUS em TODA a interface (30/09/2026+): 'Aguardando terceiros', nunca 'Aguardando cartório/juízo/consulado' nem 'Com o cartório'")
 // Varredura ampla do código de exibição (comentários não contam). Nomes de passo configurados no Gerenciamento ('Aguardar retorno do cartório') não casam: são DADO, não rótulo de status.

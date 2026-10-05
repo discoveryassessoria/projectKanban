@@ -113,7 +113,7 @@ async function main() {
     secao("J4 — bola do processo (puro)")
     const L = (o: Partial<{ estadoOperacao: "FILA" | "AGUARDANDO" | "CONCLUIDA"; esperandoDe: "terceiro" | "cliente" | null; esperandoHaDias: number | null }>) => ({ estadoOperacao: "FILA" as const, esperandoDe: null, esperandoHaDias: null, ...o })
     ok("metade ou mais esperando o terceiro → Cartório (com os dias da maior espera)", JSON.stringify(bolaDoProcesso([L({ esperandoDe: "terceiro", esperandoHaDias: 4 }), L({ esperandoDe: "terceiro", esperandoHaDias: 9 }), L({})])) === '{"rotulo":"Cartório","dias":9}')
-    ok("esperando o cliente → Cliente; senão Nossa; sem tarefas → Nossa", bolaDoProcesso([L({ esperandoDe: "cliente", esperandoHaDias: 2 })]).rotulo === "Cliente" && bolaDoProcesso([L({}), L({})]).rotulo === "Nossa" && bolaDoProcesso([]).rotulo === "Nossa")
+    ok("esperando o cliente → Cliente; senão Nossa; sem tarefas → Nossa", bolaDoProcesso([L({ esperandoDe: "cliente", esperandoHaDias: 2 })]).rotulo === "Cliente" && bolaDoProcesso([L({}), L({})]).rotulo === "Equipe" && bolaDoProcesso([]).rotulo === "Equipe")
 
     secao("J4 — Radar e Processos vêm das fontes existentes")
     // Um macrofluxo real para o tipo do teste: genealogia → emissão → análise → apostilamento.
@@ -139,7 +139,7 @@ async function main() {
     ok("risco = o score do 'Precisa de você': crítico / atenção / ok", linha(pCrit.processoId).risco === "critico" && linha(pAten.processoId).risco === "atencao" && linha(pOk.processoId).risco === "ok", JSON.stringify([linha(pCrit.processoId).scoreMaximo, linha(pAten.processoId).scoreMaximo, linha(pOk.processoId).scoreMaximo]))
     ok("ordenado do pior para o melhor", r.processos.filter((p) => ids.has(p.processoId)).map((p) => p.risco).join() === "critico,atencao,ok")
     const cel = (id: number, key: string) => linha(id).celulas[r.colunas.findIndex((x) => x.key === key)]
-    ok("célula da fase ATUAL: com quem está a bola e há quantos dias, com a cor do risco", cel(pCrit.processoId, "emissao_documental").estado === "atual" && cel(pCrit.processoId, "emissao_documental").bola === "Nossa" && cel(pCrit.processoId, "emissao_documental").risco === "critico" && (cel(pCrit.processoId, "emissao_documental").dias === null || cel(pCrit.processoId, "emissao_documental").dias === undefined ? true : typeof cel(pCrit.processoId, "emissao_documental").dias === "number"))
+    ok("célula da fase ATUAL: com quem está a bola e há quantos dias, com a cor do risco", cel(pCrit.processoId, "emissao_documental").estado === "atual" && cel(pCrit.processoId, "emissao_documental").bola === "Equipe" && cel(pCrit.processoId, "emissao_documental").risco === "critico" && (cel(pCrit.processoId, "emissao_documental").dias === null || cel(pCrit.processoId, "emissao_documental").dias === undefined ? true : typeof cel(pCrit.processoId, "emissao_documental").dias === "number"))
     ok("fase anterior = feita; posterior = futura; fase que o macrofluxo do tipo não tem = n/a", cel(pCrit.processoId, "genealogia").estado === "feita" && cel(pCrit.processoId, "analise_documental").estado === "futura" && cel(pCrit.processoId, "protocolado").estado === "na")
     ok("fase futura com achado aberto CAD-012 → 'sem passos'; sem achado → não", cel(pCrit.processoId, "apostilamento").semPassos === true && cel(pCrit.processoId, "analise_documental").semPassos === false)
     await prisma.saudeAchado.update({ where: { id: achado.id }, data: { status: "IGNORADO", ignoradoAte: new Date(Date.now() + 3 * DIA) } })

@@ -46,13 +46,13 @@ secao("Visões — as oito do protótipo, na ordem, e os mesmos predicados dos c
 
 secao("Textos da linha — bola, cobrar em, iniciou")
 {
-  const nossa = textoDaBola({ bolaCom: "Nossa", bolaDesde: null, terceiroNome: null, esperandoDe: null, estadoOperacao: "FILA" }, AGORA)
-  ok("Nossa: só 'Nossa' (sem 'há N d' inventado)", nossa.texto === "Nossa" && nossa.haDias === null && !nossa.comTerceiro)
+  const nossa = textoDaBola({ bolaCom: "Equipe", bolaDesde: null, terceiroNome: null, esperandoDe: null, estadoOperacao: "FILA" }, AGORA)
+  ok("Nossa: só 'Equipe' (sem 'há N d' inventado)", nossa.texto === "Equipe" && nossa.haDias === null && !nossa.comTerceiro)
   const cart = textoDaBola({ bolaCom: "Cartório", bolaDesde: iso(-21), terceiroNome: "Cartório de Caxias do Sul", esperandoDe: "terceiro", estadoOperacao: "AGUARDANDO" }, AGORA)
-  ok("com terceiro: nome do órgão · há N d", cart.texto === "Cartório de Caxias do Sul · há 21 d")
+  ok("com terceiro: o TIPO (Cartório) · há N d; o nome do órgão vai à parte (orgao)", cart.texto === "Cartório · há 21 d" && cart.orgao === "Cartório de Caxias do Sul")
   ok("Cliente: 'Cliente · há 14 d' (nunca o nome do órgão)", textoDaBola({ bolaCom: "Cliente", bolaDesde: iso(-14), terceiroNome: "Cartório X", esperandoDe: "cliente", estadoOperacao: "AGUARDANDO" }, AGORA).texto === "Cliente · há 14 d")
   ok("terceiro sem órgão cadastrado: o rótulo da categoria (Cartório, Tradutor…)", textoDaBola({ bolaCom: "Tradutor", bolaDesde: null, terceiroNome: null, esperandoDe: "terceiro", estadoOperacao: "AGUARDANDO" }, AGORA).texto === "Tradutor")
-  ok("sem registro de 'desde quando': sem 'há N d'", textoDaBola({ bolaCom: "Cartório", bolaDesde: null, terceiroNome: "A", esperandoDe: "terceiro", estadoOperacao: "AGUARDANDO" }, AGORA).texto === "A")
+  ok("sem registro de 'desde quando': sem 'há N d'", textoDaBola({ bolaCom: "Cartório", bolaDesde: null, terceiroNome: "A", esperandoDe: "terceiro", estadoOperacao: "AGUARDANDO" }, AGORA).texto === "Cartório")
   ok("haQuantosDias conta dias CIVIS (21h de ontem = 1 dia) e nunca é negativo", haQuantosDias(iso(-1, 23), AGORA) === 1 && haQuantosDias(iso(2), AGORA) === 0 && haQuantosDias(null, AGORA) === null)
 
   ok("cobrar: ontem → vermelho", JSON.stringify(textoDoCobrar(iso(-1), AGORA)) === JSON.stringify({ texto: "cobrar: ontem", tom: "vermelho" }))

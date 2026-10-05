@@ -107,7 +107,7 @@ export function TarefasTabela({
             <button type="button" className={`tf-chk ${todasMarcadas ? "on" : ""}`} aria-label="Selecionar todas" aria-pressed={todasMarcadas} disabled={todasDaPagina.length === 0}
               onClick={() => onTodas(todasDaPagina, !todasMarcadas)} />
           </div>
-          <div>Certidão · pessoa</div><div>Família · fase</div><div>Passo · status</div><div>Bola com · cobrar em</div><div>Responsável</div><div>Iniciou</div><div>Prazo</div><div>Risco</div><div />
+          <div>Certidão · pessoa</div><div>Família · fase</div><div>Passo · status</div><div>Aguardando · cobrar em</div><div>Responsável</div><div>Iniciou</div><div>Prazo</div><div>Risco</div><div />
         </div>
         {!vazio && grupos.map(([nome, itens]) => {
           const trabalho = itens.filter((l) => !ehCancelada(l))

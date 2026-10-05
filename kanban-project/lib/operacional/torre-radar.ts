@@ -10,6 +10,7 @@
 // o País da tela, como no protótipo; o rodapé é que diz quantas famílias o recorte tem ("Mostrando 9 de 47 famílias").
 // ============================================================================
 import type { ProcessoDaTorre } from './torre-processos'
+import { BOLA_NOSSA } from './torre-bola'
 import { PESO_NO_RADAR, rotuloNoRadar, ehGrave, precisaDeAlguem } from './torre-risco'
 import { diasComoNumero, semAcento, textoDuracao, paginar, ITENS_POR_PAGINA, TODOS_OS_PAISES } from './torre-fase'
 
@@ -20,7 +21,7 @@ export type OrdemDoRadar = 'grave' | 'tempo' | 'az'
 
 export const FILTROS_DO_RADAR: ReadonlyArray<{ chave: FiltroDoRadar; rotulo: string }> = [
   { chave: 'todas', rotulo: 'Todas' }, { chave: 'precisam', rotulo: 'Precisam de alguém' },
-  { chave: 'nossa', rotulo: 'Bola nossa' }, { chave: 'terceiro', rotulo: 'Bola com terceiro' }, { chave: 'criticas', rotulo: 'Críticas' },
+  { chave: 'nossa', rotulo: 'Aguardando a equipe' }, { chave: 'terceiro', rotulo: 'Aguardando terceiros' }, { chave: 'criticas', rotulo: 'Críticas' },
 ]
 export const ORDENS_DO_RADAR: ReadonlyArray<{ chave: OrdemDoRadar; rotulo: string }> = [
   { chave: 'grave', rotulo: 'Mais grave primeiro' }, { chave: 'tempo', rotulo: 'Mais tempo na fase' }, { chave: 'az', rotulo: 'Família A–Z' },
@@ -31,8 +32,8 @@ export const FILTRO_INICIAL_DO_RADAR: FiltroDoRadar = 'precisam'
 export const passaNoFiltroDoRadar = (p: ProcessoDaTorre, f: FiltroDoRadar): boolean =>
   f === 'todas'
   || (f === 'precisam' && precisaDeAlguem(p.nivelDeRisco))
-  || (f === 'nossa' && p.bola.rotulo === 'Nossa')
-  || (f === 'terceiro' && p.bola.rotulo !== 'Nossa')
+  || (f === 'nossa' && p.bola.rotulo === BOLA_NOSSA)
+  || (f === 'terceiro' && p.bola.rotulo !== BOLA_NOSSA)
   || (f === 'criticas' && ehGrave(p.nivelDeRisco))
 
 /** País + busca por família (tudo menos o botão) — a base da lista. */

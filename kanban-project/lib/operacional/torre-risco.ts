@@ -134,7 +134,7 @@ export function riscoDoProcesso(e: EntradaDoRisco): RiscoCalculado {
   if ((s.atrasadas ?? 0) > 0) motivos.push(`${plural(s.atrasadas!, 'tarefa atrasada', 'tarefas atrasadas')}`)
   if (s.faseDeixada) motivos.push('tarefa aberta de fase anterior')
   if (s.divergencia) motivos.push('divergência entre passo e tarefa')
-  if (parado) motivos.push(`bola com ${e.bolaRotulo ?? 'terceiro'} há ${e.bolaForaHaDias} d sem cobrança em dia`)
+  if (parado) motivos.push(`aguardando ${e.bolaRotulo ?? 'terceiro'} há ${e.bolaForaHaDias} d sem cobrança em dia`)
   if (e.semDono) motivos.push('sem responsável')
   else if ((s.semResponsavel ?? 0) > 0) motivos.push(`${plural(s.semResponsavel!, 'tarefa sem responsável', 'tarefas sem responsável')}`)
   if ((s.bloqueadas ?? 0) > 0) motivos.push(`${plural(s.bloqueadas!, 'tarefa bloqueada', 'tarefas bloqueadas')}`)

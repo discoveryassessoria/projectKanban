@@ -95,7 +95,7 @@ async function main() {
   const mix: LinhaParaTerceiros[] = [
     L({ bolaCom: "Cartório" }), L({ bolaCom: "Cartório", responsavelId: 8, cobrarEm: dia(0) }), L({ bolaCom: "Cliente" }), L({ bolaCom: "Tradutor" }), L({ bolaCom: "Tradutor" }),
     L({ bolaCom: "Juízo" }), L({ bolaCom: "Consulado" }), L({ bolaCom: "Cartório", responsavelId: null }),            // sem responsável: lista sim, cartão 1 não
-    L({ bolaCom: "Nossa", estadoOperacao: "FILA" }), L({ bolaCom: "Cartório", escalada: true }), L({ bolaCom: "Cartório", cobravelVencida: true, cobrarEm: dia(3) }),
+    L({ bolaCom: "Equipe", estadoOperacao: "FILA" }), L({ bolaCom: "Cartório", escalada: true }), L({ bolaCom: "Cartório", cobravelVencida: true, cobrarEm: dia(3) }),
   ]
   const r = resumoDeTerceiros(mix, AGORA)
   ok("cartão 1 = numeroDoKpi('cartorio') — o MESMO número da Visão geral e da aba Tarefas", r.aguardando === numeroDoKpi("cartorio", mix, AGORA) && r.aguardando === 9)

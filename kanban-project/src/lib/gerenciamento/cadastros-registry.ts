@@ -197,9 +197,9 @@ export const CADASTROS: Record<string, CadastroSpec> = {
       {
         // TORRE NOVA (M5): "BOLA COM" — quando uma tarefa espera uma organização desta categoria, com QUEM a Torre diz que está a bola.
         // É dado de cadastro (nunca lista no código): em branco, a Torre cai em "Cartório".
-        key: "rotuloBola", label: "Bola com (Torre de Controle)", tipo: "select", fechado: true, largura: "meia",
+        key: "rotuloBola", label: "Aguardando (Torre de Controle)", tipo: "select", fechado: true, largura: "meia",
         opcoes: ROTULOS_DE_TERCEIRO.map((v) => ({ valor: v, label: v })),
-        ajuda: "Quando uma tarefa espera uma organização desta categoria, a Torre mostra a bola com este rótulo. Em branco: Cartório.",
+        ajuda: "Quando uma tarefa espera uma organização desta categoria, a Torre mostra, em Aguardando, este rótulo. Em branco: Cartório.",
       },
       ...CAMPOS_BASE,
     ],

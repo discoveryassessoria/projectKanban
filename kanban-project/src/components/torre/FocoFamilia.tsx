@@ -112,7 +112,7 @@ export function FocoFamilia({ processoId, onFechar }: { processoId: number; onFe
               ))}
             </div>
             <div className="tor-card tor-scroll">
-              <div className="tor-hd tor-gF"><span>Certidão</span><span>Cartório</span><span>Bola com</span><span>Prazo</span><span>Responsável</span></div>
+              <div className="tor-hd tor-gF"><span>Certidão</span><span>Cartório</span><span>Aguardando</span><span>Prazo</span><span>Responsável</span></div>
               {foco.tarefas.length === 0 && <div className="p-4 small">Nenhuma tarefa aberta nesta família.</div>}
               {foco.tarefas.map((l) => { const b = bolaDe(l); return (
                 <div key={l.taskId} className="tor-row tor-gF">

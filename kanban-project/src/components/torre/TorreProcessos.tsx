@@ -5,6 +5,7 @@
 // Relatório (modal com exportação CSV/Excel/PDF reais). Todas as regras são puras (`lib/operacional/torre-fase.ts`); o risco é a regra
 // única `torre-risco.ts`; a próxima ação é DERIVADA das tarefas abertas (`torre-proxima-acao.ts`); "certidões prontas" é a fonte única
 // `documentacaoRequeridaDoProcesso`, pedida só para as linhas da página.
+import { BOLA_NOSSA } from "@/lib/operacional/torre-bola"
 import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -170,7 +171,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
           <div className="tor-pf-tabela">
             <div className="tor-pf-rolagem">
               <div className="tor-pf-grade tor-pf-cab">
-                <div>Família · país</div><div>Na fase há</div><div>Certidões prontas</div><div>Passo onde a maioria está</div><div>Bola com</div>
+                <div>Família · país</div><div>Na fase há</div><div>Certidões prontas</div><div>Passo onde a maioria está</div><div>Aguardando</div>
                 <div>Próxima ação</div><div>Responsável</div><div>Prazo</div><div>Situação</div><div>Ações</div>
               </div>
               {pg.itens.map((p) => {
@@ -197,7 +198,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
                       )}
                     </div>
                     <div className="tor-pf-celula">{dominante?.label ?? "—"}</div>
-                    <div><span className={`tor-pf-pilula ${p.bola.rotulo === "Nossa" ? "nossa" : "outra"}`}>{p.bola.rotulo}</span></div>
+                    <div><span className={`tor-pf-pilula ${p.bola.rotulo === BOLA_NOSSA ? "nossa" : "outra"}`}>{p.bola.rotulo}</span></div>
                     <div className="tor-pf-celula" title={p.motivoDoRisco}>{acao?.texto ?? "—"}</div>
                     <div className={`tor-pf-celula${acao && acao.responsavelNome == null ? " sem" : ""}`}>{acao ? acao.responsavelNome ?? SEM_RESPONSAVEL : "—"}</div>
                     <div className={`tor-pf-celula${acao?.prazo.tom === "vermelho" ? " vermelho" : acao?.prazo.tom === "ambar" ? " ambar" : ""}`}>{acao?.prazo.texto ?? "—"}</div>
