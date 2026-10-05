@@ -1,5 +1,5 @@
 // scripts/coleta-pendentes-prazo.test.ts — o link vale até o processo sair de "Aguardando fechamento"; o PENDENTE que ficou segue a contagem
-// de 30 dias DEPOIS do encerramento (storage de MENTIRA + banco de TESTE; só mexe no que ele mesmo criou).
+// de 30 dias DEPOIS do encerramento, qualquer que seja o motivo do encerramento (FASE_MUDOU, MANUAL, CONFERENCIA) (storage de MENTIRA + banco de TESTE; só mexe no que ele mesmo criou).
 //   PRISMA_DATABASE_URL=...discovery_test npx tsx scripts/coleta-pendentes-prazo.test.ts
 import { readFileSync } from "node:fs"
 import { prisma } from "@/lib/prisma"
@@ -45,9 +45,12 @@ async function main() {
   const B = await cenario({ link: { encerradoEm: diasAtras(29), motivo: "FASE_MUDOU" }, envio: { status: "PENDENTE" } })      // ainda não (29)
   const C = await cenario({ link: { encerradoEm: diasAtras(100), motivo: "FASE_MUDOU" }, envio: { status: "CONFIRMADO" } })    // NUNCA
   const D = await cenario({ link: { encerradoEm: null }, envio: { status: "PENDENTE" } })                                      // link ATIVO: nunca
-  const E = await cenario({ link: { encerradoEm: diasAtras(100), motivo: "MANUAL" }, envio: { status: "PENDENTE" } })          // outro motivo: fora do escopo
+  const E = await cenario({ link: { encerradoEm: diasAtras(100), motivo: "MANUAL" }, envio: { status: "PENDENTE" } })          // fechado à mão: PURGA
+  const E2 = await cenario({ link: { encerradoEm: diasAtras(40), motivo: "CONFERENCIA" }, envio: { status: "PENDENTE" } })     // fim da conferência: PURGA
+  const E3 = await cenario({ link: { encerradoEm: diasAtras(10), motivo: "MANUAL" }, envio: { status: "PENDENTE" } })          // manual há 10 dias: ainda não
+  const C2 = await cenario({ link: { encerradoEm: diasAtras(100), motivo: "MANUAL" }, envio: { status: "CONFIRMADO" } })       // confirmado de link manual: NUNCA
   const F = await cenario({ link: { encerradoEm: diasAtras(31), motivo: "CONFERENCIA" }, envio: { status: "DESCARTADO" } })    // descartado: como sempre
-  for (const x of [A, B, C, D, E, F]) storage.add(x.chave)
+  for (const x of [A, B, C, D, E, E2, E3, C2, F]) storage.add(x.chave)
   const cpfDeA = (await prisma.coletaEnvio.findUnique({ where: { id: A.envioId }, select: { cpf: true } }))!.cpf!
 
   console.log("purga com prazo de 30 dias")
@@ -60,13 +63,17 @@ async function main() {
   ok("PENDENTE com 29 dias → intacto (dados, cpf e arquivo)", b?.status === "PENDENTE" && b?.cpf != null && b?.dados != null && b?.arquivos.length === 1 && storage.has(B.chave))
   ok("CONFIRMADO → NUNCA apagado (nem com 100 dias): dados e arquivo ficam no processo", c?.status === "CONFIRMADO" && c?.dados != null && c?.purgadoEm === null && c?.arquivos.length === 1 && storage.has(C.chave))
   ok("link ATIVO → nunca (mesmo com envio antigo)", d?.status === "PENDENTE" && d?.dados != null && storage.has(D.chave))
-  ok("pendente de link encerrado por OUTRO motivo (MANUAL) fica fora deste pedido", e?.status === "PENDENTE" && e?.dados != null && storage.has(E.chave))
+  const e2 = await env(E2.envioId), e3 = await env(E3.envioId), c2 = await env(C2.envioId)
+  ok("PENDENTE de link fechado MANUALMENTE há 100 dias → apagado (dados, cpf e arquivo) e vira DESCARTADO", e?.dados === null && e?.cpf === null && e?.status === "DESCARTADO" && e?.arquivos.length === 0 && !storage.has(E.chave))
+  ok("PENDENTE de link encerrado por CONFERÊNCIA há 40 dias → apagado", e2?.dados === null && e2?.status === "DESCARTADO" && !storage.has(E2.chave))
+  ok("PENDENTE de link manual com só 10 dias → intacto (a contagem é de 30)", e3?.status === "PENDENTE" && e3?.dados != null && storage.has(E3.chave))
+  ok("CONFIRMADO de link fechado manualmente → NUNCA apagado", c2?.status === "CONFIRMADO" && c2?.dados != null && c2?.purgadoEm === null && storage.has(C2.chave))
   ok("DESCARTADO continua sendo purgado aos 30 dias (como antes)", f?.dados === null && f?.purgadoEm != null && !storage.has(F.chave))
-  ok("só 2 envios purgados (o pendente e o descartado) e 1 por prazo", r.envios === 2 && r.pendentesPorPrazo === 1 && apagadas.length === 2)
+  ok("4 envios purgados (3 pendentes por prazo + 1 descartado)", r.envios === 4 && r.pendentesPorPrazo === 3 && apagadas.length === 4)
   const aud = await prisma.logAuditoria.findFirst({ where: { acao: "COLETA_PENDENTE_PURGADO_POR_PRAZO", entidadeId: A.envioId } })
   ok("auditoria do pendente purgado existe e NÃO leva dado pessoal (nem CPF nem nome)", !!aud && !JSON.stringify(aud).includes("Fulano") && !JSON.stringify(aud).includes(cpfDeA) && JSON.stringify(aud.detalhes).includes(String(A.linkId)))
   const r2 = await purgarEnviosDescartados(AGORA, apagar)
-  ok("idempotente: rodar de novo não apaga nada", r2.envios === 0 && apagadas.length === 2)
+  ok("idempotente: rodar de novo não apaga nada", r2.envios === 0 && apagadas.length === 4)
   // 31 dias depois do dia seguinte, o de 29 dias vira candidato
   const r3 = await purgarEnviosDescartados(new Date(AGORA.getTime() + 2 * 86_400_000), apagar)
   ok("o de 29 dias é purgado quando completa mais de 30 (dois dias depois)", r3.pendentesPorPrazo === 1 && !storage.has(B.chave))
