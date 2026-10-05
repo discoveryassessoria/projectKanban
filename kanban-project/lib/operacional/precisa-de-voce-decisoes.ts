@@ -48,6 +48,24 @@ export function regraDoTipo(tipo: TipoDoPainel, escaladaApos: number = ESCALAR_A
 
 // ─── FORMATAÇÃO ──────────────────────────────────────────────────────────────
 
+/**
+ * AS COLUNAS DA TABELA "PRECISA DE VOCÊ": Família | Tipo | Fase | Tarefa | Quantidade (+ Ação). Cada informação aparece UMA vez — o que a
+ * tabela já mostra em coluna NÃO se repete em texto corrido. `complemento` guarda só o que NENHUMA coluna diz (há quanto tempo,
+ * motivo, canais…). `pais` aparece pequeno sob a família.
+ */
+export interface ColunasDoItem {
+  pais: string | null
+  fase: string | null
+  /** O que é a tarefa (certidão · pessoa) ou o conjunto ("Tarefas sem responsável"). */
+  tarefa: string | null
+  /** Quantas: tarefas sem responsável · cobranças sem resposta · cobranças ao cliente · tarefas executáveis… `null` = não se aplica. */
+  quantidade: number | null
+  /** O que a quantidade conta, escrito sob o número ("tarefas", "cobranças sem resposta"…). */
+  unidade: string | null
+  complemento: string | null
+}
+const unir = (...p: Array<string | null | undefined | false>): string | null => { const x = p.filter((v): v is string => !!v); return x.length ? x.join(' · ') : null }
+
 export const certidoes = (n: number): string => `${n} ${n === 1 ? 'certidão' : 'certidões'}`
 const dias = (n: number): string => `${n} ${n === 1 ? 'dia' : 'dias'}`
 /** "2,0" — decimal com vírgula (PT-BR), uma casa. */
@@ -157,14 +175,15 @@ export function planoDoSemDono(tarefas: Array<{ taskId: number; sugestao: Sugest
 export function textosDoSemDono(args: {
   familia: string; pais: string | null; faseLabel: string | null; entrouNaFase: Date | null; agora: Date
   total: number; plano: PlanoDoSemDono
-}): { titulo: string; detalhe: string; sugestao: string; acao1: { rotulo: string; acao: string }; acao2: { rotulo: string; acao: string } } {
+}): { titulo: string; detalhe: string; sugestao: string; acao1: { rotulo: string; acao: string }; acao2: { rotulo: string; acao: string }; colunas: ColunasDoItem } {
   const { plano } = args
+  const colunas: ColunasDoItem = { pais: args.pais, fase: args.faseLabel, tarefa: 'Tarefas sem responsável', quantidade: args.total, unidade: args.total === 1 ? 'tarefa' : 'tarefas', complemento: quandoEntrouNaFase(args.entrouNaFase, args.agora) }
   const titulo = `${args.familia} · ${certidoes(args.total)} sem responsável`
   const detalhe = [args.pais, args.faseLabel, quandoEntrouNaFase(args.entrouNaFase, args.agora)].filter((x): x is string => !!x).join(' · ')
   const [primeiro, ...resto] = plano.atribuicoes
   if (!primeiro) {
     return {
-      titulo, detalhe,
+      titulo, detalhe, colunas,
       sugestao: 'Sem aptidão cadastrada para estas certidões — a decisão é sua',
       acao1: { rotulo: 'Escolher responsável', acao: 'ATRIBUIR_ESCOLHIDO' }, acao2: { rotulo: 'Ver equipe', acao: 'VER_EQUIPE' },
     }
@@ -172,14 +191,14 @@ export function textosDoSemDono(args: {
   const sobra = plano.semAptidao.length ? `; ${certidoes(plano.semAptidao.length)} sem aptidão cadastrada ${plano.semAptidao.length === 1 ? 'fica' : 'ficam'} para você` : ''
   if (resto.length === 0) {
     return {
-      titulo, detalhe,
+      titulo, detalhe, colunas,
       sugestao: `Atribuir a ${primeiro.nome}${primeiro.motivo ? ` (${primeiro.motivo})` : ''}${sobra}`,
       acao1: { rotulo: `Atribuir a ${primeiro.nome}`, acao: 'ATRIBUIR_SUGERIDO' }, acao2: { rotulo: 'Escolher outro', acao: 'ATRIBUIR_ESCOLHIDO' },
     }
   }
   const quem = plano.atribuicoes.map((a) => `${a.nome} (${certidoes(a.tarefaIds.length)})`).join(', ')
   return {
-    titulo, detalhe,
+    titulo, detalhe, colunas,
     sugestao: `Atribuir a ${quem}, cada uma a quem tem aptidão comprovada${sobra}`,
     acao1: { rotulo: 'Atribuir às sugeridas', acao: 'ATRIBUIR_SUGERIDO' }, acao2: { rotulo: 'Escolher outro', acao: 'ATRIBUIR_ESCOLHIDO' },
   }
@@ -194,7 +213,7 @@ export function textosDoSemDono(args: {
 export function textosDaFaseDeixada(args: {
   familia: string; pais: string | null; faseLabel: string; proximaFaseLabel: string
   ultimaConclusao: Date | null; entrouNaFase: Date | null; agora: Date
-}): { titulo: string; detalhe: string; sugestao: string } {
+}): { titulo: string; detalhe: string; sugestao: string; colunas: ColunasDoItem } {
   const quando = args.ultimaConclusao
     ? `todas as tarefas da fase concluídas há ${dias(Math.max(0, diasDeCalendario(args.ultimaConclusao, args.agora)))}`
     : args.entrouNaFase
@@ -204,6 +223,7 @@ export function textosDaFaseDeixada(args: {
     titulo: `${args.familia} · ${args.faseLabel} sem próxima ação`,
     detalhe: [args.pais, quando, 'o próximo passo não foi marcado'].filter((x): x is string => !!x).join(' · '),
     sugestao: `Avançar para ${args.proximaFaseLabel} e abrir as tarefas dela`,
+    colunas: { pais: args.pais, fase: args.faseLabel, tarefa: 'Nenhuma tarefa aberta na fase', quantidade: null, unidade: null, complemento: unir(quando, 'o próximo passo não foi marcado') },
   }
 }
 
@@ -212,7 +232,7 @@ export function textosDaFaseDeixada(args: {
 export function textosDaEscalada(args: {
   orgao: string | null; certidao: string; familia: string | null; pais: string | null
   pedidoHaDias: number | null; cobrancas: number; canais: string[]
-}): { titulo: string; detalhe: string; sugestao: string } {
+}): { titulo: string; detalhe: string; sugestao: string; colunas: ColunasDoItem } {
   const pedido = args.pedidoHaDias != null ? `pedido há ${diasPorExtenso(args.pedidoHaDias)}` : 'pedido não registrado'
   const porCanal = args.canais.length ? ` por ${canaisPorExtenso(args.canais)}` : ''
   const cobr = `${args.cobrancas} ${args.cobrancas === 1 ? 'cobrança' : 'cobranças'}${porCanal} sem resposta`
@@ -221,6 +241,7 @@ export function textosDaEscalada(args: {
     titulo: `${args.orgao ?? 'Terceiro'} · ${args.certidao}`,
     detalhe: [args.pais, args.familia, pedido, cobr].filter((x): x is string => !!x).join(' · '),
     sugestao: jaLigou ? 'Registrar nova ligação ou trocar o canal da solicitação' : 'Trocar o canal para telefone e registrar a ligação',
+    colunas: { pais: args.pais, fase: null, tarefa: args.certidao, quantidade: args.cobrancas, unidade: args.cobrancas === 1 ? 'cobrança sem resposta' : 'cobranças sem resposta', complemento: unir(args.orgao, pedido, args.canais.length ? `por ${canaisPorExtenso(args.canais)}` : null) },
   }
 }
 
@@ -229,7 +250,7 @@ export function textosDaEscalada(args: {
 export function textosDaDivergencia(args: {
   familia: string | null; certidao: string; pais: string | null
   statusTarefa: string; statusPasso: string; esperado: string | null
-}): { titulo: string; detalhe: string; sugestao: string } {
+}): { titulo: string; detalhe: string; sugestao: string; colunas: ColunasDoItem } {
   const esperado = args.esperado ? tarefaPorExtenso(args.esperado) : null
   return {
     titulo: `${args.familia ? `${args.familia} · ` : ''}${args.certidao}`,
@@ -238,6 +259,10 @@ export function textosDaDivergencia(args: {
       `a tarefa diz "${tarefaPorExtenso(args.statusTarefa)}", o passo diz "${passoPorExtenso(args.statusPasso)}"${esperado ? `, a Central espera "${esperado}"` : ''}`,
     ].filter((x): x is string => !!x).join(' · '),
     sugestao: esperado ? `Reconciliar pela Central: a tarefa passa a espelhar o passo ("${esperado}")` : 'Reconciliar pela Central: a tarefa passa a espelhar o passo',
+    colunas: {
+      pais: args.pais, fase: null, tarefa: args.certidao, quantidade: 1, unidade: 'tarefa',
+      complemento: `a tarefa diz "${tarefaPorExtenso(args.statusTarefa)}", o passo diz "${passoPorExtenso(args.statusPasso)}"${esperado ? `, a Central espera "${esperado}"` : ''}`,
+    },
   }
 }
 
@@ -246,13 +271,14 @@ export function textosDaDivergencia(args: {
 export function textosDaBloqueada(args: {
   familia: string | null; certidao: string; pais: string | null; faseLabel: string | null
   bloqueadaHaDias: number | null; cobrancasAoCliente: number; motivo: string | null
-}): { titulo: string; detalhe: string; sugestao: string } {
+}): { titulo: string; detalhe: string; sugestao: string; colunas: ColunasDoItem } {
   const quando = args.bloqueadaHaDias != null ? `bloqueada há ${diasPorExtenso(args.bloqueadaHaDias)}` : 'bloqueio sem data registrada'
   const cobr = `${args.cobrancasAoCliente} ${args.cobrancasAoCliente === 1 ? 'cobrança' : 'cobranças'} ao cliente`
   return {
     titulo: `${args.familia ? `${args.familia} · ` : ''}${args.certidao}`,
     detalhe: [args.pais, args.faseLabel, quando, cobr, args.motivo ? `motivo: ${args.motivo}` : null].filter((x): x is string => !!x).join(' · '),
     sugestao: 'Cobrar o cliente de novo pelo chat do processo; sem resposta, pausar o processo',
+    colunas: { pais: args.pais, fase: args.faseLabel, tarefa: args.certidao, quantidade: args.cobrancasAoCliente, unidade: args.cobrancasAoCliente === 1 ? 'cobrança ao cliente' : 'cobranças ao cliente', complemento: unir(quando, args.motivo ? `motivo: ${args.motivo}` : null) },
   }
 }
 
@@ -269,7 +295,7 @@ export function quantoMoverDaCarga(args: { executaveis: number; limite: number; 
 export function textosDaCarga(args: {
   nome: string; executaveis: number; limite: number; vencidas: number; filaEmSemanas: number | null
   mover: number; paisDasMovidas: string | null; destinos: string[]
-}): { titulo: string; detalhe: string; sugestao: string; rotuloAcao1: string } {
+}): { titulo: string; detalhe: string; sugestao: string; rotuloAcao1: string; colunas: ColunasDoItem } {
   const fila = args.filaEmSemanas != null ? `fila de ${decimalPt(args.filaEmSemanas)} ${args.filaEmSemanas === 1 ? 'semana' : 'semanas'}` : 'fila não calculável (sem conclusões recentes)'
   let sugestao: string
   if (args.mover <= 0) sugestao = 'Nenhuma certidão ainda não iniciada para mover — decida na Equipe'
@@ -280,6 +306,7 @@ export function textosDaCarga(args: {
     detalhe: `${args.vencidas} ${args.vencidas === 1 ? 'vencida' : 'vencidas'} · ${fila}`,
     sugestao,
     rotuloAcao1: args.mover > 0 ? `Redistribuir ${args.mover}` : 'Redistribuir',
+    colunas: { pais: null, fase: null, tarefa: `Carga de ${args.nome}`, quantidade: args.executaveis, unidade: 'tarefas executáveis', complemento: unir(`limite ${args.limite}`, `${args.vencidas} ${args.vencidas === 1 ? 'vencida' : 'vencidas'}`, fila) },
   }
 }
 

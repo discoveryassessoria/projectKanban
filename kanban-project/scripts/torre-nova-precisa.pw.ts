@@ -32,7 +32,7 @@ async function main() {
   // ── A ABA PRÓPRIA: título, cartões, tabela ──────────────────────────────────────────────────
   const titulo = await texto(".pdv-titulo")
   const total = Number(/· (\d+)$/.exec(titulo)![1])
-  ok("T080 título 'Precisa de você · N' e o texto de apoio exato", /^Precisa de você · \d+$/.test(titulo) && (await texto(".pdv-texto")) === "Decisões que só o Administrador toma. Tarefa vencida não entra aqui: é trabalho da equipe. Ordem: maior risco primeiro.")
+  ok("T080 título 'Precisa de você · N' e o texto de apoio exato", /^Precisa de você · \d+$/.test(titulo) && (await texto(".pdv-texto")) === "Itens que só o Marco pode decidir ou destravar.")
   ok("T081 botão '▶ Revisar uma por uma'", await page.getByRole("button", { name: "▶ Revisar uma por uma" }).isVisible())
   const nomes = await page.locator(".pdv-tipo .pdv-tipo-t").allInnerTexts()
   ok("T082–T087 seis cartões na ordem: Sem responsável · Fase deixada · Escalada · Divergência · Bloqueada · Carga", nomes.join("|") === "Sem responsável|Fase deixada|Escalada|Divergência|Bloqueada|Carga", nomes.join("|"))
@@ -42,7 +42,7 @@ async function main() {
   // T004: o selo da aba "Precisa de você" NÃO aparece na própria aba (só na Visão geral/Processos/Tarefas) — a soma fecha com o título.
   ok("a soma dos seis cartões fecha com o título (e a própria aba não repete o selo — T004)", numeros.reduce((a, b) => a + b, 0) === total && (await page.locator('[role="tab"][aria-selected="true"] .n').count()) === 0, `${numeros.join("+")} = ${total}`)
   const colunas = (await page.locator(".pdv-hd > div").allTextContents()).join("|")
-  ok("T095 colunas Tipo · O que está acontecendo · Sugestão do sistema · Ação", colunas === "Tipo|O que está acontecendo|Sugestão do sistema|Ação", colunas)
+  ok("T095 colunas Família · Tipo · Fase · Tarefa · Quantidade · Ação", colunas === "Família|Tipo|Fase|Tarefa|Quantidade|Ação", colunas)
   const linhasAba = await page.locator(".pdv-lin").count()
   ok("a aba própria mostra TODAS as decisões (sem o corte de 7 da seção embutida)", linhasAba === total, `${linhasAba}/${total}`)
   const href = await page.locator(".pdv-lin .pdv-quem a").first().getAttribute("href")

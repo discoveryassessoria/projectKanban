@@ -43,7 +43,7 @@ import { labelDaFasePorPhaseKey, FASES } from '@/src/lib/process-stage/fases-cat
 import {
   ROTULO_DO_TIPO, TIPOS_DO_PAINEL, ESCALAR_APOS_PADRAO, bloqueioPedeDecisao, certidoes, contagemPorTipo, diasDeCalendario,
   identidadeDaCertidao, planoDoSemDono, quantoMoverDaCarga, textosDaBloqueada, textosDaCarga, textosDaDivergencia, textosDaEscalada,
-  textosDaFaseDeixada, textosDoSemDono, type PlanoDoSemDono, type SugestaoParaTexto, type TipoDoPainel,
+  textosDaFaseDeixada, textosDoSemDono, type ColunasDoItem, type PlanoDoSemDono, type SugestaoParaTexto, type TipoDoPainel,
 } from './precisa-de-voce-decisoes'
 import {
   urlDistribuicaoDoProcesso, urlOperacaoDaFamilia, urlVisaoGlobalDaFamilia,
@@ -358,6 +358,8 @@ export interface ItemPrecisaDeVoceTorre {
   titulo: string
   detalhe: string
   sugestao: string | null
+  /** As colunas da tabela do "Precisa de você" (Família · Fase · Tarefa · Quantidade). Presente nas decisões do painel. */
+  colunas?: ColunasDoItem
   acao1: AcaoDoItem
   acao2: AcaoDoItem
   link: string
@@ -964,7 +966,7 @@ export async function decisoesDoDia(
     const score = Math.max(...ids.map((id) => scorePorTarefa.get(id) ?? 0))
     decisoes.push({
       tipo: 'SEM_DONO', score, faixa: faixaDoScore(score), tarefaId: null, processoId: g.processoId, familiaNome: familia,
-      titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, acao1: t.acao1, acao2: t.acao2,
+      titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, colunas: t.colunas, acao1: t.acao1, acao2: t.acao2,
       link: g.processoId != null ? linkDoProcesso(g.processoId) : `/torre?aba=tarefas&visao=semdono`,
       contexto: {
         processoId: g.processoId, tarefaIds: ids, plano,
@@ -986,7 +988,7 @@ export async function decisoesDoDia(
     })
     decisoes.push({
       tipo: 'FASE_DEIXADA', score, faixa: faixaDoScore(score), tarefaId: null, processoId: p.processoId, familiaNome: p.familia,
-      titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao,
+      titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, colunas: t.colunas,
       acao1: { rotulo: 'Avançar fase', acao: 'AVANCAR_FASE' }, acao2: { rotulo: 'Encerrar (não devida)', acao: 'ENCERRAR_FASE_NAO_DEVIDA' },
       link: linkDoProcesso(p.processoId),
       contexto: { processoId: p.processoId, faseKey: p.faseKey, proximaFaseKey: p.proximaFaseKey, proximaFaseLabel: p.proximaFaseLabel },
@@ -1005,7 +1007,7 @@ export async function decisoesDoDia(
       orgao: l.terceiroNome ?? extrasEscalada.orgaoPorTarefa.get(l.taskId) ?? null, certidao: identidadeDaCertidao(l), familia: rotuloDaFamilia(l), pais: l.pais,
       pedidoHaDias: pedido ? Math.max(0, diasDeCalendario(pedido, agora)) : null, cobrancas: l.cobrancasSemResposta, canais: semResposta,
     })
-    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
+    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, colunas: t.colunas, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
   }
 
   // ── DIVERGÊNCIA — por tarefa ──────────────────────────────────────────────
@@ -1017,7 +1019,7 @@ export async function decisoesDoDia(
       familia: rotuloDaFamilia(l), certidao: identidadeDaCertidao(l), pais: l.pais,
       statusTarefa: d?.statusTarefa ?? l.statusTarefa, statusPasso: d?.statusPasso ?? '', esperado: d?.esperado ?? null,
     })
-    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
+    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, colunas: t.colunas, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
   }
 
   // ── BLOQUEADA — por tarefa, bloqueada há 10+ dias e esperando o cliente ───
@@ -1031,7 +1033,7 @@ export async function decisoesDoDia(
       familia: rotuloDaFamilia(l), certidao: identidadeDaCertidao(l), pais: l.pais, faseLabel: l.faseAtualDoProcessoLabel,
       bloqueadaHaDias: haDias, cobrancasAoCliente: extrasBloqueada.cobrancas.get(l.taskId) ?? 0, motivo: l.motivoBloqueio,
     })
-    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
+    decisoes.push({ ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, colunas: t.colunas, link: l.processoId != null ? linkDoProcesso(l.processoId) : i.link })
   }
 
   // ── CARGA — por pessoa ────────────────────────────────────────────────────
@@ -1049,7 +1051,7 @@ export async function decisoesDoDia(
       paisDasMovidas: paises.length === 1 ? paises[0] : null, destinos,
     })
     decisoes.push({
-      ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, link: '/torre?aba=equipe',
+      ...i, titulo: t.titulo, detalhe: t.detalhe, sugestao: t.sugestao, colunas: t.colunas, link: '/torre?aba=equipe',
       acao1: { rotulo: t.rotuloAcao1, acao: 'REDISTRIBUIR_CARGA' }, acao2: { rotulo: 'Ver equipe', acao: 'VER_EQUIPE' },
       contexto: { usuarioId, executaveis: pessoa.executaveis, limite: pessoa.limite, quantidade: plano.movimentos.length, tarefaIds: plano.movimentos.map((m) => m.tarefaId) },
     })

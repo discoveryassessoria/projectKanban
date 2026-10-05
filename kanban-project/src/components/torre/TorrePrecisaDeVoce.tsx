@@ -9,8 +9,8 @@
 // e `onRevisar` são opcionais. Sem `onRevisar`, a seção abre a Revisão do dia sozinha sobre os itens que mostra.
 //
 // O que a seção tem (inventário §1.2): título "Precisa de você · N" e o texto de apoio; "▶ Revisar uma por uma"; os 6 cartões-filtro por tipo
-// (número · nome · regra; clicar liga o filtro, clicar de novo desliga, um por vez); a tabela Tipo · O que está acontecendo · Sugestão do
-// sistema · Ação (dois botões por linha, o título é link ao Detalhe do Processo); e o rodapé com a ordem e o "Desfazer".
+// (número · nome · regra; clicar liga o filtro, clicar de novo desliga, um por vez); a tabela Família · Tipo · Fase · Tarefa · Quantidade ·
+// Ação (dois botões por linha; a família é link ao Detalhe do Processo; cada informação aparece uma vez); e o rodapé com a ordem e o "Desfazer".
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
@@ -73,7 +73,7 @@ export function TorrePrecisaDeVoce({ itens, carregando, erro, irParaAba, embutid
     <div className="pdv tor" data-pdv={embutido ? "embutido" : "aba"}>
       <div className="pdv-topo">
         <div className="pdv-titulo">Precisa de você · {todos.length}</div>
-        <div className="pdv-texto">Decisões que só o Administrador toma. Tarefa vencida não entra aqui: é trabalho da equipe. Ordem: maior risco primeiro.</div>
+        <div className="pdv-texto">Itens que só o Marco pode decidir ou destravar.</div>
         <button type="button" className="pdv-revisar" onClick={abrirRevisao} disabled={todos.length === 0}>▶ Revisar uma por uma</button>
       </div>
 
@@ -88,17 +88,26 @@ export function TorrePrecisaDeVoce({ itens, carregando, erro, irParaAba, embutid
       </div>
 
       <div className="pdv-tab">
-        <div className="pdv-hd"><div>Tipo</div><div>O que está acontecendo</div><div>Sugestão do sistema</div><div>Ação</div></div>
+        <div className="pdv-hd"><div>Família</div><div>Tipo</div><div>Fase</div><div>Tarefa</div><div>Quantidade</div><div>Ação</div></div>
         {visiveis.map((it, i) => {
           const chave = chaveDe(it, i)
+          const c = it.colunas
           return (
             <div key={chave} className="pdv-lin">
-              <div><span className={`tor-p ${PILL_DO_TIPO[it.tipo]}`}>{ROTULO_TIPO[it.tipo] ?? it.tipo}</span></div>
-              <div className="pdv-quem">
-                <Link href={it.link}>{it.titulo}</Link>
-                <span className="pdv-det">{it.detalhe}</span>
+              <div className="pdv-fam">
+                {it.familiaNome ? <Link href={it.link}>{it.familiaNome}</Link> : <span>—</span>}
+                {c?.pais && <span className="pdv-det">{c.pais}</span>}
               </div>
-              <div className="pdv-sug">{it.sugestao ?? "—"}</div>
+              <div><span className={`tor-p ${PILL_DO_TIPO[it.tipo]}`}>{ROTULO_TIPO[it.tipo] ?? it.tipo}</span></div>
+              <div className="pdv-t13">{c?.fase ?? "—"}</div>
+              <div className="pdv-quem">
+                {it.familiaNome ? <span>{c?.tarefa ?? it.titulo}</span> : <Link href={it.link}>{c?.tarefa ?? it.titulo}</Link>}
+                {c?.complemento && <span className="pdv-det">{c.complemento}</span>}
+              </div>
+              <div className="pdv-qtd">
+                <b>{c?.quantidade != null ? c.quantidade : "—"}</b>
+                {c?.quantidade != null && c.unidade && <span className="pdv-det">{c.unidade}</span>}
+              </div>
               <div className="pdv-acoes">
                 <button type="button" className="pdv-b1" disabled={ocupado === chave} onClick={() => void rodar(it, 1, chave)}>{it.acao1.rotulo}</button>
                 <button type="button" className="pdv-b2" disabled={ocupado === chave} onClick={() => void rodar(it, 2, chave)}>{it.acao2.rotulo}</button>

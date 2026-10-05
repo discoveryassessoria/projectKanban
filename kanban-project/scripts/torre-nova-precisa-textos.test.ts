@@ -123,8 +123,8 @@ const proibidos = /ningu[ée]m|com o cart[óo]rio|sem dono"|'Sem dono'/i
 const achados = ARQUIVOS.filter((f) => proibidos.test(semComentarios(ler(f))))
 ok("nenhum 'ninguém', 'Com o cartório' ou 'Sem dono' visível nos arquivos da frente", achados.length === 0, achados.join(", "))
 const tela = ler("src/components/torre/TorrePrecisaDeVoce.tsx")
-ok("os textos exatos da seção: título, apoio e botão", /Precisa de você · \{todos\.length\}/.test(tela) && tela.includes("Decisões que só o Administrador toma. Tarefa vencida não entra aqui: é trabalho da equipe. Ordem: maior risco primeiro.") && tela.includes("▶ Revisar uma por uma"))
-ok("as 4 colunas: Tipo · O que está acontecendo · Sugestão do sistema · Ação", tela.includes("<div>Tipo</div><div>O que está acontecendo</div><div>Sugestão do sistema</div><div>Ação</div>"))
+ok("os textos exatos da seção: título, apoio e botão", /Precisa de você · \{todos\.length\}/.test(tela) && tela.includes("Itens que só o Marco pode decidir ou destravar.") && tela.includes("▶ Revisar uma por uma"))
+ok("as colunas: Família · Tipo · Fase · Tarefa · Quantidade · Ação (sem 'Sugestão do sistema' e sem 'O que está acontecendo')", tela.includes("<div>Família</div><div>Tipo</div><div>Fase</div><div>Tarefa</div><div>Quantidade</div><div>Ação</div>") && !tela.includes("Sugestão do sistema") && !tela.includes("O que está acontecendo") && !tela.includes("it.sugestao") && !tela.includes("it.detalhe"))
 ok("o rodapé com filtro e sem filtro", tela.includes('Mostrando só "${ROTULO_TIPO[tipo]}" · ordenadas do maior risco para o menor') && tela.includes("ordenadas do maior risco para o menor"))
 ok("a assinatura estável: embutido? e onRevisar? opcionais; itens/carregando/erro/irParaAba obrigatórios", /embutido\?: boolean/.test(tela) && /onRevisar\?: \(\) => void/.test(tela) && /itens: ItemPrecisa\[\] \| null\n\s+carregando: boolean\n\s+erro: string \| null\n\s+irParaAba/.test(tela))
 const brief = ler("src/components/torre/TorreBriefing.tsx")
@@ -144,4 +144,22 @@ ok("POST …/desfazer usa exigirTorre('tarefas.editar')", /exigirTorre\(request,
 ok("o toast de 'Reconciliar' mostra os status em português, nunca o enum cru (NAO_INICIADA → CONCLUIDO_RECEBIDO)", /humanizarEstadosNoTexto\(`Reconciliada: \$\{de\} → \$\{resultado\.para\}\.`\)/.test(ler("src/services/precisa-de-voce-acoes.ts")) && humanizarEstadosNoTexto("Reconciliada: NAO_INICIADA → CONCLUIDO_RECEBIDO.") === "Reconciliada: a iniciar → concluída." && !/[A-Z]+_[A-Z_]+/.test(humanizarEstadosNoTexto("Reconciliada: NAO_INICIADA → CONCLUIDO_RECEBIDO.")))
 
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
-if (falhou > 0) { console.log(falhas.join("\n")); process.exit(1) }
+if (falhou > 0) { 
+// ── Ajuste 05/10: colunas estruturadas — cada informação uma vez ──────────────────────────────────────────────
+{
+  const sd = textosDoSemDono({ familia: "Salvarani", pais: "Itália", faseLabel: "Genealogia", entrouNaFase: null, agora: new Date("2026-10-05T12:00:00Z"), total: 12, plano: { atribuicoes: [], semAptidao: [] } })
+  ok("sem responsável: fase, tarefa e quantidade em colunas próprias", sd.colunas.fase === "Genealogia" && sd.colunas.tarefa === "Tarefas sem responsável" && sd.colunas.quantidade === 12 && sd.colunas.unidade === "tarefas" && sd.colunas.pais === "Itália")
+  ok("o complemento NÃO repete família, fase nem quantidade", !/Salvarani|Genealogia|12/.test(sd.colunas.complemento ?? ""))
+  const es = textosDaEscalada({ orgao: "Cartório X", certidao: "Certidão de Nascimento · Luigi", familia: "Lopes", pais: "Portugal", pedidoHaDias: 42, cobrancas: 3, canais: ["EMAIL"] })
+  ok("escalada: tarefa = a certidão; quantidade = cobranças; complemento só traz órgão, tempo e canal (por extenso)", es.colunas.tarefa === "Certidão de Nascimento · Luigi" && es.colunas.quantidade === 3 && es.colunas.unidade === "cobranças sem resposta" && es.colunas.complemento === "Cartório X · pedido há 42 dias · por e-mail" && !/Lopes|Portugal/.test(es.colunas.complemento ?? ""))
+  const bl = textosDaBloqueada({ familia: "Lopes", certidao: "Certidão de Óbito · Ana", pais: "Espanha", faseLabel: "Retificação", bloqueadaHaDias: 14, cobrancasAoCliente: 2, motivo: "esperando procuração" })
+  ok("bloqueada: fase em coluna; complemento = tempo + motivo (sem repetir a fase)", bl.colunas.fase === "Retificação" && bl.colunas.quantidade === 2 && bl.colunas.complemento === "bloqueada há 14 dias · motivo: esperando procuração")
+  const cg = textosDaCarga({ nome: "Daniela", executaveis: 23, limite: 20, vencidas: 4, filaEmSemanas: 2, mover: 4, paisDasMovidas: null, destinos: ["Marco"] })
+  ok("carga: tarefa = 'Carga de Daniela', quantidade = executáveis, sem família", cg.colunas.tarefa === "Carga de Daniela" && cg.colunas.quantidade === 23 && cg.colunas.unidade === "tarefas executáveis")
+  const fd = textosDaFaseDeixada({ familia: "Lopes", pais: "Portugal", faseLabel: "Emissão", proximaFaseLabel: "Análise", ultimaConclusao: new Date("2026-09-25T12:00:00Z"), entrouNaFase: null, agora: new Date("2026-10-05T12:00:00Z") })
+  ok("fase deixada: quantidade não se aplica (—) e o tempo vai por extenso", fd.colunas.quantidade === null && /há 10 dias/.test(fd.colunas.complemento ?? ""))
+  const todosOsTextos = [sd, es, bl, cg, fd].flatMap((t) => [t.colunas.complemento ?? "", t.colunas.tarefa ?? "", t.colunas.unidade ?? ""]).join(" | ")
+  ok("nenhum texto das colunas abrevia tempo ('5d', '5 d')", !/\b\d+ ?d\b/.test(todosOsTextos), todosOsTextos)
+}
+
+console.log(falhas.join("\n")); process.exit(1) }
