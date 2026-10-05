@@ -6,6 +6,7 @@
 // A MESMA projeção da Operação (/api/torre/tarefas). Nenhuma regra nova: cada botão chama a porta que já existe (tarefa-comandos,
 // tarefa-ciclo, cobranca-terceiros, iniciar-envio, vincular-orgao-lote, atribuir). Toda regra de tela mora em
 // lib/operacional/torre-tarefas-tela.ts e torre-filtros.ts (puras, testadas). Nada de dado de exemplo.
+import { PRIORIDADES_DO_LOTE, PRIORIDADE_NORMAL, prioridadeValida, textoDoLotePrioridade, type PrioridadeDoModelo } from "@/lib/operacional/torre-prioridade-lote"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -226,7 +227,8 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   }, [tarefaPedida, tratada, avisar, onTarefaAtendida])
 
   // ─── AÇÕES EM LOTE (a barra) ─────────────────────────────────────────────
-  const lote = async (acao: "ATRIBUIR" | "PRIORIDADE_ALTA" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
+  const [prioridadeEscolhida, setPrioridadeEscolhida] = useState<PrioridadeDoModelo>("ALTA")
+  const lote = async (acao: "ATRIBUIR" | "PRIORIDADE_ALTA" | "PRIORIDADE" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
     const { limpar = true, ddmm = "" } = opcoes
     setOcupado(true)
     const r = await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
@@ -235,6 +237,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
       const n = r.data.sucesso ?? 0
       const msg = acao === "ATRIBUIR" ? `${n} ${n === 1 ? "tarefa atribuída" : "tarefas atribuídas"} a ${pessoa?.nome ?? "a pessoa"}`
         : acao === "PRIORIDADE_ALTA" ? `Prioridade alta em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
+          : acao === "PRIORIDADE" ? textoDoLotePrioridade(prioridadeValida(extra.prioridade) ?? PRIORIDADE_NORMAL, n)
           : acao === "REPACTUAR" ? `${n} ${n === 1 ? "prazo repactuado" : "prazos repactuados"} para ${ddmm}`
             : `Cobrança registrada em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
       avisar(`${msg}${sufixoDasFalhas(r.data.itens)}`, r.data.desfazer ?? null)
@@ -386,7 +389,13 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
                 </select>
                 <button type="button" disabled={ocupado || !pessoa} onClick={() => void lote("ATRIBUIR", { responsavelId: pessoaId })}>Atribuir</button>
               </span>
-              <button type="button" disabled={ocupado} onClick={() => void lote("PRIORIDADE_ALTA")}>Prioridade alta</button>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Prioridade
+                <select aria-label="Escolher prioridade" value={prioridadeEscolhida} onChange={(e) => setPrioridadeEscolhida(e.target.value as PrioridadeDoModelo)}>
+                  {PRIORIDADES_DO_LOTE.map((p) => <option key={p.valor} value={p.valor}>{p.rotulo}</option>)}
+                </select>
+                <button type="button" disabled={ocupado} onClick={() => void lote("PRIORIDADE", { prioridade: prioridadeEscolhida })}>Aplicar</button>
+                <button type="button" disabled={ocupado} title="Volta as selecionadas para a prioridade normal" onClick={() => void lote("PRIORIDADE", { prioridade: PRIORIDADE_NORMAL })}>Voltar ao normal</button>
+              </span>
               <button type="button" disabled={ocupado} onClick={() => setRepactuarLote(true)}>Repactuar prazo</button>
               <button type="button" disabled={ocupado} onClick={() => setVincular({ ids: selIds, variante: "lote" })}>Vincular órgão</button>
             </>

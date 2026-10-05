@@ -3,7 +3,7 @@
 // TORRE — AÇÕES EM LOTE (Bloco G1, 30/09/2026).
 //
 //   POST /api/torre/tarefas/lote
-//   body: { acao: "ATRIBUIR" | "PRIORIDADE_ALTA" | "REPACTUAR" | "COBRAR", tarefaIds: number[],
+//   body: { acao: "ATRIBUIR" | "PRIORIDADE_ALTA" | "PRIORIDADE" (+ prioridade: BAIXA|MEDIA|ALTA|URGENTE) | "REPACTUAR" | "COBRAR", tarefaIds: number[],
 //           responsavelId?  (ATRIBUIR)
 //           novoPrazo?, justificativa?  (REPACTUAR — uma justificativa para todas) }
 //
@@ -13,14 +13,15 @@
 // Fora isso, gestor da Torre. Resposta item a item (207 quando houve mistura).
 // ============================================================================
 import { type NextRequest, NextResponse } from 'next/server'
+import { prioridadeValida } from '@/lib/operacional/torre-prioridade-lote'
 import { exigirTorre } from '@/src/lib/torre-acesso'
 import type { PermissaoChave } from '@/src/lib/permissoes'
 import {
-  validarIds, atribuirEmLote, prioridadeAltaEmLote, repactuarEmLote, cobrarCartorioEmLote,
+  validarIds, atribuirEmLote, prioridadeAltaEmLote, prioridadeEmLote, repactuarEmLote, cobrarCartorioEmLote,
 } from '@/src/services/torre-acoes-lote'
 
 const PERMISSAO: Record<string, PermissaoChave> = {
-  ATRIBUIR: 'tarefas.editar', PRIORIDADE_ALTA: 'tarefas.editar', REPACTUAR: 'tarefas.editar', COBRAR: 'tarefas.ver',
+  ATRIBUIR: 'tarefas.editar', PRIORIDADE_ALTA: 'tarefas.editar', PRIORIDADE: 'tarefas.editar', REPACTUAR: 'tarefas.editar', COBRAR: 'tarefas.ver',
 }
 
 export async function POST(request: NextRequest) {
@@ -42,6 +43,12 @@ export async function POST(request: NextRequest) {
         const responsavelId = Number(b?.responsavelId)
         if (!Number.isInteger(responsavelId) || responsavelId <= 0) return NextResponse.json({ error: 'responsavelId é obrigatório' }, { status: 400 })
         r = await atribuirEmLote({ tarefaIds: ids.ids, responsavelId, autorId: usuario.userId })
+        break
+      }
+      case 'PRIORIDADE': {
+        const prioridade = prioridadeValida(b?.prioridade)
+        if (!prioridade) return NextResponse.json({ error: 'prioridade inválida; use BAIXA, MEDIA, ALTA ou URGENTE' }, { status: 400 })
+        r = await prioridadeEmLote({ tarefaIds: ids.ids, prioridade, autorId: usuario.userId })
         break
       }
       case 'PRIORIDADE_ALTA':
