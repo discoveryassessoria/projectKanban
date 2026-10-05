@@ -5,11 +5,11 @@
 //
 // QUEM ENTRA NA CONTAGEM DE 30 DIAS (decisão do Marco, 05/10/2026 — docs/proposta-anexos-cliente-e-privacidade.md, ponto (c)):
 //   • envios DESCARTADOS de link encerrado (como sempre);
-//   • envios PENDENTES (que o Marco nunca confirmou) de link encerrado por SAÍDA DA FASE pré-contrato (`FASE_MUDOU`) —
-//     o link vale até o processo sair dela (normalmente para Genealogia); depois disso o pendente segue a mesma contagem.
+//   • envios PENDENTES (que o Marco nunca confirmou) de link encerrado POR QUALQUER MOTIVO — saída da fase pré-contrato (`FASE_MUDOU`, o
+//     normal: o link vale até o processo sair dela, em geral para Genealogia), fechamento manual (`MANUAL`) ou fim da conferência
+//     (`CONFERENCIA`). Contam 30 dias desde o `encerradoEm` do link.
 //   Ao ser purgado, o pendente passa a DESCARTADO (decisão do sistema, sem usuário): assim deixa de contar como "conferência pendente".
-//   NUNCA entram: CONFIRMADO (já virou cadastro e o arquivo foi para o processo), qualquer envio de link ATIVO, e pendente de link encerrado
-//   por outro motivo (MANUAL/CONFERENCIA) — este pedido cobre só a saída da fase.
+//   NUNCA entram: CONFIRMADO (já virou cadastro e o arquivo foi para o processo) e qualquer envio de link ATIVO (sem `encerradoEm`).
 //
 // A DATA DO ENCERRAMENTO: o link só era carimbado como encerrado quando alguém o abria. A rotina também carimba o link de processo que já
 // saiu da fase, usando a data REAL da saída (`PhaseAdvanceLog`); sem registro, a data de agora (a contagem de 30 dias nunca começa antes
@@ -69,10 +69,10 @@ export async function purgarEnviosDescartados(
       purgadoEm: null,
       AND: [
         { link: { encerradoEm: { lt: corte } } },
-        { OR: [{ status: "DESCARTADO" }, { status: "PENDENTE", link: { motivoEncerramento: "FASE_MUDOU" } }] },
+        { status: { in: ["DESCARTADO", "PENDENTE"] } },
       ],
     },
-    include: { arquivos: true, link: { select: { id: true, processoId: true, encerradoEm: true } } },
+    include: { arquivos: true, link: { select: { id: true, processoId: true, encerradoEm: true, motivoEncerramento: true } } },
     take: 200,
   })
   let arquivos = 0
@@ -104,8 +104,8 @@ export async function purgarEnviosDescartados(
         await prisma.logAuditoria.create({
           data: {
             acao: "COLETA_PENDENTE_PURGADO_POR_PRAZO", entidade: "ColetaEnvio", entidadeId: e.id,
-            descricao: `Envio pendente da coleta (link ${e.link.id}, processo ${e.link.processoId}) apagado ${DIAS_RETENCAO_PENDENTES} dias após o encerramento do link por saída da fase; ficou só o registro, sem dado pessoal.`,
-            detalhes: { linkId: e.link.id, processoId: e.link.processoId, encerradoEm: e.link.encerradoEm?.toISOString() ?? null, arquivosApagados: e.arquivos.length },
+            descricao: `Envio pendente da coleta (link ${e.link.id}, processo ${e.link.processoId}) apagado ${DIAS_RETENCAO_PENDENTES} dias após o encerramento do link (${e.link.motivoEncerramento ?? "sem motivo registrado"}); ficou só o registro, sem dado pessoal.`,
+            detalhes: { linkId: e.link.id, processoId: e.link.processoId, encerradoEm: e.link.encerradoEm?.toISOString() ?? null, motivoEncerramento: e.link.motivoEncerramento, arquivosApagados: e.arquivos.length },
           },
         })
       }

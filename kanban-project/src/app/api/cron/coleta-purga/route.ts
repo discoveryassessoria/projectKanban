@@ -1,6 +1,6 @@
 // src/app/api/cron/coleta-purga/route.ts
 // JOB DIÁRIO (Vercel Cron) — retenção da coleta de dados: apaga dados e arquivos dos envios
-// DESCARTADOS — e os PENDENTES de link encerrado por saída da fase — 30 dias após o encerramento do link (docs/coleta-de-dados-mandato.md §2.11;
+// DESCARTADOS — e os PENDENTES de link encerrado por qualquer motivo — 30 dias após o encerramento do link (docs/coleta-de-dados-mandato.md §2.11;
 // docs/proposta-anexos-cliente-e-privacidade.md, ponto (c)). Antes, carimba o link de processo que já saiu da fase pré-contrato.
 // Mesma convenção dos outros crons: o middleware libera, o handler se auto-verifica
 // (CRON_SECRET ou header oficial da Vercel). Idempotente.
