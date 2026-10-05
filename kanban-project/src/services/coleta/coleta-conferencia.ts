@@ -241,8 +241,8 @@ export async function conferirColeta(processoId: number, decisoes: DecisaoConfer
 // ── ANEXOS (pós-commit, idempotente) ────────────────────────────────────────
 
 /**
- * Copia os arquivos dos envios CONFIRMADOS para os anexos do cliente (padrão atual de
- * endereço público — pendência separada no mandato §8) e apaga a cópia privada. Cada
+ * Copia os arquivos dos envios CONFIRMADOS para os anexos do cliente (DENTRO do bucket privado, guardando só a chave — ver
+ * `copiarParaAnexoDeCliente`) e apaga a cópia da coleta. Cada
  * `ColetaArquivo` que sobra é um arquivo ainda não migrado, então repetir é seguro.
  */
 export async function concluirAnexos(processoId: number): Promise<{ copiados: number; falharam: number }> {
@@ -255,7 +255,8 @@ export async function concluirAnexos(processoId: number): Promise<{ copiados: nu
   for (const e of envios) {
     for (const a of e.arquivos) {
       try {
-        const copia = await copiarParaAnexoDeCliente(a.chave, a.nome)
+        const alvoDoAnexo = e.requerenteId ? { dominio: "requerente" as const, id: e.requerenteId } : { dominio: "contratante" as const, id: e.contratanteId as number }
+        const copia = await copiarParaAnexoDeCliente(a.chave, a.nome, alvoDoAnexo)
         const categoria = CATEGORIA_ANEXO_DO_TIPO[a.tipo as TipoArquivoColeta] ?? null
         await prisma.$transaction(async (tx) => {
           if (e.requerenteId) {

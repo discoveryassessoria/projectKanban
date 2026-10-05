@@ -7,6 +7,7 @@
 // ============================================================================
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { X, Loader2, Upload, AlertTriangle, RotateCcw, CheckCircle2, Trash2, Eye } from "lucide-react"
@@ -74,7 +75,7 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
   const onFile = async (files: FileList | null) => {
     if (!files?.length) return
     setSubindo(true)
-    try { const [e] = await uploadFiles([files[0]], { prefix: "financeiro/estornos" }); setComprovante({ url: e.url, nome: e.name, size: e.size }) }
+    try { const [e] = await uploadFiles([files[0]], { alvo: { dominio: "financeiro", id: obrigacaoId } }); setComprovante({ url: e.url, nome: e.name, size: e.size }) }
     catch { setErro("Falha no upload do comprovante.") } finally { setSubindo(false) }
   }
 
@@ -145,7 +146,7 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
           <div>
             <label className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Comprovante</label>
             {comprovante ? (
-              <div className="mt-1 flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--surface-primary)] px-3 py-2 text-sm"><span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">{comprovante.nome}</span><a href={comprovante.url} target="_blank" rel="noreferrer" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Eye className="h-4 w-4" /></a><button onClick={() => setComprovante(null)} className="text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 className="h-4 w-4" /></button></div>
+              <div className="mt-1 flex items-center gap-2 rounded-[var(--radius-sm)] bg-[var(--surface-primary)] px-3 py-2 text-sm"><span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">{comprovante.nome}</span><LinkDeAnexo valor={comprovante.url} nome={comprovante.nome} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Eye className="h-4 w-4" /></LinkDeAnexo><button onClick={() => setComprovante(null)} className="text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 className="h-4 w-4" /></button></div>
             ) : (
               <button onClick={() => fileRef.current?.click()} className="mt-1 flex w-full items-center justify-center gap-2 rounded-[var(--radius-sm)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-primary)] px-3 py-2.5 text-xs text-[var(--text-muted)] hover:border-[var(--border-strong)]">{subindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Anexar comprovante</button>
             )}

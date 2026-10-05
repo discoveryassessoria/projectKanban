@@ -7,6 +7,7 @@
 // ============================================================================
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useEffect, useMemo, useState } from "react"
 import { Receipt, ExternalLink, Paperclip, RotateCcw } from "lucide-react"
 import { PageHeader, SectionCard, Thead, Th, Tr, StatusBadge, EmptyState, SearchInput, FilterChip, LinkAction } from "@/src/components/financeiroComponents/ui/kit"
@@ -86,7 +87,7 @@ export function PagamentosView() {
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.forma ?? "—"}</td>
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.conta ?? "—"}</td>
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.referencia ?? "—"}</td>
-                      <td className="py-2.5 px-2 text-center">{p.temComprovante ? (p.comprovanteUrl ? <a href={p.comprovanteUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Ver comprovante" style={{ color: "var(--accent-text)" }}><Paperclip className="inline h-4 w-4" /></a> : <Paperclip className="inline h-4 w-4" style={{ color: "var(--success)" }} />) : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                      <td className="py-2.5 px-2 text-center">{p.temComprovante ? (p.comprovanteUrl ? <LinkDeAnexo valor={p.comprovanteUrl} title="Ver comprovante" style={{ color: "var(--accent-text)" }}><Paperclip className="inline h-4 w-4" /></LinkDeAnexo> : <Paperclip className="inline h-4 w-4" style={{ color: "var(--success)" }} />) : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                       <td className="py-2.5 px-2 text-center"><StatusBadge tone={estornadoTot ? (p.saldoEstornavel <= 0.005 ? "danger" : "warning") : "success"}>{estornadoTot ? (p.saldoEstornavel <= 0.005 ? "estornado" : "parcial") : "confirmado"}</StatusBadge></td>
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.responsavel ?? "—"}</td>
                       <td className="py-2.5 px-2 text-center">

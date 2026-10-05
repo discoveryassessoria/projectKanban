@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extrairToken } from '@/src/lib/app-auth';
 import { Prisma } from '@prisma/client';
+import { alvoDaChave } from '@/src/lib/anexos/chave';
 
 export async function POST(request: NextRequest) {
   const payload = extrairToken(request);
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
     select: {
       id: true,
       pessoaId: true,
+      processoId: true,
       documentos: { select: { id: true }, orderBy: { createdAt: 'desc' }, take: 1 },
       processo: {
         select: {
@@ -54,6 +56,13 @@ export async function POST(request: NextRequest) {
 
   if (!temAcesso) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  }
+
+  // `publicUrl` agora é a CHAVE devolvida pelo presign — e TEM de ser da pasta do processo desta necessidade (antes o navegador podia
+  // gravar qualquer texto como endereço do arquivo).
+  const alvoDoArquivo = alvoDaChave(publicUrl);
+  if (!alvoDoArquivo || alvoDoArquivo.dominio !== 'processo' || alvoDoArquivo.id !== necessidade.processoId) {
+    return NextResponse.json({ error: 'Arquivo não pertence a este processo' }, { status: 400 });
   }
 
   const dadosArquivo = {

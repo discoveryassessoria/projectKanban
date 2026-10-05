@@ -1,5 +1,7 @@
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
+import { ImagemDeAnexo, MiniaturaPdfDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
@@ -36,7 +38,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { uploadFiles, type UploadedFile } from "@/src/lib/storage"
-import { PDFThumbnail } from "./pdf-thumbnail"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as CreditCardIcon, Car } from "lucide-react"
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
@@ -513,7 +514,7 @@ function ConteudoModal({
     setUploadProgress(0)
     try {
       const uploadResult = await uploadFiles([file], {
-        prefix: "contratantes",
+        alvo: { dominio: editingTipo === "requerente" ? "requerente" : "contratante", id: editingId },
         onProgress: (_f, p) => setUploadProgress(p),
       })
 
@@ -588,8 +589,9 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
     setUploadProgress(0)
 
     try {
+      // Cliente já salvo: o anexo é dele. Cliente ainda não salvo: rascunho (só quem enviou abre; o servidor usa o id do próprio usuário).
       const uploaded = await uploadFiles(arquivos, {
-        prefix: "contratantes",
+        alvo: editingId ? { dominio: editingTipo === "requerente" ? "requerente" : "contratante", id: editingId } : { dominio: "rascunho", id: 0 },
         onProgress: (_f, p) => setUploadProgress(p),
       })
 
@@ -1548,22 +1550,22 @@ style={{
                           {temDocumento ? (
                             <div className="space-y-2">
                               {/* Preview do arquivo */}
-                              <a
-                                href={anexo.urlArquivo}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <LinkDeAnexo
+                                valor={anexo.urlArquivo}
+                                nome={anexo.nomeArquivo}
+                                mime={anexo.mimeType ?? undefined}
                                 className="block group"
                               >
                                 <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-[var(--surface-primary)] border border-gray-200">
                                   {anexo.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(anexo.nomeArquivo) ? (
-                                    <img 
-                                      src={anexo.urlArquivo} 
+                                    <ImagemDeAnexo
+                                      valor={anexo.urlArquivo}
                                       alt={anexo.nomeArquivo}
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (anexo.mimeType === 'application/pdf' || /\.pdf$/i.test(anexo.nomeArquivo)) ? (
-                                    <PDFThumbnail 
-                                      url={anexo.urlArquivo} 
+                                    <MiniaturaPdfDeAnexo
+                                      valor={anexo.urlArquivo}
                                       className="w-full h-full"
                                     />
                                   ) : (
@@ -1575,7 +1577,7 @@ style={{
                                     <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 </div>
-                              </a>
+                              </LinkDeAnexo>
                               
                               <div className="flex items-center justify-between">
                                 <p className="text-xs text-gray-600 truncate flex-1" title={anexo.nomeArquivo}>
@@ -1670,21 +1672,20 @@ style={{
                               key={anexo.id || index} 
                               className="group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-[var(--elev-2)] transition-shadow"
                             >
-                              <a 
-                                href={anexo.urlArquivo} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
+                              <LinkDeAnexo
+                                valor={anexo.urlArquivo}
+                                nome={fileName}
                                 className="block aspect-square relative overflow-hidden"
                               >
                                 {isImage ? (
-                                  <img 
-                                    src={anexo.urlArquivo} 
+                                  <ImagemDeAnexo
+                                    valor={anexo.urlArquivo}
                                     alt={fileName}
                                     className="w-full h-full object-cover"
                                   />
                                 ) : isPDF ? (
-                                  <PDFThumbnail 
-                                    url={anexo.urlArquivo} 
+                                  <MiniaturaPdfDeAnexo
+                                    valor={anexo.urlArquivo}
                                     className="w-full h-full"
                                   />
                                 ) : (
@@ -1710,7 +1711,7 @@ style={{
                                 <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
                                   <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
-                              </a>
+                              </LinkDeAnexo>
                               
                               <div className="p-2 border-t border-gray-200">
                                 <p className="text-xs text-gray-700 truncate" title={fileName}>

@@ -11,6 +11,8 @@
 
 "use client"
 
+import { ImagemDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
+import { LinkDeAnexo, baixarAnexo } from "@/src/lib/anexos/cliente"
 import { useState, useEffect } from "react"
 import { FileText, X, ExternalLink, Download, ChevronDown, ArrowRight, Clock } from "lucide-react"
 import type { BibDocItem } from "./ProcessoDocumentosBiblioteca"
@@ -114,14 +116,13 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
               com tooltip honesto — nunca um botão morto sem explicação. */}
           <div className="flex items-center gap-2.5 mt-4 flex-wrap">
             {item.arquivoUrl ? (
-              <a
-                href={item.arquivoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+              <LinkDeAnexo
+                valor={item.arquivoUrl}
+                nome={item.arquivoNome ?? undefined}
                 className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-[var(--border-strong)]"
               >
                 <ExternalLink className="w-[15px] h-[15px]" /> Abrir arquivo principal
-              </a>
+              </LinkDeAnexo>
             ) : (
               <button
                 disabled
@@ -132,13 +133,13 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
               </button>
             )}
             {item.arquivoUrl ? (
-              <a
-                href={item.arquivoUrl}
-                download={item.arquivoNome ?? undefined}
+              <button
+                type="button"
+                onClick={() => void baixarAnexo(item.arquivoUrl, item.arquivoNome ?? undefined)}
                 className="inline-flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-[var(--border-strong)]"
               >
                 <Download className="w-[15px] h-[15px]" /> Baixar todos os arquivos
-              </a>
+              </button>
             ) : (
               <button
                 disabled
@@ -369,16 +370,16 @@ function FileTab({ title, status, emptyMsg, arquivoUrl, arquivoNome, arquivoMime
         <div className="flex flex-col gap-2">
           <div className="border border-[var(--border-default)] rounded-xl overflow-hidden bg-[var(--surface-secondary)]">
             {isImagem ? (
-              <img src={arquivoUrl} alt={arquivoNome ?? title} className="w-full max-h-[420px] object-contain bg-black/20" />
+              <ImagemDeAnexo valor={arquivoUrl} alt={arquivoNome ?? title} className="w-full max-h-[420px] object-contain bg-black/20" />
             ) : (
-              <iframe src={arquivoUrl} title={arquivoNome ?? title} className="w-full h-[420px]" />
+              <IframeDeAnexo valor={arquivoUrl} title={arquivoNome ?? title} className="w-full h-[420px]" />
             )}
           </div>
           <div className="flex items-center justify-between gap-3 text-[12px] text-[var(--text-secondary)]">
             <span className="truncate">{arquivoNome ?? "arquivo"}</span>
-            <a href={arquivoUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-[var(--accent-text)] hover:underline flex-none">
+            <LinkDeAnexo valor={arquivoUrl} nome={arquivoNome ?? undefined} className="font-semibold text-[var(--accent-text)] hover:underline flex-none">
               Abrir em nova aba
-            </a>
+            </LinkDeAnexo>
           </div>
         </div>
       ) : (

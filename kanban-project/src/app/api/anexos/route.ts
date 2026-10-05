@@ -1,15 +1,32 @@
 import { prisma } from "@/lib/prisma"
 import { NextRequest, NextResponse } from "next/server"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { extrairUsuarioKanban } from "@/lib/kanban-auth"
+import { promoverRascunhoDeAnexo } from "@/src/lib/anexos/storage"
+import { leituraDoValor, alvoDaChave } from "@/src/lib/anexos/chave"
 
 // POST - Salvar anexo
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { nome, nomeArquivo, urlArquivo, tamanho, mimeType, tipoCliente, contratanteId, requerenteId, categoria } = body
+    const { nome, nomeArquivo, urlArquivo: urlArquivoRecebido, tamanho, mimeType, tipoCliente, contratanteId, requerenteId, categoria } = body
 
-    if (!urlArquivo || !nomeArquivo) {
+    if (!urlArquivoRecebido || !nomeArquivo) {
       return NextResponse.json({ error: "Dados do arquivo são obrigatórios" }, { status: 400 })
+    }
+
+    // Anexo que nasceu como RASCUNHO (cliente ainda não salvo) é promovido para a pasta do dono definitivo — só assim a equipe com permissão
+    // sobre o cliente consegue abri-lo (a chave de rascunho só abre para quem enviou).
+    let urlArquivo = urlArquivoRecebido as string
+    const ehRascunho = leituraDoValor(urlArquivo).tipo === "chave" && alvoDaChave(urlArquivo)?.dominio === "rascunho"
+    if (ehRascunho) {
+      const usuario = await extrairUsuarioKanban(request)
+      if (!usuario) return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+      const dono = tipoCliente === "requerente" && requerenteId
+        ? { dominio: "requerente" as const, id: parseInt(requerenteId) }
+        : { dominio: "contratante" as const, id: parseInt(contratanteId) }
+      if (!Number.isInteger(dono.id)) return NextResponse.json({ error: "ID do cliente é obrigatório" }, { status: 400 })
+      urlArquivo = await promoverRascunhoDeAnexo(urlArquivo, dono, usuario.userId, nomeArquivo)
     }
 
     let anexo

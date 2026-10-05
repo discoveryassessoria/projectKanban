@@ -8,6 +8,7 @@
 // ============================================================================
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
@@ -212,10 +213,10 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
     if (!files?.length) return
     setSubindo(true)
     try {
-      const enviados = await uploadFiles(Array.from(files), { prefix: "financeiro/comprovantes" })
+      const enviados = await uploadFiles(Array.from(files), { alvo: { dominio: "financeiro", id: obrigacaoId } })
       setComprovantes((c) => [...c, ...enviados.map((e) => ({ arquivoUrl: e.url, arquivoNome: e.name, tamanho: e.size }))])
     } catch { setErroSubmit("Falha no upload de comprovante.") } finally { setSubindo(false) }
-  }, [])
+  }, [obrigacaoId])
 
   const origemRecurso = (forma: any): string => {
     const s = `${forma?.name ?? ""} ${forma?.type ?? ""} ${forma?.categoria ?? ""}`.toUpperCase()
@@ -511,7 +512,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                           <FileText className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
                           <span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">{c.arquivoNome}</span>
                           <span className="text-[11px] text-[var(--text-muted)]">{fmtTamanho(c.tamanho)}</span>
-                          <a href={c.arquivoUrl} target="_blank" rel="noreferrer" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Eye className="h-4 w-4" /></a>
+                          <LinkDeAnexo valor={c.arquivoUrl} nome={c.arquivoNome} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><Eye className="h-4 w-4" /></LinkDeAnexo>
                           <button onClick={() => setComprovantes((cs) => cs.filter((_, j) => j !== i))} className="text-[var(--text-muted)] hover:text-[var(--danger)]"><Trash2 className="h-4 w-4" /></button>
                         </div>
                       ))}

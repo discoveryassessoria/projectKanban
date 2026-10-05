@@ -18,6 +18,9 @@
 
 "use client"
 
+import type { AlvoDoAnexo } from "@/src/lib/anexos/chave"
+import { leituraDoValor } from "@/src/lib/anexos/chave"
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import * as React from "react"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import PainelDeclarativoDaEtapa from "./PainelDeclarativoDaEtapa"
@@ -1280,7 +1283,7 @@ function FormSolicitarCertidao({
                         })
                       }
                       disabled={readOnly}
-                      prefix={`documentos/${documentoId}/solicitacao`}
+                      alvo={{ dominio: "documento", id: documentoId }}
                     />
                     {/* Já anexado numa execução anterior desta MESMA etapa: o
                         operador vê o que existe em vez de reenviar às cegas. */}
@@ -1288,14 +1291,9 @@ function FormSolicitarCertidao({
                       <div className="rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-2.5 py-2 flex items-center gap-2">
                         <Paperclip className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <a
-                            href={anexoJaRegistrado.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[12px] text-white/90 hover:text-white truncate block"
-                          >
+                          <LinkDeAnexo valor={anexoJaRegistrado.url} className="text-[12px] text-white/90 hover:text-white truncate block">
                             {anexoJaRegistrado.nome}
-                          </a>
+                          </LinkDeAnexo>
                           <div className="text-[10px] text-[var(--text-secondary)]">
                             já registrado nesta etapa
                             {anexoJaRegistrado.documentoMestre
@@ -2533,7 +2531,7 @@ function FormReceberCertidao({
                 }
               }}
               disabled={readOnly}
-              prefix={`documentos/${documentoId}/certidao`}
+              alvo={{ dominio: "documento", id: documentoId }}
             />
           </div>
 
@@ -3013,15 +3011,10 @@ function FormConferirCertidao({
               <FileCheck className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] text-white/70">Anexo recebido</div>
-                <a
-                  href={arquivoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1"
-                >
+                <LinkDeAnexo valor={arquivoUrl} className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1">
                   {arquivoNome || "Abrir arquivo"}
                   <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+                </LinkDeAnexo>
               </div>
             </div>
           )}
@@ -3280,8 +3273,8 @@ interface FileUploadFieldProps {
     meta?: { name: string; size: number; type: string; key: string; hash: string | null } | null,
   ) => void
   disabled?: boolean
-  /** Pasta lógica no bucket. Ex: "documentos/123/solicitacao" */
-  prefix?: string
+  /** DE QUEM é o arquivo (decide a permissão que abre): ex. `{ dominio: "documento", id: 123 }`. */
+  alvo: AlvoDoAnexo
 }
 
 const ACCEPT_ATTR =
@@ -3301,7 +3294,8 @@ function formatBytes(bytes: number | null): string {
 
 function fileNameFromUrl(url: string): string {
   try {
-    const u = new URL(url)
+    // Chave nova (privado/anexos/…/<carimbo>-<uuid>-<nome>) não é URL: o nome é o último pedaço.
+    const u = leituraDoValor(url).tipo === "chave" ? { pathname: url } : new URL(url)
     const last = u.pathname.split("/").pop() || ""
     // o key tem prefixo "timestamp-uuid-nome.ext" — extrai só o nome
     const parts = last.split("-")
@@ -3321,7 +3315,7 @@ function FileUploadField({
   value,
   onChange,
   disabled,
-  prefix,
+  alvo,
 }: FileUploadFieldProps) {
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -3347,7 +3341,7 @@ function FileUploadField({
       // escolheu, não do que voltou do storage.
       const hash = await hashDoArquivo(file)
       const result = await uploadFiles([file], {
-        prefix,
+        alvo,
         onProgress: (_, p) => setProgress(p),
       })
       const uploaded = result[0]
@@ -3438,14 +3432,13 @@ function FileUploadField({
               </div>
               <div className="text-[10px] text-[var(--text-secondary)] flex items-center gap-2">
                 {fileSize != null && <span>{formatBytes(fileSize)}</span>}
-                <a
-                  href={value}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <LinkDeAnexo
+                  valor={value}
+                  nome={displayName ?? undefined}
                   className="text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-0.5"
                 >
                   Abrir <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+                </LinkDeAnexo>
               </div>
             </div>
             {!disabled && (

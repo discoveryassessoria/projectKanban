@@ -15,6 +15,7 @@
 // separação é o que permite trocar o OCR sem tocar no motor, e reprocessar o
 // motor sem repetir o OCR.
 
+import { lerBytesDoAnexo } from "@/src/lib/anexos/storage"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { auditar, logRegistral } from "../auditoria"
@@ -96,24 +97,22 @@ export async function transcreverArquivo(arquivo: {
   return { resultado: null, tentativas }
 }
 
-/** Baixa um arquivo pela URL, com o mesmo teto de tamanho da transcrição. */
+/**
+ * Baixa o arquivo, com o mesmo teto de tamanho da transcrição. O valor guardado no documento pode ser a CHAVE do anexo (bucket privado —
+ * lida pelo servidor, sem URL pública) ou um endereço antigo/externo (`fetch`, como antes).
+ */
 export async function baixarArquivo(
   url: string,
 ): Promise<{ ok: true; conteudo: Uint8Array } | { ok: false; motivo: string }> {
-  try {
-    const res = await fetch(url)
-    if (!res.ok) return { ok: false, motivo: `Não foi possível baixar o arquivo (HTTP ${res.status}).` }
-    const buffer = await res.arrayBuffer()
-    if (buffer.byteLength > MAX_BYTES) {
-      return {
-        ok: false,
-        motivo: `Arquivo maior que o limite de transcrição (${Math.round(buffer.byteLength / 1024 / 1024)} MB).`,
-      }
+  const r = await lerBytesDoAnexo(url)
+  if (!r.ok) return r
+  if (r.conteudo.byteLength > MAX_BYTES) {
+    return {
+      ok: false,
+      motivo: `Arquivo maior que o limite de transcrição (${Math.round(r.conteudo.byteLength / 1024 / 1024)} MB).`,
     }
-    return { ok: true, conteudo: new Uint8Array(buffer) }
-  } catch (e) {
-    return { ok: false, motivo: `Falha ao baixar o arquivo: ${e instanceof Error ? e.message : String(e)}` }
   }
+  return r
 }
 
 /**

@@ -1,5 +1,6 @@
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useState } from "react"
 import type { PessoaArvore, UniaoArvore, CampoEdicaoPessoa } from "./types"
 import { localDaUniao, rotuloTipoDaUniao } from "@/src/lib/genealogia/uniao-rotulos"
@@ -617,14 +618,9 @@ export function PessoaDetailsPage({
                         <p className="text-xs text-[var(--text-muted)] mt-1">Status: {doc.status}</p>
                       </div>
                       {doc.arquivo_url && (
-                        <a 
-                          href={doc.arquivo_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-amber-600 hover:text-amber-800 text-sm"
-                        >
+                        <LinkDeAnexo valor={doc.arquivo_url} className="text-amber-600 hover:text-amber-800 text-sm">
                           Ver documento
-                        </a>
+                        </LinkDeAnexo>
                       )}
                     </div>
                   </div>

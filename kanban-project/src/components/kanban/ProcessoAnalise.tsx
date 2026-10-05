@@ -1,6 +1,8 @@
 // src/components/kanban/ProcessoAnalise.tsx
 "use client"
 
+import { LinkDeAnexo, abrirAnexo } from "@/src/lib/anexos/cliente"
+import { ImagemDeAnexo, IframeDeAnexo } from "@/src/lib/anexos/visores"
 import { Fragment, useEffect, useMemo, useRef, useState } from "react"
 import { useApi, invalidar } from "@/src/lib/dados"
 import { compararPorEventoDeVida } from "@/src/lib/documentos/ordem-evento-vida"
@@ -529,7 +531,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                 ) : docsFiltrados.length === 0 ? (
                   <Vazio texto="Nenhum documento encontrado para esse filtro." />
                 ) : (
-                  <TabelaDocumentos docs={docsFiltrados} divs={divs} selecionado={docSelecionado} onSelecionar={setDocSelecionado} onAbrir={(u) => window.open(u, "_blank")} />
+                  <TabelaDocumentos docs={docsFiltrados} divs={divs} selecionado={docSelecionado} onSelecionar={setDocSelecionado} onAbrir={(u) => void abrirAnexo(u)} />
                 )
               )}
 
@@ -1227,10 +1229,10 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
           </div>
         </div>
         {doc.arquivoUrl && (
-          <a href={doc.arquivoUrl} target="_blank" rel="noreferrer"
+          <LinkDeAnexo valor={doc.arquivoUrl}
             className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent-text)] hover:underline flex-shrink-0">
             <ExternalLink className="w-3.5 h-3.5" /> Abrir documento
-          </a>
+          </LinkDeAnexo>
         )}
       </div>
 
@@ -1249,9 +1251,9 @@ function PainelDocumento({ doc, divergencias, historico, processoId, readOnly, o
       <div className="p-4 space-y-3">
         {abaDoc === "visualizacao" && (
           ehImagem && doc.arquivoUrl ? (
-            <img src={doc.arquivoUrl} alt={doc.titulo} className="w-full rounded-lg border border-[var(--border-default)]" />
+            <ImagemDeAnexo valor={doc.arquivoUrl} alt={doc.titulo} className="w-full rounded-lg border border-[var(--border-default)]" />
           ) : ehPdf && doc.arquivoUrl ? (
-            <iframe src={doc.arquivoUrl} className="w-full h-[360px] rounded-lg border border-[var(--border-default)]" title={doc.titulo} />
+            <IframeDeAnexo valor={doc.arquivoUrl} className="w-full h-[360px] rounded-lg border border-[var(--border-default)]" title={doc.titulo} />
           ) : (
             <div className="rounded-lg border border-dashed border-[var(--border-default)] p-8 text-center text-xs text-[var(--text-muted)]">
               Sem arquivo anexado a este documento.

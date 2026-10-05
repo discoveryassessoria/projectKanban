@@ -8,6 +8,7 @@
 //   CreditoTab              → Financeiro › Crédito
 //   DocumentosFinanceirosTab→ Financeiro › Documentos Financeiros
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useCallback, useEffect, useState } from "react"
 import { useApi } from "@/src/lib/dados"
 
@@ -205,7 +206,7 @@ export function DocumentosFinanceirosTab() {
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">#{r.processoId}</td>
                       <td className="px-4 py-2.5">
                         {r.pdfUrl
-                          ? <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-[var(--text-secondary)] underline hover:text-[var(--text-secondary)]">abrir</a>
+                          ? <LinkDeAnexo valor={r.pdfUrl} className="text-[var(--text-secondary)] underline hover:text-[var(--text-secondary)]">abrir</LinkDeAnexo>
                           : <span className="text-[var(--text-muted)]">—</span>}
                       </td>
                     </tr>
