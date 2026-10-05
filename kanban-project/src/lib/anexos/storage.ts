@@ -10,8 +10,8 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { randomUUID } from "crypto"
 import { r2 } from "@/src/lib/r2"
 import { configDosBuckets, bucketDeEscrita, type ConfigBuckets } from "@/src/lib/r2-buckets"
-import { bucketOndeEsta, lerObjetoPrivado, urlAssinadaDeLeitura } from "@/src/lib/documentos/modelos/storage-privado"
-import { novaChaveDeAnexo, leituraDoValor, alvoDaChave, type AlvoDoAnexo } from "./chave"
+import { bucketOndeEsta, lerObjetoPrivado } from "@/src/lib/documentos/modelos/storage-privado"
+import { novaChaveDeAnexo, leituraDoValor, alvoDaChave, nomeSeguroDeAnexo, type AlvoDoAnexo } from "./chave"
 import { VALIDADE_DA_URL_DE_ANEXO_SEGUNDOS } from "./porta"
 
 export class BucketPrivadoNaoConfigurado extends Error {
@@ -36,9 +36,18 @@ export async function prepararEnvioDeAnexo(args: { alvo: AlvoDoAnexo; nome: stri
   return { chave, uploadUrl }
 }
 
-/** URL assinada de LEITURA (5 min). Só chamar DEPOIS de autorizar. */
-export async function urlAssinadaDoAnexo(chave: string, nome: string, mime: string, baixar = false): Promise<{ url: string; expiraEmSegundos: number }> {
-  const url = await urlAssinadaDeLeitura({ chave, nomeParaDownload: nome, mime, download: baixar })
+/**
+ * URL assinada de LEITURA (5 min = `VALIDADE_DA_URL_DE_ANEXO_SEGUNDOS`; nunca mais). Só chamar DEPOIS de autorizar. `resolverBucket` é injetável só para o
+ * teste (em produção: o bucket onde o objeto está — o privado; no plano B, o antigo).
+ */
+export async function urlAssinadaDoAnexo(
+  chave: string, nome: string, mime: string, baixar = false, resolverBucket: (chave: string) => Promise<string> = bucketOndeEsta,
+): Promise<{ url: string; expiraEmSegundos: number }> {
+  const comando = new GetObjectCommand({
+    Bucket: await resolverBucket(chave), Key: chave, ResponseContentType: mime,
+    ResponseContentDisposition: `${baixar ? "attachment" : "inline"}; filename="${nomeSeguroDeAnexo(nome)}"`,
+  })
+  const url = await getSignedUrl(r2, comando, { expiresIn: VALIDADE_DA_URL_DE_ANEXO_SEGUNDOS })
   return { url, expiraEmSegundos: VALIDADE_DA_URL_DE_ANEXO_SEGUNDOS }
 }
 

@@ -15,7 +15,6 @@ type PropsImg = Omit<ImgHTMLAttributes<HTMLImageElement>, "src"> & { valor: stri
 export function ImagemDeAnexo({ valor, alt, ...resto }: PropsImg) {
   const { url, erro } = useUrlDeAnexo(valor)
   if (!url) return <Espera className={resto.className} erro={erro} />
-  // eslint-disable-next-line @next/next/no-img-element
   return <img {...resto} src={url} alt={alt ?? ""} />
 }
 
