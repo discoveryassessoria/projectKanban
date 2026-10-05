@@ -94,6 +94,7 @@ const API_PUBLICA: string[] = [
   "/api/cron/torre-regras",
   // Retenção da coleta de dados (diária). Auto-verifica: x-vercel-cron ou CRON_SECRET.
   "/api/cron/coleta-purga",
+  "/api/cron/coleta-orfaos",
   "/api/cron/conferidor-orfaos",
   // LINK PÚBLICO DE COLETA DE DADOS (docs/coleta-de-dados-mandato.md): o cliente não tem login. O que
   // autoriza é o CÓDIGO aleatório do link, conferido em cada handler (inexistente, encerrado e processo
