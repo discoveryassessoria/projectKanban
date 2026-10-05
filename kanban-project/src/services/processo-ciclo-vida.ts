@@ -201,7 +201,7 @@ export interface ResultadoExclusaoProcesso {
 }
 
 /** O apagador real: chave `privado/` no bucket privado (regra do modo duplo); o resto, no bucket de anexos. Nunca lê o conteúdo. */
-async function apagadorPadraoDoStorage(chave: string): Promise<void> {
+export async function apagadorPadraoDoStorage(chave: string): Promise<void> {
   if (ehChavePrivada(chave)) {
     const { removerObjetoPrivado } = await import("@/src/lib/documentos/modelos/storage-privado")
     await removerObjetoPrivado(chave)
