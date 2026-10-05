@@ -5,13 +5,13 @@
 // REGRA DE OURO: anexo novo NUNCA vai para o bucket público. Se o bucket privado não está configurado (`R2_BUCKET_PRIVADO` ausente — modo
 // único), a rota RECUSA gerar o envio (503) em vez de cair no público: melhor não anexar do que anexar aberto ao mundo.
 // ============================================================================
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
+import { PutObjectCommand, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { randomUUID } from "crypto"
 import { r2 } from "@/src/lib/r2"
 import { configDosBuckets, bucketDeEscrita, type ConfigBuckets } from "@/src/lib/r2-buckets"
 import { bucketOndeEsta, lerObjetoPrivado, urlAssinadaDeLeitura } from "@/src/lib/documentos/modelos/storage-privado"
-import { novaChaveDeAnexo, leituraDoValor, type AlvoDoAnexo } from "./chave"
+import { novaChaveDeAnexo, leituraDoValor, alvoDaChave, type AlvoDoAnexo } from "./chave"
 import { VALIDADE_DA_URL_DE_ANEXO_SEGUNDOS } from "./porta"
 
 export class BucketPrivadoNaoConfigurado extends Error {
@@ -60,3 +60,21 @@ export async function lerBytesDoAnexo(valor: string): Promise<{ ok: true; conteu
 }
 
 export { bucketOndeEsta, GetObjectCommand }
+
+/**
+ * RASCUNHO → DONO. O anexo de um cliente que ainda não estava salvo nasce em `privado/anexos/rascunho/<usuário>/…` (só quem enviou abre). Ao
+ * salvar o cliente, a chave é PROMOVIDA: copiada (dentro do bucket privado) para a pasta do dono definitivo, e a de rascunho é apagada — assim a
+ * equipe toda com permissão sobre o cliente consegue abrir. Só promove a chave de rascunho DO PRÓPRIO usuário; qualquer outra volta como está.
+ */
+export async function promoverRascunhoDeAnexo(valor: string, alvoFinal: AlvoDoAnexo, usuarioId: number, nome: string, cfg: ConfigBuckets = configDosBuckets()): Promise<string> {
+  const l = leituraDoValor(valor)
+  if (l.tipo !== "chave") return valor
+  const alvo = alvoDaChave(l.chave)
+  if (!alvo || alvo.dominio !== "rascunho" || alvo.id !== usuarioId) return valor
+  const nova = novaChaveDeAnexo({ alvo: alvoFinal, nome, uuid8: randomUUID().slice(0, 8) })
+  const destino = bucketDoAnexoNovo(nova, cfg)
+  const origem = bucketDoAnexoNovo(l.chave, cfg)
+  await r2.send(new CopyObjectCommand({ Bucket: destino, Key: nova, CopySource: `${origem}/${l.chave}` }))
+  await r2.send(new DeleteObjectCommand({ Bucket: origem, Key: l.chave })).catch((e) => console.error("[anexos] rascunho não apagado após promover:", e))
+  return nova
+}
