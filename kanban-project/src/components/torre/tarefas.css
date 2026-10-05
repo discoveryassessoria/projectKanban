@@ -201,3 +201,14 @@
   .tf-rot { width: auto; flex: 0 0 auto; }
   .tf-gaveta { padding: 16px; }
 }
+
+/* ── abrir / recolher por família ── */
+.tf-expande { display: flex; gap: 8px; padding: 8px 12px 0; }
+.tf-expande button { height: 28px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border-default); background: var(--surface-popover); color: var(--text-primary); font-size: 12px; font-weight: 600; cursor: pointer; }
+.tf-expande button:hover { background: var(--surface-tertiary); }
+.tf-grp { cursor: pointer; }
+.tf-grp.aberto { border-bottom: 2px solid var(--border-strong); }
+.tf-bloco .tf-grp:not(.aberto) { border-bottom: 0; }
+.tf-seta { width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font-size: 16px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.tf-seta:hover { background: var(--surface-secondary); }
+.tf-selpil { display: inline-flex; height: 20px; align-items: center; padding: 0 8px; border-radius: 999px; background: var(--action-primary); color: var(--action-primary-ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
