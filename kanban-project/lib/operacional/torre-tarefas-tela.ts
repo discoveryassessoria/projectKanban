@@ -9,6 +9,7 @@
 // `diasAtePrazo`, `torre-bola.ts` (bolaCom / bolaDesde / cobrarEm), `ROTULO_STATUS_TAREFA` e `textoPrazoDaTarefa`.
 // ============================================================================
 import { diasPorExtenso } from './tempo-extenso'
+import { diaMesDoPrazo } from '@/src/lib/tarefa/texto-prazo'
 import { PREDICADO_DO_KPI, diasAtePrazo } from './torre-kpis'
 import { diasEntreDiasOperacionais, FUSO_OPERACIONAL } from './tempo-operacional'
 import type { BolaCom } from './torre-bola'
@@ -307,6 +308,22 @@ export function agruparParaTela<T extends LinhaParaGrupo>(linhas: T[], por: Agru
 
 /** Dias até o prazo (dia operacional), `null` sem prazo — reexporta a conta única para quem monta a tela. */
 export const diasDoPrazo = diasAtePrazo
+
+/**
+ * O PRAZO NA TABELA DA ABA TAREFAS — curto, no máximo 2 linhas: "venceu há 5 dias" · "vence hoje" · "vence amanhã" · "vence em 3 dias" ·
+ * "Sem prazo". Conta em DIAS OPERACIONAIS (a mesma régua do cartão Atrasadas/Vence hoje). "dias" sempre por extenso. A data (dd/mm) vai
+ * em `dica`, para o mouse; as telas que querem o rótulo canônico completo continuam usando `textoPrazoDaTarefa`.
+ */
+export function textoPrazoCompacto(l: { dataPrazo: string | null }, agora: Date): { texto: string; dica: string | null } {
+  const d = diasAtePrazo({ dataPrazo: l.dataPrazo }, agora)
+  const dia = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`
+  const dica = l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : null
+  if (d == null) return { texto: 'Sem prazo', dica: null }
+  if (d < 0) return { texto: `venceu há ${dia(-d)}`, dica }
+  if (d === 0) return { texto: 'vence hoje', dica }
+  if (d === 1) return { texto: 'vence amanhã', dica }
+  return { texto: `vence em ${dia(d)}`, dica }
+}
 
 // ─── A VISÃO "FEITO" ────────────────────────────────────────────────────────
 export type BlocoDoFeito = 'hoje' | 'ontem' | 'antes'

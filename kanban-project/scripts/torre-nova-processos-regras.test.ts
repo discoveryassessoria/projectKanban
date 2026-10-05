@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs"
 import {
   FILTROS_DE_PROCESSOS, ORDENS_DE_PROCESSOS, PARAMETROS_INICIAIS, SEM_RESPONSAVEL, ITENS_POR_PAGINA,
   aplicarPaisRespBusca, botoesDeFase, contagensDosFiltros, escolherFaseInicial, metaDaVisao, opcoesDePais, opcoesDeResponsavel, ordenarProcessos,
-  paginar, passaNoFiltro, passosDaFase, rodapeDeProcessos, saudeDaFase, fraseDaSemana, textoNaFase, tomDosDias, textoDuracao,
+  paginar, passaNoFiltro, passosDaFase, somaExibidaDosPassos, rodapeDeProcessos, saudeDaFase, fraseDaSemana, textoNaFase, tomDosDias, textoDuracao,
 } from "../lib/operacional/torre-fase"
 import { proximaAcaoDoProcesso, prazoCurto, tipoDaTarefa, type LinhaParaProximaAcao } from "../lib/operacional/torre-proxima-acao"
 import { processo } from "./_torre-nova-fabrica"
@@ -116,8 +116,9 @@ const fase = [
 ]
 const pf = passosDaFase(fase, 30)
 ok("o título soma abertas + concluídas (grain TAREFA): 15 certidões", pf.total === 15 && pf.substantivo === "certidões")
-ok("caixas: Sem responsável (r) · cada passo (a se a maioria espera, n se não) · Concluídas (g)", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join() === "Sem responsável:2:r,Solicitar:1:n,Aguardar:8:a,Concluídas:4:g", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join())
-ok("observação do passo em espera: quantas passaram da meta ('5 há mais de 30 d')", pf.caixas[2].obs === "5 há mais de 30 dias" && pf.caixas[0].obs === "sem responsável")
+ok("caixas: SÓ passos reais (a se a maioria espera, n se não) + Concluídas (g) — 'Sem responsável' NÃO é caixa", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join() === "Solicitar:1:n,Aguardar:8:a,Concluídas:4:g" && !pf.caixas.some((x) => x.nome === "Sem responsável"), pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join())
+ok("as sem responsável vêm à parte (2) e a SOMA exibida continua igual ao total (N = 15)", pf.semResponsavel === 2 && somaExibidaDosPassos(pf) === pf.total && pf.total === 15, `${somaExibidaDosPassos(pf)} × ${pf.total}`)
+ok("observação do passo em espera: quantas passaram da meta ('5 há mais de 30 d')", pf.caixas[1].obs === "5 há mais de 30 dias")
 ok("gargalo: 'O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.'", pf.gargalo === "O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 dias.", pf.gargalo)
 ok("o passo NÃO multiplica: as caixas de passo somam as tarefas abertas COM responsável (9 = 11 abertas − 2 sem responsável)", pf.caixas.filter((x) => x.classe === "n" || x.classe === "a").reduce((a, x) => a + x.n, 0) === 9)
 ok("sem tarefa aberta: gargalo diz que está tudo concluído; sem nada: 'Nenhuma certidão nesta fase ainda.'", passosDaFase([processo({ id: 92, nome: "Z", tarefasDaFase: { abertas: 0, semResponsavel: 0, concluidas: 5, passos: [], ehCertidao: true } })], 30).gargalo.startsWith("Nenhuma certidão aberta") && passosDaFase([], null).gargalo === "Nenhuma tarefa nesta fase ainda.")

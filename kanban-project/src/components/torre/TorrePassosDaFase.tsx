@@ -1,6 +1,6 @@
 "use client"
 // src/components/torre/TorrePassosDaFase.tsx — cartão "Onde estão as N certidões desta fase — por passo" (aba Processos): caixas
-// (Sem responsável · cada passo com tarefa aberta · Concluídas) e a frase do gargalo. Regras em `passosDaFase` (lib/operacional/torre-fase.ts).
+// (cada passo REAL com tarefa aberta · Concluídas) + uma linha à parte para as sem responsável (que não são um passo) e a frase do gargalo. Regras em `passosDaFase` (lib/operacional/torre-fase.ts).
 import { milhar, type PassosDaFase } from "@/lib/operacional/torre-fase"
 import "./torre-processos.css"
 
@@ -17,6 +17,11 @@ export function TorrePassosDaFase({ p }: { p: PassosDaFase }) {
           </div>
         ))}
       </div>
+      {p.semResponsavel > 0 && (
+        <div className="tor-pf-semresp">
+          {milhar(p.semResponsavel)} {p.substantivo === "certidões" ? (p.semResponsavel === 1 ? "certidão" : "certidões") : (p.semResponsavel === 1 ? "tarefa" : "tarefas")} sem responsável — ainda não entram em nenhum passo acima
+        </div>
+      )}
       <div className="tor-pf-texto">{p.gargalo}</div>
     </section>
   )

@@ -72,12 +72,12 @@ secao("Estático — toda tabela usa a função, nenhuma repete a data")
   const tt = ler("src/components/torre/TarefasTabela.tsx"), gaveta = ler("src/components/torre/TarefasGaveta.tsx"), tf = ler("src/components/operacao/tabela-familia.tsx"), ab = ler("src/components/operacao/operacao-v3-abas.tsx"), v3 = ler("src/components/operacao/operacao-v3.tsx"), painel = ler("src/components/torre/PainelTorreTarefa.tsx")
   const semComentario = (s: string) => s.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/^\s*\/\/.*$/gm, "")
   for (const [nome, src] of [["Torre › Tarefas", tt], ["Operação › tabela-familia", tf], ["Operação › abas", ab], ["Operação › tabela principal", v3], ["painel da tarefa", painel], ["gaveta da tarefa", gaveta]] as const) {
-    ok(`${nome}: importa e usa textoPrazoDaTarefa`, /texto-prazo/.test(src) && /textoPrazoDaTarefa\(/.test(src))
+    ok(`${nome}: importa e usa textoPrazoDaTarefa` + (nome === "Torre › Tarefas" ? " (ou a versão curta textoPrazoCompacto — mesma data, mesma régua de dias operacionais)" : ""), nome === "Torre › Tarefas" ? /textoPrazoCompacto\(/.test(src) : /texto-prazo/.test(src) && /textoPrazoDaTarefa\(/.test(src))
     ok(`${nome}: nenhum rótulo de prazo é desenhado cru (sempre pela função)`, !/\{[a-z]+\.rotuloDoPrazo(\s*\|\|\s*"—")?\}/.test(semComentario(src)))
   }
   ok("Operação › tabela-familia: a coluna Prazo é UMA linha — sem a data por extenso (dataCurta) embaixo do rótulo", !/dataPrazo && <div[^>]*>\{dataCurta\(l\.dataPrazo\)\}/.test(tf) && /\{textoPrazoDaTarefa\(l\)\}/.test(tf))
-  ok("Torre › Tarefas: a coluna Prazo (ao lado de Iniciou e Risco) é o prazo da TAREFA, uma vez só", /<div>Iniciou<\/div><div>Prazo<\/div><div>Risco<\/div>/.test(tt) && /textoPrazoDaTarefa\(l\) \|\| "—"/.test(tt) && !/acompTxtCompleto/.test(tt))
-  const celulaPrazo = tt.split("\n").find((l) => /textoPrazoDaTarefa\(l\)/.test(l)) ?? ""
+  ok("Torre › Tarefas: a coluna Prazo (ao lado de Iniciou e Risco) é o prazo da TAREFA, uma vez só", /<div>Iniciou<\/div><div>Prazo<\/div><div>Risco<\/div>/.test(tt) && /textoPrazoCompacto\(l, agora\)/.test(tt) && /prazo\.texto/.test(tt) && !/acompTxtCompleto/.test(tt))
+  const celulaPrazo = tt.split("\n").find((l) => /prazo\.texto/.test(l)) ?? ""
   ok("Torre › Tarefas: a célula do Prazo não lê nada do passo", !/regraTemporalPasso|acompanhamentoPasso|passoCorrente|passoAtual|etapaAtual/.test(celulaPrazo))
   ok("o prazo/regra do passo mora só no painel da tarefa (drawer)", /Espera do passo/.test(painel) && /regraTemporalPasso/.test(painel) && !/regraTemporalPasso/.test(tt))
   ok("o painel mostra o prazo da TAREFA pela mesma função", /Prazo da tarefa<\/b>\{textoPrazoDaTarefa\(linha\)/.test(painel))
