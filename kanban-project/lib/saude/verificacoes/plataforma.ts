@@ -231,16 +231,16 @@ registrar({
   executar: async (): Promise<ResultadoVerificacao> => {
     const r = await prisma.$queryRawUnsafe<{ n: number }[]>(
       `SELECT COUNT(*)::int AS n FROM "Documento"
-        WHERE "arquivo_url" IS NOT NULL AND "arquivo_url" <> '' AND "arquivo_url" NOT LIKE 'http%'`,
+        WHERE "arquivo_url" IS NOT NULL AND "arquivo_url" <> '' AND "arquivo_url" NOT LIKE 'http%' AND "arquivo_url" NOT LIKE 'privado/anexos/%'`,
     )
     const n = r?.[0]?.n ?? 0
-    if (!n) return { achados: [], metricas: { invalidas: 0 }, resumo: 'Toda URL de arquivo é utilizável.' }
+    if (!n) return { achados: [], metricas: { invalidas: 0 }, resumo: 'Todo arquivo de documento tem endereço ou chave de anexo válidos.' }
     return {
       achados: [{
         chave: 'documento-url-invalida',
         severidade: 'ERRO',
         titulo: `${n} documento(s) com URL de arquivo inválida`,
-        descricao: `${n} documento(s) têm URL que não começa com http.`,
+        descricao: `${n} documento(s) têm um valor que não é endereço (http…) nem chave de anexo (privado/anexos/…).`,
         explicacao: 'A URL é o caminho para o arquivo no storage; formato inválido não resolve.',
         impacto: 'O documento existe no cadastro mas não abre.',
         entidade: 'Documento',

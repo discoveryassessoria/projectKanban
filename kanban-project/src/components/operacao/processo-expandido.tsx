@@ -16,6 +16,7 @@
 // ============================================================================
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, CheckCircle2, ExternalLink, GitBranch, MessageSquare, Paperclip } from "lucide-react"
@@ -508,9 +509,9 @@ function LinhaPessoaDocumentos({ pessoa }: { pessoa: PessoaComDocumentos }) {
                 ? <Etiqueta tom="sucesso">{d.statusShort ?? d.status}</Etiqueta>
                 : <Etiqueta tom="neutro">{d.statusShort ?? d.status}</Etiqueta>}
               {d.arquivoUrl && (
-                <a href={d.arquivoUrl} target="_blank" rel="noreferrer" className="text-[11px] font-medium text-[var(--action-primary)] underline-offset-2 hover:underline">
+                <LinkDeAnexo valor={d.arquivoUrl} className="text-[11px] font-medium text-[var(--action-primary)] underline-offset-2 hover:underline">
                   Abrir
-                </a>
+                </LinkDeAnexo>
               )}
             </span>
           </div>

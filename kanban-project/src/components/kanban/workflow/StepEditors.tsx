@@ -1291,14 +1291,9 @@ function FormSolicitarCertidao({
                       <div className="rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-2.5 py-2 flex items-center gap-2">
                         <Paperclip className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
                         <div className="min-w-0 flex-1">
-                          <a
-                            href={anexoJaRegistrado.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[12px] text-white/90 hover:text-white truncate block"
-                          >
+                          <LinkDeAnexo valor={anexoJaRegistrado.url} className="text-[12px] text-white/90 hover:text-white truncate block">
                             {anexoJaRegistrado.nome}
-                          </a>
+                          </LinkDeAnexo>
                           <div className="text-[10px] text-[var(--text-secondary)]">
                             já registrado nesta etapa
                             {anexoJaRegistrado.documentoMestre
@@ -3016,15 +3011,10 @@ function FormConferirCertidao({
               <FileCheck className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] text-white/70">Anexo recebido</div>
-                <a
-                  href={arquivoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1"
-                >
+                <LinkDeAnexo valor={arquivoUrl} className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1">
                   {arquivoNome || "Abrir arquivo"}
                   <ExternalLink className="w-2.5 h-2.5" />
-                </a>
+                </LinkDeAnexo>
               </div>
             </div>
           )}

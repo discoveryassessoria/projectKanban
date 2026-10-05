@@ -7,6 +7,7 @@
 // ============================================================================
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useEffect, useMemo, useState } from "react"
 import { useApi } from "@/src/lib/dados"
 import { useRouter } from "next/navigation"
@@ -674,7 +675,7 @@ function Movimentacoes({ processoId, modo }: { processoId: number; modo: "extrat
         <table className="w-full text-sm">
           <thead><tr className="text-left text-xs text-[var(--text-muted)]">{["Data", "Descrição", "Origem", "Valor", "Status", ""].map((h) => <th key={h} className="py-2 font-medium">{h}</th>)}</tr></thead>
           <tbody>{eventos.map((e, i) => (
-            <tr key={i} className="border-t border-[var(--border-default)]"><td className="py-2.5 text-[var(--text-secondary)]">{dataBR(e.data)}</td><td className="text-[var(--text-secondary)]">{e.tipo}{e.manual && <span className="ml-2 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[10px] font-medium" style={{ background: "color-mix(in srgb, var(--info) 16%, transparent)", color: "var(--info)" }}>manual</span>}</td><td className="text-[var(--text-secondary)]">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-[var(--text-secondary)]">{e.status}</td><td>{e.comprovanteUrl && <a href={e.comprovanteUrl} target="_blank" rel="noreferrer" className="text-xs text-[var(--info)]">comprovante</a>}</td></tr>
+            <tr key={i} className="border-t border-[var(--border-default)]"><td className="py-2.5 text-[var(--text-secondary)]">{dataBR(e.data)}</td><td className="text-[var(--text-secondary)]">{e.tipo}{e.manual && <span className="ml-2 rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[10px] font-medium" style={{ background: "color-mix(in srgb, var(--info) 16%, transparent)", color: "var(--info)" }}>manual</span>}</td><td className="text-[var(--text-secondary)]">{e.obrigacao ?? "—"}</td><td className={ENTRADA.has(e.tipo) ? "text-[var(--success)]" : "text-[var(--text-secondary)]"}>{ENTRADA.has(e.tipo) ? "+" : ""}{fmt(e.valor, e.moeda)}</td><td className="text-[var(--text-secondary)]">{e.status}</td><td>{e.comprovanteUrl && <LinkDeAnexo valor={e.comprovanteUrl} className="text-xs text-[var(--info)]">comprovante</LinkDeAnexo>}</td></tr>
           ))}</tbody>
         </table>
       ) : (

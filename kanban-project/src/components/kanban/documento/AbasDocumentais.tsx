@@ -17,6 +17,7 @@
 
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useMemo, useRef, useState } from "react"
 import { useApi } from "@/src/lib/dados"
 import {
@@ -149,16 +150,11 @@ function Vazio({ titulo, descricao }: { titulo: string; descricao: string }) {
 function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
   const mestre = a.documentoMestre
   return (
-    <a
-      href={a.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`flex items-center gap-2.5 rounded-md border px-2.5 py-2 transition-colors ${
+    <LinkDeAnexo valor={a.url} className={`flex items-center gap-2.5 rounded-md border px-2.5 py-2 transition-colors ${
         a.vigente
           ? "border-[var(--border-default)] bg-[var(--app-background)] hover:bg-[var(--surface-popover)]"
           : "border-[var(--border-subtle)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-overlay)] opacity-60"
-      }`}
-    >
+      }`}>
       <Paperclip className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -188,7 +184,7 @@ function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
         </div>
       </div>
       <ExternalLink className="w-3 h-3 text-[var(--text-muted)] flex-shrink-0" />
-    </a>
+    </LinkDeAnexo>
   )
 }
 

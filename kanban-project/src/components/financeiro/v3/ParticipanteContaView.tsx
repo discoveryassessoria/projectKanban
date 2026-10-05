@@ -10,6 +10,7 @@
 // ============================================================================
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useCallback, useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
@@ -252,7 +253,7 @@ export default function ParticipanteContaView({ obrigacaoId, nome, onClose, onRe
                           <div className="truncate text-sm font-medium text-[var(--text-primary)]">{doc.nome}</div>
                           <div className="mt-0.5 text-xs text-[var(--text-muted)]">{[doc.tipo, fmtTamanho(doc.tamanho), `Anexado em ${dataBR(doc.criadoEm)}`].filter(Boolean).join(" · ")}</div>
                         </div>
-                        <a href={doc.url} target="_blank" rel="noreferrer" download className="inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"><Download className="h-4 w-4" /> Baixar</a>
+                        <LinkDeAnexo valor={doc.url} nome={doc.nome} className="inline-flex shrink-0 items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)]"><Download className="h-4 w-4" /> Baixar</LinkDeAnexo>
                       </div>
                     ))}</div>
                   )

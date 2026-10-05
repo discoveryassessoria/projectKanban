@@ -17,6 +17,7 @@
 
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { Loader2, MessageCircle, ExternalLink } from "lucide-react"
 import {
@@ -344,15 +345,14 @@ export function BlocoContatos({
                 </div>
               )}
               {c.anexoUrl && (
-                <a
-                  href={c.anexoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <LinkDeAnexo
+                  valor={c.anexoUrl}
+                  nome={c.anexoNome ?? undefined}
                   className="text-[11px] text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1 mt-1"
                 >
                   {c.anexoNome || "anexo"}
                   <ExternalLink className="w-3 h-3" />
-                </a>
+                </LinkDeAnexo>
               )}
             </div>
           ))}

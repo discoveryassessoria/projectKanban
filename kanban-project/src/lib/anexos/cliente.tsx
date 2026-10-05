@@ -18,13 +18,13 @@ function tokenDoUsuario(): string | null {
 }
 
 /** Pede à porta a URL assinada da chave. Lança com a mensagem do servidor (401/403/…); nunca devolve endereço fixo. */
-export async function pedirUrlAssinada(chave: string, opcoes: { nome?: string; mime?: string; auditar?: boolean } = {}): Promise<string> {
+export async function pedirUrlAssinada(chave: string, opcoes: { nome?: string; mime?: string; auditar?: boolean; baixar?: boolean } = {}): Promise<string> {
   const token = tokenDoUsuario()
   if (!token) throw new Error("Sua sessão expirou. Faça login novamente.")
   const r = await fetch("/api/anexos/abrir", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ chave, nome: opcoes.nome, mime: opcoes.mime, auditar: opcoes.auditar === true }),
+    body: JSON.stringify({ chave, nome: opcoes.nome, mime: opcoes.mime, auditar: opcoes.auditar === true, baixar: opcoes.baixar === true }),
   })
   const j = (await r.json().catch(() => ({}))) as { url?: string; error?: string }
   if (!r.ok || !j.url) throw new Error(j.error || `Não foi possível abrir o anexo (${r.status}).`)
@@ -43,6 +43,19 @@ export async function abrirAnexo(valor: string | null | undefined, nome?: string
   } catch (e) {
     aba?.close()
     window.alert(e instanceof Error ? e.message : "Não foi possível abrir o anexo.")
+  }
+}
+
+/** Botão "Baixar": como abrir, mas a URL assinada força o download (Content-Disposition: attachment) e a página não muda. */
+export async function baixarAnexo(valor: string | null | undefined, nome?: string, mime?: string): Promise<void> {
+  const l = leituraDoValor(valor)
+  if (l.tipo === "vazio") return
+  if (l.tipo === "endereco") { window.open(l.url, "_blank", "noopener,noreferrer"); return }
+  try {
+    const url = await pedirUrlAssinada(l.chave, { nome, mime, auditar: true, baixar: true })
+    window.location.href = url
+  } catch (e) {
+    window.alert(e instanceof Error ? e.message : "Não foi possível baixar o anexo.")
   }
 }
 

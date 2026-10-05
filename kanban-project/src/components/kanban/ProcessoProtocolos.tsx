@@ -8,6 +8,8 @@
 
 "use client"
 
+import { ImagemDeAnexo, IframeDeAnexo, MiniaturaPdfDeAnexo } from "@/src/lib/anexos/visores"
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState } from "react"
 import { buscar, useApi, useConsulta } from "@/src/lib/dados"
@@ -1238,15 +1240,14 @@ export function ProcessoProtocolos({
                                 className="group relative bg-[var(--surface-popover)] rounded-lg border border-[var(--border-default)] overflow-hidden hover:shadow-[var(--elev-2)] transition-shadow"
                               >
                                 {/* Preview */}
-                                <a
-                                  href={anexo.urlArquivo}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <LinkDeAnexo
+                                  valor={anexo.urlArquivo}
+                                  nome={anexo.nome}
                                   className="block aspect-square relative overflow-hidden"
                                 >
                                   {isImage ? (
-                                    <img
-                                      src={anexo.urlArquivo}
+                                    <ImagemDeAnexo
+                                      valor={anexo.urlArquivo}
                                       alt={anexo.nome}
                                       className="w-full h-full object-cover"
                                     />
@@ -1266,7 +1267,7 @@ export function ProcessoProtocolos({
                                   <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
                                     <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
-                                </a>
+                                </LinkDeAnexo>
 
                                 {/* Info */}
                                 <div className="p-2 border-t border-[var(--border-default)]">

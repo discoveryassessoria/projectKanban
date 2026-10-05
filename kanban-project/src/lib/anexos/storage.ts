@@ -37,8 +37,8 @@ export async function prepararEnvioDeAnexo(args: { alvo: AlvoDoAnexo; nome: stri
 }
 
 /** URL assinada de LEITURA (5 min). Só chamar DEPOIS de autorizar. */
-export async function urlAssinadaDoAnexo(chave: string, nome: string, mime: string): Promise<{ url: string; expiraEmSegundos: number }> {
-  const url = await urlAssinadaDeLeitura({ chave, nomeParaDownload: nome, mime, download: false })
+export async function urlAssinadaDoAnexo(chave: string, nome: string, mime: string, baixar = false): Promise<{ url: string; expiraEmSegundos: number }> {
+  const url = await urlAssinadaDeLeitura({ chave, nomeParaDownload: nome, mime, download: baixar })
   return { url, expiraEmSegundos: VALIDADE_DA_URL_DE_ANEXO_SEGUNDOS }
 }
 

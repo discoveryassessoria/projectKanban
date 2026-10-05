@@ -2,6 +2,7 @@
 
 "use client"
 
+import { LinkDeAnexo } from "@/src/lib/anexos/cliente"
 import { useState, useEffect } from "react"
 import { 
   X, 
@@ -361,40 +362,28 @@ function DocumentoCard({
       {(documento.arquivo_url || documento.arquivo_traducao_url || documento.arquivo_apostila_url) && (
         <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[var(--border-default)]">
           {documento.arquivo_url && (
-            <a 
-              href={documento.arquivo_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <LinkDeAnexo valor={documento.arquivo_url}
               className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-800 font-medium"
             >
               <FileText className="w-3 h-3" />
               Original
-            </a>
+            </LinkDeAnexo>
           )}
           {documento.arquivo_traducao_url && (
-            <a 
-              href={documento.arquivo_traducao_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <LinkDeAnexo valor={documento.arquivo_traducao_url}
               className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-800 font-medium"
             >
               <FileText className="w-3 h-3" />
               Tradução
-            </a>
+            </LinkDeAnexo>
           )}
           {documento.arquivo_apostila_url && (
-            <a 
-              href={documento.arquivo_apostila_url} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <LinkDeAnexo valor={documento.arquivo_apostila_url}
               className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] font-medium"
             >
               <FileText className="w-3 h-3" />
               Apostila
-            </a>
+            </LinkDeAnexo>
           )}
         </div>
       )}
