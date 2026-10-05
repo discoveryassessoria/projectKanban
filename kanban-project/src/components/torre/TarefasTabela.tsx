@@ -1,6 +1,7 @@
 "use client"
 // src/components/torre/TarefasTabela.tsx — a TABELA agrupada da aba Tarefas (Torre nova, igual ao protótipo).
-// Colunas: [☐] Certidão · pessoa | Família · fase | Passo · status | Bola com · cobrar em | Responsável | Iniciou | Prazo | Risco | [ações].
+// Colunas (uma informação por coluna): [☐] Certidão | Pessoa | Família | Fase | Passo | Status | Aguardando | Cobrar em | Responsável | Iniciou | Prazo | Risco | [ações].
+// Rolagem horizontal quando precisar; o ☐ e a Certidão ficam fixos à esquerda.
 // Cabeçalho de grupo: ☐, a família (link), o resumo, "N tarefas" e "Foco ›". A certidão CANCELADA continua visível — riscada, no fim do
 // grupo, com "Ver motivo" — mas é só exibição: não conta no "N tarefas", não tem seleção e não entra em lote.
 // Prazo: SEMPRE o da tarefa, uma vez só (`textoPrazoDaTarefa`). Status: `ROTULO_STATUS_TAREFA` (via `statusDaLinha`).
@@ -61,29 +62,25 @@ export function TarefasTabela({
     const semDono = l.responsavelId == null
     return (
       <div key={l.taskId} className={`tf-g tf-linha ${marcada ? "sel" : ""} ${cancelada ? "cancelada" : ""}`}>
-        <div>
+        <div className="tf-fixa-0">
           {cancelada
             ? <button type="button" className="tf-chk" disabled aria-label="Certidão cancelada: só exibição" style={{ opacity: 0.4, cursor: "not-allowed" }} />
             : <button type="button" className={`tf-chk ${marcada ? "on" : ""}`} aria-label={`Selecionar a tarefa ${l.taskId}`} aria-pressed={marcada} onClick={() => onSelecionar([l.taskId], !marcada)} />}
         </div>
-        <div className="tf-cert">
+        <div className="tf-cert tf-fixa-1">
           <button type="button" className="tf-nome" onClick={() => onAbrirGaveta(l)}>
             {novas.has(l.taskId) && <span className="tor-p amb tf-nova">nova</span>}{docTipoTxt(l)}
           </button>
-          <span className="tf-peq">{l.pessoaNome ?? l.casalNomes ?? "—"}</span>
         </div>
-        <div className="tf-col">
-          <span className="tf-t13">{l.familiaNome ?? l.processoNome ?? "—"}</span>
-          <span className="tf-peq">{rotularFase(l.faseMacroKey) ?? l.faseAtualDoProcessoLabel ?? "—"}</span>
-        </div>
-        <div className="tf-col">
-          <span className="tf-t13">{cancelada ? "—" : passoLabelDe(l).label}</span>
-          <span className={`tf-st ${st.tom}`}>{st.texto}</span>
-        </div>
-        <div className="tf-col">
-          <span className="tf-t13">{cancelada ? "—" : bola.texto}</span>
+        <div className="tf-t13">{l.pessoaNome ?? l.casalNomes ?? "—"}</div>
+        <div className="tf-t13">{l.familiaNome ?? l.processoNome ?? "—"}</div>
+        <div className="tf-t13">{rotularFase(l.faseMacroKey) ?? l.faseAtualDoProcessoLabel ?? "—"}</div>
+        <div className="tf-t13">{cancelada ? "—" : passoLabelDe(l).label}</div>
+        <div><span className={`tf-st ${st.tom}`}>{st.texto}</span></div>
+        <div className="tf-t13" title={!cancelada && bola.orgao ? bola.orgao : undefined}>{cancelada ? "—" : bola.texto}</div>
+        <div>
           {cobrar
-            ? <span className={`tf-peq tf-b ${cobrar.tom === "vermelho" ? "tf-verm" : cobrar.tom === "ambar" ? "tf-amb" : ""}`} title={l.cobrarEmPadrao ? "Padrão: 7 dias depois do pedido ou da última cobrança" : undefined}>{cobrar.texto}</span>
+            ? <span className={`tf-t13 tf-b ${cobrar.tom === "vermelho" ? "tf-verm" : cobrar.tom === "ambar" ? "tf-amb" : ""}`} title={l.cobrarEmPadrao ? "Padrão: 7 dias depois do pedido ou da última cobrança" : undefined}>{cobrar.texto}</span>
             : <span className="tf-peq">—</span>}
         </div>
         <div className={`tf-t13 ${semDono && !cancelada ? "tf-b tf-verm" : ""}`}>{cancelada ? "—" : l.responsavelNome ?? "Sem responsável"}</div>
@@ -103,11 +100,11 @@ export function TarefasTabela({
     <div className="tf-tabela">
       <div className="tf-rolagem">
         <div className="tf-g tf-hd">
-          <div>
+          <div className="tf-fixa-0">
             <button type="button" className={`tf-chk ${todasMarcadas ? "on" : ""}`} aria-label="Selecionar todas" aria-pressed={todasMarcadas} disabled={todasDaPagina.length === 0}
               onClick={() => onTodas(todasDaPagina, !todasMarcadas)} />
           </div>
-          <div>Certidão · pessoa</div><div>Família · fase</div><div>Passo · status</div><div>Aguardando · cobrar em</div><div>Responsável</div><div>Iniciou</div><div>Prazo</div><div>Risco</div><div />
+          <div className="tf-fixa-1">Certidão</div><div>Pessoa</div><div>Família</div><div>Fase</div><div>Passo</div><div>Status</div><div>Aguardando</div><div>Cobrar em</div><div>Responsável</div><div>Iniciou</div><div>Prazo</div><div>Risco</div><div />
         </div>
         {!vazio && grupos.map(([nome, itens]) => {
           const trabalho = itens.filter((l) => !ehCancelada(l))

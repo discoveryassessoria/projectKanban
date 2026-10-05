@@ -49,7 +49,7 @@ ok("o lote chama as portas existentes (lote, iniciar-lote) e o Desfazer vem do t
 ok("modais do Repactuar e Vincular não zeram a seleção (como no protótipo); os 4 diretos zeram", /limpar: false/.test(tt) && /if \(limpar\) setSel\(\{\}\)/.test(tt))
 
 secao("Tabela (T281–T306)")
-ok("colunas na ordem do protótipo", ["Certidão · pessoa", "Família · fase", "Passo · status", "Aguardando · cobrar em", "Responsável", "Iniciou", "Prazo", "Risco"].map((c) => tab.indexOf(`<div>${c}</div>`)).every((i, k, v) => i > 0 && (k === 0 || i > v[k - 1])))
+ok("colunas SEPARADAS, na ordem (Certidão | Pessoa | Família | Fase | Passo | Status | Aguardando | Cobrar em | …)", ["Certidão", "Pessoa", "Família", "Fase", "Passo", "Status", "Aguardando", "Cobrar em", "Responsável", "Iniciou", "Prazo", "Risco"].map((c) => tab.indexOf(`>${c}</div>`)).every((i, k, v) => i > 0 && (k === 0 || i > v[k - 1])))
 ok("cabeçalho de grupo: ☐, família (link), resumo, 'N tarefas', 'Foco ›'", /Selecionar o grupo/.test(tab) && /href=\{`\/torre\/processo\/\$\{processoId\}`\}/.test(tab) && /resumoDoGrupo/.test(tab) && /Foco ›/.test(tab) && /tarefas/.test(tab))
 ok("status por ROTULO_STATUS_TAREFA (statusDaLinha), risco por riscoDe, prazo por textoPrazoDaTarefa (uma vez só)", /statusDaLinha\(l\)/.test(tab) && /ROTULO_STATUS/.test(lib) && /riscoDe\(l\)/.test(tab) && (tab.match(/textoPrazoDaTarefa\(/g) ?? []).length === 1)
 ok("bola / iniciou / cobrar em vêm dos campos novos (bolaCom, bolaDesde, cobrarEm, iniciouEm)", /textoDaBola/.test(tab) && /textoDoCobrar\(l\.cobrarEm/.test(tab) && /textoDoIniciou/.test(tab) && /l\.bolaCom/.test(lib) && /l\.bolaDesde/.test(lib) && /iniciouEm/.test(lib))
