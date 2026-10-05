@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { randomUUID } from 'crypto';
 import { prisma } from '@/lib/prisma';
-import { r2, R2_BUCKET, R2_PUBLIC_URL } from '@/src/lib/r2';
+import { prepararEnvioDeAnexo, BucketPrivadoNaoConfigurado } from '@/src/lib/anexos/storage';
 import { extrairToken } from '@/src/lib/app-auth';
 
 const MAX_SIZE = 20 * 1024 * 1024; // 20MB — documento de cliente, sem motivo pra mais
@@ -15,14 +12,6 @@ const ALLOWED_TYPES = new Set([
   'application/pdf',
 ]);
 
-function sanitize(name: string) {
-  return name
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_')
-    .slice(0, 120);
-}
 
 export async function POST(request: NextRequest) {
   const payload = extrairToken(request);
@@ -86,21 +75,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 
-  const safeName = sanitize(filename) || 'arquivo';
-  const key = `app-uploads/${necessidade.processo.id}/${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
-
-  const command = new PutObjectCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    ContentType: contentType,
-    ContentLength: size,
-  });
-
+  // O arquivo do cliente vai para o bucket PRIVADO, na pasta do processo (a equipe abre pela porta de anexos, com permissão de processos).
+  // `publicUrl` devolve a CHAVE (campo mantido por compatibilidade): nunca há endereço público.
   try {
-    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 });
-    const publicUrl = `${R2_PUBLIC_URL}/${key}`;
-    return NextResponse.json({ uploadUrl, publicUrl, key });
+    const { chave, uploadUrl } = await prepararEnvioDeAnexo({ alvo: { dominio: 'processo', id: necessidade.processo.id }, nome: filename, tipo: contentType, tamanho: size });
+    return NextResponse.json({ uploadUrl, publicUrl: chave, key: chave });
   } catch (err) {
+    if (err instanceof BucketPrivadoNaoConfigurado) {
+      console.error('[/api/app/upload/presign]', err.message);
+      return NextResponse.json({ error: 'Armazenamento privado indisponível. Tente novamente mais tarde.' }, { status: 503 });
+    }
     console.error('[/api/app/upload/presign] erro:', err);
     return NextResponse.json({ error: 'Erro ao gerar URL de upload' }, { status: 500 });
   }

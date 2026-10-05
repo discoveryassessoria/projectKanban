@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { randomUUID } from "crypto";
-import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/src/lib/r2";
-import { extrairUsuarioKanban } from "@/lib/kanban-auth";
+import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao";
+import { autorizarAcessoAoAlvo } from "@/src/lib/anexos/porta";
+import { ehDominioDeAnexo } from "@/src/lib/anexos/chave";
+import { prepararEnvioDeAnexo, BucketPrivadoNaoConfigurado } from "@/src/lib/anexos/storage";
+
+// ============================================================================
+// ENVIO DE ANEXO — gera a URL assinada para o navegador subir DIRETO no bucket PRIVADO (`discovery-privado`), em
+// `privado/anexos/<domínio>/<id>/…`. O que volta em `publicUrl` é a CHAVE (nome mantido por compatibilidade com quem já lê esse campo):
+// o banco guarda só a chave, nunca um endereço público. Para ABRIR o anexo: `POST /api/anexos/abrir` (login + permissão + URL de 5 min).
+// Corpo: { filename, contentType, size, alvo: { dominio, id } } — `alvo` diz de quem é o anexo (processo, protocolo, contratante, …).
+// ============================================================================
 
 // Mesmas regras do anexoUploader do UploadThing
 const MAX_SIZE = 64 * 1024 * 1024; // 64MB
@@ -20,36 +26,30 @@ const ALLOWED_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
 ]);
 
-function sanitize(name: string) {
-  return name
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")     // tira acentos
-    .replace(/[^a-zA-Z0-9._-]/g, "_")    // troca o resto por _
-    .replace(/_+/g, "_")
-    .slice(0, 120);
-}
-
 export async function POST(req: NextRequest) {
-  // CP-SEC — verificação real de assinatura (jose) em vez do decoder inseguro.
-  const usuario = await extrairUsuarioKanban(req);
+  // Login E permissão do módulo dono do anexo (antes bastava estar logado).
+  const usuario = await extrairUsuarioComPermissoes(req);
   if (!usuario) {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  let body: { filename?: string; contentType?: string; size?: number; prefix?: string };
+  let body: { filename?: string; contentType?: string; size?: number; alvo?: { dominio?: string; id?: number } };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
 
-  const { filename, contentType, size, prefix } = body;
+  const { filename, contentType, size, alvo } = body;
 
   if (!filename || !contentType || typeof size !== "number") {
     return NextResponse.json(
       { error: "filename, contentType e size são obrigatórios" },
       { status: 400 }
     );
+  }
+  if (!alvo || !ehDominioDeAnexo(alvo.dominio) || typeof alvo.id !== "number" || !Number.isInteger(alvo.id) || alvo.id < 0) {
+    return NextResponse.json({ error: "alvo { dominio, id } é obrigatório (de quem é este anexo)" }, { status: 400 });
   }
   if (size <= 0 || size > MAX_SIZE) {
     return NextResponse.json(
@@ -64,23 +64,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const safeName = sanitize(filename) || "arquivo";
-  const folder = prefix ? `${prefix.replace(/^\/+|\/+$/g, "")}/` : "uploads/";
-  const key = `${folder}${Date.now()}-${randomUUID().slice(0, 8)}-${safeName}`;
-
-  const command = new PutObjectCommand({
-    Bucket: R2_BUCKET,
-    Key: key,
-    ContentType: contentType,
-    ContentLength: size,
-  });
+  // Rascunho (cliente ainda não salvo): o id é SEMPRE o do próprio usuário — nunca o que o navegador mandar.
+  const alvoFinal = { dominio: alvo.dominio, id: alvo.dominio === "rascunho" ? usuario.userId : alvo.id };
+  const decisao = autorizarAcessoAoAlvo({ userId: usuario.userId, tipo: usuario.tipo, permissoes: usuario.permissoes as Record<string, boolean> }, alvoFinal);
+  if (!decisao.ok) return NextResponse.json({ error: decisao.erro }, { status: decisao.status });
 
   try {
-    const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 300 }); // 5 min
-    const publicUrl = `${R2_PUBLIC_URL}/${key}`;
-
-    return NextResponse.json({ uploadUrl, publicUrl, key });
+    const { chave, uploadUrl } = await prepararEnvioDeAnexo({ alvo: alvoFinal, nome: filename, tipo: contentType, tamanho: size });
+    return NextResponse.json({ uploadUrl, publicUrl: chave, key: chave });
   } catch (err) {
+    if (err instanceof BucketPrivadoNaoConfigurado) {
+      console.error("[/api/storage/presign]", err.message);
+      return NextResponse.json({ error: "Armazenamento privado indisponível. Tente novamente mais tarde." }, { status: 503 });
+    }
     console.error("[/api/storage/presign] erro:", err);
     return NextResponse.json(
       { error: "Erro ao gerar URL de upload" },

@@ -15,7 +15,10 @@
 import { PutObjectCommand, GetObjectCommand, CopyObjectCommand } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { randomUUID } from "crypto"
-import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/src/lib/r2"
+import { r2 } from "@/src/lib/r2"
+import { configDosBuckets } from "@/src/lib/r2-buckets"
+import { novaChaveDeAnexo, type AlvoDoAnexo } from "@/src/lib/anexos/chave"
+import { bucketDoAnexoNovo } from "@/src/lib/anexos/storage"
 import {
   bucketDaEscrita, bucketOndeEsta, existeObjetoPrivado, nomeSeguro, removerObjetoPrivado, urlAssinadaDeLeitura,
 } from "@/src/lib/documentos/modelos/storage-privado"
@@ -56,15 +59,14 @@ export async function apagarObjetoColeta(chave: string): Promise<void> {
 }
 
 /**
- * CONFIRMAÇÃO: copia o arquivo para o padrão dos anexos de cliente (bucket PÚBLICO, endereço público —
- * pendência registrada no mandato §8) e devolve a URL. A cópia privada é apagada por quem chama, DEPOIS de
- * o anexo estar gravado. Origem = onde o objeto está agora (privado ou, no plano B, o antigo); destino =
- * sempre o bucket público. Entre buckets diferentes, tenta a cópia direta no storage e, se ela não for
- * aceita, lê e grava pelo servidor (arquivo de até 10 MB).
+ * CONFIRMAÇÃO: copia o arquivo da coleta para o anexo do cliente DENTRO DO BUCKET PRIVADO (`privado/anexos/<contratante|requerente>/<id>/…`)
+ * e devolve a CHAVE (o banco guarda só ela; abrir é pela porta de anexos, com URL assinada). Nunca toca o bucket público. A cópia da coleta é
+ * apagada por quem chama, DEPOIS de o anexo estar gravado. Se o objeto de origem estiver no bucket antigo (plano B), a cópia atravessa os
+ * buckets: tenta a cópia direta no storage e, se ela não for aceita, lê e grava pelo servidor (arquivo de até 10 MB).
  */
-export async function copiarParaAnexoDeCliente(chavePrivada: string, nome: string): Promise<{ key: string; url: string }> {
-  const key = `contratantes/${Date.now()}-${randomUUID().slice(0, 8)}-${nomeSeguro(nome) || "arquivo"}`
-  const destino = R2_BUCKET
+export async function copiarParaAnexoDeCliente(chavePrivada: string, nome: string, alvo: AlvoDoAnexo): Promise<{ key: string; url: string }> {
+  const key = novaChaveDeAnexo({ alvo, nome, uuid8: randomUUID().slice(0, 8) })
+  const destino = bucketDoAnexoNovo(key, configDosBuckets())
   const origem = await bucketOndeEsta(chavePrivada)
   try {
     await r2.send(new CopyObjectCommand({ Bucket: destino, Key: key, CopySource: `${origem}/${chavePrivada}` }))
@@ -74,5 +76,5 @@ export async function copiarParaAnexoDeCliente(chavePrivada: string, nome: strin
     const corpo = Buffer.from(await (lido.Body as unknown as { transformToByteArray(): Promise<Uint8Array> }).transformToByteArray())
     await r2.send(new PutObjectCommand({ Bucket: destino, Key: key, Body: corpo, ContentType: lido.ContentType, ContentLength: corpo.length }))
   }
-  return { key, url: `${R2_PUBLIC_URL}/${key}` }
+  return { key, url: key }
 }
