@@ -500,7 +500,7 @@ export function ProcessoProtocolos({
 
     try {
       const uploaded = await uploadFiles(arquivos, {
-        prefix: "processos/protocolos",
+        alvo: { dominio: "protocolo", id: protocoloId },
         onProgress: (_f, p) => setUploadProgress(p),
       })
 

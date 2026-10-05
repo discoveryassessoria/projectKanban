@@ -74,7 +74,7 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
   const onFile = async (files: FileList | null) => {
     if (!files?.length) return
     setSubindo(true)
-    try { const [e] = await uploadFiles([files[0]], { prefix: "financeiro/estornos" }); setComprovante({ url: e.url, nome: e.name, size: e.size }) }
+    try { const [e] = await uploadFiles([files[0]], { alvo: { dominio: "financeiro", id: obrigacaoId } }); setComprovante({ url: e.url, nome: e.name, size: e.size }) }
     catch { setErro("Falha no upload do comprovante.") } finally { setSubindo(false) }
   }
 

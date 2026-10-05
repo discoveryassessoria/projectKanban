@@ -233,7 +233,7 @@ export function AbaAnexosDocumentais({
     setEnviando(true)
     setErro(null)
     try {
-      const subidos = await uploadFiles(Array.from(files), { prefix: `documentos/${documentoId}/anexos` })
+      const subidos = await uploadFiles(Array.from(files), { alvo: { dominio: "documento", id: documentoId ?? 0 } })
       for (const f of subidos) {
         const res = await fetch(`/api/documentos/${documentoId}/arquivos`, {
           method: "POST",

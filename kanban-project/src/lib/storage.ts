@@ -1,14 +1,24 @@
+import type { AlvoDoAnexo } from "@/src/lib/anexos/chave";
+
 export interface UploadedFile {
-  url: string;        // URL pública (substitui `ufsUrl` / `url` do UploadThing)
-  key: string;        // chave no bucket — útil pra delete futuro
+  /**
+   * O VALOR A GUARDAR NO BANCO: a CHAVE do anexo no bucket PRIVADO (`privado/anexos/<domínio>/<id>/…`), nunca um endereço público.
+   * Para mostrar/abrir, use `abrirAnexo` / `useUrlDeAnexo` / `<LinkDeAnexo>` (src/lib/anexos/cliente) — eles trocam a chave por uma URL
+   * assinada de 5 minutos, depois de conferir login e permissão.
+   */
+  url: string;
+  key: string;        // a mesma chave
   name: string;
   size: number;
   type: string;
 }
 
 export interface UploadOptions {
-  /** Pasta lógica dentro do bucket. Default: "uploads". Ex: "documentos", "protocolos". */
-  prefix?: string;
+  /**
+   * DE QUEM é o anexo (obrigatório): `{ dominio, id }` — processo, protocolo, documento, etapa, contratante, requerente, financeiro ou
+   * rascunho (cliente ainda não salvo). O domínio decide qual permissão abre o anexo depois. Ex.: `{ dominio: "processo", id: 847 }`.
+   */
+  alvo: AlvoDoAnexo;
   /** Callback de progresso (0–100) por arquivo. */
   onProgress?: (file: File, percent: number) => void;
   /** Callback chamado quando um arquivo termina (substitui o callback do UploadThing). */
@@ -44,7 +54,7 @@ export async function hashDoArquivo(file: File): Promise<string | null> {
  */
 export async function uploadFiles(
   files: File[],
-  options: UploadOptions = {}
+  options: UploadOptions
 ): Promise<UploadedFile[]> {
   const out: UploadedFile[] = [];
 
@@ -68,7 +78,7 @@ export async function uploadFiles(
         filename: file.name,
         contentType: file.type,
         size: file.size,
-        prefix: options.prefix,
+        alvo: options.alvo,
       }),
     });
 

@@ -159,7 +159,7 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
     if (!files?.length) return
     setSubindo(true)
     try {
-      const enviados = await uploadFiles(Array.from(files), { prefix: "financeiro/comprovantes" })
+      const enviados = await uploadFiles(Array.from(files), { alvo: { dominio: "financeiro", id: obrigacaoId } })
       setComprovantes((c) => [...c, ...enviados.map((e) => ({ arquivoUrl: e.url, arquivoNome: e.name, tamanho: e.size }))])
     } catch { setErroSubmit("Falha no upload de comprovante.") } finally { setSubindo(false) }
   }, [])

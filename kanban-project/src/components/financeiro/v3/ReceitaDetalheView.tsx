@@ -154,7 +154,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
     if (!file) return
     setUploading(true)
     try {
-      const [enviado] = await uploadFiles([file], { prefix: "financeiro/documentos" })
+      const [enviado] = await uploadFiles([file], { alvo: { dominio: "financeiro", id: d.obrigacaoId } })
       if (!enviado) throw new Error("Falha no upload do arquivo.")
       const res = await fetch(`/api/financeiro/v3/obrigacoes/${d.obrigacaoId}/documentos`, {
         method: "POST",

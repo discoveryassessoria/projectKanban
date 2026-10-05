@@ -513,7 +513,7 @@ function ConteudoModal({
     setUploadProgress(0)
     try {
       const uploadResult = await uploadFiles([file], {
-        prefix: "contratantes",
+        alvo: { dominio: editingTipo === "requerente" ? "requerente" : "contratante", id: editingId },
         onProgress: (_f, p) => setUploadProgress(p),
       })
 
@@ -588,8 +588,9 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
     setUploadProgress(0)
 
     try {
+      // Cliente já salvo: o anexo é dele. Cliente ainda não salvo: rascunho (só quem enviou abre; o servidor usa o id do próprio usuário).
       const uploaded = await uploadFiles(arquivos, {
-        prefix: "contratantes",
+        alvo: editingId ? { dominio: editingTipo === "requerente" ? "requerente" : "contratante", id: editingId } : { dominio: "rascunho", id: 0 },
         onProgress: (_f, p) => setUploadProgress(p),
       })
 

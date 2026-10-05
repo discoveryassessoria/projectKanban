@@ -97,8 +97,9 @@ async function main() {
   store.set(k(PUB, up.chave), { corpo: Buffer.from("%PDF"), mime: "application/pdf" })
   ok("conferirObjetoColeta confere tamanho e tipo", (await sc.conferirObjetoColeta(up.chave, 4, "application/pdf")) === true && (await sc.conferirObjetoColeta(up.chave, 5, "application/pdf")) === false && (await sc.conferirObjetoColeta(up.chave, 4, "image/png")) === false)
   zerar()
-  const anexo = await sc.copiarParaAnexoDeCliente(up.chave, "TESTE rg.pdf")
-  ok("cópia para anexo: do bucket de sempre para o mesmo (CopySource = público/chave), URL pública do anexo", chamadas.some((c) => c.startsWith(`CopyObjectCommand ${PUB}/contratantes/`)) && anexo.url === `https://pub.exemplo.test/${anexo.key}` && store.has(k(PUB, anexo.key)))
+  let recusou = false
+  try { await sc.copiarParaAnexoDeCliente(up.chave, "TESTE rg.pdf", { dominio: "contratante", id: 5 }) } catch (e) { recusou = (e as Error).constructor.name === "BucketPrivadoNaoConfigurado" }
+  ok("modo único: a confirmação da coleta RECUSA gravar o anexo (nunca cai no bucket público)", recusou && !chamadas.some((c) => c.startsWith("CopyObjectCommand")))
   await sp.removerObjetoPrivado(g.chave)
   ok("remover apaga no bucket de sempre", !store.has(k(PUB, g.chave)))
 
@@ -152,19 +153,22 @@ async function main() {
   store.set(k(PRIV, up2.chave), { corpo: Buffer.from("%PDF"), mime: "application/pdf" })
   ok("conferência do arquivo enviado lê do privado", (await sc.conferirObjetoColeta(up2.chave, 4, "application/pdf")) === true)
   zerar()
-  const a1 = await sc.copiarParaAnexoDeCliente(up2.chave, "TESTE comprovante.pdf")
-  ok("confirmação: cópia do PRIVADO para o PÚBLICO (anexo do cliente, URL pública)", chamadas.some((c) => c.startsWith(`CopyObjectCommand ${PUB}/contratantes/`)) && store.has(k(PUB, a1.key)) && a1.url.startsWith("https://pub.exemplo.test/contratantes/"))
+  const a1 = await sc.copiarParaAnexoDeCliente(up2.chave, "TESTE comprovante.pdf", { dominio: "contratante", id: 5 })
+  ok("confirmação: cópia DENTRO do bucket PRIVADO (privado/anexos/contratante/5/…), o banco recebe só a CHAVE, nada vai ao público",
+    chamadas.some((c) => c.startsWith(`CopyObjectCommand ${PRIV}/privado/anexos/contratante/5/`)) && store.has(k(PRIV, a1.key)) && a1.url === a1.key && a1.key.startsWith("privado/anexos/contratante/5/") && ![...store.keys()].some((x) => x.startsWith(`${PUB}/privado/anexos`)))
   copiaEntreBucketsFalha = true
   zerar()
-  const a2 = await sc.copiarParaAnexoDeCliente(up2.chave, "TESTE comprovante 2.pdf")
-  ok("se o storage não aceitar a cópia entre buckets: lê e grava pelo servidor (plano B)", so("GetObjectCommand").some((c) => c.includes(`${PRIV}/`)) && store.get(k(PUB, a2.key))?.corpo.toString() === "%PDF" && store.get(k(PUB, a2.key))?.mime === "application/pdf")
+  const a2 = await sc.copiarParaAnexoDeCliente(up2.chave, "TESTE comprovante 2.pdf", { dominio: "requerente", id: 6 })
+  ok("origem e destino no MESMO bucket privado: a cópia direta basta e o anexo fica no privado", store.has(k(PRIV, a2.key)) && a2.key.startsWith("privado/anexos/requerente/6/") && !store.has(k(PUB, a2.key)))
   copiaEntreBucketsFalha = false
   // arquivo da coleta que só está no antigo (enviado antes da troca)
   const chaveColetaAntiga = "privado/coleta/3/uuid/antigo.pdf"
   store.set(k(PUB, chaveColetaAntiga), { corpo: Buffer.from("%PDF"), mime: "application/pdf" })
   zerar()
-  const a3 = await sc.copiarParaAnexoDeCliente(chaveColetaAntiga, "TESTE antigo.pdf")
-  ok("arquivo da coleta só no bucket antigo: a confirmação copia dele mesmo assim", chamadas.some((c) => c.startsWith(`CopyObjectCommand ${PUB}/contratantes/`)) && store.has(k(PUB, a3.key)))
+  copiaEntreBucketsFalha = true
+  const a3 = await sc.copiarParaAnexoDeCliente(chaveColetaAntiga, "TESTE antigo.pdf", { dominio: "contratante", id: 5 })
+  copiaEntreBucketsFalha = false
+  ok("arquivo da coleta só no bucket antigo: copia dele para o PRIVADO (lendo e gravando pelo servidor se o storage não aceitar a cópia entre buckets)", store.get(k(PRIV, a3.key))?.corpo.toString() === "%PDF" && !store.has(k(PUB, a3.key)))
 
   secao("D) Chave que NÃO é `privado/` (anexos de cliente) nunca vai ao bucket privado")
   zerar()
@@ -178,9 +182,9 @@ async function main() {
   const fonteC = sem(readFileSync("src/services/coleta/storage-coleta.ts", "utf8"))
   ok("storage-privado: nenhum comando de storage usa o bucket único direto (tudo passa pelo resolvedor)", !/Bucket:\s*R2_BUCKET\b/.test(fonteP))
   ok("storage-privado: não monta URL pública", !/R2_PUBLIC_URL/.test(fonteP))
-  ok("storage-coleta: só o DESTINO da cópia usa o bucket público (R2_BUCKET), e a URL pública só no anexo do cliente", (fonteC.match(/\bR2_BUCKET\b/g) ?? []).length === 2 && /const destino = R2_BUCKET/.test(fonteC) && !/DeleteObjectCommand/.test(fonteC))
+  ok("storage-coleta: nenhum uso do bucket público nem de URL pública (a confirmação move dentro do PRIVADO)", !/\bR2_BUCKET\b/.test(fonteC) && !/R2_PUBLIC_URL/.test(fonteC) && !/DeleteObjectCommand/.test(fonteC))
   const todos = ["src/app/api/storage/presign/route.ts", "src/app/api/app/upload/presign/route.ts"].map((f) => readFileSync(f, "utf8")).join("\n")
-  ok("nenhuma rota de upload comum (pública) aceita escrever em `privado/`", !/privado\//.test(todos) || /privado\//.test(todos) === false)
+  ok("rotas de upload: a CHAVE nasce no servidor (prepararEnvioDeAnexo, sempre no bucket privado); o navegador não escolhe pasta nem bucket e nenhuma monta endereço público", /prepararEnvioDeAnexo/.test(todos) && !/\bprefix\b/.test(todos.replace(/\/\/.*$/gm, "")) && !/R2_PUBLIC_URL|R2_BUCKET\b/.test(todos))
   ok("o comentário falso ('nunca servido pelo domínio público') saiu do código", !/nunca servido pelo dom[ií]nio p[uú]blico|Nada aqui [ée] servido pelo dom[ií]nio p[uú]blico/i.test(readFileSync("src/lib/documentos/modelos/storage-privado.ts", "utf8") + readFileSync("src/services/coleta/storage-coleta.ts", "utf8")))
 
   console.log(`\n${passou + falhou} verificações · ${falhou === 0 ? "BUCKET PRIVADO (passo 1) OK ✅" : "FALHOU ❌"}`)
