@@ -87,21 +87,6 @@ export const responsavelDaLinha = (p: ProcessoDaTorre): string | null | undefine
 /** O texto da busca: família + próxima ação + responsável (+ código). */
 export const textoDeBusca = (p: ProcessoDaTorre): string => semAcento(`${p.familiaNome} ${p.codigo ?? ''} ${p.proximaAcao?.texto ?? ''} ${p.proximaAcao?.responsavelNome ?? ''}`)
 
-export interface PassoDominante { label: string; n: number }
-/**
- * "Passo onde a maioria está": entre as tarefas ABERTAS da fase do processo, a "caixa" com mais tarefas — "Sem responsável" conta como
- * uma caixa, cada passo com tarefa COM responsável é outra. Empate → a mais adiantada no roteiro (o passo vence "Sem responsável").
- * Sem tarefa aberta: `null` ("—"); só concluídas: "Todas concluídas".
- */
-export function passoDominante(p: Pick<ProcessoDaTorre, 'tarefasDaFase'>): PassoDominante | null {
-  const t = p.tarefasDaFase
-  if (t.abertas === 0) return t.concluidas > 0 ? { label: 'Todas concluídas', n: t.concluidas } : null
-  const caixas: Array<{ label: string; n: number; ordem: number }> = t.passos.map((x) => ({ label: x.label, n: x.n, ordem: x.ordem }))
-  if (t.semResponsavel > 0) caixas.push({ label: SEM_RESPONSAVEL, n: t.semResponsavel, ordem: -1 })
-  caixas.sort((a, b) => b.n - a.n || b.ordem - a.ordem)
-  return { label: caixas[0].label, n: caixas[0].n }
-}
-
 // ─── FILTRAR · ORDENAR · PAGINAR ──────────────────────────────────────────────────────────────────────────────────────────
 
 export interface ParametrosDeProcessos {

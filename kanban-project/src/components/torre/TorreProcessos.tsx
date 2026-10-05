@@ -12,7 +12,7 @@ import { usePermissoes } from "@/src/hooks/use-permissoes"
 import {
   FILTROS_DE_PROCESSOS, ORDENS_DE_PROCESSOS, ITENS_POR_PAGINA, TODOS_OS_PAISES, TODOS_OS_RESPONSAVEIS, SEM_RESPONSAVEL,
   aplicarPaisRespBusca, botoesDeFase, milhar, contagensDosFiltros, metaDaVisao, opcoesDePais, opcoesDeResponsavel, ordenarProcessos, paginar, paginasVisiveis,
-  passaNoFiltro, passoDominante, passosDaFase, rodapeDeProcessos, saudeDaFase, textoNaFase, tomDosDias, escolherFaseInicial,
+  passaNoFiltro, passosDaFase, rodapeDeProcessos, saudeDaFase, textoNaFase, tomDosDias, escolherFaseInicial,
   type FiltroDeProcessos, type OrdemDeProcessos,
 } from "@/lib/operacional/torre-fase"
 import { ROTULO_DA_SITUACAO } from "@/lib/operacional/torre-risco"
@@ -171,12 +171,11 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
           <div className="tor-pf-tabela">
             <div className="tor-pf-rolagem">
               <div className="tor-pf-grade tor-pf-cab">
-                <div>Família · país</div><div>Na fase há</div><div>Certidões prontas</div><div>Passo onde a maioria está</div><div>Aguardando</div>
+                <div>Família · país</div><div>Na fase há</div><div>Certidões prontas</div><div>Aguardando</div>
                 <div>Próxima ação</div><div>Responsável</div><div>Prazo</div><div>Situação</div><div>Ações</div>
               </div>
               {pg.itens.map((p) => {
                 const cert = certidoes[chaveDaLinha(p)]
-                const dominante = passoDominante(p)
                 const acao = p.proximaAcao
                 const tomDias = tomDosDias(p.naFase.dias, p.metaDias)
                 return (
@@ -197,7 +196,6 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
                         </>
                       )}
                     </div>
-                    <div className="tor-pf-celula">{dominante?.label ?? "—"}</div>
                     <div><span className={`tor-pf-pilula ${p.bola.rotulo === BOLA_NOSSA ? "nossa" : "outra"}`}>{p.bola.rotulo}</span></div>
                     <div className="tor-pf-celula" title={p.motivoDoRisco}>{acao?.texto ?? "—"}</div>
                     <div className={`tor-pf-celula${acao && acao.responsavelNome == null ? " sem" : ""}`}>{acao ? acao.responsavelNome ?? SEM_RESPONSAVEL : "—"}</div>
@@ -225,7 +223,7 @@ export function TorreProcessos({ processos, carregando, erro }: { processos: Pro
             </div>
           </div>
 
-          <div className="tor-pg-explica">&quot;Foco&quot; abre o processo inteiro; &quot;Relatório&quot; abre o relatório de controle da família, com exportação em CSV, Excel e PDF. Cada linha é um processo. Clique para abrir o processo inteiro. &quot;Passo onde a maioria está&quot; resume as certidões da família; o detalhe certidão por certidão fica dentro do processo.</div>
+          <div className="tor-pg-explica">&quot;Foco&quot; abre o processo inteiro; &quot;Relatório&quot; abre o relatório de controle da família, com exportação em CSV, Excel e PDF. Cada linha é um processo. Clique para abrir o processo inteiro. &quot;Certidões prontas&quot; resume as certidões da família; o detalhe certidão por certidão fica dentro do processo.</div>
         </>
       )}
     </div>

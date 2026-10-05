@@ -6,7 +6,7 @@
 //
 // PROVA (CHECKLIST T171–T207, T221–T227): botões de fase com contagem e a fase inicial; os 4 filtros de situação (Todos · Precisam de
 // alguém · Atenção · Parados ou sem dono) e suas contagens; País, Responsável, busca (família + próxima ação + responsável, sem acento)
-// combinando em E; as 4 ordens; paginação real e rodapé; "Na fase há" (cor pela meta); "Passo onde a maioria está"; Saúde da fase (números,
+// combinando em E; as 4 ordens; paginação real e rodapé; "Na fase há" (cor pela meta); Saúde da fase (números,
 // barra em %, tempo médio vs meta, frase da semana); o cartão por passo (caixas, gargalo); a PRÓXIMA AÇÃO derivada das tarefas abertas
 // (prioridade, textos, "—" sem tarefa) e o prazo curto (ontem/hoje/amanhã/dd/mm); textos fixos do protótipo na tela.
 // ============================================================================
@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs"
 import {
   FILTROS_DE_PROCESSOS, ORDENS_DE_PROCESSOS, PARAMETROS_INICIAIS, SEM_RESPONSAVEL, ITENS_POR_PAGINA,
   aplicarPaisRespBusca, botoesDeFase, contagensDosFiltros, escolherFaseInicial, metaDaVisao, opcoesDePais, opcoesDeResponsavel, ordenarProcessos,
-  paginar, passaNoFiltro, passoDominante, passosDaFase, rodapeDeProcessos, saudeDaFase, fraseDaSemana, textoNaFase, tomDosDias, textoDuracao,
+  paginar, passaNoFiltro, passosDaFase, rodapeDeProcessos, saudeDaFase, fraseDaSemana, textoNaFase, tomDosDias, textoDuracao,
 } from "../lib/operacional/torre-fase"
 import { proximaAcaoDoProcesso, prazoCurto, tipoDaTarefa, type LinhaParaProximaAcao } from "../lib/operacional/torre-proxima-acao"
 import { processo } from "./_torre-nova-fabrica"
@@ -96,13 +96,6 @@ const botoes = botoesDeFase(colunas, mix)
 ok("um botão por fase do cadastro, com a contagem dos processos que estão nela", botoes.map((b) => `${b.label} ${b.n}`).join() === "Genealogia 2,Emissão Documental 12,Análise Documental 0")
 ok("a fase inicial é a de MAIOR volume (no protótipo, Emissão); sem processo nenhum, a primeira; sem fases, null", escolherFaseInicial(botoes) === "emissao" && escolherFaseInicial(botoesDeFase(colunas, [])) === "genealogia" && escolherFaseInicial([]) === null)
 
-secao("PASSO ONDE A MAIORIA ESTÁ (T200)")
-const comTarefas = (semResp: number, passos: Array<[string, number, number]>) => processo({ id: 80, nome: "T", tarefasDaFase: { abertas: semResp + passos.reduce((s, p) => s + p[1], 0), semResponsavel: semResp, concluidas: 0, ehCertidao: true, passos: passos.map(([label, n, ordem]) => ({ chave: label, label, ordem, n, aguardando: 0, acimaDaMeta: 0 })) } })
-ok("a caixa com mais tarefas", passoDominante(comTarefas(0, [["Solicitar", 2, 1], ["Aguardando terceiros", 7, 2]]))?.label === "Aguardando terceiros")
-ok("'Sem responsável' é uma caixa como as outras", passoDominante(comTarefas(12, [["Solicitar", 2, 1]]))?.label === "Sem responsável")
-ok("empate → o passo mais adiantado vence 'Sem responsável'", passoDominante(comTarefas(3, [["Solicitar", 3, 1]]))?.label === "Solicitar")
-ok("sem tarefa aberta: '—' (null); só concluídas: 'Todas concluídas'", passoDominante(processo({ id: 81, nome: "V" })) === null && passoDominante(processo({ id: 82, nome: "C", tarefasDaFase: { abertas: 0, semResponsavel: 0, concluidas: 4, passos: [], ehCertidao: true } }))?.label === "Todas concluídas")
-
 secao("SAÚDE DA FASE (T178–T187)")
 const s = saudeDaFase(EMISSAO, { tempoMedioDias: 34, metaDias: 30, fluxo: { entraram: 14, sairam: [{ para: "analise", n: 11 }] }, rotuloDaFase: (k) => (k === "analise" ? "Análise" : k) })
 ok("números: no ritmo 6 · atenção 2 · parados 4 (pa + sd) = total 12", s.ok === 6 && s.atencao === 2 && s.parados === 4 && s.total === 12 && s.ok + s.atencao + s.parados === s.total)
@@ -172,10 +165,17 @@ ok("o dia é o do fuso operacional (23:30 em São Paulo ainda é 'hoje' mesmo se
 
 secao("TEXTOS FIXOS NA TELA (T170–T177, T188, T194–T198, T200, T217–T227)")
 const tela = readFileSync("src/components/torre/TorreProcessos.tsx", "utf8") + readFileSync("src/components/torre/TorreSaudeDaFase.tsx", "utf8") + readFileSync("src/components/torre/TorrePassosDaFase.tsx", "utf8") + readFileSync("lib/operacional/torre-fase.ts", "utf8")
-for (const t of ["Torre de Controle", "Buscar família, pessoa, cartório…", "Escolha a fase — a tabela abaixo mostra só os processos dela", "Saúde da fase", "no ritmo", "atenção", "parados", "tempo médio real · meta", "desta fase — por passo", "Família · país", "Na fase há", "Certidões prontas", "Passo onde a maioria está", "Aguardando", "Próxima ação", "Responsável", "Prazo", "Situação", "Ações", "Foco", "Relatório", "Todos os países", "Todos os responsáveis", "Nenhum processo encontrado com esses filtros.", "12 por página", "Cada linha é um processo."])
+for (const t of ["Torre de Controle", "Buscar família, pessoa, cartório…", "Escolha a fase — a tabela abaixo mostra só os processos dela", "Saúde da fase", "no ritmo", "atenção", "parados", "tempo médio real · meta", "desta fase — por passo", "Família · país", "Na fase há", "Certidões prontas", "Aguardando", "Próxima ação", "Responsável", "Prazo", "Situação", "Ações", "Foco", "Relatório", "Todos os países", "Todos os responsáveis", "Nenhum processo encontrado com esses filtros.", "12 por página", "Cada linha é um processo."])
   ok(`a tela tem o texto "${t}"`, tela.includes(t))
 ok("todo botão tem handler; sem 'exemplo do protótipo' / 'Com o cartório' / 'Sem ninguém'", [...tela.matchAll(/<button\b[^>]*>/g)].every((m) => /onClick=/.test(m[0])) && !/exemplo do prot|reaproveitados|Com o cart[oó]rio|Sem ningu/.test(tela))
 ok("Foco e o nome da família levam a /torre/processo/[id]; Relatório só com permissão", (tela.match(/href=\{`\/torre\/processo\/\$\{p\.processoId\}`\}/g) ?? []).length === 2 && /podeRelatorio && \(/.test(tela))
 
+// A coluna "Passo onde a maioria está" foi REMOVIDA da aba Processos: mostrava "Sem responsável", que não é um passo.
+{
+  const tela = readFileSync("src/components/torre/TorreProcessos.tsx", "utf8")
+  ok("a coluna 'Passo onde a maioria está' não existe mais na tela", !tela.includes("Passo onde a maioria está") && !tela.includes("passoDominante"))
+}
+
 console.log(`\n${passou} verificações ok, ${falhou} falha(s)`)
 process.exit(falhou ? 1 : 0)
+
