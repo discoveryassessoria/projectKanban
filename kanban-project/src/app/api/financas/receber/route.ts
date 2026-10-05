@@ -5,6 +5,7 @@
 import { ONDE_PROCESSO_ATIVO_E_NA_TORRE } from "@/src/services/processo-pre-contrato"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { totaisAReceber } from "@/lib/financeiro/leitura/totais-a-receber"
 import { carregarBaseV3, diasAte, emAberto as estaEmAberto, recebida as estaRecebida, doMes, soma, SEM_VENCIMENTO } from "@/lib/financeiro/leitura/abas-v3"
 
 const CAT_LABEL: Record<string, string> = {
@@ -61,13 +62,16 @@ export async function GET(_req: NextRequest) {
       })
 
     const aberto = itens.filter((i) => !i.recebida && !i.cancelada)
-    const aReceber = soma(aberto, (i) => i.valorBRL)
+    // OS TOTAIS vêm da MESMA função que a Central do Financeiro usa (`totais-a-receber.ts`): as duas telas não podem divergir.
+    const t7 = totaisAReceber(base.obrigacoes, agora, 7)
+    const t30 = totaisAReceber(base.obrigacoes, agora, 30)
+    const aReceber = t30.totalReceberBRL
     const atrasadas = itens.filter((i) => i.atrasada)
-    const vencido = soma(atrasadas, (i) => i.valorBRL)
+    const vencido = t30.totalVencidoBRL
     const recebidoMes = soma(base.pagamentos.filter((p) => p.direcao === "A_RECEBER" && doMes(p.data, agora)), (p) => p.valorBrl)
     const noHorizonte = (n: number) => aberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= n)
-    const aVencer7 = soma(noHorizonte(7), (i) => i.valorBRL)
-    const aVencer30 = soma(noHorizonte(30), (i) => i.valorBRL)
+    const aVencer7 = t7.totalAVencerBRL
+    const aVencer30 = t30.totalAVencerBRL
     const inadimplencia = aReceber > 0 ? (vencido / aReceber) * 100 : 0
     const ticketMedio = aberto.length > 0 ? aReceber / aberto.length : 0
 

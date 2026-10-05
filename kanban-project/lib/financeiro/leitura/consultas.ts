@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { receitasExcluidasIds, obrigacaoExcluida } from './exclusao-filtro'
 import { projetar, type EntryProjecao } from '../ledger/projecao'
 import { computeCambioAging, cotacoesVivas } from './cambio-aging'
+import { totaisAReceber } from './totais-a-receber'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -157,6 +158,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
 export async function resumoFinanceiro() {
   const obrs = await listarObrigacoes()
   const aReceber = obrs.filter((o) => o.direcao === 'A_RECEBER')
+  const tot = totaisAReceber(obrs, new Date(), 30)
   const totalContratado = cent(aReceber.reduce((s, o) => s + o.valorContratado, 0))
   const totalSaldo = cent(aReceber.reduce((s, o) => s + o.saldo, 0))
   const totalRecebido = cent(aReceber.reduce((s, o) => s + o.recebido, 0))
@@ -167,7 +169,9 @@ export async function resumoFinanceiro() {
   const conciliacao = await prisma.lancamentoBancario.groupBy({ by: ['status'], _count: true }).catch(() => [])
   return {
     obrigacoes: obrs.length,
-    aReceber: { quantidade: aReceber.length, contratado: totalContratado, saldo: totalSaldo, recebido: totalRecebido },
+    // `contratado`/`saldo`/`recebido` ficam na moeda de cada obrigação (somados como número, legado); `*Brl` é o total em REAIS,
+    // pela função única dos totais (a mesma da aba A Receber).
+    aReceber: { quantidade: aReceber.length, contratado: totalContratado, saldo: totalSaldo, recebido: totalRecebido, saldoBrl: tot.totalReceberBRL, recebidoBrl: tot.totalRecebidoBRL, emAberto: tot.qtdEmAberto },
     porStatus, porNatureza,
     divergencias,
     conciliacao: Object.fromEntries((conciliacao as { status: string; _count: number }[]).map((c) => [c.status, c._count])),
