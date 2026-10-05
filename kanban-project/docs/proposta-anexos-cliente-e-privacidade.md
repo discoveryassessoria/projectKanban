@@ -1,8 +1,33 @@
 # Proposta — anexos de cliente no bucket público e três pontos de privacidade da coleta
 
-**Status:** PROPOSTA (nada foi executado). Levantamento feito em 05/10/2026, só por leitura: listagem do bucket (nomes, tamanhos e datas
+**Status:** PROPOSTA, com as DECISÕES DO MARCO de 05/10/2026 registradas na seção 0 (a exclusão dos 287 já foi executada; o resto continua proposta). Levantamento feito em 05/10/2026, só por leitura: listagem do bucket (nomes, tamanhos e datas
 dos objetos; **nenhum arquivo foi aberto**), contagens no banco de produção, leitura do código. Nenhum dado, objeto ou migration foi alterado.
 Contexto e decisões anteriores: `docs/coleta-de-dados-mandato.md` §8 e §8b.
+
+---
+
+## 0. Decisões do Marco (05/10/2026) e o que já foi executado
+
+1. **Os 287 arquivos órfãos do bucket público antigo foram DESCARTADOS** (decisão do Marco, ordem explícita de apagar só esses 287):
+   285 em `documentos/`, 1 em `analise-documental/` e 1 em `app-uploads/`. **Os 2 objetos de 03/10 eram teste** e entraram junto.
+2. **Link de coleta de dados do cliente vale até o processo ir para Genealogia** (já era a regra implementada: o link se encerra por
+   "FASE_MUDOU" na mudança de fase). Isto responde à pergunta de validade do link do ponto (c) da seção 2: o prazo é a própria saída da fase
+   "Aguardando fechamento"; falta ainda decidir só o que fazer com o link de processo que **nunca** sai da fase (ver ponto c).
+3. **Como foi feito (execução de 05/10/2026):**
+   - manifesto dos 287 (chave, tamanho, ETag, data) gerado antes, sem abrir nenhum arquivo, e guardado fora do repositório;
+   - varredura do banco (1.249 colunas de texto/JSON/lista, 287 nomes de arquivo): **1 referência**, que é só histórico — o registro de
+     auditoria nº 6054 (`BACKFILL_SOLICITACAO_DOCUMENTO`, 04/08/2026) cita o endereço de um dos arquivos. Nenhuma tela ou tabela ativa
+     apontava para eles. O Marco mandou apagar mesmo assim, **sem alterar o registro de auditoria** (que agora cita um endereço que dá 404);
+   - exclusão um por um; antes de cada exclusão: a chave está no manifesto **e** o objeto continua o mesmo (tamanho + ETag). 287 de 287
+     apagados, nenhuma divergência, nenhuma parada;
+   - conferência final: o bucket público tem agora **43 objetos, todos sob `privado/`** (nenhum do manifesto sobrou; nada fora do manifesto
+     foi tocado); o bucket privado continua com 56 (43 + 13 do backup do Antão); 4 endereços públicos testados (3 do manifesto + o citado
+     na auditoria) respondem **404**.
+4. **Continua pendente:** apagar do público os 43 de `privado/` (só depois de 05/10/2026 18:02 UTC e com o "apaga" separado do Marco) e
+   o restante deste documento (anexos novos no bucket privado, pontos a/b/c de privacidade).
+
+Por causa da decisão 1, a seção 1 abaixo (migração dos 287) fica **superada**: não há mais o que migrar; ela permanece só como registro do
+levantamento. As seções 1.5 (como o sistema passa a ler do privado) e 2 (três pontos) seguem valendo para o que vem a seguir.
 
 ---
 
