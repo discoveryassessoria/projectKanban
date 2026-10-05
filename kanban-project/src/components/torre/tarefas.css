@@ -70,10 +70,16 @@
 .tf-rolagem { overflow-x: auto; }
 .tf-g { display: grid; grid-template-columns: 34px minmax(170px, 1.6fr) minmax(130px, 1.2fr) minmax(130px, 1.2fr) minmax(110px, 1fr) minmax(120px, 1.1fr) minmax(110px, 1fr) minmax(130px, 1.1fr) minmax(100px, .9fr) minmax(130px, 1.1fr) minmax(90px, .8fr) minmax(90px, .8fr) minmax(76px, .7fr) minmax(130px, 1.2fr); gap: 8px; align-items: center; padding: 8px 12px; min-width: 1700px; }
 .tf-hd { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .05em; text-transform: uppercase; background: var(--surface-tertiary); border-bottom: 1px solid var(--border-default); padding: 10px 14px; }
-.tf-grp { display: flex; align-items: center; gap: 10px; padding: 9px 14px; background: var(--surface-tertiary); border-bottom: 1px solid var(--border-default); min-width: 1000px; }
+.tf-grp { background: var(--surface-tertiary); border-bottom: 2px solid var(--border-strong, var(--border-default)); min-width: 0; }
+.tf-grp-in { position: sticky; left: 0; display: flex; align-items: center; gap: 10px; padding: 12px 14px; width: max-content; max-width: min(100%, 1100px); flex-wrap: wrap; }
+/* CADA FAMÍLIA É UM BLOCO: espaço entre blocos, borda forte e a faixa com o nome como cabeçalho. `overflow: clip` (e não hidden)
+   para não virar contêiner de rolagem e quebrar as colunas fixas. */
+.tf-bloco { margin: 16px 12px; border: 2px solid var(--border-strong, var(--text-muted)); border-radius: 12px; overflow: clip; min-width: 1676px; background: var(--surface-secondary); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.tf-bloco:first-of-type { margin-top: 12px; }
+.tf-bloco > .tf-grp .fam { font-size: 15px; }
 .tf-grp a, .tf-grp .fam { font-weight: 700; color: var(--text-primary); background: transparent; border: 0; padding: 0; text-decoration: underline; cursor: pointer; font-size: 14px; }
 .tf-grp .resumo { font-size: 12px; color: var(--text-secondary); min-width: 0; }
-.tf-grp .foco { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--info-text); text-decoration: underline; background: transparent; border: 0; cursor: pointer; white-space: nowrap; }
+.tf-grp .foco { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--info-text); text-decoration: underline; background: transparent; border: 0; cursor: pointer; white-space: nowrap; }
 .tf-pilula { display: inline-flex; height: 20px; align-items: center; padding: 0 8px; border-radius: 999px; background: var(--info-tile); color: var(--info-text); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .tf-sub-grp { background: var(--surface-secondary); border-top: 1px solid var(--border-default); }
 .tf-linha { border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
@@ -81,7 +87,8 @@
 .tf-fixa-0, .tf-fixa-1 { position: sticky; z-index: 2; background: inherit; }
 .tf-fixa-0 { left: 0; }
 .tf-fixa-1 { left: 34px; box-shadow: 1px 0 0 var(--border-default); }
-.tf-hd { position: relative; }
+.tf-hd { position: relative; min-width: 1700px; padding: 10px 26px; } /* 26 = margem do bloco (12) + borda (2) + respiro da linha (12): as colunas do cabeçalho alinham com as dos blocos */
+.tf-bloco .tf-g { min-width: 0; }
 .tf-linha.sel { background: var(--info-tile); }
 .tf-linha.cancelada { background: var(--surface-secondary); color: var(--text-muted); }
 .tf-cert { display: flex; flex-direction: column; min-width: 0; }

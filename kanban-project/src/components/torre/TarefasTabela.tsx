@@ -114,15 +114,17 @@ export function TarefasTabela({
           const resumo = agrupar === "fam" ? resumoDoGrupo(processoId != null ? processos.get(processoId) ?? null : null, itens) : ""
           const subgrupos = agrupar === "fam" && dentro !== "none" ? agruparDentroDaFamilia(itens, dentro) : null
           return (
-            <div key={nome} role="rowgroup" aria-label={`Grupo ${nome}`}>
+            <div key={nome} role="rowgroup" aria-label={`Grupo ${nome}`} className="tf-bloco">
               <div className="tf-grp">
-                <button type="button" className={`tf-chk ${todas ? "on" : alguma ? "mid" : ""}`} aria-label={`Selecionar o grupo ${nome}`} disabled={ids.length === 0} onClick={() => onSelecionar(ids, !todas)} />
-                {processoId != null
-                  ? <Link className="fam" href={`/torre/processo/${processoId}`}>{nome}</Link>
-                  : <b>{nome}</b>}
-                {resumo && <span className="resumo">{resumo}</span>}
-                <span className="tf-pilula">{trabalho.length > 0 ? `${trabalho.length} ${trabalho.length === 1 ? "tarefa" : "tarefas"}` : `${itens.length} ${itens.length === 1 ? "cancelada" : "canceladas"}`}</span>
-                {processoId != null && <button type="button" className="foco" onClick={() => onFocoDaFamilia(processoId)}>Foco ›</button>}
+                <div className="tf-grp-in">
+                  <button type="button" className={`tf-chk ${todas ? "on" : alguma ? "mid" : ""}`} aria-label={`Selecionar o grupo ${nome}`} disabled={ids.length === 0} onClick={() => onSelecionar(ids, !todas)} />
+                  {processoId != null
+                    ? <Link className="fam" href={`/torre/processo/${processoId}`}>{nome}</Link>
+                    : <b>{nome}</b>}
+                  {resumo && <span className="resumo">{resumo}</span>}
+                  <span className="tf-pilula">{trabalho.length > 0 ? `${trabalho.length} ${trabalho.length === 1 ? "tarefa" : "tarefas"}` : `${itens.length} ${itens.length === 1 ? "cancelada" : "canceladas"}`}</span>
+                  {processoId != null && <button type="button" className="foco" onClick={() => onFocoDaFamilia(processoId)}>Foco ›</button>}
+                </div>
               </div>
               {subgrupos
                 ? subgrupos.map((g) => {
