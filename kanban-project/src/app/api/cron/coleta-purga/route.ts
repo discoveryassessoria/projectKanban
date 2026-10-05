@@ -1,10 +1,11 @@
 // src/app/api/cron/coleta-purga/route.ts
 // JOB DIÁRIO (Vercel Cron) — retenção da coleta de dados: apaga dados e arquivos dos envios
-// DESCARTADOS 30 dias após o encerramento do link (docs/coleta-de-dados-mandato.md §2.11).
+// DESCARTADOS — e os PENDENTES de link encerrado por saída da fase — 30 dias após o encerramento do link (docs/coleta-de-dados-mandato.md §2.11;
+// docs/proposta-anexos-cliente-e-privacidade.md, ponto (c)). Antes, carimba o link de processo que já saiu da fase pré-contrato.
 // Mesma convenção dos outros crons: o middleware libera, o handler se auto-verifica
 // (CRON_SECRET ou header oficial da Vercel). Idempotente.
 import { NextRequest, NextResponse } from "next/server"
-import { purgarEnviosDescartados } from "@/src/services/coleta/coleta-purga"
+import { rodarRetencaoDaColeta } from "@/src/services/coleta/coleta-purga"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -20,7 +21,7 @@ function autorizado(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ error: "não autorizado" }, { status: 401 })
   try {
-    return NextResponse.json(await purgarEnviosDescartados())
+    return NextResponse.json(await rodarRetencaoDaColeta())
   } catch (e) {
     console.error("[cron coleta-purga] falha:", e)
     return NextResponse.json({ error: "falha na purga da coleta" }, { status: 500 })

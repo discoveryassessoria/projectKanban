@@ -221,6 +221,7 @@
   ]
  },
  "arquivos": [
+    "scripts/coleta-pendentes-prazo.test.ts",
     "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",
     "scripts/exclusao-processo-sem-orfao.test.ts",

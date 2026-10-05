@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       geradoEm: r.geradoEm, totais: r.totais, orfaos: r.orfaos.length, bytesOrfaos: r.bytesOrfaos,
       referenciasSemObjeto: r.referenciasSemObjeto.length, copiasLegadasNoPublico: r.copiasLegadasNoPublico.length,
-      backupsIntencionais: r.backupsIntencionais, nota: r.nota,
+      backupsIntencionais: r.backupsIntencionais, linksAtivosAntigosComPendentes: r.linksAtivosAntigosComPendentes?.length ?? 0, nota: r.nota,
     })
   } catch (e) {
     console.error("[cron conferidor-orfaos] falha:", e)
