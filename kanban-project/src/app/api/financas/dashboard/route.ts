@@ -100,6 +100,7 @@ export async function GET(req: NextRequest) {
       id: o.obrigacaoId,
       cliente: o.processoNome ?? "Avulso",
       pais: o.pais,
+      flag: o.flag,
       processoId: o.processoId,
       descricao: o.descricao ?? o.codigoOperacional ?? `Receita ${o.obrigacaoId}`,
       valorBRL: o.saldoBrl,
