@@ -68,13 +68,13 @@
 /* ── tabela ── */
 .tf-tabela { background: var(--surface-secondary); border: 1px solid var(--border-default); border-radius: 12px; overflow: hidden; min-width: 0; }
 .tf-rolagem { overflow-x: auto; }
-.tf-g { display: grid; grid-template-columns: 34px minmax(170px, 1.6fr) minmax(130px, 1.2fr) minmax(130px, 1.2fr) minmax(110px, 1fr) minmax(120px, 1.1fr) minmax(110px, 1fr) minmax(130px, 1.1fr) minmax(100px, .9fr) minmax(130px, 1.1fr) minmax(90px, .8fr) minmax(90px, .8fr) minmax(76px, .7fr) minmax(130px, 1.2fr); gap: 8px; align-items: center; padding: 8px 12px; min-width: 1700px; }
+.tf-g { display: grid; grid-template-columns: 24px minmax(0, 1.4fr) minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.1fr) minmax(0, .9fr) minmax(0, 1.15fr) minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, .8fr) minmax(0, 1.05fr) minmax(0, .7fr) minmax(0, .85fr); gap: 8px; align-items: center; padding: 8px 12px; min-width: 0; }
 .tf-hd { font-size: 11px; font-weight: 700; color: var(--text-secondary); letter-spacing: .05em; text-transform: uppercase; background: var(--surface-tertiary); border-bottom: 1px solid var(--border-default); padding: 10px 14px; }
 .tf-grp { background: var(--surface-tertiary); border-bottom: 2px solid var(--border-strong, var(--border-default)); min-width: 0; }
 .tf-grp-in { position: sticky; left: 0; display: flex; align-items: center; gap: 10px; padding: 12px 14px; width: max-content; max-width: min(100%, 1100px); flex-wrap: wrap; }
 /* CADA FAMÍLIA É UM BLOCO: espaço entre blocos, borda forte e a faixa com o nome como cabeçalho. `overflow: clip` (e não hidden)
    para não virar contêiner de rolagem e quebrar as colunas fixas. */
-.tf-bloco { margin: 16px 12px; border: 2px solid var(--border-strong, var(--text-muted)); border-radius: 12px; overflow: clip; min-width: 1676px; background: var(--surface-secondary); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
+.tf-bloco { margin: 16px 12px; border: 2px solid var(--border-strong, var(--text-muted)); border-radius: 12px; overflow: clip; min-width: 0; background: var(--surface-secondary); box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }
 .tf-bloco:first-of-type { margin-top: 12px; }
 .tf-bloco > .tf-grp .fam { font-size: 15px; }
 .tf-grp a, .tf-grp .fam { font-weight: 700; color: var(--text-primary); background: transparent; border: 0; padding: 0; text-decoration: underline; cursor: pointer; font-size: 14px; }
@@ -83,15 +83,6 @@
 .tf-pilula { display: inline-flex; height: 20px; align-items: center; padding: 0 8px; border-radius: 999px; background: var(--info-tile); color: var(--info-text); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .tf-sub-grp { background: var(--surface-secondary); border-top: 1px solid var(--border-default); }
 .tf-linha { border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
-/* ☐ e Certidão FIXOS à esquerda na rolagem horizontal (precisam de fundo próprio para não deixar o texto passar por baixo). */
-.tf-fixa-0, .tf-fixa-1 { position: sticky; z-index: 2; background-color: var(--surface-secondary); align-self: stretch; display: flex; align-items: center; } /* stretch: o fundo cobre a ALTURA INTEIRA da linha (senão o texto vizinho aparece acima/abaixo do ☐ ao rolar) */ /* mesma cor da linha (opaca), para a coluna vizinha não aparecer por baixo ao rolar — NÃO usar o branco do popover */
-.tf-linha.sel .tf-fixa-0, .tf-linha.sel .tf-fixa-1 { background-image: linear-gradient(var(--info-tile), var(--info-tile)); }
-.tf-hd .tf-fixa-0, .tf-hd .tf-fixa-1 { background-image: linear-gradient(var(--surface-tertiary), var(--surface-tertiary)); }
-.tf-fixa-0 { left: 0; }
-.tf-cert.tf-fixa-1 { flex-direction: row; align-items: center; justify-content: flex-start; padding-left: 4px; }
-.tf-fixa-1 { left: 34px; box-shadow: 1px 0 0 var(--border-default); }
-.tf-hd { position: relative; min-width: 1700px; padding: 10px 26px; } /* 26 = margem do bloco (12) + borda (2) + respiro da linha (12): as colunas do cabeçalho alinham com as dos blocos */
-.tf-bloco .tf-g { min-width: 0; }
 .tf-linha.sel { background: var(--info-tile); }
 .tf-linha.cancelada { background: var(--surface-secondary); color: var(--text-muted); }
 .tf-cert { display: flex; flex-direction: column; min-width: 0; }
@@ -215,3 +206,15 @@
 .tf-seta { width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font-size: 16px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
 .tf-seta:hover { background: var(--surface-secondary); }
 .tf-selpil { display: inline-flex; height: 20px; align-items: center; padding: 0 8px; border-radius: 999px; background: var(--action-primary); color: var(--action-primary-ink); font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+/* ── tudo cabe na tela: texto quebra linha, sem rolagem lateral ── */
+.tf-rolagem { overflow-x: visible; }
+.tf-g { padding: 8px 8px; gap: 4px; }
+.tf-g > div { min-width: 0; overflow-wrap: break-word; }
+.tf-g .tf-t13, .tf-g .tf-nome { font-size: 12px; line-height: 1.3; }
+.tf-hd { padding: 8px 10px; font-size: 10px; letter-spacing: .02em; border-bottom: 2px solid var(--border-strong); }
+.tf-bloco { margin: 14px 10px; }
+.tf-acoes { flex-direction: column; align-items: stretch; }
+.tf-acoes button { white-space: nowrap; padding: 0 6px; }
+
+.tf-hd > div { overflow-wrap: normal; word-break: keep-all; font-size: 9.5px; }
