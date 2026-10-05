@@ -222,6 +222,7 @@
  },
  "arquivos": [
     "scripts/financeiro-abas-v3.test.ts",
+    "scripts/guard-migration-preview.test.ts",
     "scripts/paridade-dia-operacional.test.ts",
     "scripts/paridade-processos-contagens.test.ts",
     "scripts/torre-paridade-numeros.test.ts",
