@@ -84,7 +84,7 @@
 .tf-sub-grp { background: var(--surface-secondary); border-top: 1px solid var(--border-default); }
 .tf-linha { border-bottom: 1px solid var(--border-default); background: var(--surface-secondary); }
 /* ☐ e Certidão FIXOS à esquerda na rolagem horizontal (precisam de fundo próprio para não deixar o texto passar por baixo). */
-.tf-fixa-0, .tf-fixa-1 { position: sticky; z-index: 2; background-color: var(--surface-popover); align-self: stretch; display: flex; align-items: center; } /* stretch: o fundo cobre a ALTURA INTEIRA da linha (senão o texto vizinho aparece acima/abaixo do ☐ ao rolar) */ /* OPACO: o fundo da linha é translúcido e deixaria a coluna vizinha aparecer por baixo */
+.tf-fixa-0, .tf-fixa-1 { position: sticky; z-index: 2; background-color: var(--surface-secondary); align-self: stretch; display: flex; align-items: center; } /* stretch: o fundo cobre a ALTURA INTEIRA da linha (senão o texto vizinho aparece acima/abaixo do ☐ ao rolar) */ /* mesma cor da linha (opaca), para a coluna vizinha não aparecer por baixo ao rolar — NÃO usar o branco do popover */
 .tf-linha.sel .tf-fixa-0, .tf-linha.sel .tf-fixa-1 { background-image: linear-gradient(var(--info-tile), var(--info-tile)); }
 .tf-hd .tf-fixa-0, .tf-hd .tf-fixa-1 { background-image: linear-gradient(var(--surface-tertiary), var(--surface-tertiary)); }
 .tf-fixa-0 { left: 0; }
