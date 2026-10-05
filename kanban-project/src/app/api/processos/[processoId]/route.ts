@@ -341,7 +341,13 @@ export async function DELETE(
         "Processo excluído com sucesso",
         limpezaArvore?.removida ? "árvore órfã removida" : null,
         familiaRemovida ? "família órfã removida" : null,
+        resultado.arquivos?.falhas.length ? `ATENÇÃO: ${resultado.arquivos.falhas.length} arquivo(s) não foram apagados do storage (registrado na auditoria)` : null,
       ].filter(Boolean).join(" · "),
+      arquivos: resultado.arquivos ? {
+        levantadas: resultado.arquivos.levantadas, apagadas: resultado.arquivos.apagadas,
+        naoApagadas: resultado.arquivos.falhas.map((f) => f.chave), preservadas: resultado.arquivos.aindaReferenciadas,
+        documentosGeradosPreservados: resultado.arquivos.geradosPreservados,
+      } : undefined,
       arvoreRemovida: limpezaArvore?.removida ?? false,
       arvoreNaoRemovidaPorque: limpezaArvore?.removida === false ? limpezaArvore.motivoNaoRemovida : undefined,
       familiaRemovida,
