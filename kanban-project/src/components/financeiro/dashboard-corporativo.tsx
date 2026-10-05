@@ -49,7 +49,6 @@ export function dueText(d: string | Date | null): string {
   if (dias === 1) return "amanhã"
   return `em ${dias}d`
 }
-const PAIS_FLAG: Record<string, string> = { PORTUGAL: "🇵🇹", ESPANHA: "🇪🇸", ALEMANHA: "🇩🇪", ITALIA: "🇮🇹" }
 
 // ============================================================
 // TIPOS
@@ -61,7 +60,7 @@ export interface DashboardData {
     qtdVencidas: number; vencidasBRL: number; lucroMesBRL: number; margemPct: number; processosAtivos: number
   }
   contas: { id: number; nome: string; banco: string | null; saldoBRL: number; cor: string | null }[]
-  proximosRecebimentos: { id: number; cliente: string; pais: string | null; processoId: number | null; descricao: string; valorBRL: number; vencimento: string; atrasado: boolean }[]
+  proximosRecebimentos: { id: number; cliente: string; pais: string | null; flag?: string | null; processoId: number | null; descricao: string; valorBRL: number; vencimento: string; atrasado: boolean }[]
   proximosPagamentos: { id: number; fornecedor: string; valorBRL: number; vencimento: string; atrasado: boolean }[]
   atividade: { id: number; acao: string; entidade: string; descricao: string; usuario: string; data: string }[]
   fx: { EUR: number; USD: number; BRL: number }
@@ -222,7 +221,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           onVerTodos={() => onGoTab("receber")} empty="Nenhum recebimento em aberto."
           colLeft="Cliente" colMid="Descrição"
           rows={dash.proximosRecebimentos.map(r => ({
-            id: r.id, left: `${r.pais ? PAIS_FLAG[r.pais] + " " : ""}${r.cliente}`, mid: r.descricao,
+            id: r.id, left: `${r.flag ? r.flag + " " : ""}${r.cliente}`, mid: r.descricao,
             val: fmtBRL(r.valorBRL), due: fmtDate(r.vencimento), dueHint: dueText(r.vencimento),
             critical: r.atrasado, onClick: () => r.processoId && r.pais && onClickProcesso(r.processoId, r.pais),
           }))} />
