@@ -2,8 +2,9 @@
 //
 // GET /api/financas/dre — Demonstração de Resultado (gerencial).
 //
-// FONTE: MOTOR V3 (a mesma da aba Central) — ObrigacaoEconomica por COMPETÊNCIA (mês em que a obrigação foi criada; o V3 não tem
-// cronograma de parcelas). Receita bruta = A_RECEBER natureza RECEITA/RECEITA_EXTRA; custos variáveis = A_PAGAR natureza CUSTO;
+// FONTE: MOTOR V3 (a mesma da aba Central) — ObrigacaoEconomica por COMPETÊNCIA REAL: a `dataCompetencia` do lançamento de origem ou o
+// `vencimento` da obrigação. A data de CRIAÇÃO nunca é competência; obrigação sem data fica numa linha à parte (`semCompetencia`),
+// fora de qualquer mês e dos totais mensais. Receita bruta = A_RECEBER natureza RECEITA/RECEITA_EXTRA; custos variáveis = A_PAGAR natureza CUSTO;
 // despesas operacionais = demais A_PAGAR, quebradas por fornecedor. O motor antigo (ParcelaFinanceira/Custo/ContaPagar) não é mais lido.
 // Nada aqui é estimado por percentual arbitrário.
 //   • Câmbio: o da própria obrigação (computeCambioAging), nunca taxa fixa.
@@ -47,12 +48,15 @@ export async function GET(req: NextRequest) {
       select: { id: true, codigo: true, nome: true, percentual: true },
       orderBy: { nome: "asc" },
     })
-    const criadaEm = (o: { criadoEm: string | null }) => (o.criadoEm ? new Date(o.criadoEm) : null)
-    const noMes = (o: { criadoEm: string | null }, m: { ini: Date; fim: Date }) => { const d = criadaEm(o); return d != null && d >= m.ini && d <= m.fim }
+    const noMes = (o: { competencia: Date | null }, m: { ini: Date; fim: Date }) => o.competencia != null && o.competencia >= m.ini && o.competencia <= m.fim
     const receitas = base.obrigacoes.filter((o) => o.direcao === "A_RECEBER" && NATUREZAS_RECEITA.includes(o.natureza))
     const pagaveis = base.obrigacoes.filter((o) => o.direcao === "A_PAGAR")
     const custos = pagaveis.filter((o) => o.natureza === "CUSTO")
     const despesas = pagaveis.filter((o) => o.natureza !== "CUSTO")
+
+    // SEM COMPETÊNCIA DEFINIDA — fora de qualquer mês e dos totais mensais (igual ao "sem vencimento" do Fluxo).
+    const semData = (arr: typeof base.obrigacoes) => { const x = arr.filter((o) => o.competencia == null); return { qtd: x.length, totalBRL: soma(x, (o) => o.contratadoBrl) } }
+    const semCompetencia = { receitas: semData(receitas), aPagar: semData(pagaveis) }
 
     const rBruta = { total: soma(receitas.filter((o) => noMes(o, mesAtual)), (o) => o.contratadoBrl) }
     const rBrutaPrev = { total: soma(receitas.filter((o) => noMes(o, mesAnterior)), (o) => o.contratadoBrl) }
@@ -115,6 +119,7 @@ export async function GET(req: NextRequest) {
         ajustesFinanceiros: { valor: ajustesFinanceiros, prev: 0, av: 0, real: true },
         lucroLiquido: { valor: lucroLiquido, prev: 0, av: margem(lucroLiquido), real: true },
       },
+      semCompetencia,
       detalhe: { impostos: impostosDetalhe, despesas: despesasDetalhe },
       // compatibilidade: `mock` mantido enquanto a tela consumir esse nome,
       // porém agora com dados REAIS (nenhuma estimativa por percentual fixo).
@@ -127,7 +132,7 @@ export async function GET(req: NextRequest) {
         impostos: "cadastro:Imposto",
         aliquotaReceitaTotal: aliquotaTotal,
         despesas: "V3 › obrigações A_PAGAR (não-custo) › Fornecedor",
-        motor: "V3 (ObrigacaoEconomica) por competência — mês de criação",
+        motor: "V3 (ObrigacaoEconomica) por competência real (data do lançamento ou vencimento); sem data = linha à parte",
         classificacaoIntermediaria: false,
         classificacaoObs: "Categorias Financeiras, Plano de Contas e Centros de Custo foram eliminados: o comportamento financeiro vive na Configuração Financeira do cadastro mestre.",
       },

@@ -13,7 +13,9 @@
 //   • Vencimento = o da obrigação. Sem vencimento NÃO entra em vencido/a vencer/calendário — aparece à parte ("sem vencimento"),
 //                  nunca com data inventada.
 //   • Recebido/pago no período = ocorrências de PAGAMENTO processadas, convertidas pela cotação corrente (ausência declarada).
-//   • DRE por COMPETÊNCIA: a obrigação pertence ao mês em que foi criada (o V3 não tem cronograma de parcelas).
+//   • DRE por COMPETÊNCIA REAL: a obrigação só entra num mês se tiver `dataCompetencia` cadastrada no lançamento de origem (Receita/Custo)
+//     ou `vencimento` próprio. A data de CRIAÇÃO nunca é competência. Sem nenhuma das duas = "sem competência definida" (linha à
+//     parte, fora de qualquer mês e dos totais mensais).
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { carregarFx, converterBrl, type FxFinancas } from '@/lib/financeiro/cambio-financas'
@@ -28,6 +30,8 @@ export interface ObrigacaoDaAba extends ObrigacaoLista {
   pais: string | null
   paisLabel: string | null
   flag: string | null
+  /** Competência REAL (do lançamento de origem) ou o vencimento da obrigação. `null` = sem data cadastrada. Nunca a data de criação. */
+  competencia: Date | null
 }
 export interface PagamentoDaAba {
   obrigacaoId: number
@@ -60,9 +64,19 @@ export async function carregarBaseV3(agora = new Date()): Promise<BaseV3> {
     ? await prisma.processo.findMany({ where: { id: { in: procIds } }, select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } })
     : []
   const procPor = new Map(procs.map((p) => [p.id, p]))
+  const idsOrigem = (tipo: string) => [...new Set(lista.filter((o) => o.origemTipo === tipo && o.origemId != null).map((o) => o.origemId as number))]
+  const [recs, cts] = await Promise.all([
+    idsOrigem('Receita').length ? prisma.receita.findMany({ where: { id: { in: idsOrigem('Receita') } }, select: { id: true, dataCompetencia: true } }) : [],
+    idsOrigem('Custo').length ? prisma.custo.findMany({ where: { id: { in: idsOrigem('Custo') } }, select: { id: true, dataCompetencia: true } }) : [],
+  ])
+  const compOrigem = new Map<string, Date | null>([
+    ...recs.map((r) => [`Receita:${r.id}`, r.dataCompetencia] as const),
+    ...cts.map((c) => [`Custo:${c.id}`, c.dataCompetencia] as const),
+  ])
   const obrigacoes: ObrigacaoDaAba[] = lista.map((o) => {
     const p = o.processoId != null ? procPor.get(o.processoId) : undefined
-    return { ...o, processoNome: p?.nome ?? null, pais: p?.paisCanonico?.countryKey ?? null, paisLabel: p?.paisCanonico?.countryLabel ?? null, flag: p?.paisCanonico?.flag ?? null }
+    const competencia = competenciaReal(compOrigem.get(`${o.origemTipo}:${o.origemId}`) ?? null, o.vencimento)
+    return { ...o, competencia, processoNome: p?.nome ?? null, pais: p?.paisCanonico?.countryKey ?? null, paisLabel: p?.paisCanonico?.countryLabel ?? null, flag: p?.paisCanonico?.flag ?? null }
   })
   const direcaoPor = new Map(obrigacoes.map((o) => [o.obrigacaoId, o.direcao]))
   const oc = obrigacoes.length
@@ -82,6 +96,12 @@ export async function carregarBaseV3(agora = new Date()): Promise<BaseV3> {
   return { agora, obrigacoes, pagamentos, fx, naoConvertido }
 }
 
+/** Competência real = a do lançamento de origem; senão o vencimento da obrigação; senão NADA (nunca a data de criação). */
+export function competenciaReal(deOrigem: Date | null, vencimento: string | null): Date | null {
+  if (deOrigem) return deOrigem
+  if (vencimento) { const d = new Date(vencimento); if (!Number.isNaN(d.getTime())) return d }
+  return null
+}
 export const doMes = (d: Date, ref: Date) => d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear()
 export const soma = <T>(arr: T[], f: (x: T) => number) => cent2(arr.reduce((a, x) => a + f(x), 0))
 

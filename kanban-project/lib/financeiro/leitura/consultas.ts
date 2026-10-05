@@ -24,6 +24,8 @@ export interface ObrigacaoLista {
   recebido: number
   vencimento: string | null
   origemTipo: string | null
+  /** Id do lançamento de origem (Receita/Custo) — para ler a competência real. */
+  origemId: number | null
   criadoEm: string | null
   responsavel: string | null
   requerente: string | null
@@ -128,7 +130,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       obrigacaoId: o.id, codigoOperacional: o.codigoOperacional, descricao: (o.itemCatalogoId ? itemPor.get(o.itemCatalogoId) : null) ?? o.observacoes ?? null, natureza: o.natureza, direcao: o.direcao,
       status: o.status, processoId: o.processoId, moeda: String(o.moedaContratual),
       valorContratado, saldo, recebido,
-      vencimento: o.vencimento ? o.vencimento.toISOString() : null, origemTipo: o.origemTipo ?? null,
+      vencimento: o.vencimento ? o.vencimento.toISOString() : null, origemTipo: o.origemTipo ?? null, origemId: o.origemId ?? null,
       criadoEm: o.criadoEm ? o.criadoEm.toISOString() : null,
       responsavel: o.criadoPorId != null ? (userPor.get(o.criadoPorId) ?? null) : null,
       requerente: (() => { const pid = primPart.get(o.id); return pid != null ? (pessoaNomeReq.get(pid) ?? null) : null })(),
