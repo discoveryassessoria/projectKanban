@@ -1,6 +1,7 @@
 "use client"
 // src/components/torre/TorreSaudeDaFase.tsx — cartão "Saúde da fase" (aba Processos): no ritmo · atenção · parados · tempo médio real
 // (vermelho se passou da meta, verde se não) · barra empilhada · frase da semana. Os números vêm de `saudeDaFase` (lib/operacional/torre-fase.ts).
+import { diasPorExtenso } from "@/lib/operacional/tempo-extenso"
 import { milhar, textoDuracao, type SaudeDaFase } from "@/lib/operacional/torre-fase"
 import "./torre-processos.css"
 
@@ -15,7 +16,7 @@ export function TorreSaudeDaFase({ s }: { s: SaudeDaFase }) {
         <div className="tor-pf-numero"><b className="pa">{milhar(s.parados)}</b><span>parados ou sem dono</span></div>
         <div className="tor-pf-numero">
           <b className={s.acimaDaMeta ? "pa" : "ok"} title={s.tempoMedioDias == null ? "Nenhuma permanência completa registrada nesta fase" : "Média das permanências completas registradas no histórico de fases"}>{tempo}</b>
-          <span>tempo médio real · meta {s.metaDias != null ? `${s.metaDias} d` : "—"}</span>
+          <span>tempo médio real · meta {s.metaDias != null ? diasPorExtenso(s.metaDias) : "—"}</span>
         </div>
       </div>
       <div className="tor-pf-barra" role="img" aria-label={`${s.ok} no ritmo, ${s.atencao} em atenção, ${s.parados} parados ou sem dono`}>

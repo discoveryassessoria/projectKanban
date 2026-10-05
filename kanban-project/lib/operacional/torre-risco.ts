@@ -38,6 +38,7 @@
 // cartão "em risco" da Visão geral e a foto diária é `criticoOuParado` desta mesma regra (ver `processosCriticos`).
 // ============================================================================
 
+import { diasPorExtenso } from './tempo-extenso'
 export type NivelDeRisco = 'no_ritmo' | 'atencao' | 'parado' | 'critico'
 
 /** Os limiares — constantes nomeadas, UM lugar. (3 e 6 espelham `faixaDoScore`; 15 é o "parado 15+ dias" da legenda.) */
@@ -134,14 +135,14 @@ export function riscoDoProcesso(e: EntradaDoRisco): RiscoCalculado {
   if ((s.atrasadas ?? 0) > 0) motivos.push(`${plural(s.atrasadas!, 'tarefa atrasada', 'tarefas atrasadas')}`)
   if (s.faseDeixada) motivos.push('tarefa aberta de fase anterior')
   if (s.divergencia) motivos.push('divergência entre passo e tarefa')
-  if (parado) motivos.push(`aguardando ${e.bolaRotulo ?? 'terceiro'} há ${e.bolaForaHaDias} d sem cobrança em dia`)
+  if (parado) motivos.push(`aguardando ${e.bolaRotulo ?? 'terceiro'} há ${diasPorExtenso(e.bolaForaHaDias ?? 0)} sem cobrança em dia`)
   if (e.semDono) motivos.push('sem responsável')
   else if ((s.semResponsavel ?? 0) > 0) motivos.push(`${plural(s.semResponsavel!, 'tarefa sem responsável', 'tarefas sem responsável')}`)
   if ((s.bloqueadas ?? 0) > 0) motivos.push(`${plural(s.bloqueadas!, 'tarefa bloqueada', 'tarefas bloqueadas')}`)
   if (s.cobrancasSemResposta) motivos.push('2+ cobranças sem resposta')
   if ((s.acompanhamentoVencido ?? 0) > 0 && !parado) motivos.push(`${plural(s.acompanhamentoVencido!, 'cobrança vencida', 'cobranças vencidas')}`)
   if ((s.vencemEmBreve ?? 0) > 0) motivos.push(`${plural(s.vencemEmBreve!, 'tarefa com prazo hoje ou amanhã', 'tarefas com prazo hoje ou amanhã')}`)
-  if (passouDaMeta) motivos.push(`${e.diasNaFase} d na fase (meta ${e.metaDias} d)`)
+  if (passouDaMeta) motivos.push(`${diasPorExtenso(e.diasNaFase ?? 0)} na fase (meta ${diasPorExtenso(e.metaDias ?? 0)})`)
   if (motivos.length === 0 && nivel !== 'no_ritmo') motivos.push(`pontuação ${score} no Precisa de você`)
 
   const prefixo = nivel === 'critico' ? 'Crítico' : nivel === 'parado' ? 'Parado' : nivel === 'atencao' ? 'Atenção' : 'No ritmo'

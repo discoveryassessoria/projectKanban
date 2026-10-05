@@ -9,6 +9,7 @@
 // recente é saudável; um único evento preso há horas é erro; dispatcher parado
 // com fila é crítico.
 
+import { diasPorExtenso, horasPorExtenso, minutosPorExtenso } from '@/lib/operacional/tempo-extenso'
 import { prisma } from '@/lib/prisma'
 import { TIPOS_DRENADOS } from '@/src/services/outbox-dispatcher'
 import { registrar } from '../catalogo'
@@ -35,7 +36,7 @@ export const LIMITES_FILA = {
 }
 
 const minutosDesde = (d: Date, agora: Date) => Math.floor((agora.getTime() - d.getTime()) / 60000)
-const humano = (min: number) => (min < 60 ? `${min} min` : min < 1440 ? `${Math.floor(min / 60)} h` : `${Math.floor(min / 1440)} d`)
+const humano = (min: number) => (min < 60 ? minutosPorExtenso(min) : min < 1440 ? horasPorExtenso(Math.floor(min / 60)) : diasPorExtenso(Math.floor(min / 1440)))
 
 registrar({
   id: 'saude.filas.outbox-pendente',

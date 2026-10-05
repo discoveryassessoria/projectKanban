@@ -88,7 +88,7 @@ ok("números de página: até 7 todos; acima, 1 2 … vizinhas … n-1 n", pagin
 
 secao("A CÉLULA (T147)")
 ok("'<bola> · <tempo>' em dias, horas (<1 dia), '—' sem registro e meses a partir de 100 d", textoDaCelulaAtual("Cartório", 52, 1248) === "Cartório · 52 d" && textoDaCelulaAtual("Equipe", 0, 8) === "Equipe · 8 h" && textoDaCelulaAtual("Equipe", null, null) === "Equipe · —" && textoDaCelulaAtual("Consulado", 123, 2952) === "Consulado · 4,1 m")
-ok("duração longa por extenso: '4,1 meses'", textoDuracao(123, null) === "4,1 meses" && textoDuracao(99, null) === "99 d" && textoDuracao(0, 0) === "< 1 h")
+ok("duração longa por extenso: '4,1 meses'", textoDuracao(123, null) === "4,1 meses" && textoDuracao(99, null) === "99 dias" && textoDuracao(0, 0) === "menos de 1 hora" && textoDuracao(99, null, true) === "99 d" && textoDuracao(0, 0, true) === "< 1 h")
 
 secao("TEXTOS FIXOS DO PROTÓTIPO NA TELA (T128, T143, T144, T166, T168)")
 const tela = readFileSync("src/components/torre/TorreRadar.tsx", "utf8")

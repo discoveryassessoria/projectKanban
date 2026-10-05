@@ -119,7 +119,7 @@ async function main() {
     ok("2 cobranças sem resposta (limite do cadastro = 2) → Escalada", !!eItem)
     ok("1 cobrança sem resposta NÃO escala", !itens.some((i) => i.tipo === "ESCALADA" && i.tarefaId === umaCobranca.tarefaId))
     ok("título: '<órgão> · <certidão>'", (eItem?.titulo ?? "").startsWith(`${orgao.name} · `), eItem?.titulo ?? "")
-    ok("detalhe: '… · pedido há 0 d · 2 cobranças por e-mail e telefone sem resposta'", /pedido há 0 d · 2 cobranças por e-mail e telefone sem resposta$/.test(eItem?.detalhe ?? ""), eItem?.detalhe ?? "")
+    ok("detalhe: '… · pedido há 0 d · 2 cobranças por e-mail e telefone sem resposta'", /pedido há menos de 1 dia · 2 cobranças por e-mail e telefone sem resposta$/.test(eItem?.detalhe ?? ""), eItem?.detalhe ?? "")
     ok("ações: 'Registrar ligação' e 'Trocar canal'", eItem?.acao1.rotulo === "Registrar ligação" && eItem.acao2.rotulo === "Trocar canal")
 
     secao("ESCALADA — Trocar canal e Desfazer (devolve o canal anterior; recusa se mudou depois)")
@@ -143,7 +143,7 @@ async function main() {
     await prisma.logAuditoria.create({ data: { acao: "COBRANCA_CLIENTE_BLOQUEIO", entidade: "Tarefa", entidadeId: antiga.id, descricao: `${MARCA} cobrança 2` } })
     itens = await decisoes()
     const bAntiga = itens.find((i) => i.tipo === "BLOQUEADA" && i.tarefaId === antiga.id)
-    ok("bloqueada há 14 dias entra, com '2 cobranças ao cliente'", !!bAntiga && /bloqueada há 14 d · 2 cobranças ao cliente/.test(bAntiga.detalhe), bAntiga?.detalhe ?? "")
+    ok("bloqueada há 14 dias entra, com '2 cobranças ao cliente'", !!bAntiga && /bloqueada há 14 dias · 2 cobranças ao cliente/.test(bAntiga.detalhe), bAntiga?.detalhe ?? "")
     ok("bloqueada há 3 dias NÃO entra (trabalho normal)", !itens.some((i) => i.tipo === "BLOQUEADA" && i.tarefaId === recente.id))
     const bSemData = itens.find((i) => i.tipo === "BLOQUEADA" && i.tarefaId === semData.id)
     ok("sem data de bloqueio registrada: entra e diz 'bloqueio sem data registrada' (nunca inventa)", !!bSemData && /bloqueio sem data registrada/.test(bSemData.detalhe), bSemData?.detalhe ?? "")

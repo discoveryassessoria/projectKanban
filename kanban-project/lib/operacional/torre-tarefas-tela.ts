@@ -8,6 +8,7 @@
 // FONTE ÚNICA reaproveitada (nada recalculado): `PREDICADO_DO_KPI` (o mesmo dos cartões do topo), `nivelDeRisco`,
 // `diasAtePrazo`, `torre-bola.ts` (bolaCom / bolaDesde / cobrarEm), `ROTULO_STATUS_TAREFA` e `textoPrazoDaTarefa`.
 // ============================================================================
+import { diasPorExtenso } from './tempo-extenso'
 import { PREDICADO_DO_KPI, diasAtePrazo } from './torre-kpis'
 import { diasEntreDiasOperacionais, FUSO_OPERACIONAL } from './tempo-operacional'
 import type { BolaCom } from './torre-bola'
@@ -104,7 +105,7 @@ export function textoDaBola(l: LinhaParaBolaDaTela, agora: Date): { nome: string
   const nome = bola
   const orgao = bola === 'Cliente' || !comTerceiro ? null : l.terceiroNome ?? null
   const haDias = comTerceiro ? haQuantosDias(l.bolaDesde, agora) : null
-  return { nome, orgao, haDias, comTerceiro, texto: haDias != null ? `${nome} · há ${haDias} d` : nome }
+  return { nome, orgao, haDias, comTerceiro, texto: haDias != null ? `${nome} · há ${diasPorExtenso(haDias)}` : nome }
 }
 
 export type TomDoCobrar = 'vermelho' | 'ambar' | 'cinza'

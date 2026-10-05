@@ -413,7 +413,7 @@ export default function BlogAdminPage() {
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {post.tempoLeitura} min de leitura
+                            {post.tempoLeitura} {post.tempoLeitura === 1 ? "minuto" : "minutos"} de leitura
                           </span>
                           {post.dataPublicacao && (
                             <span className="flex items-center gap-1">

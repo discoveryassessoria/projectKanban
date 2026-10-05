@@ -85,7 +85,7 @@ ok("rodapé: 'Mostrando 12 de 30 processos da fase · 12 por página' / página 
 ok("rodapé sem resultado: 'Nenhum processo encontrado com esses filtros.'", rodapeDeProcessos(paginar([], 1)) === "Nenhum processo encontrado com esses filtros.")
 
 secao("'NA FASE HÁ' (T202)")
-ok("'52 d / 30' com meta; '52 d' sem meta; '—' sem registro", textoNaFase(EMISSAO[0]) === "52 d / 30" && textoNaFase({ ...EMISSAO[0], metaDias: null }) === "52 d" && textoNaFase({ naFase: { desde: null, origem: null, dias: null, horas: null }, metaDias: 30 }) === "—")
+ok("'52 d / 30' com meta; '52 d' sem meta; '—' sem registro", textoNaFase(EMISSAO[0]) === "52 dias / 30 dias" && textoNaFase({ ...EMISSAO[0], metaDias: null }) === "52 dias" && textoNaFase({ naFase: { desde: null, origem: null, dias: null, horas: null }, metaDias: 30 }) === "—")
 ok("cor pela META da fase: acima = vermelho; acima de 80% = âmbar; senão normal (meta 30 → cortes 30 e 24, como no protótipo)", tomDosDias(31, 30) === "vermelho" && tomDosDias(30, 30) === "ambar" && tomDosDias(25, 30) === "ambar" && tomDosDias(24, 30) === "normal" && tomDosDias(10, 30) === "normal")
 ok("o corte acompanha a meta de cada fase (Retificação 60: 50 d é âmbar, 61 d vermelho) e sem meta não há cor", tomDosDias(50, 60) === "ambar" && tomDosDias(61, 60) === "vermelho" && tomDosDias(400, null) === "normal" && tomDosDias(null, 30) === "normal")
 
@@ -114,7 +114,7 @@ ok("frase (Análise): destinos múltiplos 'saíram 9 (6 para Tradução, 3 para 
 ok("frase sem movimento: nada inventado", fraseDaSemana(null, String) === "Nenhum processo entrou nem saiu desta fase esta semana." && fraseDaSemana({ entraram: 0, sairam: [] }, String) === "Nenhum processo entrou nem saiu desta fase esta semana.")
 ok("singular: 'cresce 1 processo/semana'", fraseDaSemana({ entraram: 3, sairam: [{ para: "x", n: 2 }] }, String).endsWith("a fase cresce 1 processo/semana."))
 ok("meta da visão: a que todos compartilham; se divergem (países), a padrão; sem nenhuma, null", metaDaVisao([{ metaDias: 45 }, { metaDias: 45 }], 30) === 45 && metaDaVisao([{ metaDias: 45 }, { metaDias: 30 }], 30) === 30 && metaDaVisao([{ metaDias: null }], null) === null && metaDaVisao([{ metaDias: null }], 30) === 30)
-ok("duração: '34 d' · '4,1 meses' · '—'", textoDuracao(34, null) === "34 d" && textoDuracao(123, null) === "4,1 meses" && textoDuracao(null, null) === "—")
+ok("duração: '34 d' · '4,1 meses' · '—'", textoDuracao(34, null) === "34 dias" && textoDuracao(123, null) === "4,1 meses" && textoDuracao(null, null) === "—")
 
 secao("ONDE ESTÃO AS CERTIDÕES — POR PASSO (T188–T193)")
 const fase = [
@@ -124,8 +124,8 @@ const fase = [
 const pf = passosDaFase(fase, 30)
 ok("o título soma abertas + concluídas (grain TAREFA): 15 certidões", pf.total === 15 && pf.substantivo === "certidões")
 ok("caixas: Sem responsável (r) · cada passo (a se a maioria espera, n se não) · Concluídas (g)", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join() === "Sem responsável:2:r,Solicitar:1:n,Aguardar:8:a,Concluídas:4:g", pf.caixas.map((x) => `${x.nome}:${x.n}:${x.classe}`).join())
-ok("observação do passo em espera: quantas passaram da meta ('5 há mais de 30 d')", pf.caixas[2].obs === "5 há mais de 30 d" && pf.caixas[0].obs === "sem responsável")
-ok("gargalo: 'O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.'", pf.gargalo === "O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.", pf.gargalo)
+ok("observação do passo em espera: quantas passaram da meta ('5 há mais de 30 d')", pf.caixas[2].obs === "5 há mais de 30 dias" && pf.caixas[0].obs === "sem responsável")
+ok("gargalo: 'O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 d.'", pf.gargalo === "O passo com mais volume parado é Aguardar: 8 certidões, 5 há mais de 30 dias.", pf.gargalo)
 ok("o passo NÃO multiplica: as caixas de passo somam as tarefas abertas COM responsável (9 = 11 abertas − 2 sem responsável)", pf.caixas.filter((x) => x.classe === "n" || x.classe === "a").reduce((a, x) => a + x.n, 0) === 9)
 ok("sem tarefa aberta: gargalo diz que está tudo concluído; sem nada: 'Nenhuma certidão nesta fase ainda.'", passosDaFase([processo({ id: 92, nome: "Z", tarefasDaFase: { abertas: 0, semResponsavel: 0, concluidas: 5, passos: [], ehCertidao: true } })], 30).gargalo.startsWith("Nenhuma certidão aberta") && passosDaFase([], null).gargalo === "Nenhuma tarefa nesta fase ainda.")
 ok("fase sem certidões usa 'tarefas'", passosDaFase([processo({ id: 93, nome: "P", tarefasDaFase: { abertas: 1, semResponsavel: 1, concluidas: 0, passos: [], ehCertidao: false } })], null).substantivo === "tarefas")

@@ -3,6 +3,7 @@
 // PREDICADOS PUROS DA TORRE — sem Prisma, importáveis pela tela e pelo servidor.
 // A mesma conta nos dois lados é o que faz o "N" de um botão bater com a lista.
 // ============================================================================
+import { diasPorExtenso, horasPorExtenso } from './tempo-extenso'
 import { diasEntreDiasOperacionais } from './tempo-operacional'
 
 /** O que a Torre precisa saber de uma linha para decidir "cobrança vencida". */
@@ -95,6 +96,14 @@ export const nivelDaPrevisao = (n: number): 0 | 1 | 2 | 3 => (n >= 5 ? 3 : n >= 
 
 /** O texto de "há quanto tempo" — `—` sem data (NUNCA "0 d" fingindo precisão), horas até completar 1 dia, depois dias. */
 export function textoTempoNaFase(t: { dias: number | null; horas: number | null } | null | undefined): string {
+  if (!t || t.dias == null || t.horas == null) return '—'
+  // Menos de 1 dia: as HORAS (registro real), por extenso — "5 horas", "1 hora", "menos de 1 hora" — nunca "0 dias" fingindo precisão.
+  if (t.dias >= 1) return diasPorExtenso(t.dias)
+  return horasPorExtenso(t.horas)
+}
+
+/** A forma CURTA ("52 d" · "8 h" · "< 1 h") — só para o selo pequeno do Radar, onde "52 dias" não cabe. */
+export function textoTempoNaFaseCurto(t: { dias: number | null; horas: number | null } | null | undefined): string {
   if (!t || t.dias == null || t.horas == null) return '—'
   if (t.dias >= 1) return `${t.dias} d`
   return t.horas >= 1 ? `${t.horas} h` : '< 1 h'

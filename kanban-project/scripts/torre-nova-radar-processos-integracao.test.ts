@@ -119,7 +119,7 @@ async function main() {
     ok("sem meta cadastrada nenhum limiar é inventado: B2 (10 d na fase) segue no ritmo", pB2.nivelDeRisco === "no_ritmo" && pB2.metaDias === null && pB2.diasNaFase === 10, `${pB2.diasNaFase} d / meta ${pB2.metaDias}`)
     await definirMeta({ phaseKey: FASE, metaDias: 5, autorId: admin.id })
     const r1 = await processosDaTorre()
-    ok("com meta de 5 d: B2 (10 d) passa a ATENÇÃO pela meta; B (0 d) continua no ritmo", linha(r1, B2.processoId).nivelDeRisco === "atencao" && /10 d na fase \(meta 5 d\)/.test(linha(r1, B2.processoId).motivoDoRisco) && linha(r1, B.processoId).nivelDeRisco === "no_ritmo" && linha(r1, B2.processoId).metaDias === 5)
+    ok("com meta de 5 d: B2 (10 d) passa a ATENÇÃO pela meta; B (0 d) continua no ritmo", linha(r1, B2.processoId).nivelDeRisco === "atencao" && /10 dias na fase \(meta 5 dias\)/.test(linha(r1, B2.processoId).motivoDoRisco) && linha(r1, B.processoId).nivelDeRisco === "no_ritmo" && linha(r1, B2.processoId).metaDias === 5)
 
     secao("BANCO — o conjunto 'graves' é o MESMO do Radar e do cartão 'em risco'")
     const graves = await processosCriticos()

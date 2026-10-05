@@ -11,6 +11,7 @@
 // PEDIDO DE PROCESSO PAUSADO fica fora de toda cobrança (filtro canônico `idsDeProcessosPausados`), como fica fora da lista.
 // COBRANÇA NÃO TEM "DESFAZER": o terceiro FOI contatado (ver torre-acoes-lote.ts).
 // ============================================================================
+import { diasPorExtenso } from '@/lib/operacional/tempo-extenso'
 import { prisma } from '@/lib/prisma'
 import { visaoGerencial, ordenarFila, type LinhaGerencial } from '@/lib/operacional/tarefa-projecoes'
 import { lerReguaDeCobranca, reguaResumida, type LinhaDaRegua } from '@/lib/operacional/regras-torre'
@@ -155,7 +156,7 @@ async function reguaPorOrgao(orgaoIds: number[], regua: LinhaDaRegua[]): Promise
   const rotuloDoPasso = new Map(regua.map((l) => [l.passoKey, l.passo]))
   const porOrgao = new Map<number, string[]>()
   for (const r of regras) {
-    const partes = `${rotuloDoPasso.get(r.stepKey) ?? r.stepKey}: ${r.slaDays} d${r.followUpDays != null ? `, acompanhar a cada ${r.followUpDays} d` : ''}`
+    const partes = `${rotuloDoPasso.get(r.stepKey) ?? r.stepKey}: ${diasPorExtenso(r.slaDays)}${r.followUpDays != null ? `, acompanhar a cada ${diasPorExtenso(r.followUpDays)}` : ''}`
     porOrgao.set(r.orgaoProtocoloId, [...(porOrgao.get(r.orgaoProtocoloId) ?? []), partes])
   }
   const geral = reguaResumida(regua)

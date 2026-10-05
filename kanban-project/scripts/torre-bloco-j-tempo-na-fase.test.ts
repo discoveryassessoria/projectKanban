@@ -36,9 +36,9 @@ async function main() {
   try {
     secao("O texto: '—' sem data; horas antes de 1 dia; nunca '0 d'")
     ok("sem data → '—'", textoTempoNaFase(null) === "—" && textoTempoNaFase({ dias: null, horas: null }) === "—" && textoTempoNaFase({ dias: 0, horas: null }) === "—")
-    ok("menos de 1 h → '< 1 h'; 5 h → '5 h'; 23 h → '23 h'", textoTempoNaFase({ dias: 0, horas: 0 }) === "< 1 h" && textoTempoNaFase({ dias: 0, horas: 5 }) === "5 h" && textoTempoNaFase({ dias: 0, horas: 23 }) === "23 h")
-    ok("1 dia ou mais → 'N d'", textoTempoNaFase({ dias: 1, horas: 26 }) === "1 d" && textoTempoNaFase({ dias: 9, horas: 220 }) === "9 d")
-    ok("NENHUMA combinação com dia zero produz '0 d'", [null, 0, 1, 5, 23].every((h) => textoTempoNaFase({ dias: 0, horas: h }) !== "0 d"))
+    ok("menos de 1 h → 'menos de 1 hora'; 1 h → '1 hora'; 5 h → '5 horas'; 23 h → '23 horas'", textoTempoNaFase({ dias: 0, horas: 0 }) === "menos de 1 hora" && textoTempoNaFase({ dias: 0, horas: 1 }) === "1 hora" && textoTempoNaFase({ dias: 0, horas: 5 }) === "5 horas" && textoTempoNaFase({ dias: 0, horas: 23 }) === "23 horas")
+    ok("1 dia ou mais → 'N dias' (singular com 1)", textoTempoNaFase({ dias: 1, horas: 26 }) === "1 dia" && textoTempoNaFase({ dias: 9, horas: 220 }) === "9 dias")
+    ok("NENHUMA combinação com dia zero produz '0 d'", [null, 0, 1, 5, 23].every((h) => textoTempoNaFase({ dias: 0, horas: h }) !== "0 d" && textoTempoNaFase({ dias: 0, horas: h }) !== "0 dias"))
     ok("os resultados que movem de fase são MOVIDO, AVANCADO e FORCADO (BLOQUEADO não)", JSON.stringify([...RESULTADOS_QUE_MOVEM_DE_FASE]) === '["MOVIDO","AVANCADO","FORCADO"]')
 
     // ── um macrofluxo com a fixture como PRIMEIRA fase e 'emissao_documental' depois ──
@@ -51,10 +51,10 @@ async function main() {
     const a = await c.novaObrigacao({})
     await prisma.processo.update({ where: { id: a.processoId }, data: { dataInicio: new Date(agora.getTime() - 30 * H) } })
     const da = await diasNaFaseAtual(a.processoId, agora)
-    ok("origem CADASTRO_DO_PROCESSO, 30 h = 1 dia completo", da.origem === "CADASTRO_DO_PROCESSO" && da.horas === 30 && da.dias === 1 && textoTempoNaFase(da) === "1 d")
+    ok("origem CADASTRO_DO_PROCESSO, 30 h = 1 dia completo", da.origem === "CADASTRO_DO_PROCESSO" && da.horas === 30 && da.dias === 1 && textoTempoNaFase(da) === "1 dia")
     await prisma.processo.update({ where: { id: a.processoId }, data: { dataInicio: new Date(agora.getTime() - 5 * H) } })
     const da5 = await diasNaFaseAtual(a.processoId, agora)
-    ok("entrou há 5 h: dias=0 mas o texto é '5 h' (não '0 d')", da5.dias === 0 && da5.horas === 5 && textoTempoNaFase(da5) === "5 h")
+    ok("entrou há 5 h: dias=0 mas o texto é '5 h' (não '0 d')", da5.dias === 0 && da5.horas === 5 && textoTempoNaFase(da5) === "5 horas")
 
     secao("fase que NÃO é a primeira e SEM nenhum registro de entrada: sem data, sem número")
     const b = await c.novaObrigacao({})
@@ -76,7 +76,7 @@ async function main() {
     ok("FORCADO mais recente vence → 20 h", (await diasNaFaseAtual(b.processoId, agora)).horas === 20)
     await log(b.processoId, "MOVIDO", "apostilamento", "emissao_documental", new Date(agora.getTime() - 4 * H))
     const dMv = await diasNaFaseAtual(b.processoId, agora)
-    ok("MOVIDO ainda mais recente vence → 4 h, texto '4 h'", dMv.horas === 4 && textoTempoNaFase(dMv) === "4 h")
+    ok("MOVIDO ainda mais recente vence → 4 h, texto '4 h'", dMv.horas === 4 && textoTempoNaFase(dMv) === "4 horas")
     ok("a data NUNCA é o relógio de agora (a entrada é sempre anterior)", dMv.desde !== null && Date.parse(dMv.desde) < agora.getTime())
 
     secao("a aba Processos, o Radar e o Foco leem a MESMA função")
@@ -84,7 +84,7 @@ async function main() {
     const pb = processos.find((p) => p.processoId === b.processoId)!
     const colunas = (await processosDaTorre(agora)).colunas
     const celula = pb.celulas[colunas.findIndex((x) => x.key === "emissao_documental")]
-    ok("Processos: 'Dias na fase' = a função (4 h; dias 0)", pb.naFase.horas === 4 && pb.naFase.dias === 0 && pb.diasNaFase === 0 && textoTempoNaFase(pb.naFase) === "4 h")
+    ok("Processos: 'Dias na fase' = a função (4 h; dias 0)", pb.naFase.horas === 4 && pb.naFase.dias === 0 && pb.diasNaFase === 0 && textoTempoNaFase(pb.naFase) === "4 horas")
     ok("Radar: a célula da fase atual traz os MESMOS dias/horas", celula.estado === "atual" && celula.dias === pb.naFase.dias && celula.horas === pb.naFase.horas)
     const foco = await focoDaFamilia(b.processoId, agora)
     ok("Foco: os MESMOS valores e a origem", foco!.faseAtual.horas === 4 && foco!.faseAtual.dias === 0 && foco!.faseAtual.origem === "AVANCO_DE_FASE")
