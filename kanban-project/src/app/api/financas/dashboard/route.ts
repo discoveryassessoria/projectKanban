@@ -5,11 +5,12 @@
 //
 // Tudo que dá pra puxar do banco é REAL:
 //   - Caixa consolidado .......... soma de ContaBancaria.saldoAtual (+ por moeda)
-//   - A pagar .................... ContaPagar PENDENTE/VENCIDO/AGENDADO
-//   - A receber (mês) ............ ParcelaFinanceira PENDENTE no mês corrente
-//   - Recebido (mês) ............. ParcelaFinanceira RECEBIDA no mês + PagamentoFatura
-//   - Próximos recebimentos ...... ParcelaFinanceira em aberto por vencimento
-//   - Próximos pagamentos ........ ContaPagar em aberto por vencimento
+//   - A pagar .................... obrigações V3 A_PAGAR com saldo (mesma fonte da aba Central)
+//   - A receber (mês) ............ obrigações V3 A_RECEBER em aberto com vencimento no mês
+//   - Recebido (mês) ............. ocorrências de pagamento V3 do mês
+//   - Próximos recebimentos ...... obrigações A_RECEBER em aberto, por vencimento (sem vencimento ao fim)
+//   - Próximos pagamentos ........ obrigações A_PAGAR em aberto, por vencimento
+//   (motor antigo — ParcelaFinanceira/ContaPagar/PagamentoFatura — NÃO é mais lido aqui; ver lib/financeiro/leitura/abas-v3.ts)
 //   - Exposição cambial .......... ContaBancaria por moeda (EUR/USD)
 //   - Atividade recente .......... LogAuditoria (7 últimas)
 //
@@ -20,7 +21,7 @@
 import { ONDE_PROCESSO_ATIVO_E_NA_TORRE } from "@/src/services/processo-pre-contrato"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
+import { carregarBaseV3, doMes, emAberto, soma } from "@/lib/financeiro/leitura/abas-v3"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 
@@ -41,62 +42,15 @@ export async function GET(req: NextRequest) {
     const mesIni = inicioDoMes(agora)
     const mesFim = fimDoMes(agora)
 
-    // ETAPA 1A — câmbio vem de CotacaoCambio (job diário). Sem cotação real o
-    // valor NÃO é convertido: fica fora do total e é declarado em `fontes`.
-    const fx = await carregarFx()
-    const semCotacao: { moeda: string; valor: number }[] = []
-    const toBRL = (valor: number, moeda?: string | null): number => {
-      const c = converterBrl(fx, valor, moeda)
-      if (c == null) { semCotacao.push({ moeda: (moeda ?? "BRL").toUpperCase(), valor }); return 0 }
-      return c
-    }
+    const base = await carregarBaseV3(agora)
+    const fx = base.fx
+    const semData = (a: Date | null) => (a ? a.getTime() : Number.POSITIVE_INFINITY)
 
-    const [
-      contas,
-      contasPagarAbertas,
-      parcelasAbertas,
-      parcelasRecebidasMes,
-      pagamentosMes,
-      processosAtivos,
-      logs,
-    ] = await Promise.all([
-      // contas bancárias (caixa + exposição cambial)
+    const [contas, processosAtivos, logs] = await Promise.all([
+      // contas bancárias (caixa)
       prisma.contaBancaria.findMany({
         where: { ativo: true },
         select: { id: true, nome: true, banco: true, saldoAtual: true, cor: true, ativo: true },
-      }),
-      // a pagar em aberto
-      prisma.contaPagar.findMany({
-        where: { status: { in: ["PENDENTE", "VENCIDO", "AGENDADO"] } },
-        select: {
-          id: true, descricao: true, valor: true, dataVencimento: true, status: true,
-          fornecedor: { select: { nome: true } },
-        },
-        orderBy: { dataVencimento: "asc" },
-      }),
-      // a receber em aberto (parcelas de receita pendentes)
-      prisma.parcelaFinanceira.findMany({
-        where: { status: "PENDENTE", receitaId: { not: null } },
-        select: {
-          id: true, numero: true, valor: true, valorBrl: true, vencimento: true, status: true,
-          receita: {
-            select: {
-              descricao: true, moeda: true,
-              processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
-            },
-          },
-        },
-        orderBy: { vencimento: "asc" },
-      }),
-      // recebido no mês (parcelas recebidas)
-      prisma.parcelaFinanceira.findMany({
-        where: { status: "RECEBIDA", dataPagamento: { gte: mesIni, lte: mesFim }, receitaId: { not: null } },
-        select: { valor: true, valorBrl: true, receita: { select: { moeda: true } } },
-      }),
-      // recebido no mês (pagamentos de fatura)
-      prisma.pagamentoFatura.findMany({
-        where: { data: { gte: mesIni, lte: mesFim }, estornado: false },
-        select: { valor: true, valorOriginal: true, cambio: true, fatura: { select: { moeda: true } } },
       }),
       prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_E_NA_TORRE }),
       prisma.logAuditoria.findMany({
@@ -109,68 +63,57 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    // ---- caixa consolidado + exposição por moeda ----
-    // (saldoAtual é em BRL no schema; exposição cambial real depende de moeda da conta,
-    //  que o schema não guarda — então tratamos tudo como BRL e deixamos a exposição
-    //  EUR/USD como bloco a calibrar quando houver campo de moeda na conta.)
+    const abertasReceber = base.obrigacoes.filter((o) => o.direcao === "A_RECEBER" && emAberto(o))
+      .sort((a, b) => semData(a.vencimento ? new Date(a.vencimento) : null) - semData(b.vencimento ? new Date(b.vencimento) : null) || a.obrigacaoId - b.obrigacaoId)
+    const abertasPagar = base.obrigacoes.filter((o) => o.direcao === "A_PAGAR" && emAberto(o))
+      .sort((a, b) => semData(a.vencimento ? new Date(a.vencimento) : null) - semData(b.vencimento ? new Date(b.vencimento) : null) || a.obrigacaoId - b.obrigacaoId)
+    const venc = (o: { vencimento: string | null }) => (o.vencimento ? new Date(o.vencimento) : null)
+
+    // ---- caixa consolidado ----
     const caixaBRL = contas.reduce((acc, c) => acc + Number(c.saldoAtual), 0)
 
     // ---- a pagar ----
-    const aPagarBRL = contasPagarAbertas.reduce((acc, c) => acc + Number(c.valor), 0)
-    const qtdPagarPendentes = contasPagarAbertas.filter((c) => c.status === "PENDENTE").length
-    const qtdPagarAgendados = contasPagarAbertas.filter((c) => c.status === "AGENDADO").length
+    const aPagarBRL = soma(abertasPagar, (o) => o.saldoBrl)
+    const qtdPagarPendentes = abertasPagar.length
+    const qtdPagarAgendados = 0
 
-    // ---- a receber (mês corrente) ----
-    const aReceberMesBRL = parcelasAbertas
-      .filter((p) => p.vencimento >= mesIni && p.vencimento <= mesFim)
-      .reduce((acc, p) => acc + (p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), p.receita?.moeda ?? "BRL")), 0)
-
-    const aReceberTotalBRL = parcelasAbertas.reduce(
-      (acc, p) => acc + (p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), p.receita?.moeda ?? "BRL")),
-      0,
-    )
+    // ---- a receber (mês corrente: só o que tem vencimento no mês) ----
+    const aReceberMesBRL = soma(abertasReceber.filter((o) => { const v = venc(o); return v != null && v >= mesIni && v <= mesFim }), (o) => o.saldoBrl)
+    const aReceberTotalBRL = soma(abertasReceber, (o) => o.saldoBrl)
 
     // ---- recebido no mês ----
-    const recebParcelas = parcelasRecebidasMes.reduce(
-      (acc, p) => acc + (p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), p.receita?.moeda ?? "BRL")),
-      0,
-    )
-    const recebPagamentos = pagamentosMes.reduce(
-      (acc, p) => acc + (p.valorOriginal && p.cambio ? Number(p.valorOriginal) * Number(p.cambio) : Number(p.valor)),
-      0,
-    )
-    const recebidoMesBRL = recebParcelas + recebPagamentos
+    const recebidoMesBRL = soma(base.pagamentos.filter((p) => p.direcao === "A_RECEBER" && doMes(p.data, agora)), (p) => p.valorBrl)
 
-    // ---- inadimplência (parcelas vencidas / total em aberto) ----
-    const vencidasBRL = parcelasAbertas
-      .filter((p) => p.vencimento < agora)
-      .reduce((acc, p) => acc + (p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), p.receita?.moeda ?? "BRL")), 0)
-    const qtdVencidas = parcelasAbertas.filter((p) => p.vencimento < agora).length
+    // ---- inadimplência (vencido / total em aberto; sem vencimento nunca é vencido) ----
+    const vencidas = abertasReceber.filter((o) => { const v = venc(o); return v != null && v < agora })
+    const vencidasBRL = soma(vencidas, (o) => o.saldoBrl)
+    const qtdVencidas = vencidas.length
     const inadimplenciaPct = aReceberTotalBRL > 0 ? (vencidasBRL / aReceberTotalBRL) * 100 : 0
 
     // ---- lucro/margem do mês (recebido - pago no mês) ----
-    const lucroMesBRL = recebidoMesBRL - aPagarBRL
+    const pagoMesBRL = soma(base.pagamentos.filter((p) => p.direcao === "A_PAGAR" && doMes(p.data, agora)), (p) => p.valorBrl)
+    const lucroMesBRL = recebidoMesBRL - pagoMesBRL
     const margemPct = recebidoMesBRL > 0 ? (lucroMesBRL / recebidoMesBRL) * 100 : 0
 
     // ---- próximos recebimentos (5) ----
-    const proximosRecebimentos = parcelasAbertas.slice(0, 5).map((p) => ({
-      id: p.id,
-      cliente: p.receita?.processo?.nome ?? "Avulso",
-      pais: p.receita?.processo?.paisCanonico?.countryKey ?? null,
-      processoId: p.receita?.processo?.id ?? null,
-      descricao: p.receita?.descricao ?? `Parcela ${p.numero}`,
-      valorBRL: p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), p.receita?.moeda ?? "BRL"),
-      vencimento: p.vencimento,
-      atrasado: p.vencimento < agora,
+    const proximosRecebimentos = abertasReceber.slice(0, 5).map((o) => ({
+      id: o.obrigacaoId,
+      cliente: o.processoNome ?? "Avulso",
+      pais: o.pais,
+      processoId: o.processoId,
+      descricao: o.descricao ?? o.codigoOperacional ?? `Receita ${o.obrigacaoId}`,
+      valorBRL: o.saldoBrl,
+      vencimento: o.vencimento,
+      atrasado: venc(o) != null && venc(o)! < agora,
     }))
 
     // ---- próximos pagamentos (5) ----
-    const proximosPagamentos = contasPagarAbertas.slice(0, 5).map((c) => ({
-      id: c.id,
-      fornecedor: c.fornecedor?.nome ?? "—",
-      valorBRL: Number(c.valor),
-      vencimento: c.dataVencimento,
-      atrasado: c.dataVencimento < agora,
+    const proximosPagamentos = abertasPagar.slice(0, 5).map((o) => ({
+      id: o.obrigacaoId,
+      fornecedor: o.fornecedor ?? "—",
+      valorBRL: o.saldoBrl,
+      vencimento: o.vencimento,
+      atrasado: venc(o) != null && venc(o)! < agora,
     }))
 
     // ---- atividade recente (auditoria) ----
@@ -208,7 +151,9 @@ export async function GET(req: NextRequest) {
         cambio: fx.fonte,
         cambioDataReferencia: fx.dataReferencia,
         moedasSemCotacao: fx.indisponiveis,
-        naoConvertido: semCotacao,
+        naoConvertido: base.naoConvertido,
+        motor: "V3 (ObrigacaoEconomica + OcorrenciaFinanceira)",
+        semVencimento: { qtd: abertasReceber.filter((o) => !o.vencimento).length, totalBRL: soma(abertasReceber.filter((o) => !o.vencimento), (o) => o.saldoBrl) },
       },
       // placeholders (sem fonte no banco ainda) — front mostra como "prévia".
       // SEM DADOS FICTÍCIOS: métricas ainda não consolidadas voltam ZERADAS/vazias

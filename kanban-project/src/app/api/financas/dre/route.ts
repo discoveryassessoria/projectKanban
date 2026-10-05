@@ -2,8 +2,12 @@
 //
 // GET /api/financas/dre — Demonstração de Resultado (gerencial).
 //
-// ETAPA 1A — FONTE ÚNICA. Nada aqui é estimado por percentual arbitrário.
-//   • Câmbio: CotacaoCambio (lib/financeiro/cambio-financas), nunca taxa fixa.
+// FONTE: MOTOR V3 (a mesma da aba Central) — ObrigacaoEconomica por COMPETÊNCIA REAL: a `dataCompetencia` do lançamento de origem ou o
+// `vencimento` da obrigação. A data de CRIAÇÃO nunca é competência; obrigação sem data fica numa linha à parte (`semCompetencia`),
+// fora de qualquer mês e dos totais mensais. Receita bruta = A_RECEBER natureza RECEITA/RECEITA_EXTRA; custos variáveis = A_PAGAR natureza CUSTO;
+// despesas operacionais = demais A_PAGAR, quebradas por fornecedor. O motor antigo (ParcelaFinanceira/Custo/ContaPagar) não é mais lido.
+// Nada aqui é estimado por percentual arbitrário.
+//   • Câmbio: o da própria obrigação (computeCambioAging), nunca taxa fixa.
 //   • Impostos sobre receita: cadastro oficial `Imposto` (aplicaA = revenue).
 //     A alíquota agregada é a SOMA das alíquotas cadastradas e ativas — não
 //     mais o 13,6% inventado.
@@ -17,7 +21,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { carregarFx, somarBrl } from "@/lib/financeiro/cambio-financas"
+import { carregarBaseV3, soma, NATUREZAS_RECEITA } from "@/lib/financeiro/leitura/abas-v3"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 function intervaloMes(ref: Date) {
@@ -37,40 +41,27 @@ export async function GET(req: NextRequest) {
     const refAnterior = new Date(agora.getFullYear(), agora.getMonth() - 1, 1)
     const mesAnterior = intervaloMes(refAnterior)
 
-    const fx = await carregarFx()
+    const base = await carregarBaseV3(agora)
+    const fx = base.fx
+    const impostosReceitaCad = await prisma.imposto.findMany({
+      where: { ativo: true, aplicaA: "revenue", modoCalculo: { not: "fixed" } },
+      select: { id: true, codigo: true, nome: true, percentual: true },
+      orderBy: { nome: "asc" },
+    })
+    const noMes = (o: { competencia: Date | null }, m: { ini: Date; fim: Date }) => o.competencia != null && o.competencia >= m.ini && o.competencia <= m.fim
+    const receitas = base.obrigacoes.filter((o) => o.direcao === "A_RECEBER" && NATUREZAS_RECEITA.includes(o.natureza))
+    const pagaveis = base.obrigacoes.filter((o) => o.direcao === "A_PAGAR")
+    const custos = pagaveis.filter((o) => o.natureza === "CUSTO")
+    const despesas = pagaveis.filter((o) => o.natureza !== "CUSTO")
 
-    const [parcMesAtual, parcMesAnterior, custosMesAtual, contasPagarMes, impostosReceitaCad] =
-      await Promise.all([
-        prisma.parcelaFinanceira.findMany({
-          where: { receitaId: { not: null }, vencimento: { gte: mesAtual.ini, lte: mesAtual.fim }, receita: { is: { cancelada: false } } },
-          select: { valor: true, valorBrl: true, receita: { select: { moeda: true } } },
-        }),
-        prisma.parcelaFinanceira.findMany({
-          where: { receitaId: { not: null }, vencimento: { gte: mesAnterior.ini, lte: mesAnterior.fim }, receita: { is: { cancelada: false } } },
-          select: { valor: true, valorBrl: true, receita: { select: { moeda: true } } },
-        }),
-        prisma.parcelaFinanceira.findMany({
-          where: { custoId: { not: null }, vencimento: { gte: mesAtual.ini, lte: mesAtual.fim }, custo: { is: { cancelado: false } } },
-          select: { valor: true, valorBrl: true, custo: { select: { moeda: true } } },
-        }),
-        prisma.contaPagar.findMany({
-          where: { status: { not: "CANCELADO" }, dataVencimento: { gte: mesAtual.ini, lte: mesAtual.fim } },
-          select: { valor: true, fornecedor: { select: { nome: true } } },
-        }),
-        // cadastro oficial de tributos que incidem sobre RECEITA
-        prisma.imposto.findMany({
-          where: { ativo: true, aplicaA: "revenue", modoCalculo: { not: "fixed" } },
-          select: { id: true, codigo: true, nome: true, percentual: true },
-          orderBy: { nome: "asc" },
-        }),
-      ])
+    // SEM COMPETÊNCIA DEFINIDA — fora de qualquer mês e dos totais mensais (igual ao "sem vencimento" do Fluxo).
+    const semData = (arr: typeof base.obrigacoes) => { const x = arr.filter((o) => o.competencia == null); return { qtd: x.length, totalBRL: soma(x, (o) => o.contratadoBrl) } }
+    const semCompetencia = { receitas: semData(receitas), aPagar: semData(pagaveis) }
 
-    const somaParc = (arr: any[], chave: "receita" | "custo") =>
-      somarBrl(fx, arr.map((p) => ({ valor: Number(p.valor), moeda: p[chave]?.moeda ?? "BRL", valorBrl: p.valorBrl != null ? Number(p.valorBrl) : null })))
-
-    const rBruta = somaParc(parcMesAtual, "receita")
-    const rBrutaPrev = somaParc(parcMesAnterior, "receita")
-    const cVariaveis = somaParc(custosMesAtual, "custo")
+    const rBruta = { total: soma(receitas.filter((o) => noMes(o, mesAtual)), (o) => o.contratadoBrl) }
+    const rBrutaPrev = { total: soma(receitas.filter((o) => noMes(o, mesAnterior)), (o) => o.contratadoBrl) }
+    const cVariaveis = { total: soma(custos.filter((o) => noMes(o, mesAtual)), (o) => o.contratadoBrl) }
+    const contasPagarMes = despesas.filter((o) => noMes(o, mesAtual)).map((o) => ({ valor: o.contratadoBrl, fornecedor: { nome: o.fornecedor } }))
 
     const receitaBruta = rBruta.total
     const receitaBrutaPrev = rBrutaPrev.total
@@ -106,7 +97,7 @@ export async function GET(req: NextRequest) {
     const margem = (v: number) => (receitaBruta > 0 ? (v / receitaBruta) * 100 : 0)
     const ah = (cur: number, prev: number) => (prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : 0)
 
-    const naoConvertido = [...rBruta.naoConvertido, ...rBrutaPrev.naoConvertido, ...cVariaveis.naoConvertido]
+    const naoConvertido = base.naoConvertido
 
     return NextResponse.json({
       periodoAtual: agora.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
@@ -128,6 +119,7 @@ export async function GET(req: NextRequest) {
         ajustesFinanceiros: { valor: ajustesFinanceiros, prev: 0, av: 0, real: true },
         lucroLiquido: { valor: lucroLiquido, prev: 0, av: margem(lucroLiquido), real: true },
       },
+      semCompetencia,
       detalhe: { impostos: impostosDetalhe, despesas: despesasDetalhe },
       // compatibilidade: `mock` mantido enquanto a tela consumir esse nome,
       // porém agora com dados REAIS (nenhuma estimativa por percentual fixo).
@@ -139,7 +131,8 @@ export async function GET(req: NextRequest) {
         naoConvertido,
         impostos: "cadastro:Imposto",
         aliquotaReceitaTotal: aliquotaTotal,
-        despesas: "ContaPagar › Fornecedor",
+        despesas: "V3 › obrigações A_PAGAR (não-custo) › Fornecedor",
+        motor: "V3 (ObrigacaoEconomica) por competência real (data do lançamento ou vencimento); sem data = linha à parte",
         classificacaoIntermediaria: false,
         classificacaoObs: "Categorias Financeiras, Plano de Contas e Centros de Custo foram eliminados: o comportamento financeiro vive na Configuração Financeira do cadastro mestre.",
       },

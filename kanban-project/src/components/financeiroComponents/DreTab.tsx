@@ -24,6 +24,7 @@ interface DreData {
     receitaBruta: Linha; impostosReceita: Linha; receitaLiquida: Linha; custosVariaveis: Linha
     lucroBruto: Linha; despesasOperacionais: Linha; lucroOperacional: Linha; ajustesFinanceiros: Linha; lucroLiquido: Linha
   }
+  semCompetencia?: { receitas: { qtd: number; totalBRL: number }; aPagar: { qtd: number; totalBRL: number } }
   mock: { impostosDetalhe: { label: string; valor: number }[]; despesasDetalhe: { label: string; valor: number }[] }
 }
 
@@ -90,6 +91,14 @@ export default function DreTab() {
           <DreRow label="(=) LUCRO LÍQUIDO" l={d.dre.lucroLiquido} total />
         </div>
       </div>
+
+      {/* SEM COMPETÊNCIA DEFINIDA — fora de qualquer mês e dos totais acima (igual ao "sem vencimento" do Fluxo) */}
+      {d.semCompetencia && (d.semCompetencia.receitas.qtd > 0 || d.semCompetencia.aPagar.qtd > 0) && (
+        <div className="text-xs text-[var(--text-secondary)] bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3 flex flex-col gap-1" data-testid="dre-sem-competencia">
+          {d.semCompetencia.receitas.qtd > 0 && <span><strong>Sem competência definida:</strong> {d.semCompetencia.receitas.qtd} · {fmtBRL(d.semCompetencia.receitas.totalBRL)} <span className="text-[var(--text-muted)]">(receitas sem data de competência nem vencimento — não entram em nenhum mês acima)</span></span>}
+          {d.semCompetencia.aPagar.qtd > 0 && <span><strong>A pagar sem competência definida:</strong> {d.semCompetencia.aPagar.qtd} · {fmtBRL(d.semCompetencia.aPagar.totalBRL)}</span>}
+        </div>
+      )}
 
       {/* nota de prévia */}
       <div className="flex items-start gap-2 text-xs text-[var(--text-secondary)] bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">

@@ -1,191 +1,139 @@
-// CRIAR EM: src/app/api/financas/receber/route.ts
-//
-// GET /api/financas/receber — aba "A Receber", dados REAIS do banco.
-// Fonte: ParcelaFinanceira (receitaId != null) → Receita → Processo.
-// Campos conferidos no schema:
-//   - ParcelaFinanceira: numero, valor, valorBrl, vencimento, status (PENDENTE/RECEBIDA/PAGA/CANCELADA), dataPagamento
-//   - Receita: nParcelas (total de parcelas), categoria (enum CategoriaReceita), moeda, cancelada, status (ATIVA/RASCUNHO/CANCELADA)
-//   - Processo: nome, pais (enum Pais)
-// Só DSO e "vs Abril" são mock ("prévia").
+// GET /api/financas/receber — aba "A Receber", lida do MOTOR V3 (a mesma fonte da aba Central).
+// Fonte: ObrigacaoEconomica A_RECEBER + OcorrenciaFinanceira de pagamento (ver lib/financeiro/leitura/abas-v3.ts).
+// O motor antigo (ParcelaFinanceira) não é mais lido aqui. Uma obrigação = uma linha; sem vencimento não há "vencida" nem "a vencer".
 
 import { ONDE_PROCESSO_ATIVO_E_NA_TORRE } from "@/src/services/processo-pre-contrato"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { carregarFx, converterBrl } from "@/lib/financeiro/cambio-financas"
+import { carregarBaseV3, diasAte, emAberto as estaEmAberto, recebida as estaRecebida, doMes, soma, SEM_VENCIMENTO } from "@/lib/financeiro/leitura/abas-v3"
 
-function dias(d: Date) { return Math.ceil((new Date(d).getTime() - Date.now()) / 86_400_000) }
-
-// rótulos amigáveis pro enum CategoriaReceita
 const CAT_LABEL: Record<string, string> = {
-  HONORARIOS: "Honorários",
+  RECEITA: "Honorários",
+  RECEITA_EXTRA: "Receita extra",
   REEMBOLSO: "Reembolso",
-  PASTA_DOCUMENTAL: "Pasta documental",
-  OUTROS: "Outros",
 }
 
 export async function GET(_req: NextRequest) {
   try {
-    const agora = new Date()
+    const base = await carregarBaseV3()
+    const agora = base.agora
+    const processosAtivos = await prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_E_NA_TORRE })
 
-    // ETAPA 1A — câmbio da fonte oficial. Sem cotação real não se converte:
-    // o valor fica fora do total e é declarado em `fontes.naoConvertido`.
-    const fx = await carregarFx()
-    const semCotacao: { moeda: string; valor: number }[] = []
-    const toBRL = (v: number, m?: string | null): number => {
-      const c = converterBrl(fx, v, m)
-      if (c == null) { semCotacao.push({ moeda: (m ?? "BRL").toUpperCase(), valor: v }); return 0 }
-      return c
-    }
+    const itens = base.obrigacoes
+      .filter((o) => o.direcao === "A_RECEBER")
+      .map((o) => {
+        const rec = estaRecebida(o)
+        const aberto = estaEmAberto(o)
+        const d = diasAte(o.vencimento, agora)
+        const valorBRL = aberto ? o.saldoBrl : o.contratadoBrl
+        const ultimoPagamento = rec ? base.pagamentos.filter((p) => p.obrigacaoId === o.obrigacaoId).sort((a, b) => b.data.getTime() - a.data.getTime())[0] : undefined
+        return {
+          id: o.obrigacaoId,
+          numero: 1,
+          totalParcelas: 1,
+          cliente: o.processoNome ?? "Avulso",
+          processoId: o.processoId,
+          pais: o.pais,
+          descricao: o.descricao ?? o.codigoOperacional ?? `Receita ${o.obrigacaoId}`,
+          categoria: CAT_LABEL[o.natureza] ?? "Outros",
+          valorBRL,
+          vencimento: o.vencimento,
+          dataPagamento: ultimoPagamento ? ultimoPagamento.data.toISOString() : null,
+          status: rec ? "RECEBIDA" : "PENDENTE",
+          recebida: rec,
+          cancelada: false,
+          atrasada: aberto && d != null && d < 0,
+          diasParaVencer: d ?? SEM_VENCIMENTO,
+          semVencimento: o.vencimento == null,
+          lancamentoOrigemTipo: "receita" as const,
+          lancamentoOrigemId: o.origemTipo === "Receita" ? null : o.obrigacaoId,
+          origem: o.origemLancamento ?? "PROCESSO",
+          natureza: o.natureza,
+          editavelEstrutural: (o.origemLancamento ?? "PROCESSO") !== "PROCESSO",
+          estorno: false,
+          canceladoEm: null,
+          estornadoEm: null,
+          phaseKey: o.phaseKey,
+          configFinanceiraId: o.configFinanceiraId,
+          valorUnitario: null,
+          dataCompetencia: o.criadoEm,
+        }
+      })
 
-    const [parcelas, processosAtivos] = await Promise.all([
-      prisma.parcelaFinanceira.findMany({
-        // só parcelas de RECEITA cuja receita não está cancelada
-        where: { receitaId: { not: null }, receita: { is: { cancelada: false, status: { not: "CANCELADA" } } } },
-        orderBy: { vencimento: "asc" },
-        select: {
-          id: true, numero: true, valor: true, valorBrl: true, vencimento: true, status: true, dataPagamento: true,
-          receita: {
-            select: {
-              id: true, descricao: true, moeda: true, categoria: true, nParcelas: true,
-              // §1/§3/§4 — campos CANÔNICOS do lançamento de origem
-              origemLancamento: true, naturezaLancamento: true, estornoDeId: true, canceladoEm: true, estornadoEm: true,
-              phaseKey: true, configFinanceiraId: true, valorUnitario: true, dataCompetencia: true,
-              processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } },
-            },
-          },
-        },
-      }),
-      prisma.processo.count({ where: ONDE_PROCESSO_ATIVO_E_NA_TORRE }),
-    ])
-
-    const itens = parcelas.map((p) => {
-      const moeda = p.receita?.moeda ?? "BRL"
-      const valorBRL = p.valorBrl ? Number(p.valorBrl) : toBRL(Number(p.valor), moeda)
-      const d = dias(p.vencimento)
-      const recebida = p.status === "RECEBIDA" || p.status === "PAGA"
-      const cancelada = p.status === "CANCELADA"
-      const atrasada = !recebida && !cancelada && p.vencimento < agora
-      return {
-        id: p.id,
-        numero: p.numero,
-        totalParcelas: p.receita?.nParcelas ?? 1,
-        cliente: p.receita?.processo?.nome ?? "Avulso",
-        processoId: p.receita?.processo?.id ?? null,
-        pais: p.receita?.processo?.paisCanonico?.countryKey ?? null,
-        descricao: p.receita?.descricao ?? `Parcela ${p.numero}`,
-        categoria: CAT_LABEL[p.receita?.categoria ?? "OUTROS"] ?? "Outros",
-        valorBRL,
-        vencimento: p.vencimento,
-        dataPagamento: p.dataPagamento,
-        status: p.status,
-        recebida,
-        cancelada,
-        atrasada,
-        diasParaVencer: d,
-        // §1/§3/§4/§5 — canônico: origem, vínculo, natureza, bloqueio de edição, estorno
-        lancamentoOrigemTipo: "receita" as const,
-        lancamentoOrigemId: p.receita?.id ?? null,
-        origem: (p.receita?.origemLancamento ?? "PROCESSO") as string,
-        natureza: (p.receita?.naturezaLancamento ?? "RECEITA") as string,
-        editavelEstrutural: (p.receita?.origemLancamento ?? "PROCESSO") !== "PROCESSO",
-        estorno: p.receita?.estornoDeId != null,
-        canceladoEm: p.receita?.canceladoEm ?? null,
-        estornadoEm: p.receita?.estornadoEm ?? null,
-        phaseKey: p.receita?.phaseKey ?? null,
-        configFinanceiraId: p.receita?.configFinanceiraId ?? null,
-        valorUnitario: p.receita?.valorUnitario != null ? Number(p.receita.valorUnitario) : null,
-        dataCompetencia: p.receita?.dataCompetencia ?? null,
-      }
-    })
-
-    const emAberto = itens.filter((i) => !i.recebida && !i.cancelada)
-    const aReceber = emAberto.reduce((a, i) => a + i.valorBRL, 0)
+    const aberto = itens.filter((i) => !i.recebida && !i.cancelada)
+    const aReceber = soma(aberto, (i) => i.valorBRL)
     const atrasadas = itens.filter((i) => i.atrasada)
-    const vencido = atrasadas.reduce((a, i) => a + i.valorBRL, 0)
-    const recebidoMes = itens
-      .filter((i) => i.recebida && i.dataPagamento && new Date(i.dataPagamento).getMonth() === agora.getMonth() && new Date(i.dataPagamento).getFullYear() === agora.getFullYear())
-      .reduce((a, i) => a + i.valorBRL, 0)
-
-    const aVencer7 = emAberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= 7).reduce((a, i) => a + i.valorBRL, 0)
-    const aVencer30 = emAberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= 30).reduce((a, i) => a + i.valorBRL, 0)
+    const vencido = soma(atrasadas, (i) => i.valorBRL)
+    const recebidoMes = soma(base.pagamentos.filter((p) => p.direcao === "A_RECEBER" && doMes(p.data, agora)), (p) => p.valorBrl)
+    const noHorizonte = (n: number) => aberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= n)
+    const aVencer7 = soma(noHorizonte(7), (i) => i.valorBRL)
+    const aVencer30 = soma(noHorizonte(30), (i) => i.valorBRL)
     const inadimplencia = aReceber > 0 ? (vencido / aReceber) * 100 : 0
-    const ticketMedio = emAberto.length > 0 ? aReceber / emAberto.length : 0
+    const ticketMedio = aberto.length > 0 ? aReceber / aberto.length : 0
 
-    // aging
-    const noPrazo = emAberto.filter((i) => i.diasParaVencer >= 0)
-    const b30 = emAberto.filter((i) => i.atrasada && i.diasParaVencer >= -30 && i.diasParaVencer < 0)
-    const b60 = emAberto.filter((i) => i.atrasada && i.diasParaVencer >= -60 && i.diasParaVencer < -30)
-    const b90 = emAberto.filter((i) => i.atrasada && i.diasParaVencer < -60)
-    const soma = (arr: typeof itens) => arr.reduce((a, i) => a + i.valorBRL, 0)
+    const noPrazo = aberto.filter((i) => i.diasParaVencer >= 0)
+    const b30 = aberto.filter((i) => i.atrasada && i.diasParaVencer >= -30 && i.diasParaVencer < 0)
+    const b60 = aberto.filter((i) => i.atrasada && i.diasParaVencer >= -60 && i.diasParaVencer < -30)
+    const b90 = aberto.filter((i) => i.atrasada && i.diasParaVencer < -60)
+    const tot = (arr: typeof itens) => soma(arr, (i) => i.valorBRL)
     const aging = {
-      noPrazo: { total: soma(noPrazo), qtd: noPrazo.length },
-      d30: { total: soma(b30), qtd: b30.length },
-      d60: { total: soma(b60), qtd: b60.length },
-      d90: { total: soma(b90), qtd: b90.length },
+      noPrazo: { total: tot(noPrazo), qtd: noPrazo.length },
+      d30: { total: tot(b30), qtd: b30.length },
+      d60: { total: tot(b60), qtd: b60.length },
+      d90: { total: tot(b90), qtd: b90.length },
     }
 
-    // A LISTA VEM DO CADASTRO. Era `["ITALIA","ESPANHA","ALEMANHA","PORTUGAL"]`
-    // em MAIÚSCULAS, comparada com o valor do banco em minúsculas: a quebra por
-    // país sempre devolveu zero em todas as linhas, e ninguém percebeu porque
-    // zero é um número plausível. País novo também nunca apareceria.
+    // A LISTA DE PAÍSES VEM DO CADASTRO (nunca fixa em código).
     const paisesCadastrados = await prisma.catalogoPais.findMany({
-      where: { ativo: true },
-      select: { countryKey: true, countryLabel: true, flag: true },
-      orderBy: { countryLabel: "asc" },
+      where: { ativo: true }, select: { countryKey: true, countryLabel: true, flag: true }, orderBy: { countryLabel: "asc" },
     })
     const porPais = paisesCadastrados.map((c) => ({
-      pais: c.countryLabel,
-      chave: c.countryKey,
-      flag: c.flag ?? null,
-      total: soma(emAberto.filter((i) => (i.pais ?? "").toLowerCase() === c.countryKey.toLowerCase())),
+      pais: c.countryLabel, chave: c.countryKey, flag: c.flag ?? null,
+      total: tot(aberto.filter((i) => (i.pais ?? "").toLowerCase() === c.countryKey.toLowerCase())),
     }))
 
     const mapaDevedor = new Map<number, { nome: string; pais: string | null; total: number }>()
-    for (const i of emAberto) {
+    for (const i of aberto) {
       if (!i.processoId) continue
       const cur = mapaDevedor.get(i.processoId) ?? { nome: i.cliente, pais: i.pais, total: 0 }
-      cur.total += i.valorBRL
+      cur.total = Math.round((cur.total + i.valorBRL) * 100) / 100
       mapaDevedor.set(i.processoId, cur)
     }
     const topDevedores = [...mapaDevedor.entries()].map(([id, v]) => ({ processoId: id, ...v })).sort((a, b) => b.total - a.total).slice(0, 5)
 
     const resumo = {
-      totalPrevisto: soma(itens.filter((i) => !i.cancelada)),
+      totalPrevisto: tot(itens.filter((i) => !i.cancelada)),
       recebido: recebidoMes,
-      emAberto: soma(emAberto.filter((i) => !i.atrasada)),
+      emAberto: tot(aberto.filter((i) => !i.atrasada)),
       atrasado: vencido,
-      previstoFuturo: soma(emAberto.filter((i) => i.diasParaVencer > 30)),
+      previstoFuturo: tot(aberto.filter((i) => i.diasParaVencer > 30)),
     }
 
-    // ordena: atrasada → em aberto → recebida; depois por vencimento
-    const peso = (i: typeof itens[number]) => (i.atrasada ? 0 : i.recebida ? 4 : i.cancelada ? 5 : 1)
-    const lista = [...itens].sort((a, b) => {
-      const pa = peso(a), pb = peso(b)
-      if (pa !== pb) return pa - pb
-      return new Date(a.vencimento).getTime() - new Date(b.vencimento).getTime()
-    })
+    const peso = (i: typeof itens[number]) => (i.atrasada ? 0 : i.recebida ? 4 : 1)
+    const venc = (i: typeof itens[number]) => (i.vencimento ? new Date(i.vencimento).getTime() : Number.POSITIVE_INFINITY)
+    const lista = [...itens].sort((a, b) => peso(a) - peso(b) || venc(a) - venc(b) || a.id - b.id)
 
+    const semVencimento = aberto.filter((i) => i.semVencimento)
     return NextResponse.json({
       kpis: {
         aReceber, vencido, aVencer7, aVencer30, inadimplencia, ticketMedio,
-        qtdAberto: emAberto.length, qtdAtrasadas: atrasadas.length,
-        qtdAVencer7: emAberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= 7).length,
+        qtdAberto: aberto.length, qtdAtrasadas: atrasadas.length, qtdAVencer7: noHorizonte(7).length,
         processosAtivos,
       },
       aging, porPais, topDevedores, resumo, parcelas: lista,
       contagem: {
-        todos: itens.length,
-        atrasadas: atrasadas.length,
-        proximos7: emAberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= 7).length,
-        proximos30: emAberto.filter((i) => i.diasParaVencer >= 0 && i.diasParaVencer <= 30).length,
+        todos: itens.length, atrasadas: atrasadas.length,
+        proximos7: noHorizonte(7).length, proximos30: noHorizonte(30).length,
         recebidas: itens.filter((i) => i.recebida).length,
       },
       mock: { dso: 0 },
       fontes: {
-        cambio: fx.fonte,
-        cambioDataReferencia: fx.dataReferencia,
-        moedasSemCotacao: fx.indisponiveis,
-        naoConvertido: semCotacao,
+        motor: "V3 (ObrigacaoEconomica + OcorrenciaFinanceira)",
+        cambio: base.fx.fonte,
+        cambioDataReferencia: base.fx.dataReferencia,
+        moedasSemCotacao: base.fx.indisponiveis,
+        naoConvertido: base.naoConvertido,
+        semVencimento: { qtd: semVencimento.length, totalBRL: tot(semVencimento) },
       },
     })
   } catch (e) {
