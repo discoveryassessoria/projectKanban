@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/coleta-purga",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/conferidor-orfaos",
+      "schedule": "0 8 * * 1"
     }
   ]
 }
