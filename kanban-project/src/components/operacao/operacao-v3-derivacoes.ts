@@ -250,6 +250,14 @@ const ordemCategoria = (l: LinhaOperacaoV3): number => (l.categoriaDoc ? ORDEM_C
  *  linha reta (`tarefa-projecoes.ts::projetar`) — agrupar por `pessoaId` funde
  *  a certidão de casamento no MESMO grupo do nascimento/óbito dessa pessoa,
  *  nunca um grupo "Fulano e Fulana" à parte. */
+/** A ORDEM DE QUALQUER LISTA DE CERTIDÕES: G1→Gn, a mesma pessoa junta, e dentro dela nascimento → casamento → óbito. Estável. */
+export function ordenarPorEvento(linhas: LinhaOperacaoV3[]): LinhaOperacaoV3[] {
+  return [...linhas].sort((a, b) =>
+    (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity)
+    || String(a.pessoaNome ?? "").localeCompare(String(b.pessoaNome ?? ""), "pt-BR")
+    || ordemCategoria(a) - ordemCategoria(b))
+}
+
 export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "pessoa" | "orgao" | "passo"): GrupoDeLinhas[] {
   // G1→Gn e, na mesma geração, a ORDEM DO EVENTO (nascimento → casamento → óbito) — vale para qualquer agrupamento (pessoa, órgão, passo).
   const linhas = [...linhasEntrada].sort((a, b) => (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity) || ordemCategoria(a) - ordemCategoria(b))
@@ -322,7 +330,8 @@ export function agruparPorFamilia(linhas: LinhaOperacaoV3[]): FamiliaComGrupos[]
     mapa.get(k)!.push(l)
   }
   return ordem.map((k) => {
-    const rs = mapa.get(k)!
+    // Em TODAS as abas (A fazer, Aguardando, Acompanhamento, Feito, Fila) as certidões da família saem por evento: nascimento → casamento → óbito.
+    const rs = ordenarPorEvento(mapa.get(k)!)
     return { fam: k, pais: rs[0].pais, faseAtualLabel: rs[0].faseAtualDoProcessoLabel, linhas: rs }
   })
 }
@@ -336,5 +345,5 @@ export function agruparPorOrgao(linhas: LinhaOperacaoV3[]): FamiliaComGrupos[] {
     if (!mapa.has(k)) { mapa.set(k, []); ordem.push(k) }
     mapa.get(k)!.push(l)
   }
-  return ordem.map((k) => ({ fam: k, pais: null, faseAtualLabel: null, linhas: mapa.get(k)! }))
+  return ordem.map((k) => ({ fam: k, pais: null, faseAtualLabel: null, linhas: ordenarPorEvento(mapa.get(k)!) }))
 }

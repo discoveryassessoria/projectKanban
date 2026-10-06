@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import { useRouter, useSearchParams } from "next/navigation"
-import { urlArvoreDoProcesso, ABAS_DA_OPERACAO, type AbaDaOperacao } from "@/lib/operacional/navegacao"
+import { urlArvoreDoProcesso, urlOperacionalDoProcesso, ABAS_DA_OPERACAO, type AbaDaOperacao } from "@/lib/operacional/navegacao"
 import { auth } from "./kit-operacional"
 import { useJsonLocalStorage } from "@/src/lib/cliente"
 import { DocumentoOperationalDrawer } from "@/src/components/kanban/DocumentoOperationalDrawer"
@@ -201,7 +201,8 @@ export function OperacaoV3({ gestor = false }: { gestor?: boolean }) {
   const nRadar = somaDosCartoesDoRadar({ atras, acompVenc, decis, noOrg, genOpen }, { verEscaladas: gestor })
 
 
-  const linhaPorId = useMemo(() => new Map(todos.map((l) => [l.taskId, l])), [todos])
+  // Abertas E concluídas: o "Abrir" da aba Feito (e da Famílias, nas concluídas) abre o mesmo painel — sem a concluída aqui, o clique não achava a linha e nada acontecia.
+  const linhaPorId = useMemo(() => new Map([...todos, ...feitoVisivel].map((l) => [l.taskId, l])), [todos, feitoVisivel])
   const drawerLinha = drawerTaskId != null ? linhaPorId.get(drawerTaskId) ?? null : null
   const focusOn = focus != null && drawerLinha != null
 
@@ -406,7 +407,8 @@ export function OperacaoV3({ gestor = false }: { gestor?: boolean }) {
             <AbaFamilias
               abertos={abertosVisiveis} feito={feitoVisivel}
               famOpen={famOpen} setFamOpen={setFamOpen} famUltimo={famUltimo} setFamUltimo={setFamUltimo}
-              onAbrir={(id) => setDrawerTaskId(id)} onNaoLigado={naoLigado}
+              onAbrir={(id) => setDrawerTaskId(id)}
+              onAbrirProcesso={(processoId) => router.push(urlOperacionalDoProcesso(processoId))}
             />
           )}
           {tab === "radar" && (
@@ -417,7 +419,6 @@ export function OperacaoV3({ gestor = false }: { gestor?: boolean }) {
               onKEsc={() => { setTab("aguard"); setQuick("escaladas") }}
               onNoOrg={() => { setTab("fila"); setRadar("noorg") }}
               onFaseAnterior={() => { setTab("fila"); setRadar("faseant") }}
-              onNaoLigado={naoLigado}
             />
           )}
           {tab === "feito" && (

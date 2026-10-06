@@ -234,6 +234,7 @@
     "scripts/operacao-ordem-por-evento.test.ts",
     "scripts/referencia-registral-maiuscula.test.ts",
     "scripts/operacao-colunas-alinhadas.test.ts",
+    "scripts/operacao-abrir-e-feito-por-pessoa.test.ts",
     "scripts/coleta-pendentes-prazo.test.ts",
     "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",

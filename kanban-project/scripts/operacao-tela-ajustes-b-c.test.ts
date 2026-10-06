@@ -55,7 +55,7 @@ const cenariosSoma: Array<[string, typeof v, boolean]> = [
   ["misto sem gestor", { ...v, atras: [1], acompVenc: [1, 2], decis: [1], noOrg: [1], genOpen: [1, 2, 3] }, false],
 ]
 for (const [nome, c, g] of cenariosSoma) {
-  const html = renderToStaticMarkup(createElement(AbaRadar, { atras: reais(c.atras), acompVenc: reais(c.acompVenc), decis: reais(c.decis), noOrg: reais(c.noOrg), genOpen: reais(c.genOpen), verEscaladas: g, escaladaLimiar: 2, onKAtras: nada, onGoAcomp: nada, onKEsc: nada, onNoOrg: nada, onFaseAnterior: nada, onNaoLigado: nada }))
+  const html = renderToStaticMarkup(createElement(AbaRadar, { atras: reais(c.atras), acompVenc: reais(c.acompVenc), decis: reais(c.decis), noOrg: reais(c.noOrg), genOpen: reais(c.genOpen), verEscaladas: g, escaladaLimiar: 2, onKAtras: nada, onGoAcomp: nada, onKEsc: nada, onNoOrg: nada, onFaseAnterior: nada }))
   // soma dos números que aparecem nos 5 cartões da fila renderizados (os 4 fixos são "0")
   const numeros = [...html.matchAll(/<span class="opv3-pill opv3-p-(?:red|grn)">(\d+)<\/span>/g)].map((m) => Number(m[1]))
   const somaTela = numeros.reduce((a, b) => a + b, 0)
@@ -90,7 +90,7 @@ const nomes = familiasDaAba([aberA], [feitoC])
 ok("Antão (aberta) + Cibils (só concluída recente) → 2 famílias", nomes.length === 2 && nomes[0] === "Antão" && nomes[1] === "Cibils")
 ok("sem duplicar: mesma família aberta e concluída → 1", familiasDaAba([aberA], [L({ taskId: 9, familiaNome: "Antão" })]).length === 1)
 ok("sem família cadastrada cai no nome do processo", chaveDaFamilia({ familiaNome: null, processoNome: "Proc 7" }) === "Proc 7")
-const htmlFam = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [aberA], feito: [feitoC], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onNaoLigado: nada }))
+const htmlFam = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [aberA], feito: [feitoC], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onAbrirProcesso: nada }))
 const nCards = (htmlFam.match(/Gargalo:/g) ?? []).length
 ok("renderizado: nº de famílias na aba = familiasDaAba().length", nCards === nomes.length, `${nCards}`)
 ok("a tela da aba usa a MESMA função para o número", /familiasDaAba\(abertosVisiveis, feitoVisivel\)\.length/.test(v3) && /familiasDaAba\(abertos, feito\)/.test(abas))
@@ -109,11 +109,11 @@ const emissaoSemOrgao = L({ taskId: 2, faseMacroKey: "emissao_documental", docum
 ok("Emissão sem órgão É gargalo, e o cartão 'Sem órgão emissor' conta a mesma", gargaloDaFamilia([emissaoSemOrgao]) === "órgão emissor não vinculado" && precisaDeOrgaoEmissor(emissaoSemOrgao))
 ok("tarefa sem documento (gestor/manual) nunca é gargalo de órgão", gargaloDaFamilia([L({ documentoId: null, faseMacroKey: "emissao_documental" })]) === "—")
 ok("órgão com mais escaladas ganha", gargaloDaFamilia([L({ escalada: true, terceiroNome: "Cartório A" }), L({ escalada: true, terceiroNome: "Cartório A" }), L({ escalada: true, terceiroNome: "B" })]) === "Cartório A (escalada)")
-const htmlAntao = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [genSemOrgao], feito: [], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onNaoLigado: nada }))
+const htmlAntao = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [genSemOrgao], feito: [], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onAbrirProcesso: nada }))
 ok("renderizado (Antão, Genealogia): 'Gargalo: —' e NÃO diz 'órgão emissor não vinculado'", /Gargalo:[^<]*<b>—<\/b>/.test(htmlAntao) && !/órgão emissor não vinculado/.test(htmlAntao))
 ok("sem o dado da próxima fase: o 'Próximo marco' é OMITIDO (nunca 'Análise documental' fixo)", !/Próximo marco/.test(htmlAntao) && !/Análise documental/.test(abas))
 const comMarco = L({ proximaFaseDoProcessoLabel: "Emissão documental" })
-ok("com o dado da próxima fase, mostra o marco", proximoMarcoDaFamilia([comMarco]) === "Emissão documental" && /Próximo marco: <b>Emissão documental<\/b>/.test(renderToStaticMarkup(createElement(AbaFamilias, { abertos: [comMarco], feito: [], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onNaoLigado: nada }))))
+ok("com o dado da próxima fase, mostra o marco", proximoMarcoDaFamilia([comMarco]) === "Emissão documental" && /Próximo marco: <b>Emissão documental<\/b>/.test(renderToStaticMarkup(createElement(AbaFamilias, { abertos: [comMarco], feito: [], famOpen: null, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onAbrirProcesso: nada }))))
 ok("a aba usa gargaloDaFamilia (não a conta própria aIniciar && documentoId && !terceiroNome)", /gargaloDaFamilia\(abertosDaFam\)/.test(abas) && !/aIniciarEfetivo\(l\) && l\.documentoId != null && !l\.terceiroNome/.test(abas))
 
 // ── B6 ───────────────────────────────────────────────────────────────────────
@@ -122,7 +122,7 @@ ok("admin é gestor", ehGestorDaOperacao({ isAdmin: true, pode: () => false }))
 ok("quem tem operacao.distribuirTarefas é gestor", ehGestorDaOperacao({ isAdmin: false, pode: (c) => c === "operacao.distribuirTarefas" }))
 ok("assistente (Daniela) não é gestor", !ehGestorDaOperacao({ isAdmin: false, pode: () => false }))
 ok("a chave existe em src/lib/permissoes.ts", /'operacao\.distribuirTarefas'/.test(ler("src/lib/permissoes.ts")))
-const radarProps = { atras: [], acompVenc: [], decis: [L({ escalada: true })], noOrg: [], genOpen: [], escaladaLimiar: 2, onKAtras: nada, onGoAcomp: nada, onKEsc: nada, onNoOrg: nada, onFaseAnterior: nada, onNaoLigado: nada }
+const radarProps = { atras: [], acompVenc: [], decis: [L({ escalada: true })], noOrg: [], genOpen: [], escaladaLimiar: 2, onKAtras: nada, onGoAcomp: nada, onKEsc: nada, onNoOrg: nada, onFaseAnterior: nada }
 const htmlNaoGestor = renderToStaticMarkup(createElement(AbaRadar, { ...radarProps, verEscaladas: false }))
 const htmlGestor = renderToStaticMarkup(createElement(AbaRadar, { ...radarProps, verEscaladas: true }))
 ok("renderizado (não gestor): o cartão NÃO existe", !/Escaladas ao gestor/.test(htmlNaoGestor))
@@ -150,7 +150,7 @@ ok("renderizado (Aguardando): cabeçalho 'Passo atual' seguido de 'Status'", /<s
 ok("renderizado (Aguardando): tarefa EM_ANDAMENTO mostra 'Em andamento', nunca 'A iniciar'", />Em andamento</.test(htmlAg) && !/A iniciar/.test(htmlAg))
 ok("renderizado (Aguardando): Documento só o tipo, sem '· com' nem 'Inteiro Teor'", />Certidão de Casamento</.test(htmlAg) && !/· com |Inteiro Teor/.test(htmlAg))
 ok("renderizado (Aguardando): passo sem 'A iniciar ·' nem 'fase Genealogia'", !/A iniciar ·|fase Genealogia/.test(htmlAg) && /Localizar registro da certidão/.test(htmlAg))
-const htmlFamAberta = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [emAnd], feito: [], famOpen: { fam: "Antão", estagio: "cartorio" }, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onNaoLigado: nada }))
+const htmlFamAberta = renderToStaticMarkup(createElement(AbaFamilias, { abertos: [emAnd], feito: [], famOpen: { fam: "Antão", estagio: "cartorio" }, setFamOpen: nada, famUltimo: {}, setFamUltimo: nada, onAbrir: nada, onAbrirProcesso: nada }))
 ok("renderizado (Famílias expandida): Passo atual → Status, 'Em andamento', sem '· com'", /<span>Passo atual<\/span><span>Status<\/span>/.test(htmlFamAberta) && />Em andamento</.test(htmlFamAberta) && !/· com /.test(htmlFamAberta))
 
 // estático: nenhuma tela reintroduz o texto velho
