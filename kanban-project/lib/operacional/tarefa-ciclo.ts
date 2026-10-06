@@ -23,7 +23,7 @@ import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonica'
-import { reabrirPassoTx } from '@/src/services/task-step-sync'
+import { reabrirPassoTx, limparResponsavelDoPassoTx } from '@/src/services/task-step-sync'
 import { politicaDeSla, pausarSla, retomarSla } from './sla-pausa'
 import { marcarAtribuicaoComoLidaAoProgredir, sincronizarAvisosDeTarefas } from './notificacao-canonica'
 import { aoMudarDeDono } from './avisos-fatos'
@@ -474,17 +474,17 @@ async function desbloquearTarefaNucleo(args: { tarefaId: number; autorId: number
 export async function devolverAFila(args: {
   tarefaId: number; autorId: number; motivo?: string | null
   /**
-   * TIRAR O DONO DE UMA TAREFA EM ANDAMENTO EXIGE CONFIRMAÇÃO EXPLÍCITA (achado 30/09/2026, processo 651:
-   * #3834/#3845/#3850 ficaram EM_ANDAMENTO sem responsável depois de um "devolver à fila" em lote, e a tela
-   * as mostrava como "A iniciar"). O status NÃO muda ao devolver — quem já começou não "des-começa" — então
-   * o que sobra é trabalho em curso sem dono; por isso o pedido sem esta flag é recusado com código próprio.
+   * TIRAR O DONO DE UMA TAREFA JÁ INICIADA EXIGE CONFIRMAÇÃO EXPLÍCITA (achado 30/09/2026, processo 651: #3834/#3845/#3850 ficaram EM_ANDAMENTO
+   * sem responsável depois de um "devolver à fila" em lote). "Iniciada" = tarefa em andamento OU passo em andamento/executado/aguardando/concluído
+   * (06/10/2026: "Remover responsável" também protege o passo). O status NÃO muda ao remover — quem já começou não "des-começa"; o ANDAMENTO fica
+   * preservado, e o que sobra é trabalho em curso sem dono; por isso o pedido sem esta flag é recusado com código próprio.
    */
   confirmarTarefaEmAndamento?: boolean
 }): Promise<Resultado> {
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
-      select: { id: true, titulo: true, responsavelId: true, equipeKey: true, statusTarefa: true, processoId: true },
+      select: { id: true, titulo: true, responsavelId: true, equipeKey: true, statusTarefa: true, processoId: true, workflowStepInstanceId: true, responsavel: { select: { nome: true } } },
     })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
@@ -493,23 +493,33 @@ export async function devolverAFila(args: {
     if (t.responsavelId == null) {
       return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'A tarefa já está com a equipe, sem responsável.' }
     }
-    if (t.statusTarefa === 'EM_ANDAMENTO' && args.confirmarTarefaEmAndamento !== true) {
+    const passo = t.workflowStepInstanceId != null
+      ? await tx.phaseWorkflowStepInstance.findUnique({ where: { id: t.workflowStepInstanceId }, select: { id: true, status: true, startedAt: true, responsavelId: true } })
+      : null
+    const passoIniciado = !!passo && (passo.startedAt != null || ['EM_ANDAMENTO', 'EXECUTADO', 'AGUARDANDO', 'AGUARDANDO_APROVACAO', 'CONCLUIDO'].includes(String(passo.status)))
+    const iniciada = t.statusTarefa === 'EM_ANDAMENTO' || passoIniciado
+    if (iniciada && args.confirmarTarefaEmAndamento !== true) {
       return {
         ok: false as const, codigo: 'CONFIRMACAO_NECESSARIA' as const,
-        mensagem: 'Esta tarefa está EM ANDAMENTO. Tirar o responsável a deixa em andamento e sem dono. Confirme para devolvê-la à equipe.',
+        mensagem: 'Esta tarefa JÁ FOI INICIADA (tarefa ou passo em andamento). Tirar o responsável preserva o andamento e a deixa sem dono. Confirme para devolvê-la à equipe.',
       }
     }
     await tx.tarefa.update({
       where: { id: t.id },
       data: { responsavelId: null, dataAtribuicao: null, atribuidoPorId: null, lockVersion: { increment: 1 } },
     })
+    // O RESPONSÁVEL DO PASSO ATIVO ("executa …") sai junto: um só dono do trabalho (a tarefa), nunca um executor órfão no passo.
+    if (passo && passo.responsavelId != null) {
+      await limparResponsavelDoPassoTx(tx, passo.id)
+    }
+    const nomeAnterior = t.responsavel?.nome ?? `usuário ${t.responsavelId}`
     await auditar(tx, 'TAREFA_DEVOLVIDA_A_FILA', t.id, args.autorId,
-      `Tarefa "${t.titulo}" devolvida à equipe (sem responsável)${t.equipeKey ? ` — ${t.equipeKey}` : ''} (era do usuário ${t.responsavelId}).` +
+      `Responsável removido de "${t.titulo}" (${nomeAnterior} → ninguém)${t.equipeKey ? ` — volta à fila da ${t.equipeKey}` : ''}. Origem: manual.` +
       (args.motivo ? ` Motivo: ${args.motivo}` : ''),
-      { tarefaId: t.id, de: t.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null,
-        statusTarefa: t.statusTarefa, confirmouTarefaEmAndamento: t.statusTarefa === 'EM_ANDAMENTO' })
+      { tarefaId: t.id, de: t.responsavelId, deNome: nomeAnterior, equipeKey: t.equipeKey, motivo: args.motivo ?? null, origem: 'manual',
+        statusTarefa: t.statusTarefa, passoLimpo: !!passo && passo.responsavelId != null, iniciada, confirmouTarefaEmAndamento: iniciada })
     // O SINO (redesenho 29/09/2026) — os avisos de quem tinha a tarefa somem na hora e
-    // nasce o MUDOU_DE_MAO ("N tarefas saíram da sua fila").
+    // nasce o MUDOU_DE_MAO ("N tarefas saíram da sua fila"). `aoMudarDeDono` nunca avisa o autor da própria ação.
     await aoMudarDeDono(tx, { tarefas: [{ id: t.id, processoId: t.processoId }], de: t.responsavelId, para: null, autorId: args.autorId })
     return { ok: true as const, tarefaId: t.id }
   })

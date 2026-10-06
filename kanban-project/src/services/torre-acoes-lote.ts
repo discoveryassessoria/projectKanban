@@ -28,7 +28,7 @@
 import { separarPrioridadeDoLote, rotuloDaPrioridade, type PrioridadeDoModelo } from '@/lib/operacional/torre-prioridade-lote'
 import { prisma } from '@/lib/prisma'
 import { redistribuirTarefas, redistribuirPrioridade, type ItemDaRedistribuicao } from '@/lib/operacional/tarefa-comandos'
-import { alterarPrazo, alterarPrioridade } from '@/lib/operacional/tarefa-ciclo'
+import { alterarPrazo, alterarPrioridade, devolverAFila } from '@/lib/operacional/tarefa-ciclo'
 import { desfazerAtribuicao } from '@/src/services/precisa-de-voce-acoes'
 import { cobrarTarefas, type CobrancaIgnorada } from '@/src/services/cobranca-terceiros'
 import { encerrarIndisponibilidade } from '@/lib/operacional/organizacao'
@@ -46,7 +46,7 @@ export { JANELA_DO_DESFAZER_MS }
 export type TipoDesfazer = 'ATRIBUICAO' | 'PRIORIDADE' | 'PRAZO' | 'AUSENCIA' | 'COBRANCA'
 
 export interface ResultadoDoLote {
-  acao: 'ATRIBUIR' | 'PRIORIDADE_ALTA' | 'PRIORIDADE' | 'REPACTUAR' | 'COBRAR'
+  acao: 'ATRIBUIR' | 'REMOVER_RESPONSAVEL' | 'PRIORIDADE_ALTA' | 'PRIORIDADE' | 'REPACTUAR' | 'COBRAR'
   total: number
   sucesso: number
   falha: number
@@ -89,6 +89,52 @@ export async function atribuirEmLote(args: { tarefaIds: number[]; responsavelId:
     acao: 'ATRIBUIR', total: r.total, sucesso: r.sucesso, falha: r.falha, itens,
     desfazer: r.sucesso > 0 ? { tipo: 'ATRIBUICAO', tarefaIds: itens.filter((i) => i.ok).map((i) => i.tarefaId) } : null,
   }
+}
+
+// ─── REMOVER RESPONSÁVEL (devolver à fila de distribuição) ───────────────────
+
+/** A PRÉVIA da remoção — nomeia pessoa por pessoa e tarefa por tarefa; nada é gravado. `null` = nenhuma das tarefas tem responsável. */
+export async function previaDeRemoverResponsavel(tarefaIds: number[]): Promise<import('@/src/lib/torre-confirmacao').PreviaDeConfirmacao | null> {
+  const ts = await prisma.tarefa.findMany({
+    where: { id: { in: tarefaIds }, responsavelId: { not: null }, statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] } },
+    select: {
+      id: true, titulo: true, statusTarefa: true, responsavelId: true, responsavel: { select: { nome: true } },
+      processo: { select: { nome: true, arvore: { select: { nome: true } } } },
+      workflowStepInstance: { select: { status: true, startedAt: true } },
+    },
+    orderBy: { id: 'asc' },
+  })
+  if (ts.length === 0) return null
+  const porPessoa = new Map<string, string[]>()
+  let iniciadas = 0
+  for (const t of ts) {
+    const nome = t.responsavel?.nome ?? `usuário ${t.responsavelId}`
+    const familia = t.processo?.arvore?.nome ?? t.processo?.nome ?? ''
+    const linha = `${t.titulo}${familia ? ` · ${familia}` : ''}`
+    porPessoa.set(nome, [...(porPessoa.get(nome) ?? []), linha])
+    const st = t.workflowStepInstance
+    if (t.statusTarefa === 'EM_ANDAMENTO' || (st && (st.startedAt != null || ['EM_ANDAMENTO', 'EXECUTADO', 'AGUARDANDO', 'AGUARDANDO_APROVACAO', 'CONCLUIDO'].includes(String(st.status))))) iniciadas++
+  }
+  const itens = [...porPessoa.entries()].map(([pessoa, tarefas]) => ({ pessoa, quantidade: tarefas.length, tarefas }))
+  const frase = itens.map((i) => `${i.pessoa} de ${i.quantidade} ${i.quantidade === 1 ? 'tarefa' : 'tarefas'}: ${i.tarefas.join('; ')}`).join(' · ')
+  return {
+    pergunta: `Remover ${frase}?`, itens, assinatura: ts.map((t) => `${t.id}:${t.responsavelId}`).join(','),
+    pedeMotivo: true,
+    ...(iniciadas > 0 ? { exigeConfirmacaoDeAndamento: true, alerta: `${iniciadas} ${iniciadas === 1 ? 'tarefa já foi iniciada' : 'tarefas já foram iniciadas'}: o andamento é preservado e ${iniciadas === 1 ? 'ela fica' : 'elas ficam'} sem dono até a distribuição.` } : {}),
+  }
+}
+
+/** Remove o responsável de cada tarefa pela porta canônica (`devolverAFila`): fica "sem responsável", o passo ativo é limpo, o histórico e o sino acompanham. */
+export async function removerResponsavelEmLote(args: { tarefaIds: number[]; autorId: number; motivo?: string | null; confirmarAndamento?: boolean }): Promise<ResultadoDoLote> {
+  const itens: ResultadoDoLote['itens'] = []
+  const feitas: number[] = []
+  for (const tarefaId of args.tarefaIds) {
+    const r = await devolverAFila({ tarefaId, autorId: args.autorId, motivo: args.motivo ?? null, confirmarTarefaEmAndamento: args.confirmarAndamento === true })
+    if (r.ok) { itens.push({ tarefaId, ok: true }); feitas.push(tarefaId) } else itens.push({ tarefaId, ok: false, mensagem: r.mensagem })
+  }
+  const sucesso = feitas.length
+  if (sucesso > 0) await auditarLote(args.autorId, 'TORRE_LOTE_REMOVER_RESPONSAVEL', `Remover responsável em lote pela Torre: ${sucesso} de ${itens.length} tarefa(s) voltaram à fila de distribuição.` + (args.motivo ? ` Motivo: ${args.motivo}` : ''), { tarefaIds: feitas, motivo: args.motivo ?? null, origem: 'manual' })
+  return { acao: 'REMOVER_RESPONSAVEL', total: itens.length, sucesso, falha: itens.length - sucesso, itens, desfazer: null }
 }
 
 // ─── PRIORIDADE ALTA ─────────────────────────────────────────────────────────

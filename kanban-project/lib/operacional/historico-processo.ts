@@ -498,8 +498,8 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       return [a]
     }
     case 'TAREFA_DEVOLVIDA_A_FILA': {
-      const de = nomeDoUsuario(ctx, num(d.de))
-      return [simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: 'devolvida', verbo: 'devolveu à fila da equipe' }, 'a', { motivo: txt(d.motivo), efeito: de ? `deixou de ser de ${de}` : null, mudancas: [{ campo: 'responsável', antes: de, depois: 'ninguém' }] })]
+      const de = nomeDoUsuario(ctx, num(d.de)) ?? txt(d.deNome)
+      return [simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: 'devolvida', verbo: 'removeu o responsável' }, 'de', { motivo: txt(d.motivo), efeito: `(${de ?? 'alguém'} → ninguém) · origem ${txt(d.origem) ?? 'manual'}`, mudancas: [{ campo: 'responsável', antes: de, depois: 'ninguém' }] })]
     }
     case 'TAREFA_ATRIBUICAO_DESFEITA':
       return [simples({ rank: 2, tipo: 'ATRIBUICAO', subtipo: 'atribuicao_desfeita', verbo: 'desfez a atribuição' }, 'de', { motivo: txt(d.motivo) })]

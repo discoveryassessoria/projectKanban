@@ -831,6 +831,15 @@ export async function reabrirPassoTx(
   return { changed: true, anterior: step.status, atual: alvo }
 }
 
+/**
+ * LIMPA O RESPONSÁVEL (executor) DO PASSO — usado por "Remover responsável" (`devolverAFila`): a tarefa volta à fila e o passo ativo não
+ * pode seguir com um executor órfão. Não muda o STATUS do passo (o andamento é preservado). Dentro da transação de quem chama.
+ */
+export async function limparResponsavelDoPassoTx(tx: TX, stepId: number): Promise<boolean> {
+  const r = await tx.phaseWorkflowStepInstance.updateMany({ where: { id: stepId, responsavelId: { not: null } }, data: { responsavelId: null } })
+  return r.count > 0
+}
+
 // ---------------- APLICADOR: TAREFA (CAS) ----------------
 /** `tarefaPreCarregada` — mesma lógica de `aplicarPasso`: corta o `findUnique` quando
  * quem chama já tem a linha INTEIRA e ATUAL, lida na mesma transação. */

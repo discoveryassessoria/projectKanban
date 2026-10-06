@@ -36,6 +36,7 @@ import {
   VISOES_DA_TELA, CHAVES_DE_VISAO_DA_TELA, predicadoDaVisao, contagemDaVisao, agruparParaTela, paginarGrupos, acoesDaLinha,
   type Agrupar, type AcaoDaLinha, type VisaoTarefas,
 } from "@/lib/operacional/torre-tarefas-tela"
+import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import "./tarefas.css"
 
 export type { VisaoTarefas }
@@ -232,14 +233,19 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
 
   // ─── AÇÕES EM LOTE (a barra) ─────────────────────────────────────────────
   const [prioridadeEscolhida, setPrioridadeEscolhida] = useState<PrioridadeDoModelo>("ALTA")
-  const lote = async (acao: "ATRIBUIR" | "PRIORIDADE_ALTA" | "PRIORIDADE" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
+  const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
+  const lote = async (acao: "ATRIBUIR" | "REMOVER_RESPONSAVEL" | "PRIORIDADE_ALTA" | "PRIORIDADE" | "REPACTUAR" | "COBRAR", extra: Record<string, unknown> = {}, opcoes: { limpar?: boolean; ddmm?: string } = {}) => {
     const { limpar = true, ddmm = "" } = opcoes
     setOcupado(true)
-    const r = await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
+    // REMOVER RESPONSÁVEL passa pelo modal de confirmação (lista de quem sai de quê); as demais ações seguem direto.
+    const r = acao === "REMOVER_RESPONSAVEL"
+      ? await postarComConfirmacao<RespLote>("/api/torre/tarefas/lote", { acao, tarefaIds: selIds, ...extra })
+      : await api<RespLote>("/api/torre/tarefas/lote", "POST", { acao, tarefaIds: selIds, ...extra })
     setOcupado(false)
     if (r.data && typeof r.data.total === "number") {
       const n = r.data.sucesso ?? 0
       const msg = acao === "ATRIBUIR" ? `${n} ${n === 1 ? "tarefa atribuída" : "tarefas atribuídas"} a ${pessoa?.nome ?? "a pessoa"}`
+        : acao === "REMOVER_RESPONSAVEL" ? `Responsável removido de ${n} ${n === 1 ? "tarefa" : "tarefas"} — voltaram à fila de distribuição`
         : acao === "PRIORIDADE_ALTA" ? `Prioridade alta em ${n} ${n === 1 ? "tarefa" : "tarefas"}`
           : acao === "PRIORIDADE" ? textoDoLotePrioridade(prioridadeValida(extra.prioridade) ?? PRIORIDADE_NORMAL, n)
           : acao === "REPACTUAR" ? `${n} ${n === 1 ? "prazo repactuado" : "prazos repactuados"} para ${ddmm}`
@@ -391,6 +397,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
         </div>
       )}
 
+      {modalConfirmacao}
       {visao !== "feito" && selIds.length > 0 && (
         <div className="tf-lote" role="toolbar" aria-label="Ações em lote">
           <b>{selIds.length} selecionada(s)</b>
@@ -403,6 +410,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
                 </select>
                 <button type="button" disabled={ocupado || !pessoa} onClick={() => void lote("ATRIBUIR", { responsavelId: pessoaId })}>Atribuir</button>
               </span>
+              <button type="button" disabled={ocupado} title="Devolve as selecionadas à fila de distribuição (fica no histórico)" onClick={() => void lote("REMOVER_RESPONSAVEL")}>Remover responsável</button>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Prioridade
                 <select aria-label="Escolher prioridade" value={prioridadeEscolhida} onChange={(e) => setPrioridadeEscolhida(e.target.value as PrioridadeDoModelo)}>
                   {PRIORIDADES_DO_LOTE.map((p) => <option key={p.valor} value={p.valor}>{p.rotulo}</option>)}
