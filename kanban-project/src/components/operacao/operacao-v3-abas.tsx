@@ -456,9 +456,9 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
               </div>
               {!col[`fe|${b.title}|${g.fam}`] && (
                 <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
-                  <div className="opv3-hd" style={{ gridTemplateColumns: "1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px" }}><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
+                  <div className="opv3-hd" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}><span>Documento</span><span>Pessoa</span><span>Concluída em</span><span>Prazo da tarefa</span><span>Órgão</span><span>Ação</span></div>
                   {g.linhas.map((t) => (
-                    <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "1.5fr 1.1fr 1.3fr 0.9fr 0.8fr 120px" }}>
+                    <div key={t.taskId} className="opv3-row" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.3fr) minmax(0,0.8fr) minmax(0,1.1fr) minmax(0,1.6fr) 90px" }}>
                       <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}</div>
                       <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
                       <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>

@@ -26,6 +26,9 @@
 .opv3-tab .opv3-n.opv3-warn { background: #fff1d6; color: #7a4a00; }
 
 .opv3-row { display: grid; gap: 8px; align-items: center; padding: 5px 12px; border-top: 1px solid #edf0f5; font-size: 12px; min-height: 34px; }
+.opv3-row > *, .opv3-hd > * { min-width: 0; }
+/* O que não cabe na coluna é cortado com reticências — nunca empurra as colunas vizinhas. */
+.opv3-row .opv3-pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
 .opv3-row:hover { background: #f7f9fc; }
 .opv3-row.opv3-sel { background: #fff6f0; }
 .opv3-hd { display: grid; gap: 8px; padding: 5px 12px; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: #7a8296; font-weight: 600; }
