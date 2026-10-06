@@ -193,9 +193,14 @@ export function KanbanContent() {
     () => tiposDoPais.find(t => t.id === tipoSelecionadoId) ?? tiposDoPais[0] ?? null,
     [tiposDoPais, tipoSelecionadoId]
   )
+  // A BUSCA DO CABEÇALHO ACOMPANHA O QUADRO: enquanto se digita, só ficam os processos que a busca do menu achou (a mesma busca, sem o teto
+  // do menu). Vazia, tudo volta. Vale para o Kanban e para a Lista, e o contador mostra quantos restaram.
+  const [idsDaBusca, setIdsDaBusca] = useState<ReadonlySet<number> | null>(null)
+  const onBuscaProcessos = useCallback((ids: number[] | null) => setIdsDaBusca(ids ? new Set(ids) : null), [])
+  const processosVisiveis = useMemo(() => (idsDaBusca ? processos.filter((p) => idsDaBusca.has(p.id)) : processos), [processos, idsDaBusca])
   const processosDoTipo = useMemo(
-    () => (tipoSelecionado ? processos.filter(p => p.tipoProcessoMotorId === tipoSelecionado.id) : []),
-    [processos, tipoSelecionado]
+    () => (tipoSelecionado ? processosVisiveis.filter(p => p.tipoProcessoMotorId === tipoSelecionado.id) : []),
+    [processosVisiveis, tipoSelecionado]
   )
 
   // A URL É O CONTEXTO ENQUANTO O CONTEXTO EXISTE.
@@ -291,6 +296,7 @@ export function KanbanContent() {
         processos={processos as any}
         arvores={arvores}
         onLogout={() => { void encerrarSessao("manual") }}
+        onBuscaProcessos={onBuscaProcessos}
       />
 
       <div className="min-h-screen relative">
@@ -367,7 +373,7 @@ export function KanbanContent() {
                 <div className="flex min-w-0 flex-1 items-center justify-end gap-4">
                   <div className="flex shrink-0 flex-col items-center px-4 py-2 bg-[var(--surface-primary)] rounded-lg">
                     <span className="text-2xl font-bold text-white">
-                      {processos.length}
+                      {processosVisiveis.length}
                     </span>
                     <span className="text-xs text-[var(--text-secondary)]">processo(s)</span>
                   </div>
@@ -468,7 +474,7 @@ export function KanbanContent() {
             {tabPrincipal === "processos" && subTab === "lista" && (
               pode('processos.ver') ? (
                 <ProcessosLista
-                  processos={processos as any}
+                  processos={processosVisiveis as any}
                   contratantes={contratantes}
                   onRefresh={handleRefresh}
                 />

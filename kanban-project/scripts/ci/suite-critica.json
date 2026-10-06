@@ -228,6 +228,8 @@
     "scripts/torre-historico-linha-do-tempo.test.ts",
     "scripts/torre-historico-visita.test.ts",
     "scripts/aptidoes-traducao-apostilamento.test.ts",
+    "scripts/busca-sem-acento.test.ts",
+    "scripts/rotulo-fase-modal-movimentacao.test.ts",
     "scripts/coleta-pendentes-prazo.test.ts",
     "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",
