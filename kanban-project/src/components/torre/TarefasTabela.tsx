@@ -23,6 +23,12 @@ export type GrupoDaPagina = [string, LinhaDaTela[]]
 
 const TOM_RISCO: Record<string, string> = { red: "red", amb: "amb", grn: "grn", blu: "grn", gry: "grn" }
 
+/** "7 tarefas" (só o trabalho) · com as canceladas à mostra: "11 (7 ativas + 4 canceladas / não exigidas)" — o número é SEMPRE o das linhas mostradas. */
+export function textoDoCabecalho(mostradas: number, ativas: number, canceladas: number, mostrando: boolean): string {
+  const tarefas = (n: number) => `${n} ${n === 1 ? "tarefa" : "tarefas"}`
+  return mostrando ? `${mostradas} (${ativas} ${ativas === 1 ? "ativa" : "ativas"} + ${canceladas} ${canceladas === 1 ? "cancelada / não exigida" : "canceladas / não exigidas"})` : tarefas(mostradas)
+}
+
 export function TarefasTabela({
   grupos, agrupar, dentro, sel, novas, processos, agora, podeIniciar, onSelecionar, onTodas, onAbrirGaveta, onAcao, vazio, rodape,
 }: {
@@ -45,6 +51,8 @@ export function TarefasTabela({
 }) {
   // Padrão: TUDO RECOLHIDO (conjunto de grupos abertos vazio). Sem agrupamento (`none`) não há faixa: a lista fica sempre aberta.
   const [abertos, setAbertos] = useState<Set<string>>(() => recolherTudo())
+  // Canceladas / não exigidas: ESCONDIDAS por padrão (como na página do processo). O controle do grupo as mostra, riscadas, na posição da regra fixa de ordem.
+  const [comCanceladas, setComCanceladas] = useState<Set<string>>(() => new Set())
   const comFaixa = agrupar !== "none"
   const todasDaPagina = grupos.flatMap(([, ls]) => ls).filter((l) => !ehCancelada(l)).map((l) => l.taskId)
   const todasMarcadas = todasDaPagina.length > 0 && todasDaPagina.every((id) => sel[id])
@@ -120,11 +128,15 @@ export function TarefasTabela({
       <div className="tf-rolagem">
         {!vazio && grupos.map(([nome, itens]) => {
           const trabalho = itens.filter((l) => !ehCancelada(l))
+          const nCanceladas = itens.length - trabalho.length
+          const mostrarCanc = nCanceladas > 0 && comCanceladas.has(nome)
+          // O que o grupo MOSTRA: o trabalho e, se pedido, as canceladas na posição da regra. O número do cabeçalho é sempre o das linhas mostradas.
+          const mostradas = mostrarCanc ? itens : trabalho
           const ids = trabalho.map((l) => l.taskId)
           const todas = ids.length > 0 && ids.every((id) => sel[id]); const alguma = ids.some((id) => sel[id])
           const processoId = agrupar === "fam" ? itens[0]?.processoId ?? null : null
-          const resumo = agrupar === "fam" ? resumoDoGrupo(processoId != null ? processos.get(processoId) ?? null : null, itens) : ""
-          const subgrupos = agrupar === "fam" && dentro !== "none" ? agruparDentroDaFamilia(itens, dentro) : null
+          const resumo = agrupar === "fam" ? resumoDoGrupo(processoId != null ? processos.get(processoId) ?? null : null, mostradas) : ""
+          const subgrupos = agrupar === "fam" && dentro !== "none" ? agruparDentroDaFamilia(mostradas, dentro) : null
           const aberto = !comFaixa || grupoAberto(abertos, nome)
           const nSel = contarSelecionadas(ids, sel)
           const textoSel = textoSelecionadasNoGrupo(!aberto, nSel)
@@ -142,7 +154,13 @@ export function TarefasTabela({
                     ? <Link className="fam" href={`/torre/processo/${processoId}`} onClick={parar}>{nome}</Link>
                     : <b>{nome}</b>}
                   {resumo && <span className="resumo">{resumo}</span>}
-                  <span className="tf-pilula">{trabalho.length > 0 ? `${trabalho.length} ${trabalho.length === 1 ? "tarefa" : "tarefas"}` : `${itens.length} ${itens.length === 1 ? "cancelada" : "canceladas"}`}</span>
+                  <span className="tf-pilula">{textoDoCabecalho(mostradas.length, trabalho.length, nCanceladas, mostrarCanc)}</span>
+                  {nCanceladas > 0 && (
+                    <button type="button" className="tf-mini" aria-pressed={mostrarCanc}
+                      onClick={(e) => { parar(e); setComCanceladas((s) => { const n = new Set(s); if (n.has(nome)) n.delete(nome); else n.add(nome); return n }) }}>
+                      {mostrarCanc ? `Ocultar ${nCanceladas} ${nCanceladas === 1 ? "cancelada / não exigida" : "canceladas / não exigidas"}` : `+ ${nCanceladas} ${nCanceladas === 1 ? "cancelada / não exigida" : "canceladas / não exigidas"}`}
+                    </button>
+                  )}
                   {textoSel && <span className="tf-selpil" role="status">{textoSel}</span>}
                   {processoId != null && <Link className="foco" href={`/torre/processo/${processoId}`} onClick={parar}>Foco ›</Link>}
                 </div>
@@ -164,7 +182,7 @@ export function TarefasTabela({
                     </Fragment>
                   )
                 })
-                : itens.map(renderLinha)}
+                : mostradas.map(renderLinha)}
             </div>
           )
         })}

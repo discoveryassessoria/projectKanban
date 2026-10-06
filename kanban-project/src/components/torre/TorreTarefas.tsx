@@ -326,7 +326,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   const nTrabalho = trabalhoVisivel.length
   const rodape = (
     <>
-      {nTrabalho} {nTrabalho === 1 ? "tarefa" : "tarefas"}{paginas.length > 1 ? ` · página ${paginaEf + 1} de ${paginas.length}` : ""} · {LINHAS_POR_PAGINA} por página{agrupar === "fam" ? ", sempre agrupadas por processo" : ""}. A certidão cancelada continua visível, riscada, no fim do grupo. Clique no nome da certidão para abrir a gaveta.
+      {nTrabalho} {nTrabalho === 1 ? "tarefa" : "tarefas"}{paginas.length > 1 ? ` · página ${paginaEf + 1} de ${paginas.length}` : ""} · {LINHAS_POR_PAGINA} por página{agrupar === "fam" ? ", sempre agrupadas por processo" : ""}. A certidão cancelada ou não exigida fica escondida; o controle do grupo a mostra, riscada, na posição da regra de ordem. Clique no nome da certidão para abrir a gaveta.
       {paginas.length > 1 && (
         <span style={{ display: "inline-flex", gap: 6, marginLeft: 12 }}>
           <button type="button" className="tf-mini" disabled={paginaEf <= 0} onClick={() => setPagina(paginaEf - 1)}>← Anterior</button>

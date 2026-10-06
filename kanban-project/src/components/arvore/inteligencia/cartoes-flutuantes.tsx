@@ -93,7 +93,7 @@ export function CartaoResumoFlutuante({
 
   if (recolhido) {
     return (
-      <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-1.5rem)]">
+      <div data-cartao-requerente className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-1.5rem)]">
         <button
           type="button"
           onClick={alternar}
@@ -116,7 +116,7 @@ export function CartaoResumoFlutuante({
   }
 
   return (
-    <div className="pointer-events-none absolute left-3 top-3 z-10 w-[min(320px,calc(100%-1.5rem))]">
+    <div data-cartao-requerente className="pointer-events-none absolute left-3 top-3 z-10 w-[min(320px,calc(100%-1.5rem))]">
       <section aria-label="Resumo do requerente" className={`${CARTAO} pointer-events-auto p-3`}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

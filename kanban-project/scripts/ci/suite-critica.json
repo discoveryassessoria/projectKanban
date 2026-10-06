@@ -72,6 +72,7 @@
    "scripts/arquitetura-baseline.test.ts",
    "scripts/arvore-arquitetura-guard.test.ts",
    "scripts/arvore-layout-congelado.test.ts",
+   "scripts/arvore-inteligencia-guard.test.ts",
    "scripts/maioridade-calculada.test.ts",
    "scripts/gentilico-pais.test.ts",
    "scripts/cidade-nascimento.test.ts",
@@ -221,6 +222,7 @@
    "scripts/arvore-desenho-camadas.test.ts",
    "scripts/geracao-e-linha-reta-salvarani.test.ts",
    "scripts/ordem-certidoes-todas-as-listas.test.ts",
+   "scripts/torre-tarefas-canceladas-escondidas.test.ts",
    "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
    "scripts/ativar-fase-aguardando-fechamento.test.ts",
    "scripts/catalogo-fases-aguardando-fechamento.test.ts"
@@ -312,6 +314,7 @@
   "scripts/arquitetura-baseline.test.ts",
   "scripts/arvore-arquitetura-guard.test.ts",
   "scripts/arvore-layout-congelado.test.ts",
+  "scripts/arvore-inteligencia-guard.test.ts",
   "scripts/maioridade-calculada.test.ts",
   "scripts/gentilico-pais.test.ts",
   "scripts/cidade-nascimento.test.ts",
@@ -458,6 +461,7 @@
   "scripts/arvore-desenho-camadas.test.ts",
   "scripts/geracao-e-linha-reta-salvarani.test.ts",
   "scripts/ordem-certidoes-todas-as-listas.test.ts",
+  "scripts/torre-tarefas-canceladas-escondidas.test.ts",
   "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
   "scripts/ativar-fase-aguardando-fechamento.test.ts",
   "scripts/catalogo-fases-aguardando-fechamento.test.ts"

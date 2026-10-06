@@ -6,7 +6,7 @@
 //   npx tsx scripts/geracao-e-linha-reta-salvarani.test.ts
 // ============================================================================
 import { calcularGeracoes } from "../src/lib/genealogia/geracao"
-import { montarPessoasDoProcesso, type PessoaBruta } from "../src/lib/process-stage/central-operacional-core"
+import { montarPessoasDoProcesso, juntarNomes, textoDaLinha, type PessoaBruta } from "../src/lib/process-stage/central-operacional-core"
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -52,13 +52,22 @@ ok("ninguém da linha fica em «Pendente de classificação»", roster.filter((p
 ok("a linha de Silvia Helena é a de José Roberto Junior e Alessandra (não a da Maria Carolina)", R(ID.silvia).linhaDe.join() === "José Roberto Junior,Alessandra" || (R(ID.silvia).linhaDe.length === 2 && R(ID.silvia).linhaDe.includes("Alessandra") && R(ID.silvia).linhaDe.includes("José Roberto Junior") && !R(ID.silvia).linhaDe.includes("Maria Carolina")), R(ID.silvia).linhaDe.join())
 ok("Carlota e Erminio são ancestrais de TODOS os requerentes", [ID.carlota, ID.erminio].every((i) => ["Mônica", "Alberto Júnior", "André", "Maria Carolina", "José Roberto Junior", "Alessandra"].every((n) => R(i).linhaDe.includes(n))))
 ok("Adelia está na linha de Mônica, Alberto Júnior, André e Maria Carolina, e não na de José Roberto Junior", R(ID.adelia).linhaDe.includes("Maria Carolina") && !R(ID.adelia).linhaDe.includes("José Roberto Junior"))
-ok("requerentes de ramos diferentes: o parentesco diz em relação a QUEM (posicaoEm)", R(ID.silvia).posicaoEm != null && roster.filter((p) => !p.requerente && p.posicao !== "—").every((p) => p.posicaoEm != null))
+ok("requerentes de ramos diferentes: o parentesco diz em relação a QUEM (posicaoEm) — Renata é «mãe de Maria Carolina»; quem é ascendente de vários não escolhe um (ver abaixo)", R(ID.renata).posicaoEm === "Maria Carolina" && R(ID.renata).posicao !== "—" && R(ID.silvia).posicaoEm == null)
 ok("o G da lista é o calculado", roster.every((p) => p.geracaoNaArvore === (G(p.pessoaId) ?? null)))
 ok("pessoa marcada na linha reta que NÃO chega a nenhum requerente continua em pendência (a regra não afrouxou)", (() => {
   const solta = [...pessoas, P(99, "Solta", { linhaReta: true, numeroLinhagem: 11 })]
   const r = montarPessoasDoProcesso(solta, unioes).find((p) => p.pessoaId === 99)!
   return r.classificacao === "PENDENTE_CLASSIFICACAO" && /nenhum requerente/.test(r.pendencia ?? "")
 })())
+
+console.log("\nO texto da linha e o parentesco na Central Operacional")
+ok("juntarNomes: vírgulas e «e» só no último", juntarNomes(["A"]) === "A" && juntarNomes(["A", "B"]) === "A e B" && juntarNomes(["A", "B", "C"]) === "A, B e C")
+ok("na linha de TODOS os requerentes: «linha de todos os requerentes» (Carlota e Erminio)", textoDaLinha(R(ID.carlota)) === "linha de todos os requerentes" && textoDaLinha(R(ID.erminio)) === "linha de todos os requerentes" && R(ID.carlota).linhaDeTodos)
+ok("na linha de alguns: «linha de José Roberto Junior e Alessandra» (Silvia Helena)", textoDaLinha(R(ID.silvia)) === "linha de José Roberto Junior e Alessandra" && !R(ID.silvia).linhaDeTodos, String(textoDaLinha(R(ID.silvia))))
+ok("na linha de três: vírgula e «e» só no último (Adelia)", textoDaLinha(R(ID.adelia)) === "linha de Mônica, Alberto Júnior, André e Maria Carolina" || (textoDaLinha(R(ID.adelia)) ?? "").endsWith(" e Maria Carolina") && (textoDaLinha(R(ID.adelia)) ?? "").split(",").length === 3, String(textoDaLinha(R(ID.adelia))))
+ok("requerente não ganha «linha de»", textoDaLinha(R(ID.monica)) === null)
+ok("ascendente de VÁRIOS requerentes: não escolhe um ao acaso — sem parentesco, só geração e linha", [ID.carlota, ID.erminio, ID.silvia, ID.adelia].every((i) => R(i).posicao === "—" && R(i).posicaoEm == null && R(i).geracaoNaArvore != null))
+ok("ascendente de UM requerente só: o parentesco continua (Renata, de Maria Carolina)", R(ID.renata).linhaDe.length === 1 && R(ID.renata).posicao !== "—")
 
 console.log("\nUm só ramo: nada muda")
 {
