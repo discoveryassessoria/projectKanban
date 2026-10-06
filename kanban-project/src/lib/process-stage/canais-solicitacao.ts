@@ -13,6 +13,7 @@
 // Correios trabalha com rastreio. Exigir protocolo sempre era o que fazia o
 // operador inventar número — ou perder o requerimento já enviado.
 
+import { REQUERIMENTO_ENVIADO_OBRIGATORIO } from "./requerimento-opcional"
 import type { CanalSolicitacaoDocumento } from "@prisma/client"
 
 export interface ConfigCanal {
@@ -162,7 +163,7 @@ export function faltamCamposDoCanal(e: EntradaValidacaoCanal): string[] {
   if (!cfg) return ["CANAL_INVALIDO"]
   const faltando: string[] = []
   if (cfg.protocoloObrigatorio && !(e.numeroProtocolo ?? "").trim()) faltando.push("NUMERO_PROTOCOLO")
-  if (cfg.anexoObrigatorioLabel && !(e.anexoUrl ?? "").trim()) faltando.push("REQUERIMENTO")
+  if (REQUERIMENTO_ENVIADO_OBRIGATORIO && cfg.anexoObrigatorioLabel && !(e.anexoUrl ?? "").trim()) faltando.push("REQUERIMENTO") // opcional por enquanto
   if (cfg.rastreioObrigatorio && !(e.codigoRastreio ?? "").trim()) faltando.push("CODIGO_RASTREIO")
   if (cfg.observacaoObrigatoria && !(e.observacao ?? "").trim()) faltando.push("OBSERVACAO")
   if (!(e.destinatarioNome ?? "").trim()) faltando.push("DESTINATARIO")

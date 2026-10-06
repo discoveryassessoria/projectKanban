@@ -23,6 +23,7 @@
 // dois. Quando mais de uma linha alcança o mesmo documento mestre, vence a MAIS
 // específica — regra determinística, sem empate possível.
 
+import { REQUERIMENTO_ENVIADO_OBRIGATORIO } from "@/src/lib/process-stage/requerimento-opcional"
 import { prisma } from "@/lib/prisma"
 import type { Prisma, CanalSolicitacaoDocumento, TipoArquivoDocumento } from "@prisma/client"
 
@@ -135,5 +136,6 @@ export function exigenciasNaoAtendidas(
   anexados: Array<{ documentTypeId: number | null }>,
 ): ExigenciaEvidenciaDTO[] {
   const presentes = new Set(anexados.map((a) => a.documentTypeId).filter((id): id is number => id != null))
-  return exigencias.filter((e) => e.obrigatoria && !presentes.has(e.documentoMestre.id))
+  // O requerimento é OPCIONAL por enquanto (`requerimento-opcional.ts`): não conta como falta.
+  return exigencias.filter((e) => e.obrigatoria && !(!REQUERIMENTO_ENVIADO_OBRIGATORIO && e.finalidade === "REQUERIMENTO_ENVIADO") && !presentes.has(e.documentoMestre.id))
 }

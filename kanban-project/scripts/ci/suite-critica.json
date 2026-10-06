@@ -223,6 +223,7 @@
    "scripts/geracao-e-linha-reta-salvarani.test.ts",
    "scripts/ordem-certidoes-todas-as-listas.test.ts",
    "scripts/torre-tarefas-canceladas-escondidas.test.ts",
+   "scripts/requerimento-enviado-opcional.test.ts",
    "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
    "scripts/ativar-fase-aguardando-fechamento.test.ts",
    "scripts/catalogo-fases-aguardando-fechamento.test.ts"
@@ -462,6 +463,7 @@
   "scripts/geracao-e-linha-reta-salvarani.test.ts",
   "scripts/ordem-certidoes-todas-as-listas.test.ts",
   "scripts/torre-tarefas-canceladas-escondidas.test.ts",
+  "scripts/requerimento-enviado-opcional.test.ts",
   "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
   "scripts/ativar-fase-aguardando-fechamento.test.ts",
   "scripts/catalogo-fases-aguardando-fechamento.test.ts"

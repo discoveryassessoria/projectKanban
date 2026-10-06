@@ -19,6 +19,7 @@
 // a tabela vazia como pendência, para que a janela não vire estado.
 // ============================================================================
 
+import { REQUERIMENTO_ENVIADO_OBRIGATORIO } from "./requerimento-opcional"
 import { prisma } from "@/lib/prisma"
 import { CANAIS_SOLICITACAO, type ConfigCanal } from "./canais-solicitacao"
 import type { CanalSolicitacaoDocumento } from "@prisma/client"
@@ -77,7 +78,7 @@ export async function faltamCamposDoCanalCadastrado(e: {
   if (!cfg) return ["CANAL_INVALIDO"]
   const faltando: string[] = []
   if (cfg.protocoloObrigatorio && !(e.numeroProtocolo ?? "").trim()) faltando.push("NUMERO_PROTOCOLO")
-  if (cfg.anexoObrigatorioLabel && !(e.anexoUrl ?? "").trim()) faltando.push("REQUERIMENTO")
+  if (REQUERIMENTO_ENVIADO_OBRIGATORIO && cfg.anexoObrigatorioLabel && !(e.anexoUrl ?? "").trim()) faltando.push("REQUERIMENTO") // opcional por enquanto
   if (cfg.rastreioObrigatorio && !(e.codigoRastreio ?? "").trim()) faltando.push("CODIGO_RASTREIO")
   if (cfg.observacaoObrigatoria && !(e.observacao ?? "").trim()) faltando.push("OBSERVACAO")
   if (!(e.destinatarioNome ?? "").trim()) faltando.push("DESTINATARIO")

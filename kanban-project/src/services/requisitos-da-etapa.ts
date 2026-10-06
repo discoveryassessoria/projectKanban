@@ -16,6 +16,7 @@
 // recusa vem daqui.
 // ============================================================================
 
+import { REQUERIMENTO_ENVIADO_OBRIGATORIO } from "@/src/lib/process-stage/requerimento-opcional"
 import { prisma } from "@/lib/prisma"
 import { avaliarCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 import type { RequisitoCongelado, CanalCongelado, CampoCongelado, ItemChecklistCongelado } from "@/src/services/versao-publicada"
@@ -138,6 +139,8 @@ export async function requisitosPendentes(args: {
           stepKey: passoExig.stepKey,
           ativo: true,
           obrigatoria: true,
+          // O requerimento é OPCIONAL por enquanto (`requerimento-opcional.ts`).
+          ...(REQUERIMENTO_ENVIADO_OBRIGATORIO ? {} : { finalidade: { not: "REQUERIMENTO_ENVIADO" as const } }),
           AND: [
             { OR: [{ documentoTipoId: null }, { documentoTipoId: passoExig.documento?.documentTypeId ?? -1 }] },
             ...(canalAtual ? [{ OR: [{ canal: null }, { canal: canalAtual as never }] }] : []),
