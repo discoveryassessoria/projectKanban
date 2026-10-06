@@ -13,6 +13,7 @@ import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 import type { LinhaDaTabela } from "@/lib/operacional/torre-processo-puro"
 import { api, erroDe, Modal, ModalTexto, useEscFecha } from "./torre-base"
+import { SeletorResponsavel } from "@/src/components/operacao/kit-operacional"
 import { ProcessoRelatorio } from "./ProcessoRelatorio"
 import { ProcessoCabecalho } from "./ProcessoCabecalho"
 import { ProcessoCaminho } from "./ProcessoCaminho"
@@ -99,26 +100,26 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
     recarregar()
   }
 
-  const nomeAtribuido = (mensagem: unknown): string => String(mensagem ?? "").replace(/^Atribuída a /, "").replace(/\.$/, "")
-  const atribuir = async (tarefaId: number) => {
-    setOcupado(true)
-    const r = await api<{ ok?: boolean; mensagem?: string; erro?: string; desfazer?: DesfazerDeAtribuicao }>(`/api/torre/tarefas/${tarefaId}/atribuir-sugerido`, "POST")
-    setOcupado(false)
-    if (r.ok && r.data.desfazer) avisar(`Responsável atribuído · ${nomeAtribuido(r.data.mensagem)} · fica no histórico`, { rotulo: "Desfazer", fazer: desfazerAtribuicao(r.data.desfazer) })
-    else avisar(erroDe(r.data))
-    recarregar()
-  }
-  const atribuirVarias = async (ids: number[]) => {
-    setOcupado(true)
+  // ATRIBUIR abre a ESCOLHA do funcionário (a mesma lista da Operação) — nunca atribui sozinho à sugestão. Atribuir automaticamente é o botão «Distribuir».
+  const [escolha, setEscolha] = useState<number[] | null>(null)
+  const [erroEscolha, setErroEscolha] = useState<string | null>(null)
+  const atribuir = (tarefaId: number) => { setErroEscolha(null); setEscolha([tarefaId]) }
+  const atribuirVarias = (ids: number[]) => { setErroEscolha(null); setEscolha(ids) }
+  const atribuirA = async (ids: number[], responsavelId: number) => {
+    setOcupado(true); setErroEscolha(null)
     const feitas: number[] = []
     let primeiraFalha: string | null = null
     for (const id of ids) {
-      const r = await api<{ ok?: boolean; erro?: string }>(`/api/torre/tarefas/${id}/atribuir-sugerido`, "POST")
+      const r = await api<{ ok?: boolean; erro?: string }>(`/api/tarefas/${id}/comando`, "POST", { acao: "atribuir", responsavelId })
       if (r.ok) feitas.push(id); else primeiraFalha = primeiraFalha ?? erroDe(r.data)
     }
     setOcupado(false)
-    avisar(`${feitas.length} de ${ids.length} atribuídas às sugeridas · fica no histórico${primeiraFalha ? ` · ${ids.length - feitas.length} não passou(aram): ${primeiraFalha}` : ""}`,
-      feitas.length ? { rotulo: "Desfazer", fazer: desfazerAtribuicao({ tipo: "ATRIBUICAO", tarefaIds: feitas }) } : undefined)
+    if (feitas.length === 0) { setErroEscolha(primeiraFalha ?? "Não foi possível atribuir."); return } // a escolha continua aberta
+    setEscolha(null)
+    avisar(
+      ids.length === 1 ? "Responsável atribuído · fica no histórico" : `${feitas.length} de ${ids.length} atribuídas · fica no histórico${primeiraFalha ? ` · ${ids.length - feitas.length} não passou(aram): ${primeiraFalha}` : ""}`,
+      { rotulo: "Desfazer", fazer: desfazerAtribuicao({ tipo: "ATRIBUICAO", tarefaIds: feitas }) },
+    )
     recarregar()
   }
 
@@ -177,10 +178,18 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
             status={statusDaLista} onStatus={setStatusDaLista}
             d={d} agora={agora} podeAtribuir={perm.editar} ocupado={ocupado}
             onHistorico={(l) => setModal({ tipo: "historico", certidao: { documentoId: l.documentoId, tarefaId: l.tarefaId, rotulo: [l.titulo, l.pessoa].filter(Boolean).join(" · ") } })}
-            onAtribuir={(id) => void atribuir(id)} onAtribuirVarias={(ids) => void atribuirVarias(ids)}
+            onAtribuir={atribuir} onAtribuirVarias={atribuirVarias}
             onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}
             onVerHistorico={() => setModal({ tipo: "historico", certidao: null })}
           />
+          {escolha && (
+            <SeletorResponsavel
+              titulo={escolha.length === 1 ? "Atribuir tarefa" : `Atribuir ${escolha.length} tarefas`}
+              atual={null} ocupado={ocupado} erro={erroEscolha}
+              aoFechar={() => { setEscolha(null); setErroEscolha(null) }}
+              aoEscolher={(id) => void atribuirA(escolha, id)}
+            />
+          )}
           <ProcessoFatos processoId={processoId} agora={agora} versao={versao} onVerTudo={() => setModal({ tipo: "historico", certidao: null })} />
           <ProcessoComentarios processoId={processoId} familiaId={d.familiaId} agora={agora} podeComentar={perm.editar} avisar={avisarSimples} />
         </div>
