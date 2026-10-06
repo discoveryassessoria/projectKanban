@@ -330,6 +330,8 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
     linhas: abertasDaFase,
     encerradas: { canceladas: encerradasDaFase.filter((e) => e.tipo === 'CANCELADA').length, naoExigidas: encerradasDaFase.filter((e) => e.tipo === 'NAO_EXIGIDA').length },
     riscoDe: (l) => nivelDeRisco(l),
+    // As certidões da fase (abertas e concluídas) com o órgão vinculado no DOCUMENTO — o cartão Cartórios conta vinculadas e faltantes.
+    certidoesDaFase: [...abertasDaFase, ...concluidas].map((l) => ({ documentoId: l.documentoId, terceiroNome: l.terceiroNome })),
   })
 
   const faseLabel = foco.faseAtual.label

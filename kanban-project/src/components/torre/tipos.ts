@@ -27,7 +27,7 @@ export type Pill = "red" | "amb" | "grn" | "blu" | "gry"
 
 /** DE QUEM É A BOLA — só campos reais da linha. */
 export function bolaDe(l: LinhaOperacaoV3): { txt: string; cls: Pill } {
-  if (l.esperandoDe === "terceiro") return { txt: l.terceiroNome ?? "Cartório", cls: "amb" }
+  if (l.esperandoDe === "terceiro") return { txt: l.terceiroNome ?? (l.cartorioTexto ? `${l.cartorioTexto} · não vinculado` : "Cartório"), cls: "amb" }
   if (l.esperandoDe === "cliente") return { txt: "Cliente", cls: "amb" }
   if (l.statusTarefa === "BLOQUEADA") return { txt: "Bloqueada", cls: "red" }
   if (l.responsavelNome) return { txt: l.responsavelNome, cls: "blu" }

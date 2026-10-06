@@ -360,11 +360,9 @@ function ConteudoModal({
   const estadoOk = ehBrasil ? form.estado_registro.trim().length > 0 : true
   const cidadeOk = form.cidade_registro.trim().length > 0
   const cartorioOk = form.cartorio.trim().length > 0
-  // BUG 3 (26/09/2026) — cartório BRASILEIRO sem órgão mapeado bloqueia a
-  // conclusão (gap de cadastro real, nunca silencioso); fora do Brasil o
-  // vínculo estruturado ainda não existe (ver investigação), então não se
-  // exige — a mesma régua de sempre (texto livre) continua valendo lá.
-  const orgaoOk = ehBrasil ? (!cartorioOk || form.orgaoId != null) : true
+  // Cartório sem órgão vinculado bloqueia a conclusão em QUALQUER país (gap de cadastro real, nunca silencioso): o vínculo é feito aqui mesmo,
+  // escolhendo na busca ou em "Cadastrar este cartório" (nome, cidade e país obrigatórios). O servidor repete a regra (ORGAO_NAO_VINCULADO).
+  const orgaoOk = !cartorioOk || form.orgaoId != null
   const livroOk = form.livro.trim().length > 0
   const folhaOk = form.folha.trim().length > 0
   const termoOk = form.termo.trim().length > 0
@@ -728,7 +726,7 @@ function ConteudoModal({
                     )}
                     {!ehBrasil && (
                       <div className="col-span-2 text-[10.5px] text-[var(--text-secondary)]">
-                        Fora do Brasil a busca usa o cadastro de Órgãos; se não achar, use “Cadastrar este cartório”.
+                        Fora do Brasil a busca usa o cadastro de Órgãos; se não achar, use “Cadastrar este cartório” (nome, cidade e país). Para concluir, o órgão precisa estar vinculado.
                       </div>
                     )}
                     {!isModoBuscar && (

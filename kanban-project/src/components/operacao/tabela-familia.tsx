@@ -376,7 +376,7 @@ function LinhaOperacaoTabela({
         </span>
       </td>
       <td className="max-w-[140px] overflow-hidden px-3 py-2.5 text-[11.5px] text-[var(--text-secondary)]">
-        {l.terceiroNome ? <span className="block truncate text-[var(--info-text)]">{l.terceiroNome}</span> : "—"}
+        {l.terceiroNome ? <span className="block truncate text-[var(--info-text)]">{l.terceiroNome}</span> : l.cartorioTexto ? <span className="block truncate text-[var(--text-secondary)]" title="Cartório digitado, sem órgão vinculado">{l.cartorioTexto} · não vinculado</span> : "—"}
       </td>
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-1">

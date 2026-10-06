@@ -319,6 +319,11 @@ export function cartoesDaFase<L extends LinhaParaDerivar>(a: {
   encerradas: { canceladas: number; naoExigidas: number }
   /** O nível de risco de cada tarefa (a mesma `nivelDeRisco` da aba Tarefas) — o chamador passa a função. */
   riscoDe: (l: L) => 'critico' | 'atencao' | 'ritmo'
+  /**
+   * O cartão "Cartórios" olha as CERTIDÕES da fase — abertas E concluídas, pelo órgão vinculado no DOCUMENTO. Sem isto ele só via as tarefas abertas
+   * e dizia "Ainda não vinculados" mesmo com casamento e óbito já vinculados (caso Sanchez Dias, 06/10/2026). Sem a lista, vale o comportamento antigo.
+   */
+  certidoesDaFase?: Array<{ documentoId: number | null; terceiroNome: string | null }>
 }): CartaoSimples[] {
   const ls = a.linhas
   const n = ls.length
@@ -368,17 +373,24 @@ export function cartoesDaFase<L extends LinhaParaDerivar>(a: {
     }
   }
 
-  // CARTÓRIOS — os órgãos já vinculados às tarefas abertas.
-  const orgaos = [...new Set(ls.map((l) => l.terceiroNome).filter((x): x is string => !!x))]
-  const comOrgao = ls.filter((l) => l.terceiroNome).length
-  const cartorios: CartaoSimples = orgaos.length === 0
-    ? { rotulo: 'Cartórios', titulo: 'Ainda não vinculados', sub: 'define-se ao iniciar cada pedido', tom: 'normal' }
-    : {
-        rotulo: 'Cartórios',
-        titulo: orgaos.length <= 2 ? orgaos.join(' · ') : `${orgaos.slice(0, 2).join(' · ')} +${orgaos.length - 2}`,
-        sub: comOrgao === n ? `as ${n} já vinculadas` : `${comOrgao} de ${n} vinculadas · ${n - comOrgao} a definir`,
-        tom: 'normal',
-      }
+  // CARTÓRIOS — os órgãos vinculados às CERTIDÕES da fase (documento), abertas ou já concluídas: quantas têm órgão e quantas faltam.
+  const certidoes = a.certidoesDaFase
+    ? [...new Map(a.certidoesDaFase.filter((c) => c.documentoId != null).map((c) => [c.documentoId as number, c])).values()]
+    : ls.map((l) => ({ documentoId: null as number | null, terceiroNome: l.terceiroNome }))
+  const totalCert = certidoes.length
+  const orgaos = [...new Set(certidoes.map((l) => l.terceiroNome).filter((x): x is string => !!x))]
+  const comOrgao = certidoes.filter((l) => l.terceiroNome).length
+  const faltam = totalCert - comOrgao
+  const cartorios: CartaoSimples = totalCert === 0
+    ? { rotulo: 'Cartórios', titulo: '—', sub: 'nenhuma certidão nesta fase', tom: 'normal' }
+    : orgaos.length === 0
+      ? { rotulo: 'Cartórios', titulo: 'Nenhum vinculado', sub: `${totalCert === 1 ? 'a certidão ainda não tem' : `as ${totalCert} certidões ainda não têm`} órgão vinculado`, tom: 'normal' }
+      : {
+          rotulo: 'Cartórios',
+          titulo: orgaos.length <= 2 ? orgaos.join(' · ') : `${orgaos.slice(0, 2).join(' · ')} +${orgaos.length - 2}`,
+          sub: faltam === 0 ? `${totalCert === 1 ? 'a certidão já está vinculada' : `as ${totalCert} já vinculadas`}` : `${comOrgao} de ${totalCert} vinculadas · ${faltam} ${faltam === 1 ? 'falta' : 'faltam'} vincular`,
+          tom: 'normal',
+        }
 
   // CANCELADA / NÃO EXIGIDA
   const totalFora = a.encerradas.canceladas + a.encerradas.naoExigidas

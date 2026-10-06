@@ -899,6 +899,14 @@ export async function atualizarPassoV2(
   if (!carregado.ok) return carregado
   const p = carregado.passo
 
+  // "Localizar registro" só CONCLUI com o órgão do documento VINCULADO ao cadastro (Documento.orgaoId) — em qualquer país, não só no Brasil. Texto
+  // livre no campo cartório não basta: sem vínculo, o órgão não aparece na Operação nem na Torre. Só vale para a CONCLUSÃO (salvar rascunho passa);
+  // registros já concluídos sem vínculo NÃO são reabertos por esta regra (só passam por ela se alguém tentar concluir de novo).
+  if (p.stepKey === "localizar_registro" && typeof patch.status === "string" && mapLegacyStepStatus(patch.status) === "CONCLUIDO" && p.status !== "CONCLUIDO") {
+    const doc = await prisma.documento.findUnique({ where: { id: documentoId }, select: { orgaoId: true } })
+    if (doc && doc.orgaoId == null) return { ok: false, error: "VALIDATION_ERROR:ORGAO_NAO_VINCULADO", status: 422 }
+  }
+
   const now = new Date()
   // A RECUSA DO MOTOR VIRA 409, não 500. Uma transição impossível (o passo mudou
   // de estado enquanto a tela estava aberta, ou o alvo não existe a partir do

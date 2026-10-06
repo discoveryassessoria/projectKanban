@@ -97,7 +97,21 @@ export async function buscarOrgaos(db: DB, q: string, opts: { uf?: string; cidad
     // estado, o filtro em memória vem logo abaixo.
     take: cidadeNorm ? 3000 : 200,
   })
-  const cadastrados: OrgaoBusca[] = rows
+  // SEM ACENTO: o `contains` do Postgres só dobra maiúscula/minúscula, nunca acento ("Zürich" × "zurich", "São Paulo" × "sao paulo"). Quando a consulta
+  // por texto volta vazia, refaz SEM o filtro de texto (escopo de UF/cidade se houver, senão ativos) e filtra em memória por `norm()`.
+  let base = rows
+  if (rows.length === 0 && termos.length > 0) {
+    const todos = await db.orgaoProtocolo.findMany({
+      where: { ativo: true, ...(uf ? { state: { equals: uf, mode: "insensitive" as const } } : {}) },
+      select: { id: true, name: true, nomeFantasia: true, type: true, city: true, state: true, pais: { select: { countryLabel: true } } },
+      take: 5000,
+    })
+    base = todos.filter((o) => {
+      const alvo = norm([o.name, o.nomeFantasia, o.type, cidadeNorm ? "" : o.city, cidadeNorm ? "" : o.state].filter(Boolean).join(" "))
+      return termos.every((t) => alvo.includes(t))
+    })
+  }
+  const cadastrados: OrgaoBusca[] = base
     .filter((o) => !cidadeNorm || norm(o.city) === cidadeNorm)
     .map((o) => {
       const alvo = [o.name, o.city, o.state].filter(Boolean).join(" ")
@@ -222,13 +236,12 @@ export async function cadastrarOrgaoRapido(db: PrismaClient, e: EntradaNovoOrgao
   const name = (e.name ?? "").trim().slice(0, 200)
   const city = (e.city ?? "").trim().slice(0, 100)
   const tipo = String(e.tipo ?? "").toUpperCase() as TipoOrgaoRapido
-  if (!name || !city || !e.tipo) return { ok: false, code: "CAMPOS_OBRIGATORIOS", mensagem: "Nome, tipo e cidade são obrigatórios." }
+  if (!name || !city || !e.tipo) return { ok: false, code: "CAMPOS_OBRIGATORIOS", mensagem: "Nome, tipo, cidade e país são obrigatórios." }
   if (!TIPOS_ORGAO_RAPIDO.includes(tipo)) return { ok: false, code: "TIPO_INVALIDO", mensagem: "Tipo inválido." }
   const paisId = e.paisId && Number.isInteger(e.paisId) && e.paisId > 0 ? e.paisId : null
-  if (paisId != null) {
-    const p = await db.catalogoPais.findUnique({ where: { id: paisId }, select: { id: true } })
-    if (!p) return { ok: false, code: "PAIS_INEXISTENTE", mensagem: "País não encontrado no Cadastro Mestre." }
-  }
+  if (paisId == null) return { ok: false, code: "CAMPOS_OBRIGATORIOS", mensagem: "Nome, tipo, cidade e país são obrigatórios." }
+  const pais = await db.catalogoPais.findUnique({ where: { id: paisId }, select: { id: true } })
+  if (!pais) return { ok: false, code: "PAIS_INEXISTENTE", mensagem: "País não encontrado no Cadastro Mestre." }
   const state = e.state?.trim() ? e.state.trim().slice(0, 60) : null
   const dup = await acharDuplicado(db, { name, city, state, paisId })
   if (dup) return { ok: false, code: "DUPLICADO", mensagem: `Já existe "${dup.name}" cadastrado nesta cidade.`, existente: dup }

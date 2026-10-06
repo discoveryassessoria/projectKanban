@@ -10,9 +10,15 @@ import { textoPrazoDaTarefa } from "@/src/lib/tarefa/texto-prazo"
 import type { LinhaOperacaoV3 } from "./operacao-v3-tipos"
 import {
   fmtData, acompTxtCompleto, relCls, passoLabelDe, orgaoTxt, cobrancasTxt, prazoTarefaCls, docTipoTxt,
-  concluirLabelDe, aIniciarEfetivo, agruparDentroDaFamilia, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
+  concluirLabelDe, aIniciarEfetivo, orgaoSoEmTexto, agruparDentroDaFamilia, agruparPorFamilia, agruparPorOrgao, statusTarefaTxt, statusTarefaCls,
   chaveDaFamilia, familiasDaAba, faseAtualDaFamilia, gargaloDaFamilia, proximoMarcoDaFamilia, type FamiliaComGrupos,
 } from "./operacao-v3-derivacoes"
+
+/** Dentro da família: por PESSOA (G1→Gn; em cada pessoa nascimento → casamento → óbito), como em A fazer e no Feito. Sem `ativo` (agrupado por órgão), um bloco só e sem cabeçalho de pessoa. */
+const porPessoaSeAtivo = (linhas: LinhaOperacaoV3[], ativo: boolean) =>
+  ativo
+    ? agruparDentroDaFamilia(linhas, "pessoa")
+    : [{ chave: "todas", titulo: "", sub: "", pill: "", pillCls: "", linhas, lote: false }]
 
 const toggle = (col: Record<string, true>, setCol: (c: Record<string, true>) => void, k: string) =>
   setCol(col[k] ? Object.fromEntries(Object.entries(col).filter(([x]) => x !== k)) : { ...col, [k]: true })
@@ -86,15 +92,20 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
         <div style={{ flexGrow: 1 }} />
         {onVerFamilia && <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(grupo.fam)}>Ver família</button>}
       </div>
-      {aberto && (
-        <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
+      {aberto && porPessoaSeAtivo(grupo.linhas, !!onVerFamilia).map((p) => (
+        <div key={p.chave} style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
+          {p.titulo && (
+              <div className="opv3-grp" style={{ borderTop: 0 }}>
+                <span className={`opv3-pill ${p.pillCls}`}>{p.pill}</span><b style={{ fontSize: 12.5 }}>{p.titulo}</b><span style={{ color: "#5b6478" }}>{p.sub}</span>
+              </div>
+            )}
           <div className="opv3-hd opv3-gA"><span>Documento</span><span>Com quem</span><span>Passo atual</span><span>Status</span><span>Desde</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo da tarefa</span><span>Ação</span></div>
-          {grupo.linhas.map((t) => {
+          {p.linhas.map((t) => {
             const passo = passoLabelDe(t)
             return (
               <div key={t.taskId} className="opv3-row opv3-gA" style={{ boxShadow: `inset 4px 0 0 ${t.atrasada ? "#b3261e" : "transparent"}` }}>
                 <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pessoaNome}</div></div>
-                <div>{orgaoTxt(t)}</div>
+                <div>{orgaoTxt(t)}<AtalhoVincularOrgao t={t} onAbrir={onAbrir} /></div>
                 <div>{passo.label}</div>
                 <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                 <div>{fmtData(t.atribuidaEm)}</div>
@@ -110,7 +121,7 @@ function GrupoAguardando({ grupo, col, setCol, onAbrir, onCobrar, onVerFamilia }
             )
           })}
         </div>
-      )}
+      ))}
     </div>
   )
 }
@@ -193,9 +204,13 @@ export function AbaAcompanhamento({
                 <button className="opv3-btn opv3-sm" onClick={() => onVerFamilia(g.fam)}>Ver família</button>
               </div>
               {!col[`ac|${b.title}|${g.fam}`] && (
-                <div style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
+                  porPessoaSeAtivo(g.linhas, true).map((p) => (
+                <div key={p.chave} style={{ margin: "12px 12px 0", border: "1px solid #dfe4ee", borderRadius: 10, overflow: "hidden" }}>
+                  <div className="opv3-grp" style={{ borderTop: 0 }}>
+                    <span className={`opv3-pill ${p.pillCls}`}>{p.pill}</span><b style={{ fontSize: 12.5 }}>{p.titulo}</b><span style={{ color: "#5b6478" }}>{p.sub}</span>
+                  </div>
                   <div className="opv3-hd opv3-gC"><span>Documento</span><span>Passo atual</span><span>Status</span><span>Com quem / de onde veio a data</span><span>Acompanhamento</span><span>Cobranças</span><span>Prazo tarefa</span><span>Ação</span></div>
-                  {g.linhas.map((t) => {
+                  {p.linhas.map((t) => {
                     const passo = passoLabelDe(t)
                     const terceiro = t.estadoOperacao === "AGUARDANDO"
                     return (
@@ -203,7 +218,7 @@ export function AbaAcompanhamento({
                         <div style={{ fontWeight: 600 }}>{docTipoTxt(t)}<div style={{ fontSize: 11, color: "#7a8296", fontWeight: 500 }}>{t.familiaNome} · {t.pessoaNome}</div></div>
                         <div>{passo.label}</div>
                         <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
-                        <div>{orgaoTxt(t)}</div>
+                        <div>{orgaoTxt(t)}<AtalhoVincularOrgao t={t} onAbrir={onAbrir} /></div>
                         <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                         <div>{cobrancasTxt(t)}</div>
                         <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
@@ -217,6 +232,8 @@ export function AbaAcompanhamento({
                     )
                   })}
                 </div>
+                  ))
+
               )}
             </div>
           ))}
@@ -323,7 +340,7 @@ export function AbaFamilias({
                       <div><span className={`opv3-pill ${statusTarefaCls(t)}`}>{statusTarefaTxt(t)}</span></div>
                       <div><span className={`opv3-pill ${relCls(t.acompanhamentoPasso)}`}>{acompTxtCompleto(t.acompanhamentoPasso)}</span></div>
                       <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
-                      <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
+                      <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span><AtalhoVincularOrgao t={t} onAbrir={onAbrir} /></div>
                       <div><button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button></div>
                     </div>
                   )
@@ -418,6 +435,12 @@ export function AbaRadar({
 // ============================================================================
 // FEITO
 // ============================================================================
+/** O atalho "vincular órgão": só quando há cartório digitado e nenhum órgão vinculado. Abre a certidão (Dados Registrais), onde o vínculo se faz. */
+function AtalhoVincularOrgao({ t, onAbrir }: { t: LinhaOperacaoV3; onAbrir: (id: number) => void }) {
+  if (!orgaoSoEmTexto(t)) return null
+  return <button type="button" className="opv3-link" style={{ marginLeft: 6, fontSize: 11, background: "transparent", border: 0, padding: 0, color: "#1d3f8f", textDecoration: "underline", cursor: "pointer" }} onClick={() => onAbrir(t.taskId)}>vincular órgão</button>
+}
+
 export function AbaFeito({ linhas, col, setCol, onAbrir }: {
   linhas: LinhaOperacaoV3[]
   col: Record<string, true>
@@ -468,7 +491,7 @@ export function AbaFeito({ linhas, col, setCol, onAbrir }: {
                         <div>{t.pessoaNome ?? "—"}<div style={{ fontSize: 11, color: "#7a8296" }}>{t.numeroLinhagem != null ? `G${t.numeroLinhagem}` : ""}</div></div>
                         <div><span className="opv3-pill opv3-p-grn">{fmtData(t.concluidaEm)}</span></div>
                         <div><span className={`opv3-pill ${prazoTarefaCls(t)}`}>{textoPrazoDaTarefa(t)}</span></div>
-                        <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span></div>
+                        <div><span className="opv3-pill opv3-p-gry">{orgaoTxt(t)}</span><AtalhoVincularOrgao t={t} onAbrir={onAbrir} /></div>
                         <div><button className="opv3-btn opv3-sm" onClick={() => onAbrir(t.taskId)}>Abrir</button></div>
                       </div>
                     ))}
