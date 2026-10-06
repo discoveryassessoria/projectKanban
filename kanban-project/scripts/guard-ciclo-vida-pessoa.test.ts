@@ -124,6 +124,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/torre-relatorio-fase-passo-iniciou.test.ts":
     "Relatório de controle (Torre nova): monta e derruba a PRÓPRIA pessoa/necessidade/documento (marca RELCTL), só no banco de teste, " +
     "para provar as colunas Fase/Passo/Iniciou da certidão no motor de Relatórios — nenhuma pessoa real é removida",
+  "scripts/torre-relatorio-filtros.test.ts":
+    "Filtros do Relatório de controle (Torre): monta e derruba as PRÓPRIAS pessoas/necessidades/documentos (marca RELFLT), só no banco de teste, " +
+    "para provar Fase/Linhagem/Status/Pessoa e a exportação filtrada — nenhuma pessoa real é removida",
   "scripts/verificador-integridade-emissao.test.ts":
     "verificador EMI-001..020 (Saúde do Sistema, fluxo Solicitar Certidão): monta e derruba " +
     "as PRÓPRIAS árvores/pessoas/documentos (marca EMIINTEG) só no banco de teste — nenhuma " +

@@ -41,6 +41,8 @@ export interface DadosExportacao {
   truncado: boolean
   aplicados: Resultado["aplicados"]
   extraidoEm: Date
+  /** O pedido quis a linha "Filtros: …" abrindo o CSV. */
+  contextoNoCsv?: boolean
 }
 
 /**
@@ -75,6 +77,7 @@ export async function coletar(
     truncado: cabeca.total > alvo,
     aplicados: cabeca.aplicados,
     extraidoEm: new Date(),
+    contextoNoCsv: spec.contextoNoCsv === true,
   }
 }
 
@@ -108,8 +111,12 @@ export function paraCsv(d: DadosExportacao): string {
   const escapar = (v: unknown) => `"${String(v).replace(/"/g, '""')}"`
   const cab = d.colunas.map((c) => c.rotulo)
   const corpo = d.linhas.map((l) => l.celulas.map((c) => c.valor ?? ""))
+  // Quando pedido, a PRIMEIRA linha diz quais filtros geraram o arquivo (quem recebe só o CSV não vê a tela).
+  const linhaDeFiltros = d.contextoNoCsv
+    ? [[d.aplicados.length ? `Filtros: ${d.aplicados.map((a) => `${a.rotulo}: ${a.descricao}`).join(" · ")}` : "Filtros: nenhum — a base inteira do domínio"]]
+    : []
   // BOM para o Excel abrir a acentuação corretamente.
-  return "﻿" + [cab, ...corpo].map((l) => l.map(escapar).join(";")).join("\n")
+  return "﻿" + [...linhaDeFiltros, cab, ...corpo].map((l) => l.map(escapar).join(";")).join("\n")
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -36,7 +36,7 @@ import { pedirFaseDeProcessos } from "./torre-fase-memoria"
 import { TorreTarefas, CHAVES_DE_VISAO } from "./TorreTarefas"
 import { TorreTerceiros } from "./TorreTerceiros"
 import { TorreEquipe } from "./TorreEquipe"
-import { RelatorioControle } from "./RelatorioControle"
+import { ProcessoRelatorioDaTorre } from "./ProcessoRelatorio"
 import "./torre.css"
 
 export type { Aba }
@@ -382,7 +382,7 @@ export function Torre() {
           />
         )}
         {revisao && <TorreRevisao itens={revisao} irParaAba={(a) => { setRevisao(null); irParaAba(a) }} onSair={() => setRevisao(null)} />}
-        {relatorio && <RelatorioControle processoId={relatorio.processoId} processoRotulo={relatorio.codigo ?? relatorio.familiaNome} familiaId={relatorio.familiaId} familiaNome={relatorio.familiaNome} onFechar={() => setRelatorio(null)} />}
+        {relatorio && <ProcessoRelatorioDaTorre processoId={relatorio.processoId} processoRotulo={relatorio.codigo ?? relatorio.familiaNome} familiaId={relatorio.familiaId} familiaNome={relatorio.familiaNome} onFechar={() => setRelatorio(null)} />}
       </div>
     </TorreProvider>
   )

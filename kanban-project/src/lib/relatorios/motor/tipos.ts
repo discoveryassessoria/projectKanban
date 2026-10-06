@@ -62,8 +62,16 @@ export interface FiltroDef {
    * existe relação declarada, o filtro resolve os ids antes numa consulta e
    * devolve um `in` — em vez de fingir uma relação que o schema não tem.
    */
-  paraWhere: (valor: ValorDeFiltro) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>
+  paraWhere: (valor: ValorDeFiltro, contexto?: ContextoDoFiltro) => Record<string, unknown> | null | Promise<Record<string, unknown> | null>
+  /**
+   * O filtro precisa saber o RECORTE em que roda (o `where` dos demais filtros e da nacionalidade): ele resolve ids só dentro dele, em vez
+   * de varrer o domínio inteiro. O motor o aplica DEPOIS dos outros, então a ordem em `spec.filtros` não importa.
+   */
+  depoisDoEscopo?: boolean
 }
+
+/** O que o motor entrega a um filtro `depoisDoEscopo`: o `where` já montado pelos filtros anteriores. */
+export interface ContextoDoFiltro { onde: Record<string, unknown> }
 
 export type ValorDeFiltro =
   | { tipo: "texto"; texto: string }
@@ -139,6 +147,8 @@ export interface QuerySpec {
   direcao?: "asc" | "desc"
   pagina?: number
   porPagina?: number
+  /** Só a exportação CSV: abre o arquivo com uma linha "Filtros: …" (Excel e PDF já trazem o contexto). Padrão: CSV como sempre foi. */
+  contextoNoCsv?: boolean
 }
 
 export interface DominioDef {
