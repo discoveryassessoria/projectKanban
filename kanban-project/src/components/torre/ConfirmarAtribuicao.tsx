@@ -13,12 +13,12 @@ export function useConfirmarAtribuicao(): { postar: <T = Record<string, unknown>
   const [motivo, setMotivo] = useState('')
 
   const motivoRef = useRef(''); const andamentoRef = useRef(false)
-  motivoRef.current = motivo; andamentoRef.current = andamentoOk
   const postar = useCallback(async <T,>(url: string, corpo: Record<string, unknown> = {}): Promise<RespostaApi<T>> => {
     const r1 = await api<T>(url, "POST", corpo)
     if (r1.status !== 428) return r1
     const previa = (r1.data as unknown as { confirmacao?: Previa }).confirmacao
     if (!previa) return r1
+    andamentoRef.current = false; motivoRef.current = ''
     setAndamentoOk(false); setMotivo('')
     const sim = await new Promise<boolean>((resolver) => setPend({ previa, resolver }))
     const m = motivoRef.current, a = andamentoRef.current
@@ -40,10 +40,10 @@ export function useConfirmarAtribuicao(): { postar: <T = Record<string, unknown>
         </ul>
         {pend.previa.alerta && <p className="text-xs mt-3 font-semibold" style={{ color: "var(--warning-text)" }}>{pend.previa.alerta}</p>}
         {pend.previa.exigeConfirmacaoDeAndamento && (
-          <label className="flex items-start gap-2 text-xs mt-2"><input type="checkbox" checked={andamentoOk} onChange={(e) => setAndamentoOk(e.target.checked)} />Confirmo remover o responsável de tarefa já iniciada (o andamento é preservado).</label>
+          <label className="flex items-start gap-2 text-xs mt-2"><input type="checkbox" checked={andamentoOk} onChange={(e) => { andamentoRef.current = e.target.checked; setAndamentoOk(e.target.checked) }} />Confirmo remover o responsável de tarefa já iniciada (o andamento é preservado).</label>
         )}
         {pend.previa.pedeMotivo && (
-          <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2} placeholder="Motivo (opcional)" className="w-full mt-3 rounded-lg p-2 text-sm bg-transparent border border-[var(--border-default)]" />
+          <textarea value={motivo} onChange={(e) => { motivoRef.current = e.target.value; setMotivo(e.target.value) }} rows={2} placeholder="Motivo (opcional)" className="w-full mt-3 rounded-lg p-2 text-sm bg-transparent border border-[var(--border-default)]" />
         )}
         {!pend.previa.pedeMotivo && <p className="text-xs opacity-70 mt-1">Só será gravada se você confirmar; fica no histórico como &quot;via sugestão (confirmada)&quot;.</p>}
         <div className="flex justify-end gap-2 mt-4">
