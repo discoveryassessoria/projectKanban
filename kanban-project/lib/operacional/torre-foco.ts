@@ -175,7 +175,7 @@ interface InfoDaPessoa { rotulo: string | null; geracao: number | null; linhaRet
 const tipoDoTitulo = (titulo: string): string => titulo.split(' · ')[0].replace(/\s*-\s*Inteiro Teor\s*$/i, '').trim()
 
 /** A linha aberta da Torre → linha da tabela. */
-function linhaAberta(l: LinhaDaTorre, info: Map<number, InfoDaPessoa>): LinhaDaTabela {
+function linhaAberta(l: LinhaDaTorre, info: Map<number, InfoDaPessoa>, faseDe: (key: string | null) => LinhaDaTabela['fase']): LinhaDaTabela {
   const risco = nivelDeRisco(l)
   return {
     chave: `t${l.taskId}`, tarefaId: l.taskId, documentoId: l.documentoId, tipo: 'ABERTA',
@@ -187,11 +187,11 @@ function linhaAberta(l: LinhaDaTorre, info: Map<number, InfoDaPessoa>): LinhaDaT
     responsavelId: l.responsavelId, responsavelNome: l.responsavelNome,
     iniciouEm: l.iniciouEm, concluidaEm: null, dataPrazo: l.dataPrazo, rotuloDoPrazo: l.rotuloDoPrazo,
     risco, atrasada: l.atrasada, bola: l.bolaCom, encerramentoTexto: null, motivoTexto: null, reabrivel: false,
-    podeAtribuir: l.responsavelId == null,
+    podeAtribuir: l.responsavelId == null, fase: faseDe(l.faseMacroKey ?? null),
   }
 }
 
-function linhaConcluida(l: LinhaGerencial, info: Map<number, InfoDaPessoa>): LinhaDaTabela {
+function linhaConcluida(l: LinhaGerencial, info: Map<number, InfoDaPessoa>, fase: LinhaDaTabela['fase']): LinhaDaTabela {
   return {
     chave: `t${l.taskId}`, tarefaId: l.taskId, documentoId: l.documentoId, tipo: 'CONCLUIDA',
     titulo: tipoDoTitulo(l.titulo), pessoaId: l.pessoaId, pessoa: l.pessoaNome ?? l.casalNomes ?? null,
@@ -199,11 +199,11 @@ function linhaConcluida(l: LinhaGerencial, info: Map<number, InfoDaPessoa>): Lin
     passo: null, status: 'CONCLUIDA', statusRotulo: rotuloDoStatus(l.statusTarefa),
     responsavelId: l.responsavelId, responsavelNome: l.responsavelNome,
     iniciouEm: l.iniciouEm, concluidaEm: l.concluidaEm, dataPrazo: null, rotuloDoPrazo: '',
-    risco: null, atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: false,
+    risco: null, atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: false, fase,
   }
 }
 
-function linhaEncerrada(e: CertidaoEncerradaDoFoco, info: Map<number, InfoDaPessoa>, agora: Date): LinhaDaTabela {
+function linhaEncerrada(e: CertidaoEncerradaDoFoco, info: Map<number, InfoDaPessoa>, agora: Date, fase: LinhaDaTabela['fase']): LinhaDaTabela {
   const enc = e.encerramento
   const cancelada = e.tipo === 'CANCELADA'
   const encerramentoTexto = cancelada
@@ -222,7 +222,7 @@ function linhaEncerrada(e: CertidaoEncerradaDoFoco, info: Map<number, InfoDaPess
     passo: null, status: e.tipo, statusRotulo: cancelada ? 'Cancelada' : 'Não exigida',
     responsavelId: null, responsavelNome: null, iniciouEm: null, concluidaEm: null, dataPrazo: null, rotuloDoPrazo: '',
     risco: null, atrasada: false, bola: null, encerramentoTexto, motivoTexto,
-    reabrivel: cancelada && enc?.tarefaReabrivelId != null, podeAtribuir: false,
+    reabrivel: cancelada && enc?.tarefaReabrivelId != null, podeAtribuir: false, fase,
   }
 }
 
@@ -328,10 +328,14 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   // A tabela: abertas e concluídas DA FASE ATUAL + as certidões canceladas / não exigidas.
   const abertasDaFase = foco.tarefas.filter((l) => faseAtualKey == null || l.faseMacroKey === faseAtualKey)
   const deFasesAnteriores = foco.tarefas.filter((l) => faseAtualKey != null && l.faseMacroKey !== faseAtualKey)
-  const trabalho: LinhaDaTabela[] = [...abertasDaFase.map((l) => linhaAberta(l, info)), ...concluidas.map((l) => linhaConcluida(l, info))]
+  // A LISTA É DO PROCESSO: TODAS as tarefas abertas, de qualquer fase (a fase mais antiga trava as seguintes), + as concluídas e encerradas da fase atual.
+  const ordemDaFase = new Map(cam.fases.map((f) => [f.phaseKey, f.numero]))
+  const faseDe = (key: string | null): LinhaDaTabela['fase'] => ({ key, label: key ? labelDaFasePorPhaseKey(key) ?? key : null, ordem: key != null ? ordemDaFase.get(key) ?? 9000 : 9000 })
+  const faseDaAtual = faseDe(faseAtualKey ?? null)
+  const trabalho: LinhaDaTabela[] = [...foco.tarefas.map((l) => linhaAberta(l, info, faseDe)), ...concluidas.map((l) => linhaConcluida(l, info, faseDaAtual))]
   const faseEhDocumental = trabalho.some((l) => l.documentoId != null)
   const encerradasDaFase = foco.encerradas.filter((e) => (e.faseMacroKey ? e.faseMacroKey === faseAtualKey : faseEhDocumental))
-  const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, info, agora))]
+  const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, info, agora, faseDaAtual))]
 
   const cartoes = cartoesDaFase({
     linhas: abertasDaFase,
@@ -353,7 +357,7 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
       risco, noPrecisaDeVoce: itensDoProcesso.length > 0, faseNumero: cam.numeroDaFaseAtual, faseTotal: cam.total,
     },
     proximaAcao: (() => {
-      const pa = proximaAcaoDoProcesso(foco.tarefas, faseAtualKey)
+      const pa = proximaAcaoDoProcesso(foco.tarefas, null, ordemDaFase)
       return pa ? cartaoDaProximaAcao(pa, prazoCurto(pa.dataPrazo, agora).texto, faseLabel, itensDoProcesso.length > 0) : null
     })(),
     trava, previsao, caminho: cam, cartoes, tabela,

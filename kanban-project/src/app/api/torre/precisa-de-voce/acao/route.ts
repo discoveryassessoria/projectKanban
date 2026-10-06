@@ -12,6 +12,7 @@
 // `workflow.avancar`; forçar/encerrar fase pede `workflow.forcarAvanco`; atribuir/redistribuir/reconciliar/trocar canal pedem `tarefas.editar`;
 // desbloquear pede `tarefas.bloquear`. A API confere sempre; esconder o botão na tela é só sugestão.
 // ============================================================================
+import { confirmacaoDoCorpo, pedirConfirmacao } from '@/src/lib/torre-confirmacao'
 import { type NextRequest, NextResponse } from 'next/server'
 import { exigirTorre } from '@/src/lib/torre-acesso'
 import type { PermissaoChave } from '@/src/lib/permissoes'
@@ -46,8 +47,16 @@ export async function POST(request: NextRequest) {
     switch (acao) {
       case 'ATRIBUIR_SUGERIDO': {
         // Item "Sem responsável" é de um PROCESSO; `tarefaId` segue valendo para a ação individual (Tarefas, Revisão antiga).
-        const r = processoId != null ? await acoes.atribuirSugeridoDoProcesso(processoId, autorId) : await acoes.atribuirSugerido(tarefaId, autorId)
-        return NextResponse.json(r, { status: r.ok ? 200 : 422 })
+        // SUGESTÃO NUNCA ATRIBUI SOZINHA: 1ª viagem devolve a prévia (428, nada gravado); a 2ª exige `confirmado` + a assinatura da prévia.
+        const { confirmado, assinatura } = confirmacaoDoCorpo(b)
+        if (!confirmado || assinatura == null) {
+          const previa = processoId != null ? await acoes.previaDaSugestaoDoProcesso(processoId) : await acoes.previaDaSugestaoDaTarefa(tarefaId)
+          if (!previa) return NextResponse.json({ ok: false, erro: 'Sem sugestão de responsável para confirmar — escolha a pessoa.' }, { status: 422 })
+          return pedirConfirmacao(previa)
+        }
+        const o = { autorNome: usuario.nome, assinaturaConfirmada: assinatura }
+        const r = processoId != null ? await acoes.atribuirSugeridoDoProcesso(processoId, autorId, new Date(), o) : await acoes.atribuirSugerido(tarefaId, autorId, o)
+        return NextResponse.json(r, { status: r.ok ? 200 : (r as { mudou?: boolean }).mudou ? 409 : 422 })
       }
       case 'ATRIBUIR_ESCOLHIDO': {
         const responsavelId = idPositivo(b?.responsavelId)

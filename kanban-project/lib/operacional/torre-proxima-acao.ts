@@ -91,10 +91,12 @@ const dataPrazoMs = (l: LinhaParaProximaAcao) => (l.dataPrazo ? new Date(l.dataP
  * A PRÓXIMA AÇÃO do processo a partir das linhas de tarefa ABERTAS. Só entram as da fase `faseAtualKey` (leitura escopada por
  * ciclo: tarefa de outra fase nunca vaza para a fase consultada). `null` = nenhuma tarefa elegível.
  */
-export function proximaAcaoDoProcesso(linhas: LinhaParaProximaAcao[], faseAtualKey: string | null): ProximaAcao | null {
+export function proximaAcaoDoProcesso(linhas: LinhaParaProximaAcao[], faseAtualKey: string | null, ordemDaFase?: ReadonlyMap<string, number>): ProximaAcao | null {
   const abertas = linhas.filter((l) => l.estadoOperacao !== 'CONCLUIDA' && (faseAtualKey == null || l.faseMacroKey === faseAtualKey))
   if (abertas.length === 0) return null
-  const ordenadas = [...abertas].sort((a, b) => rankDaTarefa(a) - rankDaTarefa(b) || dataPrazoMs(a) - dataPrazoMs(b) || a.taskId - b.taskId)
+  // Com `ordemDaFase` a escolha começa pela fase MAIS ANTIGA (é ela que trava as seguintes) e a contagem é a de todas as fases abertas.
+  const faseOrd = (l: LinhaParaProximaAcao) => (ordemDaFase && l.faseMacroKey ? ordemDaFase.get(l.faseMacroKey) ?? 9000 : 0)
+  const ordenadas = [...abertas].sort((a, b) => faseOrd(a) - faseOrd(b) || rankDaTarefa(a) - rankDaTarefa(b) || dataPrazoMs(a) - dataPrazoMs(b) || a.taskId - b.taskId)
   const l = ordenadas[0]
   const tipo = tipoDaTarefa(l)
   const mesmas = abertas.filter((m) => tipoDaTarefa(m) === tipo)

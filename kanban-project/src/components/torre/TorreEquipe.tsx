@@ -4,6 +4,7 @@
 // Aguard. terceiros fecham com a aba Tarefas e a Visão geral). Ausência é só REGISTRO (com sucessor sugerido); mover a carteira é
 // ação MANUAL; "Simular saída" mostra o impacto antes de aplicar e NUNCA grava; "Distribuir por aptidão e carga" só atribui a quem
 // tem aptidão comprovada (sem apto, a tarefa fica para o Precisa de você). Toda ação com efeito grava no histórico e tem Desfazer.
+import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useEffect, useState } from "react"
 import { api, erroDe, useTorre, type Desfazer } from "./torre-base"
 import { TITULO_EQUIPE, TEXTO_EXPLICATIVO, toastAusenciaCancelada, toastAusenciaMarcada, toastCarteiraMovida, toastDistribuicao, toastRedistribuicao, toastSimulacaoAplicada } from "./equipe-visual"
@@ -31,6 +32,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
   const [sim, setSim] = useState<SimulacaoDeSaida | null>(null)
   const [diasSim, setDiasSim] = useState(10)
   const [ocupado, setOcupado] = useState(false)
+  const { postar: postarComConfirmacao, modal: modalConfirmacao } = useConfirmarAtribuicao()
 
   const permitido = !!permissoes?.equipe
   useEffect(() => {
@@ -70,7 +72,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
   }
   const distribuir = async () => {
     setOcupado(true)
-    const r = await api<RespostaDistribuicao>("/api/torre/equipe/distribuir-sem-responsavel", "POST", {})
+    const r = await postarComConfirmacao<RespostaDistribuicao>("/api/torre/equipe/distribuir-sem-responsavel", {})
     setOcupado(false)
     if (typeof r.data?.atribuidas === "number") { avisar(toastDistribuicao(r.data, nomes), r.data.desfazer ?? null); atualizar() } else avisar(erroDe(r.data))
   }
@@ -86,6 +88,7 @@ export function TorreEquipe({ versao, pais = "" }: { versao: number; pais?: stri
 
   return (
     <div className="eqp">
+      {modalConfirmacao}
       <div className="eqp-cab">
         <div className="eqp-mig"><a href="/torre?aba=visao">Torre de Controle</a> › Equipe</div>
         <h1 className="eqp-titulo">{TITULO_EQUIPE}</h1>

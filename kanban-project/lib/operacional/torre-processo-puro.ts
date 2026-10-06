@@ -138,6 +138,8 @@ export interface LinhaDaTabela {
   /** Pode reabrir pela porta canônica (cancelada por decisão humana). */
   reabrivel: boolean
   podeAtribuir: boolean
+  /** A FASE da tarefa (a lista do processo mostra as abertas de TODAS as fases, agrupadas da mais antiga para a mais nova). */
+  fase: { key: string | null; label: string | null; ordem: number }
 }
 
 /** A chave da regra fixa de ordem das certidões para uma linha desta tabela. */
@@ -168,8 +170,11 @@ export function filtrarEOrdenar(
       if (f.status === 'ENCERRADAS') return l.tipo === 'CANCELADA' || l.tipo === 'NAO_EXIGIDA'
       return l.status === f.status
     })
-  // UMA família (o processo): a regra fixa e nada mais — nem o status (cancelada no fim) nem o prazo reordenam.
-  return ordenarCertidoesDaFamilia(filtradas, chaveDaLinhaDaTabela)
+  // GRUPOS POR FASE, a mais antiga primeiro (é ela que trava as seguintes); dentro de cada grupo, UMA família (o processo): a regra fixa
+  // das certidões e nada mais — nem o status (cancelada no fim) nem o prazo reordenam.
+  const porFase = new Map<number, LinhaDaTabela[]>()
+  for (const l of filtradas) { const o = l.fase?.ordem ?? 9999; const g = porFase.get(o) ?? []; g.push(l); porFase.set(o, g) }
+  return [...porFase.entries()].sort((a, b) => a[0] - b[0]).flatMap(([, g]) => ordenarCertidoesDaFamilia(g, chaveDaLinhaDaTabela))
 }
 
 /** Quantas linhas contam por padrão: as que são trabalho (abertas + concluídas). Canceladas / não exigidas não contam. */
@@ -189,7 +194,7 @@ export function tituloDaTabela(linhas: LinhaDaTabela[], ehCertidao: (l: LinhaDaT
   const enc = lista.filter(ehEncerrada).length
   const ativas = lista.length - enc
   const detalhe = enc === 0 ? '' : ativas === 0 ? ` (${ROTULO_ENCERRADAS.toLowerCase()})` : ` (${ativas} ${ativas === 1 ? 'ativa' : 'ativas'} + ${enc} ${ROTULO_ENCERRADAS.toLowerCase()})`
-  return `${soCertidoes ? 'Certidões' : 'Tarefas'} da fase atual · ${lista.length}${detalhe}`
+  return `${soCertidoes ? 'Certidões abertas' : 'Tarefas abertas'} do processo · ${lista.length}${detalhe}`
 }
 
 // ─── LINHA-RESUMO ("+ 5 certidões iguais a estas") ───────────────────────────

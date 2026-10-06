@@ -43,16 +43,55 @@ async function registrarAuditoriaSimples(args: {
 
 // ─── FASE DEIXADA / SEM DONO ────────────────────────────────────────────────
 
-export async function atribuirSugerido(tarefaId: number, autorId: number): Promise<Resultado> {
+// ─── CONFIRMAÇÃO EXPLÍCITA (06/10/2026) ─────────────────────────────────────
+// Sugestão NUNCA atribui sozinha nem com um clique solto: o servidor devolve a PRÉVIA ("Atribuir X a Y?") e só grava quando o cliente
+// reenvia `confirmado: true` COM a mesma assinatura da prévia (se a sugestão mudou no meio, recusa e mostra a nova).
+
+export interface PreviaDeAtribuicao {
+  pergunta: string
+  itens: Array<{ pessoa: string; quantidade: number; tarefas: string[] }>
+  /** Identifica o que está sendo confirmado: tarefa→pessoa, ordenado. A execução recalcula e compara. */
+  assinatura: string
+}
+
+const assinar = (pares: Array<[number, number]>): string => pares.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([t, u]) => `${t}:${u}`).join(',')
+
+async function titulosDe(ids: number[]): Promise<Map<number, string>> {
+  const ts = await prisma.tarefa.findMany({ where: { id: { in: ids } }, select: { id: true, titulo: true } })
+  return new Map(ts.map((t) => [t.id, t.titulo]))
+}
+
+export async function previaDaSugestaoDaTarefa(tarefaId: number): Promise<PreviaDeAtribuicao | null> {
+  const s = await sugerirResponsavelPrecisaDeVoce(tarefaId)
+  if (!s) return null
+  const titulo = (await titulosDe([tarefaId])).get(tarefaId) ?? `tarefa #${tarefaId}`
+  return { pergunta: `Atribuir "${titulo}" a ${s.nome}?`, itens: [{ pessoa: s.nome, quantidade: 1, tarefas: [titulo] }], assinatura: assinar([[tarefaId, s.usuarioId]]) }
+}
+
+export async function previaDaSugestaoDoProcesso(processoId: number, agora = new Date()): Promise<PreviaDeAtribuicao | null> {
+  const ids = await semDonoDoProcesso(processoId, agora)
+  if (ids.length === 0) return null
+  const plano = await planoDeAtribuicao(ids, agora)
+  if (plano.atribuicoes.length === 0) return null
+  const tit = await titulosDe(plano.atribuicoes.flatMap((a) => a.tarefaIds))
+  const itens = plano.atribuicoes.map((a) => ({ pessoa: a.nome, quantidade: a.tarefaIds.length, tarefas: a.tarefaIds.map((t) => tit.get(t) ?? `#${t}`) }))
+  const total = itens.reduce((n, i) => n + i.quantidade, 0)
+  return { pergunta: `Atribuir ${total} ${total === 1 ? 'tarefa' : 'tarefas'}: ${itens.map((i) => `${i.quantidade} a ${i.pessoa}`).join(', ')}?`, itens, assinatura: assinar(plano.atribuicoes.flatMap((a) => a.tarefaIds.map((t) => [t, a.usuarioId] as [number, number]))) }
+}
+
+const origemDaSugestao = (autorNome?: string | null) => `via sugestão do Precisa de você (confirmada${autorNome ? ` por ${autorNome}` : ''})`
+
+export async function atribuirSugerido(tarefaId: number, autorId: number, o: { autorNome?: string | null; assinaturaConfirmada?: string | null } = {}): Promise<Resultado> {
   const s = await sugerirResponsavelPrecisaDeVoce(tarefaId)
   if (!s) return { ok: false, erro: 'Nenhum candidato apto e disponível encontrado.' }
-  const r = await atribuirTarefa({ tarefaId, responsavelId: s.usuarioId, autorId, motivo: `sugestão do Precisa de você: ${s.motivo}` })
+  if (o.assinaturaConfirmada != null && o.assinaturaConfirmada !== assinar([[tarefaId, s.usuarioId]])) return { ok: false, erro: 'A sugestão mudou desde que você confirmou. Revise e confirme de novo.', mudou: true }
+  const r = await atribuirTarefa({ tarefaId, responsavelId: s.usuarioId, autorId, motivo: `${origemDaSugestao(o.autorNome)}: ${s.motivo}` })
   if (!r.ok) return { ok: false, erro: r.mensagem }
   return { ok: true, mensagem: `Atribuída a ${s.nome}.`, tarefaId, responsavelId: s.usuarioId }
 }
 
 export async function atribuirEscolhido(tarefaId: number, responsavelId: number, autorId: number): Promise<Resultado> {
-  const r = await atribuirTarefa({ tarefaId, responsavelId, autorId, motivo: 'escolhido manualmente no Precisa de você (não a sugestão)' })
+  const r = await atribuirTarefa({ tarefaId, responsavelId, autorId, motivo: 'manual: escolhido no Precisa de você (não a sugestão)' })
   if (!r.ok) return { ok: false, erro: r.mensagem }
   return { ok: true, mensagem: 'Atribuída.', tarefaId, responsavelId }
 }
@@ -66,16 +105,18 @@ export async function encerrarNaoDevida(tarefaId: number, justificativa: string,
 // ─── SEM RESPONSÁVEL — por PROCESSO ─────────────────────────────────────────
 
 /** Atribui as certidões sem responsável de um PROCESSO, cada uma a quem tem APTIDÃO comprovada (o plano da lista). Sem apto → nada, decisão humana. */
-export async function atribuirSugeridoDoProcesso(processoId: number, autorId: number, agora = new Date()): Promise<Resultado> {
+export async function atribuirSugeridoDoProcesso(processoId: number, autorId: number, agora = new Date(), o: { autorNome?: string | null; assinaturaConfirmada?: string | null } = {}): Promise<Resultado> {
   const ids = await semDonoDoProcesso(processoId, agora)
   if (ids.length === 0) return { ok: false, erro: 'este processo não tem mais certidões sem responsável' }
   const plano = await planoDeAtribuicao(ids, agora)
   if (plano.atribuicoes.length === 0) return { ok: false, erro: 'Sem aptidão cadastrada para estas certidões — escolha o responsável' }
+  const assinaturaAgora = assinar(plano.atribuicoes.flatMap((a) => a.tarefaIds.map((t) => [t, a.usuarioId] as [number, number])))
+  if (o.assinaturaConfirmada != null && o.assinaturaConfirmada !== assinaturaAgora) return { ok: false, erro: 'A sugestão mudou desde que você confirmou. Revise e confirme de novo.', mudou: true }
   const itens: Array<{ tarefaId: number; ok: boolean; mensagem?: string }> = []
   for (const a of plano.atribuicoes) {
     const r = await redistribuirTarefas({
       tarefaIds: a.tarefaIds, novoResponsavelId: a.usuarioId, autorId,
-      motivo: `sugestão do Precisa de você${a.motivo ? `: ${a.motivo}` : ''}`,
+      motivo: `${origemDaSugestao(o.autorNome)}${a.motivo ? `: ${a.motivo}` : ''}`,
     })
     itens.push(...r.itens)
   }
@@ -93,7 +134,7 @@ export async function atribuirSugeridoDoProcesso(processoId: number, autorId: nu
 export async function atribuirEscolhidoDoProcesso(processoId: number, responsavelId: number, autorId: number, agora = new Date()): Promise<Resultado> {
   const ids = await semDonoDoProcesso(processoId, agora)
   if (ids.length === 0) return { ok: false, erro: 'este processo não tem mais certidões sem responsável' }
-  const r = await redistribuirTarefas({ tarefaIds: ids, novoResponsavelId: responsavelId, autorId, motivo: 'escolhido manualmente no Precisa de você (não a sugestão)' })
+  const r = await redistribuirTarefas({ tarefaIds: ids, novoResponsavelId: responsavelId, autorId, motivo: 'manual: escolhido no Precisa de você (não a sugestão)' })
   if (r.sucesso === 0) return { ok: false, erro: r.itens.find((i) => !i.ok)?.mensagem ?? 'nenhuma certidão pôde ser atribuída' }
   return { ok: true, mensagem: `${r.sucesso} de ${r.total} ${r.total === 1 ? 'certidão atribuída' : 'certidões atribuídas'}.`, total: r.total, sucesso: r.sucesso, itens: r.itens, processoId }
 }

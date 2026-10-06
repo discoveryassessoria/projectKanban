@@ -9,7 +9,7 @@ import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/req
 import { registrarTransicaoParaRequerenteTx, efeitosDoVinculoPosCommit } from "@/lib/genealogia/vincular-requerente"
 import { aplicarMudancaNaArvore, descreverMudancaPessoa, SELECT_PESSOA_COMPARAVEL, PropagacaoPosCommitError } from "@/src/services/genealogia/propagar-arvore"
 import { validarDocumentosExigidos, mesmaEscolha, type CodigoDocumentoExigivel } from "@/src/lib/genealogia/documentos-exigidos"
-import { auditarDocumentosExigidos } from "@/src/services/genealogia/documentos-exigidos-auditoria"
+import { auditarDocumentosExigidos, certidoesJaAndadasQueSairiam } from "@/src/services/genealogia/documentos-exigidos-auditoria"
 import { removerPessoaDaArvore, type ModoRemocao } from "@/src/services/pessoa-ciclo-vida"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
@@ -160,11 +160,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // MUDOU de verdade (re-save de pessoa antiga NUNCA grava a lista cheia: `null` ≡ os três marcados) e é ignorado quando
     // a pessoa NÃO precisa de documentação (a caixa desligada vale mais que qualquer lista).
     let documentosExigidosNovo: CodigoDocumentoExigivel[] | null | undefined
+    let decisaoRemocao: { motivo: string } | null = null
     if (body.documentosExigidos !== undefined) {
       const v = validarDocumentosExigidos(body.documentosExigidos)
       if (!v.ok) return NextResponse.json({ error: v.erro }, { status: 400 })
       const documentacaoFinal = body.documentacao !== undefined ? body.documentacao === true : antes?.documentacao !== false
       if (documentacaoFinal && !mesmaEscolha(antes?.documentosExigidos ?? null, v.valor)) {
+        // REGRA FIXA: tirar certidão que JÁ ANDOU exige confirmação explícita + motivo (decisão humana registrada).
+        const andadas = await certidoesJaAndadasQueSairiam(prisma, { pessoaId: id, antes: antes?.documentosExigidos ?? null, depois: v.valor })
+        const motivo = typeof body.motivoRemocaoDeCertidao === "string" ? body.motivoRemocaoDeCertidao.trim().replace(/\s+/g, " ") : ""
+        if (andadas.length > 0) {
+          if (body.confirmarRemocaoDeCertidao !== true || motivo.length < 10) {
+            return NextResponse.json({
+              error: `Esta edição tiraria da lista certidão(ões) que já andou(aram): ${andadas.join(", ")}. Confirme a remoção e informe o motivo (pelo menos 10 caracteres).`,
+              code: "REMOCAO_DE_CERTIDAO_JA_ANDADA", certidoes: andadas,
+            }, { status: 409 })
+          }
+          decisaoRemocao = { motivo: motivo.slice(0, 300) }
+        }
         documentosExigidosNovo = v.valor
         dataToUpdate.documentosExigidos = v.valor ?? Prisma.DbNull
       }
@@ -205,7 +218,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           await registrarTransicaoParaRequerenteTx(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
         }
         if (documentosExigidosNovo !== undefined) {
-          await auditarDocumentosExigidos(tx, { pessoaId: p.id, antes: estadoAntes?.documentosExigidos ?? null, depois: documentosExigidosNovo, usuarioId: autorDaMudanca })
+          await auditarDocumentosExigidos(tx, { pessoaId: p.id, antes: estadoAntes?.documentosExigidos ?? null, depois: documentosExigidosNovo, usuarioId: autorDaMudanca, ...(decisaoRemocao ? { decisaoHumana: true, motivo: decisaoRemocao.motivo } : {}) })
         }
         return { pessoa: p, estadoAntes }
       },

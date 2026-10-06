@@ -162,7 +162,7 @@ secao("7) Página do processo (tabela de certidões da fase) — status/prazo/ri
     chave: `t${p.id}${i}`, tarefaId: p.id * 100 + i, documentoId: null, tipo: (i % 3 === 0 ? "ABERTA" : i % 3 === 1 ? "CONCLUIDA" : "CANCELADA") as LinhaDaTabela["tipo"], titulo: TITULO[c], pessoaId: p.id, pessoa: p.nome,
     geracao: `G${p.geracao}`, geracaoNum: p.geracao, linhaReta: p.linhaReta, pessoaNascimento: `${p.nasc}T00:00:00Z`,
     passo: null, status: (i % 3 === 0 ? "A_INICIAR" : i % 3 === 1 ? "CONCLUIDA" : "CANCELADA") as LinhaDaTabela["status"], statusRotulo: "x", responsavelId: null, responsavelNome: null, iniciouEm: null, concluidaEm: null,
-    dataPrazo: "2026-10-20T15:00:00Z", rotuloDoPrazo: "", risco: "ritmo" as const, atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: false,
+    dataPrazo: "2026-10-20T15:00:00Z", rotuloDoPrazo: "", risco: "ritmo" as const, atrasada: false, bola: null, encerramentoTexto: null, motivoTexto: null, reabrivel: false, podeAtribuir: false, fase: { key: "emissao_documental", label: "Emissão", ordem: 2 },
   }))), 13)
   const r = filtrarEOrdenar(tab, { pessoaId: null, status: "TODOS" })
   ok("«Ativas + canceladas»: a regra fixa — a cancelada NÃO vai para o fim", iguais(r.map((l) => `${l.pessoaId}:${l.titulo.includes("nasc") ? "NASCIMENTO" : l.titulo.includes("casam") ? "CASAMENTO" : l.titulo.includes("óbito") ? "OBITO" : "OUTRO"}`), esperado))

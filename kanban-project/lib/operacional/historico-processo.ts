@@ -467,7 +467,10 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       a.pessoaId = n?.pessoaId ?? a.pessoaId
       return [a]
     }
+    case 'NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO':
     case 'NECESSIDADE_ATENDIDA_SEM_CAUSA': {
+      // Avisos repetidos foram consolidados em UM registro (nada apagado: os originais ficam marcados `consolidadoPor`).
+      if (d.consolidadoPor != null) return []
       const n = l.entidadeId != null ? ctx.necessidades[l.entidadeId] : undefined
       const a = novoAtomo(ctx, { ...origem, rank: 2, tipo: 'ARVORE', subtipo: 'exigencia_sem_causa', verbo: 'deixou de ser exigida pela árvore, mas já andou e pede decisão humana:', motivo: txt(d.motivo) }, { necessidadeId: l.entidadeId })
       a.objeto = n?.rotulo ?? null

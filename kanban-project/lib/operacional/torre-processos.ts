@@ -282,7 +282,8 @@ export function anotarRisco<T extends { processoId: number | null }>(linhas: T[]
 
 const rotuloDoPassoDaLinha = (l: Pick<LinhaDaTorre, 'passoCorrente' | 'etapaAtual'>): string => l.passoCorrente?.label ?? l.etapaAtual ?? 'Sem passo'
 
-export function tarefasDaFaseDoProcesso(linhasDaFase: LinhaDaTorre[], concluidas: number, metaDias: number | null): TarefasDaFase {
+/** `todasAbertas` (opcional): as abertas do PROCESSO inteiro — `abertas` e `semResponsavel` passam a contar o MESMO conjunto da lista da página do processo. */
+export function tarefasDaFaseDoProcesso(linhasDaFase: LinhaDaTorre[], concluidas: number, metaDias: number | null, todasAbertas?: LinhaDaTorre[]): TarefasDaFase {
   const semResp = linhasDaFase.filter((l) => l.responsavelId == null)
   const comResp = linhasDaFase.filter((l) => l.responsavelId != null)
   const porPasso = new Map<string, PassoDoProcesso>()
@@ -298,7 +299,7 @@ export function tarefasDaFaseDoProcesso(linhasDaFase: LinhaDaTorre[], concluidas
     porPasso.set(label, p)
   }
   return {
-    abertas: linhasDaFase.length, semResponsavel: semResp.length, concluidas,
+    abertas: (todasAbertas ?? linhasDaFase).length, semResponsavel: (todasAbertas ?? linhasDaFase).filter((l) => l.responsavelId == null).length, concluidas,
     passos: [...porPasso.values()].sort((a, b) => a.ordem - b.ordem || a.label.localeCompare(b.label, 'pt-BR')),
     ehCertidao: linhasDaFase.some((l) => l.documentoId != null),
   }
@@ -342,7 +343,7 @@ export async function processosDaTorre(agora = new Date(), linhasEntrada?: Linha
     const metaDias = p.faseAtualKey ? metaDaFaseDoPais(metas, p.faseAtualKey, p.paisId) : null
     const bola = bolaDoProcesso(daFase)
     const r = riscoDoProcesso(entradaDoRisco({ linhas: ls, itens: is, diasNaFase: tempo.dias, metaDias, bolaRotulo: bola.rotulo }))
-    const prox = proximaAcaoDoProcesso(daFase, null)
+    const prox = proximaAcaoDoProcesso(ls, null)
     const ordens = p.tipoProcessoMotorId != null ? ordensPorTipo.get(p.tipoProcessoMotorId) : undefined
     const ordemAtual = p.faseAtualKey ? ordens?.get(p.faseAtualKey) : undefined
     const celulas: CelulaDoRadar[] = colunas.map((c): CelulaDoRadar => {
@@ -363,7 +364,7 @@ export async function processosDaTorre(agora = new Date(), linhasEntrada?: Linha
         comCartorio: ls.filter((l) => l.estadoOperacao === 'AGUARDANDO').length, semResponsavel: ls.filter((l) => l.responsavelId == null).length,
       },
       proximaAcao: prox ? { ...prox, prazo: prazoCurto(prox.dataPrazo, agora) } : null,
-      tarefasDaFase: tarefasDaFaseDoProcesso(daFase, concluidas.get(p.id) ?? 0, metaDias),
+      tarefasDaFase: tarefasDaFaseDoProcesso(daFase, concluidas.get(p.id) ?? 0, metaDias, ls),
       celulas,
     }
   })

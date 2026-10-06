@@ -621,6 +621,13 @@ async function auditarFatos(res: MaterializarResultado, processoId: number, db: 
     })
   }
   for (const pv of res.preservadasSemCausa) {
+    // UM AVISO POR SITUAÇÃO (06/10/2026, caso Attilio: 11 linhas iguais durante uma sequência de edições): se o último registro desta
+    // necessidade já é este mesmo aviso, a situação não mudou — nada novo a registrar.
+    const ultimo = await db.logAuditoria.findFirst({
+      where: { entidade: "NecessidadeDocumental", entidadeId: pv.necessidadeId, acao: { startsWith: "NECESSIDADE_" } },
+      orderBy: { id: "desc" }, select: { acao: true },
+    })
+    if (ultimo?.acao === "NECESSIDADE_ATENDIDA_SEM_CAUSA" || ultimo?.acao === "NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO") continue
     await db.logAuditoria.create({
       data: {
         acao: "NECESSIDADE_ATENDIDA_SEM_CAUSA", entidade: "NecessidadeDocumental", entidadeId: pv.necessidadeId, usuarioId,

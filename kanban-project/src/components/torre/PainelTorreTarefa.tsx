@@ -6,6 +6,7 @@
 // são as MESMAS da gaveta da aba Tarefas (`ModalDaAcao`: justificativa de 5 letras que vai para o histórico) e cada uma chama uma
 // porta existente — só aparece com a permissão dela.
 // ============================================================================
+import { useConfirmarAtribuicao } from "./ConfirmarAtribuicao"
 import { useEffect, useState } from "react"
 import { relTxt, fmtData, statusTarefaCls } from "@/src/components/operacao/operacao-v3-derivacoes"
 import { textoDaBola, textoDoCobrar, textoDoIniciou, statusDaLinha } from "@/lib/operacional/torre-tarefas-tela"
@@ -35,9 +36,10 @@ export function PainelTorreTarefa({ linha, agora }: { linha: LinhaTorre; agora: 
     return () => { vivo = false }
   }, [linha.taskId, linha.responsavelId, permissoes?.editar])
 
+  const { postar, modal: modalConfirmacao } = useConfirmarAtribuicao()
   const atribuirSugerido = async () => {
     setOcupado(true)
-    const r = await api<{ ok?: boolean; mensagem?: string; desfazer?: { tipo: "ATRIBUICAO"; tarefaIds: number[] } }>(`/api/torre/tarefas/${linha.taskId}/atribuir-sugerido`, "POST")
+    const r = await postar<{ ok?: boolean; mensagem?: string; desfazer?: { tipo: "ATRIBUICAO"; tarefaIds: number[] } }>(`/api/torre/tarefas/${linha.taskId}/atribuir-sugerido`)
     setOcupado(false)
     if (r.ok) { avisar(r.data.mensagem ?? "Atribuída.", r.data.desfazer ?? null); recarregar() } else avisar(erroDe(r.data))
   }
@@ -46,6 +48,7 @@ export function PainelTorreTarefa({ linha, agora }: { linha: LinhaTorre; agora: 
   const passos = linha.passoAtual
   return (
     <div className="tor tor-painel" data-testid="painel-torre">
+      {modalConfirmacao}
       <div className="tor-kv">
         <div><b>Aguardando</b><span className={`tor-p ${bola.comTerceiro ? "amb" : "blu"}`}>{bola.texto}</span></div>
         <div><b>Status</b><span className={`tor-p ${statusTarefaCls(linha).replace("opv3-p-", "")}`}>{st.texto}</span></div>
