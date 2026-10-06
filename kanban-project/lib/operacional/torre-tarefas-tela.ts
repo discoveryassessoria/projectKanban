@@ -90,6 +90,8 @@ export interface LinhaParaBolaDaTela {
   bolaCom?: BolaCom
   bolaDesde?: string | null
   terceiroNome: string | null
+  /** Cartório digitado, sem órgão vinculado: a dica mostra "<texto> · não vinculado" (nunca some o que a pessoa informou). */
+  cartorioTexto?: string | null
   esperandoDe: 'terceiro' | 'cliente' | null
   estadoOperacao: 'FILA' | 'AGUARDANDO' | 'CONCLUIDA'
   responsavelNome?: string | null
@@ -104,7 +106,7 @@ export function textoDaBola(l: LinhaParaBolaDaTela, agora: Date): { nome: string
   const bola: BolaCom = l.bolaCom ?? (l.esperandoDe === 'cliente' ? 'Cliente' : l.esperandoDe === 'terceiro' || l.estadoOperacao === 'AGUARDANDO' ? 'Cartório' : BOLA_NOSSA)
   const comTerceiro = bola !== BOLA_NOSSA
   const nome = bola
-  const orgao = bola === 'Cliente' || !comTerceiro ? null : l.terceiroNome ?? null
+  const orgao = bola === 'Cliente' || !comTerceiro ? null : l.terceiroNome ?? (l.cartorioTexto ? `${l.cartorioTexto} · não vinculado` : null)
   const haDias = comTerceiro ? haQuantosDias(l.bolaDesde, agora) : null
   return { nome, orgao, haDias, comTerceiro, texto: haDias != null ? `${nome} · há ${diasPorExtenso(haDias)}` : nome }
 }

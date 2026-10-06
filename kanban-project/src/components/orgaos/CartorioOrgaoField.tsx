@@ -185,7 +185,7 @@ function ModalCadastro({ nomeInicial, cidadeInicial, ufInicial, paisNome, salvan
     }).catch(() => setPaises([]))
   }, [paisNome])
 
-  const completo = f.name.trim() && f.tipo && f.city.trim()
+  const completo = f.name.trim() && f.tipo && f.city.trim() && f.paisId
   const enviar = async () => {
     setErro(null); setExistente(null)
     const r = await onSalvar({ ...f, paisId: f.paisId ? Number(f.paisId) : null })
@@ -207,9 +207,9 @@ function ModalCadastro({ nomeInicial, cidadeInicial, ufInicial, paisNome, salvan
               <option value="CARTORIO">Cartório</option><option value="CONSULADO">Consulado</option>
               <option value="JUIZO">Juízo</option><option value="OUTRO">Outro</option>
             </select></div>
-          <div><label className={lab}>País</label>
+          <div><label className={lab}>País *</label>
             <select className={cls} value={f.paisId} onChange={(e) => setF({ ...f, paisId: e.target.value })}>
-              <option value="">—</option>{paises.map((p) => <option key={p.id} value={p.id}>{p.countryLabel}</option>)}
+              <option value="">Selecione…</option>{paises.map((p) => <option key={p.id} value={p.id}>{p.countryLabel}</option>)}
             </select></div>
           <div><label className={lab}>Cidade *</label><input className={cls} value={f.city} onChange={(e) => setF({ ...f, city: e.target.value })} /></div>
           <div><label className={lab}>UF</label><input className={cls} maxLength={60} value={f.state} onChange={(e) => setF({ ...f, state: e.target.value })} /></div>

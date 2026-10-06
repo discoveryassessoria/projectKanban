@@ -106,7 +106,15 @@ export function docTipoTxt(l: Pick<LinhaOperacaoV3, "titulo">): string {
  *  já devia estar resolvido antes de enviar o requerimento (mandato
  *  "Operação/Antão", correção pós-conferência 29/09/2026). */
 export const orgaoTxt = (l: LinhaOperacaoV3): string =>
-  l.terceiroNome ?? (l.documentoId == null ? "—" : l.faseMacroKey === "genealogia" ? "a definir" : "não vinculado")
+  l.terceiroNome
+  ?? (l.documentoId == null ? "—"
+    // Cartório DIGITADO mas sem órgão do cadastro: mostra o que a pessoa informou, marcado como não vinculado ("Aguila · não vinculado").
+    : l.cartorioTexto ? `${l.cartorioTexto} · não vinculado`
+    // "a definir" só quando não há nem vínculo nem texto.
+    : l.faseMacroKey === "genealogia" ? "a definir" : "não vinculado")
+/** Há cartório digitado, mas nenhum órgão vinculado — é onde aparece o atalho "vincular órgão". */
+export const orgaoSoEmTexto = (l: Pick<LinhaOperacaoV3, "terceiroNome" | "cartorioTexto" | "documentoId">): boolean =>
+  !l.terceiroNome && l.documentoId != null && !!l.cartorioTexto
 export const orgaoCls = (l: LinhaOperacaoV3): string =>
   l.terceiroNome || l.documentoId == null ? "opv3-p-gry" : l.faseMacroKey === "genealogia" ? "opv3-p-gry" : "opv3-p-red"
 

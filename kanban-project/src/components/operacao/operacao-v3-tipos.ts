@@ -60,6 +60,8 @@ export interface LinhaOperacaoV3 {
   requerDecisao: boolean
   executavelAgora: boolean
   terceiroNome: string | null
+  /** O cartório digitado (texto livre) quando NÃO há órgão vinculado — a coluna Órgão mostra "<texto> · não vinculado". */
+  cartorioTexto: string | null
   terceiroEmail: string | null
   terceiroTelefone: string | null
   servico: string | null

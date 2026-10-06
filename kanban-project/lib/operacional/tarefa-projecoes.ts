@@ -291,6 +291,11 @@ export interface LinhaDeFila {
    * `null` = espera real, terceiro não identificado.
    */
   terceiroNome: string | null
+  /**
+   * O cartório DIGITADO (texto livre do documento) — só vale quando NÃO há órgão vinculado: a coluna Órgão mostra "Aguila · não vinculado" em vez
+   * de "a definir". Nunca decide nada (espera, prazo, bloqueio): é só o que a pessoa já informou.
+   */
+  cartorioTexto: string | null
   /** Contato do terceiro (`OrgaoProtocolo.email`/`.telefone`) — mesma fonte de `terceiroNome`, nunca inventado. */
   terceiroEmail: string | null
   terceiroTelefone: string | null
@@ -439,7 +444,7 @@ const SELECT = {
   // `whereGerencial`).
   // `tipo`: só pra classificar nascimento/casamento/óbito na ordenação da
   // sequência genealógica (`categoriaDoc`) — nunca usado como identidade.
-  documento: { select: { tipo: true, orgao: { select: { name: true, email: true, telefone: true } } } },
+  documento: { select: { tipo: true, cartorio: true, orgao: { select: { name: true, email: true, telefone: true } } } },
 } satisfies Prisma.TarefaSelect
 
 /** NASCIMENTO/CASAMENTO/OBITO a partir do enum legado — só as variantes "Inteiro Teor" contam junto, o resto (RG, CPF, apostila…) fica `null` e vai para o fim da sequência. */
@@ -584,6 +589,7 @@ function projetar(
       statusTarefa: t.statusTarefa, aguardandoDependencia, causaRemovidaEm: t.causaRemovidaEm,
     }),
     terceiroNome: t.documento?.orgao?.name ?? null,
+    cartorioTexto: t.documento?.orgao ? null : (t.documento?.cartorio?.trim() || null),
     terceiroEmail: t.documento?.orgao?.email ?? null,
     terceiroTelefone: t.documento?.orgao?.telefone ?? null,
     servico: t.necessidade?.itemCatalogo?.name ?? null,
@@ -2492,7 +2498,7 @@ async function carregarBrutas(
     }),
     semLinhas(documentoIds, () => db.documento.findMany({
       where: { id: { in: documentoIds } },
-      select: { id: true, tipo: true, orgaoId: true, orgao: { select: { name: true, email: true, telefone: true } } },
+      select: { id: true, tipo: true, cartorio: true, orgaoId: true, orgao: { select: { name: true, email: true, telefone: true } } },
     })),
   ])
 
@@ -2556,7 +2562,7 @@ async function carregarBrutas(
         ordem: passo.ordem, createdAt: passo.createdAt,
       } : null,
       dependeDe: dependenciasPorTarefa.get(e.id) ?? [],
-      documento: doc ? { tipo: doc.tipo, orgao: doc.orgao } : null,
+      documento: doc ? { tipo: doc.tipo, cartorio: doc.cartorio, orgao: doc.orgao } : null,
     }
   })
   return { brutas, ordensPorTipo: doProcesso.ordensPorTipo, extras, proximaFasePorProcesso }

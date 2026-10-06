@@ -110,10 +110,18 @@ async function main() {
   ok("Passo atual: Solicitar certidão / passo 1 de 4 · 12 a iniciar", c[0].titulo === "Solicitar certidão" && c[0].sub === "passo 1 de 4 · 12 a iniciar", c[0].sub)
   ok("Com quem: Sem responsável vermelho / 0 equipe · 0 terceiros · 12 sem dono", c[1].titulo === "Sem responsável" && c[1].tom === "vermelho" && c[1].sub === "0 equipe · 0 terceiros · 12 sem dono", c[1].sub)
   ok("Prazo: Iniciar até 10/10 âmbar / as 12 · faltam 10 dias", c[2].titulo === "Iniciar até 10/10" && c[2].tom === "ambar" && c[2].sub === "as 12 · faltam 10 dias", `${c[2].titulo} | ${c[2].sub}`)
-  ok("Cartórios: Ainda não vinculados", c[3].titulo === "Ainda não vinculados" && c[3].sub === "define-se ao iniciar cada pedido")
+  ok("Cartórios: nenhum vinculado (as 12 certidões ainda sem órgão)", c[3].titulo === "Nenhum vinculado" && c[3].sub === "as 12 certidões ainda não têm órgão vinculado", c[3].sub)
+  // O CASO REAL (Sanchez Dias, 06/10/2026): 1 certidão aberta SEM órgão + casamento e óbito JÁ CONCLUÍDOS com órgão vinculado no documento.
+  const sd = cartoesDaFase({ linhas: [base({ taskId: 1, terceiroNome: null })], encerradas: { canceladas: 0, naoExigidas: 0 }, riscoDe: () => "ritmo",
+    certidoesDaFase: [{ documentoId: 1, terceiroNome: null }, { documentoId: 2, terceiroNome: "Taquaritinga - Distrito Jurupema" }, { documentoId: 3, terceiroNome: "São Paulo - 9º Subdistrito - Vila Mariana" }] })
+  ok("Cartórios conta o órgão vinculado no DOCUMENTO, também nas concluídas: 2 de 3 vinculadas · 1 falta vincular", sd[3].titulo === "Taquaritinga - Distrito Jurupema · São Paulo - 9º Subdistrito - Vila Mariana" && sd[3].sub === "2 de 3 vinculadas · 1 falta vincular", `${sd[3].titulo} | ${sd[3].sub}`)
+  const todas = cartoesDaFase({ linhas: [], encerradas: { canceladas: 0, naoExigidas: 0 }, riscoDe: () => "ritmo", certidoesDaFase: [{ documentoId: 1, terceiroNome: "X" }, { documentoId: 1, terceiroNome: "X" }, { documentoId: 2, terceiroNome: "X" }] })
+  ok("a mesma certidão não conta duas vezes; todas vinculadas: 'as 2 já vinculadas'", todas[3].titulo === "X" && todas[3].sub === "as 2 já vinculadas", todas[3].sub)
+  const nenhuma = cartoesDaFase({ linhas: [], encerradas: { canceladas: 0, naoExigidas: 0 }, riscoDe: () => "ritmo", certidoesDaFase: [{ documentoId: 1, terceiroNome: null }, { documentoId: 2, terceiroNome: null }] })
+  ok("nenhuma vinculada: 'Nenhum vinculado · as 2 certidões ainda não têm órgão vinculado'", nenhuma[3].titulo === "Nenhum vinculado" && nenhuma[3].sub === "as 2 certidões ainda não têm órgão vinculado")
   ok("Cancelada / não exigida: 2 certidões / 1 cancelada · 1 não exigida", c[4].rotulo === ROTULO_ENCERRADAS && c[4].titulo === "2 certidões" && c[4].sub === "1 cancelada · 1 não exigida")
   const vazio = cartoesDaFase({ linhas: [], encerradas: { canceladas: 0, naoExigidas: 0 }, riscoDe: () => "ritmo" })
-  ok("sem tarefa aberta: traço, nunca exemplo", vazio[0].titulo === "—" && vazio[2].titulo === "—" && vazio[4].titulo === "Nenhuma")
+  ok("sem tarefa aberta: traço, nunca exemplo", vazio[0].titulo === "—" && vazio[2].titulo === "—" && vazio[3].titulo === "—" && vazio[4].titulo === "Nenhuma")
 
   secao("caminho das fases")
   const fases = [

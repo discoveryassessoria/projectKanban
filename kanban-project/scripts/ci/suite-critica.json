@@ -216,6 +216,7 @@
    "scripts/torre-cobranca-estorno.test.ts",
    "scripts/fase-aguardando-fechamento-motor.test.ts",
    "scripts/mover-fase-outbox-orfao.test.ts",
+   "scripts/orgao-nao-vinculado-atribuir-agrupar.test.ts",
    "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
    "scripts/ativar-fase-aguardando-fechamento.test.ts",
    "scripts/catalogo-fases-aguardando-fechamento.test.ts"
@@ -448,6 +449,7 @@
   "scripts/torre-cobranca-estorno.test.ts",
   "scripts/fase-aguardando-fechamento-motor.test.ts",
   "scripts/mover-fase-outbox-orfao.test.ts",
+  "scripts/orgao-nao-vinculado-atribuir-agrupar.test.ts",
   "scripts/torre-aguardando-fechamento-fora-da-torre.test.ts",
   "scripts/ativar-fase-aguardando-fechamento.test.ts",
   "scripts/catalogo-fases-aguardando-fechamento.test.ts"
