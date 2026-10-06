@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import {
   rotuloQuando, rotuloDia, rotuloMesAno, rotuloDuracaoMedia, filtrarEOrdenar, resumirIguais, resolverMencoes, pedacosDoComentario, seloDoCabecalho,
-  cartaoDaProximaAcao, cartoesDaFase, rotuloDoStatus, chaveDoStatus, tituloDaTabela, pessoasDaTabela, iniciaisDe, type LinhaDaTabela, type LinhaParaDerivar,
+  cartaoDaProximaAcao, cartoesDaFase, OPCOES_DE_STATUS, ROTULO_ENCERRADAS, rotuloDoStatus, chaveDoStatus, tituloDaTabela, pessoasDaTabela, iniciaisDe, type LinhaDaTabela, type LinhaParaDerivar,
 } from "../lib/operacional/torre-processo-puro"
 import { montarCaminho, textosDaFase, passagensPelasFases } from "../lib/operacional/torre-caminho"
 import { montarTrava, traduzirPendencias, aFase } from "../lib/operacional/torre-trava"
@@ -50,16 +50,25 @@ async function main() {
     linha({ chave: "e", tarefaId: null, documentoId: 10, tipo: "NAO_EXIGIDA", status: "NAO_EXIGIDA", statusRotulo: "Não exigida", pessoaId: 3, pessoa: "Edison", ordemArvore: 1 }),
   ]
   const ids = (xs: LinhaDaTabela[]) => xs.map((x) => x.chave).join("")
-  ok("árvore: abertas, concluídas, depois fora do jogo", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })) === "baced", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })))
+  ok("árvore (com canceladas / não exigidas): abertas, concluídas, depois canceladas / não exigidas", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })) === "baced", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })))
   ok("prazo: mais cedo primeiro", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "prazo" })).startsWith("ba"))
   ok("status: em andamento depois de a iniciar", ids(filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "status" })).startsWith("ab"))
   ok("filtro pessoa", ids(filtrarEOrdenar(l, { pessoaId: 1, status: "TODOS", ordem: "arvore" })) === "ac")
   ok("filtro Concluída", ids(filtrarEOrdenar(l, { pessoaId: null, status: "CONCLUIDA", ordem: "arvore" })) === "c")
   ok("filtro Cancelada / não exigida", ids(filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS", ordem: "arvore" })) === "ed")
-  ok("fora do jogo some nos demais filtros", !ids(filtrarEOrdenar(l, { pessoaId: null, status: "A_INICIAR", ordem: "arvore" })).match(/[de]/))
+  ok("canceladas / não exigidas somem nos demais filtros", !ids(filtrarEOrdenar(l, { pessoaId: null, status: "A_INICIAR", ordem: "arvore" })).match(/[de]/))
   ok("pessoas do select, na ordem da árvore", pessoasDaTabela(l).map((p) => p.nome).join() === "Edison,Helena,Maria")
   ok("título: tarefas quando não é tudo certidão", tituloDaTabela(l, (x) => x.documentoId != null && x.chave !== "b") === "Tarefas da fase atual · 3")
-  ok("título: certidões · N (fora do jogo não conta)", tituloDaTabela(l, () => true) === "Certidões da fase atual · 3")
+  ok("título: certidões · N (canceladas / não exigidas não contam por padrão)", tituloDaTabela(l, () => true) === "Certidões da fase atual · 3")
+  const ativasPadrao = filtrarEOrdenar(l, { pessoaId: null, status: "ATIVAS", ordem: "arvore" })
+  ok("PADRÃO 'ATIVAS': só abertas e concluídas, sem canceladas nem não exigidas", ids(ativasPadrao) === "bac")
+  ok("título = linhas da lista, sempre (padrão)", tituloDaTabela(l, () => true, ativasPadrao) === `Certidões da fase atual · ${ativasPadrao.length}`)
+  const comEnc = filtrarEOrdenar(l, { pessoaId: null, status: "TODOS", ordem: "arvore" })
+  ok("com canceladas / não exigidas: título diz quantas são e bate com as linhas", tituloDaTabela(l, () => true, comEnc) === "Certidões da fase atual · 5 (3 ativas + 2 cancelada / não exigida)" && comEnc.length === 5, tituloDaTabela(l, () => true, comEnc))
+  const soEnc = filtrarEOrdenar(l, { pessoaId: null, status: "ENCERRADAS", ordem: "arvore" })
+  ok("filtro só canceladas / não exigidas: título bate", tituloDaTabela(l, () => true, soEnc) === "Certidões da fase atual · 2 (cancelada / não exigida)")
+  ok("filtro de pessoa: o número do título acompanha a lista", tituloDaTabela(l, () => true, filtrarEOrdenar(l, { pessoaId: 1, status: "ATIVAS", ordem: "arvore" })) === "Certidões da fase atual · 2")
+  ok("o filtro de status oferece 'Ativas' (padrão) e 'Cancelada / não exigida'", OPCOES_DE_STATUS[0].valor === "ATIVAS" && OPCOES_DE_STATUS.some((o) => o.valor === "ENCERRADAS" && o.rotulo === ROTULO_ENCERRADAS) && ROTULO_ENCERRADAS === "Cancelada / não exigida")
 
   secao("linha-resumo '+ N certidões iguais a estas'")
   const doze = Array.from({ length: 12 }, (_, i) => linha({ chave: `x${i}`, tarefaId: i + 1, pessoa: i < 7 ? `P${i}` : `Nome${i} Sobrenome` }))
@@ -102,7 +111,7 @@ async function main() {
   ok("Com quem: Sem responsável vermelho / 0 equipe · 0 terceiros · 12 sem dono", c[1].titulo === "Sem responsável" && c[1].tom === "vermelho" && c[1].sub === "0 equipe · 0 terceiros · 12 sem dono", c[1].sub)
   ok("Prazo: Iniciar até 10/10 âmbar / as 12 · faltam 10 dias", c[2].titulo === "Iniciar até 10/10" && c[2].tom === "ambar" && c[2].sub === "as 12 · faltam 10 dias", `${c[2].titulo} | ${c[2].sub}`)
   ok("Cartórios: Ainda não vinculados", c[3].titulo === "Ainda não vinculados" && c[3].sub === "define-se ao iniciar cada pedido")
-  ok("Fora do jogo: 2 certidões / 1 cancelada · 1 não exigida", c[4].titulo === "2 certidões" && c[4].sub === "1 cancelada · 1 não exigida")
+  ok("Cancelada / não exigida: 2 certidões / 1 cancelada · 1 não exigida", c[4].rotulo === ROTULO_ENCERRADAS && c[4].titulo === "2 certidões" && c[4].sub === "1 cancelada · 1 não exigida")
   const vazio = cartoesDaFase({ linhas: [], encerradas: { canceladas: 0, naoExigidas: 0 }, riscoDe: () => "ritmo" })
   ok("sem tarefa aberta: traço, nunca exemplo", vazio[0].titulo === "—" && vazio[2].titulo === "—" && vazio[4].titulo === "Nenhuma")
 

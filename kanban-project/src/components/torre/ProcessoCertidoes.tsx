@@ -1,18 +1,16 @@
 "use client"
 // src/components/torre/ProcessoCertidoes.tsx — o cartão "Certidões da fase atual · N" do Detalhe do Processo: selects Pessoa / Status /
-// Ordenar (funcionam de verdade, ao contrário do exemplo do protótipo), a tabela (abertas, concluídas e as FORA DO JOGO —
-// canceladas e não exigidas, com "Motivo" e "Reabrir"), a linha-resumo "+ N certidões iguais a estas" e o "Atribuir" por linha.
+// Ordenar (funcionam de verdade, ao contrário do exemplo do protótipo), a tabela (por padrão só as ATIVAS: abertas e concluídas; as
+// CANCELADA / NÃO EXIGIDA, com "Motivo" e "Reabrir", entram quando o bloco ou o filtro de status as pedem), a linha-resumo "+ N certidões iguais a estas" e o "Atribuir" por linha.
 // Os dados são `d.tabela` (montados em `torre-foco.ts` a partir das MESMAS linhas da aba Tarefas); aqui só se filtra, ordena e desenha.
 import { useMemo, useState } from "react"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import { diaMesDoPrazo } from "@/src/lib/tarefa/texto-prazo"
 import {
   OPCOES_DE_ORDEM, OPCOES_DE_STATUS, filtrarEOrdenar, pessoasDaTabela, resumirIguais, rotuloQuando, rotuloDia, tituloDaTabela,
-  type LinhaDaTabela, type OrdemDaTabela,
+  type FiltroDeStatusDaTabela, type LinhaDaTabela, type OrdemDaTabela,
 } from "@/lib/operacional/torre-processo-puro"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
-
-type FiltroDeStatus = (typeof OPCOES_DE_STATUS)[number]["valor"]
 
 const PILL: Record<string, string> = { CONCLUIDA: "verde", EM_ANDAMENTO: "azul", BLOQUEADA: "vermelho", CANCELADA: "fora", NAO_EXIGIDA: "fora" }
 const TOM_PRAZO = { critico: "tpr-c-verm", atencao: "tpr-c-amb", ritmo: "", } as const
@@ -20,8 +18,10 @@ const TOM_PRAZO = { critico: "tpr-c-verm", atencao: "tpr-c-amb", ritmo: "", } as
 const descricaoDaIgual = (l: LinhaDaTabela): string =>
   [l.passo ? `${l.passo.rotulo}${l.passo.total ? ` · ${l.passo.ordem}/${l.passo.total}` : ""}` : null, l.statusRotulo, l.responsavelNome ?? "sem responsável", l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : null].filter(Boolean).join(" · ")
 
-export function ProcessoCertidoes({ d, agora, podeAtribuir, ocupado, onAtribuir, onAtribuirVarias, onMotivo, onReabrir, onVerHistorico }: {
+export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, onAtribuirVarias, onMotivo, onReabrir, onVerHistorico }: {
   d: DetalheDoProcesso; agora: Date; podeAtribuir: boolean; ocupado: boolean
+  /** O filtro de status vive na página: o bloco "Cancelada / não exigida" e este select mexem no MESMO estado. */
+  status: FiltroDeStatusDaTabela; onStatus: (s: FiltroDeStatusDaTabela) => void
   onAtribuir: (tarefaId: number) => void
   onAtribuirVarias: (tarefaIds: number[]) => void
   onMotivo: (l: LinhaDaTabela) => void
@@ -29,7 +29,6 @@ export function ProcessoCertidoes({ d, agora, podeAtribuir, ocupado, onAtribuir,
   onVerHistorico: () => void
 }) {
   const [pessoaId, setPessoaId] = useState<number | null>(null)
-  const [status, setStatus] = useState<FiltroDeStatus>("TODOS")
   const [ordem, setOrdem] = useState<OrdemDaTabela>("arvore")
   const [expandido, setExpandido] = useState(false)
   const [marcadas, setMarcadas] = useState<ReadonlySet<string>>(new Set())
@@ -38,16 +37,18 @@ export function ProcessoCertidoes({ d, agora, podeAtribuir, ocupado, onAtribuir,
   const linhas = useMemo(() => filtrarEOrdenar(d.tabela, { pessoaId, status, ordem }), [d.tabela, pessoaId, status, ordem])
   const trabalho = linhas.filter((l) => l.tipo === "ABERTA" || l.tipo === "CONCLUIDA")
   const fora = linhas.filter((l) => l.tipo === "CANCELADA" || l.tipo === "NAO_EXIGIDA")
-  // A linha-resumo só vale na visão padrão (todas as pessoas, todos os status): filtrado, mostra tudo o que casou.
+  // A linha-resumo só vale na visão sem filtro (todas as pessoas; ativas, ou ativas + canceladas / não exigidas): filtrado, mostra tudo o que casou.
   const resumo = resumirIguais(trabalho, descricaoDaIgual)
-  const colapsa = !expandido && pessoaId == null && status === "TODOS" && resumo.ocultas.length > 0
+  const semFiltroDeStatus = status === "ATIVAS" || status === "TODOS"
+  const colapsa = !expandido && pessoaId == null && semFiltroDeStatus && resumo.ocultas.length > 0
   const visiveis = colapsa ? resumo.visiveis : trabalho
 
   const marcaveis = trabalho.filter((l) => l.podeAtribuir && l.tarefaId != null)
   const todasMarcadas = marcaveis.length > 0 && marcaveis.every((l) => marcadas.has(l.chave))
   const alternar = (chave: string) => setMarcadas((m) => { const n = new Set(m); if (n.has(chave)) n.delete(chave); else n.add(chave); return n })
   const marcadasAtribuiveis = marcaveis.filter((l) => marcadas.has(l.chave))
-  const titulo = tituloDaTabela(d.tabela, (l) => l.documentoId != null)
+  // O número do título é SEMPRE o das linhas da lista (as que casam com pessoa e status).
+  const titulo = tituloDaTabela(d.tabela, (l) => l.documentoId != null, linhas)
 
   const linhaDeTrabalho = (l: LinhaDaTabela) => {
     const nomePessoa = l.pessoa ?? "Processo inteiro"
@@ -100,7 +101,7 @@ export function ProcessoCertidoes({ d, agora, podeAtribuir, ocupado, onAtribuir,
             <option value="">Todas as pessoas</option>
             {pessoas.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}
           </select>
-          <select className="tpr-sel" aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value as FiltroDeStatus)}>
+          <select className="tpr-sel" aria-label="Status" value={status} onChange={(e) => onStatus(e.target.value as FiltroDeStatusDaTabela)}>
             {OPCOES_DE_STATUS.map((o) => <option key={o.valor} value={o.valor}>{o.rotulo}</option>)}
           </select>
           <select className="tpr-sel" aria-label="Ordenar" value={ordem} onChange={(e) => setOrdem(e.target.value as OrdemDaTabela)}>
@@ -134,7 +135,7 @@ export function ProcessoCertidoes({ d, agora, podeAtribuir, ocupado, onAtribuir,
             <button type="button" onClick={() => setExpandido(true)}>ver todas</button>
           </div>
         )}
-        {!colapsa && expandido && resumo.ocultas.length > 0 && pessoaId == null && status === "TODOS" && (
+        {!colapsa && expandido && resumo.ocultas.length > 0 && pessoaId == null && semFiltroDeStatus && (
           <div className="tpr-resumo"><button type="button" onClick={() => setExpandido(false)}>mostrar menos</button></div>
         )}
         {fora.map(linhaFora)}

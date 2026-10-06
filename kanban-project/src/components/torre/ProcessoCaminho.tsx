@@ -1,11 +1,12 @@
 "use client"
 // src/components/torre/ProcessoCaminho.tsx — "Caminho do processo" (as fases do Workflow Macro do processo) e os cinco cartões
-// (Passo atual · Com quem · Prazo · Cartórios · Fora do jogo). Os textos nascem de `torre-caminho.ts` e `torre-processo-puro.ts` (puros).
+// (Passo atual · Com quem · Prazo · Cartórios · Cancelada / não exigida — este último é um botão que liga e desliga a exibição dessas certidões na lista). Os textos nascem de `torre-caminho.ts` e `torre-processo-puro.ts` (puros).
 import { textosDaFase } from "@/lib/operacional/torre-caminho"
 import { textoTempoNaFase } from "@/lib/operacional/torre-predicados"
+import { ROTULO_ENCERRADAS } from "@/lib/operacional/torre-processo-puro"
 import type { DetalheDoProcesso } from "@/lib/operacional/torre-foco"
 
-export function ProcessoCaminho({ d, agora }: { d: DetalheDoProcesso; agora: Date }) {
+export function ProcessoCaminho({ d, agora, encerradasNaLista, onAlternarEncerradas }: { d: DetalheDoProcesso; agora: Date; encerradasNaLista: boolean; onAlternarEncerradas: () => void }) {
   const fases = d.caminho.fases
   return (
     <>
@@ -31,13 +32,24 @@ export function ProcessoCaminho({ d, agora }: { d: DetalheDoProcesso; agora: Dat
       </div>
 
       <div className="tpr-cinco">
-        {d.cartoes.map((c) => (
-          <div key={c.rotulo} className="tpr-cartao">
-            <span className="rot">{c.rotulo}</span>
-            <span className={`tit ${c.tom === "normal" ? "" : c.tom}`}>{c.titulo}</span>
-            <span className="sub">{c.sub}</span>
-          </div>
-        ))}
+        {d.cartoes.map((c) => {
+          const miolo = (
+            <>
+              <span className="rot">{c.rotulo}</span>
+              <span className={`tit ${c.tom === "normal" ? "" : c.tom}`}>{c.titulo}</span>
+              <span className="sub">{c.sub}</span>
+            </>
+          )
+          if (c.rotulo !== ROTULO_ENCERRADAS) return <div key={c.rotulo} className="tpr-cartao">{miolo}</div>
+          const temEncerradas = d.tabela.some((l) => l.tipo === "CANCELADA" || l.tipo === "NAO_EXIGIDA")
+          return (
+            <button key={c.rotulo} type="button" className={`tpr-cartao tpr-cartao-bt ${encerradasNaLista ? "ligado" : ""}`} aria-pressed={encerradasNaLista} disabled={!temEncerradas}
+              title={!temEncerradas ? "Nenhuma certidão cancelada nem dispensada pela árvore." : encerradasNaLista ? "Clique para voltar à lista só com as certidões ativas." : "Clique para mostrar essas certidões na lista, riscadas e no fim."}
+              onClick={onAlternarEncerradas}>
+              {miolo}
+            </button>
+          )
+        })}
       </div>
     </>
   )

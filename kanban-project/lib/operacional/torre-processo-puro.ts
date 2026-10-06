@@ -81,15 +81,19 @@ export function chaveDoStatus(statusTarefa: string): ChaveDeStatus {
 }
 
 /** As opções do select "Status" — as do protótipo + as duas que o sistema real tem e o exemplo não tinha. */
-export const OPCOES_DE_STATUS: ReadonlyArray<{ valor: 'TODOS' | ChaveDeStatus | 'ENCERRADAS'; rotulo: string }> = [
-  { valor: 'TODOS', rotulo: 'Todos os status' },
+export type FiltroDeStatusDaTabela = 'ATIVAS' | 'TODOS' | ChaveDeStatus | 'ENCERRADAS'
+/** O nome do bloco (e do filtro) das certidões que deixaram de ser trabalho. */
+export const ROTULO_ENCERRADAS = 'Cancelada / não exigida'
+export const OPCOES_DE_STATUS: ReadonlyArray<{ valor: FiltroDeStatusDaTabela; rotulo: string }> = [
+  { valor: 'ATIVAS', rotulo: 'Ativas' },
+  { valor: 'TODOS', rotulo: 'Ativas + canceladas / não exigidas' },
   { valor: 'A_INICIAR', rotulo: 'A iniciar' },
   { valor: 'EM_ANDAMENTO', rotulo: 'Em andamento' },
   { valor: 'AGUARDANDO_TERCEIROS', rotulo: 'Aguardando terceiros' },
   { valor: 'AGUARDANDO_CLIENTE', rotulo: 'Aguardando cliente' },
   { valor: 'BLOQUEADA', rotulo: 'Bloqueada' },
   { valor: 'CONCLUIDA', rotulo: 'Concluída' },
-  { valor: 'ENCERRADAS', rotulo: 'Cancelada / não exigida' },
+  { valor: 'ENCERRADAS', rotulo: ROTULO_ENCERRADAS },
 ]
 export const OPCOES_DE_ORDEM = [
   { valor: 'arvore', rotulo: 'Ordem: geração na árvore' },
@@ -100,7 +104,7 @@ export type OrdemDaTabela = (typeof OPCOES_DE_ORDEM)[number]['valor']
 
 // ─── A LINHA DA TABELA "CERTIDÕES DA FASE ATUAL" ─────────────────────────────
 
-/** Uma linha da tabela — aberta, concluída ou fora do jogo (cancelada / não exigida). Montada no servidor, só desenhada na tela. */
+/** Uma linha da tabela — aberta, concluída, cancelada ou não exigida. Montada no servidor, só desenhada na tela. */
 export interface LinhaDaTabela {
   chave: string
   tarefaId: number | null
@@ -129,9 +133,9 @@ export interface LinhaDaTabela {
   risco: 'critico' | 'atencao' | 'ritmo' | null
   atrasada: boolean
   bola: BolaCom | null
-  /** "cancelada hoje 12:15 por Marco Rovatti · Documento não necessário" (já redigido) — só para as fora do jogo. */
+  /** "cancelada hoje 12:15 por Marco Rovatti · Documento não necessário" (já redigido) — só para as canceladas / não exigidas. */
   encerramentoTexto: string | null
-  /** Motivo curto para o link "Motivo" — só para as fora do jogo. */
+  /** Motivo curto para o link "Motivo" — só para as canceladas / não exigidas. */
   motivoTexto: string | null
   /** Pode reabrir pela porta canônica (cancelada por decisão humana). */
   reabrivel: boolean
@@ -149,7 +153,7 @@ export function pessoasDaTabela(linhas: LinhaDaTabela[]): Array<{ id: number; no
   return [...vistos.values()].sort((a, b) => (a.ordem ?? 1e9) - (b.ordem ?? 1e9) || a.nome.localeCompare(b.nome, 'pt-BR')).map(({ id, nome }) => ({ id, nome }))
 }
 
-const GRUPO = (l: LinhaDaTabela): number => (l.tipo === 'ABERTA' ? 0 : l.tipo === 'CONCLUIDA' ? 1 : 2) // abertas, concluídas e, por último, fora do jogo
+const GRUPO = (l: LinhaDaTabela): number => (l.tipo === 'ABERTA' ? 0 : l.tipo === 'CONCLUIDA' ? 1 : 2) // abertas, concluídas e, por último, canceladas / não exigidas
 
 function comparar(a: LinhaDaTabela, b: LinhaDaTabela, ordem: OrdemDaTabela): number {
   const g = GRUPO(a) - GRUPO(b)
@@ -167,28 +171,42 @@ function comparar(a: LinhaDaTabela, b: LinhaDaTabela, ordem: OrdemDaTabela): num
   return arvore
 }
 
-/** Filtra por pessoa e status e ordena. Fora do jogo (cancelada / não exigida) só aparece em "Todos os status" e em "Cancelada / não exigida". */
+/**
+ * Filtra por pessoa e status e ordena. O PADRÃO é "ATIVAS" (só o que é trabalho). Canceladas / não exigidas só aparecem em
+ * "Ativas + canceladas / não exigidas" (no fim, riscadas) e em "Cancelada / não exigida" (só elas).
+ */
 export function filtrarEOrdenar(
-  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: 'TODOS' | ChaveDeStatus | 'ENCERRADAS'; ordem: OrdemDaTabela },
+  linhas: LinhaDaTabela[], f: { pessoaId: number | null; status: FiltroDeStatusDaTabela; ordem: OrdemDaTabela },
 ): LinhaDaTabela[] {
   return linhas
     .filter((l) => (f.pessoaId == null ? true : l.pessoaId === f.pessoaId))
     .filter((l) => {
       if (f.status === 'TODOS') return true
+      if (f.status === 'ATIVAS') return l.tipo === 'ABERTA' || l.tipo === 'CONCLUIDA'
       if (f.status === 'ENCERRADAS') return l.tipo === 'CANCELADA' || l.tipo === 'NAO_EXIGIDA'
       return l.status === f.status
     })
     .sort((a, b) => comparar(a, b, f.ordem))
 }
 
-/** Quantas linhas contam no título "Certidões da fase atual · N": as que são trabalho (abertas + concluídas). Fora do jogo não conta. */
+/** Quantas linhas contam por padrão: as que são trabalho (abertas + concluídas). Canceladas / não exigidas não contam. */
 export const totalDaFase = (linhas: LinhaDaTabela[]): number => linhas.filter((l) => l.tipo === 'ABERTA' || l.tipo === 'CONCLUIDA').length
 
-/** O rótulo do cartão: "Certidões da fase atual" quando TUDO é certidão; "Tarefas da fase atual" quando há tarefa de outro tipo (Análise, Tradução…). */
-export function tituloDaTabela(linhas: LinhaDaTabela[], ehCertidao: (l: LinhaDaTabela) => boolean): string {
-  const trabalho = linhas.filter((l) => l.tipo === 'ABERTA' || l.tipo === 'CONCLUIDA')
+const ehEncerrada = (l: LinhaDaTabela): boolean => l.tipo === 'CANCELADA' || l.tipo === 'NAO_EXIGIDA'
+
+/**
+ * O rótulo do cartão: "Certidões da fase atual" quando TUDO é certidão; "Tarefas da fase atual" quando há tarefa de outro tipo (Análise,
+ * Tradução…). O número é SEMPRE o das linhas mostradas (`mostradas`; sem ele, as ativas — o padrão). Quando a lista inclui canceladas /
+ * não exigidas, o título diz quantas são: "· 19 (12 ativas + 7 canceladas / não exigidas)".
+ */
+export function tituloDaTabela(linhas: LinhaDaTabela[], ehCertidao: (l: LinhaDaTabela) => boolean, mostradas?: LinhaDaTabela[]): string {
+  const trabalho = linhas.filter((l) => !ehEncerrada(l))
   const soCertidoes = trabalho.length > 0 && trabalho.every(ehCertidao)
-  return `${soCertidoes ? 'Certidões' : 'Tarefas'} da fase atual · ${trabalho.length}`
+  const lista = mostradas ?? trabalho
+  const enc = lista.filter(ehEncerrada).length
+  const ativas = lista.length - enc
+  const detalhe = enc === 0 ? '' : ativas === 0 ? ` (${ROTULO_ENCERRADAS.toLowerCase()})` : ` (${ativas} ${ativas === 1 ? 'ativa' : 'ativas'} + ${enc} ${ROTULO_ENCERRADAS.toLowerCase()})`
+  return `${soCertidoes ? 'Certidões' : 'Tarefas'} da fase atual · ${lista.length}${detalhe}`
 }
 
 // ─── LINHA-RESUMO ("+ 5 certidões iguais a estas") ───────────────────────────
@@ -362,14 +380,14 @@ export function cartoesDaFase<L extends LinhaParaDerivar>(a: {
         tom: 'normal',
       }
 
-  // FORA DO JOGO
+  // CANCELADA / NÃO EXIGIDA
   const totalFora = a.encerradas.canceladas + a.encerradas.naoExigidas
   const partes = [
     a.encerradas.canceladas > 0 ? `${a.encerradas.canceladas} ${plural(a.encerradas.canceladas, 'cancelada', 'canceladas')}` : null,
     a.encerradas.naoExigidas > 0 ? `${a.encerradas.naoExigidas} ${plural(a.encerradas.naoExigidas, 'não exigida', 'não exigidas')}` : null,
   ].filter(Boolean)
   const fora: CartaoSimples = {
-    rotulo: 'Fora do jogo',
+    rotulo: ROTULO_ENCERRADAS,
     titulo: totalFora === 0 ? 'Nenhuma' : `${totalFora} ${plural(totalFora, 'certidão', 'certidões')}`,
     sub: partes.length ? partes.join(' · ') : 'nada cancelado nem dispensado pela árvore',
     tom: 'normal',

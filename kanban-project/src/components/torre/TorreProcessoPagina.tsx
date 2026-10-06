@@ -16,6 +16,7 @@ import { ProcessoCabecalho } from "./ProcessoCabecalho"
 import { ProcessoCaminho } from "./ProcessoCaminho"
 import { ProcessoCertidoes } from "./ProcessoCertidoes"
 import { VoltarDaTorre } from "./VoltarDaTorre"
+import type { FiltroDeStatusDaTabela } from "@/lib/operacional/torre-processo-puro"
 import { ProcessoFatos } from "./ProcessoFatos"
 import { ProcessoComentarios } from "./ProcessoComentarios"
 import "./torre.css"
@@ -29,6 +30,8 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
   const [d, setD] = useState<DetalheDoProcesso | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [versao, setVersao] = useState(0)
+  // O estado da lista de certidões: o padrão é só as ATIVAS; o bloco "Cancelada / não exigida" e o select de Status mexem neste mesmo estado.
+  const [statusDaLista, setStatusDaLista] = useState<FiltroDeStatusDaTabela>("ATIVAS")
   const [ocupado, setOcupado] = useState(false)
   const [toast, setToast] = useState<ToastDaPagina | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -156,8 +159,9 @@ export function TorreProcessoPagina({ processoId }: { processoId: number }) {
             onDistribuir={() => void distribuir()} onRelatorio={() => setModal({ tipo: "relatorio" })} onHistorico={() => setModal({ tipo: "historico" })}
             onPausar={() => setModal({ tipo: "pausar" })} onReativar={() => void reativar(false)} onForcar={() => setModal({ tipo: "forcar" })}
           />
-          <ProcessoCaminho d={d} agora={agora} />
+          <ProcessoCaminho d={d} agora={agora} encerradasNaLista={statusDaLista === "TODOS" || statusDaLista === "ENCERRADAS"} onAlternarEncerradas={() => setStatusDaLista((s) => (s === "TODOS" || s === "ENCERRADAS" ? "ATIVAS" : "TODOS"))} />
           <ProcessoCertidoes
+            status={statusDaLista} onStatus={setStatusDaLista}
             d={d} agora={agora} podeAtribuir={perm.editar} ocupado={ocupado}
             onAtribuir={(id) => void atribuir(id)} onAtribuirVarias={(ids) => void atribuirVarias(ids)}
             onMotivo={(l) => setModal({ tipo: "motivo", linha: l })} onReabrir={(l) => setModal({ tipo: "reabrir", linha: l })}

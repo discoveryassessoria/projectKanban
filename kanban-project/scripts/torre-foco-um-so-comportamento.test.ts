@@ -47,5 +47,13 @@ ok("regra: sem entrada anterior (aba nova / link direto) → Torre, aba Processo
 ok("regra: anterior de OUTRO site ou a tela de login → não volta para lá", !haPaginaAnteriorNoSistema({ anteriorUrl: "https://google.com/", origem: o, referrer: "", tamanhoHistorico: 4 }) && !haPaginaAnteriorNoSistema({ anteriorUrl: `${o}/login`, origem: o, referrer: "", tamanhoHistorico: 4 }))
 ok("regra (navegador sem Navigation API): só volta se veio de página do sistema e há mais de uma entrada", haPaginaAnteriorNoSistema({ origem: o, referrer: `${o}/torre?aba=radar`, tamanhoHistorico: 2 }) && !haPaginaAnteriorNoSistema({ origem: o, referrer: "", tamanhoHistorico: 2 }) && !haPaginaAnteriorNoSistema({ origem: o, referrer: `${o}/torre`, tamanhoHistorico: 1 }))
 ok("a Torre em si (/torre) não tem Voltar; a trilha da página continua", !/VoltarDaTorre/.test(ler("src/components/torre/Torre.tsx")) && /tpr-crumb/.test(ler(join(dir, "ProcessoCabecalho.tsx"))))
+
+// ── Lista "Certidões da fase atual": ativas por padrão; bloco "Cancelada / não exigida" liga e desliga ──
+const caminho = ler(join(dir, "ProcessoCaminho.tsx"))
+ok("página: o estado da lista nasce em ATIVAS e é UM só (bloco e select de Status mexem nele)", /useState<FiltroDeStatusDaTabela>\("ATIVAS"\)/.test(pagina) && /status=\{statusDaLista\} onStatus=\{setStatusDaLista\}/.test(pagina) && /encerradasNaLista=/.test(pagina) && /onAlternarEncerradas=/.test(pagina))
+ok("bloco 'Cancelada / não exigida' é um botão (aria-pressed) que alterna", /<button[^>]*aria-pressed=\{encerradasNaLista\}/.test(caminho) && /onClick=\{onAlternarEncerradas\}/.test(caminho))
+ok("o título da lista usa as linhas mostradas", /tituloDaTabela\(d\.tabela, \(l\) => l\.documentoId != null, linhas\)/.test(ler(join(dir, "ProcessoCertidoes.tsx"))))
+const textos = ["ProcessoCertidoes.tsx", "ProcessoCaminho.tsx", "TorreProcessoPagina.tsx"].map((f) => ler(join(dir, f))).join("\n") + ler("lib/operacional/torre-processo-puro.ts") + ler("lib/operacional/torre-foco.ts")
+ok("o nome 'fora do jogo' não existe mais na Torre", !/fora do jogo/i.test(textos))
 console.log(`\n${falhou === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${passou} ok, ${falhou} falhas`)
 process.exit(falhou ? 1 : 0)
