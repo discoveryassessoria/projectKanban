@@ -20,6 +20,7 @@ import { liberadosPor, descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia
 import { limitarCorrelationId } from "@/src/lib/motor/correlacao"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
+import { reconciliarGenealogiaEEmissaoTx } from "@/src/services/genealogia/trava-emissao-por-genealogia"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { politicaDeSla, pausarSla, retomarSla } from "@/lib/operacional/sla-pausa"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
@@ -113,7 +114,7 @@ type TX = Prisma.TransactionClient
  */
 type StepPreCarregado = Pick<
   PhaseWorkflowStepInstance,
-  "id" | "status" | "lockVersion" | "dependeDeStepKeys" | "workflowInstanceId" | "necessidadeId" | "documentoId" | "startedAt" | "completedAt"
+  "id" | "status" | "lockVersion" | "dependeDeStepKeys" | "workflowInstanceId" | "necessidadeId" | "documentoId" | "startedAt" | "completedAt" | "stepKey" | "processoId"
 >
 /** Mesma ideia, para `aplicarTarefa` — só os três campos que ela lê da Tarefa. */
 type TarefaPreCarregada = Pick<Tarefa, "statusTarefa" | "dataInicio" | "lockVersion">
@@ -289,6 +290,12 @@ async function aplicarPasso(
     executadoPorId: o.usuarioId ?? undefined,
   }, tx, tentativaAtual)
 
+  // "LOCALIZAR REGISTRO" MUDOU DE ESTADO → a Genealogia e a Emissão da MESMA necessidade reconvergem na MESMA transação: passo aberto
+  // reabre a Genealogia concluída e trava a emissão ("Aguardando Genealogia"); passo resolvido libera a emissão. Vale para TODA porta
+  // (concluir, reabrir, cancelar, dispensar) porque todas passam por aqui.
+  if (step.stepKey === "localizar_registro" && step.processoId != null) {
+    await reconciliarGenealogiaEEmissaoTx(tx, step.processoId)
+  }
   return { changed: true, anterior: step.status, atual: alvo }
 }
 
@@ -804,6 +811,10 @@ export async function reabrirPassoTx(
       payload: { stepId, alvo, de: step.status, ciclo: o.ciclo },
     },
   })
+  // Reabrir "Localizar registro" (Carlota, processo 676): a Genealogia concluída reabre e a emissão da mesma necessidade trava.
+  if (step.stepKey === "localizar_registro" && step.processoId != null) {
+    await reconciliarGenealogiaEEmissaoTx(tx, step.processoId)
+  }
   return { changed: true, anterior: step.status, atual: alvo }
 }
 

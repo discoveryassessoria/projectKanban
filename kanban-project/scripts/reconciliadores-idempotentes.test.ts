@@ -66,6 +66,8 @@ const RECONCILIADORES: Array<{ arquivo: string; fn: string; oQueConverge: string
   { arquivo: "src/services/registral/reconciliacao-documental.ts", fn: "reconciliarDocumentalDoProcesso", oQueConverge: "documentos × linhagem registral" },
   { arquivo: "src/services/financeiro/reconciliacao-documental-financeira.ts", fn: "reconciliarDocumentalFinanceiro", oQueConverge: "documento × lançamento financeiro" },
   { arquivo: "lib/operacional/reconciliar-tarefas.ts", fn: "reconciliarTarefas", oQueConverge: "tarefa × passos" },
+  { arquivo: "src/services/genealogia/trava-emissao-por-genealogia.ts", fn: "reconciliarGenealogiaEEmissaoTx", oQueConverge: "Localizar registro aberto × Genealogia reaberta × Emissão travada" },
+  { arquivo: "src/services/genealogia/trava-emissao-por-genealogia.ts", fn: "reconciliarGenealogiaEEmissao", oQueConverge: "mesma conciliação, fora de transação (pós-commit/cron)" },
   // Concluir uma subtarefa muda o estado das que dependiam dela. Sem reconciliar, elas
   // continuariam BLOQUEADO no banco enquanto a projeção já as considera disponíveis —
   // duas respostas para a mesma pergunta.

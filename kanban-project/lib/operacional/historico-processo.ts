@@ -447,6 +447,8 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       const de = txt(d.deFase), para = txt(d.paraFase)
       return [novoAtomo(ctx, { ...origem, rank: 3, tipo: 'FASE', subtipo: 'retorno_fase', verbo: 'voltou o processo', marco: true, complemento: `de ${ctx.rotuloDaFase(de) ?? '—'} para ${ctx.rotuloDaFase(para) ?? '—'}`, justificativa: txt(d.justificativa), faseKey: null, faseDestino: para, mudancas: [{ campo: 'fase', antes: ctx.rotuloDaFase(de), depois: ctx.rotuloDaFase(para) }] })]
     }
+    case 'GENEALOGIA_REABERTA':
+      return [novoAtomo(ctx, { ...origem, rank: 3, tipo: 'FASE', subtipo: 'reaberta', verbo: 'reabriu a Genealogia:', marco: true, motivo: txt(d.motivo), efeito: 'as certidões dessa exigência aguardam a Genealogia para serem solicitadas' })]
     // ── ÁRVORE ────────────────────────────────────────────────────────────
     case 'NECESSIDADE_REMOVIDA_PELA_ARVORE':
     case 'NECESSIDADE_CRIADA_PELA_ARVORE':

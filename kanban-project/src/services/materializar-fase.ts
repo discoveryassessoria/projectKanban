@@ -25,6 +25,7 @@
 // O que ele NÃO faz: não muda a fase do processo, não conclui nada, não cancela
 // nada, não toca em ciclo anterior, não altera obrigação de outra fase.
 
+import { reconciliarGenealogiaEEmissao } from "@/src/services/genealogia/trava-emissao-por-genealogia"
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
@@ -192,7 +193,17 @@ function mensagemDe(estado: EstadoMaterializacao, faseLabel: string, motivos: Wo
  * MATERIALIZA (ou converge) a execução de uma fase. Idempotente: rodar N vezes sobre
  * o mesmo phaseInstanceId produz exatamente o mesmo estado.
  */
+/**
+ * Materializa a fase e, em seguida, aplica a trava "Aguardando Genealogia": certidão cuja necessidade ainda tem "Localizar registro" aberto
+ * nunca fica disponível na Emissão (processo 683, Fogli). Idempotente.
+ */
 export async function materializarExecucaoDaFase(input: MaterializarInput): Promise<RelatorioMaterializacao> {
+  const rel = await materializarExecucaoDaFaseBruta(input)
+  await reconciliarGenealogiaEEmissao(input.processoId)
+  return rel
+}
+
+async function materializarExecucaoDaFaseBruta(input: MaterializarInput): Promise<RelatorioMaterializacao> {
   const inicio = Date.now()
   const correlationId = input.correlationId ?? randomUUID()
 
