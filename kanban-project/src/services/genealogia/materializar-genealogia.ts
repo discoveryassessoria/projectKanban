@@ -17,6 +17,7 @@
 // ver `documentoTemDadosPreenchidos` para distinguir rascunho de dado real.
 
 import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
+import { reabrirGenealogiaParaNecessidadeTardiaTx, reconciliarGenealogiaEEmissaoTx } from "@/src/services/genealogia/trava-emissao-por-genealogia"
 import { prisma } from "@/lib/prisma"
 import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
@@ -360,7 +361,8 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
   // as necessidades órfãs (regra inativada/arquivada) vivas para sempre — a
   // reconciliação abaixo as dispensa (PENDENTE) ou as aponta (já andaram).
 
-  const { arvoreId, tipoProcessoId, instancia, labelLocalizarRegistro, slaDaysLocalizarRegistro, tipoPorCode } = calculo
+  const { arvoreId, tipoProcessoId, instancia: instanciaDoCalculo, labelLocalizarRegistro, slaDaysLocalizarRegistro, tipoPorCode } = calculo
+  let instancia = instanciaDoCalculo
   if (!instancia) res.semInstanciaWorkflow = true
 
   // varianteKeys aplicáveis nesta rodada (para reconciliação)
@@ -420,6 +422,18 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       // É o que impede RG, comprovante e procuração de herdarem os cinco passos
       // da emissão de certidão: eles entram na fase como necessidade, sem passo.
       // A distinção vem do perfil cadastrado, não de uma lista de exceções.
+      // PESSOA/UNIÃO QUE ENTRA DEPOIS DE A GENEALOGIA CONCLUIR: sem instância ativa o passo "Localizar registro" simplesmente não nascia
+      // (processo 683, Fogli) e a Emissão abria a certidão sem os dados registrais. A necessidade que ainda NÃO tem passo de localizar
+      // reabre a Genealogia (histórico preservado) e o passo nasce nela. Quem já tem passo (concluído ou cancelado) não reabre nada.
+      if (!instancia && recebeWorkflowOperacional(tipoDoc)) {
+        const jaTemLocalizar = await db.phaseWorkflowStepInstance.findFirst({
+          where: { processoId, stepKey: STEP_LOCALIZAR, necessidadeId: necessidade.id, status: { not: "SUPERSEDIDO" } }, select: { id: true },
+        })
+        if (!jaTemLocalizar) {
+          const r = await reabrirGenealogiaParaNecessidadeTardiaTx(db as Prisma.TransactionClient, processoId, necessidade.id)
+          if (r) { instancia = { id: r.id, ciclo: r.ciclo }; res.semInstanciaWorkflow = false }
+        }
+      }
       if (instancia && recebeWorkflowOperacional(tipoDoc)) {
         const chave = chaveStep(necessidade.id, instancia.ciclo)
         // CONVERGÊNCIA PELA IDENTIDADE LÓGICA, não pela string da chave.
@@ -515,6 +529,7 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
   // nunca escreve fora dela.
   await contarTarefasAbertasDosFatos(finalizado, db)
   await reconciliarTarefas({ processoId, db })
+  await reconciliarGenealogiaEEmissaoTx(db as Prisma.TransactionClient, processoId)
   await auditarFatos(finalizado, processoId, db, opts)
 
   return finalizado

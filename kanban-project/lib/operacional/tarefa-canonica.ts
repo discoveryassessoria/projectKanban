@@ -564,6 +564,27 @@ export function executavelAgora(t: {
 }
 
 /**
+ * REANCORA a MESMA tarefa (taskId preservado) em outro passo/instância — a tarefa é UMA por obrigação e mostra o trabalho aberto AGORA.
+ * Hoje: "Localizar registro" reaberto/novo com a certidão já na Emissão (a tarefa vai para a Genealogia e volta quando o registro é localizado).
+ * Depois de mover o ponteiro, o estado volta a ser derivado dos passos da unidade (única fonte).
+ */
+export async function reancorarTarefaNoPasso(
+  tx: Prisma.TransactionClient,
+  tarefaId: number,
+  alvo: { workflowInstanceId: number; workflowStepInstanceId: number; faseMacroKey: string | null; motivoCodigo: string | null },
+  agora: Date,
+): Promise<{ mudou: boolean; status: StatusTarefa; stepAtualId: number | null }> {
+  await tx.tarefa.update({
+    where: { id: tarefaId },
+    data: {
+      workflowInstanceId: alvo.workflowInstanceId, workflowStepInstanceId: alvo.workflowStepInstanceId, faseMacroKey: alvo.faseMacroKey,
+      motivoCodigo: alvo.motivoCodigo, blockedPreviousStatus: null, justificativa: null, lockVersion: { increment: 1 },
+    },
+  })
+  return sincronizarTarefaComWorkflow(tx, tarefaId, agora)
+}
+
+/**
  * SINCRONIZA a tarefa com o workflow dela: estado derivado + etapa corrente.
  *
  * Não conclui passo, não avança fase, não cria nada. Só faz a tarefa dizer a

@@ -31,6 +31,7 @@
 // não toca em tarefa. Ele só faz a pergunta — e registra a resposta.
 // ============================================================================
 
+import { reconciliarGenealogiaEEmissao } from "@/src/services/genealogia/trava-emissao-por-genealogia"
 import { randomUUID } from "crypto"
 import { advance, type AdvanceResult } from "@/src/lib/motor/phase-advance"
 import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
@@ -105,6 +106,9 @@ export async function reconciliarMotorDeFases(
   const transicoes: TransicaoReconciliada[] = []
   let faseInicial: string | null = null
   let ultimo: AdvanceResult | null = null
+
+  // A trava "Aguardando Genealogia" vem ANTES de qualquer avanço: o gate precisa enxergar o passo bloqueado.
+  await reconciliarGenealogiaEEmissao(processoId)
 
   try {
     for (let i = 0; i < MAX_SALTOS; i++) {
