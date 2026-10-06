@@ -20,7 +20,7 @@
 import { rotuloQuando } from './torre-processo-puro'
 import { FUSO_OPERACIONAL } from './tempo-operacional'
 
-export type EstadoDaFaseNoCaminho = 'concluida' | 'atual' | 'futura' | 'condicional' | 'pulada'
+export type EstadoDaFaseNoCaminho = 'concluida' | 'atual' | 'futura' | 'condicional' | 'pulada' | 'reaberta'
 
 export interface FaseCadastrada { phaseKey: string; ordem: number; label: string; conditional: boolean; required: boolean }
 export interface PassagemPelaFase { entradaEm: string | null; saidaEm: string | null }
@@ -37,6 +37,8 @@ export interface FaseDoCaminho {
   entradaEm: string | null
   saidaEm: string | null
   tarefas: TarefasDaFase
+  /** Só em `reaberta`: a fase JÁ ANTERIOR à atual cuja instância voltou a ATIVO (passo "Localizar registro" aberto) — quando e quanto falta. */
+  reaberta: { em: string | null; progresso: number | null } | null
 }
 
 const VAZIAS: TarefasDaFase = { total: 0, concluidas: 0, semResponsavel: 0, abertas: 0, responsaveis: [] }
@@ -48,6 +50,8 @@ export function montarCaminho(a: {
   requerRetificacao: boolean | null
   passagens: ReadonlyMap<string, PassagemPelaFase>
   tarefas: ReadonlyMap<string, TarefasDaFase>
+  /** A MESMA fonte da barra de fases: fase cuja instância mais recente está ATIVA (aberta) — `em` = quando foi reaberta, `progresso` = a projeção. */
+  reabertas?: ReadonlyMap<string, { em: string | null; progresso: number | null }>
 }): FaseDoCaminho[] {
   const fases = [...a.fases].sort((x, y) => x.ordem - y.ordem)
   const idxAtual = a.faseAtualKey ? fases.findIndex((f) => f.phaseKey === a.faseAtualKey) : -1
@@ -57,13 +61,15 @@ export function montarCaminho(a: {
     const condicionalDispensada = f.conditional && a.requerRetificacao !== true
     let estado: EstadoDaFaseNoCaminho
     let motivoPulada: FaseDoCaminho['motivoPulada'] = null
+    const reaberta = idxAtual >= 0 && i < idxAtual ? a.reabertas?.get(f.phaseKey) ?? null : null
     if (idxAtual === i) estado = 'atual'
+    else if (reaberta) estado = 'reaberta'
     else if (idxAtual >= 0 && i < idxAtual) {
       if (condicionalDispensada) { estado = 'pulada'; motivoPulada = 'NAO_FOI_PRECISO' }
       else if (passagem.entradaEm == null && tarefas.total === 0 && i > 0) { estado = 'pulada'; motivoPulada = 'SEM_REGISTRO' }
       else estado = 'concluida'
     } else estado = condicionalDispensada ? 'condicional' : 'futura'
-    return { phaseKey: f.phaseKey, numero: i + 1, label: f.label, estado, motivoPulada, entradaEm: passagem.entradaEm, saidaEm: passagem.saidaEm, tarefas }
+    return { phaseKey: f.phaseKey, numero: i + 1, label: f.label, estado, motivoPulada, entradaEm: passagem.entradaEm, saidaEm: passagem.saidaEm, tarefas, reaberta }
   })
 }
 
@@ -100,6 +106,14 @@ export function textosDaFase(f: FaseDoCaminho, agora: Date, extra: { tempoNaFase
       const quemTxt = t.abertas > 0 ? quem(t, true) : ''
       const andamento = c && c.requeridas > 0 ? `${c.recebidas} de ${c.requeridas} recebidas` : t.total > 0 ? `${t.concluidas} de ${t.total} concluídas` : 'sem tarefas nesta fase'
       return { l1: `${titulo} · atual`, l2: desde, l3: `${andamento}${quemTxt ? ` · ${quemTxt}` : ''}` }
+    }
+    case 'reaberta': {
+      // FONTE ÚNICA DE FASE: igual à barra de fases — a instância voltou a ATIVO, então a fase está EM ANDAMENTO (nunca "concluída ✓").
+      const r = f.reaberta
+      const pct = r?.progresso != null ? `${r.progresso}% · ` : ''
+      const quando = r?.em ? `reaberta ${rotuloQuando(r.em, agora, true)}` : 'reaberta'
+      const t = f.tarefas
+      return { l1: `${titulo} · em andamento`, l2: `${pct}${quando}`, l3: t.abertas > 0 ? `${t.abertas} ${t.abertas === 1 ? 'tarefa aberta' : 'tarefas abertas'}${quem(t, true) ? ` · ${quem(t, true)}` : ''}` : null }
     }
     case 'condicional': return { l1: titulo, l2: 'só se preciso', l3: null }
     case 'pulada': return { l1: titulo, l2: f.motivoPulada === 'NAO_FOI_PRECISO' ? 'pulada · não foi preciso' : 'pulada · sem registro de passagem', l3: null }

@@ -2,6 +2,7 @@
 // O LEITOR DO CAMINHO DO PROCESSO (servidor) — carrega do banco o que `torre-caminho.ts` (puro) precisa, em poucas consultas
 // constantes no volume. Ver o cabeçalho de `torre-caminho.ts` para as fontes e a divergência registrada (D02).
 import { prisma } from '@/lib/prisma'
+import { resolveOperationalProjection } from '@/src/lib/process-stage/operational-projection'
 import { labelDaFasePorPhaseKey } from '@/src/lib/process-stage/fases-catalog'
 import { proximaFaseDoCaminho } from '@/src/lib/motor/phase-advance-helpers'
 import { RESULTADOS_QUE_MOVEM_DE_FASE } from './metricas-processo'
@@ -29,7 +30,7 @@ export async function lerCaminhoDoProcesso(processoId: number): Promise<CaminhoD
       : Promise.resolve([]),
     prisma.analiseDocumental.findFirst({ where: { processoId }, orderBy: { id: 'desc' }, select: { requerRetificacao: true } }),
     prisma.phaseAdvanceLog.findMany({ where: { processoId, resultado: { in: [...RESULTADOS_QUE_MOVEM_DE_FASE] } }, orderBy: { criadoEm: 'asc' }, select: { faseAtual: true, fasePretendida: true, criadoEm: true } }),
-    prisma.phaseWorkflowInstance.findMany({ where: { processoId }, select: { faseMacroKey: true, createdAt: true } }),
+    prisma.phaseWorkflowInstance.findMany({ where: { processoId }, select: { id: true, faseMacroKey: true, createdAt: true, ciclo: true, status: true } }),
     prisma.tarefa.findMany({ where: { processoId }, select: { faseMacroKey: true, statusTarefa: true, responsavelId: true, responsavel: { select: { nome: true } } } }),
   ])
   if (fasesDb.length === 0) return { fases: [], numeroDaFaseAtual: null, total: 0, proximaFaseLabel: null }
@@ -56,8 +57,23 @@ export async function lerCaminhoDoProcesso(processoId: number): Promise<CaminhoD
     }]),
   )
 
+  // FASE REABERTA = a instância MAIS RECENTE da fase está ATIVA e a fase é ANTERIOR à atual (a mesma regra da barra de fases:
+  // `/api/processos/[id]/phases`). `em` = o evento de reabertura; `progresso` = a projeção operacional (a mesma da barra e da Central).
+  const ordemDe = new Map(fases.map((f) => [f.phaseKey, f.ordem]))
+  const ordemAtual = proc.faseAtualKey ? ordemDe.get(proc.faseAtualKey) ?? null : null
+  const reabertas = new Map<string, { em: string | null; progresso: number | null }>()
+  if (ordemAtual != null) {
+    const maisRecente = new Map<string, (typeof instancias)[number]>()
+    for (const i of instancias) { const a = maisRecente.get(i.faseMacroKey); if (!a || i.ciclo > a.ciclo) maisRecente.set(i.faseMacroKey, i) }
+    for (const [key, inst] of maisRecente) {
+      if (inst.status !== 'ATIVO' || key === proc.faseAtualKey || (ordemDe.get(key) ?? 9999) >= ordemAtual) continue
+      const ev = await prisma.workflowEvento.findFirst({ where: { workflowInstanceId: inst.id, tipo: 'WORKFLOW_REABERTO' }, orderBy: { id: 'desc' }, select: { criadoEm: true } })
+      const proj = await resolveOperationalProjection(processoId, { faseMacroKey: key, workflowInstanceId: inst.id }).catch(() => null)
+      reabertas.set(key, { em: ev?.criadoEm.toISOString() ?? null, progresso: proj ? proj.progress.percentage : null })
+    }
+  }
   const requer = analise ? analise.requerRetificacao === true : null
-  const caminho = montarCaminho({ fases, faseAtualKey: proc.faseAtualKey, requerRetificacao: requer, passagens, tarefas: tarefasPorFase })
+  const caminho = montarCaminho({ fases, faseAtualKey: proc.faseAtualKey, requerRetificacao: requer, passagens, tarefas: tarefasPorFase, reabertas })
   const atual = caminho.find((f) => f.estado === 'atual') ?? null
   const proximaKey = proc.faseAtualKey ? proximaFaseDoCaminho(fases.map((f) => ({ phaseKey: f.phaseKey, ordem: f.ordem, conditional: f.conditional, required: f.required })), proc.faseAtualKey, requer === true) : null
   return {

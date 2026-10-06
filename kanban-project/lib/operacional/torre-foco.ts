@@ -337,12 +337,13 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
   const encerradasDaFase = foco.encerradas.filter((e) => (e.faseMacroKey ? e.faseMacroKey === faseAtualKey : faseEhDocumental))
   const tabela = [...trabalho, ...encerradasDaFase.map((e) => linhaEncerrada(e, info, agora, faseDaAtual))]
 
+  // OS CARTÕES (Passo atual · Com quem · Prazo · Cartórios) leem a MESMA lista da tabela (todas as abertas do processo): L3 da Lei da Torre.
   const cartoes = cartoesDaFase({
-    linhas: abertasDaFase,
+    linhas: foco.tarefas,
     encerradas: { canceladas: encerradasDaFase.filter((e) => e.tipo === 'CANCELADA').length, naoExigidas: encerradasDaFase.filter((e) => e.tipo === 'NAO_EXIGIDA').length },
     riscoDe: (l) => nivelDeRisco(l),
     // As certidões da fase (abertas e concluídas) com o órgão vinculado no DOCUMENTO — o cartão Cartórios conta vinculadas e faltantes.
-    certidoesDaFase: [...abertasDaFase, ...concluidas].map((l) => ({ documentoId: l.documentoId, terceiroNome: l.terceiroNome })),
+    certidoesDaFase: [...foco.tarefas, ...concluidas].map((l) => ({ documentoId: l.documentoId, terceiroNome: l.terceiroNome })),
   })
 
   const faseLabel = foco.faseAtual.label
@@ -357,7 +358,7 @@ export async function detalheDoProcesso(processoId: number, agora = new Date()):
       risco, noPrecisaDeVoce: itensDoProcesso.length > 0, faseNumero: cam.numeroDaFaseAtual, faseTotal: cam.total,
     },
     proximaAcao: (() => {
-      const pa = proximaAcaoDoProcesso(foco.tarefas, null, ordemDaFase)
+      const pa = proximaAcaoDoProcesso(foco.tarefas, null, ordemDaFase, { rotuloDaFase: (k) => labelDaFasePorPhaseKey(k) ?? k, faseAtualLabel: faseLabel })
       return pa ? cartaoDaProximaAcao(pa, prazoCurto(pa.dataPrazo, agora).texto, faseLabel, itensDoProcesso.length > 0) : null
     })(),
     trava, previsao, caminho: cam, cartoes, tabela,

@@ -343,7 +343,7 @@ export async function processosDaTorre(agora = new Date(), linhasEntrada?: Linha
     const metaDias = p.faseAtualKey ? metaDaFaseDoPais(metas, p.faseAtualKey, p.paisId) : null
     const bola = bolaDoProcesso(daFase)
     const r = riscoDoProcesso(entradaDoRisco({ linhas: ls, itens: is, diasNaFase: tempo.dias, metaDias, bolaRotulo: bola.rotulo }))
-    const prox = proximaAcaoDoProcesso(ls, null)
+    const prox = proximaAcaoDoProcesso(ls, null, (p.tipoProcessoMotorId != null ? ordensPorTipo.get(p.tipoProcessoMotorId) : undefined), { rotuloDaFase: (k) => labelDaFasePorPhaseKey(k) ?? k, faseAtualLabel: p.faseAtualKey ? labelDaFasePorPhaseKey(p.faseAtualKey) ?? p.faseAtualKey : null })
     const ordens = p.tipoProcessoMotorId != null ? ordensPorTipo.get(p.tipoProcessoMotorId) : undefined
     const ordemAtual = p.faseAtualKey ? ordens?.get(p.faseAtualKey) : undefined
     const celulas: CelulaDoRadar[] = colunas.map((c): CelulaDoRadar => {

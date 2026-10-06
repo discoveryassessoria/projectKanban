@@ -13,6 +13,8 @@ import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { criarPalco } from "./_fixture-arvore-fonte"
 import { filtrarEOrdenar, tituloDaTabela, type LinhaDaTabela } from "../lib/operacional/torre-processo-puro"
+import { montarCaminho, textosDaFase } from "../lib/operacional/torre-caminho"
+import { proximaAcaoDoProcesso } from "../lib/operacional/torre-proxima-acao"
 
 const MARCA = "RFIX"
 let passou = 0, falhou = 0
@@ -24,6 +26,7 @@ const ok = (nome: string, cond: boolean, extra = "") => {
 const secao = (t: string) => console.log(`\n${t}`)
 const ler = (p: string) => readFileSync(p, "utf8")
 
+const limpoComTarefaSemDono = (v: Array<{ regra: string }>) => v.some((x) => x.regra === "R5")
 async function main() {
   exigirBancoDeTeste("regras-fixas-integridade.test.ts")
   const P = criarPalco(MARCA)
@@ -51,7 +54,7 @@ async function main() {
   await prisma.processo.update({ where: { id: c.processoId }, data: { dataConclusao: null } })
   ok("pré: processo na Emissão", (await prisma.processo.findUniqueOrThrow({ where: { id: c.processoId }, select: { faseAtualKey: true } })).faseAtualKey === "emissao_documental")
   const limpo = await vigia(c.processoId)
-  ok("pré: processo saudável sem violação de R1/R2/R3/R4/R6/R7", limpo.filter((v) => v.regra !== "R5").length === 0, JSON.stringify(limpo.map((v) => `${v.regra}:${v.detalhe}`)))
+  ok("pré: processo saudável sem violação de R1/R2/R3/R4/R6/R7", limpo.length === 0, JSON.stringify(limpo.map((v) => `${v.regra}:${v.detalhe}`)))
 
   // ── R1: trava no ponto de escrita ──────────────────────────────────────────────────────────────────────────────────────
   secao("R1 — a certidão não anda na Emissão com 'Localizar registro' aberto (trava no ponto de escrita)")
@@ -67,7 +70,7 @@ async function main() {
   }
   const v0 = await vigia(c.processoId)
   ok("vigia: R1/R2/R6 vazios depois da regra aplicada", ["R1", "R2", "R6"].every((x) => so(v0, x).length === 0), JSON.stringify(v0.map((v) => v.regra)))
-  ok("vigia R5: a tarefa de Genealogia do Rodolfo sem responsável aparece (pendência de fase anterior visível)", so(v0, "R5").some((v) => /Rodolfo/.test(v.pessoa ?? "")))
+  ok("tarefa SEM responsável nunca é violação: o vigia não tem regra para isso (aguardando distribuição é pendência do gestor, em HOJE)", !limpoComTarefaSemDono(v0), "")
 
   // ── vigia: cada regra acusa o que viola (sementes) ─────────────────────────────────────────────────────────────────────
   secao("VIGIA — cada regra acusa o que viola, por nome (certidão + pessoa + família)")
@@ -132,9 +135,26 @@ async function main() {
   ok("dentro do grupo: Nascimento, Casamento, Óbito (§38)", lista.slice(0, 3).map((l) => l.titulo).join("|") === "Certidão de nascimento|Certidão de casamento|Certidão de óbito", lista.slice(0, 3).map((l) => l.titulo).join("|"))
   ok("o título diz que a lista é do processo", /abertas do processo · 5/.test(tituloDaTabela(lista, () => true, lista)), tituloDaTabela(lista, () => true, lista))
   const foco = ler("lib/operacional/torre-foco.ts"), puro = ler("lib/operacional/torre-proxima-acao.ts"), proc = ler("lib/operacional/torre-processos.ts")
-  ok("a tabela do processo lê TODAS as abertas (não só a fase atual) e a próxima ação conta o mesmo conjunto", /foco\.tarefas\.map\(\(l\) => linhaAberta/.test(foco) && /proximaAcaoDoProcesso\(foco\.tarefas, null, ordemDaFase\)/.test(foco) && /proximaAcaoDoProcesso\(ls, null\)/.test(proc) && /faseOrd\(a\) - faseOrd\(b\)/.test(puro))
+  ok("a tabela do processo lê TODAS as abertas (não só a fase atual) e a próxima ação conta o mesmo conjunto", /foco\.tarefas\.map\(\(l\) => linhaAberta/.test(foco) && /proximaAcaoDoProcesso\(foco\.tarefas, null, ordemDaFase/.test(foco) && /proximaAcaoDoProcesso\(ls, null/.test(proc) && /faseOrd\(a\) - faseOrd\(b\)/.test(puro))
   ok("o cabeçalho do grupo na aba Tarefas (abertas / sem responsável) conta o processo inteiro", /todasAbertas \?\? linhasDaFase/.test(proc))
   ok("a página mostra a coluna Fase e o cabeçalho por grupo", /<div>Fase<\/div>/.test(ler("src/components/torre/ProcessoCertidoes.tsx")) && /data-testid="grupo-fase"/.test(ler("src/components/torre/ProcessoCertidoes.tsx")))
+
+
+  // ── complemento 06/10: caminho do processo = fonte única de fase; próxima ação; passo atual ─────────────────────────────
+  secao("Caminho do processo (fonte única de fase), Próxima ação e Passo atual")
+  const fasesC = [{ phaseKey: "genealogia", ordem: 1, label: "Genealogia", conditional: false, required: true }, { phaseKey: "emissao_documental", ordem: 2, label: "Emissão Documental", conditional: false, required: true }]
+  const passagens = new Map([["genealogia", { entradaEm: "2026-10-06T15:00:00Z", saidaEm: "2026-10-06T15:20:00Z" }], ["emissao_documental", { entradaEm: "2026-10-06T15:20:00Z", saidaEm: null }]])
+  const cam = montarCaminho({ fases: fasesC, faseAtualKey: "emissao_documental", requerRetificacao: null, passagens, tarefas: new Map(), reabertas: new Map([["genealogia", { em: "2026-10-06T19:57:00Z", progresso: 82 }]]) })
+  const tg = textosDaFase(cam[0], new Date("2026-10-06T21:00:00Z"))
+  ok("fase com instância ATIVA e anterior à atual aparece 'em andamento · 82% · reaberta …' (nunca 'concluída ✓')", cam[0].estado === "reaberta" && /em andamento/.test(tg.l1) && !/✓/.test(tg.l1) && /82%/.test(tg.l2) && /reaberta/.test(tg.l2), JSON.stringify(tg))
+  const camConcl = montarCaminho({ fases: fasesC, faseAtualKey: "emissao_documental", requerRetificacao: null, passagens, tarefas: new Map() })
+  ok("sem reabertura continua 'concluída ✓'", camConcl[0].estado === "concluida")
+  const L = (id: number, fase: string, resp: number | null) => ({ taskId: id, titulo: "Certidão de óbito", statusTarefa: "NAO_INICIADA", faseMacroKey: fase, responsavelId: resp, responsavelNome: null, dataPrazo: null, atrasada: false, diasParaPrazo: null, estadoOperacao: "FILA" as const, esperandoDe: null, acompanhamentoVencido: false, terceiroNome: null })
+  const prox = proximaAcaoDoProcesso([L(1, "genealogia", null), ...Array.from({ length: 14 }, (_, i) => L(10 + i, "emissao_documental", null))] as never, null, new Map([["genealogia", 1], ["emissao_documental", 2]]), { rotuloDaFase: (k) => (k === "genealogia" ? "Genealogia" : "Emissão"), faseAtualLabel: "Emissão" })
+  ok("próxima ação: 'Atribuir 1 de Genealogia (trava a Emissão) e 14 de Emissão' (fase mais antiga primeiro)", prox?.texto === "Atribuir 1 de Genealogia (trava a Emissão) e 14 de Emissão" && prox.quantas === 15, prox?.texto)
+  ok("os cartões laterais leem a MESMA lista da tabela (todas as abertas do processo)", /cartoesDaFase\(\{\s*linhas: foco\.tarefas,/.test(foco))
+  ok("'Passo atual' de passo único (sem subtarefa) mostra o nome do passo, nunca '—'", /PASSO ÚNICO, SEM SUBTAREFA/.test(ler("lib/operacional/tarefa-projecoes.ts")))
+  ok("o registro consolidado é AÇÃO DO SISTEMA (sem 'pede decisão humana')", /NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO': \{[\s\S]*atomoDoSistema/.test(ler("lib/operacional/historico-processo.ts")))
 
   // ── sugestão nunca atribui sozinha ─────────────────────────────────────────────────────────────────────────────────────
   secao("SUGESTÃO — nunca atribui sem confirmação explícita (servidor e tela); origem no histórico")

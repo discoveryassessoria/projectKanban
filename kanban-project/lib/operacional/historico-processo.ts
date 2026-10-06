@@ -467,7 +467,12 @@ function atomosDoLog(l: Extract<LinhaCrua, { fonte: 'LOG' }>, ctx: ContextoDoHis
       a.pessoaId = n?.pessoaId ?? a.pessoaId
       return [a]
     }
-    case 'NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO':
+    case 'NECESSIDADE_ATENDIDA_SEM_CAUSA_CONSOLIDADO': {
+      // AÇÃO DO SISTEMA (nunca de uma pessoa): "restaurou a lista de certidões exigidas de X (óbito) — remoção não intencional; N avisos consolidados".
+      const texto = txt(d.textoDoSistema)
+      if (!texto) return []
+      return [atomoDoSistema(ctx, { ...origem, rank: 2, tipo: 'ARVORE', subtipo: 'exigencia_reativada' }, texto, { chaveExtra: `consolidado${l.id}` })]
+    }
     case 'NECESSIDADE_ATENDIDA_SEM_CAUSA': {
       // Avisos repetidos foram consolidados em UM registro (nada apagado: os originais ficam marcados `consolidadoPor`).
       if (d.consolidadoPor != null) return []

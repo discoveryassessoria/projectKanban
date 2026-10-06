@@ -8,7 +8,7 @@
 //   R2  Nenhuma fase concluída (ou 100%) com passo obrigatório aberto.
 //   R3  Certidão exigida nunca vira "não exigida"/cancelada sem decisão humana registrada (lista de certidões da pessoa × necessidade já andada).
 //   R4  Toda pessoa com certidão exigida tem tarefa viva, na fase certa (Genealogia enquanto o registro não foi localizado).
-//   R5  Toda tarefa aberta tem como ser atribuída pela Torre (pendência de fase anterior sem responsável precisa estar visível).
+//   R5  (retirada: tarefa sem responsável nunca é violação — "aguardando distribuição" é pendência do gestor, mostrada em HOJE.)
 //   R6  Barra de fases, Central e Torre mostram o mesmo estado (tarefa aberta presa a instância já concluída/supersedida).
 //   R7  Tela × banco: a lista "Certidões exigidas desta pessoa" gravada concorda com as necessidades que existem.
 // ============================================================================
@@ -18,7 +18,7 @@ import type { Achado, ResultadoVerificacao } from '../tipos'
 import { lerDocumentosExigidosGravado, type CodigoDocumentoExigivel } from '@/src/lib/genealogia/documentos-exigidos'
 import { PESSOA_ATIVA } from '@/src/lib/genealogia/vinculo-ativo'
 
-export type RegraDoVigia = 'R1' | 'R2' | 'R3' | 'R4' | 'R5' | 'R6' | 'R7'
+export type RegraDoVigia = 'R1' | 'R2' | 'R3' | 'R4' | 'R6' | 'R7'
 
 export interface ViolacaoDoVigia {
   regra: RegraDoVigia
@@ -152,14 +152,7 @@ export async function detectarViolacoesDeIntegridade(): Promise<{ processos: num
     }
   }
 
-  // R5 — pendência de fase anterior sem responsável (precisa estar visível e atribuível pela Torre).
-  for (const t of tarefas) {
-    if (t.processoId == null || TAREFA_ENCERRADA.includes(t.statusTarefa) || t.responsavelId != null) continue
-    const p = proc.get(t.processoId)
-    if (!p || !t.faseMacroKey || t.faseMacroKey === p.faseAtualKey) continue
-    const n = t.necessidadeId != null ? necPorId.get(t.necessidadeId) : undefined
-    out.push({ regra: 'R5', processoId: t.processoId, familia: familia(t.processoId), certidao: n ? certidaoDe(n) : t.titulo, pessoa: n ? quem(n) : null, detalhe: `tarefa aberta da fase ${t.faseMacroKey} (processo está em ${p.faseAtualKey}) sem responsável`, entidade: 'Tarefa', registroId: t.id })
-  }
+  // (R5 — "tarefa sem responsável" — NÃO É violação e saiu do vigia: aguardando distribuição é pendência do gestor e aparece em HOJE, não erro de integridade.)
 
   // R6 — tarefa aberta presa a instância concluída/supersedida (barra, Central e Torre divergem).
   for (const t of tarefas) {
@@ -193,7 +186,6 @@ const TITULO: Record<RegraDoVigia, string> = {
   R2: 'fase concluída com passo obrigatório aberto',
   R3: 'certidão já andada tirada da lista sem decisão humana',
   R4: 'certidão exigida sem tarefa (ou na fase errada)',
-  R5: 'pendência de fase anterior sem responsável',
   R6: 'tarefa aberta presa a fase já concluída',
   R7: 'lista de certidões da pessoa × necessidades divergem',
 }
@@ -202,7 +194,7 @@ registrar({
   id: 'saude.integridade.regras-fixas',
   codigo: 'INT-002',
   nome: 'Regras fixas de integridade (Genealogia × Emissão × Torre)',
-  descricao: 'Varre todos os processos ativos contra as 7 regras fixas definidas em 06/10/2026 (caso Fogli): certidão só na Emissão com o registro localizado; fase concluída sem passo obrigatório aberto; certidão andada nunca "não exigida" sem decisão humana; toda certidão exigida com tarefa na fase certa; toda tarefa aberta atribuível; barra/Central/Torre no mesmo estado; lista de certidões da pessoa coerente. Somente leitura.',
+  descricao: 'Varre todos os processos ativos contra as regras fixas (R1–R4, R6, R7) definidas em 06/10/2026 (caso Fogli): certidão só na Emissão com o registro localizado; fase concluída sem passo obrigatório aberto; certidão andada nunca "não exigida" sem decisão humana; toda certidão exigida com tarefa na fase certa; toda tarefa aberta atribuível; barra/Central/Torre no mesmo estado; lista de certidões da pessoa coerente. Somente leitura.',
   dominio: 'ARVORE',
   modulo: 'Genealogia',
   severidadePadrao: 'ERRO',
@@ -219,7 +211,7 @@ registrar({
     const { processos, violacoes } = await detectarViolacoesDeIntegridade()
     const achados: Achado[] = violacoes.map((v) => ({
       chave: `INT-002:${v.regra}:${v.entidade}:${v.registroId}`,
-      severidade: v.regra === 'R5' || v.regra === 'R7' ? 'ALERTA' : 'ERRO',
+      severidade: v.regra === 'R7' ? 'ALERTA' : 'ERRO',
       titulo: `${v.regra} — ${TITULO[v.regra]}: ${v.certidao ?? '—'}${v.pessoa ? ` · ${v.pessoa}` : ''} (família ${v.familia} · processo #${v.processoId})`,
       descricao: v.detalhe,
       entidade: v.entidade, registroId: String(v.registroId), registroNome: `${v.certidao ?? ''}${v.pessoa ? ` · ${v.pessoa}` : ''}`.trim(),
