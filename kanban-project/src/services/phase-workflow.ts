@@ -928,17 +928,22 @@ export async function instanciarWorkflowDaFase(
           dados: { faseMacroKey: input.faseMacroKey, ciclo, steps: stepInstances.map((s) => ({ id: s.id, stepKey: s.stepKey })) },
         },
       })
-      await tx.domainOutbox.create({
-        data: {
+      // A chave do evento leva o ID DA INSTÂNCIA: o evento é "ESTA instância nasceu". Sem o id, um processo cuja instância foi apagada (reinício/limpeza)
+      // e que reentra na mesma fase, ciclo e versão do workflow batia na linha do outbox da instância antiga (a do ENVIADO) — o INSERT dava
+      // violação de unicidade e a mudança de fase falhava com "Conflito de concorrência" (Antão, ES-2, 06/10/2026). `skipDuplicates` (como o resto do
+      // motor) deixa a repetição do MESMO evento inofensiva sem abortar a transação.
+      await tx.domainOutbox.createMany({
+        data: [{
           tipo: "phase-workflow.instanced", aggregateType: "PhaseWorkflowInstance", aggregateId: instancia.id,
           correlationId, causationId: input.causationId ?? null,
-          chaveIdempotencia: `outbox|${chaveWorkflow}`,
+          chaveIdempotencia: `outbox|${chaveWorkflow}|wfi${instancia.id}`,
           payload: {
             processoId: processo.id, faseMacroKey: input.faseMacroKey, ciclo,
             workflowInstanceId: instancia.id, stepInstanceIds: stepInstances.map((s) => s.id),
             stepKeys: stepInstances.map((s) => s.stepKey), workflowVersion: workflow.versao,
           },
-        },
+        }],
+        skipDuplicates: true,
       })
 
       // `avisos`, não `val.warnings`: o ramo que CRIA a instância é justamente onde os
