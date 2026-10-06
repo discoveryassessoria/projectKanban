@@ -41,6 +41,13 @@ export function useFila(key: string) {
   return { data, error, isLoading, recarregar: mutate }
 }
 
+/** Todos os processos que a MESMA busca do menu acha (sem o teto do menu) — o Kanban mostra só esses enquanto se digita. */
+export async function buscarProcessoIds(q: string): Promise<number[]> {
+  if (q.trim().length < 2) return []
+  const json = await fetcherComAuth(`/api/home/search?q=${encodeURIComponent(q)}&ids=1`)
+  return (json?.processoIds ?? []) as number[]
+}
+
 export async function buscarGlobal(q: string): Promise<SearchResult[]> {
   if (q.trim().length < 2) return []
   const json = await fetcherComAuth(`/api/home/search?q=${encodeURIComponent(q)}`)

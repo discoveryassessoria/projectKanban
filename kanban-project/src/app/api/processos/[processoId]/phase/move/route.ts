@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
 import { movePhaseManual } from "@/src/lib/motor/phase-advance"
+import { resolverRotuloDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import { resolverMacroWorkflowDoProcesso } from "@/src/lib/motor/resolver-macro-workflow"
 import {
   MOTIVOS_MOVIMENTACAO,
@@ -28,7 +29,7 @@ import {
   JUSTIFICATIVA_MIN,
   JUSTIFICATIVA_MAX,
 } from "@/src/lib/motor/motivos-movimentacao"
-import { FASES, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { FASES, phaseKeyToFaseCode, labelDaFasePorPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
 
 const PERMISSAO = "processos.moverFaseManual"
@@ -83,7 +84,9 @@ function erro(code: string, message: string, extra?: Record<string, unknown>) {
 /** Rótulo humano da fase, do catálogo oficial — nunca a chave crua na tela. */
 function rotuloFase(phaseKey: string): string {
   const code = phaseKeyToFaseCode(phaseKey)
-  return code ? FASES[code as FaseCode].label : phaseKey
+  if (code) return FASES[code as FaseCode].label
+  // Fase fora do enum (ex.: "Aguardando fechamento" = `a_iniciar`) tem nome no catálogo; a CHAVE nunca vai para a tela.
+  return labelDaFasePorPhaseKey(phaseKey) ?? phaseKey
 }
 
 /**
@@ -137,7 +140,7 @@ export async function GET(
   const macro = await resolverMacroWorkflowDoProcesso(processo.tipoProcessoMotorId, processo.modalidadeId)
   const fases = (macro?.fases ?? []).map((f) => ({
     phaseKey: f.phaseKey,
-    label: rotuloFase(f.phaseKey) || f.label,
+    label: labelDaFasePorPhaseKey(f.phaseKey) ?? f.label ?? f.phaseKey,
     ordem: f.ordem,
     conditional: f.conditional === true,
     atual: f.phaseKey === processo.faseAtualKey,
@@ -147,7 +150,7 @@ export async function GET(
     success: true,
     processo: { id: processo.id, nome: processo.nome, codigo: processo.codigo },
     faseAtual: processo.faseAtualKey,
-    faseAtualLabel: processo.faseAtualKey ? rotuloFase(processo.faseAtualKey) : null,
+    faseAtualLabel: await resolverRotuloDaFase(processo.faseAtualKey) ?? processo.faseAtualKey,
     fases,
     motivos: MOTIVOS_MOVIMENTACAO,
     justificativa: { min: JUSTIFICATIVA_MIN, max: JUSTIFICATIVA_MAX },

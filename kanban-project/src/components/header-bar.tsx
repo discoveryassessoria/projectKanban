@@ -10,7 +10,7 @@ import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { parseLocalDate, getToday, isToday, isPast, isWithinDays } from "@/src/lib/date-utils"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { CambioMini } from "@/src/components/cambio/cambio-mini"
-import { buscarGlobal } from "@/src/components/home/use-home"
+import { buscarGlobal, buscarProcessoIds } from "@/src/components/home/use-home"
 import type { SearchResult } from "@/src/app/api/home/search/route"
 
 const ROTULO_TIPO_BUSCA: Record<SearchResult["tipo"], string> = {
@@ -42,6 +42,11 @@ interface HeaderBarProps {
   onLogout?: () => void
   /** Esconde a busca por processos da barra (telas que já têm busca global própria). */
   ocultarBusca?: boolean
+  /**
+   * O Kanban acompanha o que se digita: a cada busca chega a lista de processos que a MESMA busca do menu achou (todos, sem o teto do menu);
+   * `null` = busca vazia, o quadro volta ao normal.
+   */
+  onBuscaProcessos?: (processoIds: number[] | null) => void
 }
 
 export function HeaderBar({
@@ -55,6 +60,7 @@ export function HeaderBar({
   arvores = [],
   onLogout,
   ocultarBusca = false,
+  onBuscaProcessos,
 }: HeaderBarProps) {
   const [currentTime, setCurrentTime] = useState<string>("")
   const [currentDate, setCurrentDate] = useState<string>("")
@@ -106,12 +112,17 @@ export function HeaderBar({
     setSearchQuery(query)
 
     if (query.trim().length < 2) {
+      buscaSeq.current++
       setShowSearchResults(false)
       setSearchResults([])
+      onBuscaProcessos?.(null)
       return
     }
 
     const minhaSeq = ++buscaSeq.current
+    if (onBuscaProcessos) {
+      buscarProcessoIds(query).then((ids) => { if (minhaSeq === buscaSeq.current) onBuscaProcessos(ids) }).catch(() => { /* o menu já mostra o erro; o quadro fica como estava */ })
+    }
     buscarGlobal(query).then((resultados) => {
       if (minhaSeq !== buscaSeq.current) return
       setSearchResults(resultados)
@@ -127,6 +138,8 @@ export function HeaderBar({
     router.push(r.href)
     setShowSearchResults(false)
     setSearchQuery("")
+    buscaSeq.current++
+    onBuscaProcessos?.(null)
   }
 
   const totalResults = searchResults.length

@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
 import { escopoProcesso } from "@/src/lib/autorizacao/escopo-operacional"
+import { idsQueContem } from "@/src/lib/busca-sem-acento"
 
 export interface SearchResult {
   tipo: "processo" | "familia" | "requerente" | "cliente"
@@ -23,6 +24,8 @@ export interface SearchResult {
 }
 
 const LIMITE = 8
+/** `?ids=1`: o Kanban pede TODOS os processos que casam (mesma busca do menu, sem o teto de 8 por tipo). */
+const LIMITE_IDS = 500
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +40,13 @@ export async function GET(request: NextRequest) {
     const q = (new URL(request.url).searchParams.get("q") ?? "").trim()
     if (q.length < 2) return NextResponse.json({ resultados: [] })
 
-    const contains = { contains: q, mode: "insensitive" as const }
+    const soIds = new URL(request.url).searchParams.get("ids") === "1"
+    const limite = soIds ? LIMITE_IDS : LIMITE
+    const porProcesso = soIds ? 500 : 3
+    // SEM ACENTO E SEM CAIXA: "antao" acha "Antão". Os ids que casam saem de `busca-sem-acento` (translate, sem extensão do banco).
+    const [idsProcesso, idsFamilia, idsRequerente, idsContratante] = await Promise.all([
+      idsQueContem("Processo", q, limite), idsQueContem("Familia", q, limite), idsQueContem("Requerente", q, limite), idsQueContem("Contratante", q, limite),
+    ])
     const href = (pid: number, pais: string | null) =>
       pais ? `/kanban?pais=${encodeURIComponent(pais)}&processoId=${pid}` : `/kanban?processoId=${pid}`
 
@@ -54,35 +63,35 @@ export async function GET(request: NextRequest) {
         // `OR` (ver escopoProcesso), e um objeto JS só pode ter uma chave
         // `OR` — espalhar as duas apagava a condição de busca por completo e
         // devolvia qualquer processo do escopo, ignorando o texto digitado.
-        where: { AND: [{ OR: [{ nome: contains }, { codigo: contains }] }, escopo] },
+        where: { AND: [{ id: { in: idsProcesso } }, escopo] },
         select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } }, codigo: true, familia: { select: { nome: true } } },
-        take: LIMITE,
+        take: limite,
         orderBy: { updatedAt: "desc" },
       }),
       prisma.familia.findMany({
-        where: { nome: contains, processos: { some: escopo } },
-        select: { id: true, nome: true, processos: { where: escopo, select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: 3 } },
-        take: LIMITE,
+        where: { id: { in: idsFamilia }, processos: { some: escopo } },
+        select: { id: true, nome: true, processos: { where: escopo, select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } }, take: porProcesso } },
+        take: limite,
       }),
       prisma.requerente.findMany({
-        where: { OR: [{ nome: contains }, { publicCode: contains }], processos: { some: { processo: escopo } } },
+        where: { id: { in: idsRequerente }, processos: { some: { processo: escopo } } },
         select: {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { where: { processo: escopo }, select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
+          processos: { where: { processo: escopo }, select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: porProcesso },
         },
-        take: LIMITE,
+        take: limite,
       }),
       prisma.contratante.findMany({
-        where: { OR: [{ nome: contains }, { publicCode: contains }], processos: { some: { processo: escopo } } },
+        where: { id: { in: idsContratante }, processos: { some: { processo: escopo } } },
         select: {
           id: true,
           publicCode: true,
           nome: true,
-          processos: { where: { processo: escopo }, select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: 3 },
+          processos: { where: { processo: escopo }, select: { processo: { select: { id: true, nome: true, paisCanonico: { select: { countryKey: true, countryLabel: true, flag: true } } } } }, take: porProcesso },
         },
-        take: LIMITE,
+        take: limite,
       }),
     ])
 
@@ -116,6 +125,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (soIds) return NextResponse.json({ processoIds: [...new Set(resultados.map((r) => r.processoId))] })
     return NextResponse.json({ resultados: resultados.slice(0, 12) })
   } catch (e) {
     console.error("[/api/home/search] erro:", e)
