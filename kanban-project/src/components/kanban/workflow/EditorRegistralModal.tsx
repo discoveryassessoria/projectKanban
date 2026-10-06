@@ -368,11 +368,10 @@ function ConteudoModal({
   const livroOk = form.livro.trim().length > 0
   const folhaOk = form.folha.trim().length > 0
   const termoOk = form.termo.trim().length > 0
-  const numeroRegistroOk = form.numero_registro.trim().length > 0
   const dataEventoOk = form.data_evento.trim().length > 0
   const podeConcluirEtapa =
     nomeRegistradoOk && estadoOk && cidadeOk && cartorioOk && orgaoOk &&
-    livroOk && folhaOk && termoOk && numeroRegistroOk && dataEventoOk
+    livroOk && folhaOk && termoOk && dataEventoOk
 
   // -- Salvar (e opcionalmente concluir etapa)
   const handleSalvar = async () => {
@@ -389,7 +388,6 @@ function ConteudoModal({
         !livroOk && "Livro",
         !folhaOk && "Folha",
         !termoOk && "Termo",
-        !numeroRegistroOk && "Nº registro",
         !dataEventoOk && labelDataEvento(doc.tipo),
       ].filter((x): x is string => Boolean(x))
       alert(
@@ -419,7 +417,6 @@ function ConteudoModal({
         livro: form.livro.trim() || null,
         folha: form.folha.trim() || null,
         termo: form.termo.trim() || null,
-        numero_registro: form.numero_registro.trim() || null,
         matricula: form.matricula.trim() || null,
         crc: form.crc.trim() || null,
         protocolo: form.protocolo.trim() || null,
@@ -603,11 +600,7 @@ function ConteudoModal({
                       <strong className={livroOk && folhaOk && termoOk ? "text-green-800" : "text-[var(--accent-text)]"}>
                         Livro, Folha e Termo
                       </strong>
-                      ,{" "}
-                      <strong className={numeroRegistroOk ? "text-green-800" : "text-[var(--accent-text)]"}>
-                        Nº registro
-                      </strong>{" "}
-                      e{" "}
+                      {" "}e{" "}
                       <strong className={dataEventoOk ? "text-green-800" : "text-[var(--accent-text)]"}>
                         {labelDataEvento(doc.tipo)}
                       </strong>
@@ -786,12 +779,6 @@ function ConteudoModal({
                       requiredToComplete={isModoBuscar}
                       value={form.termo}
                       onChange={(v) => setForm({ ...form, termo: v })}
-                    />
-                    <Field
-                      label="Nº registro"
-                      requiredToComplete={isModoBuscar}
-                      value={form.numero_registro}
-                      onChange={(v) => setForm({ ...form, numero_registro: v })}
                     />
                     {!isModoBuscar && (
                       <>
