@@ -235,11 +235,10 @@ export interface GrupoDeLinhas {
   lote: boolean
 }
 
-/** NASCIMENTO → ÓBITO → CASAMENTO → (sem categoria) — a ordem dentro do grupo
- *  da pessoa (mandato "Operação/Antão", correção pós-conferência 29/09/2026:
- *  "certidão de casamento no grupo da pessoa da linha reta, APÓS nascimento e
- *  óbito"). */
-const ORDEM_CATEGORIA: Record<string, number> = { NASCIMENTO: 0, OBITO: 1, CASAMENTO: 2 }
+/** A ORDEM É POR EVENTO DA VIDA: NASCIMENTO → CASAMENTO → ÓBITO → (sem categoria). Sempre — dentro do grupo da pessoa e em qualquer
+ *  agrupamento (a regra anterior, "nascimento, óbito, casamento", estava ERRADA e foi corrigida a pedido do dono em 06/10/2026). É a mesma
+ *  ordem da Torre (`ORDEM_DO_TIPO` em `torre-foco.ts`) e da árvore. */
+const ORDEM_CATEGORIA: Record<string, number> = { NASCIMENTO: 0, CASAMENTO: 1, OBITO: 2 }
 const ordemCategoria = (l: LinhaOperacaoV3): number => (l.categoriaDoc ? ORDEM_CATEGORIA[l.categoriaDoc] ?? 3 : 3)
 
 /** Agrupa (dentro de uma família) por pessoa/órgão/passo — mesma régua do seletor "Por família, depois por".
@@ -252,7 +251,8 @@ const ordemCategoria = (l: LinhaOperacaoV3): number => (l.categoriaDoc ? ORDEM_C
  *  a certidão de casamento no MESMO grupo do nascimento/óbito dessa pessoa,
  *  nunca um grupo "Fulano e Fulana" à parte. */
 export function agruparDentroDaFamilia(linhasEntrada: LinhaOperacaoV3[], por: "pessoa" | "orgao" | "passo"): GrupoDeLinhas[] {
-  const linhas = [...linhasEntrada].sort((a, b) => (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity))
+  // G1→Gn e, na mesma geração, a ORDEM DO EVENTO (nascimento → casamento → óbito) — vale para qualquer agrupamento (pessoa, órgão, passo).
+  const linhas = [...linhasEntrada].sort((a, b) => (a.numeroLinhagem ?? Infinity) - (b.numeroLinhagem ?? Infinity) || ordemCategoria(a) - ordemCategoria(b))
   const ordem: string[] = []
   const mapa = new Map<string, LinhaOperacaoV3[]>()
   const chaveDe = (l: LinhaOperacaoV3): string => {

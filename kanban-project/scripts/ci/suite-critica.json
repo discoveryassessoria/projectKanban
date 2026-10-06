@@ -231,6 +231,7 @@
     "scripts/busca-sem-acento.test.ts",
     "scripts/rotulo-fase-modal-movimentacao.test.ts",
     "scripts/editor-registral-sem-numero-registro.test.ts",
+    "scripts/operacao-ordem-por-evento.test.ts",
     "scripts/coleta-pendentes-prazo.test.ts",
     "scripts/coleta-orfaos.test.ts",
     "scripts/processo-arquivos-orfaos.test.ts",
