@@ -111,6 +111,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "duplicidade de reconciliação/reancoragem (30/09/2026, item 12 da auditoria): monta e derruba os PRÓPRIOS processos/necessidades (marca de teste) só no banco de teste — a necessidade é cenário para provar idempotência, não uma escrita de negócio fora do reconciliador",
   "scripts/torre-relatorio-fase-passo-iniciou.test.ts":
     "Relatório de controle (Torre nova, 01/10/2026): monta e derruba a PRÓPRIA necessidade/documento (marca RELCTL) só no banco de teste, para provar as colunas Fase/Passo/Iniciou do domínio Certidões (uma linha = uma necessidade) — leitura do relatório, não uma escrita de negócio fora do serviço canônico",
+  "scripts/aptidoes-traducao-apostilamento.test.ts":
+    "Aptidões de tradução e apostilamento (Capacidade Operacional): monta e derruba as PRÓPRIAS necessidades (marca APT) só no banco de teste, como causa das tarefas cuja unidade de trabalho a prova resolve — leitura da camada operacional, não uma escrita de negócio fora do reconciliador",
   "scripts/torre-relatorio-filtros.test.ts":
     "Filtros do Relatório de controle (Torre): monta e derruba as PRÓPRIAS necessidades/documentos (marca RELFLT) só no banco de teste, para provar Fase/Linhagem/Status/Pessoa e a exportação filtrada do domínio Certidões — leitura do relatório, não uma escrita de negócio fora do serviço canônico",
   "scripts/torre-visao-gerencial-leitura-paralela.test.ts":

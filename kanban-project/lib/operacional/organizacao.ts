@@ -398,8 +398,13 @@ export async function unidadesDasTarefas(tarefaIds: number[]): Promise<Map<numbe
       id: true,
       necessidade: { select: { itemCatalogoId: true } },
       documentoId: true,
+      faseMacroKey: true,
+      workflowStepInstance: { select: { stepKey: true } },
     },
   })
+  // O PASSO primeiro: a tarefa nasce de um passo do Workflow Interno, e o perfil que aponta para esse workflow é a unidade que a cobre
+  // (tradução e apostilamento: o MESMO documento, outro trabalho — por isso o tipo documental não basta para distinguir).
+  const porPasso = await perfisPorPasso()
   for (const t of tarefas) fora.set(t.id, null)
 
   // Um lote por caminho — nunca uma consulta por tarefa.
@@ -426,9 +431,39 @@ export async function unidadesDasTarefas(tarefaIds: number[]): Promise<Map<numbe
   for (const t of tarefas) {
     const porNecessidade = t.necessidade?.itemCatalogoId != null ? perfilDoItem.get(t.necessidade.itemCatalogoId) ?? null : null
     const porDocumento = t.documentoId != null ? perfilDoDoc.get(t.documentoId) ?? null : null
-    fora.set(t.id, porNecessidade ?? porDocumento)
+    fora.set(t.id, unidadeDoPasso(porPasso, t.faseMacroKey, t.workflowStepInstance?.stepKey ?? null) ?? porNecessidade ?? porDocumento)
   }
   return fora
+}
+
+/** fase → perfis cujo Workflow Interno é o dessa fase, com as chaves dos passos que ele tem. */
+export type PerfisPorPasso = Map<string, Array<{ perfilOperacionalId: number; passos: ReadonlySet<string> }>>
+
+export async function perfisPorPasso(): Promise<PerfisPorPasso> {
+  const perfis = await prisma.perfilOperacionalDocumento.findMany({
+    where: { ativo: true, workflowId: { not: null }, workflow: { active: true, arquivado: false } },
+    select: { id: true, workflow: { select: { phaseKey: true, passos: { select: { key: true } } } } },
+  })
+  const mapa: PerfisPorPasso = new Map()
+  for (const p of perfis) {
+    if (!p.workflow) continue
+    const lista = mapa.get(p.workflow.phaseKey) ?? []
+    lista.push({ perfilOperacionalId: p.id, passos: new Set(p.workflow.passos.map((x) => x.key)) })
+    mapa.set(p.workflow.phaseKey, lista)
+  }
+  return mapa
+}
+
+/**
+ * A unidade de uma tarefa pelo PASSO de onde ela nasceu — PURA. A fase da tarefa acha o workflow; havendo passo, a chave dele precisa ser
+ * de um passo desse workflow (passo antigo/removido não casa e cai nos outros caminhos). Sem passo (trabalho avulso da fase), vale a fase.
+ */
+export function unidadeDoPasso(mapa: PerfisPorPasso, faseMacroKey: string | null, stepKey: string | null): number | null {
+  if (!faseMacroKey) return null
+  const candidatos = mapa.get(faseMacroKey)
+  if (!candidatos?.length) return null
+  if (stepKey == null) return candidatos.length === 1 ? candidatos[0].perfilOperacionalId : null
+  return candidatos.find((c) => c.passos.has(stepKey))?.perfilOperacionalId ?? null
 }
 
 /** Nome e família de cada unidade, para a explicação e a tela. */
