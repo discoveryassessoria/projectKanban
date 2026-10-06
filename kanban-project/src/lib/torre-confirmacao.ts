@@ -11,6 +11,12 @@ export interface PreviaDeConfirmacao {
   pergunta: string
   itens: Array<{ pessoa: string; quantidade: number; tarefas: string[] }>
   assinatura: string
+  /** Texto de ALERTA (ex.: "2 tarefas já iniciadas — o andamento é preservado"). */
+  alerta?: string
+  /** `true` = há tarefa já iniciada: o modal exige uma 2ª confirmação (checkbox) e o cliente reenvia `confirmarAndamento: true`. */
+  exigeConfirmacaoDeAndamento?: boolean
+  /** `true` = o modal oferece um motivo OPCIONAL (reenviado como `motivo`). */
+  pedeMotivo?: boolean
 }
 
 export const CODIGO_CONFIRMACAO = 'CONFIRMACAO_OBRIGATORIA'

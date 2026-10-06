@@ -25,7 +25,8 @@ const ok = (nome: string, cond: boolean, extra = "") => {
 const secao = (t: string) => console.log(`\n${t}`)
 const MARCA = "TORREC23"
 const ler = (p: string) => readFileSync(join(process.cwd(), p), "utf8")
-const TEXTO_NOVO = "devolvida à equipe (sem responsável)"
+// 06/10/2026 ("Remover responsável"): a descrição gravada diz o que aconteceu com o responsável — "Responsável removido de … (X → ninguém) … Origem: manual".
+const TEXTO_NOVO = "→ ninguém"
 
 async function main() {
   secao("TEXTO GRAVADO PELA PORTA (banco): devolverAFila e redistribuição em lote")
@@ -38,7 +39,7 @@ async function main() {
     ok("devolverAFila deu certo", r.ok === true, JSON.stringify(r))
     const log = await prisma.logAuditoria.findFirst({ where: { acao: "TAREFA_DEVOLVIDA_A_FILA", entidadeId: o1.tarefaId } })
     ok("o CÓDIGO da ação não mudou (TAREFA_DEVOLVIDA_A_FILA)", log != null)
-    ok(`a descrição gravada contém '${TEXTO_NOVO}'`, (log?.descricao ?? "").includes(TEXTO_NOVO), log?.descricao ?? "")
+    ok(`a descrição gravada diz 'Responsável removido … ${TEXTO_NOVO}' e a origem`, /Responsável removido de/.test(log?.descricao ?? "") && (log?.descricao ?? "").includes(TEXTO_NOVO) && /Origem: manual/.test(log?.descricao ?? ""), log?.descricao ?? "")
     ok("…e não traz mais 'fila da equipe' nem 'devolvida à fila'", !/fila da equipe|devolvida à fila/.test(log?.descricao ?? ""))
     const de = await devolverAFila({ tarefaId: o1.tarefaId, autorId: dono.id })
     ok("devolver quem já está sem responsável: mensagem sem 'fila'", de.ok === false && !/fila/.test(de.mensagem), JSON.stringify(de))

@@ -2,23 +2,29 @@
 // SUGESTÃO NUNCA ATRIBUI SOZINHA (06/10/2026). Toda ação da Torre que atribui a partir de uma SUGESTÃO passa por aqui: a 1ª chamada ao
 // servidor devolve a prévia (HTTP 428, nada gravado); o modal pergunta "Atribuir X a Y?" e só a confirmação explícita reenvia com
 // `confirmado: true` + a assinatura da prévia. "Cancelar" não grava nada. Ver `src/lib/torre-confirmacao.ts` (servidor).
-import { useCallback, useState, type ReactNode } from "react"
+import { useCallback, useRef, useState, type ReactNode } from "react"
 import { api, type RespostaApi } from "./torre-base"
 
-interface Previa { pergunta: string; itens: Array<{ pessoa: string; quantidade: number; tarefas: string[] }>; assinatura: string }
+interface Previa { pergunta: string; itens: Array<{ pessoa: string; quantidade: number; tarefas: string[] }>; assinatura: string; alerta?: string; exigeConfirmacaoDeAndamento?: boolean; pedeMotivo?: boolean }
 
 export function useConfirmarAtribuicao(): { postar: <T = Record<string, unknown>>(url: string, corpo?: Record<string, unknown>) => Promise<RespostaApi<T>>; modal: ReactNode } {
   const [pend, setPend] = useState<{ previa: Previa; resolver: (sim: boolean) => void } | null>(null)
+  const [andamentoOk, setAndamentoOk] = useState(false)
+  const [motivo, setMotivo] = useState('')
 
+  const motivoRef = useRef(''); const andamentoRef = useRef(false)
   const postar = useCallback(async <T,>(url: string, corpo: Record<string, unknown> = {}): Promise<RespostaApi<T>> => {
     const r1 = await api<T>(url, "POST", corpo)
     if (r1.status !== 428) return r1
     const previa = (r1.data as unknown as { confirmacao?: Previa }).confirmacao
     if (!previa) return r1
+    andamentoRef.current = false; motivoRef.current = ''
+    setAndamentoOk(false); setMotivo('')
     const sim = await new Promise<boolean>((resolver) => setPend({ previa, resolver }))
+    const m = motivoRef.current, a = andamentoRef.current
     setPend(null)
-    if (!sim) return { status: 0, ok: false, data: { mensagem: "Atribuição não confirmada — nada foi gravado." } as unknown as T }
-    return api<T>(url, "POST", { ...corpo, confirmado: true, assinatura: previa.assinatura })
+    if (!sim) return { status: 0, ok: false, data: { mensagem: "Ação não confirmada — nada foi gravado." } as unknown as T }
+    return api<T>(url, "POST", { ...corpo, confirmado: true, assinatura: previa.assinatura, ...(previa.pedeMotivo && m.trim() ? { motivo: m.trim() } : {}), ...(previa.exigeConfirmacaoDeAndamento ? { confirmarAndamento: a } : {}) })
   }, [])
 
   const modal = pend ? (
@@ -32,10 +38,17 @@ export function useConfirmarAtribuicao(): { postar: <T = Record<string, unknown>
             </li>
           ))}
         </ul>
-        <p className="text-xs opacity-70 mt-3">É uma sugestão do sistema. Só será gravada se você confirmar; fica no histórico como &quot;via sugestão (confirmada)&quot;.</p>
+        {pend.previa.alerta && <p className="text-xs mt-3 font-semibold" style={{ color: "var(--warning-text)" }}>{pend.previa.alerta}</p>}
+        {pend.previa.exigeConfirmacaoDeAndamento && (
+          <label className="flex items-start gap-2 text-xs mt-2"><input type="checkbox" checked={andamentoOk} onChange={(e) => { andamentoRef.current = e.target.checked; setAndamentoOk(e.target.checked) }} />Confirmo remover o responsável de tarefa já iniciada (o andamento é preservado).</label>
+        )}
+        {pend.previa.pedeMotivo && (
+          <textarea value={motivo} onChange={(e) => { motivoRef.current = e.target.value; setMotivo(e.target.value) }} rows={2} placeholder="Motivo (opcional)" className="w-full mt-3 rounded-lg p-2 text-sm bg-transparent border border-[var(--border-default)]" />
+        )}
+        {!pend.previa.pedeMotivo && <p className="text-xs opacity-70 mt-1">Só será gravada se você confirmar; fica no histórico como &quot;via sugestão (confirmada)&quot;.</p>}
         <div className="flex justify-end gap-2 mt-4">
           <button type="button" className="tor-btn" onClick={() => pend.resolver(false)}>Cancelar</button>
-          <button type="button" className="tor-btn pri" onClick={() => pend.resolver(true)}>Confirmar atribuição</button>
+          <button type="button" className="tor-btn pri" disabled={!!pend.previa.exigeConfirmacaoDeAndamento && !andamentoOk} onClick={() => pend.resolver(true)}>{pend.previa.pedeMotivo ? "Remover responsável" : "Confirmar atribuição"}</button>
         </div>
       </div>
     </div>

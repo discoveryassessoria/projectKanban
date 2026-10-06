@@ -16,12 +16,13 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { prioridadeValida } from '@/lib/operacional/torre-prioridade-lote'
 import { exigirTorre } from '@/src/lib/torre-acesso'
 import type { PermissaoChave } from '@/src/lib/permissoes'
+import { confirmacaoDoCorpo, pedirConfirmacao } from '@/src/lib/torre-confirmacao'
 import {
-  validarIds, atribuirEmLote, prioridadeAltaEmLote, prioridadeEmLote, repactuarEmLote, cobrarCartorioEmLote,
+  validarIds, atribuirEmLote, removerResponsavelEmLote, previaDeRemoverResponsavel, prioridadeAltaEmLote, prioridadeEmLote, repactuarEmLote, cobrarCartorioEmLote,
 } from '@/src/services/torre-acoes-lote'
 
 const PERMISSAO: Record<string, PermissaoChave> = {
-  ATRIBUIR: 'tarefas.editar', PRIORIDADE_ALTA: 'tarefas.editar', PRIORIDADE: 'tarefas.editar', REPACTUAR: 'tarefas.editar', COBRAR: 'tarefas.ver',
+  ATRIBUIR: 'tarefas.editar', REMOVER_RESPONSAVEL: 'tarefas.editar', PRIORIDADE_ALTA: 'tarefas.editar', PRIORIDADE: 'tarefas.editar', REPACTUAR: 'tarefas.editar', COBRAR: 'tarefas.ver',
 }
 
 export async function POST(request: NextRequest) {
@@ -43,6 +44,19 @@ export async function POST(request: NextRequest) {
         const responsavelId = Number(b?.responsavelId)
         if (!Number.isInteger(responsavelId) || responsavelId <= 0) return NextResponse.json({ error: 'responsavelId é obrigatório' }, { status: 400 })
         r = await atribuirEmLote({ tarefaIds: ids.ids, responsavelId, autorId: usuario.userId })
+        break
+      }
+      case 'REMOVER_RESPONSAVEL': {
+        // CONFIRMAÇÃO EXPLÍCITA com a lista (quem sai de quê): 1ª chamada devolve a prévia (428, nada gravado); a 2ª exige `confirmado` + a
+        // assinatura da prévia. Tarefa já iniciada pede a 2ª confirmação (`confirmarAndamento`); o andamento é preservado.
+        const previa = await previaDeRemoverResponsavel(ids.ids)
+        if (!previa) return NextResponse.json({ error: 'Nenhuma das tarefas selecionadas tem responsável para remover.' }, { status: 422 })
+        const { confirmado, assinatura } = confirmacaoDoCorpo(b)
+        if (!confirmado || assinatura == null) return pedirConfirmacao(previa)
+        if (assinatura !== previa.assinatura) return NextResponse.json({ error: 'As tarefas mudaram desde que você confirmou. Revise e confirme de novo.', code: 'SUGESTAO_MUDOU', confirmacao: previa }, { status: 409 })
+        if (previa.exigeConfirmacaoDeAndamento && b?.confirmarAndamento !== true) return NextResponse.json({ error: 'Há tarefa já iniciada: confirme também que o andamento será preservado.', code: 'CONFIRMACAO_DE_ANDAMENTO', confirmacao: previa }, { status: 428 })
+        const motivo = typeof b?.motivo === 'string' && b.motivo.trim() ? b.motivo.trim().slice(0, 300) : null
+        r = await removerResponsavelEmLote({ tarefaIds: ids.ids, autorId: usuario.userId, motivo, confirmarAndamento: b?.confirmarAndamento === true })
         break
       }
       case 'PRIORIDADE': {

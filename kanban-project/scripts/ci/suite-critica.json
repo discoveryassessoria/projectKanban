@@ -159,6 +159,7 @@
    "scripts/arvore-fonte-da-verdade-e-incluir-remover.test.ts",
     "scripts/localizar-registro-pessoa-tardia.test.ts",
     "scripts/regras-fixas-integridade.test.ts",
+    "scripts/remover-responsavel.test.ts",
    "scripts/localizar-registro-pessoa-tardia.test.ts",
    "scripts/regras-fixas-integridade.test.ts",
    "scripts/arvore-fonte-da-verdade-f-linha-reta.test.ts",
@@ -236,6 +237,7 @@
   ]
  },
  "arquivos": [
+    "scripts/remover-responsavel.test.ts",
     "scripts/localizar-registro-pessoa-tardia.test.ts",
     "scripts/regras-fixas-integridade.test.ts",
     "scripts/anexos-privados.test.ts",

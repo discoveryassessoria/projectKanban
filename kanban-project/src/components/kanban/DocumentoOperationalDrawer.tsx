@@ -532,6 +532,40 @@ function ConteudoDrawer({
   // auditoria, notificação e trava otimista. Este componente não decide nada
   // sobre atribuição: só chama.
   // ────────────────────────────────────────────────────────────────────────────
+  // REMOVER RESPONSÁVEL: 1ª chamada devolve a prévia (428, nada gravado) → confirmação com a lista (+ 2ª confirmação se já iniciada, + motivo opcional) → 2ª chamada grava.
+  const [removerPrevia, setRemoverPrevia] = useState<{ pergunta: string; alerta?: string; exigeConfirmacaoDeAndamento?: boolean; assinatura: string } | null>(null)
+  const [removerMotivo, setRemoverMotivo] = useState("")
+  const [removerAndamentoOk, setRemoverAndamentoOk] = useState(false)
+  const chamarRemocao = async (corpo: Record<string, unknown>) => {
+    const taskId = projection?.tarefa?.taskId
+    if (!taskId) return null
+    const r = await fetch(`/api/torre/tarefas/${taskId}/remover-responsavel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      body: JSON.stringify(corpo),
+    })
+    return { status: r.status, data: await r.json().catch(() => ({})) as Record<string, unknown> }
+  }
+  const removerResponsavel = async () => {
+    setSalvando(true)
+    try {
+      const r = await chamarRemocao({})
+      if (r?.status === 428 && r.data.confirmacao) { setRemoverMotivo(""); setRemoverAndamentoOk(false); setRemoverPrevia(r.data.confirmacao as never) }
+      else if (r && !(r.status >= 200 && r.status < 300)) console.error("[DocumentoOperationalDrawer] remover responsável:", r.data.error ?? r.status)
+    } finally { setSalvando(false) }
+  }
+  const confirmarRemocao = async () => {
+    if (!removerPrevia) return
+    setSalvando(true)
+    try {
+      const r = await chamarRemocao({ confirmado: true, assinatura: removerPrevia.assinatura, ...(removerMotivo.trim() ? { motivo: removerMotivo.trim() } : {}), ...(removerPrevia.exigeConfirmacaoDeAndamento ? { confirmarAndamento: removerAndamentoOk } : {}) })
+      if (r && !(r.status >= 200 && r.status < 300)) console.error("[DocumentoOperationalDrawer] remover responsável:", r.data.error ?? r.status)
+      setRemoverPrevia(null)
+      await carregar()
+      onSave?.()
+    } finally { setSalvando(false) }
+  }
+
   const delegarTarefa = async (responsavelId: number) => {
     const taskId = projection?.tarefa?.taskId
     if (!taskId) return
@@ -791,7 +825,7 @@ function ConteudoDrawer({
                       onBlur={() => setDelegandoResp(false)}
                       className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)] disabled:opacity-50"
                     >
-                      <option value="" className="bg-[var(--surface-secondary)]">— selecione —</option>
+                      <option value="" disabled className="bg-[var(--surface-secondary)]">— selecione —</option>
                       {usuarios.map((u) => (
                         <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
                       ))}
@@ -812,6 +846,18 @@ function ConteudoDrawer({
                       Delegar
                     </button>
                   ) : null}
+                  {/* REMOVER RESPONSÁVEL (06/10/2026): só por este botão, com confirmação explícita — "— selecione —" nunca remove (ambíguo). */}
+                  {!delegandoResp && tarefa?.responsavelId != null && pode('tarefas.editar') && (
+                    <button
+                      onClick={() => void removerResponsavel()}
+                      disabled={salvando}
+                      title="Devolve a tarefa à fila de distribuição (fica no histórico)"
+                      className="self-start text-[var(--text-secondary)] text-[12px] hover:underline disabled:opacity-50"
+                      data-testid="remover-responsavel"
+                    >
+                      Remover responsável
+                    </button>
+                  )}
                 </div>
                 {/* PRAZO DA TAREFA — dimensão A (prazo oficial), nunca "SLA": rótulo
                     genérico demais e ambíguo com o que hoje é acompanhamento/regra
@@ -993,6 +1039,23 @@ function ConteudoDrawer({
                 onSave?.()
               }}
             />
+            {removerPrevia && (
+              <div className="fixed inset-0 z-[10030] flex items-center justify-center bg-[var(--overlay-modal)] p-4" data-testid="confirmar-remocao-responsavel" role="dialog" aria-modal="true">
+                <div className="bg-[var(--surface-popover)] text-white rounded-xl shadow-[var(--elev-3)] w-full max-w-md p-5">
+                  <h3 className="text-base font-bold">{removerPrevia.pergunta}</h3>
+                  {removerPrevia.alerta && <p className="text-xs mt-3 font-semibold" style={{ color: "var(--warning-text)" }}>{removerPrevia.alerta}</p>}
+                  {removerPrevia.exigeConfirmacaoDeAndamento && (
+                    <label className="flex items-start gap-2 text-xs mt-2"><input type="checkbox" checked={removerAndamentoOk} onChange={(e) => setRemoverAndamentoOk(e.target.checked)} />Confirmo remover o responsável de tarefa já iniciada (o andamento é preservado).</label>
+                  )}
+                  <textarea value={removerMotivo} onChange={(e) => setRemoverMotivo(e.target.value)} rows={2} placeholder="Motivo (opcional)" className="w-full mt-3 rounded-lg p-2 text-sm bg-transparent border border-[var(--border-default)]" />
+                  <p className="text-xs opacity-70 mt-2">Fica no histórico (origem manual); a pessoa que perdeu a tarefa é avisada.</p>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <button type="button" className="px-3 py-2 text-sm rounded-lg border" onClick={() => setRemoverPrevia(null)}>Cancelar</button>
+                    <button type="button" disabled={salvando || (!!removerPrevia.exigeConfirmacaoDeAndamento && !removerAndamentoOk)} className="px-3 py-2 text-sm rounded-lg bg-[var(--accent-primary)] text-white disabled:opacity-50" onClick={() => void confirmarRemocao()}>Remover responsável</button>
+                  </div>
+                </div>
+              </div>
+            )}
             {repactuandoPrazo && (
               <RepactuarPrazoModal
                 prazoAtualIso={tarefa?.dataPrazo ?? null}
