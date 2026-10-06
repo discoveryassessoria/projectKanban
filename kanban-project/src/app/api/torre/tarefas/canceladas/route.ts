@@ -10,6 +10,7 @@
 // status CANCELADA), mais — por linha — quem cancelou, quando e por quê, lidos do LogAuditoria `TAREFA_CANCELADA` da própria
 // tarefa (a auditoria da porta canônica de cancelamento e do reconciliador da árvore). Em lote: 2 consultas, sem N+1.
 // ============================================================================
+import { apresentarCodigos } from '@/lib/operacional/motivos-legiveis'
 import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { exigirTorre } from '@/src/lib/torre-acesso'
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
       quando: log?.criadoEm.toISOString() ?? null,
       quandoRotulo: log ? rotuloDoMomento(log.criadoEm.toISOString(), agora).replace(', ', ' ') : null,
       porNome: log?.usuarioId != null ? nomes.get(log.usuarioId) ?? null : null,
-      motivo: motivo ? motivo.replace(/^necessidade removida pela árvore:\s*/i, 'Documento não necessário — ') : null,
+      motivo: motivo ? apresentarCodigos(motivo.replace(/^necessidade removida pela árvore:\s*/i, 'Documento não necessário — ')) : null,
     }
     return { ...l, encerramento }
   })

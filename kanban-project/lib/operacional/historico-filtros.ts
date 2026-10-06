@@ -152,7 +152,7 @@ export interface VisaoDoHistorico {
 }
 
 /** O que cada automático é, em poucas palavras — para o aviso "N fatos automáticos ocultos (…)". */
-const ROTULO_AUTOMATICO: Partial<Record<SubtipoDeFato, string>> = {
+export const ROTULO_AUTOMATICO: Partial<Record<SubtipoDeFato, string>> = {
   linhagem: 'recálculo da linhagem', conferencia: 'conferência da árvore', preparo_fase: 'preparo da fase', tarefa_criada: 'criação de tarefas',
   exigencia_criada: 'exigências da árvore', exigencia_removida: 'exigências da árvore', exigencia_reativada: 'exigências da árvore', nao_exigida: 'exigências da árvore',
   exigencia_sem_causa: 'exigências da árvore', espera_terceiro: 'espera do cartório', localizada: 'registros localizados', cancelada: 'cancelamentos do sistema',

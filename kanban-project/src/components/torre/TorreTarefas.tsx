@@ -6,6 +6,7 @@
 // A MESMA projeção da Operação (/api/torre/tarefas). Nenhuma regra nova: cada botão chama a porta que já existe (tarefa-comandos,
 // tarefa-ciclo, cobranca-terceiros, iniciar-envio, vincular-orgao-lote, atribuir). Toda regra de tela mora em
 // lib/operacional/torre-tarefas-tela.ts e torre-filtros.ts (puras, testadas). Nada de dado de exemplo.
+import { motivoLegivel, porQuem } from "@/lib/operacional/motivos-legiveis"
 import { PRIORIDADES_DO_LOTE, PRIORIDADE_NORMAL, prioridadeValida, textoDoLotePrioridade, type PrioridadeDoModelo } from "@/lib/operacional/torre-prioridade-lote"
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -280,7 +281,7 @@ export function TorreTarefas({ linhas, carregando, erro, kpi, busca, paisChave, 
   }
   const verMotivo = (l: LinhaDaTela) => {
     const e = l.encerramento
-    avisar(`Cancelada${e?.quandoRotulo ? ` em ${e.quandoRotulo}` : ""} por ${e?.porNome ?? "Sistema"}${e?.motivo ? ` · ${e.motivo}` : ""}`)
+    avisar(`Cancelada${e?.quandoRotulo ? ` em ${e.quandoRotulo}` : ""} ${porQuem(e?.porNome)}${e?.motivo ? ` · ${motivoLegivel(e.motivo)}` : ""}`)
   }
   const executar = (acao: AcaoDaLinha, l: LinhaDaTela) => {
     switch (acao) {

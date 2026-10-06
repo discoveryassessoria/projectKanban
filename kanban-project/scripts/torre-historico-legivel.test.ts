@@ -45,7 +45,7 @@ async function main() {
   ok("equipe_documental → 'Equipe documental'", T("(estava na fila da equipe_documental)") === "(estava na fila da Equipe documental)" && rotuloDeEquipe("equipe_documental") === "Equipe documental")
   ok("'SLA 5d' → 'prazo de 5 dias' e 'SLA 1d' → 'prazo de 1 dia'", T("Prazo 2026-10-06 (SLA 5d).") === "Prazo 06/10/2026 (prazo de 5 dias)." && T("(SLA 1d)") === "(prazo de 1 dia)")
   ok("'Sem SLA declarado — sem prazo' → 'Sem prazo declarado'", T("Sem SLA declarado — sem prazo.") === "Sem prazo declarado — sem prazo.")
-  ok("'passou a aguardar terceiro' → 'terceiros' (status oficial)", T("passou a aguardar terceiro (estava NAO_INICIADA)") === "passou a aguardar terceiros (estava NAO_INICIADA)")
+  ok("'passou a aguardar terceiro' → 'terceiros' (status oficial)", T("passou a aguardar terceiro (estava NAO_INICIADA)") === "passou a aguardar terceiros (estava a iniciar)")
   ok("idempotente e sem efeito em texto limpo", T(T("atribuída ao usuário 7 (SLA 5d)")) === T("atribuída ao usuário 7 (SLA 5d)") && T("Marco Rovatti abriu o processo") === "Marco Rovatti abriu o processo")
   ok("idsDeUsuarioNoTexto coleta todos (inclusive o 2º de 'do usuário 8 para 2')", JSON.stringify(idsDeUsuarioNoTexto("do usuário 8 para 2 e ao usuário 7").sort()) === "[2,7,8]")
 

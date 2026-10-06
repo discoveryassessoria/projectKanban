@@ -22,14 +22,14 @@ import { labelDaFasePorPhaseKey, phaseKeyToFaseCode, rotuloDoPasso } from '@/src
 import { TIPO_DOCUMENTO_LABELS } from '@/src/lib/process-stage/estrutura-operacional'
 import { idsDeUsuarioNoTexto } from '@/lib/operacional/historico-apresentacao'
 import {
-  montarFatos, type ContextoDoHistorico, type FatoDoHistorico, type LinhaCrua,
+  montarFatos, type ContextoDoHistorico, type FatoDoHistorico, type LinhaCrua, type ModoDeAgrupamento,
 } from '@/lib/operacional/historico-processo'
 
 /** Teto de linhas por fonte — o serviço diz quando cortou (`truncado`), nunca corta em silêncio. */
 export const LIMITE_POR_FONTE = 5000
 
 export interface HistoricoDoProcesso {
-  processo: { id: number; nome: string; codigo: string | null; pais: string | null; familiaId: number | null; faseAtual: string | null }
+  processo: { id: number; nome: string; codigo: string | null; pais: string | null; familiaId: number | null; familiaNome: string | null; faseAtual: string | null }
   geradoEm: string
   fatos: FatoDoHistorico[]
   descartados: Record<string, number>
@@ -45,12 +45,12 @@ const numOf = (v: unknown): number | null => (typeof v === 'number' && Number.is
 /** Tipos de WorkflowEvento que carregam FATO (o resto é mecânica interna e nem é lido). */
 const WORKFLOW_COM_FATO = ['FASE_AVANCADA', 'FASE_AVANCADA_FORCADO', 'FASE_RETORNADA', 'FASE_MOVIDA', 'FASE_REABERTA', 'TAREFA_BLOQUEADA'] as const
 
-export async function historicoDoProcesso(processoId: number, opcoes: { agora?: Date; /** cliente instrumentado (teste de contagem de consultas) */ db?: PrismaClient } = {}): Promise<HistoricoDoProcesso | null> {
+export async function historicoDoProcesso(processoId: number, opcoes: { agora?: Date; /** cliente instrumentado (teste de contagem de consultas) */ db?: PrismaClient; /** `minuto` = linha do tempo da Torre (lote por identificador, ou usuário + ação + mesmo minuto); padrão: sequência (aba Histórico) */ agrupar?: ModoDeAgrupamento } = {}): Promise<HistoricoDoProcesso | null> {
   const agora = opcoes.agora ?? new Date()
   const db = opcoes.db ?? prisma
   const proc = await db.processo.findUnique({
     where: { id: processoId },
-    select: { id: true, nome: true, codigo: true, faseAtualKey: true, familiaId: true, arvoreId: true, paisCanonico: { select: { countryLabel: true } } },
+    select: { id: true, nome: true, codigo: true, faseAtualKey: true, familiaId: true, arvoreId: true, paisCanonico: { select: { countryLabel: true } }, familia: { select: { nome: true } } },
   })
   if (!proc) return null
 
@@ -178,9 +178,9 @@ export async function historicoDoProcesso(processoId: number, opcoes: { agora?: 
     ...historicoTarefa.map((h): LinhaCrua => ({ fonte: 'TAREFA_HIST', id: h.id, tarefaId: h.tarefaId, acao: h.acao, descricao: h.descricao, dados: asJ(h.dados), usuarioId: h.usuarioId, criadoEm: iso(h.createdAt) })),
   ]
 
-  const r = montarFatos(linhas, ctx)
+  const r = montarFatos(linhas, ctx, { agrupar: opcoes.agrupar })
   return {
-    processo: { id: proc.id, nome: proc.nome, codigo: proc.codigo, pais: ctx.processo.pais, familiaId: proc.familiaId, faseAtual: ctx.rotuloDaFase(proc.faseAtualKey) },
+    processo: { id: proc.id, nome: proc.nome, codigo: proc.codigo, pais: ctx.processo.pais, familiaId: proc.familiaId, familiaNome: proc.familia?.nome ?? null, faseAtual: ctx.rotuloDaFase(proc.faseAtualKey) },
     geradoEm: agora.toISOString(), fatos: r.fatos, descartados: r.descartados, naoClassificados: r.naoClassificados, truncado,
   }
 }

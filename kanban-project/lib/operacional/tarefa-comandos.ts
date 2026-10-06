@@ -165,7 +165,7 @@ export async function atribuirTarefa(args: {
         ? `Tarefa "${t.titulo}" transferida do usuário ${anterior} para ${args.responsavelId}.` +
           (args.motivo ? ` Motivo: ${args.motivo}` : '')
         : `Tarefa "${t.titulo}" atribuída ao usuário ${args.responsavelId} (estava na fila${t.equipeKey ? ` da ${t.equipeKey}` : ''}).`,
-      { tarefaId: t.id, de: anterior, para: args.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null },
+      { tarefaId: t.id, de: anterior, para: args.responsavelId, equipeKey: t.equipeKey, motivo: args.motivo ?? null, ...(args.loteId ? { loteId: args.loteId } : {}) },
     )
 
 

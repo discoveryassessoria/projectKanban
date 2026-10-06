@@ -18,7 +18,7 @@ const TOM_PRAZO = { critico: "tpr-c-verm", atencao: "tpr-c-amb", ritmo: "", } as
 const descricaoDaIgual = (l: LinhaDaTabela): string =>
   [l.passo ? `${l.passo.rotulo}${l.passo.total ? ` · ${l.passo.ordem}/${l.passo.total}` : ""}` : null, l.statusRotulo, l.responsavelNome ?? "sem responsável", l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : null].filter(Boolean).join(" · ")
 
-export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, onAtribuirVarias, onMotivo, onReabrir, onVerHistorico }: {
+export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, ocupado, onAtribuir, onAtribuirVarias, onMotivo, onReabrir, onVerHistorico, onHistorico }: {
   d: DetalheDoProcesso; agora: Date; podeAtribuir: boolean; ocupado: boolean
   /** O filtro de status vive na página: o bloco "Cancelada / não exigida" e este select mexem no MESMO estado. */
   status: FiltroDeStatusDaTabela; onStatus: (s: FiltroDeStatusDaTabela) => void
@@ -27,6 +27,8 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
   onMotivo: (l: LinhaDaTabela) => void
   onReabrir: (l: LinhaDaTabela) => void
   onVerHistorico: () => void
+  /** "Histórico" da certidão: abre o Histórico completo já filtrado nela (só leitura). */
+  onHistorico: (l: LinhaDaTabela) => void
 }) {
   const [pessoaId, setPessoaId] = useState<number | null>(null)
   const [ordem, setOrdem] = useState<OrdemDaTabela>("arvore")
@@ -67,7 +69,8 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
           {aberta ? (l.dataPrazo ? diaMesDoPrazo(l.dataPrazo) : "sem prazo") : l.concluidaEm ? `concl. ${rotuloDia(l.concluidaEm, agora)}` : "—"}
         </div>
         <div className="tpr-c-mut">{l.bola ?? "—"}</div>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button type="button" className="tpr-linkbtn" onClick={() => onHistorico(l)} title="Abre o Histórico completo só com os fatos desta certidão">Histórico</button>
           {l.podeAtribuir && l.tarefaId != null
             ? <button type="button" className="tpr-btn peq" disabled={ocupado || !podeAtribuir} onClick={() => onAtribuir(l.tarefaId!)}>Atribuir</button>
             : l.tarefaId != null
@@ -87,6 +90,7 @@ export function ProcessoCertidoes({ d, agora, status, onStatus, podeAtribuir, oc
       <div>—</div><div>—</div><div>—</div><div>—</div>
       <div style={{ display: "flex", gap: 8 }}>
         <button type="button" className="tpr-linkbtn" onClick={() => onMotivo(l)}>Motivo</button>
+        <button type="button" className="tpr-linkbtn" onClick={() => onHistorico(l)} title="Abre o Histórico completo só com os fatos desta certidão">Histórico</button>
         {l.reabrivel && <button type="button" className="tpr-linkbtn" disabled={ocupado || !podeAtribuir} onClick={() => onReabrir(l)}>Reabrir</button>}
       </div>
     </div>
