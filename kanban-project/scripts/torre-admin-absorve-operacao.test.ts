@@ -31,15 +31,15 @@ const MARCA = "TADMOP"
 
 async function main() {
   console.log("Links do ADMIN: /operacao → Torre")
-  ok("sem parâmetro → Minhas tarefas", destinoDaOperacaoParaAdmin("") === "/torre?aba=tarefas&visao=minhas")
-  ok("?aba=fila → Minhas tarefas", destinoDaOperacaoParaAdmin("aba=fila") === "/torre?aba=tarefas&visao=minhas")
-  ok("?aba=aguardando → Com o cartório", destinoDaOperacaoParaAdmin("aba=aguardando") === "/torre?aba=tarefas&visao=aguard")
-  ok("?aba=acompanhamento → Acompanhamentos vencidos", destinoDaOperacaoParaAdmin("aba=acompanhamento") === "/torre?aba=tarefas&visao=acompvenc")
-  ok("?aba=feito → Feito", destinoDaOperacaoParaAdmin("aba=feito") === "/torre?aba=tarefas&visao=feito")
-  ok("?aba=familias → Radar; ?aba=radar → Precisa de você", destinoDaOperacaoParaAdmin("aba=familias") === "/torre?aba=radar" && destinoDaOperacaoParaAdmin("aba=radar") === "/torre?aba=precisa")
+  ok("sem parâmetro → aba Minha operação", destinoDaOperacaoParaAdmin("") === "/torre?aba=minha")
+  ok("?aba=fila → Minha operação (A fazer)", destinoDaOperacaoParaAdmin("aba=fila") === "/torre?aba=minha")
+  ok("?aba=aguardando → Minha operação, aba Aguardando", destinoDaOperacaoParaAdmin("aba=aguardando") === "/torre?aba=minha&op=aguardando")
+  ok("?aba=acompanhamento → Minha operação, aba Acompanhamento", destinoDaOperacaoParaAdmin("aba=acompanhamento") === "/torre?aba=minha&op=acompanhamento")
+  ok("?aba=feito → Minha operação, aba Feito", destinoDaOperacaoParaAdmin("aba=feito") === "/torre?aba=minha&op=feito")
+  ok("?aba=familias e ?aba=radar → as abas internas de Minha operação", destinoDaOperacaoParaAdmin("aba=familias") === "/torre?aba=minha&op=familias" && destinoDaOperacaoParaAdmin("aba=radar") === "/torre?aba=minha&op=radar")
   ok("aviso de família (?processo=&aba=) → página do processo", destinoDaOperacaoParaAdmin("processo=651&aba=acompanhamento") === "/torre/processo/651")
   ok("?taskId= → drawer da tarefa", destinoDaOperacaoParaAdmin("taskId=3834") === "/torre?aba=tarefas&tarefa=3834")
-  ok("parâmetro não numérico é ignorado (nada de injeção na URL)", destinoDaOperacaoParaAdmin("processo=1%26aba%3Dx&taskId=abc") === "/torre?aba=tarefas&visao=minhas")
+  ok("parâmetro não numérico é ignorado (nada de injeção na URL)", destinoDaOperacaoParaAdmin("processo=1%26aba%3Dx&taskId=abc") === "/torre?aba=minha")
 
   console.log("\nAvisos JÁ GRAVADOS (as formas reais geradas pelo sistema)")
   const admin = (l: string) => linkDoAvisoParaAdmin(l, "admin")
@@ -74,7 +74,7 @@ async function main() {
 
   console.log("\nPáginas e Torre")
   const pg = readFileSync("src/app/operacao/page.tsx", "utf8")
-  ok("/operacao continua existindo e só redireciona quem é admin", existsSync("src/app/operacao/page.tsx") && /user\.tipo === "admin" \? destinoDaOperacaoParaAdmin\(parametros\) : null/.test(pg) && /router\.replace\(paraTorre\)/.test(pg))
+  ok("/operacao continua existindo e só redireciona quem tem acesso à Torre (admin ou operacao.distribuirTarefas)", existsSync("src/app/operacao/page.tsx") && /temAcessoATorre\(user\.tipo, pode\) \? destinoDaOperacaoParaAdmin\(parametros\) : null/.test(pg) && /router\.replace\(paraTorre\)/.test(pg))
   ok("a tela da Operação (OperacaoV3) continua montada para o não-admin", pg.includes("<OperacaoV3 gestor="))
   const sino = readFileSync("src/components/sino-notificacoes.tsx", "utf8")
   ok("o clique do sino traduz o link só para admin", /linkDoAvisoParaAdmin\(a\.link, usuarioSalvo\?\.tipo\)/.test(sino))

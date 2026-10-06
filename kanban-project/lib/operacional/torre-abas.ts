@@ -2,22 +2,22 @@
 // ============================================================================
 // AS ABAS DA TORRE — Torre nova, Etapa A (01/10/2026). PURO: a tela (`Torre.tsx`) e o teste leem a MESMA lista.
 //
-// Sete abas, na ORDEM EXATA do protótipo:
-//   Visão geral · Precisa de você · Radar · Processos · Tarefas · Equipe · Terceiros
+// Oito abas (as sete do protótipo + "Minha operação", 06/10/2026, logo depois de Tarefas):
+//   Visão geral · Precisa de você · Radar · Processos · Tarefas · Minha operação · Equipe · Terceiros
 // O Processo (detalhe) NÃO é aba: é a página `/torre/processo/[id]`.
 //
-// CONTRATO DE URL — `?aba=` com ids ESTÁVEIS: visao · precisa · radar · processos · tarefas · equipe · terceiros.
+// CONTRATO DE URL — `?aba=` com ids ESTÁVEIS: visao · precisa · radar · processos · tarefas · minha · equipe · terceiros.
 // Sem `?aba=` (ou valor desconhecido) a Torre abre na Visão geral. Os valores ANTIGOS (precisa, radar, tarefas, equipe,
 // processos, terceiros) continuam todos válidos — links antigos (sino, avisos gravados, favoritos) seguem funcionando.
 // `?aba=regras|integridade|auditoria` não é aba da Torre: redireciona para o Gerenciamento (`destinoDaAbaAntigaDaTorre`).
 // ============================================================================
 
-export type Aba = 'visao' | 'precisa' | 'radar' | 'processos' | 'tarefas' | 'equipe' | 'terceiros'
+export type Aba = 'visao' | 'precisa' | 'radar' | 'processos' | 'tarefas' | 'minha' | 'equipe' | 'terceiros'
 
 /** As abas, na ordem, com o rótulo oficial. */
 export const ABAS_DA_TORRE: Array<[Aba, string]> = [
   ['visao', 'Visão geral'], ['precisa', 'Precisa de você'], ['radar', 'Radar'], ['processos', 'Processos'],
-  ['tarefas', 'Tarefas'], ['equipe', 'Equipe'], ['terceiros', 'Terceiros'],
+  ['tarefas', 'Tarefas'], ['minha', 'Minha operação'], ['equipe', 'Equipe'], ['terceiros', 'Terceiros'],
 ]
 
 /** A aba em que a Torre abre quando a URL não pede outra. */

@@ -97,23 +97,25 @@ function useNovasDaFamilia(processoId: number | null): Set<number> {
 
 /** `gestor`: administrador ou quem tem `operacao.distribuirTarefas` (`ehGestorDaOperacao`) — decidido na página, que já lê as
  *  permissões. Só ele vê o cartão "Escaladas ao gestor" no Radar (e só ele o soma no número da aba). */
-export function OperacaoV3({ gestor = false }: { gestor?: boolean }) {
+export function OperacaoV3({ gestor = false, naTorre = false, abaInicial = null }: { gestor?: boolean; naTorre?: boolean; abaInicial?: string | null }) {
   const usuario = useJsonLocalStorage<{ nome?: string }>("user")
   const router = useRouter()
   const dados = useOperacaoV3Dados()
 
   const params = useSearchParams()
-  const [tab, setTab] = useState<Tab>(() => abaDaUrl(params.get("aba")) ?? "fila")
+  // `naTorre` (aba "Minha operação" da Torre, 06/10/2026): é ESTE mesmo componente. Lá `?aba=` e `?processo=` são da TORRE — a aba inicial vem de `abaInicial`
+  // (`?op=`) e o filtro de família não se aplica. Os dados são sempre os do usuário do token (`minha_fila`).
+  const [tab, setTab] = useState<Tab>(() => (naTorre ? abaDaUrl(abaInicial) : abaDaUrl(params.get("aba"))) ?? "fila")
   // A FAMÍLIA vinda do sino (`?processo=`) é lida DIRETO da URL (a URL é a fonte): filtra a
   // tela inteira até a pessoa tirar o chip (que limpa a query).
-  const processoFiltro = processoDaUrl(params.get("processo"))
+  const processoFiltro = naTorre ? null : processoDaUrl(params.get("processo"))
   // O sino navega para a MESMA rota trocando só a query — a tela não remonta, então a aba
   // da URL nova entra no estado aqui (ajuste durante a renderização, sem efeito).
   const paramsChave = params.toString()
   const [paramsAplicados, setParamsAplicados] = useState(paramsChave)
   if (paramsAplicados !== paramsChave) {
     setParamsAplicados(paramsChave)
-    const aba = abaDaUrl(params.get("aba"))
+    const aba = naTorre ? null : abaDaUrl(params.get("aba"))
     if (aba) setTab(aba)
   }
   const novasIds = useNovasDaFamilia(processoFiltro)
@@ -324,7 +326,7 @@ export function OperacaoV3({ gestor = false }: { gestor?: boolean }) {
       {/* ===== HEADER: título + KPIs + sino ===== */}
       <header style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 24px 0", background: "#fff", borderBottom: "1px solid #dfe4ee" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingBottom: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0b1f4b" }}>Operação</h1>
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: "#0b1f4b" }}>{naTorre ? "Minha operação" : "Operação"}</h1>
           <div style={{ fontSize: 12, color: "#5b6478" }}>{hoje} · {usuario?.nome ?? "—"} · equipe documental</div>
         </div>
         <div style={{ flexGrow: 1 }} />
