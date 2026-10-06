@@ -12,6 +12,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useStore,
   ReactFlowProvider,
   Handle,
   Position,
@@ -1335,6 +1336,31 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   const automaticoRef = useRef<Map<string, { x: number; y: number }>>(new Map())
   // Quais cartões têm ajuste manual (só os arrastados, só nesta disposição) — marcados na tela.
   const [ajustados, setAjustados] = useState<Set<string>>(new Set())
+  // O aviso dos ajustes manuais fica SEMPRE logo abaixo do cartão do requerente (canto superior esquerdo, que muda de altura e largura entre
+  // resumo aberto e fechado): mede o cartão e acompanha qualquer mudança de tamanho da janela. Sem o cartão, fica no canto.
+  const domDoCanvas = useStore((s) => s.domNode)
+  const [topoDoAviso, setTopoDoAviso] = useState(12)
+  useEffect(() => {
+    const canvas = domDoCanvas
+    const pai = canvas?.parentElement
+    if (!canvas || !pai || ajustados.size === 0) return
+    const medir = () => {
+      const cartao = pai.querySelector<HTMLElement>("[data-cartao-requerente]")
+      const filho = cartao?.firstElementChild as HTMLElement | null
+      const alvo = filho ?? cartao
+      if (!alvo) { setTopoDoAviso(12); return }
+      const baixo = alvo.getBoundingClientRect().bottom - canvas.getBoundingClientRect().top
+      setTopoDoAviso(Math.max(12, Math.round(baixo + 8)))
+    }
+    medir()
+    const ro = new ResizeObserver(medir)
+    ro.observe(canvas)
+    const mo = new MutationObserver(() => { medir(); pai.querySelectorAll("[data-cartao-requerente]").forEach((el) => ro.observe(el)) })
+    mo.observe(pai, { childList: true, subtree: true, attributes: true })
+    pai.querySelectorAll("[data-cartao-requerente]").forEach((el) => ro.observe(el))
+    window.addEventListener("resize", medir)
+    return () => { ro.disconnect(); mo.disconnect(); window.removeEventListener("resize", medir) }
+  }, [domDoCanvas, ajustados.size])
   const posicoesNoInicioDoArrasteRef = useRef<Map<string, { x: number; y: number }>>(new Map())
 
   const onPersonClickRef = useRef(onPersonClick)
@@ -1585,7 +1611,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       <Background color="#e0e0e0" gap={20} />
       
       {ajustados.size > 0 && (
-        <Panel position="top-left">
+        <Panel position="top-left" style={{ top: topoDoAviso, left: 12, margin: 0, maxWidth: "calc(100% - 24px)" }}>
           <div
             data-testid="aviso-ajustes-manuais"
             className="flex items-center gap-2 rounded border bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-gray-700 shadow-[var(--elev-1)]"

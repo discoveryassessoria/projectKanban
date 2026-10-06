@@ -359,7 +359,7 @@ if (/class RollbackDaSimulacao/.test(simulador) && /throw new RollbackDaSimulaca
     "sem o throw, a transação COMMITA — o preview passaria a gravar de verdade",
   )
 }
-if (/materializarGenealogia\(entrada\.processoId,\s*tx\)/.test(simulador)) {
+if (/materializarGenealogia\(entrada\.processoId,\s*tx\b/.test(simulador)) {
   ok("a simulação roda o materializador OFICIAL, com o tx")
 } else {
   falhar("a simulação deixou de usar o materializador oficial", "seria lógica documental duplicada")

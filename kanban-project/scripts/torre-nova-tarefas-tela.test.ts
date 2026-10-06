@@ -55,7 +55,7 @@ ok("status por ROTULO_STATUS_TAREFA (statusDaLinha), risco por riscoDe, prazo po
 ok("bola / iniciou / cobrar em vêm dos campos novos (bolaCom, bolaDesde, cobrarEm, iniciouEm)", /textoDaBola/.test(tab) && /textoDoCobrar\(l\.cobrarEm/.test(tab) && /textoDoIniciou/.test(tab) && /l\.bolaCom/.test(lib) && /l\.bolaDesde/.test(lib) && /iniciouEm/.test(lib))
 ok("cancelada: riscada (classe), no fim do grupo, sem seleção, só 'Ver motivo', e fora dos contadores", /cancelada/.test(tab) && /disabled aria-label="Certidão cancelada: só exibição"/.test(tab) && /Ver motivo/.test(lib) && /filter\(\(l\) => !ehCancelada\(l\)\)/.test(tab) && /canceladasVisiveis/.test(tt) && /nTrabalho = trabalhoVisivel\.length/.test(tt))
 ok("'Ver motivo' mostra quem, quando e por quê (toast) — dado real do cancelamento", /Cancelada\$\{e\?\.quandoRotulo \? ` em \$\{e\.quandoRotulo\}` : ""\} \$\{porQuem\(e\?\.porNome\)\}/.test(tt) && /TAREFA_CANCELADA/.test(ler("src/app/api/torre/tarefas/canceladas/route.ts")))
-ok("rodapé sem texto de exemplo; fala da cancelada riscada e da gaveta", !/Exemplo com/.test(tt) && tt.includes("A certidão cancelada continua visível, riscada, no fim do grupo. Clique no nome da certidão para abrir a gaveta."))
+ok("rodapé sem texto de exemplo; fala da cancelada riscada e da gaveta", !/Exemplo com/.test(tt) && tt.includes("A certidão cancelada ou não exigida fica escondida; o controle do grupo a mostra, riscada, na posição da regra de ordem. Clique no nome da certidão para abrir a gaveta."))
 ok("'Selecionar todas' funciona (sem botão morto)", /onTodas\(todasDaPagina/.test(tab))
 
 secao("Modais (T298–T304, T316–T320) e gaveta (T307–T315)")

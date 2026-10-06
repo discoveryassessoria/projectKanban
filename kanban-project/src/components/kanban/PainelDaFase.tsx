@@ -39,6 +39,7 @@
 
 "use client"
 
+import { textoDaLinha } from "@/src/lib/process-stage/central-operacional-core"
 import { useState, useRef, useEffect, useMemo } from "react"
 import { AlertTriangle, Ban, CheckCircle2, ChevronDown, ChevronRight, Clock, FileText, Layers, Search, Star, Users } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
@@ -867,8 +868,8 @@ function PessoaCard({
               </span>
             )}
             <span className="truncate">{p.requerente ? "Requerente" : `${p.posicao}${p.posicaoEm ? ` de ${p.posicaoEm}` : ""}`}</span>
-            {p.linhaDe.length > 0 && !p.requerente && (
-              <span className="text-[10px] text-[var(--text-muted)]" title="O caminho de filiação desta pessoa chega a estes requerentes">linha de {p.linhaDe.join(" e ")}</span>
+            {textoDaLinha(p) && (
+              <span className="text-[10px] text-[var(--text-muted)]" title="O caminho de filiação desta pessoa chega a estes requerentes">{textoDaLinha(p)}</span>
             )}
             <span className={`flex items-center gap-1 ${transmissao.cor}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${transmissao.dot}`} />

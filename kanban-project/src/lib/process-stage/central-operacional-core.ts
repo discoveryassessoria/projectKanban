@@ -66,6 +66,8 @@ export interface PessoaDoProcesso {
   geracaoNaArvore: number | null
   /** Nomes dos requerentes de cuja LINHA esta pessoa faz parte (ela está no caminho de filiação até eles). Vazio fora da linha. */
   linhaDe: string[]
+  /** A pessoa está na linha de TODOS os requerentes do processo (e há mais de um). */
+  linhaDeTodos: boolean
   /**
    * Nome do requerente em relação a quem `posicao` foi escrita — preenchido só quando o processo tem requerentes de RAMOS diferentes
    * ("tia-avó" + posicaoEm "Maria Carolina" = "tia-avó de Maria Carolina"). `null` = um só ramo: a posição é em relação ao requerente.
@@ -98,6 +100,18 @@ export interface UniaoBruta {
   id: number
   pessoa1Id: number | null
   pessoa2Id: number | null
+}
+
+/** "A" · "A e B" · "A, B e C": vírgulas e "e" só no último. */
+export function juntarNomes(nomes: readonly string[]): string {
+  if (nomes.length <= 1) return nomes[0] ?? ""
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`
+}
+
+/** O texto da linha da Central: "linha de todos os requerentes" ou "linha de José Roberto e Alessandra". `null` quando não há o que dizer. */
+export function textoDaLinha(p: Pick<PessoaDoProcesso, "linhaDe" | "linhaDeTodos" | "requerente">): string | null {
+  if (p.requerente || p.linhaDe.length === 0) return null
+  return p.linhaDeTodos ? "linha de todos os requerentes" : `linha de ${juntarNomes(p.linhaDe)}`
 }
 
 export function nomeCompletoPessoa(p: { nome: string; sobrenome?: string | null }): string {
@@ -182,7 +196,8 @@ export function montarPessoasDoProcesso(
     let posicao = "—"
     let posicaoEm: string | null = null
     // Os requerentes de cuja linha esta pessoa faz parte (ela é o requerente ou está acima dele).
-    const linhaDe = requerentes.filter((r) => r.id === p.id || ascendentesPorRequerente.get(r.id)!.has(p.id)).map(nomeCurtoDoRequerente)
+    const requerentesDaLinha = requerentes.filter((r) => r.id === p.id || ascendentesPorRequerente.get(r.id)!.has(p.id))
+    const linhaDe = requerentesDaLinha.map(nomeCurtoDoRequerente)
     const ascendenteDireto = linhaDe.length > 0
 
     if (ancora && p.id === ancora.id) {
@@ -191,7 +206,8 @@ export function montarPessoasDoProcesso(
     } else if (ancora) {
       // `posicao`/`geracao` (grau a partir do requerente) em relação ao requerente MAIS PRÓXIMO: o de menor distância de parentesco.
       let melhor: { par: NonNullable<ReturnType<typeof calcularParentesco>>; ref: PessoaBruta } | null = null
-      for (const r of requerentes) {
+      // Quem está na linha de algum requerente: o parentesco é dito em relação a ELES (mãe de Maria Carolina), não a quem só é parente por afinidade.
+      for (const r of requerentesDaLinha.length > 0 ? requerentesDaLinha : requerentes) {
         if (r.id === p.id) continue
         const par = calcularParentesco(grafo, r.id, p.id)
         if (!par) continue
@@ -207,6 +223,9 @@ export function montarPessoasDoProcesso(
       }
       if (eRequerente && posicao === "—") posicao = "Requerente"
     }
+
+    // Ascendente de VÁRIOS requerentes: não se escolhe um ao acaso para dizer o parentesco — mostra-se só a geração e a linha (`linhaDe`).
+    if (!eRequerente && linhaDe.length > 1) { posicao = "—"; posicaoEm = null }
 
     // CLASSIFICAÇÃO
     //  • Requerente e ascendentes (de QUALQUER requerente) declarados na linha reta → linha principal.
@@ -243,6 +262,7 @@ export function montarPessoasDoProcesso(
       geracao,
       geracaoNaArvore: geracoes.get(p.id) ?? null,
       linhaDe,
+      linhaDeTodos: requerentes.length > 1 && linhaDe.length === requerentes.length,
       posicaoEm,
       posicao,
       pendencia,
